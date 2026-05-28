@@ -13,6 +13,10 @@
     .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; background: #1e293b; }
     .low-confidence { border-left: 3px solid #f59e0b; }
     .placeholder { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 10px; text-align: center; padding: 2px; }
+    .pick-card { transition: transform 0.1s, background 0.1s; }
+    .pick-card:hover { transform: translateY(-2px); background: rgb(51 65 85); }
+    .pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: #1e293b; }
+    .pick-cover.placeholder { aspect-ratio: 2 / 3; font-size: 11px; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -22,6 +26,23 @@
       <p id="meta" class="text-slate-400 text-sm mt-1">Loading…</p>
       <div id="summary" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"></div>
     </header>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="bg-slate-800 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-amber-400 uppercase tracking-wide">Top Rated in Backlog</h2>
+          <span id="topRatedCount" class="text-xs text-slate-400"></span>
+        </div>
+        <div id="topRated" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2"></div>
+      </div>
+      <div class="bg-slate-800 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-sky-400 uppercase tracking-wide">Next Up</h2>
+          <span id="nextUpCount" class="text-xs text-slate-400"></span>
+        </div>
+        <div id="nextUp" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2"></div>
+      </div>
+    </section>
 
     <section class="bg-slate-800 rounded-lg p-4 mb-4 space-y-3">
       <div class="flex flex-wrap gap-2 items-center">
@@ -96,7 +117,8 @@
         return;
       }
       const name = img.dataset.name || '';
-      img.outerHTML = `<div class="cover placeholder" title="${name.replace(/"/g,'&quot;')}">${name.slice(0, 18)}</div>`;
+      const cls = img.classList.contains('pick-cover') ? 'pick-cover placeholder' : 'cover placeholder';
+      img.outerHTML = `<div class="${cls}" title="${name.replace(/"/g,'&quot;')}">${name.slice(0, 18)}</div>`;
     };
 
     const STORAGE_KEY = 'steam-backlog-personal';
@@ -127,6 +149,7 @@
       personal[appid][field] = value;
       savePersonal();
       renderSummary();
+      renderPicks();
     }
 
     function formatHours(minutes) {
@@ -189,6 +212,63 @@
         if (typeof va === 'string') return sortDir * va.localeCompare(vb);
         return sortDir * (va - vb);
       });
+    }
+
+    function pickCardHtml(g) {
+      const headerFallback = g.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${g.appid}/header.jpg`;
+      const cover = g.library_image || headerFallback;
+      const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : (g.metacritic_score != null ? `${g.metacritic_score}` : '—');
+      const hltb = g.hltb_main_hours != null ? `${g.hltb_main_hours}h` : '';
+      return `
+        <div class="pick-card bg-slate-700/50 rounded p-2 cursor-pointer" data-appid="${g.appid}" title="${escapeAttr(g.name)} · ${rating}${hltb ? ' · ' + hltb : ''}">
+          <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+          <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
+          <div class="text-xs text-slate-400 flex justify-between">
+            <span>${rating}</span>
+            <span>${hltb}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPicks() {
+      const backlog = allGames
+        .filter(g => getPersonal(g.appid).status === 'backlog' && g.steam_review_percent != null)
+        .sort((a, b) => b.steam_review_percent - a.steam_review_percent);
+      const next = allGames
+        .filter(g => getPersonal(g.appid).status === 'next')
+        .sort((a, b) => {
+          const pa = getPersonal(a.appid).priority;
+          const pb = getPersonal(b.appid).priority;
+          if (pb !== pa) return pb - pa;
+          return (b.steam_review_percent || 0) - (a.steam_review_percent || 0);
+        });
+
+      const topRated = backlog.slice(0, 12);
+      document.getElementById('topRated').innerHTML = topRated.length
+        ? topRated.map(pickCardHtml).join('')
+        : '<div class="col-span-full text-sm text-slate-400 italic">No backlog games with ratings yet.</div>';
+      document.getElementById('topRatedCount').textContent = `${topRated.length} of ${backlog.length}`;
+
+      document.getElementById('nextUp').innerHTML = next.length
+        ? next.slice(0, 12).map(pickCardHtml).join('')
+        : '<div class="col-span-full text-sm text-slate-400 italic">Set a game\'s status to "Next up" to pin it here.</div>';
+      document.getElementById('nextUpCount').textContent = `${next.length} total`;
+    }
+
+    function focusGame(appid) {
+      expandedAppid = appid;
+      document.getElementById('search').value = '';
+      document.getElementById('statusFilter').value = '';
+      document.getElementById('genreFilter').value = '';
+      document.getElementById('unplayedOnly').checked = false;
+      document.getElementById('minRating').value = 0;
+      document.getElementById('maxHours').value = 200;
+      document.getElementById('minRatingVal').textContent = '0';
+      document.getElementById('maxHoursVal').textContent = '200+';
+      renderTable();
+      const row = document.querySelector(`select[data-appid="${appid}"]`)?.closest('tr');
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function renderSummary() {
@@ -375,8 +455,14 @@
       personal = { ...personal, ...data };
       savePersonal();
       renderSummary();
+      renderPicks();
       renderTable();
       e.target.value = '';
+    });
+
+    document.addEventListener('click', e => {
+      const card = e.target.closest('.pick-card');
+      if (card) focusGame(+card.dataset.appid);
     });
 
     function applyGamesData(data) {
@@ -386,6 +472,7 @@
         `${data.game_count} games · fetched ${new Date(data.fetched_at).toLocaleString()}`;
       populateGenres();
       renderSummary();
+      renderPicks();
       renderTable();
     }
 

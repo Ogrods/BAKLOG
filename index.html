@@ -10,8 +10,9 @@
     th { cursor: pointer; user-select: none; }
     th:hover { background: rgb(51 65 85); }
     tr.expanded td { border-bottom: none; }
-    .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; }
+    .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; background: #1e293b; }
     .low-confidence { border-left: 3px solid #f59e0b; }
+    .placeholder { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 10px; text-align: center; padding: 2px; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -87,6 +88,17 @@
   </div>
 
   <script>
+    window.coverFallback = function (img) {
+      const fb = img.dataset.fallback;
+      if (fb && img.src !== fb) {
+        img.src = fb;
+        img.dataset.fallback = '';
+        return;
+      }
+      const name = img.dataset.name || '';
+      img.outerHTML = `<div class="cover placeholder" title="${name.replace(/"/g,'&quot;')}">${name.slice(0, 18)}</div>`;
+    };
+
     const STORAGE_KEY = 'steam-backlog-personal';
     let allGames = [];
     let personal = loadPersonal();
@@ -212,8 +224,9 @@
           ? `${g.hltb_main_hours}h` + (lowConf ? ' ⚠' : '')
           : '—';
 
+        const headerFallback = g.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${g.appid}/header.jpg`;
         tr.innerHTML = `
-          <td class="p-2"><img class="cover" src="${g.library_image || g.header_image}" alt="" loading="lazy" /></td>
+          <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /></td>
           <td class="p-2">
             <a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium">${escapeHtml(g.name)}</a>
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB: ${escapeHtml(g.hltb_name)}</div>` : ''}
@@ -260,7 +273,7 @@
             (g.tags || []).slice(0, 5).join(' · '),
           ].filter(Boolean).join(' · ');
           detail.innerHTML = `<td colspan="12" class="p-3 text-sm text-slate-300 border-t border-slate-700">
-            <img src="${g.header_image}" class="max-h-24 rounded float-right ml-4" alt="" />
+            <img src="${headerFallback}" data-fallback="" data-name="${escapeAttr(g.name)}" class="max-h-24 rounded float-right ml-4" alt="" onerror="window.coverFallback(this)" />
             ${extra || 'No extra details.'}
             <a href="${g.store_url}" class="text-sky-400 ml-2" target="_blank">Store →</a>
           </td>`;

@@ -55,6 +55,10 @@ def _build_game_row(
             "hltb_name": None,
             "store_url": f"https://store.steampowered.com/app/{appid}",
             "type": "unknown",
+            "price": None,
+            "price_initial": None,
+            "discount_percent": None,
+            "currency": None,
         }
 
     if details.get("type") != "game":
@@ -64,6 +68,8 @@ def _build_game_row(
     tags = []
     if details.get("categories"):
         tags = [c["description"] for c in details["categories"][:8]]
+
+    price = details.get("price_overview") or {}
 
     row = {
         "appid": appid,
@@ -87,6 +93,10 @@ def _build_game_row(
         "hltb_name": None,
         "store_url": f"https://store.steampowered.com/app/{appid}",
         "type": details.get("type", "game"),
+        "price": price.get("final_formatted"),
+        "price_initial": price.get("initial_formatted"),
+        "discount_percent": price.get("discount_percent"),
+        "currency": price.get("currency"),
     }
 
     if hltb:

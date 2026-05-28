@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Steam Backlog</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+    th { cursor: pointer; user-select: none; }
+    th:hover { background: rgb(51 65 85); }
+    tr.expanded td { border-bottom: none; }
+    .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; }
+    .low-confidence { border-left: 3px solid #f59e0b; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <div class="max-w-[1600px] mx-auto p-4 md:p-6">
+    <header class="mb-6">
+      <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Steam Backlog</h1>
+      <p id="meta" class="text-slate-400 text-sm mt-1">Loading…</p>
+      <div id="summary" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"></div>
+    </header>
+
+    <section class="bg-slate-800 rounded-lg p-4 mb-4 space-y-3">
+      <div class="flex flex-wrap gap-2 items-center">
+        <input id="search" type="search" placeholder="Search games…"
+          class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
+        <select id="statusFilter" class="bg-slate-700 border border-slate-600 rounded px-3 py-2">
+          <option value="">All statuses</option>
+          <option value="backlog">Backlog</option>
+          <option value="next">Next up</option>
+          <option value="playing">Playing</option>
+          <option value="finished">Finished</option>
+          <option value="skip">Skip</option>
+        </select>
+        <select id="genreFilter" class="bg-slate-700 border border-slate-600 rounded px-3 py-2 min-w-[140px]">
+          <option value="">All genres</option>
+        </select>
+        <label class="flex items-center gap-2 text-sm">
+          <input id="unplayedOnly" type="checkbox" class="rounded" />
+          Unplayed only
+        </label>
+      </div>
+      <div class="flex flex-wrap gap-4 items-center text-sm">
+        <label>Min rating % <input id="minRating" type="range" min="0" max="100" value="0" class="align-middle w-24" />
+          <span id="minRatingVal">0</span></label>
+        <label>Max length (h) <input id="maxHours" type="range" min="0" max="200" value="200" class="align-middle w-24" />
+          <span id="maxHoursVal">200+</span></label>
+        <div class="ml-auto flex gap-2">
+          <label class="bg-sky-700 hover:bg-sky-600 px-3 py-1.5 rounded text-sm cursor-pointer">
+            Load games.json
+            <input id="loadGamesFile" type="file" accept=".json" class="hidden" />
+          </label>
+          <button id="exportCsv" class="bg-slate-600 hover:bg-slate-500 px-3 py-1.5 rounded text-sm">Export CSV</button>
+          <button id="exportNotes" class="bg-slate-600 hover:bg-slate-500 px-3 py-1.5 rounded text-sm">Export notes</button>
+          <label class="bg-slate-600 hover:bg-slate-500 px-3 py-1.5 rounded text-sm cursor-pointer">
+            Import notes
+            <input id="importNotes" type="file" accept=".json" class="hidden" />
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <div class="overflow-x-auto rounded-lg border border-slate-700">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800 text-slate-300">
+          <tr>
+            <th class="p-2 w-12"></th>
+            <th data-sort="name" class="p-2 text-left">Game</th>
+            <th data-sort="status" class="p-2 text-left">Status</th>
+            <th data-sort="priority" class="p-2 text-center">Pri</th>
+            <th data-sort="playtime_minutes" class="p-2 text-right">Played</th>
+            <th data-sort="hltb_main_hours" class="p-2 text-right">HLTB</th>
+            <th data-sort="steam_review_percent" class="p-2 text-right">Steam %</th>
+            <th data-sort="metacritic_score" class="p-2 text-right">Meta</th>
+            <th data-sort="release_date" class="p-2 text-left">Released</th>
+            <th data-sort="last_played" class="p-2 text-left">Last played</th>
+            <th class="p-2 text-left">Genres</th>
+            <th class="p-2 text-left">Notes</th>
+          </tr>
+        </thead>
+        <tbody id="tbody" class="divide-y divide-slate-700"></tbody>
+      </table>
+    </div>
+    <p id="rowCount" class="text-slate-400 text-sm mt-2"></p>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'steam-backlog-personal';
+    let allGames = [];
+    let personal = loadPersonal();
+    let sortKey = 'name';
+    let sortDir = 1;
+    let expandedAppid = null;
+
+    function loadPersonal() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function savePersonal() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(personal));
+    }
+
+    function getPersonal(appid) {
+      return personal[appid] || { status: 'backlog', notes: '', priority: 0 };
+    }
+
+    function setPersonal(appid, field, value) {
+      if (!personal[appid]) personal[appid] = { status: 'backlog', notes: '', priority: 0 };
+      personal[appid][field] = value;
+      savePersonal();
+      renderSummary();
+    }
+
+    function formatHours(minutes) {
+      if (!minutes) return '0h';
+      const h = (minutes / 60).toFixed(1);
+      return h + 'h';
+    }
+
+    function formatDate(unixOrStr) {
+      if (!unixOrStr) return '—';
+      if (typeof unixOrStr === 'number') {
+        if (unixOrStr === 0) return '—';
+        return new Date(unixOrStr * 1000).toLocaleDateString();
+      }
+      return unixOrStr;
+    }
+
+    function parseReleaseForSort(d) {
+      if (!d) return 0;
+      const t = Date.parse(d);
+      return isNaN(t) ? 0 : t;
+    }
+
+    function filteredGames() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      const status = document.getElementById('statusFilter').value;
+      const genre = document.getElementById('genreFilter').value;
+      const unplayed = document.getElementById('unplayedOnly').checked;
+      const minRating = +document.getElementById('minRating').value;
+      const maxHours = +document.getElementById('maxHours').value;
+
+      return allGames.filter(g => {
+        const p = getPersonal(g.appid);
+        if (q && !g.name.toLowerCase().includes(q)) return false;
+        if (status && p.status !== status) return false;
+        if (genre && !(g.genres || []).includes(genre)) return false;
+        if (unplayed && g.playtime_minutes > 0) return false;
+        const rating = g.steam_review_percent ?? g.metacritic_score ?? 0;
+        if (minRating > 0 && rating < minRating) return false;
+        const hltb = g.hltb_main_hours;
+        if (maxHours < 200 && hltb != null && hltb > maxHours) return false;
+        return true;
+      });
+    }
+
+    function sortedGames(list) {
+      return [...list].sort((a, b) => {
+        const pa = getPersonal(a.appid);
+        const pb = getPersonal(b.appid);
+        let va, vb;
+        switch (sortKey) {
+          case 'status': va = pa.status; vb = pb.status; break;
+          case 'priority': va = pa.priority; vb = pb.priority; break;
+          case 'last_played': va = a.last_played || 0; vb = b.last_played || 0; break;
+          case 'release_date': va = parseReleaseForSort(a.release_date); vb = parseReleaseForSort(b.release_date); break;
+          default: va = a[sortKey]; vb = b[sortKey];
+        }
+        if (va == null) va = sortDir > 0 ? Infinity : -Infinity;
+        if (vb == null) vb = sortDir > 0 ? Infinity : -Infinity;
+        if (typeof va === 'string') return sortDir * va.localeCompare(vb);
+        return sortDir * (va - vb);
+      });
+    }
+
+    function renderSummary() {
+      const backlog = allGames.filter(g => getPersonal(g.appid).status === 'backlog');
+      const totalHltb = backlog.reduce((s, g) => s + (g.hltb_main_hours || 0), 0);
+      const played = allGames.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
+      const rated = allGames.filter(g => g.steam_review_percent != null);
+      const avgRating = rated.length
+        ? (rated.reduce((s, g) => s + g.steam_review_percent, 0) / rated.length).toFixed(0)
+        : '—';
+
+      document.getElementById('summary').innerHTML = `
+        <div class="bg-slate-800 rounded p-3"><div class="text-slate-400 text-xs">Games</div><div class="text-xl font-semibold">${allGames.length}</div></div>
+        <div class="bg-slate-800 rounded p-3"><div class="text-slate-400 text-xs">Backlog hours (HLTB main)</div><div class="text-xl font-semibold">${totalHltb.toFixed(0)}h</div></div>
+        <div class="bg-slate-800 rounded p-3"><div class="text-slate-400 text-xs">Your playtime</div><div class="text-xl font-semibold">${played.toFixed(0)}h</div></div>
+        <div class="bg-slate-800 rounded p-3"><div class="text-slate-400 text-xs">Avg Steam rating</div><div class="text-xl font-semibold">${avgRating}${avgRating !== '—' ? '%' : ''}</div></div>
+      `;
+    }
+
+    function renderTable() {
+      const list = sortedGames(filteredGames());
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+
+      list.forEach(g => {
+        const p = getPersonal(g.appid);
+        const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
+        const tr = document.createElement('tr');
+        tr.className = 'bg-slate-800/50 hover:bg-slate-700/50' + (lowConf ? ' low-confidence' : '');
+        if (expandedAppid === g.appid) tr.classList.add('expanded');
+
+        const hltbLabel = g.hltb_main_hours != null
+          ? `${g.hltb_main_hours}h` + (lowConf ? ' ⚠' : '')
+          : '—';
+
+        tr.innerHTML = `
+          <td class="p-2"><img class="cover" src="${g.library_image || g.header_image}" alt="" loading="lazy" /></td>
+          <td class="p-2">
+            <a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium">${escapeHtml(g.name)}</a>
+            ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB: ${escapeHtml(g.hltb_name)}</div>` : ''}
+          </td>
+          <td class="p-2">
+            <select data-appid="${g.appid}" data-field="status" class="status-select bg-slate-700 border border-slate-600 rounded text-xs py-1">
+              <option value="backlog" ${p.status==='backlog'?'selected':''}>Backlog</option>
+              <option value="next" ${p.status==='next'?'selected':''}>Next up</option>
+              <option value="playing" ${p.status==='playing'?'selected':''}>Playing</option>
+              <option value="finished" ${p.status==='finished'?'selected':''}>Finished</option>
+              <option value="skip" ${p.status==='skip'?'selected':''}>Skip</option>
+            </select>
+          </td>
+          <td class="p-2 text-center">
+            <select data-appid="${g.appid}" data-field="priority" class="priority-select bg-slate-700 border border-slate-600 rounded text-xs py-1">
+              ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${p.priority===n?'selected':''}>${n||'—'}</option>`).join('')}
+            </select>
+          </td>
+          <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
+          <td class="p-2 text-right" title="Main / +Extra / 100%">${hltbLabel}</td>
+          <td class="p-2 text-right">${g.steam_review_percent != null ? g.steam_review_percent + '%' : '—'}</td>
+          <td class="p-2 text-right">${g.metacritic_score ?? '—'}</td>
+          <td class="p-2 text-slate-300">${g.release_date || '—'}</td>
+          <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
+          <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres||[]).join(', ')}">${(g.genres||[]).slice(0,2).join(', ') || '—'}</td>
+          <td class="p-2"><input type="text" data-appid="${g.appid}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes…" class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full min-w-[100px] px-2 py-1" /></td>
+        `;
+
+        tr.addEventListener('click', e => {
+          if (e.target.closest('select, input, a')) return;
+          expandedAppid = expandedAppid === g.appid ? null : g.appid;
+          renderTable();
+        });
+
+        tbody.appendChild(tr);
+
+        if (expandedAppid === g.appid) {
+          const detail = document.createElement('tr');
+          detail.className = 'bg-slate-800';
+          const extra = [
+            g.hltb_main_extra_hours != null ? `Main+Extra: ${g.hltb_main_extra_hours}h` : null,
+            g.hltb_completionist_hours != null ? `100%: ${g.hltb_completionist_hours}h` : null,
+            g.steam_review_desc,
+            (g.tags || []).slice(0, 5).join(' · '),
+          ].filter(Boolean).join(' · ');
+          detail.innerHTML = `<td colspan="12" class="p-3 text-sm text-slate-300 border-t border-slate-700">
+            <img src="${g.header_image}" class="max-h-24 rounded float-right ml-4" alt="" />
+            ${extra || 'No extra details.'}
+            <a href="${g.store_url}" class="text-sky-400 ml-2" target="_blank">Store →</a>
+          </td>`;
+          tbody.appendChild(detail);
+        }
+      });
+
+      document.getElementById('rowCount').textContent = `Showing ${list.length} of ${allGames.length} games`;
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function escapeAttr(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    }
+
+    function populateGenres() {
+      const genres = new Set();
+      allGames.forEach(g => (g.genres || []).forEach(x => genres.add(x)));
+      const sel = document.getElementById('genreFilter');
+      [...genres].sort().forEach(g => {
+        const o = document.createElement('option');
+        o.value = g;
+        o.textContent = g;
+        sel.appendChild(o);
+      });
+    }
+
+    function exportCsv() {
+      const list = sortedGames(filteredGames());
+      const headers = ['appid','name','status','priority','playtime_hours','hltb_main','steam_review_percent','metacritic','release_date','genres','notes'];
+      const rows = list.map(g => {
+        const p = getPersonal(g.appid);
+        return [
+          g.appid, g.name, p.status, p.priority,
+          (g.playtime_minutes/60).toFixed(1),
+          g.hltb_main_hours ?? '', g.steam_review_percent ?? '', g.metacritic_score ?? '',
+          g.release_date ?? '', (g.genres||[]).join('; '), p.notes
+        ].map(c => `"${String(c).replace(/"/g,'""')}"`).join(',');
+      });
+      download('steam-backlog.csv', headers.join(',') + '\n' + rows.join('\n'), 'text/csv');
+    }
+
+    function exportNotes() {
+      download('steam-backlog-notes.json', JSON.stringify(personal, null, 2), 'application/json');
+    }
+
+    function download(name, content, type) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content], { type }));
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortKey === key) sortDir *= -1;
+        else { sortKey = key; sortDir = 1; }
+        renderTable();
+      });
+    });
+
+    ['search','statusFilter','genreFilter','unplayedOnly','minRating','maxHours'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        if (id === 'minRating') document.getElementById('minRatingVal').textContent = document.getElementById('minRating').value;
+        if (id === 'maxHours') {
+          const v = document.getElementById('maxHours').value;
+          document.getElementById('maxHoursVal').textContent = v >= 200 ? '200+' : v;
+        }
+        renderTable();
+      });
+    });
+
+    document.getElementById('tbody').addEventListener('change', e => {
+      const t = e.target;
+      if (!t.dataset.appid) return;
+      setPersonal(+t.dataset.appid, t.dataset.field, t.dataset.field === 'priority' ? +t.value : t.value);
+      renderTable();
+    });
+
+    document.getElementById('tbody').addEventListener('blur', e => {
+      if (e.target.classList.contains('notes-input')) {
+        setPersonal(+e.target.dataset.appid, 'notes', e.target.value);
+      }
+    }, true);
+
+    document.getElementById('exportCsv').addEventListener('click', exportCsv);
+    document.getElementById('exportNotes').addEventListener('click', exportNotes);
+    document.getElementById('importNotes').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const data = JSON.parse(await file.text());
+      personal = { ...personal, ...data };
+      savePersonal();
+      renderSummary();
+      renderTable();
+      e.target.value = '';
+    });
+
+    function applyGamesData(data) {
+      allGames = data.games || [];
+      document.getElementById('genreFilter').length = 1;
+      document.getElementById('meta').textContent =
+        `${data.game_count} games · fetched ${new Date(data.fetched_at).toLocaleString()}`;
+      populateGenres();
+      renderSummary();
+      renderTable();
+    }
+
+    async function init() {
+      try {
+        const res = await fetch('games.json');
+        if (!res.ok) throw new Error('games.json not found');
+        applyGamesData(await res.json());
+      } catch (err) {
+        document.getElementById('meta').innerHTML =
+          `<span class="text-amber-400">Run <code class="bg-slate-700 px-1 rounded">python fetch_games.py</code>, then use <strong>Load games.json</strong> above (or run <code class="bg-slate-700 px-1 rounded">python -m http.server 8080</code> and open localhost:8080).</span>`;
+      }
+    }
+
+    document.getElementById('loadGamesFile').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      applyGamesData(JSON.parse(await file.text()));
+      e.target.value = '';
+    });
+
+    init();
+  </script>
+</body>
+</html>

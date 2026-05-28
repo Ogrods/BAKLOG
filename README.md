@@ -1,6 +1,16 @@
 # Steam Backlog Dashboard
 
-A local HTML dashboard for browsing, sorting, and prioritizing your Steam library.
+A **local-only** tool for browsing, sorting, and prioritizing your Steam library. Nothing is hosted on the web; your API key and library data stay on your machine.
+
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| Data pipeline | Python 3 (`requests`, `python-dotenv`, `howlongtobeatpy`) |
+| Data file | `games.json` (generated, gitignored) |
+| Dashboard | Static HTML + vanilla JS + Tailwind (CDN) |
+| Personal edits | Browser `localStorage` (status, notes, priority) |
+| View locally | `python -m http.server 8080` → http://localhost:8080 |
 
 ## Setup
 

@@ -1,0 +1,11 @@
+{
+  "name": "steam-backlog",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./styles/tailwind-input.css -o ./tailwind.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.8",
+    "tailwindcss": "^4.1.8"
+  }
+}

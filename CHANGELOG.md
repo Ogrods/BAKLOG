@@ -9,6 +9,7 @@ All notable changes to this project are documented here.
 - PlayStation library fetcher (`fetch_psn.py`, `psn_client.py`) using NPSSO token auth via `psnawp`
 - PSN store filter chip, badge, and summary counts in the dashboard
 - Trophy progress and platform tags on PSN rows
+- itch.io owned-games fetcher (`fetch_itch.py`, `itch_client.py`) + dashboard chip/badge
 - Slim toolbar with filter drawer, active filter pills, and kebab menu for data actions
 - Personal free-form tags per game with filter chips, bulk tag add, picks integration, CSV export
 - Bulk row selection with status/priority bar; cleanup mode filter; keyboard shortcuts

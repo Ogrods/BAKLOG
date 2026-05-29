@@ -10,7 +10,7 @@ A **local-only** tool for browsing, sorting, and prioritizing your game librarie
 |-------|------|
 | Data pipeline | Python 3 (`requests`, `python-dotenv`, `howlongtobeatpy`, `psnawp`) |
 | Data files | `games_steam.json`, `games_gog.json`, `games_psn.json` (generated, gitignored) |
-| Dashboard | Static HTML + vanilla JS + Tailwind (CDN) |
+| Dashboard | Static HTML + vanilla JS + prebuilt Tailwind (`tailwind.css`) |
 | Personal edits | Browser `localStorage` (status, notes, priority) |
 | View locally | `python -m http.server 8080` → http://localhost:8080 |
 
@@ -24,6 +24,15 @@ A **local-only** tool for browsing, sorting, and prioritizing your game librarie
 - Price and discount column sourced from Steam app details
 - Status-aware row styling and hidden-gem badges
 - Multi-store dashboard with Steam / GOG / PSN filters and store badges
+
+## Dashboard CSS (optional)
+
+Tailwind is precompiled into `tailwind.css` (no browser JIT). After you change Tailwind classes in `index.html`, rebuild:
+
+```bash
+npm install
+npm run build:css
+```
 
 ## Setup
 
@@ -140,6 +149,7 @@ schtasks /create /SC WEEKLY /D SUN /TN "Steam Backlog Refresh" /TR "powershell -
 | `fetch_games.py` | Fetches Steam library → `games_steam.json` |
 | `fetch_gog.py` | Fetches GOG library → `games_gog.json` |
 | `fetch_psn.py` | Fetches PSN library → `games_psn.json` |
+| `fetch_itch.py` | itch.io owned games → `games_itch.json` (`ITCH_API_KEY` in `.env`) |
 | `fetch_wishlist.py` | Steam wishlist → `games_wishlist.json` (public wishlist + `STEAM_API_KEY`) |
 | `fetch_itad.py` | IsThereAnyDeal prices → `itad_prices.json` (`ITAD_API_KEY` in `.env`) |
 | `enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |

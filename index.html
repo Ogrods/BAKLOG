@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Steam Backlog</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="tailwind.css" />
   <style>
     /* === Base === */
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
@@ -32,6 +32,7 @@
     .store-badge.nintendo { background: #e60012; color: #fff5f5; }
     .store-badge.xbox { background: #107c10; color: #f0fff4; }
     .store-badge.other { background: #475569; color: #f1f5f9; }
+    .store-badge.itch { background: #fa5c5c; color: #2a0606; }
     .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
     .view-tab.active { border-color: #38bdf8; color: #e2e8f0; background: rgba(14, 165, 233, 0.15); }
     /* === Table row states === */
@@ -207,6 +208,7 @@
           <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="epic">Epic</button>
           <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="amazon">Amazon</button>
           <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="nintendo">Nintendo</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="itch">itch.io</button>
           <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="xbox">Xbox</button>
           <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="other">Other</button>
         </div>
@@ -257,6 +259,7 @@
           Show score column
         </label>
         <button type="button" id="cleanupModeBtn" class="w-full bg-orange-800 hover:bg-orange-700 px-3 py-2 rounded text-sm" title="Backlog, 0 playtime, rating under 60%, released 2+ years ago">Cleanup mode</button>
+        <p class="text-[11px] text-slate-400 mt-1 leading-snug">Surfaces obvious candidates to mark as <em>Skip</em>: backlog games you've never played, rated under 60%, released 2+ years ago. Pair with bulk select to clear them out fast.</p>
       </div>
     </div>
   </aside>
@@ -280,6 +283,7 @@
               <option value="epic">Epic</option>
               <option value="psn">PlayStation</option>
               <option value="nintendo">Nintendo</option>
+              <option value="itch">itch.io</option>
               <option value="xbox">Xbox</option>
               <option value="amazon">Amazon</option>
               <option value="other">Other</option>
@@ -309,8 +313,9 @@
     let sortDir = 1;
     let expandedKeys = new Set();
     let pickedKey = null;
-    let libraryMeta = { steam: null, gog: null, psn: null, epic: null, amazon: null, nintendo: null, wishlist: null };
+    let libraryMeta = { steam: null, gog: null, psn: null, epic: null, amazon: null, nintendo: null, itch: null, wishlist: null };
     let crossStoreHiddenKeys = new Set();
+    let crossStoreOwnedStores = new Map();
     let wishlistGames = [];
     let itadByKey = {};
     let activeView = "library";
@@ -326,7 +331,7 @@
     let genreChipsExpanded = false;
 
     // === Constants & config ===
-    const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "xbox", "other", "manual"];
+    const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "other", "manual"];
     const JUNK_NAMES = new Set(["live", "fortnite"]);
     const JUNK_NAME_PATTERNS = [
       /\btech beta\b/i,
@@ -395,7 +400,7 @@
 
     function recomputeCrossStoreHidden() {
       crossStoreHiddenKeys = new Set();
-      if (!prefs.crossStoreDedup) return;
+      crossStoreOwnedStores = new Map();
       const groups = new Map();
       for (const g of allGames) {
         const norm = normalizeNameForDedup(g.name);
@@ -411,8 +416,18 @@
           if (pa !== pb) return pa - pb;
           return scoreEntry(b) - scoreEntry(a);
         });
-        for (let i = 1; i < list.length; i++) {
-          crossStoreHiddenKeys.add(gameKey(list[i]));
+        const orderedStores = [];
+        for (const g of list) {
+          const s = normalizeGame(g).store;
+          if (!orderedStores.includes(s)) orderedStores.push(s);
+        }
+        if (orderedStores.length > 1) {
+          crossStoreOwnedStores.set(gameKey(list[0]), orderedStores);
+        }
+        if (prefs.crossStoreDedup) {
+          for (let i = 1; i < list.length; i++) {
+            crossStoreHiddenKeys.add(gameKey(list[i]));
+          }
         }
       }
     }
@@ -450,7 +465,21 @@
       personal = next;
       savePersonal();
     }
-    function savePersonal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(personal)); }
+    let _savePersonalTimer = null;
+    function savePersonal() {
+      clearTimeout(_savePersonalTimer);
+      _savePersonalTimer = setTimeout(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(personal));
+      }, 250);
+    }
+    function flushSavePersonal() {
+      if (!_savePersonalTimer) return;
+      clearTimeout(_savePersonalTimer);
+      _savePersonalTimer = null;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(personal));
+    }
+    window.addEventListener("beforeunload", flushSavePersonal);
+    window.addEventListener("blur", flushSavePersonal);
     function loadPrefs() {
       const fallback = { picksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR" };
       try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
@@ -476,16 +505,22 @@
       saveManualGames(manualGames);
     }
     function normalizeGame(g) {
+      if (g.store && g.id != null) return g;
       const store = g.store || "steam";
-      const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id;
+      const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id;
       return { ...g, store, id };
     }
+    function gameStore(g) {
+      return g.store || "steam";
+    }
+    function gameId(g) {
+      return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id;
+    }
     function gameKey(g) {
-      const ng = normalizeGame(g);
-      return `${ng.store}:${ng.id}`;
+      return `${gameStore(g)}:${gameId(g)}`;
     }
     function gameNumericId(g) {
-      return normalizeGame(g).id;
+      return gameId(g);
     }
     function coverFallbackFor(g) {
       const ng = normalizeGame(g);
@@ -494,20 +529,34 @@
       return "";
     }
     const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, tags: [] };
+    const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, tags: Object.freeze([]) });
     function getPersonal(g) {
       const key = gameKey(g);
-      const found = personal[key] || (typeof personal[normalizeGame(g).id] === "object" ? personal[normalizeGame(g).id] : null);
-      if (!found) return { ...PERSONAL_DEFAULT, tags: [] };
-      return { ...PERSONAL_DEFAULT, ...found, tags: Array.isArray(found.tags) ? found.tags : [] };
+      const found = personal[key] || (typeof personal[gameId(g)] === "object" ? personal[gameId(g)] : null);
+      if (!found) return PERSONAL_EMPTY;
+      if (found.status == null) found.status = "backlog";
+      if (found.notes == null) found.notes = "";
+      if (found.priority == null) found.priority = 0;
+      if (found.hltb_override === undefined) found.hltb_override = null;
+      if (!Array.isArray(found.tags)) found.tags = [];
+      return found;
     }
-    function setPersonal(g, field, value) {
+    let _downstreamSyncTimer = null;
+    function scheduleDownstreamSync() {
+      clearTimeout(_downstreamSyncTimer);
+      _downstreamSyncTimer = setTimeout(() => {
+        renderSummary();
+        renderPicks();
+      }, 200);
+    }
+    function setPersonal(g, field, value, options) {
       const key = gameKey(g);
       if (!personal[key]) personal[key] = { ...PERSONAL_DEFAULT, tags: [] };
       if (!Array.isArray(personal[key].tags)) personal[key].tags = [];
       personal[key][field] = value;
       savePersonal();
-      renderSummary();
-      renderPicks();
+      if (options?.silent) return;
+      scheduleDownstreamSync();
     }
     function normalizeTag(t) {
       return String(t || "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 32);
@@ -557,10 +606,18 @@
       const rating = g.steam_review_percent ?? g.metacritic_score ?? 0;
       return rating >= 90 && (g.playtime_minutes || 0) === 0 && p.status === "backlog";
     }
+    function storeLetter(s) {
+      return s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "itch" ? "I" : s === "xbox" ? "X" : s === "other" ? "?" : s === "manual" ? "M" : "S";
+    }
+    function singleStoreBadgeHtml(s, title) {
+      return `<span class="store-badge ${s}" title="${title || s.toUpperCase()}">${storeLetter(s)}</span>`;
+    }
     function storeBadgeHtml(g) {
-      const s = normalizeGame(g).store;
-      const label = s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "xbox" ? "X" : s === "other" ? "?" : "S";
-      return `<span class="store-badge ${s}" title="${s.toUpperCase()}">${label}</span>`;
+      const primary = normalizeGame(g).store;
+      const owned = crossStoreOwnedStores.get(gameKey(g));
+      if (!owned || owned.length < 2) return singleStoreBadgeHtml(primary);
+      const tip = `Owned on: ${owned.map(s => s.toUpperCase()).join(", ")}`;
+      return `<span class="inline-flex items-center gap-0.5 align-middle" title="${tip}">${owned.map(s => singleStoreBadgeHtml(s, tip)).join("")}</span>`;
     }
     function formatHours(minutes) { return !minutes ? "0h" : `${(minutes / 60).toFixed(1)}h`; }
     function formatDate(unixOrStr) {
@@ -791,6 +848,7 @@
       const epicCount = visible.filter(g => normalizeGame(g).store === "epic").length;
       const amazonCount = visible.filter(g => normalizeGame(g).store === "amazon").length;
       const nintendoCount = visible.filter(g => normalizeGame(g).store === "nintendo").length;
+      const itchCount = visible.filter(g => normalizeGame(g).store === "itch").length;
       const rated = visible.filter(g => ratingValue(g) > 0);
       const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : "—";
       const hiddenCount = allGames.length - visible.length;
@@ -802,6 +860,7 @@
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Epic <span class="text-slate-100 font-semibold ml-1">${epicCount}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Amazon <span class="text-slate-100 font-semibold ml-1">${amazonCount}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Nintendo <span class="text-slate-100 font-semibold ml-1">${nintendoCount}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">itch.io <span class="text-slate-100 font-semibold ml-1">${itchCount}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${totalHltb.toFixed(0)}h</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${played.toFixed(0)}h</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== "—" ? "%" : ""}</span></div>`;
@@ -809,6 +868,15 @@
 
     function findGameByKey(key) {
       return allGames.find(g => gameKey(g) === key);
+    }
+
+    function updateRowInPlace(tr, g) {
+      const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
+      const cleanup = activeView === "library" && isCleanupCandidate(g);
+      const key = gameKey(g);
+      const selected = selectedKeys.has(key);
+      const focused = tr.classList.contains("row-focused");
+      tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
     }
 
     function rowClass(g, lowConf) {
@@ -845,8 +913,26 @@
     }
 
     function focusGame(key) {
-      expandedKeys.add(key);
       pickedKey = key;
+      const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+      if (existing) {
+        document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
+        document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
+        existing.classList.add("row-focused", "row-picked");
+        scrollRowToCenter(existing);
+        requestAnimationFrame(() => {
+          expandedKeys.add(key);
+          if (!existing.nextElementSibling?.classList.contains("detail-row")) {
+            const g = findGameByKey(key);
+            if (g) existing.after(buildDetailRow(g));
+          }
+          const list = visibleListForKeyboard();
+          const idx = list.findIndex(g => gameKey(g) === key);
+          if (idx >= 0) focusedRowIndex = idx;
+        });
+        return;
+      }
+      expandedKeys.add(key);
       const list = visibleListForKeyboard();
       const idx = list.findIndex(g => gameKey(g) === key);
       if (idx >= 0) focusedRowIndex = idx;
@@ -854,15 +940,52 @@
       scrollFocusedRow();
     }
 
+    function scrollRowToCenter(row) {
+      if (!row) return;
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
     function scrollFocusedRow() {
-      const row = document.querySelector("tr.row-focused");
-      if (row) row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      scrollRowToCenter(document.querySelector("tr.row-focused"));
+    }
+
+    function buildDetailRow(g) {
+      const showScore = !!prefs.showScoreColumn;
+      const headerFallback = coverFallbackFor(g);
+      const itad = getItadForGame(g);
+      const extra = [
+        g.steam_review_desc,
+        g.trophy_progress != null ? `Trophy progress ${g.trophy_progress}%` : null,
+        (g.tags || []).slice(0, 6).join(" · "),
+        g.price_initial && g.price_initial !== g.price ? `Was ${g.price_initial}` : null,
+        itad?.url ? `<a href="${itad.url}" class="text-sky-400" target="_blank" rel="noopener">ITAD deal</a>` : null,
+        itad?.is_historical_low ? "Historical low" : null,
+      ].filter(Boolean).join(" · ");
+      const cols = showScore ? 15 : 14;
+      const detail = document.createElement("tr");
+      detail.className = "detail-row bg-slate-800";
+      detail.dataset.detailFor = gameKey(g);
+      detail.innerHTML = `<td colspan="${cols}" class="p-3 text-sm text-slate-300 border-t border-slate-700">
+        <img src="${headerFallback}" data-fallback="" data-name="${escapeAttr(g.name)}" class="max-h-24 rounded float-right ml-4" alt="" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+        ${extra || "No extra details."}
+        <a href="${g.store_url}" class="text-sky-400 ml-2" target="_blank" rel="noopener">Store →</a>
+      </td>`;
+      return detail;
     }
 
     function toggleExpand(key) {
-      if (expandedKeys.has(key)) expandedKeys.delete(key);
+      const wasOpen = expandedKeys.has(key);
+      if (wasOpen) expandedKeys.delete(key);
       else expandedKeys.add(key);
-      renderTable();
+      const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+      if (!row) { renderTable(); return; }
+      const next = row.nextElementSibling;
+      if (wasOpen) {
+        if (next && next.classList.contains("detail-row")) next.remove();
+        return;
+      }
+      const g = findGameByKey(key);
+      if (g && !(next && next.classList.contains("detail-row"))) row.after(buildDetailRow(g));
     }
 
     function renderTable() {
@@ -899,12 +1022,14 @@
           <td class="p-2 text-center">${activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
           <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
           <td class="p-2">
-            <span class="inline-flex items-center gap-1.5 align-middle">
-              ${activeView === "wishlist" ? '<span class="store-badge steam" title="WISHLIST">W</span>' : storeBadgeHtml(g)}
+            <div class="flex items-center gap-1.5">
               <a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium game-name">${escapeHtml(g.name)}</a>
               ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
-              ${ownedWish ? '<span class="text-amber-400 text-xs ml-1" title="You already own this (matched by title)">owned</span>' : ""}
-            </span>
+              ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
+            </div>
+            <div class="mt-1">
+              ${activeView === "wishlist" ? '<span class="store-badge steam" title="WISHLIST">W</span>' : storeBadgeHtml(g)}
+            </div>
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </td>
           <td class="p-2">
@@ -948,26 +1073,7 @@
 
         tbody.appendChild(tr);
 
-        if (expandedKeys.has(key)) {
-          const detail = document.createElement("tr");
-          detail.className = "bg-slate-800";
-          const itad = getItadForGame(g);
-          const extra = [
-            g.steam_review_desc,
-            g.trophy_progress != null ? `Trophy progress ${g.trophy_progress}%` : null,
-            (g.tags || []).slice(0, 6).join(" · "),
-            g.price_initial && g.price_initial !== g.price ? `Was ${g.price_initial}` : null,
-            itad?.url ? `<a href="${itad.url}" class="text-sky-400" target="_blank" rel="noopener">ITAD deal</a>` : null,
-            itad?.is_historical_low ? "Historical low" : null,
-          ].filter(Boolean).join(" · ");
-          const cols = showScore ? 15 : 14;
-          detail.innerHTML = `<td colspan="${cols}" class="p-3 text-sm text-slate-300 border-t border-slate-700">
-            <img src="${headerFallback}" data-fallback="" data-name="${escapeAttr(g.name)}" class="max-h-24 rounded float-right ml-4" alt="" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
-            ${extra || "No extra details."}
-            <a href="${g.store_url}" class="text-sky-400 ml-2" target="_blank" rel="noopener">Store →</a>
-          </td>`;
-          tbody.appendChild(detail);
-        }
+        if (expandedKeys.has(key)) tbody.appendChild(buildDetailRow(g));
       });
 
       const base = activeView === "wishlist"
@@ -1140,11 +1246,22 @@
       el.classList.toggle("expanded", genreChipsExpanded);
     }
 
-    function refreshFilterUI() {
+    function refreshFilterUI(options) {
       renderFiltersButtonBadge();
       renderActiveFilterPills();
       renderTable();
+      if (options?.skipPicks) return;
       renderPicks();
+    }
+    let _filterDebounceTimer = null;
+    function refreshFilterUIDebounced(options) {
+      clearTimeout(_filterDebounceTimer);
+      _filterDebounceTimer = setTimeout(() => refreshFilterUI(options), 120);
+    }
+    let _tableRerenderTimer = null;
+    function scheduleTableRerender() {
+      clearTimeout(_tableRerenderTimer);
+      _tableRerenderTimer = setTimeout(renderTable, 200);
     }
 
     function renderGenreChips() {
@@ -1214,6 +1331,7 @@
       if (libraryMeta.epic) parts.push(`Epic ${libraryMeta.epic.game_count} (${new Date(libraryMeta.epic.fetched_at).toLocaleString()})`);
       if (libraryMeta.amazon) parts.push(`Amazon ${libraryMeta.amazon.game_count} (${new Date(libraryMeta.amazon.fetched_at).toLocaleString()})`);
       if (libraryMeta.nintendo) parts.push(`Nintendo ${libraryMeta.nintendo.game_count} (${new Date(libraryMeta.nintendo.fetched_at).toLocaleString()})`);
+      if (libraryMeta.itch) parts.push(`itch.io ${libraryMeta.itch.game_count} (${new Date(libraryMeta.itch.fetched_at).toLocaleString()})`);
       if (libraryMeta.wishlist) parts.push(`Wishlist ${libraryMeta.wishlist.game_count}`);
       if (Object.keys(itadByKey).length) parts.push(`ITAD prices ${Object.keys(itadByKey).length}`);
       document.getElementById("meta").textContent = parts.length ? parts.join(" · ") : "No library data loaded";
@@ -1239,14 +1357,16 @@
       const epic = await fetchLibraryJson("games_epic.json");
       const amazon = await fetchLibraryJson("games_amazon.json");
       const nintendo = await fetchLibraryJson("games_nintendo.json");
+      const itch = await fetchLibraryJson("games_itch.json");
       const steamData = steam || legacy;
-      if (!steamData && !gog && !psn && !epic && !amazon && !nintendo) throw new Error("No library files found");
+      if (!steamData && !gog && !psn && !epic && !amazon && !nintendo && !itch) throw new Error("No library files found");
       libraryMeta.steam = steamData;
       libraryMeta.gog = gog;
       libraryMeta.psn = psn;
       libraryMeta.epic = epic;
       libraryMeta.amazon = amazon;
       libraryMeta.nintendo = nintendo;
+      libraryMeta.itch = itch;
       const sources = [
         (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
         (gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
@@ -1254,6 +1374,7 @@
         (epic?.games || []).map(g => normalizeGame({ ...g, store: "epic", id: g.id })),
         (amazon?.games || []).map(g => normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id })),
         (nintendo?.games || []).map(g => normalizeGame({ ...g, store: "nintendo", id: g.id ?? g.nintendo_id })),
+        (itch?.games || []).map(g => normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id })),
         loadManualGames().map(g => normalizeGame(g)),
       ];
       allGames = sources.flatMap(dedupeWithinStore);
@@ -1562,7 +1683,7 @@
           document.getElementById("minRatingVal").textContent = document.getElementById("minRating").value;
           const h = +document.getElementById("maxHours").value;
           document.getElementById("maxHoursVal").textContent = h >= 200 ? "200+" : h;
-          refreshFilterUI();
+          refreshFilterUIDebounced({ skipPicks: id === "search" });
         });
       });
       document.getElementById("genreMode").addEventListener("change", e => {
@@ -1673,15 +1794,23 @@
       document.getElementById("tbody").addEventListener("change", e => {
         const t = e.target;
         if (t.classList.contains("row-select")) {
+          const tr = t.closest("tr");
           toggleSelection(t.dataset.gameKey, t.checked);
-          renderTable();
+          if (tr) tr.classList.toggle("row-selected", t.checked);
           return;
         }
         if (!t.dataset.gameKey || !t.dataset.field) return;
         const g = findGameByKey(t.dataset.gameKey);
         if (!g) return;
-        setPersonal(g, t.dataset.field, t.dataset.field === "priority" ? +t.value : t.value);
-        renderTable();
+        const field = t.dataset.field;
+        setPersonal(g, field, field === "priority" ? +t.value : t.value);
+        const tr = t.closest("tr");
+        if (tr) updateRowInPlace(tr, g);
+        const statusFilterActive = !!document.getElementById("statusFilter").value;
+        const sortAffected = sortKey === field || sortKey === "priority_score" || sortKey === "status";
+        if ((field === "status" && (statusFilterActive || cleanupModeActive)) || sortAffected) {
+          scheduleTableRerender();
+        }
       });
       document.getElementById("selectAllVisible").addEventListener("change", e => {
         const list = sortedGames(filteredGames());

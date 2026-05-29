@@ -6,10 +6,13 @@ games_psn.json
 games_epic.json
 games_amazon.json
 games_wishlist.json
+games_itch.json
 itad_prices.json
 broken_images.json
+still_missing_images.json
 cache/
 __pycache__/
 *.pyc
 .venv/
 venv/
+node_modules/

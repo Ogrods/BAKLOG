@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## [0.3.0] - 2026-05-28
+
+### Added
+
+- GOG library fetcher (`fetch_gog.py`, `gog_client.py`) using session cookie auth
+- Multi-store dashboard: load `games_steam.json` + `games_gog.json`, store filter chips, store badges
+- Namespaced personal data keys (`steam:<id>` / `gog:<id>`) with automatic migration from v0.2
+
+### Changed
+
+- Steam fetcher writes `games_steam.json` and adds `store` / `id` fields on every game row
+- Dashboard title and summary pills show per-store counts
+
 ## [0.2.0] - 2026-05-27
 
 ### Added

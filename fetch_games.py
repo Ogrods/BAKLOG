@@ -13,8 +13,16 @@ import os
 from hltb_client import HltbClient
 from steam_client import SteamClient
 
-GAMES_JSON = Path("games.json")
+GAMES_STEAM_JSON = Path("games_steam.json")
+GAMES_JSON_LEGACY = Path("games.json")
 HLTB_DELAY_SEC = 1.0
+
+
+def _finalize_steam_row(row: dict) -> dict:
+    appid = row["appid"]
+    row["store"] = "steam"
+    row["id"] = appid
+    return row
 
 
 def _parse_release_date(data: dict) -> str | None:
@@ -34,32 +42,34 @@ def _build_game_row(
     name = owned.get("name") or (details or {}).get("name", f"App {appid}")
 
     if details is None:
-        return {
-            "appid": appid,
-            "name": name,
-            "playtime_minutes": owned.get("playtime_forever", 0),
-            "last_played": owned.get("rtime_last_played", 0) or None,
-            "header_image": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg",
-            "library_image": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900.jpg",
-            "release_date": None,
-            "genres": [],
-            "tags": [],
-            "metacritic_score": None,
-            "steam_review_percent": None,
-            "steam_review_count": None,
-            "steam_review_desc": None,
-            "hltb_main_hours": None,
-            "hltb_main_extra_hours": None,
-            "hltb_completionist_hours": None,
-            "hltb_match_confidence": None,
-            "hltb_name": None,
-            "store_url": f"https://store.steampowered.com/app/{appid}",
-            "type": "unknown",
-            "price": None,
-            "price_initial": None,
-            "discount_percent": None,
-            "currency": None,
-        }
+        return _finalize_steam_row(
+            {
+                "appid": appid,
+                "name": name,
+                "playtime_minutes": owned.get("playtime_forever", 0),
+                "last_played": owned.get("rtime_last_played", 0) or None,
+                "header_image": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg",
+                "library_image": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900.jpg",
+                "release_date": None,
+                "genres": [],
+                "tags": [],
+                "metacritic_score": None,
+                "steam_review_percent": None,
+                "steam_review_count": None,
+                "steam_review_desc": None,
+                "hltb_main_hours": None,
+                "hltb_main_extra_hours": None,
+                "hltb_completionist_hours": None,
+                "hltb_match_confidence": None,
+                "hltb_name": None,
+                "store_url": f"https://store.steampowered.com/app/{appid}",
+                "type": "unknown",
+                "price": None,
+                "price_initial": None,
+                "discount_percent": None,
+                "currency": None,
+            }
+        )
 
     if details.get("type") != "game":
         return None
@@ -110,13 +120,14 @@ def _build_game_row(
             }
         )
 
-    return row
+    return _finalize_steam_row(row)
 
 
 def load_existing() -> dict[int, dict]:
-    if not GAMES_JSON.exists():
+    path = GAMES_STEAM_JSON if GAMES_STEAM_JSON.exists() else GAMES_JSON_LEGACY
+    if not path.exists():
         return {}
-    data = json.loads(GAMES_JSON.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
     return {g["appid"]: g for g in data.get("games", [])}
 
 
@@ -157,7 +168,7 @@ def main() -> int:
         name = owned.get("name", str(appid))
 
         if args.only_new and appid in existing and not args.refresh and not args.appid:
-            games_out.append(existing[appid])
+            games_out.append(_finalize_steam_row(dict(existing[appid])))
             continue
 
         print(f"[{i}/{len(owned_games)}] {name} ({appid})")
@@ -211,8 +222,10 @@ def main() -> int:
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
 
-    GAMES_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\nWrote {len(games_out)} games to {GAMES_JSON} (skipped {skipped} non-game items).")
+    text = json.dumps(payload, indent=2, ensure_ascii=False)
+    GAMES_STEAM_JSON.write_text(text, encoding="utf-8")
+    GAMES_JSON_LEGACY.write_text(text, encoding="utf-8")
+    print(f"\nWrote {len(games_out)} games to {GAMES_STEAM_JSON} (skipped {skipped} non-game items).")
     print("Open index.html in your browser to view the dashboard.")
     return 0
 

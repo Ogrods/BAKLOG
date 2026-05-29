@@ -18,6 +18,15 @@ GAMES_JSON_LEGACY = Path("games.json")
 HLTB_DELAY_SEC = 1.0
 
 
+def _configure_stdout() -> None:
+    """Avoid UnicodeEncodeError on Windows consoles (cp1252)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+
+
 def _finalize_steam_row(row: dict) -> dict:
     appid = row["appid"]
     row["store"] = "steam"
@@ -138,6 +147,7 @@ def main() -> int:
     parser.add_argument("--appid", type=int, help="Fetch a single app by ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     args = parser.parse_args()
+    _configure_stdout()
 
     load_dotenv()
     api_key = os.getenv("STEAM_API_KEY", "").strip()

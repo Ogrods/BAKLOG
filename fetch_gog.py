@@ -18,6 +18,35 @@ GAMES_GOG_JSON = Path("games_gog.json")
 HLTB_DELAY_SEC = 1.0
 
 
+def _configure_stdout() -> None:
+    """Avoid UnicodeEncodeError on Windows consoles (cp1252)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+
+
+def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
+    """Turn GOG's bare image hash into usable (header, library_cover) URLs.
+
+    GOG's CDN serves the hash without a file extension; the bare path 404s.
+    Append `.jpg` for the original (landscape banner) and `_glx_vertical_cover.jpg`
+    for the portrait cover used by Galaxy. The HTML img onerror handler falls
+    back to the header if the vertical cover doesn't exist for older titles.
+    """
+    if not raw:
+        return None, None
+    url = raw
+    if url.startswith("//"):
+        url = "https:" + url
+    if not url.startswith("http"):
+        return None, None
+    if url.endswith(".jpg") or url.endswith(".png"):
+        return url, url
+    return f"{url}.jpg", f"{url}_glx_vertical_cover.jpg"
+
+
 def _extract_genres(product: dict, details: dict | None) -> list[str]:
     genres: list[str] = []
     for source in (details or {}, product):
@@ -75,8 +104,7 @@ def _build_game_row(
         or (details or {}).get("backgroundImage")
         or (details or {}).get("image")
     )
-    if image and image.startswith("//"):
-        image = "https:" + image
+    header_url, library_url = _gog_image_urls(image)
 
     release = product.get("releaseDate") or product.get("release_date")
     if isinstance(release, dict):
@@ -102,8 +130,8 @@ def _build_game_row(
         "name": name,
         "playtime_minutes": _playtime_minutes(details),
         "last_played": None,
-        "header_image": image,
-        "library_image": image,
+        "header_image": header_url,
+        "library_image": library_url,
         "release_date": release,
         "genres": _extract_genres(product, details),
         "tags": [],
@@ -152,6 +180,7 @@ def main() -> int:
     parser.add_argument("--id", type=int, dest="gog_id", help="Fetch a single product by GOG ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     args = parser.parse_args()
+    _configure_stdout()
 
     load_dotenv()
     gog_al = os.getenv("GOG_AL", "").strip()

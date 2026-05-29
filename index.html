@@ -6,16 +6,35 @@
   <title>Steam Backlog</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    /* === Base === */
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
     th { cursor: pointer; user-select: none; }
     th:hover { background: rgb(51 65 85); }
-    .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; background: #1e293b; }
+    /* === Covers & picks === */
+    .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
+    .cover.landscape, .pick-cover.landscape { object-fit: contain; }
     .placeholder { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 10px; text-align: center; padding: 2px; }
-    .pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: #1e293b; }
+    .pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
     .pick-card { transition: transform 0.1s ease, background 0.1s ease; }
     .pick-card:hover { transform: translateY(-2px); background: rgb(51 65 85); }
     .pick-tab.active { border-color: #38bdf8; color: #e2e8f0; background: rgba(14, 165, 233, 0.15); }
+    .picks-limit-btn.active { background: #0284c7; border-color: #0ea5e9; color: #f8fafc; }
+    .pick-store { position: absolute; top: 4px; right: 4px; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; }
+    /* === Chips & badges === */
     .genre-chip.active { background: #0284c7; border-color: #0ea5e9; color: #f8fafc; }
+    .store-chip.active { background: #7c3aed; border-color: #a78bfa; color: #f8fafc; }
+    .store-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 4px; line-height: 1; flex-shrink: 0; }
+    .store-badge.steam { background: #ea580c; color: #fff7ed; }
+    .store-badge.gog { background: #6d28d9; color: #ede9fe; }
+    .store-badge.psn { background: #003791; color: #dbeafe; }
+    .store-badge.epic { background: #1e293b; color: #e2e8f0; border: 1px solid #64748b; }
+    .store-badge.amazon { background: #ff9900; color: #1a1200; }
+    .store-badge.nintendo { background: #e60012; color: #fff5f5; }
+    .store-badge.xbox { background: #107c10; color: #f0fff4; }
+    .store-badge.other { background: #475569; color: #f1f5f9; }
+    .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
+    .view-tab.active { border-color: #38bdf8; color: #e2e8f0; background: rgba(14, 165, 233, 0.15); }
+    /* === Table row states === */
     .status-next { background: rgba(14, 165, 233, 0.08); box-shadow: inset 3px 0 0 #38bdf8; }
     .status-playing { background: rgba(16, 185, 129, 0.08); box-shadow: inset 3px 0 0 #10b981; }
     .status-finished { opacity: 0.72; box-shadow: inset 3px 0 0 #94a3b8; }
@@ -23,30 +42,63 @@
     .status-skip .game-name { text-decoration: line-through; }
     .low-confidence { box-shadow: inset 6px 0 0 #f59e0b; }
     .row-picked { outline: 2px solid #eab308; outline-offset: -2px; }
-    .store-chip.active { background: #7c3aed; border-color: #a78bfa; color: #f8fafc; }
-    .store-badge { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
-    .store-badge.steam { background: #0369a1; color: #e0f2fe; }
-    .store-badge.gog { background: #6d28d9; color: #ede9fe; }
-    .pick-store { position: absolute; top: 4px; right: 4px; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; }
+    .row-selected { background: rgba(234, 179, 8, 0.08) !important; }
+    .row-focused { outline: 2px solid #38bdf8; outline-offset: -2px; }
+    .cleanup-candidate { box-shadow: inset 3px 0 0 #f97316; }
+    .cleanup-active .cleanup-candidate { background: rgba(249, 115, 22, 0.06); }
+    #bulkBar { box-shadow: 0 -4px 24px rgba(0,0,0,0.45); }
+    body.bulk-bar-open { padding-bottom: 56px; }
+    /* === Toolbar & active filter pills === */
+    .active-filter-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 11px; background: rgba(14, 165, 233, 0.2); border: 1px solid #38bdf8; color: #e0f2fe; }
+    .active-filter-pill button { line-height: 1; opacity: 0.8; }
+    .active-filter-pill button:hover { opacity: 1; }
+    #filtersBtnBadge { min-width: 1.1rem; }
+    /* === Filter drawer === */
+    #filterDrawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    #filterDrawerBackdrop.open { opacity: 1; pointer-events: auto; }
+    #filterDrawer { transform: translateX(100%); transition: transform 0.22s ease; }
+    #filterDrawer.open { transform: translateX(0); }
+    .drawer-section { border-bottom: 1px solid rgb(51 65 85); padding-bottom: 0.75rem; margin-bottom: 0.75rem; }
+    .drawer-section:last-child { border-bottom: none; margin-bottom: 0; }
+    #genreChips.collapsed { max-height: 4.5rem; overflow: hidden; }
+    #genreChips.expanded { max-height: none; }
+    #cleanupModeBtn.active { ring: 2px; box-shadow: 0 0 0 2px #fb923c; }
+    /* === Kebab menu === */
+    #kebabMenu { display: none; }
+    #kebabMenu.open { display: block; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
   <div class="max-w-[1600px] mx-auto p-4 md:p-6">
     <header class="mb-4">
-      <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
-      <p id="meta" class="text-slate-400 text-sm mt-1">Loading...</p>
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
+        <div class="flex gap-1">
+          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm active" data-view="library">Library</button>
+          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
+        </div>
+      </div>
+      <p id="metaCaption" class="text-slate-500 text-xs mt-1"><span id="meta">Loading...</span><span class="hidden md:inline"> · ↑↓ navigate · B/N/P/F/S status · / search</span></p>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
     </header>
 
     <section class="bg-slate-800 rounded-lg mb-4">
-      <div class="flex flex-wrap items-center gap-2 p-3 border-b border-slate-700">
+      <div class="flex flex-wrap items-center gap-2 p-3 border-b border-slate-700 relative z-10">
         <button id="togglePicks" class="px-2 py-1 rounded bg-slate-700 text-xs">Hide</button>
         <h2 class="text-sm font-semibold tracking-wide text-slate-200 uppercase">Picks</h2>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs active" data-tab="topRated">Top Rated</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp">Next Up</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins">Quick Wins</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems">Hidden Gems</button>
-        <label class="text-xs text-slate-300 ml-auto">Quick-win max hours:
+        <span class="text-xs text-slate-300 ml-auto flex items-center gap-1">Show:
+          <span id="picksLimitGroup" class="inline-flex rounded border border-slate-600 overflow-hidden" role="group" aria-label="Number of picks to show">
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="16">16</button>
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="24">24</button>
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="48">48</button>
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700" data-limit="96">96</button>
+          </span>
+        </span>
+        <label class="text-xs text-slate-300">Quick-win max hours:
           <input id="quickWinMax" type="range" min="2" max="40" value="15" class="align-middle w-24" />
           <span id="quickWinMaxVal">15</span>
         </label>
@@ -57,70 +109,33 @@
       </div>
     </section>
 
-    <section class="bg-slate-800 rounded-lg p-4 mb-4 space-y-3">
+    <section class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
       <div class="flex flex-wrap gap-2 items-center">
-        <input id="search" type="search" placeholder="Search games..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[220px]" />
-        <select id="statusFilter" class="bg-slate-700 border border-slate-600 rounded px-3 py-2">
-          <option value="">All statuses</option>
-          <option value="backlog">Backlog</option>
-          <option value="next">Next up</option>
-          <option value="playing">Playing</option>
-          <option value="finished">Finished</option>
-          <option value="skip">Skip</option>
-        </select>
-        <label class="flex items-center gap-1 text-xs bg-slate-700 border border-slate-600 rounded px-2 py-2">
-          Genre mode
-          <select id="genreMode" class="bg-slate-700">
-            <option value="OR">OR</option>
-            <option value="AND">AND</option>
-          </select>
-        </label>
-        <label class="flex items-center gap-2 text-sm">
-          <input id="unplayedOnly" type="checkbox" class="rounded" />
-          Unplayed only
-        </label>
-      </div>
-      <div id="storeChips" class="flex flex-wrap gap-2 items-center">
-        <span class="text-xs text-slate-400 mr-1">Store</span>
-        <button class="store-chip px-2 py-1 rounded border border-slate-600 text-xs active bg-slate-700" data-store="">All</button>
-        <button class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="steam">Steam</button>
-        <button class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="gog">GOG</button>
-      </div>
-      <div id="genreChips" class="flex flex-wrap gap-2"></div>
-      <div class="flex flex-wrap gap-4 items-center text-sm">
-        <label>Min rating %
-          <input id="minRating" type="range" min="0" max="100" value="0" class="align-middle w-24" />
-          <span id="minRatingVal">0</span>
-        </label>
-        <label>Max length (h)
-          <input id="maxHours" type="range" min="0" max="200" value="200" class="align-middle w-24" />
-          <span id="maxHoursVal">200+</span>
-        </label>
-        <label class="flex items-center gap-2">
-          <input id="showScoreColumn" type="checkbox" />
-          Show score column
-        </label>
-        <button id="pickForMe" class="bg-amber-700 hover:bg-amber-600 px-3 py-1.5 rounded text-sm">Pick for me</button>
-        <button id="reloadData" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 rounded text-sm">Reload library</button>
-        <div class="ml-auto flex gap-2">
-          <label class="bg-sky-700 hover:bg-sky-600 px-3 py-1.5 rounded text-sm cursor-pointer">
-            Load games.json
-            <input id="loadGamesFile" type="file" accept=".json" class="hidden" />
-          </label>
-          <button id="exportCsv" class="bg-slate-600 hover:bg-slate-500 px-3 py-1.5 rounded text-sm">Export CSV</button>
-          <button id="exportNotes" class="bg-slate-600 hover:bg-slate-500 px-3 py-1.5 rounded text-sm">Export notes</button>
-          <label class="bg-slate-600 hover:bg-slate-500 px-3 py-1.5 rounded text-sm cursor-pointer">
-            Import notes
-            <input id="importNotes" type="file" accept=".json" class="hidden" />
-          </label>
+        <input id="search" type="search" placeholder="Search games..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
+        <button type="button" id="openFiltersBtn" class="relative bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm whitespace-nowrap">
+          Filters <span id="filtersBtnBadge" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-sky-600 text-[10px] font-bold">0</span>
+        </button>
+        <button id="pickForMe" class="bg-amber-700 hover:bg-amber-600 px-3 py-2 rounded text-sm whitespace-nowrap">Pick for me</button>
+        <button id="addGameBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded text-sm whitespace-nowrap" title="Manually add a game">+ Add game</button>
+        <div class="relative">
+          <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions">⋯</button>
+          <div id="kebabMenu" class="absolute right-0 top-full mt-1 z-30 min-w-[180px] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 text-sm">
+            <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
+            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Load games.json<input id="loadGamesFile" type="file" accept=".json" class="hidden" /></label>
+            <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
+            <button type="button" id="exportNotes" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes</button>
+            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Import notes<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
+          </div>
         </div>
       </div>
+      <div id="activeFilterPills" class="hidden flex flex-wrap gap-1.5 items-center"></div>
     </section>
 
-    <div class="overflow-x-auto rounded-lg border border-slate-700">
+    <div id="tableWrap" class="overflow-x-auto rounded-lg border border-slate-700">
       <table class="w-full text-sm">
         <thead class="bg-slate-800 text-slate-300">
           <tr>
+            <th class="p-2 w-8"><input type="checkbox" id="selectAllVisible" title="Select all visible rows" /></th>
             <th class="p-2 w-12"></th>
             <th data-sort="name" class="p-2 text-left">Game</th>
             <th data-sort="status" class="p-2 text-left">Status</th>
@@ -143,9 +158,150 @@
     <p id="rowCount" class="text-slate-400 text-sm mt-2"></p>
   </div>
 
+  <div id="bulkBar" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-800 border-t border-slate-600 hidden">
+    <div class="max-w-[1600px] mx-auto px-4 py-2 flex flex-wrap items-center gap-2 text-sm">
+      <span id="bulkCount" class="text-slate-200 font-medium mr-2">0 selected</span>
+      <span class="text-slate-500 text-xs mr-2">Status:</span>
+      <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="backlog">Backlog</button>
+      <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="next">Next</button>
+      <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="playing">Playing</button>
+      <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="finished">Finished</button>
+      <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="skip">Skip</button>
+      <span class="text-slate-500 text-xs ml-2 mr-1">Priority:</span>
+      <select id="bulkPriority" class="bg-slate-700 border border-slate-600 rounded text-xs px-1 py-1">
+        <option value="">—</option>
+        <option value="0">0</option><option value="1">1</option><option value="2">2</option>
+        <option value="3">3</option><option value="4">4</option><option value="5">5</option>
+      </select>
+      <button type="button" id="bulkApplyPriority" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs">Set priority</button>
+      <button type="button" id="bulkClear" class="ml-auto px-2 py-1 rounded text-slate-400 hover:text-slate-200 text-xs">Clear selection</button>
+    </div>
+  </div>
+
+  <!-- Filter drawer -->
+  <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/50 z-40" aria-hidden="true"></div>
+  <aside id="filterDrawer" class="fixed top-0 right-0 h-full w-[min(360px,92vw)] bg-slate-800 border-l border-slate-600 z-50 flex flex-col shadow-2xl" aria-hidden="true">
+    <div class="flex items-center justify-between p-3 border-b border-slate-700 shrink-0">
+      <h2 class="text-sm font-semibold text-slate-100 uppercase tracking-wide">Filters</h2>
+      <button type="button" id="closeFiltersBtn" class="text-slate-400 hover:text-slate-100 text-xl leading-none px-2" aria-label="Close filters">&times;</button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-3 space-y-0 text-sm">
+      <div class="drawer-section">
+        <label class="text-xs text-slate-400 block mb-1">Status</label>
+        <select id="statusFilter" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5">
+          <option value="">All statuses</option>
+          <option value="backlog">Backlog</option>
+          <option value="next">Next up</option>
+          <option value="playing">Playing</option>
+          <option value="finished">Finished</option>
+          <option value="skip">Skip</option>
+        </select>
+      </div>
+      <div class="drawer-section">
+        <label class="text-xs text-slate-400 block mb-2">Store</label>
+        <div id="storeChips" class="flex flex-wrap gap-1.5 items-center">
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs active bg-slate-700" data-store="">All</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="steam">Steam</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="gog">GOG</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="psn">PSN</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="epic">Epic</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="amazon">Amazon</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="nintendo">Nintendo</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="xbox">Xbox</button>
+          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="other">Other</button>
+        </div>
+        <label class="text-xs text-slate-300 mt-2 flex items-center gap-1.5" title="Hide secondary copies. Priority: Steam > PSN > GOG > Epic > Amazon > Nintendo > Xbox > Other.">
+          <input id="crossStoreDedup" type="checkbox" class="rounded" />
+          Hide duplicates
+        </label>
+      </div>
+      <div class="drawer-section">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs text-slate-400">Genres</span>
+          <label class="text-xs text-slate-400 flex items-center gap-1">Mode
+            <select id="genreMode" class="bg-slate-700 border border-slate-600 rounded text-xs px-1 py-0.5">
+              <option value="OR">OR</option>
+              <option value="AND">AND</option>
+            </select>
+          </label>
+        </div>
+        <div id="genreChips" class="flex flex-wrap gap-1.5 collapsed"></div>
+        <button type="button" id="toggleGenreChipsBtn" class="hidden mt-2 text-xs text-sky-400 hover:underline"></button>
+      </div>
+      <div class="drawer-section">
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+          <span class="text-xs text-slate-400">My tags</span>
+          <select id="tagFilterMode" class="bg-slate-700 border border-slate-600 rounded text-xs px-1 py-0.5" title="How multiple tag filters combine">
+            <option value="OR">Any tag</option>
+            <option value="AND">All tags</option>
+          </select>
+          <button type="button" id="addTagBtn" class="px-2 py-0.5 rounded border border-slate-600 text-xs text-slate-300 hover:bg-slate-700">+ Tag selected</button>
+        </div>
+        <div id="tagChips" class="flex flex-wrap gap-1.5"></div>
+      </div>
+      <div class="drawer-section space-y-3">
+        <label class="block text-xs text-slate-300">Min rating % <span id="minRatingVal" class="text-slate-100">0</span>
+          <input id="minRating" type="range" min="0" max="100" value="0" class="w-full mt-1" />
+        </label>
+        <label class="block text-xs text-slate-300">Max length (h) <span id="maxHoursVal" class="text-slate-100">200+</span>
+          <input id="maxHours" type="range" min="0" max="200" value="200" class="w-full mt-1" />
+        </label>
+      </div>
+      <div class="drawer-section space-y-2">
+        <label class="flex items-center gap-2 text-xs text-slate-300">
+          <input id="unplayedOnly" type="checkbox" class="rounded" />
+          Unplayed only
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-300">
+          <input id="showScoreColumn" type="checkbox" />
+          Show score column
+        </label>
+        <button type="button" id="cleanupModeBtn" class="w-full bg-orange-800 hover:bg-orange-700 px-3 py-2 rounded text-sm" title="Backlog, 0 playtime, rating under 60%, released 2+ years ago">Cleanup mode</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Add-game modal -->
+  <div id="addGameModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-700 p-3">
+        <h3 class="text-lg font-semibold text-slate-100">Add a game</h3>
+        <button id="addGameClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
+      </div>
+      <div class="p-4 space-y-3 overflow-y-auto">
+        <div class="flex flex-wrap gap-2 items-end">
+          <label class="flex-1 min-w-[200px] text-xs text-slate-300">Title
+            <input id="addGameTitle" type="text" autocomplete="off" placeholder="e.g. The Legend of Zelda: Tears of the Kingdom" class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300">Platform
+            <select id="addGamePlatform" class="block mt-1 bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm">
+              <option value="steam">Steam</option>
+              <option value="gog">GOG</option>
+              <option value="epic">Epic</option>
+              <option value="psn">PlayStation</option>
+              <option value="nintendo">Nintendo</option>
+              <option value="xbox">Xbox</option>
+              <option value="amazon">Amazon</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <button id="addGameSearch" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 rounded text-sm">Search Steam</button>
+        </div>
+        <p id="addGameHint" class="text-xs text-slate-400">Type a title and click Search Steam. Pick the closest match to import its cover, Steam rating, and store link. The game will be saved under your chosen platform.</p>
+        <div id="addGameStatus" class="text-xs text-amber-400"></div>
+        <div id="addGameResults" class="space-y-2"></div>
+      </div>
+      <div class="border-t border-slate-700 p-3 flex justify-between items-center gap-2">
+        <button id="addGameSkipSteam" class="text-xs text-slate-400 hover:text-slate-200 underline">Save without Steam match (title only)</button>
+        <div class="text-xs text-slate-500">Manual entries are saved in your browser. <button id="addGameExport" class="underline hover:text-slate-300">Export</button> / <label class="underline hover:text-slate-300 cursor-pointer">Import<input id="addGameImport" type="file" accept=".json" class="hidden" /></label></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const STORAGE_KEY = "steam-backlog-personal";
     const PREFS_KEY = "steam-backlog-ui-prefs";
+    const MANUAL_KEY = "steam-backlog-manual-games";
     let allGames = [];
     let personal = loadPersonal();
     let prefs = loadPrefs();
@@ -153,7 +309,113 @@
     let sortDir = 1;
     let expandedKeys = new Set();
     let pickedKey = null;
-    let libraryMeta = { steam: null, gog: null };
+    let libraryMeta = { steam: null, gog: null, psn: null, epic: null, amazon: null, nintendo: null, wishlist: null };
+    let crossStoreHiddenKeys = new Set();
+    let wishlistGames = [];
+    let itadByKey = {};
+    let activeView = "library";
+    let selectedKeys = new Set();
+    let cleanupModeActive = false;
+    let focusedRowIndex = -1;
+    let ownedNormNames = new Set();
+    const CLEANUP_MAX_RATING = 60;
+    const CLEANUP_MIN_AGE_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
+    const GENRE_CHIP_COLLAPSE_AT = 12;
+    const GENRE_ALIASES = { Simulator: "Simulation", Sport: "Sports" };
+    let filtersDrawerOpen = false;
+    let genreChipsExpanded = false;
+
+    // === Constants & config ===
+    const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "xbox", "other", "manual"];
+    const JUNK_NAMES = new Set(["live", "fortnite"]);
+    const JUNK_NAME_PATTERNS = [
+      /\btech beta\b/i,
+      /\b(pre[- ]game )?editor\b/i,
+      /\bresource archiver\b/i,
+      /\bbeta\b$/i,
+    ];
+
+    // === Game normalization & dedup ===
+    function storePriority(store) {
+      const idx = STORE_PRIORITY.indexOf(store);
+      return idx === -1 ? STORE_PRIORITY.length : idx;
+    }
+
+    function normalizeNameForDedup(name) {
+      return String(name || "")
+        .toLowerCase()
+        .replace(/[\u2122\u00ae\u00a9]/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\b(remastered|edition|complete|gold|definitive|enhanced|classic|goty|of the year|game of the year|special|standard|deluxe|collection|anthology|pack|the)\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function isJunkEntry(g) {
+      const raw = String(g.name || "").trim();
+      if (!raw) return true;
+      const lower = raw.toLowerCase();
+      if (JUNK_NAMES.has(lower)) return true;
+      return JUNK_NAME_PATTERNS.some(re => re.test(raw));
+    }
+
+    function dedupeWithinStore(games) {
+      const byKey = new Map();
+      for (const g of games) {
+        if (isJunkEntry(g)) continue;
+        const ng = normalizeGame(g);
+        const key = `${ng.store}:${ng.id}`;
+        const existing = byKey.get(key);
+        if (!existing || scoreEntry(g) > scoreEntry(existing)) byKey.set(key, g);
+      }
+      const byNorm = new Map();
+      const noNameOut = [];
+      for (const g of byKey.values()) {
+        const ng = normalizeGame(g);
+        const norm = normalizeNameForDedup(g.name);
+        if (!norm) { noNameOut.push(g); continue; }
+        const composite = `${ng.store}::${norm}`;
+        const existing = byNorm.get(composite);
+        if (!existing || scoreEntry(g) > scoreEntry(existing)) byNorm.set(composite, g);
+      }
+      return [...byNorm.values(), ...noNameOut];
+    }
+
+    function scoreEntry(g) {
+      let s = 0;
+      if (g.header_image) s += 4;
+      if (g.library_image) s += 2;
+      if (g.hltb_main_hours) s += 2;
+      if (g.steam_review_percent != null) s += 2;
+      if (g.release_date) s += 1;
+      if ((g.genres || []).length) s += 1;
+      if (g.playtime_minutes) s += 1;
+      return s;
+    }
+
+    function recomputeCrossStoreHidden() {
+      crossStoreHiddenKeys = new Set();
+      if (!prefs.crossStoreDedup) return;
+      const groups = new Map();
+      for (const g of allGames) {
+        const norm = normalizeNameForDedup(g.name);
+        if (!norm) continue;
+        if (!groups.has(norm)) groups.set(norm, []);
+        groups.get(norm).push(g);
+      }
+      for (const [, list] of groups) {
+        if (list.length < 2) continue;
+        list.sort((a, b) => {
+          const pa = storePriority(normalizeGame(a).store);
+          const pb = storePriority(normalizeGame(b).store);
+          if (pa !== pb) return pa - pb;
+          return scoreEntry(b) - scoreEntry(a);
+        });
+        for (let i = 1; i < list.length; i++) {
+          crossStoreHiddenKeys.add(gameKey(list[i]));
+        }
+      }
+    }
 
     window.coverFallback = function (img) {
       const fb = img.dataset.fallback;
@@ -166,7 +428,13 @@
       const cls = img.classList.contains("pick-cover") ? "pick-cover placeholder" : "cover placeholder";
       img.outerHTML = `<div class="${cls}" title="${name.replace(/"/g, "&quot;")}">${name.slice(0, 18)}</div>`;
     };
+    window.markLandscape = function (img) {
+      if (img.naturalWidth && img.naturalHeight && img.naturalWidth > img.naturalHeight * 1.1) {
+        img.classList.add("landscape");
+      }
+    };
 
+    // === Storage ===
     function loadPersonal() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
     }
@@ -184,13 +452,32 @@
     }
     function savePersonal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(personal)); }
     function loadPrefs() {
-      const fallback = { picksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "" };
+      const fallback = { picksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR" };
       try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
     }
     function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
+    function loadManualGames() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(MANUAL_KEY) || "[]");
+        return Array.isArray(raw) ? raw : [];
+      } catch { return []; }
+    }
+    function saveManualGames(list) { localStorage.setItem(MANUAL_KEY, JSON.stringify(list)); }
+    let manualGames = loadManualGames();
+    function addManualGame(g) {
+      manualGames = loadManualGames();
+      const dupIdx = manualGames.findIndex(m => m.id === g.id && m.store === g.store);
+      if (dupIdx >= 0) manualGames[dupIdx] = g;
+      else manualGames.push(g);
+      saveManualGames(manualGames);
+    }
+    function removeManualGame(store, id) {
+      manualGames = loadManualGames().filter(m => !(m.store === store && m.id === id));
+      saveManualGames(manualGames);
+    }
     function normalizeGame(g) {
       const store = g.store || "steam";
-      const id = g.id ?? g.appid ?? g.gog_id;
+      const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id;
       return { ...g, store, id };
     }
     function gameKey(g) {
@@ -206,20 +493,46 @@
       if (ng.store === "steam") return `https://cdn.akamai.steamstatic.com/steam/apps/${ng.id}/header.jpg`;
       return "";
     }
+    const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, tags: [] };
     function getPersonal(g) {
       const key = gameKey(g);
-      if (personal[key]) return personal[key];
-      const legacy = personal[normalizeGame(g).id];
-      if (legacy && typeof legacy === "object") return legacy;
-      return { status: "backlog", notes: "", priority: 0, hltb_override: null };
+      const found = personal[key] || (typeof personal[normalizeGame(g).id] === "object" ? personal[normalizeGame(g).id] : null);
+      if (!found) return { ...PERSONAL_DEFAULT, tags: [] };
+      return { ...PERSONAL_DEFAULT, ...found, tags: Array.isArray(found.tags) ? found.tags : [] };
     }
     function setPersonal(g, field, value) {
       const key = gameKey(g);
-      if (!personal[key]) personal[key] = { status: "backlog", notes: "", priority: 0, hltb_override: null };
+      if (!personal[key]) personal[key] = { ...PERSONAL_DEFAULT, tags: [] };
+      if (!Array.isArray(personal[key].tags)) personal[key].tags = [];
       personal[key][field] = value;
       savePersonal();
       renderSummary();
       renderPicks();
+    }
+    function normalizeTag(t) {
+      return String(t || "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 32);
+    }
+    function addTagToGame(g, raw) {
+      const tag = normalizeTag(raw);
+      if (!tag) return false;
+      const cur = getPersonal(g).tags;
+      if (cur.includes(tag)) return false;
+      setPersonal(g, "tags", [...cur, tag].sort());
+      return true;
+    }
+    function removeTagFromGame(g, tag) {
+      const cur = getPersonal(g).tags;
+      if (!cur.includes(tag)) return false;
+      setPersonal(g, "tags", cur.filter(x => x !== tag));
+      return true;
+    }
+    function allPersonalTags() {
+      const counts = new Map();
+      for (const v of Object.values(personal)) {
+        if (!v || typeof v !== "object" || !Array.isArray(v.tags)) continue;
+        for (const t of v.tags) counts.set(t, (counts.get(t) || 0) + 1);
+      }
+      return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
     }
     function hltbMain(g) {
       const p = getPersonal(g);
@@ -227,6 +540,12 @@
       return g.hltb_main_hours;
     }
     function ratingValue(g) { return g.steam_review_percent ?? g.metacritic_score ?? 0; }
+    const MIN_REVIEW_COUNT = 50;
+    function hasEnoughReviews(g) {
+      const pct = g.steam_review_percent;
+      if (pct != null && pct > 0) return (g.steam_review_count || 0) >= MIN_REVIEW_COUNT;
+      return (g.metacritic_score || 0) > 0;
+    }
     function priorityScore(g) {
       const p = getPersonal(g);
       const review = ratingValue(g);
@@ -236,11 +555,11 @@
     function isHiddenGem(g) {
       const p = getPersonal(g);
       const rating = g.steam_review_percent ?? g.metacritic_score ?? 0;
-      return rating >= 90 && (g.playtime_minutes || 0) === 0 && p.status !== "skip";
+      return rating >= 90 && (g.playtime_minutes || 0) === 0 && p.status === "backlog";
     }
     function storeBadgeHtml(g) {
       const s = normalizeGame(g).store;
-      const label = s === "gog" ? "G" : "S";
+      const label = s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "xbox" ? "X" : s === "other" ? "?" : "S";
       return `<span class="store-badge ${s}" title="${s.toUpperCase()}">${label}</span>`;
     }
     function formatHours(minutes) { return !minutes ? "0h" : `${(minutes / 60).toFixed(1)}h`; }
@@ -253,6 +572,43 @@
     function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
     function escapeAttr(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 
+    function buildOwnedNormNames() {
+      ownedNormNames = new Set();
+      for (const g of allGames) {
+        if (crossStoreHiddenKeys.has(gameKey(g))) continue;
+        const n = normalizeNameForDedup(g.name);
+        if (n) ownedNormNames.add(n);
+      }
+    }
+
+    function isOwnedByTitle(name) {
+      const n = normalizeNameForDedup(name);
+      return n && ownedNormNames.has(n);
+    }
+
+    function isCleanupCandidate(g) {
+      const p = getPersonal(g);
+      if (p.status !== "backlog") return false;
+      if ((g.playtime_minutes || 0) > 0) return false;
+      const rating = ratingValue(g);
+      if (rating > 0 && rating >= CLEANUP_MAX_RATING) return false;
+      const released = parseReleaseForSort(g.release_date);
+      if (!released) return true;
+      return Date.now() - released >= CLEANUP_MIN_AGE_MS;
+    }
+
+    function getItadForGame(g) {
+      const key = gameKey(g);
+      if (itadByKey[key]) return itadByKey[key];
+      const ng = normalizeGame(g);
+      if (ng.store === "steam" || ng.store === "wishlist") {
+        const alt = itadByKey[`steam:${ng.id}`] || itadByKey[`wishlist:${ng.id}`];
+        if (alt) return alt;
+      }
+      return null;
+    }
+
+    // === Filter + sort ===
     function filteredGames() {
       const q = document.getElementById("search").value.toLowerCase().trim();
       const status = document.getElementById("statusFilter").value;
@@ -261,11 +617,16 @@
       const maxHours = +document.getElementById("maxHours").value;
       const genres = prefs.genreFilters;
       const genreMode = prefs.genreFilterMode;
+      const source = activeView === "wishlist" ? wishlistGames : allGames;
 
-      return allGames.filter(g => {
+      return source.filter(g => {
         const ng = normalizeGame(g);
         const p = getPersonal(g);
-        if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
+        if (activeView === "library") {
+          if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
+          if (crossStoreHiddenKeys.has(gameKey(g))) return false;
+        }
+        if (cleanupModeActive && activeView === "library" && !isCleanupCandidate(g)) return false;
         if (q && !g.name.toLowerCase().includes(q)) return false;
         if (status && p.status !== status) return false;
         if (unplayed && (g.playtime_minutes || 0) > 0) return false;
@@ -273,16 +634,58 @@
         if (minRating > 0 && rating < minRating) return false;
         const h = hltbMain(g);
         if (maxHours < 200 && h != null && h > maxHours) return false;
-        if (genres.length) {
-          const gameGenres = g.genres || [];
-          if (genreMode === "AND") {
-            if (!genres.every(x => gameGenres.includes(x))) return false;
-          } else if (!genres.some(x => gameGenres.includes(x))) {
+        if (genres.length && !gameMatchesGenreFilters(g, genres, genreMode)) return false;
+        const tagFilters = prefs.tagFilters || [];
+        if (tagFilters.length) {
+          const gameTags = p.tags || [];
+          if (prefs.tagFilterMode === "AND") {
+            if (!tagFilters.every(t => gameTags.includes(t))) return false;
+          } else if (!tagFilters.some(t => gameTags.includes(t))) {
             return false;
           }
         }
         return true;
       });
+    }
+
+    function visibleListForKeyboard() {
+      return sortedGames(filteredGames());
+    }
+
+    // === Selection & bulk ===
+    function updateBulkBar() {
+      const bar = document.getElementById("bulkBar");
+      const n = selectedKeys.size;
+      document.getElementById("bulkCount").textContent = `${n} selected`;
+      const show = n > 0 && activeView === "library";
+      bar.classList.toggle("hidden", !show);
+      document.body.classList.toggle("bulk-bar-open", show);
+    }
+
+    function toggleSelection(key, on) {
+      if (on) selectedKeys.add(key);
+      else selectedKeys.delete(key);
+      updateBulkBar();
+    }
+
+    function bulkSetStatus(status) {
+      for (const key of selectedKeys) {
+        const g = findGameByKey(key);
+        if (g) setPersonal(g, "status", status);
+      }
+      selectedKeys.clear();
+      updateBulkBar();
+      renderTable();
+    }
+
+    function bulkSetPriority(priority) {
+      for (const key of selectedKeys) {
+        const g = findGameByKey(key);
+        if (g) setPersonal(g, "priority", priority);
+      }
+      selectedKeys.clear();
+      updateBulkBar();
+      renderTable();
     }
 
     function sortedGames(list) {
@@ -315,51 +718,90 @@
       const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : (g.metacritic_score != null ? `${g.metacritic_score}` : "—");
       const h = hltbMain(g);
       const store = normalizeGame(g).store;
+      const badge = store === "gog" ? "G" : store === "psn" ? "P" : store === "epic" ? "E" : store === "amazon" ? "A" : store === "nintendo" ? "N" : store === "xbox" ? "X" : store === "other" ? "?" : "S";
       return `
         <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
-          <span class="pick-store store-badge ${store}">${store === "gog" ? "G" : "S"}</span>
-          <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+          <span class="pick-store store-badge ${store}">${badge}</span>
+          <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
           <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
           <div class="text-xs text-slate-400 flex justify-between"><span>${rating}</span><span>${h != null ? `${h}h` : ""}</span></div>
         </div>`;
     }
 
+    function passesTagFilter(g) {
+      const tagFilters = prefs.tagFilters || [];
+      if (!tagFilters.length) return true;
+      const gameTags = getPersonal(g).tags || [];
+      if (prefs.tagFilterMode === "AND") return tagFilters.every(t => gameTags.includes(t));
+      return tagFilters.some(t => gameTags.includes(t));
+    }
+
     function renderPicks() {
       const tab = prefs.picksTab;
-      const backlogRated = allGames
-        .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) > 0)
+      const visible = allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g)) && passesTagFilter(g));
+      const backlogRated = visible
+        .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) > 0 && hasEnoughReviews(g))
         .sort((a, b) => ratingValue(b) - ratingValue(a));
-      const nextUp = allGames.filter(g => getPersonal(g).status === "next").sort((a, b) => {
+      const nextUp = visible.filter(g => getPersonal(g).status === "next").sort((a, b) => {
         const pa = getPersonal(a).priority;
         const pb = getPersonal(b).priority;
         if (pb !== pa) return pb - pa;
         return ratingValue(b) - ratingValue(a);
       });
-      const quickWins = allGames
-        .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) >= 75 && (hltbMain(g) || 999) <= prefs.quickWinMaxHours)
+      const quickWins = visible
+        .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) >= 75 && hasEnoughReviews(g) && (hltbMain(g) || 999) <= prefs.quickWinMaxHours)
         .sort((a, b) => ratingValue(b) - ratingValue(a));
-      const hidden = allGames.filter(isHiddenGem).sort((a, b) => ratingValue(b) - ratingValue(a));
+      const hidden = visible.filter(g => isHiddenGem(g) && hasEnoughReviews(g)).sort((a, b) => ratingValue(b) - ratingValue(a));
       const data = tab === "nextUp" ? nextUp : tab === "quickWins" ? quickWins : tab === "hiddenGems" ? hidden : backlogRated;
-      const countLabel = `${Math.min(data.length, 12)} of ${data.length}`;
+      const limit = prefs.picksLimit || 16;
+      const countLabel = `${Math.min(data.length, limit)} of ${data.length}`;
       document.getElementById("pickMeta").textContent = countLabel;
       document.getElementById("picksGrid").innerHTML = data.length
-        ? data.slice(0, 12).map(pickCardHtml).join("")
+        ? data.slice(0, limit).map(pickCardHtml).join("")
         : '<div class="col-span-full text-sm text-slate-400 italic">No games match this tab yet.</div>';
       document.querySelectorAll(".pick-tab").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+      renderPicksLimitButtons();
+    }
+
+    function normalizePicksLimit() {
+      const validLimits = [16, 24, 48, 96];
+      const n = Number(prefs.picksLimit);
+      if (!validLimits.includes(n)) {
+        prefs.picksLimit = 16;
+        savePrefs();
+      }
+      return prefs.picksLimit;
+    }
+
+    function renderPicksLimitButtons() {
+      const limit = normalizePicksLimit();
+      document.querySelectorAll(".picks-limit-btn").forEach(btn => {
+        btn.classList.toggle("active", +btn.dataset.limit === limit);
+      });
     }
 
     function renderSummary() {
-      const backlog = allGames.filter(g => getPersonal(g).status === "backlog");
+      const visible = allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g)));
+      const backlog = visible.filter(g => getPersonal(g).status === "backlog");
       const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
-      const played = allGames.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
-      const steamCount = allGames.filter(g => normalizeGame(g).store === "steam").length;
-      const gogCount = allGames.filter(g => normalizeGame(g).store === "gog").length;
-      const rated = allGames.filter(g => ratingValue(g) > 0);
+      const played = visible.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
+      const steamCount = visible.filter(g => normalizeGame(g).store === "steam").length;
+      const gogCount = visible.filter(g => normalizeGame(g).store === "gog").length;
+      const psnCount = visible.filter(g => normalizeGame(g).store === "psn").length;
+      const epicCount = visible.filter(g => normalizeGame(g).store === "epic").length;
+      const amazonCount = visible.filter(g => normalizeGame(g).store === "amazon").length;
+      const nintendoCount = visible.filter(g => normalizeGame(g).store === "nintendo").length;
+      const rated = visible.filter(g => ratingValue(g) > 0);
       const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : "—";
+      const hiddenCount = allGames.length - visible.length;
       document.getElementById("summary").innerHTML = `
-        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="text-slate-100 font-semibold ml-1">${allGames.length}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="text-slate-100 font-semibold ml-1">${visible.length}</span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Steam <span class="text-slate-100 font-semibold ml-1">${steamCount}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">GOG <span class="text-slate-100 font-semibold ml-1">${gogCount}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">PSN <span class="text-slate-100 font-semibold ml-1">${psnCount}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Epic <span class="text-slate-100 font-semibold ml-1">${epicCount}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Amazon <span class="text-slate-100 font-semibold ml-1">${amazonCount}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Nintendo <span class="text-slate-100 font-semibold ml-1">${nintendoCount}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${totalHltb.toFixed(0)}h</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${played.toFixed(0)}h</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== "—" ? "%" : ""}</span></div>`;
@@ -387,6 +829,13 @@
     }
 
     function formatPrice(g) {
+      const itad = getItadForGame(g);
+      if (itad?.price_str) {
+        const cut = itad.cut ? ` (-${itad.cut}%)` : "";
+        const low = itad.is_historical_low ? " 🔥" : "";
+        const shop = itad.shop ? ` @ ${itad.shop}` : "";
+        return `${itad.price_str}${cut}${low}${shop}`;
+      }
       if (!g.price && g.discount_percent == null) return "—";
       const base = g.price || "N/A";
       if ((g.discount_percent || 0) > 0) {
@@ -398,9 +847,16 @@
     function focusGame(key) {
       expandedKeys.add(key);
       pickedKey = key;
+      const list = visibleListForKeyboard();
+      const idx = list.findIndex(g => gameKey(g) === key);
+      if (idx >= 0) focusedRowIndex = idx;
       renderTable();
-      const row = document.querySelector(`tr[data-row-key="${key}"]`);
-      if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollFocusedRow();
+    }
+
+    function scrollFocusedRow() {
+      const row = document.querySelector("tr.row-focused");
+      if (row) row.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
     function toggleExpand(key) {
@@ -415,21 +871,40 @@
       tbody.innerHTML = "";
       const showScore = !!prefs.showScoreColumn;
       document.getElementById("scoreHeader").classList.toggle("hidden", !showScore);
+      document.getElementById("tableWrap").classList.toggle("cleanup-active", cleanupModeActive && activeView === "library");
+      const selectAll = document.getElementById("selectAllVisible");
+      if (selectAll) {
+        selectAll.disabled = activeView === "wishlist";
+        selectAll.checked = activeView === "library" && list.length > 0 && list.every(g => selectedKeys.has(gameKey(g)));
+      }
 
-      list.forEach(g => {
+      if (focusedRowIndex >= list.length) focusedRowIndex = list.length - 1;
+      if (focusedRowIndex < 0 && list.length) focusedRowIndex = 0;
+
+      list.forEach((g, idx) => {
         const p = getPersonal(g);
         const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
         const hiddenGem = isHiddenGem(g);
         const key = gameKey(g);
         const headerFallback = coverFallbackFor(g);
+        const cleanup = activeView === "library" && isCleanupCandidate(g);
+        const ownedWish = activeView === "wishlist" && isOwnedByTitle(g.name);
+        const selected = selectedKeys.has(key);
+        const focused = idx === focusedRowIndex;
         const tr = document.createElement("tr");
         tr.dataset.rowKey = key;
-        tr.className = rowClass(g, lowConf);
+        tr.dataset.rowIndex = String(idx);
+        tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
         tr.innerHTML = `
-          <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /></td>
+          <td class="p-2 text-center">${activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
+          <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
           <td class="p-2">
-            ${storeBadgeHtml(g)}<a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium game-name">${escapeHtml(g.name)}</a>
-            ${hiddenGem ? '<span class="ml-1 text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
+            <span class="inline-flex items-center gap-1.5 align-middle">
+              ${activeView === "wishlist" ? '<span class="store-badge steam" title="WISHLIST">W</span>' : storeBadgeHtml(g)}
+              <a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium game-name">${escapeHtml(g.name)}</a>
+              ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
+              ${ownedWish ? '<span class="text-amber-400 text-xs ml-1" title="You already own this (matched by title)">owned</span>' : ""}
+            </span>
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </td>
           <td class="p-2">
@@ -457,10 +932,17 @@
           <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
           <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
           <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).join(", ")}">${(g.genres || []).slice(0, 2).join(", ") || "—"}</td>
-          <td class="p-2"><input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full min-w-[100px] px-2 py-1" /></td>`;
+          <td class="p-2 min-w-[180px]">
+            <div class="flex flex-wrap gap-1 mb-1">
+              ${(p.tags || []).map(t => `<span class="row-tag inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-700/40 border border-amber-500/40 text-[11px] text-amber-100">${escapeHtml(t)}<button type="button" class="row-tag-remove text-amber-200 hover:text-white" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("")}
+              <button type="button" class="row-tag-add text-[11px] px-1.5 py-0.5 rounded-full border border-dashed border-slate-500 text-slate-400 hover:text-slate-100 hover:border-slate-300" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>
+            </div>
+            <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
+          </td>`;
 
         tr.addEventListener("click", e => {
           if (e.target.closest("select, input, a, button")) return;
+          focusedRowIndex = idx;
           toggleExpand(key);
         });
 
@@ -469,14 +951,18 @@
         if (expandedKeys.has(key)) {
           const detail = document.createElement("tr");
           detail.className = "bg-slate-800";
+          const itad = getItadForGame(g);
           const extra = [
             g.steam_review_desc,
+            g.trophy_progress != null ? `Trophy progress ${g.trophy_progress}%` : null,
             (g.tags || []).slice(0, 6).join(" · "),
-            g.price_initial && g.price_initial !== g.price ? `Was ${g.price_initial}` : null
+            g.price_initial && g.price_initial !== g.price ? `Was ${g.price_initial}` : null,
+            itad?.url ? `<a href="${itad.url}" class="text-sky-400" target="_blank" rel="noopener">ITAD deal</a>` : null,
+            itad?.is_historical_low ? "Historical low" : null,
           ].filter(Boolean).join(" · ");
-          const cols = showScore ? 14 : 13;
+          const cols = showScore ? 15 : 14;
           detail.innerHTML = `<td colspan="${cols}" class="p-3 text-sm text-slate-300 border-t border-slate-700">
-            <img src="${headerFallback}" data-fallback="" data-name="${escapeAttr(g.name)}" class="max-h-24 rounded float-right ml-4" alt="" onerror="window.coverFallback(this)" />
+            <img src="${headerFallback}" data-fallback="" data-name="${escapeAttr(g.name)}" class="max-h-24 rounded float-right ml-4" alt="" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
             ${extra || "No extra details."}
             <a href="${g.store_url}" class="text-sky-400 ml-2" target="_blank" rel="noopener">Store →</a>
           </td>`;
@@ -484,28 +970,217 @@
         }
       });
 
-      document.getElementById("rowCount").textContent = `Showing ${list.length} of ${allGames.length} games`;
+      const base = activeView === "wishlist"
+        ? `Wishlist: ${list.length} of ${wishlistGames.length}`
+        : `Showing ${list.length} of ${allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g))).length} games`;
+      const extra = cleanupModeActive && activeView === "library" ? " · cleanup mode" : "";
+      document.getElementById("rowCount").textContent = base + extra;
+      updateBulkBar();
+    }
+
+    // === Drawer + active pills ===
+    function aliasCanonicalGenre(name) {
+      return GENRE_ALIASES[name] || name;
+    }
+    function gameGenresCanonical(g) {
+      return [...new Set((g.genres || []).map(aliasCanonicalGenre))];
+    }
+    function gameMatchesGenreFilters(g, genres, genreMode) {
+      const gameGenres = gameGenresCanonical(g);
+      if (!genres.length) return true;
+      if (genreMode === "AND") return genres.every(x => gameGenres.includes(x));
+      return genres.some(x => gameGenres.includes(x));
+    }
+
+    function collectActiveFilters() {
+      const pills = [];
+      const q = document.getElementById("search").value.trim();
+      if (q) pills.push({ kind: "search", value: q, label: `Search: ${q}` });
+      const status = document.getElementById("statusFilter").value;
+      if (status) pills.push({ kind: "status", value: status, label: `Status: ${status}` });
+      if (prefs.storeFilter) pills.push({ kind: "store", value: prefs.storeFilter, label: `Store: ${prefs.storeFilter}` });
+      for (const g of prefs.genreFilters || []) pills.push({ kind: "genre", value: g, label: g });
+      for (const t of prefs.tagFilters || []) pills.push({ kind: "tag", value: t, label: `#${t}` });
+      if (document.getElementById("unplayedOnly").checked) pills.push({ kind: "unplayed", value: "1", label: "Unplayed only" });
+      const minR = +document.getElementById("minRating").value;
+      if (minR > 0) pills.push({ kind: "minRating", value: String(minR), label: `Rating ≥ ${minR}%` });
+      const maxH = +document.getElementById("maxHours").value;
+      if (maxH < 200) pills.push({ kind: "maxHours", value: String(maxH), label: `HLTB ≤ ${maxH}h` });
+      if (cleanupModeActive && activeView === "library") pills.push({ kind: "cleanup", value: "1", label: "Cleanup mode" });
+      if (prefs.crossStoreDedup) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
+      if ((prefs.tagFilters || []).length > 1 && prefs.tagFilterMode === "AND") {
+        pills.push({ kind: "tagMode", value: "AND", label: "Tags: all" });
+      }
+      return pills;
+    }
+
+    function renderFiltersButtonBadge() {
+      const n = collectActiveFilters().length;
+      const badge = document.getElementById("filtersBtnBadge");
+      if (!badge) return;
+      badge.textContent = String(n);
+      badge.classList.toggle("hidden", n === 0);
+    }
+
+    function renderActiveFilterPills() {
+      const wrap = document.getElementById("activeFilterPills");
+      if (!wrap) return;
+      const pills = collectActiveFilters();
+      if (!pills.length) {
+        wrap.classList.add("hidden");
+        wrap.innerHTML = "";
+        return;
+      }
+      wrap.classList.remove("hidden");
+      wrap.innerHTML = pills.map(p => `
+        <span class="active-filter-pill">
+          ${escapeHtml(p.label)}
+          <button type="button" class="active-filter-remove" data-kind="${escapeAttr(p.kind)}" data-value="${escapeAttr(p.value)}" aria-label="Remove filter">×</button>
+        </span>
+      `).join("") + `<button type="button" id="clearAllFiltersBtn" class="text-xs text-slate-400 hover:text-slate-200 underline ml-1">Clear all</button>`;
+      wrap.querySelector("#clearAllFiltersBtn")?.addEventListener("click", clearAllFilters);
+      wrap.querySelectorAll(".active-filter-remove").forEach(btn => {
+        btn.addEventListener("click", () => removeActiveFilter(btn.dataset.kind, btn.dataset.value));
+      });
+    }
+
+    function removeActiveFilter(kind, value) {
+      switch (kind) {
+        case "search": document.getElementById("search").value = ""; break;
+        case "status": document.getElementById("statusFilter").value = ""; break;
+        case "store": prefs.storeFilter = ""; savePrefs(); renderStoreChips(); break;
+        case "genre":
+          prefs.genreFilters = (prefs.genreFilters || []).filter(x => x !== value);
+          savePrefs();
+          break;
+        case "tag":
+          prefs.tagFilters = (prefs.tagFilters || []).filter(x => x !== value);
+          savePrefs();
+          break;
+        case "unplayed": document.getElementById("unplayedOnly").checked = false; break;
+        case "minRating": document.getElementById("minRating").value = "0"; document.getElementById("minRatingVal").textContent = "0"; break;
+        case "maxHours": document.getElementById("maxHours").value = "200"; document.getElementById("maxHoursVal").textContent = "200+"; break;
+        case "cleanup": cleanupModeActive = false; updateCleanupBtnState(); break;
+        case "dedup":
+          prefs.crossStoreDedup = false;
+          savePrefs();
+          document.getElementById("crossStoreDedup").checked = false;
+          recomputeCrossStoreHidden();
+          renderSummary();
+          break;
+        case "tagMode":
+          prefs.tagFilterMode = "OR";
+          savePrefs();
+          document.getElementById("tagFilterMode").value = "OR";
+          break;
+      }
+      refreshFilterUI();
+    }
+
+    function clearAllFilters() {
+      document.getElementById("search").value = "";
+      document.getElementById("statusFilter").value = "";
+      document.getElementById("unplayedOnly").checked = false;
+      document.getElementById("minRating").value = "0";
+      document.getElementById("minRatingVal").textContent = "0";
+      document.getElementById("maxHours").value = "200";
+      document.getElementById("maxHoursVal").textContent = "200+";
+      prefs.storeFilter = "";
+      prefs.genreFilters = [];
+      prefs.tagFilters = [];
+      prefs.tagFilterMode = "OR";
+      cleanupModeActive = false;
+      savePrefs();
+      document.getElementById("crossStoreDedup").checked = false;
+      prefs.crossStoreDedup = false;
+      document.getElementById("tagFilterMode").value = "OR";
+      recomputeCrossStoreHidden();
+      renderSummary();
+      updateCleanupBtnState();
+      refreshFilterUI();
+    }
+
+    function openFiltersDrawer() {
+      filtersDrawerOpen = true;
+      document.getElementById("filterDrawerBackdrop").classList.add("open");
+      document.getElementById("filterDrawer").classList.add("open");
+      document.getElementById("filterDrawerBackdrop").setAttribute("aria-hidden", "false");
+      document.getElementById("filterDrawer").setAttribute("aria-hidden", "false");
+    }
+
+    function closeFiltersDrawer() {
+      filtersDrawerOpen = false;
+      document.getElementById("filterDrawerBackdrop").classList.remove("open");
+      document.getElementById("filterDrawer").classList.remove("open");
+      document.getElementById("filterDrawerBackdrop").setAttribute("aria-hidden", "true");
+      document.getElementById("filterDrawer").setAttribute("aria-hidden", "true");
+    }
+
+    function updateCleanupBtnState() {
+      const btn = document.getElementById("cleanupModeBtn");
+      if (!btn) return;
+      btn.classList.toggle("active", cleanupModeActive);
+      btn.classList.toggle("ring-2", cleanupModeActive);
+      btn.classList.toggle("ring-orange-400", cleanupModeActive);
+    }
+
+    function updateGenreChipsCollapse() {
+      const el = document.getElementById("genreChips");
+      const btn = document.getElementById("toggleGenreChipsBtn");
+      if (!el || !btn) return;
+      const count = el.querySelectorAll(".genre-chip").length;
+      if (count <= GENRE_CHIP_COLLAPSE_AT) {
+        btn.classList.add("hidden");
+        el.classList.remove("collapsed", "expanded");
+        return;
+      }
+      btn.classList.remove("hidden");
+      btn.textContent = genreChipsExpanded ? "Show fewer genres" : `Show all (${count})`;
+      el.classList.toggle("collapsed", !genreChipsExpanded);
+      el.classList.toggle("expanded", genreChipsExpanded);
+    }
+
+    function refreshFilterUI() {
+      renderFiltersButtonBadge();
+      renderActiveFilterPills();
+      renderTable();
+      renderPicks();
     }
 
     function renderGenreChips() {
-      const genres = [...new Set(allGames.flatMap(g => g.genres || []))].sort();
+      const genres = [...new Set(allGames.flatMap(g => (g.genres || []).map(aliasCanonicalGenre)))].sort();
       const html = genres.map(genre => {
-        const active = prefs.genreFilters.includes(genre);
-        return `<button class="genre-chip px-2 py-1 rounded border border-slate-600 text-xs ${active ? "active" : "bg-slate-700 text-slate-300"}" data-genre="${escapeAttr(genre)}">${escapeHtml(genre)}</button>`;
+        const active = (prefs.genreFilters || []).includes(genre);
+        return `<button type="button" class="genre-chip px-2 py-1 rounded border border-slate-600 text-xs ${active ? "active" : "bg-slate-700 text-slate-300"}" data-genre="${escapeAttr(genre)}">${escapeHtml(genre)}</button>`;
       }).join("");
       document.getElementById("genreChips").innerHTML = html || '<span class="text-xs text-slate-400">No genres found.</span>';
+      updateGenreChipsCollapse();
+    }
+
+    function renderTagChips() {
+      const tags = allPersonalTags();
+      const wrap = document.getElementById("tagChips");
+      if (!wrap) return;
+      if (!tags.length) {
+        wrap.innerHTML = '<span class="text-xs text-slate-500 italic">No personal tags yet. Use "+ Tag selected" or the tag input on a row.</span>';
+        return;
+      }
+      wrap.innerHTML = tags.map(([t, n]) => {
+        const active = (prefs.tagFilters || []).includes(t);
+        return `<button class="personal-tag-chip px-2 py-0.5 rounded-full border text-xs ${active ? "bg-amber-600 border-amber-400 text-white" : "bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600"}" data-tag="${escapeAttr(t)}">${escapeHtml(t)}<span class="ml-1 text-[10px] text-slate-400">${n}</span></button>`;
+      }).join("");
     }
 
     function exportCsv() {
       const list = sortedGames(filteredGames());
-      const headers = ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "metacritic", "price", "discount_percent", "release_date", "genres", "notes"];
+      const headers = ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "metacritic", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
       const rows = list.map(g => {
         const p = getPersonal(g);
         const ng = normalizeGame(g);
         return [
           ng.store, ng.id, g.name, p.status, p.priority, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
           hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "", g.metacritic_score ?? "",
-          g.price ?? "", g.discount_percent ?? "", g.release_date ?? "", (g.genres || []).join("; "), p.notes
+          g.price ?? "", g.discount_percent ?? "", g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes
         ].map(x => `"${String(x).replace(/"/g, '""')}"`).join(",");
       });
       download("steam-backlog.csv", `${headers.join(",")}\n${rows.join("\n")}`, "text/csv");
@@ -519,16 +1194,35 @@
       URL.revokeObjectURL(a.href);
     }
 
+    // === Library loading ===
+    async function loadItadPrices() {
+      try {
+        const data = await fetchLibraryJson("itad_prices.json");
+        itadByKey = data?.by_key || {};
+      } catch {
+        itadByKey = {};
+      }
+    }
+
     function applyMergedLibrary() {
+      recomputeCrossStoreHidden();
+      buildOwnedNormNames();
       const parts = [];
       if (libraryMeta.steam) parts.push(`Steam ${libraryMeta.steam.game_count} (${new Date(libraryMeta.steam.fetched_at).toLocaleString()})`);
       if (libraryMeta.gog) parts.push(`GOG ${libraryMeta.gog.game_count} (${new Date(libraryMeta.gog.fetched_at).toLocaleString()})`);
+      if (libraryMeta.psn) parts.push(`PSN ${libraryMeta.psn.game_count} (${new Date(libraryMeta.psn.fetched_at).toLocaleString()})`);
+      if (libraryMeta.epic) parts.push(`Epic ${libraryMeta.epic.game_count} (${new Date(libraryMeta.epic.fetched_at).toLocaleString()})`);
+      if (libraryMeta.amazon) parts.push(`Amazon ${libraryMeta.amazon.game_count} (${new Date(libraryMeta.amazon.fetched_at).toLocaleString()})`);
+      if (libraryMeta.nintendo) parts.push(`Nintendo ${libraryMeta.nintendo.game_count} (${new Date(libraryMeta.nintendo.fetched_at).toLocaleString()})`);
+      if (libraryMeta.wishlist) parts.push(`Wishlist ${libraryMeta.wishlist.game_count}`);
+      if (Object.keys(itadByKey).length) parts.push(`ITAD prices ${Object.keys(itadByKey).length}`);
       document.getElementById("meta").textContent = parts.length ? parts.join(" · ") : "No library data loaded";
       renderStoreChips();
       renderGenreChips();
+      renderTagChips();
       renderSummary();
       renderPicks();
-      renderTable();
+      refreshFilterUI();
     }
 
     async function fetchLibraryJson(path) {
@@ -541,14 +1235,38 @@
       const steam = await fetchLibraryJson("games_steam.json");
       const legacy = steam ? null : await fetchLibraryJson("games.json");
       const gog = await fetchLibraryJson("games_gog.json");
+      const psn = await fetchLibraryJson("games_psn.json");
+      const epic = await fetchLibraryJson("games_epic.json");
+      const amazon = await fetchLibraryJson("games_amazon.json");
+      const nintendo = await fetchLibraryJson("games_nintendo.json");
       const steamData = steam || legacy;
-      if (!steamData && !gog) throw new Error("No library files found");
+      if (!steamData && !gog && !psn && !epic && !amazon && !nintendo) throw new Error("No library files found");
       libraryMeta.steam = steamData;
       libraryMeta.gog = gog;
-      allGames = [
-        ...(steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
-        ...(gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
+      libraryMeta.psn = psn;
+      libraryMeta.epic = epic;
+      libraryMeta.amazon = amazon;
+      libraryMeta.nintendo = nintendo;
+      const sources = [
+        (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
+        (gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
+        (psn?.games || []).map(g => normalizeGame({ ...g, store: "psn", id: g.id ?? g.psn_id })),
+        (epic?.games || []).map(g => normalizeGame({ ...g, store: "epic", id: g.id })),
+        (amazon?.games || []).map(g => normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id })),
+        (nintendo?.games || []).map(g => normalizeGame({ ...g, store: "nintendo", id: g.id ?? g.nintendo_id })),
+        loadManualGames().map(g => normalizeGame(g)),
       ];
+      allGames = sources.flatMap(dedupeWithinStore);
+      const wishlist = await fetchLibraryJson("games_wishlist.json");
+      libraryMeta.wishlist = wishlist;
+      wishlistGames = (wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }));
+      await loadItadPrices();
+      applyMergedLibrary();
+    }
+
+    function refreshAfterManualChange() {
+      const nonManual = allGames.filter(g => !g.manual);
+      allGames = [...nonManual, ...dedupeWithinStore(loadManualGames().map(g => normalizeGame(g)))];
       applyMergedLibrary();
     }
 
@@ -558,6 +1276,264 @@
       });
     }
 
+    // === Modals ===
+    function openAddGameModal() {
+      const m = document.getElementById("addGameModal");
+      m.classList.remove("hidden");
+      m.classList.add("flex");
+      document.getElementById("addGameTitle").focus();
+    }
+    function closeAddGameModal() {
+      const m = document.getElementById("addGameModal");
+      m.classList.add("hidden");
+      m.classList.remove("flex");
+      document.getElementById("addGameTitle").value = "";
+      document.getElementById("addGameResults").innerHTML = "";
+      document.getElementById("addGameStatus").textContent = "";
+    }
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
+    async function steamSearch(term) {
+      const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=english&cc=US`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Steam search HTTP ${res.status}`);
+      const data = await res.json();
+      return (data.items || []).slice(0, 6);
+    }
+    async function steamAppReviews(appid) {
+      const url = `https://store.steampowered.com/appreviews/${appid}?json=1&language=all&purchase_type=all&num_per_page=0`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!data.success || !data.query_summary) return null;
+        const q = data.query_summary;
+        return {
+          steam_review_percent: q.total_reviews > 0 ? Math.round((q.total_positive / q.total_reviews) * 100) : null,
+          steam_review_count: q.total_reviews || 0,
+          steam_review_desc: q.review_score_desc || null,
+        };
+      } catch { return null; }
+    }
+    function manualSlug(title) {
+      return "manual-" + String(title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+    }
+    async function importSteamMatch(title, platform, match) {
+      const status = document.getElementById("addGameStatus");
+      status.textContent = "Pulling details from Steam...";
+      const reviews = await steamAppReviews(match.id) || {};
+      const game = {
+        store: platform,
+        id: platform === "steam" ? match.id : manualSlug(title || match.name),
+        name: title || match.name,
+        header_image: match.tiny_image || `https://cdn.akamai.steamstatic.com/steam/apps/${match.id}/header.jpg`,
+        library_image: `https://cdn.akamai.steamstatic.com/steam/apps/${match.id}/library_600x900_2x.jpg`,
+        playtime_minutes: 0,
+        last_played: null,
+        release_date: null,
+        genres: [],
+        tags: [],
+        metacritic_score: null,
+        steam_review_percent: reviews.steam_review_percent ?? null,
+        steam_review_count: reviews.steam_review_count ?? null,
+        steam_review_desc: reviews.steam_review_desc ?? null,
+        hltb_main_hours: null,
+        hltb_main_extra_hours: null,
+        hltb_completionist_hours: null,
+        hltb_match_confidence: null,
+        hltb_name: null,
+        store_url: `https://store.steampowered.com/app/${match.id}/`,
+        steam_appid: match.id,
+        steam_match_name: match.name,
+        manual: true,
+        added_at: new Date().toISOString(),
+      };
+      addManualGame(game);
+      status.textContent = `Saved "${game.name}" under ${platform}.`;
+      refreshAfterManualChange();
+      setTimeout(closeAddGameModal, 700);
+    }
+    function importTitleOnly() {
+      const title = document.getElementById("addGameTitle").value.trim();
+      const platform = document.getElementById("addGamePlatform").value;
+      if (!title) { document.getElementById("addGameStatus").textContent = "Enter a title first."; return; }
+      const game = {
+        store: platform,
+        id: manualSlug(title),
+        name: title,
+        header_image: null,
+        library_image: null,
+        playtime_minutes: 0,
+        last_played: null,
+        release_date: null,
+        genres: [],
+        tags: [],
+        metacritic_score: null,
+        steam_review_percent: null,
+        steam_review_count: null,
+        steam_review_desc: null,
+        hltb_main_hours: null,
+        hltb_main_extra_hours: null,
+        hltb_completionist_hours: null,
+        hltb_match_confidence: null,
+        hltb_name: null,
+        store_url: null,
+        manual: true,
+        added_at: new Date().toISOString(),
+      };
+      addManualGame(game);
+      document.getElementById("addGameStatus").textContent = `Saved "${title}" under ${platform} (no Steam data).`;
+      refreshAfterManualChange();
+      setTimeout(closeAddGameModal, 700);
+    }
+    function bindAddGameModal() {
+      const titleEl = document.getElementById("addGameTitle");
+      const platformEl = document.getElementById("addGamePlatform");
+      const searchBtn = document.getElementById("addGameSearch");
+      const resultsEl = document.getElementById("addGameResults");
+      const statusEl = document.getElementById("addGameStatus");
+
+      document.getElementById("addGameBtn").addEventListener("click", openAddGameModal);
+      document.getElementById("addGameClose").addEventListener("click", closeAddGameModal);
+      document.getElementById("addGameModal").addEventListener("click", e => {
+        if (e.target.id === "addGameModal") closeAddGameModal();
+      });
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape" && !document.getElementById("addGameModal").classList.contains("hidden")) closeAddGameModal();
+      });
+
+      async function runSearch() {
+        const term = titleEl.value.trim();
+        if (!term) { statusEl.textContent = "Enter a title first."; return; }
+        statusEl.textContent = "Searching Steam...";
+        resultsEl.innerHTML = "";
+        try {
+          const matches = await steamSearch(term);
+          if (!matches.length) {
+            statusEl.textContent = "No Steam matches. Save without a match to add the title only.";
+            return;
+          }
+          statusEl.textContent = `Pick a match to import:`;
+          resultsEl.innerHTML = matches.map(m => `
+            <button class="add-game-match w-full text-left flex gap-3 items-center bg-slate-700 hover:bg-slate-600 rounded p-2" data-appid="${m.id}">
+              <img src="${m.tiny_image || ''}" alt="" class="w-20 h-10 object-cover rounded bg-slate-800" onerror="this.style.visibility='hidden'" />
+              <div class="flex-1 min-w-0">
+                <div class="text-sm text-slate-100 truncate">${escapeHtml(m.name)}</div>
+                <div class="text-xs text-slate-400">App ${m.id}${m.price ? ` · ${escapeHtml(m.price.final_formatted || '')}` : ""}</div>
+              </div>
+              <span class="text-xs text-emerald-400">Import &rarr;</span>
+            </button>
+          `).join("");
+        } catch (err) {
+          statusEl.textContent = `Steam search failed: ${err.message}. (Steam may rate-limit; try again.)`;
+        }
+      }
+
+      searchBtn.addEventListener("click", runSearch);
+      titleEl.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
+      resultsEl.addEventListener("click", async e => {
+        const btn = e.target.closest(".add-game-match");
+        if (!btn) return;
+        const appid = +btn.dataset.appid;
+        const match = (await steamSearch(titleEl.value.trim())).find(m => m.id === appid);
+        if (!match) { statusEl.textContent = "Couldn't refetch match details."; return; }
+        await importSteamMatch(titleEl.value.trim(), platformEl.value, match);
+      });
+      document.getElementById("addGameSkipSteam").addEventListener("click", importTitleOnly);
+
+      document.getElementById("addGameExport").addEventListener("click", () => {
+        download("steam-backlog-manual-games.json", JSON.stringify(loadManualGames(), null, 2), "application/json");
+      });
+      document.getElementById("addGameImport").addEventListener("change", async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const incoming = JSON.parse(await file.text());
+          if (!Array.isArray(incoming)) throw new Error("File must be an array of manual games.");
+          const merged = [...loadManualGames()];
+          for (const g of incoming) {
+            const idx = merged.findIndex(m => m.store === g.store && m.id === g.id);
+            if (idx >= 0) merged[idx] = g; else merged.push(g);
+          }
+          saveManualGames(merged);
+          refreshAfterManualChange();
+          statusEl.textContent = `Imported ${incoming.length} manual games.`;
+        } catch (err) {
+          statusEl.textContent = `Import failed: ${err.message}`;
+        }
+        e.target.value = "";
+      });
+    }
+
+    // === Keyboard shortcuts ===
+    function handleGlobalKeydown(e) {
+      if (e.key === "Escape") {
+        if (filtersDrawerOpen) { closeFiltersDrawer(); return; }
+        if (!document.getElementById("addGameModal").classList.contains("hidden")) return;
+        expandedKeys = new Set();
+        selectedKeys.clear();
+        updateBulkBar();
+        renderTable();
+        return;
+      }
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || e.target.isContentEditable) {
+        if (e.key === "/" && tag !== "input" && tag !== "textarea") { /* allow below */ }
+        else return;
+      }
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        document.getElementById("search").focus();
+        return;
+      }
+      const list = visibleListForKeyboard();
+      if (!list.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusedRowIndex = Math.min((focusedRowIndex < 0 ? 0 : focusedRowIndex + 1), list.length - 1);
+        renderTable();
+        scrollFocusedRow();
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusedRowIndex = Math.max((focusedRowIndex < 0 ? 0 : focusedRowIndex - 1), 0);
+        renderTable();
+        scrollFocusedRow();
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const g = list[focusedRowIndex];
+        if (g) toggleExpand(gameKey(g));
+        return;
+      }
+      if (activeView !== "library") return;
+      const statusKeys = { b: "backlog", n: "next", p: "playing", f: "finished", s: "skip" };
+      if (statusKeys[e.key.toLowerCase()]) {
+        e.preventDefault();
+        const g = list[focusedRowIndex] || list[0];
+        if (g) { setPersonal(g, "status", statusKeys[e.key.toLowerCase()]); renderTable(); }
+        return;
+      }
+      if (e.key >= "1" && e.key <= "5") {
+        e.preventDefault();
+        const g = list[focusedRowIndex] || list[0];
+        if (g) { setPersonal(g, "priority", +e.key); renderTable(); }
+        return;
+      }
+      if (e.key === " ") {
+        e.preventDefault();
+        const g = list[focusedRowIndex];
+        if (!g) return;
+        const key = gameKey(g);
+        toggleSelection(key, !selectedKeys.has(key));
+        renderTable();
+      }
+    }
+
+    // === Event wiring ===
     function bindEvents() {
       document.querySelectorAll("th[data-sort]").forEach(th => {
         th.addEventListener("click", () => {
@@ -567,18 +1543,32 @@
           renderTable();
         });
       });
+      document.getElementById("openFiltersBtn").addEventListener("click", openFiltersDrawer);
+      document.getElementById("closeFiltersBtn").addEventListener("click", closeFiltersDrawer);
+      document.getElementById("filterDrawerBackdrop").addEventListener("click", closeFiltersDrawer);
+      document.getElementById("toggleGenreChipsBtn").addEventListener("click", () => {
+        genreChipsExpanded = !genreChipsExpanded;
+        updateGenreChipsCollapse();
+      });
+      const kebabBtn = document.getElementById("kebabBtn");
+      const kebabMenu = document.getElementById("kebabMenu");
+      kebabBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        kebabMenu.classList.toggle("open");
+      });
+      document.addEventListener("click", () => kebabMenu.classList.remove("open"));
       ["search", "statusFilter", "unplayedOnly", "minRating", "maxHours"].forEach(id => {
         document.getElementById(id).addEventListener("input", () => {
           document.getElementById("minRatingVal").textContent = document.getElementById("minRating").value;
           const h = +document.getElementById("maxHours").value;
           document.getElementById("maxHoursVal").textContent = h >= 200 ? "200+" : h;
-          renderTable();
+          refreshFilterUI();
         });
       });
       document.getElementById("genreMode").addEventListener("change", e => {
         prefs.genreFilterMode = e.target.value;
         savePrefs();
-        renderTable();
+        refreshFilterUI();
       });
       document.getElementById("showScoreColumn").addEventListener("change", e => {
         prefs.showScoreColumn = e.target.checked;
@@ -589,6 +1579,16 @@
         prefs.quickWinMaxHours = +e.target.value;
         document.getElementById("quickWinMaxVal").textContent = prefs.quickWinMaxHours;
         savePrefs();
+        renderPicks();
+      });
+      normalizePicksLimit();
+      renderPicksLimitButtons();
+      document.getElementById("picksLimitGroup").addEventListener("click", e => {
+        const btn = e.target.closest(".picks-limit-btn");
+        if (!btn) return;
+        prefs.picksLimit = +btn.dataset.limit || 16;
+        savePrefs();
+        renderPicksLimitButtons();
         renderPicks();
       });
       document.getElementById("togglePicks").addEventListener("click", () => {
@@ -610,8 +1610,20 @@
         prefs.storeFilter = chip.dataset.store || "";
         savePrefs();
         renderStoreChips();
-        renderTable();
+        refreshFilterUI();
       });
+      const dedupEl = document.getElementById("crossStoreDedup");
+      if (dedupEl) {
+        if (typeof prefs.crossStoreDedup !== "boolean") prefs.crossStoreDedup = true;
+        dedupEl.checked = !!prefs.crossStoreDedup;
+        dedupEl.addEventListener("change", () => {
+          prefs.crossStoreDedup = dedupEl.checked;
+          savePrefs();
+          recomputeCrossStoreHidden();
+          renderSummary();
+          refreshFilterUI();
+        });
+      }
       document.getElementById("genreChips").addEventListener("click", e => {
         const chip = e.target.closest(".genre-chip");
         if (!chip) return;
@@ -620,14 +1632,96 @@
         else prefs.genreFilters.push(genre);
         savePrefs();
         renderGenreChips();
+        refreshFilterUI();
+      });
+      document.getElementById("tagChips").addEventListener("click", e => {
+        const chip = e.target.closest(".personal-tag-chip");
+        if (!chip) return;
+        const tag = chip.dataset.tag;
+        const cur = prefs.tagFilters || [];
+        prefs.tagFilters = cur.includes(tag) ? cur.filter(x => x !== tag) : [...cur, tag];
+        savePrefs();
+        renderTagChips();
+        refreshFilterUI();
+      });
+      const tagModeEl = document.getElementById("tagFilterMode");
+      tagModeEl.value = prefs.tagFilterMode || "OR";
+      tagModeEl.addEventListener("change", () => {
+        prefs.tagFilterMode = tagModeEl.value;
+        savePrefs();
+        refreshFilterUI();
+      });
+      document.getElementById("addTagBtn").addEventListener("click", () => {
+        const list = sortedGames(filteredGames());
+        const targets = [];
+        if (selectedKeys.size) {
+          for (const k of selectedKeys) {
+            const g = findGameByKey(k);
+            if (g) targets.push(g);
+          }
+        } else if (focusedRowIndex >= 0 && list[focusedRowIndex]) {
+          targets.push(list[focusedRowIndex]);
+        }
+        if (!targets.length) { alert("Select rows (or focus a row with arrow keys) before adding a tag."); return; }
+        const raw = prompt(`Add a tag to ${targets.length} game${targets.length === 1 ? "" : "s"} (lowercase, e.g. co-op, cozy, bedtime):`);
+        if (!raw) return;
+        let added = 0;
+        for (const g of targets) if (addTagToGame(g, raw)) added++;
+        renderTagChips();
         renderTable();
       });
       document.getElementById("tbody").addEventListener("change", e => {
         const t = e.target;
-        if (!t.dataset.gameKey) return;
+        if (t.classList.contains("row-select")) {
+          toggleSelection(t.dataset.gameKey, t.checked);
+          renderTable();
+          return;
+        }
+        if (!t.dataset.gameKey || !t.dataset.field) return;
         const g = findGameByKey(t.dataset.gameKey);
         if (!g) return;
         setPersonal(g, t.dataset.field, t.dataset.field === "priority" ? +t.value : t.value);
+        renderTable();
+      });
+      document.getElementById("selectAllVisible").addEventListener("change", e => {
+        const list = sortedGames(filteredGames());
+        if (e.target.checked) list.forEach(g => selectedKeys.add(gameKey(g)));
+        else list.forEach(g => selectedKeys.delete(gameKey(g)));
+        updateBulkBar();
+        renderTable();
+      });
+      document.querySelectorAll(".view-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const view = btn.dataset.view || "library";
+          if (view === activeView) return;
+          activeView = view;
+          selectedKeys.clear();
+          focusedRowIndex = 0;
+          document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+          if (view === "wishlist") cleanupModeActive = false;
+          updateCleanupBtnState();
+          updateBulkBar();
+          refreshFilterUI();
+        });
+      });
+      document.getElementById("cleanupModeBtn").addEventListener("click", () => {
+        if (activeView !== "library") return;
+        cleanupModeActive = !cleanupModeActive;
+        updateCleanupBtnState();
+        focusedRowIndex = 0;
+        refreshFilterUI();
+      });
+      document.querySelectorAll(".bulk-status").forEach(btn => {
+        btn.addEventListener("click", () => bulkSetStatus(btn.dataset.status));
+      });
+      document.getElementById("bulkApplyPriority").addEventListener("click", () => {
+        const v = document.getElementById("bulkPriority").value;
+        if (v === "") return;
+        bulkSetPriority(+v);
+      });
+      document.getElementById("bulkClear").addEventListener("click", () => {
+        selectedKeys.clear();
+        updateBulkBar();
         renderTable();
       });
       document.getElementById("tbody").addEventListener("blur", e => {
@@ -637,6 +1731,29 @@
         if (g) setPersonal(g, "notes", t.value);
       }, true);
       document.getElementById("tbody").addEventListener("click", e => {
+        const removeBtn = e.target.closest(".row-tag-remove");
+        if (removeBtn) {
+          e.stopPropagation();
+          const g = findGameByKey(removeBtn.dataset.gameKey);
+          if (g) {
+            removeTagFromGame(g, removeBtn.dataset.tag);
+            renderTagChips();
+            renderTable();
+          }
+          return;
+        }
+        const addBtn = e.target.closest(".row-tag-add");
+        if (addBtn) {
+          e.stopPropagation();
+          const g = findGameByKey(addBtn.dataset.gameKey);
+          if (!g) return;
+          const raw = prompt(`Add a tag to "${g.name}" (lowercase, e.g. co-op, cozy, bedtime):`);
+          if (!raw) return;
+          addTagToGame(g, raw);
+          renderTagChips();
+          renderTable();
+          return;
+        }
         const btn = e.target.closest("[data-hltb-edit]");
         if (!btn) return;
         const g = findGameByKey(btn.dataset.hltbEdit);
@@ -652,12 +1769,7 @@
         const card = e.target.closest(".pick-card");
         if (card) focusGame(card.dataset.gameKey);
       });
-      document.addEventListener("keydown", e => {
-        if (e.key === "Escape") {
-          expandedKeys = new Set();
-          renderTable();
-        }
-      });
+      document.addEventListener("keydown", handleGlobalKeydown);
       document.getElementById("pickForMe").addEventListener("click", e => {
         let list = filteredGames();
         if (!e.shiftKey) list = list.filter(g => getPersonal(g).status === "backlog");
@@ -666,8 +1778,13 @@
         focusGame(gameKey(pick));
       });
       document.getElementById("reloadData").addEventListener("click", async () => {
+        kebabMenu.classList.remove("open");
         try { await reloadGames(); } catch { alert("Could not reload library files. Use Load games.json or run the fetch scripts."); }
       });
+      kebabMenu.querySelectorAll("button, label").forEach(el => {
+        el.addEventListener("click", () => kebabMenu.classList.remove("open"));
+      });
+      bindAddGameModal();
       document.getElementById("exportCsv").addEventListener("click", exportCsv);
       document.getElementById("exportNotes").addEventListener("click", () => download("steam-backlog-notes.json", JSON.stringify(personal, null, 2), "application/json"));
       document.getElementById("importNotes").addEventListener("change", async e => {
@@ -690,6 +1807,24 @@
             ...allGames.filter(g => normalizeGame(g).store !== "gog"),
             ...(data.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
           ];
+        } else if (data.store === "psn") {
+          libraryMeta.psn = data;
+          allGames = [
+            ...allGames.filter(g => normalizeGame(g).store !== "psn"),
+            ...(data.games || []).map(g => normalizeGame({ ...g, store: "psn", id: g.id ?? g.psn_id })),
+          ];
+        } else if (data.store === "epic") {
+          libraryMeta.epic = data;
+          allGames = [
+            ...allGames.filter(g => normalizeGame(g).store !== "epic"),
+            ...(data.games || []).map(g => normalizeGame({ ...g, store: "epic", id: g.id })),
+          ];
+        } else if (data.store === "amazon") {
+          libraryMeta.amazon = data;
+          allGames = [
+            ...allGames.filter(g => normalizeGame(g).store !== "amazon"),
+            ...(data.games || []).map(g => normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id })),
+          ];
         } else {
           libraryMeta.steam = data;
           allGames = [
@@ -702,8 +1837,11 @@
       });
     }
 
+    // === Init ===
     async function init() {
       migrateV3();
+      prefs.genreFilters = (prefs.genreFilters || []).map(aliasCanonicalGenre);
+      savePrefs();
       bindEvents();
       document.getElementById("showScoreColumn").checked = !!prefs.showScoreColumn;
       document.getElementById("genreMode").value = prefs.genreFilterMode;
@@ -711,11 +1849,16 @@
       document.getElementById("quickWinMaxVal").textContent = prefs.quickWinMaxHours;
       document.getElementById("picksContainer").classList.toggle("hidden", prefs.picksCollapsed);
       document.getElementById("togglePicks").textContent = prefs.picksCollapsed ? "Show" : "Hide";
+      const dedupEl = document.getElementById("crossStoreDedup");
+      if (dedupEl) dedupEl.checked = !!prefs.crossStoreDedup;
+      document.getElementById("tagFilterMode").value = prefs.tagFilterMode || "OR";
+      updateCleanupBtnState();
       renderStoreChips();
+      renderPicksLimitButtons();
       try {
         await reloadGames();
       } catch {
-        document.getElementById("meta").innerHTML = '<span class="text-amber-400">Run <code class="bg-slate-700 px-1 rounded">python fetch_games.py</code> and/or <code class="bg-slate-700 px-1 rounded">python fetch_gog.py</code>, then reload.</span>';
+        document.getElementById("meta").innerHTML = '<span class="text-amber-400">Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span>';
       }
     }
 

@@ -1,0 +1,201 @@
+"""Epic Games Store client.
+
+Auth flow:
+1. User visits the login URL we print and logs in.
+2. Epic redirects to a JSON page containing `authorizationCode`.
+3. User pastes the code as EPIC_AUTH_CODE in .env (one-time, 5-min lifetime).
+4. We exchange it for access + refresh tokens via OAuth.
+5. Refresh token is cached to cache/epic/session.json (good ~30 days).
+   On subsequent runs we use the refresh token automatically.
+
+Library:
+- /library/api/public/items returns paginated records with catalogItemId + namespace.
+- /catalog/api/shared/bulk/items returns metadata for one or more catalog items.
+
+The client credentials below are the well-known launcher pair used by community
+tools like legendary; they grant access only when paired with a real user code.
+"""
+
+import base64
+import json
+import threading
+import time
+from pathlib import Path
+
+import requests
+
+CACHE_DIR = Path("cache/epic")
+SESSION_FILE = CACHE_DIR / "session.json"
+
+OAUTH_URL = "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token"
+LIBRARY_URL = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items"
+CATALOG_HOST = "catalog-public-service-prod06.ol.epicgames.com"
+LOGIN_URL = (
+    "https://www.epicgames.com/id/api/redirect"
+    "?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code"
+)
+
+CLIENT_ID = "34a02cf8f4414e29b15921876da36f9a"
+CLIENT_SECRET = "daafbccc737745039dffe53d94fc76cf"
+BASIC_AUTH = "basic " + base64.b64encode(
+    f"{CLIENT_ID}:{CLIENT_SECRET}".encode()
+).decode()
+
+REQUEST_DELAY_SEC = 0.12
+
+
+class EpicAuthError(Exception):
+    """Authorization code missing/expired or refresh token rejected."""
+
+
+class EpicClient:
+    def __init__(self, auth_code: str | None = None):
+        self.session = requests.Session()
+        self.session.headers.update({"User-Agent": "steam-backlog/1.0"})
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        self._access_token: str | None = None
+        self._refresh_token: str | None = None
+        self._account_id: str | None = None
+        self._last_request = 0.0
+        self._auth_code = auth_code
+        self._lock = threading.Lock()
+
+    def _throttle(self) -> None:
+        with self._lock:
+            elapsed = time.time() - self._last_request
+            if elapsed < REQUEST_DELAY_SEC:
+                time.sleep(REQUEST_DELAY_SEC - elapsed)
+            self._last_request = time.time()
+
+    def _save_session(self) -> None:
+        SESSION_FILE.write_text(
+            json.dumps(
+                {"refresh_token": self._refresh_token, "account_id": self._account_id},
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+    def _load_session(self) -> dict | None:
+        if not SESSION_FILE.exists():
+            return None
+        try:
+            return json.loads(SESSION_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+
+    def _request_token(self, params: dict) -> dict:
+        self._throttle()
+        resp = self.session.post(
+            OAUTH_URL,
+            data=params,
+            headers={
+                "Authorization": BASIC_AUTH,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "steam-backlog/1.0",
+            },
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            try:
+                err = resp.json().get("errorCode", resp.text[:200])
+            except json.JSONDecodeError:
+                err = resp.text[:200]
+            raise EpicAuthError(f"OAuth {resp.status_code}: {err}")
+        return resp.json()
+
+    def login(self) -> None:
+        """Authenticate using cached refresh token, falling back to auth code."""
+        cached = self._load_session()
+        if cached and cached.get("refresh_token"):
+            try:
+                data = self._request_token(
+                    {"grant_type": "refresh_token", "refresh_token": cached["refresh_token"]}
+                )
+                self._apply_tokens(data)
+                return
+            except EpicAuthError as e:
+                print(f"  refresh token rejected ({e}); falling back to auth code")
+
+        if not self._auth_code:
+            raise EpicAuthError(
+                "No valid Epic session. Run: python fetch_epic.py --auth-help"
+            )
+
+        data = self._request_token(
+            {"grant_type": "authorization_code", "code": self._auth_code, "token_type": "eg1"}
+        )
+        self._apply_tokens(data)
+
+    def _apply_tokens(self, data: dict) -> None:
+        self._access_token = data.get("access_token")
+        self._refresh_token = data.get("refresh_token")
+        self._account_id = data.get("account_id")
+        if not self._access_token:
+            raise EpicAuthError("OAuth response missing access_token")
+        self._save_session()
+
+    def _auth_headers(self) -> dict:
+        return {"Authorization": f"bearer {self._access_token}"}
+
+    def get_library_records(self) -> list[dict]:
+        """All entitlement records (paginated) for the logged-in user."""
+        records: list[dict] = []
+        cursor: str | None = None
+        while True:
+            self._throttle()
+            params: dict = {"includeMetadata": "true"}
+            if cursor:
+                params["cursor"] = cursor
+            resp = self.session.get(
+                LIBRARY_URL, params=params, headers=self._auth_headers(), timeout=30
+            )
+            if resp.status_code == 401:
+                raise EpicAuthError("Library 401: access token expired")
+            resp.raise_for_status()
+            data = resp.json()
+            records.extend(data.get("records", []))
+            cursor = data.get("responseMetadata", {}).get("nextCursor")
+            if not cursor:
+                break
+        return records
+
+    def get_catalog_item(
+        self, namespace: str, catalog_id: str, country: str = "US", locale: str = "en-US"
+    ) -> dict | None:
+        """Catalog metadata for one item (legendary-compatible endpoint)."""
+        self._throttle()
+        resp = self.session.get(
+            f"https://{CATALOG_HOST}/catalog/api/shared/namespace/{namespace}/bulk/items",
+            params={
+                "id": catalog_id,
+                "includeDLCDetails": "true",
+                "includeMainGameDetails": "true",
+                "country": country,
+                "locale": locale,
+            },
+            headers=self._auth_headers(),
+            timeout=30,
+        )
+        if resp.status_code == 401:
+            raise EpicAuthError("Catalog 401: access token expired")
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json().get(catalog_id)
+
+    def get_catalog_bulk(
+        self, namespace: str, catalog_ids: list[str], country: str = "US",
+        locale: str = "en-US",
+    ) -> dict:
+        """Bulk metadata for catalog items in a single namespace."""
+        out: dict = {}
+        for cid in catalog_ids:
+            item = self.get_catalog_item(namespace, cid, country=country, locale=locale)
+            if item:
+                out[cid] = item
+        return out
+
+    @property
+    def account_id(self) -> str | None:
+        return self._account_id

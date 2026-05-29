@@ -23,12 +23,17 @@
     .status-skip .game-name { text-decoration: line-through; }
     .low-confidence { box-shadow: inset 6px 0 0 #f59e0b; }
     .row-picked { outline: 2px solid #eab308; outline-offset: -2px; }
+    .store-chip.active { background: #7c3aed; border-color: #a78bfa; color: #f8fafc; }
+    .store-badge { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
+    .store-badge.steam { background: #0369a1; color: #e0f2fe; }
+    .store-badge.gog { background: #6d28d9; color: #ede9fe; }
+    .pick-store { position: absolute; top: 4px; right: 4px; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
   <div class="max-w-[1600px] mx-auto p-4 md:p-6">
     <header class="mb-4">
-      <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Steam Backlog</h1>
+      <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
       <p id="meta" class="text-slate-400 text-sm mt-1">Loading...</p>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
     </header>
@@ -75,6 +80,12 @@
           Unplayed only
         </label>
       </div>
+      <div id="storeChips" class="flex flex-wrap gap-2 items-center">
+        <span class="text-xs text-slate-400 mr-1">Store</span>
+        <button class="store-chip px-2 py-1 rounded border border-slate-600 text-xs active bg-slate-700" data-store="">All</button>
+        <button class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="steam">Steam</button>
+        <button class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="gog">GOG</button>
+      </div>
       <div id="genreChips" class="flex flex-wrap gap-2"></div>
       <div class="flex flex-wrap gap-4 items-center text-sm">
         <label>Min rating %
@@ -90,7 +101,7 @@
           Show score column
         </label>
         <button id="pickForMe" class="bg-amber-700 hover:bg-amber-600 px-3 py-1.5 rounded text-sm">Pick for me</button>
-        <button id="reloadData" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 rounded text-sm">Reload games.json</button>
+        <button id="reloadData" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 rounded text-sm">Reload library</button>
         <div class="ml-auto flex gap-2">
           <label class="bg-sky-700 hover:bg-sky-600 px-3 py-1.5 rounded text-sm cursor-pointer">
             Load games.json
@@ -140,8 +151,9 @@
     let prefs = loadPrefs();
     let sortKey = "name";
     let sortDir = 1;
-    let expandedAppids = new Set();
-    let pickedAppid = null;
+    let expandedKeys = new Set();
+    let pickedKey = null;
+    let libraryMeta = { steam: null, gog: null };
 
     window.coverFallback = function (img) {
       const fb = img.dataset.fallback;
@@ -158,37 +170,78 @@
     function loadPersonal() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
     }
+    function migrateV3() {
+      if (personal.__migrated_v3) return;
+      const next = {};
+      for (const [k, v] of Object.entries(personal)) {
+        if (k === "__migrated_v3") continue;
+        if (String(k).includes(":")) next[k] = v;
+        else next[`steam:${k}`] = v;
+      }
+      next.__migrated_v3 = true;
+      personal = next;
+      savePersonal();
+    }
     function savePersonal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(personal)); }
     function loadPrefs() {
-      const fallback = { picksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15 };
+      const fallback = { picksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "" };
       try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
     }
     function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
-    function getPersonal(appid) {
-      return personal[appid] || { status: "backlog", notes: "", priority: 0, hltb_override: null };
+    function normalizeGame(g) {
+      const store = g.store || "steam";
+      const id = g.id ?? g.appid ?? g.gog_id;
+      return { ...g, store, id };
     }
-    function setPersonal(appid, field, value) {
-      if (!personal[appid]) personal[appid] = { status: "backlog", notes: "", priority: 0, hltb_override: null };
-      personal[appid][field] = value;
+    function gameKey(g) {
+      const ng = normalizeGame(g);
+      return `${ng.store}:${ng.id}`;
+    }
+    function gameNumericId(g) {
+      return normalizeGame(g).id;
+    }
+    function coverFallbackFor(g) {
+      const ng = normalizeGame(g);
+      if (ng.header_image) return ng.header_image;
+      if (ng.store === "steam") return `https://cdn.akamai.steamstatic.com/steam/apps/${ng.id}/header.jpg`;
+      return "";
+    }
+    function getPersonal(g) {
+      const key = gameKey(g);
+      if (personal[key]) return personal[key];
+      const legacy = personal[normalizeGame(g).id];
+      if (legacy && typeof legacy === "object") return legacy;
+      return { status: "backlog", notes: "", priority: 0, hltb_override: null };
+    }
+    function setPersonal(g, field, value) {
+      const key = gameKey(g);
+      if (!personal[key]) personal[key] = { status: "backlog", notes: "", priority: 0, hltb_override: null };
+      personal[key][field] = value;
       savePersonal();
       renderSummary();
       renderPicks();
     }
     function hltbMain(g) {
-      const p = getPersonal(g.appid);
+      const p = getPersonal(g);
       if (p.hltb_override != null && p.hltb_override !== "") return +p.hltb_override;
       return g.hltb_main_hours;
     }
     function ratingValue(g) { return g.steam_review_percent ?? g.metacritic_score ?? 0; }
     function priorityScore(g) {
-      const p = getPersonal(g.appid);
+      const p = getPersonal(g);
       const review = ratingValue(g);
       const h = hltbMain(g) || 20;
       return (review * (p.priority + 1)) / Math.log2(h + 2);
     }
     function isHiddenGem(g) {
-      const p = getPersonal(g.appid);
-      return (g.steam_review_percent || 0) >= 90 && (g.playtime_minutes || 0) === 0 && p.status !== "skip";
+      const p = getPersonal(g);
+      const rating = g.steam_review_percent ?? g.metacritic_score ?? 0;
+      return rating >= 90 && (g.playtime_minutes || 0) === 0 && p.status !== "skip";
+    }
+    function storeBadgeHtml(g) {
+      const s = normalizeGame(g).store;
+      const label = s === "gog" ? "G" : "S";
+      return `<span class="store-badge ${s}" title="${s.toUpperCase()}">${label}</span>`;
     }
     function formatHours(minutes) { return !minutes ? "0h" : `${(minutes / 60).toFixed(1)}h`; }
     function formatDate(unixOrStr) {
@@ -210,7 +263,9 @@
       const genreMode = prefs.genreFilterMode;
 
       return allGames.filter(g => {
-        const p = getPersonal(g.appid);
+        const ng = normalizeGame(g);
+        const p = getPersonal(g);
+        if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
         if (q && !g.name.toLowerCase().includes(q)) return false;
         if (status && p.status !== status) return false;
         if (unplayed && (g.playtime_minutes || 0) > 0) return false;
@@ -232,8 +287,8 @@
 
     function sortedGames(list) {
       return [...list].sort((a, b) => {
-        const pa = getPersonal(a.appid);
-        const pb = getPersonal(b.appid);
+        const pa = getPersonal(a);
+        const pb = getPersonal(b);
         let va;
         let vb;
         switch (sortKey) {
@@ -253,12 +308,16 @@
     }
 
     function pickCardHtml(g) {
-      const headerFallback = g.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${g.appid}/header.jpg`;
+      const key = gameKey(g);
+      const headerFallback = coverFallbackFor(g);
       const cover = g.library_image || headerFallback;
-      const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : (g.metacritic_score ?? "—");
+      const ratingVal = ratingValue(g);
+      const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : (g.metacritic_score != null ? `${g.metacritic_score}` : "—");
       const h = hltbMain(g);
+      const store = normalizeGame(g).store;
       return `
-        <div class="pick-card bg-slate-700/50 rounded p-2 cursor-pointer" data-appid="${g.appid}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
+        <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
+          <span class="pick-store store-badge ${store}">${store === "gog" ? "G" : "S"}</span>
           <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
           <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
           <div class="text-xs text-slate-400 flex justify-between"><span>${rating}</span><span>${h != null ? `${h}h` : ""}</span></div>
@@ -267,20 +326,19 @@
 
     function renderPicks() {
       const tab = prefs.picksTab;
-      const backlogRated = allGames.filter(g => getPersonal(g.appid).status === "backlog" && g.steam_review_percent != null).sort((a, b) => b.steam_review_percent - a.steam_review_percent);
-      const nextUp = allGames.filter(g => getPersonal(g.appid).status === "next").sort((a, b) => {
-        const pa = getPersonal(a.appid).priority;
-        const pb = getPersonal(b.appid).priority;
+      const backlogRated = allGames
+        .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) > 0)
+        .sort((a, b) => ratingValue(b) - ratingValue(a));
+      const nextUp = allGames.filter(g => getPersonal(g).status === "next").sort((a, b) => {
+        const pa = getPersonal(a).priority;
+        const pb = getPersonal(b).priority;
         if (pb !== pa) return pb - pa;
         return ratingValue(b) - ratingValue(a);
       });
       const quickWins = allGames
-        .filter(g => getPersonal(g.appid).status === "backlog" && (g.steam_review_percent || 0) >= 75 && (hltbMain(g) || 999) <= prefs.quickWinMaxHours)
+        .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) >= 75 && (hltbMain(g) || 999) <= prefs.quickWinMaxHours)
         .sort((a, b) => ratingValue(b) - ratingValue(a));
-      const hidden = allGames.filter(isHiddenGem).sort((a, b) => {
-        if ((b.steam_review_percent || 0) !== (a.steam_review_percent || 0)) return (b.steam_review_percent || 0) - (a.steam_review_percent || 0);
-        return (b.steam_review_count || 0) - (a.steam_review_count || 0);
-      });
+      const hidden = allGames.filter(isHiddenGem).sort((a, b) => ratingValue(b) - ratingValue(a));
       const data = tab === "nextUp" ? nextUp : tab === "quickWins" ? quickWins : tab === "hiddenGems" ? hidden : backlogRated;
       const countLabel = `${Math.min(data.length, 12)} of ${data.length}`;
       document.getElementById("pickMeta").textContent = countLabel;
@@ -291,28 +349,36 @@
     }
 
     function renderSummary() {
-      const backlog = allGames.filter(g => getPersonal(g.appid).status === "backlog");
+      const backlog = allGames.filter(g => getPersonal(g).status === "backlog");
       const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
       const played = allGames.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
-      const rated = allGames.filter(g => g.steam_review_percent != null);
-      const avg = rated.length ? (rated.reduce((s, g) => s + g.steam_review_percent, 0) / rated.length).toFixed(0) : "—";
+      const steamCount = allGames.filter(g => normalizeGame(g).store === "steam").length;
+      const gogCount = allGames.filter(g => normalizeGame(g).store === "gog").length;
+      const rated = allGames.filter(g => ratingValue(g) > 0);
+      const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : "—";
       document.getElementById("summary").innerHTML = `
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="text-slate-100 font-semibold ml-1">${allGames.length}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Steam <span class="text-slate-100 font-semibold ml-1">${steamCount}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">GOG <span class="text-slate-100 font-semibold ml-1">${gogCount}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${totalHltb.toFixed(0)}h</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${played.toFixed(0)}h</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== "—" ? "%" : ""}</span></div>`;
     }
 
+    function findGameByKey(key) {
+      return allGames.find(g => gameKey(g) === key);
+    }
+
     function rowClass(g, lowConf) {
-      const status = getPersonal(g.appid).status;
+      const status = getPersonal(g).status;
       const stateClass = status === "next" ? "status-next" : status === "playing" ? "status-playing" : status === "finished" ? "status-finished" : status === "skip" ? "status-skip" : "";
       const lowClass = lowConf ? " low-confidence" : "";
-      const picked = pickedAppid === g.appid ? " row-picked" : "";
+      const picked = pickedKey === gameKey(g) ? " row-picked" : "";
       return `bg-slate-800/50 hover:bg-slate-700/50 ${stateClass}${lowClass}${picked}`;
     }
 
     function hltbLabel(g) {
-      const p = getPersonal(g.appid);
+      const p = getPersonal(g);
       if (p.hltb_override != null && p.hltb_override !== "") return `${p.hltb_override}* / - / -`;
       const m = g.hltb_main_hours ?? "-";
       const e = g.hltb_main_extra_hours ?? "-";
@@ -329,17 +395,17 @@
       return base;
     }
 
-    function focusGame(appid) {
-      expandedAppids.add(appid);
-      pickedAppid = appid;
+    function focusGame(key) {
+      expandedKeys.add(key);
+      pickedKey = key;
       renderTable();
-      const row = document.querySelector(`tr[data-row-appid="${appid}"]`);
+      const row = document.querySelector(`tr[data-row-key="${key}"]`);
       if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
-    function toggleExpand(appid) {
-      if (expandedAppids.has(appid)) expandedAppids.delete(appid);
-      else expandedAppids.add(appid);
+    function toggleExpand(key) {
+      if (expandedKeys.has(key)) expandedKeys.delete(key);
+      else expandedKeys.add(key);
       renderTable();
     }
 
@@ -351,22 +417,23 @@
       document.getElementById("scoreHeader").classList.toggle("hidden", !showScore);
 
       list.forEach(g => {
-        const p = getPersonal(g.appid);
+        const p = getPersonal(g);
         const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
         const hiddenGem = isHiddenGem(g);
-        const headerFallback = g.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${g.appid}/header.jpg`;
+        const key = gameKey(g);
+        const headerFallback = coverFallbackFor(g);
         const tr = document.createElement("tr");
-        tr.dataset.rowAppid = g.appid;
+        tr.dataset.rowKey = key;
         tr.className = rowClass(g, lowConf);
         tr.innerHTML = `
           <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /></td>
           <td class="p-2">
-            <a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium game-name">${escapeHtml(g.name)}</a>
+            ${storeBadgeHtml(g)}<a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium game-name">${escapeHtml(g.name)}</a>
             ${hiddenGem ? '<span class="ml-1 text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </td>
           <td class="p-2">
-            <select data-appid="${g.appid}" data-field="status" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
+            <select data-game-key="${escapeAttr(key)}" data-field="status" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
               <option value="backlog" ${p.status === "backlog" ? "selected" : ""}>Backlog</option>
               <option value="next" ${p.status === "next" ? "selected" : ""}>Next up</option>
               <option value="playing" ${p.status === "playing" ? "selected" : ""}>Playing</option>
@@ -375,14 +442,14 @@
             </select>
           </td>
           <td class="p-2 text-center">
-            <select data-appid="${g.appid}" data-field="priority" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
+            <select data-game-key="${escapeAttr(key)}" data-field="priority" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
               ${[0, 1, 2, 3, 4, 5].map(n => `<option value="${n}" ${p.priority === n ? "selected" : ""}>${n || "—"}</option>`).join("")}
             </select>
           </td>
           ${showScore ? `<td class="p-2 text-right">${priorityScore(g).toFixed(1)}</td>` : ""}
           <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
           <td class="p-2 text-right">
-            <button data-hltb-edit="${g.appid}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
+            <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
           </td>
           <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
           <td class="p-2 text-right">${g.metacritic_score ?? "—"}</td>
@@ -390,16 +457,16 @@
           <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
           <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
           <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).join(", ")}">${(g.genres || []).slice(0, 2).join(", ") || "—"}</td>
-          <td class="p-2"><input type="text" data-appid="${g.appid}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full min-w-[100px] px-2 py-1" /></td>`;
+          <td class="p-2"><input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full min-w-[100px] px-2 py-1" /></td>`;
 
         tr.addEventListener("click", e => {
           if (e.target.closest("select, input, a, button")) return;
-          toggleExpand(g.appid);
+          toggleExpand(key);
         });
 
         tbody.appendChild(tr);
 
-        if (expandedAppids.has(g.appid)) {
+        if (expandedKeys.has(key)) {
           const detail = document.createElement("tr");
           detail.className = "bg-slate-800";
           const extra = [
@@ -431,11 +498,12 @@
 
     function exportCsv() {
       const list = sortedGames(filteredGames());
-      const headers = ["appid", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "metacritic", "price", "discount_percent", "release_date", "genres", "notes"];
+      const headers = ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "metacritic", "price", "discount_percent", "release_date", "genres", "notes"];
       const rows = list.map(g => {
-        const p = getPersonal(g.appid);
+        const p = getPersonal(g);
+        const ng = normalizeGame(g);
         return [
-          g.appid, g.name, p.status, p.priority, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
+          ng.store, ng.id, g.name, p.status, p.priority, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
           hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "", g.metacritic_score ?? "",
           g.price ?? "", g.discount_percent ?? "", g.release_date ?? "", (g.genres || []).join("; "), p.notes
         ].map(x => `"${String(x).replace(/"/g, '""')}"`).join(",");
@@ -451,19 +519,43 @@
       URL.revokeObjectURL(a.href);
     }
 
-    function applyGamesData(data) {
-      allGames = data.games || [];
-      document.getElementById("meta").textContent = `${data.game_count} games · fetched ${new Date(data.fetched_at).toLocaleString()}`;
+    function applyMergedLibrary() {
+      const parts = [];
+      if (libraryMeta.steam) parts.push(`Steam ${libraryMeta.steam.game_count} (${new Date(libraryMeta.steam.fetched_at).toLocaleString()})`);
+      if (libraryMeta.gog) parts.push(`GOG ${libraryMeta.gog.game_count} (${new Date(libraryMeta.gog.fetched_at).toLocaleString()})`);
+      document.getElementById("meta").textContent = parts.length ? parts.join(" · ") : "No library data loaded";
+      renderStoreChips();
       renderGenreChips();
       renderSummary();
       renderPicks();
       renderTable();
     }
 
+    async function fetchLibraryJson(path) {
+      const res = await fetch(`${path}?t=${Date.now()}`);
+      if (!res.ok) return null;
+      return res.json();
+    }
+
     async function reloadGames() {
-      const res = await fetch(`games.json?t=${Date.now()}`);
-      if (!res.ok) throw new Error("games.json not found");
-      applyGamesData(await res.json());
+      const steam = await fetchLibraryJson("games_steam.json");
+      const legacy = steam ? null : await fetchLibraryJson("games.json");
+      const gog = await fetchLibraryJson("games_gog.json");
+      const steamData = steam || legacy;
+      if (!steamData && !gog) throw new Error("No library files found");
+      libraryMeta.steam = steamData;
+      libraryMeta.gog = gog;
+      allGames = [
+        ...(steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
+        ...(gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
+      ];
+      applyMergedLibrary();
+    }
+
+    function renderStoreChips() {
+      document.querySelectorAll(".store-chip").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.store === (prefs.storeFilter || ""));
+      });
     }
 
     function bindEvents() {
@@ -512,6 +604,14 @@
           renderPicks();
         });
       });
+      document.getElementById("storeChips").addEventListener("click", e => {
+        const chip = e.target.closest(".store-chip");
+        if (!chip) return;
+        prefs.storeFilter = chip.dataset.store || "";
+        savePrefs();
+        renderStoreChips();
+        renderTable();
+      });
       document.getElementById("genreChips").addEventListener("click", e => {
         const chip = e.target.closest(".genre-chip");
         if (!chip) return;
@@ -524,45 +624,49 @@
       });
       document.getElementById("tbody").addEventListener("change", e => {
         const t = e.target;
-        if (!t.dataset.appid) return;
-        setPersonal(+t.dataset.appid, t.dataset.field, t.dataset.field === "priority" ? +t.value : t.value);
+        if (!t.dataset.gameKey) return;
+        const g = findGameByKey(t.dataset.gameKey);
+        if (!g) return;
+        setPersonal(g, t.dataset.field, t.dataset.field === "priority" ? +t.value : t.value);
         renderTable();
       });
       document.getElementById("tbody").addEventListener("blur", e => {
         const t = e.target;
         if (!t.classList.contains("notes-input")) return;
-        setPersonal(+t.dataset.appid, "notes", t.value);
+        const g = findGameByKey(t.dataset.gameKey);
+        if (g) setPersonal(g, "notes", t.value);
       }, true);
       document.getElementById("tbody").addEventListener("click", e => {
         const btn = e.target.closest("[data-hltb-edit]");
         if (!btn) return;
-        const appid = +btn.dataset.hltbEdit;
-        const existing = getPersonal(appid).hltb_override ?? "";
+        const g = findGameByKey(btn.dataset.hltbEdit);
+        if (!g) return;
+        const existing = getPersonal(g).hltb_override ?? "";
         const next = prompt("Override HLTB main hours (blank to reset):", existing);
         if (next === null) return;
         const value = String(next).trim();
-        setPersonal(appid, "hltb_override", value === "" ? null : Number(value));
+        setPersonal(g, "hltb_override", value === "" ? null : Number(value));
         renderTable();
       });
       document.addEventListener("click", e => {
         const card = e.target.closest(".pick-card");
-        if (card) focusGame(+card.dataset.appid);
+        if (card) focusGame(card.dataset.gameKey);
       });
       document.addEventListener("keydown", e => {
         if (e.key === "Escape") {
-          expandedAppids = new Set();
+          expandedKeys = new Set();
           renderTable();
         }
       });
       document.getElementById("pickForMe").addEventListener("click", e => {
         let list = filteredGames();
-        if (!e.shiftKey) list = list.filter(g => getPersonal(g.appid).status === "backlog");
+        if (!e.shiftKey) list = list.filter(g => getPersonal(g).status === "backlog");
         if (!list.length) return;
         const pick = list[Math.floor(Math.random() * list.length)];
-        focusGame(pick.appid);
+        focusGame(gameKey(pick));
       });
       document.getElementById("reloadData").addEventListener("click", async () => {
-        try { await reloadGames(); } catch { alert("Could not reload games.json. Use Load games.json."); }
+        try { await reloadGames(); } catch { alert("Could not reload library files. Use Load games.json or run the fetch scripts."); }
       });
       document.getElementById("exportCsv").addEventListener("click", exportCsv);
       document.getElementById("exportNotes").addEventListener("click", () => download("steam-backlog-notes.json", JSON.stringify(personal, null, 2), "application/json"));
@@ -579,12 +683,27 @@
       document.getElementById("loadGamesFile").addEventListener("change", async e => {
         const file = e.target.files[0];
         if (!file) return;
-        applyGamesData(JSON.parse(await file.text()));
+        const data = JSON.parse(await file.text());
+        if (data.store === "gog") {
+          libraryMeta.gog = data;
+          allGames = [
+            ...allGames.filter(g => normalizeGame(g).store !== "gog"),
+            ...(data.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
+          ];
+        } else {
+          libraryMeta.steam = data;
+          allGames = [
+            ...allGames.filter(g => normalizeGame(g).store !== "steam"),
+            ...(data.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
+          ];
+        }
+        applyMergedLibrary();
         e.target.value = "";
       });
     }
 
     async function init() {
+      migrateV3();
       bindEvents();
       document.getElementById("showScoreColumn").checked = !!prefs.showScoreColumn;
       document.getElementById("genreMode").value = prefs.genreFilterMode;
@@ -592,10 +711,11 @@
       document.getElementById("quickWinMaxVal").textContent = prefs.quickWinMaxHours;
       document.getElementById("picksContainer").classList.toggle("hidden", prefs.picksCollapsed);
       document.getElementById("togglePicks").textContent = prefs.picksCollapsed ? "Show" : "Hide";
+      renderStoreChips();
       try {
         await reloadGames();
       } catch {
-        document.getElementById("meta").innerHTML = '<span class="text-amber-400">Run <code class="bg-slate-700 px-1 rounded">python fetch_games.py</code>, then use Load games.json or run <code class="bg-slate-700 px-1 rounded">python -m http.server 8080</code>.</span>';
+        document.getElementById("meta").innerHTML = '<span class="text-amber-400">Run <code class="bg-slate-700 px-1 rounded">python fetch_games.py</code> and/or <code class="bg-slate-700 px-1 rounded">python fetch_gog.py</code>, then reload.</span>';
       }
     }
 

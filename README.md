@@ -2,14 +2,14 @@
 
 ![Dashboard preview](dashboard.png)
 
-A **local-only** tool for browsing, sorting, and prioritizing your Steam library. Nothing is hosted on the web; your API key and library data stay on your machine.
+A **local-only** tool for browsing, sorting, and prioritizing your game libraries (Steam and GOG). Nothing is hosted on the web; your credentials and library data stay on your machine.
 
 ## Stack
 
 | Layer | Tech |
 |-------|------|
 | Data pipeline | Python 3 (`requests`, `python-dotenv`, `howlongtobeatpy`) |
-| Data file | `games.json` (generated, gitignored) |
+| Data files | `games_steam.json`, `games_gog.json` (generated, gitignored) |
 | Dashboard | Static HTML + vanilla JS + Tailwind (CDN) |
 | Personal edits | Browser `localStorage` (status, notes, priority) |
 | View locally | `python -m http.server 8080` → http://localhost:8080 |
@@ -23,6 +23,7 @@ A **local-only** tool for browsing, sorting, and prioritizing your Steam library
 - Inline HLTB override and compact Main/Extra/Completionist display
 - Price and discount column sourced from Steam app details
 - Status-aware row styling and hidden-gem badges
+- Multi-store dashboard with Steam / GOG filters and store badges
 
 ## Setup
 
@@ -46,19 +47,39 @@ A **local-only** tool for browsing, sorting, and prioritizing your Steam library
 
 5. Set **Game details** to **Public** in Steam → Profile → Edit Profile → Privacy Settings.
 
-## Fetch your library
+## Fetch your libraries
+
+**Steam:**
 
 ```bash
 python fetch_games.py
 ```
 
-First run may take several minutes for a large library (Steam Store API is rate-limited). Subsequent runs use cache and are much faster.
+Writes `games_steam.json` (and a legacy `games.json` copy for compatibility).
 
-Options:
+**GOG:**
+
+1. Sign in at [gog.com](https://www.gog.com) in your browser.
+2. Open DevTools (F12) → **Application** → **Cookies** → `https://www.gog.com`.
+3. Copy the value of the `gog-al` cookie into `.env` as `GOG_AL=...`.
+4. Run:
+
+```bash
+python fetch_gog.py
+```
+
+Writes `games_gog.json`. The cookie expires about every 30 days; re-copy it when fetches fail with an auth error.
+
+GOG playtime in the dashboard only appears if you use **GOG Galaxy 2.0** and have played the game through Galaxy.
+
+Fetcher options (both scripts):
 
 - `--refresh` — ignore cache, refetch everything
-- `--only-new` — only fetch games not already in `games.json`
-- `--appid 12345` — refetch a single game
+- `--only-new` — only fetch games not already in the store JSON file
+- `--skip-hltb` — skip HowLongToBeat lookups (faster)
+- Steam: `--appid 12345` · GOG: `--id 1234567890`
+
+First Steam run may take several minutes for a large library (Store API is rate-limited). Subsequent runs use cache and are much faster.
 
 ## Open the dashboard
 
@@ -93,9 +114,11 @@ schtasks /create /SC WEEKLY /D SUN /TN "Steam Backlog Refresh" /TR "powershell -
 
 | File | Purpose |
 |------|---------|
-| `fetch_games.py` | Fetches library data and writes `games.json` |
+| `fetch_games.py` | Fetches Steam library → `games_steam.json` |
+| `fetch_gog.py` | Fetches GOG library → `games_gog.json` |
 | `steam_client.py` | Steam Web API + Store API client |
+| `gog_client.py` | GOG embed API client |
 | `hltb_client.py` | HowLongToBeat lookup |
-| `index.html` | Dashboard UI |
-| `games.json` | Generated game data (created by fetcher) |
+| `index.html` | Dashboard UI (loads both JSON files) |
+| `games_steam.json` / `games_gog.json` | Generated per-store data |
 | `cache/` | Cached API responses |

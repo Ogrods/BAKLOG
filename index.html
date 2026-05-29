@@ -77,7 +77,6 @@
         <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
         <div class="flex gap-1">
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm active" data-view="library">Library</button>
-          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="unfinished">Return to</button>
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
         </div>
       </div>
@@ -93,6 +92,7 @@
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp">Next Up</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins">Quick Wins</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems">Hidden Gems</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo">Return To</button>
         <span class="text-xs text-slate-300 ml-auto flex items-center gap-1">Show:
           <span id="picksLimitGroup" class="inline-flex rounded border border-slate-600 overflow-hidden" role="group" aria-label="Number of picks to show">
             <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="16">16</button>
@@ -562,8 +562,8 @@
       if (ng.store === "steam" && ng.id != null) {
         return `https://store.steampowered.com/app/${ng.id}/`;
       }
-      if (ng.store === "gog" && url.startsWith("/")) {
-        return "https://www.gog.com" + url;
+      if (ng.store === "gog" && ng.gog_id) {
+        return `https://www.gog.com/en/game/${ng.gog_id}`;
       }
       if (ng.store === "psn" && ng.concept_id) {
         return `https://store.playstation.com/en-us/concept/${ng.concept_id}`;
@@ -683,7 +683,9 @@
       return unixOrStr;
     }
     function parseReleaseForSort(d) { const t = Date.parse(d || ""); return isNaN(t) ? 0 : t; }
-    function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
     function escapeAttr(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 
     function buildOwnedNormNames() {
@@ -736,11 +738,10 @@
       return source.filter(g => {
         const ng = normalizeGame(g);
         const p = getPersonal(g);
-        if (activeView === "library" || activeView === "unfinished") {
+        if (activeView === "library") {
           if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
           if (crossStoreHiddenKeys.has(gameKey(g))) return false;
         }
-        if (activeView === "unfinished" && p.status !== "unfinished") return false;
         if (cleanupModeActive && activeView === "library" && !isCleanupCandidate(g)) return false;
         if (q && !g.name.toLowerCase().includes(q)) return false;
         if (status && p.status !== status) return false;
@@ -867,7 +868,18 @@
         .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) >= 75 && hasEnoughReviews(g) && (hltbMain(g) || 999) <= prefs.quickWinMaxHours)
         .sort((a, b) => ratingValue(b) - ratingValue(a));
       const hidden = visible.filter(g => isHiddenGem(g) && hasEnoughReviews(g)).sort((a, b) => ratingValue(b) - ratingValue(a));
-      const data = tab === "nextUp" ? nextUp : tab === "quickWins" ? quickWins : tab === "hiddenGems" ? hidden : backlogRated;
+      const returnTo = visible
+        .filter(g => getPersonal(g).status === "unfinished")
+        .sort((a, b) => {
+          const pa = getPersonal(a).priority;
+          const pb = getPersonal(b).priority;
+          if (pb !== pa) return pb - pa;
+          const la = a.last_played ? Date.parse(a.last_played) : 0;
+          const lb = b.last_played ? Date.parse(b.last_played) : 0;
+          if (lb !== la) return lb - la;
+          return ratingValue(b) - ratingValue(a);
+        });
+      const data = tab === "nextUp" ? nextUp : tab === "quickWins" ? quickWins : tab === "hiddenGems" ? hidden : tab === "returnTo" ? returnTo : backlogRated;
       const limit = prefs.picksLimit || 16;
       const countLabel = `${Math.min(data.length, limit)} of ${data.length}`;
       document.getElementById("pickMeta").textContent = countLabel;
@@ -1074,7 +1086,7 @@
       const selectAll = document.getElementById("selectAllVisible");
       if (selectAll) {
         selectAll.disabled = activeView === "wishlist";
-        selectAll.checked = activeView !== "wishlist" && list.length > 0 && list.every(g => selectedKeys.has(gameKey(g)));
+        selectAll.checked = activeView === "library" && list.length > 0 && list.every(g => selectedKeys.has(gameKey(g)));
       }
 
       if (focusedRowIndex >= list.length) focusedRowIndex = list.length - 1;
@@ -1095,7 +1107,7 @@
         tr.dataset.rowIndex = String(idx);
         tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
         tr.innerHTML = `
-          <td class="p-2 text-center">${activeView !== "wishlist" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
+          <td class="p-2 text-center">${activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
           <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
           <td class="p-2">
             <div class="flex items-center gap-1.5">
@@ -1150,12 +1162,9 @@
         if (expandedKeys.has(key)) tbody.appendChild(buildDetailRow(g));
       });
 
-      const unfinishedTotal = allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g)) && getPersonal(g).status === "unfinished").length;
       const base = activeView === "wishlist"
         ? `Wishlist: ${list.length} of ${wishlistGames.length}`
-        : activeView === "unfinished"
-          ? `Return to: ${list.length} of ${unfinishedTotal} unfinished games`
-          : `Showing ${list.length} of ${allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g))).length} games`;
+        : `Showing ${list.length} of ${allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g))).length} games`;
       const extra = cleanupModeActive && activeView === "library" ? " · cleanup mode" : "";
       document.getElementById("rowCount").textContent = base + extra;
       updateBulkBar();
@@ -1488,9 +1497,6 @@
       document.getElementById("addGameTitle").value = "";
       document.getElementById("addGameResults").innerHTML = "";
       document.getElementById("addGameStatus").textContent = "";
-    }
-    function escapeHtml(s) {
-      return String(s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     }
     async function steamSearch(term) {
       const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=english&cc=US`;
@@ -1904,7 +1910,7 @@
           selectedKeys.clear();
           focusedRowIndex = 0;
           document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-          if (view !== "library") cleanupModeActive = false;
+          if (view === "wishlist") cleanupModeActive = false;
           updateCleanupBtnState();
           updateBulkBar();
           refreshFilterUI();

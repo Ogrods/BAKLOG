@@ -19,6 +19,7 @@ import re
 import sqlite3
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 if sys.platform != "win32":
     raise ImportError("amazon_client requires Windows (DPAPI decryption)")
@@ -203,11 +204,7 @@ class AmazonGamesClient:
             if asin:
                 store_url = f"https://www.amazon.com/dp/{asin}"
             else:
-                from urllib.parse import quote
-
-                store_url = (
-                    f"https://www.amazon.com/s?k={quote(title)}&i=videogames"
-                )
+                store_url = f"https://www.amazon.com/s?k={quote(title)}&i=videogames"
 
             genres = list(
                 dict.fromkeys(

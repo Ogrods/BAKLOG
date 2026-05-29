@@ -200,11 +200,14 @@ class AmazonGamesClient:
             )
 
             asin = ent.get("ProductAsin") or cached.get("ProductAsin")
-            store_url = (
-                f"https://www.amazon.com/dp/{asin}"
-                if asin
-                else "https://gaming.amazon.com/home"
-            )
+            if asin:
+                store_url = f"https://www.amazon.com/dp/{asin}"
+            else:
+                from urllib.parse import quote
+
+                store_url = (
+                    f"https://www.amazon.com/s?k={quote(title)}&i=videogames"
+                )
 
             genres = list(
                 dict.fromkeys(

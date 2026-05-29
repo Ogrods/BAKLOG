@@ -5,10 +5,12 @@ import argparse
 import concurrent.futures
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -63,6 +65,40 @@ def _extract_genres(item: dict) -> list[str]:
     return list(dict.fromkeys(genres))
 
 
+_PUBLIC_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+def _is_public_epic_slug(value: str | None) -> bool:
+    """Real Epic store slugs are lowercase + digits + hyphens (e.g. ``fortnite``).
+
+    Internal entitlement slugs like ``Fortnite_Studio`` or ``KingletAztec`` are
+    PascalCase/snake_case and 404 on the public store.
+    """
+    return bool(value and _PUBLIC_SLUG.match(str(value).strip()))
+
+
+def _epic_public_slug(item: dict, catalog_id: str) -> str | None:
+    for key in ("productSlug", "urlSlug", "pageSlug"):
+        slug = item.get(key)
+        if _is_public_epic_slug(slug):
+            return str(slug).strip()
+    return None
+
+
+def _epic_store_url(item: dict, catalog_id: str, name: str) -> str:
+    slug = _epic_public_slug(item, catalog_id)
+    if slug:
+        return f"https://store.epicgames.com/en-US/p/{slug}"
+    return f"https://store.epicgames.com/en-US/browse?q={quote(name)}"
+
+
+def _epic_store_url_from_record(rec: dict, name: str) -> str:
+    slug = rec.get("appName")
+    if _is_public_epic_slug(slug):
+        return f"https://store.epicgames.com/en-US/p/{slug}"
+    return f"https://store.epicgames.com/en-US/browse?q={quote(name)}"
+
+
 def _is_game_item(item: dict) -> bool:
     paths = [
         c.get("path", "")
@@ -90,8 +126,7 @@ def _build_game_row(
     key_images = item.get("keyImages") or []
     header = _pick_image(key_images, HEADER_IMAGE_TYPES)
     library = _pick_image(key_images, LIBRARY_IMAGE_TYPES) or header
-    slug = item.get("productSlug") or item.get("urlSlug") or catalog_id
-    store_url = f"https://store.epicgames.com/en-US/p/{slug}"
+    store_url = _epic_store_url(item, catalog_id, name)
 
     release = None
     for info in item.get("releaseInfo") or []:
@@ -155,7 +190,6 @@ def _build_game_row_from_record(
         if row:
             return row
     name = rec.get("sandboxName") or rec.get("appName") or str(cid)
-    slug = rec.get("appName") or str(cid)
     row = {
         "store": "epic",
         "id": f"{ns}:{cid}",
@@ -178,7 +212,7 @@ def _build_game_row_from_record(
         "hltb_completionist_hours": None,
         "hltb_match_confidence": None,
         "hltb_name": None,
-        "store_url": f"https://store.epicgames.com/en-US/p/{slug}",
+        "store_url": _epic_store_url_from_record(rec, name),
         "type": "game",
         "price": None,
         "price_initial": None,

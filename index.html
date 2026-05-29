@@ -38,6 +38,7 @@
     /* === Table row states === */
     .status-next { background: rgba(14, 165, 233, 0.08); box-shadow: inset 3px 0 0 #38bdf8; }
     .status-playing { background: rgba(16, 185, 129, 0.08); box-shadow: inset 3px 0 0 #10b981; }
+    .status-unfinished { background: rgba(168, 85, 247, 0.07); box-shadow: inset 3px 0 0 #a855f7; }
     .status-finished { opacity: 0.72; box-shadow: inset 3px 0 0 #94a3b8; }
     .status-skip { opacity: 0.48; box-shadow: inset 3px 0 0 #64748b; }
     .status-skip .game-name { text-decoration: line-through; }
@@ -76,10 +77,11 @@
         <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
         <div class="flex gap-1">
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm active" data-view="library">Library</button>
+          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="unfinished">Return to</button>
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
         </div>
       </div>
-      <p id="metaCaption" class="text-slate-500 text-xs mt-1"><span id="meta">Loading...</span><span class="hidden md:inline"> · ↑↓ navigate · B/N/P/F/S status · / search</span></p>
+      <p id="metaCaption" class="text-slate-500 text-xs mt-1"><span id="meta">Loading...</span><span class="hidden md:inline"> · ↑↓ navigate · B/N/P/U/F/S status · / search</span></p>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
     </header>
 
@@ -166,6 +168,7 @@
       <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="backlog">Backlog</button>
       <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="next">Next</button>
       <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="playing">Playing</button>
+      <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="unfinished">Unfinished</button>
       <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="finished">Finished</button>
       <button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="skip">Skip</button>
       <span class="text-slate-500 text-xs ml-2 mr-1">Priority:</span>
@@ -194,6 +197,7 @@
           <option value="backlog">Backlog</option>
           <option value="next">Next up</option>
           <option value="playing">Playing</option>
+          <option value="unfinished">Unfinished</option>
           <option value="finished">Finished</option>
           <option value="skip">Skip</option>
         </select>
@@ -528,6 +532,59 @@
       if (ng.store === "steam") return `https://cdn.akamai.steamstatic.com/steam/apps/${ng.id}/header.jpg`;
       return "";
     }
+    const EPIC_PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]*$/;
+    const GENERIC_STORE_URLS = new Set([
+      "https://gaming.amazon.com/home",
+      "https://gaming.amazon.com/home/",
+    ]);
+    function isEpicPublicSlug(slug) {
+      return EPIC_PUBLIC_SLUG.test(String(slug || "").trim());
+    }
+    function isGenericStoreUrl(url) {
+      if (!url) return true;
+      const u = String(url).trim().replace(/\/$/, "");
+      return GENERIC_STORE_URLS.has(u) || u === "https://gaming.amazon.com/home";
+    }
+    function storeUrlForGame(g) {
+      const ng = normalizeGame(g);
+      let url = (ng.store_url || "").trim();
+      if (ng.store === "gog" && url.startsWith("/")) {
+        return "https://www.gog.com" + url;
+      }
+      if (url && url.startsWith("http") && !isGenericStoreUrl(url)) {
+        if (ng.store === "epic" && url.includes("/p/")) {
+          const slug = url.split("/p/").pop()?.split(/[?#]/)[0] || "";
+          if (isEpicPublicSlug(slug)) return url;
+        } else {
+          return url;
+        }
+      }
+      if (ng.store === "steam" && ng.id != null) {
+        return `https://store.steampowered.com/app/${ng.id}/`;
+      }
+      if (ng.store === "gog" && url.startsWith("/")) {
+        return "https://www.gog.com" + url;
+      }
+      if (ng.store === "psn" && ng.concept_id) {
+        return `https://store.playstation.com/en-us/concept/${ng.concept_id}`;
+      }
+      if (ng.store === "epic") {
+        return `https://store.epicgames.com/en-US/browse?q=${encodeURIComponent(ng.name || "")}`;
+      }
+      if (ng.store === "amazon") {
+        if (ng.asin) return `https://www.amazon.com/dp/${ng.asin}`;
+        return `https://www.amazon.com/s?k=${encodeURIComponent(ng.name || "")}&i=videogames`;
+      }
+      if (ng.store === "itch" && ng.itch_slug) {
+        return `https://itch.io/${ng.itch_slug}`;
+      }
+      return url && url.startsWith("http") && !isGenericStoreUrl(url) ? url : null;
+    }
+    function storeLinkHtml(g, className, labelHtml) {
+      const url = storeUrlForGame(g);
+      if (!url) return `<span class="${className}">${labelHtml}</span>`;
+      return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" class="${className}">${labelHtml}</a>`;
+    }
     const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, tags: [] };
     const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, tags: Object.freeze([]) });
     function getPersonal(g) {
@@ -679,10 +736,11 @@
       return source.filter(g => {
         const ng = normalizeGame(g);
         const p = getPersonal(g);
-        if (activeView === "library") {
+        if (activeView === "library" || activeView === "unfinished") {
           if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
           if (crossStoreHiddenKeys.has(gameKey(g))) return false;
         }
+        if (activeView === "unfinished" && p.status !== "unfinished") return false;
         if (cleanupModeActive && activeView === "library" && !isCleanupCandidate(g)) return false;
         if (q && !g.name.toLowerCase().includes(q)) return false;
         if (status && p.status !== status) return false;
@@ -867,7 +925,7 @@
     }
 
     function findGameByKey(key) {
-      return allGames.find(g => gameKey(g) === key);
+      return allGames.find(g => gameKey(g) === key) || wishlistGames.find(g => gameKey(g) === key);
     }
 
     function updateRowInPlace(tr, g) {
@@ -879,9 +937,27 @@
       tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
     }
 
+    function tagCellHtml(g) {
+      const key = gameKey(g);
+      const p = getPersonal(g);
+      return (p.tags || []).map(t => `<span class="row-tag inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-700/40 border border-amber-500/40 text-[11px] text-amber-100">${escapeHtml(t)}<button type="button" class="row-tag-remove text-amber-200 hover:text-white" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("") + `<button type="button" class="row-tag-add text-[11px] px-1.5 py-0.5 rounded-full border border-dashed border-slate-500 text-slate-400 hover:text-slate-100 hover:border-slate-300" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>`;
+    }
+
+    function updateTagCellInPlace(tr, g) {
+      if (!tr) return;
+      const wrap = tr.querySelector(".tag-chip-wrap");
+      if (wrap) wrap.innerHTML = tagCellHtml(g);
+    }
+
+    let _tagChipsRefreshTimer = null;
+    function scheduleTagChipsRefresh() {
+      clearTimeout(_tagChipsRefreshTimer);
+      _tagChipsRefreshTimer = setTimeout(renderTagChips, 150);
+    }
+
     function rowClass(g, lowConf) {
       const status = getPersonal(g).status;
-      const stateClass = status === "next" ? "status-next" : status === "playing" ? "status-playing" : status === "finished" ? "status-finished" : status === "skip" ? "status-skip" : "";
+      const stateClass = status === "next" ? "status-next" : status === "playing" ? "status-playing" : status === "unfinished" ? "status-unfinished" : status === "finished" ? "status-finished" : status === "skip" ? "status-skip" : "";
       const lowClass = lowConf ? " low-confidence" : "";
       const picked = pickedKey === gameKey(g) ? " row-picked" : "";
       return `bg-slate-800/50 hover:bg-slate-700/50 ${stateClass}${lowClass}${picked}`;
@@ -968,7 +1044,7 @@
       detail.innerHTML = `<td colspan="${cols}" class="p-3 text-sm text-slate-300 border-t border-slate-700">
         <img src="${headerFallback}" data-fallback="" data-name="${escapeAttr(g.name)}" class="max-h-24 rounded float-right ml-4" alt="" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${extra || "No extra details."}
-        <a href="${g.store_url}" class="text-sky-400 ml-2" target="_blank" rel="noopener">Store →</a>
+        ${storeLinkHtml(g, "text-sky-400 ml-2", "Store →")}
       </td>`;
       return detail;
     }
@@ -998,7 +1074,7 @@
       const selectAll = document.getElementById("selectAllVisible");
       if (selectAll) {
         selectAll.disabled = activeView === "wishlist";
-        selectAll.checked = activeView === "library" && list.length > 0 && list.every(g => selectedKeys.has(gameKey(g)));
+        selectAll.checked = activeView !== "wishlist" && list.length > 0 && list.every(g => selectedKeys.has(gameKey(g)));
       }
 
       if (focusedRowIndex >= list.length) focusedRowIndex = list.length - 1;
@@ -1019,11 +1095,11 @@
         tr.dataset.rowIndex = String(idx);
         tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
         tr.innerHTML = `
-          <td class="p-2 text-center">${activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
+          <td class="p-2 text-center">${activeView !== "wishlist" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
           <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
           <td class="p-2">
             <div class="flex items-center gap-1.5">
-              <a href="${g.store_url}" target="_blank" rel="noopener" class="text-sky-400 hover:underline font-medium game-name">${escapeHtml(g.name)}</a>
+              ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name", escapeHtml(g.name))}
               ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
               ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
             </div>
@@ -1037,6 +1113,7 @@
               <option value="backlog" ${p.status === "backlog" ? "selected" : ""}>Backlog</option>
               <option value="next" ${p.status === "next" ? "selected" : ""}>Next up</option>
               <option value="playing" ${p.status === "playing" ? "selected" : ""}>Playing</option>
+              <option value="unfinished" ${p.status === "unfinished" ? "selected" : ""}>Unfinished</option>
               <option value="finished" ${p.status === "finished" ? "selected" : ""}>Finished</option>
               <option value="skip" ${p.status === "skip" ? "selected" : ""}>Skip</option>
             </select>
@@ -1058,10 +1135,7 @@
           <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
           <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).join(", ")}">${(g.genres || []).slice(0, 2).join(", ") || "—"}</td>
           <td class="p-2 min-w-[180px]">
-            <div class="flex flex-wrap gap-1 mb-1">
-              ${(p.tags || []).map(t => `<span class="row-tag inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-700/40 border border-amber-500/40 text-[11px] text-amber-100">${escapeHtml(t)}<button type="button" class="row-tag-remove text-amber-200 hover:text-white" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("")}
-              <button type="button" class="row-tag-add text-[11px] px-1.5 py-0.5 rounded-full border border-dashed border-slate-500 text-slate-400 hover:text-slate-100 hover:border-slate-300" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>
-            </div>
+            <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
             <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
           </td>`;
 
@@ -1076,9 +1150,12 @@
         if (expandedKeys.has(key)) tbody.appendChild(buildDetailRow(g));
       });
 
+      const unfinishedTotal = allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g)) && getPersonal(g).status === "unfinished").length;
       const base = activeView === "wishlist"
         ? `Wishlist: ${list.length} of ${wishlistGames.length}`
-        : `Showing ${list.length} of ${allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g))).length} games`;
+        : activeView === "unfinished"
+          ? `Return to: ${list.length} of ${unfinishedTotal} unfinished games`
+          : `Showing ${list.length} of ${allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g))).length} games`;
       const extra = cleanupModeActive && activeView === "library" ? " · cleanup mode" : "";
       document.getElementById("rowCount").textContent = base + extra;
       updateBulkBar();
@@ -1631,7 +1708,7 @@
         return;
       }
       if (activeView !== "library") return;
-      const statusKeys = { b: "backlog", n: "next", p: "playing", f: "finished", s: "skip" };
+      const statusKeys = { b: "backlog", n: "next", p: "playing", u: "unfinished", f: "finished", s: "skip" };
       if (statusKeys[e.key.toLowerCase()]) {
         e.preventDefault();
         const g = list[focusedRowIndex] || list[0];
@@ -1827,7 +1904,7 @@
           selectedKeys.clear();
           focusedRowIndex = 0;
           document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-          if (view === "wishlist") cleanupModeActive = false;
+          if (view !== "library") cleanupModeActive = false;
           updateCleanupBtnState();
           updateBulkBar();
           refreshFilterUI();
@@ -1866,8 +1943,9 @@
           const g = findGameByKey(removeBtn.dataset.gameKey);
           if (g) {
             removeTagFromGame(g, removeBtn.dataset.tag);
-            renderTagChips();
-            renderTable();
+            const tr = removeBtn.closest("tr");
+            updateTagCellInPlace(tr, g);
+            scheduleTagChipsRefresh();
           }
           return;
         }
@@ -1876,11 +1954,37 @@
           e.stopPropagation();
           const g = findGameByKey(addBtn.dataset.gameKey);
           if (!g) return;
-          const raw = prompt(`Add a tag to "${g.name}" (lowercase, e.g. co-op, cozy, bedtime):`);
-          if (!raw) return;
-          addTagToGame(g, raw);
-          renderTagChips();
-          renderTable();
+          const input = document.createElement("input");
+          input.type = "text";
+          input.placeholder = "tag…";
+          input.maxLength = 32;
+          input.className = "row-tag-input text-[11px] px-1.5 py-0.5 rounded-full border border-amber-500/60 bg-slate-700 text-amber-100 w-20 focus:outline-none focus:border-amber-300";
+          addBtn.replaceWith(input);
+          let done = false;
+          const tr = input.closest("tr");
+          const commit = () => {
+            if (done) return;
+            done = true;
+            const raw = input.value;
+            if (raw && raw.trim()) {
+              addTagToGame(g, raw);
+              updateTagCellInPlace(tr, g);
+              scheduleTagChipsRefresh();
+            } else if (input.parentNode) {
+              input.replaceWith(addBtn);
+            }
+          };
+          const cancel = () => {
+            if (done) return;
+            done = true;
+            if (input.parentNode) input.replaceWith(addBtn);
+          };
+          input.addEventListener("keydown", ev => {
+            if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+            else if (ev.key === "Escape") { ev.preventDefault(); cancel(); }
+          });
+          input.addEventListener("blur", commit);
+          setTimeout(() => input.focus(), 0);
           return;
         }
         const btn = e.target.closest("[data-hltb-edit]");

@@ -47,6 +47,19 @@ def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
     return f"{url}.jpg", f"{url}_glx_vertical_cover.jpg"
 
 
+def _normalize_gog_store_url(product: dict, gog_id: int) -> str:
+    """GOG API often returns a site-relative path; the dashboard needs an absolute URL."""
+    url = (product.get("url") or "").strip()
+    slug = product.get("slug") or str(gog_id)
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    if url.startswith("/"):
+        return f"https://www.gog.com{url}"
+    if url:
+        return f"https://www.gog.com/{url.lstrip('/')}"
+    return f"https://www.gog.com/en/game/{slug}"
+
+
 def _extract_genres(product: dict, details: dict | None) -> list[str]:
     genres: list[str] = []
     for source in (details or {}, product):
@@ -144,7 +157,7 @@ def _build_game_row(
         "hltb_completionist_hours": None,
         "hltb_match_confidence": None,
         "hltb_name": None,
-        "store_url": product.get("url") or f"https://www.gog.com/game/{product.get('slug', gog_id)}",
+        "store_url": _normalize_gog_store_url(product, gog_id),
         "type": "game",
         "price": price_str,
         "price_initial": None,

@@ -16,3 +16,9 @@ __pycache__/
 .venv/
 venv/
 node_modules/
+
+# One-off local maintenance scripts (keep patch_store_urls.py in repo)
+check_images.py
+find_dupes.py
+migrate_gog_images.py
+remove_steam_dupes.py

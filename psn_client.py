@@ -112,6 +112,13 @@ def _strip_marketing(name: str) -> str:
     return name.replace("\u2122", "").replace("\u00ae", "").replace("\u00a9", "")
 
 
+def _display_name(name: str) -> str:
+    """Fix known broken spacing from PSN trophy/API titles."""
+    n = _strip_marketing(name).strip()
+    n = re.sub(r"\bT elltale\b", "Telltale", n, flags=re.I)
+    return n
+
+
 def _norm_name_raw(name: str | None) -> str:
     """Normalize for filtering — does not strip trophy/platform suffixes."""
     if not name:
@@ -249,7 +256,7 @@ class PsnClient:
             comm_id = trophy.np_communication_id
             if not comm_id:
                 continue
-            name = trophy.title_name or f"PSN {comm_id}"
+            name = _display_name(trophy.title_name or f"PSN {comm_id}")
             entry = PsnGameEntry(
                 id=comm_id,
                 np_communication_id=comm_id,
@@ -297,7 +304,7 @@ class PsnClient:
             if not title_id or title_id in seen_title_ids:
                 continue
 
-            name = (
+            name = _display_name(
                 title_meta.get("name")
                 or concept_meta.get("name")
                 or (entitlement.get("gameMeta") or {}).get("name")

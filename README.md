@@ -16,14 +16,15 @@ A **local-only** tool for browsing, sorting, and prioritizing your game librarie
 
 ## Features
 
-- Tabbed Picks panel: Top Rated, Next Up, Quick Wins, Hidden Gems
+- Tabbed Picks panel: Top Rated, Next Up, Quick Wins, Hidden Gems, Return To, **Wishlist Deals**
 - Smart sorting with optional Priority Score column
 - Multi-select genre filters with AND/OR mode
 - Pick-for-me randomizer and one-click `games.json` reload
 - Inline HLTB override and compact Main/Extra/Completionist display
-- Price and discount column sourced from Steam app details
+- Price and discount column sourced from Steam app details (or ITAD when available)
 - Status-aware row styling and hidden-gem badges
 - Multi-store dashboard with Steam / GOG / PSN filters and store badges
+- **Wishlist deal radar:** filter by On Sale / Historical Low / Min Discount % / Max Price, hide already-owned cross-store, and add wishes manually for any storefront
 
 ## Dashboard CSS (optional)
 
@@ -151,6 +152,7 @@ schtasks /create /SC WEEKLY /D SUN /TN "Steam Backlog Refresh" /TR "powershell -
 | `fetch_psn.py` | Fetches PSN library → `games_psn.json` |
 | `fetch_itch.py` | itch.io owned games → `games_itch.json` (`ITCH_API_KEY` in `.env`) |
 | `fetch_wishlist.py` | Steam wishlist → `games_wishlist.json` (public wishlist + `STEAM_API_KEY`) |
+| `fetch_gog_wishlist.py` | GOG wishlist → `games_wishlist_gog.json` (uses `GOG_AL` cookie; `--hltb` for HLTB lookup) |
 | `fetch_itad.py` | IsThereAnyDeal prices → `itad_prices.json` (`ITAD_API_KEY` in `.env`) |
 | `enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |
 | `steam_client.py` | Steam Web API + Store API client |

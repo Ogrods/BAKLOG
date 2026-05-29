@@ -35,6 +35,10 @@
     .store-badge.itch { background: #fa5c5c; color: #2a0606; }
     .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
     .view-tab.active { border-color: #38bdf8; color: #e2e8f0; background: rgba(14, 165, 233, 0.15); }
+    .add-target-btn { color: #cbd5e1; }
+    .add-target-btn.active { background: rgba(16, 185, 129, 0.25); color: #ecfdf5; box-shadow: inset 0 0 0 1px #10b981; }
+    .deal-flag-low { color: #f97316; font-weight: 600; }
+    .deal-flag-cut { color: #34d399; font-weight: 600; }
     /* === Table row states === */
     .status-next { background: rgba(14, 165, 233, 0.08); box-shadow: inset 3px 0 0 #38bdf8; }
     .status-playing { background: rgba(16, 185, 129, 0.08); box-shadow: inset 3px 0 0 #10b981; }
@@ -68,6 +72,26 @@
     /* === Kebab menu === */
     #kebabMenu { display: none; }
     #kebabMenu.open { display: block; }
+    /* === View-switch loading overlay === */
+    #viewLoadingOverlay {
+      position: absolute; inset: 0; z-index: 30;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(2px);
+      border-radius: 0.5rem;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    #viewLoadingOverlay.show { opacity: 1; pointer-events: auto; }
+    .view-spinner {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(148, 163, 184, 0.35);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: view-spin 0.75s linear infinite;
+    }
+    @keyframes view-spin { to { transform: rotate(360deg); } }
+    .view-tab[disabled] { opacity: 0.5; cursor: progress; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -88,11 +112,12 @@
       <div class="flex flex-wrap items-center gap-2 p-3 border-b border-slate-700 relative z-10">
         <button id="togglePicks" class="px-2 py-1 rounded bg-slate-700 text-xs">Hide</button>
         <h2 class="text-sm font-semibold tracking-wide text-slate-200 uppercase">Picks</h2>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs active" data-tab="topRated">Top Rated</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp">Next Up</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins">Quick Wins</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems">Hidden Gems</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo">Return To</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs active" data-tab="topRated" data-pick-view="library">Top Rated</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp" data-pick-view="library">Next Up</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins" data-pick-view="library">Quick Wins</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems" data-pick-view="library">Hidden Gems</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo" data-pick-view="library">Return To</button>
+        <button class="pick-tab px-2 py-1 rounded border border-emerald-700/60 text-xs text-emerald-300" data-tab="wishlistDeals" data-pick-view="wishlist" title="Best deals on your wishlist (ITAD + Steam)">Wishlist Deals</button>
         <span class="text-xs text-slate-300 ml-auto flex items-center gap-1">Show:
           <span id="picksLimitGroup" class="inline-flex rounded border border-slate-600 overflow-hidden" role="group" aria-label="Number of picks to show">
             <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="16">16</button>
@@ -101,7 +126,7 @@
             <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700" data-limit="96">96</button>
           </span>
         </span>
-        <label class="text-xs text-slate-300">Quick-win max hours:
+        <label id="quickWinMaxWrap" class="text-xs text-slate-300">Quick-win max hours:
           <input id="quickWinMax" type="range" min="2" max="40" value="15" class="align-middle w-24" />
           <span id="quickWinMaxVal">15</span>
         </label>
@@ -134,6 +159,13 @@
       <div id="activeFilterPills" class="hidden flex flex-wrap gap-1.5 items-center"></div>
     </section>
 
+    <div id="tableShell" class="relative">
+      <div id="viewLoadingOverlay" aria-hidden="true">
+        <div class="flex flex-col items-center gap-2 text-slate-200">
+          <div class="view-spinner"></div>
+          <span id="viewLoadingLabel" class="text-xs uppercase tracking-wide text-slate-300">Loading…</span>
+        </div>
+      </div>
     <div id="tableWrap" class="overflow-x-auto rounded-lg border border-slate-700">
       <table class="w-full text-sm">
         <thead class="bg-slate-800 text-slate-300">
@@ -141,14 +173,14 @@
             <th class="p-2 w-8"><input type="checkbox" id="selectAllVisible" title="Select all visible rows" /></th>
             <th class="p-2 w-12"></th>
             <th data-sort="name" class="p-2 text-left">Game</th>
-            <th data-sort="status" class="p-2 text-left">Status</th>
+            <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
             <th data-sort="priority" class="p-2 text-center">Pri</th>
             <th id="scoreHeader" data-sort="priority_score" class="p-2 text-right hidden">Score</th>
             <th data-sort="playtime_minutes" class="p-2 text-right">Played</th>
             <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
             <th data-sort="steam_review_percent" class="p-2 text-right">Steam %</th>
             <th data-sort="metacritic_score" class="p-2 text-right">Meta</th>
-            <th data-sort="discount_percent" class="p-2 text-right">Price</th>
+            <th id="priceHeader" data-sort="discount_percent" class="p-2 text-right">Price</th>
             <th data-sort="release_date" class="p-2 text-left">Released</th>
             <th data-sort="last_played" class="p-2 text-left">Last played</th>
             <th class="p-2 text-left">Genres</th>
@@ -157,6 +189,7 @@
         </thead>
         <tbody id="tbody" class="divide-y divide-slate-700"></tbody>
       </table>
+    </div>
     </div>
     <p id="rowCount" class="text-slate-400 text-sm mt-2"></p>
   </div>
@@ -190,7 +223,7 @@
       <button type="button" id="closeFiltersBtn" class="text-slate-400 hover:text-slate-100 text-xl leading-none px-2" aria-label="Close filters">&times;</button>
     </div>
     <div class="flex-1 overflow-y-auto p-3 space-y-0 text-sm">
-      <div class="drawer-section">
+      <div id="libraryStatusSection" class="drawer-section">
         <label class="text-xs text-slate-400 block mb-1">Status</label>
         <select id="statusFilter" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5">
           <option value="">All statuses</option>
@@ -202,7 +235,7 @@
           <option value="skip">Skip</option>
         </select>
       </div>
-      <div class="drawer-section">
+      <div id="libraryStoreSection" class="drawer-section">
         <label class="text-xs text-slate-400 block mb-2">Store</label>
         <div id="storeChips" class="flex flex-wrap gap-1.5 items-center">
           <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs active bg-slate-700" data-store="">All</button>
@@ -253,7 +286,7 @@
           <input id="maxHours" type="range" min="0" max="200" value="200" class="w-full mt-1" />
         </label>
       </div>
-      <div class="drawer-section space-y-2">
+      <div id="libraryMiscSection" class="drawer-section space-y-2">
         <label class="flex items-center gap-2 text-xs text-slate-300">
           <input id="unplayedOnly" type="checkbox" class="rounded" />
           Unplayed only
@@ -265,6 +298,31 @@
         <button type="button" id="cleanupModeBtn" class="w-full bg-orange-800 hover:bg-orange-700 px-3 py-2 rounded text-sm" title="Backlog, 0 playtime, rating under 60%, released 2+ years ago">Cleanup mode</button>
         <p class="text-[11px] text-slate-400 mt-1 leading-snug">Surfaces obvious candidates to mark as <em>Skip</em>: backlog games you've never played, rated under 60%, released 2+ years ago. Pair with bulk select to clear them out fast.</p>
       </div>
+      <div id="wishlistDealsSection" class="drawer-section space-y-2 hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs uppercase tracking-wide text-emerald-300 font-semibold">Deal radar</span>
+          <button type="button" id="resetDealFiltersBtn" class="text-[11px] text-slate-400 hover:text-slate-200 underline">Reset</button>
+        </div>
+        <label class="flex items-center gap-2 text-xs text-slate-300">
+          <input id="dealOnSaleOnly" type="checkbox" class="rounded" />
+          On sale only
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-300">
+          <input id="dealHistoricalLowOnly" type="checkbox" class="rounded" />
+          Historical low only <span class="text-[10px] text-amber-400 ml-1">via ITAD</span>
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-300">
+          <input id="dealHideOwned" type="checkbox" class="rounded" />
+          Hide already-owned (matched by title)
+        </label>
+        <label class="block text-xs text-slate-300">Min discount % <span id="dealMinDiscountVal" class="text-slate-100">0</span>
+          <input id="dealMinDiscount" type="range" min="0" max="100" step="5" value="0" class="w-full mt-1" />
+        </label>
+        <label class="block text-xs text-slate-300">Max price $ <span id="dealMaxPriceVal" class="text-slate-100">any</span>
+          <input id="dealMaxPrice" type="range" min="0" max="100" step="5" value="100" class="w-full mt-1" />
+        </label>
+        <p class="text-[11px] text-slate-400 mt-1 leading-snug">Best results when <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code> has been run recently. Steam discount % is used as a fallback.</p>
+      </div>
     </div>
   </aside>
 
@@ -272,10 +330,14 @@
   <div id="addGameModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
     <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
-        <h3 class="text-lg font-semibold text-slate-100">Add a game</h3>
+        <h3 id="addGameModalTitle" class="text-lg font-semibold text-slate-100">Add a game</h3>
         <button id="addGameClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
       <div class="p-4 space-y-3 overflow-y-auto">
+        <div class="inline-flex rounded border border-slate-600 overflow-hidden text-xs" role="group" aria-label="Add to library or wishlist">
+          <button type="button" class="add-target-btn px-3 py-1.5 bg-slate-700" data-target="library">Add to Library</button>
+          <button type="button" class="add-target-btn px-3 py-1.5 bg-slate-700 border-l border-slate-600" data-target="wishlist">Add to Wishlist</button>
+        </div>
         <div class="flex flex-wrap gap-2 items-end">
           <label class="flex-1 min-w-[200px] text-xs text-slate-300">Title
             <input id="addGameTitle" type="text" autocomplete="off" placeholder="e.g. The Legend of Zelda: Tears of the Kingdom" class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
@@ -294,6 +356,17 @@
             </select>
           </label>
           <button id="addGameSearch" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 rounded text-sm">Search Steam</button>
+        </div>
+        <div id="addGameWishlistFields" class="hidden flex flex-wrap gap-2 items-end p-2 rounded bg-slate-900/40 border border-emerald-700/40">
+          <label class="text-xs text-slate-300">Price (optional)
+            <input id="addGameWishPrice" type="text" inputmode="decimal" placeholder="e.g. 19.99" class="block mt-1 w-28 bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300">Discount % (optional)
+            <input id="addGameWishDiscount" type="number" min="0" max="100" step="1" placeholder="0" class="block mt-1 w-24 bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
+          </label>
+          <label class="flex-1 min-w-[200px] text-xs text-slate-300">Store URL (optional)
+            <input id="addGameWishUrl" type="url" placeholder="https://..." class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
+          </label>
         </div>
         <p id="addGameHint" class="text-xs text-slate-400">Type a title and click Search Steam. Pick the closest match to import its cover, Steam rating, and store link. The game will be saved under your chosen platform.</p>
         <div id="addGameStatus" class="text-xs text-amber-400"></div>
@@ -485,7 +558,7 @@
     window.addEventListener("beforeunload", flushSavePersonal);
     window.addEventListener("blur", flushSavePersonal);
     function loadPrefs() {
-      const fallback = { picksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR" };
+      const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, wishlistSortInitialized: false };
       try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
     }
     function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
@@ -676,6 +749,31 @@
       const tip = `Owned on: ${owned.map(s => s.toUpperCase()).join(", ")}`;
       return `<span class="inline-flex items-center gap-0.5 align-middle" title="${tip}">${owned.map(s => singleStoreBadgeHtml(s, tip)).join("")}</span>`;
     }
+    function wishlistStatusSelectHtml(g, p) {
+      const key = gameKey(g);
+      const opts = [
+        ["backlog", "Watching"],
+        ["next", "Want it"],
+        ["skip", "Pass"],
+        ["finished", "Bought"],
+      ];
+      return `<select data-game-key="${escapeAttr(key)}" data-field="status" class="bg-slate-700 border border-slate-600 rounded text-xs py-1" title="Wishlist tracking">
+        ${opts.map(([val, label]) => `<option value="${val}" ${p.status === val ? "selected" : ""}>${label}</option>`).join("")}
+      </select>`;
+    }
+
+    function tableColSpan() {
+      return prefs.showScoreColumn ? 15 : 14;
+    }
+
+    function wishlistBadgeHtml(g) {
+      const target = g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
+      const cls = target === "gog" ? "gog" : target === "epic" ? "epic" : target === "psn" ? "psn" : target === "amazon" ? "amazon" : target === "nintendo" ? "nintendo" : target === "xbox" ? "xbox" : target === "itch" ? "itch" : target === "manual" ? "other" : "steam";
+      const letter = target === "gog" ? "G" : target === "epic" ? "E" : target === "psn" ? "P" : target === "amazon" ? "A" : target === "nintendo" ? "N" : target === "xbox" ? "X" : target === "itch" ? "I" : target === "manual" ? "M" : "S";
+      const manualMark = g.manual ? " manual" : "";
+      const tip = `Wishlist · ${target.toUpperCase()}${g.manual ? " (manual)" : ""}`;
+      return `<span class="store-badge ${cls}${manualMark}" title="${tip}">W${letter}</span>`;
+    }
     function formatHours(minutes) { return !minutes ? "0h" : `${(minutes / 60).toFixed(1)}h`; }
     function formatDate(unixOrStr) {
       if (!unixOrStr) return "—";
@@ -724,6 +822,69 @@
       return null;
     }
 
+    function parsePriceLike(v) {
+      if (v == null) return null;
+      if (typeof v === "number") return v;
+      const m = String(v).match(/-?\d+(?:\.\d+)?/);
+      return m ? parseFloat(m[0]) : null;
+    }
+
+    // Returns unified deal info for a game. ITAD is preferred (cross-store best price);
+    // Steam discount is the fallback. Manual wishlist entries can supply price/discount.
+    function getDealInfo(g) {
+      const itad = getItadForGame(g);
+      if (itad && itad.price != null) {
+        return {
+          source: "itad",
+          price: itad.price,
+          regular: itad.regular,
+          cut: itad.cut || 0,
+          isHistoricalLow: !!itad.is_historical_low,
+          shop: itad.shop,
+          url: itad.url,
+        };
+      }
+      const steamPrice = parsePriceLike(g.price);
+      const steamRegular = parsePriceLike(g.price_initial);
+      const cut = g.discount_percent || 0;
+      if (steamPrice != null || cut) {
+        return {
+          source: "steam",
+          price: steamPrice,
+          regular: steamRegular,
+          cut,
+          isHistoricalLow: false,
+          shop: "Steam",
+          url: g.store_url || null,
+        };
+      }
+      return null;
+    }
+
+    function effectiveDiscountPercent(g) {
+      const d = getDealInfo(g);
+      if (d) return d.cut || 0;
+      return g.discount_percent || 0;
+    }
+
+    function effectiveSortPrice(g) {
+      const d = getDealInfo(g);
+      if (d && d.price != null) return d.price;
+      return parsePriceLike(g.price);
+    }
+
+    function dealScore(g) {
+      const d = getDealInfo(g);
+      if (!d) return -Infinity;
+      const cut = d.cut || 0;
+      const lowBonus = d.isHistoricalLow ? 25 : 0;
+      const rating = ratingValue(g);
+      const ratingBonus = rating >= 90 ? 15 : rating >= 80 ? 10 : rating >= 70 ? 5 : 0;
+      const ownedPenalty = isOwnedByTitle(g.name) ? 1000 : 0;
+      const pricePenalty = d.price != null ? Math.max(0, d.price - 30) * 0.5 : 0;
+      return cut + lowBonus + ratingBonus - ownedPenalty - pricePenalty;
+    }
+
     // === Filter + sort ===
     function filteredGames() {
       const q = document.getElementById("search").value.toLowerCase().trim();
@@ -742,9 +903,12 @@
           if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
           if (crossStoreHiddenKeys.has(gameKey(g))) return false;
         }
+        if (activeView === "wishlist") {
+          if (!passesDealFilters(g)) return false;
+        }
         if (cleanupModeActive && activeView === "library" && !isCleanupCandidate(g)) return false;
         if (q && !g.name.toLowerCase().includes(q)) return false;
-        if (status && p.status !== status) return false;
+        if (activeView === "library" && status && p.status !== status) return false;
         if (unplayed && (g.playtime_minutes || 0) > 0) return false;
         const rating = ratingValue(g);
         if (minRating > 0 && rating < minRating) return false;
@@ -762,6 +926,28 @@
         }
         return true;
       });
+    }
+
+    function passesDealFilters(g) {
+      if (prefs.dealHideOwned && isOwnedByTitle(g.name)) return false;
+      const d = getDealInfo(g);
+      const onSale = prefs.dealOnSaleOnly;
+      const lowOnly = prefs.dealHistoricalLowOnly;
+      const minCut = +(prefs.dealMinDiscount || 0);
+      const maxPrice = +(prefs.dealMaxPrice ?? 100);
+      if (onSale && (!d || (d.cut || 0) <= 0)) return false;
+      if (lowOnly && !(d && d.isHistoricalLow)) return false;
+      if (minCut > 0 && (!d || (d.cut || 0) < minCut)) return false;
+      if (maxPrice < 100) {
+        if (!d) return false;
+        if (d.price == null) {
+          // Manual wishlist with a discount but no price still passes max-price filter.
+          if (g.manual && (d.cut || 0) > 0) return true;
+          return false;
+        }
+        if (d.price > maxPrice) return false;
+      }
+      return true;
     }
 
     function visibleListForKeyboard() {
@@ -817,6 +1003,8 @@
           case "last_played": va = a.last_played || 0; vb = b.last_played || 0; break;
           case "release_date": va = parseReleaseForSort(a.release_date); vb = parseReleaseForSort(b.release_date); break;
           case "hltb_main_hours": va = hltbMain(a); vb = hltbMain(b); break;
+          case "discount_percent": va = effectiveDiscountPercent(a); vb = effectiveDiscountPercent(b); break;
+          case "deal_price": va = effectiveSortPrice(a); vb = effectiveSortPrice(b); break;
           default: va = a[sortKey]; vb = b[sortKey];
         }
         if (va == null) va = sortDir > 0 ? Infinity : -Infinity;
@@ -879,15 +1067,65 @@
           if (lb !== la) return lb - la;
           return ratingValue(b) - ratingValue(a);
         });
-      const data = tab === "nextUp" ? nextUp : tab === "quickWins" ? quickWins : tab === "hiddenGems" ? hidden : tab === "returnTo" ? returnTo : backlogRated;
+      const wishlistDeals = wishlistGames
+        .filter(g => {
+          const d = getDealInfo(g);
+          if (!d) return false;
+          return (d.cut || 0) > 0 || d.isHistoricalLow;
+        })
+        .sort((a, b) => dealScore(b) - dealScore(a));
+      let data;
+      switch (tab) {
+        case "nextUp": data = nextUp; break;
+        case "quickWins": data = quickWins; break;
+        case "hiddenGems": data = hidden; break;
+        case "returnTo": data = returnTo; break;
+        case "wishlistDeals": data = wishlistDeals; break;
+        default: data = backlogRated;
+      }
       const limit = prefs.picksLimit || 16;
       const countLabel = `${Math.min(data.length, limit)} of ${data.length}`;
       document.getElementById("pickMeta").textContent = countLabel;
+      const renderCard = tab === "wishlistDeals" ? dealCardHtml : pickCardHtml;
+      const emptyMsg = tab === "wishlistDeals"
+        ? 'No deals on your wishlist right now. Run <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code> for cross-store prices.'
+        : "No games match this tab yet.";
       document.getElementById("picksGrid").innerHTML = data.length
-        ? data.slice(0, limit).map(pickCardHtml).join("")
-        : '<div class="col-span-full text-sm text-slate-400 italic">No games match this tab yet.</div>';
+        ? data.slice(0, limit).map(renderCard).join("")
+        : `<div class="col-span-full text-sm text-slate-400 italic">${emptyMsg}</div>`;
       document.querySelectorAll(".pick-tab").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+      updatePicksChrome();
       renderPicksLimitButtons();
+    }
+
+    function dealCardHtml(g) {
+      const key = gameKey(g);
+      const headerFallback = coverFallbackFor(g);
+      const cover = g.library_image || headerFallback;
+      const d = getDealInfo(g);
+      const priceLabel = d && d.price != null ? `$${d.price.toFixed(2)}` : "—";
+      const cutLabel = d && d.cut ? `-${d.cut}%` : "";
+      const lowFlag = d && d.isHistoricalLow ? '<span class="deal-flag-low" title="Historical low">★ low</span>' : "";
+      const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : "";
+      const ownedFlag = isOwnedByTitle(g.name) ? '<span class="text-amber-400 text-[10px]" title="Already owned elsewhere">owned</span>' : "";
+      const shop = d && d.shop ? d.shop : "";
+      return `
+        <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
+          <span class="pick-store store-badge steam">W</span>
+          <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+          <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
+          <div class="text-xs text-slate-400 flex justify-between items-center gap-1">
+            <span class="text-slate-100">${priceLabel}</span>
+            <span class="flex items-center gap-1">
+              ${cutLabel ? `<span class="deal-flag-cut">${cutLabel}</span>` : ""}
+              ${lowFlag}
+            </span>
+          </div>
+          <div class="text-[10px] text-slate-500 flex justify-between mt-0.5">
+            <span class="truncate">${escapeHtml(shop)}</span>
+            <span class="flex items-center gap-1">${rating}${ownedFlag ? ` ${ownedFlag}` : ""}</span>
+          </div>
+        </div>`;
     }
 
     function normalizePicksLimit() {
@@ -908,6 +1146,26 @@
     }
 
     function renderSummary() {
+      const el = document.getElementById("summary");
+      if (!el) return;
+      if (activeView === "wishlist") {
+        const wl = wishlistGames;
+        const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
+        const lows = wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; });
+        const owned = wl.filter(g => isOwnedByTitle(g.name)).length;
+        const cuts = onSale.map(g => effectiveDiscountPercent(g)).filter(c => c > 0);
+        const avgDisc = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : null;
+        const prices = wl.map(g => effectiveSortPrice(g)).filter(p => p != null);
+        const avgPrice = prices.length ? (prices.reduce((s, p) => s + p, 0) / prices.length).toFixed(2) : null;
+        el.innerHTML = `
+          <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Wishlist <span class="text-slate-100 font-semibold ml-1">${wl.length}</span></div>
+          <div class="px-3 py-2 rounded-full bg-emerald-900/40 border border-emerald-700/50 text-xs">On sale <span class="text-emerald-200 font-semibold ml-1">${onSale.length}</span></div>
+          <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Historical low <span class="text-amber-300 font-semibold ml-1">${lows.length}</span></div>
+          ${avgDisc != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
+          ${avgPrice != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
+          ${owned ? `<div class="px-3 py-2 rounded-full bg-amber-900/30 border border-amber-700/40 text-xs">Already owned <span class="text-amber-200 font-semibold ml-1">${owned}</span></div>` : ""}`;
+        return;
+      }
       const visible = allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g)));
       const backlog = visible.filter(g => getPersonal(g).status === "backlog");
       const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
@@ -922,7 +1180,7 @@
       const rated = visible.filter(g => ratingValue(g) > 0);
       const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : "—";
       const hiddenCount = allGames.length - visible.length;
-      document.getElementById("summary").innerHTML = `
+      el.innerHTML = `
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="text-slate-100 font-semibold ml-1">${visible.length}</span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Steam <span class="text-slate-100 font-semibold ml-1">${steamCount}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">GOG <span class="text-slate-100 font-semibold ml-1">${gogCount}</span></div>
@@ -1002,6 +1260,12 @@
 
     function focusGame(key) {
       pickedKey = key;
+      const targetIsWishlist = String(key).startsWith("wishlist:");
+      if (targetIsWishlist && activeView !== "wishlist") {
+        switchView("wishlist");
+      } else if (!targetIsWishlist && activeView !== "library") {
+        switchView("library");
+      }
       const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
       if (existing) {
         document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
@@ -1049,7 +1313,7 @@
         itad?.url ? `<a href="${itad.url}" class="text-sky-400" target="_blank" rel="noopener">ITAD deal</a>` : null,
         itad?.is_historical_low ? "Historical low" : null,
       ].filter(Boolean).join(" · ");
-      const cols = showScore ? 15 : 14;
+      const cols = tableColSpan();
       const detail = document.createElement("tr");
       detail.className = "detail-row bg-slate-800";
       detail.dataset.detailFor = gameKey(g);
@@ -1081,7 +1345,16 @@
       const tbody = document.getElementById("tbody");
       tbody.innerHTML = "";
       const showScore = !!prefs.showScoreColumn;
+      const isWish = activeView === "wishlist";
       document.getElementById("scoreHeader").classList.toggle("hidden", !showScore);
+      const statusHdr = document.getElementById("statusHeader");
+      if (statusHdr) statusHdr.textContent = isWish ? "Tracking" : "Status";
+      const priceHdr = document.getElementById("priceHeader");
+      if (priceHdr) {
+        priceHdr.title = isWish
+          ? "Sort by best discount (ITAD cross-store price, then Steam). Shift+click header to sort by deal price."
+          : "";
+      }
       document.getElementById("tableWrap").classList.toggle("cleanup-active", cleanupModeActive && activeView === "library");
       const selectAll = document.getElementById("selectAllVisible");
       if (selectAll) {
@@ -1116,11 +1389,11 @@
               ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
             </div>
             <div class="mt-1">
-              ${activeView === "wishlist" ? '<span class="store-badge steam" title="WISHLIST">W</span>' : storeBadgeHtml(g)}
+              ${activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
             </div>
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </td>
-          <td class="p-2">
+          ${isWish ? "" : `<td class="p-2">
             <select data-game-key="${escapeAttr(key)}" data-field="status" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
               <option value="backlog" ${p.status === "backlog" ? "selected" : ""}>Backlog</option>
               <option value="next" ${p.status === "next" ? "selected" : ""}>Next up</option>
@@ -1129,7 +1402,8 @@
               <option value="finished" ${p.status === "finished" ? "selected" : ""}>Finished</option>
               <option value="skip" ${p.status === "skip" ? "selected" : ""}>Skip</option>
             </select>
-          </td>
+          </td>`}
+          ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : ""}
           <td class="p-2 text-center">
             <select data-game-key="${escapeAttr(key)}" data-field="priority" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
               ${[0, 1, 2, 3, 4, 5].map(n => `<option value="${n}" ${p.priority === n ? "selected" : ""}>${n || "—"}</option>`).join("")}
@@ -1162,9 +1436,18 @@
         if (expandedKeys.has(key)) tbody.appendChild(buildDetailRow(g));
       });
 
-      const base = activeView === "wishlist"
-        ? `Wishlist: ${list.length} of ${wishlistGames.length}`
-        : `Showing ${list.length} of ${allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g))).length} games`;
+      let base;
+      if (activeView === "wishlist") {
+        const onSale = list.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
+        const lows = list.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; }).length;
+        const dealBits = [];
+        if (onSale) dealBits.push(`${onSale} on sale`);
+        if (lows) dealBits.push(`${lows} at historical low`);
+        const tail = dealBits.length ? ` · ${dealBits.join(", ")}` : "";
+        base = `Wishlist: ${list.length} of ${wishlistGames.length}${tail}`;
+      } else {
+        base = `Showing ${list.length} of ${allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g))).length} games`;
+      }
       const extra = cleanupModeActive && activeView === "library" ? " · cleanup mode" : "";
       document.getElementById("rowCount").textContent = base + extra;
       updateBulkBar();
@@ -1188,8 +1471,10 @@
       const pills = [];
       const q = document.getElementById("search").value.trim();
       if (q) pills.push({ kind: "search", value: q, label: `Search: ${q}` });
-      const status = document.getElementById("statusFilter").value;
-      if (status) pills.push({ kind: "status", value: status, label: `Status: ${status}` });
+      if (activeView === "library") {
+        const status = document.getElementById("statusFilter").value;
+        if (status) pills.push({ kind: "status", value: status, label: `Status: ${status}` });
+      }
       if (prefs.storeFilter) pills.push({ kind: "store", value: prefs.storeFilter, label: `Store: ${prefs.storeFilter}` });
       for (const g of prefs.genreFilters || []) pills.push({ kind: "genre", value: g, label: g });
       for (const t of prefs.tagFilters || []) pills.push({ kind: "tag", value: t, label: `#${t}` });
@@ -1202,6 +1487,13 @@
       if (prefs.crossStoreDedup) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
       if ((prefs.tagFilters || []).length > 1 && prefs.tagFilterMode === "AND") {
         pills.push({ kind: "tagMode", value: "AND", label: "Tags: all" });
+      }
+      if (activeView === "wishlist") {
+        if (prefs.dealOnSaleOnly) pills.push({ kind: "dealOnSale", value: "1", label: "On sale only" });
+        if (prefs.dealHistoricalLowOnly) pills.push({ kind: "dealLow", value: "1", label: "Historical low only" });
+        if (prefs.dealHideOwned) pills.push({ kind: "dealHideOwned", value: "1", label: "Hide owned" });
+        if (+prefs.dealMinDiscount > 0) pills.push({ kind: "dealMinDiscount", value: String(prefs.dealMinDiscount), label: `Discount ≥ ${prefs.dealMinDiscount}%` });
+        if (+prefs.dealMaxPrice < 100) pills.push({ kind: "dealMaxPrice", value: String(prefs.dealMaxPrice), label: `Price ≤ $${prefs.dealMaxPrice}` });
       }
       return pills;
     }
@@ -1264,6 +1556,33 @@
           prefs.tagFilterMode = "OR";
           savePrefs();
           document.getElementById("tagFilterMode").value = "OR";
+          break;
+        case "dealOnSale":
+          prefs.dealOnSaleOnly = false;
+          savePrefs();
+          document.getElementById("dealOnSaleOnly").checked = false;
+          break;
+        case "dealLow":
+          prefs.dealHistoricalLowOnly = false;
+          savePrefs();
+          document.getElementById("dealHistoricalLowOnly").checked = false;
+          break;
+        case "dealHideOwned":
+          prefs.dealHideOwned = false;
+          savePrefs();
+          document.getElementById("dealHideOwned").checked = false;
+          break;
+        case "dealMinDiscount":
+          prefs.dealMinDiscount = 0;
+          savePrefs();
+          document.getElementById("dealMinDiscount").value = "0";
+          document.getElementById("dealMinDiscountVal").textContent = "0";
+          break;
+        case "dealMaxPrice":
+          prefs.dealMaxPrice = 100;
+          savePrefs();
+          document.getElementById("dealMaxPrice").value = "100";
+          document.getElementById("dealMaxPriceVal").textContent = "any";
           break;
       }
       refreshFilterUI();
@@ -1339,6 +1658,93 @@
       if (options?.skipPicks) return;
       renderPicks();
     }
+
+    function updateWishlistDrawerVisibility() {
+      const section = document.getElementById("wishlistDealsSection");
+      if (!section) return;
+      section.classList.toggle("hidden", activeView !== "wishlist");
+    }
+
+    function updatePicksChrome() {
+      const hideQuick = activeView === "wishlist";
+      document.getElementById("quickWinMaxWrap")?.classList.toggle("hidden", hideQuick);
+    }
+
+    function updateViewChrome() {
+      const isWish = activeView === "wishlist";
+      updateWishlistDrawerVisibility();
+      updatePickTabsVisibility();
+      updatePicksChrome();
+      ["libraryStatusSection", "libraryStoreSection", "libraryMiscSection"].forEach(id => {
+        document.getElementById(id)?.classList.toggle("hidden", isWish);
+      });
+      renderSummary();
+    }
+
+    function updatePickTabsVisibility() {
+      document.querySelectorAll(".pick-tab").forEach(btn => {
+        const owner = btn.dataset.pickView || "library";
+        btn.classList.toggle("hidden", owner !== activeView);
+      });
+    }
+
+    function showViewLoading(label) {
+      const ov = document.getElementById("viewLoadingOverlay");
+      const lbl = document.getElementById("viewLoadingLabel");
+      if (lbl && label) lbl.textContent = label;
+      if (ov) {
+        ov.setAttribute("aria-hidden", "false");
+        ov.classList.add("show");
+      }
+      document.querySelectorAll(".view-tab").forEach(b => { b.disabled = true; });
+    }
+
+    function hideViewLoading() {
+      const ov = document.getElementById("viewLoadingOverlay");
+      if (ov) {
+        ov.classList.remove("show");
+        ov.setAttribute("aria-hidden", "true");
+      }
+      document.querySelectorAll(".view-tab").forEach(b => { b.disabled = false; });
+    }
+
+    function switchView(view) {
+      if (view === activeView) return;
+      const fromView = activeView;
+      const label = view === "wishlist" ? "Loading wishlist…" : "Loading library…";
+      showViewLoading(label);
+      // Two RAF ticks ensure the overlay paints before the (sometimes heavier)
+      // re-render. Keeps the spinner from flickering past too fast on big libs.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        activeView = view;
+        selectedKeys.clear();
+        focusedRowIndex = 0;
+        document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+        if (view === "wishlist") {
+          cleanupModeActive = false;
+          document.getElementById("statusFilter").value = "";
+          if (fromView === "library" && prefs.picksTab && prefs.picksTab !== "wishlistDeals") {
+            prefs.libraryPicksTab = prefs.picksTab;
+          }
+          prefs.picksTab = "wishlistDeals";
+          if (!prefs.wishlistSortInitialized) {
+            sortKey = "discount_percent";
+            sortDir = -1;
+            prefs.wishlistSortInitialized = true;
+          }
+        } else {
+          prefs.picksTab = prefs.libraryPicksTab || "topRated";
+        }
+        savePrefs();
+        updateCleanupBtnState();
+        updateBulkBar();
+        updateViewChrome();
+        refreshFilterUI();
+        // Keep the overlay up just long enough to feel like a real transition,
+        // not flash-then-hidden. 220ms total is the sweet spot from testing.
+        setTimeout(hideViewLoading, 180);
+      }));
+    }
     let _filterDebounceTimer = null;
     function refreshFilterUIDebounced(options) {
       clearTimeout(_filterDebounceTimer);
@@ -1376,17 +1782,32 @@
 
     function exportCsv() {
       const list = sortedGames(filteredGames());
-      const headers = ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "metacritic", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
+      const isWish = activeView === "wishlist";
+      const headers = isWish
+        ? ["store", "wishlist_store", "id", "name", "tracking_status", "priority", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "metacritic", "hltb_main", "release_date", "genres", "tags", "notes", "store_url"]
+        : ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "metacritic", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
       const rows = list.map(g => {
         const p = getPersonal(g);
         const ng = normalizeGame(g);
+        const d = getDealInfo(g);
+        if (isWish) {
+          return [
+            ng.store, g.wishlist_store ?? "", ng.id, g.name, p.status, p.priority,
+            d?.price != null ? d.price.toFixed(2) : "", effectiveDiscountPercent(g) || "",
+            d?.shop ?? "", d?.isHistoricalLow ? "yes" : "",
+            g.steam_review_percent ?? "", g.metacritic_score ?? "", hltbMain(g) ?? "",
+            g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes,
+            g.store_url ?? d?.url ?? "",
+          ];
+        }
         return [
           ng.store, ng.id, g.name, p.status, p.priority, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
           hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "", g.metacritic_score ?? "",
-          g.price ?? "", g.discount_percent ?? "", g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes
-        ].map(x => `"${String(x).replace(/"/g, '""')}"`).join(",");
-      });
-      download("steam-backlog.csv", `${headers.join(",")}\n${rows.join("\n")}`, "text/csv");
+          g.price ?? "", effectiveDiscountPercent(g) || (g.discount_percent ?? ""), g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes
+        ];
+      }).map(cells => cells.map(x => `"${String(x).replace(/"/g, '""')}"`).join(","));
+      const fname = isWish ? "steam-backlog-wishlist.csv" : "steam-backlog-library.csv";
+      download(fname, `${headers.join(",")}\n${rows.join("\n")}`, "text/csv");
     }
 
     function download(name, content, type) {
@@ -1419,6 +1840,7 @@
       if (libraryMeta.nintendo) parts.push(`Nintendo ${libraryMeta.nintendo.game_count} (${new Date(libraryMeta.nintendo.fetched_at).toLocaleString()})`);
       if (libraryMeta.itch) parts.push(`itch.io ${libraryMeta.itch.game_count} (${new Date(libraryMeta.itch.fetched_at).toLocaleString()})`);
       if (libraryMeta.wishlist) parts.push(`Wishlist ${libraryMeta.wishlist.game_count}`);
+      if (libraryMeta.wishlistGog) parts.push(`Wishlist GOG ${libraryMeta.wishlistGog.game_count}`);
       if (Object.keys(itadByKey).length) parts.push(`ITAD prices ${Object.keys(itadByKey).length}`);
       document.getElementById("meta").textContent = parts.length ? parts.join(" · ") : "No library data loaded";
       renderStoreChips();
@@ -1453,6 +1875,9 @@
       libraryMeta.amazon = amazon;
       libraryMeta.nintendo = nintendo;
       libraryMeta.itch = itch;
+      const allManual = loadManualGames().map(g => normalizeGame(g));
+      const manualLibrary = allManual.filter(g => !g.wishlist);
+      const manualWishlist = allManual.filter(g => !!g.wishlist);
       const sources = [
         (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
         (gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
@@ -1461,19 +1886,30 @@
         (amazon?.games || []).map(g => normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id })),
         (nintendo?.games || []).map(g => normalizeGame({ ...g, store: "nintendo", id: g.id ?? g.nintendo_id })),
         (itch?.games || []).map(g => normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id })),
-        loadManualGames().map(g => normalizeGame(g)),
+        manualLibrary,
       ];
       allGames = sources.flatMap(dedupeWithinStore);
       const wishlist = await fetchLibraryJson("games_wishlist.json");
+      const wishlistGog = await fetchLibraryJson("games_wishlist_gog.json");
       libraryMeta.wishlist = wishlist;
-      wishlistGames = (wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }));
+      libraryMeta.wishlistGog = wishlistGog;
+      const fetchedWishlist = [
+        ...((wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }))),
+        ...((wishlistGog?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: `gog-${g.id ?? g.gog_id}`, wishlist_store: "gog" }))),
+      ];
+      wishlistGames = [...fetchedWishlist, ...manualWishlist];
       await loadItadPrices();
       applyMergedLibrary();
     }
 
     function refreshAfterManualChange() {
-      const nonManual = allGames.filter(g => !g.manual);
-      allGames = [...nonManual, ...dedupeWithinStore(loadManualGames().map(g => normalizeGame(g)))];
+      const allManual = loadManualGames().map(g => normalizeGame(g));
+      const manualLibrary = allManual.filter(g => !g.wishlist);
+      const manualWishlist = allManual.filter(g => !!g.wishlist);
+      const nonManualLibrary = allGames.filter(g => !g.manual);
+      allGames = [...nonManualLibrary, ...dedupeWithinStore(manualLibrary)];
+      const fetchedWishlist = wishlistGames.filter(g => !g.manual);
+      wishlistGames = [...fetchedWishlist, ...manualWishlist];
       applyMergedLibrary();
     }
 
@@ -1484,10 +1920,28 @@
     }
 
     // === Modals ===
+    let addGameTarget = "library";
+    function setAddGameTarget(target) {
+      addGameTarget = target === "wishlist" ? "wishlist" : "library";
+      document.querySelectorAll(".add-target-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.target === addGameTarget);
+      });
+      document.getElementById("addGameWishlistFields").classList.toggle("hidden", addGameTarget !== "wishlist");
+      const titleEl = document.getElementById("addGameModalTitle");
+      const hint = document.getElementById("addGameHint");
+      if (addGameTarget === "wishlist") {
+        titleEl.textContent = "Add to wishlist";
+        hint.textContent = "Tracking a deal? Add an optional price and/or discount % and store URL. Discount-only entries still match On sale / Min discount filters even without a price.";
+      } else {
+        titleEl.textContent = "Add a game";
+        hint.textContent = "Type a title and click Search Steam. Pick the closest match to import its cover, Steam rating, and store link. The game will be saved under your chosen platform.";
+      }
+    }
     function openAddGameModal() {
       const m = document.getElementById("addGameModal");
       m.classList.remove("hidden");
       m.classList.add("flex");
+      setAddGameTarget(activeView === "wishlist" ? "wishlist" : "library");
       document.getElementById("addGameTitle").focus();
     }
     function closeAddGameModal() {
@@ -1497,6 +1951,9 @@
       document.getElementById("addGameTitle").value = "";
       document.getElementById("addGameResults").innerHTML = "";
       document.getElementById("addGameStatus").textContent = "";
+      document.getElementById("addGameWishPrice").value = "";
+      document.getElementById("addGameWishDiscount").value = "";
+      document.getElementById("addGameWishUrl").value = "";
     }
     async function steamSearch(term) {
       const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=english&cc=US`;
@@ -1523,13 +1980,36 @@
     function manualSlug(title) {
       return "manual-" + String(title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
     }
+    function readWishlistFields() {
+      const priceRaw = document.getElementById("addGameWishPrice").value.trim();
+      const discountRaw = document.getElementById("addGameWishDiscount").value.trim();
+      const url = document.getElementById("addGameWishUrl").value.trim();
+      const priceNum = priceRaw ? parseFloat(priceRaw.replace(/[^0-9.]/g, "")) : null;
+      const discount = discountRaw ? Math.max(0, Math.min(100, parseInt(discountRaw, 10) || 0)) : null;
+      return {
+        price: priceNum != null && !isNaN(priceNum) ? `$${priceNum.toFixed(2)}` : null,
+        priceNumeric: priceNum != null && !isNaN(priceNum) ? priceNum : null,
+        discount_percent: discount,
+        store_url: url || null,
+      };
+    }
+    function applyWishlistMeta(game) {
+      const w = readWishlistFields();
+      game.wishlist = true;
+      game.wishlist_added = new Date().toISOString();
+      if (w.price) game.price = w.price;
+      if (w.discount_percent != null) game.discount_percent = w.discount_percent;
+      if (w.store_url) game.store_url = w.store_url;
+    }
     async function importSteamMatch(title, platform, match) {
       const status = document.getElementById("addGameStatus");
       status.textContent = "Pulling details from Steam...";
       const reviews = await steamAppReviews(match.id) || {};
+      const isWishlist = addGameTarget === "wishlist";
       const game = {
-        store: platform,
-        id: platform === "steam" ? match.id : manualSlug(title || match.name),
+        store: isWishlist ? "wishlist" : platform,
+        wishlist_store: isWishlist ? platform : undefined,
+        id: (isWishlist ? "wish-" : "") + (platform === "steam" ? match.id : manualSlug(title || match.name)),
         name: title || match.name,
         header_image: match.tiny_image || `https://cdn.akamai.steamstatic.com/steam/apps/${match.id}/header.jpg`,
         library_image: `https://cdn.akamai.steamstatic.com/steam/apps/${match.id}/library_600x900_2x.jpg`,
@@ -1553,8 +2033,10 @@
         manual: true,
         added_at: new Date().toISOString(),
       };
+      if (isWishlist) applyWishlistMeta(game);
       addManualGame(game);
-      status.textContent = `Saved "${game.name}" under ${platform}.`;
+      const where = isWishlist ? `wishlist (${platform})` : platform;
+      status.textContent = `Saved "${game.name}" under ${where}.`;
       refreshAfterManualChange();
       setTimeout(closeAddGameModal, 700);
     }
@@ -1562,9 +2044,11 @@
       const title = document.getElementById("addGameTitle").value.trim();
       const platform = document.getElementById("addGamePlatform").value;
       if (!title) { document.getElementById("addGameStatus").textContent = "Enter a title first."; return; }
+      const isWishlist = addGameTarget === "wishlist";
       const game = {
-        store: platform,
-        id: manualSlug(title),
+        store: isWishlist ? "wishlist" : platform,
+        wishlist_store: isWishlist ? platform : undefined,
+        id: (isWishlist ? "wish-" : "") + manualSlug(title),
         name: title,
         header_image: null,
         library_image: null,
@@ -1586,8 +2070,10 @@
         manual: true,
         added_at: new Date().toISOString(),
       };
+      if (isWishlist) applyWishlistMeta(game);
       addManualGame(game);
-      document.getElementById("addGameStatus").textContent = `Saved "${title}" under ${platform} (no Steam data).`;
+      const where = isWishlist ? `wishlist (${platform})` : platform;
+      document.getElementById("addGameStatus").textContent = `Saved "${title}" under ${where} (no Steam data).`;
       refreshAfterManualChange();
       setTimeout(closeAddGameModal, 700);
     }
@@ -1600,6 +2086,9 @@
 
       document.getElementById("addGameBtn").addEventListener("click", openAddGameModal);
       document.getElementById("addGameClose").addEventListener("click", closeAddGameModal);
+      document.querySelectorAll(".add-target-btn").forEach(btn => {
+        btn.addEventListener("click", () => setAddGameTarget(btn.dataset.target));
+      });
       document.getElementById("addGameModal").addEventListener("click", e => {
         if (e.target.id === "addGameModal") closeAddGameModal();
       });
@@ -1740,10 +2229,16 @@
     // === Event wiring ===
     function bindEvents() {
       document.querySelectorAll("th[data-sort]").forEach(th => {
-        th.addEventListener("click", () => {
-          const key = th.dataset.sort;
+        th.addEventListener("click", e => {
+          let key = th.dataset.sort;
+          if (key === "discount_percent" && e.shiftKey && activeView === "wishlist") {
+            key = "deal_price";
+          }
           if (sortKey === key) sortDir *= -1;
-          else { sortKey = key; sortDir = 1; }
+          else {
+            sortKey = key;
+            sortDir = (key === "discount_percent" || key === "deal_price") ? -1 : 1;
+          }
           renderTable();
         });
       });
@@ -1769,6 +2264,59 @@
           refreshFilterUIDebounced({ skipPicks: id === "search" });
         });
       });
+      const bindDealCheckbox = (id, key) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.checked = !!prefs[key];
+        el.addEventListener("change", () => {
+          prefs[key] = el.checked;
+          savePrefs();
+          refreshFilterUI();
+        });
+      };
+      bindDealCheckbox("dealOnSaleOnly", "dealOnSaleOnly");
+      bindDealCheckbox("dealHistoricalLowOnly", "dealHistoricalLowOnly");
+      bindDealCheckbox("dealHideOwned", "dealHideOwned");
+      const dealMinDiscountEl = document.getElementById("dealMinDiscount");
+      const dealMinDiscountVal = document.getElementById("dealMinDiscountVal");
+      if (dealMinDiscountEl) {
+        dealMinDiscountEl.value = String(prefs.dealMinDiscount || 0);
+        dealMinDiscountVal.textContent = String(prefs.dealMinDiscount || 0);
+        dealMinDiscountEl.addEventListener("input", () => {
+          prefs.dealMinDiscount = +dealMinDiscountEl.value;
+          dealMinDiscountVal.textContent = String(prefs.dealMinDiscount);
+          savePrefs();
+          refreshFilterUIDebounced();
+        });
+      }
+      const dealMaxPriceEl = document.getElementById("dealMaxPrice");
+      const dealMaxPriceVal = document.getElementById("dealMaxPriceVal");
+      if (dealMaxPriceEl) {
+        const initMax = prefs.dealMaxPrice ?? 100;
+        dealMaxPriceEl.value = String(initMax);
+        dealMaxPriceVal.textContent = initMax >= 100 ? "any" : `$${initMax}`;
+        dealMaxPriceEl.addEventListener("input", () => {
+          prefs.dealMaxPrice = +dealMaxPriceEl.value;
+          dealMaxPriceVal.textContent = prefs.dealMaxPrice >= 100 ? "any" : `$${prefs.dealMaxPrice}`;
+          savePrefs();
+          refreshFilterUIDebounced();
+        });
+      }
+      const resetDealFiltersBtn = document.getElementById("resetDealFiltersBtn");
+      if (resetDealFiltersBtn) {
+        resetDealFiltersBtn.addEventListener("click", () => {
+          prefs.dealOnSaleOnly = false;
+          prefs.dealHistoricalLowOnly = false;
+          prefs.dealHideOwned = false;
+          prefs.dealMinDiscount = 0;
+          prefs.dealMaxPrice = 100;
+          savePrefs();
+          if (dealMinDiscountEl) { dealMinDiscountEl.value = "0"; dealMinDiscountVal.textContent = "0"; }
+          if (dealMaxPriceEl) { dealMaxPriceEl.value = "100"; dealMaxPriceVal.textContent = "any"; }
+          ["dealOnSaleOnly", "dealHistoricalLowOnly", "dealHideOwned"].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+          refreshFilterUI();
+        });
+      }
       document.getElementById("genreMode").addEventListener("change", e => {
         prefs.genreFilterMode = e.target.value;
         savePrefs();
@@ -1803,7 +2351,11 @@
       });
       document.querySelectorAll(".pick-tab").forEach(btn => {
         btn.addEventListener("click", () => {
-          prefs.picksTab = btn.dataset.tab;
+          const tab = btn.dataset.tab;
+          prefs.picksTab = tab;
+          if ((btn.dataset.pickView || "library") === "library") {
+            prefs.libraryPicksTab = tab;
+          }
           savePrefs();
           renderPicks();
         });
@@ -1906,14 +2458,7 @@
         btn.addEventListener("click", () => {
           const view = btn.dataset.view || "library";
           if (view === activeView) return;
-          activeView = view;
-          selectedKeys.clear();
-          focusedRowIndex = 0;
-          document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-          if (view === "wishlist") cleanupModeActive = false;
-          updateCleanupBtnState();
-          updateBulkBar();
-          refreshFilterUI();
+          switchView(view);
         });
       });
       document.getElementById("cleanupModeBtn").addEventListener("click", () => {
@@ -2011,7 +2556,12 @@
       document.addEventListener("keydown", handleGlobalKeydown);
       document.getElementById("pickForMe").addEventListener("click", e => {
         let list = filteredGames();
-        if (!e.shiftKey) list = list.filter(g => getPersonal(g).status === "backlog");
+        if (activeView === "library") {
+          if (!e.shiftKey) list = list.filter(g => getPersonal(g).status === "backlog");
+        } else if (!e.shiftKey) {
+          const onSale = list.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
+          if (onSale.length) list = onSale;
+        }
         if (!list.length) return;
         const pick = list[Math.floor(Math.random() * list.length)];
         focusGame(gameKey(pick));
@@ -2092,6 +2642,12 @@
       if (dedupEl) dedupEl.checked = !!prefs.crossStoreDedup;
       document.getElementById("tagFilterMode").value = prefs.tagFilterMode || "OR";
       updateCleanupBtnState();
+      updateViewChrome();
+      // Library is the default landing view — make sure picksTab matches.
+      if (activeView === "library" && prefs.picksTab === "wishlistDeals") {
+        prefs.picksTab = prefs.libraryPicksTab || "topRated";
+        savePrefs();
+      }
       renderStoreChips();
       renderPicksLimitButtons();
       try {

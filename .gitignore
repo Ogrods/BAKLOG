@@ -2,6 +2,12 @@
 games.json
 games_steam.json
 games_gog.json
+games_psn.json
+games_epic.json
+games_amazon.json
+games_wishlist.json
+itad_prices.json
+broken_images.json
 cache/
 __pycache__/
 *.pyc

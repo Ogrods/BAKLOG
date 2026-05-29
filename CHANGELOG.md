@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+
+- PlayStation library fetcher (`fetch_psn.py`, `psn_client.py`) using NPSSO token auth via `psnawp`
+- PSN store filter chip, badge, and summary counts in the dashboard
+- Trophy progress and platform tags on PSN rows
+- Slim toolbar with filter drawer, active filter pills, and kebab menu for data actions
+- Personal free-form tags per game with filter chips, bulk tag add, picks integration, CSV export
+- Bulk row selection with status/priority bar; cleanup mode filter; keyboard shortcuts
+- Steam wishlist tab (`fetch_wishlist.py` → `games_wishlist.json`) with “already owned” hints
+- IsThereAnyDeal prices (`fetch_itad.py`, `itad_client.py` → `itad_prices.json`) in Price column
+- Cross-store cover backfill (`enrich_cross_store_images.py`) via Steam store search
+
 ## [0.3.0] - 2026-05-28
 
 ### Added

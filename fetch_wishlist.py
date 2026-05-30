@@ -12,11 +12,19 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+from fetchers._base import load_existing_games, merge_cached_row, resolve_hltb_for_row
 from hltb_client import HltbClient
 from steam_client import SteamClient
 
 GAMES_WISHLIST_JSON = Path("games_wishlist.json")
 HLTB_DELAY_SEC = 1.0
+WISHLIST_AUTHORITATIVE = frozenset({
+    "store", "id", "appid", "name", "wishlist_priority", "wishlist_added",
+    "playtime_minutes", "last_played", "header_image", "library_image", "release_date",
+    "genres", "tags", "coop_online", "coop_local", "steam_review_percent",
+    "steam_review_count", "steam_review_desc", "store_url", "type", "price",
+    "price_initial", "discount_percent", "currency",
+})
 
 
 def _configure_stdout() -> None:
@@ -67,6 +75,7 @@ def main() -> int:
     print(f"Found {len(items)} wishlist items.")
     steam = SteamClient(api_key, steam_id)
     hltb = HltbClient()
+    existing = load_existing_games(GAMES_WISHLIST_JSON)
     games_out: list[dict] = []
 
     for i, item in enumerate(items, 1):
@@ -92,13 +101,15 @@ def main() -> int:
         except Exception:
             pass
 
-        hltb_data = None
-        if not args.skip_hltb:
-            try:
-                time.sleep(HLTB_DELAY_SEC)
-                hltb_data = hltb.lookup(name)
-            except Exception as e:
-                print(f"  HLTB warning: {e}")
+        cached = existing.get(str(appid))
+        hltb_data, hltb_updated = resolve_hltb_for_row(
+            skip_hltb=args.skip_hltb,
+            only_new=False,
+            cached=cached,
+            name=name,
+            client=hltb,
+            delay_sec=HLTB_DELAY_SEC,
+        )
 
         price_block = (data or {}).get("price_overview") or {}
         categories = (data or {}).get("categories") or []
@@ -137,7 +148,9 @@ def main() -> int:
             "discount_percent": price_block.get("discount_percent"),
             "currency": price_block.get("currency"),
         }
-        games_out.append(row)
+        games_out.append(
+            merge_cached_row(row, cached, authoritative=WISHLIST_AUTHORITATIVE, hltb_updated=hltb_updated)
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

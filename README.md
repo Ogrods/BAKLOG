@@ -257,8 +257,13 @@ No nested `src/` folder — run fetchers from the repo root so paths stay simple
 
 ```bash
 pip install -e ".[dev]"
+pip install -r requirements.txt
 python -m pytest
+npm install
+npm run test:js
 ruff check shared fetchers enrichers tests
 ```
+
+Dashboard fetchers run with `--skip-hltb` by default (see `fetchers/manifest.json`). Run `python enrich_hltb.py` (or use the **HLTB** chip / `refresh.ps1`) to backfill hours without re-fetching entire libraries.
 
 Phase 0 is **local-only** — no cloud accounts or billing. Supabase/Next.js (Phase 1) stays on the roadmap until you opt in.

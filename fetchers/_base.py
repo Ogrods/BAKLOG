@@ -110,3 +110,46 @@ def merge_cached_row(
 
 
 RowBuilder = Callable[..., dict[str, Any]]
+
+HLTB_ROW_KEYS = (
+    "hltb_main_hours",
+    "hltb_main_extra_hours",
+    "hltb_completionist_hours",
+    "hltb_match_confidence",
+    "hltb_name",
+)
+
+
+def hltb_dict_from_row(row: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not row:
+        return None
+    if row.get("hltb_main_hours") is None and not row.get("hltb_name"):
+        return None
+    return {key: row.get(key) for key in HLTB_ROW_KEYS}
+
+
+def resolve_hltb_for_row(
+    *,
+    skip_hltb: bool,
+    only_new: bool,
+    cached: dict[str, Any] | None,
+    name: str,
+    client: Any,
+    delay_sec: float,
+) -> tuple[dict[str, Any] | None, bool]:
+    """Return (hltb_fields_dict, hltb_updated). Preserves cached HLTB when skipping lookups."""
+    import time
+
+    if skip_hltb:
+        return hltb_dict_from_row(cached), False
+    if only_new and cached and cached.get("hltb_main_hours") is not None:
+        return hltb_dict_from_row(cached), False
+    if cached and cached.get("hltb_main_hours") is not None and not only_new:
+        return hltb_dict_from_row(cached), False
+    try:
+        time.sleep(delay_sec)
+        result = client.lookup(name)
+        return result, bool(result)
+    except Exception as e:
+        print(f"  HLTB warning: {e}")
+        return hltb_dict_from_row(cached), False

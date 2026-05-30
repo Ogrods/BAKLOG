@@ -15,11 +15,17 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from battlenet_client import BattleNetAuthError, BattleNetClient
+from fetchers._base import load_existing_games, merge_cached_row, resolve_hltb_for_row
 from hltb_client import HltbClient
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
 RAW_DUMP_JSON = Path("cache/battlenet_raw.json")
 HLTB_DELAY_SEC = 1.0
+BATTLENET_AUTHORITATIVE = frozenset({
+    "store", "id", "battlenet_id", "name", "playtime_minutes", "last_played",
+    "header_image", "library_image", "release_date", "genres", "tags",
+    "store_url", "type", "price", "price_initial", "discount_percent", "currency",
+})
 
 # Map Blizzard's franchise icon filename to the canonical game site.
 FRANCHISE_STORE_URLS: dict[str, str] = {
@@ -203,18 +209,25 @@ def main() -> int:
         return 2
 
     hltb_client = HltbClient()
+    existing = load_existing_games(GAMES_BATTLENET_JSON)
     games_out: list[dict] = []
     for i, item in enumerate(deduped, 1):
         name = _name(item)
         print(f"[{i}/{len(deduped)}] {name}")
-        hltb = None
-        if not args.skip_hltb:
-            try:
-                time.sleep(HLTB_DELAY_SEC)
-                hltb = hltb_client.lookup(name)
-            except Exception as e:
-                print(f"  HLTB warning: {e}")
-        games_out.append(_build_row(item, hltb))
+        uid = _id(item, name)
+        cached = existing.get(uid)
+        hltb, hltb_updated = resolve_hltb_for_row(
+            skip_hltb=args.skip_hltb,
+            only_new=False,
+            cached=cached,
+            name=name,
+            client=hltb_client,
+            delay_sec=HLTB_DELAY_SEC,
+        )
+        row = _build_row(item, hltb)
+        games_out.append(
+            merge_cached_row(row, cached, authoritative=BATTLENET_AUTHORITATIVE, hltb_updated=hltb_updated)
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

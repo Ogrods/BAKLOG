@@ -5,6 +5,7 @@ import {
   MANUAL_KEY,
   CLEANUP_MAX_RATING,
   CLEANUP_MIN_AGE_MS,
+  QUICK_WIN_MIN_RATING,
   GENRE_CHIP_COLLAPSE_AT,
   GENRE_ALIASES,
   ITCH_NON_GAME_CLASSIFICATIONS,
@@ -17,17 +18,20 @@ import {
   virtualRange,
   virtualRangeAroundIndex,
   tableVirtualMetrics,
-  TABLE_ROW_HEIGHT,
+  getTableRowHeight,
 } from './virtual-table.js';
 import { buildStatusSelect, buildPrioritySelect, STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { createMemo } from './memo.js';
 
-import { escapeHtml, escapeAttr, formatNum } from './dom-util.js';
+import { escapeHtml, escapeAttr, formatNum, formatReleaseDate } from './dom-util.js';
+import { aliasCanonicalGenre, gameGenresCanonical, isPlatformToken } from './genres.js';
+import { gameKey, gameStore, gameId, normalizeGame, coverFallbackFor } from './game-core.js';
 import { personalStore, configurePersonalStore, showMigrationBanner } from './personal-store.js';
 import { fetcherRunner, loadFetcherSources, renderDashboardFetcherHealth, configureFetcherHealth } from './fetcher-health.js';
 import {
   initDashboard,
   scheduleDashboardRender,
+  cancelScheduledDashboardRender,
   destroyDashboardCharts,
   dashboardLibraryGames,
   dashDrillCoop,
@@ -193,7 +197,7 @@ function flushSavePersonal() {
 window.addEventListener("beforeunload", flushSavePersonal);
 window.addEventListener("blur", flushSavePersonal);
 function loadPrefs() {
-  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false };
+  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, itchClassification: "", releaseYearFilter: "", reviewTierFilter: "", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealStealsOnly: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false };
   try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
 }
 function savePrefs() {
@@ -260,29 +264,8 @@ function removeManualGame(store, id) {
   saveManualGames(manualGames);
 }
 
-function normalizeGame(g) {
-  if (g.store && g.id != null) return g;
-  const store = g.store || "steam";
-  const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id;
-  return { ...g, store, id };
-}
-function gameStore(g) {
-  return g.store || "steam";
-}
-function gameId(g) {
-  return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id;
-}
-function gameKey(g) {
-  return `${gameStore(g)}:${gameId(g)}`;
-}
 function gameNumericId(g) {
   return gameId(g);
-}
-function coverFallbackFor(g) {
-  const ng = normalizeGame(g);
-  if (ng.header_image) return ng.header_image;
-  if (ng.store === "steam") return `https://cdn.akamai.steamstatic.com/steam/apps/${ng.id}/header.jpg`;
-  return "";
 }
 const EPIC_PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]*$/;
 const GENERIC_STORE_URLS = new Set([
@@ -446,7 +429,7 @@ function coopPillsHtml(g) {
   const bits = [];
   if (g.coop_online) bits.push('<span class="coop-pill coop-pill-online" title="Online co-op">ONLINE CO-OP</span>');
   if (g.coop_local) bits.push('<span class="coop-pill coop-pill-local" title="Shared / split-screen co-op">COUCH CO-OP</span>');
-  return bits.join("");
+  return bits.length ? `<span class="game-title-badges inline-flex flex-wrap items-center gap-1">${bits.join("")}</span>` : "";
 }
 function storeLetter(s) {
   return s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "itch" ? "I" : s === "xbox" ? "X" : s === "battlenet" ? "B" : s === "ubisoft" ? "U" : s === "other" ? "?" : s === "manual" ? "M" : "S";
@@ -498,8 +481,10 @@ function wishlistBadgeHtml(g) {
 function formatHours(minutes) { return !minutes ? "0h" : `${(minutes / 60).toFixed(1)}h`; }
 function formatDate(unixOrStr) {
   if (!unixOrStr) return "—";
-  if (typeof unixOrStr === "number") return unixOrStr === 0 ? "—" : new Date(unixOrStr * 1000).toLocaleDateString();
-  return unixOrStr;
+  if (typeof unixOrStr === "number") {
+    return unixOrStr === 0 ? "—" : new Date(unixOrStr * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  return formatReleaseDate(unixOrStr);
 }
 function parseReleaseForSort(d) { const t = Date.parse(d || ""); return isNaN(t) ? 0 : t; }
 
@@ -535,9 +520,14 @@ function syncDealFilterControls() {
   if (minVal) minVal.textContent = String(state.prefs.dealMinDiscount || 0);
 }
 
-function drillWishlistDealFilter({ onSaleOnly, minDiscount }) {
+function drillWishlistDealFilter({ onSaleOnly, minDiscount, stealsOnly } = {}) {
+  state.prefs.dealOnSaleOnly = false;
+  state.prefs.dealHistoricalLowOnly = false;
+  state.prefs.dealMinDiscount = 0;
+  state.prefs.dealStealsOnly = false;
   if (onSaleOnly) state.prefs.dealOnSaleOnly = true;
   if (minDiscount != null) state.prefs.dealMinDiscount = minDiscount;
+  if (stealsOnly) state.prefs.dealStealsOnly = true;
   syncDealFilterControls();
   savePrefs();
   if (state.activeView !== "wishlist") switchView("wishlist");
@@ -893,11 +883,11 @@ function tableListDocTop() {
 }
 
 function rowScrollTop(idx) {
-  return tableListDocTop() + idx * TABLE_ROW_HEIGHT;
+  return tableListDocTop() + idx * getTableRowHeight();
 }
 
 function scrollToRowIndex(idx, { smooth = false } = {}) {
-  const list = state._visibleList || sortedGames(filteredGames());
+  const list = state._visibleList || filteredGames();
   if (!list.length || idx < 0 || idx >= list.length) return;
   state.focusedRowIndex = idx;
   const key = gameKey(list[idx]);
@@ -922,7 +912,7 @@ function scrollToRowIndex(idx, { smooth = false } = {}) {
 }
 
 function jumpToLetter(letter) {
-  const list = state._visibleList || sortedGames(filteredGames());
+  const list = state._visibleList || filteredGames();
   const idx = list.findIndex(g => alphaBucket(g.name) === letter);
   if (idx < 0) return;
   scrollToRowIndex(idx);
@@ -932,30 +922,8 @@ function filteredGames() {
   return state._visibleList || [];
 }
 
-function passesDealFilters(g) {
-  if (state.prefs.dealHideOwned && isOwnedByTitle(g.name)) return false;
-  const d = getDealInfo(g);
-  const onSale = state.prefs.dealOnSaleOnly;
-  const lowOnly = state.prefs.dealHistoricalLowOnly;
-  const minCut = +(state.prefs.dealMinDiscount || 0);
-  const maxPrice = +(state.prefs.dealMaxPrice ?? 100);
-  if (onSale && (!d || (d.cut || 0) <= 0)) return false;
-  if (lowOnly && !(d && d.isHistoricalLow)) return false;
-  if (minCut > 0 && (!d || (d.cut || 0) < minCut)) return false;
-  if (maxPrice < 100) {
-    if (!d) return false;
-    if (d.price == null) {
-      // Manual wishlist with a discount but no price still passes max-price filter.
-      if (g.manual && (d.cut || 0) > 0) return true;
-      return false;
-    }
-    if (d.price > maxPrice) return false;
-  }
-  return true;
-}
-
 function visibleListForKeyboard() {
-  return sortedGames(filteredGames());
+  return filteredGames();
 }
 
 // === Selection & bulk ===
@@ -995,10 +963,6 @@ function bulkSetPriority(priority) {
   updateBulkBar();
   invalidateTableCache();
   renderTable();
-}
-
-function sortedGames(list) {
-  return list;
 }
 
 function pickCardHtml(g) {
@@ -1046,7 +1010,7 @@ function renderPicks() {
     return ratingValue(b) - ratingValue(a);
   });
   const quickWins = visible
-    .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) >= 75 && hasEnoughReviews(g) && (hltbMain(g) || 999) <= state.prefs.quickWinMaxHours)
+    .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) >= QUICK_WIN_MIN_RATING && hasEnoughReviews(g) && (hltbMain(g) || 999) <= state.prefs.quickWinMaxHours)
     .sort((a, b) => ratingValue(b) - ratingValue(a));
   const hidden = visible.filter(g => isHiddenGem(g) && hasEnoughReviews(g)).sort((a, b) => ratingValue(b) - ratingValue(a));
   const returnTo = visible
@@ -1400,8 +1364,8 @@ function tableFingerprint() {
     gm: state.prefs.genreFilterMode,
     tags: state.prefs.tagFilters || [],
     tm: state.prefs.tagFilterMode,
-    deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
-    unp: !!state.prefs.unplayedOnly,
+    deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, state.prefs.dealStealsOnly, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
+    unp: !!document.getElementById("unplayedOnly")?.checked,
     ea: !!document.getElementById("earlyAccessOnly")?.checked,
     co: !!document.getElementById("coopOnlineOnly")?.checked,
     cc: !!document.getElementById("coopLocalOnly")?.checked,
@@ -1409,6 +1373,9 @@ function tableFingerprint() {
     score: !!state.prefs.showScoreColumn,
     dedupe: !!state.prefs.crossStoreDedup,
     ihng: !!state.prefs.itchHideNonGames,
+    itchCls: state.prefs.itchClassification || "",
+    relYr: state.prefs.releaseYearFilter || "",
+    revTier: state.prefs.reviewTierFilter || "",
     lib: state.allGames.length,
     wl: state.wishlistGames.length,
     itch: state.itchGames.length,
@@ -1434,11 +1401,13 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const ownedWish = state.activeView === "wishlist" && isOwnedByTitle(g.name);
   const selected = state.selectedKeys.has(key);
   const focused = idx === state.focusedRowIndex;
-  const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
+  const expanded = state._expandedRowKeys.has(key);
+  const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}${expanded ? " row-expanded" : ""}`;
+  const genreLabel = (g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—";
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
-      <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
-      <td class="p-2"><span class="cover-wrap"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
-      <td class="p-2">
+      <td class="col-check p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
+      <td class="col-cover p-2"><span class="cover-wrap"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
+      <td class="col-title p-2">
         <div class="flex items-center gap-1.5">
           ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name", escapeHtml(g.name))}
           ${earlyAccessPillHtml(g)}
@@ -1450,20 +1419,21 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
           ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
         </div>
         ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
+        <button type="button" class="row-expand-btn" data-action="row-expand" data-game-key="${escapeAttr(key)}" aria-expanded="${expanded ? "true" : "false"}" title="${expanded ? "Collapse" : "Notes & tags"}">${expanded ? "▾" : "▸"}</button>
       </td>
-      ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
-      <td class="p-2 text-center">${buildPrioritySelect(key, p.priority)}</td>
+      ${isWish ? `<td class="col-status p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="col-status p-2">${buildStatusSelect(key, p.status)}</td>`}
+      <td class="col-pri p-2 text-center">${buildPrioritySelect(key, p.priority)}</td>
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
-      <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
-      <td class="p-2 text-right">
-        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
+      <td class="col-played p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
+      <td class="col-hltb p-2 text-right">
+        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs row-hltb-btn">${hltbLabel(g)}</button>
       </td>
-      <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
-      <td class="p-2 text-right">${formatPrice(g)}</td>
-      <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
-      <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
-      <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
-      <td class="p-2 min-w-[180px]">
+      <td class="col-steam p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
+      <td class="col-price p-2 text-right">${formatPrice(g)}</td>
+      <td class="col-released p-2 text-slate-300">${formatReleaseDate(g.release_date)}</td>
+      <td class="col-last-played p-2 text-slate-300">${formatDate(g.last_played)}</td>
+      <td class="col-genres p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${escapeAttr((g.genres || []).filter(x => !isPlatformToken(x)).join(", "))}">${escapeHtml(genreLabel)}</td>
+      <td class="col-notes p-2 min-w-[180px]">
         <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
         <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
       </td>
@@ -1483,14 +1453,15 @@ function paintTableBody(list, opts = {}) {
   state._virtualActive = shouldVirtualize(list.length);
   if (state._virtualActive && scrollEl && !opts.resetScroll) {
     let range;
+    const rowH = getTableRowHeight();
     if (typeof opts.anchorIndex === "number") {
-      range = virtualRangeAroundIndex(opts.anchorIndex, list.length);
+      range = virtualRangeAroundIndex(opts.anchorIndex, list.length, undefined, rowH);
     } else {
       const { scrollTop, clientHeight } = tableVirtualMetrics(scrollEl);
-      range = virtualRange(scrollTop, clientHeight, list.length);
+      range = virtualRange(scrollTop, clientHeight, list.length, rowH);
     }
     if (range.start >= range.end && list.length > 0) {
-      range = virtualRangeAroundIndex(0, list.length);
+      range = virtualRangeAroundIndex(0, list.length, undefined, rowH);
     }
     ({ start, end, topPad, bottomPad } = range);
   } else if (opts.resetScroll) {
@@ -1576,28 +1547,6 @@ async function renderTable(opts) {
 }
 
 // === Drawer + active pills ===
-const NON_GENRE_TOKENS = new Set([
-  "ps3", "ps4", "ps5", "psp", "ps vita", "psvita", "vita",
-  "xbox", "xbox 360", "xbox one", "xbox series x", "xbox series s", "xbox series x|s", "xbox series x/s", "xbox series",
-  "nintendo switch", "switch", "wii", "wii u", "ds", "3ds", "nintendo ds", "nintendo 3ds",
-  "pc", "windows", "mac", "macos", "osx", "linux", "steamos",
-  "ios", "android", "browser", "stadia", "google stadia",
-]);
-function isPlatformToken(name) {
-  return NON_GENRE_TOKENS.has(String(name || "").trim().toLowerCase());
-}
-function aliasCanonicalGenre(name) {
-  return GENRE_ALIASES[name] || name;
-}
-function gameGenresCanonical(g) {
-  return [...new Set((g.genres || []).filter(x => !isPlatformToken(x)).map(aliasCanonicalGenre))];
-}
-function gameMatchesGenreFilters(g, genres, genreMode) {
-  const gameGenres = gameGenresCanonical(g);
-  if (!genres.length) return true;
-  if (genreMode === "AND") return genres.every(x => gameGenres.includes(x));
-  return genres.some(x => gameGenres.includes(x));
-}
 
 function collectActiveFilters() {
   const pills = [];
@@ -1626,10 +1575,16 @@ function collectActiveFilters() {
   if (state.cleanupModeActive && state.activeView === "library") pills.push({ kind: "cleanup", value: "1", label: "Cleanup mode" });
   if (state.activeView === "itch" && state.prefs.itchHideNonGames) pills.push({ kind: "itchHideNonGames", value: "1", label: "Hide tools, soundtracks, etc." });
   if (state.prefs.crossStoreDedup) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
+  if (state.activeView === "itch" && state.prefs.itchClassification) {
+    pills.push({ kind: "itchClass", value: state.prefs.itchClassification, label: `Type: ${state.prefs.itchClassification}` });
+  }
+  if (state.prefs.releaseYearFilter) pills.push({ kind: "releaseYear", value: state.prefs.releaseYearFilter, label: `Released ${state.prefs.releaseYearFilter}` });
+  if (state.prefs.reviewTierFilter) pills.push({ kind: "reviewTier", value: state.prefs.reviewTierFilter, label: state.prefs.reviewTierFilter });
   if ((state.prefs.tagFilters || []).length > 1 && state.prefs.tagFilterMode === "AND") {
     pills.push({ kind: "tagMode", value: "AND", label: "Tags: all" });
   }
   if (state.activeView === "wishlist") {
+    if (state.prefs.dealStealsOnly) pills.push({ kind: "dealSteals", value: "1", label: "Steals (80%+ rated)" });
     if (state.prefs.dealOnSaleOnly) pills.push({ kind: "dealOnSale", value: "1", label: "On sale only" });
     if (state.prefs.dealHistoricalLowOnly) pills.push({ kind: "dealLow", value: "1", label: "Historical low only" });
     if (state.prefs.dealHideOwned) pills.push({ kind: "dealHideOwned", value: "1", label: "Hide owned" });
@@ -1721,6 +1676,22 @@ function removeActiveFilter(kind, value) {
       savePrefs();
       document.getElementById("tagFilterMode").value = "OR";
       break;
+    case "dealSteals":
+      state.prefs.dealStealsOnly = false;
+      savePrefs();
+      break;
+    case "itchClass":
+      state.prefs.itchClassification = "";
+      savePrefs();
+      break;
+    case "releaseYear":
+      state.prefs.releaseYearFilter = "";
+      savePrefs();
+      break;
+    case "reviewTier":
+      state.prefs.reviewTierFilter = "";
+      savePrefs();
+      break;
     case "dealOnSale":
       state.prefs.dealOnSaleOnly = false;
       savePrefs();
@@ -1772,9 +1743,11 @@ function clearAllFilters() {
   state.prefs.tagFilters = [];
   state.prefs.tagFilterMode = "OR";
   state.cleanupModeActive = false;
+  state.prefs.dealStealsOnly = false;
+  state.prefs.itchClassification = "";
+  state.prefs.releaseYearFilter = "";
+  state.prefs.reviewTierFilter = "";
   savePrefs();
-  document.getElementById("crossStoreDedup").checked = false;
-  state.prefs.crossStoreDedup = false;
   document.getElementById("tagFilterMode").value = "OR";
   recomputeCrossStoreHidden();
   renderSummary();
@@ -1864,7 +1837,7 @@ function updateViewChrome() {
   document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish);
   document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash);
   document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash);
-  document.getElementById("coopSection")?.classList.toggle("hidden", isDash);
+  document.getElementById("coopSection")?.classList.toggle("hidden", isDash || isWish || isItch);
   if (isDash) scheduleDashboardRender();
   else destroyDashboardCharts();
   renderBulkStatusButtons();
@@ -1908,7 +1881,7 @@ function switchView(view) {
   if (useOverlay) showViewLoading(label);
   const doSwitch = () => {
     if (fromView === "dashboard") {
-      clearTimeout(_dashboardRenderTimer);
+      cancelScheduledDashboardRender();
       destroyDashboardCharts();
     }
     invalidateTableCache();
@@ -1986,7 +1959,7 @@ function renderTagChips() {
 }
 
 function exportCsv() {
-  const list = sortedGames(filteredGames());
+  const list = filteredGames();
   const isWish = state.activeView === "wishlist";
   const headers = isWish
     ? ["store", "wishlist_store", "id", "name", "tracking_status", "priority", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "hltb_main", "release_date", "genres", "tags", "notes", "store_url"]
@@ -2525,7 +2498,7 @@ function bindEvents() {
       return;
     }
     if (action === "deal-steals") {
-      drillWishlistDealFilter({ minDiscount: 50 });
+      drillWishlistDealFilter({ stealsOnly: true });
     }
   });
 
@@ -2536,6 +2509,7 @@ function bindEvents() {
   };
   document.getElementById("dashTopRated")?.addEventListener("click", onDashListClick);
   document.getElementById("dashQuickWins")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashItchRecap")?.addEventListener("click", onDashListClick);
 
   const handleCoopActivate = (e) => {
     const target = e.target.closest("[data-action]");
@@ -2655,6 +2629,7 @@ function bindEvents() {
       state.prefs.dealOnSaleOnly = false;
       state.prefs.dealHistoricalLowOnly = false;
       state.prefs.dealHideOwned = false;
+      state.prefs.dealStealsOnly = false;
       state.prefs.dealMinDiscount = 0;
       state.prefs.dealMaxPrice = 100;
       savePrefs();
@@ -2782,7 +2757,7 @@ function bindEvents() {
     refreshFilterUI();
   });
   document.getElementById("addTagBtn").addEventListener("click", () => {
-    const list = sortedGames(filteredGames());
+    const list = filteredGames();
     const targets = [];
     if (state.selectedKeys.size) {
       for (const k of state.selectedKeys) {
@@ -2822,7 +2797,7 @@ function bindEvents() {
     }
   });
   document.getElementById("selectAllVisible").addEventListener("change", e => {
-    const list = state._visibleList || sortedGames(filteredGames());
+    const list = state._visibleList || filteredGames();
     if (e.target.checked) list.forEach(g => state.selectedKeys.add(gameKey(g)));
     else list.forEach(g => state.selectedKeys.delete(gameKey(g)));
     updateBulkBar();
@@ -2865,6 +2840,23 @@ function bindEvents() {
     if (g) setPersonal(g, "notes", t.value);
   }, true);
   document.getElementById("tbody").addEventListener("click", e => {
+    const expandBtn = e.target.closest("[data-action=\"row-expand\"]");
+    if (expandBtn) {
+      e.stopPropagation();
+      const key = expandBtn.dataset.gameKey;
+      if (state._expandedRowKeys.has(key)) state._expandedRowKeys.delete(key);
+      else state._expandedRowKeys.add(key);
+      const tr = expandBtn.closest("tr[data-row-key]");
+      if (tr) {
+        const on = state._expandedRowKeys.has(key);
+        tr.classList.toggle("row-expanded", on);
+        expandBtn.setAttribute("aria-expanded", on ? "true" : "false");
+        expandBtn.textContent = on ? "▾" : "▸";
+        expandBtn.title = on ? "Collapse" : "Notes & tags";
+      }
+      if (state._virtualActive) renderTable({ virtualOnly: true });
+      return;
+    }
     if (!e.target.closest("select, input, a, button, .row-tag-remove, .row-tag-add, [data-hltb-edit]")) {
       const tr = e.target.closest("tr[data-row-key]");
       if (tr) {
@@ -3038,6 +3030,7 @@ async function bootstrap() {
     renderGenreChips,
     invalidateTableCache,
     renderTable,
+    focusGame,
   });
   let migrationInfo = { migrated: true, pendingMigration: null };
   try {

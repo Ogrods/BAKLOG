@@ -63,10 +63,9 @@ def _genres(game: dict) -> list[str]:
     classification = game.get("classification")
     if classification and classification != "game":
         genres.append(classification)
-    for key in ("genre", "type"):
-        val = game.get(key)
-        if isinstance(val, str) and val:
-            genres.append(val)
+    val = game.get("genre")
+    if isinstance(val, str) and val:
+        genres.append(val)
     return list(dict.fromkeys(genres))
 
 

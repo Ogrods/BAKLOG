@@ -5,25 +5,17 @@
 import {
   CLEANUP_MAX_RATING,
   CLEANUP_MIN_AGE_MS,
-  GENRE_ALIASES,
   ITCH_NON_GAME_CLASSIFICATIONS,
 } from './state.js';
-
-const NON_GENRE_TOKENS = new Set([
-  'ps3', 'ps4', 'ps5', 'psp', 'ps vita', 'psvita', 'vita',
-  'xbox', 'xbox 360', 'xbox one', 'xbox series x', 'xbox series s', 'xbox series x|s', 'xbox series x/s', 'xbox series',
-  'nintendo switch', 'switch', 'wii', 'wii u', 'ds', '3ds', 'nintendo ds', 'nintendo 3ds',
-  'pc', 'windows', 'mac', 'macos', 'osx', 'linux', 'steamos',
-  'ios', 'android', 'browser', 'stadia', 'google stadia',
-]);
+import { escapeAttr } from './dom-util.js';
+import { gameGenresCanonical, gameMatchesGenreFilters } from './genres.js';
+import { gameKey, gameStore, gameId, normalizeGame } from './game-core.js';
 
 const WORKER_THRESHOLD = 500;
 let _worker = null;
 let _workerGen = 0;
 
-export function escapeAttr(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
+export { escapeAttr };
 
 export function collectTableParams() {
   return {
@@ -49,38 +41,7 @@ export function isEarlyAccess(g) {
   return false;
 }
 
-function gameStore(g) {
-  return g.store || 'steam';
-}
-
-function gameId(g) {
-  return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id
-    ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id;
-}
-
-export function gameKey(g) {
-  return `${gameStore(g)}:${gameId(g)}`;
-}
-
-function normalizeGame(g) {
-  if (g.store && g.id != null) return g;
-  return { ...g, store: gameStore(g), id: gameId(g) };
-}
-
-function aliasCanonicalGenre(name) {
-  return GENRE_ALIASES[name] || name;
-}
-
-function gameGenresCanonical(g) {
-  return [...new Set((g.genres || []).filter(x => !NON_GENRE_TOKENS.has(String(x || '').trim().toLowerCase())).map(aliasCanonicalGenre))];
-}
-
-function gameMatchesGenreFilters(g, genres, genreMode) {
-  const gameGenres = gameGenresCanonical(g);
-  if (!genres.length) return true;
-  if (genreMode === 'AND') return genres.every(x => gameGenres.includes(x));
-  return genres.some(x => gameGenres.includes(x));
-}
+export { gameKey, normalizeGame };
 
 function normalizeNameForDedup(name) {
   return String(name || '')
@@ -166,8 +127,18 @@ function isOwnedByTitle(ownedNormNames, name) {
   return !!(n && ownedNormNames.has(n));
 }
 
+function isStealDeal(ctx, g) {
+  const d = getDealInfo(ctx.itadByKey, g);
+  if (!d) return false;
+  const cut = d.cut || 0;
+  if (cut <= 0) return false;
+  if (ratingValue(g) < 80) return false;
+  return cut >= 50 || d.isHistoricalLow;
+}
+
 function passesDealFilters(ctx, g) {
   const { prefs, ownedNormNames, itadByKey } = ctx;
+  if (prefs.dealStealsOnly) return isStealDeal(ctx, g);
   if (prefs.dealHideOwned && isOwnedByTitle(ownedNormNames, g.name)) return false;
   const d = getDealInfo(itadByKey, g);
   const onSale = prefs.dealOnSaleOnly;
@@ -240,6 +211,18 @@ function passesFilter(ctx, g) {
     if (!passesDealFilters(ctx, g)) return false;
   }
   if (view === 'itch' && prefs.itchHideNonGames && !itchIsGame(g)) return false;
+  if (view === 'itch' && prefs.itchClassification) {
+    const cls = g.classification || 'game';
+    if (cls !== prefs.itchClassification) return false;
+  }
+  if (prefs.releaseYearFilter) {
+    const y = (g.release_date || '').slice(0, 4);
+    if (y !== prefs.releaseYearFilter) return false;
+  }
+  if (prefs.reviewTierFilter) {
+    const tier = g.steam_review_desc || (ratingValue(g) > 0 ? 'Mixed' : 'Unreviewed');
+    if (tier !== prefs.reviewTierFilter) return false;
+  }
   if (ctx.cleanupModeActive && view === 'library' && !isCleanupCandidate(ctx, g)) return false;
   if (params.q && !g.name.toLowerCase().includes(params.q)) return false;
   if ((view === 'library' || view === 'itch') && params.status) {

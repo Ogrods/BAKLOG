@@ -34,7 +34,10 @@ STORE_FILES = [
     ("games_battlenet.json", "battlenet"),
     ("games_ubisoft.json", "ubisoft"),
     ("games_nintendo.json", "nintendo"),
+    ("games_itch.json", "itch"),
     ("games_wishlist.json", "wishlist"),
+    ("games_wishlist_gog.json", "wishlist"),
+    ("games_wishlist_epic.json", "wishlist"),
 ]
 
 HLTB_FIELDS = (

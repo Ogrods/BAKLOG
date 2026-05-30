@@ -674,9 +674,72 @@
     .dash-chart-wrap { position: relative; height: 260px; }
     .dash-chart-wrap.tall { height: 320px; }
     .table-hide-score .col-score { display: none; }
-    .dash-itch-recap { color: #cbd5e1; line-height: 1.5; }
+    .dash-itch-recap { color: #cbd5e1; line-height: 1.5; display: flex; flex-direction: column; gap: 0.75rem; min-height: 100%; }
+    .itch-card { display: flex; flex-direction: column; }
+    .itch-card > .dash-itch-recap { flex: 1; }
+    .itch-footer { margin-top: auto; display: flex; }
     .dash-itch-recap strong { color: #ffffff; font-weight: 600; }
-    .dash-itch-recap .dash-itch-muted { color: #94a3b8; font-size: 0.75rem; margin-top: 0.35rem; }
+    .itch-distribution { display: flex; flex-direction: column; gap: 0.3rem; flex: 0 0 auto; }
+    .itch-distribution-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
+    .itch-seg-rated, .sale-distribution-swatch.itch-seg-rated { background: #22c55e; }
+    .itch-seg-unrated, .sale-distribution-swatch.itch-seg-unrated { background: #64748b; }
+    .itch-seg-non, .sale-distribution-swatch.itch-seg-non { background: #8b5cf6; }
+    .itch-distribution .sale-distribution-legend { justify-content: flex-start; gap: 0.9rem; flex-wrap: wrap; }
+    .itch-distribution .sale-distribution-tick { flex: 0 0 auto; gap: 0.35rem; }
+    .itch-distribution .sale-distribution-tick-count { margin-left: 0; }
+    .itch-hero { display: flex; flex-direction: column; gap: 0.35rem; flex: 0 0 auto; }
+    .itch-hero-label { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
+    .itch-hero-shuffle {
+      border: none; background: transparent; color: #94a3b8; cursor: pointer;
+      font-size: 1rem; line-height: 1; padding: 0.1rem 0.25rem; opacity: 0.6;
+      transition: opacity 0.12s ease, color 0.12s ease;
+    }
+    .itch-hero-shuffle:hover { opacity: 1; color: #e2e8f0; }
+    .itch-hero-card {
+      display: flex; gap: 0.65rem; align-items: flex-start; width: 100%; text-align: left;
+      padding: 0.55rem 0.6rem; border-radius: 8px; cursor: pointer;
+      background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(51, 65, 85, 0.65);
+      color: inherit; transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+    }
+    .itch-hero-card:hover { background: rgba(51, 65, 85, 0.55); border-color: rgba(71, 85, 105, 0.9); transform: translateY(-1px); }
+    .itch-hero-cover { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; background: #1e293b; flex-shrink: 0; }
+    .itch-hero-body { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1; }
+    .itch-hero-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+    .itch-hero-name { color: #f1f5f9; font-size: 0.9rem; font-weight: 600; line-height: 1.25; }
+    .itch-hero-rating { color: #34d399; font-weight: 700; font-size: 0.8rem; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .itch-hero-meta { color: #94a3b8; font-size: 0.72rem; }
+    .itch-hero-desc {
+      color: #cbd5e1; font-size: 0.72rem; line-height: 1.4; margin: 0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .itch-hero-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.1rem; }
+    .itch-hero-tag {
+      font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12); color: #7dd3fc;
+    }
+    .itch-hero-empty {
+      font-size: 0.72rem; color: #64748b; padding: 0.5rem 0.6rem; border-radius: 6px;
+      background: rgba(15, 23, 42, 0.35); border: 1px dashed rgba(51, 65, 85, 0.6);
+    }
+    .itch-breakdown { display: flex; flex-direction: column; gap: 0.35rem; flex: 0 0 auto; }
+    .itch-breakdown-list { display: flex; flex-direction: column; gap: 0.2rem; }
+    .itch-breakdown-row {
+      display: grid; grid-template-columns: minmax(4.5rem, 1fr) 2fr auto; gap: 0.45rem;
+      align-items: center; width: 100%; padding: 0.2rem 0.35rem; border-radius: 4px;
+      border: none; background: transparent; color: inherit; text-align: left; cursor: pointer;
+      transition: background 0.1s ease;
+    }
+    .itch-breakdown-row:hover { background: rgba(51, 65, 85, 0.45); }
+    .itch-breakdown-name { font-size: 0.72rem; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .itch-breakdown-bar {
+      position: relative; height: 6px; border-radius: 3px; background: rgba(30, 41, 59, 0.9); overflow: hidden;
+    }
+    .itch-breakdown-fill {
+      position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; min-width: 2px;
+    }
+    .itch-bar-class { background: #8b5cf6; }
+    .itch-bar-genre { background: #38bdf8; }
+    .itch-breakdown-count { font-size: 0.72rem; color: #94a3b8; font-variant-numeric: tabular-nums; min-width: 1.5rem; text-align: right; }
     .dash-list-row {
       display: flex;
       gap: 0.5rem;
@@ -701,6 +764,123 @@
     .dash-list-row .truncate { color: #e2e8f0; }
     .dash-list-cover { width: 28px; height: 42px; object-fit: cover; border-radius: 3px; background: #1e293b; flex-shrink: 0; }
     #alphaNav.dashboard-hidden { display: none !important; }
+    /* === Responsive row height (virtual scroll) === */
+    :root { --row-h: 56px; }
+    @media (max-width: 767px) { :root { --row-h: 88px; } }
+    @media (max-width: 639px) { :root { --row-h: 132px; } }
+    .row-expand-btn { display: none; }
+    .col-status .row-ctl, .col-status select { max-width: 7.5rem; }
+    .col-title .game-title-badges { margin-right: 0.2rem; }
+    .col-released, .col-last-played { white-space: nowrap; }
+    /* === Table column visibility (narrow desktop) === */
+    @media (max-width: 1279px) {
+      .col-pri, .col-played, .col-last-played { display: none; }
+      thead .col-pri, thead .col-played, thead .col-last-played { display: none; }
+    }
+    @media (max-width: 1023px) {
+      .col-score, .col-released { display: none; }
+      thead .col-score, thead .col-released { display: none; }
+      .table-hide-score .col-score { display: none; }
+    }
+    /* === Table: compact row layout (tablet) === */
+    @media (max-width: 767px) {
+      #tableWrap { overflow-x: visible; }
+      #tableWrap table { display: block; width: 100%; }
+      #tableWrap thead { display: none; }
+      #tableWrap tbody { display: block; }
+      #tbody tr.virtual-spacer {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: none;
+      }
+      #tbody tr.virtual-spacer td {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: none;
+      }
+      #tbody tr:not(.virtual-spacer) {
+        display: grid;
+        grid-template-columns: 56px 1fr auto;
+        grid-template-areas:
+          "cover title status"
+          "cover meta meta";
+        gap: 0.35rem 0.5rem;
+        padding: 0.5rem 0.65rem;
+        align-items: start;
+        border-bottom: 1px solid rgb(51 65 85);
+      }
+      #tbody tr:not(.virtual-spacer) > td { display: block; padding: 0; border: none; min-width: 0; }
+      #tbody .col-check, #tbody .col-notes, #tbody .col-pri, #tbody .col-played,
+      #tbody .col-last-played, #tbody .col-released, #tbody .col-score, #tbody .col-price { display: none !important; }
+      #tbody tr.row-expanded .col-check,
+      #tbody tr.row-expanded .col-notes { display: block !important; grid-column: 1 / -1; }
+      #tbody tr.row-expanded .col-notes { grid-area: auto; margin-top: 0.35rem; }
+      #tbody .col-cover { grid-area: cover; }
+      #tbody .col-title { grid-area: title; }
+      #tbody .col-status { grid-area: status; justify-self: end; }
+      #tbody .col-hltb, #tbody .col-steam, #tbody .col-genres { grid-area: meta; }
+      #tbody .col-hltb, #tbody .col-steam { display: inline-block !important; width: auto; }
+      #tbody .col-genres { display: block !important; }
+      #tbody .col-hltb .row-hltb-btn { font-size: 0.65rem; padding: 0.15rem 0.35rem; }
+      #tbody .row-expand-btn {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 4px;
+        border: 1px solid rgb(71 85 105);
+        background: rgb(30 41 59);
+        color: #94a3b8;
+        font-size: 0.85rem;
+        line-height: 1;
+        cursor: pointer;
+      }
+      #tbody .row-expand-btn:hover { color: #e2e8f0; border-color: #64748b; }
+      #tbody .notes-input { min-width: 0; }
+      #tbody .tag-chip-wrap { flex-wrap: wrap; }
+      #tbody .game-title-badges { margin-right: 0.25rem; }
+    }
+    /* === Table: card layout (phone) === */
+    @media (max-width: 639px) {
+      #tbody tr:not(.virtual-spacer) {
+        grid-template-columns: 72px 1fr;
+        grid-template-areas:
+          "cover title"
+          "cover status"
+          "meta meta";
+        padding: 0.75rem;
+      }
+      #tbody .col-status { justify-self: start; }
+      #tbody tr.row-expanded { padding-bottom: 0.5rem; }
+    }
+  /* === View tabs scroll (phone) === */
+    .view-tabs-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
+    }
+    .view-tabs-scroll .view-tab { flex-shrink: 0; }
+    /* === Dashboard phone tweaks === */
+    @media (max-width: 639px) {
+      .dash-kpi { padding: 0.5rem; }
+      .dash-kpi-value { font-size: 1rem; }
+      .dash-kpi-label { font-size: 0.65rem; }
+      .dash-chart-wrap { height: 240px; }
+      .dash-chart-wrap.tall { height: 320px; }
+      .coop-side-picks-list { gap: 0.5rem; }
+      .itch-hero-card { flex-direction: column; }
+      .itch-hero-cover { width: 100%; height: 120px; object-fit: cover; }
+    }
+    /* === Add-game modal (phone) === */
+    #addGameModal .add-game-modal-panel { max-width: min(560px, 94vw); }
+    @media (max-width: 639px) {
+      #addGameModal .add-game-fields-row { flex-direction: column; align-items: stretch; }
+      #addGameModal .add-game-fields-row label { min-width: 0 !important; width: 100%; }
+    }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -709,7 +889,7 @@
     <header class="mb-4">
       <div class="flex flex-wrap items-center gap-3">
         <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
-        <div class="flex gap-1">
+        <div class="view-tabs-scroll flex gap-1">
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm active" data-view="dashboard">Dashboard</button>
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="library">Library</button>
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
@@ -746,7 +926,7 @@
         <span id="pickMeta" class="text-xs text-slate-400"></span>
       </div>
       <div id="picksContainer" class="p-3">
-        <div id="picksGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-2"></div>
+        <div id="picksGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2"></div>
       </div>
     </section>
 
@@ -778,6 +958,7 @@
         <div id="dashboardFetcherHealth" class="dash-card dash-fetcher-health"></div>
         <div id="fetcherRunLog" class="fh-log"></div>
         <div id="dashboardKpis" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-9 gap-2"></div>
+        <div id="dashboardPlayTonight" class="flex justify-end -mt-1 mb-1"></div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Library by store</h3><div class="dash-chart-wrap"><canvas id="chartStoreDonut"></canvas></div></div>
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Status breakdown</h3><div class="dash-chart-wrap"><canvas id="chartStatusDonut"></canvas></div></div>
@@ -809,7 +990,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Top rated unplayed</h3><div id="dashTopRated"></div></div>
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Quick wins</h3><div id="dashQuickWins"></div></div>
-          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3><div id="dashItchRecap" class="dash-itch-recap text-sm"></div><div id="dashItchChartWrap" class="dash-chart-wrap mt-3"><canvas id="chartItchStatus"></canvas></div></div>
+          <div class="dash-card itch-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3><div id="dashItchRecap" class="dash-itch-recap text-sm"></div></div>
         </div>
       </div>
     </section>
@@ -825,20 +1006,20 @@
       <table class="w-full text-sm">
         <thead class="bg-slate-800 text-slate-300">
           <tr>
-            <th class="p-2 w-8"><input type="checkbox" id="selectAllVisible" title="Select all visible rows" /></th>
-            <th class="p-2 w-12"></th>
-            <th data-sort="name" class="p-2 text-left">Game</th>
-            <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
-            <th data-sort="priority" class="p-2 text-center">Pri</th>
+            <th class="col-check p-2 w-8"><input type="checkbox" id="selectAllVisible" title="Select all visible rows" /></th>
+            <th class="col-cover p-2 w-12"></th>
+            <th data-sort="name" class="col-title p-2 text-left">Game</th>
+            <th id="statusHeader" data-sort="status" class="col-status p-2 text-left">Status</th>
+            <th data-sort="priority" class="col-pri p-2 text-center">Pri</th>
             <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>
-            <th data-sort="playtime_minutes" class="p-2 text-right">Played</th>
-            <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
-            <th data-sort="steam_review_percent" class="p-2 text-right">Steam %</th>
-            <th id="priceHeader" data-sort="discount_percent" class="p-2 text-right">Price</th>
-            <th data-sort="release_date" class="p-2 text-left">Released</th>
-            <th data-sort="last_played" class="p-2 text-left">Last played</th>
-            <th class="p-2 text-left">Genres</th>
-            <th class="p-2 text-left">Notes</th>
+            <th data-sort="playtime_minutes" class="col-played p-2 text-right">Played</th>
+            <th data-sort="hltb_main_hours" class="col-hltb p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
+            <th data-sort="steam_review_percent" class="col-steam p-2 text-right">Steam %</th>
+            <th id="priceHeader" data-sort="discount_percent" class="col-price p-2 text-right">Price</th>
+            <th data-sort="release_date" class="col-released p-2 text-left">Released</th>
+            <th data-sort="last_played" class="col-last-played p-2 text-left">Last played</th>
+            <th class="col-genres p-2 text-left">Genres</th>
+            <th class="col-notes p-2 text-left">Notes</th>
           </tr>
         </thead>
         <tbody id="tbody" class="divide-y divide-slate-700"></tbody>
@@ -1037,7 +1218,7 @@
 
   <!-- Add-game modal -->
   <div id="addGameModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
-    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
+    <div class="add-game-modal-panel bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="addGameModalTitle" class="text-lg font-semibold text-slate-100">Add a game</h3>
         <button id="addGameClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
@@ -1047,7 +1228,7 @@
           <button type="button" class="add-target-btn px-3 py-1.5 bg-slate-700" data-target="library">Add to Library</button>
           <button type="button" class="add-target-btn px-3 py-1.5 bg-slate-700 border-l border-slate-600" data-target="wishlist">Add to Wishlist</button>
         </div>
-        <div class="flex flex-wrap gap-2 items-end">
+        <div class="add-game-fields-row flex flex-wrap gap-2 items-end">
           <label class="flex-1 min-w-[200px] text-xs text-slate-300">Title
             <input id="addGameTitle" type="text" autocomplete="off" placeholder="e.g. The Legend of Zelda: Tears of the Kingdom" class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
           </label>

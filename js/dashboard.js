@@ -1,4 +1,4 @@
-import { state, STATUS_CHIP_DEFS } from './state.js';
+import { state, STATUS_CHIP_DEFS, QUICK_WIN_MIN_RATING } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 import { renderDashboardFetcherHealth } from './fetcher-health.js';
 
@@ -16,6 +16,18 @@ function c(name) {
 
 const dashboardCharts = {};
 let _dashboardRenderTimer = null;
+let itchHeroIndex = Math.floor(Math.random() * 10);
+
+const ITCH_CLASS_LABELS = {
+  game: "Games",
+  tool: "Tools",
+  assets: "Assets",
+  comic: "Comics",
+  book: "Books",
+  soundtrack: "Soundtracks",
+  physical_game: "Physical games",
+  other: "Other",
+};
 const DASH_STORE_COLORS = {
   steam: "#ea580c", gog: "#6d28d9", psn: "#003791", epic: "#64748b",
   amazon: "#c2410c", xbox: "#107C10", battlenet: "#148EFF", ubisoft: "#FFD200",
@@ -173,6 +185,110 @@ function dashDrillGenre(genre) {
   c('refreshFilterUI')();
 }
 
+function dashDrillItchGenre(genre) {
+  if (!state.prefs.genreFilters.includes(genre)) state.prefs.genreFilters.push(genre);
+  c('savePrefs')();
+  c('switchView')("itch");
+  c('renderGenreChips')();
+  c('refreshFilterUI')();
+}
+
+function dashDrillItchClass(cls) {
+  state.prefs.itchClassification = cls || "";
+  c('savePrefs')();
+  c('switchView')("itch");
+  c('refreshFilterUI')();
+}
+
+function dashDrillHltbBucket(bucketIndex) {
+  const maxByBucket = [2, 5, 10, 20, 40, 200];
+  const maxH = maxByBucket[bucketIndex] ?? 200;
+  const maxEl = document.getElementById("maxHours");
+  const maxVal = document.getElementById("maxHoursVal");
+  if (maxEl) maxEl.value = String(maxH);
+  if (maxVal) maxVal.textContent = maxH >= 200 ? "200+" : String(maxH);
+  document.getElementById("statusFilter").value = "backlog";
+  state.prefs.storeFilter = "";
+  c('savePrefs')();
+  c('switchView')("library");
+  c('renderStoreChips')();
+  c('refreshFilterUI')();
+}
+
+function dashDrillReleaseYear(year) {
+  state.prefs.releaseYearFilter = year || "";
+  c('savePrefs')();
+  c('switchView')("library");
+  c('refreshFilterUI')();
+}
+
+function dashDrillReviewTier(tier) {
+  state.prefs.reviewTierFilter = tier || "";
+  c('savePrefs')();
+  c('switchView')("library");
+  c('refreshFilterUI')();
+}
+
+export function pickPlayTonight(games) {
+  const pool = games.filter(g => {
+    if (c('getPersonal')(g).status !== "backlog") return false;
+    if ((g.playtime_minutes || 0) > 0) return false;
+    return true;
+  });
+  if (!pool.length) return null;
+  const moods = [
+    () => pool.filter(g => (c('hltbMain')(g) || 999) <= (state.prefs.quickWinMaxHours || 15) && c('ratingValue')(g) >= QUICK_WIN_MIN_RATING),
+    () => pool.filter(g => g.coop_online || g.coop_local),
+    () => pool.filter(g => c('ratingValue')(g) > 0 && c('ratingValue')(g) < 75 && c('hasEnoughReviews')(g)),
+    () => pool.filter(g => (c('hltbMain')(g) || 0) >= 20),
+  ];
+  const mood = moods[Math.floor(Math.random() * moods.length)]();
+  const candidates = mood.length ? mood : pool;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function itchBreakdownRows(entries, fillClass, action) {
+  const max = Math.max(...entries.map(([, n]) => n), 1);
+  return entries.map(([value, count, label]) => {
+    const pct = Math.round((count / max) * 100);
+    const display = label || value;
+    return `<button type="button" class="itch-breakdown-row" data-action="${escapeAttr(action)}" data-value="${escapeAttr(value)}" title="${escapeAttr(display)}: ${formatNum(count)}">
+      <span class="itch-breakdown-name">${escapeHtml(display)}</span>
+      <span class="itch-breakdown-bar" aria-hidden="true"><span class="itch-breakdown-fill ${fillClass}" style="width:${pct}%"></span></span>
+      <span class="itch-breakdown-count">${formatNum(count)}</span>
+    </button>`;
+  }).join("");
+}
+
+function bindItchRecapClick() {
+  const el = document.getElementById("dashItchRecap");
+  if (!el || el.dataset.itchBound) return;
+  el.dataset.itchBound = "1";
+  el.addEventListener("click", e => {
+    const shuffle = e.target.closest('[data-action="itch-hero-shuffle"]');
+    if (shuffle) {
+      e.preventDefault();
+      e.stopPropagation();
+      itchHeroIndex += 1;
+      renderDashboardItchRecap();
+      return;
+    }
+    const genreRow = e.target.closest('[data-action="itch-drill-genre"]');
+    if (genreRow?.dataset.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      dashDrillItchGenre(genreRow.dataset.value);
+      return;
+    }
+    const classRow = e.target.closest('[data-action="itch-drill-class"]');
+    if (classRow?.dataset.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      dashDrillItchClass(classRow.dataset.value);
+    }
+  });
+}
+
 export function dashDrillCoop({ online = false, local = false } = {}) {
   const onlineEl = document.getElementById("coopOnlineOnly");
   const localEl = document.getElementById("coopLocalOnly");
@@ -317,6 +433,26 @@ function renderDashboardKPIs(games) {
       <div class="dash-kpi-label">${escapeHtml(k.label)}</div>
       <div class="dash-kpi-value">${escapeHtml(String(k.value))}</div>
     </div>`).join("");
+  const pt = document.getElementById("dashboardPlayTonight");
+  if (pt) {
+    pt.innerHTML = `<button type="button" id="playTonightBtn" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-xs font-medium text-slate-100 border border-sky-500/50 cursor-pointer" title="Random backlog pick (quick, co-op, hidden gem, or long)">What to play tonight?</button>`;
+  }
+}
+
+function bindPlayTonightButton() {
+  const wrap = document.getElementById("dashboardPlayTonight");
+  if (!wrap || wrap.dataset.playTonightBound) return;
+  wrap.dataset.playTonightBound = "1";
+  wrap.addEventListener("click", e => {
+    if (!e.target.closest("#playTonightBtn")) return;
+    const pick = pickPlayTonight(dashboardLibraryGames());
+    if (!pick) {
+      alert("No backlog games match — add some titles to your backlog first.");
+      return;
+    }
+    c('switchView')("library");
+    c('focusGame')(c('gameKey')(pick));
+  });
 }
 
 function renderDashboardLists(games) {
@@ -325,7 +461,7 @@ function renderDashboardLists(games) {
     .sort((a, b) => c('ratingValue')(b) - c('ratingValue')(a))
     .slice(0, 10);
   const quickWins = games
-    .filter(g => c('getPersonal')(g).status === "backlog" && (c('hltbMain')(g) || 999) <= (state.prefs.quickWinMaxHours || 15) && c('ratingValue')(g) >= 80)
+    .filter(g => c('getPersonal')(g).status === "backlog" && (c('hltbMain')(g) || 999) <= (state.prefs.quickWinMaxHours || 15) && c('ratingValue')(g) >= QUICK_WIN_MIN_RATING)
     .sort((a, b) => c('ratingValue')(b) - c('ratingValue')(a))
     .slice(0, 10);
   const listHtml = (items, scoreFn) => items.length
@@ -393,55 +529,166 @@ function renderDashboardWishlistStats() {
   ].join("");
 }
 
+function renderItchHeroHtml(candidates) {
+  if (!candidates.length) {
+    return `<div class="itch-hero">
+      <div class="itch-hero-label"><span>Featured unplayed pick</span></div>
+      <div class="itch-hero-empty">No rated picks yet — run <code class="text-slate-200">enrich_steam_reviews.py --stores itch</code> to backfill ratings.</div>
+    </div>`;
+  }
+  const idx = itchHeroIndex % candidates.length;
+  const g = candidates[idx];
+  const cover = g.library_image || c('coverFallbackFor')(g);
+  const fb = c('coverFallbackFor')(g);
+  const key = c('gameKey')(g);
+  const rating = c('ratingValue')(g);
+  const hltb = c('hltbMain')(g);
+  const metaParts = [];
+  if (g.publisher) metaParts.push(`by ${escapeHtml(g.publisher)}`);
+  if (hltb) metaParts.push(`~${hltb}h`);
+  const metaHtml = metaParts.length ? `<div class="itch-hero-meta">${metaParts.join(" · ")}</div>` : "";
+  const desc = g.short_text
+    ? `<p class="itch-hero-desc">${escapeHtml(g.short_text)}</p>`
+    : "";
+  const tags = c('gameGenresCanonical')(g).slice(0, 3);
+  const tagsHtml = tags.length
+    ? `<div class="itch-hero-tags">${tags.map(t => `<span class="itch-hero-tag">${escapeHtml(t)}</span>`).join("")}</div>`
+    : "";
+  const shuffleBtn = candidates.length > 1
+    ? `<button type="button" class="itch-hero-shuffle" data-action="itch-hero-shuffle" title="Cycle picks">↻</button>`
+    : "";
+  return `<div class="itch-hero">
+    <div class="itch-hero-label">
+      <span>Featured unplayed pick</span>
+      ${shuffleBtn}
+    </div>
+    <button type="button" class="itch-hero-card" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on itch.io">
+      <img class="itch-hero-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fb)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+      <div class="itch-hero-body">
+        <div class="itch-hero-head">
+          <span class="itch-hero-name">${escapeHtml(g.name)}</span>
+          <span class="itch-hero-rating">${rating}%</span>
+        </div>
+        ${metaHtml}
+        ${desc}
+        ${tagsHtml}
+      </div>
+    </button>
+  </div>`;
+}
+
 function renderDashboardItchRecap() {
   const el = document.getElementById("dashItchRecap");
-  const chartWrap = document.getElementById("dashItchChartWrap");
   if (!el) return;
+  bindItchRecapClick();
+  if (dashboardCharts.chartItchStatus) {
+    dashboardCharts.chartItchStatus.destroy();
+    delete dashboardCharts.chartItchStatus;
+  }
+
   const total = state.itchGames.length;
   if (!total) {
-    el.innerHTML = `<p>No itch.io data loaded. Run <code style="color:#e2e8f0">fetch_itch.py</code>, then reload.</p>`;
-    if (chartWrap) chartWrap.style.display = "none";
-    if (dashboardCharts.chartItchStatus) {
-      dashboardCharts.chartItchStatus.destroy();
-      delete dashboardCharts.chartItchStatus;
-    }
+    el.innerHTML = `<p class="text-sm text-slate-400">No itch.io data loaded. Run <code class="text-slate-200">fetch_itch.py</code>, then reload.</p>`;
     return;
   }
+
   const gamesOnly = state.itchGames.filter(c('itchIsGame'));
+  const videogames = gamesOnly.length;
   const rated = gamesOnly.filter(g => c('ratingValue')(g) > 0).length;
-  const unrated = gamesOnly.length - rated;
-  const nonGames = total - gamesOnly.length;
-  el.innerHTML = `
-    <p><strong>${formatNum(gamesOnly.length)}</strong> videogames of <strong>${formatNum(total)}</strong> owned keys · <strong>${formatNum(rated)}</strong> with review scores</p>
-    <p class="dash-itch-muted mt-2"><button type="button" class="summary-jump-chip px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs border border-slate-600 cursor-pointer" data-jump-view="itch">Open itch.io tab →</button></p>`;
-  const entries = [
-    { key: "rated", label: "Rated games", value: rated, color: "#22c55e" },
-    { key: "unrated", label: "Unrated games", value: unrated, color: "#64748b" },
-    { key: "nonGames", label: "Tools, OSTs, etc.", value: nonGames, color: "#8b5cf6" },
-  ].filter(e => e.value > 0);
-  if (chartWrap) chartWrap.style.display = entries.length ? "" : "none";
-  if (!entries.length) {
-    if (dashboardCharts.chartItchStatus) {
-      dashboardCharts.chartItchStatus.destroy();
-      delete dashboardCharts.chartItchStatus;
-    }
-    return;
-  }
-  setDashboardChart("chartItchStatus", {
-    type: "doughnut",
-    data: {
-      labels: entries.map(e => e.label),
-      datasets: [{ data: entries.map(e => e.value), backgroundColor: entries.map(e => e.color), borderWidth: 0 }],
-    },
-    options: dashChartOptions({
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: { color: "#ffffff", font: { size: 11 }, boxWidth: 10 },
-        },
-      },
-    }),
+  const unrated = videogames - rated;
+  const nonGames = total - videogames;
+  const backlogged = gamesOnly.filter(g => c('getPersonal')(g).status === "backlog").length;
+
+  const segments = [
+    { id: "rated", label: "Rated", count: rated },
+    { id: "unrated", label: "Unrated", count: unrated },
+    { id: "non", label: "Non-game", count: nonGames },
+  ];
+  const segSum = segments.reduce((a, s) => a + s.count, 0);
+  const segHtml = segSum
+    ? `<div class="itch-distribution">
+        <div class="itch-distribution-label">Library composition</div>
+        <div class="sale-distribution-bar" role="img" aria-label="itch.io library composition">
+          ${segments.map(s => s.count
+            ? `<span class="sale-distribution-seg itch-seg-${s.id}" style="flex: ${s.count};" title="${s.label}: ${formatNum(s.count)}"></span>`
+            : ""
+          ).join("")}
+        </div>
+        <div class="sale-distribution-legend">
+          ${segments.map(s => `<span class="sale-distribution-tick ${s.count ? "" : "sale-distribution-tick-empty"}" title="${s.label}: ${formatNum(s.count)}">
+            <span class="sale-distribution-swatch itch-seg-${s.id}"></span>
+            <span class="sale-distribution-tick-label">${s.label}</span>
+            <span class="sale-distribution-tick-count">${formatNum(s.count)}</span>
+          </span>`).join("")}
+        </div>
+      </div>`
+    : "";
+
+  const heroCandidates = gamesOnly
+    .filter(g => c('getPersonal')(g).status !== "finished" && (g.playtime_minutes || 0) === 0)
+    .filter(g => c('ratingValue')(g) > 0 && c('hasEnoughReviews')(g))
+    .sort((a, b) => c('ratingValue')(b) - c('ratingValue')(a))
+    .slice(0, 10);
+  if (heroCandidates.length) itchHeroIndex %= heroCandidates.length;
+  else itchHeroIndex = 0;
+
+  const heroHtml = videogames ? renderItchHeroHtml(heroCandidates) : "";
+
+  const classCounts = {};
+  state.itchGames.forEach(g => {
+    const cls = g.classification || "game";
+    classCounts[cls] = (classCounts[cls] || 0) + 1;
   });
+  const classEntries = Object.entries(classCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([cls, count]) => [cls, count, ITCH_CLASS_LABELS[cls] || cls]);
+  const classHtml = classEntries.length
+    ? `<div class="itch-breakdown">
+        <div class="itch-distribution-label">What's in your library</div>
+        <div class="itch-breakdown-list">${itchBreakdownRows(classEntries, "itch-bar-class", "itch-drill-class")}</div>
+      </div>`
+    : "";
+
+  const genreCounts = {};
+  gamesOnly.forEach(g => {
+    c('gameGenresCanonical')(g).forEach(genre => {
+      genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+    });
+  });
+  const genreEntries = Object.entries(genreCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([genre, count]) => [genre, count, genre]);
+  const genreHtml = genreEntries.length
+    ? `<div class="itch-breakdown">
+        <div class="itch-distribution-label">Top itch genres</div>
+        <div class="itch-breakdown-list">${itchBreakdownRows(genreEntries, "itch-bar-genre", "itch-drill-genre")}</div>
+      </div>`
+    : "";
+
+  el.innerHTML = `
+    <div class="sale-scoreboard">
+      <div class="sale-stat">
+        <div class="sale-stat-label">Videogames</div>
+        <div class="sale-stat-value">${formatNum(videogames)}<span class="sale-stat-suffix"> / ${formatNum(total)}</span></div>
+      </div>
+      <div class="sale-stat">
+        <div class="sale-stat-label">Backlog</div>
+        <div class="sale-stat-value ${backlogged ? "" : "sale-stat-muted"}">${backlogged ? formatNum(backlogged) : "—"}</div>
+      </div>
+      <div class="sale-stat">
+        <div class="sale-stat-label">Rated</div>
+        <div class="sale-stat-value ${rated ? "" : "sale-stat-muted"}">${rated ? formatNum(rated) : "—"}</div>
+      </div>
+    </div>
+    ${segHtml}
+    ${heroHtml}
+    ${classHtml}
+    ${genreHtml}
+    <div class="itch-footer">
+      <button type="button" class="summary-jump-chip px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs border border-slate-600 cursor-pointer" data-jump-view="itch">Open itch.io tab →</button>
+    </div>`;
 }
 
 function renderDashboardCharts(games) {
@@ -581,7 +828,11 @@ function renderDashboardCharts(games) {
   setDashboardChart("chartHltbHist", {
     type: "bar",
     data: { labels: buckets, datasets: [{ label: "Backlog games", data: bucketCounts, backgroundColor: hltbBucketColors, borderColor: hltbBucketColors, borderWidth: 1 }] },
-    options: dashChartOptions({ plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
+    options: dashChartOptions({
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } },
+      onClick(_evt, elements) { if (elements.length) dashDrillHltbBucket(elements[0].index); },
+    }),
   });
 
   const reviewBuckets = {
@@ -601,7 +852,13 @@ function renderDashboardCharts(games) {
       labels: revEntries.map(([k]) => k),
       datasets: [{ data: revEntries.map(([, n]) => n), backgroundColor: revEntries.map(([k]) => DASH_REVIEW_COLORS[k] || "#475569"), borderWidth: 0 }],
     },
-    options: dashChartOptions({ plugins: { legend: { position: "right" } } }),
+    options: dashChartOptions({
+      plugins: { legend: { position: "right" } },
+      onClick(_evt, elements) {
+        if (!elements.length) return;
+        dashDrillReviewTier(revEntries[elements[0].index][0]);
+      },
+    }),
   });
 
   const yearCounts = {};
@@ -662,11 +919,16 @@ function renderDashboardCharts(games) {
         x: { ticks: { color: "#94a3b8", maxRotation: 45 }, grid: { display: false } },
         y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
       },
+      onClick(_evt, elements) {
+        if (!elements.length) return;
+        dashDrillReleaseYear(years[elements[0].index]);
+      },
     }),
     plugins: [makeEraBandsPlugin(years)],
   });
 
-  const scatterPts = games.filter(g => c('ratingValue')(g) > 0 && c('hltbMain')(g) != null && c('hltbMain')(g) > 0).map(g => ({
+  const scatterGames = games.filter(g => c('ratingValue')(g) > 0 && c('hltbMain')(g) != null && c('hltbMain')(g) > 0);
+  const scatterPts = scatterGames.map(g => ({
     x: c('hltbMain')(g),
     y: c('ratingValue')(g),
     label: g.name,
@@ -720,6 +982,13 @@ function renderDashboardCharts(games) {
           },
         },
       },
+      onClick(_evt, elements) {
+        if (!elements.length) return;
+        const g = scatterGames[elements[0].index];
+        if (!g) return;
+        c('switchView')("library");
+        c('focusGame')(c('gameKey')(g));
+      },
     }),
   });
 
@@ -742,6 +1011,7 @@ export function renderDashboard() {
   Chart.defaults.borderColor = "#334155";
   const games = dashboardLibraryGames();
   renderDashboardFetcherHealth();
+  bindPlayTonightButton();
   renderDashboardKPIs(games);
   renderDashboardItchRecap();
   try {
@@ -762,8 +1032,13 @@ export function renderDashboard() {
   }
 }
 
+export function cancelScheduledDashboardRender() {
+  clearTimeout(_dashboardRenderTimer);
+  _dashboardRenderTimer = null;
+}
+
 export function scheduleDashboardRender() {
   if (state.activeView !== "dashboard") return;
-  clearTimeout(_dashboardRenderTimer);
+  cancelScheduledDashboardRender();
   _dashboardRenderTimer = setTimeout(renderDashboard, 80);
 }

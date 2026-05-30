@@ -30,8 +30,10 @@ export const state = {
   _visibleList: null,
   _virtualActive: false,
   _virtualStart: 0,
+  _expandedRowKeys: new Set(),
 };
 
+export const QUICK_WIN_MIN_RATING = 80;
 export const CLEANUP_MAX_RATING = 60;
 export const CLEANUP_MIN_AGE_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
 export const GENRE_CHIP_COLLAPSE_AT = 12;

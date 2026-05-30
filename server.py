@@ -386,6 +386,19 @@ def _sse_format(event: str, data: Any) -> bytes:
 class Handler(SimpleHTTPRequestHandler):
     server_version = "SteamBacklogDev/1.0"
 
+    # ES module imports are recursive; if app.js is fresh but dom-util.js is
+    # cached from an older revision, missing exports throw SyntaxError and kill
+    # the whole app. Force code assets to revalidate on every load so module
+    # skew can't happen. JSON data files keep normal caching (Last-Modified +
+    # 304 still works) so a multi-MB library refresh isn't a full re-download.
+    _REVALIDATE_SUFFIXES = (".html", ".js", ".css")
+
+    def end_headers(self) -> None:  # noqa: D401 - http.server API
+        path = (self.path or "").split("?", 1)[0].lower()
+        if path == "/" or path.endswith(self._REVALIDATE_SUFFIXES):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     # ---- routing -----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802 - http.server API
         if self.path == "/api/runs":

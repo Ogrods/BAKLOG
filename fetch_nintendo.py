@@ -15,12 +15,18 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 
+from fetchers._base import load_existing_games, merge_cached_row, resolve_hltb_for_row
 from hltb_client import HltbClient
 from nintendo_client import NintendoAuthError, NintendoClient
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
 RAW_DUMP_JSON = Path("cache/nintendo_raw.json")
 HLTB_DELAY_SEC = 1.0
+NINTENDO_AUTHORITATIVE = frozenset({
+    "store", "id", "nintendo_id", "name", "playtime_minutes", "last_played",
+    "header_image", "library_image", "release_date", "genres", "tags",
+    "store_url", "type", "price", "price_initial", "discount_percent", "currency",
+})
 
 # Skip non-game purchases (funds, subscriptions, vouchers).
 SKIP_CONTENT_TYPES = frozenset(
@@ -195,17 +201,25 @@ def main() -> int:
         return 2
 
     hltb_client = HltbClient()
+    existing = load_existing_games(GAMES_NINTENDO_JSON)
     games_out: list[dict] = []
     for i, item in enumerate(merged, 1):
-        print(f"[{i}/{len(merged)}] {item['name']}")
-        hltb = None
-        if not args.skip_hltb:
-            try:
-                time.sleep(HLTB_DELAY_SEC)
-                hltb = hltb_client.lookup(item["name"])
-            except Exception as e:
-                print(f"  HLTB warning: {e}")
-        games_out.append(_build_row(item, hltb))
+        name = item["name"]
+        print(f"[{i}/{len(merged)}] {name}")
+        nid = str(item.get("id") or name)
+        cached = existing.get(nid)
+        hltb, hltb_updated = resolve_hltb_for_row(
+            skip_hltb=args.skip_hltb,
+            only_new=False,
+            cached=cached,
+            name=name,
+            client=hltb_client,
+            delay_sec=HLTB_DELAY_SEC,
+        )
+        row = _build_row(item, hltb)
+        games_out.append(
+            merge_cached_row(row, cached, authoritative=NINTENDO_AUTHORITATIVE, hltb_updated=hltb_updated)
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

@@ -14,11 +14,18 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 
+from fetchers._base import load_existing_games, merge_cached_row, resolve_hltb_for_row, write_games_json
 from hltb_client import HltbClient
 from xbox_client import XboxAuthError, XboxClient
 
 GAMES_XBOX_JSON = Path("games_xbox.json")
 HLTB_DELAY_SEC = 1.0
+XBOX_AUTHORITATIVE = frozenset({
+    "store", "id", "xbox_title_id", "name", "playtime_minutes", "last_played",
+    "header_image", "library_image", "release_date", "genres", "tags",
+    "store_url", "type", "price", "price_initial", "discount_percent", "currency",
+    "trophy_progress", "xbox_gamerscore_current", "xbox_gamerscore_total",
+})
 
 
 def _configure_stdout() -> None:
@@ -126,30 +133,29 @@ def main() -> int:
     print(f"Found {len(games)} Xbox titles in title history.")
 
     hltb_client = HltbClient()
+    existing = load_existing_games(GAMES_XBOX_JSON)
     games_out: list[dict] = []
 
     for i, title in enumerate(games, 1):
         name = title.get("name") or tid_placeholder(title)
         print(f"[{i}/{len(games)}] {name}")
-        hltb = None
-        if not args.skip_hltb:
-            try:
-                time.sleep(HLTB_DELAY_SEC)
-                hltb = hltb_client.lookup(name)
-            except Exception as e:
-                print(f"  HLTB warning: {e}")
-        games_out.append(_build_row(title, hltb))
+        tid = str(title.get("titleId") or title.get("modernTitleId") or "")
+        cached = existing.get(tid) if tid else None
+        hltb, hltb_updated = resolve_hltb_for_row(
+            skip_hltb=args.skip_hltb,
+            only_new=False,
+            cached=cached,
+            name=name,
+            client=hltb_client,
+            delay_sec=HLTB_DELAY_SEC,
+        )
+        row = _build_row(title, hltb)
+        games_out.append(
+            merge_cached_row(row, cached, authoritative=XBOX_AUTHORITATIVE, hltb_updated=hltb_updated)
+        )
 
-    payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "store": "xbox",
-        "gamertag": gt,
-        "game_count": len(games_out),
-        "games": sorted(games_out, key=lambda g: g["name"].lower()),
-    }
-    GAMES_XBOX_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    games_out.sort(key=lambda g: g["name"].lower())
+    write_games_json(GAMES_XBOX_JSON, store="xbox", games=games_out)
     print(f"\nWrote {len(games_out)} games to {GAMES_XBOX_JSON}.")
     print("Reload the dashboard to see your Xbox library.")
     return 0

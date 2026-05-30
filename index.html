@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Steam Backlog</title>
   <link rel="stylesheet" href="tailwind.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <style>
     /* === Base === */
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
@@ -183,6 +184,17 @@
     .status-chip[data-status-filter="finished"] { --status-accent: #94a3b8; }
     .status-chip[data-status-filter="skip"] { --status-accent: #64748b; }
     .status-chip[data-status-filter="__none__"] { --status-accent: #475569; }
+    /* === Dashboard === */
+    .dash-card { background: rgb(30 41 59); border: 1px solid rgb(51 65 85); border-radius: 0.5rem; padding: 1rem; }
+    .dash-kpi { background: rgb(30 41 59); border: 1px solid rgb(51 65 85); border-radius: 0.5rem; padding: 0.75rem 1rem; }
+    .dash-kpi-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8; }
+    .dash-kpi-value { font-size: 1.35rem; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
+    .dash-chart-wrap { position: relative; height: 260px; }
+    .dash-chart-wrap.tall { height: 320px; }
+    .dash-list-row { display: flex; gap: 0.5rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid rgb(51 65 85); font-size: 0.75rem; }
+    .dash-list-row:last-child { border-bottom: none; }
+    .dash-list-cover { width: 28px; height: 42px; object-fit: cover; border-radius: 3px; background: #1e293b; flex-shrink: 0; }
+    #alphaNav.dashboard-hidden { display: none !important; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -191,7 +203,8 @@
       <div class="flex flex-wrap items-center gap-3">
         <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
         <div class="flex gap-1">
-          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm active" data-view="library">Library</button>
+          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm active" data-view="dashboard">Dashboard</button>
+          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="library">Library</button>
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
         </div>
@@ -200,7 +213,7 @@
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
     </header>
 
-    <section class="bg-slate-800 rounded-lg mb-4">
+    <section id="picksSection" class="bg-slate-800 rounded-lg mb-4">
       <div class="flex flex-wrap items-center gap-2 p-3 border-b border-slate-700 relative z-10">
         <button id="togglePicks" class="px-2 py-1 rounded bg-slate-700 text-xs">Hide</button>
         <h2 class="text-sm font-semibold tracking-wide text-slate-200 uppercase">Picks</h2>
@@ -230,7 +243,7 @@
       </div>
     </section>
 
-    <section class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
+    <section id="toolbarSection" class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
       <div class="flex flex-wrap gap-2 items-center">
         <input id="search" type="search" placeholder="Search games..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
         <button type="button" id="openFiltersBtn" class="relative bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm whitespace-nowrap">
@@ -250,6 +263,35 @@
         </div>
       </div>
       <div id="activeFilterPills" class="hidden flex flex-wrap gap-1.5 items-center"></div>
+    </section>
+
+    <section id="dashboardContainer" class="hidden space-y-4 mb-4">
+      <div id="dashboardLoading" class="dash-card text-sm text-slate-400 text-center py-8">Loading charts…</div>
+      <div id="dashboardContent" class="hidden space-y-4">
+        <div id="dashboardKpis" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Library by store</h3><div class="dash-chart-wrap"><canvas id="chartStoreDonut"></canvas></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Status breakdown</h3><div class="dash-chart-wrap"><canvas id="chartStatusDonut"></canvas></div></div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Top genres</h3><div class="dash-chart-wrap"><canvas id="chartGenresBar"></canvas></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Backlog hours by store</h3><div class="dash-chart-wrap"><canvas id="chartBacklogStore"></canvas></div></div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB length (backlog)</h3><div class="dash-chart-wrap"><canvas id="chartHltbHist"></canvas></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Steam review tiers</h3><div class="dash-chart-wrap"><canvas id="chartReviewDonut"></canvas></div></div>
+        </div>
+        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Releases by year</h3><div class="dash-chart-wrap tall"><canvas id="chartReleases"></canvas></div></div>
+        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB vs Steam rating</h3><div class="dash-chart-wrap tall"><canvas id="chartScatter"></canvas></div></div>
+        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Personal tags</h3><div class="dash-chart-wrap"><canvas id="chartTagsBar"></canvas></div></div>
+        <div id="dashboardWishlistStats" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-3">Top rated unplayed</h3><div id="dashTopRated"></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-3">Quick wins</h3><div id="dashQuickWins"></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-3">Recently completed</h3><div id="dashCompleted"></div></div>
+        </div>
+        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3><div id="dashItchRecap" class="text-sm text-slate-300"></div><div class="dash-chart-wrap mt-3 max-w-md"><canvas id="chartItchStatus"></canvas></div></div>
+      </div>
     </section>
 
     <div id="tableShell" class="relative">
@@ -504,7 +546,7 @@
     let wishlistGames = [];
     let itchGames = [];
     let itadByKey = {};
-    let activeView = "library";
+    let activeView = "dashboard";
     let selectedKeys = new Set();
     let cleanupModeActive = false;
     let focusedRowIndex = -1;
@@ -820,7 +862,8 @@
       clearTimeout(_downstreamSyncTimer);
       _downstreamSyncTimer = setTimeout(() => {
         renderSummary();
-        renderPicks();
+        if (activeView === "dashboard") scheduleDashboardRender();
+        else renderPicks();
       }, 200);
     }
     function setPersonal(g, field, value, options) {
@@ -1398,9 +1441,408 @@
       });
     }
 
+    // === Dashboard ===
+    const dashboardCharts = {};
+    let _dashboardRenderTimer = null;
+    const DASH_STORE_COLORS = {
+      steam: "#ea580c", gog: "#6d28d9", psn: "#003791", epic: "#64748b",
+      amazon: "#c2410c", xbox: "#107C10", battlenet: "#148EFF", ubisoft: "#FFD200",
+      nintendo: "#E60012", itch: "#fa5c5c", other: "#94a3b8", manual: "#64748b",
+    };
+    const DASH_STATUS_COLORS = {
+      backlog: "#64748b", next: "#38bdf8", playing: "#10b981", unfinished: "#a855f7",
+      live: "#ec4899", finished: "#94a3b8", skip: "#475569", __none__: "#334155",
+    };
+    const DASH_STORE_LABELS = {
+      steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic", amazon: "Amazon",
+      xbox: "Xbox", battlenet: "Battle.net", ubisoft: "Ubisoft", nintendo: "Nintendo",
+      itch: "itch.io", other: "Other", manual: "Manual",
+    };
+
+    function destroyDashboardCharts() {
+      Object.values(dashboardCharts).forEach(c => { try { c.destroy(); } catch (_) {} });
+      Object.keys(dashboardCharts).forEach(k => delete dashboardCharts[k]);
+    }
+
+    function dashboardLibraryGames() {
+      return allGames.filter(g => !crossStoreHiddenKeys.has(gameKey(g)));
+    }
+
+    function dashChartOptions(extra = {}) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#94a3b8", boxWidth: 12 } } },
+        ...extra,
+      };
+    }
+
+    function setDashboardChart(id, config) {
+      const canvas = document.getElementById(id);
+      if (!canvas || typeof Chart === "undefined") return;
+      if (dashboardCharts[id]) {
+        dashboardCharts[id].destroy();
+        delete dashboardCharts[id];
+      }
+      dashboardCharts[id] = new Chart(canvas, config);
+    }
+
+    function dashDrillStore(store) {
+      prefs.storeFilter = store || "";
+      savePrefs();
+      document.getElementById("statusFilter").value = "";
+      switchView("library");
+      renderStoreChips();
+      refreshFilterUI();
+    }
+
+    function dashDrillStatus(status) {
+      document.getElementById("statusFilter").value = status || "";
+      prefs.storeFilter = "";
+      savePrefs();
+      switchView("library");
+      renderStoreChips();
+      refreshFilterUI();
+    }
+
+    function dashDrillGenre(genre) {
+      if (!prefs.genreFilters.includes(genre)) prefs.genreFilters.push(genre);
+      savePrefs();
+      switchView("library");
+      renderGenreChips();
+      refreshFilterUI();
+    }
+
+    function dashDrillTag(tag) {
+      const cur = prefs.tagFilters || [];
+      if (!cur.includes(tag)) prefs.tagFilters = [...cur, tag];
+      savePrefs();
+      switchView("library");
+      renderTagChips();
+      refreshFilterUI();
+    }
+
+    function renderDashboardKPIs(games) {
+      const backlog = games.filter(g => getPersonal(g).status === "backlog");
+      const backlogHrs = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
+      const playedHrs = games.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
+      const nonSkip = games.filter(g => getPersonal(g).status !== "skip");
+      const finished = games.filter(g => getPersonal(g).status === "finished").length;
+      const completion = nonSkip.length ? Math.round((finished / nonSkip.length) * 100) : 0;
+      const rated = games.filter(g => ratingValue(g) > 0);
+      const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length) : "—";
+      const wlDeals = wishlistGames.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
+      const itchGameCount = itchGames.filter(itchIsGame).length;
+      const stores = new Set(games.map(g => normalizeGame(g).store)).size;
+      const kpis = [
+        { label: "Library games", value: games.length },
+        { label: "Backlog hours", value: `${Math.round(backlogHrs)}h` },
+        { label: "Played hours", value: `${Math.round(playedHrs)}h` },
+        { label: "Completion", value: `${completion}%` },
+        { label: "Avg review", value: avgRating === "—" ? "—" : `${avgRating}%` },
+        { label: "Wishlist deals", value: wlDeals },
+        { label: "Itch games", value: itchGameCount },
+        { label: "Stores", value: stores },
+      ];
+      document.getElementById("dashboardKpis").innerHTML = kpis.map(k => `
+        <div class="dash-kpi">
+          <div class="dash-kpi-label">${escapeHtml(k.label)}</div>
+          <div class="dash-kpi-value">${escapeHtml(String(k.value))}</div>
+        </div>`).join("");
+    }
+
+    function renderDashboardLists(games) {
+      const topRated = games
+        .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) > 0 && hasEnoughReviews(g))
+        .sort((a, b) => ratingValue(b) - ratingValue(a))
+        .slice(0, 10);
+      const quickWins = games
+        .filter(g => getPersonal(g).status === "backlog" && (hltbMain(g) || 999) <= (prefs.quickWinMaxHours || 15) && ratingValue(g) >= 80)
+        .sort((a, b) => ratingValue(b) - ratingValue(a))
+        .slice(0, 10);
+      const completed = games
+        .filter(g => getPersonal(g).status === "finished")
+        .sort((a, b) => {
+          const la = a.last_played ? Date.parse(a.last_played) : 0;
+          const lb = b.last_played ? Date.parse(b.last_played) : 0;
+          if (lb !== la) return lb - la;
+          return (b.release_date || "").localeCompare(a.release_date || "");
+        })
+        .slice(0, 10);
+      const listHtml = (items, scoreFn) => items.length
+        ? items.map(g => {
+          const cover = g.library_image || coverFallbackFor(g);
+          const score = scoreFn(g);
+          return `<div class="dash-list-row"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}</span><span class="text-slate-400">${score}</span></div>`;
+        }).join("")
+        : '<p class="text-xs text-slate-500 italic">No matches yet.</p>';
+      document.getElementById("dashTopRated").innerHTML = listHtml(topRated, g => `${ratingValue(g)}%`);
+      document.getElementById("dashQuickWins").innerHTML = listHtml(quickWins, g => `${hltbMain(g) || "?"}h`);
+      document.getElementById("dashCompleted").innerHTML = listHtml(completed, g => g.last_played ? g.last_played.slice(0, 10) : "—");
+    }
+
+    function renderDashboardWishlistStats() {
+      const wl = wishlistGames;
+      const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
+      const lows = wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; });
+      const cuts = onSale.map(g => effectiveDiscountPercent(g)).filter(c => c > 0);
+      const avgDisc = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : 0;
+      const pctLow = wl.length ? Math.round((lows.length / wl.length) * 100) : 0;
+      const tiers = { lt25: 0, m25: 0, m50: 0, m75: 0 };
+      onSale.forEach(g => {
+        const c = effectiveDiscountPercent(g);
+        if (c >= 75) tiers.m75++;
+        else if (c >= 50) tiers.m50++;
+        else if (c >= 25) tiers.m25++;
+        else tiers.lt25++;
+      });
+      document.getElementById("dashboardWishlistStats").innerHTML = `
+        <div class="dash-card"><div class="dash-kpi-label">Avg discount (on sale)</div><div class="dash-kpi-value mt-1">${avgDisc}%</div><div class="text-xs text-slate-500 mt-1">${onSale.length} of ${wl.length} on sale</div></div>
+        <div class="dash-card"><div class="dash-kpi-label">Historical low</div><div class="dash-kpi-value mt-1">${pctLow}%</div><div class="text-xs text-slate-500 mt-1">${lows.length} titles at all-time low</div></div>
+        <div class="dash-card"><div class="dash-kpi-label">Deal tiers</div><div class="text-xs text-slate-300 mt-2 space-y-1"><div>&lt;25%: ${tiers.lt25}</div><div>25–49%: ${tiers.m25}</div><div>50–74%: ${tiers.m50}</div><div>75%+: ${tiers.m75}</div></div></div>`;
+    }
+
+    function renderDashboardItchRecap() {
+      const total = itchGames.length;
+      const gamesOnly = itchGames.filter(itchIsGame);
+      const rated = gamesOnly.filter(g => ratingValue(g) > 0).length;
+      const recent = [...gamesOnly].sort((a, b) => (b.release_date || "").localeCompare(a.release_date || "")).slice(0, 5);
+      document.getElementById("dashItchRecap").innerHTML = `
+        <p><span class="text-slate-100 font-semibold">${gamesOnly.length}</span> videogames of <span class="text-slate-100 font-semibold">${total}</span> owned keys · <span class="text-slate-100 font-semibold">${rated}</span> with review scores</p>
+        ${recent.length ? `<p class="text-xs text-slate-500 mt-2">Recent: ${recent.map(g => escapeHtml(g.name)).join(" · ")}</p>` : ""}`;
+      const counts = {};
+      STATUS_CHIP_DEFS.forEach(d => { counts[d.key] = 0; });
+      gamesOnly.forEach(g => { counts[chipStatusKey(g)] = (counts[chipStatusKey(g)] || 0) + 1; });
+      const labels = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0 && d.key !== "__none__").map(d => d.label);
+      const data = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0 && d.key !== "__none__").map(d => counts[d.key]);
+      const colors = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0 && d.key !== "__none__").map(d => DASH_STATUS_COLORS[d.key] || "#64748b");
+      if (labels.length) {
+        setDashboardChart("chartItchStatus", {
+          type: "doughnut",
+          data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+          options: dashChartOptions({ plugins: { legend: { position: "right" } } }),
+        });
+      }
+    }
+
+    function renderDashboardCharts(games) {
+      const storeCounts = {};
+      games.forEach(g => {
+        const s = normalizeGame(g).store;
+        storeCounts[s] = (storeCounts[s] || 0) + 1;
+      });
+      const storeEntries = Object.entries(storeCounts).sort((a, b) => b[1] - a[1]);
+      setDashboardChart("chartStoreDonut", {
+        type: "doughnut",
+        data: {
+          labels: storeEntries.map(([k]) => DASH_STORE_LABELS[k] || k),
+          datasets: [{ data: storeEntries.map(([, v]) => v), backgroundColor: storeEntries.map(([k]) => DASH_STORE_COLORS[k] || "#64748b"), borderWidth: 0 }],
+        },
+        options: dashChartOptions({
+          onClick(_evt, elements) {
+            if (!elements.length) return;
+            dashDrillStore(storeEntries[elements[0].index][0]);
+          },
+        }),
+      });
+
+      const statusCounts = {};
+      STATUS_CHIP_DEFS.forEach(d => { statusCounts[d.key] = 0; });
+      games.forEach(g => { statusCounts[chipStatusKey(g)]++; });
+      const statusEntries = STATUS_CHIP_DEFS.filter(d => statusCounts[d.key] > 0 && (d.key !== "__none__" || statusCounts[d.key] > 0));
+      setDashboardChart("chartStatusDonut", {
+        type: "doughnut",
+        data: {
+          labels: statusEntries.map(d => d.label),
+          datasets: [{ data: statusEntries.map(d => statusCounts[d.key]), backgroundColor: statusEntries.map(d => DASH_STATUS_COLORS[d.key]), borderWidth: 0 }],
+        },
+        options: dashChartOptions({
+          onClick(_evt, elements) {
+            if (!elements.length) return;
+            dashDrillStatus(statusEntries[elements[0].index].key);
+          },
+        }),
+      });
+
+      const genreCounts = {};
+      games.forEach(g => (g.genres || []).forEach(gen => {
+        const c = aliasCanonicalGenre(gen);
+        genreCounts[c] = (genreCounts[c] || 0) + 1;
+      }));
+      const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      setDashboardChart("chartGenresBar", {
+        type: "bar",
+        data: {
+          labels: topGenres.map(([g]) => g),
+          datasets: [{ label: "Games", data: topGenres.map(([, n]) => n), backgroundColor: "#38bdf8" }],
+        },
+        options: dashChartOptions({
+          indexAxis: "y",
+          scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { display: false } } },
+          onClick(_evt, elements) { if (elements.length) dashDrillGenre(topGenres[elements[0].index][0]); },
+        }),
+      });
+
+      const stores = [...new Set(games.map(g => normalizeGame(g).store))].sort();
+      const backlogByStore = { backlog: {}, playing: {}, finished: {} };
+      stores.forEach(s => { backlogByStore.backlog[s] = 0; backlogByStore.playing[s] = 0; backlogByStore.finished[s] = 0; });
+      games.forEach(g => {
+        const st = getPersonal(g).status;
+        const store = normalizeGame(g).store;
+        const hrs = hltbMain(g) || 0;
+        if (st === "backlog") backlogByStore.backlog[store] += hrs;
+        else if (st === "playing") backlogByStore.playing[store] += hrs;
+        else if (st === "finished") backlogByStore.finished[store] += hrs;
+      });
+      setDashboardChart("chartBacklogStore", {
+        type: "bar",
+        data: {
+          labels: stores.map(s => DASH_STORE_LABELS[s] || s),
+          datasets: [
+            { label: "Backlog", data: stores.map(s => backlogByStore.backlog[s]), backgroundColor: "#64748b" },
+            { label: "Playing", data: stores.map(s => backlogByStore.playing[s]), backgroundColor: "#10b981" },
+            { label: "Finished", data: stores.map(s => backlogByStore.finished[s]), backgroundColor: "#94a3b8" },
+          ],
+        },
+        options: dashChartOptions({
+          indexAxis: "y",
+          scales: { x: { stacked: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { stacked: true, ticks: { color: "#94a3b8" }, grid: { display: false } } },
+        }),
+      });
+
+      const buckets = ["0–2h", "2–5h", "5–10h", "10–20h", "20–40h", "40h+"];
+      const bucketCounts = [0, 0, 0, 0, 0, 0];
+      games.filter(g => getPersonal(g).status === "backlog").forEach(g => {
+        const h = hltbMain(g);
+        if (h == null) return;
+        if (h <= 2) bucketCounts[0]++;
+        else if (h <= 5) bucketCounts[1]++;
+        else if (h <= 10) bucketCounts[2]++;
+        else if (h <= 20) bucketCounts[3]++;
+        else if (h <= 40) bucketCounts[4]++;
+        else bucketCounts[5]++;
+      });
+      setDashboardChart("chartHltbHist", {
+        type: "bar",
+        data: { labels: buckets, datasets: [{ label: "Backlog games", data: bucketCounts, backgroundColor: "#a855f7" }] },
+        options: dashChartOptions({ scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
+      });
+
+      const reviewBuckets = {
+        "Overwhelmingly Positive": 0, "Very Positive": 0, "Mostly Positive": 0,
+        "Mixed": 0, "Mostly Negative": 0, "Negative": 0, "Unreviewed": 0,
+      };
+      games.forEach(g => {
+        const d = g.steam_review_desc;
+        if (d && reviewBuckets[d] !== undefined) reviewBuckets[d]++;
+        else if (ratingValue(g) > 0) reviewBuckets.Mixed++;
+        else reviewBuckets.Unreviewed++;
+      });
+      const revEntries = Object.entries(reviewBuckets).filter(([, n]) => n > 0);
+      setDashboardChart("chartReviewDonut", {
+        type: "doughnut",
+        data: {
+          labels: revEntries.map(([k]) => k),
+          datasets: [{ data: revEntries.map(([, n]) => n), backgroundColor: ["#22c55e", "#34d399", "#86efac", "#fbbf24", "#f97316", "#ef4444", "#475569"].slice(0, revEntries.length), borderWidth: 0 }],
+        },
+        options: dashChartOptions({ plugins: { legend: { position: "right" } } }),
+      });
+
+      const yearCounts = {};
+      games.forEach(g => {
+        const y = (g.release_date || "").slice(0, 4);
+        if (y && /^\d{4}$/.test(y) && +y >= 1990) yearCounts[y] = (yearCounts[y] || 0) + 1;
+      });
+      const years = Object.keys(yearCounts).sort();
+      setDashboardChart("chartReleases", {
+        type: "bar",
+        data: { labels: years, datasets: [{ label: "Games", data: years.map(y => yearCounts[y]), backgroundColor: "#0ea5e9" }] },
+        options: dashChartOptions({ scales: { x: { ticks: { color: "#94a3b8", maxRotation: 45 }, grid: { display: false } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
+      });
+
+      const scatterPts = games.filter(g => ratingValue(g) > 0 && hltbMain(g) != null).map(g => ({
+        x: hltbMain(g),
+        y: ratingValue(g),
+        label: g.name,
+      }));
+      setDashboardChart("chartScatter", {
+        type: "scatter",
+        data: {
+          datasets: [{
+            label: "Games",
+            data: scatterPts.map(p => ({ x: p.x, y: p.y })),
+            backgroundColor: "rgba(56, 189, 248, 0.55)",
+            pointRadius: 4,
+          }],
+        },
+        options: dashChartOptions({
+          scales: {
+            x: { title: { display: true, text: "HLTB main (hours)", color: "#94a3b8" }, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+            y: { title: { display: true, text: "Steam review %", color: "#94a3b8" }, min: 0, max: 100, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const pt = scatterPts[ctx.dataIndex];
+                  return pt ? `${pt.label}: ${pt.x}h · ${pt.y}%` : "";
+                },
+              },
+            },
+          },
+        }),
+      });
+
+      const tagCounts = {};
+      games.forEach(g => (getPersonal(g).tags || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+      const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      setDashboardChart("chartTagsBar", {
+        type: "bar",
+        data: { labels: topTags.map(([t]) => t), datasets: [{ label: "Games", data: topTags.map(([, n]) => n), backgroundColor: "#f59e0b" }] },
+        options: dashChartOptions({
+          indexAxis: "y",
+          scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { display: false } } },
+          onClick(_evt, elements) { if (elements.length) dashDrillTag(topTags[elements[0].index][0]); },
+        }),
+      });
+    }
+
+    function renderDashboard() {
+      if (activeView !== "dashboard") return;
+      const loading = document.getElementById("dashboardLoading");
+      const content = document.getElementById("dashboardContent");
+      if (typeof Chart === "undefined") {
+        loading?.classList.remove("hidden");
+        content?.classList.add("hidden");
+        if (loading) loading.textContent = "Loading charts…";
+        return;
+      }
+      loading?.classList.add("hidden");
+      content?.classList.remove("hidden");
+      destroyDashboardCharts();
+      Chart.defaults.color = "#94a3b8";
+      Chart.defaults.borderColor = "#334155";
+      const games = dashboardLibraryGames();
+      renderDashboardKPIs(games);
+      renderDashboardCharts(games);
+      renderDashboardWishlistStats();
+      renderDashboardLists(games);
+      renderDashboardItchRecap();
+    }
+
+    function scheduleDashboardRender() {
+      clearTimeout(_dashboardRenderTimer);
+      _dashboardRenderTimer = setTimeout(renderDashboard, 80);
+    }
+
     function renderSummary() {
       const el = document.getElementById("summary");
       if (!el) return;
+      if (activeView === "dashboard") {
+        const games = dashboardLibraryGames();
+        el.innerHTML = `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Dashboard overview · <span class="text-slate-100 font-semibold ml-1">${games.length}</span> library games</div>`;
+        return;
+      }
       if (activeView === "wishlist") {
         const wl = wishlistGames;
         const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
@@ -1934,6 +2376,10 @@
     function refreshFilterUI(options) {
       renderFiltersButtonBadge();
       renderActiveFilterPills();
+      if (activeView === "dashboard") {
+        scheduleDashboardRender();
+        return;
+      }
       renderTable();
       if (options?.skipPicks) return;
       renderPicks();
@@ -1953,13 +2399,22 @@
     function updateViewChrome() {
       const isWish = activeView === "wishlist";
       const isItch = activeView === "itch";
+      const isDash = activeView === "dashboard";
       updateWishlistDrawerVisibility();
       updatePickTabsVisibility();
       updatePicksChrome();
-      document.getElementById("libraryStatusSection")?.classList.toggle("hidden", isWish);
+      document.getElementById("picksSection")?.classList.toggle("hidden", isDash);
+      document.getElementById("toolbarSection")?.classList.toggle("hidden", isDash);
+      document.getElementById("tableShell")?.classList.toggle("hidden", isDash);
+      document.getElementById("rowCount")?.classList.toggle("hidden", isDash);
+      document.getElementById("alphaNav")?.classList.toggle("dashboard-hidden", isDash);
+      document.getElementById("dashboardContainer")?.classList.toggle("hidden", !isDash);
+      document.getElementById("libraryStatusSection")?.classList.toggle("hidden", isWish || isDash);
       document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
-      document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isWish || isItch);
-      document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch);
+      document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isWish || isItch || isDash);
+      document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash);
+      if (isDash) scheduleDashboardRender();
+      else destroyDashboardCharts();
       renderSummary();
     }
 
@@ -1993,7 +2448,7 @@
     function switchView(view) {
       if (view === activeView) return;
       const fromView = activeView;
-      const label = view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : "Loading library…";
+      const label = view === "dashboard" ? "Loading dashboard…" : view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : "Loading library…";
       showViewLoading(label);
       // Two RAF ticks ensure the overlay paints before the (sometimes heavier)
       // re-render. Keeps the spinner from flickering past too fast on big libs.
@@ -2002,7 +2457,9 @@
         selectedKeys.clear();
         focusedRowIndex = 0;
         document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-        if (view === "wishlist") {
+        if (view === "dashboard") {
+          cleanupModeActive = false;
+        } else if (view === "wishlist") {
           cleanupModeActive = false;
           document.getElementById("statusFilter").value = "";
           if (fromView === "library" && prefs.picksTab && prefs.picksTab !== "wishlistDeals") {
@@ -2029,6 +2486,7 @@
         updateBulkBar();
         updateViewChrome();
         refreshFilterUI();
+        if (view !== "dashboard") renderTable();
         // Keep the overlay up just long enough to feel like a real transition,
         // not flash-then-hidden. 220ms total is the sweet spot from testing.
         setTimeout(hideViewLoading, 180);
@@ -2140,8 +2598,11 @@
       renderGenreChips();
       renderTagChips();
       renderSummary();
-      renderPicks();
-      refreshFilterUI();
+      if (activeView === "dashboard") scheduleDashboardRender();
+      else {
+        renderPicks();
+        refreshFilterUI();
+      }
     }
 
     async function fetchLibraryJson(path) {
@@ -2972,18 +3433,25 @@
       if (itchShowNonGamesEl) itchShowNonGamesEl.checked = !prefs.itchHideNonGames;
       updateCleanupBtnState();
       updateViewChrome();
-      // Library is the default landing view — make sure picksTab matches.
       if (activeView === "library" && prefs.picksTab === "wishlistDeals") {
         prefs.picksTab = prefs.libraryPicksTab || "topRated";
         savePrefs();
       }
       renderStoreChips();
       renderPicksLimitButtons();
+      const chartScript = document.querySelector('script[src*="chart.js"]');
+      if (chartScript && !chartScript.dataset.bound) {
+        chartScript.dataset.bound = "1";
+        chartScript.addEventListener("load", () => {
+          if (activeView === "dashboard") scheduleDashboardRender();
+        });
+      }
       try {
         await reloadGames();
       } catch {
         document.getElementById("meta").innerHTML = '<span class="text-amber-400">Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span>';
       }
+      if (activeView === "dashboard") scheduleDashboardRender();
     }
 
     init();

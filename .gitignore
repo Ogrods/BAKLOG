@@ -6,7 +6,12 @@ games_psn.json
 games_epic.json
 games_amazon.json
 games_wishlist.json
+games_wishlist_gog.json
 games_itch.json
+games_xbox.json
+games_battlenet.json
+games_nintendo.json
+games_ubisoft.json
 itad_prices.json
 broken_images.json
 still_missing_images.json
@@ -16,6 +21,9 @@ __pycache__/
 .venv/
 venv/
 node_modules/
+refresh.log
+.vscode/
+*.code-workspace
 
 # One-off local maintenance scripts (keep patch_store_urls.py in repo)
 check_images.py

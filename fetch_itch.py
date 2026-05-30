@@ -10,6 +10,9 @@ Notes
   until you claim each one on itch.io.
 - itch doesn't expose playtime or aggregate ratings, so those fields stay
   empty. HLTB is best-effort (most jam games won't have entries).
+- All owned keys are written to JSON (including tools, soundtracks, etc.).
+  The dashboard itch.io tab hides non-games by default; use the filter toggle
+  to show everything.
 """
 
 from __future__ import annotations
@@ -29,7 +32,6 @@ from itch_client import ItchApiError, ItchAuthError, ItchClient
 
 GAMES_ITCH_JSON = Path("games_itch.json")
 HLTB_DELAY_SEC = 1.0
-SKIP_CLASSIFICATIONS = {"tool", "assets", "comic", "book", "soundtrack", "physical_game", "other"}
 
 
 def _configure_stdout() -> None:
@@ -131,11 +133,6 @@ def main() -> int:
         help="Only HLTB-lookup games not already in games_itch.json",
     )
     parser.add_argument(
-        "--include-tools",
-        action="store_true",
-        help="Include non-game classifications (tools, assets, comics, books, soundtracks)",
-    )
-    parser.add_argument(
         "--min-price",
         type=int,
         default=None,
@@ -171,24 +168,16 @@ def main() -> int:
         print("No owned games returned from itch.io.", file=sys.stderr)
         return 2
 
-    print(f"Found {len(keys)} owned games.")
+    print(f"Found {len(keys)} owned keys.")
 
-    # Filter classifications + price
     filtered: list[dict] = []
-    skipped_class = 0
     skipped_price = 0
     for entry in keys:
         game = entry.get("game") or {}
-        classification = game.get("classification")
-        if not args.include_tools and classification in SKIP_CLASSIFICATIONS:
-            skipped_class += 1
-            continue
         if args.min_price is not None and (game.get("min_price") or 0) < args.min_price:
             skipped_price += 1
             continue
         filtered.append(entry)
-    if skipped_class:
-        print(f"  filtered {skipped_class} non-game items (tools/comics/etc); use --include-tools to keep")
     if skipped_price:
         print(f"  filtered {skipped_price} items below --min-price")
 

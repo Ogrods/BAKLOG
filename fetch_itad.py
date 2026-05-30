@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fetch current prices from IsThereAnyDeal for library + wishlist titles."""
+"""Fetch current prices from IsThereAnyDeal for the wishlist.
+
+By default we only look up wishlist titles - those are the ones where a price
+drop matters. Pass ``--include-library`` to also look up every owned game.
+"""
 
 import argparse
 import json
@@ -31,8 +35,8 @@ def _configure_stdout() -> None:
             pass
 
 
-def _collect_titles() -> list[tuple[str, str]]:
-    """(lookup_key, title) — lookup_key is store:id or wishlist:appid."""
+def _collect_titles(include_library: bool) -> list[tuple[str, str]]:
+    """(lookup_key, title) - lookup_key is store:id or wishlist:appid."""
     seen: set[str] = set()
     out: list[tuple[str, str]] = []
 
@@ -42,24 +46,25 @@ def _collect_titles() -> list[tuple[str, str]]:
         seen.add(key)
         out.append((key, title.strip()))
 
-    for path in LIBRARY_FILES:
-        p = Path(path)
-        if not p.exists():
-            continue
-        data = json.loads(p.read_text(encoding="utf-8"))
-        store = data.get("store") or path.replace("games_", "").replace(".json", "")
-        for g in data.get("games", []):
-            gid = g.get("id") or g.get("appid")
-            if gid is None:
-                continue
-            add(f"{store}:{gid}", g.get("name") or "")
-
     wp = Path(WISHLIST_FILE)
     if wp.exists():
         data = json.loads(wp.read_text(encoding="utf-8"))
         for g in data.get("games", []):
             appid = g.get("appid") or g.get("id")
             add(f"wishlist:{appid}", g.get("name") or "")
+
+    if include_library:
+        for path in LIBRARY_FILES:
+            p = Path(path)
+            if not p.exists():
+                continue
+            data = json.loads(p.read_text(encoding="utf-8"))
+            store = data.get("store") or path.replace("games_", "").replace(".json", "")
+            for g in data.get("games", []):
+                gid = g.get("id") or g.get("appid")
+                if gid is None:
+                    continue
+                add(f"{store}:{gid}", g.get("name") or "")
 
     return out
 
@@ -68,6 +73,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch ITAD prices into itad_prices.json")
     parser.add_argument("--country", default="US", help="ITAD country code (default US)")
     parser.add_argument("--limit", type=int, default=0, help="Max titles (0 = all)")
+    parser.add_argument(
+        "--include-library",
+        action="store_true",
+        help="Also look up every owned game (slow; default is wishlist only).",
+    )
     args = parser.parse_args()
     _configure_stdout()
     load_dotenv()
@@ -76,10 +86,11 @@ def main() -> int:
         print("Set ITAD_API_KEY in .env (free key from https://isthereanydeal.com/dev/api/)", file=sys.stderr)
         return 1
 
-    titles = _collect_titles()
+    titles = _collect_titles(include_library=args.include_library)
     if args.limit:
         titles = titles[: args.limit]
-    print(f"Looking up ITAD prices for {len(titles)} titles...")
+    scope = "library + wishlist" if args.include_library else "wishlist"
+    print(f"Looking up ITAD prices for {len(titles)} {scope} titles...")
 
     try:
         client = ItadClient(api_key, country=args.country)
@@ -91,9 +102,15 @@ def main() -> int:
     for i, (key, title) in enumerate(titles, 1):
         if i % 25 == 0 or i == 1:
             print(f"[{i}/{len(titles)}] {title[:50]}")
-        plain = client.lookup_title(title)
-        if plain:
-            plain_by_key[key] = plain
+        appid = None
+        if key.startswith("steam:") or key.startswith("wishlist:"):
+            try:
+                appid = int(key.split(":", 1)[1])
+            except ValueError:
+                appid = None
+        game_id = client.lookup_title(title, appid=appid)
+        if game_id:
+            plain_by_key[key] = game_id
 
     print(f"Resolved {len(plain_by_key)} ITAD ids. Fetching prices...")
     plains = list(set(plain_by_key.values()))

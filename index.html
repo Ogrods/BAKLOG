@@ -480,7 +480,9 @@
       border-radius: 999px;
       line-height: 1.2;
     }
-    .deal-hero-stat-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .deal-hero-stat-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; background: #94a3b8; }
+    .deal-hero-stat-dot-review { background: #34d399; }
+    .deal-hero-stat-dot-hltb { background: #38bdf8; }
     .deal-hero-genres { font-size: 0.7rem; color: #94a3b8; line-height: 1.3; }
     .deal-badge-low { font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.35); }
     /* Sale scoreboard card */
@@ -513,12 +515,12 @@
     .sale-bucket-medium { background: #34d399; }
     .sale-bucket-deep { background: #fbbf24; }
     .sale-bucket-huge { background: linear-gradient(90deg, #f472b6 0%, #ec4899 100%); }
-    .sale-distribution-legend { display: flex; justify-content: space-between; gap: 0.4rem; margin-top: 0.4rem; font-size: 0.65rem; color: #cbd5e1; }
-    .sale-distribution-tick { display: inline-flex; align-items: center; gap: 0.3rem; flex: 1; min-width: 0; }
+    .sale-distribution-legend { display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.65rem; color: #cbd5e1; flex-wrap: wrap; }
+    .sale-distribution-tick { display: inline-flex; align-items: center; gap: 0.35rem; flex: 0 0 auto; min-width: 0; }
     .sale-distribution-tick-empty { color: #64748b; }
     .sale-distribution-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
     .sale-distribution-tick-label { color: inherit; }
-    .sale-distribution-tick-count { margin-left: auto; font-variant-numeric: tabular-nums; color: #f1f5f9; font-weight: 700; }
+    .sale-distribution-tick-count { font-variant-numeric: tabular-nums; color: #f1f5f9; font-weight: 700; }
     .sale-distribution-tick-empty .sale-distribution-tick-count { color: #64748b; font-weight: 500; }
     /* Co-op spotlight */
     .coop-spotlight-header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
@@ -649,7 +651,7 @@
     .steal-list { display: flex; flex-direction: column; gap: 0.2rem; }
     .steal-row {
       display: grid;
-      grid-template-columns: 22px 1fr auto auto auto;
+      grid-template-columns: 22px minmax(0, 1fr) auto auto auto auto;
       align-items: center;
       gap: 0.4rem;
       padding: 0.25rem 0.35rem;
@@ -669,14 +671,100 @@
     .steal-row-low { color: #fbbf24; font-size: 0.7rem; line-height: 1; }
     .steal-row-cut { color: #34d399; font-weight: 700; font-size: 0.72rem; }
     .steal-row-price { color: #cbd5e1; font-variant-numeric: tabular-nums; font-size: 0.72rem; min-width: 38px; text-align: right; }
+    .steal-row-shop {
+      font-size: 0.6rem; font-weight: 600; letter-spacing: 0.02em;
+      padding: 0.05rem 0.35rem; border-radius: 999px;
+      background: rgba(71, 85, 105, 0.55); color: #cbd5e1; border: 1px solid rgba(100, 116, 139, 0.5);
+      max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      line-height: 1.25;
+    }
+    .steal-row-shop-steam { background: rgba(234, 88, 12, 0.18); color: #fdba74; border-color: rgba(249, 115, 22, 0.4); }
+    .steal-row-shop-gog { background: rgba(109, 40, 217, 0.22); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.45); }
+    .steal-row-shop-humble { background: rgba(202, 28, 28, 0.18); color: #fca5a5; border-color: rgba(220, 38, 38, 0.45); }
+    .steal-row-shop-fanatical { background: rgba(220, 38, 38, 0.18); color: #fecaca; border-color: rgba(248, 113, 113, 0.45); }
+    .steal-row-shop-gmg { background: rgba(132, 204, 22, 0.18); color: #d9f99d; border-color: rgba(163, 230, 53, 0.45); }
+    .steal-row-shop-indiegala { background: rgba(244, 114, 182, 0.18); color: #fbcfe8; border-color: rgba(236, 72, 153, 0.45); }
+    .steal-row-shop-microsoft { background: rgba(16, 124, 16, 0.22); color: #bbf7d0; border-color: rgba(34, 197, 94, 0.45); }
+    .steal-row-shop-epic { background: rgba(15, 23, 42, 0.55); color: #e2e8f0; border-color: rgba(148, 163, 184, 0.45); }
+    .steal-row-shop-ubisoft { background: rgba(20, 142, 255, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.45); }
+    .steal-row-shop-ea { background: rgba(245, 158, 11, 0.18); color: #fde68a; border-color: rgba(217, 119, 6, 0.45); }
+    .steal-row-shop-battlenet { background: rgba(20, 142, 255, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.45); }
+    .steal-row-shop-nintendo { background: rgba(230, 0, 18, 0.22); color: #fecaca; border-color: rgba(239, 68, 68, 0.5); }
+    .steal-row-shop-psn { background: rgba(0, 55, 145, 0.32); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.5); }
+    .steal-row-shop-gamersgate { background: rgba(56, 189, 248, 0.18); color: #bae6fd; border-color: rgba(14, 165, 233, 0.45); }
+    .steal-row-shop-gamesplanet { background: rgba(34, 197, 94, 0.18); color: #bbf7d0; border-color: rgba(22, 163, 74, 0.45); }
     .steal-list-footer { margin-top: auto; font-size: 0.7rem; color: #64748b; cursor: pointer; user-select: none; transition: color 0.1s ease; }
     .steal-list-footer:hover { color: #38bdf8; }
     .dash-chart-wrap { position: relative; height: 260px; }
     .dash-chart-wrap.tall { height: 320px; }
     .table-hide-score .col-score { display: none; }
-    .dash-itch-recap { color: #cbd5e1; line-height: 1.5; }
+    .dash-itch-recap { color: #cbd5e1; line-height: 1.5; display: flex; flex-direction: column; gap: 0.65rem; flex: 1; min-height: 0; }
     .dash-itch-recap strong { color: #ffffff; font-weight: 600; }
     .dash-itch-recap .dash-itch-muted { color: #94a3b8; font-size: 0.75rem; margin-top: 0.35rem; }
+    .itch-distribution { display: flex; flex-direction: column; gap: 0.3rem; flex: 0 0 auto; }
+    .itch-distribution-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
+    .itch-seg-rated, .sale-distribution-swatch.itch-seg-rated { background: #22c55e; }
+    .itch-seg-unrated, .sale-distribution-swatch.itch-seg-unrated { background: #64748b; }
+    .itch-seg-non, .sale-distribution-swatch.itch-seg-non { background: #8b5cf6; }
+    .itch-distribution .sale-distribution-legend { justify-content: flex-start; gap: 0.9rem; flex-wrap: wrap; }
+    .itch-distribution .sale-distribution-tick { flex: 0 0 auto; gap: 0.35rem; }
+    .itch-distribution .sale-distribution-tick-count { margin-left: 0; }
+    .itch-hero { display: flex; flex-direction: column; gap: 0.35rem; flex: 0 0 auto; }
+    .itch-hero-label { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
+    .itch-hero-shuffle {
+      background: transparent; border: 1px solid rgb(71 85 105); color: #94a3b8;
+      border-radius: 4px; padding: 0.05rem 0.4rem; cursor: pointer;
+      font-size: 0.85rem; line-height: 1; opacity: 0.85;
+    }
+    .itch-hero-shuffle:hover { opacity: 1; color: #e2e8f0; }
+    .itch-hero-card {
+      display: flex; gap: 0.65rem; align-items: stretch;
+      background: rgba(51, 65, 85, 0.35); border: 1px solid rgba(71, 85, 105, 0.6);
+      border-radius: 6px; padding: 0.5rem; cursor: pointer; text-align: left;
+      width: 100%; transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    }
+    .itch-hero-card:hover { background: rgba(51, 65, 85, 0.55); border-color: rgba(71, 85, 105, 0.9); transform: translateY(-1px); }
+    .itch-hero-cover { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; background: #1e293b; flex-shrink: 0; }
+    .itch-hero-body { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1; }
+    .itch-hero-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+    .itch-hero-name { color: #f1f5f9; font-size: 0.9rem; font-weight: 600; line-height: 1.25; }
+    .itch-hero-rating { color: #34d399; font-weight: 700; font-size: 0.8rem; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .itch-hero-meta { color: #94a3b8; font-size: 0.72rem; }
+    .itch-hero-desc {
+      color: #cbd5e1; font-size: 0.72rem; line-height: 1.35; margin: 0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .itch-hero-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.1rem; }
+    .itch-hero-tag {
+      background: rgba(99, 102, 241, 0.15); color: #c7d2fe;
+      border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 3px;
+      padding: 0.05rem 0.35rem; font-size: 0.65rem;
+    }
+    .itch-hero-empty {
+      color: #94a3b8; font-size: 0.72rem; padding: 0.5rem; border: 1px dashed rgba(71, 85, 105, 0.6); border-radius: 6px;
+    }
+    .itch-breakdown { display: flex; flex-direction: column; gap: 0.35rem; flex: 1 1 auto; min-height: 0; }
+    .itch-breakdown-list { display: flex; flex-direction: column; justify-content: space-around; gap: 0.25rem; flex: 1; }
+    .itch-breakdown-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto;
+      align-items: center; gap: 0.4rem;
+      background: transparent; border: none; padding: 0.25rem 0.25rem; border-radius: 4px;
+      cursor: pointer; text-align: left; width: 100%; color: inherit;
+    }
+    .itch-breakdown-row:hover { background: rgba(51, 65, 85, 0.45); }
+    .itch-breakdown-row-static { cursor: default; }
+    .itch-breakdown-row-static:hover { background: transparent; }
+    .itch-breakdown-name { font-size: 0.72rem; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .itch-breakdown-bar {
+      height: 8px; background: rgba(15, 23, 42, 0.6); border-radius: 4px; overflow: hidden; min-width: 50px;
+    }
+    .itch-breakdown-fill {
+      display: block; height: 100%; border-radius: 3px;
+    }
+    .itch-bar-class { background: #8b5cf6; }
+    .itch-bar-genre { background: #38bdf8; }
+    .itch-breakdown-count { font-size: 0.72rem; color: #94a3b8; font-variant-numeric: tabular-nums; min-width: 1.5rem; text-align: right; }
+    .itch-footer { margin-top: auto; display: flex; }
     .dash-list-row {
       display: flex;
       gap: 0.5rem;
@@ -809,7 +897,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Top rated unplayed</h3><div id="dashTopRated"></div></div>
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Quick wins</h3><div id="dashQuickWins"></div></div>
-          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3><div id="dashItchRecap" class="dash-itch-recap text-sm"></div><div id="dashItchChartWrap" class="dash-chart-wrap mt-3"><canvas id="chartItchStatus"></canvas></div></div>
+          <div class="dash-card dash-card-itch"><h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3><div id="dashItchRecap" class="dash-itch-recap text-sm"></div></div>
         </div>
       </div>
     </section>

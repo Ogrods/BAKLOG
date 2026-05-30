@@ -58,16 +58,43 @@ def _release_date(game: dict) -> str | None:
     return None
 
 
+_ITCH_NOISE_GENRES = {
+    "default", "html", "html5", "flash", "java", "unity", "godot",
+    "physical_game", "physical game", "assets", "asset_pack", "asset pack",
+    "tool", "book", "comic", "soundtrack", "other", "game",
+}
+
+
 def _genres(game: dict) -> list[str]:
+    """Collect itch.io tags as genres, filtering out classification/engine noise.
+
+    The itch.io owned-keys API does not expose real genres in the listing
+    endpoint - the ``classification`` field already captures format (game vs.
+    tool vs. soundtrack, etc.) and ``type`` is engine metadata (html, flash).
+    Neither belongs in the genres array. Tags array (if present) holds real
+    genre-ish tags such as "shooter" or "platformer".
+    """
+
     genres: list[str] = []
-    classification = game.get("classification")
-    if classification and classification != "game":
-        genres.append(classification)
-    for key in ("genre", "type"):
+    for key in ("tags", "tag_list"):
         val = game.get(key)
-        if isinstance(val, str) and val:
-            genres.append(val)
-    return list(dict.fromkeys(genres))
+        if isinstance(val, list):
+            for item in val:
+                if isinstance(item, str) and item.strip():
+                    genres.append(item.strip())
+        elif isinstance(val, str) and val.strip():
+            genres.append(val.strip())
+    cleaned = []
+    seen = set()
+    for g in genres:
+        norm = g.strip().lower()
+        if not norm or norm in _ITCH_NOISE_GENRES:
+            continue
+        if norm in seen:
+            continue
+        seen.add(norm)
+        cleaned.append(g)
+    return cleaned
 
 
 def _build_row(entry: dict, hltb: dict | None) -> dict | None:

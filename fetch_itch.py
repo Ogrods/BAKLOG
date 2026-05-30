@@ -18,15 +18,22 @@ Notes
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
 
+from fetchers._base import (
+    add_dry_run_arg,
+    add_hltb_args,
+    configure_stdout,
+    load_existing_games,
+    merge_cached_row,
+    print_id_diff,
+    write_games_json,
+)
 from hltb_client import HltbClient
 from itch_client import ItchApiError, ItchAuthError, ItchClient
 
@@ -41,14 +48,6 @@ FETCHER_AUTHORITATIVE = frozenset({
     "classification", "min_price", "in_press_system",
     "download_key_id", "purchase_id",
 })
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _release_date(game: dict) -> str | None:
@@ -126,51 +125,18 @@ def _build_row(entry: dict, hltb: dict | None) -> dict | None:
     return row
 
 
-def _merge_cached_row(fresh: dict, cached: dict | None, *, hltb_updated: bool = False) -> dict:
-    """Overlay itch-authoritative fields onto cached row, preserving enrichment."""
-    if not cached:
-        return fresh
-    merged = dict(cached)
-    for key in FETCHER_AUTHORITATIVE:
-        if key in fresh:
-            merged[key] = fresh[key]
-    if hltb_updated:
-        for key in (
-            "hltb_main_hours", "hltb_main_extra_hours", "hltb_completionist_hours",
-            "hltb_match_confidence", "hltb_name",
-        ):
-            merged[key] = fresh.get(key)
-    return merged
-
-
-def load_existing() -> dict[str, dict]:
-    if not GAMES_ITCH_JSON.exists():
-        return {}
-    data = json.loads(GAMES_ITCH_JSON.read_text(encoding="utf-8"))
-    return {str(g["id"]): g for g in data.get("games", [])}
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch itch.io library into games_itch.json")
-    parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups (recommended for itch)")
-    parser.add_argument(
-        "--only-new",
-        action="store_true",
-        help="Only HLTB-lookup games not already in games_itch.json",
-    )
+    add_hltb_args(parser)
     parser.add_argument(
         "--min-price",
         type=int,
         default=None,
         help="Skip games whose listed min_price is below this (in cents). Useful to drop free jam games.",
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print summary diff and skip writing games_itch.json",
-    )
+    add_dry_run_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     load_dotenv()
 
     api_key = os.getenv("ITCH_API_KEY", "").strip()
@@ -213,7 +179,7 @@ def main() -> int:
         print(f"  filtered {skipped_price} items below --min-price")
 
     hltb_client = HltbClient()
-    existing = load_existing()
+    existing = load_existing_games(GAMES_ITCH_JSON)
     games_out: list[dict] = []
 
     for i, entry in enumerate(filtered, 1):
@@ -247,12 +213,18 @@ def main() -> int:
 
         row = _build_row(entry, hltb)
         if row:
-            games_out.append(_merge_cached_row(row, cached, hltb_updated=hltb_updated))
+            games_out.append(
+                merge_cached_row(
+                    row,
+                    cached,
+                    authoritative=FETCHER_AUTHORITATIVE,
+                    hltb_updated=hltb_updated,
+                )
+            )
 
     existing_ids = set(existing.keys())
     new_ids = {str(g["id"]) for g in games_out}
-    added = new_ids - existing_ids
-    removed = existing_ids - new_ids
+    print_id_diff(existing_ids, new_ids)
     preserved_enrichment = sum(
         1 for g in games_out
         if existing.get(str(g["id"]))
@@ -262,29 +234,16 @@ def main() -> int:
             or g.get("metacritic_score") is not None
         )
     )
-
-    print(f"\nSummary: {len(games_out)} rows ({len(added)} new, {len(removed)} dropped from file)")
     if preserved_enrichment:
         print(f"  {preserved_enrichment} rows kept enrichment from cache (reviews/HLTB/metacritic)")
-    if added:
-        print(f"  New ids: {len(added)}")
-    if removed:
-        print(f"  Removed ids: {len(removed)}")
 
     if args.dry_run:
         print("\nDry run — not writing games_itch.json.")
         return 0
 
-    payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "store": "itch",
-        "game_count": len(games_out),
-        "games": sorted(games_out, key=lambda g: g["name"].lower()),
-    }
-    GAMES_ITCH_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    print(f"\nWrote {len(games_out)} games to {GAMES_ITCH_JSON}.")
+    sorted_games = sorted(games_out, key=lambda g: g["name"].lower())
+    write_games_json(GAMES_ITCH_JSON, store="itch", games=sorted_games)
+    print(f"\nWrote {len(sorted_games)} games to {GAMES_ITCH_JSON}.")
     print("Reload the dashboard to see your itch.io library.")
     return 0
 

@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-29
+
+### Added
+
+- **Phase 0 refactor:** `js/state.js` + `js/app.js` (ESM); dashboard logic moved out of inline `<script>`
+- `shared/json_util.py` — strips null enrichment stubs when writing `games_*.json`
+- `fetchers/_base.py` — shared fetcher helpers (stdout, HLTB/dry-run args, cache merge, JSON write)
+- `enrichers` package — `python -m enrichers hltb|steam-reviews|cross-store-images`
+- `pyproject.toml` + `tests/` (pytest for JSON slim + dedup name normalization)
+- `tools/split_index_js.py` — re-extract script from HTML if needed
+
+### Changed
+
+- `fetch_itch.py` uses `fetchers._base` and slim JSON output
+
 ## [0.4.0] - 2026-05-29
 
 ### Added

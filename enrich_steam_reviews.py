@@ -1,14 +1,17 @@
 """Backfill steam_review_percent for non-Steam library rows.
 
-For each game in games_gog.json / games_epic.json / games_psn.json that lacks
-a steam_review_percent, search Steam's store for a matching title, then pull
-the review summary. Saves a small mapping file so repeat runs are fast.
+For each game in games_gog.json / games_epic.json / games_psn.json / games_itch.json
+that lacks a steam_review_percent, search Steam's store for a matching title, then
+pull the review summary. Saves a small mapping file so repeat runs are fast.
+
+itch.io: only rows with classification == "game" (skips TTRPG PDFs, assets, tools).
 """
 
 import json
 import re
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import requests
@@ -22,10 +25,15 @@ SEARCH_DELAY_SEC = 1.0
 SEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
 
-STORE_FILES = [
-    ("games_gog.json", "gog"),
-    ("games_epic.json", "epic"),
-    ("games_psn.json", "psn"),
+def _itch_is_videogame(row: dict) -> bool:
+    return row.get("classification") == "game"
+
+
+STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
+    ("games_gog.json", "gog", None),
+    ("games_epic.json", "epic", None),
+    ("games_psn.json", "psn", None),
+    ("games_itch.json", "itch", _itch_is_videogame),
 ]
 
 
@@ -96,8 +104,25 @@ def steam_appids_by_id() -> set[int]:
 
 
 def main() -> int:
+    import argparse
     from dotenv import load_dotenv
     import os
+
+    parser = argparse.ArgumentParser(description="Backfill Steam review fields on non-Steam library JSON.")
+    parser.add_argument(
+        "--stores",
+        nargs="+",
+        choices=["gog", "epic", "psn", "itch"],
+        metavar="STORE",
+        help="Only process these stores (default: all). Example: --stores itch",
+    )
+    args = parser.parse_args()
+
+    store_files = STORE_FILES
+    if args.stores:
+        wanted = set(args.stores)
+        store_files = [row for row in STORE_FILES if row[1] in wanted]
+
     load_dotenv()
     api_key = os.getenv("STEAM_API_KEY", "").strip()
     steam_id = os.getenv("STEAM_ID", "").strip()
@@ -109,15 +134,18 @@ def main() -> int:
     mapping = load_mapping()
     owned_ids = steam_appids_by_id()
 
-    for filename, store in STORE_FILES:
+    for filename, store, row_filter in store_files:
         path = Path(filename)
         if not path.exists():
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         games = data.get("games", [])
-        print(f"\n=== {filename} ({len(games)} games) ===")
+        eligible = [g for g in games if row_filter is None or row_filter(g)]
+        print(f"\n=== {filename} ({len(eligible)} eligible / {len(games)} rows) ===")
         updated = 0
         for i, g in enumerate(games, 1):
+            if row_filter is not None and not row_filter(g):
+                continue
             if g.get("steam_review_percent") is not None:
                 continue
             key = f"{store}:{g['id']}"

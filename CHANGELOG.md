@@ -6,6 +6,31 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Epic Games library fetcher (`fetch_epic.py`, `epic_client.py`)
+- Amazon Prime Gaming fetcher (`fetch_amazon.py`, `amazon_client.py`) via local SQLite
+- Xbox / Game Pass / Microsoft Store fetcher (`fetch_xbox.py`, `xbox_client.py`) via OpenXBL
+- Battle.net fetcher (`fetch_battlenet.py`, `battlenet_client.py`) via unofficial cookie scrape
+- Ubisoft Connect fetcher (`fetch_ubisoft.py`, `ubisoft_client.py`) via unofficial API headers
+- Nintendo Switch fetcher (`fetch_nintendo.py`, `nintendo_client.py`) via eShop transactions (~2yr history; older/cartridge = manual Add Game)
+- itch.io quarantine tab: `itchGames` array separate from `allGames`; Top Rated picks only; summary chip shows game count vs total keys
+- itch.io non-game filter pill ("Hide tools, soundtracks, etc.") default-on; fetcher imports all owned keys
+- Live service status in row dropdown, bulk toolbar, sidebar filter, and keyboard shortcut (`L`)
+- A–Z jump nav pinned to right edge (`#` bucket for non-letter titles); dims unused letters
+- Status breakdown chips in Library and itch.io summary rows (click to filter by status)
+- Wishlist Deals tab sorts by post-sale price ascending (cheapest first)
+- Deal discount badge styling tiers: ≥50% gradient glow, ≥75% animated gradient
+- `enrich_steam_reviews.py --stores itch` backfills Steam review % on itch.io game-class rows
+- `enrich_hltb.py` backfill script for any `games_*.json` row missing HLTB hours
+
+### Changed
+
+- Top-stats itch.io chip on Library tab shows videogame count only (not TTRPG/tools total)
+- `refresh.ps1` clears log before run, includes itch Steam-review enrich step
+- `.gitignore` covers Xbox, Battle.net, Nintendo, Ubisoft, GOG wishlist JSON outputs
+- README documents all 11 data sources and enrichment scripts
+
+### Added (earlier unreleased)
+
 - Wishlist becomes a deal radar: dedicated drawer section with On sale only, Historical low only, Hide already-owned (cross-store), Min discount %, and Max price filters
 - Default sort on first wishlist visit is Discount % desc, plus a deal-stat row count (e.g. "12 on sale, 3 at historical low")
 - New "Wishlist Deals" Picks tab ranks wishlist items by deal score (discount + historical-low bonus + rating bonus, owned-elsewhere penalty); clicking a card switches view and focuses the row

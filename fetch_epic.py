@@ -21,6 +21,20 @@ GAMES_EPIC_JSON = Path("games_epic.json")
 HLTB_DELAY_SEC = 1.0
 CATALOG_WORKERS = 16
 
+# Manual denylist of (namespace, catalogItemId) for entries Epic's catalog
+# classifies as "games" but are really cosmetics/DLC/soundtracks. Add a tuple
+# here whenever the library picks up junk you don't want to see again.
+DENYLIST: set[tuple[str, str]] = {
+    # Q.U.B.E. 2 cosmetic/DLC/soundtrack — main game has its own catalog id.
+    ("4b5f1eb366dc45f0920d397c01b291ba", "8d644d777e5042c187c03530b965dc17"),  # Glove Skin
+    ("4b5f1eb366dc45f0920d397c01b291ba", "ade772fcce3a41cf97279032c10b0041"),  # Puzzle Pack 1
+    ("4b5f1eb366dc45f0920d397c01b291ba", "b36ab3b81c844ee2a908c7d28451337a"),  # Puzzle Pack 2
+    ("4b5f1eb366dc45f0920d397c01b291ba", "8c8ee5e50c7c42a7b59a9ee8c31c0330"),  # Q.U.B.E. 2 Soundtrack
+    ("7015c51a49be4592b5ba3ae2577723c5", "ca31f80025ea4466b871ba11184bc74b"),  # Map Pack (DLC)
+    ("f4a904fcef2447439c35c4e6457f3027", "678578f8abe84265b0d5f81c1997c6da"),  # Death Stranding Content (DLC bundle)
+    ("f4a904fcef2447439c35c4e6457f3027", "c7bad4fcef1e4188b36732ed4bdf8103"),  # Death Stranding Digital Soundtrack
+}
+
 LIBRARY_IMAGE_TYPES = (
     "DieselGameBoxTall",
     "Thumbnail",
@@ -184,6 +198,8 @@ def _build_game_row_from_record(
     ns = rec.get("namespace")
     cid = rec.get("catalogItemId")
     if not ns or not cid:
+        return None
+    if (str(ns), str(cid)) in DENYLIST:
         return None
     if catalog_item:
         row = _build_game_row(str(cid), str(ns), catalog_item, hltb)

@@ -156,6 +156,15 @@ function dashDrillStatus(status) {
   c('refreshFilterUI')();
 }
 
+function dashDrillStoreStatus(store, status) {
+  state.prefs.storeFilter = store || "";
+  document.getElementById("statusFilter").value = status || "";
+  c('savePrefs')();
+  c('switchView')("library");
+  c('renderStoreChips')();
+  c('refreshFilterUI')();
+}
+
 function dashDrillGenre(genre) {
   if (!state.prefs.genreFilters.includes(genre)) state.prefs.genreFilters.push(genre);
   c('savePrefs')();
@@ -289,7 +298,7 @@ function renderDashboardKPIs(games) {
   const rated = games.filter(g => c('ratingValue')(g) > 0);
   const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + c('ratingValue')(g), 0) / rated.length) : "—";
   const wlDeals = state.wishlistGames.filter(g => { const d = c('getDealInfo')(g); return d && (d.cut || 0) > 0; }).length;
-  const itchGameCount = state.itchGames.filter(itchIsGame).length;
+  const itchGameCount = state.itchGames.filter(c('itchIsGame')).length;
   const stores = new Set(games.map(g => c('normalizeGame')(g).store)).size;
   const wishlistCount = state.wishlistGames.length;
   const kpis = [
@@ -367,7 +376,7 @@ function renderDashboardWishlistStats() {
   }
   const avgCut = onSale.length ? Math.round(cutSum / onSale.length) : 0;
 
-  const steals = wl.filter(isStealDeal);
+  const steals = wl.filter(c('isStealDeal'));
 
   el.innerHTML = [
     topDeal ? c('dealHeroCardHtml')(topDeal) : c('dealHeroEmptyHtml')(),
@@ -398,7 +407,7 @@ function renderDashboardItchRecap() {
     }
     return;
   }
-  const gamesOnly = state.itchGames.filter(itchIsGame);
+  const gamesOnly = state.itchGames.filter(c('itchIsGame'));
   const rated = gamesOnly.filter(g => c('ratingValue')(g) > 0).length;
   const unrated = gamesOnly.length - rated;
   const nonGames = total - gamesOnly.length;
@@ -487,8 +496,6 @@ function renderDashboardCharts(games) {
         label: "Games",
         data: topGenres.map(([, n]) => n),
         backgroundColor: "#38bdf8",
-        borderRadius: 6,
-        borderSkipped: false,
       }],
     },
     options: dashChartOptions({
@@ -531,8 +538,6 @@ function renderDashboardCharts(games) {
           label: "Finished",
           data: sortedStores.map(s => backlogByStore.finished[s]),
           backgroundColor: storeBrandColors.map(c => c + "55"),
-          borderRadius: 6,
-          borderSkipped: false,
         },
       ],
     },
@@ -541,6 +546,17 @@ function renderDashboardCharts(games) {
       layout: { padding: { right: 60 } },
       plugins: { legend: { display: false } },
       scales: { x: { stacked: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { stacked: true, ticks: { color: "#94a3b8" }, grid: { display: false } } },
+      onHover(evt, elements) {
+        const canvas = evt.native?.target;
+        if (canvas) canvas.style.cursor = elements.length ? "pointer" : "default";
+      },
+      onClick(_evt, elements) {
+        if (!elements.length) return;
+        const el = elements[0];
+        const store = sortedStores[el.index];
+        const status = el.datasetIndex === 0 ? "backlog" : "finished";
+        dashDrillStoreStatus(store, status);
+      },
     }),
     plugins: [makeBarEndLabelsPlugin(i => {
       const s = sortedStores[i];

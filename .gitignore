@@ -6,6 +6,7 @@ games_epic.json
 games_amazon.json
 games_wishlist.json
 games_wishlist_gog.json
+games_wishlist_epic.json
 games_itch.json
 games_xbox.json
 games_battlenet.json
@@ -21,8 +22,10 @@ __pycache__/
 venv/
 node_modules/
 refresh.log
+enrich_hltb_run.log
 .vscode/
 *.code-workspace
+data/
 
 # One-off local maintenance scripts
 check_images.py

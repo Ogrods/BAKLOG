@@ -40,6 +40,21 @@ def _parse_release_date(data: dict) -> str | None:
     return rd.get("date") or None
 
 
+def _coop_flags_from_categories(categories: list[dict] | None) -> tuple[bool, bool]:
+    """Return (coop_online, coop_local) by scanning Steam category descriptions.
+
+    Steam categories include "Co-op", "Online Co-op", "Shared/Split Screen Co-op",
+    and "LAN Co-op". We treat LAN Co-op as online. A bare "Co-op" with no flavor
+    sets both flags to False (unknown flavor) so the UI doesn't mislabel it.
+    """
+    if not categories:
+        return (False, False)
+    names = {str(c.get("description") or "").strip().lower() for c in categories}
+    online = "online co-op" in names or "lan co-op" in names
+    local = "shared/split screen co-op" in names
+    return (online, local)
+
+
 def _build_game_row(
     owned: dict,
     details: dict | None,
@@ -61,7 +76,6 @@ def _build_game_row(
                 "release_date": None,
                 "genres": [],
                 "tags": [],
-                "metacritic_score": None,
                 "steam_review_percent": None,
                 "steam_review_count": None,
                 "steam_review_desc": None,
@@ -83,9 +97,9 @@ def _build_game_row(
         return None
 
     genres = [g["description"] for g in details.get("genres", [])]
-    tags = []
-    if details.get("categories"):
-        tags = [c["description"] for c in details["categories"][:8]]
+    categories = details.get("categories") or []
+    tags = [c["description"] for c in categories[:16]]
+    coop_online, coop_local = _coop_flags_from_categories(categories)
 
     price = details.get("price_overview") or {}
 
@@ -100,7 +114,8 @@ def _build_game_row(
         "release_date": _parse_release_date(details),
         "genres": genres,
         "tags": tags,
-        "metacritic_score": (details.get("metacritic") or {}).get("score"),
+        "coop_online": coop_online,
+        "coop_local": coop_local,
         "steam_review_percent": (reviews or {}).get("percent_positive"),
         "steam_review_count": (reviews or {}).get("total_reviews"),
         "steam_review_desc": (reviews or {}).get("review_score_desc"),

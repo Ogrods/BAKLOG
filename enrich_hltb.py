@@ -13,6 +13,7 @@ import argparse
 import json
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from hltb_client import HltbClient
@@ -29,6 +30,10 @@ STORE_FILES = [
     ("games_psn.json", "psn"),
     ("games_epic.json", "epic"),
     ("games_amazon.json", "amazon"),
+    ("games_xbox.json", "xbox"),
+    ("games_battlenet.json", "battlenet"),
+    ("games_ubisoft.json", "ubisoft"),
+    ("games_nintendo.json", "nintendo"),
     ("games_wishlist.json", "wishlist"),
 ]
 
@@ -52,6 +57,7 @@ def load_mapping() -> dict:
 
 
 def save_mapping(mapping: dict) -> None:
+    mapping["fetched_at"] = datetime.now(timezone.utc).isoformat()
     MAPPING_FILE.parent.mkdir(parents=True, exist_ok=True)
     MAPPING_FILE.write_text(
         json.dumps(mapping, indent=2, ensure_ascii=False), encoding="utf-8"

@@ -148,7 +148,6 @@ def _build_game_row(
         "release_date": release,
         "genres": _extract_genres(product, details),
         "tags": [],
-        "metacritic_score": product.get("criticsScore") or product.get("metacriticScore"),
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,

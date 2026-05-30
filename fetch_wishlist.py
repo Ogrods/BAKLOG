@@ -101,6 +101,10 @@ def main() -> int:
                 print(f"  HLTB warning: {e}")
 
         price_block = (data or {}).get("price_overview") or {}
+        categories = (data or {}).get("categories") or []
+        category_names = {str(c.get("description") or "").strip().lower() for c in categories}
+        coop_online = "online co-op" in category_names or "lan co-op" in category_names
+        coop_local = "shared/split screen co-op" in category_names
         row = {
             "store": "wishlist",
             "id": appid,
@@ -115,8 +119,9 @@ def main() -> int:
             "library_image": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900_2x.jpg",
             "release_date": None,
             "genres": [g["description"] for g in (data or {}).get("genres", [])],
-            "tags": [],
-            "metacritic_score": (data or {}).get("metacritic", {}).get("score"),
+            "tags": [c["description"] for c in categories[:16]],
+            "coop_online": coop_online,
+            "coop_local": coop_local,
             "steam_review_percent": reviews.get("percent_positive") if reviews else None,
             "steam_review_count": reviews.get("total_reviews") if reviews else None,
             "steam_review_desc": reviews.get("review_score_desc") if reviews else None,

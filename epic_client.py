@@ -199,3 +199,164 @@ class EpicClient:
     @property
     def account_id(self) -> str | None:
         return self._account_id
+
+
+# Launcher OAuth can't reach the storefront wishlist (auth context differs).
+# EpicStoreClient (below) uses the same cookies your browser sends to
+# www.epicgames.com — paste the request Cookie header from DevTools as
+# EPIC_STORE_COOKIE in .env.
+STORE_GRAPHQL_URL = "https://store.epicgames.com/graphql"
+
+
+class EpicStoreClient:
+    """Storefront GraphQL client authenticated via the browser session cookie.
+
+    Use this for endpoints that live behind ``www.epicgames.com`` (wishlist,
+    receipts, etc.) — i.e. anything the launcher OAuth bearer can't reach.
+    """
+
+    def __init__(self, cookie: str):
+        self.session = requests.Session()
+        cookie = (cookie or "").strip()
+        if cookie.lower().startswith("cookie:"):
+            cookie = cookie.split(":", 1)[1].strip()
+        if not cookie:
+            raise EpicAuthError(
+                "EPIC_STORE_COOKIE is empty. See README for instructions."
+            )
+        self._cookie = cookie
+        self._last_request = 0.0
+        self._lock = threading.Lock()
+
+    def _throttle(self) -> None:
+        with self._lock:
+            elapsed = time.time() - self._last_request
+            if elapsed < REQUEST_DELAY_SEC:
+                time.sleep(REQUEST_DELAY_SEC - elapsed)
+            self._last_request = time.time()
+
+    def _headers(self) -> dict:
+        return {
+            "Cookie": self._cookie,
+            "Content-Type": "application/json",
+            "Accept": "*/*",
+            "Origin": "https://store.epicgames.com",
+            "Referer": "https://store.epicgames.com/",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0 Safari/537.36"
+            ),
+        }
+
+    def graphql(self, query: str, variables: dict, operation_name: str) -> dict:
+        self._throttle()
+        resp = self.session.post(
+            STORE_GRAPHQL_URL,
+            json={
+                "query": query,
+                "operationName": operation_name,
+                "variables": variables,
+            },
+            headers=self._headers(),
+            timeout=30,
+        )
+        if resp.status_code in (401, 403):
+            raise EpicAuthError(
+                f"Storefront GraphQL {resp.status_code}: cookie expired or wrong "
+                "(grab a fresh EPIC_STORE_COOKIE from DevTools — see README)."
+            )
+        if resp.status_code >= 400:
+            body = resp.text[:1500] if resp.text else "<empty>"
+            raise EpicAuthError(
+                f"Storefront GraphQL {resp.status_code}: {body}"
+            )
+        payload = resp.json()
+        errors = payload.get("errors") or []
+        if errors:
+            raise EpicAuthError(f"GraphQL errors: {errors[0].get('message')}")
+        return payload.get("data") or {}
+
+    def get_wishlist(
+        self, country: str = "US", locale: str = "en-US",
+    ) -> list[dict]:
+        """All wishlist items for the cookie's logged-in user.
+
+        Each element has ``offerId``, ``namespace``, ``created``, and an
+        embedded ``offer`` with title/keyImages/price/productSlug/releaseDate.
+        """
+        all_elements: list[dict] = []
+        seen_ids: set[str] = set()
+        for start in (0, 200, 400, 600, 800):
+            data = self.graphql(
+                _WISHLIST_QUERY,
+                {"country": country, "locale": locale, "start": start, "count": 200},
+                "getWishlistQuery",
+            )
+            elements = (
+                ((data.get("Wishlist") or {}).get("wishlistItems") or {})
+                .get("elements", [])
+            )
+            if not elements:
+                break
+            added_this_page = 0
+            for el in elements:
+                if not isinstance(el, dict):
+                    continue
+                eid = el.get("id")
+                if eid in seen_ids:
+                    continue
+                if eid is not None:
+                    seen_ids.add(eid)
+                all_elements.append(el)
+                added_this_page += 1
+            if len(elements) < 200 or added_this_page == 0:
+                break
+        return all_elements
+
+
+_WISHLIST_QUERY = """
+query getWishlistQuery($country: String!, $locale: String, $start: Int, $count: Int) {
+  Wishlist {
+    wishlistItems(start: $start, count: $count) {
+      elements {
+        id
+        order
+        created
+        offerId
+        updated
+        namespace
+        offer(locale: $locale) {
+          productSlug
+          urlSlug
+          title
+          id
+          namespace
+          offerType
+          effectiveDate
+          pcReleaseDate
+          releaseDate
+          keyImages { type url }
+          seller { name }
+          categories { path }
+          tags { id name }
+          developerDisplayName
+          publisherDisplayName
+          price(country: $country) {
+            totalPrice {
+              discountPrice
+              originalPrice
+              discount
+              currencyCode
+              fmtPrice(locale: $locale) {
+                originalPrice
+                discountPrice
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""

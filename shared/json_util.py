@@ -15,7 +15,6 @@ NULL_STRIP_KEYS: frozenset[str] = frozenset(
         "hltb_id",
         "steam_review_percent",
         "steam_review_count",
-        "metacritic_score",
         "library_image",
         "header_image",
         "store_url",

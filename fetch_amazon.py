@@ -43,7 +43,6 @@ def _build_row(rec: dict, hltb: dict | None) -> dict:
         "release_date": rec.get("release_date"),
         "genres": rec.get("genres") or [],
         "tags": [],
-        "metacritic_score": None,
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,

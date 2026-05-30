@@ -1,0 +1,552 @@
+"""Local dev server for the Steam Backlog dashboard.
+
+Serves static files like ``python -m http.server`` and adds a tiny API that
+lets dashboard chips trigger Python fetchers and stream their output back to
+the browser via Server-Sent Events. Also owns the user's personal data
+(statuses, notes, priorities, prefs, manually-added games) so it survives
+browser changes, port changes, and cache wipes.
+
+Endpoints:
+    GET  /api/runs            -> {active, queue, history}
+    POST /api/run/<key>       -> {run_id, status}    (queues a fetcher)
+    GET  /api/stream/<run_id> -> SSE: line / done / error events
+    GET  /api/personal        -> {personal, prefs, manual, updated_at}
+    PUT  /api/personal        -> overwrite the whole document atomically
+
+Bind: 127.0.0.1 only. The fetcher whitelist mirrors the frontend registry
+in js/app.js so the browser cannot execute arbitrary commands.
+"""
+from __future__ import annotations
+
+import json
+import os
+import queue
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from collections import deque
+from functools import partial
+from http import HTTPStatus
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parent
+HOST = "127.0.0.1"
+PORT = int(os.environ.get("PORT", "8765"))
+MAX_HISTORY = 20
+MAX_LINES_PER_RUN = 5000
+
+# Personal-data persistence.
+# This file is the source of truth for the user's edits. localStorage in the
+# browser is treated as a hydration cache that is overwritten from this file
+# on every boot.
+PERSONAL_DIR = ROOT / "data"
+PERSONAL_FILE = PERSONAL_DIR / "personal.json"
+PERSONAL_BACKUP_DIR = PERSONAL_DIR / "personal_backups"
+PERSONAL_BACKUP_KEEP = 10
+PERSONAL_MAX_BYTES = 32 * 1024 * 1024  # 32 MB hard cap on the PUT body
+_personal_lock = threading.RLock()
+_personal_last_backup_at = 0.0
+
+
+def _empty_personal_doc() -> dict[str, Any]:
+    return {
+        "personal": {},
+        "prefs": {},
+        "manual": [],
+        "updated_at": None,
+        "schema_version": 1,
+    }
+
+
+def _load_personal_doc() -> dict[str, Any]:
+    with _personal_lock:
+        if not PERSONAL_FILE.exists():
+            return _empty_personal_doc()
+        try:
+            with PERSONAL_FILE.open("r", encoding="utf-8") as f:
+                doc = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[personal] corrupted: {exc!r} -- returning empty doc", file=sys.stderr)
+            return _empty_personal_doc()
+        # Defensive defaults so the client can rely on shape.
+        doc.setdefault("personal", {})
+        doc.setdefault("prefs", {})
+        doc.setdefault("manual", [])
+        doc.setdefault("updated_at", None)
+        doc.setdefault("schema_version", 1)
+        return doc
+
+
+def _validate_personal_payload(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be a JSON object")
+    personal = payload.get("personal", {})
+    prefs = payload.get("prefs", {})
+    manual = payload.get("manual", [])
+    if not isinstance(personal, dict):
+        raise ValueError("personal must be an object")
+    if not isinstance(prefs, dict):
+        raise ValueError("prefs must be an object")
+    if not isinstance(manual, list):
+        raise ValueError("manual must be an array")
+    return {"personal": personal, "prefs": prefs, "manual": manual}
+
+
+def _rotate_personal_backup() -> None:
+    """Keep a rolling set of timestamped backups so a bad save can't wipe
+    out months of edits. Runs at most once every 5 minutes; the previous
+    on-disk file becomes the backup before being overwritten."""
+    global _personal_last_backup_at
+    now = time.time()
+    if now - _personal_last_backup_at < 300:
+        return
+    if not PERSONAL_FILE.exists():
+        return
+    PERSONAL_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(now))
+    backup = PERSONAL_BACKUP_DIR / f"personal-{stamp}.json"
+    try:
+        backup.write_bytes(PERSONAL_FILE.read_bytes())
+    except OSError as exc:
+        print(f"[personal] backup failed: {exc!r}", file=sys.stderr)
+        return
+    _personal_last_backup_at = now
+    # Prune oldest backups beyond the keep-count.
+    backups = sorted(PERSONAL_BACKUP_DIR.glob("personal-*.json"))
+    for old in backups[:-PERSONAL_BACKUP_KEEP]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+def _save_personal_doc(payload: dict[str, Any]) -> dict[str, Any]:
+    """Atomic write: temp file + os.replace(). Never partial; never corrupted."""
+    with _personal_lock:
+        validated = _validate_personal_payload(payload)
+        doc = _empty_personal_doc()
+        doc.update(validated)
+        doc["updated_at"] = time.time()
+        PERSONAL_DIR.mkdir(parents=True, exist_ok=True)
+        _rotate_personal_backup()
+        tmp = PERSONAL_FILE.with_suffix(".json.tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(doc, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, PERSONAL_FILE)
+        return doc
+
+
+# A fetcher is just a label plus an argv. argv is fixed at definition time;
+# nothing the browser sends affects which command runs.
+def _argv(*parts: str) -> list[str]:
+    return [_python_executable(), *parts]
+
+
+def _python_executable() -> str:
+    """Prefer the project's venv interpreter when present."""
+    candidates = [
+        ROOT / ".venv" / "Scripts" / "python.exe",  # Windows
+        ROOT / ".venv" / "bin" / "python",          # POSIX
+        ROOT / ".venv" / "bin" / "python3",
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return sys.executable
+
+
+FETCHERS: dict[str, dict[str, Any]] = {
+    "steam":         {"label": "Steam",      "argv": _argv("fetch_games.py")},
+    "gog":           {"label": "GOG",        "argv": _argv("fetch_gog.py")},
+    "psn":           {"label": "PSN",        "argv": _argv("fetch_psn.py")},
+    "epic":          {"label": "Epic",       "argv": _argv("fetch_epic.py")},
+    "amazon":        {"label": "Amazon",     "argv": _argv("fetch_amazon.py")},
+    "xbox":          {"label": "Xbox",       "argv": _argv("fetch_xbox.py")},
+    "battlenet":     {"label": "Battle.net", "argv": _argv("fetch_battlenet.py")},
+    "ubisoft":       {"label": "Ubisoft",    "argv": _argv("fetch_ubisoft.py")},
+    "nintendo":      {"label": "Nintendo",   "argv": _argv("fetch_nintendo.py")},
+    "itch":          {"label": "itch.io",    "argv": _argv("fetch_itch.py")},
+    "wishlistSteam": {"label": "WL Steam",   "argv": _argv("fetch_wishlist.py")},
+    "wishlistGog":   {"label": "WL GOG",     "argv": _argv("fetch_gog_wishlist.py")},
+    "wishlistEpic":  {"label": "WL Epic",    "argv": _argv("fetch_epic_wishlist.py")},
+    "itad":          {"label": "ITAD",       "argv": _argv("fetch_itad.py")},
+    "hltb":          {"label": "HLTB",       "argv": _argv("enrich_hltb.py")},
+}
+
+
+class Run:
+    """A single queued/running/completed fetcher invocation."""
+
+    __slots__ = (
+        "id", "key", "label", "status", "started_at", "ended_at", "exit_code",
+        "lines", "_lock", "_listeners", "_finished",
+    )
+
+    def __init__(self, key: str) -> None:
+        spec = FETCHERS[key]
+        self.id: str = uuid.uuid4().hex[:12]
+        self.key: str = key
+        self.label: str = spec["label"]
+        self.status: str = "queued"  # queued | running | done | failed
+        self.started_at: float | None = None
+        self.ended_at: float | None = None
+        self.exit_code: int | None = None
+        # Capped ring buffer so a runaway script can't OOM the server.
+        self.lines: deque[dict[str, Any]] = deque(maxlen=MAX_LINES_PER_RUN)
+        self._lock = threading.Lock()
+        self._listeners: set[queue.Queue] = set()
+        self._finished = threading.Event()
+
+    def to_summary(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "key": self.key,
+            "label": self.label,
+            "status": self.status,
+            "started_at": self.started_at,
+            "ended_at": self.ended_at,
+            "exit_code": self.exit_code,
+            "line_count": len(self.lines),
+        }
+
+    def add_line(self, stream: str, text: str) -> None:
+        msg = {"t": time.time(), "stream": stream, "text": text}
+        with self._lock:
+            self.lines.append(msg)
+            for q in list(self._listeners):
+                try:
+                    q.put_nowait(("line", msg))
+                except queue.Full:
+                    # Drop slow listeners rather than block the worker thread.
+                    self._listeners.discard(q)
+
+    def broadcast(self, event: str, data: dict[str, Any]) -> None:
+        with self._lock:
+            for q in list(self._listeners):
+                try:
+                    q.put_nowait((event, data))
+                except queue.Full:
+                    self._listeners.discard(q)
+
+    def attach_listener(self) -> tuple[queue.Queue, list[dict[str, Any]], bool]:
+        """Return (queue, replay-buffer, already-finished)."""
+        q: queue.Queue = queue.Queue(maxsize=1024)
+        with self._lock:
+            replay = list(self.lines)
+            done = self._finished.is_set()
+            if not done:
+                self._listeners.add(q)
+        return q, replay, done
+
+    def detach_listener(self, q: queue.Queue) -> None:
+        with self._lock:
+            self._listeners.discard(q)
+
+    def mark_finished(self) -> None:
+        self._finished.set()
+
+
+class RunManager:
+    """Single-worker queue. Fetchers may share locks (PSN session, etc.) so
+    we deliberately serialize them rather than spawn in parallel."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._queue: queue.Queue[Run] = queue.Queue()
+        self._pending: list[Run] = []  # queued + active, in submission order
+        self._history: deque[Run] = deque(maxlen=MAX_HISTORY)
+        self._active: Run | None = None
+        self._runs_by_id: dict[str, Run] = {}
+        threading.Thread(target=self._worker_loop, name="run-worker", daemon=True).start()
+
+    def submit(self, key: str) -> Run:
+        if key not in FETCHERS:
+            raise KeyError(key)
+        run = Run(key)
+        with self._lock:
+            self._pending.append(run)
+            self._runs_by_id[run.id] = run
+        self._queue.put(run)
+        return run
+
+    def get(self, run_id: str) -> Run | None:
+        with self._lock:
+            return self._runs_by_id.get(run_id)
+
+    def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            active = self._active.to_summary() if self._active else None
+            queued = [r.to_summary() for r in self._pending if r.status == "queued"]
+            history = [r.to_summary() for r in self._history]
+        return {"active": active, "queue": queued, "history": history}
+
+    def _worker_loop(self) -> None:
+        while True:
+            run = self._queue.get()
+            with self._lock:
+                self._active = run
+            try:
+                self._execute(run)
+            except Exception as exc:  # noqa: BLE001 - surface anything the subprocess plumbing might raise.
+                run.status = "failed"
+                run.exit_code = -1
+                run.add_line("stderr", f"[server] worker error: {exc!r}")
+            finally:
+                run.ended_at = time.time()
+                run.mark_finished()
+                run.broadcast("done", {
+                    "status": run.status,
+                    "exit_code": run.exit_code,
+                    "started_at": run.started_at,
+                    "ended_at": run.ended_at,
+                })
+                with self._lock:
+                    self._active = None
+                    if run in self._pending:
+                        self._pending.remove(run)
+                    self._history.appendleft(run)
+
+    def _execute(self, run: Run) -> None:
+        spec = FETCHERS[run.key]
+        run.status = "running"
+        run.started_at = time.time()
+        run.broadcast("status", {"status": run.status, "started_at": run.started_at})
+        run.add_line("stdout", f"$ {' '.join(spec['argv'])}")
+
+        env = os.environ.copy()
+        # Force unbuffered Python output so we see progress in real time.
+        env["PYTHONUNBUFFERED"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
+
+        try:
+            proc = subprocess.Popen(  # noqa: S603 - argv is fixed in FETCHERS, not user input
+                spec["argv"],
+                cwd=str(ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+        except FileNotFoundError as exc:
+            run.status = "failed"
+            run.exit_code = -1
+            run.add_line("stderr", f"[server] cannot launch: {exc}")
+            return
+
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            run.add_line("stdout", line.rstrip("\n"))
+        proc.wait()
+        run.exit_code = proc.returncode
+        run.status = "done" if proc.returncode == 0 else "failed"
+
+
+MANAGER = RunManager()
+
+
+def _send_json(handler: SimpleHTTPRequestHandler, status: int, payload: Any) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _sse_format(event: str, data: Any) -> bytes:
+    payload = data if isinstance(data, str) else json.dumps(data)
+    out = f"event: {event}\ndata: {payload}\n\n"
+    return out.encode("utf-8")
+
+
+class Handler(SimpleHTTPRequestHandler):
+    server_version = "SteamBacklogDev/1.0"
+
+    # ---- routing -----------------------------------------------------------
+    def do_GET(self) -> None:  # noqa: N802 - http.server API
+        if self.path == "/api/runs":
+            self._handle_runs()
+            return
+        if self.path == "/api/fetchers":
+            self._handle_fetchers()
+            return
+        if self.path == "/api/personal":
+            self._handle_personal_get()
+            return
+        if self.path.startswith("/api/stream/"):
+            self._handle_stream(self.path[len("/api/stream/"):])
+            return
+        super().do_GET()
+
+    def do_POST(self) -> None:  # noqa: N802 - http.server API
+        if self.path.startswith("/api/run/"):
+            self._handle_submit(self.path[len("/api/run/"):])
+            return
+        self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
+
+    def do_PUT(self) -> None:  # noqa: N802 - http.server API
+        if self.path == "/api/personal":
+            self._handle_personal_put()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
+
+    # ---- handlers ----------------------------------------------------------
+    def _handle_fetchers(self) -> None:
+        data = {
+            "fetchers": [
+                {"key": k, "label": v["label"], "cmd": " ".join(v["argv"][1:])}
+                for k, v in FETCHERS.items()
+            ]
+        }
+        _send_json(self, HTTPStatus.OK, data)
+
+    def _handle_personal_get(self) -> None:
+        try:
+            doc = _load_personal_doc()
+        except Exception as exc:  # noqa: BLE001 - the file is small, anything is unexpected here
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"load failed: {exc!r}"})
+            return
+        _send_json(self, HTTPStatus.OK, doc)
+
+    def _handle_personal_put(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid Content-Length"})
+            return
+        if length <= 0:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "empty body"})
+            return
+        if length > PERSONAL_MAX_BYTES:
+            _send_json(self, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": f"body too large ({length} > {PERSONAL_MAX_BYTES})"})
+            return
+        try:
+            raw = self.rfile.read(length).decode("utf-8")
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"invalid JSON: {exc!r}"})
+            return
+        try:
+            doc = _save_personal_doc(payload)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except OSError as exc:
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"write failed: {exc!r}"})
+            return
+        _send_json(self, HTTPStatus.OK, doc)
+
+    def _handle_runs(self) -> None:
+        _send_json(self, HTTPStatus.OK, MANAGER.snapshot())
+
+    def _handle_submit(self, key: str) -> None:
+        key = key.strip("/").split("/", 1)[0]
+        if key not in FETCHERS:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown fetcher: {key}"})
+            return
+        run = MANAGER.submit(key)
+        _send_json(self, HTTPStatus.ACCEPTED, {
+            "run_id": run.id,
+            "key": run.key,
+            "label": run.label,
+            "status": run.status,
+        })
+
+    def _handle_stream(self, run_id: str) -> None:
+        run_id = run_id.strip("/").split("/", 1)[0]
+        run = MANAGER.get(run_id)
+        if run is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")
+            return
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        q, replay, already_done = run.attach_listener()
+        try:
+            self._sse_write("status", {
+                "status": run.status,
+                "started_at": run.started_at,
+                "ended_at": run.ended_at,
+                "exit_code": run.exit_code,
+            })
+            for msg in replay:
+                self._sse_write("line", msg)
+
+            if already_done:
+                self._sse_write("done", {
+                    "status": run.status,
+                    "exit_code": run.exit_code,
+                    "started_at": run.started_at,
+                    "ended_at": run.ended_at,
+                })
+                return
+
+            last_ping = time.time()
+            while True:
+                try:
+                    event, data = q.get(timeout=15)
+                except queue.Empty:
+                    self._sse_write_raw(b": keepalive\n\n")
+                    last_ping = time.time()
+                    continue
+                self._sse_write(event, data)
+                if event == "done":
+                    return
+                if time.time() - last_ping > 30:
+                    self._sse_write_raw(b": keepalive\n\n")
+                    last_ping = time.time()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            # Browser closed the SSE (tab switch, reload, navigate). Not an error.
+            pass
+        finally:
+            run.detach_listener(q)
+
+    # ---- SSE helpers -------------------------------------------------------
+    def _sse_write(self, event: str, data: Any) -> None:
+        self._sse_write_raw(_sse_format(event, data))
+
+    def _sse_write_raw(self, chunk: bytes) -> None:
+        try:
+            self.wfile.write(chunk)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            # Re-raise so _handle_stream's outer try/except can break the loop
+            # and call detach_listener. Windows fires ConnectionAbortedError
+            # (WinError 10053) instead of BrokenPipeError on client disconnect.
+            raise
+
+    # ---- small niceties ----------------------------------------------------
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - http.server API
+        # Quieter logs; skip favicon and api keepalive noise.
+        if "/api/stream/" in self.path:
+            return
+        super().log_message(format, *args)
+
+
+def main() -> None:
+    handler = partial(Handler, directory=str(ROOT))
+    with ThreadingHTTPServer((HOST, PORT), handler) as server:
+        print(f"Steam Backlog dev server on http://{HOST}:{PORT}")
+        print(f"Python for fetchers: {_python_executable()}")
+        print(f"Registered fetchers: {len(FETCHERS)}")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nShutting down.")
+
+
+if __name__ == "__main__":
+    main()

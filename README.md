@@ -10,7 +10,7 @@ A **local-only** tool for browsing, sorting, and prioritizing game libraries acr
 |-------|------|
 | Data pipeline | Python 3 (`requests`, `python-dotenv`, `howlongtobeatpy`, `psnawp`, store-specific clients) |
 | Data files | `games_<store>.json` per source (generated, gitignored) |
-| Dashboard | Static HTML + vanilla JS + prebuilt Tailwind (`tailwind.css`) + Chart.js (CDN) |
+| Dashboard | Static HTML + ESM (`js/state.js`, `js/app.js`) + prebuilt Tailwind (`tailwind.css`) + Chart.js (CDN) |
 | Personal edits | Browser `localStorage` (status, notes, priority, tags) |
 | View locally | `python -m http.server 8080` → http://localhost:8080 |
 
@@ -33,7 +33,7 @@ A **local-only** tool for browsing, sorting, and prioritizing game libraries acr
 
 ## Dashboard CSS (optional)
 
-Tailwind is precompiled into `tailwind.css` (no browser JIT). After you change Tailwind classes in `index.html`, rebuild:
+Tailwind is precompiled into `tailwind.css` (no browser JIT). After you change Tailwind classes in `index.html` (or `js/`), rebuild:
 
 ```bash
 npm install
@@ -204,6 +204,9 @@ schtasks /create /SC WEEKLY /D SUN /TN "Steam Backlog Refresh" /TR "powershell -
 | `enrich_steam_reviews.py` | Backfill Steam review fields on non-Steam rows |
 | `enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |
 | `enrich_hltb.py` | Backfill HLTB hours on any store JSON |
+| `python -m enrichers <cmd>` | Wrapper: `hltb`, `steam-reviews`, `cross-store-images` |
+| `shared/`, `fetchers/` | Shared JSON slim + fetcher base helpers |
+| `js/state.js`, `js/app.js` | Dashboard app (ES modules) |
 | `steam_client.py` | Steam Web API + Store API client |
 | `gog_client.py` | GOG embed API client |
 | `psn_client.py` | PlayStation Network client (via psnawp) |
@@ -230,8 +233,18 @@ The repo keeps most scripts in the project root on purpose — each fetcher is a
 | `*_client.py` | HTTP/auth helpers used by fetchers |
 | `enrich_*.py` | Backfill or maintenance scripts |
 | `games_*.json`, `itad_prices.json` | Generated library data (gitignored where applicable) |
-| `index.html`, `tailwind.css` | Static dashboard (no build step required to view) |
+| `index.html`, `js/`, `tailwind.css` | Static dashboard (serve over HTTP for ES modules) |
 | `cache/` | Cached API responses between fetch runs |
 | `refresh.ps1` | Runs the fetch sequence in order |
 
 No nested `src/` folder — run fetchers from the repo root so paths stay simple.
+
+### Dev checks
+
+```bash
+pip install -e ".[dev]"
+python -m pytest
+ruff check shared fetchers enrichers tests
+```
+
+Phase 0 is **local-only** — no cloud accounts or billing. Supabase/Next.js (Phase 1) stays on the roadmap until you opt in.

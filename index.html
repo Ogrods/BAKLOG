@@ -191,6 +191,10 @@
     .dash-kpi-value { font-size: 1.35rem; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
     .dash-chart-wrap { position: relative; height: 260px; }
     .dash-chart-wrap.tall { height: 320px; }
+    .table-hide-score .col-score { display: none; }
+    .dash-itch-recap { color: #cbd5e1; line-height: 1.5; }
+    .dash-itch-recap strong { color: #ffffff; font-weight: 600; }
+    .dash-itch-recap .dash-itch-muted { color: #94a3b8; font-size: 0.75rem; margin-top: 0.35rem; }
     .dash-list-row { display: flex; gap: 0.5rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid rgb(51 65 85); font-size: 0.75rem; }
     .dash-list-row:last-child { border-bottom: none; }
     .dash-list-cover { width: 28px; height: 42px; object-fit: cover; border-radius: 3px; background: #1e293b; flex-shrink: 0; }
@@ -255,7 +259,7 @@
           <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions">⋯</button>
           <div id="kebabMenu" class="absolute right-0 top-full mt-1 z-30 min-w-[180px] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 text-sm">
             <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
-            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Load games.json<input id="loadGamesFile" type="file" accept=".json" class="hidden" /></label>
+            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Load Steam JSON…<input id="loadGamesFile" type="file" accept=".json" class="hidden" /></label>
             <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
             <button type="button" id="exportNotes" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes</button>
             <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Import notes<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
@@ -269,28 +273,25 @@
       <div id="dashboardLoading" class="dash-card text-sm text-slate-400 text-center py-8">Loading charts…</div>
       <div id="dashboardContent" class="hidden space-y-4">
         <div id="dashboardKpis" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2"></div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Library by store</h3><div class="dash-chart-wrap"><canvas id="chartStoreDonut"></canvas></div></div>
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Status breakdown</h3><div class="dash-chart-wrap"><canvas id="chartStatusDonut"></canvas></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Steam review tiers</h3><div class="dash-chart-wrap"><canvas id="chartReviewDonut"></canvas></div></div>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Top genres</h3><div class="dash-chart-wrap"><canvas id="chartGenresBar"></canvas></div></div>
           <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Backlog hours by store</h3><div class="dash-chart-wrap"><canvas id="chartBacklogStore"></canvas></div></div>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB length (backlog)</h3><div class="dash-chart-wrap"><canvas id="chartHltbHist"></canvas></div></div>
-          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Steam review tiers</h3><div class="dash-chart-wrap"><canvas id="chartReviewDonut"></canvas></div></div>
-        </div>
+        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB length (backlog)</h3><div class="dash-chart-wrap"><canvas id="chartHltbHist"></canvas></div></div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Releases by year</h3><div class="dash-chart-wrap tall"><canvas id="chartReleases"></canvas></div></div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB vs Steam rating</h3><div class="dash-chart-wrap tall"><canvas id="chartScatter"></canvas></div></div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Personal tags</h3><div class="dash-chart-wrap"><canvas id="chartTagsBar"></canvas></div></div>
         <div id="dashboardWishlistStats" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-3">Top rated unplayed</h3><div id="dashTopRated"></div></div>
-          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-3">Quick wins</h3><div id="dashQuickWins"></div></div>
-          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-3">Recently completed</h3><div id="dashCompleted"></div></div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Top rated unplayed</h3><div id="dashTopRated"></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Quick wins</h3><div id="dashQuickWins"></div></div>
+          <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3><div id="dashItchRecap" class="dash-itch-recap text-sm"></div><div id="dashItchChartWrap" class="dash-chart-wrap mt-3"><canvas id="chartItchStatus"></canvas></div></div>
         </div>
-        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3><div id="dashItchRecap" class="text-sm text-slate-300"></div><div class="dash-chart-wrap mt-3 max-w-md"><canvas id="chartItchStatus"></canvas></div></div>
       </div>
     </section>
 
@@ -310,7 +311,7 @@
             <th data-sort="name" class="p-2 text-left">Game</th>
             <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
             <th data-sort="priority" class="p-2 text-center">Pri</th>
-            <th id="scoreHeader" data-sort="priority_score" class="p-2 text-right hidden">Score</th>
+            <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>
             <th data-sort="playtime_minutes" class="p-2 text-right">Played</th>
             <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
             <th data-sort="steam_review_percent" class="p-2 text-right">Steam %</th>
@@ -372,7 +373,7 @@
           <option value="live">Live service</option>
           <option value="finished">Finished</option>
           <option value="skip">Skip</option>
-          <option value="__none__">No status</option>
+          <option value="__none__">Untouched (no personal data)</option>
         </select>
       </div>
       <div id="itchFilterSection" class="drawer-section hidden">
@@ -564,7 +565,6 @@
       { key: "live", label: "Live" },
       { key: "finished", label: "Finished" },
       { key: "skip", label: "Skip" },
-      { key: "__none__", label: "No status" },
     ];
     const STATUS_FILTER_LABELS = {
       backlog: "Backlog",
@@ -871,6 +871,7 @@
       if (!personal[key]) personal[key] = { ...PERSONAL_DEFAULT, tags: [] };
       if (!Array.isArray(personal[key].tags)) personal[key].tags = [];
       personal[key][field] = value;
+      window._dataVersion = (window._dataVersion || 0) + 1;
       savePersonal();
       if (options?.silent) return;
       scheduleDownstreamSync();
@@ -972,6 +973,11 @@
       return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     }
     function escapeAttr(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+    function formatNum(n) {
+      const num = Number(n);
+      if (!Number.isFinite(num)) return String(n);
+      return Math.abs(num) >= 10000 ? num.toLocaleString("en-US") : String(num);
+    }
 
     function buildOwnedNormNames() {
       ownedNormNames = new Set();
@@ -1079,7 +1085,7 @@
     }
 
     function chipStatusKey(g) {
-      if (!hasPersonalEntry(g)) return "__none__";
+      if (!hasPersonalEntry(g)) return "backlog";
       return getPersonal(g).status || "backlog";
     }
 
@@ -1472,7 +1478,7 @@
       return {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: "#94a3b8", boxWidth: 12 } } },
+        plugins: { legend: { labels: { color: "#ffffff", boxWidth: 12 } } },
         ...extra,
       };
     }
@@ -1535,13 +1541,13 @@
       const itchGameCount = itchGames.filter(itchIsGame).length;
       const stores = new Set(games.map(g => normalizeGame(g).store)).size;
       const kpis = [
-        { label: "Library games", value: games.length },
-        { label: "Backlog hours", value: `${Math.round(backlogHrs)}h` },
-        { label: "Played hours", value: `${Math.round(playedHrs)}h` },
+        { label: "Library games", value: formatNum(games.length) },
+        { label: "Backlog hours", value: `${formatNum(Math.round(backlogHrs))}h` },
+        { label: "Played hours", value: `${formatNum(Math.round(playedHrs))}h` },
         { label: "Completion", value: `${completion}%` },
         { label: "Avg review", value: avgRating === "—" ? "—" : `${avgRating}%` },
-        { label: "Wishlist deals", value: wlDeals },
-        { label: "Itch games", value: itchGameCount },
+        { label: "Wishlist deals", value: formatNum(wlDeals) },
+        { label: "Itch games", value: formatNum(itchGameCount) },
         { label: "Stores", value: stores },
       ];
       document.getElementById("dashboardKpis").innerHTML = kpis.map(k => `
@@ -1560,15 +1566,6 @@
         .filter(g => getPersonal(g).status === "backlog" && (hltbMain(g) || 999) <= (prefs.quickWinMaxHours || 15) && ratingValue(g) >= 80)
         .sort((a, b) => ratingValue(b) - ratingValue(a))
         .slice(0, 10);
-      const completed = games
-        .filter(g => getPersonal(g).status === "finished")
-        .sort((a, b) => {
-          const la = a.last_played ? Date.parse(a.last_played) : 0;
-          const lb = b.last_played ? Date.parse(b.last_played) : 0;
-          if (lb !== la) return lb - la;
-          return (b.release_date || "").localeCompare(a.release_date || "");
-        })
-        .slice(0, 10);
       const listHtml = (items, scoreFn) => items.length
         ? items.map(g => {
           const cover = g.library_image || coverFallbackFor(g);
@@ -1578,7 +1575,6 @@
         : '<p class="text-xs text-slate-500 italic">No matches yet.</p>';
       document.getElementById("dashTopRated").innerHTML = listHtml(topRated, g => `${ratingValue(g)}%`);
       document.getElementById("dashQuickWins").innerHTML = listHtml(quickWins, g => `${hltbMain(g) || "?"}h`);
-      document.getElementById("dashCompleted").innerHTML = listHtml(completed, g => g.last_played ? g.last_played.slice(0, 10) : "—");
     }
 
     function renderDashboardWishlistStats() {
@@ -1599,30 +1595,52 @@
       document.getElementById("dashboardWishlistStats").innerHTML = `
         <div class="dash-card"><div class="dash-kpi-label">Avg discount (on sale)</div><div class="dash-kpi-value mt-1">${avgDisc}%</div><div class="text-xs text-slate-500 mt-1">${onSale.length} of ${wl.length} on sale</div></div>
         <div class="dash-card"><div class="dash-kpi-label">Historical low</div><div class="dash-kpi-value mt-1">${pctLow}%</div><div class="text-xs text-slate-500 mt-1">${lows.length} titles at all-time low</div></div>
-        <div class="dash-card"><div class="dash-kpi-label">Deal tiers</div><div class="text-xs text-slate-300 mt-2 space-y-1"><div>&lt;25%: ${tiers.lt25}</div><div>25–49%: ${tiers.m25}</div><div>50–74%: ${tiers.m50}</div><div>75%+: ${tiers.m75}</div></div></div>`;
+        <div class="dash-card"><div class="dash-kpi-label">Deal tiers</div><div class="text-xs text-slate-300 mt-2" style="display:grid;gap:0.15rem;"><div>&lt;25%: ${tiers.lt25}</div><div>25–49%: ${tiers.m25}</div><div>50–74%: ${tiers.m50}</div><div>75%+: ${tiers.m75}</div></div></div>`;
     }
 
     function renderDashboardItchRecap() {
+      const el = document.getElementById("dashItchRecap");
+      const chartWrap = document.getElementById("dashItchChartWrap");
+      if (!el) return;
       const total = itchGames.length;
+      if (!total) {
+        el.innerHTML = `<p>No itch.io data loaded. Run <code style="color:#e2e8f0">fetch_itch.py</code>, then reload.</p>`;
+        if (chartWrap) chartWrap.style.display = "none";
+        if (dashboardCharts.chartItchStatus) {
+          dashboardCharts.chartItchStatus.destroy();
+          delete dashboardCharts.chartItchStatus;
+        }
+        return;
+      }
       const gamesOnly = itchGames.filter(itchIsGame);
       const rated = gamesOnly.filter(g => ratingValue(g) > 0).length;
+      const withStatus = gamesOnly.filter(g => chipStatusKey(g) !== "__none__").length;
       const recent = [...gamesOnly].sort((a, b) => (b.release_date || "").localeCompare(a.release_date || "")).slice(0, 5);
-      document.getElementById("dashItchRecap").innerHTML = `
-        <p><span class="text-slate-100 font-semibold">${gamesOnly.length}</span> videogames of <span class="text-slate-100 font-semibold">${total}</span> owned keys · <span class="text-slate-100 font-semibold">${rated}</span> with review scores</p>
-        ${recent.length ? `<p class="text-xs text-slate-500 mt-2">Recent: ${recent.map(g => escapeHtml(g.name)).join(" · ")}</p>` : ""}`;
+      el.innerHTML = `
+        <p><strong>${formatNum(gamesOnly.length)}</strong> videogames of <strong>${formatNum(total)}</strong> owned keys · <strong>${formatNum(rated)}</strong> with review scores · <strong>${formatNum(withStatus)}</strong> with a status</p>
+        ${recent.length ? `<p class="dash-itch-muted">Recent: ${recent.map(g => escapeHtml(g.name)).join(" · ")}</p>` : ""}
+        <p class="dash-itch-muted mt-2"><button type="button" class="summary-jump-chip px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs border border-slate-600 cursor-pointer" data-jump-view="itch">Open itch.io tab →</button></p>`;
       const counts = {};
       STATUS_CHIP_DEFS.forEach(d => { counts[d.key] = 0; });
       gamesOnly.forEach(g => { counts[chipStatusKey(g)] = (counts[chipStatusKey(g)] || 0) + 1; });
-      const labels = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0 && d.key !== "__none__").map(d => d.label);
-      const data = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0 && d.key !== "__none__").map(d => counts[d.key]);
-      const colors = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0 && d.key !== "__none__").map(d => DASH_STATUS_COLORS[d.key] || "#64748b");
-      if (labels.length) {
-        setDashboardChart("chartItchStatus", {
-          type: "doughnut",
-          data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
-          options: dashChartOptions({ plugins: { legend: { position: "right" } } }),
-        });
-      }
+      const statusEntries = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0);
+      if (chartWrap) chartWrap.style.display = statusEntries.length ? "" : "none";
+      if (!statusEntries.length) return;
+      const labels = statusEntries.map(d => d.label);
+      const data = statusEntries.map(d => counts[d.key]);
+      const colors = statusEntries.map(d => DASH_STATUS_COLORS[d.key] || "#64748b");
+      setDashboardChart("chartItchStatus", {
+        type: "doughnut",
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+        options: dashChartOptions({
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: "#ffffff", font: { size: 11 }, boxWidth: 10 },
+            },
+          },
+        }),
+      });
     }
 
     function renderDashboardCharts(games) {
@@ -1665,8 +1683,7 @@
       });
 
       const genreCounts = {};
-      games.forEach(g => (g.genres || []).forEach(gen => {
-        const c = aliasCanonicalGenre(gen);
+      games.forEach(g => gameGenresCanonical(g).forEach(c => {
         genreCounts[c] = (genreCounts[c] || 0) + 1;
       }));
       const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -1694,18 +1711,36 @@
         else if (st === "playing") backlogByStore.playing[store] += hrs;
         else if (st === "finished") backlogByStore.finished[store] += hrs;
       });
+      const storeBrandColors = stores.map(s => DASH_STORE_COLORS[s] || "#64748b");
       setDashboardChart("chartBacklogStore", {
         type: "bar",
         data: {
           labels: stores.map(s => DASH_STORE_LABELS[s] || s),
           datasets: [
-            { label: "Backlog", data: stores.map(s => backlogByStore.backlog[s]), backgroundColor: "#64748b" },
-            { label: "Playing", data: stores.map(s => backlogByStore.playing[s]), backgroundColor: "#10b981" },
-            { label: "Finished", data: stores.map(s => backlogByStore.finished[s]), backgroundColor: "#94a3b8" },
+            { label: "Backlog",  data: stores.map(s => backlogByStore.backlog[s]),  backgroundColor: storeBrandColors.map(c => c + "FF"), borderColor: storeBrandColors, borderWidth: 1 },
+            { label: "Playing",  data: stores.map(s => backlogByStore.playing[s]),  backgroundColor: "#38bdf8",                             borderColor: "#0ea5e9",       borderWidth: 2 },
+            { label: "Finished", data: stores.map(s => backlogByStore.finished[s]), backgroundColor: storeBrandColors.map(c => c + "55"), borderColor: storeBrandColors, borderWidth: 1 },
           ],
         },
         options: dashChartOptions({
           indexAxis: "y",
+          plugins: {
+            legend: {
+              labels: {
+                color: "#ffffff",
+                boxWidth: 14,
+                font: { size: 12, weight: "500" },
+                generateLabels() {
+                  return [
+                    { text: "Backlog",  fillStyle: "#94a3b8FF", strokeStyle: "#cbd5e1", lineWidth: 1, fontColor: "#ffffff", hidden: false },
+                    { text: "Playing",  fillStyle: "#38bdf8",   strokeStyle: "#0ea5e9", lineWidth: 2, fontColor: "#ffffff", hidden: false },
+                    { text: "Finished", fillStyle: "#94a3b855", strokeStyle: "#cbd5e1", lineWidth: 1, fontColor: "#ffffff", hidden: false },
+                  ];
+                },
+              },
+              onClick: () => {},
+            },
+          },
           scales: { x: { stacked: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { stacked: true, ticks: { color: "#94a3b8" }, grid: { display: false } } },
         }),
       });
@@ -1722,10 +1757,11 @@
         else if (h <= 40) bucketCounts[4]++;
         else bucketCounts[5]++;
       });
+      const hltbBucketColors = ["#22c55e", "#84cc16", "#eab308", "#f59e0b", "#ef4444", "#b91c1c"];
       setDashboardChart("chartHltbHist", {
         type: "bar",
-        data: { labels: buckets, datasets: [{ label: "Backlog games", data: bucketCounts, backgroundColor: "#a855f7" }] },
-        options: dashChartOptions({ scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
+        data: { labels: buckets, datasets: [{ label: "Backlog games", data: bucketCounts, backgroundColor: hltbBucketColors, borderColor: hltbBucketColors, borderWidth: 1 }] },
+        options: dashChartOptions({ plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
       });
 
       const reviewBuckets = {
@@ -1760,7 +1796,7 @@
         options: dashChartOptions({ scales: { x: { ticks: { color: "#94a3b8", maxRotation: 45 }, grid: { display: false } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
       });
 
-      const scatterPts = games.filter(g => ratingValue(g) > 0 && hltbMain(g) != null).map(g => ({
+      const scatterPts = games.filter(g => ratingValue(g) > 0 && hltbMain(g) != null && hltbMain(g) > 0).map(g => ({
         x: hltbMain(g),
         y: ratingValue(g),
         label: g.name,
@@ -1771,13 +1807,29 @@
           datasets: [{
             label: "Games",
             data: scatterPts.map(p => ({ x: p.x, y: p.y })),
-            backgroundColor: "rgba(56, 189, 248, 0.55)",
-            pointRadius: 4,
+            backgroundColor: "rgba(56, 189, 248, 0.5)",
+            borderColor: "rgba(56, 189, 248, 0.85)",
+            borderWidth: 0.5,
+            pointRadius: 3,
+            pointHoverRadius: 6,
           }],
         },
         options: dashChartOptions({
           scales: {
-            x: { title: { display: true, text: "HLTB main (hours)", color: "#94a3b8" }, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+            x: {
+              type: "logarithmic",
+              title: { display: true, text: "HLTB main (hours, log scale)", color: "#94a3b8" },
+              min: 0.5,
+              ticks: {
+                color: "#94a3b8",
+                autoSkip: false,
+                callback(v) {
+                  const allowed = new Set([1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2000]);
+                  return allowed.has(Number(v)) ? `${v}h` : "";
+                },
+              },
+              grid: { color: "#334155" },
+            },
             y: { title: { display: true, text: "Steam review %", color: "#94a3b8" }, min: 0, max: 100, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
           },
           plugins: {
@@ -1824,10 +1876,18 @@
       Chart.defaults.borderColor = "#334155";
       const games = dashboardLibraryGames();
       renderDashboardKPIs(games);
-      renderDashboardCharts(games);
-      renderDashboardWishlistStats();
-      renderDashboardLists(games);
       renderDashboardItchRecap();
+      try {
+        renderDashboardCharts(games);
+      } catch (err) {
+        console.error("Dashboard charts error:", err);
+      }
+      renderDashboardWishlistStats();
+      try {
+        renderDashboardLists(games);
+      } catch (err) {
+        console.error("Dashboard lists error:", err);
+      }
     }
 
     function scheduleDashboardRender() {
@@ -1878,7 +1938,7 @@
         el.innerHTML = `
           <div class="w-full flex flex-wrap gap-2">
             <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">itch.io <span class="text-slate-100 font-semibold ml-1">${countLabel}</span></div>
-            <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${totalHltb.toFixed(0)}h</span></div>
+            <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
             <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
             <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== "—" ? "%" : ""}</span></div>
             ${fetched ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs text-slate-400">Fetched ${escapeHtml(fetched)}</div>` : ""}
@@ -1923,8 +1983,8 @@
         <div class="w-full flex flex-wrap gap-2">
           <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="text-slate-100 font-semibold ml-1">${visible.length}</span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
           ${storeChips}
-          <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${totalHltb.toFixed(0)}h</span></div>
-          <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${played.toFixed(0)}h</span></div>
+          <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
+          <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(played))}h</span></div>
           <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== "—" ? "%" : ""}</span></div>
         </div>
         ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
@@ -2049,13 +2109,47 @@
       if (url) window.open(url, "_blank", "noopener");
     }
 
-    function renderTable() {
+    let _tableFingerprint = "";
+    let _lastRenderedView = null;
+    function tableFingerprint() {
+      return JSON.stringify({
+        v: activeView,
+        sk: sortKey, sd: sortDir,
+        q: (document.getElementById("search")?.value || "").trim().toLowerCase(),
+        sf: document.getElementById("statusFilter")?.value || "",
+        store: prefs.storeFilter || "",
+        gen: prefs.genreFilters || [],
+        gm: prefs.genreFilterMode,
+        tags: prefs.tagFilters || [],
+        tm: prefs.tagFilterMode,
+        deal: [prefs.dealOnSaleOnly, prefs.dealHistoricalLowOnly, prefs.dealHideOwned, prefs.dealMinDiscount, prefs.dealMaxPrice],
+        unp: !!prefs.unplayedOnly,
+        cleanup: !!cleanupModeActive,
+        score: !!prefs.showScoreColumn,
+        dedupe: !!prefs.crossStoreDedup,
+        ihng: !!prefs.itchHideNonGames,
+        lib: allGames.length,
+        wl: wishlistGames.length,
+        itch: itchGames.length,
+        dv: window._dataVersion || 0,
+      });
+    }
+
+    function invalidateTableCache() {
+      _tableFingerprint = "";
+    }
+
+    function renderTable(opts) {
+      const force = !!opts?.force;
+      const fp = tableFingerprint();
+      if (!force && fp === _tableFingerprint && _lastRenderedView === activeView) {
+        return;
+      }
       const list = sortedGames(filteredGames());
       const tbody = document.getElementById("tbody");
-      tbody.innerHTML = "";
       const showScore = !!prefs.showScoreColumn;
       const isWish = activeView === "wishlist";
-      document.getElementById("scoreHeader").classList.toggle("hidden", !showScore);
+      document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !showScore);
       const statusHdr = document.getElementById("statusHeader");
       if (statusHdr) statusHdr.textContent = isWish ? "Tracking" : "Status";
       const priceHdr = document.getElementById("priceHeader");
@@ -2074,6 +2168,7 @@
       if (focusedRowIndex >= list.length) focusedRowIndex = list.length - 1;
       if (focusedRowIndex < 0 && list.length) focusedRowIndex = 0;
 
+      const rowsHtml = new Array(list.length);
       list.forEach((g, idx) => {
         const p = getPersonal(g);
         const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
@@ -2084,11 +2179,8 @@
         const ownedWish = activeView === "wishlist" && isOwnedByTitle(g.name);
         const selected = selectedKeys.has(key);
         const focused = idx === focusedRowIndex;
-        const tr = document.createElement("tr");
-        tr.dataset.rowKey = key;
-        tr.dataset.rowIndex = String(idx);
-        tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
-        tr.innerHTML = `
+        const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
+        rowsHtml[idx] = `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
           <td class="p-2 text-center">${activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
           <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
           <td class="p-2">
@@ -2119,7 +2211,7 @@
               ${[0, 1, 2, 3, 4, 5].map(n => `<option value="${n}" ${p.priority === n ? "selected" : ""}>${n || "—"}</option>`).join("")}
             </select>
           </td>
-          ${showScore ? `<td class="p-2 text-right">${priorityScore(g).toFixed(1)}</td>` : ""}
+          <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
           <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
           <td class="p-2 text-right">
             <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
@@ -2129,20 +2221,14 @@
           <td class="p-2 text-right">${formatPrice(g)}</td>
           <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
           <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
-          <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).join(", ")}">${(g.genres || []).slice(0, 2).join(", ") || "—"}</td>
+          <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
           <td class="p-2 min-w-[180px]">
             <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
             <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
-          </td>`;
-
-        tr.addEventListener("click", e => {
-          if (e.target.closest("select, input, a, button")) return;
-          focusedRowIndex = idx;
-          focusRow(key);
-        });
-
-        tbody.appendChild(tr);
+          </td>
+        </tr>`;
       });
+      tbody.innerHTML = rowsHtml.join("");
 
       let base;
       if (activeView === "wishlist") {
@@ -2165,14 +2251,26 @@
       document.getElementById("rowCount").textContent = base + extra;
       updateBulkBar();
       buildAlphaNav(list);
+      _tableFingerprint = fp;
+      _lastRenderedView = activeView;
     }
 
     // === Drawer + active pills ===
+    const NON_GENRE_TOKENS = new Set([
+      "ps3", "ps4", "ps5", "psp", "ps vita", "psvita", "vita",
+      "xbox", "xbox 360", "xbox one", "xbox series x", "xbox series s", "xbox series x|s", "xbox series x/s", "xbox series",
+      "nintendo switch", "switch", "wii", "wii u", "ds", "3ds", "nintendo ds", "nintendo 3ds",
+      "pc", "windows", "mac", "macos", "osx", "linux", "steamos",
+      "ios", "android", "browser", "stadia", "google stadia",
+    ]);
+    function isPlatformToken(name) {
+      return NON_GENRE_TOKENS.has(String(name || "").trim().toLowerCase());
+    }
     function aliasCanonicalGenre(name) {
       return GENRE_ALIASES[name] || name;
     }
     function gameGenresCanonical(g) {
-      return [...new Set((g.genres || []).map(aliasCanonicalGenre))];
+      return [...new Set((g.genres || []).filter(x => !isPlatformToken(x)).map(aliasCanonicalGenre))];
     }
     function gameMatchesGenreFilters(g, genres, genreMode) {
       const gameGenres = gameGenresCanonical(g);
@@ -2448,11 +2546,12 @@
     function switchView(view) {
       if (view === activeView) return;
       const fromView = activeView;
+      const fpBefore = view !== "dashboard" ? tableFingerprint().replace(/"v":"[^"]+"/, `"v":"${view}"`) : "";
+      const willBeCached = view !== "dashboard" && view === _lastRenderedView && fpBefore === _tableFingerprint;
+      const useOverlay = !willBeCached;
       const label = view === "dashboard" ? "Loading dashboard…" : view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : "Loading library…";
-      showViewLoading(label);
-      // Two RAF ticks ensure the overlay paints before the (sometimes heavier)
-      // re-render. Keeps the spinner from flickering past too fast on big libs.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (useOverlay) showViewLoading(label);
+      const doSwitch = () => {
         activeView = view;
         selectedKeys.clear();
         focusedRowIndex = 0;
@@ -2486,11 +2585,13 @@
         updateBulkBar();
         updateViewChrome();
         refreshFilterUI();
-        if (view !== "dashboard") renderTable();
-        // Keep the overlay up just long enough to feel like a real transition,
-        // not flash-then-hidden. 220ms total is the sweet spot from testing.
-        setTimeout(hideViewLoading, 180);
-      }));
+        if (useOverlay) hideViewLoading();
+      };
+      if (useOverlay) {
+        requestAnimationFrame(() => requestAnimationFrame(doSwitch));
+      } else {
+        doSwitch();
+      }
     }
     let _filterDebounceTimer = null;
     function refreshFilterUIDebounced(options) {
@@ -2505,7 +2606,7 @@
 
     function renderGenreChips() {
       const genreSource = activeView === "itch" ? itchGames : allGames;
-      const genres = [...new Set(genreSource.flatMap(g => (g.genres || []).map(aliasCanonicalGenre)))].sort();
+      const genres = [...new Set(genreSource.flatMap(g => gameGenresCanonical(g)))].sort();
       const html = genres.map(genre => {
         const active = (prefs.genreFilters || []).includes(genre);
         return `<button type="button" class="genre-chip px-2 py-1 rounded border border-slate-600 text-xs ${active ? "active" : "bg-slate-700 text-slate-300"}" data-genre="${escapeAttr(genre)}">${escapeHtml(genre)}</button>`;
@@ -2577,6 +2678,7 @@
     }
 
     function applyMergedLibrary() {
+      window._dataVersion = (window._dataVersion || 0) + 1;
       recomputeCrossStoreHidden();
       buildOwnedNormNames();
       const parts = [];
@@ -2613,7 +2715,6 @@
 
     async function reloadGames() {
       const steam = await fetchLibraryJson("games_steam.json");
-      const legacy = steam ? null : await fetchLibraryJson("games.json");
       const gog = await fetchLibraryJson("games_gog.json");
       const psn = await fetchLibraryJson("games_psn.json");
       const epic = await fetchLibraryJson("games_epic.json");
@@ -2623,7 +2724,7 @@
       const xbox = await fetchLibraryJson("games_xbox.json");
       const battlenet = await fetchLibraryJson("games_battlenet.json");
       const ubisoft = await fetchLibraryJson("games_ubisoft.json");
-      const steamData = steam || legacy;
+      const steamData = steam;
       if (!steamData && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft) throw new Error("No library files found");
       libraryMeta.steam = steamData;
       libraryMeta.gog = gog;
@@ -3097,7 +3198,7 @@
       document.getElementById("showScoreColumn").addEventListener("change", e => {
         prefs.showScoreColumn = e.target.checked;
         savePrefs();
-        renderTable();
+        document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !e.target.checked);
       });
       document.getElementById("quickWinMax").addEventListener("input", e => {
         prefs.quickWinMaxHours = +e.target.value;
@@ -3154,6 +3255,10 @@
         if (!chip) return;
         const view = chip.dataset.jumpView;
         if (view) switchView(view);
+      });
+      document.getElementById("dashboardContent")?.addEventListener("click", e => {
+        const chip = e.target.closest("[data-jump-view]");
+        if (chip?.dataset.jumpView) switchView(chip.dataset.jumpView);
       });
       const dedupEl = document.getElementById("crossStoreDedup");
       if (dedupEl) {
@@ -3275,6 +3380,13 @@
         if (g) setPersonal(g, "notes", t.value);
       }, true);
       document.getElementById("tbody").addEventListener("click", e => {
+        if (!e.target.closest("select, input, a, button, .row-tag-remove, .row-tag-add, [data-hltb-edit]")) {
+          const tr = e.target.closest("tr[data-row-key]");
+          if (tr) {
+            focusedRowIndex = Number(tr.dataset.rowIndex || -1);
+            focusRow(tr.dataset.rowKey);
+          }
+        }
         const removeBtn = e.target.closest(".row-tag-remove");
         if (removeBtn) {
           e.stopPropagation();
@@ -3355,7 +3467,7 @@
       });
       document.getElementById("reloadData").addEventListener("click", async () => {
         kebabMenu.classList.remove("open");
-        try { await reloadGames(); } catch { alert("Could not reload library files. Use Load games.json or run the fetch scripts."); }
+        try { await reloadGames(); } catch { alert("Could not reload library files. Use Load Steam JSON… or run the fetch scripts."); }
       });
       kebabMenu.querySelectorAll("button, label").forEach(el => {
         el.addEventListener("click", () => kebabMenu.classList.remove("open"));
@@ -3420,6 +3532,7 @@
       savePrefs();
       bindEvents();
       document.getElementById("showScoreColumn").checked = !!prefs.showScoreColumn;
+      document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !prefs.showScoreColumn);
       document.getElementById("genreMode").value = prefs.genreFilterMode;
       document.getElementById("quickWinMax").value = prefs.quickWinMaxHours;
       document.getElementById("quickWinMaxVal").textContent = prefs.quickWinMaxHours;

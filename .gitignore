@@ -1,5 +1,4 @@
 .env
-games.json
 games_steam.json
 games_gog.json
 games_psn.json
@@ -25,7 +24,7 @@ refresh.log
 .vscode/
 *.code-workspace
 
-# One-off local maintenance scripts (keep patch_store_urls.py in repo)
+# One-off local maintenance scripts
 check_images.py
 find_dupes.py
 migrate_gog_images.py

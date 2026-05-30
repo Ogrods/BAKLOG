@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch Steam library data and write games.json for the dashboard."""
+"""Fetch Steam library data and write games_steam.json for the dashboard."""
 
 import argparse
 import json
@@ -14,7 +14,6 @@ from hltb_client import HltbClient
 from steam_client import SteamClient
 
 GAMES_STEAM_JSON = Path("games_steam.json")
-GAMES_JSON_LEGACY = Path("games.json")
 HLTB_DELAY_SEC = 1.0
 
 
@@ -133,17 +132,16 @@ def _build_game_row(
 
 
 def load_existing() -> dict[int, dict]:
-    path = GAMES_STEAM_JSON if GAMES_STEAM_JSON.exists() else GAMES_JSON_LEGACY
-    if not path.exists():
+    if not GAMES_STEAM_JSON.exists():
         return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(GAMES_STEAM_JSON.read_text(encoding="utf-8"))
     return {g["appid"]: g for g in data.get("games", [])}
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Fetch Steam library into games.json")
+    parser = argparse.ArgumentParser(description="Fetch Steam library into games_steam.json")
     parser.add_argument("--refresh", action="store_true", help="Ignore API cache")
-    parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games.json")
+    parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games_steam.json")
     parser.add_argument("--appid", type=int, help="Fetch a single app by ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     args = parser.parse_args()
@@ -234,7 +232,6 @@ def main() -> int:
 
     text = json.dumps(payload, indent=2, ensure_ascii=False)
     GAMES_STEAM_JSON.write_text(text, encoding="utf-8")
-    GAMES_JSON_LEGACY.write_text(text, encoding="utf-8")
     print(f"\nWrote {len(games_out)} games to {GAMES_STEAM_JSON} (skipped {skipped} non-game items).")
     print("Open index.html in your browser to view the dashboard.")
     return 0

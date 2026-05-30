@@ -10,14 +10,16 @@ A **local-only** tool for browsing, sorting, and prioritizing game libraries acr
 |-------|------|
 | Data pipeline | Python 3 (`requests`, `python-dotenv`, `howlongtobeatpy`, `psnawp`, store-specific clients) |
 | Data files | `games_<store>.json` per source (generated, gitignored) |
-| Dashboard | Static HTML + vanilla JS + prebuilt Tailwind (`tailwind.css`) |
+| Dashboard | Static HTML + vanilla JS + prebuilt Tailwind (`tailwind.css`) + Chart.js (CDN) |
 | Personal edits | Browser `localStorage` (status, notes, priority, tags) |
 | View locally | `python -m http.server 8080` → http://localhost:8080 |
 
 ## Features
 
-- Three tabs: **Library** (deduped cross-store), **Wishlist** (deal radar), **itch.io** (quarantined indie library)
+- Four tabs: **Dashboard** (Chart.js analytics, default view), **Library** (deduped cross-store), **Wishlist** (deal radar), **itch.io** (quarantined indie library)
 - Tabbed Picks panel: Top Rated, Next Up, Quick Wins, Hidden Gems, Return To, **Wishlist Deals**
+- **Dashboard tab:** KPI cards, store/status/review donuts, genre and tag charts, HLTB histogram, releases timeline, wishlist deal stats, top-rated and quick-wins lists, itch.io recap; tab switches cache table renders for snappy navigation
+- **itch.io tab:** hides tools/soundtracks/TTRPG PDFs by default; toggle to show all owned keys
 - Status breakdown chips in the summary row (click to filter): Backlog, Next, Playing, Unfinished, Live service, Finished, Skip
 - Smart sorting with optional Priority Score column
 - Multi-select genre filters with AND/OR mode
@@ -28,7 +30,6 @@ A **local-only** tool for browsing, sorting, and prioritizing game libraries acr
 - Multi-store dashboard with store filter chips and store badges
 - A–Z jump nav pinned to the right edge (xl+ screens)
 - **Wishlist deal radar:** filter by On Sale / Historical Low / Min Discount % / Max Price, hide already-owned cross-store
-- **itch.io tab:** hides tools/soundtracks/TTRPG PDFs by default; toggle to show all owned keys
 
 ## Dashboard CSS (optional)
 
@@ -69,7 +70,7 @@ npm run build:css
 python fetch_games.py
 ```
 
-Writes `games_steam.json` (and a legacy `games.json` copy for compatibility).
+Writes `games_steam.json`.
 
 **GOG:** Sign in at [gog.com](https://www.gog.com), copy the `gog-al` cookie from DevTools → Application → Cookies, set `GOG_AL=` in `.env`, then:
 
@@ -164,7 +165,7 @@ python -m http.server 8080
 
 Then open http://localhost:8080 in your browser.
 
-**Option B:** open `index.html` directly and click **Load games.json** to pick the file (browsers block automatic file loading when not using a server).
+**Option B:** open `index.html` directly and click **Load Steam JSON…** to pick a library file (browsers block automatic file loading when not using a server).
 
 Personal notes, status, and priority are stored in your browser's localStorage. Use **Export notes** in the dashboard to back them up.
 
@@ -227,7 +228,7 @@ The repo keeps most scripts in the project root on purpose — each fetcher is a
 |---------|------------|
 | `fetch_*.py` | One script per store; writes `games_<store>.json` |
 | `*_client.py` | HTTP/auth helpers used by fetchers |
-| `enrich_*.py`, `patch_*.py` | Backfill or maintenance scripts |
+| `enrich_*.py` | Backfill or maintenance scripts |
 | `games_*.json`, `itad_prices.json` | Generated library data (gitignored where applicable) |
 | `index.html`, `tailwind.css` | Static dashboard (no build step required to view) |
 | `cache/` | Cached API responses between fetch runs |

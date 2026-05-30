@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-29
+
+### Added
+
+- **Dashboard tab** (default view): Chart.js analytics with store/status/review donuts, genre and tag bars, backlog-hours-by-store stacked bar, HLTB histogram, releases timeline, HLTB-vs-rating scatter (log x-axis), wishlist deal stats, top-rated unplayed and quick-wins lists, itch.io recap card
+- Per-view table render cache: instant tab switching when filters/sort/data unchanged
+- `formatNum()` helper: comma-separates values with 5+ digits (KPIs, summary chips)
+- PSN `psn_platforms` field; frontend `NON_GENRE_TOKENS` blocklist so platform labels never appear in genre charts
+- itch.io fetcher merge preservation (`FETCHER_AUTHORITATIVE`, `_merge_cached_row`) and `--dry-run` flag
+
+### Changed
+
+- Score column toggle uses CSS class flip (`.table-hide-score`) instead of full table rerender
+- Untouched games count as **Backlog** in status chips and dashboard donuts (removed misleading "No status" slice)
+- HLTB histogram bars shade green→red by bucket; backlog-hours bars use store brand colors with bright cyan **Playing** segment
+- itch.io recap moved into the 3-list row beside Quick wins; "Recently completed" card removed
+- Dashboard legend labels use white text; custom backlog-hours legend uses `fontColor`
+- `fetch_psn.py`: platforms stored in `psn_platforms`, not `genres`
+- `fetch_games.py` writes only `games_steam.json` (dropped legacy `games.json` dual-write)
+- File picker menu label: **Load Steam JSON…**
+- Tailwind rebuilt with responsive variants (`md:`, `sm:`, `xl:`); removed dashboard `.dash-grid` workaround CSS
+- Table render uses single `innerHTML` batch + delegated row-click handler
+
+### Removed
+
+- `enrich_steam_images.py` (superseded by `enrich_cross_store_images.py`)
+- `patch_store_urls.py` (one-shot URL fix, complete)
+- Legacy `games.json` auto-fetch fallback in dashboard
+
+## [0.3.1] - 2026-05-29
+
 ### Added
 
 - Epic Games library fetcher (`fetch_epic.py`, `epic_client.py`)
@@ -70,7 +101,7 @@ All notable changes to this project are documented here.
 - Pick-for-me randomizer, reload button, multi-select genre filters, and score column toggle
 - Priority Score sorting, hidden-gem badge, status row colors, and persistent multi-row expansion
 - Inline HLTB main-hour override and compact Main/Extra/Completionist display
-- Price/discount support in `games.json` and Price column in the dashboard
+- Price/discount support in store JSON and Price column in the dashboard
 - Weekly automation helper script (`refresh.ps1`) and updated README docs
 
 ## [0.1.0] - 2026-05-27

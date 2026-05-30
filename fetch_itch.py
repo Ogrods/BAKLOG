@@ -33,6 +33,15 @@ from itch_client import ItchApiError, ItchAuthError, ItchClient
 GAMES_ITCH_JSON = Path("games_itch.json")
 HLTB_DELAY_SEC = 1.0
 
+# Fields refreshed from itch.io on every fetch; everything else is preserved from cache.
+FETCHER_AUTHORITATIVE = frozenset({
+    "store", "id", "itch_id", "name", "header_image", "library_image",
+    "release_date", "genres", "store_url", "type", "price", "price_initial",
+    "discount_percent", "currency", "publisher", "short_text",
+    "classification", "min_price", "in_press_system",
+    "download_key_id", "purchase_id",
+})
+
 
 def _configure_stdout() -> None:
     for stream in (sys.stdout, sys.stderr):
@@ -117,6 +126,23 @@ def _build_row(entry: dict, hltb: dict | None) -> dict | None:
     return row
 
 
+def _merge_cached_row(fresh: dict, cached: dict | None, *, hltb_updated: bool = False) -> dict:
+    """Overlay itch-authoritative fields onto cached row, preserving enrichment."""
+    if not cached:
+        return fresh
+    merged = dict(cached)
+    for key in FETCHER_AUTHORITATIVE:
+        if key in fresh:
+            merged[key] = fresh[key]
+    if hltb_updated:
+        for key in (
+            "hltb_main_hours", "hltb_main_extra_hours", "hltb_completionist_hours",
+            "hltb_match_confidence", "hltb_name",
+        ):
+            merged[key] = fresh.get(key)
+    return merged
+
+
 def load_existing() -> dict[str, dict]:
     if not GAMES_ITCH_JSON.exists():
         return {}
@@ -137,6 +163,11 @@ def main() -> int:
         type=int,
         default=None,
         help="Skip games whose listed min_price is below this (in cents). Useful to drop free jam games.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print summary diff and skip writing games_itch.json",
     )
     args = parser.parse_args()
     _configure_stdout()
@@ -195,15 +226,17 @@ def main() -> int:
 
         cached = existing.get(str(gid))
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb and not (
             args.only_new and cached and cached.get("hltb_main_hours") is not None
         ):
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
+                hltb_updated = bool(hltb)
             except Exception as e:
                 print(f"  HLTB warning: {e}")
-        elif cached:
+        elif cached and not args.skip_hltb:
             hltb = {
                 "hltb_main_hours": cached.get("hltb_main_hours"),
                 "hltb_main_extra_hours": cached.get("hltb_main_extra_hours"),
@@ -214,7 +247,33 @@ def main() -> int:
 
         row = _build_row(entry, hltb)
         if row:
-            games_out.append(row)
+            games_out.append(_merge_cached_row(row, cached, hltb_updated=hltb_updated))
+
+    existing_ids = set(existing.keys())
+    new_ids = {str(g["id"]) for g in games_out}
+    added = new_ids - existing_ids
+    removed = existing_ids - new_ids
+    preserved_enrichment = sum(
+        1 for g in games_out
+        if existing.get(str(g["id"]))
+        and (
+            g.get("steam_review_percent") is not None
+            or g.get("hltb_main_hours") is not None
+            or g.get("metacritic_score") is not None
+        )
+    )
+
+    print(f"\nSummary: {len(games_out)} rows ({len(added)} new, {len(removed)} dropped from file)")
+    if preserved_enrichment:
+        print(f"  {preserved_enrichment} rows kept enrichment from cache (reviews/HLTB/metacritic)")
+    if added:
+        print(f"  New ids: {len(added)}")
+    if removed:
+        print(f"  Removed ids: {len(removed)}")
+
+    if args.dry_run:
+        print("\nDry run — not writing games_itch.json.")
+        return 0
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

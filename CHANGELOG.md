@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-29
+
+### Added
+
+- Virtual scrolling for large tables (80+ rows): only visible rows are painted
+- Web Worker filter/sort for libraries with 500+ games
+- Shared row `<select>` templates and memoized `getPersonal()` lookups
+
+### Changed
+
+- `#tableWrap` is vertically scrollable with sticky header; compact `.row-ctl` selects
+- Dashboard chart timers cancelled when leaving the dashboard tab (avoids stray renders)
+
 ## [0.5.0] - 2026-05-29
 
 ### Added

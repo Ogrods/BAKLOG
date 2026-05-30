@@ -22,6 +22,9 @@ export const state = {
   ownedNormNames: new Set(),
   filtersDrawerOpen: false,
   genreChipsExpanded: false,
+  _visibleList: null,
+  _virtualActive: false,
+  _virtualStart: 0,
 };
 
 export const CLEANUP_MAX_RATING = 60;

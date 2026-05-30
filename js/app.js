@@ -11,6 +11,12 @@ import {
   STATUS_CHIP_DEFS,
   STATUS_FILTER_LABELS,
 } from './state.js';
+import { collectTableParams, queryGamesAsync } from './table-query.js';
+import { shouldVirtualize, virtualRange } from './virtual-table.js';
+import { buildStatusSelect, buildPrioritySelect } from './row-templates.js';
+import { createMemo } from './memo.js';
+
+const personalMemo = createMemo();
 
 function hydrateState() {
   state.personal = loadPersonal();
@@ -286,14 +292,17 @@ const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_overr
 const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, tags: Object.freeze([]) });
 function getPersonal(g) {
   const key = gameKey(g);
-  const found = state.personal[key] || (typeof state.personal[gameId(g)] === "object" ? state.personal[gameId(g)] : null);
-  if (!found) return PERSONAL_EMPTY;
-  if (found.status == null) found.status = "backlog";
-  if (found.notes == null) found.notes = "";
-  if (found.priority == null) found.priority = 0;
-  if (found.hltb_override === undefined) found.hltb_override = null;
-  if (!Array.isArray(found.tags)) found.tags = [];
-  return found;
+  const ver = window._dataVersion || 0;
+  return personalMemo.get(`${key}:${ver}`, () => {
+    const found = state.personal[key] || (typeof state.personal[gameId(g)] === "object" ? state.personal[gameId(g)] : null);
+    if (!found) return PERSONAL_EMPTY;
+    if (found.status == null) found.status = "backlog";
+    if (found.notes == null) found.notes = "";
+    if (found.priority == null) found.priority = 0;
+    if (found.hltb_override === undefined) found.hltb_override = null;
+    if (!Array.isArray(found.tags)) found.tags = [];
+    return found;
+  });
 }
 let _downstreamSyncTimer = null;
 function scheduleDownstreamSync() {
@@ -310,6 +319,7 @@ function setPersonal(g, field, value, options) {
   if (!Array.isArray(state.personal[key].tags)) state.personal[key].tags = [];
   state.personal[key][field] = value;
   window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
   savePersonal();
   if (options?.silent) return;
   scheduleDownstreamSync();
@@ -596,54 +606,7 @@ function jumpToLetter(letter) {
 }
 
 function filteredGames() {
-  const q = document.getElementById("search").value.toLowerCase().trim();
-  const status = document.getElementById("statusFilter").value;
-  const unplayed = document.getElementById("unplayedOnly").checked;
-  const minRating = +document.getElementById("minRating").value;
-  const maxHours = +document.getElementById("maxHours").value;
-  const genres = state.prefs.genreFilters;
-  const genreMode = state.prefs.genreFilterMode;
-  const source = state.activeView === "wishlist" ? state.wishlistGames : state.activeView === "itch" ? state.itchGames : state.allGames;
-
-  return source.filter(g => {
-    const ng = normalizeGame(g);
-    const p = getPersonal(g);
-    if (state.activeView === "library") {
-      if (state.prefs.storeFilter && ng.store !== state.prefs.storeFilter) return false;
-      if (state.crossStoreHiddenKeys.has(gameKey(g))) return false;
-    }
-    if (state.activeView === "wishlist") {
-      if (!passesDealFilters(g)) return false;
-    }
-    if (state.activeView === "itch" && state.prefs.itchHideNonGames && !itchIsGame(g)) return false;
-    if (state.cleanupModeActive && state.activeView === "library" && !isCleanupCandidate(g)) return false;
-    if (q && !g.name.toLowerCase().includes(q)) return false;
-    if ((state.activeView === "library" || state.activeView === "itch") && status) {
-      if (status === "__none__") {
-        if (hasPersonalEntry(g)) return false;
-      } else if (status === "backlog") {
-        if (hasPersonalEntry(g) && p.status !== "backlog") return false;
-      } else if (p.status !== status) {
-        return false;
-      }
-    }
-    if (unplayed && (g.playtime_minutes || 0) > 0) return false;
-    const rating = ratingValue(g);
-    if (minRating > 0 && rating < minRating) return false;
-    const h = hltbMain(g);
-    if (maxHours < 200 && h != null && h > maxHours) return false;
-    if (genres.length && !gameMatchesGenreFilters(g, genres, genreMode)) return false;
-    const tagFilters = state.prefs.tagFilters || [];
-    if (tagFilters.length) {
-      const gameTags = p.tags || [];
-      if (state.prefs.tagFilterMode === "AND") {
-        if (!tagFilters.every(t => gameTags.includes(t))) return false;
-      } else if (!tagFilters.some(t => gameTags.includes(t))) {
-        return false;
-      }
-    }
-    return true;
-  });
+  return state._visibleList || [];
 }
 
 function passesDealFilters(g) {
@@ -709,27 +672,7 @@ function bulkSetPriority(priority) {
 }
 
 function sortedGames(list) {
-  return [...list].sort((a, b) => {
-    const pa = getPersonal(a);
-    const pb = getPersonal(b);
-    let va;
-    let vb;
-    switch (state.sortKey) {
-      case "status": va = pa.status; vb = pb.status; break;
-      case "priority": va = pa.priority; vb = pb.priority; break;
-      case "priority_score": va = priorityScore(a); vb = priorityScore(b); break;
-      case "last_played": va = a.last_played || 0; vb = b.last_played || 0; break;
-      case "release_date": va = parseReleaseForSort(a.release_date); vb = parseReleaseForSort(b.release_date); break;
-      case "hltb_main_hours": va = hltbMain(a); vb = hltbMain(b); break;
-      case "discount_percent": va = effectiveDiscountPercent(a); vb = effectiveDiscountPercent(b); break;
-      case "deal_price": va = effectiveSortPrice(a); vb = effectiveSortPrice(b); break;
-      default: va = a[state.sortKey]; vb = b[state.sortKey];
-    }
-    if (va == null) va = state.sortDir > 0 ? Infinity : -Infinity;
-    if (vb == null) vb = state.sortDir > 0 ? Infinity : -Infinity;
-    if (typeof va === "string") return state.sortDir * va.localeCompare(vb);
-    return state.sortDir * (va - vb);
-  });
+  return list;
 }
 
 function pickCardHtml(g) {
@@ -1329,6 +1272,7 @@ function renderDashboard() {
 }
 
 function scheduleDashboardRender() {
+  if (state.activeView !== "dashboard") return;
   clearTimeout(_dashboardRenderTimer);
   _dashboardRenderTimer = setTimeout(renderDashboard, 80);
 }
@@ -1529,6 +1473,14 @@ function scrollRowToCenter(row) {
 }
 
 function scrollFocusedRow() {
+  const scrollEl = document.getElementById("tableWrap");
+  if (state._virtualActive && scrollEl && state.focusedRowIndex >= 0) {
+    const targetTop = state.focusedRowIndex * 56 - scrollEl.clientHeight / 2 + 28;
+    scrollEl.scrollTop = Math.max(0, targetTop);
+    renderTable({ virtualOnly: true });
+    const row = document.querySelector("tr.row-focused");
+    if (row) return;
+  }
   scrollRowToCenter(document.querySelector("tr.row-focused"));
 }
 
@@ -1575,16 +1527,101 @@ function tableFingerprint() {
 
 function invalidateTableCache() {
   _tableFingerprint = "";
+  state._visibleList = null;
 }
 
-function renderTable(opts) {
+let _renderTableGen = 0;
+let _virtualScrollRaf = 0;
+
+function tableRowHtml(g, idx, { isWish, showScore }) {
+  const p = getPersonal(g);
+  const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
+  const hiddenGem = isHiddenGem(g);
+  const key = gameKey(g);
+  const headerFallback = coverFallbackFor(g);
+  const cleanup = state.activeView === "library" && isCleanupCandidate(g);
+  const ownedWish = state.activeView === "wishlist" && isOwnedByTitle(g.name);
+  const selected = state.selectedKeys.has(key);
+  const focused = idx === state.focusedRowIndex;
+  const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
+  return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
+      <td class="p-2 text-center">${state.activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
+      <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
+      <td class="p-2">
+        <div class="flex items-center gap-1.5">
+          ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name", escapeHtml(g.name))}
+          ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
+          ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
+        </div>
+        <div class="mt-1">
+          ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
+        </div>
+        ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
+      </td>
+      ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
+      <td class="p-2 text-center">${buildPrioritySelect(key, p.priority)}</td>
+      <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
+      <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
+      <td class="p-2 text-right">
+        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
+      </td>
+      <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
+      <td class="p-2 text-right">${g.metacritic_score ?? "—"}</td>
+      <td class="p-2 text-right">${formatPrice(g)}</td>
+      <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
+      <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
+      <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
+      <td class="p-2 min-w-[180px]">
+        <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
+        <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
+      </td>
+    </tr>`;
+}
+
+function paintTableBody(list, opts = {}) {
+  const tbody = document.getElementById("tbody");
+  const scrollEl = document.getElementById("tableWrap");
+  const colSpan = tableColSpan();
+  const isWish = state.activeView === "wishlist";
+  const showScore = !!state.prefs.showScoreColumn;
+  let start = 0;
+  let end = list.length;
+  let topPad = 0;
+  let bottomPad = 0;
+  state._virtualActive = shouldVirtualize(list.length);
+  if (state._virtualActive && scrollEl && !opts.resetScroll) {
+    const range = virtualRange(scrollEl.scrollTop, scrollEl.clientHeight, list.length);
+    ({ start, end, topPad, bottomPad } = range);
+  } else if (opts.resetScroll && scrollEl) {
+    scrollEl.scrollTop = 0;
+  }
+  state._virtualStart = start;
+  const parts = [];
+  parts.push(`<tr class="virtual-spacer" aria-hidden="true"><td colspan="${colSpan}" style="height:${topPad}px;padding:0;border:0"></td></tr>`);
+  for (let i = start; i < end; i++) {
+    parts.push(tableRowHtml(list[i], i, { isWish, showScore }));
+  }
+  parts.push(`<tr class="virtual-spacer" aria-hidden="true"><td colspan="${colSpan}" style="height:${bottomPad}px;padding:0;border:0"></td></tr>`);
+  tbody.innerHTML = parts.join("");
+}
+
+async function renderTable(opts) {
   const force = !!opts?.force;
+  const virtualOnly = !!opts?.virtualOnly;
   const fp = tableFingerprint();
-  if (!force && fp === _tableFingerprint && _lastRenderedView === state.activeView) {
+  if (!force && !virtualOnly && fp === _tableFingerprint && _lastRenderedView === state.activeView) {
     return;
   }
-  const list = sortedGames(filteredGames());
-  const tbody = document.getElementById("tbody");
+  const gen = ++_renderTableGen;
+  let list = state._visibleList;
+  if (!virtualOnly) {
+    const params = collectTableParams();
+    list = await queryGamesAsync(state, params);
+    if (gen !== _renderTableGen) return;
+    state._visibleList = list;
+  } else if (!list) {
+    return;
+  }
   const showScore = !!state.prefs.showScoreColumn;
   const isWish = state.activeView === "wishlist";
   document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !showScore);
@@ -1606,67 +1643,7 @@ function renderTable(opts) {
   if (state.focusedRowIndex >= list.length) state.focusedRowIndex = list.length - 1;
   if (state.focusedRowIndex < 0 && list.length) state.focusedRowIndex = 0;
 
-  const rowsHtml = new Array(list.length);
-  list.forEach((g, idx) => {
-    const p = getPersonal(g);
-    const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
-    const hiddenGem = isHiddenGem(g);
-    const key = gameKey(g);
-    const headerFallback = coverFallbackFor(g);
-    const cleanup = state.activeView === "library" && isCleanupCandidate(g);
-    const ownedWish = state.activeView === "wishlist" && isOwnedByTitle(g.name);
-    const selected = state.selectedKeys.has(key);
-    const focused = idx === state.focusedRowIndex;
-    const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
-    rowsHtml[idx] = `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
-      <td class="p-2 text-center">${state.activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
-      <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
-      <td class="p-2">
-        <div class="flex items-center gap-1.5">
-          ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name", escapeHtml(g.name))}
-          ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
-          ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
-        </div>
-        <div class="mt-1">
-          ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
-        </div>
-        ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
-      </td>
-      ${isWish ? "" : `<td class="p-2">
-        <select data-game-key="${escapeAttr(key)}" data-field="status" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
-          <option value="backlog" ${p.status === "backlog" ? "selected" : ""}>Backlog</option>
-          <option value="next" ${p.status === "next" ? "selected" : ""}>Next up</option>
-          <option value="playing" ${p.status === "playing" ? "selected" : ""}>Playing</option>
-          <option value="unfinished" ${p.status === "unfinished" ? "selected" : ""}>Unfinished</option>
-          <option value="live" ${p.status === "live" ? "selected" : ""}>Live service</option>
-          <option value="finished" ${p.status === "finished" ? "selected" : ""}>Finished</option>
-          <option value="skip" ${p.status === "skip" ? "selected" : ""}>Skip</option>
-        </select>
-      </td>`}
-      ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : ""}
-      <td class="p-2 text-center">
-        <select data-game-key="${escapeAttr(key)}" data-field="priority" class="bg-slate-700 border border-slate-600 rounded text-xs py-1">
-          ${[0, 1, 2, 3, 4, 5].map(n => `<option value="${n}" ${p.priority === n ? "selected" : ""}>${n || "—"}</option>`).join("")}
-        </select>
-      </td>
-      <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
-      <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
-      <td class="p-2 text-right">
-        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
-      </td>
-      <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
-      <td class="p-2 text-right">${g.metacritic_score ?? "—"}</td>
-      <td class="p-2 text-right">${formatPrice(g)}</td>
-      <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
-      <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
-      <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
-      <td class="p-2 min-w-[180px]">
-        <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
-        <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
-      </td>
-    </tr>`;
-  });
-  tbody.innerHTML = rowsHtml.join("");
+  paintTableBody(list, { resetScroll: force && !virtualOnly });
 
   let base;
   if (state.activeView === "wishlist") {
@@ -1990,6 +1967,11 @@ function switchView(view) {
   const label = view === "dashboard" ? "Loading dashboard…" : view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : "Loading library…";
   if (useOverlay) showViewLoading(label);
   const doSwitch = () => {
+    if (fromView === "dashboard") {
+      clearTimeout(_dashboardRenderTimer);
+      destroyDashboardCharts();
+    }
+    invalidateTableCache();
     state.activeView = view;
     state.selectedKeys.clear();
     state.focusedRowIndex = 0;
@@ -2058,12 +2040,12 @@ function renderTagChips() {
   const wrap = document.getElementById("tagChips");
   if (!wrap) return;
   if (!tags.length) {
-    wrap.innerHTML = '<span class="text-xs text-slate-500 italic">No state.personal tags yet. Use "+ Tag selected" or the tag input on a row.</span>';
+    wrap.innerHTML = '<span class="text-xs text-slate-500 italic">No personal tags yet. Use "+ Tag selected" or the tag input on a row.</span>';
     return;
   }
   wrap.innerHTML = tags.map(([t, n]) => {
     const active = (state.prefs.tagFilters || []).includes(t);
-    return `<button class="state.personal-tag-chip px-2 py-0.5 rounded-full border text-xs ${active ? "bg-amber-600 border-amber-400 text-white" : "bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600"}" data-tag="${escapeAttr(t)}">${escapeHtml(t)}<span class="ml-1 text-[10px] text-slate-400">${n}</span></button>`;
+    return `<button class="personal-tag-chip px-2 py-0.5 rounded-full border text-xs ${active ? "bg-amber-600 border-amber-400 text-white" : "bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600"}" data-tag="${escapeAttr(t)}">${escapeHtml(t)}<span class="ml-1 text-[10px] text-slate-400">${n}</span></button>`;
   }).join("");
 }
 
@@ -2117,6 +2099,8 @@ async function loadItadPrices() {
 
 function applyMergedLibrary() {
   window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
+  invalidateTableCache();
   recomputeCrossStoreHidden();
   buildOwnedNormNames();
   const parts = [];
@@ -2530,6 +2514,13 @@ function handleGlobalKeydown(e) {
 
 // === Event wiring ===
 function bindEvents() {
+  const tableWrap = document.getElementById("tableWrap");
+  tableWrap?.addEventListener("scroll", () => {
+    if (!state._virtualActive) return;
+    cancelAnimationFrame(_virtualScrollRaf);
+    _virtualScrollRaf = requestAnimationFrame(() => renderTable({ virtualOnly: true }));
+  }, { passive: true });
+
   document.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", e => {
       let key = th.dataset.sort;
@@ -2721,7 +2712,7 @@ function bindEvents() {
     refreshFilterUI();
   });
   document.getElementById("tagChips").addEventListener("click", e => {
-    const chip = e.target.closest(".state.personal-tag-chip");
+    const chip = e.target.closest(".personal-tag-chip");
     if (!chip) return;
     const tag = chip.dataset.tag;
     const cur = state.prefs.tagFilters || [];
@@ -2778,7 +2769,7 @@ function bindEvents() {
     }
   });
   document.getElementById("selectAllVisible").addEventListener("change", e => {
-    const list = sortedGames(filteredGames());
+    const list = state._visibleList || sortedGames(filteredGames());
     if (e.target.checked) list.forEach(g => state.selectedKeys.add(gameKey(g)));
     else list.forEach(g => state.selectedKeys.delete(gameKey(g)));
     updateBulkBar();

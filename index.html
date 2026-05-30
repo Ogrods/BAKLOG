@@ -65,6 +65,11 @@
       0%, 100% { filter: brightness(1); }
       50% { filter: brightness(1.25); }
     }
+    /* === Table virtual scroll & compact controls === */
+    #tableWrap { max-height: calc(100vh - 17rem); overflow-y: auto; overflow-x: auto; }
+    #tableWrap thead th { position: sticky; top: 0; z-index: 2; background: rgb(30 41 59); }
+    .row-ctl { max-width: 6.5rem; padding: 0.1rem 0.2rem; font-size: 0.7rem; line-height: 1.1; }
+    .virtual-spacer td { line-height: 0; font-size: 0; border: none !important; }
     /* === Table row states === */
     .status-next { background: rgba(14, 165, 233, 0.08); box-shadow: inset 3px 0 0 #38bdf8; }
     .status-playing { background: rgba(16, 185, 129, 0.08); box-shadow: inset 3px 0 0 #10b981; }

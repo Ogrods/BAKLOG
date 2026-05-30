@@ -28,6 +28,7 @@ import { fetcherRunner, loadFetcherSources, renderDashboardFetcherHealth, config
 import {
   initDashboard,
   scheduleDashboardRender,
+  cancelScheduledDashboardRender,
   destroyDashboardCharts,
   dashboardLibraryGames,
   dashDrillCoop,
@@ -562,8 +563,8 @@ function dealHeroCardHtml(g) {
   const hltbLabel = hltb != null ? `${hltb}h` : null;
   const genres = (g.genres || []).filter(x => !isPlatformToken(x) && !/^early access$/i.test(x)).slice(0, 2);
   const statPills = [];
-  if (reviewPct) statPills.push(`<span class="deal-hero-stat" title="Steam review score"><span class="deal-hero-stat-dot bg-emerald-400"></span>${reviewPct}</span>`);
-  if (hltbLabel) statPills.push(`<span class="deal-hero-stat" title="HLTB main story"><span class="deal-hero-stat-dot bg-sky-400"></span>${hltbLabel}</span>`);
+  if (reviewPct) statPills.push(`<span class="deal-hero-stat" title="Steam review score"><span class="deal-hero-stat-dot deal-hero-stat-dot-review"></span>${reviewPct}</span>`);
+  if (hltbLabel) statPills.push(`<span class="deal-hero-stat" title="HLTB main story"><span class="deal-hero-stat-dot deal-hero-stat-dot-hltb"></span>${hltbLabel}</span>`);
   const genreLine = genres.length
     ? `<div class="deal-hero-genres">${genres.map(escapeHtml).join(" · ")}</div>`
     : "";
@@ -690,10 +691,15 @@ function dealStealsCardHtml(steals) {
     const cutLabel = cut > 0 ? `-${cut}%` : "★";
     const low = d.isHistoricalLow ? '<span class="steal-row-low" title="Historical low">★</span>' : "";
     const price = d.price != null ? `<span class="steal-row-price">${formatDollar(d.price)}</span>` : "";
+    const shopFull = d.shop || "";
+    const shopShort = dealShopShort(shopFull);
+    const shopCls = `steal-row-shop steal-row-shop-${shopSlug(shopFull)}`;
+    const shop = shopShort ? `<span class="${shopCls}" title="Deal on ${escapeAttr(shopFull)}">${escapeHtml(shopShort)}</span>` : "";
     const key = gameKey(g);
-    return `<button type="button" class="steal-row" data-action="deal-steal-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist">
+    return `<button type="button" class="steal-row" data-action="deal-steal-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist${shopFull ? ` (deal on ${escapeAttr(shopFull)})` : ""}">
       <img class="steal-row-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fb)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
       <span class="steal-row-name truncate">${escapeHtml(g.name)}</span>
+      ${shop}
       ${low}
       <span class="steal-row-cut">${cutLabel}</span>
       ${price}
@@ -788,6 +794,44 @@ function getDealInfo(g) {
     };
   }
   return null;
+}
+
+const DEAL_SHOP_SHORT = {
+  "steam": "Steam",
+  "gog": "GOG",
+  "humble store": "Humble",
+  "humble": "Humble",
+  "fanatical": "Fanatical",
+  "greenmangaming": "GMG",
+  "green man gaming": "GMG",
+  "indiegala": "IndieGala",
+  "indie gala": "IndieGala",
+  "microsoft store": "Microsoft",
+  "epic games store": "Epic",
+  "epic": "Epic",
+  "ubisoft store": "Ubisoft",
+  "ubisoft connect": "Ubisoft",
+  "ea app": "EA",
+  "origin": "Origin",
+  "gamersgate": "GamersGate",
+  "gamesplanet": "GamesPlanet",
+  "battle.net": "Battle.net",
+  "nintendo eshop": "Nintendo",
+  "playstation store": "PSN",
+  "wingamestore": "WGS",
+  "dlgamer": "DLGamer",
+};
+
+function dealShopShort(shop) {
+  if (!shop) return "";
+  const k = String(shop).trim().toLowerCase();
+  if (DEAL_SHOP_SHORT[k]) return DEAL_SHOP_SHORT[k];
+  return shop.length > 10 ? shop.slice(0, 10) + "…" : shop;
+}
+
+function shopSlug(shop) {
+  const short = dealShopShort(shop);
+  return String(short || shop || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function effectiveDiscountPercent(g) {
@@ -1327,12 +1371,11 @@ function focusGame(key) {
   state.pickedKey = key;
   const targetIsWishlist = String(key).startsWith("wishlist:");
   const targetIsItch = String(key).startsWith("itch:");
-  if (targetIsWishlist && state.activeView !== "wishlist") {
-    switchView("wishlist");
-  } else if (targetIsItch && state.activeView !== "itch") {
-    switchView("itch");
-  } else if (!targetIsWishlist && !targetIsItch && state.activeView !== "library") {
-    switchView("library");
+  const targetView = targetIsWishlist ? "wishlist" : targetIsItch ? "itch" : "library";
+  if (state.activeView !== targetView) {
+    state._pendingFocusKey = key;
+    switchView(targetView);
+    return;
   }
   const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
   if (existing) {
@@ -1349,6 +1392,27 @@ function focusGame(key) {
   const idx = list.findIndex(g => gameKey(g) === key);
   if (idx >= 0) scrollToRowIndex(idx);
   else renderTable();
+}
+
+function consumePendingFocus(list) {
+  const key = state._pendingFocusKey;
+  if (!key) return;
+  state._pendingFocusKey = null;
+  const idx = list.findIndex(g => gameKey(g) === key);
+  if (idx < 0) return;
+  state.pickedKey = key;
+  state.focusedRowIndex = idx;
+  requestAnimationFrame(() => {
+    const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+    if (row) {
+      document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
+      document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
+      row.classList.add("row-focused", "row-picked");
+      scrollRowToCenter(row);
+    } else {
+      scrollToRowIndex(idx);
+    }
+  });
 }
 
 function scrollRowToCenter(row) {
@@ -1512,6 +1576,7 @@ async function renderTable(opts) {
   const virtualOnly = !!opts?.virtualOnly;
   const fp = tableFingerprint();
   if (!force && !virtualOnly && fp === _tableFingerprint && _lastRenderedView === state.activeView) {
+    if (state._pendingFocusKey && state._visibleList) consumePendingFocus(state._visibleList);
     return;
   }
   const gen = ++_renderTableGen;
@@ -1573,6 +1638,7 @@ async function renderTable(opts) {
   buildAlphaNav(list);
   _tableFingerprint = fp;
   _lastRenderedView = state.activeView;
+  consumePendingFocus(list);
 }
 
 // === Drawer + active pills ===
@@ -1582,6 +1648,9 @@ const NON_GENRE_TOKENS = new Set([
   "nintendo switch", "switch", "wii", "wii u", "ds", "3ds", "nintendo ds", "nintendo 3ds",
   "pc", "windows", "mac", "macos", "osx", "linux", "steamos",
   "ios", "android", "browser", "stadia", "google stadia",
+  "default", "html", "html5", "flash", "java", "unity", "godot",
+  "physical_game", "physical game", "assets", "asset_pack", "asset pack",
+  "tool", "book", "comic", "soundtrack", "other",
 ]);
 function isPlatformToken(name) {
   return NON_GENRE_TOKENS.has(String(name || "").trim().toLowerCase());
@@ -1908,7 +1977,7 @@ function switchView(view) {
   if (useOverlay) showViewLoading(label);
   const doSwitch = () => {
     if (fromView === "dashboard") {
-      clearTimeout(_dashboardRenderTimer);
+      cancelScheduledDashboardRender();
       destroyDashboardCharts();
     }
     invalidateTableCache();
@@ -2536,6 +2605,7 @@ function bindEvents() {
   };
   document.getElementById("dashTopRated")?.addEventListener("click", onDashListClick);
   document.getElementById("dashQuickWins")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashItchRecap")?.addEventListener("click", onDashListClick);
 
   const handleCoopActivate = (e) => {
     const target = e.target.closest("[data-action]");

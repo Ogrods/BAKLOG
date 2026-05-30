@@ -177,9 +177,13 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
         label = entry.get("label", key)
         if not key or not script:
             continue
+        extra_args = entry.get("args") or []
+        if not isinstance(extra_args, list):
+            print(f"[fetchers] {key}: 'args' must be a list, ignoring", file=sys.stderr)
+            extra_args = []
         fetchers[key] = {
             "label": label,
-            "argv": _argv(script),
+            "argv": _argv(script, *map(str, extra_args)),
             "metaKey": entry.get("metaKey", key),
             "group": entry.get("group", "library"),
             "color": entry.get("color"),

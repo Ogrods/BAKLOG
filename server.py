@@ -13,8 +13,8 @@ Endpoints:
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
 
-Bind: 127.0.0.1 only. The fetcher whitelist mirrors the frontend registry
-in js/app.js so the browser cannot execute arbitrary commands.
+Bind: 127.0.0.1 only. The fetcher whitelist is loaded from fetchers/manifest.json
+so the browser cannot execute arbitrary commands.
 """
 from __future__ import annotations
 
@@ -159,23 +159,35 @@ def _python_executable() -> str:
     return sys.executable
 
 
-FETCHERS: dict[str, dict[str, Any]] = {
-    "steam":         {"label": "Steam",      "argv": _argv("fetch_games.py")},
-    "gog":           {"label": "GOG",        "argv": _argv("fetch_gog.py")},
-    "psn":           {"label": "PSN",        "argv": _argv("fetch_psn.py")},
-    "epic":          {"label": "Epic",       "argv": _argv("fetch_epic.py")},
-    "amazon":        {"label": "Amazon",     "argv": _argv("fetch_amazon.py")},
-    "xbox":          {"label": "Xbox",       "argv": _argv("fetch_xbox.py")},
-    "battlenet":     {"label": "Battle.net", "argv": _argv("fetch_battlenet.py")},
-    "ubisoft":       {"label": "Ubisoft",    "argv": _argv("fetch_ubisoft.py")},
-    "nintendo":      {"label": "Nintendo",   "argv": _argv("fetch_nintendo.py")},
-    "itch":          {"label": "itch.io",    "argv": _argv("fetch_itch.py")},
-    "wishlistSteam": {"label": "WL Steam",   "argv": _argv("fetch_wishlist.py")},
-    "wishlistGog":   {"label": "WL GOG",     "argv": _argv("fetch_gog_wishlist.py")},
-    "wishlistEpic":  {"label": "WL Epic",    "argv": _argv("fetch_epic_wishlist.py")},
-    "itad":          {"label": "ITAD",       "argv": _argv("fetch_itad.py")},
-    "hltb":          {"label": "HLTB",       "argv": _argv("enrich_hltb.py")},
-}
+MANIFEST_FILE = ROOT / "fetchers" / "manifest.json"
+
+
+def _load_fetchers() -> dict[str, dict[str, Any]]:
+    """Build the fetcher registry from fetchers/manifest.json."""
+    try:
+        raw = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+        entries = raw.get("fetchers", [])
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"[fetchers] manifest load failed: {exc!r}", file=sys.stderr)
+        entries = []
+    fetchers: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        key = entry.get("key")
+        script = entry.get("script")
+        label = entry.get("label", key)
+        if not key or not script:
+            continue
+        fetchers[key] = {
+            "label": label,
+            "argv": _argv(script),
+            "metaKey": entry.get("metaKey", key),
+            "group": entry.get("group", "library"),
+            "color": entry.get("color"),
+        }
+    return fetchers
+
+
+FETCHERS: dict[str, dict[str, Any]] = _load_fetchers()
 
 
 class Run:
@@ -402,7 +414,14 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_fetchers(self) -> None:
         data = {
             "fetchers": [
-                {"key": k, "label": v["label"], "cmd": " ".join(v["argv"][1:])}
+                {
+                    "key": k,
+                    "label": v["label"],
+                    "cmd": " ".join(v["argv"][1:]),
+                    "metaKey": v.get("metaKey", k),
+                    "group": v.get("group", "library"),
+                    "color": v.get("color"),
+                }
                 for k, v in FETCHERS.items()
             ]
         }

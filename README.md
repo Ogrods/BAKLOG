@@ -102,7 +102,7 @@ python fetch_amazon.py
 python fetch_xbox.py --skip-hltb
 ```
 
-**Battle.net (unofficial):** Sign in at account.battle.net, visit `/games`, copy the full `Cookie` header sent to `/api/games-and-subs` into `BATTLENET_COOKIE=`.
+**Battle.net (unofficial):** Sign in at account.battle.net, visit `/games`, copy the full `Cookie` header sent to `/api/games-and-subs` into `BATTLENET_COOKIE=`. Cookies expire — if the fetcher exits 1 with `401`, sign in again and paste a fresh cookie.
 
 ```bash
 python fetch_battlenet.py --skip-hltb
@@ -133,10 +133,12 @@ Writes all owned keys (games + tools/TTRPG PDFs). The dashboard itch.io tab hide
 
 ```bash
 python fetch_wishlist.py --skip-hltb
-python fetch_gog_wishlist.py
+python fetch_gog_wishlist.py    # optional — needs GOG_AL; until run, WL GOG chip shows "missing"
 python fetch_epic_wishlist.py
 python fetch_itad.py
 ```
+
+Wishlist JSON files (`games_wishlist.json`, `games_wishlist_gog.json`, `games_wishlist_epic.json`) are optional per store. The dashboard **Fetcher health** row marks any file that has not been fetched yet as *missing*; that is normal until you run the matching script.
 
 **Epic wishlist (storefront cookie):** the wishlist lives behind storefront auth, separate from the launcher OAuth that `fetch_epic.py` uses. Sign in at [store.epicgames.com](https://store.epicgames.com), open the wishlist page, DevTools → Network → filter `graphql` → click any POST `/graphql` → Headers → Request Headers → copy the entire `Cookie:` value into `EPIC_STORE_COOKIE` in `.env`.
 

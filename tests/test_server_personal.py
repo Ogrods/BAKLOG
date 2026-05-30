@@ -1,0 +1,103 @@
+"""Tests for server.py personal-data API."""
+from __future__ import annotations
+
+import json
+import threading
+import urllib.error
+import urllib.request
+from http.server import ThreadingHTTPServer
+from functools import partial
+from pathlib import Path
+
+import pytest
+
+import server
+
+
+@pytest.fixture()
+def personal_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Run server.Handler on an ephemeral port with isolated personal-data files."""
+    personal_file = tmp_path / "personal.json"
+    backup_dir = tmp_path / "personal_backups"
+    monkeypatch.setattr(server, "PERSONAL_DIR", tmp_path)
+    monkeypatch.setattr(server, "PERSONAL_FILE", personal_file)
+    monkeypatch.setattr(server, "PERSONAL_BACKUP_DIR", backup_dir)
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(server.ROOT)))
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
+
+
+def _request(base: str, method: str, path: str, body: dict | None = None) -> tuple[int, dict]:
+    data = None
+    headers = {}
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(f"{base}{path}", data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status, json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        payload = exc.read().decode("utf-8")
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            parsed = {"error": payload}
+        return exc.code, parsed
+
+
+def test_personal_get_empty_doc(personal_server: str):
+    status, doc = _request(personal_server, "GET", "/api/personal")
+    assert status == 200
+    assert doc["personal"] == {}
+    assert doc["prefs"] == {}
+    assert doc["manual"] == []
+    assert doc["schema_version"] == 1
+
+
+def test_personal_put_round_trip(personal_server: str):
+    payload = {
+        "personal": {"steam:570": {"status": "backlog"}},
+        "prefs": {"picksTab": "topRated"},
+        "manual": [{"store": "manual", "id": "demo", "name": "Demo"}],
+    }
+    put_status, saved = _request(personal_server, "PUT", "/api/personal", payload)
+    assert put_status == 200
+    assert saved["personal"]["steam:570"]["status"] == "backlog"
+    assert saved["manual"][0]["name"] == "Demo"
+    assert saved.get("updated_at") is not None
+
+    get_status, loaded = _request(personal_server, "GET", "/api/personal")
+    assert get_status == 200
+    assert loaded["personal"] == saved["personal"]
+    assert loaded["prefs"] == saved["prefs"]
+    assert loaded["manual"] == saved["manual"]
+
+
+def test_personal_put_invalid_payload(personal_server: str):
+    status, err = _request(personal_server, "PUT", "/api/personal", {"personal": "not-an-object"})
+    assert status == 400
+    assert "personal must be an object" in err["error"]
+
+
+def test_run_unknown_fetcher(personal_server: str):
+    status, err = _request(personal_server, "POST", "/api/run/unknown-fetcher-key")
+    assert status == 404
+    assert "unknown fetcher" in err["error"]
+
+
+def test_fetchers_from_manifest(personal_server: str):
+    status, data = _request(personal_server, "GET", "/api/fetchers")
+    assert status == 200
+    keys = {entry["key"] for entry in data["fetchers"]}
+    assert "steam" in keys
+    assert "hltb" in keys
+    assert len(keys) == len(server.FETCHERS)

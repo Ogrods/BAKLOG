@@ -11,8 +11,8 @@ A **local-only** tool for browsing, sorting, and prioritizing game libraries acr
 | Data pipeline | Python 3 (`requests`, `python-dotenv`, `howlongtobeatpy`, `psnawp`, store-specific clients) |
 | Data files | `games_<store>.json` per source (generated, gitignored) |
 | Dashboard | Static HTML + ESM (`js/state.js`, `js/app.js`) + prebuilt Tailwind (`tailwind.css`) + Chart.js (CDN) |
-| Personal edits | Browser `localStorage` (status, notes, priority, tags) |
-| View locally | `python -m http.server 8080` → http://localhost:8080 |
+| Personal edits | `data/personal.json` via the dev server (status, notes, priority, tags, prefs, manual games); browser `localStorage` is the cache + fallback for read-only mode |
+| View locally | `python server.py` → http://localhost:8765 (or `python -m http.server 8080` for read-only mode) |
 
 ## Features
 
@@ -134,8 +134,11 @@ Writes all owned keys (games + tools/TTRPG PDFs). The dashboard itch.io tab hide
 ```bash
 python fetch_wishlist.py --skip-hltb
 python fetch_gog_wishlist.py
+python fetch_epic_wishlist.py
 python fetch_itad.py
 ```
+
+**Epic wishlist (storefront cookie):** the wishlist lives behind storefront auth, separate from the launcher OAuth that `fetch_epic.py` uses. Sign in at [store.epicgames.com](https://store.epicgames.com), open the wishlist page, DevTools → Network → filter `graphql` → click any POST `/graphql` → Headers → Request Headers → copy the entire `Cookie:` value into `EPIC_STORE_COOKIE` in `.env`.
 
 Fetcher options (all scripts):
 
@@ -157,17 +160,25 @@ First Steam run may take several minutes for a large library (Store API is rate-
 
 ## Open the dashboard
 
-**Option A (recommended):** run a local server from this folder:
+**Option A (recommended):** run the bundled dev server, which serves the dashboard *and* lets you trigger fetchers from the dashboard "Fetcher health" row:
 
 ```bash
-python -m http.server 8080
+python server.py
 ```
 
-Then open http://localhost:8080 in your browser.
+Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes. Runs are serialized (single-worker queue) so concurrent clicks won't corrupt shared caches. The server binds to `127.0.0.1` only; override with `PORT=9000 python server.py` to change the port.
 
-**Option B:** open `index.html` directly and click **Load Steam JSON…** to pick a library file (browsers block automatic file loading when not using a server).
+**Option B (read-only):** `python -m http.server 8080` if you only want to browse and prefer to run fetchers in your terminal.
 
-Personal notes, status, and priority are stored in your browser's localStorage. Use **Export notes** in the dashboard to back them up.
+**Option C:** open `index.html` directly and click **Load Steam JSON…** to pick a library file (browsers block automatic file loading when not using a server).
+
+### Personal data storage
+
+When you launch via `python server.py` (the recommended mode), your statuses, notes, priorities, tags, UI prefs, and manually-added games are persisted to `data/personal.json`. The file is the source of truth — back it up, sync it via Dropbox/OneDrive/git, copy it to another machine. The dev server writes atomically (temp file + rename) and keeps a rolling set of timestamped backups in `data/personal_backups/` so a bad save can't wipe earlier edits.
+
+The browser's `localStorage` still exists as a hot cache that the page hydrates from on first paint, but it is overwritten from `data/personal.json` on every boot. **Server wins.**
+
+If you instead serve the dashboard read-only via `python -m http.server`, the dashboard falls back to localStorage as in earlier versions and the **Export notes** / **Import notes** buttons (in the toolbar ⋯ menu) become the only way to back up. The first time you open the dashboard via `server.py` after using read-only mode, a banner offers to upload your existing localStorage data into `data/personal.json`.
 
 ## Auto-refresh on a schedule (Windows)
 
@@ -200,6 +211,7 @@ schtasks /create /SC WEEKLY /D SUN /TN "Steam Backlog Refresh" /TR "powershell -
 | `fetch_itch.py` | itch.io owned keys → `games_itch.json` |
 | `fetch_wishlist.py` | Steam wishlist → `games_wishlist.json` |
 | `fetch_gog_wishlist.py` | GOG wishlist → `games_wishlist_gog.json` |
+| `fetch_epic_wishlist.py` | Epic Games Store wishlist → `games_wishlist_epic.json` (uses `EPIC_STORE_COOKIE`) |
 | `fetch_itad.py` | IsThereAnyDeal prices → `itad_prices.json` |
 | `enrich_steam_reviews.py` | Backfill Steam review fields on non-Steam rows |
 | `enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |

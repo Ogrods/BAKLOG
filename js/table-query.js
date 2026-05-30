@@ -30,9 +30,23 @@ export function collectTableParams() {
     q: (document.getElementById('search')?.value || '').trim().toLowerCase(),
     status: document.getElementById('statusFilter')?.value || '',
     unplayed: !!document.getElementById('unplayedOnly')?.checked,
+    earlyAccess: !!document.getElementById('earlyAccessOnly')?.checked,
+    coopOnline: !!document.getElementById('coopOnlineOnly')?.checked,
+    coopLocal: !!document.getElementById('coopLocalOnly')?.checked,
     minRating: +(document.getElementById('minRating')?.value || 0),
     maxHours: +(document.getElementById('maxHours')?.value || 200),
   };
+}
+
+export function isEarlyAccess(g) {
+  if (!g) return false;
+  if (g.early_access === true) return true;
+  const tokens = [...(g.genres || []), ...(g.tags || [])];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (typeof t === 'string' && t.toLowerCase().includes('early access')) return true;
+  }
+  return false;
 }
 
 function gameStore(g) {
@@ -105,7 +119,7 @@ function hltbMain(personal, g) {
 }
 
 function ratingValue(g) {
-  return g.steam_review_percent ?? g.metacritic_score ?? 0;
+  return g.steam_review_percent ?? 0;
 }
 
 function parseReleaseForSort(d) {
@@ -218,7 +232,13 @@ function passesFilter(ctx, g) {
     if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
     if (hiddenKeys.has(gameKey(g))) return false;
   }
-  if (view === 'wishlist' && !passesDealFilters(ctx, g)) return false;
+  if (view === 'wishlist') {
+    if (prefs.wishlistStoreFilter) {
+      const target = g.wishlist_store || g.store_target || (g.manual ? 'manual' : 'steam');
+      if (target !== prefs.wishlistStoreFilter) return false;
+    }
+    if (!passesDealFilters(ctx, g)) return false;
+  }
   if (view === 'itch' && prefs.itchHideNonGames && !itchIsGame(g)) return false;
   if (ctx.cleanupModeActive && view === 'library' && !isCleanupCandidate(ctx, g)) return false;
   if (params.q && !g.name.toLowerCase().includes(params.q)) return false;
@@ -232,6 +252,9 @@ function passesFilter(ctx, g) {
     }
   }
   if (params.unplayed && (g.playtime_minutes || 0) > 0) return false;
+  if (params.earlyAccess && !isEarlyAccess(g)) return false;
+  if (params.coopOnline && !g.coop_online) return false;
+  if (params.coopLocal && !g.coop_local) return false;
   const rating = ratingValue(g);
   if (params.minRating > 0 && rating < params.minRating) return false;
   const h = hltbMain(personal, g);

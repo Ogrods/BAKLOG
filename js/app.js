@@ -11,9 +11,15 @@ import {
   STATUS_CHIP_DEFS,
   STATUS_FILTER_LABELS,
 } from './state.js';
-import { collectTableParams, queryGamesAsync } from './table-query.js';
-import { shouldVirtualize, virtualRange } from './virtual-table.js';
-import { buildStatusSelect, buildPrioritySelect } from './row-templates.js';
+import { collectTableParams, isEarlyAccess, queryGamesAsync } from './table-query.js';
+import {
+  shouldVirtualize,
+  virtualRange,
+  virtualRangeAroundIndex,
+  tableVirtualMetrics,
+  TABLE_ROW_HEIGHT,
+} from './virtual-table.js';
+import { buildStatusSelect, buildPrioritySelect, STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { createMemo } from './memo.js';
 
 const personalMemo = createMemo();
@@ -163,6 +169,7 @@ function savePersonal() {
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = setTimeout(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
+    personalStore.notify();
   }, 250);
 }
 function flushSavePersonal() {
@@ -170,21 +177,60 @@ function flushSavePersonal() {
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = null;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
+  personalStore.notify();
 }
 window.addEventListener("beforeunload", flushSavePersonal);
 window.addEventListener("blur", flushSavePersonal);
 function loadPrefs() {
-  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, wishlistSortInitialized: false };
+  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false };
   try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
 }
-function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs)); }
+function savePrefs() {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
+  personalStore.notify();
+}
+
+const VIEW_SORT_DEFAULTS = {
+  library: { key: "name", dir: 1 },
+  wishlist: { key: "deal_price", dir: 1 },
+  itch: { key: "name", dir: 1 },
+};
+
+function getSavedSortForView(view) {
+  const def = VIEW_SORT_DEFAULTS[view];
+  if (!def) return null;
+  const saved = state.prefs.viewSorts && state.prefs.viewSorts[view];
+  if (saved && typeof saved.key === "string" && (saved.dir === 1 || saved.dir === -1)) {
+    return { key: saved.key, dir: saved.dir };
+  }
+  return { ...def };
+}
+
+function applySavedSortForView(view) {
+  const s = getSavedSortForView(view);
+  if (!s) return;
+  state.sortKey = s.key;
+  state.sortDir = s.dir;
+}
+
+function persistCurrentSort() {
+  if (!VIEW_SORT_DEFAULTS[state.activeView]) return;
+  if (!state.prefs.viewSorts || typeof state.prefs.viewSorts !== "object") {
+    state.prefs.viewSorts = {};
+  }
+  state.prefs.viewSorts[state.activeView] = { key: state.sortKey, dir: state.sortDir };
+  savePrefs();
+}
 function loadManualGames() {
   try {
     const raw = JSON.parse(localStorage.getItem(MANUAL_KEY) || "[]");
     return Array.isArray(raw) ? raw : [];
   } catch { return []; }
 }
-function saveManualGames(list) { localStorage.setItem(MANUAL_KEY, JSON.stringify(list)); }
+function saveManualGames(list) {
+  localStorage.setItem(MANUAL_KEY, JSON.stringify(list));
+  personalStore.notify();
+}
 let manualGames = loadManualGames();
 function addManualGame(g) {
   manualGames = loadManualGames();
@@ -197,6 +243,176 @@ function removeManualGame(store, id) {
   manualGames = loadManualGames().filter(m => !(m.store === store && m.id === id));
   saveManualGames(manualGames);
 }
+
+// === Server-backed personal data store ===
+// When server.py is reachable, the JSON file at data/personal.json is the
+// source of truth. localStorage stays in sync as a hydration cache so the
+// dashboard still works in read-only mode (static server / file://). The
+// flow is one-way once we're live: save -> localStorage -> debounced PUT.
+const personalStore = (() => {
+  let apiAvailable = null;
+  let serverDoc = null;
+  let pushTimer = null;
+  let inFlight = null;
+  let dirty = false;
+  let initComplete = false;
+  let pendingMigration = null; // local snapshot waiting for user confirm
+  const PUSH_DEBOUNCE_MS = 600;
+
+  function snapshotLocal() {
+    return {
+      personal: JSON.parse(JSON.stringify(state.personal || {})),
+      prefs: JSON.parse(JSON.stringify(state.prefs || {})),
+      manual: JSON.parse(JSON.stringify(loadManualGames())),
+    };
+  }
+
+  function isMeaningful(snap) {
+    const personalKeys = Object.keys(snap.personal || {}).filter(k => k !== "__migrated_v3");
+    if (personalKeys.length) return true;
+    if ((snap.manual || []).length) return true;
+    return false;
+  }
+
+  async function probe() {
+    if (apiAvailable !== null) return apiAvailable;
+    try {
+      const res = await fetch("/api/personal", { method: "GET" });
+      if (!res.ok) { apiAvailable = false; return false; }
+      serverDoc = await res.json();
+      apiAvailable = true;
+      return true;
+    } catch {
+      apiAvailable = false;
+      return false;
+    }
+  }
+
+  function applyServerDoc(doc) {
+    state.personal = doc.personal || {};
+    state.prefs = { ...state.prefs, ...(doc.prefs || {}) };
+    const manual = Array.isArray(doc.manual) ? doc.manual : [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
+    localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
+    localStorage.setItem(MANUAL_KEY, JSON.stringify(manual));
+    manualGames = manual;
+  }
+
+  async function init() {
+    const localSnapBeforeProbe = snapshotLocal();
+    const available = await probe();
+    if (!available) return { migrated: false, pendingMigration: null };
+
+    const serverHas = isMeaningful(serverDoc || {});
+    const localHas = isMeaningful(localSnapBeforeProbe);
+
+    if (serverHas) {
+      applyServerDoc(serverDoc);
+      initComplete = true;
+      return { migrated: true, pendingMigration: null };
+    }
+
+    if (localHas) {
+      // Don't auto-overwrite the server with local data; let the user confirm.
+      // notify() stays a no-op until the migration banner is resolved.
+      pendingMigration = localSnapBeforeProbe;
+      return { migrated: false, pendingMigration };
+    }
+
+    applyServerDoc(serverDoc || { personal: {}, prefs: {}, manual: [] });
+    initComplete = true;
+    return { migrated: true, pendingMigration: null };
+  }
+
+  async function uploadLocalToServer() {
+    if (!pendingMigration) return false;
+    const payload = pendingMigration;
+    pendingMigration = null;
+    initComplete = true;
+    const ok = await putPayload(payload);
+    if (ok && dirty) {
+      // If anything was edited mid-banner, push it too.
+      flush();
+    }
+    return ok;
+  }
+
+  function dismissMigration() {
+    pendingMigration = null;
+    initComplete = true;
+    if (dirty) flush();
+  }
+
+  function notify() {
+    if (apiAvailable !== true) return;
+    if (!initComplete) {
+      // Still resolving migration banner; remember that we have changes,
+      // but don't push yet. Will be flushed when the banner is resolved.
+      dirty = true;
+      return;
+    }
+    dirty = true;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(flush, PUSH_DEBOUNCE_MS);
+  }
+
+  async function putPayload(payload) {
+    inFlight = (async () => {
+      try {
+        const res = await fetch("/api/personal", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          console.warn("[personalStore] PUT failed", res.status, await res.text().catch(() => ""));
+          return false;
+        }
+        serverDoc = await res.json();
+        return true;
+      } catch (err) {
+        console.warn("[personalStore] PUT errored", err);
+        return false;
+      } finally {
+        inFlight = null;
+      }
+    })();
+    return inFlight;
+  }
+
+  async function flush() {
+    if (apiAvailable !== true) return;
+    if (inFlight) {
+      try { await inFlight; } catch (_) {}
+    }
+    if (!dirty) return;
+    dirty = false;
+    pushTimer = null;
+    const snap = snapshotLocal();
+    const ok = await putPayload(snap);
+    if (!ok) dirty = true;
+  }
+
+  function flushSync() {
+    if (apiAvailable !== true) return;
+    if (!dirty && !pushTimer) return;
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    dirty = false;
+    const snap = snapshotLocal();
+    try {
+      const blob = new Blob([JSON.stringify(snap)], { type: "application/json" });
+      navigator.sendBeacon("/api/personal", blob);
+    } catch (err) {
+      console.warn("[personalStore] sendBeacon failed", err);
+    }
+  }
+
+  function isAvailable() { return apiAvailable === true; }
+
+  return { init, notify, flush, flushSync, uploadLocalToServer, dismissMigration, isAvailable };
+})();
+window.addEventListener("beforeunload", () => personalStore.flushSync());
 function normalizeGame(g) {
   if (g.store && g.id != null) return g;
   const store = g.store || "steam";
@@ -354,12 +570,12 @@ function hltbMain(g) {
   if (p.hltb_override != null && p.hltb_override !== "") return +p.hltb_override;
   return g.hltb_main_hours;
 }
-function ratingValue(g) { return g.steam_review_percent ?? g.metacritic_score ?? 0; }
+function ratingValue(g) { return g.steam_review_percent ?? 0; }
 const MIN_REVIEW_COUNT = 50;
 function hasEnoughReviews(g) {
   const pct = g.steam_review_percent;
   if (pct != null && pct > 0) return (g.steam_review_count || 0) >= MIN_REVIEW_COUNT;
-  return (g.metacritic_score || 0) > 0;
+  return false;
 }
 function priorityScore(g) {
   const p = getPersonal(g);
@@ -369,8 +585,21 @@ function priorityScore(g) {
 }
 function isHiddenGem(g) {
   const p = getPersonal(g);
-  const rating = g.steam_review_percent ?? g.metacritic_score ?? 0;
+  const rating = g.steam_review_percent ?? 0;
   return rating >= 90 && (g.playtime_minutes || 0) === 0 && p.status === "backlog";
+}
+function earlyAccessRibbonHtml(g, { label = "EARLY ACCESS" } = {}) {
+  return isEarlyAccess(g) ? `<span class="ea-ribbon" title="Early Access">${label}</span>` : "";
+}
+function earlyAccessPillHtml(g) {
+  return isEarlyAccess(g) ? '<span class="ea-pill" title="Early Access">EA</span>' : "";
+}
+function coopPillsHtml(g) {
+  if (!g) return "";
+  const bits = [];
+  if (g.coop_online) bits.push('<span class="coop-pill coop-pill-online" title="Online co-op">ONLINE CO-OP</span>');
+  if (g.coop_local) bits.push('<span class="coop-pill coop-pill-local" title="Shared / split-screen co-op">COUCH CO-OP</span>');
+  return bits.join("");
 }
 function storeLetter(s) {
   return s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "itch" ? "I" : s === "xbox" ? "X" : s === "battlenet" ? "B" : s === "ubisoft" ? "U" : s === "other" ? "?" : s === "manual" ? "M" : "S";
@@ -387,28 +616,37 @@ function storeBadgeHtml(g) {
 }
 function wishlistStatusSelectHtml(g, p) {
   const key = gameKey(g);
-  const opts = [
-    ["backlog", "Watching"],
-    ["next", "Want it"],
-    ["skip", "Pass"],
-    ["finished", "Bought"],
-  ];
   return `<select data-game-key="${escapeAttr(key)}" data-field="status" class="bg-slate-700 border border-slate-600 rounded text-xs py-1" title="Wishlist tracking">
-    ${opts.map(([val, label]) => `<option value="${val}" ${p.status === val ? "selected" : ""}>${label}</option>`).join("")}
+    ${Object.entries(WISHLIST_STATUS_LABELS).map(([val, label]) => `<option value="${val}" ${p.status === val ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
   </select>`;
 }
 
+function bulkStatusOptsForView(view) {
+  const labels = view === "wishlist" ? WISHLIST_STATUS_LABELS : STATUS_LABELS;
+  return Object.entries(labels).map(([status, label]) => ({ status, label }));
+}
+
+function renderBulkStatusButtons() {
+  const wrap = document.getElementById("bulkStatusButtons");
+  if (!wrap) return;
+  if (state.activeView === "dashboard") {
+    wrap.innerHTML = "";
+    return;
+  }
+  wrap.innerHTML = bulkStatusOptsForView(state.activeView).map(
+    ({ status, label }) => `<button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="${escapeAttr(status)}">${escapeHtml(label)}</button>`,
+  ).join("");
+}
+
 function tableColSpan() {
-  return state.prefs.showScoreColumn ? 15 : 14;
+  return state.prefs.showScoreColumn ? 14 : 13;
 }
 
 function wishlistBadgeHtml(g) {
   const target = g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
-  const cls = target === "gog" ? "gog" : target === "epic" ? "epic" : target === "psn" ? "psn" : target === "amazon" ? "amazon" : target === "nintendo" ? "nintendo" : target === "xbox" ? "xbox" : target === "battlenet" ? "battlenet" : target === "ubisoft" ? "ubisoft" : target === "itch" ? "itch" : target === "manual" ? "other" : "steam";
-  const letter = target === "gog" ? "G" : target === "epic" ? "E" : target === "psn" ? "P" : target === "amazon" ? "A" : target === "nintendo" ? "N" : target === "xbox" ? "X" : target === "battlenet" ? "B" : target === "ubisoft" ? "U" : target === "itch" ? "I" : target === "manual" ? "M" : "S";
   const manualMark = g.manual ? " manual" : "";
   const tip = `Wishlist · ${target.toUpperCase()}${g.manual ? " (manual)" : ""}`;
-  return `<span class="store-badge ${cls}${manualMark}" title="${tip}">W${letter}</span>`;
+  return `<span class="store-badge ${target}${manualMark}" title="${tip}">${storeLetter(target)}</span>`;
 }
 function formatHours(minutes) { return !minutes ? "0h" : `${(minutes / 60).toFixed(1)}h`; }
 function formatDate(unixOrStr) {
@@ -425,6 +663,218 @@ function formatNum(n) {
   const num = Number(n);
   if (!Number.isFinite(num)) return String(n);
   return Math.abs(num) >= 10000 ? num.toLocaleString("en-US") : String(num);
+}
+
+function formatDollar(n) {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return "—";
+  return num.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: num % 1 ? 2 : 0, maximumFractionDigits: 2 });
+}
+
+function isStealDeal(g) {
+  const d = getDealInfo(g);
+  if (!d) return false;
+  const cut = d.cut || 0;
+  if (cut <= 0) return false;
+  const rating = ratingValue(g);
+  if (rating < 80) return false;
+  return cut >= 50 || d.isHistoricalLow;
+}
+
+function wishlistGamesWithDeals(wl) {
+  return wl.filter(g => {
+    const d = getDealInfo(g);
+    return d && (d.cut || 0) > 0;
+  });
+}
+
+function syncDealFilterControls() {
+  const onSaleEl = document.getElementById("dealOnSaleOnly");
+  if (onSaleEl) onSaleEl.checked = !!state.prefs.dealOnSaleOnly;
+  const minEl = document.getElementById("dealMinDiscount");
+  const minVal = document.getElementById("dealMinDiscountVal");
+  if (minEl) minEl.value = String(state.prefs.dealMinDiscount || 0);
+  if (minVal) minVal.textContent = String(state.prefs.dealMinDiscount || 0);
+}
+
+function drillWishlistDealFilter({ onSaleOnly, minDiscount }) {
+  if (onSaleOnly) state.prefs.dealOnSaleOnly = true;
+  if (minDiscount != null) state.prefs.dealMinDiscount = minDiscount;
+  syncDealFilterControls();
+  savePrefs();
+  if (state.activeView !== "wishlist") switchView("wishlist");
+  else refreshFilterUI();
+}
+
+function dealHeroCardHtml(g) {
+  const d = getDealInfo(g);
+  const key = gameKey(g);
+  const cover = g.library_image || coverFallbackFor(g);
+  const headerFallback = coverFallbackFor(g);
+  const cut = d?.cut || 0;
+  const price = d?.price;
+  const regular = d?.regular;
+  const shop = d?.shop ? `@ ${escapeHtml(d.shop)}` : "";
+  const lowPin = d?.isHistoricalLow ? '<span class="deal-badge-low">★ Historical low</span>' : "";
+  const priceHtml = price != null
+    ? `<span class="deal-hero-price">${formatDollar(price)}</span>${regular != null && regular > price ? `<span class="deal-hero-regular">${formatDollar(regular)}</span>` : ""}`
+    : `<span class="deal-hero-price">${cut > 0 ? `${cut}% off` : "On sale"}</span>`;
+  const reviewPct = g.steam_review_percent != null ? `${g.steam_review_percent}%` : null;
+  const hltb = hltbMain(g);
+  const hltbLabel = hltb != null ? `${hltb}h` : null;
+  const genres = (g.genres || []).filter(x => !isPlatformToken(x) && !/^early access$/i.test(x)).slice(0, 2);
+  const statPills = [];
+  if (reviewPct) statPills.push(`<span class="deal-hero-stat" title="Steam review score"><span class="deal-hero-stat-dot bg-emerald-400"></span>${reviewPct}</span>`);
+  if (hltbLabel) statPills.push(`<span class="deal-hero-stat" title="HLTB main story"><span class="deal-hero-stat-dot bg-sky-400"></span>${hltbLabel}</span>`);
+  const genreLine = genres.length
+    ? `<div class="deal-hero-genres">${genres.map(escapeHtml).join(" · ")}</div>`
+    : "";
+  const statStrip = (statPills.length || genreLine)
+    ? `<div class="deal-hero-stats">
+        ${statPills.length ? `<div class="deal-hero-stats-row">${statPills.join("")}</div>` : ""}
+        ${genreLine}
+      </div>`
+    : "";
+  return `<button type="button" class="deal-card-clickable deal-hero dash-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist">
+    <div class="dash-kpi-label">Today&apos;s top deal</div>
+    <div class="deal-hero-body mt-2">
+      <span class="cover-wrap deal-hero-cover-wrap">
+        <img class="deal-hero-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+        ${earlyAccessRibbonHtml(g)}
+      </span>
+      <div class="deal-hero-meta min-w-0 flex-1">
+        <div class="deal-hero-top">
+          <div class="deal-hero-name font-medium text-slate-100">${escapeHtml(g.name)}</div>
+          <div class="deal-hero-prices mt-1">${priceHtml}${shop ? `<span class="text-xs text-slate-400 ml-1">${shop}</span>` : ""}</div>
+        </div>
+        <div class="deal-hero-badges flex flex-wrap items-center gap-1.5">
+          ${cut > 0 ? `<span class="deal-cut-badge">-${cut}%</span>` : ""}
+          ${wishlistBadgeHtml(g)}
+          ${lowPin}
+        </div>
+        ${statStrip}
+      </div>
+    </div>
+  </button>`;
+}
+
+function dealHeroEmptyHtml() {
+  return `<div class="dash-card deal-hero-empty">
+    <div class="dash-kpi-label">Today&apos;s top deal</div>
+    <div class="text-sm text-slate-400 mt-3">No active deals — check back after the next ITAD refresh.</div>
+  </div>`;
+}
+
+const CUT_BUCKETS = [
+  { id: "light", label: "Light", short: "<25%", min: 1, max: 24, cls: "sale-bucket-light" },
+  { id: "medium", label: "Medium", short: "25–49%", min: 25, max: 49, cls: "sale-bucket-medium" },
+  { id: "deep", label: "Deep", short: "50–74%", min: 50, max: 74, cls: "sale-bucket-deep" },
+  { id: "huge", label: "Huge", short: "75%+", min: 75, max: 100, cls: "sale-bucket-huge" },
+];
+
+function bucketCuts(cuts) {
+  const counts = CUT_BUCKETS.map(b => ({ ...b, count: 0 }));
+  for (const c of cuts) {
+    if (!Number.isFinite(c) || c <= 0) continue;
+    for (const bucket of counts) {
+      if (c >= bucket.min && c <= bucket.max) { bucket.count++; break; }
+    }
+  }
+  return counts;
+}
+
+function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, bestCut, bestCutGame, hasPricing, cuts }) {
+  if (!hasPricing) {
+    return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
+      <div class="dash-kpi-label">Sale scoreboard</div>
+      <div class="text-xs text-slate-400 mt-2">Run <code class="text-slate-300">fetch_itad.py</code> for cross-store sale stats.</div>
+    </button>`;
+  }
+  const noSale = onSaleCount === 0;
+  const bestLabel = bestCutGame ? `<div class="sale-stat-caption truncate" title="${escapeAttr(bestCutGame)}">${escapeHtml(bestCutGame)}</div>` : "";
+  const buckets = bucketCuts(cuts || []);
+  const total = buckets.reduce((a, b) => a + b.count, 0);
+  const distHtml = total
+    ? `<div class="sale-distribution">
+        <div class="sale-distribution-label">Cut distribution</div>
+        <div class="sale-distribution-bar" role="img" aria-label="Cut depth distribution">
+          ${buckets.map(b => b.count
+            ? `<span class="sale-distribution-seg ${b.cls}" style="flex: ${b.count};" title="${b.label} (${b.short}): ${b.count}"></span>`
+            : ""
+          ).join("")}
+        </div>
+        <div class="sale-distribution-legend">
+          ${buckets.map(b => `<span class="sale-distribution-tick ${b.count ? "" : "sale-distribution-tick-empty"}" title="${b.label} (${b.short})">
+            <span class="sale-distribution-swatch ${b.cls}"></span>
+            <span class="sale-distribution-tick-label">${b.label}</span>
+            <span class="sale-distribution-tick-count">${b.count}</span>
+          </span>`).join("")}
+        </div>
+      </div>`
+    : "";
+  return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
+    <div class="dash-kpi-label">Sale scoreboard</div>
+    <div class="sale-scoreboard mt-2">
+      <div class="sale-stat">
+        <div class="sale-stat-label">On sale</div>
+        <div class="sale-stat-value">${onSaleCount}<span class="sale-stat-suffix"> / ${totalCount}</span></div>
+      </div>
+      <div class="sale-stat">
+        <div class="sale-stat-label">Avg cut</div>
+        <div class="sale-stat-value ${noSale ? "sale-stat-muted" : ""}">${noSale ? "—" : `-${avgCut}%`}</div>
+      </div>
+      <div class="sale-stat">
+        <div class="sale-stat-label">Best cut</div>
+        <div class="sale-stat-value ${noSale ? "sale-stat-muted" : "sale-stat-best"}">${noSale ? "—" : `-${bestCut}%`}</div>
+        ${noSale ? "" : bestLabel}
+      </div>
+    </div>
+    ${distHtml}
+  </button>`;
+}
+
+function dealStealsCardHtml(steals) {
+  if (!steals.length) {
+    return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-steals" title="Show wishlist steals (50%+ off, 80%+ rated)">
+      <div class="dash-kpi-label">Steals waiting</div>
+      <div class="text-xs text-slate-400 mt-1">50%+ off or historical low · 80%+ rated</div>
+      <div class="text-xs text-slate-500 mt-3">No steals match right now.</div>
+    </button>`;
+  }
+  const ranked = [...steals].sort((a, b) => dealScore(b) - dealScore(a));
+  const shown = ranked.slice(0, 6);
+  const remaining = ranked.length - shown.length;
+  const rows = shown.map(g => {
+    const cover = g.library_image || coverFallbackFor(g);
+    const fb = coverFallbackFor(g);
+    const d = getDealInfo(g) || {};
+    const cut = d.cut || 0;
+    const cutLabel = cut > 0 ? `-${cut}%` : "★";
+    const low = d.isHistoricalLow ? '<span class="steal-row-low" title="Historical low">★</span>' : "";
+    const price = d.price != null ? `<span class="steal-row-price">${formatDollar(d.price)}</span>` : "";
+    const key = gameKey(g);
+    return `<button type="button" class="steal-row" data-action="deal-steal-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist">
+      <img class="steal-row-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fb)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+      <span class="steal-row-name truncate">${escapeHtml(g.name)}</span>
+      ${low}
+      <span class="steal-row-cut">${cutLabel}</span>
+      ${price}
+    </button>`;
+  }).join("");
+  const footer = remaining > 0
+    ? `<div class="steal-list-footer" data-action="deal-steals" title="Show all steals">+${remaining} more · view all →</div>`
+    : `<div class="steal-list-footer" data-action="deal-steals" title="Show all steals on wishlist">View on wishlist →</div>`;
+  return `<div class="dash-card steal-card" title="50%+ off or historical low · 80%+ rated">
+    <div class="flex items-baseline justify-between gap-2">
+      <div>
+        <div class="dash-kpi-label">Steals waiting</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">50%+ off or historical low · 80%+ rated</div>
+      </div>
+      <div class="text-sm font-semibold text-slate-300">${steals.length}</div>
+    </div>
+    <div class="steal-list mt-2">${rows}</div>
+    ${footer}
+  </div>`;
 }
 
 function buildOwnedNormNames() {
@@ -594,15 +1044,50 @@ function buildAlphaNav(list) {
   });
 }
 
-function jumpToLetter(letter) {
-  const list = sortedGames(filteredGames());
-  const idx = list.findIndex(g => alphaBucket(g.name) === letter);
-  if (idx < 0) return;
+function tableListDocTop() {
+  const shell = document.getElementById("tableShell");
+  const tableWrap = document.getElementById("tableWrap");
+  const anchor = shell || tableWrap;
+  if (!anchor) return 0;
+  const thead = tableWrap?.querySelector("thead");
+  const headerH = thead?.offsetHeight ?? 0;
+  return anchor.getBoundingClientRect().top + window.scrollY + headerH;
+}
+
+function rowScrollTop(idx) {
+  return tableListDocTop() + idx * TABLE_ROW_HEIGHT;
+}
+
+function scrollToRowIndex(idx, { smooth = false } = {}) {
+  const list = state._visibleList || sortedGames(filteredGames());
+  if (!list.length || idx < 0 || idx >= list.length) return;
   state.focusedRowIndex = idx;
   const key = gameKey(list[idx]);
   state.pickedKey = key;
+
+  if (state._virtualActive) {
+    const target = Math.max(0, rowScrollTop(idx) - 100);
+    window.scrollTo({ top: target, behavior: smooth ? "smooth" : "auto" });
+    paintTableBody(list, { anchorIndex: idx });
+    requestAnimationFrame(() => {
+      paintTableBody(list, { anchorIndex: idx });
+      document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
+      const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+      row?.classList.add("row-picked", "row-focused");
+    });
+    return;
+  }
+
   focusRow(key);
-  scrollFocusedRow();
+  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (row) scrollRowToCenter(row);
+}
+
+function jumpToLetter(letter) {
+  const list = state._visibleList || sortedGames(filteredGames());
+  const idx = list.findIndex(g => alphaBucket(g.name) === letter);
+  if (idx < 0) return;
+  scrollToRowIndex(idx);
 }
 
 function filteredGames() {
@@ -637,10 +1122,11 @@ function visibleListForKeyboard() {
 
 // === Selection & bulk ===
 function updateBulkBar() {
+  renderBulkStatusButtons();
   const bar = document.getElementById("bulkBar");
   const n = state.selectedKeys.size;
   document.getElementById("bulkCount").textContent = `${n} selected`;
-  const show = n > 0 && state.activeView === "library";
+  const show = n > 0 && state.activeView !== "dashboard";
   bar.classList.toggle("hidden", !show);
   document.body.classList.toggle("bulk-bar-open", show);
 }
@@ -658,6 +1144,7 @@ function bulkSetStatus(status) {
   }
   state.selectedKeys.clear();
   updateBulkBar();
+  invalidateTableCache();
   renderTable();
 }
 
@@ -668,6 +1155,7 @@ function bulkSetPriority(priority) {
   }
   state.selectedKeys.clear();
   updateBulkBar();
+  invalidateTableCache();
   renderTable();
 }
 
@@ -680,14 +1168,17 @@ function pickCardHtml(g) {
   const headerFallback = coverFallbackFor(g);
   const cover = g.library_image || headerFallback;
   const ratingVal = ratingValue(g);
-  const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : (g.metacritic_score != null ? `${g.metacritic_score}` : "—");
+  const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—";
   const h = hltbMain(g);
   const store = normalizeGame(g).store;
   const badge = store === "gog" ? "G" : store === "psn" ? "P" : store === "epic" ? "E" : store === "amazon" ? "A" : store === "nintendo" ? "N" : store === "xbox" ? "X" : store === "battlenet" ? "B" : store === "ubisoft" ? "U" : store === "other" ? "?" : "S";
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
       <span class="pick-store store-badge ${store}">${badge}</span>
-      <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+      <div class="cover-wrap w-full block">
+        <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+        ${earlyAccessRibbonHtml(g)}
+      </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
       <div class="text-xs text-slate-400 flex justify-between"><span>${rating}</span><span>${h != null ? `${h}h` : ""}</span></div>
     </div>`;
@@ -792,10 +1283,14 @@ function dealCardHtml(g) {
   const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : "";
   const ownedFlag = isOwnedByTitle(g.name) ? '<span class="text-amber-400 text-[10px]" title="Already owned elsewhere">owned</span>' : "";
   const shop = d && d.shop ? d.shop : "";
+  const wishlistTarget = g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
-      <span class="pick-store store-badge steam">W</span>
-      <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+      <span class="pick-store store-badge ${wishlistTarget}" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLetter(wishlistTarget)}</span>
+      <div class="cover-wrap w-full block">
+        <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+        ${earlyAccessRibbonHtml(g)}
+      </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
       <div class="text-xs text-slate-400 flex justify-between items-center gap-1">
         <span class="text-slate-100">${priceLabel}</span>
@@ -837,14 +1332,74 @@ const DASH_STORE_COLORS = {
   nintendo: "#E60012", itch: "#fa5c5c", other: "#94a3b8", manual: "#64748b",
 };
 const DASH_STATUS_COLORS = {
-  backlog: "#64748b", next: "#38bdf8", playing: "#10b981", unfinished: "#a855f7",
-  live: "#ec4899", finished: "#94a3b8", skip: "#475569", __none__: "#334155",
+  backlog: "#ef4444", next: "#38bdf8", playing: "#facc15", unfinished: "#f97316",
+  live: "#ec4899", finished: "#22c55e", skip: "#475569", __none__: "#334155",
+};
+const DASH_REVIEW_COLORS = {
+  "Overwhelmingly Positive": "#22c55e",
+  "Very Positive": "#34d399",
+  "Mostly Positive": "#86efac",
+  "Mixed": "#fbbf24",
+  "Mostly Negative": "#f97316",
+  "Negative": "#ef4444",
+  "Unreviewed": "#475569",
 };
 const DASH_STORE_LABELS = {
   steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic", amazon: "Amazon",
   xbox: "Xbox", battlenet: "Battle.net", ubisoft: "Ubisoft", nintendo: "Nintendo",
   itch: "itch.io", other: "Other", manual: "Manual",
 };
+
+const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
+
+const DASH_FETCHER_SOURCES = [
+  { key: "steam", label: "Steam", group: "library", color: DASH_STORE_COLORS.steam, metaKey: "steam", cmd: "python fetch_games.py" },
+  { key: "gog", label: "GOG", group: "library", color: DASH_STORE_COLORS.gog, metaKey: "gog", cmd: "python fetch_gog.py" },
+  { key: "psn", label: "PSN", group: "library", color: DASH_STORE_COLORS.psn, metaKey: "psn", cmd: "python fetch_psn.py" },
+  { key: "epic", label: "Epic", group: "library", color: DASH_STORE_COLORS.epic, metaKey: "epic", cmd: "python fetch_epic.py" },
+  { key: "amazon", label: "Amazon", group: "library", color: DASH_STORE_COLORS.amazon, metaKey: "amazon", cmd: "python fetch_amazon.py" },
+  { key: "xbox", label: "Xbox", group: "library", color: DASH_STORE_COLORS.xbox, metaKey: "xbox", cmd: "python fetch_xbox.py" },
+  { key: "battlenet", label: "Battle.net", group: "library", color: DASH_STORE_COLORS.battlenet, metaKey: "battlenet", cmd: "python fetch_battlenet.py" },
+  { key: "ubisoft", label: "Ubisoft", group: "library", color: DASH_STORE_COLORS.ubisoft, metaKey: "ubisoft", cmd: "python fetch_ubisoft.py" },
+  { key: "nintendo", label: "Nintendo", group: "library", color: DASH_STORE_COLORS.nintendo, metaKey: "nintendo", cmd: "python fetch_nintendo.py" },
+  { key: "itch", label: "itch.io", group: "library", color: DASH_STORE_COLORS.itch, metaKey: "itch", cmd: "python fetch_itch.py" },
+  { key: "wishlistSteam", label: "WL Steam", group: "wishlist", color: DASH_STORE_COLORS.steam, metaKey: "wishlist", cmd: "python fetch_wishlist.py" },
+  { key: "wishlistGog", label: "WL GOG", group: "wishlist", color: DASH_STORE_COLORS.gog, metaKey: "wishlistGog", cmd: "python fetch_gog_wishlist.py" },
+  { key: "wishlistEpic", label: "WL Epic", group: "wishlist", color: DASH_STORE_COLORS.epic, metaKey: "wishlistEpic", cmd: "python fetch_epic_wishlist.py" },
+  { key: "itad", label: "ITAD", group: "prices", color: "#22d3ee", metaKey: "itad", cmd: "python fetch_itad.py", countFn: m => Object.keys(m?.by_key || {}).length },
+  { key: "hltb", label: "HLTB", group: "enrich", color: "#a78bfa", metaKey: "hltb", cmd: "python enrich_hltb.py", countFn: m => Object.keys(m || {}).filter(k => k !== "fetched_at").length },
+];
+
+function humanizeAge(ms) {
+  if (!Number.isFinite(ms)) return "—";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 14) return `${d}d`;
+  const w = Math.floor(d / 7);
+  if (w < 8) return `${w}w`;
+  return `${Math.floor(d / 30)}mo`;
+}
+
+function fetcherFreshness(source) {
+  const meta = state.libraryMeta[source.metaKey];
+  const count = meta
+    ? (source.countFn ? source.countFn(meta) : (meta.game_count ?? null))
+    : null;
+  if (!meta || !meta.fetched_at) {
+    return { status: "missing", ageMs: Infinity, count, ageLabel: meta ? "?" : "—", iso: null };
+  }
+  const ts = Date.parse(meta.fetched_at);
+  const ageMs = Number.isFinite(ts) ? Date.now() - ts : Infinity;
+  let status = "stale";
+  if (ageMs < FRESH_THRESHOLDS.fresh) status = "fresh";
+  else if (ageMs < FRESH_THRESHOLDS.recent) status = "recent";
+  return { status, ageMs, count, ageLabel: humanizeAge(ageMs), iso: meta.fetched_at };
+}
 
 function destroyDashboardCharts() {
   Object.values(dashboardCharts).forEach(c => { try { c.destroy(); } catch (_) {} });
@@ -874,6 +1429,76 @@ function setDashboardChart(id, config) {
   dashboardCharts[id] = new Chart(canvas, config);
 }
 
+const ERA_BANDS = [
+  { start: 1990, end: 1999, label: "'90s", fill: "rgba(251, 191, 36, 0.06)", textColor: "rgba(251, 191, 36, 0.55)" },
+  { start: 2000, end: 2009, label: "'00s", fill: "rgba(52, 211, 153, 0.06)", textColor: "rgba(52, 211, 153, 0.55)" },
+  { start: 2010, end: 2019, label: "'10s", fill: "rgba(56, 189, 248, 0.07)", textColor: "rgba(56, 189, 248, 0.6)" },
+  { start: 2020, end: 2099, label: "'20s", fill: "rgba(168, 85, 247, 0.08)", textColor: "rgba(168, 85, 247, 0.65)" },
+];
+
+function makeEraBandsPlugin(yearLabels) {
+  return {
+    id: "eraBands",
+    beforeDatasetsDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      const xs = scales.x;
+      if (!xs || yearLabels.length === 0) return;
+      const labelToIdx = new Map(yearLabels.map((y, i) => [y, i]));
+      const halfBar = yearLabels.length > 1
+        ? Math.abs(xs.getPixelForTick(1) - xs.getPixelForTick(0)) / 2
+        : (chartArea.right - chartArea.left) / 2;
+      ctx.save();
+      ERA_BANDS.forEach(era => {
+        let firstIdx = -1, lastIdx = -1;
+        for (let i = 0; i < yearLabels.length; i++) {
+          const y = +yearLabels[i];
+          if (y >= era.start && y <= era.end) {
+            if (firstIdx === -1) firstIdx = i;
+            lastIdx = i;
+          }
+        }
+        if (firstIdx === -1) return;
+        const left = Math.max(chartArea.left, xs.getPixelForTick(firstIdx) - halfBar);
+        const right = Math.min(chartArea.right, xs.getPixelForTick(lastIdx) + halfBar);
+        if (right <= left) return;
+        ctx.fillStyle = era.fill;
+        ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+        if (right - left > 36) {
+          ctx.fillStyle = era.textColor;
+          ctx.font = "600 10px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(era.label, (left + right) / 2, chartArea.top + 4);
+        }
+      });
+      ctx.restore();
+    },
+  };
+}
+
+function makeBarEndLabelsPlugin(getLabelForBarIndex) {
+  return {
+    id: "barEndLabels",
+    afterDatasetsDraw(chart) {
+      const { ctx, data } = chart;
+      const lastIdx = data.datasets.length - 1;
+      const meta = chart.getDatasetMeta(lastIdx);
+      if (!meta || !meta.data) return;
+      ctx.save();
+      ctx.fillStyle = "#cbd5e1";
+      ctx.font = "600 11px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      meta.data.forEach((bar, i) => {
+        const text = getLabelForBarIndex(i);
+        if (text == null || text === "") return;
+        ctx.fillText(String(text), bar.x + 6, bar.y);
+      });
+      ctx.restore();
+    },
+  };
+}
+
 function dashDrillStore(store) {
   state.prefs.storeFilter = store || "";
   savePrefs();
@@ -900,14 +1525,444 @@ function dashDrillGenre(genre) {
   refreshFilterUI();
 }
 
-function dashDrillTag(tag) {
-  const cur = state.prefs.tagFilters || [];
-  if (!cur.includes(tag)) state.prefs.tagFilters = [...cur, tag];
+function dashDrillCoop({ online = false, local = false } = {}) {
+  const onlineEl = document.getElementById("coopOnlineOnly");
+  const localEl = document.getElementById("coopLocalOnly");
+  if (onlineEl) onlineEl.checked = !!online;
+  if (localEl) localEl.checked = !!local;
+  document.getElementById("statusFilter").value = "";
+  state.prefs.storeFilter = "";
   savePrefs();
-  switchView("library");
-  renderTagChips();
+  invalidateTableCache();
+  if (state.activeView !== "library") switchView("library");
+  renderStoreChips();
   refreshFilterUI();
+  renderTable();
 }
+
+function renderDashboardCoopSpotlight(games) {
+  const el = document.getElementById("dashboardCoopSpotlight");
+  if (!el) return;
+  const coopGames = games.filter(g => g.coop_online || g.coop_local);
+  const onlineGames = games.filter(g => g.coop_online);
+  const localGames = games.filter(g => g.coop_local);
+  const bothGames = games.filter(g => g.coop_online && g.coop_local);
+
+  if (coopGames.length === 0) {
+    el.innerHTML = `
+      <div class="coop-spotlight-header">
+        <div class="coop-spotlight-title">Co-op spotlight</div>
+      </div>
+      <div class="coop-empty">
+        No co-op games detected yet. Co-op flags come from Steam store categories — run <code>fetch_games.py</code> to refresh, or wait until you own a Steam title tagged <em>Online Co-op</em> or <em>Shared/Split Screen Co-op</em>.
+      </div>`;
+    return;
+  }
+
+  const sideHtml = (list, { sideClass, title, drillArgs }) => {
+    const backlog = list.filter(g => getPersonal(g).status === "backlog").length;
+    const finished = list.filter(g => getPersonal(g).status === "finished").length;
+    const hltbValues = list.map(g => hltbMain(g)).filter(h => h != null && h > 0);
+    const avgHltb = hltbValues.length
+      ? Math.round(hltbValues.reduce((s, h) => s + h, 0) / hltbValues.length)
+      : null;
+    const picks = list
+      .filter(g => getPersonal(g).status !== "finished" && (g.playtime_minutes || 0) === 0)
+      .filter(g => ratingValue(g) > 0 && hasEnoughReviews(g))
+      .sort((a, b) => ratingValue(b) - ratingValue(a))
+      .slice(0, 3);
+    const picksHtml = picks.length
+      ? picks.map(g => {
+          const cover = g.library_image || coverFallbackFor(g);
+          const key = gameKey(g);
+          return `<button type="button" class="coop-pick-row" data-action="coop-pick-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library">
+            <img class="coop-pick-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+            <span class="coop-pick-name">${escapeHtml(g.name)}</span>
+            <span class="coop-pick-rating">${ratingValue(g)}%</span>
+          </button>`;
+        }).join("")
+      : '<div class="coop-picks-empty">All started or finished — nothing unplayed.</div>';
+    const drillJson = escapeAttr(JSON.stringify(drillArgs));
+    return `
+      <div class="coop-side ${sideClass}" role="button" tabindex="0" data-action="coop-drill" data-drill="${drillJson}" title="Filter the library by ${escapeAttr(title)}">
+        <div class="coop-side-header">
+          <div class="coop-side-title-row">
+            <span class="coop-side-title">${escapeHtml(title)}</span>
+          </div>
+          <span class="coop-side-count">${list.length}</span>
+        </div>
+        <div class="coop-side-stats">
+          <div class="coop-side-stat">
+            <div class="coop-side-stat-label">Backlog</div>
+            <div class="coop-side-stat-value ${backlog ? "" : "coop-side-stat-muted"}">${backlog}</div>
+          </div>
+          <div class="coop-side-stat">
+            <div class="coop-side-stat-label">Finished</div>
+            <div class="coop-side-stat-value ${finished ? "" : "coop-side-stat-muted"}">${finished}</div>
+          </div>
+          <div class="coop-side-stat">
+            <div class="coop-side-stat-label">Avg HLTB</div>
+            <div class="coop-side-stat-value ${avgHltb != null ? "" : "coop-side-stat-muted"}">${avgHltb != null ? avgHltb + "h" : "—"}</div>
+          </div>
+        </div>
+        <div>
+          <div class="coop-side-picks-label">Top unplayed picks</div>
+          <div class="coop-side-picks-list">${picksHtml}</div>
+        </div>
+      </div>`;
+  };
+
+  const bothDrill = escapeAttr(JSON.stringify({ online: true, local: true }));
+  const connector = `
+    <div class="coop-connector">
+      <div class="coop-connector-stat" title="Total games with any co-op flag">
+        <div class="coop-connector-label">Total co-op</div>
+        <div class="coop-connector-value">${coopGames.length}</div>
+        <div class="coop-connector-sub">of ${games.length} games</div>
+      </div>
+      <div class="coop-connector-divider" aria-hidden="true"></div>
+      <button type="button" class="coop-connector-stat" data-action="coop-drill" data-drill="${bothDrill}" title="Filter the library by games that support both online and couch co-op">
+        <div class="coop-connector-label">Both flavors</div>
+        <div class="coop-connector-value">${bothGames.length}</div>
+        <div class="coop-connector-sub">online + couch</div>
+      </button>
+    </div>`;
+
+  el.innerHTML = `
+    <div class="coop-spotlight-header">
+      <div class="coop-spotlight-title">Co-op spotlight</div>
+      <div class="coop-spotlight-sub">Steam co-op signal · click a side to filter the library</div>
+    </div>
+    <div class="coop-versus">
+      ${sideHtml(onlineGames, { sideClass: "coop-side-online", title: "Online co-op", drillArgs: { online: true, local: false } })}
+      ${connector}
+      ${sideHtml(localGames, { sideClass: "coop-side-local", title: "Couch co-op", drillArgs: { online: false, local: true } })}
+    </div>
+  `;
+}
+
+function renderDashboardFetcherHealth() {
+  const slot = document.getElementById("dashboardFetcherHealth");
+  if (!slot) return;
+  const showOnlyStale = !!state.prefs.fetcherHealthStaleOnly;
+  const rows = DASH_FETCHER_SOURCES.map(src => ({ src, ...fetcherFreshness(src) }));
+  const staleRows = rows.filter(r => r.status === "stale");
+  const missingRows = rows.filter(r => r.status === "missing");
+  const visible = showOnlyStale
+    ? rows.filter(r => r.status === "stale" || r.status === "missing")
+    : rows;
+  const rank = { missing: 0, stale: 1, recent: 2, fresh: 3 };
+  visible.sort((a, b) => rank[a.status] - rank[b.status] || a.src.label.localeCompare(b.src.label));
+
+  const summaryParts = [];
+  if (staleRows.length) summaryParts.push(`${staleRows.length} stale`);
+  if (missingRows.length) summaryParts.push(`${missingRows.length} missing`);
+  const summaryText = summaryParts.length ? summaryParts.join(" · ") : "All fresh";
+  const apiReady = fetcherRunner.isApiAvailable();
+  const apiNotice = apiReady
+    ? '<span class="fh-summary" title="Click a chip to run that fetcher">· click to fetch</span>'
+    : '<span class="fh-summary" title="Launch with `python server.py` for click-to-fetch">· read-only (run server.py to enable)</span>';
+
+  const chipsHtml = visible.length
+    ? visible.map(({ src, status, count, ageLabel, iso }) => {
+        const countStr = count != null && count > 0 ? formatNum(count) : "—";
+        const fetchedLine = iso ? new Date(iso).toLocaleString() : "not loaded";
+        const runState = fetcherRunner.stateFor(src.key);
+        const displayStatus = runState || status;
+        const runLabel = runState ? ` · ${runState.toUpperCase()}` : "";
+        const title = apiReady
+          ? `${src.label} · ${countStr} entries · fetched ${fetchedLine}${runLabel} — click to run \`${src.cmd}\``
+          : `${src.label} · ${countStr} entries · fetched ${fetchedLine} · ${src.cmd}`;
+        const disabled = !apiReady || runState === "running" || runState === "queued";
+        return `<button type="button" class="fh-chip fh-chip-${displayStatus}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? " disabled" : ""}>
+          <span class="fh-chip-dot"></span>
+          <span class="fh-chip-label">${escapeHtml(src.label)}</span>
+          <span class="fh-chip-count">${escapeHtml(countStr)}</span>
+          <span class="fh-chip-age">${escapeHtml(runState ? runState : ageLabel)}</span>
+        </button>`;
+      }).join("")
+    : '<span class="fh-empty">No stale or missing fetchers — nice.</span>';
+
+  slot.innerHTML = `
+    <div class="fh-head">
+      <div class="fh-head-left">
+        <span class="fh-title">Fetcher health</span>
+        <span class="fh-summary">${escapeHtml(summaryText)}</span>
+        ${apiNotice}
+      </div>
+      <label class="fh-toggle">
+        <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? "checked" : ""} />
+        Only stale / missing
+      </label>
+    </div>
+    <div class="fh-chips">${chipsHtml}</div>
+  `;
+}
+
+// === Fetcher runner ===
+// Talks to /api endpoints exposed by server.py. Gracefully no-ops when the
+// user is running a plain static server (`python -m http.server`).
+const fetcherRunner = (() => {
+  let apiAvailable = null;        // null until probed, then boolean
+  const runStateByKey = new Map(); // key -> "queued" | "running"
+  let activeRunId = null;
+  let activeKey = null;
+  let activeSource = null;        // EventSource
+  let logEl = null;
+  let logBodyEl = null;
+
+  function logPanel() {
+    if (!logEl) {
+      logEl = document.getElementById("fetcherRunLog");
+    }
+    return logEl;
+  }
+
+  function logBody() {
+    if (!logBodyEl || !document.body.contains(logBodyEl)) {
+      logBodyEl = logPanel()?.querySelector(".fh-log-body") || null;
+    }
+    return logBodyEl;
+  }
+
+  async function probeApi() {
+    if (apiAvailable !== null) return apiAvailable;
+    try {
+      const res = await fetch("/api/fetchers", { method: "GET" });
+      apiAvailable = res.ok;
+    } catch {
+      apiAvailable = false;
+    }
+    return apiAvailable;
+  }
+
+  function isApiAvailable() {
+    return apiAvailable === true;
+  }
+
+  function stateFor(key) {
+    return runStateByKey.get(key) || null;
+  }
+
+  function source(key) {
+    return DASH_FETCHER_SOURCES.find(s => s.key === key) || null;
+  }
+
+  function ensurePanel(src) {
+    const panel = logPanel();
+    if (!panel) return;
+    if (!panel.dataset.built) {
+      panel.innerHTML = `
+        <div class="fh-log-head">
+          <span class="fh-log-title" data-role="title">Fetcher log</span>
+          <span class="fh-log-status" data-role="status">idle</span>
+          <span class="fh-log-spacer"></span>
+          <button type="button" class="fh-log-btn" data-role="clear">Clear</button>
+          <button type="button" class="fh-log-btn" data-role="close">Close</button>
+        </div>
+        <div class="fh-log-body" data-role="body"></div>
+      `;
+      panel.dataset.built = "1";
+      panel.addEventListener("click", e => {
+        const btn = e.target.closest("[data-role]");
+        if (!btn) return;
+        if (btn.dataset.role === "close") closePanel();
+        else if (btn.dataset.role === "clear") clearLog();
+      });
+    }
+    panel.classList.add("open");
+    panel.querySelector('[data-role="title"]').textContent = src ? `Running: ${src.label}` : "Fetcher log";
+    setStatus("queued");
+    logBodyEl = panel.querySelector('[data-role="body"]');
+  }
+
+  function closePanel() {
+    const panel = logPanel();
+    if (panel) panel.classList.remove("open");
+  }
+
+  function clearLog() {
+    const body = logBody();
+    if (body) body.innerHTML = "";
+  }
+
+  function setStatus(status, extra) {
+    const panel = logPanel();
+    if (!panel) return;
+    const el = panel.querySelector('[data-role="status"]');
+    if (!el) return;
+    el.className = `fh-log-status ${status}`;
+    el.textContent = extra ? `${status} · ${extra}` : status;
+  }
+
+  function appendLine(text, kind = "stdout") {
+    const body = logBody();
+    if (!body) return;
+    const div = document.createElement("div");
+    div.className = `fh-log-line ${kind}`;
+    div.textContent = text;
+    body.appendChild(div);
+    while (body.children.length > 4000) body.removeChild(body.firstChild);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function markChipState(key, state) {
+    if (state) runStateByKey.set(key, state);
+    else runStateByKey.delete(key);
+    renderDashboardFetcherHealth();
+  }
+
+  async function run(key) {
+    if (!isApiAvailable()) return;
+    const src = source(key);
+    if (!src) return;
+    if (runStateByKey.has(key)) return; // already queued/running for this key
+
+    ensurePanel(src);
+    appendLine(`$ ${src.cmd}`, "cmd");
+    markChipState(key, "queued");
+
+    let res;
+    try {
+      res = await fetch(`/api/run/${encodeURIComponent(key)}`, { method: "POST" });
+    } catch (err) {
+      appendLine(`[client] cannot reach server: ${err}`, "stderr");
+      setStatus("failed");
+      markChipState(key, null);
+      return;
+    }
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      appendLine(`[server ${res.status}] ${txt || "submit failed"}`, "stderr");
+      setStatus("failed");
+      markChipState(key, null);
+      return;
+    }
+    const { run_id: runId } = await res.json();
+    if (activeKey && activeKey !== key) {
+      appendLine(`(queued after ${source(activeKey)?.label || activeKey})`, "meta");
+    }
+    activeRunId = runId;
+    activeKey = key;
+    subscribe(runId, key, src);
+  }
+
+  function subscribe(runId, key, src) {
+    if (activeSource) {
+      try { activeSource.close(); } catch (_) {}
+      activeSource = null;
+    }
+    const es = new EventSource(`/api/stream/${encodeURIComponent(runId)}`);
+    activeSource = es;
+
+    es.addEventListener("status", evt => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.status === "running") {
+          markChipState(key, "running");
+          const panel = logPanel();
+          if (panel) panel.querySelector('[data-role="title"]').textContent = `Running: ${src.label}`;
+          setStatus("running");
+        }
+      } catch (_) {}
+    });
+
+    es.addEventListener("line", evt => {
+      try {
+        const data = JSON.parse(evt.data);
+        appendLine(data.text || "", data.stream === "stderr" ? "stderr" : "stdout");
+      } catch (_) {}
+    });
+
+    es.addEventListener("done", async evt => {
+      try {
+        const data = JSON.parse(evt.data);
+        const ok = data.status === "done" && data.exit_code === 0;
+        const duration = data.started_at && data.ended_at
+          ? `${(data.ended_at - data.started_at).toFixed(1)}s`
+          : "";
+        appendLine(`[exit ${data.exit_code}] ${ok ? "done" : "failed"}${duration ? ` in ${duration}` : ""}`, "meta");
+        setStatus(ok ? "done" : "failed", duration);
+        if (ok) {
+          await refreshAfterFetch(key);
+          markChipState(key, null);
+        } else {
+          markChipState(key, "failed");
+          setTimeout(() => {
+            if (runStateByKey.get(key) === "failed") {
+              runStateByKey.delete(key);
+              renderDashboardFetcherHealth();
+            }
+          }, 10000);
+        }
+      } catch (err) {
+        appendLine(`[client] parse error on done: ${err}`, "stderr");
+      } finally {
+        try { es.close(); } catch (_) {}
+        if (activeSource === es) activeSource = null;
+        if (activeRunId === runId) {
+          activeRunId = null;
+          activeKey = null;
+        }
+      }
+    });
+
+    es.onerror = async () => {
+      // EventSource auto-reconnects on transient errors. Only treat this as a
+      // real failure if the run no longer exists on the server.
+      if (es.readyState === EventSource.CONNECTING) {
+        return; // built-in reconnect in progress
+      }
+      try { es.close(); } catch (_) {}
+      if (activeSource === es) activeSource = null;
+      try {
+        const snap = await fetch("/api/runs").then(r => r.json());
+        const stillActive = snap.active?.id === runId;
+        const inQueue = (snap.queue || []).some(r => r.id === runId);
+        const finished = (snap.history || []).find(r => r.id === runId);
+        if (stillActive || inQueue) {
+          appendLine("[client] stream dropped — reconnecting", "meta");
+          setTimeout(() => subscribe(runId, key, src), 500);
+          return;
+        }
+        if (finished) {
+          const ok = finished.status === "done" && finished.exit_code === 0;
+          appendLine(`[client] stream dropped after exit ${finished.exit_code}`, "meta");
+          setStatus(ok ? "done" : "failed");
+          if (ok) {
+            await refreshAfterFetch(key);
+            markChipState(key, null);
+          } else {
+            markChipState(key, null);
+          }
+          return;
+        }
+      } catch (_) {}
+      appendLine("[client] stream error (server may have shut down)", "stderr");
+      setStatus("failed");
+      markChipState(key, null);
+    };
+  }
+
+  async function refreshAfterFetch(key) {
+    try {
+      await reloadGames();
+    } catch (err) {
+      appendLine(`[client] reload failed: ${err}`, "stderr");
+    }
+    const src = source(key);
+    if (src) {
+      const meta = state.libraryMeta[src.metaKey];
+      if (meta && typeof meta === "object" && !meta.fetched_at) {
+        meta.fetched_at = new Date().toISOString();
+      } else if (!meta) {
+        state.libraryMeta[src.metaKey] = { fetched_at: new Date().toISOString() };
+      }
+    }
+  }
+
+  return { probeApi, isApiAvailable, stateFor, run };
+})();
 
 function renderDashboardKPIs(games) {
   const backlog = games.filter(g => getPersonal(g).status === "backlog");
@@ -921,6 +1976,7 @@ function renderDashboardKPIs(games) {
   const wlDeals = state.wishlistGames.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
   const itchGameCount = state.itchGames.filter(itchIsGame).length;
   const stores = new Set(games.map(g => normalizeGame(g).store)).size;
+  const wishlistCount = state.wishlistGames.length;
   const kpis = [
     { label: "Library games", value: formatNum(games.length) },
     { label: "Backlog hours", value: `${formatNum(Math.round(backlogHrs))}h` },
@@ -930,6 +1986,7 @@ function renderDashboardKPIs(games) {
     { label: "Wishlist deals", value: formatNum(wlDeals) },
     { label: "Itch games", value: formatNum(itchGameCount) },
     { label: "Stores", value: stores },
+    { label: "Wishlist", value: formatNum(wishlistCount) },
   ];
   document.getElementById("dashboardKpis").innerHTML = kpis.map(k => `
     <div class="dash-kpi">
@@ -951,7 +2008,8 @@ function renderDashboardLists(games) {
     ? items.map(g => {
       const cover = g.library_image || coverFallbackFor(g);
       const score = scoreFn(g);
-      return `<div class="dash-list-row"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}</span><span class="text-slate-400">${score}</span></div>`;
+      const key = gameKey(g);
+      return `<button type="button" class="dash-list-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}</span><span class="text-slate-400">${score}</span></button>`;
     }).join("")
     : '<p class="text-xs text-slate-500 italic">No matches yet.</p>';
   document.getElementById("dashTopRated").innerHTML = listHtml(topRated, g => `${ratingValue(g)}%`);
@@ -959,24 +2017,56 @@ function renderDashboardLists(games) {
 }
 
 function renderDashboardWishlistStats() {
+  const el = document.getElementById("dashboardWishlistStats");
+  if (!el) return;
   const wl = state.wishlistGames;
+  if (!wl.length) {
+    el.innerHTML = `<div class="dash-card sm:col-span-3"><div class="text-sm text-slate-400">No wishlist data — run <code class="text-slate-200">fetch_wishlist.py</code>, then reload.</div></div>`;
+    return;
+  }
+
   const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
-  const lows = wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; });
-  const cuts = onSale.map(g => effectiveDiscountPercent(g)).filter(c => c > 0);
-  const avgDisc = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : 0;
-  const pctLow = wl.length ? Math.round((lows.length / wl.length) * 100) : 0;
-  const tiers = { lt25: 0, m25: 0, m50: 0, m75: 0 };
-  onSale.forEach(g => {
-    const c = effectiveDiscountPercent(g);
-    if (c >= 75) tiers.m75++;
-    else if (c >= 50) tiers.m50++;
-    else if (c >= 25) tiers.m25++;
-    else tiers.lt25++;
-  });
-  document.getElementById("dashboardWishlistStats").innerHTML = `
-    <div class="dash-card"><div class="dash-kpi-label">Avg discount (on sale)</div><div class="dash-kpi-value mt-1">${avgDisc}%</div><div class="text-xs text-slate-500 mt-1">${onSale.length} of ${wl.length} on sale</div></div>
-    <div class="dash-card"><div class="dash-kpi-label">Historical low</div><div class="dash-kpi-value mt-1">${pctLow}%</div><div class="text-xs text-slate-500 mt-1">${lows.length} titles at all-time low</div></div>
-    <div class="dash-card"><div class="dash-kpi-label">Deal tiers</div><div class="text-xs text-slate-300 mt-2" style="display:grid;gap:0.15rem;"><div>&lt;25%: ${tiers.lt25}</div><div>25–49%: ${tiers.m25}</div><div>50–74%: ${tiers.m50}</div><div>75%+: ${tiers.m75}</div></div></div>`;
+  const withDeals = wishlistGamesWithDeals(wl);
+  const topDeal = withDeals.length
+    ? [...withDeals].sort((a, b) => dealScore(b) - dealScore(a))[0]
+    : null;
+
+  let hasPricing = false;
+  let bestCut = 0;
+  let bestCutGame = "";
+  let cutSum = 0;
+  const cuts = [];
+  for (const g of wl) {
+    const d = getDealInfo(g);
+    if (!d) continue;
+    if (d.price != null || d.regular != null || d.cut) hasPricing = true;
+    const cut = d.cut || 0;
+    if (cut > 0) {
+      cutSum += cut;
+      cuts.push(cut);
+      if (cut > bestCut) {
+        bestCut = cut;
+        bestCutGame = g.name || "";
+      }
+    }
+  }
+  const avgCut = onSale.length ? Math.round(cutSum / onSale.length) : 0;
+
+  const steals = wl.filter(isStealDeal);
+
+  el.innerHTML = [
+    topDeal ? dealHeroCardHtml(topDeal) : dealHeroEmptyHtml(),
+    dealSaleScoreboardCardHtml({
+      onSaleCount: onSale.length,
+      totalCount: wl.length,
+      avgCut,
+      bestCut,
+      bestCutGame,
+      hasPricing,
+      cuts,
+    }),
+    dealStealsCardHtml(steals),
+  ].join("");
 }
 
 function renderDashboardItchRecap() {
@@ -995,24 +2085,30 @@ function renderDashboardItchRecap() {
   }
   const gamesOnly = state.itchGames.filter(itchIsGame);
   const rated = gamesOnly.filter(g => ratingValue(g) > 0).length;
-  const withStatus = gamesOnly.filter(g => chipStatusKey(g) !== "__none__").length;
-  const recent = [...gamesOnly].sort((a, b) => (b.release_date || "").localeCompare(a.release_date || "")).slice(0, 5);
+  const unrated = gamesOnly.length - rated;
+  const nonGames = total - gamesOnly.length;
   el.innerHTML = `
-    <p><strong>${formatNum(gamesOnly.length)}</strong> videogames of <strong>${formatNum(total)}</strong> owned keys · <strong>${formatNum(rated)}</strong> with review scores · <strong>${formatNum(withStatus)}</strong> with a status</p>
-    ${recent.length ? `<p class="dash-itch-muted">Recent: ${recent.map(g => escapeHtml(g.name)).join(" · ")}</p>` : ""}
+    <p><strong>${formatNum(gamesOnly.length)}</strong> videogames of <strong>${formatNum(total)}</strong> owned keys · <strong>${formatNum(rated)}</strong> with review scores</p>
     <p class="dash-itch-muted mt-2"><button type="button" class="summary-jump-chip px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs border border-slate-600 cursor-pointer" data-jump-view="itch">Open itch.io tab →</button></p>`;
-  const counts = {};
-  STATUS_CHIP_DEFS.forEach(d => { counts[d.key] = 0; });
-  gamesOnly.forEach(g => { counts[chipStatusKey(g)] = (counts[chipStatusKey(g)] || 0) + 1; });
-  const statusEntries = STATUS_CHIP_DEFS.filter(d => (counts[d.key] || 0) > 0);
-  if (chartWrap) chartWrap.style.display = statusEntries.length ? "" : "none";
-  if (!statusEntries.length) return;
-  const labels = statusEntries.map(d => d.label);
-  const data = statusEntries.map(d => counts[d.key]);
-  const colors = statusEntries.map(d => DASH_STATUS_COLORS[d.key] || "#64748b");
+  const entries = [
+    { key: "rated", label: "Rated games", value: rated, color: "#22c55e" },
+    { key: "unrated", label: "Unrated games", value: unrated, color: "#64748b" },
+    { key: "nonGames", label: "Tools, OSTs, etc.", value: nonGames, color: "#8b5cf6" },
+  ].filter(e => e.value > 0);
+  if (chartWrap) chartWrap.style.display = entries.length ? "" : "none";
+  if (!entries.length) {
+    if (dashboardCharts.chartItchStatus) {
+      dashboardCharts.chartItchStatus.destroy();
+      delete dashboardCharts.chartItchStatus;
+    }
+    return;
+  }
   setDashboardChart("chartItchStatus", {
     type: "doughnut",
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+    data: {
+      labels: entries.map(e => e.label),
+      datasets: [{ data: entries.map(e => e.value), backgroundColor: entries.map(e => e.color), borderWidth: 0 }],
+    },
     options: dashChartOptions({
       plugins: {
         legend: {
@@ -1072,58 +2168,70 @@ function renderDashboardCharts(games) {
     type: "bar",
     data: {
       labels: topGenres.map(([g]) => g),
-      datasets: [{ label: "Games", data: topGenres.map(([, n]) => n), backgroundColor: "#38bdf8" }],
+      datasets: [{
+        label: "Games",
+        data: topGenres.map(([, n]) => n),
+        backgroundColor: "#38bdf8",
+        borderRadius: 6,
+        borderSkipped: false,
+      }],
     },
     options: dashChartOptions({
       indexAxis: "y",
+      layout: { padding: { right: 30 } },
+      plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { display: false } } },
       onClick(_evt, elements) { if (elements.length) dashDrillGenre(topGenres[elements[0].index][0]); },
     }),
+    plugins: [makeBarEndLabelsPlugin(i => topGenres[i]?.[1])],
   });
 
-  const stores = [...new Set(games.map(g => normalizeGame(g).store))].sort();
-  const backlogByStore = { backlog: {}, playing: {}, finished: {} };
-  stores.forEach(s => { backlogByStore.backlog[s] = 0; backlogByStore.playing[s] = 0; backlogByStore.finished[s] = 0; });
+  const stores = [...new Set(games.map(g => normalizeGame(g).store))];
+  const backlogByStore = { backlog: {}, finished: {} };
+  stores.forEach(s => { backlogByStore.backlog[s] = 0; backlogByStore.finished[s] = 0; });
   games.forEach(g => {
     const st = getPersonal(g).status;
     const store = normalizeGame(g).store;
     const hrs = hltbMain(g) || 0;
     if (st === "backlog") backlogByStore.backlog[store] += hrs;
-    else if (st === "playing") backlogByStore.playing[store] += hrs;
     else if (st === "finished") backlogByStore.finished[store] += hrs;
   });
-  const storeBrandColors = stores.map(s => DASH_STORE_COLORS[s] || "#64748b");
+  const sortedStores = stores.sort((a, b) => {
+    const totalA = (backlogByStore.backlog[a] || 0) + (backlogByStore.finished[a] || 0);
+    const totalB = (backlogByStore.backlog[b] || 0) + (backlogByStore.finished[b] || 0);
+    return totalB - totalA;
+  });
+  const storeBrandColors = sortedStores.map(s => DASH_STORE_COLORS[s] || "#64748b");
   setDashboardChart("chartBacklogStore", {
     type: "bar",
     data: {
-      labels: stores.map(s => DASH_STORE_LABELS[s] || s),
+      labels: sortedStores.map(s => DASH_STORE_LABELS[s] || s),
       datasets: [
-        { label: "Backlog",  data: stores.map(s => backlogByStore.backlog[s]),  backgroundColor: storeBrandColors.map(c => c + "FF"), borderColor: storeBrandColors, borderWidth: 1 },
-        { label: "Playing",  data: stores.map(s => backlogByStore.playing[s]),  backgroundColor: "#38bdf8",                             borderColor: "#0ea5e9",       borderWidth: 2 },
-        { label: "Finished", data: stores.map(s => backlogByStore.finished[s]), backgroundColor: storeBrandColors.map(c => c + "55"), borderColor: storeBrandColors, borderWidth: 1 },
+        {
+          label: "Backlog",
+          data: sortedStores.map(s => backlogByStore.backlog[s]),
+          backgroundColor: storeBrandColors.map(c => c + "FF"),
+        },
+        {
+          label: "Finished",
+          data: sortedStores.map(s => backlogByStore.finished[s]),
+          backgroundColor: storeBrandColors.map(c => c + "55"),
+          borderRadius: 6,
+          borderSkipped: false,
+        },
       ],
     },
     options: dashChartOptions({
       indexAxis: "y",
-      plugins: {
-        legend: {
-          labels: {
-            color: "#ffffff",
-            boxWidth: 14,
-            font: { size: 12, weight: "500" },
-            generateLabels() {
-              return [
-                { text: "Backlog",  fillStyle: "#94a3b8FF", strokeStyle: "#cbd5e1", lineWidth: 1, fontColor: "#ffffff", hidden: false },
-                { text: "Playing",  fillStyle: "#38bdf8",   strokeStyle: "#0ea5e9", lineWidth: 2, fontColor: "#ffffff", hidden: false },
-                { text: "Finished", fillStyle: "#94a3b855", strokeStyle: "#cbd5e1", lineWidth: 1, fontColor: "#ffffff", hidden: false },
-              ];
-            },
-          },
-          onClick: () => {},
-        },
-      },
+      layout: { padding: { right: 60 } },
+      plugins: { legend: { display: false } },
       scales: { x: { stacked: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { stacked: true, ticks: { color: "#94a3b8" }, grid: { display: false } } },
     }),
+    plugins: [makeBarEndLabelsPlugin(i => {
+      const s = sortedStores[i];
+      const total = Math.round((backlogByStore.backlog[s] || 0) + (backlogByStore.finished[s] || 0));
+      return total > 0 ? formatNum(total) : "";
+    })],
   });
 
   const buckets = ["0–2h", "2–5h", "5–10h", "10–20h", "20–40h", "40h+"];
@@ -1160,7 +2268,7 @@ function renderDashboardCharts(games) {
     type: "doughnut",
     data: {
       labels: revEntries.map(([k]) => k),
-      datasets: [{ data: revEntries.map(([, n]) => n), backgroundColor: ["#22c55e", "#34d399", "#86efac", "#fbbf24", "#f97316", "#ef4444", "#475569"].slice(0, revEntries.length), borderWidth: 0 }],
+      datasets: [{ data: revEntries.map(([, n]) => n), backgroundColor: revEntries.map(([k]) => DASH_REVIEW_COLORS[k] || "#475569"), borderWidth: 0 }],
     },
     options: dashChartOptions({ plugins: { legend: { position: "right" } } }),
   });
@@ -1171,10 +2279,60 @@ function renderDashboardCharts(games) {
     if (y && /^\d{4}$/.test(y) && +y >= 1990) yearCounts[y] = (yearCounts[y] || 0) + 1;
   });
   const years = Object.keys(yearCounts).sort();
+  const trendData = years.map(y => yearCounts[y]);
+  const rolling = years.map((_, i) => {
+    const lo = Math.max(0, i - 1);
+    const hi = Math.min(years.length - 1, i + 1);
+    let sum = 0, n = 0;
+    for (let j = lo; j <= hi; j++) { sum += trendData[j]; n++; }
+    return n > 0 ? sum / n : 0;
+  });
   setDashboardChart("chartReleases", {
-    type: "bar",
-    data: { labels: years, datasets: [{ label: "Games", data: years.map(y => yearCounts[y]), backgroundColor: "#0ea5e9" }] },
-    options: dashChartOptions({ scales: { x: { ticks: { color: "#94a3b8", maxRotation: 45 }, grid: { display: false } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
+    type: "line",
+    data: {
+      labels: years,
+      datasets: [
+        {
+          label: "Games / year",
+          data: trendData,
+          borderColor: "rgba(56, 189, 248, 0.95)",
+          backgroundColor: "rgba(56, 189, 248, 0.18)",
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.25,
+          fill: true,
+        },
+        {
+          label: "3-yr rolling avg",
+          data: rolling,
+          borderColor: "rgba(52, 211, 153, 0.95)",
+          backgroundColor: "transparent",
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.4,
+          borderDash: [4, 3],
+          fill: false,
+        },
+      ],
+    },
+    options: dashChartOptions({
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: { color: "#cbd5e1", boxWidth: 12, font: { size: 11 } },
+        },
+        tooltip: { mode: "index", intersect: false },
+      },
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { ticks: { color: "#94a3b8", maxRotation: 45 }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+      },
+    }),
+    plugins: [makeEraBandsPlugin(years)],
   });
 
   const scatterPts = games.filter(g => ratingValue(g) > 0 && hltbMain(g) != null && hltbMain(g) > 0).map(g => ({
@@ -1182,17 +2340,24 @@ function renderDashboardCharts(games) {
     y: ratingValue(g),
     label: g.name,
   }));
+  const ratingGradient = (rating, alpha) => {
+    const t = Math.max(0, Math.min(1, rating / 100));
+    const r = Math.round(245 + (16 - 245) * t);
+    const g = Math.round(158 + (185 - 158) * t);
+    const b = Math.round(11 + (129 - 11) * t);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
   setDashboardChart("chartScatter", {
     type: "scatter",
     data: {
       datasets: [{
         label: "Games",
         data: scatterPts.map(p => ({ x: p.x, y: p.y })),
-        backgroundColor: "rgba(56, 189, 248, 0.5)",
-        borderColor: "rgba(56, 189, 248, 0.85)",
-        borderWidth: 0.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
+        backgroundColor: scatterPts.map(p => ratingGradient(p.y, 0.55)),
+        borderColor: scatterPts.map(p => ratingGradient(p.y, 0.95)),
+        borderWidth: 0.6,
+        pointRadius: 4,
+        pointHoverRadius: 7,
       }],
     },
     options: dashChartOptions({
@@ -1214,6 +2379,7 @@ function renderDashboardCharts(games) {
         y: { title: { display: true, text: "Steam review %", color: "#94a3b8" }, min: 0, max: 100, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
       },
       plugins: {
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label(ctx) {
@@ -1226,18 +2392,6 @@ function renderDashboardCharts(games) {
     }),
   });
 
-  const tagCounts = {};
-  games.forEach(g => (getPersonal(g).tags || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
-  const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
-  setDashboardChart("chartTagsBar", {
-    type: "bar",
-    data: { labels: topTags.map(([t]) => t), datasets: [{ label: "Games", data: topTags.map(([, n]) => n), backgroundColor: "#f59e0b" }] },
-    options: dashChartOptions({
-      indexAxis: "y",
-      scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { display: false } } },
-      onClick(_evt, elements) { if (elements.length) dashDrillTag(topTags[elements[0].index][0]); },
-    }),
-  });
 }
 
 function renderDashboard() {
@@ -1256,6 +2410,7 @@ function renderDashboard() {
   Chart.defaults.color = "#94a3b8";
   Chart.defaults.borderColor = "#334155";
   const games = dashboardLibraryGames();
+  renderDashboardFetcherHealth();
   renderDashboardKPIs(games);
   renderDashboardItchRecap();
   try {
@@ -1264,6 +2419,11 @@ function renderDashboard() {
     console.error("Dashboard charts error:", err);
   }
   renderDashboardWishlistStats();
+  try {
+    renderDashboardCoopSpotlight(games);
+  } catch (err) {
+    console.error("Dashboard co-op spotlight error:", err);
+  }
   try {
     renderDashboardLists(games);
   } catch (err) {
@@ -1462,9 +2622,8 @@ function focusGame(key) {
   }
   const list = visibleListForKeyboard();
   const idx = list.findIndex(g => gameKey(g) === key);
-  if (idx >= 0) state.focusedRowIndex = idx;
-  renderTable();
-  scrollFocusedRow();
+  if (idx >= 0) scrollToRowIndex(idx);
+  else renderTable();
 }
 
 function scrollRowToCenter(row) {
@@ -1473,15 +2632,18 @@ function scrollRowToCenter(row) {
 }
 
 function scrollFocusedRow() {
-  const scrollEl = document.getElementById("tableWrap");
-  if (state._virtualActive && scrollEl && state.focusedRowIndex >= 0) {
-    const targetTop = state.focusedRowIndex * 56 - scrollEl.clientHeight / 2 + 28;
-    scrollEl.scrollTop = Math.max(0, targetTop);
-    renderTable({ virtualOnly: true });
-    const row = document.querySelector("tr.row-focused");
-    if (row) return;
+  const list = visibleListForKeyboard();
+  const idx = state.focusedRowIndex;
+  if (idx < 0 || !list[idx]) return;
+  const key = gameKey(list[idx]);
+  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (row) {
+    scrollRowToCenter(row);
+    focusRow(key);
+    if (state._virtualActive) paintTableBody(list, { anchorIndex: idx });
+    return;
   }
-  scrollRowToCenter(document.querySelector("tr.row-focused"));
+  scrollToRowIndex(idx);
 }
 
 function focusRow(key) {
@@ -1508,12 +2670,16 @@ function tableFingerprint() {
     q: (document.getElementById("search")?.value || "").trim().toLowerCase(),
     sf: document.getElementById("statusFilter")?.value || "",
     store: state.prefs.storeFilter || "",
+    wstore: state.prefs.wishlistStoreFilter || "",
     gen: state.prefs.genreFilters || [],
     gm: state.prefs.genreFilterMode,
     tags: state.prefs.tagFilters || [],
     tm: state.prefs.tagFilterMode,
     deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
     unp: !!state.prefs.unplayedOnly,
+    ea: !!document.getElementById("earlyAccessOnly")?.checked,
+    co: !!document.getElementById("coopOnlineOnly")?.checked,
+    cc: !!document.getElementById("coopLocalOnly")?.checked,
     cleanup: !!state.cleanupModeActive,
     score: !!state.prefs.showScoreColumn,
     dedupe: !!state.prefs.crossStoreDedup,
@@ -1545,11 +2711,13 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const focused = idx === state.focusedRowIndex;
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
-      <td class="p-2 text-center">${state.activeView === "library" ? `<input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} />` : ""}</td>
-      <td class="p-2"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" /></td>
+      <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
+      <td class="p-2"><span class="cover-wrap"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2">
         <div class="flex items-center gap-1.5">
           ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name", escapeHtml(g.name))}
+          ${earlyAccessPillHtml(g)}
+          ${coopPillsHtml(g)}
           ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
           ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
         </div>
@@ -1566,7 +2734,6 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
         <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
       </td>
       <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
-      <td class="p-2 text-right">${g.metacritic_score ?? "—"}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
       <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
       <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
@@ -1590,10 +2757,20 @@ function paintTableBody(list, opts = {}) {
   let bottomPad = 0;
   state._virtualActive = shouldVirtualize(list.length);
   if (state._virtualActive && scrollEl && !opts.resetScroll) {
-    const range = virtualRange(scrollEl.scrollTop, scrollEl.clientHeight, list.length);
+    let range;
+    if (typeof opts.anchorIndex === "number") {
+      range = virtualRangeAroundIndex(opts.anchorIndex, list.length);
+    } else {
+      const { scrollTop, clientHeight } = tableVirtualMetrics(scrollEl);
+      range = virtualRange(scrollTop, clientHeight, list.length);
+    }
+    if (range.start >= range.end && list.length > 0) {
+      range = virtualRangeAroundIndex(0, list.length);
+    }
     ({ start, end, topPad, bottomPad } = range);
-  } else if (opts.resetScroll && scrollEl) {
-    scrollEl.scrollTop = 0;
+  } else if (opts.resetScroll) {
+    const shell = document.getElementById("tableShell");
+    if (shell) window.scrollTo({ top: shell.offsetTop - 8, behavior: "instant" in window ? "instant" : "auto" });
   }
   state._virtualStart = start;
   const parts = [];
@@ -1636,14 +2813,17 @@ async function renderTable(opts) {
   document.getElementById("tableWrap").classList.toggle("cleanup-active", state.cleanupModeActive && state.activeView === "library");
   const selectAll = document.getElementById("selectAllVisible");
   if (selectAll) {
-    selectAll.disabled = state.activeView === "wishlist" || state.activeView === "itch";
-    selectAll.checked = state.activeView === "library" && list.length > 0 && list.every(g => state.selectedKeys.has(gameKey(g)));
+    selectAll.disabled = false;
+    selectAll.checked = list.length > 0 && list.every(g => state.selectedKeys.has(gameKey(g)));
   }
 
   if (state.focusedRowIndex >= list.length) state.focusedRowIndex = list.length - 1;
   if (state.focusedRowIndex < 0 && list.length) state.focusedRowIndex = 0;
 
-  paintTableBody(list, { resetScroll: force && !virtualOnly });
+  paintTableBody(list, {
+    resetScroll: force && !virtualOnly,
+    anchorIndex: opts?.anchorIndex,
+  });
 
   let base;
   if (state.activeView === "wishlist") {
@@ -1703,9 +2883,17 @@ function collectActiveFilters() {
     if (status) pills.push({ kind: "status", value: status, label: `Status: ${STATUS_FILTER_LABELS[status] || status}` });
   }
   if (state.prefs.storeFilter) pills.push({ kind: "store", value: state.prefs.storeFilter, label: `Store: ${state.prefs.storeFilter}` });
+  if (state.activeView === "wishlist" && state.prefs.wishlistStoreFilter) {
+    const labelMap = { steam: "Steam", gog: "GOG", epic: "Epic" };
+    const v = state.prefs.wishlistStoreFilter;
+    pills.push({ kind: "wishlistStore", value: v, label: `Wishlist source: ${labelMap[v] || v}` });
+  }
   for (const g of state.prefs.genreFilters || []) pills.push({ kind: "genre", value: g, label: g });
   for (const t of state.prefs.tagFilters || []) pills.push({ kind: "tag", value: t, label: `#${t}` });
   if (document.getElementById("unplayedOnly").checked) pills.push({ kind: "unplayed", value: "1", label: "Unplayed only" });
+  if (document.getElementById("earlyAccessOnly")?.checked) pills.push({ kind: "earlyAccess", value: "1", label: "Early Access only" });
+  if (document.getElementById("coopOnlineOnly")?.checked) pills.push({ kind: "coopOnline", value: "1", label: "Online co-op" });
+  if (document.getElementById("coopLocalOnly")?.checked) pills.push({ kind: "coopLocal", value: "1", label: "Couch co-op" });
   const minR = +document.getElementById("minRating").value;
   if (minR > 0) pills.push({ kind: "minRating", value: String(minR), label: `Rating ≥ ${minR}%` });
   const maxH = +document.getElementById("maxHours").value;
@@ -1761,6 +2949,7 @@ function removeActiveFilter(kind, value) {
     case "search": document.getElementById("search").value = ""; break;
     case "status": document.getElementById("statusFilter").value = ""; break;
     case "store": state.prefs.storeFilter = ""; savePrefs(); renderStoreChips(); break;
+    case "wishlistStore": state.prefs.wishlistStoreFilter = ""; savePrefs(); renderWishlistStoreChips(); break;
     case "genre":
       state.prefs.genreFilters = (state.prefs.genreFilters || []).filter(x => x !== value);
       savePrefs();
@@ -1770,6 +2959,21 @@ function removeActiveFilter(kind, value) {
       savePrefs();
       break;
     case "unplayed": document.getElementById("unplayedOnly").checked = false; break;
+    case "earlyAccess": {
+      const el = document.getElementById("earlyAccessOnly");
+      if (el) el.checked = false;
+      break;
+    }
+    case "coopOnline": {
+      const el = document.getElementById("coopOnlineOnly");
+      if (el) el.checked = false;
+      break;
+    }
+    case "coopLocal": {
+      const el = document.getElementById("coopLocalOnly");
+      if (el) el.checked = false;
+      break;
+    }
     case "minRating": document.getElementById("minRating").value = "0"; document.getElementById("minRatingVal").textContent = "0"; break;
     case "maxHours": document.getElementById("maxHours").value = "200"; document.getElementById("maxHoursVal").textContent = "200+"; break;
     case "cleanup": state.cleanupModeActive = false; updateCleanupBtnState(); break;
@@ -1827,11 +3031,18 @@ function clearAllFilters() {
   document.getElementById("search").value = "";
   document.getElementById("statusFilter").value = "";
   document.getElementById("unplayedOnly").checked = false;
+  const eaEl = document.getElementById("earlyAccessOnly");
+  if (eaEl) eaEl.checked = false;
+  const coEl = document.getElementById("coopOnlineOnly");
+  if (coEl) coEl.checked = false;
+  const ccEl = document.getElementById("coopLocalOnly");
+  if (ccEl) ccEl.checked = false;
   document.getElementById("minRating").value = "0";
   document.getElementById("minRatingVal").textContent = "0";
   document.getElementById("maxHours").value = "200";
   document.getElementById("maxHoursVal").textContent = "200+";
   state.prefs.storeFilter = "";
+  state.prefs.wishlistStoreFilter = "";
   state.prefs.genreFilters = [];
   state.prefs.tagFilters = [];
   state.prefs.tagFilterMode = "OR";
@@ -1925,9 +3136,13 @@ function updateViewChrome() {
   document.getElementById("libraryStatusSection")?.classList.toggle("hidden", isWish || isDash);
   document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
   document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isWish || isItch || isDash);
+  document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish);
   document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash);
+  document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash);
+  document.getElementById("coopSection")?.classList.toggle("hidden", isDash);
   if (isDash) scheduleDashboardRender();
   else destroyDashboardCharts();
+  renderBulkStatusButtons();
   renderSummary();
 }
 
@@ -1973,6 +3188,7 @@ function switchView(view) {
     }
     invalidateTableCache();
     state.activeView = view;
+    state.prefs.activeView = view;
     state.selectedKeys.clear();
     state.focusedRowIndex = 0;
     document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
@@ -1985,12 +3201,6 @@ function switchView(view) {
         state.prefs.libraryPicksTab = state.prefs.picksTab;
       }
       state.prefs.picksTab = "wishlistDeals";
-      if (state.prefs.wishlistSortVersion !== 2) {
-        state.sortKey = "deal_price";
-        state.sortDir = 1;
-        state.prefs.wishlistSortInitialized = true;
-        state.prefs.wishlistSortVersion = 2;
-      }
     } else if (view === "itch") {
       state.cleanupModeActive = false;
       if (fromView === "library" && state.prefs.picksTab && state.prefs.picksTab !== "topRated") {
@@ -2000,6 +3210,7 @@ function switchView(view) {
     } else {
       state.prefs.picksTab = state.prefs.libraryPicksTab || "topRated";
     }
+    applySavedSortForView(view);
     savePrefs();
     updateCleanupBtnState();
     updateBulkBar();
@@ -2053,8 +3264,8 @@ function exportCsv() {
   const list = sortedGames(filteredGames());
   const isWish = state.activeView === "wishlist";
   const headers = isWish
-    ? ["store", "wishlist_store", "id", "name", "tracking_status", "priority", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "metacritic", "hltb_main", "release_date", "genres", "tags", "notes", "store_url"]
-    : ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "metacritic", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
+    ? ["store", "wishlist_store", "id", "name", "tracking_status", "priority", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "hltb_main", "release_date", "genres", "tags", "notes", "store_url"]
+    : ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
   const rows = list.map(g => {
     const p = getPersonal(g);
     const ng = normalizeGame(g);
@@ -2064,14 +3275,14 @@ function exportCsv() {
         ng.store, g.wishlist_store ?? "", ng.id, g.name, p.status, p.priority,
         d?.price != null ? d.price.toFixed(2) : "", effectiveDiscountPercent(g) || "",
         d?.shop ?? "", d?.isHistoricalLow ? "yes" : "",
-        g.steam_review_percent ?? "", g.metacritic_score ?? "", hltbMain(g) ?? "",
+        g.steam_review_percent ?? "", hltbMain(g) ?? "",
         g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes,
         g.store_url ?? d?.url ?? "",
       ];
     }
     return [
       ng.store, ng.id, g.name, p.status, p.priority, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
-      hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "", g.metacritic_score ?? "",
+      hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "",
       g.price ?? "", effectiveDiscountPercent(g) || (g.discount_percent ?? ""), g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes
     ];
   }).map(cells => cells.map(x => `"${String(x).replace(/"/g, '""')}"`).join(","));
@@ -2091,9 +3302,32 @@ function download(name, content, type) {
 async function loadItadPrices() {
   try {
     const data = await fetchLibraryJson("itad_prices.json");
+    state.libraryMeta.itad = data || null;
     state.itadByKey = data?.by_key || {};
   } catch {
+    state.libraryMeta.itad = null;
     state.itadByKey = {};
+  }
+}
+
+async function loadHltbCache() {
+  try {
+    const res = await fetch(`cache/hltb_map.json?t=${Date.now()}`);
+    if (!res.ok) {
+      state.libraryMeta.hltb = null;
+      return;
+    }
+    const data = await res.json();
+    if (data && !data.fetched_at) {
+      const lm = res.headers.get("Last-Modified");
+      if (lm) {
+        const ts = Date.parse(lm);
+        if (Number.isFinite(ts)) data.fetched_at = new Date(ts).toISOString();
+      }
+    }
+    state.libraryMeta.hltb = data || null;
+  } catch {
+    state.libraryMeta.hltb = null;
   }
 }
 
@@ -2114,11 +3348,20 @@ function applyMergedLibrary() {
   if (state.libraryMeta.ubisoft) parts.push(`Ubisoft ${state.libraryMeta.ubisoft.game_count} (${new Date(state.libraryMeta.ubisoft.fetched_at).toLocaleString()})`);
   if (state.libraryMeta.nintendo) parts.push(`Nintendo ${state.libraryMeta.nintendo.game_count} (${new Date(state.libraryMeta.nintendo.fetched_at).toLocaleString()})`);
   if (state.libraryMeta.itch) parts.push(`itch.io ${state.libraryMeta.itch.game_count} (${new Date(state.libraryMeta.itch.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.wishlist) parts.push(`Wishlist ${state.libraryMeta.wishlist.game_count}`);
-  if (state.libraryMeta.wishlistGog) parts.push(`Wishlist GOG ${state.libraryMeta.wishlistGog.game_count}`);
+  const wlSources = [
+    ["S", state.libraryMeta.wishlist?.game_count],
+    ["G", state.libraryMeta.wishlistGog?.game_count],
+    ["E", state.libraryMeta.wishlistEpic?.game_count],
+  ].filter(([, n]) => typeof n === "number");
+  if (wlSources.length) {
+    const total = wlSources.reduce((a, [, n]) => a + n, 0);
+    const breakdown = wlSources.map(([k, n]) => `${k} ${n}`).join(" · ");
+    parts.push(`Wishlist ${total} (${breakdown})`);
+  }
   if (Object.keys(state.itadByKey).length) parts.push(`ITAD prices ${Object.keys(state.itadByKey).length}`);
   document.getElementById("meta").textContent = parts.length ? parts.join(" · ") : "No library data loaded";
   renderStoreChips();
+  renderWishlistStoreChips();
   renderGenreChips();
   renderTagChips();
   renderSummary();
@@ -2179,14 +3422,18 @@ async function reloadGames() {
   );
   const wishlist = await fetchLibraryJson("games_wishlist.json");
   const wishlistGog = await fetchLibraryJson("games_wishlist_gog.json");
+  const wishlistEpic = await fetchLibraryJson("games_wishlist_epic.json");
   state.libraryMeta.wishlist = wishlist;
   state.libraryMeta.wishlistGog = wishlistGog;
+  state.libraryMeta.wishlistEpic = wishlistEpic;
   const fetchedWishlist = [
     ...((wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }))),
     ...((wishlistGog?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: `gog-${g.id ?? g.gog_id}`, wishlist_store: "gog" }))),
+    ...((wishlistEpic?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `epic-${g.epic_namespace}:${g.epic_offer_id}`, wishlist_store: "epic" }))),
   ];
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
   await loadItadPrices();
+  await loadHltbCache();
   applyMergedLibrary();
 }
 
@@ -2204,6 +3451,12 @@ function refreshAfterManualChange() {
 function renderStoreChips() {
   document.querySelectorAll(".store-chip").forEach(chip => {
     chip.classList.toggle("active", chip.dataset.store === (state.prefs.storeFilter || ""));
+  });
+}
+
+function renderWishlistStoreChips() {
+  document.querySelectorAll(".wishlist-store-chip").forEach(chip => {
+    chip.classList.toggle("active", chip.dataset.wishlistStore === (state.prefs.wishlistStoreFilter || ""));
   });
 }
 
@@ -2306,7 +3559,6 @@ async function importSteamMatch(title, platform, match) {
     release_date: null,
     genres: [],
     tags: [],
-    metacritic_score: null,
     steam_review_percent: reviews.steam_review_percent ?? null,
     steam_review_count: reviews.steam_review_count ?? null,
     steam_review_desc: reviews.steam_review_desc ?? null,
@@ -2345,7 +3597,6 @@ function importTitleOnly() {
     release_date: null,
     genres: [],
     tags: [],
-    metacritic_score: null,
     steam_review_percent: null,
     steam_review_count: null,
     steam_review_desc: null,
@@ -2471,16 +3722,14 @@ function handleGlobalKeydown(e) {
   if (!list.length) return;
   if (e.key === "ArrowDown") {
     e.preventDefault();
-    state.focusedRowIndex = Math.min((state.focusedRowIndex < 0 ? 0 : state.focusedRowIndex + 1), list.length - 1);
-    renderTable();
-    scrollFocusedRow();
+    const next = Math.min((state.focusedRowIndex < 0 ? 0 : state.focusedRowIndex + 1), list.length - 1);
+    scrollToRowIndex(next);
     return;
   }
   if (e.key === "ArrowUp") {
     e.preventDefault();
-    state.focusedRowIndex = Math.max((state.focusedRowIndex < 0 ? 0 : state.focusedRowIndex - 1), 0);
-    renderTable();
-    scrollFocusedRow();
+    const next = Math.max((state.focusedRowIndex < 0 ? 0 : state.focusedRowIndex - 1), 0);
+    scrollToRowIndex(next);
     return;
   }
   if (e.key === "Enter") {
@@ -2514,12 +3763,81 @@ function handleGlobalKeydown(e) {
 
 // === Event wiring ===
 function bindEvents() {
-  const tableWrap = document.getElementById("tableWrap");
-  tableWrap?.addEventListener("scroll", () => {
+  const onTableVirtualScroll = () => {
     if (!state._virtualActive) return;
     cancelAnimationFrame(_virtualScrollRaf);
     _virtualScrollRaf = requestAnimationFrame(() => renderTable({ virtualOnly: true }));
-  }, { passive: true });
+  };
+  window.addEventListener("scroll", onTableVirtualScroll, { passive: true });
+  window.addEventListener("resize", onTableVirtualScroll, { passive: true });
+
+  document.getElementById("dashboardFetcherHealth")?.addEventListener("change", e => {
+    if (e.target.id === "fetcherHealthStaleOnly") {
+      state.prefs.fetcherHealthStaleOnly = e.target.checked;
+      savePrefs();
+      renderDashboardFetcherHealth();
+    }
+  });
+
+  document.getElementById("dashboardFetcherHealth")?.addEventListener("click", e => {
+    const chip = e.target.closest(".fh-chip[data-fetcher-key]");
+    if (!chip || chip.disabled) return;
+    e.preventDefault();
+    fetcherRunner.run(chip.dataset.fetcherKey);
+  });
+
+  document.getElementById("dashboardWishlistStats")?.addEventListener("click", e => {
+    const card = e.target.closest("[data-action]");
+    if (!card) return;
+    const action = card.dataset.action;
+    if ((action === "deal-hero" || action === "deal-steal-jump") && card.dataset.key) {
+      focusGame(card.dataset.key);
+      return;
+    }
+    if (action === "deal-on-sale") {
+      drillWishlistDealFilter({ onSaleOnly: true });
+      return;
+    }
+    if (action === "deal-steals") {
+      drillWishlistDealFilter({ minDiscount: 50 });
+    }
+  });
+
+  const onDashListClick = e => {
+    const row = e.target.closest('[data-action="dash-list-jump"]');
+    if (!row || !row.dataset.key) return;
+    focusGame(row.dataset.key);
+  };
+  document.getElementById("dashTopRated")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashQuickWins")?.addEventListener("click", onDashListClick);
+
+  const handleCoopActivate = (e) => {
+    const target = e.target.closest("[data-action]");
+    if (!target) return;
+    const action = target.dataset.action;
+    if (action === "coop-pick-jump" && target.dataset.key) {
+      e.stopPropagation();
+      focusGame(target.dataset.key);
+      return;
+    }
+    if (action === "coop-drill") {
+      try {
+        const args = JSON.parse(target.dataset.drill || "{}");
+        dashDrillCoop(args);
+      } catch (err) { console.error("co-op drill payload error", err); }
+    }
+  };
+  const coopSpotlightEl = document.getElementById("dashboardCoopSpotlight");
+  if (coopSpotlightEl) {
+    coopSpotlightEl.addEventListener("click", handleCoopActivate);
+    coopSpotlightEl.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const target = e.target.closest('[role="button"][data-action]');
+      if (!target) return;
+      e.preventDefault();
+      handleCoopActivate(e);
+    });
+  }
 
   document.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", e => {
@@ -2532,6 +3850,7 @@ function bindEvents() {
         state.sortKey = key;
         state.sortDir = (key === "discount_percent" || key === "deal_price") ? -1 : 1;
       }
+      persistCurrentSort();
       renderTable();
     });
   });
@@ -2549,7 +3868,7 @@ function bindEvents() {
     kebabMenu.classList.toggle("open");
   });
   document.addEventListener("click", () => kebabMenu.classList.remove("open"));
-  ["search", "statusFilter", "unplayedOnly", "minRating", "maxHours"].forEach(id => {
+  ["search", "statusFilter", "unplayedOnly", "earlyAccessOnly", "coopOnlineOnly", "coopLocalOnly", "minRating", "maxHours"].forEach(id => {
     document.getElementById(id).addEventListener("input", () => {
       document.getElementById("minRatingVal").textContent = document.getElementById("minRating").value;
       const h = +document.getElementById("maxHours").value;
@@ -2671,6 +3990,14 @@ function bindEvents() {
     renderStoreChips();
     refreshFilterUI();
   });
+  document.getElementById("wishlistStoreChips")?.addEventListener("click", e => {
+    const chip = e.target.closest(".wishlist-store-chip");
+    if (!chip) return;
+    state.prefs.wishlistStoreFilter = chip.dataset.wishlistStore || "";
+    savePrefs();
+    renderWishlistStoreChips();
+    refreshFilterUI();
+  });
   document.getElementById("summary").addEventListener("click", e => {
     const statusChip = e.target.closest(".status-chip");
     if (statusChip) {
@@ -2773,6 +4100,7 @@ function bindEvents() {
     if (e.target.checked) list.forEach(g => state.selectedKeys.add(gameKey(g)));
     else list.forEach(g => state.selectedKeys.delete(gameKey(g)));
     updateBulkBar();
+    invalidateTableCache();
     renderTable();
   });
   document.querySelectorAll(".view-tab").forEach(btn => {
@@ -2789,8 +4117,9 @@ function bindEvents() {
     state.focusedRowIndex = 0;
     refreshFilterUI();
   });
-  document.querySelectorAll(".bulk-status").forEach(btn => {
-    btn.addEventListener("click", () => bulkSetStatus(btn.dataset.status));
+  document.getElementById("bulkBar")?.addEventListener("click", e => {
+    const btn = e.target.closest(".bulk-status");
+    if (btn?.dataset.status) bulkSetStatus(btn.dataset.status);
   });
   document.getElementById("bulkApplyPriority").addEventListener("click", () => {
     const v = document.getElementById("bulkPriority").value;
@@ -2800,6 +4129,7 @@ function bindEvents() {
   document.getElementById("bulkClear").addEventListener("click", () => {
     state.selectedKeys.clear();
     updateBulkBar();
+    invalidateTableCache();
     renderTable();
   });
   document.getElementById("tbody").addEventListener("blur", e => {
@@ -2956,8 +4286,20 @@ function bindEvents() {
 
 // === Init ===
 async function bootstrap() {
+  let migrationInfo = { migrated: true, pendingMigration: null };
+  try {
+    migrationInfo = await personalStore.init();
+  } catch (err) {
+    console.warn("[personalStore] init failed, falling back to localStorage", err);
+  }
   migrateV3();
   state.prefs.genreFilters = (state.prefs.genreFilters || []).map(aliasCanonicalGenre);
+  const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch"]);
+  if (VALID_VIEWS.has(state.prefs.activeView)) {
+    state.activeView = state.prefs.activeView;
+  }
+  applySavedSortForView(state.activeView);
+  document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === state.activeView));
   savePrefs();
   bindEvents();
   document.getElementById("showScoreColumn").checked = !!state.prefs.showScoreColumn;
@@ -2980,6 +4322,8 @@ async function bootstrap() {
     savePrefs();
   }
   renderStoreChips();
+  renderWishlistStoreChips();
+  renderBulkStatusButtons();
   renderPicksLimitButtons();
   const chartScript = document.querySelector('script[src*="chart.js"]');
   if (chartScript && !chartScript.dataset.bound) {
@@ -2993,7 +4337,61 @@ async function bootstrap() {
   } catch {
     document.getElementById("meta").innerHTML = '<span class="text-amber-400">Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span>';
   }
+  fetcherRunner.probeApi().then(available => {
+    if (available && state.activeView === "dashboard") renderDashboardFetcherHealth();
+  });
+  if (migrationInfo.pendingMigration) {
+    showMigrationBanner(migrationInfo.pendingMigration);
+  }
   if (state.activeView === "dashboard") scheduleDashboardRender();
+}
+
+function showMigrationBanner(snap) {
+  const host = document.getElementById("migrationBanner");
+  if (!host) return;
+  const personalCount = Object.keys(snap.personal || {}).filter(k => k !== "__migrated_v3").length;
+  const manualCount = (snap.manual || []).length;
+  const parts = [];
+  if (personalCount) parts.push(`${personalCount} personal edit${personalCount === 1 ? "" : "s"}`);
+  if (manualCount) parts.push(`${manualCount} manual game${manualCount === 1 ? "" : "s"}`);
+  const summary = parts.join(" + ") || "your local data";
+  host.innerHTML = `
+    <div class="migration-banner-body">
+      <div>
+        <strong>Server file is empty.</strong>
+        Found ${escapeHtml(summary)} in this browser that isn't on the server yet.
+        Upload to <code class="bg-slate-700 px-1 rounded">data/personal.json</code>?
+      </div>
+      <div class="migration-banner-actions">
+        <button type="button" id="migrationUpload" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm">Upload to server</button>
+        <button type="button" id="migrationDismiss" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Dismiss</button>
+      </div>
+    </div>
+  `;
+  host.classList.remove("hidden");
+  const close = () => {
+    host.classList.add("hidden");
+    host.innerHTML = "";
+  };
+  document.getElementById("migrationUpload").addEventListener("click", async () => {
+    const btn = document.getElementById("migrationUpload");
+    btn.disabled = true;
+    btn.textContent = "Uploading…";
+    const ok = await personalStore.uploadLocalToServer();
+    if (ok) close();
+    else {
+      btn.disabled = false;
+      btn.textContent = "Retry upload";
+      const note = document.createElement("div");
+      note.className = "text-xs text-rose-300 mt-1";
+      note.textContent = "Upload failed. Check the server terminal for details.";
+      host.querySelector(".migration-banner-body")?.appendChild(note);
+    }
+  });
+  document.getElementById("migrationDismiss").addEventListener("click", () => {
+    personalStore.dismissMigration();
+    close();
+  });
 }
 hydrateState();
 bootstrap();

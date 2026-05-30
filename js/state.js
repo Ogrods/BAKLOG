@@ -9,7 +9,12 @@ export const state = {
   sortKey: 'name',
   sortDir: 1,
   pickedKey: null,
-  libraryMeta: { steam: null, gog: null, psn: null, epic: null, amazon: null, nintendo: null, itch: null, wishlist: null },
+  libraryMeta: {
+    steam: null, gog: null, psn: null, epic: null, amazon: null,
+    xbox: null, battlenet: null, ubisoft: null, nintendo: null, itch: null,
+    wishlist: null, wishlistGog: null, wishlistEpic: null,
+    itad: null, hltb: null,
+  },
   crossStoreHiddenKeys: new Set(),
   crossStoreOwnedStores: new Map(),
   wishlistGames: [],

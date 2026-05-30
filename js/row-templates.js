@@ -1,6 +1,6 @@
 import { escapeAttr } from './table-query.js';
 
-const STATUS_LABELS = {
+export const STATUS_LABELS = {
   backlog: 'Backlog',
   next: 'Next up',
   playing: 'Playing',
@@ -8,6 +8,13 @@ const STATUS_LABELS = {
   live: 'Live service',
   finished: 'Finished',
   skip: 'Skip',
+};
+
+export const WISHLIST_STATUS_LABELS = {
+  backlog: 'Watching',
+  next: 'Want it',
+  skip: 'Pass',
+  finished: 'Bought',
 };
 
 const STATUS_VALUES = Object.keys(STATUS_LABELS);

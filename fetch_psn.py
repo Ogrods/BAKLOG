@@ -63,7 +63,6 @@ def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
         "psn_platforms": list(entry.platforms or []),
         "tags": tags,
         "trophy_progress": entry.trophy_progress,
-        "metacritic_score": None,
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,

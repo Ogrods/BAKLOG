@@ -164,7 +164,6 @@ def _build_row(gog_id: int, product: dict | None, price_doc: dict | None, hltb_d
         "release_date": release,
         "genres": [],
         "tags": [],
-        "metacritic_score": None,
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,

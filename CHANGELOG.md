@@ -4,6 +4,215 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-30
+
+### Added
+
+- **`server.py` dev server** — replaces `python -m http.server` as the recommended
+  way to run the dashboard on http://localhost:8765. Serves static files and
+  exposes a small API: `POST /api/run/<key>` queues a fetcher, `GET
+  /api/stream/<run_id>` streams stdout/stderr over SSE, `GET/PUT
+  /api/personal` reads/writes `data/personal.json`. Runs are serialized through
+  a single-worker queue; fetcher argv is whitelisted server-side.
+- **Fetcher health row (dashboard)** — compact chip strip for all 15 data
+  sources (stores, wishlists, ITAD, HLTB) with freshness coloring, entry
+  counts, and an "Only stale / missing" toggle. When `server.py` is running,
+  chips become buttons that enqueue the matching fetch script and open a live
+  log panel below the row.
+- **Server-backed personal data** — statuses, notes, priorities, tags, UI
+  prefs, and manually-added games persist to `data/personal.json` (atomic
+  writes + rolling backups in `data/personal_backups/`). Browser
+  `localStorage` remains a hydration cache; server wins on boot. One-time
+  migration banner offers to upload existing localStorage data when the server
+  file is empty.
+- **Filter drawer keyboard shortcuts footer** — always-visible two-row hint
+  (`/` search, arrows, Enter, Esc, library status keys, priority, Space select)
+  pinned to the bottom of the filter drawer.
+- **Dashboard chart polish** — status/review donut palette tuned (backlog red,
+  playing yellow, unfinished orange, finished green; Unreviewed grey); Top
+  genres and Backlog hours by store unified (sorted bars, rounded ends, end
+  labels, inline backlog legend); Releases by year switched to area chart with
+  3-year rolling average and era bands; HLTB vs Steam rating scatter uses
+  amber-to-emerald rating gradient; KPI strip adds Wishlist count and fits nine
+  tiles on one row at xl widths.
+- **Co-op spotlight (dashboard)** — replaced the old "Personal tags" bar chart
+  with a full-width Co-op spotlight card laid out as a head-to-head versus:
+  Online co-op on the left (blue-tinted side panel, blue-gradient hover) and
+  Couch co-op on the right (emerald-tinted side panel, emerald-gradient
+  hover), with a thin central unifier strip that shows Total co-op and Both
+  flavors stats. Each side panel surfaces its own big count, Backlog /
+  Finished / Avg HLTB numbers, and a three-row "Top unplayed picks" list
+  (cover thumb, name, Steam rating %), all sorted by review score. The
+  whole side panel is clickable (`role="button"` + Enter/Space keyboard
+  support) to drill into the library with the matching co-op filter; the
+  pick rows short-circuit the side click and focus the individual game
+  instead. Empty-state copy guides the user back to `fetch_games.py` if no
+  co-op flags are detected. The `dashDrillTag` helper and `chartTagsBar`
+  block are gone (personal tags are still filterable via the drawer, just
+  no longer charted on the dashboard).
+- **Per-view sort persistence** — Library, Wishlist, and itch.io each now
+  remember their last-used column sort across reloads. New `prefs.viewSorts`
+  object stores `{ key, dir }` per view; the column header click handler
+  persists it via a new `persistCurrentSort()` helper, and both
+  `bootstrap()` and `switchView()` restore the right sort on entry through
+  `applySavedSortForView()`. Also fixes a pre-existing cross-contamination
+  bug: sorting Library by `hltb_main_hours` and then hopping to Wishlist no
+  longer leaves Library stuck on `deal_price` when you come back. The old
+  one-shot `wishlistSortVersion` migration is gone — wishlist's "cheapest
+  first" preference is now just the default value of `viewSorts.wishlist`
+  (`deal_price` asc), overrideable by any column click.
+- **Co-op signal (Steam)** — `fetch_games.py` and `fetch_wishlist.py` now parse
+  Steam's `categories` array into structured `coop_online` and `coop_local`
+  booleans on every row. "Online Co-op" and "LAN Co-op" set `coop_online`;
+  "Shared/Split Screen Co-op" sets `coop_local`. The bare "Co-op" category is
+  intentionally ignored because the flavor is unknown. The category cap was
+  also raised from `[:8]` to `[:16]` so co-op tags can't be silently truncated
+  when a game ships with a lot of leading achievement/cloud-save flags.
+  Existing JSON files (`games_steam.json`, `games_wishlist.json`) were
+  backfilled in-place from the data already present in the `tags` array, so no
+  refetch is required to see the new pills.
+- **Co-op row pills** — the table title cell now renders a blue `ONLINE`
+  pill and/or an emerald `COUCH` pill (right after the EA pill) whenever the
+  matching co-op flag is set, mirroring the visual weight of the existing
+  Early Access pill.
+- **Co-op filter toggles** — the filter drawer gained a Co-op section with
+  two checkboxes ("Online co-op", "Couch co-op"). Each acts as an AND filter
+  (check both to require games that support *both* flavors), produces a
+  matching active-filter pill ("Online co-op" / "Couch co-op"), and is
+  cleared by both the per-pill × button and the Clear-all sweep. Filters
+  feed into the same `table-query.js` worker pipeline as the rest of the
+  drawer so the virtual table stays responsive.
+- **Early Access filter toggle** — new "Early Access only" checkbox in the
+  filter drawer (with an inline `EA` pill so its function is obvious). Hides
+  every non-EA game across Library, Wishlist, and itch.io. Adds a matching
+  active filter pill ("Early Access only") that the Clear-all sweep and the
+  per-pill × button both reset. Detection reuses the same `isEarlyAccess`
+  helper that drives the cover ribbon and table pill — now exported from
+  `table-query.js` so the worker thread can use it too (the duplicate copy in
+  `app.js` was removed to prevent drift).
+- **Wishlist source filter chips** — the filter drawer now shows an "All ·
+  Steam · GOG · Epic" chip row whenever the Wishlist tab is active (mirroring
+  the Library tab's Store chips). Picking a chip filters the wishlist table
+  by `wishlist_store`, adds a "Wishlist source: …" pill to the active filter
+  bar, and persists across reloads via the `wishlistStoreFilter` pref. Manual
+  wishlist entries still appear under "All".
+- **Early Access badge** — games tagged "Early Access" (e.g. *Hyper Light
+  Breaker*, *Slay the Spire 2*) now wear a Steam-style amber ribbon across the
+  bottom of their cover art on the dashboard pick cards, deal hero card, and
+  wishlist deal cards, plus a small `EA` pill next to the title in the main
+  table. Detection is data-driven: any genre/tag containing "early access" or
+  an explicit `early_access: true` flag triggers the badge — no extra fetch
+  pass required.
+- **Epic Games Store wishlist** fetcher (`fetch_epic_wishlist.py`) — uses the
+  storefront session cookie (`EPIC_STORE_COOKIE` in `.env`) to query
+  `www.epicgames.com/graphql`. Required because Epic discontinued
+  `graphql.epicgames.com` and the launcher OAuth bearer can't reach the
+  storefront. Results merge into the dashboard Wishlist tab and deal radar
+  alongside Steam + GOG entries.
+- `epic_client.EpicStoreClient` — cookie-based storefront GraphQL client.
+
+### Changed
+
+- **Dashboard `Top rated unplayed` and `Quick wins` rows are now clickable.**
+  Each row in those two list cards is rendered as a button that calls
+  `focusGame()` — clicking a game flips you to the Library tab, scrolls the
+  matching row to the center of the table, and highlights it (same plumbing
+  used by the deal hero and steals list).
+- **Top deal card got a hero treatment.** The "Today's top deal" cover jumped
+  from 52×78 to 92×138, the name now wraps to two lines instead of truncating,
+  the price font is bumped, and a stat strip below the badges shows review%
+  and HLTB main hours as pills with genres as plain text on a second line.
+- **Wishlist deal cards fill their grid row.** All three dashboard deal cards
+  now stretch to match the tallest column (driven by the steals list). The top
+  deal meta column distributes name/price, badges, and stats top→middle→bottom;
+  the sale scoreboard pins its cut-distribution bar to the card floor; the
+  steals footer anchors to the bottom — so short and tall rows both look
+  balanced instead of leaving dead space or crowded pill stacks.
+- **Sale scoreboard stats are larger** and now include a **cut distribution**
+  strip beneath the numbers: a horizontal stacked bar splitting wishlist sale
+  items into Light (<25%) · Medium (25-49%) · Deep (50-74%) · Huge (75%+),
+  with a labelled legend underneath showing each bucket's count. Lets you see
+  at a glance whether your wishlist is full of mild sales or deep ones.
+- **Wishlist deal cards revamped** — the dashboard's two scoreboard cards next
+  to "Today's top deal" got real upgrades:
+  - **Saved by waiting → Sale scoreboard.** The hypothetical "$70 you'd save
+    if you bought everything" dollar figure was replaced by three actionable
+    stats: `On sale 8 / 30`, `Avg cut -25%`, `Best cut -75%` (with the
+    leading game's name as a caption). Click still drills to the
+    on-sale-only wishlist view.
+  - **Steals waiting → mini-list.** The big "4" + three thumbs were replaced
+    with up to six clickable rows (cover · name · ★ if historical low · cut%
+    · price). Each row jumps straight to that wishlist entry; the footer
+    `+N more · view all →` still applies the steals filter (50%+ off or
+    historical low, 80%+ rated).
+- Wishlist row/pick badges now show the plain source-store letter (S/G/E/…)
+  instead of a stacked `W*` glyph. The tooltip still reads "Wishlist · STORE".
+- Dashboard itch.io recap pie chart now reflects the stats shown (rated games,
+  unrated games, non-game items) instead of a personal-status breakdown.
+- Header meta strip now consolidates wishlist counts into one entry
+  (`Wishlist 30 (S 29 · G 0 · E 1)`) instead of three separate entries —
+  scales as more stores are added.
+- `state.libraryMeta` initial keys now cover every store (xbox, battlenet,
+  ubisoft, wishlistGog, wishlistEpic, itad, hltb) for consistency.
+- **Default local URL** — README and stack table now recommend
+  `python server.py` → http://localhost:8765; plain `http.server` documented
+  as read-only fallback.
+- **`enrich_hltb.py`** — writes `fetched_at` into `cache/hltb_map.json` on
+  save; dashboard HLTB fetcher-health chip falls back to the file's HTTP
+  `Last-Modified` when the field is absent.
+
+### Fixed
+
+- **Bulk selection now works on Wishlist + itch.io tabs.** Previously the
+  row-select checkboxes were rendered only when `activeView === "library"`
+  and the bulk action bar refused to open elsewhere, so the column-header
+  "select all visible" checkbox effectively no-op'd on those tabs. The per-row
+  checkbox is now rendered in all table views and the bulk bar opens
+  whenever there's at least one selection (any non-dashboard view).
+- **Bulk status buttons now match the active tab.** The bottom bulk bar
+  previously always showed all seven library statuses (Playing, Unfinished,
+  Live service, …) even on Wishlist, where row dropdowns only offer Watching /
+  Want it / Pass / Bought. Status buttons are rendered per view from shared
+  label maps (`STATUS_LABELS` for Library + itch.io, `WISHLIST_STATUS_LABELS`
+  for Wishlist) so bulk-set values always align with what each row can display.
+- **"Select all visible" now visually checks every row.** The select-all and
+  bulk-clear handlers updated `state.selectedKeys` but `renderTable()`
+  short-circuited on the unchanged fingerprint, so the per-row boxes never
+  re-painted. Each selection-mutation site (`selectAllVisible`, `bulkClear`,
+  `bulkSetStatus`, `bulkSetPriority`) now calls `invalidateTableCache()`
+  before re-rendering, so the table redraws with the new checkbox state.
+- **HLTB enrichment now covers Xbox, Battle.net, Ubisoft, and Nintendo.**
+  `enrich_hltb.py`'s `STORE_FILES` list was stale and silently skipped those
+  four `games_*.json` files, leaving `hltb_main_hours` null on every entry.
+  The Dashboard "Backlog hours by store" chart consequently showed empty bars
+  for those stores. Added them to the loop so a single
+  `python enrich_hltb.py` pass now backfills hours for all stores.
+- **Dashboard wishlist cards no longer surface "fake" historical lows.**
+  Newly released wishlist games whose price has never dropped were appearing
+  in "Today's top deal" and "Steals waiting" because ITAD/Steam still reports
+  `is_historical_low: true` for any never-discounted current price (e.g.
+  *Mina the Hollower*, *MOUSE: P.I. For Hire*). `isStealDeal` and
+  `wishlistGamesWithDeals` now require `cut > 0` first, so the dashboard only
+  shows games that are genuinely on sale. The full wishlist tab still keeps
+  the historical-low badge for those entries — it's just no longer flagged as
+  a steal on the dashboard.
+- **Fetcher SSE log panel on Windows** — `ConnectionAbortedError` when the
+  browser closes an EventSource is handled gracefully; client reconnects to
+  active/queued runs via `/api/runs` instead of showing a blank log.
+- **Dashboard loading overlay** — `.dash-card { display: flex }` no longer
+  overrides Tailwind `.hidden` on `#dashboardLoading`.
+- **KPI row wrap** — nine KPI tiles stay on one row at xl (`xl:grid-cols-9`).
+
+### Removed
+
+- **Metacritic score** column, schema field (`metacritic_score`), and Steam
+  `appdetails.metacritic` ingestion. Only Steam provided values, coverage was
+  sparse (~10% of the Steam library; 0% of every other store), and the field
+  doubled as a misleading signal next to Steam's own review %. Steam review %
+  is now the single source of truth for rating. Existing
+  `metacritic_score` fields are stripped from `games_*.json` on next fetch and
+  the dashboard ignores any cached values.
+
 ## [0.5.1] - 2026-05-29
 
 ### Added

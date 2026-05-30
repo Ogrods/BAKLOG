@@ -117,7 +117,6 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
         "release_date": item.get("purchase_date"),
         "genres": [],
         "tags": list(item.get("tags") or []),
-        "metacritic_score": None,
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,

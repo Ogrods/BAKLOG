@@ -89,7 +89,6 @@ def _build_row(entry: dict, hltb: dict | None) -> dict | None:
         "release_date": _release_date(game),
         "genres": _genres(game),
         "tags": [],
-        "metacritic_score": None,
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,
@@ -231,11 +230,10 @@ def main() -> int:
         and (
             g.get("steam_review_percent") is not None
             or g.get("hltb_main_hours") is not None
-            or g.get("metacritic_score") is not None
         )
     )
     if preserved_enrichment:
-        print(f"  {preserved_enrichment} rows kept enrichment from cache (reviews/HLTB/metacritic)")
+        print(f"  {preserved_enrichment} rows kept enrichment from cache (reviews/HLTB)")
 
     if args.dry_run:
         print("\nDry run — not writing games_itch.json.")

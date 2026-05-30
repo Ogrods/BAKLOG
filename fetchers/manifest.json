@@ -1,0 +1,19 @@
+{
+  "fetchers": [
+    { "key": "steam", "label": "Steam", "group": "library", "script": "fetch_games.py", "metaKey": "steam", "color": "#ea580c" },
+    { "key": "gog", "label": "GOG", "group": "library", "script": "fetch_gog.py", "metaKey": "gog", "color": "#6d28d9" },
+    { "key": "psn", "label": "PSN", "group": "library", "script": "fetch_psn.py", "metaKey": "psn", "color": "#003791" },
+    { "key": "epic", "label": "Epic", "group": "library", "script": "fetch_epic.py", "metaKey": "epic", "color": "#64748b" },
+    { "key": "amazon", "label": "Amazon", "group": "library", "script": "fetch_amazon.py", "metaKey": "amazon", "color": "#c2410c" },
+    { "key": "xbox", "label": "Xbox", "group": "library", "script": "fetch_xbox.py", "metaKey": "xbox", "color": "#107C10" },
+    { "key": "battlenet", "label": "Battle.net", "group": "library", "script": "fetch_battlenet.py", "metaKey": "battlenet", "color": "#148EFF" },
+    { "key": "ubisoft", "label": "Ubisoft", "group": "library", "script": "fetch_ubisoft.py", "metaKey": "ubisoft", "color": "#FFD200" },
+    { "key": "nintendo", "label": "Nintendo", "group": "library", "script": "fetch_nintendo.py", "metaKey": "nintendo", "color": "#E60012" },
+    { "key": "itch", "label": "itch.io", "group": "library", "script": "fetch_itch.py", "metaKey": "itch", "color": "#fa5c5c" },
+    { "key": "wishlistSteam", "label": "WL Steam", "group": "wishlist", "script": "fetch_wishlist.py", "metaKey": "wishlist", "color": "#ea580c" },
+    { "key": "wishlistGog", "label": "WL GOG", "group": "wishlist", "script": "fetch_gog_wishlist.py", "metaKey": "wishlistGog", "color": "#6d28d9" },
+    { "key": "wishlistEpic", "label": "WL Epic", "group": "wishlist", "script": "fetch_epic_wishlist.py", "metaKey": "wishlistEpic", "color": "#64748b" },
+    { "key": "itad", "label": "ITAD", "group": "prices", "script": "fetch_itad.py", "metaKey": "itad", "color": "#22d3ee" },
+    { "key": "hltb", "label": "HLTB", "group": "enrich", "script": "enrich_hltb.py", "metaKey": "hltb", "color": "#a78bfa" }
+  ]
+}

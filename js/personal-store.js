@@ -1,0 +1,216 @@
+import { state, STORAGE_KEY, PREFS_KEY, MANUAL_KEY } from './state.js';
+
+let getManualGamesFn = () => [];
+let setManualGamesFn = () => {};
+
+export function configurePersonalStore({ getManualGames, setManualGames }) {
+  getManualGamesFn = getManualGames;
+  setManualGamesFn = setManualGames;
+}
+
+export const personalStore = (() => {
+  let apiAvailable = null;
+  let serverDoc = null;
+  let pushTimer = null;
+  let inFlight = null;
+  let dirty = false;
+  let initComplete = false;
+  let pendingMigration = null;
+  const PUSH_DEBOUNCE_MS = 600;
+
+  function snapshotLocal() {
+    return {
+      personal: JSON.parse(JSON.stringify(state.personal || {})),
+      prefs: JSON.parse(JSON.stringify(state.prefs || {})),
+      manual: JSON.parse(JSON.stringify(getManualGamesFn())),
+    };
+  }
+
+  function isMeaningful(snap) {
+    const personalKeys = Object.keys(snap.personal || {}).filter(k => k !== '__migrated_v3');
+    if (personalKeys.length) return true;
+    if ((snap.manual || []).length) return true;
+    return false;
+  }
+
+  async function probe() {
+    if (apiAvailable !== null) return apiAvailable;
+    try {
+      const res = await fetch('/api/personal', { method: 'GET' });
+      if (!res.ok) { apiAvailable = false; return false; }
+      serverDoc = await res.json();
+      apiAvailable = true;
+      return true;
+    } catch {
+      apiAvailable = false;
+      return false;
+    }
+  }
+
+  function applyServerDoc(doc) {
+    state.personal = doc.personal || {};
+    state.prefs = { ...state.prefs, ...(doc.prefs || {}) };
+    const manual = Array.isArray(doc.manual) ? doc.manual : [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
+    localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
+    localStorage.setItem(MANUAL_KEY, JSON.stringify(manual));
+    setManualGamesFn(manual);
+  }
+
+  async function init() {
+    const localSnapBeforeProbe = snapshotLocal();
+    const available = await probe();
+    if (!available) return { migrated: false, pendingMigration: null };
+
+    const serverHas = isMeaningful(serverDoc || {});
+    const localHas = isMeaningful(localSnapBeforeProbe);
+
+    if (serverHas) {
+      applyServerDoc(serverDoc);
+      initComplete = true;
+      return { migrated: true, pendingMigration: null };
+    }
+
+    if (localHas) {
+      pendingMigration = localSnapBeforeProbe;
+      return { migrated: false, pendingMigration };
+    }
+
+    applyServerDoc(serverDoc || { personal: {}, prefs: {}, manual: [] });
+    initComplete = true;
+    return { migrated: true, pendingMigration: null };
+  }
+
+  async function uploadLocalToServer() {
+    if (!pendingMigration) return false;
+    const payload = pendingMigration;
+    pendingMigration = null;
+    initComplete = true;
+    const ok = await putPayload(payload);
+    if (ok && dirty) flush();
+    return ok;
+  }
+
+  function dismissMigration() {
+    pendingMigration = null;
+    initComplete = true;
+    if (dirty) flush();
+  }
+
+  function notify() {
+    if (apiAvailable !== true) return;
+    if (!initComplete) {
+      dirty = true;
+      return;
+    }
+    dirty = true;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(flush, PUSH_DEBOUNCE_MS);
+  }
+
+  async function putPayload(payload) {
+    inFlight = (async () => {
+      try {
+        const res = await fetch('/api/personal', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          console.warn('[personalStore] PUT failed', res.status, await res.text().catch(() => ''));
+          return false;
+        }
+        serverDoc = await res.json();
+        return true;
+      } catch (err) {
+        console.warn('[personalStore] PUT errored', err);
+        return false;
+      } finally {
+        inFlight = null;
+      }
+    })();
+    return inFlight;
+  }
+
+  async function flush() {
+    if (apiAvailable !== true) return;
+    if (inFlight) {
+      try { await inFlight; } catch (_) {}
+    }
+    if (!dirty) return;
+    dirty = false;
+    pushTimer = null;
+    const snap = snapshotLocal();
+    const ok = await putPayload(snap);
+    if (!ok) dirty = true;
+  }
+
+  function flushSync() {
+    if (apiAvailable !== true) return;
+    if (!dirty && !pushTimer) return;
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    dirty = false;
+    const snap = snapshotLocal();
+    try {
+      const blob = new Blob([JSON.stringify(snap)], { type: 'application/json' });
+      navigator.sendBeacon('/api/personal', blob);
+    } catch (err) {
+      console.warn('[personalStore] sendBeacon failed', err);
+    }
+  }
+
+  return { init, notify, flush, flushSync, uploadLocalToServer, dismissMigration };
+})();
+
+window.addEventListener('beforeunload', () => personalStore.flushSync());
+
+export function showMigrationBanner(snap, { escapeHtml, onUploaded }) {
+  const host = document.getElementById('migrationBanner');
+  if (!host) return;
+  const personalCount = Object.keys(snap.personal || {}).filter(k => k !== '__migrated_v3').length;
+  const manualCount = (snap.manual || []).length;
+  const parts = [];
+  if (personalCount) parts.push(`${personalCount} personal edit${personalCount === 1 ? '' : 's'}`);
+  if (manualCount) parts.push(`${manualCount} manual game${manualCount === 1 ? '' : 's'}`);
+  const summary = parts.join(' + ') || 'your local data';
+  host.innerHTML = `
+    <div class="migration-banner-body">
+      <div>
+        <strong>Server file is empty.</strong>
+        Found ${escapeHtml(summary)} in this browser that isn't on the server yet.
+        Upload to <code class="bg-slate-700 px-1 rounded">data/personal.json</code>?
+      </div>
+      <div class="migration-banner-actions">
+        <button type="button" id="migrationUpload" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm">Upload to server</button>
+        <button type="button" id="migrationDismiss" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Dismiss</button>
+      </div>
+    </div>
+  `;
+  host.classList.remove('hidden');
+  const close = () => {
+    host.classList.add('hidden');
+    host.innerHTML = '';
+  };
+  document.getElementById('migrationUpload').addEventListener('click', async () => {
+    const btn = document.getElementById('migrationUpload');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    const ok = await personalStore.uploadLocalToServer();
+    if (ok) {
+      close();
+      if (onUploaded) onUploaded();
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Retry upload';
+      const note = document.createElement('div');
+      note.className = 'text-xs text-rose-300 mt-1';
+      note.textContent = 'Upload failed. Check the server terminal for details.';
+      host.querySelector('.migration-banner-body')?.appendChild(note);
+    }
+  });
+  document.getElementById('migrationDismiss').addEventListener('click', () => {
+    personalStore.dismissMigration();
+    close();
+  });
+}

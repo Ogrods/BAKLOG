@@ -423,7 +423,7 @@ function buildInsightPool(games) {
   }
 
   const withDate = games
-    .map(g => ({ g, d: g.added_at || g.release_date || '' }))
+    .map(g => ({ g, d: g.added_at || '' }))
     .filter(x => x.d)
     .sort((a, b) => b.d.localeCompare(a.d));
   if (withDate[0]) {
@@ -726,10 +726,19 @@ function buildMarqueeItems(games) {
   }
   if (libraryMsrp > 0) push('#', 'is-violet', formatDollarMarquee(libraryMsrp), 'library at MSRP');
 
+  const parseReleaseYear = (d) => {
+    if (!d) return null;
+    const s = String(d);
+    const m = s.match(/\b(19\d{2}|20\d{2}|21\d{2})\b/);
+    if (m) return parseInt(m[1], 10);
+    const t = Date.parse(s);
+    if (!isNaN(t)) return new Date(t).getUTCFullYear();
+    return null;
+  };
   const withReleaseYear = games
     .map(g => {
-      const y = parseInt((g.release_date || '').slice(0, 4), 10);
-      return Number.isFinite(y) ? { g, y } : null;
+      const y = parseReleaseYear(g.release_date);
+      return y != null ? { g, y } : null;
     })
     .filter(Boolean);
   if (withReleaseYear.length) {
@@ -745,14 +754,14 @@ function buildMarqueeItems(games) {
     const topDec = Object.entries(decadeCounts).sort((a, b) => b[1] - a[1])[0];
     if (topDec) push('>', '', `${topDec[0]}s · ${formatNum(topDec[1])}`, 'top decade');
     const oldUnplayed = backlog
-      .map(g => ({ g, y: parseInt((g.release_date || '').slice(0, 4), 10) }))
-      .filter(x => Number.isFinite(x.y))
+      .map(g => ({ g, y: parseReleaseYear(g.release_date) }))
+      .filter(x => x.y != null)
       .reduce((a, b) => (!a || a.y > b.y) ? b : a, null);
     if (oldUnplayed) push('^', 'is-rose', `${oldUnplayed.g.name} · ${oldUnplayed.y}`, 'oldest unplayed');
   }
 
   const withAddDate = games
-    .map(g => ({ g, d: g.added_at || g.release_date || '' }))
+    .map(g => ({ g, d: g.added_at || '' }))
     .filter(x => x.d)
     .sort((a, b) => b.d.localeCompare(a.d));
   if (withAddDate[0]) push('*', 'is-violet', withAddDate[0].g.name, 'newest add');

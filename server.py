@@ -59,6 +59,8 @@ MAX_SSE_CONNECTIONS = 8
 STALL_FIRST_NOTICE_SEC = 30
 STALL_REPEAT_SEC = 60
 STALL_POLL_SEC = 1.0
+SILENT_STALL_KILL_SEC = 180  # if a fetcher emits zero lines AND proc still alive after this, force-kill
+TERMINATE_GRACE_SEC = 5  # how long to wait after proc.terminate() before falling back to taskkill /F
 RUNS_DIR = ROOT / "cache" / "runs"
 ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
 RUN_HISTORY_FILE = RUNS_DIR / "history.json"
@@ -448,7 +450,15 @@ class Run:
             )
             return True
         if proc is not None and proc.poll() is None:
-            proc.terminate()
+            try:
+                proc.terminate()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                proc.wait(timeout=TERMINATE_GRACE_SEC)
+            except Exception:  # noqa: BLE001 - includes TimeoutExpired
+                if proc.pid:
+                    _terminate_pid(proc.pid)
         return True
 
 
@@ -665,6 +675,18 @@ class RunManager:
                 if proc.poll() is not None and line_queue.empty():
                     break
                 silent = now - last_line_at
+                if silent >= SILENT_STALL_KILL_SEC and len(run.lines) <= 1:
+                    run.add_line(
+                        "stderr",
+                        f"[server] no output for {int(silent)}s and no lines produced — force-killing PID {proc.pid}",
+                    )
+                    if proc.pid:
+                        _terminate_pid(proc.pid)
+                    try:
+                        proc.wait(timeout=TERMINATE_GRACE_SEC)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    break
                 if silent >= STALL_FIRST_NOTICE_SEC and (
                     last_stall_notice_at == 0.0
                     or now - last_stall_notice_at >= STALL_REPEAT_SEC

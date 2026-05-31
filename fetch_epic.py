@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 
+from auth import mark_invalid, resolve_env
 from epic_client import EpicAuthError, EpicClient, LOGIN_URL
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
@@ -295,7 +296,7 @@ def main() -> int:
         return stats.finish("fetch_epic", t0, exit_code=0)
 
     load_dotenv()
-    auth_code = os.getenv("EPIC_AUTH_CODE", "").strip() or None
+    auth_code = resolve_env("EPIC_AUTH_CODE", provider="epic") or None
 
     try:
         client = EpicClient(auth_code=auth_code)
@@ -303,6 +304,7 @@ def main() -> int:
         client.login()
         print(f"  account {client.account_id}")
     except EpicAuthError as e:
+        mark_invalid("epic", error=str(e))
         stats.error(str(e))
         print_auth_help()
         return stats.finish("fetch_epic", t0, exit_code=1)

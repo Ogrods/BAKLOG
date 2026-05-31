@@ -178,10 +178,14 @@ First Steam run may take several minutes for a large library (Store API is rate-
 **Option A (recommended):** run the bundled dev server, which serves the dashboard *and* lets you trigger fetchers from the dashboard "Fetcher health" row:
 
 ```bash
+pip install -r requirements.txt
+playwright install chromium   # one-time, for Connections browser sign-in
 python server.py
 ```
 
-Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes. Enrichment chips **HLTB**, **Reviews** (`enrich_steam_reviews.py`), and **Covers** (`enrich_cross_store_images.py`) backfill non-Steam rows; **Steam** refreshes your owned Steam library. Runs are serialized (single-worker queue) so concurrent clicks won't corrupt shared caches. The server binds to `127.0.0.1` only; override with `PORT=9000 python server.py` to change the port. Restart `server.py` after editing `fetchers/manifest.json` so new chips register.
+**Connections tab:** sign in once per store from the dashboard — API keys via form fields, cookie/OAuth stores via a headed Chromium window. Credentials are encrypted in `cache/auth/` (OS keychain by default). `.env` still works as a fallback.
+
+Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes. Use the **Connections** tab to sign in to each store once (encrypted locally via Playwright); `.env` still works as a fallback for API keys and cookies.
 
 **Option B (read-only):** `python -m http.server 8080` if you only want to browse and prefer to run fetchers in your terminal.
 

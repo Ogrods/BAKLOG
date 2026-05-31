@@ -1,5 +1,6 @@
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
+import { noteFetcherAuthFailure } from './connections.js';
 
 const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
 // ITAD is a deal feed — library-style 7d/30d thresholds are misleading.
@@ -666,6 +667,7 @@ export const fetcherRunner = (() => {
     }
     const es = new EventSource(`/api/stream/${encodeURIComponent(runId)}`);
     sourcesByRunId.set(runId, { es, key, src });
+    const recentLog = [];
 
     es.addEventListener('status', evt => {
       try {
@@ -691,7 +693,10 @@ export const fetcherRunner = (() => {
     es.addEventListener('line', evt => {
       try {
         const data = JSON.parse(evt.data);
-        appendLine(data.text || '', data.stream === 'stderr' ? 'stderr' : 'stdout');
+        const text = data.text || '';
+        recentLog.push(text);
+        if (recentLog.length > 40) recentLog.shift();
+        appendLine(text, data.stream === 'stderr' ? 'stderr' : 'stdout');
       } catch (_) {}
     });
 
@@ -719,6 +724,7 @@ export const fetcherRunner = (() => {
           markChipState(key, null);
         } else {
           markChipState(key, 'failed');
+          noteFetcherAuthFailure(key, recentLog.join('\n'));
           setTimeout(() => {
             if (runStateByKey.get(key) === 'failed') {
               runStateByKey.delete(key);

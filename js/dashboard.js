@@ -17,6 +17,14 @@ function c(name) {
 const dashboardCharts = {};
 let _dashboardRenderTimer = null;
 let itchHeroIndex = Math.floor(Math.random() * 10);
+let _insightTimer = null;
+let _insightFadeTimer = null;
+let _insightIndex = 0;
+let _spotlightTimer = null;
+let _spotlightFadeTimer = null;
+let _spotlightIndex = 0;
+const SPOTLIGHT_INTERVAL_MS = 7000;
+const SPOTLIGHT_FADE_MS = 300;
 
 const ITCH_CLASS_LABELS = {
   game: "Games",
@@ -52,8 +60,24 @@ const DASH_STORE_LABELS = {
   itch: "itch.io", other: "Other", manual: "Manual",
 };
 
+export function stopInsightRotation() {
+  if (_insightTimer) clearInterval(_insightTimer);
+  if (_insightFadeTimer) clearTimeout(_insightFadeTimer);
+  _insightTimer = null;
+  _insightFadeTimer = null;
+}
+
+export function stopSpotlightRotation() {
+  if (_spotlightTimer) clearInterval(_spotlightTimer);
+  if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+  _spotlightTimer = null;
+  _spotlightFadeTimer = null;
+}
+
 export function destroyDashboardCharts() {
-  Object.values(dashboardCharts).forEach(c => { try { c.destroy(); } catch (_) {} });
+  stopInsightRotation();
+  stopSpotlightRotation();
+  Object.values(dashboardCharts).forEach(ch => { try { ch.destroy(); } catch (_) {} });
   Object.keys(dashboardCharts).forEach(k => delete dashboardCharts[k]);
 }
 
@@ -273,9 +297,11 @@ function renderDashboardCoopSpotlight(games) {
     const avgHltb = hltbValues.length
       ? Math.round(hltbValues.reduce((s, h) => s + h, 0) / hltbValues.length)
       : null;
+    const failedCoop = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
     const picks = list
       .filter(g => c('getPersonal')(g).status !== "finished" && (g.playtime_minutes || 0) === 0)
       .filter(g => c('ratingValue')(g) > 0 && c('hasEnoughReviews')(g))
+      .filter(g => !!(g.library_image || g.header_image) && !failedCoop.has(c('gameKey')(g)))
       .sort((a, b) => c('ratingValue')(b) - c('ratingValue')(a))
       .slice(0, 3);
     const picksHtml = picks.length
@@ -347,7 +373,475 @@ function renderDashboardCoopSpotlight(games) {
     </div>
   `;
 }
-function renderDashboardKPIs(games) {
+function buildInsightPool(games) {
+  const insights = [];
+  const backlog = games.filter(g => c('getPersonal')(g).status === 'backlog');
+
+  const genreHrs = {};
+  backlog.forEach(g => {
+    c('gameGenresCanonical')(g).forEach(gen => {
+      genreHrs[gen] = (genreHrs[gen] || 0) + (c('hltbMain')(g) || 0);
+    });
+  });
+  const topGenre = Object.entries(genreHrs).sort((a, b) => b[1] - a[1])[0];
+  if (topGenre && topGenre[1] > 0) {
+    insights.push(`Biggest backlog: <strong>${escapeHtml(topGenre[0])}</strong> · ${escapeHtml(formatNum(Math.round(topGenre[1])))}h`);
+  }
+
+  const byPlay = [...games].filter(g => (g.playtime_minutes || 0) > 0).sort((a, b) => (b.playtime_minutes || 0) - (a.playtime_minutes || 0));
+  if (byPlay[0]) {
+    const hrs = Math.round((byPlay[0].playtime_minutes || 0) / 60);
+    insights.push(`Most played: <strong>${escapeHtml(byPlay[0].name)}</strong> · ${escapeHtml(formatNum(hrs))}h`);
+  }
+
+  const hltbVals = backlog.map(g => c('hltbMain')(g)).filter(h => h != null && h > 0);
+  if (hltbVals.length) {
+    const avg = Math.round(hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length);
+    insights.push(`Avg HLTB main: <strong>${escapeHtml(formatNum(avg))}h</strong>`);
+  }
+
+  const unplayed = backlog.filter(g => !(g.playtime_minutes || 0)).sort((a, b) => (c('hltbMain')(b) || 0) - (c('hltbMain')(a) || 0));
+  if (unplayed[0]) {
+    const h = c('hltbMain')(unplayed[0]);
+    insights.push(`Longest unplayed: <strong>${escapeHtml(unplayed[0].name)}</strong> · ${h != null ? escapeHtml(formatNum(Math.round(h))) + 'h' : '?'}`);
+  }
+
+  const deals = state.wishlistGames.filter(g => {
+    const d = c('getDealInfo')(g);
+    return d && (d.cut || 0) > 0;
+  });
+  if (deals.length) {
+    const top = [...deals].sort((a, b) => c('dealScore')(b) - c('dealScore')(a))[0];
+    const cut = c('getDealInfo')(top)?.cut || 0;
+    insights.push(`Top deal: <strong>${escapeHtml(top.name)}</strong> · -${cut}%`);
+  }
+
+  const rated = games.filter(g => c('ratingValue')(g) > 0);
+  if (rated.length) {
+    const avg = Math.round(rated.reduce((s, g) => s + c('ratingValue')(g), 0) / rated.length);
+    insights.push(`Average review: <strong>${avg}%</strong>`);
+  }
+
+  const withDate = games
+    .map(g => ({ g, d: g.added_at || g.release_date || '' }))
+    .filter(x => x.d)
+    .sort((a, b) => b.d.localeCompare(a.d));
+  if (withDate[0]) {
+    insights.push(`Newest add: <strong>${escapeHtml(withDate[0].g.name)}</strong>`);
+  }
+
+  const playedHrs = games.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
+  if (games.length) {
+    const ratio = (playedHrs / games.length).toFixed(1);
+    insights.push(`Hours per game: <strong>${ratio}h</strong>`);
+  }
+
+  return insights;
+}
+
+function formatDollarMarquee(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
+function gameSpotlightReason(g) {
+  const rating = c('ratingValue')(g);
+  const hltb = c('hltbMain')(g);
+  const personal = c('getPersonal')(g);
+  const enough = c('hasEnoughReviews')(g);
+  const playtime = g.playtime_minutes || 0;
+  const status = personal.status || 'backlog';
+  if (['finished', 'skip', 'live'].includes(status)) return null;
+  if (!['backlog', 'next', 'playing', 'unfinished'].includes(status)) return null;
+
+  if ((status === 'playing' || status === 'unfinished') && playtime >= 30 && rating >= 70) {
+    return { eyebrow: 'Return to', score: rating + 6 };
+  }
+  if (status === 'next' && rating >= 70) {
+    return { eyebrow: 'Up next', score: rating + 10 };
+  }
+  if (rating >= 88 && enough && hltb && hltb <= 8) {
+    return { eyebrow: 'Top-rated quick pick', score: rating + 8 };
+  }
+  if (rating >= 90 && enough) {
+    return { eyebrow: 'Critically acclaimed', score: rating + 4 };
+  }
+  if (rating >= 78 && hltb && hltb <= 5) {
+    return { eyebrow: 'Quick win', score: rating + 2 };
+  }
+  if (rating >= 82 && enough) {
+    return { eyebrow: 'Highly rated', score: rating };
+  }
+  if (rating >= 80 && !enough) {
+    return { eyebrow: 'Hidden gem', score: rating - 3 };
+  }
+  if (rating >= 75 && enough) {
+    return { eyebrow: 'Solid pick', score: rating - 5 };
+  }
+  if (hltb && hltb <= 4 && rating > 0) {
+    return { eyebrow: 'Fast finish', score: rating - 6 };
+  }
+  if (rating >= 70) {
+    return { eyebrow: 'Worth a look', score: rating - 10 };
+  }
+  return null;
+}
+
+function pickSpotlightGames(games) {
+  const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
+  const hasArt = g => !!(g.header_image || g.library_image) && !failed.has(c('gameKey')(g));
+  const eligible = games.filter(hasArt);
+  const target = Math.max(60, Math.round(eligible.length * 0.35));
+
+  const tagged = [];
+  for (const g of eligible) {
+    const reason = gameSpotlightReason(g);
+    if (reason) tagged.push({ g, reason });
+  }
+  tagged.sort((a, b) => b.reason.score - a.reason.score);
+  const top = tagged.slice(0, target);
+
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j], top[i]];
+  }
+  return top.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
+}
+
+const SPOTLIGHT_STATUS_LABEL = {
+  backlog: 'in backlog',
+  next: 'next up',
+  playing: 'in progress',
+  unfinished: 'unfinished',
+};
+
+function spotlightInnerHtml(g) {
+  const art = g.header_image || g.library_image || c('coverFallbackFor')(g);
+  const rating = c('ratingValue')(g);
+  const hltb = c('hltbMain')(g);
+  const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
+  const status = (c('getPersonal')(g).status) || 'backlog';
+  const statusLabel = SPOTLIGHT_STATUS_LABEL[status] || 'in your library';
+  const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
+  return `
+    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+    <div class="dash-spotlight-gradient" aria-hidden="true"></div>
+    <div class="dash-spotlight-body">
+      <span class="dash-spotlight-eyebrow">${escapeHtml(eyebrow)}</span>
+      <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
+      <span class="dash-spotlight-meta"><strong>${rating}%</strong> review · <strong>${escapeHtml(hltbStr)}</strong> main · ${escapeHtml(statusLabel)}</span>
+    </div>`;
+}
+
+function renderSpotlightHtml(g) {
+  const key = c('gameKey')(g);
+  return `
+    <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in library">
+      ${spotlightInnerHtml(g)}
+    </button>`;
+}
+
+function startSpotlightRotation(pool) {
+  stopSpotlightRotation();
+  if (!pool || pool.length <= 1) return;
+  const el = document.getElementById('dashboardSpotlight');
+  if (!el) return;
+  _spotlightIndex = 0;
+  let paused = false;
+  el.addEventListener('mouseenter', () => { paused = true; });
+  el.addEventListener('mouseleave', () => { paused = false; });
+  _spotlightTimer = setInterval(() => {
+    if (paused) return;
+    if (!document.getElementById('dashboardSpotlight')) {
+      stopSpotlightRotation();
+      return;
+    }
+    _spotlightIndex = (_spotlightIndex + 1) % pool.length;
+    const next = pool[_spotlightIndex];
+    el.classList.add('is-fading');
+    if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+    _spotlightFadeTimer = setTimeout(() => {
+      el.innerHTML = spotlightInnerHtml(next);
+      el.dataset.key = c('gameKey')(next);
+      el.title = `Jump to ${next.name} in library`;
+      el.classList.remove('is-fading');
+    }, SPOTLIGHT_FADE_MS);
+  }, SPOTLIGHT_INTERVAL_MS);
+}
+
+function buildMarqueeItems(games) {
+  const maxHrs = state.prefs.quickWinMaxHours || 15;
+  const status = (g) => c('getPersonal')(g).status || 'backlog';
+  const playMin = (g) => g.playtime_minutes || 0;
+  const rating = (g) => c('ratingValue')(g);
+  const hltb = (g) => c('hltbMain')(g);
+
+  const total = games.length;
+  const backlog = games.filter(g => status(g) === 'backlog');
+  const playing = games.filter(g => status(g) === 'playing');
+  const unfinished = games.filter(g => status(g) === 'unfinished');
+  const next = games.filter(g => status(g) === 'next');
+  const finished = games.filter(g => status(g) === 'finished');
+  const touched = games.filter(g => playMin(g) > 0);
+  const playedHrs = games.reduce((s, g) => s + playMin(g), 0) / 60;
+  const backlogHrs = backlog.reduce((s, g) => s + (hltb(g) || 0), 0);
+  const ratedGames = games.filter(g => rating(g) > 0);
+
+  const wl = state.wishlistGames || [];
+  const onSale = wl.filter(g => {
+    const d = c('getDealInfo')(g);
+    return d && (d.cut || 0) > 0;
+  });
+  const wlSources = new Set(
+    wl.map(g => g.wishlist_store || g.store_target || (g.manual ? 'manual' : 'steam')).filter(Boolean)
+  ).size;
+  const itchGameCount = (state.itchGames || []).filter(c('itchIsGame')).length;
+
+  const items = [];
+  const push = (glyph, iconCls, value, label) => {
+    items.push({ glyph, iconCls, valueHtml: escapeHtml(String(value)), label });
+  };
+
+  if (total > 0) push('>', '', formatNum(total), 'games owned');
+  const stores = new Set(games.map(g => c('normalizeGame')(g).store)).size;
+  if (stores > 0) push('>', '', String(stores), 'stores');
+  if (wlSources > 0) push('*', 'is-violet', String(wlSources), 'wishlists tracked');
+  if (itchGameCount > 0) push('>', '', formatNum(itchGameCount), 'itch games');
+  if (backlog.length) push('~', 'is-amber', formatNum(backlog.length), 'in backlog');
+  if (finished.length) push('+', 'is-emerald', formatNum(finished.length), 'completed');
+  if (touched.length) push('>', '', formatNum(touched.length), 'games touched');
+  if (playing.length) push('*', 'is-violet', formatNum(playing.length), 'in progress');
+  if (next.length) push('*', 'is-amber', formatNum(next.length), 'queued next');
+  if (unfinished.length) push('^', 'is-rose', formatNum(unfinished.length), 'left unfinished');
+
+  if (total > 0) {
+    const completionPct = Math.round((finished.length / total) * 100);
+    push('+', 'is-emerald', `${completionPct}%`, 'library completion');
+    const touchedPct = Math.round((touched.length / total) * 100);
+    push('~', 'is-amber', `${touchedPct}%`, 'ever touched');
+  }
+
+  if (playedHrs > 0) push('~', 'is-amber', `${formatNum(Math.round(playedHrs))}h`, 'all-time played');
+  if (touched.length) {
+    const avgSession = Math.round(playedHrs / touched.length);
+    if (avgSession > 0) push('~', 'is-amber', `${avgSession}h`, 'avg time per played game');
+  }
+  const mostPlayed = [...games].sort((a, b) => playMin(b) - playMin(a))[0];
+  if (mostPlayed && playMin(mostPlayed) > 0) {
+    push('^', 'is-rose', `${mostPlayed.name} · ${formatNum(Math.round(playMin(mostPlayed) / 60))}h`, 'most-played');
+  }
+
+  const hltbVals = backlog.map(hltb).filter(h => h != null && h > 0);
+  if (hltbVals.length) {
+    const avg = Math.round(hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length);
+    push('~', 'is-amber', `${formatNum(avg)}h`, 'avg backlog main');
+    const med = [...hltbVals].sort((a, b) => a - b)[Math.floor(hltbVals.length / 2)];
+    push('~', 'is-amber', `${formatNum(Math.round(med))}h`, 'median backlog main');
+  }
+
+  const longest = [...backlog].sort((a, b) => (hltb(b) || 0) - (hltb(a) || 0))[0];
+  if (longest && hltb(longest)) {
+    push('^', 'is-rose', `${longest.name} · ${formatNum(Math.round(hltb(longest)))}h`, 'longest backlog');
+  }
+  const shortest = [...backlog].filter(g => hltb(g) > 0).sort((a, b) => hltb(a) - hltb(b))[0];
+  if (shortest) {
+    push('>', '', `${shortest.name} · ${(hltb(shortest)).toFixed(1)}h`, 'shortest backlog');
+  }
+
+  const underTwo = backlog.filter(g => hltb(g) && hltb(g) <= 2).length;
+  if (underTwo) push('>', '', formatNum(underTwo), 'under 2h to beat');
+  const underFive = backlog.filter(g => hltb(g) && hltb(g) <= 5).length;
+  if (underFive) push('>', '', formatNum(underFive), 'under 5h to beat');
+  const marathons = backlog.filter(g => hltb(g) && hltb(g) >= 50).length;
+  if (marathons) push('^', 'is-rose', formatNum(marathons), '50h+ marathons');
+  const epics = backlog.filter(g => hltb(g) && hltb(g) >= 100).length;
+  if (epics) push('^', 'is-rose', formatNum(epics), '100h+ epics');
+
+  if (backlogHrs > 0) {
+    const years2h = (backlogHrs / (2 * 365)).toFixed(1);
+    push('~', 'is-amber', `${years2h} yrs`, 'to clear at 2h/day');
+    const years4h = (backlogHrs / (4 * 365)).toFixed(1);
+    push('~', 'is-amber', `${years4h} yrs`, 'to clear at 4h/day');
+    const days8h = Math.round(backlogHrs / 8);
+    push('~', 'is-amber', `${formatNum(days8h)} d`, 'non-stop at 8h/day');
+  }
+
+  if (ratedGames.length) {
+    const avgRating = Math.round(ratedGames.reduce((s, g) => s + rating(g), 0) / ratedGames.length);
+    push('+', 'is-emerald', `${avgRating}%`, 'avg review score');
+    const backlogRated = backlog.filter(g => rating(g) > 0);
+    if (backlogRated.length) {
+      const avgBacklogRating = Math.round(backlogRated.reduce((s, g) => s + rating(g), 0) / backlogRated.length);
+      push('+', 'is-emerald', `${avgBacklogRating}%`, 'avg backlog review');
+    }
+    const ratedPct = Math.round((ratedGames.length / total) * 100);
+    push('~', 'is-amber', `${ratedPct}%`, 'of library rated');
+  }
+
+  const top90 = backlog.filter(g => rating(g) >= 90 && c('hasEnoughReviews')(g)).length;
+  if (top90) push('*', 'is-amber', formatNum(top90), '90%+ unplayed');
+  const top80 = backlog.filter(g => rating(g) >= 80 && c('hasEnoughReviews')(g)).length;
+  if (top80) push('*', 'is-amber', formatNum(top80), '80%+ unplayed');
+  const quickWins = backlog.filter(g => rating(g) >= 75 && (hltb(g) || 999) <= maxHrs).length;
+  if (quickWins) push('>', '', formatNum(quickWins), 'quick wins ready');
+  const hiddenGems = backlog.filter(g => rating(g) >= 90 && c('hasEnoughReviews')(g) && !playMin(g)).length;
+  if (hiddenGems) push('*', 'is-amber', formatNum(hiddenGems), 'hidden gems');
+
+  const topRated = [...backlog].filter(g => rating(g) > 0 && c('hasEnoughReviews')(g))
+    .sort((a, b) => rating(b) - rating(a))[0];
+  if (topRated) push('*', 'is-amber', `${topRated.name} · ${rating(topRated)}%`, 'top-rated unplayed');
+
+  const stealsCount = wl.filter(c('isStealDeal')).length;
+  if (stealsCount) push('+', 'is-emerald', formatNum(stealsCount), 'steal-tier deals');
+  if (onSale.length) push('+', 'is-emerald', formatNum(onSale.length), 'on sale now');
+  if (onSale.length) {
+    const top = [...onSale].sort((a, b) => c('dealScore')(b) - c('dealScore')(a))[0];
+    const cut = c('getDealInfo')(top)?.cut || 0;
+    push('+', 'is-emerald', `${top.name} -${cut}%`, 'top deal');
+    const cuts = onSale.map(g => c('getDealInfo')(g)?.cut || 0).filter(x => x > 0);
+    if (cuts.length) {
+      const avgCut = Math.round(cuts.reduce((s, c2) => s + c2, 0) / cuts.length);
+      push('+', 'is-emerald', `${avgCut}%`, 'avg discount');
+      const steepest = Math.max(...cuts);
+      push('+', 'is-emerald', `-${steepest}%`, 'steepest cut');
+    }
+  }
+
+  let wishlistValue = 0;
+  let wishlistSaleNow = 0;
+  for (const g of wl) {
+    const d = c('getDealInfo')(g);
+    if (d?.regular != null) wishlistValue += d.regular;
+    if (d?.price != null) wishlistSaleNow += d.price;
+  }
+  if (wishlistValue > 0) push('#', 'is-violet', formatDollarMarquee(wishlistValue), 'wishlist value');
+  if (wishlistSaleNow > 0 && wishlistSaleNow < wishlistValue) {
+    push('#', 'is-violet', formatDollarMarquee(wishlistValue - wishlistSaleNow), 'savings if bought now');
+  }
+
+  let libraryMsrp = 0;
+  for (const g of games) {
+    const d = c('getDealInfo')(g);
+    if (d?.regular != null) libraryMsrp += d.regular;
+  }
+  if (libraryMsrp > 0) push('#', 'is-violet', formatDollarMarquee(libraryMsrp), 'library at MSRP');
+
+  const withReleaseYear = games
+    .map(g => {
+      const y = parseInt((g.release_date || '').slice(0, 4), 10);
+      return Number.isFinite(y) ? { g, y } : null;
+    })
+    .filter(Boolean);
+  if (withReleaseYear.length) {
+    const oldest = withReleaseYear.reduce((a, b) => a.y < b.y ? a : b);
+    push('^', 'is-rose', `${oldest.g.name} · ${oldest.y}`, 'oldest in library');
+    const newest = withReleaseYear.reduce((a, b) => a.y > b.y ? a : b);
+    push('*', 'is-violet', `${newest.g.name} · ${newest.y}`, 'newest release owned');
+    const decadeCounts = {};
+    for (const { y } of withReleaseYear) {
+      const dec = Math.floor(y / 10) * 10;
+      decadeCounts[dec] = (decadeCounts[dec] || 0) + 1;
+    }
+    const topDec = Object.entries(decadeCounts).sort((a, b) => b[1] - a[1])[0];
+    if (topDec) push('>', '', `${topDec[0]}s · ${formatNum(topDec[1])}`, 'top decade');
+    const oldUnplayed = backlog
+      .map(g => ({ g, y: parseInt((g.release_date || '').slice(0, 4), 10) }))
+      .filter(x => Number.isFinite(x.y))
+      .reduce((a, b) => (!a || a.y > b.y) ? b : a, null);
+    if (oldUnplayed) push('^', 'is-rose', `${oldUnplayed.g.name} · ${oldUnplayed.y}`, 'oldest unplayed');
+  }
+
+  const withAddDate = games
+    .map(g => ({ g, d: g.added_at || g.release_date || '' }))
+    .filter(x => x.d)
+    .sort((a, b) => b.d.localeCompare(a.d));
+  if (withAddDate[0]) push('*', 'is-violet', withAddDate[0].g.name, 'newest add');
+
+  const thisYear = new Date().getFullYear();
+  const addedThisYear = games.filter(g => (g.added_at || '').startsWith(String(thisYear))).length;
+  if (addedThisYear) push('+', 'is-emerald', formatNum(addedThisYear), `added in ${thisYear}`);
+
+  const devCounts = {};
+  const pubCounts = {};
+  for (const g of games) {
+    const ng = c('normalizeGame')(g);
+    (ng.developers || g.developers || []).forEach(d => { if (d) devCounts[d] = (devCounts[d] || 0) + 1; });
+    (ng.publishers || g.publishers || []).forEach(p => { if (p) pubCounts[p] = (pubCounts[p] || 0) + 1; });
+  }
+  const topDev = Object.entries(devCounts).sort((a, b) => b[1] - a[1])[0];
+  if (topDev && topDev[1] > 1) push('*', 'is-violet', `${topDev[0]} · ${formatNum(topDev[1])}`, 'top developer');
+  const topPub = Object.entries(pubCounts).sort((a, b) => b[1] - a[1])[0];
+  if (topPub && topPub[1] > 1) push('*', 'is-violet', `${topPub[0]} · ${formatNum(topPub[1])}`, 'top publisher');
+  const uniqueDevs = Object.keys(devCounts).length;
+  if (uniqueDevs > 1) push('>', '', formatNum(uniqueDevs), 'unique developers');
+
+  const genreCounts = {};
+  for (const g of games) {
+    const gens = c('gameGenresCanonical')(g);
+    gens.forEach(genre => { if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1; });
+  }
+  const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
+  if (topGenre) push('*', 'is-amber', `${topGenre[0]} · ${formatNum(topGenre[1])}`, 'top genre');
+  const uniqueGenres = Object.keys(genreCounts).length;
+  if (uniqueGenres > 1) push('>', '', formatNum(uniqueGenres), 'unique genres');
+
+  const storeCounts = {};
+  for (const g of games) {
+    const s = c('normalizeGame')(g).store;
+    if (s) storeCounts[s] = (storeCounts[s] || 0) + 1;
+  }
+  const topStore = Object.entries(storeCounts).sort((a, b) => b[1] - a[1])[0];
+  if (topStore) push('>', '', `${topStore[0]} · ${formatNum(topStore[1])}`, 'biggest store');
+
+  if (stores > 0 && total > 0) {
+    const avgPerStore = Math.round(total / stores);
+    push('~', 'is-amber', formatNum(avgPerStore), 'games per store avg');
+  }
+
+  return items;
+}
+
+function renderMarqueeHtml(items) {
+  if (!items.length) return '';
+  const itemHtml = items.map(it => `
+    <span class="dash-marquee-item">
+      <span class="dash-marquee-icon ${escapeAttr(it.iconCls || '')}">${escapeHtml(it.glyph)}</span>
+      <strong>${it.valueHtml}</strong>
+      <span class="dash-marquee-label">${escapeHtml(it.label)}</span>
+    </span>`).join('');
+  return `
+    <div class="dash-marquee" id="dashboardMarquee" aria-hidden="true">
+      <div class="dash-marquee-track">${itemHtml}${itemHtml}</div>
+    </div>`;
+}
+
+function startInsightRotation(insights) {
+  stopInsightRotation();
+  const el = document.getElementById('dashboardInsight');
+  if (!el || !insights.length) {
+    if (el) {
+      el.innerHTML = '';
+      el.classList.remove('is-visible');
+    }
+    return;
+  }
+  _insightIndex = 0;
+  const show = (i) => {
+    el.classList.remove('is-visible');
+    if (_insightFadeTimer) clearTimeout(_insightFadeTimer);
+    _insightFadeTimer = setTimeout(() => {
+      el.innerHTML = insights[i % insights.length];
+      el.classList.add('is-visible');
+    }, 250);
+  };
+  show(0);
+  _insightTimer = setInterval(() => {
+    _insightIndex += 1;
+    show(_insightIndex);
+  }, 6000);
+}
+
+function renderDashboardMega(games) {
   const backlog = games.filter(g => c('getPersonal')(g).status === "backlog");
   const backlogHrs = backlog.reduce((s, g) => s + (c('hltbMain')(g) || 0), 0);
   const playedHrs = games.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
@@ -357,55 +851,152 @@ function renderDashboardKPIs(games) {
   const rated = games.filter(g => c('ratingValue')(g) > 0);
   const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + c('ratingValue')(g), 0) / rated.length) : "—";
   const wlDeals = state.wishlistGames.filter(g => { const d = c('getDealInfo')(g); return d && (d.cut || 0) > 0; }).length;
-  const itchGameCount = state.itchGames.filter(c('itchIsGame')).length;
   const stores = new Set(games.map(g => c('normalizeGame')(g).store)).size;
-  const wishlistCount = state.wishlistGames.length;
-  const kpis = [
-    { label: "Library games", value: formatNum(games.length) },
-    { label: "Backlog hours", value: `${formatNum(Math.round(backlogHrs))}h` },
-    { label: "Played hours", value: `${formatNum(Math.round(playedHrs))}h` },
-    { label: "Completion", value: `${completion}%` },
-    { label: "Avg review", value: avgRating === "—" ? "—" : `${avgRating}%` },
-    { label: "Wishlist deals", value: formatNum(wlDeals) },
-    { label: "Itch games", value: formatNum(itchGameCount) },
-    { label: "Stores", value: stores },
-    { label: "Wishlist", value: formatNum(wishlistCount) },
-  ];
-  document.getElementById("dashboardKpis").innerHTML = kpis.map(k => `
-    <div class="dash-kpi">
-      <div class="dash-kpi-label">${escapeHtml(k.label)}</div>
-      <div class="dash-kpi-value">${escapeHtml(String(k.value))}</div>
-    </div>`).join("");
+  const years = backlogHrs > 0 ? (backlogHrs / (2 * 365)).toFixed(1) : "0";
+  const total = games.length;
+  const el = document.getElementById("dashboardMega");
+  if (!el) return;
+
+  const spotlightPool = pickSpotlightGames(games);
+  const spotlight = spotlightPool[0] || null;
+  const marqueeItems = buildMarqueeItems(games);
+  el.className = spotlight ? 'dash-mega dash-mega--has-spotlight' : 'dash-mega';
+
+  el.innerHTML = `
+    <div class="dash-mega-hero">
+      ${spotlight ? renderSpotlightHtml(spotlight) : ''}
+      <div class="dash-hero-eyebrow">Your library</div>
+      <div class="dash-hero-number">${escapeHtml(formatNum(total))}</div>
+      <div class="dash-hero-sub">games owned across ${escapeHtml(String(stores))} stores</div>
+      <div class="dash-hero-tagline">
+        <span><strong>${completion}%</strong> complete</span>
+        <span class="sep">·</span>
+        <span><strong>${years}</strong> yrs to clear at 2h/day</span>
+        <span class="sep">·</span>
+        <span><strong>${escapeHtml(formatNum(wlDeals))}</strong> deals live</span>
+      </div>
+      <div class="dash-hero-pillars">
+        <div class="dash-hero-pillar">
+          <div class="dash-hero-pillar-value">${escapeHtml(formatNum(Math.round(playedHrs)))}h</div>
+          <div class="dash-hero-pillar-label">Played</div>
+        </div>
+        <div class="dash-hero-pillar">
+          <div class="dash-hero-pillar-value">${escapeHtml(formatNum(Math.round(backlogHrs)))}h</div>
+          <div class="dash-hero-pillar-label">Backlog</div>
+        </div>
+        <div class="dash-hero-pillar">
+          <div class="dash-hero-pillar-value">${avgRating === "—" ? "—" : escapeHtml(String(avgRating)) + "%"}</div>
+          <div class="dash-hero-pillar-label">Avg review</div>
+        </div>
+      </div>
+      <span id="dashboardInsight" class="dash-insight" aria-live="polite"></span>
+    </div>
+    ${renderMarqueeHtml(marqueeItems)}
+    <div class="dash-mega-divider" aria-hidden="true"></div>
+    <div class="dash-ribbon">
+      <div class="dash-ribbon-tile">
+        <div class="dash-ribbon-eyebrow">Library by store</div>
+        <div class="dash-ribbon-chart"><canvas id="chartStoreDonut"></canvas></div>
+        <div class="dash-ribbon-headline" id="ribbonStoreHeadline"></div>
+      </div>
+      <div class="dash-ribbon-tile">
+        <div class="dash-ribbon-eyebrow">Status breakdown</div>
+        <div class="dash-ribbon-chart"><canvas id="chartStatusDonut"></canvas></div>
+        <div class="dash-ribbon-headline" id="ribbonStatusHeadline"></div>
+      </div>
+      <div class="dash-ribbon-tile">
+        <div class="dash-ribbon-eyebrow">Review sentiment</div>
+        <div class="dash-ribbon-chart"><canvas id="chartReviewDonut"></canvas></div>
+        <div class="dash-ribbon-headline" id="ribbonReviewHeadline"></div>
+      </div>
+    </div>
+  `;
+
+  startInsightRotation(buildInsightPool(games));
+  startSpotlightRotation(spotlightPool);
 }
 
-function renderDashboardLists(games) {
-  const topRated = games
-    .filter(g => c('getPersonal')(g).status === "backlog" && c('ratingValue')(g) > 0 && c('hasEnoughReviews')(g))
-    .sort((a, b) => c('ratingValue')(b) - c('ratingValue')(a))
-    .slice(0, 10);
-  const topRatedKeys = new Set(topRated.map(g => c('gameKey')(g)));
-  const quickWins = games
+function applyItchVisibility() {
+  const row = document.getElementById("dashboardPicksRow");
+  const card = document.getElementById("dashItchCard");
+  const has = (state.itchGames || []).length > 0;
+  row?.classList.toggle("no-itch", !has);
+  card?.classList.toggle("hidden", !has);
+}
+
+function renderDashboardPicksVersus(games) {
+  const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
+  const hasCover = g => !!(g.library_image || g.header_image) && !failed.has(c('gameKey')(g));
+
+  const ratedAll = games
     .filter(g => c('getPersonal')(g).status === "backlog"
-      && !topRatedKeys.has(c('gameKey')(g))
-      && (c('hltbMain')(g) || 999) <= (state.prefs.quickWinMaxHours || 15)
-      && c('ratingValue')(g) >= 80)
+      && c('ratingValue')(g) > 0
+      && c('hasEnoughReviews')(g)
+      && hasCover(g))
+    .sort((a, b) => c('ratingValue')(b) - c('ratingValue')(a));
+
+  const fastMax = state.prefs.quickWinMaxHours || 15;
+  const fastAll = games
+    .filter(g => c('getPersonal')(g).status === "backlog"
+      && (c('hltbMain')(g) || 999) <= fastMax
+      && c('ratingValue')(g) >= 80
+      && hasCover(g))
     .sort((a, b) => {
       const ha = c('hltbMain')(a) || 999;
       const hb = c('hltbMain')(b) || 999;
       if (ha !== hb) return ha - hb;
       return c('ratingValue')(b) - c('ratingValue')(a);
-    })
-    .slice(0, 10);
-  const listHtml = (items, scoreFn) => items.length
-    ? items.map(g => {
-      const cover = g.library_image || c('coverFallbackFor')(g);
-      const score = scoreFn(g);
-      const key = c('gameKey')(g);
-      return `<button type="button" class="dash-list-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}</span><span class="text-slate-400">${score}</span></button>`;
-    }).join("")
-    : '<p class="text-xs text-slate-500 italic">No matches yet.</p>';
-  document.getElementById("dashTopRated").innerHTML = listHtml(topRated, g => `${c('ratingValue')(g)}%`);
-  document.getElementById("dashQuickWins").innerHTML = listHtml(quickWins, g => `${c('hltbMain')(g) || "?"}h`);
+    });
+
+  const balanced = Math.min(ratedAll.length, fastAll.length, 10);
+  const sliceCount = balanced > 0 ? balanced : Math.min(Math.max(ratedAll.length, fastAll.length), 10);
+  const rated = ratedAll.slice(0, sliceCount);
+  const fast = fastAll.slice(0, sliceCount);
+
+  const ratedKeys = new Set(rated.map(g => c('gameKey')(g)));
+  const fastKeys = new Set(fast.map(g => c('gameKey')(g)));
+  const crossKeys = new Set([...ratedKeys].filter(k => fastKeys.has(k)));
+
+  const row = (g, scoreFn, accentCls) => {
+    const cover = g.library_image || c('coverFallbackFor')(g);
+    const key = c('gameKey')(g);
+    const isCross = crossKeys.has(key);
+    const star = isCross ? ' <span class="dash-versus-star" title="Also in the other list">*</span>' : "";
+    return `<button type="button" class="dash-list-row dash-versus-row ${accentCls}${isCross ? " is-cross" : ""}" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}${star}</span><span class="text-slate-400">${escapeHtml(scoreFn(g))}</span></button>`;
+  };
+
+  const empty = '<p class="text-xs text-slate-500 italic">No matches yet.</p>';
+  const ratedEl = document.getElementById("dashVersusRated");
+  const fastEl = document.getElementById("dashVersusFast");
+  if (ratedEl) {
+    ratedEl.innerHTML = rated.length
+      ? rated.map(g => row(g, gg => `${c('ratingValue')(gg)}%`, "dash-versus-row--rated")).join("")
+      : empty;
+  }
+  if (fastEl) {
+    fastEl.innerHTML = fast.length
+      ? fast.map(g => row(g, gg => `${c('hltbMain')(gg) || "?"}h`, "dash-versus-row--fast")).join("")
+      : empty;
+  }
+
+  const badge = document.getElementById("dashVersusBadge");
+  if (badge) {
+    if (crossKeys.size) {
+      const names = [...crossKeys]
+        .map(k => (rated.find(g => c('gameKey')(g) === k) || fast.find(g => c('gameKey')(g) === k))?.name || "")
+        .filter(Boolean)
+        .join(", ");
+      badge.textContent = `${crossKeys.size} cross-list pick${crossKeys.size === 1 ? "" : "s"}`;
+      badge.title = names;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+      badge.textContent = "";
+      badge.removeAttribute("title");
+    }
+  }
+
+  applyItchVisibility();
 }
 
 function renderDashboardWishlistStats() {
@@ -517,6 +1108,7 @@ function renderDashboardItchRecap() {
   }
 
   const total = state.itchGames.length;
+  applyItchVisibility();
   if (!total) {
     el.innerHTML = `<p class="text-sm text-slate-400">No itch.io data loaded. Run <code class="text-slate-200">fetch_itch.py</code>, then reload.</p>`;
     return;
@@ -554,9 +1146,11 @@ function renderDashboardItchRecap() {
       </div>`
     : "";
 
+  const failedItch = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
   const heroCandidates = gamesOnly
     .filter(g => c('getPersonal')(g).status !== "finished" && (g.playtime_minutes || 0) === 0)
     .filter(g => c('ratingValue')(g) > 0 && c('hasEnoughReviews')(g))
+    .filter(g => !!(g.library_image || g.header_image) && !failedItch.has(c('gameKey')(g)))
     .sort((a, b) => c('ratingValue')(b) - c('ratingValue')(a))
     .slice(0, 10);
   if (heroCandidates.length) itchHeroIndex %= heroCandidates.length;
@@ -780,6 +1374,33 @@ function renderDashboardCharts(games) {
     options: dashChartOptions({ plugins: { legend: { position: "right" } } }),
   });
 
+  const total = games.length;
+  const topStore = storeEntries[0] || [null, 0];
+  const storePct = total ? Math.round(topStore[1] / total * 100) : 0;
+  const storeHeadlineEl = document.getElementById('ribbonStoreHeadline');
+  if (storeHeadlineEl) {
+    storeHeadlineEl.innerHTML = topStore[0]
+      ? `<strong>${escapeHtml(DASH_STORE_LABELS[topStore[0]] || topStore[0])}</strong> ${storePct}%`
+      : '<strong>—</strong>';
+  }
+
+  const backlogCount = games.filter(g => c('getPersonal')(g).status === 'backlog').length;
+  const statusHeadlineEl = document.getElementById('ribbonStatusHeadline');
+  if (statusHeadlineEl) {
+    statusHeadlineEl.innerHTML = `<strong>${escapeHtml(formatNum(backlogCount))}</strong> in backlog`;
+  }
+
+  const positive = ['Overwhelmingly Positive', 'Very Positive', 'Mostly Positive']
+    .reduce((s, k) => s + (reviewBuckets[k] || 0), 0);
+  const ratedTotal = Object.entries(reviewBuckets)
+    .filter(([k]) => k !== 'Unreviewed')
+    .reduce((s, [, n]) => s + n, 0);
+  const positivePct = ratedTotal ? Math.round(positive / ratedTotal * 100) : 0;
+  const reviewHeadlineEl = document.getElementById('ribbonReviewHeadline');
+  if (reviewHeadlineEl) {
+    reviewHeadlineEl.innerHTML = `<strong>${positivePct}%</strong> positive`;
+  }
+
   const yearCounts = {};
   games.forEach(g => {
     const y = (g.release_date || "").slice(0, 4);
@@ -918,7 +1539,7 @@ export function renderDashboard() {
   Chart.defaults.borderColor = "#334155";
   const games = dashboardLibraryGames();
   renderDashboardFetcherHealth();
-  renderDashboardKPIs(games);
+  renderDashboardMega(games);
   renderDashboardItchRecap();
   try {
     renderDashboardCharts(games);
@@ -932,9 +1553,9 @@ export function renderDashboard() {
     console.error("Dashboard co-op spotlight error:", err);
   }
   try {
-    renderDashboardLists(games);
+    renderDashboardPicksVersus(games);
   } catch (err) {
-    console.error("Dashboard lists error:", err);
+    console.error("Dashboard picks versus error:", err);
   }
 }
 

@@ -23,6 +23,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from epic_client import EpicAuthError, EpicStoreClient
+from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
@@ -200,7 +201,7 @@ def main() -> int:
     stats = RunStats()
 
     load_dotenv()
-    cookie = os.getenv("EPIC_STORE_COOKIE", "").strip()
+    cookie = resolve_env("EPIC_STORE_COOKIE", provider="epic_wishlist")
     if not cookie:
         print(
             "EPIC_STORE_COOKIE is not set in .env.\n\n"
@@ -218,6 +219,7 @@ def main() -> int:
     try:
         client = EpicStoreClient(cookie=cookie)
     except EpicAuthError as e:
+        mark_invalid("epic_wishlist", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
 
@@ -225,6 +227,7 @@ def main() -> int:
     try:
         elements = client.get_wishlist(country=args.country, locale=args.locale)
     except EpicAuthError as e:
+        mark_invalid("epic_wishlist", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
 

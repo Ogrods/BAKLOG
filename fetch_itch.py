@@ -34,6 +34,7 @@ from fetchers._base import (
     print_id_diff,
     write_games_json,
 )
+from auth import mark_invalid, resolve_env
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 from itch_client import ItchApiError, ItchAuthError, ItchClient
@@ -168,7 +169,7 @@ def main() -> int:
     stats = RunStats()
     load_dotenv()
 
-    api_key = os.getenv("ITCH_API_KEY", "").strip()
+    api_key = resolve_env("ITCH_API_KEY", provider="itch")
     if not api_key:
         stats.error("Set ITCH_API_KEY in .env (https://itch.io/user/settings/api-keys)")
         return stats.finish("fetch_itch", t0, exit_code=1)

@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 from battlenet_client import BattleNetAuthError, BattleNetClient
 from hltb_client import HltbClient
+from auth import mark_invalid, resolve_env
 from fetchers._progress import RunStats, started
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
@@ -173,9 +174,12 @@ def _build_client(browser: str, env_cookie: str) -> BattleNetClient:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Battle.net library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
+    load_dotenv()
+    env_cookie = resolve_env("BATTLENET_COOKIE", provider="battlenet")
+    default_browser = "env" if env_cookie else os.getenv("BATTLENET_BROWSER", "edge")
     parser.add_argument(
         "--browser",
-        default=os.getenv("BATTLENET_BROWSER", "edge"),
+        default=default_browser,
         choices=["edge", "chrome", "brave", "firefox", "env"],
         help="Where to read session cookies from (default: edge, or BATTLENET_BROWSER env).",
     )
@@ -188,18 +192,19 @@ def main() -> int:
     _configure_stdout()
     t0 = started("fetch_battlenet")
     stats = RunStats()
-    load_dotenv()
-    env_cookie = os.getenv("BATTLENET_COOKIE", "").strip()
+    env_cookie = resolve_env("BATTLENET_COOKIE", provider="battlenet")
 
     try:
         client = _build_client(args.browser, env_cookie)
     except BattleNetAuthError as e:
+        mark_invalid("battlenet", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_battlenet", t0, exit_code=1)
 
     try:
         raw = client.get_raw_account()
     except BattleNetAuthError as e:
+        mark_invalid("battlenet", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_battlenet", t0, exit_code=1)
 

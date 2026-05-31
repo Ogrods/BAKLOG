@@ -1710,7 +1710,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
         <div class="flex items-center gap-1.5 min-w-0">
           ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate flex-1 min-w-0", escapeHtml(g.name))}
           ${earlyAccessPillHtml(g)}
-          ${hiddenGem ? '<span class="text-purple-400 shrink-0" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
+          ${hiddenGem ? '<span class="text-purple-400 shrink-0" style="cursor: default" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
           ${ownedWish ? '<span class="text-amber-400 text-xs shrink-0" title="You already own this (matched by title)">owned</span>' : ""}
         </div>
         <div class="mt-1 flex items-center gap-1.5 flex-wrap">

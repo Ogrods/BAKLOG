@@ -1237,6 +1237,12 @@ function renderDashboardCharts(games) {
       datasets: [{ data: storeEntries.map(([, v]) => v), backgroundColor: storeEntries.map(([k]) => DASH_STORE_COLORS[k] || "#64748b"), borderWidth: 0 }],
     },
     options: dashChartOptions({
+      plugins: {
+        legend: {
+          position: "right",
+          labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
+        },
+      },
       onClick(_evt, elements) {
         if (!elements.length) return;
         dashDrillStore(storeEntries[elements[0].index][0]);
@@ -1255,6 +1261,12 @@ function renderDashboardCharts(games) {
       datasets: [{ data: statusEntries.map(d => statusCounts[d.key]), backgroundColor: statusEntries.map(d => DASH_STATUS_COLORS[d.key]), borderWidth: 0 }],
     },
     options: dashChartOptions({
+      plugins: {
+        legend: {
+          position: "right",
+          labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
+        },
+      },
       onClick(_evt, elements) {
         if (!elements.length) return;
         dashDrillStatus(statusEntries[elements[0].index].key);
@@ -1380,7 +1392,14 @@ function renderDashboardCharts(games) {
       labels: revEntries.map(([k]) => k),
       datasets: [{ data: revEntries.map(([, n]) => n), backgroundColor: revEntries.map(([k]) => DASH_REVIEW_COLORS[k] || "#475569"), borderWidth: 0 }],
     },
-    options: dashChartOptions({ plugins: { legend: { position: "right" } } }),
+    options: dashChartOptions({
+      plugins: {
+        legend: {
+          position: "right",
+          labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
+        },
+      },
+    }),
   });
 
   const total = games.length;

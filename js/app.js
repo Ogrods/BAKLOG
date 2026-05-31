@@ -213,7 +213,12 @@ window.coverFallback = function (img) {
   }
   const name = img.dataset.name || "";
   const cls = img.classList.contains("pick-cover") ? "pick-cover placeholder" : "cover placeholder";
-  img.outerHTML = `<div class="${cls}" title="${name.replace(/"/g, "&quot;")}">${name.slice(0, 18)}</div>`;
+  const words = name.split(/\s+/).filter(Boolean);
+  const initials = (words.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3);
+  const captionRaw = words.slice(0, 4).join(" ").slice(0, 28);
+  const safeName = name.replace(/"/g, "&quot;");
+  const safeCap = captionRaw.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  img.outerHTML = `<div class="${cls}" title="${safeName}"><span class="placeholder-initials">${initials}</span><span class="placeholder-caption">${safeCap}</span></div>`;
 };
 window.markLandscape = function (img) {
   if (!img?.classList) return;

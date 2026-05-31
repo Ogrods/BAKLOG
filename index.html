@@ -17,7 +17,19 @@
     /* === Covers & picks === */
     .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
     .cover.landscape, .pick-cover.landscape { object-fit: contain; }
-    .placeholder { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 10px; text-align: center; padding: 2px; }
+    .placeholder {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: #94a3b8; text-align: center;
+      padding: 2px; gap: 2px; overflow: hidden;
+    }
+    .placeholder-initials { font-weight: 700; letter-spacing: 0.04em; color: #cbd5e1; line-height: 1; }
+    .placeholder-caption { font-size: 8px; line-height: 1.05; color: #64748b; max-width: 100%; word-break: break-word; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .cover.placeholder .placeholder-initials { font-size: 14px; }
+    .cover.placeholder .placeholder-caption { display: none; }
+    .pick-cover.placeholder .placeholder-initials { font-size: 30px; }
+    .pick-cover.placeholder .placeholder-caption { font-size: 10px; }
     .pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
     .pick-card { transition: transform 0.1s ease, background 0.1s ease; }
     .pick-card:hover { transform: translateY(-2px); background: rgb(51 65 85); }
@@ -30,14 +42,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(
-        180deg,
-        #0f172a 0%,
-        #1e293b 22%,
-        #334155 50%,
-        #1e293b 78%,
-        #0f172a 100%
-      );
+      background: linear-gradient(180deg, #1e293b 0%, #334155 50%, #1e293b 100%);
       z-index: 0;
       pointer-events: none;
     }

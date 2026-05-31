@@ -9,6 +9,15 @@ import {
   ITCH_NON_GAME_CLASSIFICATIONS,
 } from './state.js';
 
+const HLTB_BUCKETS_QUERY = [
+  { minExclusive: null, maxInclusive: 2 },
+  { minExclusive: 2, maxInclusive: 5 },
+  { minExclusive: 5, maxInclusive: 10 },
+  { minExclusive: 10, maxInclusive: 20 },
+  { minExclusive: 20, maxInclusive: 40 },
+  { minExclusive: 40, maxInclusive: null },
+];
+
 const NON_GENRE_TOKENS = new Set([
   'ps3', 'ps4', 'ps5', 'psp', 'ps vita', 'psvita', 'vita',
   'xbox', 'xbox 360', 'xbox one', 'xbox series x', 'xbox series s', 'xbox series x|s', 'xbox series x/s', 'xbox series',
@@ -127,6 +136,29 @@ function parseReleaseForSort(d) {
   return Number.isNaN(t) ? 0 : t;
 }
 
+function parseReleaseYear(d) {
+  if (!d) return null;
+  const s = String(d);
+  const m = s.match(/\b(19\d{2}|20\d{2}|21\d{2})\b/);
+  if (m) return parseInt(m[1], 10);
+  const t = Date.parse(s);
+  if (!Number.isNaN(t)) return new Date(t).getUTCFullYear();
+  return null;
+}
+
+function matchesReleaseYearFilter(g, filterVal) {
+  if (!filterVal) return true;
+  const y = parseReleaseYear(g.release_date);
+  if (y == null) return false;
+  const decade = /^(\d{4})s$/.exec(filterVal);
+  if (decade) {
+    const start = parseInt(decade[1], 10);
+    return y >= start && y <= start + 9;
+  }
+  if (/^\d{4}$/.test(filterVal)) return y === parseInt(filterVal, 10);
+  return true;
+}
+
 function parsePriceLike(v) {
   if (v == null) return null;
   if (typeof v === 'number') return v;
@@ -229,6 +261,7 @@ function passesFilter(ctx, g) {
   const p = getPersonalRecord(personal, g);
   if (view === 'library') {
     if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
+    if (prefs.releaseYearFilter && !matchesReleaseYearFilter(g, prefs.releaseYearFilter)) return false;
     if (hiddenKeys.has(gameKey(g))) return false;
   }
   if (view === 'wishlist') {
@@ -264,10 +297,17 @@ function passesFilter(ctx, g) {
   if (params.earlyAccess && !isEarlyAccess(g)) return false;
   if (params.coopOnline && !g.coop_online) return false;
   if (params.coopLocal && !g.coop_local) return false;
+  if (prefs.coopAny && !(g.coop_online || g.coop_local)) return false;
   const rating = ratingValue(g);
   if (params.minRating > 0 && rating < params.minRating) return false;
   const h = hltbMain(personal, g);
   if (params.maxHours < 200 && h != null && h > params.maxHours) return false;
+  if (prefs.hltbBucket != null && HLTB_BUCKETS_QUERY[prefs.hltbBucket]) {
+    if (h == null) return false;
+    const b = HLTB_BUCKETS_QUERY[prefs.hltbBucket];
+    if (b.minExclusive != null && h <= b.minExclusive) return false;
+    if (b.maxInclusive != null && h > b.maxInclusive) return false;
+  }
   const genres = prefs.genreFilters || [];
   if (genres.length && !gameMatchesGenreFilters(g, genres, prefs.genreFilterMode)) return false;
   const tagFilters = prefs.tagFilters || [];

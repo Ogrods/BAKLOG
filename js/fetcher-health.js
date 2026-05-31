@@ -423,6 +423,75 @@ export const fetcherRunner = (() => {
   // queues another one, and every run gets its own `done` event so its chip
   // can clear independently.
   const sourcesByRunId = new Map();
+  const reconnectTimers = new Map();
+  const reconnectAttempts = new Map();
+  const RECONNECT_BASE_MS = 2000;
+  const RECONNECT_MAX_MS = 30000;
+  const RECONNECT_MAX_ATTEMPTS = 8;
+  let runsSnapshotPromise = null;
+  let runsSnapshotAt = 0;
+  const RUNS_SNAPSHOT_MIN_MS = 1500;
+
+  function closeAllStreams() {
+    for (const timer of reconnectTimers.values()) clearTimeout(timer);
+    reconnectTimers.clear();
+    reconnectAttempts.clear();
+    for (const { es } of sourcesByRunId.values()) {
+      try { es.close(); } catch (_) {}
+    }
+    sourcesByRunId.clear();
+    liveRunId = null;
+    updateCancelButton();
+  }
+
+  async function fetchRunsSnapshot() {
+    const now = Date.now();
+    if (runsSnapshotPromise && now - runsSnapshotAt < RUNS_SNAPSHOT_MIN_MS) {
+      return runsSnapshotPromise;
+    }
+    runsSnapshotAt = now;
+    runsSnapshotPromise = fetch('/api/runs')
+      .then(r => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .finally(() => {
+        setTimeout(() => { runsSnapshotPromise = null; }, RUNS_SNAPSHOT_MIN_MS);
+      });
+    return runsSnapshotPromise;
+  }
+
+  function clearReconnect(runId) {
+    const t = reconnectTimers.get(runId);
+    if (t) clearTimeout(t);
+    reconnectTimers.delete(runId);
+  }
+
+  function scheduleReconnect(runId, key, src) {
+    if (reconnectTimers.has(runId)) return;
+    const attempt = (reconnectAttempts.get(runId) || 0) + 1;
+    if (attempt > RECONNECT_MAX_ATTEMPTS) {
+      reconnectAttempts.delete(runId);
+      appendLine(
+        `[${src.label}: stream dropped too many times — refresh the page or use Cancel]`,
+        'stderr',
+      );
+      markChipState(key, null);
+      if (liveRunId === runId) {
+        setStatus('failed');
+        liveRunId = null;
+        updateCancelButton();
+      }
+      return;
+    }
+    reconnectAttempts.set(runId, attempt);
+    const delay = Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS);
+    appendLine(`[${src.label}: stream dropped — reconnecting in ${Math.round(delay / 1000)}s]`, 'meta');
+    const timer = setTimeout(() => {
+      reconnectTimers.delete(runId);
+      if (!sourcesByRunId.has(runId)) subscribe(runId, key, src, { reconnect: true });
+    }, delay);
+    reconnectTimers.set(runId, timer);
+  }
+
   // Whichever run is currently emitting stdout — used to set the panel title
   // and the top-right status pill. Only one server-side run is active at a
   // time because the worker queue is single-threaded, so this is safe.
@@ -521,6 +590,7 @@ export const fetcherRunner = (() => {
   async function cancelActiveRun() {
     if (!liveRunId || !isApiAvailable()) return;
     const runId = liveRunId;
+    closeAllStreams();
     try {
       const res = await fetch(`/api/run/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
       if (res.ok) {
@@ -660,6 +730,7 @@ export const fetcherRunner = (() => {
   }
 
   function subscribe(runId, key, src, { reconnect = false } = {}) {
+    clearReconnect(runId);
     const prior = sourcesByRunId.get(runId);
     if (prior) {
       try { prior.es.close(); } catch (_) {}
@@ -735,6 +806,8 @@ export const fetcherRunner = (() => {
       } catch (err) {
         appendLine(`[client] parse error on done: ${err}`, 'stderr');
       } finally {
+        clearReconnect(runId);
+        reconnectAttempts.delete(runId);
         try { es.close(); } catch (_) {}
         sourcesByRunId.delete(runId);
         if (liveRunId === runId) {
@@ -746,16 +819,17 @@ export const fetcherRunner = (() => {
 
     es.onerror = async () => {
       if (es.readyState === EventSource.CONNECTING) return;
+      if (!sourcesByRunId.has(runId)) return;
       try { es.close(); } catch (_) {}
       sourcesByRunId.delete(runId);
       try {
-        const snap = await fetch('/api/runs').then(r => r.json());
+        const snap = await fetchRunsSnapshot();
+        if (!snap) throw new Error('no snapshot');
         const stillActive = snap.active?.id === runId;
         const inQueue = (snap.queue || []).some(r => r.id === runId);
         const finished = (snap.history || []).find(r => r.id === runId);
         if (stillActive || inQueue) {
-          appendLine(`[${src.label}: stream dropped — reconnecting]`, 'meta');
-          setTimeout(() => subscribe(runId, key, src), 500);
+          scheduleReconnect(runId, key, src);
           return;
         }
         if (finished) {
@@ -796,9 +870,8 @@ export const fetcherRunner = (() => {
     await loadFetcherSources(true);
     let snap;
     try {
-      const res = await fetch('/api/runs');
-      if (!res.ok) return;
-      snap = await res.json();
+      snap = await fetchRunsSnapshot();
+      if (!snap) return;
     } catch {
       return;
     }
@@ -868,6 +941,7 @@ export const fetcherRunner = (() => {
     syncFromServer,
     startDashboardPolling,
     stopDashboardPolling,
+    closeAllStreams,
   };
 })();
 

@@ -301,6 +301,81 @@ def _extract_epic_wishlist(context) -> dict[str, str]:
     return {"EPIC_STORE_COOKIE": header}
 
 
+def _validate_epic_store_cookie(cookie_header: str) -> bool:
+    """Round-trip the cookie against store.epicgames.com/graphql so we don't
+    save an anonymous session and call it a win."""
+    try:
+        from epic_client import EpicAuthError, EpicStoreClient
+    except Exception:  # noqa: BLE001
+        return False
+    try:
+        client = EpicStoreClient(cookie=cookie_header)
+        data = client.graphql(
+            """query bakCheck($country: String!, $locale: String, $start: Int, $count: Int) {
+              Wishlist { wishlistItems(country: $country, locale: $locale, start: $start, count: $count) { elements { id } } }
+            }""",
+            {"country": "US", "locale": "en-US", "start": 0, "count": 1},
+            "bakCheck",
+        )
+        return bool(data and "Wishlist" in data)
+    except EpicAuthError:
+        return False
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
+    """Wait until the captured cookies actually authenticate against the
+    storefront. Plain SSO cookies (set during login on www.epicgames.com) are
+    not enough — the storefront issues a separate session only after a real
+    page load on store.epicgames.com while signed in."""
+    EPIC_WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
+    try:
+        page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
+    except Exception:  # noqa: BLE001
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_msg = 0.0
+    last_tried = ""
+    while time.time() < deadline:
+        url = page.url or ""
+        cookies = context.cookies()
+        header = _cookie_header(cookies, ("epicgames.com",))
+        if header and header != last_tried:
+            last_tried = header
+            if _validate_epic_store_cookie(header):
+                return {"EPIC_STORE_COOKIE": header}
+
+        now = time.time()
+        if session and now - last_msg > 6:
+            last_msg = now
+            lower = url.lower()
+            if "login" in lower or "id.epicgames.com" in lower:
+                msg = "Sign in to your Epic account in the browser window."
+            elif "store.epicgames.com" not in lower:
+                msg = "Open store.epicgames.com/wishlist after signing in."
+            else:
+                msg = (
+                    "Signed in? Click the wishlist tab so the storefront issues "
+                    "a session cookie."
+                )
+            session.emit("waiting_for_user", {"message": msg})
+
+        if "epicgames.com" not in url.lower():
+            try:
+                page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=15000)
+            except Exception:  # noqa: BLE001
+                pass
+
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Could not capture a working Epic storefront session — sign in at "
+        "store.epicgames.com/wishlist and keep the window open until it closes."
+    )
+
+
 def _extract_ubisoft(page, context) -> dict[str, str]:
     captured: dict[str, str] = {}
 
@@ -365,7 +440,7 @@ EXTRACTORS = {
 }
 
 # Custom wait/extract loops — not the URL-pattern path in run_browser_auth.
-INLINE_PROVIDERS = {"psn", "steam", "itch", "itad", "xbox", "ubisoft", "epic"}
+INLINE_PROVIDERS = {"psn", "steam", "itch", "itad", "xbox", "ubisoft", "epic", "epic_wishlist"}
 
 
 def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | None:
@@ -405,6 +480,8 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
                 except Exception:
                     pass
                 creds = _extract_psn(page, context, session)
+            elif provider == "epic_wishlist":
+                creds = _extract_epic_wishlist_inline(page, context, session)
             elif provider in ("steam", "itch", "itad", "xbox"):
                 try:
                     page.goto(spec.login_url, wait_until="domcontentloaded", timeout=20000)

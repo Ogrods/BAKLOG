@@ -104,13 +104,33 @@ function donutLegendHighlight() {
     ds.backgroundColor = orig.map((c, i) => (hoveredIdx == null || i === hoveredIdx ? c : c + "33"));
     chart.update("none");
   };
+  const showSliceTooltip = (chart, idx) => {
+    if (!chart?.tooltip) return;
+    if (idx == null) {
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+      chart.update("none");
+      return;
+    }
+    const meta = chart.getDatasetMeta(0);
+    const arc = meta?.data?.[idx];
+    if (!arc) return;
+    const { x, y } = arc.tooltipPosition();
+    chart.tooltip.setActiveElements([{ datasetIndex: 0, index: idx }], { x, y });
+    chart.update("none");
+  };
   return {
     position: "right",
     labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
     onHover(_evt, legendItem, legend) {
-      if (legendItem && legendItem.index != null) dimOther(legend.chart, legendItem.index);
+      if (legendItem && legendItem.index != null) {
+        dimOther(legend.chart, legendItem.index);
+        showSliceTooltip(legend.chart, legendItem.index);
+      }
     },
-    onLeave(_evt, _legendItem, legend) { dimOther(legend.chart, null); },
+    onLeave(_evt, _legendItem, legend) {
+      dimOther(legend.chart, null);
+      showSliceTooltip(legend.chart, null);
+    },
   };
 }
 

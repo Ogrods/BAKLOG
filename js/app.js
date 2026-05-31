@@ -232,7 +232,7 @@ window.markLandscape = function (img) {
 /** Virtual scroll rebuilds rows from HTML; cached images often skip inline onload. */
 function syncCoverFits(root) {
   if (!root?.querySelectorAll) return;
-  for (const img of root.querySelectorAll("img.cover, img.pick-cover")) {
+  for (const img of root.querySelectorAll("img.cover, img.pick-cover, img.deal-hero-cover")) {
     if (img.complete && img.naturalWidth > 0) window.markLandscape(img);
     else img.addEventListener("load", () => window.markLandscape(img), { once: true });
   }

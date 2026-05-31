@@ -1,6 +1,18 @@
-export const TABLE_ROW_HEIGHT = 56;
+export const TABLE_ROW_HEIGHT = 76;
 export const VIRTUAL_OVERSCAN = 10;
 export const VIRTUAL_MIN_ROWS = 80;
+
+let _measuredRowHeight = TABLE_ROW_HEIGHT;
+
+export function setMeasuredRowHeight(h) {
+  if (typeof h === 'number' && h > 20 && h < 400) {
+    _measuredRowHeight = h;
+  }
+}
+
+export function measuredRowHeight() {
+  return _measuredRowHeight;
+}
 
 export function shouldVirtualize(rowCount) {
   return rowCount >= VIRTUAL_MIN_ROWS;
@@ -33,7 +45,7 @@ export function virtualRangeAroundIndex(
   anchorIndex,
   total,
   viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800,
-  rowHeight = TABLE_ROW_HEIGHT,
+  rowHeight = _measuredRowHeight,
   overscan = VIRTUAL_OVERSCAN,
 ) {
   if (total <= 0) {
@@ -50,7 +62,7 @@ export function virtualRangeAroundIndex(
   };
 }
 
-export function virtualRange(scrollTop, viewportHeight, total, rowHeight = TABLE_ROW_HEIGHT, overscan = VIRTUAL_OVERSCAN) {
+export function virtualRange(scrollTop, viewportHeight, total, rowHeight = _measuredRowHeight, overscan = VIRTUAL_OVERSCAN) {
   if (total <= 0) {
     return { start: 0, end: 0, topPad: 0, bottomPad: 0 };
   }

@@ -19,6 +19,8 @@ import {
   virtualRangeAroundIndex,
   tableVirtualMetrics,
   TABLE_ROW_HEIGHT,
+  setMeasuredRowHeight,
+  measuredRowHeight,
 } from './virtual-table.js';
 import { buildStatusSelect, STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { createMemo } from './memo.js';
@@ -213,11 +215,28 @@ window.coverFallback = function (img) {
   const cls = img.classList.contains("pick-cover") ? "pick-cover placeholder" : "cover placeholder";
   img.outerHTML = `<div class="${cls}" title="${name.replace(/"/g, "&quot;")}">${name.slice(0, 18)}</div>`;
 };
+function coverWrapStyle(url) {
+  if (!url) return "";
+  const safe = String(url).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  return ` style="--cover:url('${safe}')"`;
+}
+
 window.markLandscape = function (img) {
-  if (img.naturalWidth && img.naturalHeight && img.naturalWidth > img.naturalHeight * 1.1) {
-    img.classList.add("landscape");
-  }
+  if (!img?.classList) return;
+  const isLandscape = !!(img.naturalWidth && img.naturalHeight && img.naturalWidth > img.naturalHeight * 1.1);
+  img.classList.toggle("landscape", isLandscape);
+  const wrap = img.closest(".cover-wrap");
+  if (wrap) wrap.classList.toggle("landscape", isLandscape);
 };
+
+/** Virtual scroll rebuilds rows from HTML; cached images often skip inline onload. */
+function syncCoverFits(root) {
+  if (!root?.querySelectorAll) return;
+  for (const img of root.querySelectorAll("img.cover, img.pick-cover")) {
+    if (img.complete && img.naturalWidth > 0) window.markLandscape(img);
+    else img.addEventListener("load", () => window.markLandscape(img), { once: true });
+  }
+}
 
 // === Storage ===
 function loadPersonal() {
@@ -646,11 +665,19 @@ function dealHeroCardHtml(g) {
         ${genreLine}
       </div>`
     : "";
+  const heroBadges = [];
+  if (cut > 0) heroBadges.push(`<span class="deal-cut-badge">-${cut}%</span>`);
+  if (lowPin) heroBadges.push(lowPin);
+  if (droppedPin) heroBadges.push(droppedPin);
+  const wlBadge = wishlistBadgeHtml(g);
+  if (wlBadge) heroBadges.push(wlBadge);
+  if (ownedPin) heroBadges.push(ownedPin);
+  const heroBadgesHtml = heroBadges.slice(0, 4).join("");
   return `<button type="button" class="deal-card-clickable deal-hero dash-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist">
     <div class="dash-kpi-label">Today&apos;s top deal</div>
     <div class="deal-hero-body mt-2">
-      <span class="cover-wrap deal-hero-cover-wrap">
-        <img class="deal-hero-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+      <span class="cover-wrap deal-hero-cover-wrap"${coverWrapStyle(cover)}>
+        <img class="deal-hero-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </span>
       <div class="deal-hero-meta min-w-0 flex-1">
@@ -659,11 +686,7 @@ function dealHeroCardHtml(g) {
           <div class="deal-hero-prices mt-1">${priceHtml}${shop ? `<span class="text-xs text-slate-400 ml-1">${shop}</span>` : ""}</div>
         </div>
         <div class="deal-hero-badges flex flex-wrap items-center gap-1.5">
-          ${cut > 0 ? `<span class="deal-cut-badge">-${cut}%</span>` : ""}
-          ${wishlistBadgeHtml(g)}
-          ${droppedPin}
-          ${lowPin}
-          ${ownedPin}
+          ${heroBadgesHtml}
         </div>
         ${statStrip}
       </div>
@@ -1197,7 +1220,7 @@ function pickCardHtml(g) {
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
       <span class="pick-store store-badge ${store}">${badge}</span>
-      <div class="cover-wrap w-full block">
+      <div class="cover-wrap w-full block"${coverWrapStyle(cover)}>
         <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
@@ -1271,9 +1294,11 @@ function renderPicks() {
     : pickView === "itch"
       ? "No rated itch.io backlog games yet. Most indie titles won't have Steam review scores."
       : "No games match this tab yet.";
-  document.getElementById("picksGrid").innerHTML = data.length
+  const picksGrid = document.getElementById("picksGrid");
+  picksGrid.innerHTML = data.length
     ? data.slice(0, limit).map(renderCard).join("")
     : `<div class="col-span-full text-sm text-slate-400 italic">${emptyMsg}</div>`;
+  syncCoverFits(picksGrid);
   document.querySelectorAll(".pick-tab").forEach(el => {
     const owner = el.dataset.pickView || "library";
     el.classList.toggle("active", owner === pickView && el.dataset.tab === tab);
@@ -1300,28 +1325,28 @@ function dealCardHtml(g) {
     : "";
   const dropFlag = dealDroppedBadgeHtml(g);
   const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : "";
-  const ownedFlag = ownedElsewhereBadgeHtml(g);
+  const ownedTxt = isOwnedByTitle(g.name) ? '<span class="text-amber-400/80 shrink-0">own</span>' : "";
   const shop = d && d.shop ? d.shop : "";
   const wishlistTarget = g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
       <span class="pick-store store-badge ${wishlistTarget}" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLetter(wishlistTarget)}</span>
-      <div class="cover-wrap w-full block">
+      <div class="cover-wrap w-full block"${coverWrapStyle(cover)}>
         <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
       <div class="text-xs text-slate-400 flex justify-between items-center gap-1">
         <span class="text-slate-100">${priceLabel}</span>
-        <span class="flex items-center gap-1 flex-wrap justify-end">
+        <span class="flex items-center gap-1 shrink-0">
           ${dropFlag}
           ${cutLabel ? `<span class="${cutClass}">${cutLabel}</span>` : ""}
           ${lowFlag}
         </span>
       </div>
-      <div class="text-[10px] text-slate-500 flex justify-between mt-0.5">
+      <div class="text-[10px] text-slate-500 flex justify-between gap-1 mt-0.5 min-w-0">
         <span class="truncate">${escapeHtml(shop)}</span>
-        <span class="flex items-center gap-1">${rating}${ownedFlag ? ` ${ownedFlag}` : ""}</span>
+        <span class="flex items-center gap-1 shrink-0">${rating}${ownedTxt}</span>
       </div>
     </div>`;
 }
@@ -1522,8 +1547,11 @@ function formatPrice(g) {
     const d = getDealInfo(g);
     const lowBadge = d ? dealLowBadgeHtml(d).replace(/^/, "&nbsp;") : "";
     const dropBadge = dealDroppedBadgeHtml(g).replace(/^/, "&nbsp;");
-    const shopHtml = itad.shop ? ` <span class="text-slate-400">@ ${escapeHtml(itad.shop)}</span>` : "";
-    return `<span class="whitespace-nowrap">${priceHtml}${dropBadge}${lowBadge}</span>${shopHtml}`;
+    const shopHtml = itad.shop ? `@ ${escapeHtml(itad.shop)}` : "";
+    return `<div class="flex flex-col items-end leading-tight">
+      <span class="whitespace-nowrap">${priceHtml}${dropBadge}${lowBadge}</span>
+      ${shopHtml ? `<span class="text-[10px] text-slate-400 truncate w-full text-right" title="${escapeAttr(itad.shop)}">${shopHtml}</span>` : ""}
+    </div>`;
   }
   if (!g.price && g.discount_percent == null) return "—";
   const base = g.price || "N/A";
@@ -1669,12 +1697,12 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
       <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
       <td class="p-2"><span class="cover-wrap"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
-      <td class="p-2">
-        <div class="flex items-center gap-1.5 flex-wrap">
-          ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name", escapeHtml(g.name))}
+      <td class="p-2 game-name-cell">
+        <div class="flex items-center gap-1.5 min-w-0">
+          ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate flex-1 min-w-0", escapeHtml(g.name))}
           ${earlyAccessPillHtml(g)}
-          ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
-          ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
+          ${hiddenGem ? '<span class="text-purple-400 shrink-0" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
+          ${ownedWish ? '<span class="text-amber-400 text-xs shrink-0" title="You already own this (matched by title)">owned</span>' : ""}
         </div>
         <div class="mt-1 flex items-center gap-1.5 flex-wrap">
           ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
@@ -1693,8 +1721,8 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="p-2 text-right">${formatPrice(g)}</td>
       <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
       <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
-      <td class="p-2 text-slate-400 text-xs max-w-[120px] truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
-      <td class="p-2 min-w-[180px]">
+      <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
+      <td class="p-2 notes-cell">
         <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
         <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
       </td>
@@ -1736,6 +1764,24 @@ function paintTableBody(list, opts = {}) {
   }
   parts.push(`<tr class="virtual-spacer" aria-hidden="true"><td colspan="${colSpan}" style="height:${bottomPad}px;padding:0;border:0"></td></tr>`);
   tbody.innerHTML = parts.join("");
+  syncCoverFits(tbody);
+  // Re-measure on first real render of a view — never on virtual-scroll repaints,
+  // and average multiple rows so per-row variation (tag chips, etc.) doesn't oscillate.
+  if (state._virtualActive && end > start && opts.measure) {
+    requestAnimationFrame(() => {
+      const rows = tbody.querySelectorAll("tr[data-row-index]");
+      if (!rows.length) return;
+      const sampleCount = Math.min(rows.length, 8);
+      let total = 0;
+      for (let i = 0; i < sampleCount; i++) total += rows[i].offsetHeight;
+      const avg = Math.round(total / sampleCount);
+      if (avg && Math.abs(avg - measuredRowHeight()) > 4) {
+        setMeasuredRowHeight(avg);
+        cancelAnimationFrame(_virtualScrollRaf);
+        _virtualScrollRaf = requestAnimationFrame(() => renderTable({ virtualOnly: true }));
+      }
+    });
+  }
 }
 
 async function renderTable(opts) {
@@ -1780,6 +1826,7 @@ async function renderTable(opts) {
   paintTableBody(list, {
     resetScroll: force && !virtualOnly,
     anchorIndex: opts?.anchorIndex,
+    measure: !virtualOnly,
   });
 
   let base;

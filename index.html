@@ -23,9 +23,29 @@
     .pick-card:hover { transform: translateY(-2px); background: rgb(51 65 85); }
     .pick-tab.active { border-color: #38bdf8; color: #e2e8f0; background: rgba(14, 165, 233, 0.15); }
     .picks-limit-btn.active { background: #0284c7; border-color: #0ea5e9; color: #f8fafc; }
-    .pick-store { position: absolute; top: 4px; right: 4px; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; }
+    .pick-store { position: absolute; top: 4px; right: 4px; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; z-index: 2; pointer-events: none; }
     /* === Early Access === */
-    .cover-wrap { position: relative; display: inline-block; line-height: 0; }
+    .cover-wrap { position: relative; display: inline-block; line-height: 0; overflow: hidden; }
+    .cover-wrap.landscape::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: var(--cover);
+      background-size: cover;
+      background-position: center;
+      filter: blur(18px) brightness(0.6) saturate(1.15);
+      transform: scale(1.2);
+      z-index: 0;
+      pointer-events: none;
+    }
+    .cover-wrap.landscape img.pick-cover,
+    .cover-wrap.landscape img.deal-hero-cover { position: relative; z-index: 1; }
+    .cover-wrap.landscape .ea-ribbon { z-index: 2; }
+    .pick-card .deal-badge-drop,
+    .pick-card .owned-elsewhere-pill {
+      padding: 0 0.2rem; font-size: 0.6rem; border: none; background: transparent;
+    }
+    .pick-card .deal-flag-cut.deal-flag-cut--huge { animation: none; }
     .cover-wrap .cover { display: block; }
     .ea-ribbon {
       position: absolute; left: 0; right: 0; bottom: 0;
@@ -1119,8 +1139,7 @@
     .steal-card { display: flex; flex-direction: column; }
     .steal-list { display: flex; flex-direction: column; gap: 0.2rem; }
     .steal-row {
-      display: grid;
-      grid-template-columns: 22px minmax(0, 1fr) auto auto auto auto;
+      display: flex;
       align-items: center;
       gap: 0.4rem;
       padding: 0.25rem 0.35rem;
@@ -1133,13 +1152,14 @@
       font-size: 0.75rem;
       line-height: 1.2;
       transition: background 0.1s ease;
+      width: 100%;
     }
     .steal-row:hover { background: rgba(51, 65, 85, 0.6); }
     .steal-row-cover { width: 22px; height: 32px; object-fit: cover; border-radius: 3px; background: #1e293b; flex-shrink: 0; }
-    .steal-row-name { color: #e2e8f0; min-width: 0; }
+    .steal-row-name { flex: 1; min-width: 0; color: #e2e8f0; }
     .steal-row-low { color: #fbbf24; font-size: 0.7rem; line-height: 1; }
     .steal-row-cut { color: #34d399; font-weight: 700; font-size: 0.72rem; }
-    .steal-row-price { color: #cbd5e1; font-variant-numeric: tabular-nums; font-size: 0.72rem; min-width: 38px; text-align: right; }
+    .steal-row-price { margin-left: auto; color: #cbd5e1; font-variant-numeric: tabular-nums; font-size: 0.72rem; min-width: 38px; text-align: right; flex-shrink: 0; }
     .steal-row-shop {
       font-size: 0.6rem; font-weight: 600; letter-spacing: 0.02em;
       padding: 0.05rem 0.35rem; border-radius: 999px;
@@ -1167,6 +1187,14 @@
     .dash-chart-wrap { position: relative; height: 260px; }
     .dash-chart-wrap.tall { height: 320px; }
     .table-hide-score .col-score { display: none; }
+    #tableWrap { width: 100%; }
+    .games-table { width: 100%; table-layout: fixed; min-width: 1280px; }
+    .games-table thead { position: sticky; top: 0; z-index: 10; }
+    .games-table thead th { background: rgb(30 41 59); box-shadow: inset 0 -1px 0 #334155; }
+    .games-table th, .games-table td { overflow: hidden; }
+    .games-table td.notes-cell { white-space: normal; overflow: visible; }
+    .games-table .game-name-cell { min-width: 0; }
+    .games-table .game-name-cell .game-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%; }
     .dash-itch-recap { color: #cbd5e1; line-height: 1.5; display: flex; flex-direction: column; gap: 0.65rem; flex: 1; min-height: 0; }
     .dash-itch-recap strong { color: #ffffff; font-weight: 600; }
     .dash-itch-recap .dash-itch-muted { color: #94a3b8; font-size: 0.75rem; margin-top: 0.35rem; }
@@ -1548,10 +1576,7 @@
     <div id="authReconnectBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="mb-4">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div class="flex items-center gap-3 shrink-0 pr-3 mr-1 border-r border-slate-700/80">
-          <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap">BAKLOG</h1>
-          <p class="text-[11px] text-slate-500 leading-snug hidden md:block max-w-[7.5rem]">Cross-store backlog · local-only</p>
-        </div>
+        <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap shrink-0" style="margin: 0 1rem 0 0;">BAKLOG</h1>
         <nav class="flex flex-wrap items-center gap-1.5" aria-label="Main views">
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm active" data-view="dashboard">Dashboard</button>
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="library">Library</button>
@@ -1559,6 +1584,7 @@
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
         </nav>
+        <span class="text-[11px] text-slate-500 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
         <span id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto self-center" aria-live="polite"></span>
       </div>
       <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
@@ -1708,11 +1734,26 @@
         </div>
       </div>
     <div id="tableWrap" class="overflow-x-auto rounded-lg border border-slate-700">
-      <table class="w-full text-sm">
+      <table class="w-full text-sm games-table">
+        <colgroup>
+          <col style="width:36px" />
+          <col style="width:60px" />
+          <col class="col-game" style="width:100%" />
+          <col style="width:120px" />
+          <col class="col-score" style="width:60px" />
+          <col style="width:64px" />
+          <col style="width:112px" />
+          <col style="width:64px" />
+          <col style="width:170px" />
+          <col style="width:96px" />
+          <col style="width:96px" />
+          <col style="width:128px" />
+          <col style="width:240px" />
+        </colgroup>
         <thead class="bg-slate-800 text-slate-300">
           <tr>
-            <th class="p-2 w-8"><input type="checkbox" id="selectAllVisible" title="Select all visible rows" /></th>
-            <th class="p-2 w-12"></th>
+            <th class="p-2"><input type="checkbox" id="selectAllVisible" title="Select all visible rows" /></th>
+            <th class="p-2"></th>
             <th data-sort="name" class="p-2 text-left">Game</th>
             <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
             <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>

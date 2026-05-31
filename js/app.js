@@ -26,6 +26,7 @@ import { createMemo } from './memo.js';
 import { escapeHtml, escapeAttr, formatNum } from './dom-util.js';
 import { personalStore, configurePersonalStore, showMigrationBanner } from './personal-store.js';
 import { fetcherRunner, loadFetcherSources, renderDashboardFetcherHealth, configureFetcherHealth, consumeItadAutoRunFlag, diffItadDeals } from './fetcher-health.js';
+import { initConnections, refreshConnections, startConnectionsPolling, stopConnectionsPolling } from './connections.js';
 import {
   initDashboard,
   scheduleDashboardRender,
@@ -183,11 +184,29 @@ function recomputeWishlistCrossStore() {
   }
 }
 
+window.__dashFailedCovers = window.__dashFailedCovers || new Set();
+let _dashRebalanceTimer = null;
+function scheduleDashRebalance() {
+  clearTimeout(_dashRebalanceTimer);
+  _dashRebalanceTimer = setTimeout(() => {
+    window.dispatchEvent(new CustomEvent("dash:cover-failures"));
+  }, 600);
+}
 window.coverFallback = function (img) {
   const fb = img.dataset.fallback;
   if (fb && img.src !== fb) {
     img.src = fb;
     img.dataset.fallback = "";
+    return;
+  }
+  const dashRow = img.closest(".dash-versus-row, .dash-list-row, .coop-pick-row, .dash-spotlight, .itch-hero-card");
+  if (dashRow) {
+    const key = dashRow.dataset.key || dashRow.dataset.gameKey;
+    if (key) {
+      window.__dashFailedCovers.add(key);
+      scheduleDashRebalance();
+    }
+    dashRow.style.display = "none";
     return;
   }
   const name = img.dataset.name || "";
@@ -233,6 +252,9 @@ function flushSavePersonal() {
 }
 window.addEventListener("beforeunload", flushSavePersonal);
 window.addEventListener("blur", flushSavePersonal);
+window.addEventListener("dash:cover-failures", () => {
+  if (state.activeView === "dashboard") scheduleDashboardRender();
+});
 function loadPrefs() {
   const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false };
   try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
@@ -1978,24 +2000,27 @@ function updateViewChrome() {
   const isWish = state.activeView === "wishlist";
   const isItch = state.activeView === "itch";
   const isDash = state.activeView === "dashboard";
+  const isConn = state.activeView === "connections";
   updateWishlistDrawerVisibility();
   updatePickTabsVisibility();
   updatePicksChrome();
-  document.getElementById("picksSection")?.classList.toggle("hidden", isDash);
-  document.getElementById("toolbarSection")?.classList.toggle("hidden", isDash);
-  document.getElementById("tableShell")?.classList.toggle("hidden", isDash);
-  document.getElementById("rowCount")?.classList.toggle("hidden", isDash);
-  document.getElementById("alphaNav")?.classList.toggle("dashboard-hidden", isDash);
+  document.getElementById("picksSection")?.classList.toggle("hidden", isDash || isConn);
+  document.getElementById("toolbarSection")?.classList.toggle("hidden", isDash || isConn);
+  document.getElementById("tableShell")?.classList.toggle("hidden", isDash || isConn);
+  document.getElementById("rowCount")?.classList.toggle("hidden", isDash || isConn);
+  document.getElementById("alphaNav")?.classList.toggle("dashboard-hidden", isDash || isConn);
   document.getElementById("dashboardContainer")?.classList.toggle("hidden", !isDash);
+  document.getElementById("connectionsContainer")?.classList.toggle("hidden", !isConn);
   document.getElementById("libraryStatusSection")?.classList.add("hidden");
   document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
-  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isWish || isItch || isDash);
+  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
   document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish);
-  document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash);
-  document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash);
-  document.getElementById("coopSection")?.classList.toggle("hidden", isDash);
+  document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
+  document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash || isConn);
+  document.getElementById("coopSection")?.classList.toggle("hidden", isDash || isConn);
   if (isDash) scheduleDashboardRender();
   else destroyDashboardCharts();
+  if (isConn) refreshConnections();
   renderBulkStatusButtons();
   renderSummary();
 }
@@ -2033,7 +2058,7 @@ function switchView(view) {
   const fpBefore = view !== "dashboard" ? tableFingerprint().replace(/"v":"[^"]+"/, `"v":"${view}"`) : "";
   const willBeCached = view !== "dashboard" && view === _lastRenderedView && fpBefore === _tableFingerprint;
   const useOverlay = !willBeCached;
-  const label = view === "dashboard" ? "Loading dashboard…" : view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : "Loading library…";
+  const label = view === "dashboard" ? "Loading dashboard…" : view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : view === "connections" ? "Loading connections…" : "Loading library…";
   if (useOverlay) showViewLoading(label);
   const doSwitch = () => {
     if (fromView === "dashboard") {
@@ -2075,9 +2100,15 @@ function switchView(view) {
         if (!ok) return;
         await fetcherRunner.syncFromServer();
         fetcherRunner.startDashboardPolling();
+        stopConnectionsPolling();
       });
+    } else if (view === "connections") {
+      fetcherRunner.stopDashboardPolling();
+      startConnectionsPolling();
+      refreshConnections();
     } else {
       fetcherRunner.stopDashboardPolling();
+      stopConnectionsPolling();
     }
     if (useOverlay) hideViewLoading();
   };
@@ -2786,9 +2817,9 @@ function bindEvents() {
     if (!row || !row.dataset.key) return;
     focusGame(row.dataset.key);
   };
-  document.getElementById("dashTopRated")?.addEventListener("click", onDashListClick);
-  document.getElementById("dashQuickWins")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashPicksVersusCard")?.addEventListener("click", onDashListClick);
   document.getElementById("dashItchRecap")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashboardMega")?.addEventListener("click", onDashListClick);
 
   const handleCoopActivate = (e) => {
     const target = e.target.closest("[data-action]");
@@ -3329,7 +3360,7 @@ async function bootstrap() {
   }
   migrateV3();
   state.prefs.genreFilters = (state.prefs.genreFilters || []).map(aliasCanonicalGenre);
-  const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch"]);
+  const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch", "connections"]);
   if (VALID_VIEWS.has(state.prefs.activeView)) {
     state.activeView = state.prefs.activeView;
   }
@@ -3377,6 +3408,7 @@ async function bootstrap() {
     }
   }
   await loadFetcherSources();
+  initConnections();
   fetcherRunner.probeApi().then(async available => {
     if (!available) return;
     await fetcherRunner.syncFromServer();

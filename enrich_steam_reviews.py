@@ -20,6 +20,7 @@ from pathlib import Path
 
 import requests
 
+from auth import resolve_env
 from fetchers._progress import RunStats, started
 from steam_client import SteamClient
 
@@ -147,8 +148,8 @@ def main() -> int:
         store_files = [row for row in STORE_FILES if row[1] in wanted]
 
     load_dotenv()
-    api_key = os.getenv("STEAM_API_KEY", "").strip()
-    steam_id = os.getenv("STEAM_ID", "").strip()
+    api_key = resolve_env("STEAM_API_KEY", provider="steam")
+    steam_id = resolve_env("STEAM_ID", provider="steam")
     if not api_key or not steam_id:
         stats.error("STEAM_API_KEY/STEAM_ID required in .env")
         return stats.finish("enrich_steam_reviews", t0, exit_code=1)

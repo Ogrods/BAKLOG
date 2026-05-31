@@ -12,6 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from psn_client import PsnAuthError, PsnClient, PsnGameEntry
@@ -115,7 +116,7 @@ def main() -> int:
     stats = RunStats()
 
     load_dotenv()
-    npsso = os.getenv("PSN_NPSSO", "").strip()
+    npsso = resolve_env("PSN_NPSSO", provider="psn")
     if not npsso:
         stats.error("Set PSN_NPSSO in .env (see README for NPSSO instructions).")
         return stats.finish("fetch_psn", t0, exit_code=1)
@@ -124,6 +125,7 @@ def main() -> int:
         psn = PsnClient(npsso)
         online_id = psn.validate_session()
     except PsnAuthError as exc:
+        mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
         return stats.finish("fetch_psn", t0, exit_code=1)
 

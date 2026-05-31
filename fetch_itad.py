@@ -14,6 +14,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from auth import resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from itad_client import ItadClient, ItadError
@@ -86,7 +87,7 @@ def main() -> int:
     t0 = started("fetch_itad")
     stats = RunStats()
     load_dotenv()
-    api_key = os.getenv("ITAD_API_KEY", "").strip()
+    api_key = resolve_env("ITAD_API_KEY", provider="itad")
     if not api_key:
         stats.error("Set ITAD_API_KEY in .env (free key from https://isthereanydeal.com/dev/api/)")
         return stats.finish("fetch_itad", t0, exit_code=1)

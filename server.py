@@ -13,6 +13,12 @@ Endpoints:
     GET  /api/stream/<run_id>      -> SSE: line / done / error events
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
+    GET  /api/auth/status     -> per-provider connection state
+    POST /api/auth/<p>/start  -> begin Playwright sign-in (returns session_id)
+    GET  /api/auth/<id>/stream -> SSE auth flow events
+    PUT  /api/auth/<p>/credentials -> save form API keys
+    POST /api/auth/<p>/disconnect  -> wipe stored credentials
+    GET  /oauth/epic/callback -> Epic OAuth redirect handler
 
 Bind: 127.0.0.1 only. The fetcher whitelist is loaded from fetchers/manifest.json
 so the browser cannot execute arbitrary commands.
@@ -222,11 +228,19 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
 
 def _missing_requirements(requires: list[dict[str, Any]]) -> list[str]:
     missing: list[str] = []
+    resolve = None
+    try:
+        from auth import resolve_env as resolve
+    except ImportError:
+        resolve = None
     for req in requires:
         if not isinstance(req, dict):
             continue
         env_name = (req.get("env") or "").strip()
-        if env_name and not os.getenv(env_name, "").strip():
+        if not env_name:
+            continue
+        val = resolve(env_name) if resolve else os.getenv(env_name, "").strip()
+        if not val:
             missing.append(env_name)
     return missing
 
@@ -714,6 +728,16 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/api/personal":
             self._handle_personal_get()
             return
+        if self.path == "/api/auth/status":
+            self._handle_auth_status()
+            return
+        if self.path.startswith("/api/auth/") and self.path.endswith("/stream"):
+            rest = self.path[len("/api/auth/") : -len("/stream")].strip("/")
+            self._handle_auth_stream(rest)
+            return
+        if self.path.startswith("/oauth/epic/callback"):
+            self._handle_epic_oauth_callback()
+            return
         if self.path.startswith("/api/stream/"):
             self._handle_stream(self.path[len("/api/stream/"):])
             return
@@ -728,11 +752,30 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 self._handle_submit(rest)
             return
+        if self.path.startswith("/api/auth/") and self.path.endswith("/start"):
+            provider = self.path[len("/api/auth/") : -len("/start")].strip("/")
+            self._handle_auth_start(provider)
+            return
+        if self.path.startswith("/api/auth/") and self.path.endswith("/open-url"):
+            provider = self.path[len("/api/auth/") : -len("/open-url")].strip("/")
+            self._handle_auth_open_url(provider)
+            return
+        if self.path.startswith("/api/auth/") and self.path.endswith("/disconnect"):
+            provider = self.path[len("/api/auth/") : -len("/disconnect")].strip("/")
+            self._handle_auth_disconnect(provider)
+            return
+        if self.path == "/api/auth/master-password":
+            self._handle_auth_master_password()
+            return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_PUT(self) -> None:  # noqa: N802 - http.server API
         if self.path == "/api/personal":
             self._handle_personal_put()
+            return
+        if self.path.startswith("/api/auth/") and self.path.endswith("/credentials"):
+            provider = self.path[len("/api/auth/") : -len("/credentials")].strip("/")
+            self._handle_auth_credentials(provider)
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
@@ -843,6 +886,176 @@ class Handler(SimpleHTTPRequestHandler):
             return
         assert run is not None
         _send_json(self, HTTPStatus.OK, run.to_summary())
+
+    def _handle_auth_status(self) -> None:
+        try:
+            from auth.manager import get_status
+
+            _send_json(self, HTTPStatus.OK, {"providers": get_status()})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_auth_open_url(self, provider: str) -> None:
+        try:
+            from auth.manager import open_manual_signin
+
+            result = open_manual_signin(provider)
+            _send_json(self, HTTPStatus.OK, result)
+        except KeyError:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_auth_start(self, provider: str) -> None:
+        try:
+            from auth.manager import start_browser_auth
+
+            session_id = start_browser_auth(provider)
+            _send_json(self, HTTPStatus.ACCEPTED, {"session_id": session_id, "provider": provider})
+        except KeyError:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_auth_disconnect(self, provider: str) -> None:
+        try:
+            from auth.manager import disconnect
+
+            disconnect(provider)
+            _send_json(self, HTTPStatus.OK, {"ok": True})
+        except KeyError:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_auth_credentials(self, provider: str) -> None:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid Content-Length"})
+            return
+        if length <= 0 or length > 65536:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid body size"})
+            return
+        try:
+            raw = self.rfile.read(length).decode("utf-8")
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"invalid JSON: {exc!r}"})
+            return
+        try:
+            from auth.manager import set_form_credentials
+
+            fields = payload.get("fields") if isinstance(payload, dict) else payload
+            if not isinstance(fields, dict):
+                raise ValueError("fields must be an object")
+            result = set_form_credentials(provider, fields)
+            _send_json(self, HTTPStatus.OK, result)
+        except KeyError:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_auth_master_password(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+            payload = json.loads(raw)
+            from auth.manager import set_master_password
+
+            set_master_password(payload.get("password"))
+            _send_json(self, HTTPStatus.OK, {"ok": True})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _handle_epic_oauth_callback(self) -> None:
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        code = (params.get("code") or [None])[0]
+        if not code:
+            self.send_response(HTTPStatus.BAD_REQUEST)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            body = b"<html><body><p>Missing authorization code.</p></body></html>"
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        try:
+            from auth.manager import mark_connected
+            from epic_client import EpicClient
+
+            client = EpicClient(auth_code=code)
+            client.login()
+            mark_connected("epic", {"EPIC_AUTH_CODE": code})
+            body = (
+                b"<html><body><p>Epic connected. You can close this tab and return to the dashboard.</p>"
+                b"<script>setTimeout(()=>window.close(),1500)</script></body></html>"
+            )
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as exc:  # noqa: BLE001
+            body = f"<html><body><p>Epic sign-in failed: {exc}</p></body></html>".encode("utf-8")
+            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    def _handle_auth_stream(self, session_id: str) -> None:
+        global _sse_connections
+        session_id = session_id.strip("/").split("/", 1)[0]
+        try:
+            from auth.manager import get_auth_session
+        except ImportError as exc:
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            return
+        session = get_auth_session(session_id)
+        if session is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "Unknown auth session")
+            return
+
+        with _sse_lock:
+            if _sse_connections >= MAX_SSE_CONNECTIONS:
+                _send_json(
+                    self,
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": f"too many stream connections (max {MAX_SSE_CONNECTIONS})"},
+                )
+                return
+            _sse_connections += 1
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        try:
+            while True:
+                try:
+                    event, data = session.events.get(timeout=30)
+                    self._sse_write(event, data)
+                    if event == "done":
+                        return
+                except queue.Empty:
+                    self._sse_write_raw(b": keepalive\n\n")
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            pass
+        finally:
+            with _sse_lock:
+                _sse_connections = max(0, _sse_connections - 1)
 
     def _handle_stream(self, run_id: str) -> None:
         global _sse_connections

@@ -15,6 +15,23 @@ class PsnAuthError(Exception):
     """NPSSO token invalid, expired, or profile not accessible."""
 
 
+def validate_npsso(npsso: str) -> None:
+    """Raise PsnAuthError if the NPSSO token is missing or not accepted by PSN."""
+    token = (npsso or "").strip()
+    if len(token) < 20:
+        raise PsnAuthError("NPSSO token is too short.")
+    try:
+        PsnClient(token).validate_session()
+    except PSNAWPAuthenticationError as exc:
+        raise PsnAuthError(
+            "NPSSO rejected — sign in at playstation.com, open the ssocookie link, and paste a fresh token."
+        ) from exc
+    except PSNAWPForbiddenError as exc:
+        raise PsnAuthError(
+            "PSN profile is private. Set trophies/games visibility to Anyone in PSN privacy settings."
+        ) from exc
+
+
 @dataclass
 class PsnGameEntry:
     id: str

@@ -6,6 +6,16 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Connections tab** — unified sign-in for all stores: form fields for API keys (Steam, Xbox, itch, ITAD), Playwright browser login for cookie/OAuth providers (GOG, PSN, Epic, Battle.net, Nintendo, Ubisoft), encrypted at rest via OS keychain + AES-GCM (`auth/` package).
+- **Reconnect banner** when a fetcher fails auth (401/403) — links to Connections tab.
+- **`scripts/build_installer.ps1`** — bundles app + Playwright Chromium into `dist/steam-backlog/`.
+
+### Changed
+
+- Fetch scripts read credentials from encrypted store first, then `.env` fallback (`auth.resolve_env`).
+
+### Added (fetcher observability)
+
 - **Fetcher observability hardening** — shared progress helpers (`fetchers/_progress.py`), start/end timing footers on all fetch/enrich scripts, heartbeats during long silent phases (HLTB cache skips, itch pagination, ITAD lookup, cover enrichment thread pool).
 - **Server stall watchdog** — `server.py` emits `[server] no output for Ns — still running` when a subprocess is quiet for 30s (repeats every 60s).
 - **`--allow-empty` flag** on GOG/Epic wishlist, Steam wishlist, Xbox, Epic library, GOG library, Steam library, PSN library, and ITAD fetchers — default refuses to overwrite JSON when zero items are returned (exit 2).

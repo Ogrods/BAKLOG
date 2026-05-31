@@ -15,6 +15,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from auth import mark_invalid, resolve_env
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 from xbox_client import XboxAuthError, XboxClient
@@ -113,7 +114,7 @@ def main() -> int:
     t0 = started("fetch_xbox")
     stats = RunStats()
     load_dotenv()
-    api_key = os.getenv("XBL_API_KEY", "").strip()
+    api_key = resolve_env("XBL_API_KEY", provider="xbox")
     if not api_key:
         stats.error("Set XBL_API_KEY in .env (https://xbl.io/)")
         return stats.finish("fetch_xbox", t0, exit_code=1)

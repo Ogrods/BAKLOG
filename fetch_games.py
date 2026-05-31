@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import os
 
 from hltb_client import HltbClient
+from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from steam_client import SteamClient
@@ -168,8 +169,8 @@ def main() -> int:
     stats = RunStats()
 
     load_dotenv()
-    api_key = os.getenv("STEAM_API_KEY", "").strip()
-    steam_id = os.getenv("STEAM_ID", "").strip()
+    api_key = resolve_env("STEAM_API_KEY", provider="steam")
+    steam_id = resolve_env("STEAM_ID", provider="steam")
     if not api_key or not steam_id:
         stats.error("Set STEAM_API_KEY and STEAM_ID in .env (see .env.example)")
         return stats.finish("fetch_games", t0, exit_code=1)

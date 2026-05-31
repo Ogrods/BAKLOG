@@ -15,6 +15,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from auth import mark_invalid, resolve_env
 from fetchers._progress import RunStats, started
 from ubisoft_client import UbisoftAuthError, UbisoftClient
 
@@ -268,9 +269,9 @@ def main() -> int:
     t0 = started("fetch_ubisoft")
     stats = RunStats()
     load_dotenv()
-    auth = os.getenv("UBISOFT_AUTH", "").strip()
-    session_id = os.getenv("UBISOFT_SESSION_ID", "").strip()
-    app_id = os.getenv("UBISOFT_APP_ID", "").strip() or None
+    auth = resolve_env("UBISOFT_AUTH", provider="ubisoft")
+    session_id = resolve_env("UBISOFT_SESSION_ID", provider="ubisoft")
+    app_id = resolve_env("UBISOFT_APP_ID", provider="ubisoft") or None
     if not auth or not session_id:
         stats.error(
             "Set UBISOFT_AUTH and UBISOFT_SESSION_ID in .env. To get them:\n"
@@ -286,6 +287,7 @@ def main() -> int:
         client = UbisoftClient(auth, session_id, app_id=app_id)
         raw, endpoint = client.get_library()
     except UbisoftAuthError as e:
+        mark_invalid("ubisoft", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_ubisoft", t0, exit_code=1)
 

@@ -21,6 +21,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from gog_client import GogAuthError, GogClient
@@ -217,7 +218,7 @@ def main() -> int:
     t0 = started("fetch_gog_wishlist")
     stats = RunStats()
     load_dotenv()
-    gog_al = os.getenv("GOG_AL", "").strip()
+    gog_al = resolve_env("GOG_AL", provider="gog")
     if not gog_al:
         stats.error("Set GOG_AL in .env (see README for cookie instructions).")
         return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
@@ -226,6 +227,7 @@ def main() -> int:
         gog = GogClient(gog_al)
         gog.validate_session()
     except GogAuthError as e:
+        mark_invalid("gog", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
 
@@ -233,6 +235,7 @@ def main() -> int:
     try:
         ids = _fetch_wishlist_ids(gog, refresh=args.refresh)
     except GogAuthError as e:
+        mark_invalid("gog", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
     empty_exit = refuse_empty_result(

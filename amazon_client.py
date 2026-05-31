@@ -30,6 +30,10 @@ from ctypes import wintypes
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", ""))
 DEFAULT_SQL_DIR = LOCALAPPDATA / "Amazon Games" / "Data" / "Games" / "Sql"
 
+
+def default_sql_dir() -> Path:
+    return DEFAULT_SQL_DIR
+
 ENTITLEMENTS_DB = "Entitlements.sqlite"
 PRODUCT_DETAILS_DB = "ProductDetails.sqlite"
 INTERACTIONS_DB = "GameUserInteractionsInfo.sqlite"

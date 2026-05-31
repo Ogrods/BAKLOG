@@ -16,6 +16,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from auth import mark_invalid, resolve_env
 from fetchers._progress import RunStats, started
 from nintendo_client import NintendoAuthError, NintendoClient
 
@@ -159,7 +160,7 @@ def main() -> int:
     t0 = started("fetch_nintendo")
     stats = RunStats()
     load_dotenv()
-    cookie = os.getenv("NINTENDO_COOKIE", "").strip()
+    cookie = resolve_env("NINTENDO_COOKIE", provider="nintendo")
     if not cookie:
         stats.error(
             "Set NINTENDO_COOKIE in .env:\n"
@@ -173,6 +174,7 @@ def main() -> int:
         client = NintendoClient(cookie)
         raw_tx = client.fetch_all_transactions()
     except NintendoAuthError as e:
+        mark_invalid("nintendo", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_nintendo", t0, exit_code=1)
 

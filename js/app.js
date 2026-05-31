@@ -220,12 +220,34 @@ window.coverFallback = function (img) {
   const safeCap = captionRaw.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   img.outerHTML = `<div class="${cls}" title="${safeName}"><span class="placeholder-initials">${initials}</span><span class="placeholder-caption">${safeCap}</span></div>`;
 };
+const LANDSCAPE_CACHE_KEY = "baklog-landscape-covers";
+window.__landscapeCovers = (() => {
+  try { return new Set(JSON.parse(localStorage.getItem(LANDSCAPE_CACHE_KEY) || "[]")); }
+  catch { return new Set(); }
+})();
+let _landscapeSaveTimer = 0;
+function persistLandscapeCache() {
+  if (_landscapeSaveTimer) return;
+  _landscapeSaveTimer = setTimeout(() => {
+    _landscapeSaveTimer = 0;
+    try { localStorage.setItem(LANDSCAPE_CACHE_KEY, JSON.stringify([...window.__landscapeCovers].slice(-1500))); } catch {}
+  }, 800);
+}
+window.coverLandscapeAttr = function (url) {
+  return url && window.__landscapeCovers.has(url) ? " landscape" : "";
+};
 window.markLandscape = function (img) {
   if (!img?.classList) return;
   const isLandscape = !!(img.naturalWidth && img.naturalHeight && img.naturalWidth > img.naturalHeight * 1.1);
   img.classList.toggle("landscape", isLandscape);
   const wrap = img.closest(".cover-wrap");
   if (wrap) wrap.classList.toggle("landscape", isLandscape);
+  const src = img.currentSrc || img.src;
+  if (src) {
+    const had = window.__landscapeCovers.has(src);
+    if (isLandscape && !had) { window.__landscapeCovers.add(src); persistLandscapeCache(); }
+    else if (!isLandscape && had) { window.__landscapeCovers.delete(src); persistLandscapeCache(); }
+  }
 };
 
 /** Virtual scroll rebuilds rows from HTML; cached images often skip inline onload. */
@@ -675,8 +697,8 @@ function dealHeroCardHtml(g) {
   return `<button type="button" class="deal-card-clickable deal-hero dash-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist">
     <div class="dash-kpi-label">Today&apos;s top deal</div>
     <div class="deal-hero-body mt-2">
-      <span class="cover-wrap deal-hero-cover-wrap">
-        <img class="deal-hero-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+      <span class="cover-wrap deal-hero-cover-wrap${window.coverLandscapeAttr(cover)}">
+        <img class="deal-hero-cover${window.coverLandscapeAttr(cover)}" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </span>
       <div class="deal-hero-meta min-w-0 flex-1">
@@ -1219,8 +1241,8 @@ function pickCardHtml(g) {
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
       <span class="pick-store store-badge ${store}">${badge}</span>
-      <div class="cover-wrap w-full block">
-        <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+      <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
+        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
@@ -1330,8 +1352,8 @@ function dealCardHtml(g) {
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
       <span class="pick-store store-badge ${wishlistTarget}" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLetter(wishlistTarget)}</span>
-      <div class="cover-wrap w-full block">
-        <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+      <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
+        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
@@ -1705,7 +1727,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
       <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
-      <td class="p-2"><span class="cover-wrap"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
+      <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(g.library_image || headerFallback)}"><img class="cover${window.coverLandscapeAttr(g.library_image || headerFallback)}" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2 game-name-cell">
         <div class="flex items-center gap-1.5 min-w-0">
           ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate flex-1 min-w-0", escapeHtml(g.name))}
@@ -1723,7 +1745,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
       <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
       <td class="p-2 text-right">
-        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs">${hltbLabel(g)}</button>
+        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
       <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
@@ -3431,12 +3453,19 @@ function bindEvents() {
     if (!btn) return;
     const g = findGameByKey(btn.dataset.hltbEdit);
     if (!g) return;
-    const existing = getPersonal(g).hltb_override ?? "";
-    const next = prompt("Override HLTB main hours (blank to reset):", existing);
-    if (next === null) return;
-    const value = String(next).trim();
-    setPersonal(g, "hltb_override", value === "" ? null : Number(value));
-    renderTable();
+    if (e.shiftKey || e.altKey) {
+      const existing = getPersonal(g).hltb_override ?? "";
+      const next = prompt("Override HLTB main hours (blank to reset):", existing);
+      if (next === null) return;
+      const value = String(next).trim();
+      setPersonal(g, "hltb_override", value === "" ? null : Number(value));
+      renderTable();
+      return;
+    }
+    const hltbName = g.hltb_name || g.name || "";
+    if (!hltbName) return;
+    const url = `https://howlongtobeat.com/?q=${encodeURIComponent(hltbName)}`;
+    window.open(url, "_blank", "noopener");
   });
   document.addEventListener("click", e => {
     const card = e.target.closest(".pick-card");

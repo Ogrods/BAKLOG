@@ -193,7 +193,7 @@ Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher
 
 **Option B (read-only):** `python -m http.server 8080` if you only want to browse and prefer to run fetchers in your terminal.
 
-**Option C:** open `index.html` directly and click **Load Steam JSON…** to pick a library file (browsers block automatic file loading when not using a server).
+**Option C:** open `index.html` directly (browsers block automatic local file loading without a server — use Option A or B for the full experience).
 
 ### Personal data storage
 

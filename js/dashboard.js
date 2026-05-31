@@ -23,8 +23,34 @@ let _insightIndex = 0;
 let _spotlightTimer = null;
 let _spotlightFadeTimer = null;
 let _spotlightIndex = 0;
+let _spotlightPool = [];
+let _spotlightCurrentKey = null;
 const SPOTLIGHT_INTERVAL_MS = 7000;
 const SPOTLIGHT_FADE_MS = 300;
+
+let _dashCountersInitialized = false;
+const _dashLastCounters = {};
+
+function animateCount(el, from, to, format, durationMs = 900) {
+  if (!el) return;
+  const prefersReduced = typeof matchMedia === 'function'
+    && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReduced || durationMs <= 0 || from === to) {
+    el.textContent = format(to);
+    return;
+  }
+  const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  function tick(now) {
+    const elapsed = (now || performance.now()) - start;
+    const t = Math.min(1, elapsed / durationMs);
+    const v = from + (to - from) * ease(t);
+    el.textContent = format(v);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = format(to);
+  }
+  requestAnimationFrame(tick);
+}
 
 const ITCH_CLASS_LABELS = {
   game: "Games",
@@ -72,13 +98,96 @@ export function stopSpotlightRotation() {
   if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
   _spotlightTimer = null;
   _spotlightFadeTimer = null;
+  // Intentionally NOT clearing _spotlightIndex / _spotlightCurrentKey / _spotlightPool —
+  // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
+}
+
+export function stopDashboardRotations() {
+  stopInsightRotation();
+  stopSpotlightRotation();
+}
+
+function poolKeysEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (c('gameKey')(a[i]) !== c('gameKey')(b[i])) return false;
+  }
+  return true;
+}
+
+const pendingChartRenders = new Map();
+let chartLazyObserver = null;
+
+const CHART_STAGGER_MS = 120;
+const chartRenderQueue = [];
+let chartRenderTimer = null;
+let lastChartRenderAt = 0;
+
+function drainChartRenderQueue() {
+  chartRenderTimer = null;
+  if (!chartRenderQueue.length) return;
+  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const sinceLast = now - lastChartRenderAt;
+  if (sinceLast < CHART_STAGGER_MS) {
+    chartRenderTimer = setTimeout(drainChartRenderQueue, CHART_STAGGER_MS - sinceLast);
+    return;
+  }
+  const job = chartRenderQueue.shift();
+  if (job) {
+    lastChartRenderAt = now;
+    try { job(); } catch (err) { console.error("Lazy chart render failed:", err); }
+  }
+  if (chartRenderQueue.length) {
+    chartRenderTimer = setTimeout(drainChartRenderQueue, CHART_STAGGER_MS);
+  }
+}
+
+function scheduleStaggeredChartRender(fn) {
+  chartRenderQueue.push(fn);
+  if (chartRenderTimer == null) {
+    chartRenderTimer = setTimeout(drainChartRenderQueue, 0);
+  }
+}
+
+function ensureChartObserver() {
+  if (chartLazyObserver || typeof IntersectionObserver === "undefined") return chartLazyObserver;
+  chartLazyObserver = new IntersectionObserver((entries) => {
+    const ready = [];
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const id = entry.target.id;
+      const fn = pendingChartRenders.get(id);
+      if (!fn) continue;
+      pendingChartRenders.delete(id);
+      chartLazyObserver.unobserve(entry.target);
+      ready.push({ fn, top: entry.boundingClientRect.top });
+    }
+    ready.sort((a, b) => a.top - b.top);
+    for (const r of ready) scheduleStaggeredChartRender(r.fn);
+  }, { threshold: 0.5, rootMargin: "0px" });
+  return chartLazyObserver;
 }
 
 export function destroyDashboardCharts() {
-  stopInsightRotation();
-  stopSpotlightRotation();
+  // Rotations (insight + spotlight) are deliberately NOT stopped here so an in-place
+  // dashboard re-render doesn't reset the spotlight. Use stopDashboardRotations()
+  // from the actual teardown sites (view switch).
+  clearScatterList();
   Object.values(dashboardCharts).forEach(ch => { try { ch.destroy(); } catch (_) {} });
   Object.keys(dashboardCharts).forEach(k => delete dashboardCharts[k]);
+  if (chartLazyObserver) {
+    for (const id of pendingChartRenders.keys()) {
+      const el = document.getElementById(id);
+      if (el) chartLazyObserver.unobserve(el);
+    }
+  }
+  pendingChartRenders.clear();
+  chartRenderQueue.length = 0;
+  if (chartRenderTimer != null) {
+    clearTimeout(chartRenderTimer);
+    chartRenderTimer = null;
+  }
+  lastChartRenderAt = 0;
 }
 
 export function dashboardLibraryGames() {
@@ -141,7 +250,26 @@ function setDashboardChart(id, config) {
     dashboardCharts[id].destroy();
     delete dashboardCharts[id];
   }
-  dashboardCharts[id] = new Chart(canvas, config);
+  const build = () => {
+    if (!document.body.contains(canvas)) return;
+    dashboardCharts[id] = new Chart(canvas, config);
+  };
+  const observer = ensureChartObserver();
+  if (!observer) {
+    build();
+    return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const visible = rect.height > 0
+    && rect.top < vh - rect.height * 0.5
+    && rect.bottom > rect.height * 0.5;
+  if (visible) {
+    build();
+    return;
+  }
+  pendingChartRenders.set(id, build);
+  observer.observe(canvas);
 }
 
 const ERA_BANDS = [
@@ -151,6 +279,102 @@ const ERA_BANDS = [
   { start: 2020, end: 2099, label: "'20s", fill: "rgba(168, 85, 247, 0.08)", textColor: "rgba(168, 85, 247, 0.65)" },
 ];
 
+const DASH_REVIEW_MIN_RATING = {
+  "Overwhelmingly Positive": 95,
+  "Very Positive": 80,
+  "Mostly Positive": 70,
+  Mixed: 40,
+};
+
+export const HLTB_BUCKETS = [
+  { minExclusive: null, maxInclusive: 2, label: "HLTB 0–2h" },
+  { minExclusive: 2, maxInclusive: 5, label: "HLTB 2–5h" },
+  { minExclusive: 5, maxInclusive: 10, label: "HLTB 5–10h" },
+  { minExclusive: 10, maxInclusive: 20, label: "HLTB 10–20h" },
+  { minExclusive: 20, maxInclusive: 40, label: "HLTB 20–40h" },
+  { minExclusive: 40, maxInclusive: null, label: "HLTB 40h+" },
+];
+
+function parseReleaseYear(d) {
+  if (!d) return null;
+  const s = String(d);
+  const m = s.match(/\b(19\d{2}|20\d{2}|21\d{2})\b/);
+  if (m) return parseInt(m[1], 10);
+  const t = Date.parse(s);
+  if (!Number.isNaN(t)) return new Date(t).getUTCFullYear();
+  return null;
+}
+
+function findEraLabelHit(chart, x, y) {
+  for (const h of chart._eraHits || []) {
+    if (x >= h.labelLeft && x <= h.labelRight && y >= h.labelTop && y <= h.labelBottom) return h;
+  }
+  return null;
+}
+
+function findEraBandAtPixel(chart, x) {
+  for (const h of chart._eraHits || []) {
+    if (x >= h.bandLeft && x <= h.bandRight) return h;
+  }
+  return null;
+}
+
+function buildDecadeStats(games) {
+  const stats = new Map();
+  ERA_BANDS.forEach(era => {
+    const eraGames = games.filter(g => {
+      const y = parseReleaseYear(g.release_date);
+      return y != null && y >= era.start && y <= era.end;
+    });
+    if (!eraGames.length) return;
+    const ratings = eraGames.map(g => c("ratingValue")(g)).filter(n => n > 0);
+    const hours = eraGames.map(g => c("hltbMain")(g)).filter(n => n != null && n > 0);
+    const top = eraGames.slice().sort((a, b) => c("ratingValue")(b) - c("ratingValue")(a))[0];
+    stats.set(era.start, {
+      era,
+      count: eraGames.length,
+      avgRating: ratings.length ? Math.round(ratings.reduce((s, n) => s + n, 0) / ratings.length) : null,
+      avgHours: hours.length ? (hours.reduce((s, n) => s + n, 0) / hours.length).toFixed(1) : null,
+      topName: top?.name || null,
+    });
+  });
+  return stats;
+}
+
+function updateEraTooltip(chart, labelHit, decadeStats, evt) {
+  const el = document.getElementById("chartReleasesEraTooltip");
+  if (!el) return;
+  if (!labelHit) {
+    el.classList.remove("is-visible");
+    el.hidden = true;
+    return;
+  }
+  const stats = decadeStats.get(labelHit.era.start);
+  if (!stats) {
+    el.classList.remove("is-visible");
+    el.hidden = true;
+    return;
+  }
+  const end = labelHit.era.end > 2019 ? "today" : String(labelHit.era.end);
+  const rows = [
+    ["Games", formatNum(stats.count)],
+    stats.avgRating != null ? ["Avg review", `${stats.avgRating}%`] : null,
+    stats.avgHours != null ? ["Avg main", `${stats.avgHours}h`] : null,
+    stats.topName ? ["Top", stats.topName] : null,
+  ].filter(Boolean);
+  el.innerHTML = `
+    <div class="era-title" style="color:${labelHit.era.textColor}">${escapeHtml(labelHit.era.label)} <span style="font-weight:400;opacity:0.85">(${labelHit.era.start}–${end})</span></div>
+    ${rows.map(([k, v]) => `<div class="era-row"><span>${escapeHtml(k)}</span><span>${escapeHtml(v)}</span></div>`).join("")}
+  `;
+  const wrap = chart.canvas.parentElement;
+  const x = evt.x + 12;
+  const y = evt.y - 8;
+  el.style.left = `${Math.max(4, Math.min(x, wrap.clientWidth - 220))}px`;
+  el.style.top = `${Math.max(4, y)}px`;
+  el.hidden = false;
+  el.classList.add("is-visible");
+}
+
 function makeEraBandsPlugin(yearLabels) {
   return {
     id: "eraBands",
@@ -158,11 +382,11 @@ function makeEraBandsPlugin(yearLabels) {
       const { ctx, chartArea, scales } = chart;
       const xs = scales.x;
       if (!xs || yearLabels.length === 0) return;
-      const labelToIdx = new Map(yearLabels.map((y, i) => [y, i]));
       const halfBar = yearLabels.length > 1
         ? Math.abs(xs.getPixelForTick(1) - xs.getPixelForTick(0)) / 2
         : (chartArea.right - chartArea.left) / 2;
       ctx.save();
+      chart._eraHits = [];
       ERA_BANDS.forEach(era => {
         let firstIdx = -1, lastIdx = -1;
         for (let i = 0; i < yearLabels.length; i++) {
@@ -178,13 +402,28 @@ function makeEraBandsPlugin(yearLabels) {
         if (right <= left) return;
         ctx.fillStyle = era.fill;
         ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+        let labelLeft = left;
+        let labelRight = right;
         if (right - left > 36) {
           ctx.fillStyle = era.textColor;
           ctx.font = "600 10px system-ui, sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
-          ctx.fillText(era.label, (left + right) / 2, chartArea.top + 4);
+          const cx = (left + right) / 2;
+          const w = ctx.measureText(era.label).width;
+          labelLeft = cx - w / 2 - 4;
+          labelRight = cx + w / 2 + 4;
+          ctx.fillText(era.label, cx, chartArea.top + 4);
         }
+        chart._eraHits.push({
+          era,
+          bandLeft: left,
+          bandRight: right,
+          labelLeft,
+          labelRight,
+          labelTop: chartArea.top + 2,
+          labelBottom: chartArea.top + 16,
+        });
       });
       ctx.restore();
     },
@@ -214,18 +453,53 @@ function makeBarEndLabelsPlugin(getLabelForBarIndex) {
   };
 }
 
+/** Reset every active library filter except cross-store dedup before drilling. */
+function dashResetLibraryFiltersExceptDedup() {
+  const search = document.getElementById("search");
+  if (search) search.value = "";
+  const sf = document.getElementById("statusFilter");
+  if (sf) sf.value = "";
+  const unplayed = document.getElementById("unplayedOnly");
+  if (unplayed) unplayed.checked = false;
+  const ea = document.getElementById("earlyAccessOnly");
+  if (ea) ea.checked = false;
+  const co = document.getElementById("coopOnlineOnly");
+  if (co) co.checked = false;
+  const cc = document.getElementById("coopLocalOnly");
+  if (cc) cc.checked = false;
+  const minR = document.getElementById("minRating");
+  if (minR) minR.value = "0";
+  const minRVal = document.getElementById("minRatingVal");
+  if (minRVal) minRVal.textContent = "0";
+  const maxH = document.getElementById("maxHours");
+  if (maxH) maxH.value = "200";
+  const maxHVal = document.getElementById("maxHoursVal");
+  if (maxHVal) maxHVal.textContent = "200+";
+  state.prefs.storeFilter = "";
+  state.prefs.wishlistStoreFilter = "";
+  state.prefs.releaseYearFilter = "";
+  state.prefs.hltbBucket = null;
+  state.prefs.genreFilters = [];
+  state.prefs.tagFilters = [];
+  state.prefs.tagFilterMode = "OR";
+  state.cleanupModeActive = false;
+  const tagModeEl = document.getElementById("tagFilterMode");
+  if (tagModeEl) tagModeEl.value = "OR";
+}
+
 function dashDrillStore(store) {
+  dashResetLibraryFiltersExceptDedup();
   state.prefs.storeFilter = store || "";
   c('savePrefs')();
-  document.getElementById("statusFilter").value = "";
   c('switchView')("library");
   c('renderStoreChips')();
   c('refreshFilterUI')();
 }
 
 function dashDrillStatus(status) {
-  document.getElementById("statusFilter").value = status || "";
-  state.prefs.storeFilter = "";
+  dashResetLibraryFiltersExceptDedup();
+  const sf = document.getElementById("statusFilter");
+  if (sf) sf.value = status || "";
   c('savePrefs')();
   c('switchView')("library");
   c('renderStoreChips')();
@@ -233,16 +507,70 @@ function dashDrillStatus(status) {
 }
 
 function dashDrillStoreStatus(store, status) {
+  dashResetLibraryFiltersExceptDedup();
   state.prefs.storeFilter = store || "";
-  document.getElementById("statusFilter").value = status || "";
+  const sf = document.getElementById("statusFilter");
+  if (sf) sf.value = status || "";
   c('savePrefs')();
   c('switchView')("library");
   c('renderStoreChips')();
   c('refreshFilterUI')();
 }
 
+function dashFinishDrillToLibrary() {
+  c("savePrefs")();
+  c("switchView")("library");
+  c("renderStoreChips")();
+  c("renderGenreChips")();
+  c("refreshFilterUI")();
+  scrollLibraryToPicks();
+}
+
+function scrollLibraryToPicks() {
+  const land = () => {
+    const picks = document.getElementById("picksSection");
+    if (!picks) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    const rect = picks.getBoundingClientRect();
+    const targetY = Math.max(0, rect.top + window.scrollY - 8);
+    try { window.scrollTo({ top: targetY, behavior: "auto" }); }
+    catch (_) { window.scrollTo(0, targetY); }
+  };
+  // Run after the library render commits so layout is final.
+  requestAnimationFrame(() => requestAnimationFrame(land));
+}
+
+function dashSetReleaseYear(value) {
+  dashResetLibraryFiltersExceptDedup();
+  state.prefs.releaseYearFilter = value || "";
+  dashFinishDrillToLibrary();
+}
+
+function dashDrillHltbBucket(idx) {
+  if (idx == null || !HLTB_BUCKETS[idx]) return;
+  dashResetLibraryFiltersExceptDedup();
+  const maxH = document.getElementById("maxHours");
+  const maxHVal = document.getElementById("maxHoursVal");
+  if (maxH) maxH.value = "200";
+  if (maxHVal) maxHVal.textContent = "200+";
+  state.prefs.hltbBucket = idx;
+  dashFinishDrillToLibrary();
+}
+
+function dashDrillMinRating(minRating) {
+  dashResetLibraryFiltersExceptDedup();
+  const minR = document.getElementById("minRating");
+  const minRVal = document.getElementById("minRatingVal");
+  if (minR) minR.value = String(minRating);
+  if (minRVal) minRVal.textContent = String(minRating);
+  dashFinishDrillToLibrary();
+}
+
 function dashDrillGenre(genre) {
-  if (!state.prefs.genreFilters.includes(genre)) state.prefs.genreFilters.push(genre);
+  dashResetLibraryFiltersExceptDedup();
+  state.prefs.genreFilters = [genre];
   c('savePrefs')();
   c('switchView')("library");
   c('renderGenreChips')();
@@ -250,7 +578,8 @@ function dashDrillGenre(genre) {
 }
 
 function dashDrillItchGenre(genre) {
-  if (!state.prefs.genreFilters.includes(genre)) state.prefs.genreFilters.push(genre);
+  dashResetLibraryFiltersExceptDedup();
+  state.prefs.genreFilters = [genre];
   c('savePrefs')();
   c('switchView')("itch");
   c('renderGenreChips')();
@@ -296,11 +625,20 @@ function bindItchRecapClick() {
   });
 }
 
-export function dashDrillCoop({ online = false, local = false } = {}) {
+export function dashDrillCoop({ online = false, local = false, any = false } = {}) {
   const onlineEl = document.getElementById("coopOnlineOnly");
   const localEl = document.getElementById("coopLocalOnly");
-  if (onlineEl) onlineEl.checked = !!online;
-  if (localEl) localEl.checked = !!local;
+  // "Any co-op" is the union (online OR local); clear the strict per-flag
+  // checkboxes so they don't accidentally narrow the result with AND logic.
+  if (any) {
+    if (onlineEl) onlineEl.checked = false;
+    if (localEl) localEl.checked = false;
+    state.prefs.coopAny = true;
+  } else {
+    if (onlineEl) onlineEl.checked = !!online;
+    if (localEl) localEl.checked = !!local;
+    state.prefs.coopAny = false;
+  }
   document.getElementById("statusFilter").value = "";
   state.prefs.storeFilter = "";
   c('savePrefs')();
@@ -385,14 +723,15 @@ function renderDashboardCoopSpotlight(games) {
       </div>`;
   };
 
+  const anyDrill = escapeAttr(JSON.stringify({ any: true }));
   const bothDrill = escapeAttr(JSON.stringify({ online: true, local: true }));
   const connector = `
     <div class="coop-connector">
-      <div class="coop-connector-stat" title="Total games with any co-op flag">
+      <button type="button" class="coop-connector-stat" data-action="coop-drill" data-drill="${anyDrill}" title="Filter the library by any game with an online or couch co-op flag">
         <div class="coop-connector-label">Total co-op</div>
         <div class="coop-connector-value">${coopGames.length}</div>
         <div class="coop-connector-sub">of ${games.length} games</div>
-      </div>
+      </button>
       <div class="coop-connector-divider" aria-hidden="true"></div>
       <button type="button" class="coop-connector-stat" data-action="coop-drill" data-drill="${bothDrill}" title="Filter the library by games that support both online and couch co-op">
         <div class="coop-connector-label">Both flavors</div>
@@ -545,7 +884,18 @@ function pickSpotlightGames(games) {
     const j = Math.floor(Math.random() * (i + 1));
     [top[i], top[j]] = [top[j], top[i]];
   }
-  return top.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
+  const pool = top.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
+
+  // Preserve the previously-displayed game across dashboard revisits: if it's still
+  // eligible, rotate it to index 0 so re-paint doesn't visibly switch games.
+  if (_spotlightCurrentKey) {
+    const idx = pool.findIndex(g => c('gameKey')(g) === _spotlightCurrentKey);
+    if (idx > 0) {
+      const [head] = pool.splice(idx, 1);
+      pool.unshift(head);
+    }
+  }
+  return pool;
 }
 
 const SPOTLIGHT_STATUS_LABEL = {
@@ -564,7 +914,7 @@ function spotlightInnerHtml(g) {
   const statusLabel = SPOTLIGHT_STATUS_LABEL[status] || 'in your library';
   const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
   return `
-    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded');window.coverFallback(this)" />
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow">${escapeHtml(eyebrow)}</span>
@@ -582,10 +932,22 @@ function renderSpotlightHtml(g) {
 }
 
 function startSpotlightRotation(pool) {
-  stopSpotlightRotation();
-  if (!pool || pool.length <= 1) return;
+  if (!pool || pool.length <= 1) {
+    stopSpotlightRotation();
+    _spotlightPool = pool || [];
+    return;
+  }
   const el = document.getElementById('dashboardSpotlight');
   if (!el) return;
+  // If the pool sequence is unchanged AND a timer is already running, leave it alone:
+  // the DOM was just re-painted to the same first game so there's nothing to reset.
+  const sameSequence = _spotlightTimer && poolKeysEqual(_spotlightPool, pool);
+  _spotlightPool = pool;
+  if (sameSequence) return;
+  stopSpotlightRotation();
+  // _spotlightIndex is intentionally NOT reset — pickSpotlightGames has already
+  // arranged the pool so the previously-displayed game is at index 0; on first
+  // load _spotlightIndex is already 0 from module init.
   _spotlightIndex = 0;
   let paused = false;
   el.addEventListener('mouseenter', () => { paused = true; });
@@ -596,8 +958,8 @@ function startSpotlightRotation(pool) {
       stopSpotlightRotation();
       return;
     }
-    _spotlightIndex = (_spotlightIndex + 1) % pool.length;
-    const next = pool[_spotlightIndex];
+    _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
+    const next = _spotlightPool[_spotlightIndex];
     el.classList.add('is-fading');
     if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
     _spotlightFadeTimer = setTimeout(() => {
@@ -605,6 +967,7 @@ function startSpotlightRotation(pool) {
       el.dataset.key = c('gameKey')(next);
       el.title = `Jump to ${next.name} in library`;
       el.classList.remove('is-fading');
+      _spotlightCurrentKey = c('gameKey')(next);
     }, SPOTLIGHT_FADE_MS);
   }, SPOTLIGHT_INTERVAL_MS);
 }
@@ -908,6 +1271,8 @@ function renderDashboardMega(games) {
 
   const spotlightPool = pickSpotlightGames(games);
   const spotlight = spotlightPool[0] || null;
+  if (spotlight) _spotlightCurrentKey = c('gameKey')(spotlight);
+  else _spotlightCurrentKey = null;
   const marqueeItems = buildMarqueeItems(games);
   el.className = spotlight ? 'dash-mega dash-mega--has-spotlight' : 'dash-mega';
 
@@ -915,7 +1280,7 @@ function renderDashboardMega(games) {
     <div class="dash-mega-hero">
       ${spotlight ? renderSpotlightHtml(spotlight) : ''}
       <div class="dash-hero-eyebrow">Your library</div>
-      <div class="dash-hero-number">${escapeHtml(formatNum(total))}</div>
+      <div class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(total))}</div>
       <div class="dash-hero-sub">games owned across ${escapeHtml(String(stores))} stores</div>
       <div class="dash-hero-tagline">
         <span><strong>${completion}%</strong> complete</span>
@@ -926,15 +1291,15 @@ function renderDashboardMega(games) {
       </div>
       <div class="dash-hero-pillars">
         <div class="dash-hero-pillar">
-          <div class="dash-hero-pillar-value">${escapeHtml(formatNum(Math.round(playedHrs)))}h</div>
+          <div class="dash-hero-pillar-value" id="dashHeroPlayed">${escapeHtml(formatNum(Math.round(playedHrs)))}h</div>
           <div class="dash-hero-pillar-label">Played</div>
         </div>
         <div class="dash-hero-pillar">
-          <div class="dash-hero-pillar-value">${escapeHtml(formatNum(Math.round(backlogHrs)))}h</div>
+          <div class="dash-hero-pillar-value" id="dashHeroBacklog">${escapeHtml(formatNum(Math.round(backlogHrs)))}h</div>
           <div class="dash-hero-pillar-label">Backlog</div>
         </div>
         <div class="dash-hero-pillar">
-          <div class="dash-hero-pillar-value">${avgRating === "—" ? "—" : escapeHtml(String(avgRating)) + "%"}</div>
+          <div class="dash-hero-pillar-value" id="dashHeroAvg">${avgRating === "—" ? "—" : escapeHtml(String(avgRating)) + "%"}</div>
           <div class="dash-hero-pillar-label">Avg review</div>
         </div>
       </div>
@@ -960,6 +1325,30 @@ function renderDashboardMega(games) {
       </div>
     </div>
   `;
+
+  const fmtH = n => `${formatNum(Math.round(n))}h`;
+  const fmtN = n => formatNum(Math.round(n));
+  const fmtPct = n => `${Math.round(n)}%`;
+  const counters = [
+    { id: "dashHeroCount",   to: total,                 format: fmtN },
+    { id: "dashHeroPlayed",  to: Math.round(playedHrs), format: fmtH },
+    { id: "dashHeroBacklog", to: Math.round(backlogHrs),format: fmtH },
+  ];
+  if (avgRating !== "—") {
+    counters.push({ id: "dashHeroAvg", to: avgRating, format: fmtPct });
+  }
+  for (const item of counters) {
+    const node = document.getElementById(item.id);
+    if (!node) continue;
+    if (_dashCountersInitialized) {
+      // Revisit: snap to final value, no re-animation (mirrors the spotlight rule).
+      node.textContent = item.format(item.to);
+    } else {
+      animateCount(node, 0, item.to, item.format, 900);
+    }
+    _dashLastCounters[item.id] = item.to;
+  }
+  _dashCountersInitialized = true;
 
   startInsightRotation(buildInsightPool(games));
   startSpotlightRotation(spotlightPool);
@@ -1048,13 +1437,10 @@ function renderDashboardPicksVersus(games) {
   applyItchVisibility();
 }
 
-function renderDashboardWishlistStats() {
-  const el = document.getElementById("dashboardWishlistStats");
-  if (!el) return;
+function buildWishlistStatsHtml() {
   const wl = state.wishlistGames;
   if (!wl.length) {
-    el.innerHTML = `<div class="dash-card sm:col-span-3"><div class="text-sm text-slate-400">No wishlist data — run <code class="text-slate-200">fetch_wishlist.py</code>, then reload.</div></div>`;
-    return;
+    return `<div class="dash-card sm:col-span-3"><div class="text-sm text-slate-400">No wishlist data — run <code class="text-slate-200">fetch_wishlist.py</code>, then reload.</div></div>`;
   }
 
   const onSale = wl.filter(g => { const d = c('getDealInfo')(g); return d && (d.cut || 0) > 0; });
@@ -1083,10 +1469,9 @@ function renderDashboardWishlistStats() {
     }
   }
   const avgCut = onSale.length ? Math.round(cutSum / onSale.length) : 0;
-
   const steals = wl.filter(c('isStealDeal'));
 
-  el.innerHTML = [
+  return [
     topDeal ? c('dealHeroCardHtml')(topDeal) : c('dealHeroEmptyHtml')(),
     c('dealSaleScoreboardCardHtml')({
       onSaleCount: onSale.length,
@@ -1100,6 +1485,18 @@ function renderDashboardWishlistStats() {
     c('dealStealsCardHtml')(steals),
   ].join("");
 }
+
+function renderDashboardWishlistStats() {
+  // Re-used by both the dashboard mega-grid and the standalone wishlist deal
+  // radar shown above the table on the Wishlist view. Iterating over all
+  // matching targets keeps a single source of truth for the markup + math.
+  const targets = document.querySelectorAll(".dash-wishlist-stats-target");
+  if (!targets.length) return;
+  const html = buildWishlistStatsHtml();
+  for (const el of targets) el.innerHTML = html;
+}
+
+export { renderDashboardWishlistStats };
 
 function renderItchHeroHtml(candidates) {
   if (!candidates.length) {
@@ -1263,6 +1660,177 @@ function renderDashboardItchRecap() {
     </div>`;
 }
 
+// --- Scatter cluster + inline list (HLTB vs review chart) ---
+
+const SCATTER_HIT_RADIUS_PX = 8;
+const SCATTER_STATUS_PRIORITY = { next: 0, playing: 1, unfinished: 2, backlog: 3, finished: 4, live: 5, skip: 6 };
+let _scatterListLastKey = null;
+let _scatterListClickBound = false;
+let _scatterListFrozen = false;
+let _scatterListFrozenKey = null;
+
+function hitsAtScatterClick(chart, canvasX, canvasY) {
+  const pts = chart._scatterPts;
+  const px = chart._scatterPxX;
+  const py = chart._scatterPxY;
+  if (!pts || !px || !py) return [];
+  const r2 = SCATTER_HIT_RADIUS_PX * SCATTER_HIT_RADIUS_PX;
+  const hits = [];
+  for (let i = 0; i < pts.length; i++) {
+    const dx = px[i] - canvasX;
+    const dy = py[i] - canvasY;
+    if (dx * dx + dy * dy <= r2) hits.push({ pt: pts[i], i, d2: dx * dx + dy * dy });
+  }
+  hits.sort((a, b) => a.d2 - b.d2);
+  return hits;
+}
+
+function sortClusterForPicker(hits) {
+  return hits.slice().sort((a, b) => {
+    const pa = SCATTER_STATUS_PRIORITY[a.pt.status] ?? 99;
+    const pb = SCATTER_STATUS_PRIORITY[b.pt.status] ?? 99;
+    if (pa !== pb) return pa - pb;
+    if (b.pt.y !== a.pt.y) return b.pt.y - a.pt.y;
+    return a.pt.x - b.pt.x;
+  });
+}
+
+function ensureScatterListClickHandler() {
+  if (_scatterListClickBound) return;
+  const el = document.getElementById('chartScatterList');
+  if (!el) return;
+  _scatterListClickBound = true;
+  el.addEventListener('click', (e) => {
+    const row = e.target.closest('.dash-scatter-list-row');
+    if (!row?.dataset.key) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dashResetLibraryFiltersExceptDedup();
+    c('focusGame')(row.dataset.key);
+  });
+}
+
+function clearScatterList() {
+  _scatterListLastKey = null;
+  _scatterListFrozen = false;
+  _scatterListFrozenKey = null;
+  hideScatterCursorTooltip();
+  renderScatterList([]);
+}
+
+function pulseScatterList() {
+  const el = document.getElementById('chartScatterList');
+  if (!el) return;
+  el.classList.remove('is-pulsing');
+  // Reflow so the animation restarts.
+  void el.offsetWidth;
+  el.classList.add('is-pulsing');
+}
+
+function setScatterListFrozen(frozen) {
+  _scatterListFrozen = frozen;
+  const el = document.getElementById('chartScatterList');
+  if (!el) return;
+  el.classList.toggle('is-frozen', frozen);
+  if (frozen) pulseScatterList();
+  // Force the next render() to repaint so the pin badge appears/disappears.
+  _scatterListLastKey = null;
+}
+
+function renderScatterList(hits) {
+  const el = document.getElementById('chartScatterList');
+  if (!el) return;
+  ensureScatterListClickHandler();
+
+  if (!hits.length) {
+    el.innerHTML = '<div class="dash-scatter-list-hint">Hover a point or cluster to inspect</div>';
+    return;
+  }
+
+  const key = hits.map(h => h.pt.key).join('|');
+  if (key === _scatterListLastKey) return;
+  _scatterListLastKey = key;
+
+  const CAP = 12;
+  const sorted = sortClusterForPicker(hits);
+  const shown = sorted.slice(0, CAP);
+  const extra = sorted.length - shown.length;
+  const isCluster = hits.length >= 2;
+  const pinBadge = _scatterListFrozen
+    ? '<span class="dash-scatter-list-pin" title="Click the chart background or another cluster to unpin">Pinned</span>'
+    : '';
+  const headLabel = isCluster
+    ? `${hits.length} games here · click to jump`
+    : `${shown[0].pt.label} · click to jump`;
+  const headText = `${headLabel}${pinBadge}`;
+
+  const rowHtml = shown.map(({ pt }) => {
+    const cover = pt.cover || '';
+    const coverHtml = cover
+      ? `<img class="dash-scatter-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />`
+      : `<span class="dash-scatter-list-cover" aria-hidden="true"></span>`;
+    return `<button type="button" class="dash-scatter-list-row" data-key="${escapeAttr(pt.key)}" title="Jump to ${escapeAttr(pt.label)} in the library">
+      ${coverHtml}
+      <span class="dash-scatter-list-name">${escapeHtml(pt.label)}</span>
+      <span class="dash-scatter-list-meta">${pt.y}% · ${pt.x}h</span>
+    </button>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="dash-scatter-list-head">${headText}</div>
+    <div class="dash-scatter-list-strip">${rowHtml}</div>
+    ${extra > 0 ? `<div class="dash-scatter-list-foot">+${extra} more — refine with a filter</div>` : ''}
+  `;
+}
+
+const SCATTER_TIP_MAX = 6;
+
+function hideScatterCursorTooltip() {
+  const tip = document.getElementById('chartScatterTooltip');
+  if (!tip) return;
+  tip.classList.remove('is-visible');
+  tip.hidden = true;
+}
+
+function ensureScatterWrapListeners(chart) {
+  const wrap = chart?.canvas?.parentElement;
+  if (!wrap || wrap.dataset.scatterWrapBound) return;
+  wrap.dataset.scatterWrapBound = '1';
+  wrap.addEventListener('mouseleave', hideScatterCursorTooltip);
+}
+
+function showScatterCursorTooltip(chart, hits, canvasX, canvasY) {
+  const tip = document.getElementById('chartScatterTooltip');
+  const wrap = chart?.canvas?.parentElement;
+  if (!tip || !wrap || !hits.length) {
+    hideScatterCursorTooltip();
+    return;
+  }
+  ensureScatterWrapListeners(chart);
+  const sorted = sortClusterForPicker(hits);
+  const shown = sorted.slice(0, SCATTER_TIP_MAX);
+  const extra = sorted.length - shown.length;
+  const rows = shown.map(({ pt }) =>
+    `<div class="dash-scatter-cursor-tip-row">${escapeHtml(pt.label)}</div>`
+  ).join('');
+  const more = extra > 0
+    ? `<div class="dash-scatter-cursor-tip-more">+${extra} more</div>`
+    : '';
+  tip.innerHTML = `${rows}${more}`;
+  tip.hidden = false;
+  // Force layout so offsetWidth/Height are valid this frame.
+  const tipW = tip.offsetWidth || 180;
+  const tipH = tip.offsetHeight || 60;
+  const margin = 8;
+  let left = canvasX + 14;
+  let top = canvasY + 14;
+  if (left + tipW > wrap.clientWidth - margin) left = Math.max(margin, canvasX - tipW - 14);
+  if (top + tipH > wrap.clientHeight - margin) top = Math.max(margin, canvasY - tipH - 14);
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+  tip.classList.add('is-visible');
+}
+
 function renderDashboardCharts(games) {
   const storeCounts = {};
   games.forEach(g => {
@@ -1367,10 +1935,6 @@ function renderDashboardCharts(games) {
       layout: { padding: { right: 60 } },
       plugins: { legend: { display: false } },
       scales: { x: { stacked: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { stacked: true, ticks: { color: "#94a3b8" }, grid: { display: false } } },
-      onHover(evt, elements) {
-        const canvas = evt.native?.target;
-        if (canvas) canvas.style.cursor = elements.length ? "pointer" : "default";
-      },
       onClick(_evt, elements) {
         if (!elements.length) return;
         const el = elements[0];
@@ -1402,7 +1966,14 @@ function renderDashboardCharts(games) {
   setDashboardChart("chartHltbHist", {
     type: "bar",
     data: { labels: buckets, datasets: [{ label: "Backlog games", data: bucketCounts, backgroundColor: hltbBucketColors, borderColor: hltbBucketColors, borderWidth: 1 }] },
-    options: dashChartOptions({ plugins: { legend: { display: false } }, scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } } }),
+    options: dashChartOptions({
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } },
+      onClick(_evt, elements) {
+        if (!elements.length) return;
+        dashDrillHltbBucket(elements[0].index);
+      },
+    }),
   });
 
   const reviewBuckets = {
@@ -1424,6 +1995,13 @@ function renderDashboardCharts(games) {
     },
     options: dashChartOptions({
       plugins: { legend: donutLegendHighlight() },
+      onClick(_evt, elements) {
+        if (!elements.length) return;
+        const label = revEntries[elements[0].index][0];
+        const minRating = DASH_REVIEW_MIN_RATING[label];
+        if (minRating == null) return;
+        dashDrillMinRating(minRating);
+      },
     }),
   });
 
@@ -1468,6 +2046,7 @@ function renderDashboardCharts(games) {
     for (let j = lo; j <= hi; j++) { sum += trendData[j]; n++; }
     return n > 0 ? sum / n : 0;
   });
+  const decadeStats = buildDecadeStats(games);
   setDashboardChart("chartReleases", {
     type: "line",
     data: {
@@ -1503,24 +2082,97 @@ function renderDashboardCharts(games) {
         legend: {
           display: true,
           position: "top",
-          labels: { color: "#cbd5e1", boxWidth: 12, font: { size: 11 } },
+          labels: {
+            color: "#cbd5e1",
+            boxWidth: 14,
+            boxHeight: 8,
+            font: { size: 11 },
+            usePointStyle: true,
+            pointStyle: "rectRounded",
+          },
         },
-        tooltip: { mode: "index", intersect: false },
+        tooltip: {
+          mode: "index",
+          intersect: false,
+          filter(item) {
+            const chart = item.chart;
+            return !chart._eraHover;
+          },
+        },
       },
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { ticks: { color: "#94a3b8", maxRotation: 45 }, grid: { display: false } },
         y: { beginAtZero: true, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
       },
+      onHover(evt, _els, chart) {
+        const labelHit = findEraLabelHit(chart, evt.x, evt.y);
+        chart._eraHover = labelHit?.era ?? null;
+        updateEraTooltip(chart, labelHit, decadeStats, evt);
+        if (labelHit) chart.tooltip?.setActiveElements([], { x: 0, y: 0 });
+      },
+      onClick(evt, els, chart) {
+        if (els.length) {
+          dashSetReleaseYear(String(chart.data.labels[els[0].index]));
+          return;
+        }
+        const bandHit = findEraBandAtPixel(chart, evt.x);
+        if (bandHit) dashSetReleaseYear(`${bandHit.era.start}s`);
+      },
     }),
     plugins: [makeEraBandsPlugin(years)],
   });
+  const releasesCanvas = document.getElementById("chartReleases");
+  if (releasesCanvas && !releasesCanvas.dataset.eraLeaveBound) {
+    releasesCanvas.dataset.eraLeaveBound = "1";
+    releasesCanvas.addEventListener("mouseleave", () => {
+      const tip = document.getElementById("chartReleasesEraTooltip");
+      tip?.classList.remove("is-visible");
+      if (tip) tip.hidden = true;
+      const ch = dashboardCharts.chartReleases;
+      if (ch) ch._eraHover = null;
+    });
+  }
 
   const scatterPts = games.filter(g => c('ratingValue')(g) > 0 && c('hltbMain')(g) != null && c('hltbMain')(g) > 0).map(g => ({
     x: c('hltbMain')(g),
     y: c('ratingValue')(g),
     label: g.name,
+    key: c('gameKey')(g),
+    status: (c('getPersonal')(g).status) || 'backlog',
+    cover: g.library_image || g.header_image || c('coverFallbackFor')(g),
   }));
+  const scatterClusterPlugin = {
+    id: 'scatterCluster',
+    afterLayout(chart) {
+      const xs = chart.scales?.x;
+      const ys = chart.scales?.y;
+      if (!xs || !ys) return;
+      const px = new Array(scatterPts.length);
+      const py = new Array(scatterPts.length);
+      for (let i = 0; i < scatterPts.length; i++) {
+        px[i] = xs.getPixelForValue(scatterPts[i].x);
+        py[i] = ys.getPixelForValue(scatterPts[i].y);
+      }
+      chart._scatterPts = scatterPts;
+      chart._scatterPxX = px;
+      chart._scatterPxY = py;
+      // Cluster count per data index: how many *other* points fall within hit radius.
+      const r2 = SCATTER_HIT_RADIUS_PX * SCATTER_HIT_RADIUS_PX;
+      const counts = new Array(scatterPts.length).fill(0);
+      for (let i = 0; i < scatterPts.length; i++) {
+        for (let j = i + 1; j < scatterPts.length; j++) {
+          const dx = px[i] - px[j];
+          const dy = py[i] - py[j];
+          if (dx * dx + dy * dy <= r2) {
+            counts[i]++;
+            counts[j]++;
+          }
+        }
+      }
+      chart._scatterClusterCounts = counts;
+    },
+  };
   const ratingGradient = (rating, alpha) => {
     const t = Math.max(0, Math.min(1, rating / 100));
     const r = Math.round(245 + (16 - 245) * t);
@@ -1542,6 +2194,34 @@ function renderDashboardCharts(games) {
       }],
     },
     options: dashChartOptions({
+      animation: {
+        duration: 900,
+        easing: "easeOutQuart",
+      },
+      animations: {
+        y: {
+          type: "number",
+          duration: 900,
+          easing: "easeOutQuart",
+          from: (ctx) => {
+            if (ctx.type !== "data") return undefined;
+            const yScale = ctx.chart.scales?.y;
+            return yScale ? yScale.getPixelForValue(0) : undefined;
+          },
+        },
+        backgroundColor: {
+          type: "color",
+          duration: 900,
+          easing: "easeOutQuart",
+          from: "rgba(148, 163, 184, 0)",
+        },
+        borderColor: {
+          type: "color",
+          duration: 900,
+          easing: "easeOutQuart",
+          from: "rgba(148, 163, 184, 0)",
+        },
+      },
       scales: {
         x: {
           type: "logarithmic",
@@ -1562,16 +2242,80 @@ function renderDashboardCharts(games) {
       plugins: {
         legend: { display: false },
         tooltip: {
+          mode: "nearest",
+          intersect: true,
+          // Show the tooltip only when there is a single point under the cursor.
+          // Clusters are handled by the inline list below the chart.
+          filter(item) {
+            const counts = item.chart._scatterClusterCounts;
+            const extra = counts ? (counts[item.dataIndex] || 0) : 0;
+            return extra === 0;
+          },
           callbacks: {
+            title(items) {
+              const it = items[0];
+              if (!it) return "";
+              const pt = scatterPts[it.dataIndex];
+              return pt ? pt.label : "";
+            },
             label(ctx) {
               const pt = scatterPts[ctx.dataIndex];
-              return pt ? `${pt.label}: ${pt.x}h · ${pt.y}%` : "";
+              return pt ? `${pt.x}h · ${pt.y}%` : "";
             },
           },
         },
       },
+      onHover(evt, _elements, chart) {
+        if (!evt) return;
+        if (evt.native?.type === "mouseout") {
+          hideScatterCursorTooltip();
+          return;
+        }
+        const cx = evt.x ?? (evt.native?.offsetX ?? 0);
+        const cy = evt.y ?? (evt.native?.offsetY ?? 0);
+        const hits = hitsAtScatterClick(chart, cx, cy);
+        if (hits.length >= 2) {
+          showScatterCursorTooltip(chart, hits, cx, cy);
+        } else {
+          hideScatterCursorTooltip();
+        }
+        if (_scatterListFrozen) return;
+        if (hits.length >= 1) renderScatterList(hits);
+        // hits.length === 0 (and not frozen): leave the list sticky until another hover replaces it.
+      },
+      onClick(evt, _elements, chart) {
+        const cx = evt.x ?? (evt.native?.offsetX ?? 0);
+        const cy = evt.y ?? (evt.native?.offsetY ?? 0);
+        const hits = hitsAtScatterClick(chart, cx, cy);
+        if (!hits.length) {
+          if (_scatterListFrozen) {
+            _scatterListFrozenKey = null;
+            setScatterListFrozen(false);
+            renderScatterList([]);
+          }
+          return;
+        }
+        if (hits.length === 1) {
+          dashResetLibraryFiltersExceptDedup();
+          c("focusGame")(hits[0].pt.key);
+          return;
+        }
+        const key = hits.map(h => h.pt.key).join('|');
+        if (_scatterListFrozen && key === _scatterListFrozenKey) {
+          _scatterListFrozenKey = null;
+          setScatterListFrozen(false);
+          renderScatterList(hits);
+          return;
+        }
+        _scatterListFrozenKey = key;
+        setScatterListFrozen(true);
+        renderScatterList(hits);
+        hideScatterCursorTooltip();
+      },
     }),
+    plugins: [scatterClusterPlugin],
   });
+  renderScatterList([]);
 
 }
 
@@ -1583,6 +2327,12 @@ export function renderDashboard() {
     loading?.classList.remove("hidden");
     content?.classList.add("hidden");
     if (loading) loading.textContent = "Loading charts…";
+    return;
+  }
+  if (!state.dashboardDataReady) {
+    loading?.classList.remove("hidden");
+    content?.classList.add("hidden");
+    if (loading) loading.textContent = "Loading library…";
     return;
   }
   loading?.classList.add("hidden");

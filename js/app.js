@@ -18,7 +18,6 @@ import {
   virtualRange,
   virtualRangeAroundIndex,
   tableVirtualMetrics,
-  TABLE_ROW_HEIGHT,
   setMeasuredRowHeight,
   measuredRowHeight,
 } from './virtual-table.js';
@@ -34,9 +33,12 @@ import {
   scheduleDashboardRender,
   cancelScheduledDashboardRender,
   destroyDashboardCharts,
+  stopDashboardRotations,
   dashboardLibraryGames,
   dashDrillCoop,
+  renderDashboardWishlistStats,
 } from './dashboard.js';
+import { createGlobalKeydownHandler } from './events.js';
 
 const personalMemo = createMemo();
 
@@ -186,13 +188,25 @@ function recomputeWishlistCrossStore() {
   }
 }
 
-window.__dashFailedCovers = window.__dashFailedCovers || new Set();
-let _dashRebalanceTimer = null;
-function scheduleDashRebalance() {
-  clearTimeout(_dashRebalanceTimer);
-  _dashRebalanceTimer = setTimeout(() => {
-    window.dispatchEvent(new CustomEvent("dash:cover-failures"));
-  }, 600);
+const DASH_FAILED_COVERS_KEY = "baklog-dash-failed-covers";
+window.__dashFailedCovers = window.__dashFailedCovers || (() => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(DASH_FAILED_COVERS_KEY) || "[]");
+    return new Set(Array.isArray(stored) ? stored : []);
+  } catch { return new Set(); }
+})();
+let _dashFailedSaveTimer = 0;
+function persistDashFailedCovers() {
+  if (_dashFailedSaveTimer) return;
+  _dashFailedSaveTimer = setTimeout(() => {
+    _dashFailedSaveTimer = 0;
+    try {
+      localStorage.setItem(
+        DASH_FAILED_COVERS_KEY,
+        JSON.stringify([...window.__dashFailedCovers].slice(-2000)),
+      );
+    } catch {}
+  }, 800);
 }
 window.coverFallback = function (img) {
   const fb = img.dataset.fallback;
@@ -204,9 +218,9 @@ window.coverFallback = function (img) {
   const dashRow = img.closest(".dash-versus-row, .dash-list-row, .coop-pick-row, .dash-spotlight, .itch-hero-card");
   if (dashRow) {
     const key = dashRow.dataset.key || dashRow.dataset.gameKey;
-    if (key) {
+    if (key && !window.__dashFailedCovers.has(key)) {
       window.__dashFailedCovers.add(key);
-      scheduleDashRebalance();
+      persistDashFailedCovers();
     }
     dashRow.style.display = "none";
     return;
@@ -292,11 +306,8 @@ function flushSavePersonal() {
 }
 window.addEventListener("beforeunload", flushSavePersonal);
 window.addEventListener("blur", flushSavePersonal);
-window.addEventListener("dash:cover-failures", () => {
-  if (state.activeView === "dashboard") scheduleDashboardRender();
-});
 function loadPrefs() {
-  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false };
+  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, coopAny: false };
   try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
 }
 function savePrefs() {
@@ -950,14 +961,6 @@ function dealLowBadgeHtml(d) {
   return "";
 }
 
-function crossStoreOwnPillHtml(g) {
-  if (state.activeView !== "library") return "";
-  const owned = state.crossStoreOwnedStores.get(gameKey(g));
-  if (!owned || owned.length < 2) return "";
-  const rest = owned.slice(1).map(s => s.toUpperCase()).join(" · ");
-  return `<span class="cross-store-pill" title="Also on: ${escapeAttr(owned.map(s => s.toUpperCase()).join(", "))}">also on ${escapeHtml(rest)}</span>`;
-}
-
 function applyItadPriceSnapshot(prevByKey, nextByKey) {
   state.itadPriceDroppedKeys = new Set();
   for (const [key, n] of Object.entries(nextByKey || {})) {
@@ -1148,18 +1151,26 @@ function buildAlphaNav(list) {
   });
 }
 
-function tableListDocTop() {
-  const shell = document.getElementById("tableShell");
-  const tableWrap = document.getElementById("tableWrap");
-  const anchor = shell || tableWrap;
-  if (!anchor) return 0;
-  const thead = tableWrap?.querySelector("thead");
-  const headerH = thead?.offsetHeight ?? 0;
-  return anchor.getBoundingClientRect().top + window.scrollY + headerH;
+/** Scroll so the row sits slightly above vertical center (readable under sticky chrome). */
+function scrollRowToCenter(row, { smooth = true } = {}) {
+  if (!row) return;
+  // Compute the target scroll position in one shot so the user never sees a
+  // two-step "center, then nudge up" jump — that was the post-paint snap when
+  // landing from a dashboard drill-in.
+  const rect = row.getBoundingClientRect();
+  const rowCenterY = rect.top + window.scrollY + rect.height / 2;
+  // Aim ~42% from the top of the viewport, accounting for the sticky table
+  // header so the focused row clears it.
+  const target = Math.max(0, rowCenterY - window.innerHeight * 0.42);
+  window.scrollTo({ top: target, behavior: smooth ? "smooth" : "auto" });
 }
 
-function rowScrollTop(idx) {
-  return tableListDocTop() + idx * TABLE_ROW_HEIGHT;
+function markFocusedRow(key) {
+  document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
+  document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
+  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (row) row.classList.add("row-focused", "row-picked");
+  return row;
 }
 
 function scrollToRowIndex(idx, { smooth = false } = {}) {
@@ -1170,21 +1181,19 @@ function scrollToRowIndex(idx, { smooth = false } = {}) {
   state.pickedKey = key;
 
   if (state._virtualActive) {
-    const target = Math.max(0, rowScrollTop(idx) - 100);
-    window.scrollTo({ top: target, behavior: smooth ? "smooth" : "auto" });
+    // Paint a slice that contains the target row, then scroll directly to the
+    // real DOM position. An earlier "rough" scrollTo based on default row
+    // height (76px) was producing a visible jump on dashboard drill-ins: when
+    // the real rows are taller, the rough target was off by idx*delta pixels.
     paintTableBody(list, { anchorIndex: idx });
-    requestAnimationFrame(() => {
-      paintTableBody(list, { anchorIndex: idx });
-      document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
-      const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-      row?.classList.add("row-picked", "row-focused");
-    });
+    const row = markFocusedRow(key);
+    if (row) scrollRowToCenter(row, { smooth });
     return;
   }
 
   focusRow(key);
   const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-  if (row) scrollRowToCenter(row);
+  if (row) scrollRowToCenter(row, { smooth });
 }
 
 function jumpToLetter(letter) {
@@ -1241,8 +1250,83 @@ function toggleSelection(key, on) {
   updateBulkBar();
 }
 
+// === Undo (mutation history) ===
+// Targets accidental mass mutations like the "Set 1700+ games to Playing"
+// faceplant. Each entry: { label, undo, ts }. Ctrl+Z (or the toast button)
+// runs `undo()` which restores previous state. Bounded stack so we never
+// hold onto stale snapshots.
+const UNDO_LIMIT = 20;
+const UNDO_TOAST_MS = 12000;
+const _undoStack = [];
+let _undoToastTimer = null;
+
+function pushUndo({ label, undo }) {
+  if (typeof undo !== "function") return;
+  _undoStack.push({ label, undo, ts: Date.now() });
+  while (_undoStack.length > UNDO_LIMIT) _undoStack.shift();
+  showUndoToast(label);
+}
+
+function performUndo() {
+  const entry = _undoStack.pop();
+  if (!entry) return false;
+  try { entry.undo(); } catch (err) { console.error("[undo] failed", err); }
+  hideUndoToast();
+  return true;
+}
+
+function hideUndoToast() {
+  const el = document.getElementById("undoToast");
+  if (!el) return;
+  el.classList.add("hidden");
+  el.innerHTML = "";
+  if (_undoToastTimer) { clearTimeout(_undoToastTimer); _undoToastTimer = null; }
+}
+
+function showUndoToast(label) {
+  const el = document.getElementById("undoToast");
+  if (!el) return;
+  el.innerHTML = `
+    <span class="undo-toast-label">${escapeHtml(label)}<span class="undo-toast-shortcut">Ctrl+Z</span></span>
+    <button type="button" data-undo-action="undo">Undo</button>
+    <button type="button" class="undo-toast-dismiss" data-undo-action="dismiss" aria-label="Dismiss">×</button>
+  `;
+  el.classList.remove("hidden");
+  if (_undoToastTimer) clearTimeout(_undoToastTimer);
+  _undoToastTimer = setTimeout(hideUndoToast, UNDO_TOAST_MS);
+}
+
+function snapshotPersonalForKeys(keys) {
+  // Deep-clone affected entries (or capture "absent" so undo can re-delete).
+  const snap = new Map();
+  for (const key of keys) {
+    const cur = state.personal[key];
+    snap.set(key, cur ? JSON.parse(JSON.stringify(cur)) : null);
+  }
+  return snap;
+}
+
+function restorePersonalFromSnapshot(snap) {
+  for (const [key, prev] of snap) {
+    if (prev === null) delete state.personal[key];
+    else state.personal[key] = prev;
+  }
+  window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
+  savePersonal();
+  invalidateTableCache();
+  recomputeCrossStoreHidden();
+  renderTable();
+  renderSummary();
+  renderPicks();
+  if (state.activeView === "dashboard") scheduleDashboardRender();
+}
+
 function bulkSetStatus(status) {
-  for (const key of state.selectedKeys) {
+  const affectedKeys = [...state.selectedKeys];
+  if (!affectedKeys.length) return;
+  const snap = snapshotPersonalForKeys(affectedKeys);
+  for (const key of affectedKeys) {
     const g = findGameByKey(key);
     if (g) setPersonal(g, "status", status);
   }
@@ -1250,6 +1334,11 @@ function bulkSetStatus(status) {
   updateBulkBar();
   invalidateTableCache();
   renderTable();
+  const statusLabel = (STATUS_LABELS && STATUS_LABELS[status]) || status;
+  pushUndo({
+    label: `Set ${affectedKeys.length} game${affectedKeys.length === 1 ? "" : "s"} to ${statusLabel}`,
+    undo: () => restorePersonalFromSnapshot(snap),
+  });
 }
 
 function sortedGames(list) {
@@ -1343,13 +1432,41 @@ function renderPicks() {
       ? "No rated itch.io backlog games yet. Most indie titles won't have Steam review scores."
       : "No games match this tab yet.";
   const picksGrid = document.getElementById("picksGrid");
-  picksGrid.innerHTML = data.length
-    ? data.slice(0, limit).map(renderCard).join("")
-    : `<div class="col-span-full text-sm text-slate-400 italic">${emptyMsg}</div>`;
-  syncCoverFits(picksGrid);
+  const rendererTag = tab === "wishlistDeals" ? "deal" : "pick";
+  if (data.length) {
+    const slice = data.slice(0, limit);
+    const newKeys = slice.map(g => gameKey(g));
+    const existingCards = Array.from(picksGrid.querySelectorAll(".pick-card"));
+    const existingKeys = existingCards.map(c => c.dataset.gameKey || "");
+    const sameRenderer = picksGrid.dataset.renderer === rendererTag;
+    let canIncremental = sameRenderer && existingKeys.length > 0;
+    if (canIncremental) {
+      const overlap = Math.min(existingKeys.length, newKeys.length);
+      for (let i = 0; i < overlap; i++) {
+        if (existingKeys[i] !== newKeys[i]) { canIncremental = false; break; }
+      }
+    }
+    if (canIncremental) {
+      if (newKeys.length < existingKeys.length) {
+        for (let i = newKeys.length; i < existingKeys.length; i++) existingCards[i].remove();
+      } else if (newKeys.length > existingKeys.length) {
+        const tail = slice.slice(existingKeys.length).map(renderCard).join("");
+        picksGrid.insertAdjacentHTML("beforeend", tail);
+        syncCoverFits(picksGrid);
+      }
+    } else {
+      picksGrid.innerHTML = slice.map(renderCard).join("");
+      picksGrid.dataset.renderer = rendererTag;
+      syncCoverFits(picksGrid);
+    }
+  } else {
+    picksGrid.innerHTML = `<div class="col-span-full text-sm text-slate-400 italic">${emptyMsg}</div>`;
+    picksGrid.dataset.renderer = "";
+  }
   document.querySelectorAll(".pick-tab").forEach(el => {
-    const owner = el.dataset.pickView || "library";
-    el.classList.toggle("active", owner === pickView && el.dataset.tab === tab);
+    const owner = el.dataset.pickView;
+    const visibleHere = !owner || owner === pickView;
+    el.classList.toggle("active", visibleHere && el.dataset.tab === tab);
   });
   updatePicksChrome();
   renderPicksLimitButtons();
@@ -1421,8 +1538,7 @@ function renderSummary() {
   const el = document.getElementById("summary");
   if (!el) return;
   if (state.activeView === "dashboard") {
-    const games = dashboardLibraryGames();
-    el.innerHTML = `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Dashboard overview · <span class="text-slate-100 font-semibold ml-1">${games.length}</span> library games</div>`;
+    el.innerHTML = "";
     return;
   }
   if (state.activeView === "wishlist") {
@@ -1635,21 +1751,25 @@ function focusGame(key) {
     switchView(targetView);
     return;
   }
-  const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-  if (existing) {
-    document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
-    document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
-    existing.classList.add("row-focused", "row-picked");
-    scrollRowToCenter(existing);
-    const list = visibleListForKeyboard();
-    const idx = list.findIndex(g => gameKey(g) === key);
-    if (idx >= 0) state.focusedRowIndex = idx;
-    return;
-  }
   const list = visibleListForKeyboard();
   const idx = list.findIndex(g => gameKey(g) === key);
-  if (idx >= 0) scrollToRowIndex(idx);
-  else renderTable();
+  if (idx < 0) {
+    renderTable();
+    return;
+  }
+  state.focusedRowIndex = idx;
+  // Virtualized tables only mount a slice of rows — always scroll by index first.
+  if (state._virtualActive || shouldVirtualize(list.length)) {
+    scrollToRowIndex(idx, { smooth: true });
+    return;
+  }
+  const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (existing) {
+    markFocusedRow(key);
+    scrollRowToCenter(existing, { smooth: true });
+    return;
+  }
+  scrollToRowIndex(idx, { smooth: true });
 }
 
 function consumePendingFocus(list) {
@@ -1660,22 +1780,7 @@ function consumePendingFocus(list) {
   if (idx < 0) return;
   state.pickedKey = key;
   state.focusedRowIndex = idx;
-  requestAnimationFrame(() => {
-    const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-    if (row) {
-      document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
-      document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
-      row.classList.add("row-focused", "row-picked");
-      scrollRowToCenter(row);
-    } else {
-      scrollToRowIndex(idx);
-    }
-  });
-}
-
-function scrollRowToCenter(row) {
-  if (!row) return;
-  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  scrollToRowIndex(idx, { smooth: false });
 }
 
 function scrollFocusedRow() {
@@ -1718,12 +1823,20 @@ function tableFingerprint() {
     sf: document.getElementById("statusFilter")?.value || "",
     store: state.prefs.storeFilter || "",
     wstore: state.prefs.wishlistStoreFilter || "",
+    releaseYear: state.prefs.releaseYearFilter || "",
+    hltbBucket: state.prefs.hltbBucket ?? null,
     gen: state.prefs.genreFilters || [],
     gm: state.prefs.genreFilterMode,
     tags: state.prefs.tagFilters || [],
     tm: state.prefs.tagFilterMode,
     deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
-    unp: !!state.prefs.unplayedOnly,
+    // The next three read straight from the DOM so the cache invalidates the
+    // instant a slider/checkbox in the filter drawer changes. Without these
+    // entries, dragging Min rating / Max length / Unplayed only updates the
+    // active-filter pills but the table itself never re-renders.
+    minR: +(document.getElementById("minRating")?.value || 0),
+    maxH: +(document.getElementById("maxHours")?.value || 200),
+    unp: !!document.getElementById("unplayedOnly")?.checked,
     ea: !!document.getElementById("earlyAccessOnly")?.checked,
     co: !!document.getElementById("coopOnlineOnly")?.checked,
     cc: !!document.getElementById("coopLocalOnly")?.checked,
@@ -1761,17 +1874,23 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
       <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(g.library_image || headerFallback)}"><img class="cover${window.coverLandscapeAttr(g.library_image || headerFallback)}" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2 game-name-cell">
-        <div class="flex items-center gap-1.5 min-w-0">
-          ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate flex-1 min-w-0", escapeHtml(g.name))}
-          ${earlyAccessPillHtml(g)}
-          ${hiddenGem ? '<span class="text-purple-400 shrink-0" style="cursor: default" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
-          ${ownedWish ? '<span class="text-amber-400 text-xs shrink-0" title="You already own this (matched by title)">owned</span>' : ""}
+        <div class="flex items-center gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5 min-w-0">
+              ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate flex-1 min-w-0", escapeHtml(g.name))}
+              ${ownedWish ? '<span class="text-amber-400 text-xs shrink-0" title="You already own this (matched by title)">owned</span>' : ""}
+            </div>
+            <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+              ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
+              ${coopPillsHtml(g)}
+            </div>
+            ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            ${earlyAccessPillHtml(g)}
+            ${hiddenGem ? '<span class="text-purple-400 shrink-0" style="cursor: default" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
+          </div>
         </div>
-        <div class="mt-1 flex items-center gap-1.5 flex-wrap">
-          ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
-          ${coopPillsHtml(g)}
-        </div>
-        ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
       </td>
       ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
@@ -1838,9 +1957,34 @@ function paintTableBody(list, opts = {}) {
       for (let i = 0; i < sampleCount; i++) total += rows[i].offsetHeight;
       const avg = Math.round(total / sampleCount);
       if (avg && Math.abs(avg - measuredRowHeight()) > 4) {
+        // Remember where the focused row sits in the viewport BEFORE the
+        // remeasure-driven rerender. After the rerender, topPad changes by
+        // (idx * delta) pixels and the row would visually jump unless we
+        // compensate window.scrollY by the exact same delta. This is what
+        // the user perceives as "sticky header or something loads in after
+        // paint" after a dashboard drill.
+        const focusedKey = state.pickedKey;
+        let beforeTop = null;
+        if (focusedKey) {
+          const before = document.querySelector(`tr[data-row-key="${CSS.escape(focusedKey)}"]`);
+          if (before) beforeTop = before.getBoundingClientRect().top;
+        }
         setMeasuredRowHeight(avg);
         cancelAnimationFrame(_virtualScrollRaf);
-        _virtualScrollRaf = requestAnimationFrame(() => renderTable({ virtualOnly: true }));
+        const anchor = state.focusedRowIndex >= 0 ? state.focusedRowIndex : undefined;
+        _virtualScrollRaf = requestAnimationFrame(() => {
+          renderTable({ virtualOnly: true, anchorIndex: anchor });
+          if (focusedKey != null && beforeTop != null) {
+            const after = document.querySelector(`tr[data-row-key="${CSS.escape(focusedKey)}"]`);
+            if (after) {
+              const afterTop = after.getBoundingClientRect().top;
+              const delta = afterTop - beforeTop;
+              if (Math.abs(delta) > 0.5) {
+                window.scrollBy({ top: delta, behavior: "auto" });
+              }
+            }
+          }
+        });
       }
     });
   }
@@ -1888,9 +2032,17 @@ async function renderTable(opts) {
   if (state.focusedRowIndex >= list.length) state.focusedRowIndex = list.length - 1;
   if (state.focusedRowIndex < 0 && list.length) state.focusedRowIndex = 0;
 
+  let anchorIndex = opts?.anchorIndex;
+  if (anchorIndex == null && state._pendingFocusKey) {
+    const pidx = list.findIndex(g => gameKey(g) === state._pendingFocusKey);
+    if (pidx >= 0) anchorIndex = pidx;
+  }
+  // Do NOT default anchorIndex to focusedRowIndex on virtualOnly repaints — that
+  // locked the slice to the last-focused row and scrolling stopped populating rows.
+
   paintTableBody(list, {
     resetScroll: force && !virtualOnly,
-    anchorIndex: opts?.anchorIndex,
+    anchorIndex,
     measure: !virtualOnly,
   });
 
@@ -1954,8 +2106,17 @@ function collectActiveFilters() {
   if (state.activeView === "library" || state.activeView === "itch") {
     const status = document.getElementById("statusFilter").value;
     if (status) pills.push({ kind: "status", value: status, label: `Status: ${STATUS_FILTER_LABELS[status] || status}` });
+  } else if (state.activeView === "wishlist") {
+    const status = document.getElementById("statusFilter").value;
+    if (status) {
+      const label = WISHLIST_STATUS_LABELS[status] || STATUS_FILTER_LABELS[status] || status;
+      pills.push({ kind: "status", value: status, label: `Status: ${label}` });
+    }
   }
   if (state.prefs.storeFilter) pills.push({ kind: "store", value: state.prefs.storeFilter, label: `Store: ${state.prefs.storeFilter}` });
+  if (state.activeView === "library" && state.prefs.releaseYearFilter) {
+    pills.push({ kind: "releaseYear", value: state.prefs.releaseYearFilter, label: `Released: ${state.prefs.releaseYearFilter}` });
+  }
   if (state.activeView === "wishlist" && state.prefs.wishlistStoreFilter) {
     const labelMap = { steam: "Steam", gog: "GOG", epic: "Epic" };
     const v = state.prefs.wishlistStoreFilter;
@@ -1967,10 +2128,16 @@ function collectActiveFilters() {
   if (document.getElementById("earlyAccessOnly")?.checked) pills.push({ kind: "earlyAccess", value: "1", label: "Early Access only" });
   if (document.getElementById("coopOnlineOnly")?.checked) pills.push({ kind: "coopOnline", value: "1", label: "Online co-op" });
   if (document.getElementById("coopLocalOnly")?.checked) pills.push({ kind: "coopLocal", value: "1", label: "Couch co-op" });
+  if (state.prefs.coopAny) pills.push({ kind: "coopAny", value: "1", label: "Any co-op" });
   const minR = +document.getElementById("minRating").value;
   if (minR > 0) pills.push({ kind: "minRating", value: String(minR), label: `Rating ≥ ${minR}%` });
   const maxH = +document.getElementById("maxHours").value;
   if (maxH < 200) pills.push({ kind: "maxHours", value: String(maxH), label: `HLTB ≤ ${maxH}h` });
+  if (state.prefs.hltbBucket != null) {
+    const labels = ["0–2h", "2–5h", "5–10h", "10–20h", "20–40h", "40h+"];
+    const lbl = labels[state.prefs.hltbBucket];
+    if (lbl) pills.push({ kind: "hltbBucket", value: String(state.prefs.hltbBucket), label: `HLTB ${lbl}` });
+  }
   if (state.cleanupModeActive && state.activeView === "library") pills.push({ kind: "cleanup", value: "1", label: "Cleanup mode" });
   if (state.activeView === "itch" && state.prefs.itchHideNonGames) pills.push({ kind: "itchHideNonGames", value: "1", label: "Hide tools, soundtracks, etc." });
   if (state.prefs.crossStoreDedup) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
@@ -2006,13 +2173,13 @@ function renderActiveFilterPills() {
   }
   wrap.classList.remove("hidden");
   wrap.innerHTML = pills.map(p => `
-    <span class="active-filter-pill">
+    <button type="button" class="active-filter-pill" data-kind="${escapeAttr(p.kind)}" data-value="${escapeAttr(p.value)}" aria-label="Remove filter: ${escapeAttr(p.label)}">
       ${escapeHtml(p.label)}
-      <button type="button" class="active-filter-remove" data-kind="${escapeAttr(p.kind)}" data-value="${escapeAttr(p.value)}" aria-label="Remove filter">×</button>
-    </span>
+      <span class="active-filter-pill-x" aria-hidden="true">×</span>
+    </button>
   `).join("") + `<button type="button" id="clearAllFiltersBtn" class="text-xs text-slate-400 hover:text-slate-200 underline ml-1">Clear all</button>`;
   wrap.querySelector("#clearAllFiltersBtn")?.addEventListener("click", clearAllFilters);
-  wrap.querySelectorAll(".active-filter-remove").forEach(btn => {
+  wrap.querySelectorAll(".active-filter-pill").forEach(btn => {
     btn.addEventListener("click", () => removeActiveFilter(btn.dataset.kind, btn.dataset.value));
   });
 }
@@ -2022,6 +2189,10 @@ function removeActiveFilter(kind, value) {
     case "search": document.getElementById("search").value = ""; break;
     case "status": document.getElementById("statusFilter").value = ""; break;
     case "store": state.prefs.storeFilter = ""; savePrefs(); renderStoreChips(); break;
+    case "releaseYear":
+      state.prefs.releaseYearFilter = "";
+      savePrefs();
+      break;
     case "wishlistStore": state.prefs.wishlistStoreFilter = ""; savePrefs(); renderWishlistStoreChips(); break;
     case "genre":
       state.prefs.genreFilters = (state.prefs.genreFilters || []).filter(x => x !== value);
@@ -2047,8 +2218,14 @@ function removeActiveFilter(kind, value) {
       if (el) el.checked = false;
       break;
     }
+    case "coopAny": {
+      state.prefs.coopAny = false;
+      savePrefs();
+      break;
+    }
     case "minRating": document.getElementById("minRating").value = "0"; document.getElementById("minRatingVal").textContent = "0"; break;
     case "maxHours": document.getElementById("maxHours").value = "200"; document.getElementById("maxHoursVal").textContent = "200+"; break;
+    case "hltbBucket": state.prefs.hltbBucket = null; savePrefs(); break;
     case "cleanup": state.cleanupModeActive = false; updateCleanupBtnState(); break;
     case "dedup":
       state.prefs.crossStoreDedup = false;
@@ -2110,12 +2287,15 @@ function clearAllFilters() {
   if (coEl) coEl.checked = false;
   const ccEl = document.getElementById("coopLocalOnly");
   if (ccEl) ccEl.checked = false;
+  state.prefs.coopAny = false;
   document.getElementById("minRating").value = "0";
   document.getElementById("minRatingVal").textContent = "0";
   document.getElementById("maxHours").value = "200";
   document.getElementById("maxHoursVal").textContent = "200+";
   state.prefs.storeFilter = "";
   state.prefs.wishlistStoreFilter = "";
+  state.prefs.releaseYearFilter = "";
+  state.prefs.hltbBucket = null;
   state.prefs.genreFilters = [];
   state.prefs.tagFilters = [];
   state.prefs.tagFilterMode = "OR";
@@ -2185,11 +2365,22 @@ function refreshFilterUI(options) {
 
 function updateWishlistDrawerVisibility() {
   const section = document.getElementById("wishlistDealsSection");
-  if (!section) return;
-  section.classList.toggle("hidden", state.activeView !== "wishlist");
+  if (section) section.classList.toggle("hidden", state.activeView !== "wishlist");
+  const radar = document.getElementById("wishlistDealRadar");
+  if (radar) {
+    // Wait for the library/wishlist data to land before showing the radar so
+    // it never flashes the "No wishlist data — run fetch_wishlist.py" message
+    // on reload (mirrors the dashboardDataReady gate the dashboard uses).
+    const showRadar = state.activeView === "wishlist" && state.dashboardDataReady;
+    radar.classList.toggle("hidden", !showRadar);
+    if (showRadar) renderDashboardWishlistStats();
+  }
 }
 
 function updatePicksChrome() {
+  // Quick-Wins slider only makes sense alongside the Quick Wins picks tab,
+  // which is library-only. Hide the wrapper on wishlist/itch so the picks
+  // bar stays tidy.
   const hideQuick = state.activeView === "wishlist" || state.activeView === "itch";
   document.getElementById("quickWinMaxWrap")?.classList.toggle("hidden", hideQuick);
 }
@@ -2199,6 +2390,9 @@ function updateViewChrome() {
   const isItch = state.activeView === "itch";
   const isDash = state.activeView === "dashboard";
   const isConn = state.activeView === "connections";
+  // Keep the FOUC guard in sync so its !important rules don't outlive the
+  // initial view. Once the user switches views, the attribute matches reality.
+  document.documentElement.setAttribute("data-init-view", state.activeView);
   updateWishlistDrawerVisibility();
   updatePickTabsVisibility();
   updatePicksChrome();
@@ -2218,7 +2412,10 @@ function updateViewChrome() {
   document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash || isConn);
   document.getElementById("coopSection")?.classList.toggle("hidden", isDash || isConn);
   if (isDash) scheduleDashboardRender();
-  else destroyDashboardCharts();
+  else {
+    destroyDashboardCharts();
+    stopDashboardRotations();
+  }
   if (isConn) refreshConnections();
   renderBulkStatusButtons();
   renderSummary();
@@ -2226,8 +2423,9 @@ function updateViewChrome() {
 
 function updatePickTabsVisibility() {
   document.querySelectorAll(".pick-tab").forEach(btn => {
-    const owner = btn.dataset.pickView || "library";
-    btn.classList.toggle("hidden", owner !== state.activeView);
+    const owner = btn.dataset.pickView;
+    // Tabs without a pick-view are always visible (e.g., shared "Top Rated").
+    btn.classList.toggle("hidden", !!owner && owner !== state.activeView);
   });
 }
 
@@ -2263,12 +2461,13 @@ function switchView(view) {
     if (fromView === "dashboard") {
       cancelScheduledDashboardRender();
       destroyDashboardCharts();
+      stopDashboardRotations();
     }
     invalidateTableCache();
     state.activeView = view;
     state.prefs.activeView = view;
     state.selectedKeys.clear();
-    state.focusedRowIndex = 0;
+    if (!state._pendingFocusKey) state.focusedRowIndex = 0;
     document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
     if (view === "dashboard") {
       state.cleanupModeActive = false;
@@ -2527,6 +2726,7 @@ function applyMergedLibrary() {
   personalMemo.bump();
   invalidateTableCache();
   recomputeCrossStoreHidden();
+  state.dashboardDataReady = true;
   buildOwnedNormNames();
   const banner = document.getElementById("bootErrorBanner");
   if (banner) {
@@ -2542,6 +2742,10 @@ function applyMergedLibrary() {
   else {
     renderPicks();
     refreshFilterUI();
+    if (state.activeView === "wishlist") {
+      // dashboardDataReady just flipped true — re-evaluate the radar gate.
+      updateWishlistDrawerVisibility();
+    }
   }
 }
 
@@ -2957,61 +3161,10 @@ function bindAddGameModal() {
 }
 
 // === Keyboard shortcuts ===
-function handleGlobalKeydown(e) {
-  if (e.key === "Escape") {
-    if (state.filtersDrawerOpen) { closeFiltersDrawer(); return; }
-    if (!document.getElementById("addGameModal").classList.contains("hidden")) return;
-    state.selectedKeys.clear();
-    updateBulkBar();
-    renderTable();
-    return;
-  }
-  const tag = (e.target.tagName || "").toLowerCase();
-  if (tag === "input" || tag === "textarea" || tag === "select" || e.target.isContentEditable) {
-    if (e.key === "/" && tag !== "input" && tag !== "textarea") { /* allow below */ }
-    else return;
-  }
-  if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
-    e.preventDefault();
-    document.getElementById("search").focus();
-    return;
-  }
-  const list = visibleListForKeyboard();
-  if (!list.length) return;
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    const next = Math.min((state.focusedRowIndex < 0 ? 0 : state.focusedRowIndex + 1), list.length - 1);
-    scrollToRowIndex(next);
-    return;
-  }
-  if (e.key === "ArrowUp") {
-    e.preventDefault();
-    const next = Math.max((state.focusedRowIndex < 0 ? 0 : state.focusedRowIndex - 1), 0);
-    scrollToRowIndex(next);
-    return;
-  }
-  if (e.key === "Enter") {
-    e.preventDefault();
-    openStoreForFocused();
-    return;
-  }
-  if (state.activeView !== "library") return;
-  const statusKeys = { b: "backlog", n: "next", p: "playing", u: "unfinished", l: "live", f: "finished", s: "skip" };
-  if (statusKeys[e.key.toLowerCase()]) {
-    e.preventDefault();
-    const g = list[state.focusedRowIndex] || list[0];
-    if (g) { setPersonal(g, "status", statusKeys[e.key.toLowerCase()]); renderTable(); }
-    return;
-  }
-  if (e.key === " ") {
-    e.preventDefault();
-    const g = list[state.focusedRowIndex];
-    if (!g) return;
-    const key = gameKey(g);
-    toggleSelection(key, !state.selectedKeys.has(key));
-    renderTable();
-  }
-}
+// Implementation lives in ./events.js (createGlobalKeydownHandler). bindEvents
+// builds the deps bag and wires it via document.addEventListener("keydown").
+// The bulk of bindEvents itself still lives in this file until its dependency
+// surface (~50 helpers) is broken into focused modules.
 
 // === Event wiring ===
 function bindEvents() {
@@ -3022,6 +3175,13 @@ function bindEvents() {
   };
   window.addEventListener("scroll", onTableVirtualScroll, { passive: true });
   window.addEventListener("resize", onTableVirtualScroll, { passive: true });
+
+  document.getElementById("undoToast")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-undo-action]");
+    if (!btn) return;
+    if (btn.dataset.undoAction === "undo") performUndo();
+    else if (btn.dataset.undoAction === "dismiss") hideUndoToast();
+  });
 
   document.getElementById("dashboardFetcherHealth")?.addEventListener("change", e => {
     if (e.target.id === "fetcherHealthStaleOnly") {
@@ -3044,7 +3204,7 @@ function bindEvents() {
     fetcherRunner.run(chip.dataset.fetcherKey, { refresh: e.shiftKey });
   });
 
-  document.getElementById("dashboardWishlistStats")?.addEventListener("click", e => {
+  const onWishlistStatsClick = (e) => {
     const card = e.target.closest("[data-action]");
     if (!card) return;
     const action = card.dataset.action;
@@ -3059,7 +3219,9 @@ function bindEvents() {
     if (action === "deal-steals") {
       drillWishlistDealFilter({ minDiscount: 50 });
     }
-  });
+  };
+  document.getElementById("dashboardWishlistStats")?.addEventListener("click", onWishlistStatsClick);
+  document.getElementById("wishlistDealRadar")?.addEventListener("click", onWishlistStatsClick);
 
   const onDashListClick = e => {
     const row = e.target.closest('[data-action="dash-list-jump"]');
@@ -3219,7 +3381,10 @@ function bindEvents() {
     state.prefs.quickWinMaxHours = +e.target.value;
     document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;
     savePrefs();
-    renderPicks();
+    // Only the Quick Wins tab consumes quickWinMaxHours; re-rendering the picks
+    // grid on other tabs would needlessly reload every cover (and bounce the
+    // landscape detection). Refresh only when the visible tab is affected.
+    if (state.prefs.picksTab === "quickWins") renderPicks();
   });
   normalizePicksLimit();
   renderPicksLimitButtons();
@@ -3241,7 +3406,12 @@ function bindEvents() {
     btn.addEventListener("click", () => {
       const tab = btn.dataset.tab;
       state.prefs.picksTab = tab;
-      const pv = btn.dataset.pickView || "library";
+      // Tabs without an explicit pick-view (e.g., the shared "Top Rated") apply
+      // to whichever pickView the active view maps to, so save against that.
+      const pv = btn.dataset.pickView
+        || (state.activeView === "wishlist" ? "wishlist"
+          : state.activeView === "itch" ? "itch"
+          : "library");
       if (pv === "library") state.prefs.libraryPicksTab = tab;
       if (pv === "itch") state.prefs.itchPicksTab = tab;
       savePrefs();
@@ -3311,8 +3481,11 @@ function bindEvents() {
   });
   const dedupEl = document.getElementById("crossStoreDedup");
   if (dedupEl) {
-    if (typeof state.prefs.crossStoreDedup !== "boolean") state.prefs.crossStoreDedup = true;
-    dedupEl.checked = !!state.prefs.crossStoreDedup;
+    // Hide duplicates always defaults back to on across page refreshes;
+    // toggling it off only lasts for the current session.
+    state.prefs.crossStoreDedup = true;
+    savePrefs();
+    dedupEl.checked = true;
     dedupEl.addEventListener("change", () => {
       state.prefs.crossStoreDedup = dedupEl.checked;
       savePrefs();
@@ -3506,7 +3679,19 @@ function bindEvents() {
     const card = e.target.closest(".pick-card");
     if (card) focusGame(card.dataset.gameKey);
   });
-  document.addEventListener("keydown", handleGlobalKeydown);
+  document.addEventListener("keydown", createGlobalKeydownHandler({
+    canUndo: () => _undoStack.length > 0,
+    performUndo,
+    closeFiltersDrawer,
+    updateBulkBar,
+    renderTable,
+    visibleListForKeyboard,
+    scrollToRowIndex,
+    openStoreForFocused,
+    setPersonal,
+    gameKey,
+    toggleSelection,
+  }));
   document.getElementById("pickForMe").addEventListener("click", e => {
     let list = filteredGames();
     if (state.activeView === "library") {
@@ -3521,7 +3706,7 @@ function bindEvents() {
   });
   document.getElementById("reloadData").addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
-    try { await reloadGames(); } catch { alert("Could not reload library files. Use Load Steam JSON… or run the fetch scripts."); }
+    try { await reloadGames(); } catch { alert("Could not reload library files. Run the fetch scripts (fetch_games.py, fetch_gog.py, etc.) and reload."); }
   });
   kebabMenu.querySelectorAll("button, label").forEach(el => {
     el.addEventListener("click", () => kebabMenu.classList.remove("open"));
@@ -3538,44 +3723,6 @@ function bindEvents() {
     renderSummary();
     renderPicks();
     renderTable();
-    e.target.value = "";
-  });
-  document.getElementById("loadGamesFile").addEventListener("change", async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const data = JSON.parse(await file.text());
-    if (data.store === "gog") {
-      state.libraryMeta.gog = data;
-      state.allGames = [
-        ...state.allGames.filter(g => normalizeGame(g).store !== "gog"),
-        ...(data.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
-      ];
-    } else if (data.store === "psn") {
-      state.libraryMeta.psn = data;
-      state.allGames = [
-        ...state.allGames.filter(g => normalizeGame(g).store !== "psn"),
-        ...(data.games || []).map(g => normalizeGame({ ...g, store: "psn", id: g.id ?? g.psn_id })),
-      ];
-    } else if (data.store === "epic") {
-      state.libraryMeta.epic = data;
-      state.allGames = [
-        ...state.allGames.filter(g => normalizeGame(g).store !== "epic"),
-        ...(data.games || []).map(g => normalizeGame({ ...g, store: "epic", id: g.id })),
-      ];
-    } else if (data.store === "amazon") {
-      state.libraryMeta.amazon = data;
-      state.allGames = [
-        ...state.allGames.filter(g => normalizeGame(g).store !== "amazon"),
-        ...(data.games || []).map(g => normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id })),
-      ];
-    } else {
-      state.libraryMeta.steam = data;
-      state.allGames = [
-        ...state.allGames.filter(g => normalizeGame(g).store !== "steam"),
-        ...(data.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
-      ];
-    }
-    applyMergedLibrary();
     e.target.value = "";
   });
 }
@@ -3608,6 +3755,7 @@ async function bootstrap() {
     renderGenreChips,
     invalidateTableCache,
     renderTable,
+    focusGame,
   });
   let migrationInfo = { migrated: true, pendingMigration: null };
   try {

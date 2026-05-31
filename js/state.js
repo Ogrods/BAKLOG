@@ -23,6 +23,7 @@ export const state = {
   itchGames: [],
   itadByKey: {},
   itadPriceDroppedKeys: new Set(),
+  dashboardDataReady: false,
   activeView: 'dashboard',
   selectedKeys: new Set(),
   cleanupModeActive: false,

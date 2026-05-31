@@ -47,9 +47,31 @@ export const personalStore = (() => {
     }
   }
 
+  // Preferences that describe the tab's current UI state. Server pushes get
+  // debounced 600ms, so the server copy is often staler than what the user
+  // just did in this tab — and reloading would otherwise snap them back.
+  // Treat the local browser as authoritative for these.
+  const LOCAL_FIRST_PREF_KEYS = [
+    'activeView',
+    'picksTab',
+    'libraryPicksTab',
+    'itchPicksTab',
+    'picksCollapsed',
+    'picksLimit',
+    'viewSorts',
+  ];
+
   function applyServerDoc(doc) {
     state.personal = doc.personal || {};
-    state.prefs = { ...state.prefs, ...(doc.prefs || {}) };
+    const serverPrefs = doc.prefs || {};
+    const localPrefs = state.prefs || {};
+    const merged = { ...localPrefs, ...serverPrefs };
+    for (const key of LOCAL_FIRST_PREF_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(localPrefs, key)) {
+        merged[key] = localPrefs[key];
+      }
+    }
+    state.prefs = merged;
     const manual = Array.isArray(doc.manual) ? doc.manual : [];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
     localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));

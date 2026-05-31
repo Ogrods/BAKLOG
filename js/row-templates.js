@@ -25,10 +25,3 @@ export function buildStatusSelect(key, current) {
   ).join('');
   return `<select data-game-key="${escapeAttr(key)}" data-field="status" class="row-ctl bg-slate-700 border border-slate-600 rounded text-xs">${inner}</select>`;
 }
-
-export function buildPrioritySelect(key, current) {
-  const inner = [0, 1, 2, 3, 4, 5].map(
-    n => `<option value="${n}"${n === current ? ' selected' : ''}>${n || '—'}</option>`,
-  ).join('');
-  return `<select data-game-key="${escapeAttr(key)}" data-field="priority" class="row-ctl bg-slate-700 border border-slate-600 rounded text-xs">${inner}</select>`;
-}

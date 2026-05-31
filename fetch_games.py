@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 import os
 
 from hltb_client import HltbClient
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from steam_client import SteamClient
 
 GAMES_STEAM_JSON = Path("games_steam.json")
@@ -159,15 +161,18 @@ def main() -> int:
     parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games_steam.json")
     parser.add_argument("--appid", type=int, help="Fetch a single app by ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_games")
+    stats = RunStats()
 
     load_dotenv()
     api_key = os.getenv("STEAM_API_KEY", "").strip()
     steam_id = os.getenv("STEAM_ID", "").strip()
     if not api_key or not steam_id:
-        print("Set STEAM_API_KEY and STEAM_ID in .env (see .env.example)", file=sys.stderr)
-        return 1
+        stats.error("Set STEAM_API_KEY and STEAM_ID in .env (see .env.example)")
+        return stats.finish("fetch_games", t0, exit_code=1)
 
     steam = SteamClient(api_key, steam_id)
     hltb_client = HltbClient()
@@ -177,11 +182,21 @@ def main() -> int:
     owned_games = steam.get_owned_games()
     print(f"Found {len(owned_games)} entries in library.")
 
+    if not args.appid:
+        empty_exit = refuse_empty_result(
+            owned_games,
+            label="Steam owned-games API",
+            allow_empty=args.allow_empty,
+            output_path=GAMES_STEAM_JSON,
+        )
+        if empty_exit is not None:
+            return stats.finish("fetch_games", t0, exit_code=empty_exit)
+
     if args.appid:
         owned_games = [g for g in owned_games if g["appid"] == args.appid]
         if not owned_games:
-            print(f"App ID {args.appid} not in your library.", file=sys.stderr)
-            return 1
+            stats.error(f"App ID {args.appid} not in your library.")
+            return stats.finish("fetch_games", t0, exit_code=1)
 
     games_out: list[dict] = []
     skipped = 0
@@ -238,6 +253,15 @@ def main() -> int:
             continue
         games_out.append(row)
 
+    empty_exit = refuse_empty_result(
+        games_out,
+        label="Steam library rows",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_STEAM_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_games", t0, exit_code=empty_exit)
+
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "steam_id": steam_id,
@@ -247,9 +271,10 @@ def main() -> int:
 
     text = json.dumps(payload, indent=2, ensure_ascii=False)
     GAMES_STEAM_JSON.write_text(text, encoding="utf-8")
-    print(f"\nWrote {len(games_out)} games to {GAMES_STEAM_JSON} (skipped {skipped} non-game items).")
-    print("Open index.html in your browser to view the dashboard.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_STEAM_JSON} (skipped {skipped} non-game items).", flush=True)
+    print("Open index.html in your browser to view the dashboard.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_games", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

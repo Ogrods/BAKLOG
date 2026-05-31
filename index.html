@@ -294,6 +294,69 @@
     .status-chip[data-status-filter="finished"] { --status-accent: #94a3b8; }
     .status-chip[data-status-filter="skip"] { --status-accent: #64748b; }
     .status-chip[data-status-filter="__none__"] { --status-accent: #475569; }
+    .summary-deal-chip {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.45rem 0.85rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.12);
+      color: #d1fae5;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .summary-deal-chip:hover { background: rgba(16, 185, 129, 0.22); }
+    .summary-deal-chip.active {
+      background: rgba(16, 185, 129, 0.4);
+      border-color: rgba(110, 231, 183, 0.8);
+      box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.4);
+      color: #ecfdf5;
+    }
+    .summary-deal-chip.historical { border-color: rgba(251, 191, 36, 0.4); background: rgba(251, 191, 36, 0.10); color: #fde68a; }
+    .summary-deal-chip.historical:hover { background: rgba(251, 191, 36, 0.18); }
+    .summary-deal-chip.historical.active {
+      background: rgba(251, 191, 36, 0.35);
+      border-color: rgba(252, 211, 77, 0.8);
+      box-shadow: 0 0 0 1px rgba(252, 211, 77, 0.45);
+    }
+    .summary-deal-chip.owned { border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.10); color: #fde68a; }
+    .summary-deal-chip.owned:hover { background: rgba(245, 158, 11, 0.18); }
+    .summary-deal-chip.owned.active {
+      background: rgba(245, 158, 11, 0.32);
+      border-color: rgba(252, 211, 77, 0.8);
+      box-shadow: 0 0 0 1px rgba(252, 211, 77, 0.4);
+    }
+    .summary-wishlist-reset { background: rgb(30 41 59); transition: background 0.15s ease; }
+    /* === Top-bar store filter chips === */
+    .summary-store-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      line-height: 1rem;
+      background: rgb(30 41 59);
+      border: 1px solid rgb(51 65 85);
+      color: inherit;
+      cursor: pointer;
+      box-shadow: inset 3px 0 0 var(--store-accent, #475569);
+      transition: background 0.1s ease, border-color 0.1s ease;
+    }
+    .summary-store-chip:hover { background: rgb(51 65 85); }
+    .summary-store-chip.active {
+      background: rgba(15, 23, 42, 0.9);
+      border-color: var(--store-accent, #475569);
+    }
+    .summary-store-chip[data-store="steam"] { --store-accent: #ea580c; }
+    .summary-store-chip[data-store="gog"] { --store-accent: #6d28d9; }
+    .summary-store-chip[data-store="psn"] { --store-accent: #1d4ed8; }
+    .summary-store-chip[data-store="epic"] { --store-accent: #94a3b8; }
+    .summary-store-chip[data-store="amazon"] { --store-accent: #f59e0b; }
+    .summary-store-chip[data-store="nintendo"] { --store-accent: #e60012; }
+    .summary-store-chip[data-store="xbox"] { --store-accent: #107c10; }
+    .summary-store-chip[data-store="battlenet"] { --store-accent: #148eff; }
+    .summary-store-chip[data-store="ubisoft"] { --store-accent: #00adef; }
+    .summary-store-chip[data-store="other"] { --store-accent: #475569; }
     /* === Dashboard === */
     .dash-card { background: rgb(30 41 59); border: 1px solid rgb(51 65 85); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; height: 100%; }
     .dash-card.hidden { display: none; }
@@ -313,6 +376,10 @@
       gap: 0.75rem; flex-wrap: wrap;
     }
     .migration-banner-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+    .itad-alert-banner {
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.06));
+      border-color: rgba(245, 158, 11, 0.45);
+    }
     .dash-card-head {
       display: flex;
       align-items: center;
@@ -341,10 +408,41 @@
     .dash-fetcher-health { display: flex; flex-direction: column; gap: 0.4rem; height: auto; }
     .fh-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
     .fh-head-left { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+    .fh-head-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .fh-run-stale {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      border: 1px solid rgb(51 65 85);
+      background: rgb(30 41 59);
+      color: #cbd5e1;
+      cursor: pointer;
+    }
+    .fh-run-stale:hover:not(:disabled) { background: rgb(51 65 85); }
+    .fh-run-stale:disabled { opacity: 0.45; cursor: not-allowed; }
     .fh-title { font-size: 0.75rem; font-weight: 600; color: #cbd5e1; letter-spacing: 0.04em; text-transform: uppercase; }
     .fh-summary { font-size: 0.7rem; color: #94a3b8; }
     .fh-toggle { font-size: 0.7rem; color: #94a3b8; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; user-select: none; }
-    .fh-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .fh-global-status {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.1rem 0.45rem; border-radius: 9999px;
+      font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em;
+      color: #7dd3fc; background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+    .fh-global-status::before {
+      content: ""; width: 6px; height: 6px; border-radius: 50%;
+      background: #38bdf8; box-shadow: 0 0 6px #38bdf8;
+      animation: fh-pulse 1.2s ease-in-out infinite;
+    }
+    .fh-global-status.hidden { display: none; }
+    .fh-chips { display: flex; flex-direction: column; gap: 0.55rem; }
+    .fh-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .fh-group-label {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #64748b;
+    }
+    .fh-group-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
     .fh-chip {
       display: inline-flex; align-items: center; gap: 0.3rem;
       padding: 0.2rem 0.5rem 0.2rem 0.4rem;
@@ -384,6 +482,31 @@
     .fh-chip-queued .fh-chip-dot { background: #94a3b8; opacity: 0.7; }
     .fh-chip-failed { border-color: rgba(244, 63, 94, 0.6); background: rgba(244, 63, 94, 0.12); }
     .fh-chip-failed .fh-chip-dot { background: #f43f5e; }
+    .fh-chip-needs-config { border-style: dashed; }
+    .fh-chip-readonly { opacity: 0.55; cursor: not-allowed; }
+    .fh-readonly-banner {
+      font-size: 0.72rem; line-height: 1.35;
+      padding: 0.45rem 0.55rem; margin-bottom: 0.35rem;
+      border-radius: 0.35rem;
+      color: #fcd34d; background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    .fh-readonly-banner code { font-size: 0.68rem; background: rgba(15, 23, 42, 0.5); padding: 0.1rem 0.25rem; border-radius: 0.2rem; }
+    .fh-readonly-link { color: #7dd3fc; text-decoration: underline; }
+    .fh-readonly .fh-run-stale { pointer-events: none; opacity: 0.45; }
+    .fh-chip-warn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 50%;
+      background: #f59e0b;
+      color: #1a1200;
+      flex-shrink: 0;
+    }
     @keyframes fh-pulse {
       0%, 100% { transform: scale(1); box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.6), 0 0 0 4px rgba(56, 189, 248, 0); }
       50% { transform: scale(1.25); box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.6), 0 0 0 4px rgba(56, 189, 248, 0.35); }
@@ -412,6 +535,42 @@
     .fh-log-status.done { color: #34d399; }
     .fh-log-status.failed { color: #f43f5e; }
     .fh-log-status.queued { color: #cbd5e1; }
+    .fh-log-status.running::after,
+    .fh-log-status.queued::after {
+      content: '';
+      display: inline-block;
+      width: 1.4ch;
+      text-align: left;
+      animation: fh-dots 1.2s steps(4, end) infinite;
+      margin-left: 0.15rem;
+    }
+    @keyframes fh-dots {
+      0%   { content: ''; }
+      25%  { content: '.'; }
+      50%  { content: '..'; }
+      75%  { content: '...'; }
+      100% { content: ''; }
+    }
+    /* Heartbeat-style indicator at the bottom of the running log */
+    .fh-log-body[data-running="1"]::after {
+      content: 'working';
+      display: block;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.7rem;
+      color: #38bdf8;
+      font-style: italic;
+      opacity: 0.85;
+    }
+    .fh-log-body[data-running="1"]::after {
+      animation: fh-body-dots 1.4s steps(4, end) infinite;
+    }
+    @keyframes fh-body-dots {
+      0%   { content: 'working'; }
+      25%  { content: 'working.'; }
+      50%  { content: 'working..'; }
+      75%  { content: 'working...'; }
+      100% { content: 'working'; }
+    }
     .fh-log-spacer { flex: 1; }
     .fh-log-btn {
       font-size: 0.7rem;
@@ -424,6 +583,9 @@
     }
     .fh-log-btn:hover { background: rgb(51 65 85); }
     .fh-log-btn:focus-visible { outline: 2px solid #38bdf8; outline-offset: 1px; }
+    .fh-log-btn-cancel { color: #fda4af; border-color: rgba(244, 63, 94, 0.45); }
+    .fh-log-btn-cancel:hover:not(:disabled) { background: rgba(244, 63, 94, 0.15); }
+    .fh-log-btn.hidden { display: none; }
     .fh-log-body {
       max-height: 16rem;
       overflow-y: auto;
@@ -484,7 +646,7 @@
     .deal-hero-stat-dot-review { background: #34d399; }
     .deal-hero-stat-dot-hltb { background: #38bdf8; }
     .deal-hero-genres { font-size: 0.7rem; color: #94a3b8; line-height: 1.3; }
-    .deal-badge-low { font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.35); }
+    .deal-badge-low { display: inline-block; white-space: nowrap; font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.35); }
     /* Sale scoreboard card */
     .sale-scoreboard { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; align-items: start; }
     .sale-stat { min-width: 0; }
@@ -794,6 +956,7 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen">
   <div class="max-w-[1600px] mx-auto p-4 md:p-6">
     <div id="migrationBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
+    <div id="itadAlertBanner" class="migration-banner itad-alert-banner hidden" role="status" aria-live="polite"></div>
     <header class="mb-4">
       <div class="flex flex-wrap items-center gap-3">
         <h1 class="text-2xl md:text-3xl font-bold text-sky-400">Game Backlog</h1>
@@ -803,8 +966,9 @@
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
           <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
         </div>
+        <span id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto" aria-live="polite"></span>
       </div>
-      <p id="metaCaption" class="text-slate-500 text-xs mt-1"><span id="meta">Loading...</span><span class="hidden md:inline"> · ↑↓ navigate · Enter store · B/N/P/U/F/S status · / search</span></p>
+      <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
     </header>
 
@@ -853,6 +1017,10 @@
             <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Load Steam JSON…<input id="loadGamesFile" type="file" accept=".json" class="hidden" /></label>
             <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
             <button type="button" id="exportNotes" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes</button>
+            <label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-700 cursor-pointer text-left" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
+              <input type="checkbox" id="itadAutoRefreshToggle" class="rounded" checked />
+              Auto-refresh ITAD prices
+            </label>
             <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Import notes<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
           </div>
         </div>
@@ -917,7 +1085,6 @@
             <th class="p-2 w-12"></th>
             <th data-sort="name" class="p-2 text-left">Game</th>
             <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
-            <th data-sort="priority" class="p-2 text-center">Pri</th>
             <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>
             <th data-sort="playtime_minutes" class="p-2 text-right">Played</th>
             <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
@@ -943,13 +1110,6 @@
       <span id="bulkCount" class="text-slate-200 font-medium mr-2">0 selected</span>
       <span class="text-slate-500 text-xs mr-2">Status:</span>
       <div id="bulkStatusButtons" class="flex flex-wrap gap-2 items-center"></div>
-      <span class="text-slate-500 text-xs ml-2 mr-1">Priority:</span>
-      <select id="bulkPriority" class="bg-slate-700 border border-slate-600 rounded text-xs px-1 py-1">
-        <option value="">—</option>
-        <option value="0">0</option><option value="1">1</option><option value="2">2</option>
-        <option value="3">3</option><option value="4">4</option><option value="5">5</option>
-      </select>
-      <button type="button" id="bulkApplyPriority" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs">Set priority</button>
       <button type="button" id="bulkClear" class="ml-auto px-2 py-1 rounded text-slate-400 hover:text-slate-200 text-xs">Clear selection</button>
     </div>
   </div>
@@ -962,9 +1122,14 @@
       <button type="button" id="closeFiltersBtn" class="text-slate-400 hover:text-slate-100 text-xl leading-none px-2" aria-label="Close filters">&times;</button>
     </div>
     <div class="flex-1 overflow-y-auto p-3 space-y-0 text-sm">
-      <div id="libraryStatusSection" class="drawer-section">
-        <label class="text-xs text-slate-400 block mb-1">Status</label>
-        <select id="statusFilter" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5">
+      <!--
+        Filter consolidation: status + store chips live in the top summary bar
+        (renderSummary). The drawer keeps the long-tail filters below. The
+        <select id="statusFilter"> is retained here, hidden, because it's the
+        single source of truth that filter logic and keyboard shortcuts read.
+      -->
+      <div id="libraryStatusSection" class="hidden" aria-hidden="true">
+        <select id="statusFilter">
           <option value="">All statuses</option>
           <option value="backlog">Backlog</option>
           <option value="next">Next up</option>
@@ -984,25 +1149,12 @@
         <p class="text-[11px] text-slate-500 mt-1 leading-snug">By default only itch.io games are shown. Check to include tools, assets, comics, books, and soundtracks.</p>
       </div>
       <div id="libraryStoreSection" class="drawer-section">
-        <label class="text-xs text-slate-400 block mb-2">Store</label>
-        <div id="storeChips" class="flex flex-wrap gap-1.5 items-center">
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs active bg-slate-700" data-store="">All</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="steam">Steam</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="gog">GOG</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="psn">PSN</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="epic">Epic</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="amazon">Amazon</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="nintendo">Nintendo</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="itch">itch.io</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="xbox">Xbox</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="battlenet">Battle.net</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="ubisoft">Ubisoft</button>
-          <button type="button" class="store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-store="other">Other</button>
-        </div>
-        <label class="text-xs text-slate-300 mt-2 flex items-center gap-1.5" title="Hide secondary copies. Priority: Steam > PSN > GOG > Epic > Amazon > Nintendo > Xbox > Other.">
+        <label class="text-xs text-slate-400 block mb-2">Cross-store</label>
+        <label class="text-xs text-slate-300 flex items-center gap-1.5" title="Hide secondary copies. Priority: Steam > PSN > GOG > Epic > Amazon > Nintendo > Xbox > Other.">
           <input id="crossStoreDedup" type="checkbox" class="rounded" />
           Hide duplicates
         </label>
+        <p class="text-[11px] text-slate-500 mt-1 leading-snug">Filter by store using the chips at the top of the page.</p>
       </div>
       <div id="wishlistStoreSection" class="drawer-section hidden">
         <label class="text-xs text-slate-400 block mb-2">Wishlist source</label>
@@ -1117,7 +1269,6 @@
       <div class="drawer-footer-row">
         <span class="drawer-footer-tag">Library</span>
         <span class="drawer-footer-item"><span class="kbd-group"><kbd class="kbd">B</kbd><kbd class="kbd">N</kbd><kbd class="kbd">P</kbd><kbd class="kbd">U</kbd><kbd class="kbd">L</kbd><kbd class="kbd">F</kbd><kbd class="kbd">S</kbd></span> status</span>
-        <span class="drawer-footer-item"><span class="kbd-group"><kbd class="kbd">1</kbd>&ndash;<kbd class="kbd">5</kbd></span> priority</span>
         <span class="drawer-footer-item"><kbd class="kbd">Space</kbd> select</span>
       </div>
     </div>

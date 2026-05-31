@@ -15,6 +15,8 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from epic_client import EpicAuthError, EpicClient, LOGIN_URL
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 
 GAMES_EPIC_JSON = Path("games_epic.json")
@@ -282,12 +284,15 @@ def main() -> int:
     parser.add_argument("--refresh", action="store_true", help="Re-fetch all catalog metadata")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     parser.add_argument("--auth-help", action="store_true", help="Print Epic login instructions")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_epic")
+    stats = RunStats()
 
     if args.auth_help:
         print_auth_help()
-        return 0
+        return stats.finish("fetch_epic", t0, exit_code=0)
 
     load_dotenv()
     auth_code = os.getenv("EPIC_AUTH_CODE", "").strip() or None
@@ -298,16 +303,25 @@ def main() -> int:
         client.login()
         print(f"  account {client.account_id}")
     except EpicAuthError as e:
-        print(str(e), file=sys.stderr)
+        stats.error(str(e))
         print_auth_help()
-        return 1
+        return stats.finish("fetch_epic", t0, exit_code=1)
 
     print("Fetching library...")
     records = client.get_library_records()
     apps = [r for r in records if r.get("recordType") == "APPLICATION"]
-    print(f"  {len(records)} entitlements, {len(apps)} applications")
+    print(f"  {len(records)} entitlements, {len(apps)} applications", flush=True)
 
-    print(f"Fetching catalog metadata ({CATALOG_WORKERS} workers)...")
+    empty_exit = refuse_empty_result(
+        apps,
+        label="Epic library",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_EPIC_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_epic", t0, exit_code=empty_exit)
+
+    print(f"Fetching catalog metadata ({CATALOG_WORKERS} workers)...", flush=True)
     catalog: dict[tuple[str, str], dict] = {}
 
     def fetch_one(rec: dict) -> tuple[tuple[str, str], dict | None]:
@@ -317,14 +331,14 @@ def main() -> int:
     with concurrent.futures.ThreadPoolExecutor(max_workers=CATALOG_WORKERS) as ex:
         futures = [ex.submit(fetch_one, rec) for rec in apps]
         for i, fut in enumerate(concurrent.futures.as_completed(futures), 1):
-            if i % 75 == 0 or i == len(futures):
-                print(f"  catalog {i}/{len(futures)}")
+            if i % 25 == 0 or i == len(futures):
+                print(f"  catalog {i}/{len(futures)}", flush=True)
             try:
                 key, item = fut.result()
                 if item:
                     catalog[key] = item
             except Exception as e:
-                print(f"  catalog warning: {e}")
+                stats.warn(f"catalog: {e}")
 
     print(f"  catalog hits: {len(catalog)}/{len(apps)}")
 
@@ -390,9 +404,10 @@ def main() -> int:
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
     GAMES_EPIC_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\nWrote {len(games_out)} games to {GAMES_EPIC_JSON} (skipped {skipped}).")
-    print("Reload the dashboard (or click Reload library) to refresh Picks.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_EPIC_JSON} (skipped {skipped}).", flush=True)
+    print("Reload the dashboard (or click Reload library) to refresh Picks.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_epic", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

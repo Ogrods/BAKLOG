@@ -14,6 +14,8 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 from xbox_client import XboxAuthError, XboxClient
 
@@ -105,40 +107,53 @@ def _build_row(title: dict, hltb: dict | None) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Xbox library via OpenXBL")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_xbox")
+    stats = RunStats()
     load_dotenv()
     api_key = os.getenv("XBL_API_KEY", "").strip()
     if not api_key:
-        print("Set XBL_API_KEY in .env (https://xbl.io/)", file=sys.stderr)
-        return 1
+        stats.error("Set XBL_API_KEY in .env (https://xbl.io/)")
+        return stats.finish("fetch_xbox", t0, exit_code=1)
 
     try:
         client = XboxClient(api_key)
         gt = client.get_gamertag()
-        print(f"OpenXBL account: {gt or '(unknown gamertag)'}")
+        print(f"OpenXBL account: {gt or '(unknown gamertag)'}", flush=True)
         titles = client.get_title_history()
     except XboxAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_xbox", t0, exit_code=1)
 
     games = [t for t in titles if (t.get("type") or "Game").lower() in ("game", "dlc")]
-    print(f"Found {len(games)} Xbox titles in title history.")
+    print(f"Found {len(games)} Xbox titles in title history.", flush=True)
+
+    empty_exit = refuse_empty_result(
+        games,
+        label="Xbox library",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_XBOX_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_xbox", t0, exit_code=empty_exit)
 
     hltb_client = HltbClient()
     games_out: list[dict] = []
 
     for i, title in enumerate(games, 1):
         name = title.get("name") or tid_placeholder(title)
-        print(f"[{i}/{len(games)}] {name}")
+        print(f"[{i}/{len(games)}] {name}", flush=True)
         hltb = None
         if not args.skip_hltb:
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
             except Exception as e:
-                print(f"  HLTB warning: {e}")
+                stats.warn(f"HLTB for {name!r}: {e}")
         games_out.append(_build_row(title, hltb))
+        stats.ok += 1
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -150,9 +165,9 @@ def main() -> int:
     GAMES_XBOX_JSON.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\nWrote {len(games_out)} games to {GAMES_XBOX_JSON}.")
-    print("Reload the dashboard to see your Xbox library.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_XBOX_JSON}.", flush=True)
+    print("Reload the dashboard to see your Xbox library.", flush=True)
+    return stats.finish("fetch_xbox", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 def tid_placeholder(title: dict) -> str:

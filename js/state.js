@@ -17,6 +17,8 @@ export const state = {
   },
   crossStoreHiddenKeys: new Set(),
   crossStoreOwnedStores: new Map(),
+  wishlistCrossStoreHiddenKeys: new Set(),
+  wishlistCrossStoreOwnedStores: new Map(),
   wishlistGames: [],
   itchGames: [],
   itadByKey: {},
@@ -45,6 +47,14 @@ export const STATUS_CHIP_DEFS = [
   { key: 'live', label: 'Live' },
   { key: 'finished', label: 'Finished' },
   { key: 'skip', label: 'Skip' },
+];
+// Wishlist statuses share underlying keys with library but are relabeled by
+// the row controls (see WISHLIST_STATUS_LABELS in row-templates.js).
+export const WISHLIST_STATUS_CHIP_DEFS = [
+  { key: 'backlog', label: 'Watching' },
+  { key: 'next', label: 'Want it' },
+  { key: 'finished', label: 'Bought' },
+  { key: 'skip', label: 'Pass' },
 ];
 export const STATUS_FILTER_LABELS = {
   backlog: 'Backlog',

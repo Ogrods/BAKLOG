@@ -23,6 +23,8 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from epic_client import EpicAuthError, EpicStoreClient
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 
 GAMES_WISHLIST_EPIC_JSON = Path("games_wishlist_epic.json")
@@ -191,8 +193,11 @@ def main() -> int:
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slower)")
     parser.add_argument("--country", default="US", help="Storefront country code (default US)")
     parser.add_argument("--locale", default="en-US", help="Storefront locale (default en-US)")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_epic_wishlist")
+    stats = RunStats()
 
     load_dotenv()
     cookie = os.getenv("EPIC_STORE_COOKIE", "").strip()
@@ -208,35 +213,31 @@ def main() -> int:
             "  4. Paste it into .env as: EPIC_STORE_COOKIE=...\n",
             file=sys.stderr,
         )
-        return 1
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
 
     try:
         client = EpicStoreClient(cookie=cookie)
     except EpicAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
 
-    print("Fetching Epic wishlist via storefront GraphQL...")
+    print("Fetching Epic wishlist via storefront GraphQL...", flush=True)
     try:
         elements = client.get_wishlist(country=args.country, locale=args.locale)
     except EpicAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
 
-    print(f"  {len(elements)} wishlist items")
+    print(f"  {len(elements)} wishlist items", flush=True)
 
-    if not elements:
-        payload = {
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "store": "wishlist_epic",
-            "game_count": 0,
-            "games": [],
-        }
-        GAMES_WISHLIST_EPIC_JSON.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
-        print(f"Wrote empty wishlist to {GAMES_WISHLIST_EPIC_JSON}.")
-        return 0
+    empty_exit = refuse_empty_result(
+        elements,
+        label="Epic wishlist",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_WISHLIST_EPIC_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=empty_exit)
 
     hltb_client = HltbClient() if args.hltb else None
     existing = _load_existing()
@@ -280,9 +281,10 @@ def main() -> int:
     GAMES_WISHLIST_EPIC_JSON.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\nWrote {len(rows)} games to {GAMES_WISHLIST_EPIC_JSON}.")
-    print("Reload the dashboard to see Epic items in the Wishlist tab.")
-    return 0
+    print(f"\nWrote {len(rows)} games to {GAMES_WISHLIST_EPIC_JSON}.", flush=True)
+    print("Reload the dashboard to see Epic items in the Wishlist tab.", flush=True)
+    stats.ok = len(rows)
+    return stats.finish("fetch_epic_wishlist", t0, exit_code=0, extra=f"{len(rows)} games")
 
 
 if __name__ == "__main__":

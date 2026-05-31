@@ -110,6 +110,11 @@ class UbisoftClient:
             qs = "&".join(f"spaceIds={sid}" for sid in chunk)
             status, body, text = self._get(f"{CATALOG_PATH}?{qs}")
             if status >= 400 or not isinstance(body, dict):
+                print(
+                    f"  HTTP {status} for Ubisoft catalog batch "
+                    f"({len(chunk)} spaceIds): {text[:120]}",
+                    flush=True,
+                )
                 continue
             for game in body.get("games") or []:
                 if not isinstance(game, dict):

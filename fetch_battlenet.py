@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 from battlenet_client import BattleNetAuthError, BattleNetClient
 from hltb_client import HltbClient
+from fetchers._progress import RunStats, started
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
 RAW_DUMP_JSON = Path("cache/battlenet_raw.json")
@@ -144,9 +145,40 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
     return row
 
 
+def _build_client(browser: str, env_cookie: str) -> BattleNetClient:
+    """Resolve Battle.net session: browser jar first, BATTLENET_COOKIE fallback."""
+    if browser == "env":
+        if not env_cookie:
+            raise BattleNetAuthError(
+                "--browser env was requested but BATTLENET_COOKIE is empty in .env."
+            )
+        return BattleNetClient(env_cookie)
+
+    try:
+        return BattleNetClient.from_browser(browser)
+    except BattleNetAuthError as e:
+        if env_cookie:
+            print(
+                f"warning: {e}\nFalling back to BATTLENET_COOKIE from .env.",
+                file=sys.stderr,
+            )
+            return BattleNetClient(env_cookie)
+        raise BattleNetAuthError(
+            f"{e}\nAs a fallback, set BATTLENET_COOKIE in .env "
+            "(DevTools → Network → /api/games-and-subs → Cookie header), "
+            "or run with --browser env after setting it."
+        ) from e
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Battle.net library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
+    parser.add_argument(
+        "--browser",
+        default=os.getenv("BATTLENET_BROWSER", "edge"),
+        choices=["edge", "chrome", "brave", "firefox", "env"],
+        help="Where to read session cookies from (default: edge, or BATTLENET_BROWSER env).",
+    )
     parser.add_argument(
         "--dump-raw",
         action="store_true",
@@ -154,26 +186,22 @@ def main() -> int:
     )
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_battlenet")
+    stats = RunStats()
     load_dotenv()
-    cookie = os.getenv("BATTLENET_COOKIE", "").strip()
-    if not cookie:
-        print(
-            "Set BATTLENET_COOKIE in .env. To get it:\n"
-            "  1. Sign in at https://account.battle.net/\n"
-            "  2. Visit https://account.battle.net/games\n"
-            "  3. DevTools → Network → click the request to /api/games-and-subs\n"
-            "  4. Copy the entire 'Cookie' request header value\n"
-            "  5. Paste into .env as BATTLENET_COOKIE=<long_cookie_string>",
-            file=sys.stderr,
-        )
-        return 1
+    env_cookie = os.getenv("BATTLENET_COOKIE", "").strip()
 
     try:
-        client = BattleNetClient(cookie)
+        client = _build_client(args.browser, env_cookie)
+    except BattleNetAuthError as e:
+        stats.error(str(e))
+        return stats.finish("fetch_battlenet", t0, exit_code=1)
+
+    try:
         raw = client.get_raw_account()
     except BattleNetAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_battlenet", t0, exit_code=1)
 
     if args.dump_raw:
         RAW_DUMP_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -195,12 +223,11 @@ def main() -> int:
     print(f"Found {len(deduped)} unique Battle.net entries (from {len(raw_games)} raw).")
 
     if not deduped:
-        print(
+        stats.error(
             "No game records found in the response. Re-run with --dump-raw and inspect "
-            f"{RAW_DUMP_JSON} to confirm the cookie hit the right account.",
-            file=sys.stderr,
+            f"{RAW_DUMP_JSON} to confirm the cookie hit the right account."
         )
-        return 2
+        return stats.finish("fetch_battlenet", t0, exit_code=2)
 
     hltb_client = HltbClient()
     games_out: list[dict] = []
@@ -225,9 +252,10 @@ def main() -> int:
     GAMES_BATTLENET_JSON.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\nWrote {len(games_out)} games to {GAMES_BATTLENET_JSON}.")
-    print("Reload the dashboard to see your Battle.net library.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_BATTLENET_JSON}.", flush=True)
+    print("Reload the dashboard to see your Battle.net library.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_battlenet", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

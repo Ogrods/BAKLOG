@@ -609,12 +609,27 @@ function formatDate(unixOrStr) {
   return unixOrStr;
 }
 function parseReleaseForSort(d) { const t = Date.parse(d || ""); return isNaN(t) ? 0 : t; }
+const RELEASE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function formatReleaseDate(d) {
   if (!d) return "—";
   const s = String(d).trim();
   if (!s) return "—";
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const iso = s.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/);
+  if (iso) {
+    const y = iso[1];
+    const m = Number(iso[2]);
+    const day = iso[3] ? Number(iso[3]) : null;
+    if (m >= 1 && m <= 12) {
+      return day ? `${RELEASE_MONTHS[m - 1]} ${day}, ${y}` : `${RELEASE_MONTHS[m - 1]} ${y}`;
+    }
+    return y;
+  }
+  const t = Date.parse(s);
+  if (!isNaN(t)) {
+    const dt = new Date(t);
+    return `${RELEASE_MONTHS[dt.getUTCMonth()]} ${dt.getUTCDate()}, ${dt.getUTCFullYear()}`;
+  }
+  if (/^\d{4}$/.test(s)) return s;
   return s;
 }
 

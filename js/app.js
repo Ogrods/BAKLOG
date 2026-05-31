@@ -1745,7 +1745,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
       <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
       <td class="p-2 text-right">
-        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
+        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
       <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>

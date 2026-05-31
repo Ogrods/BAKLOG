@@ -1,8 +1,12 @@
-# Steam Backlog Dashboard
+# BAKLOG
+
+**Cross-store game backlog — local-only.**
 
 ![Dashboard preview](dashboard.png)
 
-A **local-only** tool for browsing, sorting, and prioritizing game libraries across Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, and itch.io. Nothing is hosted on the web; your credentials and library data stay on your machine.
+BAKLOG helps you browse, sort, and prioritize games across Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, and itch.io. Nothing is hosted on the web; your credentials and library JSON stay on your machine.
+
+> Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
 ## Stack
 
@@ -211,7 +215,7 @@ Set-Location "c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog"
 Create a weekly scheduled task (example: Sundays at 9:00):
 
 ```powershell
-schtasks /create /SC WEEKLY /D SUN /TN "Steam Backlog Refresh" /TR "powershell -ExecutionPolicy Bypass -File \"c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog\refresh.ps1\"" /ST 09:00
+schtasks /create /SC WEEKLY /D SUN /TN "BAKLOG Refresh" /TR "powershell -ExecutionPolicy Bypass -File \"c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog\refresh.ps1\"" /ST 09:00
 ```
 
 ## Files

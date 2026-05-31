@@ -1,4 +1,4 @@
-"""Local dev server for the Steam Backlog dashboard.
+"""Local dev server for the BAKLOG dashboard.
 
 Serves static files like ``python -m http.server`` and adds a tiny API that
 lets dashboard chips trigger Python fetchers and stream their output back to
@@ -1164,7 +1164,7 @@ def main() -> None:
 
     handler = partial(Handler, directory=str(ROOT))
     with ThreadingHTTPServer((HOST, PORT), handler) as httpd:
-        print(f"Steam Backlog dev server on http://{HOST}:{PORT}")
+        print(f"BAKLOG dev server on http://{HOST}:{PORT}")
         print(f"Python for fetchers: {_python_executable()}")
         print(f"Registered fetchers: {len(FETCHERS)}")
         print(f"Run history: {RUN_HISTORY_FILE} (max {MAX_HISTORY})")

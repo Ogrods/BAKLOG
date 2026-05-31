@@ -265,7 +265,7 @@
       flex-direction: column;
       align-items: center;
       gap: 1px;
-      max-height: 90vh;
+      max-height: calc(100vh - 120px);
       overflow-y: auto;
       padding: 4px 2px;
       background: rgba(15, 23, 42, 0.88);
@@ -308,6 +308,9 @@
     #backToTop:hover { opacity: 1; color: #38bdf8; background: rgba(15, 23, 42, 0.92); transform: translateY(-1px); }
     #backToTop:focus-visible { opacity: 1; outline: 2px solid #38bdf8; outline-offset: 2px; }
     #backToTop svg { width: 16px; height: 16px; }
+    @media (min-width: 1280px) {
+      #backToTop { right: 48px; }
+    }
     /* === Status breakdown chips === */
     .status-chip {
       display: inline-flex;
@@ -991,7 +994,7 @@
     .deal-badge-low-year { background: rgba(251, 191, 36, 0.1); color: #fde68a; border-color: rgba(253, 224, 71, 0.3); }
     .deal-badge-drop { display: inline-block; white-space: nowrap; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(52, 211, 153, 0.12); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.35); }
     .owned-elsewhere-pill { font-size: 0.65rem; font-weight: 600; color: #fbbf24; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25); padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; }
-    .cross-store-pill { font-size: 0.65rem; color: #94a3b8; background: rgba(51, 65, 85, 0.5); border: 1px solid #475569; padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; }
+    .cross-store-pill { font-size: 0.65rem; color: #94a3b8; background: rgba(51, 65, 85, 0.5); border: 1px solid #475569; padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
     /* Sale scoreboard card */
     .sale-scoreboard { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; align-items: start; }
     .sale-stat { min-width: 0; }
@@ -1205,6 +1208,7 @@
     .dash-chart-wrap { position: relative; height: 260px; }
     .dash-chart-wrap.tall { height: 320px; }
     .table-hide-score .col-score { display: none; }
+    .table-hide-score col.col-score { width: 0; }
     #tableWrap { width: 100%; }
     .games-table { width: 100%; table-layout: fixed; min-width: 1280px; }
     .games-table thead th {

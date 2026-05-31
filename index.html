@@ -39,7 +39,9 @@
       pointer-events: none;
     }
     .cover-wrap.landscape img.pick-cover,
-    .cover-wrap.landscape img.deal-hero-cover { position: relative; z-index: 1; }
+    .cover-wrap.landscape img.deal-hero-cover,
+    .cover-wrap.landscape img.cover { position: relative; z-index: 1; background: transparent; }
+    .cover.landscape, .pick-cover.landscape, .deal-hero-cover.landscape { background: transparent; }
     .cover-wrap.landscape .ea-ribbon { z-index: 2; }
     .pick-card .deal-badge-drop,
     .pick-card .owned-elsewhere-pill {
@@ -1189,8 +1191,13 @@
     .table-hide-score .col-score { display: none; }
     #tableWrap { width: 100%; }
     .games-table { width: 100%; table-layout: fixed; min-width: 1280px; }
-    .games-table thead { position: sticky; top: 0; z-index: 10; }
-    .games-table thead th { background: rgb(30 41 59); box-shadow: inset 0 -1px 0 #334155; }
+    .games-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgb(30 41 59);
+      box-shadow: inset 0 -1px 0 #334155;
+    }
     .games-table th, .games-table td { overflow: hidden; }
     .games-table td.notes-cell { white-space: normal; overflow: visible; }
     .games-table .game-name-cell { min-width: 0; }
@@ -1733,7 +1740,7 @@
           <span id="viewLoadingLabel" class="text-xs uppercase tracking-wide text-slate-300">Loading…</span>
         </div>
       </div>
-    <div id="tableWrap" class="overflow-x-auto rounded-lg border border-slate-700">
+    <div id="tableWrap" class="rounded-lg border border-slate-700">
       <table class="w-full text-sm games-table">
         <colgroup>
           <col style="width:36px" />

@@ -950,6 +950,10 @@
     .deal-hero-stat-dot-hltb { background: #38bdf8; }
     .deal-hero-genres { font-size: 0.7rem; color: #94a3b8; line-height: 1.3; }
     .deal-badge-low { display: inline-block; white-space: nowrap; font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.35); }
+    .deal-badge-low-year { background: rgba(251, 191, 36, 0.1); color: #fde68a; border-color: rgba(253, 224, 71, 0.3); }
+    .deal-badge-drop { display: inline-block; white-space: nowrap; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(52, 211, 153, 0.12); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.35); }
+    .owned-elsewhere-pill { font-size: 0.65rem; font-weight: 600; color: #fbbf24; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25); padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; }
+    .cross-store-pill { font-size: 0.65rem; color: #94a3b8; background: rgba(51, 65, 85, 0.5); border: 1px solid #475569; padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; }
     /* Sale scoreboard card */
     .sale-scoreboard { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; align-items: start; }
     .sale-stat { min-width: 0; }
@@ -1543,19 +1547,19 @@
     <div id="itadAlertBanner" class="migration-banner itad-alert-banner hidden" role="status" aria-live="polite"></div>
     <div id="authReconnectBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="mb-4">
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div class="flex flex-col min-w-0">
-          <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-tight">BAKLOG</h1>
-          <p class="text-xs text-slate-500 tracking-wide hidden sm:block">Cross-store backlog · local-only</p>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div class="flex items-center gap-3 shrink-0 pr-3 mr-1 border-r border-slate-700/80">
+          <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap">BAKLOG</h1>
+          <p class="text-[11px] text-slate-500 leading-snug hidden md:block max-w-[7.5rem]">Cross-store backlog · local-only</p>
         </div>
-        <div class="flex gap-1">
-          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm active" data-view="dashboard">Dashboard</button>
-          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="library">Library</button>
-          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
-          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
-          <button type="button" class="view-tab px-3 py-1 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
-        </div>
-        <span id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto" aria-live="polite"></span>
+        <nav class="flex flex-wrap items-center gap-1.5" aria-label="Main views">
+          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm active" data-view="dashboard">Dashboard</button>
+          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="library">Library</button>
+          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
+          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
+          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
+        </nav>
+        <span id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto self-center" aria-live="polite"></span>
       </div>
       <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
@@ -1629,6 +1633,7 @@
             <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Load Steam JSON…<input id="loadGamesFile" type="file" accept=".json" class="hidden" /></label>
             <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
             <button type="button" id="exportNotes" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes</button>
+            <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700">Copy top 20 backlog (Markdown)</button>
             <label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-700 cursor-pointer text-left" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
               <input type="checkbox" id="itadAutoRefreshToggle" class="rounded" checked />
               Auto-refresh ITAD prices

@@ -22,6 +22,7 @@ export const state = {
   wishlistGames: [],
   itchGames: [],
   itadByKey: {},
+  itadPriceDroppedKeys: new Set(),
   activeView: 'dashboard',
   selectedKeys: new Set(),
   cleanupModeActive: false,

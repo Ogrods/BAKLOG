@@ -7,6 +7,11 @@ All notable changes to this project are documented here.
 ### Added
 
 - **BAKLOG branding** — product title, favicon, README tagline, header subtitle (“Cross-store backlog · local-only”).
+- **Deal badges** — price-dropped-since-last-ITAD (↓), all-time vs 1-year historical low, owned-elsewhere on dashboard deal cards.
+- **Library cross-store pill** — “also on GOG · …” when deduped copies exist on multiple stores.
+- **Export top 20 backlog** — ⋯ menu copies a Markdown table to clipboard.
+- **Nintendo fetch** — clearer reconnect hint when session cookie expires (9001-1620).
+- **Installer** — `dist/baklog` output folder and `Start BAKLOG.bat`.
 - **Connections tab** — unified sign-in for all stores: form fields for API keys (Steam, Xbox, itch, ITAD), Playwright browser login for cookie/OAuth providers (GOG, PSN, Epic, Battle.net, Nintendo, Ubisoft), encrypted at rest via OS keychain + AES-GCM (`auth/` package).
 - **Reconnect banner** when a fetcher fails auth (401/403) — links to Connections tab.
 - **`scripts/build_installer.ps1`** — bundles app + Playwright Chromium into `dist/steam-backlog/`.

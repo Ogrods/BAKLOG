@@ -99,17 +99,31 @@ class ItadClient:
                 price = best.get("price") or {}
                 regular = best.get("regular") or {}
                 hist = entry.get("historyLow") or {}
+                price_amt = price.get("amount")
+                all_low = (hist.get("all") or {}).get("amount")
+                year_low = (hist.get("year") or {}).get("amount")
+                is_all_time = (
+                    price_amt is not None
+                    and all_low is not None
+                    and price_amt <= all_low + 0.01
+                )
+                is_year = (
+                    price_amt is not None
+                    and year_low is not None
+                    and price_amt <= year_low + 0.01
+                    and not is_all_time
+                )
                 out[gid] = {
                     "shop": (best.get("shop") or {}).get("name"),
-                    "price": price.get("amount"),
-                    "price_str": f"${price.get('amount', 0):.2f}" if price.get("amount") is not None else None,
+                    "price": price_amt,
+                    "price_str": f"${price_amt:.2f}" if price_amt is not None else None,
                     "regular": regular.get("amount"),
                     "cut": best.get("cut", 0),
                     "url": best.get("url"),
-                    "history_low_all": (hist.get("all") or {}).get("amount"),
-                    "is_historical_low": price.get("amount") is not None
-                    and hist.get("all", {}).get("amount") is not None
-                    and price.get("amount") <= hist.get("all", {}).get("amount") + 0.01,
+                    "history_low_all": all_low,
+                    "history_low_year": year_low,
+                    "is_historical_low": is_all_time,
+                    "is_historical_low_year": is_year,
                 }
         return out
 

@@ -66,9 +66,17 @@ class NintendoClient:
                     "Refresh NINTENDO_COOKIE from ec.nintendo.com/my/transactions/."
                 )
             if resp.status_code >= 400:
-                raise NintendoAuthError(
-                    f"Nintendo API {resp.status_code}: {resp.text[:300]}"
-                )
+                body_snip = resp.text[:300]
+                hint = ""
+                if resp.status_code == 400 and (
+                    "9001-1620" in body_snip or "sign in again" in body_snip.lower()
+                ):
+                    hint = (
+                        " Session expired — open the Connections tab to reconnect Nintendo, "
+                        "or refresh NINTENDO_COOKIE from ec.nintendo.com/my/transactions/ "
+                        "(DevTools → Network → transactions request → Cookie header)."
+                    )
+                raise NintendoAuthError(f"Nintendo API {resp.status_code}: {body_snip}{hint}")
 
             try:
                 body = resp.json()

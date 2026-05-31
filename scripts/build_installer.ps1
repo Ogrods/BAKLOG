@@ -12,7 +12,7 @@ Write-Host "Installing Python dependencies..."
 python -m pip install -r requirements.txt
 python -m playwright install chromium
 
-$Out = Join-Path $Root "dist\steam-backlog"
+$Out = Join-Path $Root "dist\baklog"
 if (Test-Path $Out) { Remove-Item -Recurse -Force $Out }
 New-Item -ItemType Directory -Path $Out | Out-Null
 
@@ -30,7 +30,7 @@ cd /d "%~dp0"
 echo Starting BAKLOG server on http://127.0.0.1:8765
 python server.py
 pause
-"@ | Set-Content -Encoding ASCII (Join-Path $Out "Start Backlog.bat")
+"@ | Set-Content -Encoding ASCII (Join-Path $Out "Start BAKLOG.bat")
 
 Write-Host "Done. Output: $Out"
 Write-Host "First run: open Connections tab and sign in to each store."

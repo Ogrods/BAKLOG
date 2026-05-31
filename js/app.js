@@ -624,7 +624,9 @@ function dealHeroCardHtml(g) {
   const price = d?.price;
   const regular = d?.regular;
   const shop = d?.shop ? `@ ${escapeHtml(d.shop)}` : "";
-  const lowPin = d?.isHistoricalLow ? '<span class="deal-badge-low">★ Historical low</span>' : "";
+  const lowPin = dealLowBadgeHtml(d);
+  const droppedPin = dealDroppedBadgeHtml(g);
+  const ownedPin = ownedElsewhereBadgeHtml(g);
   const priceHtml = price != null
     ? `<span class="deal-hero-price">${formatDollar(price)}</span>${regular != null && regular > price ? `<span class="deal-hero-regular">${formatDollar(regular)}</span>` : ""}`
     : `<span class="deal-hero-price">${cut > 0 ? `${cut}% off` : "On sale"}</span>`;
@@ -659,7 +661,9 @@ function dealHeroCardHtml(g) {
         <div class="deal-hero-badges flex flex-wrap items-center gap-1.5">
           ${cut > 0 ? `<span class="deal-cut-badge">-${cut}%</span>` : ""}
           ${wishlistBadgeHtml(g)}
+          ${droppedPin}
           ${lowPin}
+          ${ownedPin}
         </div>
         ${statStrip}
       </div>
@@ -759,7 +763,9 @@ function dealStealsCardHtml(steals) {
     const d = getDealInfo(g) || {};
     const cut = d.cut || 0;
     const cutLabel = cut > 0 ? `-${cut}%` : "★";
-    const low = d.isHistoricalLow ? '<span class="steal-row-low" title="Historical low">★</span>' : "";
+    const low = d.isHistoricalLow ? `<span class="steal-row-low" title="${d.lowKind === "year" ? "1-year low" : "All-time low"}">★</span>` : "";
+    const dropped = itadPriceDropped(g) ? '<span class="deal-badge-drop" title="Price dropped">↓</span>' : "";
+    const owned = isOwnedByTitle(g.name) ? '<span class="owned-elsewhere-pill">own</span>' : "";
     const price = d.price != null ? `<span class="steal-row-price">${formatDollar(d.price)}</span>` : "";
     const shopFull = d.shop || "";
     const shopShort = dealShopShort(shopFull);
@@ -770,7 +776,9 @@ function dealStealsCardHtml(steals) {
       <img class="steal-row-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fb)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
       <span class="steal-row-name truncate">${escapeHtml(g.name)}</span>
       ${shop}
+      ${dropped}
       ${low}
+      ${owned}
       <span class="steal-row-cut">${cutLabel}</span>
       ${price}
     </button>`;
@@ -816,6 +824,8 @@ function isCleanupCandidate(g) {
   return Date.now() - released >= CLEANUP_MIN_AGE_MS;
 }
 
+const ITAD_SNAPSHOT_KEY = "baklog-itad-snapshot";
+
 function getItadForGame(g) {
   const key = gameKey(g);
   if (state.itadByKey[key]) return state.itadByKey[key];
@@ -825,6 +835,73 @@ function getItadForGame(g) {
     if (alt) return alt;
   }
   return null;
+}
+
+function itadKeysForGame(g) {
+  const keys = [gameKey(g)];
+  const ng = normalizeGame(g);
+  if (ng.store === "steam" || ng.store === "wishlist") {
+    keys.push(`steam:${ng.id}`, `wishlist:${ng.id}`);
+  }
+  return keys;
+}
+
+function itadPriceDropped(g) {
+  for (const k of itadKeysForGame(g)) {
+    if (state.itadPriceDroppedKeys.has(k)) return true;
+  }
+  return false;
+}
+
+function dealDroppedBadgeHtml(g) {
+  return itadPriceDropped(g)
+    ? '<span class="deal-badge-drop" title="Price dropped since your last ITAD refresh">↓ dropped</span>'
+    : "";
+}
+
+function ownedElsewhereBadgeHtml(g) {
+  return isOwnedByTitle(g.name)
+    ? '<span class="owned-elsewhere-pill" title="You already own this (matched by title in your library)">owned</span>'
+    : "";
+}
+
+function dealLowBadgeHtml(d) {
+  if (!d) return "";
+  if (d.lowKind === "all" || (d.isHistoricalLow && !d.isHistoricalLowYear)) {
+    return '<span class="deal-badge-low" title="Lowest recorded price (all-time)">★ all-time</span>';
+  }
+  if (d.lowKind === "year" || d.isHistoricalLowYear) {
+    return '<span class="deal-badge-low deal-badge-low-year" title="Lowest price in the past year">★ 1yr low</span>';
+  }
+  if (d.isHistoricalLow) {
+    return '<span class="deal-badge-low" title="Historical low">★ low</span>';
+  }
+  return "";
+}
+
+function crossStoreOwnPillHtml(g) {
+  if (state.activeView !== "library") return "";
+  const owned = state.crossStoreOwnedStores.get(gameKey(g));
+  if (!owned || owned.length < 2) return "";
+  const rest = owned.slice(1).map(s => s.toUpperCase()).join(" · ");
+  return `<span class="cross-store-pill" title="Also on: ${escapeAttr(owned.map(s => s.toUpperCase()).join(", "))}">also on ${escapeHtml(rest)}</span>`;
+}
+
+function applyItadPriceSnapshot(prevByKey, nextByKey) {
+  state.itadPriceDroppedKeys = new Set();
+  for (const [key, n] of Object.entries(nextByKey || {})) {
+    const p = prevByKey?.[key];
+    if (!p || n?.price == null || p.price == null) continue;
+    if (n.price < p.price - 0.009) state.itadPriceDroppedKeys.add(key);
+  }
+}
+
+function slimItadSnapshot(byKey) {
+  const slim = {};
+  for (const [k, v] of Object.entries(byKey || {})) {
+    if (v?.price != null) slim[k] = { price: v.price, cut: v.cut || 0 };
+  }
+  return slim;
 }
 
 function parsePriceLike(v) {
@@ -839,12 +916,16 @@ function parsePriceLike(v) {
 function getDealInfo(g) {
   const itad = getItadForGame(g);
   if (itad && itad.price != null) {
+    const isAllTime = !!itad.is_historical_low;
+    const isYear = !!itad.is_historical_low_year;
     return {
       source: "itad",
       price: itad.price,
       regular: itad.regular,
       cut: itad.cut || 0,
-      isHistoricalLow: !!itad.is_historical_low,
+      isHistoricalLow: isAllTime || isYear,
+      isHistoricalLowYear: isYear,
+      lowKind: isAllTime ? "all" : isYear ? "year" : null,
       shop: itad.shop,
       url: itad.url,
     };
@@ -1214,9 +1295,12 @@ function dealCardHtml(g) {
     : cutValue >= 50
       ? "deal-flag-cut deal-flag-cut--big"
       : "deal-flag-cut";
-  const lowFlag = d && d.isHistoricalLow ? '<span class="deal-flag-low" title="Historical low">★ low</span>' : "";
+  const lowFlag = d && d.isHistoricalLow
+    ? `<span class="deal-flag-low" title="${d.lowKind === "year" ? "1-year low" : "All-time low"}">★ ${d.lowKind === "year" ? "1yr" : "low"}</span>`
+    : "";
+  const dropFlag = dealDroppedBadgeHtml(g);
   const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : "";
-  const ownedFlag = isOwnedByTitle(g.name) ? '<span class="text-amber-400 text-[10px]" title="Already owned elsewhere">owned</span>' : "";
+  const ownedFlag = ownedElsewhereBadgeHtml(g);
   const shop = d && d.shop ? d.shop : "";
   const wishlistTarget = g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
   return `
@@ -1229,7 +1313,8 @@ function dealCardHtml(g) {
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
       <div class="text-xs text-slate-400 flex justify-between items-center gap-1">
         <span class="text-slate-100">${priceLabel}</span>
-        <span class="flex items-center gap-1">
+        <span class="flex items-center gap-1 flex-wrap justify-end">
+          ${dropFlag}
           ${cutLabel ? `<span class="${cutClass}">${cutLabel}</span>` : ""}
           ${lowFlag}
         </span>
@@ -1434,11 +1519,11 @@ function formatPrice(g) {
     const priceHtml = onSale
       ? `<span class="text-emerald-300 font-semibold">${escapeHtml(itad.price_str)}${escapeHtml(cutTxt)}</span>`
       : escapeHtml(itad.price_str);
-    const lowBadge = itad.is_historical_low
-      ? '&nbsp;<span class="deal-badge-low" title="Historical low">★&nbsp;low</span>'
-      : "";
+    const d = getDealInfo(g);
+    const lowBadge = d ? dealLowBadgeHtml(d).replace(/^/, "&nbsp;") : "";
+    const dropBadge = dealDroppedBadgeHtml(g).replace(/^/, "&nbsp;");
     const shopHtml = itad.shop ? ` <span class="text-slate-400">@ ${escapeHtml(itad.shop)}</span>` : "";
-    return `<span class="whitespace-nowrap">${priceHtml}${lowBadge}</span>${shopHtml}`;
+    return `<span class="whitespace-nowrap">${priceHtml}${dropBadge}${lowBadge}</span>${shopHtml}`;
   }
   if (!g.price && g.discount_percent == null) return "—";
   const base = g.price || "N/A";
@@ -1593,6 +1678,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
         </div>
         <div class="mt-1 flex items-center gap-1.5 flex-wrap">
           ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
+          ${crossStoreOwnPillHtml(g)}
           ${coopPillsHtml(g)}
         </div>
         ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
@@ -2155,6 +2241,37 @@ function renderTagChips() {
   }).join("");
 }
 
+function exportTopBacklogMarkdown() {
+  const visible = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
+  const backlog = visible
+    .filter(g => chipStatusKey(g) === "backlog")
+    .sort((a, b) => priorityScore(b) - priorityScore(a))
+    .slice(0, 20);
+  if (!backlog.length) {
+    alert("No backlog games to export.");
+    return;
+  }
+  const lines = [
+    "# BAKLOG — Top 20 backlog",
+    "",
+    "| # | Game | Store | Score | HLTB main | Rating |",
+    "|---:|---|---|---:|---:|---:|",
+  ];
+  backlog.forEach((g, i) => {
+    const store = normalizeGame(g).store.toUpperCase();
+    const h = hltbMain(g);
+    const rating = ratingValue(g);
+    lines.push(
+      `| ${i + 1} | ${g.name.replace(/\|/g, "\\|")} | ${store} | ${priorityScore(g).toFixed(1)} | ${h != null ? `${h}h` : "—"} | ${rating > 0 ? `${rating}%` : "—"} |`,
+    );
+  });
+  const md = lines.join("\n");
+  navigator.clipboard.writeText(md).then(
+    () => { /* copied */ },
+    () => download("baklog-top-20.md", md, "text/markdown"),
+  );
+}
+
 function exportCsv() {
   const list = sortedGames(filteredGames());
   const isWish = state.activeView === "wishlist";
@@ -2195,13 +2312,27 @@ function download(name, content, type) {
 
 // === Library loading ===
 async function loadItadPrices() {
+  let prevByKey = {};
+  try {
+    const raw = localStorage.getItem(ITAD_SNAPSHOT_KEY);
+    if (raw) prevByKey = JSON.parse(raw)?.by_key || {};
+  } catch (_) {}
   try {
     const data = await fetchLibraryJson("itad_prices.json");
     state.libraryMeta.itad = data || null;
-    state.itadByKey = data?.by_key || {};
+    const nextByKey = data?.by_key || {};
+    applyItadPriceSnapshot(prevByKey, nextByKey);
+    state.itadByKey = nextByKey;
+    try {
+      localStorage.setItem(ITAD_SNAPSHOT_KEY, JSON.stringify({
+        saved_at: Date.now(),
+        by_key: slimItadSnapshot(nextByKey),
+      }));
+    } catch (_) {}
   } catch {
     state.libraryMeta.itad = null;
     state.itadByKey = {};
+    state.itadPriceDroppedKeys = new Set();
   }
 }
 
@@ -3278,7 +3409,8 @@ function bindEvents() {
   });
   bindAddGameModal();
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
-  document.getElementById("exportNotes").addEventListener("click", () => download("steam-backlog-notes.json", JSON.stringify(state.personal, null, 2), "application/json"));
+  document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
+  document.getElementById("exportNotes").addEventListener("click", () => download("baklog-notes.json", JSON.stringify(state.personal, null, 2), "application/json"));
   document.getElementById("importNotes").addEventListener("change", async e => {
     const file = e.target.files[0];
     if (!file) return;

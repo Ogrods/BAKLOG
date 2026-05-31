@@ -94,6 +94,26 @@ function dashChartOptions(extra = {}) {
   };
 }
 
+/** Highlight one donut slice + its legend chip; dim the rest on hover. */
+function donutLegendHighlight() {
+  const dimOther = (chart, hoveredIdx) => {
+    const ds = chart.data.datasets[0];
+    if (!ds) return;
+    if (!ds._origColors) ds._origColors = [...ds.backgroundColor];
+    const orig = ds._origColors;
+    ds.backgroundColor = orig.map((c, i) => (hoveredIdx == null || i === hoveredIdx ? c : c + "33"));
+    chart.update("none");
+  };
+  return {
+    position: "right",
+    labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
+    onHover(_evt, legendItem, legend) {
+      if (legendItem && legendItem.index != null) dimOther(legend.chart, legendItem.index);
+    },
+    onLeave(_evt, _legendItem, legend) { dimOther(legend.chart, null); },
+  };
+}
+
 function setDashboardChart(id, config) {
   const canvas = document.getElementById(id);
   if (!canvas || typeof Chart === "undefined") return;
@@ -1237,12 +1257,7 @@ function renderDashboardCharts(games) {
       datasets: [{ data: storeEntries.map(([, v]) => v), backgroundColor: storeEntries.map(([k]) => DASH_STORE_COLORS[k] || "#64748b"), borderWidth: 0 }],
     },
     options: dashChartOptions({
-      plugins: {
-        legend: {
-          position: "right",
-          labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
-        },
-      },
+      plugins: { legend: donutLegendHighlight() },
       onClick(_evt, elements) {
         if (!elements.length) return;
         dashDrillStore(storeEntries[elements[0].index][0]);
@@ -1261,12 +1276,7 @@ function renderDashboardCharts(games) {
       datasets: [{ data: statusEntries.map(d => statusCounts[d.key]), backgroundColor: statusEntries.map(d => DASH_STATUS_COLORS[d.key]), borderWidth: 0 }],
     },
     options: dashChartOptions({
-      plugins: {
-        legend: {
-          position: "right",
-          labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
-        },
-      },
+      plugins: { legend: donutLegendHighlight() },
       onClick(_evt, elements) {
         if (!elements.length) return;
         dashDrillStatus(statusEntries[elements[0].index].key);
@@ -1393,12 +1403,7 @@ function renderDashboardCharts(games) {
       datasets: [{ data: revEntries.map(([, n]) => n), backgroundColor: revEntries.map(([k]) => DASH_REVIEW_COLORS[k] || "#475569"), borderWidth: 0 }],
     },
     options: dashChartOptions({
-      plugins: {
-        legend: {
-          position: "right",
-          labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
-        },
-      },
+      plugins: { legend: donutLegendHighlight() },
     }),
   });
 

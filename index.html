@@ -1255,6 +1255,10 @@
     .dash-chart-wrap.tall { height: 320px; }
     .table-hide-score .col-score { display: none; }
     .table-hide-score col.col-score { width: 0; }
+    .table-hide-playtime .col-played { display: none; }
+    .table-hide-playtime col.col-played { width: 0; }
+    .table-hide-lastplayed .col-lastplayed { display: none; }
+    .table-hide-lastplayed col.col-lastplayed { width: 0; }
     #tableWrap { width: 100%; }
     .games-table { width: 100%; table-layout: fixed; min-width: 1280px; }
     .games-table thead th {
@@ -1814,12 +1818,12 @@
           <col class="col-game" style="width:100%" />
           <col style="width:120px" />
           <col class="col-score" style="width:60px" />
-          <col style="width:64px" />
+          <col class="col-played" style="width:64px" />
           <col style="width:112px" />
           <col style="width:64px" />
           <col style="width:170px" />
           <col style="width:96px" />
-          <col style="width:96px" />
+          <col class="col-lastplayed" style="width:96px" />
           <col style="width:128px" />
           <col style="width:240px" />
         </colgroup>
@@ -1830,12 +1834,12 @@
             <th data-sort="name" class="p-2 text-left">Game</th>
             <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
             <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>
-            <th data-sort="playtime_minutes" class="p-2 text-right">Played</th>
+            <th data-sort="playtime_minutes" class="col-played p-2 text-right">Played</th>
             <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
             <th data-sort="steam_review_percent" class="p-2 text-right">Steam %</th>
             <th id="priceHeader" data-sort="discount_percent" class="p-2 text-right">Price</th>
             <th data-sort="release_date" class="p-2 text-left">Released</th>
-            <th data-sort="last_played" class="p-2 text-left">Last played</th>
+            <th data-sort="last_played" class="col-lastplayed p-2 text-left">Last played</th>
             <th class="p-2 text-left">Genres</th>
             <th class="p-2 text-left">Notes</th>
           </tr>

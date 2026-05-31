@@ -37,9 +37,7 @@ def _finalize_steam_row(row: dict) -> dict:
 
 
 def _parse_release_date(data: dict) -> str | None:
-    rd = data.get("release_date", {})
-    if rd.get("coming_soon"):
-        return None
+    rd = data.get("release_date", {}) or {}
     return rd.get("date") or None
 
 

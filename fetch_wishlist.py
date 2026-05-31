@@ -128,7 +128,8 @@ def main() -> int:
             "header_image": (data or {}).get("header_image")
             or f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg",
             "library_image": f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900_2x.jpg",
-            "release_date": None,
+            "release_date": ((data or {}).get("release_date") or {}).get("date") or None,
+            "release_coming_soon": bool(((data or {}).get("release_date") or {}).get("coming_soon")),
             "genres": [g["description"] for g in (data or {}).get("genres", [])],
             "tags": [c["description"] for c in categories[:16]],
             "coop_online": coop_online,

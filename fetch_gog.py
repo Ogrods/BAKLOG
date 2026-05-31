@@ -11,6 +11,8 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
 
@@ -191,21 +193,24 @@ def main() -> int:
     parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games_gog.json")
     parser.add_argument("--id", type=int, dest="gog_id", help="Fetch a single product by GOG ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_gog")
+    stats = RunStats()
 
     load_dotenv()
     gog_al = os.getenv("GOG_AL", "").strip()
     if not gog_al:
-        print("Set GOG_AL in .env (see README for cookie instructions).", file=sys.stderr)
-        return 1
+        stats.error("Set GOG_AL in .env (see README for cookie instructions).")
+        return stats.finish("fetch_gog", t0, exit_code=1)
 
     try:
         gog = GogClient(gog_al)
         gog.validate_session()
     except GogAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_gog", t0, exit_code=1)
 
     hltb_client = HltbClient()
     existing = load_existing()
@@ -214,15 +219,24 @@ def main() -> int:
     try:
         products = gog.get_all_filtered_products(refresh=args.refresh)
     except GogAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_gog", t0, exit_code=1)
 
     if not products:
         owned_ids = gog.get_owned_game_ids()
-        print(f"Found {len(owned_ids)} owned IDs (building from details)...")
+        print(f"Found {len(owned_ids)} owned IDs (building from details)...", flush=True)
         products = [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
     else:
-        print(f"Found {len(products)} products in library.")
+        print(f"Found {len(products)} products in library.", flush=True)
+
+    empty_exit = refuse_empty_result(
+        products,
+        label="GOG library",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_GOG_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_gog", t0, exit_code=empty_exit)
 
     if args.gog_id:
         products = [p for p in products if int(p.get("id") or p.get("productId") or 0) == args.gog_id]
@@ -284,9 +298,10 @@ def main() -> int:
     }
 
     GAMES_GOG_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\nWrote {len(games_out)} games to {GAMES_GOG_JSON} (skipped {skipped} non-game items).")
-    print("Open index.html in your browser to view the dashboard.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_GOG_JSON} (skipped {skipped} non-game items).", flush=True)
+    print("Open index.html in your browser to view the dashboard.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_gog", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

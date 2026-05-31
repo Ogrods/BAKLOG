@@ -12,6 +12,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from psn_client import PsnAuthError, PsnClient, PsnGameEntry
 
 GAMES_PSN_JSON = Path("games_psn.json")
@@ -106,21 +108,24 @@ def main() -> int:
     parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games_psn.json")
     parser.add_argument("--id", dest="psn_id", help="Fetch a single title by np_communication_id or title_id")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_psn")
+    stats = RunStats()
 
     load_dotenv()
     npsso = os.getenv("PSN_NPSSO", "").strip()
     if not npsso:
-        print("Set PSN_NPSSO in .env (see README for NPSSO instructions).", file=sys.stderr)
-        return 1
+        stats.error("Set PSN_NPSSO in .env (see README for NPSSO instructions).")
+        return stats.finish("fetch_psn", t0, exit_code=1)
 
     try:
         psn = PsnClient(npsso)
         online_id = psn.validate_session()
     except PsnAuthError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        stats.error(str(exc))
+        return stats.finish("fetch_psn", t0, exit_code=1)
 
     hltb_client = HltbClient()
     existing = load_existing()
@@ -129,14 +134,23 @@ def main() -> int:
     try:
         library = psn.collect_library()
     except PsnAuthError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        stats.error(str(exc))
+        return stats.finish("fetch_psn", t0, exit_code=1)
 
     if args.psn_id:
         library = [entry for entry in library if entry.id == args.psn_id]
         if not library:
-            print(f"No PSN title found with id {args.psn_id!r}.", file=sys.stderr)
-            return 1
+            stats.error(f"No PSN title found with id {args.psn_id!r}.")
+            return stats.finish("fetch_psn", t0, exit_code=1)
+    else:
+        empty_exit = refuse_empty_result(
+            library,
+            label="PSN library API",
+            allow_empty=args.allow_empty,
+            output_path=GAMES_PSN_JSON,
+        )
+        if empty_exit is not None:
+            return stats.finish("fetch_psn", t0, exit_code=empty_exit)
 
     denied = sum(1 for e in library if e.id in DENYLIST_IDS)
     library = [e for e in library if e.id not in DENYLIST_IDS]
@@ -184,6 +198,15 @@ def main() -> int:
 
         games_out.append(_build_game_row(entry, hltb))
 
+    empty_exit = refuse_empty_result(
+        games_out,
+        label="PSN library rows",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_PSN_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_psn", t0, exit_code=empty_exit)
+
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "store": "psn",
@@ -193,9 +216,10 @@ def main() -> int:
     }
 
     GAMES_PSN_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\nWrote {len(games_out)} games to {GAMES_PSN_JSON}.")
-    print("Open index.html in your browser to view the dashboard.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_PSN_JSON}.", flush=True)
+    print("Open index.html in your browser to view the dashboard.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_psn", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

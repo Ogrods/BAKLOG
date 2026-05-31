@@ -38,6 +38,35 @@ def add_dry_run_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_allow_empty_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Allow writing an empty result (e.g. genuinely empty wishlist).",
+    )
+
+
+def refuse_empty_result(
+    items: list[Any] | int,
+    *,
+    label: str,
+    allow_empty: bool,
+    output_path: Path | None = None,
+) -> int | None:
+    """Return exit code 2 when result is empty and --allow-empty was not passed."""
+    count = len(items) if isinstance(items, list) else items
+    if count or allow_empty:
+        return None
+    where = f" ({output_path})" if output_path else ""
+    print(
+        f"ERROR: {label} returned 0 items{where} — refusing to overwrite existing file.\n"
+        "If this is genuinely empty, re-run with --allow-empty.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 2
+
+
 def load_existing_games(path: Path, *, id_key: str = "id") -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}

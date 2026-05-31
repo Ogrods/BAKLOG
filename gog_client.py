@@ -10,6 +10,18 @@ CACHE_DIR = Path("cache/gog")
 REQUEST_DELAY_SEC = 1.0
 EMBED_BASE = "https://embed.gog.com"
 
+# Per-endpoint cache TTLs. `None` means "cache forever" (legacy behaviour),
+# `0` forces a re-fetch every call. Tuned to balance speed against the
+# staleness bugs we've actually hit:
+#   - user-state lists (owned/wishlist IDs) are tiny and change whenever the
+#     user clicks a heart on gog.com -- never trust cached results.
+#   - paginated owned library metadata is slow to re-fetch but only changes
+#     when you buy a game; refresh once a day.
+#   - per-product detail is essentially immutable once published.
+USER_STATE_TTL = 0
+LIBRARY_TTL = 24 * 60 * 60
+DETAILS_TTL = None
+
 
 class GogAuthError(Exception):
     """Session cookie invalid or expired."""
@@ -39,21 +51,42 @@ class GogClient:
         safe = key.replace("/", "_")
         return self.cache_dir / f"{safe}.json"
 
-    def _read_cache(self, key: str) -> dict | None:
+    def _read_cache(self, key: str, max_age_seconds: float | None = None) -> dict | None:
+        """Return the cached payload for ``key`` if it's still considered fresh.
+
+        ``max_age_seconds`` semantics:
+            - ``None``: cache never expires (legacy behaviour).
+            - ``0``: cache is always stale; callers should re-fetch.
+            - Otherwise: payload is fresh iff it was written within that many
+              seconds ago.
+        """
         path = self._cache_path(key)
-        if path.exists():
+        if not path.exists():
+            return None
+        if max_age_seconds is not None:
+            age = time.time() - path.stat().st_mtime
+            if age > max_age_seconds:
+                return None
+        try:
             return json.loads(path.read_text(encoding="utf-8"))
-        return None
+        except (OSError, json.JSONDecodeError):
+            return None
 
     def _write_cache(self, key: str, data: dict) -> None:
         self._cache_path(key).write_text(
             json.dumps(data, ensure_ascii=False), encoding="utf-8"
         )
 
-    def _get(self, path: str, refresh: bool = False, cache_key: str | None = None) -> dict:
+    def _get(
+        self,
+        path: str,
+        refresh: bool = False,
+        cache_key: str | None = None,
+        max_age_seconds: float | None = None,
+    ) -> dict:
         ck = cache_key or path.replace("/", "_")
         if not refresh:
-            cached = self._read_cache(ck)
+            cached = self._read_cache(ck, max_age_seconds=max_age_seconds)
             if cached is not None:
                 return cached
 
@@ -80,7 +113,11 @@ class GogClient:
         return True
 
     def get_owned_game_ids(self) -> list[int]:
-        data = self._get("/user/data/games", cache_key="user_data_games")
+        data = self._get(
+            "/user/data/games",
+            cache_key="user_data_games",
+            max_age_seconds=USER_STATE_TTL,
+        )
         owned = data.get("owned", data.get("games", []))
         ids: list[int] = []
         for item in owned:
@@ -94,7 +131,12 @@ class GogClient:
 
     def get_filtered_products(self, page: int = 1, refresh: bool = False) -> dict:
         path = f"/account/getFilteredProducts?mediaType=1&sortBy=title&page={page}"
-        return self._get(path, refresh=refresh, cache_key=f"filtered_products_p{page}")
+        return self._get(
+            path,
+            refresh=refresh,
+            cache_key=f"filtered_products_p{page}",
+            max_age_seconds=LIBRARY_TTL,
+        )
 
     def get_all_filtered_products(self, refresh: bool = False) -> list[dict]:
         products: list[dict] = []
@@ -116,4 +158,5 @@ class GogClient:
             f"/account/gameDetails/{product_id}.json",
             refresh=refresh,
             cache_key=f"details_{product_id}",
+            max_age_seconds=DETAILS_TTL,
         )

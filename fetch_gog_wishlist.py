@@ -21,6 +21,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
 
@@ -58,7 +60,18 @@ def _fetch_wishlist_ids(gog: GogClient, refresh: bool) -> list[int]:
     The embed endpoint returns shapes like ``{"wishlist": {"<id>": 1}}`` (current)
     or ``{"products": [<id>, ...]}`` (older); handle both.
     """
-    data = gog._get("/user/wishlist.json", refresh=refresh, cache_key="user_wishlist")
+    # The wishlist ID list is tiny and changes whenever the user heart-clicks
+    # on GOG. Use the user-state TTL (0s) so we don't keep showing yesterday's
+    # snapshot, while still honoring an explicit ``--refresh`` for any future
+    # cache layers we might add.
+    from gog_client import USER_STATE_TTL
+
+    data = gog._get(
+        "/user/wishlist.json",
+        refresh=refresh,
+        cache_key="user_wishlist",
+        max_age_seconds=USER_STATE_TTL,
+    )
     ids: list[int] = []
     wl = data.get("wishlist")
     if isinstance(wl, dict):
@@ -88,9 +101,15 @@ def _fetch_product(session: requests.Session, gog_id: int, country: str) -> dict
             timeout=20,
         )
         if resp.status_code != 200:
+            snippet = (resp.text or "")[:120].replace("\n", " ")
+            print(
+                f"  HTTP {resp.status_code} for {resp.url}: {snippet}",
+                flush=True,
+            )
             return None
         return resp.json()
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        print(f"  request failed for product {gog_id}: {exc}", flush=True)
         return None
 
 
@@ -103,9 +122,15 @@ def _fetch_price(session: requests.Session, gog_id: int, country: str) -> dict |
             timeout=20,
         )
         if resp.status_code != 200:
+            snippet = (resp.text or "")[:120].replace("\n", " ")
+            print(
+                f"  HTTP {resp.status_code} for {resp.url}: {snippet}",
+                flush=True,
+            )
             return None
         return resp.json()
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        print(f"  request failed for price {gog_id}: {exc}", flush=True)
         return None
 
 
@@ -186,53 +211,47 @@ def main() -> int:
     parser.add_argument("--refresh", action="store_true", help="Ignore cached wishlist ID list")
     parser.add_argument("--country", default="US", help="GOG storefront country code (default US)")
     parser.add_argument("--hltb", action="store_true", help="Look up HLTB hours (slow)")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_gog_wishlist")
+    stats = RunStats()
     load_dotenv()
     gog_al = os.getenv("GOG_AL", "").strip()
     if not gog_al:
-        print("Set GOG_AL in .env (see README for cookie instructions).", file=sys.stderr)
-        return 1
+        stats.error("Set GOG_AL in .env (see README for cookie instructions).")
+        return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
 
     try:
         gog = GogClient(gog_al)
         gog.validate_session()
     except GogAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
 
-    print("Fetching GOG wishlist IDs...")
+    print("Fetching GOG wishlist IDs...", flush=True)
     try:
         ids = _fetch_wishlist_ids(gog, refresh=args.refresh)
     except GogAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
-    if not ids:
-        print("Wishlist is empty (or the endpoint shape changed).", file=sys.stderr)
-        # Still write an empty file so the dashboard can show a 0 count cleanly.
-        GAMES_WISHLIST_GOG_JSON.write_text(
-            json.dumps(
-                {
-                    "fetched_at": datetime.now(timezone.utc).isoformat(),
-                    "store": "wishlist_gog",
-                    "game_count": 0,
-                    "games": [],
-                },
-                indent=2,
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-        return 0
+        stats.error(str(e))
+        return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
+    empty_exit = refuse_empty_result(
+        ids,
+        label="GOG wishlist",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_WISHLIST_GOG_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_gog_wishlist", t0, exit_code=empty_exit)
 
-    print(f"Found {len(ids)} GOG wishlist items.")
+    print(f"Found {len(ids)} GOG wishlist items.", flush=True)
     session = requests.Session()
     session.headers["User-Agent"] = "steam-backlog/1.0"
     hltb = HltbClient() if args.hltb else None
 
     rows: list[dict] = []
     for i, gog_id in enumerate(ids, 1):
-        print(f"[{i}/{len(ids)}] product {gog_id}")
+        print(f"[{i}/{len(ids)}] product {gog_id}", flush=True)
         product = _fetch_product(session, gog_id, args.country)
         time.sleep(GOG_PRODUCT_DELAY_SEC)
         price_doc = _fetch_price(session, gog_id, args.country)
@@ -243,8 +262,9 @@ def main() -> int:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb_data = hltb.lookup(product["title"])
             except Exception as e:
-                print(f"  HLTB warning: {e}")
+                stats.warn(f"HLTB for {product['title']!r}: {e}")
         rows.append(_build_row(gog_id, product, price_doc, hltb_data))
+        stats.ok += 1
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -256,8 +276,8 @@ def main() -> int:
         json.dumps(payload, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    print(f"\nWrote {len(rows)} games to {GAMES_WISHLIST_GOG_JSON}.")
-    return 0
+    print(f"\nWrote {len(rows)} games to {GAMES_WISHLIST_GOG_JSON}.", flush=True)
+    return stats.finish("fetch_gog_wishlist", t0, exit_code=0, extra=f"{len(rows)} games")
 
 
 if __name__ == "__main__":

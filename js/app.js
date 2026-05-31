@@ -9,6 +9,7 @@ import {
   GENRE_ALIASES,
   ITCH_NON_GAME_CLASSIFICATIONS,
   STATUS_CHIP_DEFS,
+  WISHLIST_STATUS_CHIP_DEFS,
   STATUS_FILTER_LABELS,
 } from './state.js';
 import { collectTableParams, isEarlyAccess, queryGamesAsync } from './table-query.js';
@@ -19,12 +20,12 @@ import {
   tableVirtualMetrics,
   TABLE_ROW_HEIGHT,
 } from './virtual-table.js';
-import { buildStatusSelect, buildPrioritySelect, STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
+import { buildStatusSelect, STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { createMemo } from './memo.js';
 
 import { escapeHtml, escapeAttr, formatNum } from './dom-util.js';
 import { personalStore, configurePersonalStore, showMigrationBanner } from './personal-store.js';
-import { fetcherRunner, loadFetcherSources, renderDashboardFetcherHealth, configureFetcherHealth } from './fetcher-health.js';
+import { fetcherRunner, loadFetcherSources, renderDashboardFetcherHealth, configureFetcherHealth, consumeItadAutoRunFlag, diffItadDeals } from './fetcher-health.js';
 import {
   initDashboard,
   scheduleDashboardRender,
@@ -138,6 +139,45 @@ function recomputeCrossStoreHidden() {
     if (state.prefs.crossStoreDedup) {
       for (let i = 1; i < list.length; i++) {
         state.crossStoreHiddenKeys.add(gameKey(list[i]));
+      }
+    }
+  }
+  recomputeWishlistCrossStore();
+}
+
+function wishlistEntryStore(g) {
+  return g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
+}
+
+function recomputeWishlistCrossStore() {
+  state.wishlistCrossStoreHiddenKeys = new Set();
+  state.wishlistCrossStoreOwnedStores = new Map();
+  const groups = new Map();
+  for (const g of state.wishlistGames) {
+    const norm = normalizeNameForDedup(g.name);
+    if (!norm) continue;
+    if (!groups.has(norm)) groups.set(norm, []);
+    groups.get(norm).push(g);
+  }
+  for (const [, list] of groups) {
+    if (list.length < 2) continue;
+    list.sort((a, b) => {
+      const pa = storePriority(wishlistEntryStore(a));
+      const pb = storePriority(wishlistEntryStore(b));
+      if (pa !== pb) return pa - pb;
+      return scoreEntry(b) - scoreEntry(a);
+    });
+    const orderedStores = [];
+    for (const g of list) {
+      const s = wishlistEntryStore(g);
+      if (!orderedStores.includes(s)) orderedStores.push(s);
+    }
+    if (orderedStores.length > 1) {
+      state.wishlistCrossStoreOwnedStores.set(gameKey(list[0]), orderedStores);
+    }
+    if (state.prefs.crossStoreDedup) {
+      for (let i = 1; i < list.length; i++) {
+        state.wishlistCrossStoreHiddenKeys.add(gameKey(list[i]));
       }
     }
   }
@@ -426,10 +466,9 @@ function hasEnoughReviews(g) {
   return false;
 }
 function priorityScore(g) {
-  const p = getPersonal(g);
   const review = ratingValue(g);
   const h = hltbMain(g) || 20;
-  return (review * (p.priority + 1)) / Math.log2(h + 2);
+  return review / Math.log2(h + 2);
 }
 function isHiddenGem(g) {
   const p = getPersonal(g);
@@ -491,8 +530,13 @@ function tableColSpan() {
 }
 
 function wishlistBadgeHtml(g) {
-  const target = g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
+  const target = wishlistEntryStore(g);
   const manualMark = g.manual ? " manual" : "";
+  const owned = state.wishlistCrossStoreOwnedStores.get(gameKey(g));
+  if (owned && owned.length > 1) {
+    const tip = `Wishlisted on: ${owned.map(s => s.toUpperCase()).join(", ")}`;
+    return `<span class="inline-flex items-center gap-0.5 align-middle" title="${tip}">${owned.map(s => singleStoreBadgeHtml(s, tip)).join("")}</span>`;
+  }
   const tip = `Wishlist · ${target.toUpperCase()}${g.manual ? " (manual)" : ""}`;
   return `<span class="store-badge ${target}${manualMark}" title="${tip}">${storeLetter(target)}</span>`;
 }
@@ -530,6 +574,10 @@ function wishlistGamesWithDeals(wl) {
 function syncDealFilterControls() {
   const onSaleEl = document.getElementById("dealOnSaleOnly");
   if (onSaleEl) onSaleEl.checked = !!state.prefs.dealOnSaleOnly;
+  const lowEl = document.getElementById("dealHistoricalLowOnly");
+  if (lowEl) lowEl.checked = !!state.prefs.dealHistoricalLowOnly;
+  const hideOwnedEl = document.getElementById("dealHideOwned");
+  if (hideOwnedEl) hideOwnedEl.checked = !!state.prefs.dealHideOwned;
   const minEl = document.getElementById("dealMinDiscount");
   const minVal = document.getElementById("dealMinDiscountVal");
   if (minEl) minEl.value = String(state.prefs.dealMinDiscount || 0);
@@ -869,14 +917,14 @@ function chipStatusKey(g) {
   return getPersonal(g).status || "backlog";
 }
 
-function renderStatusChipsHtml(games) {
-  const counts = Object.fromEntries(STATUS_CHIP_DEFS.map(d => [d.key, 0]));
+function renderStatusChipsHtml(games, defs = STATUS_CHIP_DEFS) {
+  const counts = Object.fromEntries(defs.map(d => [d.key, 0]));
   for (const g of games) {
     const k = chipStatusKey(g);
-    counts[k] = (counts[k] || 0) + 1;
+    if (k in counts) counts[k] = (counts[k] || 0) + 1;
   }
   const active = document.getElementById("statusFilter")?.value || "";
-  return STATUS_CHIP_DEFS.map(def => {
+  return defs.map(def => {
     const n = counts[def.key] || 0;
     if (def.key === "__none__" && n === 0) return "";
     if (n === 0) return "";
@@ -1030,17 +1078,6 @@ function bulkSetStatus(status) {
   renderTable();
 }
 
-function bulkSetPriority(priority) {
-  for (const key of state.selectedKeys) {
-    const g = findGameByKey(key);
-    if (g) setPersonal(g, "priority", priority);
-  }
-  state.selectedKeys.clear();
-  updateBulkBar();
-  invalidateTableCache();
-  renderTable();
-}
-
 function sortedGames(list) {
   return list;
 }
@@ -1083,12 +1120,8 @@ function renderPicks() {
   const backlogRated = visible
     .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) > 0 && (pickView === "itch" || hasEnoughReviews(g)))
     .sort((a, b) => ratingValue(b) - ratingValue(a));
-  const nextUp = visible.filter(g => getPersonal(g).status === "next").sort((a, b) => {
-    const pa = getPersonal(a).priority;
-    const pb = getPersonal(b).priority;
-    if (pb !== pa) return pb - pa;
-    return ratingValue(b) - ratingValue(a);
-  });
+  const nextUp = visible.filter(g => getPersonal(g).status === "next")
+    .sort((a, b) => ratingValue(b) - ratingValue(a));
   const quickWins = visible
     .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) >= 75 && hasEnoughReviews(g) && (hltbMain(g) || 999) <= state.prefs.quickWinMaxHours)
     .sort((a, b) => ratingValue(b) - ratingValue(a));
@@ -1096,15 +1129,13 @@ function renderPicks() {
   const returnTo = visible
     .filter(g => getPersonal(g).status === "unfinished")
     .sort((a, b) => {
-      const pa = getPersonal(a).priority;
-      const pb = getPersonal(b).priority;
-      if (pb !== pa) return pb - pa;
       const la = a.last_played ? Date.parse(a.last_played) : 0;
       const lb = b.last_played ? Date.parse(b.last_played) : 0;
       if (lb !== la) return lb - la;
       return ratingValue(b) - ratingValue(a);
     });
   const wishlistDeals = state.wishlistGames
+    .filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)))
     .filter(g => {
       const d = getDealInfo(g);
       if (!d) return false;
@@ -1215,7 +1246,8 @@ function renderSummary() {
     return;
   }
   if (state.activeView === "wishlist") {
-    const wl = state.wishlistGames;
+    const wl = state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)));
+    const hiddenCount = state.wishlistGames.length - wl.length;
     const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
     const lows = wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; });
     const owned = wl.filter(g => isOwnedByTitle(g.name)).length;
@@ -1223,13 +1255,31 @@ function renderSummary() {
     const avgDisc = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : null;
     const prices = wl.map(g => effectiveSortPrice(g)).filter(p => p != null);
     const avgPrice = prices.length ? (prices.reduce((s, p) => s + p, 0) / prices.length).toFixed(2) : null;
+    const onSaleActive = !!state.prefs.dealOnSaleOnly;
+    const lowOnlyActive = !!state.prefs.dealHistoricalLowOnly;
+    const hideOwnedActive = !!state.prefs.dealHideOwned;
+    const wishlistFiltersDirty = onSaleActive || lowOnlyActive || hideOwnedActive
+      || !!state.prefs.wishlistStoreFilter
+      || !!document.getElementById("statusFilter")?.value;
+    const resetChip = `<button type="button" class="summary-wishlist-reset px-3 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-xs cursor-pointer border border-slate-700${wishlistFiltersDirty ? " text-slate-200" : " text-slate-400 cursor-default"}" title="${wishlistFiltersDirty ? "Clear all wishlist filters" : "All wishlist entries"}"><span>Wishlist</span> <span class="text-slate-100 font-semibold ml-1">${wl.length}</span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</button>`;
+    const onSaleChip = `<button type="button" class="summary-deal-chip${onSaleActive ? " active" : ""}" data-wishlist-deal-filter="onSale" title="${onSaleActive ? "Clear: show only on-sale wishlist items" : "Show only on-sale wishlist items"}">On sale <span class="text-emerald-200 font-semibold ml-1">${onSale.length}</span></button>`;
+    const lowChip = lows.length
+      ? `<button type="button" class="summary-deal-chip historical${lowOnlyActive ? " active" : ""}" data-wishlist-deal-filter="historicalLow" title="${lowOnlyActive ? "Clear: show only historical lows" : "Show only historical lows"}">Historical low <span class="text-amber-300 font-semibold ml-1">${lows.length}</span></button>`
+      : "";
+    const ownedChip = owned
+      ? `<button type="button" class="summary-deal-chip owned${hideOwnedActive ? " active" : ""}" data-wishlist-deal-filter="hideOwned" title="${hideOwnedActive ? "Currently hiding already-owned wishlist items — click to show" : "Hide wishlist items you already own elsewhere"}">Already owned <span class="text-amber-200 font-semibold ml-1">${owned}</span></button>`
+      : "";
+    const statusChips = renderStatusChipsHtml(wl, WISHLIST_STATUS_CHIP_DEFS);
     el.innerHTML = `
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Wishlist <span class="text-slate-100 font-semibold ml-1">${wl.length}</span></div>
-      <div class="px-3 py-2 rounded-full bg-emerald-900/40 border border-emerald-700/50 text-xs">On sale <span class="text-emerald-200 font-semibold ml-1">${onSale.length}</span></div>
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Historical low <span class="text-amber-300 font-semibold ml-1">${lows.length}</span></div>
-      ${avgDisc != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
-      ${avgPrice != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
-      ${owned ? `<div class="px-3 py-2 rounded-full bg-amber-900/30 border border-amber-700/40 text-xs">Already owned <span class="text-amber-200 font-semibold ml-1">${owned}</span></div>` : ""}`;
+      <div class="w-full flex flex-wrap gap-2">
+        ${resetChip}
+        ${onSaleChip}
+        ${lowChip}
+        ${avgDisc != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
+        ${avgPrice != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
+        ${ownedChip}
+      </div>
+      ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
     return;
   }
   if (state.activeView === "itch") {
@@ -1276,6 +1326,7 @@ function renderSummary() {
   const rated = visible.filter(g => ratingValue(g) > 0);
   const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : "—";
   const hiddenCount = state.allGames.length - visible.length;
+  const activeStore = state.prefs.storeFilter || "";
   const storeChips = storeCounts
     .map(s => {
       if (s.key === "itch" && s.count > 0) {
@@ -1286,7 +1337,9 @@ function renderSummary() {
         return `<button type="button" class="summary-jump-chip px-3 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-xs cursor-pointer border border-slate-700" data-jump-view="itch" title="${titleText}">${s.label} <span class="text-slate-100 font-semibold ml-1">${s.count}</span> <span class="text-slate-400 ml-0.5">→</span></button>`;
       }
       if (s.count === 0) return "";
-      return `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">${s.label} <span class="text-slate-100 font-semibold ml-1">${s.count}</span></div>`;
+      const isActive = activeStore === s.key;
+      const title = isActive ? `Clear ${s.label} filter` : `Filter: ${s.label}`;
+      return `<button type="button" class="summary-store-chip${isActive ? " active" : ""}" data-store-filter="${escapeAttr(s.key)}" title="${escapeAttr(title)}">${escapeHtml(s.label)} <span class="text-slate-100 font-semibold ml-1">${s.count}</span></button>`;
     })
     .join("");
   const statusChips = renderStatusChipsHtml(visible);
@@ -1354,17 +1407,24 @@ function hltbLabel(g) {
 function formatPrice(g) {
   const itad = getItadForGame(g);
   if (itad?.price_str) {
-    const cut = itad.cut ? ` (-${itad.cut}%)` : "";
-    const low = itad.is_historical_low ? " 🔥" : "";
-    const shop = itad.shop ? ` @ ${itad.shop}` : "";
-    return `${itad.price_str}${cut}${low}${shop}`;
+    const onSale = (itad.cut || 0) > 0;
+    const cutTxt = onSale ? ` (-${itad.cut}%)` : "";
+    const priceHtml = onSale
+      ? `<span class="text-emerald-300 font-semibold">${escapeHtml(itad.price_str)}${escapeHtml(cutTxt)}</span>`
+      : escapeHtml(itad.price_str);
+    const lowBadge = itad.is_historical_low
+      ? '&nbsp;<span class="deal-badge-low" title="Historical low">★&nbsp;low</span>'
+      : "";
+    const shopHtml = itad.shop ? ` <span class="text-slate-400">@ ${escapeHtml(itad.shop)}</span>` : "";
+    return `<span class="whitespace-nowrap">${priceHtml}${lowBadge}</span>${shopHtml}`;
   }
   if (!g.price && g.discount_percent == null) return "—";
   const base = g.price || "N/A";
-  if ((g.discount_percent || 0) > 0) {
-    return `${base} (-${g.discount_percent}%)`;
+  const cut = g.discount_percent || 0;
+  if (cut > 0) {
+    return `<span class="text-emerald-300 font-semibold">${escapeHtml(base)} (-${cut}%)</span>`;
   }
-  return base;
+  return escapeHtml(base);
 }
 
 function focusGame(key) {
@@ -1503,20 +1563,19 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
       <td class="p-2"><span class="cover-wrap"><img class="cover" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2">
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 flex-wrap">
           ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name", escapeHtml(g.name))}
           ${earlyAccessPillHtml(g)}
-          ${coopPillsHtml(g)}
           ${hiddenGem ? '<span class="text-purple-400" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
           ${ownedWish ? '<span class="text-amber-400 text-xs" title="You already own this (matched by title)">owned</span>' : ""}
         </div>
-        <div class="mt-1">
+        <div class="mt-1 flex items-center gap-1.5 flex-wrap">
           ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
+          ${coopPillsHtml(g)}
         </div>
         ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
       </td>
       ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
-      <td class="p-2 text-center">${buildPrioritySelect(key, p.priority)}</td>
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
       <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
       <td class="p-2 text-right">
@@ -1623,7 +1682,7 @@ async function renderTable(opts) {
     if (onSale) dealBits.push(`${onSale} on sale`);
     if (lows) dealBits.push(`${lows} at historical low`);
     const tail = dealBits.length ? ` · ${dealBits.join(", ")}` : "";
-    base = `Wishlist: ${list.length} of ${state.wishlistGames.length}${tail}`;
+    base = `Wishlist: ${list.length} of ${state.wishlistGames.length - state.wishlistCrossStoreHiddenKeys.size}${tail}`;
   } else if (state.activeView === "itch") {
     const total = state.itchGames.length;
     const gamesOnly = state.itchGames.filter(itchIsGame).length;
@@ -1898,6 +1957,7 @@ function refreshFilterUI(options) {
     scheduleDashboardRender();
     return;
   }
+  renderSummary();
   renderTable();
   if (options?.skipPicks) return;
   renderPicks();
@@ -1927,7 +1987,7 @@ function updateViewChrome() {
   document.getElementById("rowCount")?.classList.toggle("hidden", isDash);
   document.getElementById("alphaNav")?.classList.toggle("dashboard-hidden", isDash);
   document.getElementById("dashboardContainer")?.classList.toggle("hidden", !isDash);
-  document.getElementById("libraryStatusSection")?.classList.toggle("hidden", isWish || isDash);
+  document.getElementById("libraryStatusSection")?.classList.add("hidden");
   document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
   document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isWish || isItch || isDash);
   document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish);
@@ -2010,6 +2070,15 @@ function switchView(view) {
     updateBulkBar();
     updateViewChrome();
     refreshFilterUI();
+    if (view === "dashboard") {
+      fetcherRunner.probeApi().then(async ok => {
+        if (!ok) return;
+        await fetcherRunner.syncFromServer();
+        fetcherRunner.startDashboardPolling();
+      });
+    } else {
+      fetcherRunner.stopDashboardPolling();
+    }
     if (useOverlay) hideViewLoading();
   };
   if (useOverlay) {
@@ -2058,15 +2127,15 @@ function exportCsv() {
   const list = sortedGames(filteredGames());
   const isWish = state.activeView === "wishlist";
   const headers = isWish
-    ? ["store", "wishlist_store", "id", "name", "tracking_status", "priority", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "hltb_main", "release_date", "genres", "tags", "notes", "store_url"]
-    : ["store", "id", "name", "status", "priority", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
+    ? ["store", "wishlist_store", "id", "name", "tracking_status", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "hltb_main", "release_date", "genres", "tags", "notes", "store_url"]
+    : ["store", "id", "name", "status", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
   const rows = list.map(g => {
     const p = getPersonal(g);
     const ng = normalizeGame(g);
     const d = getDealInfo(g);
     if (isWish) {
       return [
-        ng.store, g.wishlist_store ?? "", ng.id, g.name, p.status, p.priority,
+        ng.store, g.wishlist_store ?? "", ng.id, g.name, p.status,
         d?.price != null ? d.price.toFixed(2) : "", effectiveDiscountPercent(g) || "",
         d?.shop ?? "", d?.isHistoricalLow ? "yes" : "",
         g.steam_review_percent ?? "", hltbMain(g) ?? "",
@@ -2075,7 +2144,7 @@ function exportCsv() {
       ];
     }
     return [
-      ng.store, ng.id, g.name, p.status, p.priority, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
+      ng.store, ng.id, g.name, p.status, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
       hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "",
       g.price ?? "", effectiveDiscountPercent(g) || (g.discount_percent ?? ""), g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes
     ];
@@ -2104,11 +2173,52 @@ async function loadItadPrices() {
   }
 }
 
-async function loadHltbCache() {
+function showItadAlertBanner({ newSales, newHistoricalLows }) {
+  const el = document.getElementById("itadAlertBanner");
+  if (!el) return;
+  const parts = [];
+  if (newSales > 0) parts.push(`${newSales} new sale${newSales === 1 ? "" : "s"}`);
+  if (newHistoricalLows > 0) {
+    parts.push(`${newHistoricalLows} new historical low${newHistoricalLows === 1 ? "" : "s"}`);
+  }
+  if (!parts.length) return;
+  el.innerHTML = `
+    <div class="migration-banner-body">
+      <span><strong>Prices refreshed</strong> — ${escapeHtml(parts.join(" · "))}.
+        <button type="button" class="text-sky-300 hover:text-sky-200 underline ml-1" data-itad-view-deals>View deals →</button>
+      </span>
+      <span class="migration-banner-actions">
+        <button type="button" class="fh-log-btn" data-itad-dismiss>Dismiss</button>
+      </span>
+    </div>`;
+  el.classList.remove("hidden");
+  el.querySelector("[data-itad-dismiss]")?.addEventListener("click", () => {
+    state.prefs.itadAlertLastDismissedAt = Date.now();
+    savePrefs();
+    el.classList.add("hidden");
+  }, { once: true });
+  el.querySelector("[data-itad-view-deals]")?.addEventListener("click", () => {
+    state.prefs.itadAlertLastDismissedAt = Date.now();
+    savePrefs();
+    el.classList.add("hidden");
+    if (state.activeView !== "wishlist") {
+      switchView("wishlist");
+    } else {
+      state.prefs.picksTab = "wishlistDeals";
+      savePrefs();
+      document.querySelectorAll(".pick-tab").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.tab === "wishlistDeals");
+      });
+      renderPicks();
+    }
+  }, { once: true });
+}
+
+async function loadCacheMeta(url, metaKey) {
   try {
-    const res = await fetch(`cache/hltb_map.json?t=${Date.now()}`);
+    const res = await fetch(`${url}?t=${Date.now()}`);
     if (!res.ok) {
-      state.libraryMeta.hltb = null;
+      state.libraryMeta[metaKey] = null;
       return;
     }
     const data = await res.json();
@@ -2119,10 +2229,22 @@ async function loadHltbCache() {
         if (Number.isFinite(ts)) data.fetched_at = new Date(ts).toISOString();
       }
     }
-    state.libraryMeta.hltb = data || null;
+    state.libraryMeta[metaKey] = data || null;
   } catch {
-    state.libraryMeta.hltb = null;
+    state.libraryMeta[metaKey] = null;
   }
+}
+
+async function loadHltbCache() {
+  await loadCacheMeta("cache/hltb_map.json", "hltb");
+}
+
+async function loadSteamReviewCache() {
+  await loadCacheMeta("cache/steam_review_map.json", "steamReviews");
+}
+
+async function loadSteamCoversMeta() {
+  await loadCacheMeta("cache/cross_store_images_meta.json", "steamCovers");
 }
 
 function applyMergedLibrary() {
@@ -2131,29 +2253,11 @@ function applyMergedLibrary() {
   invalidateTableCache();
   recomputeCrossStoreHidden();
   buildOwnedNormNames();
-  const parts = [];
-  if (state.libraryMeta.steam) parts.push(`Steam ${state.libraryMeta.steam.game_count} (${new Date(state.libraryMeta.steam.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.gog) parts.push(`GOG ${state.libraryMeta.gog.game_count} (${new Date(state.libraryMeta.gog.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.psn) parts.push(`PSN ${state.libraryMeta.psn.game_count} (${new Date(state.libraryMeta.psn.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.epic) parts.push(`Epic ${state.libraryMeta.epic.game_count} (${new Date(state.libraryMeta.epic.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.amazon) parts.push(`Amazon ${state.libraryMeta.amazon.game_count} (${new Date(state.libraryMeta.amazon.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.xbox) parts.push(`Xbox ${state.libraryMeta.xbox.game_count} (${new Date(state.libraryMeta.xbox.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.battlenet) parts.push(`Battle.net ${state.libraryMeta.battlenet.game_count} (${new Date(state.libraryMeta.battlenet.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.ubisoft) parts.push(`Ubisoft ${state.libraryMeta.ubisoft.game_count} (${new Date(state.libraryMeta.ubisoft.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.nintendo) parts.push(`Nintendo ${state.libraryMeta.nintendo.game_count} (${new Date(state.libraryMeta.nintendo.fetched_at).toLocaleString()})`);
-  if (state.libraryMeta.itch) parts.push(`itch.io ${state.libraryMeta.itch.game_count} (${new Date(state.libraryMeta.itch.fetched_at).toLocaleString()})`);
-  const wlSources = [
-    ["S", state.libraryMeta.wishlist?.game_count],
-    ["G", state.libraryMeta.wishlistGog?.game_count],
-    ["E", state.libraryMeta.wishlistEpic?.game_count],
-  ].filter(([, n]) => typeof n === "number");
-  if (wlSources.length) {
-    const total = wlSources.reduce((a, [, n]) => a + n, 0);
-    const breakdown = wlSources.map(([k, n]) => `${k} ${n}`).join(" · ");
-    parts.push(`Wishlist ${total} (${breakdown})`);
+  const banner = document.getElementById("bootErrorBanner");
+  if (banner) {
+    banner.classList.add("hidden");
+    banner.innerHTML = "";
   }
-  if (Object.keys(state.itadByKey).length) parts.push(`ITAD prices ${Object.keys(state.itadByKey).length}`);
-  document.getElementById("meta").textContent = parts.length ? parts.join(" · ") : "No library data loaded";
   renderStoreChips();
   renderWishlistStoreChips();
   renderGenreChips();
@@ -2172,33 +2276,29 @@ async function fetchLibraryJson(path) {
   return res.json();
 }
 
-configureFetcherHealth({ reloadGames });
-async function reloadGames() {
-  const steam = await fetchLibraryJson("games_steam.json");
-  const gog = await fetchLibraryJson("games_gog.json");
-  const psn = await fetchLibraryJson("games_psn.json");
-  const epic = await fetchLibraryJson("games_epic.json");
-  const amazon = await fetchLibraryJson("games_amazon.json");
-  const nintendo = await fetchLibraryJson("games_nintendo.json");
-  const itch = await fetchLibraryJson("games_itch.json");
-  const xbox = await fetchLibraryJson("games_xbox.json");
-  const battlenet = await fetchLibraryJson("games_battlenet.json");
-  const ubisoft = await fetchLibraryJson("games_ubisoft.json");
-  const steamData = steam;
-  if (!steamData && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft) throw new Error("No library files found");
-  state.libraryMeta.steam = steamData;
-  state.libraryMeta.gog = gog;
-  state.libraryMeta.psn = psn;
-  state.libraryMeta.epic = epic;
-  state.libraryMeta.amazon = amazon;
-  state.libraryMeta.nintendo = nintendo;
-  state.libraryMeta.itch = itch;
-  state.libraryMeta.xbox = xbox;
-  state.libraryMeta.battlenet = battlenet;
-  state.libraryMeta.ubisoft = ubisoft;
+const LIBRARY_STORE_JSON = {
+  steam: "games_steam.json",
+  gog: "games_gog.json",
+  psn: "games_psn.json",
+  epic: "games_epic.json",
+  amazon: "games_amazon.json",
+  nintendo: "games_nintendo.json",
+  itch: "games_itch.json",
+  xbox: "games_xbox.json",
+  battlenet: "games_battlenet.json",
+  ubisoft: "games_ubisoft.json",
+};
+const WISHLIST_FETCHER_JSON = {
+  wishlistSteam: "games_wishlist.json",
+  wishlistGog: "games_wishlist_gog.json",
+  wishlistEpic: "games_wishlist_epic.json",
+};
+const ENRICH_FETCHER_KEYS = new Set(["hltb", "steamReviews", "steamCovers"]);
+
+function rebuildAllGamesFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
   const manualLibrary = allManual.filter(g => !g.wishlist);
-  const manualWishlist = allManual.filter(g => !!g.wishlist);
+  const { steam: steamData, gog, psn, epic, amazon, nintendo, xbox, battlenet, ubisoft, itch } = state.libraryMeta;
   const sources = [
     (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
     (gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
@@ -2215,20 +2315,99 @@ async function reloadGames() {
   state.itchGames = dedupeWithinStore(
     (itch?.games || []).map(g => normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id })),
   );
-  const wishlist = await fetchLibraryJson("games_wishlist.json");
-  const wishlistGog = await fetchLibraryJson("games_wishlist_gog.json");
-  const wishlistEpic = await fetchLibraryJson("games_wishlist_epic.json");
-  state.libraryMeta.wishlist = wishlist;
-  state.libraryMeta.wishlistGog = wishlistGog;
-  state.libraryMeta.wishlistEpic = wishlistEpic;
+}
+
+function rebuildWishlistFromMetas() {
+  const allManual = loadManualGames().map(g => normalizeGame(g));
+  const manualWishlist = allManual.filter(g => !!g.wishlist);
+  const { wishlist, wishlistGog, wishlistEpic } = state.libraryMeta;
   const fetchedWishlist = [
     ...((wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }))),
     ...((wishlistGog?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: `gog-${g.id ?? g.gog_id}`, wishlist_store: "gog" }))),
     ...((wishlistEpic?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `epic-${g.epic_namespace}:${g.epic_offer_id}`, wishlist_store: "epic" }))),
   ];
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
+}
+
+async function reloadAllLibraryStoreFiles() {
+  const entries = await Promise.all(
+    Object.entries(LIBRARY_STORE_JSON).map(async ([metaKey, file]) => {
+      try {
+        return [metaKey, await fetchLibraryJson(file)];
+      } catch {
+        return [metaKey, state.libraryMeta[metaKey] ?? null];
+      }
+    }),
+  );
+  for (const [metaKey, data] of entries) state.libraryMeta[metaKey] = data;
+  rebuildAllGamesFromMetas();
+}
+
+async function reloadAfterFetcher(key) {
+  if (key === "itad") {
+    const prevByKey = { ...state.itadByKey };
+    const wasAuto = consumeItadAutoRunFlag();
+    await loadItadPrices();
+    if (wasAuto) {
+      const diff = diffItadDeals(prevByKey, state.itadByKey);
+      if (diff.newSales > 0 || diff.newHistoricalLows > 0) {
+        showItadAlertBanner(diff);
+      }
+    }
+  } else if (ENRICH_FETCHER_KEYS.has(key)) {
+    await reloadAllLibraryStoreFiles();
+    if (key === "hltb") await loadHltbCache();
+    if (key === "steamReviews") await loadSteamReviewCache();
+    if (key === "steamCovers") await loadSteamCoversMeta();
+  } else if (WISHLIST_FETCHER_JSON[key]) {
+    const metaKey = key === "wishlistSteam" ? "wishlist" : key === "wishlistGog" ? "wishlistGog" : "wishlistEpic";
+    state.libraryMeta[metaKey] = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
+    rebuildWishlistFromMetas();
+  } else if (LIBRARY_STORE_JSON[key]) {
+    state.libraryMeta[key] = await fetchLibraryJson(LIBRARY_STORE_JSON[key]);
+    rebuildAllGamesFromMetas();
+  } else {
+    await reloadGames();
+    return;
+  }
+  applyMergedLibrary();
+}
+
+configureFetcherHealth({ reloadGames, reloadAfterFetcher });
+async function reloadGames() {
+  const steam = await fetchLibraryJson("games_steam.json");
+  const gog = await fetchLibraryJson("games_gog.json");
+  const psn = await fetchLibraryJson("games_psn.json");
+  const epic = await fetchLibraryJson("games_epic.json");
+  const amazon = await fetchLibraryJson("games_amazon.json");
+  const nintendo = await fetchLibraryJson("games_nintendo.json");
+  const itch = await fetchLibraryJson("games_itch.json");
+  const xbox = await fetchLibraryJson("games_xbox.json");
+  const battlenet = await fetchLibraryJson("games_battlenet.json");
+  const ubisoft = await fetchLibraryJson("games_ubisoft.json");
+  if (!steam && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft) throw new Error("No library files found");
+  state.libraryMeta.steam = steam;
+  state.libraryMeta.gog = gog;
+  state.libraryMeta.psn = psn;
+  state.libraryMeta.epic = epic;
+  state.libraryMeta.amazon = amazon;
+  state.libraryMeta.nintendo = nintendo;
+  state.libraryMeta.itch = itch;
+  state.libraryMeta.xbox = xbox;
+  state.libraryMeta.battlenet = battlenet;
+  state.libraryMeta.ubisoft = ubisoft;
+  rebuildAllGamesFromMetas();
+  const wishlist = await fetchLibraryJson("games_wishlist.json");
+  const wishlistGog = await fetchLibraryJson("games_wishlist_gog.json");
+  const wishlistEpic = await fetchLibraryJson("games_wishlist_epic.json");
+  state.libraryMeta.wishlist = wishlist;
+  state.libraryMeta.wishlistGog = wishlistGog;
+  state.libraryMeta.wishlistEpic = wishlistEpic;
+  rebuildWishlistFromMetas();
   await loadItadPrices();
   await loadHltbCache();
+  await loadSteamReviewCache();
+  await loadSteamCoversMeta();
   applyMergedLibrary();
 }
 
@@ -2244,9 +2423,13 @@ function refreshAfterManualChange() {
 }
 
 function renderStoreChips() {
+  // Drawer chips were retired in the filter consolidation; the top-bar summary
+  // chips are the source of truth. Kept for backward compat with callers that
+  // touch this after a state-only filter change (e.g. removeActiveFilter).
   document.querySelectorAll(".store-chip").forEach(chip => {
     chip.classList.toggle("active", chip.dataset.store === (state.prefs.storeFilter || ""));
   });
+  if (state.activeView !== "dashboard") renderSummary();
 }
 
 function renderWishlistStoreChips() {
@@ -2540,12 +2723,6 @@ function handleGlobalKeydown(e) {
     if (g) { setPersonal(g, "status", statusKeys[e.key.toLowerCase()]); renderTable(); }
     return;
   }
-  if (e.key >= "1" && e.key <= "5") {
-    e.preventDefault();
-    const g = list[state.focusedRowIndex] || list[0];
-    if (g) { setPersonal(g, "priority", +e.key); renderTable(); }
-    return;
-  }
   if (e.key === " ") {
     e.preventDefault();
     const g = list[state.focusedRowIndex];
@@ -2575,10 +2752,16 @@ function bindEvents() {
   });
 
   document.getElementById("dashboardFetcherHealth")?.addEventListener("click", e => {
+    const staleBtn = e.target.closest(".fh-run-stale");
+    if (staleBtn && !staleBtn.disabled) {
+      e.preventDefault();
+      fetcherRunner.runAllStale();
+      return;
+    }
     const chip = e.target.closest(".fh-chip[data-fetcher-key]");
     if (!chip || chip.disabled) return;
     e.preventDefault();
-    fetcherRunner.run(chip.dataset.fetcherKey);
+    fetcherRunner.run(chip.dataset.fetcherKey, { refresh: e.shiftKey });
   });
 
   document.getElementById("dashboardWishlistStats")?.addEventListener("click", e => {
@@ -2664,6 +2847,14 @@ function bindEvents() {
     kebabMenu.classList.toggle("open");
   });
   document.addEventListener("click", () => kebabMenu.classList.remove("open"));
+  const itadAutoRefreshToggle = document.getElementById("itadAutoRefreshToggle");
+  if (itadAutoRefreshToggle) {
+    itadAutoRefreshToggle.checked = !state.prefs.itadAutoRefreshDisabled;
+    itadAutoRefreshToggle.addEventListener("change", () => {
+      state.prefs.itadAutoRefreshDisabled = !itadAutoRefreshToggle.checked;
+      savePrefs();
+    });
+  }
   ["search", "statusFilter", "unplayedOnly", "earlyAccessOnly", "coopOnlineOnly", "coopLocalOnly", "minRating", "maxHours"].forEach(id => {
     document.getElementById(id).addEventListener("input", () => {
       document.getElementById("minRatingVal").textContent = document.getElementById("minRating").value;
@@ -2777,15 +2968,9 @@ function bindEvents() {
       renderPicks();
     });
   });
-  document.getElementById("storeChips").addEventListener("click", e => {
-    const chip = e.target.closest(".store-chip");
-    if (!chip) return;
-    if (chip.dataset.store === "itch") { switchView("itch"); return; }
-    state.prefs.storeFilter = chip.dataset.store || "";
-    savePrefs();
-    renderStoreChips();
-    refreshFilterUI();
-  });
+  // The drawer's store-chip row was removed in the filter consolidation;
+  // the top-bar summary chips are the only store-filter UI now. Click handling
+  // for those lives in the #summary listener below.
   document.getElementById("wishlistStoreChips")?.addEventListener("click", e => {
     const chip = e.target.closest(".wishlist-store-chip");
     if (!chip) return;
@@ -2800,6 +2985,38 @@ function bindEvents() {
       const sf = document.getElementById("statusFilter");
       const val = statusChip.dataset.statusFilter;
       sf.value = sf.value === val ? "" : val;
+      refreshFilterUI();
+      return;
+    }
+    const storeChip = e.target.closest(".summary-store-chip");
+    if (storeChip) {
+      const val = storeChip.dataset.storeFilter || "";
+      state.prefs.storeFilter = state.prefs.storeFilter === val ? "" : val;
+      savePrefs();
+      refreshFilterUI();
+      return;
+    }
+    const dealChip = e.target.closest(".summary-deal-chip[data-wishlist-deal-filter]");
+    if (dealChip) {
+      const kind = dealChip.dataset.wishlistDealFilter;
+      if (kind === "onSale") state.prefs.dealOnSaleOnly = !state.prefs.dealOnSaleOnly;
+      else if (kind === "historicalLow") state.prefs.dealHistoricalLowOnly = !state.prefs.dealHistoricalLowOnly;
+      else if (kind === "hideOwned") state.prefs.dealHideOwned = !state.prefs.dealHideOwned;
+      savePrefs();
+      syncDealFilterControls();
+      refreshFilterUI();
+      return;
+    }
+    if (e.target.closest(".summary-wishlist-reset")) {
+      state.prefs.dealOnSaleOnly = false;
+      state.prefs.dealHistoricalLowOnly = false;
+      state.prefs.dealHideOwned = false;
+      state.prefs.wishlistStoreFilter = "";
+      const sf = document.getElementById("statusFilter");
+      if (sf) sf.value = "";
+      savePrefs();
+      syncDealFilterControls();
+      renderWishlistStoreChips();
       refreshFilterUI();
       return;
     }
@@ -2882,11 +3099,11 @@ function bindEvents() {
     const g = findGameByKey(t.dataset.gameKey);
     if (!g) return;
     const field = t.dataset.field;
-    setPersonal(g, field, field === "priority" ? +t.value : t.value);
+    setPersonal(g, field, t.value);
     const tr = t.closest("tr");
     if (tr) updateRowInPlace(tr, g);
     const statusFilterActive = !!document.getElementById("statusFilter").value;
-    const sortAffected = state.sortKey === field || state.sortKey === "priority_score" || state.sortKey === "status";
+    const sortAffected = state.sortKey === field || state.sortKey === "status";
     if ((field === "status" && (statusFilterActive || state.cleanupModeActive)) || sortAffected) {
       scheduleTableRerender();
     }
@@ -2916,11 +3133,6 @@ function bindEvents() {
   document.getElementById("bulkBar")?.addEventListener("click", e => {
     const btn = e.target.closest(".bulk-status");
     if (btn?.dataset.status) bulkSetStatus(btn.dataset.status);
-  });
-  document.getElementById("bulkApplyPriority").addEventListener("click", () => {
-    const v = document.getElementById("bulkPriority").value;
-    if (v === "") return;
-    bulkSetPriority(+v);
   });
   document.getElementById("bulkClear").addEventListener("click", () => {
     state.selectedKeys.clear();
@@ -3158,11 +3370,20 @@ async function bootstrap() {
   try {
     await reloadGames();
   } catch {
-    document.getElementById("meta").innerHTML = '<span class="text-amber-400">Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span>';
+    const banner = document.getElementById("bootErrorBanner");
+    if (banner) {
+      banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">No library data found. Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span></div>';
+      banner.classList.remove("hidden");
+    }
   }
   await loadFetcherSources();
-  fetcherRunner.probeApi().then(available => {
-    if (available && state.activeView === "dashboard") renderDashboardFetcherHealth();
+  fetcherRunner.probeApi().then(async available => {
+    if (!available) return;
+    await fetcherRunner.syncFromServer();
+    if (state.activeView === "dashboard") {
+      fetcherRunner.startDashboardPolling();
+      renderDashboardFetcherHealth();
+    }
   });
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {

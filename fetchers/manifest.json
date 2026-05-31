@@ -1,19 +1,161 @@
 {
   "fetchers": [
-    { "key": "steam", "label": "Steam", "group": "library", "script": "fetch_games.py", "args": ["--skip-hltb"], "metaKey": "steam", "color": "#ea580c" },
-    { "key": "gog", "label": "GOG", "group": "library", "script": "fetch_gog.py", "args": ["--skip-hltb"], "metaKey": "gog", "color": "#6d28d9" },
-    { "key": "psn", "label": "PSN", "group": "library", "script": "fetch_psn.py", "args": ["--skip-hltb"], "metaKey": "psn", "color": "#003791" },
-    { "key": "epic", "label": "Epic", "group": "library", "script": "fetch_epic.py", "args": ["--skip-hltb"], "metaKey": "epic", "color": "#64748b" },
+    {
+      "key": "steam",
+      "label": "Steam",
+      "group": "library",
+      "script": "fetch_games.py",
+      "args": ["--skip-hltb"],
+      "refreshArgs": ["--refresh"],
+      "metaKey": "steam",
+      "color": "#ea580c",
+      "requires": [
+        { "env": "STEAM_API_KEY", "note": "Steam Web API key from steamcommunity.com/dev/apikey" },
+        { "env": "STEAM_ID", "note": "Your SteamID64 (17-digit id from steamid.io)" }
+      ]
+    },
+    {
+      "key": "gog",
+      "label": "GOG",
+      "group": "library",
+      "script": "fetch_gog.py",
+      "args": ["--skip-hltb"],
+      "refreshArgs": ["--refresh"],
+      "metaKey": "gog",
+      "color": "#6d28d9",
+      "requires": [{ "env": "GOG_AL", "note": "Copy gog-al cookie from DevTools after signing in at gog.com" }]
+    },
+    {
+      "key": "psn",
+      "label": "PSN",
+      "group": "library",
+      "script": "fetch_psn.py",
+      "args": ["--skip-hltb"],
+      "refreshArgs": ["--refresh"],
+      "metaKey": "psn",
+      "color": "#003791",
+      "requires": [{ "env": "PSN_NPSSO", "note": "NPSSO token from account.sony.com — see README" }]
+    },
+    {
+      "key": "epic",
+      "label": "Epic",
+      "group": "library",
+      "script": "fetch_epic.py",
+      "args": ["--skip-hltb"],
+      "refreshArgs": ["--refresh"],
+      "metaKey": "epic",
+      "color": "#64748b",
+      "requires": [{ "env": "EPIC_AUTH_CODE", "note": "OAuth auth code — run fetch_epic.py --auth-help" }]
+    },
     { "key": "amazon", "label": "Amazon", "group": "library", "script": "fetch_amazon.py", "args": ["--skip-hltb"], "metaKey": "amazon", "color": "#c2410c" },
-    { "key": "xbox", "label": "Xbox", "group": "library", "script": "fetch_xbox.py", "args": ["--skip-hltb"], "metaKey": "xbox", "color": "#107C10" },
-    { "key": "battlenet", "label": "Battle.net", "group": "library", "script": "fetch_battlenet.py", "args": ["--skip-hltb"], "metaKey": "battlenet", "color": "#148EFF" },
-    { "key": "ubisoft", "label": "Ubisoft", "group": "library", "script": "fetch_ubisoft.py", "args": ["--skip-hltb"], "metaKey": "ubisoft", "color": "#FFD200" },
-    { "key": "nintendo", "label": "Nintendo", "group": "library", "script": "fetch_nintendo.py", "args": ["--skip-hltb"], "metaKey": "nintendo", "color": "#E60012" },
-    { "key": "itch", "label": "itch.io", "group": "library", "script": "fetch_itch.py", "args": ["--skip-hltb"], "metaKey": "itch", "color": "#fa5c5c" },
-    { "key": "wishlistSteam", "label": "WL Steam", "group": "wishlist", "script": "fetch_wishlist.py", "args": ["--skip-hltb"], "metaKey": "wishlist", "color": "#ea580c" },
-    { "key": "wishlistGog", "label": "WL GOG", "group": "wishlist", "script": "fetch_gog_wishlist.py", "metaKey": "wishlistGog", "color": "#6d28d9" },
-    { "key": "wishlistEpic", "label": "WL Epic", "group": "wishlist", "script": "fetch_epic_wishlist.py", "metaKey": "wishlistEpic", "color": "#64748b" },
-    { "key": "itad", "label": "ITAD", "group": "prices", "script": "fetch_itad.py", "metaKey": "itad", "color": "#22d3ee" },
-    { "key": "hltb", "label": "HLTB", "group": "enrich", "script": "enrich_hltb.py", "metaKey": "hltb", "color": "#a78bfa" }
+    {
+      "key": "xbox",
+      "label": "Xbox",
+      "group": "library",
+      "script": "fetch_xbox.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "xbox",
+      "color": "#107C10",
+      "requires": [{ "env": "XBL_API_KEY", "note": "Free key from https://xbl.io/" }]
+    },
+    {
+      "key": "battlenet",
+      "label": "Battle.net",
+      "group": "library",
+      "script": "fetch_battlenet.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "battlenet",
+      "color": "#148EFF",
+      "requires": [{ "env": "BATTLENET_COOKIE", "note": "Paste Cookie header from DevTools — see README" }]
+    },
+    {
+      "key": "ubisoft",
+      "label": "Ubisoft",
+      "group": "library",
+      "script": "fetch_ubisoft.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "ubisoft",
+      "color": "#FFD200",
+      "requires": [
+        { "env": "UBISOFT_AUTH", "note": "Authorization header from ubisoft.com DevTools" },
+        { "env": "UBISOFT_SESSION_ID", "note": "Ubi-SessionId header from ubisoft.com DevTools" }
+      ]
+    },
+    {
+      "key": "nintendo",
+      "label": "Nintendo",
+      "group": "library",
+      "script": "fetch_nintendo.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "nintendo",
+      "color": "#E60012",
+      "requires": [{ "env": "NINTENDO_COOKIE", "note": "Cookie from ec.nintendo.com transactions page" }]
+    },
+    {
+      "key": "itch",
+      "label": "itch.io",
+      "group": "library",
+      "script": "fetch_itch.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "itch",
+      "color": "#fa5c5c",
+      "requires": [{ "env": "ITCH_API_KEY", "note": "API key from itch.io user settings" }]
+    },
+    {
+      "key": "wishlistSteam",
+      "label": "WL Steam",
+      "group": "wishlist",
+      "script": "fetch_wishlist.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "wishlist",
+      "color": "#ea580c",
+      "requires": [
+        { "env": "STEAM_API_KEY", "note": "Steam Web API key from steamcommunity.com/dev/apikey" },
+        { "env": "STEAM_ID", "note": "Your SteamID64 — profile and wishlist must be public" }
+      ]
+    },
+    {
+      "key": "wishlistGog",
+      "label": "WL GOG",
+      "group": "wishlist",
+      "script": "fetch_gog_wishlist.py",
+      "refreshArgs": ["--refresh"],
+      "metaKey": "wishlistGog",
+      "color": "#6d28d9",
+      "requires": [{ "env": "GOG_AL", "note": "Same gog-al cookie as GOG library fetch" }]
+    },
+    {
+      "key": "wishlistEpic",
+      "label": "WL Epic",
+      "group": "wishlist",
+      "script": "fetch_epic_wishlist.py",
+      "metaKey": "wishlistEpic",
+      "color": "#64748b",
+      "requires": [{ "env": "EPIC_STORE_COOKIE", "note": "Storefront Cookie from store.epicgames.com" }]
+    },
+    {
+      "key": "itad",
+      "label": "ITAD",
+      "group": "prices",
+      "script": "fetch_itad.py",
+      "metaKey": "itad",
+      "color": "#22d3ee",
+      "requires": [{ "env": "ITAD_API_KEY", "note": "Free API key from isthereanydeal.com/dev/api/" }]
+    },
+    { "key": "hltb", "label": "HLTB", "group": "enrich", "script": "enrich_hltb.py", "refreshArgs": ["--retry-misses"], "metaKey": "hltb", "color": "#a78bfa" },
+    {
+      "key": "steamReviews",
+      "label": "Reviews",
+      "group": "enrich",
+      "script": "enrich_steam_reviews.py",
+      "refreshArgs": ["--retry-misses"],
+      "metaKey": "steamReviews",
+      "color": "#66c0f4",
+      "requires": [
+        { "env": "STEAM_API_KEY", "note": "Used for Steam store search when backfilling review %" },
+        { "env": "STEAM_ID", "note": "Steam Web API identity (same as library fetch)" }
+      ]
+    },
+    { "key": "steamCovers", "label": "Covers", "group": "enrich", "script": "enrich_cross_store_images.py", "refreshArgs": ["--retry-misses"], "metaKey": "steamCovers", "color": "#1b2838" }
   ]
 }

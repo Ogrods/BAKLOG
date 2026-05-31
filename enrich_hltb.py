@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from fetchers._progress import RunStats, heartbeat, started
 from hltb_client import HltbClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -23,18 +24,26 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 MAPPING_FILE = Path("cache/hltb_map.json")
 QUERY_DELAY_SEC = 0.4  # be polite to HLTB; howlongtobeatpy doesn't throttle itself
 SAVE_EVERY_N_LOOKUPS = 25
+HEARTBEAT_EVERY = 25
+
+def _itch_is_videogame(row: dict) -> bool:
+    # itch.io is full of TTRPG PDFs, asset packs, soundtracks etc. — only
+    # rows tagged `classification: "game"` are worth running through HLTB.
+    return row.get("classification") == "game"
+
 
 STORE_FILES = [
-    ("games_steam.json", "steam"),
-    ("games_gog.json", "gog"),
-    ("games_psn.json", "psn"),
-    ("games_epic.json", "epic"),
-    ("games_amazon.json", "amazon"),
-    ("games_xbox.json", "xbox"),
-    ("games_battlenet.json", "battlenet"),
-    ("games_ubisoft.json", "ubisoft"),
-    ("games_nintendo.json", "nintendo"),
-    ("games_wishlist.json", "wishlist"),
+    ("games_steam.json", "steam", None),
+    ("games_gog.json", "gog", None),
+    ("games_psn.json", "psn", None),
+    ("games_epic.json", "epic", None),
+    ("games_amazon.json", "amazon", None),
+    ("games_xbox.json", "xbox", None),
+    ("games_battlenet.json", "battlenet", None),
+    ("games_ubisoft.json", "ubisoft", None),
+    ("games_nintendo.json", "nintendo", None),
+    ("games_wishlist.json", "wishlist", None),
+    ("games_itch.json", "itch", _itch_is_videogame),
 ]
 
 HLTB_FIELDS = (
@@ -73,17 +82,19 @@ def main() -> int:
     )
     parser.add_argument(
         "--store",
-        choices=[s for _, s in STORE_FILES],
+        choices=[s for _, s, _ in STORE_FILES],
         help="Only enrich one store (default: all).",
     )
     args = parser.parse_args()
 
+    t0 = started("enrich_hltb")
+    stats = RunStats()
     hltb = HltbClient()
     mapping = load_mapping()
     grand_lookups = 0
     grand_updated = 0
 
-    for filename, store in STORE_FILES:
+    for filename, store, row_filter in STORE_FILES:
         if args.store and args.store != store:
             continue
         path = Path(filename)
@@ -91,17 +102,34 @@ def main() -> int:
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         games = data.get("games", [])
-        missing = [g for g in games if g.get("hltb_main_hours") is None]
+        eligible = games if row_filter is None else [g for g in games if row_filter(g)]
+        missing = [g for g in eligible if g.get("hltb_main_hours") is None]
         if not missing:
-            print(f"=== {filename}: nothing to enrich ===")
+            print(f"=== {filename}: nothing to enrich ===", flush=True)
             continue
-        print(f"\n=== {filename}: {len(missing)}/{len(games)} need HLTB ===")
+        filter_note = f" ({len(eligible)} eligible)" if row_filter is not None else ""
+        print(
+            f"\n=== {filename}: {len(missing)}/{len(games)} need HLTB{filter_note} ===",
+            flush=True,
+        )
         updated = 0
+        store_lookups = 0
+        store_hits = 0
+        store_misses = 0
+        store_skipped = 0
+        processed = 0
         for i, g in enumerate(missing, 1):
             key = f"{store}:{g.get('id')}"
             cached = mapping.get(key)
+            processed += 1
 
             if cached is False and not args.retry_misses:
+                store_skipped += 1
+                if processed % HEARTBEAT_EVERY == 0:
+                    heartbeat(
+                        f"[{i}/{len(missing)}] skipped {store_skipped} cached misses, "
+                        f"{store_lookups} lookups (+{store_hits} hits) — still working"
+                    )
                 continue
 
             if isinstance(cached, dict):
@@ -111,12 +139,22 @@ def main() -> int:
                 try:
                     hit = hltb.lookup(g.get("name") or "")
                 except Exception as e:
-                    print(f"  hltb error for {g.get('name')!r}: {e}")
+                    stats.warn(f"hltb error for {g.get('name')!r}: {e}")
                     continue
                 grand_lookups += 1
+                store_lookups += 1
+                if hit:
+                    store_hits += 1
+                else:
+                    store_misses += 1
                 mapping[key] = hit if hit else False
                 if grand_lookups % SAVE_EVERY_N_LOOKUPS == 0:
                     save_mapping(mapping)
+                if store_lookups % HEARTBEAT_EVERY == 0:
+                    heartbeat(
+                        f"[{i}/{len(missing)}] checked {store_lookups} "
+                        f"(+{store_hits} hits, {store_misses} no-match) — still working"
+                    )
 
             if not hit:
                 continue
@@ -126,25 +164,35 @@ def main() -> int:
                     g[field] = hit[field]
             updated += 1
             grand_updated += 1
+            stats.ok += 1
             if updated % 25 == 0:
                 print(
                     f"  [{i}/{len(missing)}] {updated} updated so far "
                     f"({g.get('name')} -> {hit.get('hltb_main_hours')}h, "
-                    f"match {hit.get('hltb_match_confidence')})"
+                    f"match {hit.get('hltb_match_confidence')})",
+                    flush=True,
                 )
 
         data["game_count"] = len(games)
         path.write_text(
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"  saved {updated} HLTB updates to {filename}")
+        print(
+            f"  saved {updated} HLTB updates to {filename} "
+            f"({store_lookups} lookups: {store_hits} hits, {store_misses} no-match, "
+            f"{store_skipped} skipped from cache)",
+            flush=True,
+        )
         save_mapping(mapping)
 
     save_mapping(mapping)
-    print(
-        f"\nDone. {grand_lookups} fresh HLTB lookups, {grand_updated} rows updated."
+    stats.ok = grand_updated
+    return stats.finish(
+        "enrich_hltb",
+        t0,
+        exit_code=0,
+        extra=f"{grand_lookups} lookups, {grand_updated} updated",
     )
-    return 0
 
 
 if __name__ == "__main__":

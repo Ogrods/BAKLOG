@@ -16,6 +16,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from fetchers._progress import RunStats, started
 from nintendo_client import NintendoAuthError, NintendoClient
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
@@ -155,24 +156,25 @@ def main() -> int:
     )
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_nintendo")
+    stats = RunStats()
     load_dotenv()
     cookie = os.getenv("NINTENDO_COOKIE", "").strip()
     if not cookie:
-        print(
+        stats.error(
             "Set NINTENDO_COOKIE in .env:\n"
             "  1. https://ec.nintendo.com/my/transactions/\n"
             "  2. DevTools → Network → filter transactions\n"
-            "  3. Click transactions?limit=… → copy Cookie header",
-            file=sys.stderr,
+            "  3. Click transactions?limit=… → copy Cookie header"
         )
-        return 1
+        return stats.finish("fetch_nintendo", t0, exit_code=1)
 
     try:
         client = NintendoClient(cookie)
         raw_tx = client.fetch_all_transactions()
     except NintendoAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_nintendo", t0, exit_code=1)
 
     print(f"Fetched {len(raw_tx)} raw transactions.")
 
@@ -187,12 +189,11 @@ def main() -> int:
     print(f"Found {len(merged)} unique game/DLC titles (after filtering funds/NSO).")
 
     if not merged:
-        print(
+        stats.error(
             "No games found. Check cache/nintendo_raw.json — cookie may be valid "
-            "but account has no eShop purchases in the last ~2 years.",
-            file=sys.stderr,
+            "but account has no eShop purchases in the last ~2 years."
         )
-        return 2
+        return stats.finish("fetch_nintendo", t0, exit_code=2)
 
     hltb_client = HltbClient()
     games_out: list[dict] = []
@@ -217,9 +218,10 @@ def main() -> int:
     GAMES_NINTENDO_JSON.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\nWrote {len(games_out)} games to {GAMES_NINTENDO_JSON}.")
-    print("Reload the dashboard to see your Nintendo library.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_NINTENDO_JSON}.", flush=True)
+    print("Reload the dashboard to see your Nintendo library.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_nintendo", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

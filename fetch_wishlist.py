@@ -13,6 +13,8 @@ import requests
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._progress import RunStats, started
 from steam_client import SteamClient
 
 GAMES_WISHLIST_JSON = Path("games_wishlist.json")
@@ -43,26 +45,34 @@ def fetch_wishlist_items(api_key: str, steam_id: str) -> list[dict]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Steam wishlist")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_wishlist")
+    stats = RunStats()
     load_dotenv()
     api_key = os.getenv("STEAM_API_KEY", "").strip()
     steam_id = os.getenv("STEAM_ID", "").strip()
     if not api_key or not steam_id:
-        print("Set STEAM_API_KEY and STEAM_ID in .env", file=sys.stderr)
-        return 1
+        stats.error("Set STEAM_API_KEY and STEAM_ID in .env")
+        return stats.finish("fetch_wishlist", t0, exit_code=1)
 
     print("Fetching Steam wishlist...")
     try:
         items = fetch_wishlist_items(api_key, steam_id)
     except requests.HTTPError as e:
-        print(f"Wishlist API error: {e}", file=sys.stderr)
-        print("Ensure your Steam profile and wishlist are public.", file=sys.stderr)
-        return 1
+        stats.error(f"Wishlist API error: {e}")
+        stats.error("Ensure your Steam profile and wishlist are public.")
+        return stats.finish("fetch_wishlist", t0, exit_code=1)
 
-    if not items:
-        print("Wishlist empty or not accessible.", file=sys.stderr)
-        return 2
+    empty_exit = refuse_empty_result(
+        items,
+        label="Steam wishlist",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_WISHLIST_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_wishlist", t0, exit_code=empty_exit)
 
     print(f"Found {len(items)} wishlist items.")
     steam = SteamClient(api_key, steam_id)
@@ -139,6 +149,15 @@ def main() -> int:
         }
         games_out.append(row)
 
+    empty_exit = refuse_empty_result(
+        games_out,
+        label="Steam wishlist rows",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_WISHLIST_JSON,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_wishlist", t0, exit_code=empty_exit)
+
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "store": "wishlist",
@@ -146,8 +165,9 @@ def main() -> int:
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
     GAMES_WISHLIST_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\nWrote {len(games_out)} games to {GAMES_WISHLIST_JSON}.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_WISHLIST_JSON}.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_wishlist", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

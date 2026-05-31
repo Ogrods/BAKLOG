@@ -7,9 +7,10 @@ the browser via Server-Sent Events. Also owns the user's personal data
 browser changes, port changes, and cache wipes.
 
 Endpoints:
-    GET  /api/runs            -> {active, queue, history}
-    POST /api/run/<key>       -> {run_id, status}    (queues a fetcher)
-    GET  /api/stream/<run_id> -> SSE: line / done / error events
+    GET  /api/runs                 -> {active, queue, history}
+    POST /api/run/<key>            -> {run_id, status}    (queues a fetcher)
+    POST /api/run/<run_id>/cancel  -> cancel queued or running fetcher
+    GET  /api/stream/<run_id>      -> SSE: line / done / error events
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
 
@@ -18,9 +19,11 @@ so the browser cannot execute arbitrary commands.
 """
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import queue
+import signal
 import subprocess
 import sys
 import threading
@@ -34,10 +37,28 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+except ImportError:
+    pass
+
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
-MAX_HISTORY = 20
-MAX_LINES_PER_RUN = 5000
+MAX_HISTORY = 200
+MAX_LINES_PER_RUN = 25_000
+MAX_SSE_CONNECTIONS = 8
+STALL_FIRST_NOTICE_SEC = 30
+STALL_REPEAT_SEC = 60
+STALL_POLL_SEC = 1.0
+RUNS_DIR = ROOT / "cache" / "runs"
+ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
+RUN_HISTORY_FILE = RUNS_DIR / "history.json"
+
+_sse_connections = 0
+_sse_lock = threading.Lock()
 
 # Personal-data persistence.
 # This file is the source of truth for the user's edits. localStorage in the
@@ -181,17 +202,98 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
         if not isinstance(extra_args, list):
             print(f"[fetchers] {key}: 'args' must be a list, ignoring", file=sys.stderr)
             extra_args = []
+        requires = entry.get("requires") or []
+        if not isinstance(requires, list):
+            requires = []
+        refresh_args = entry.get("refreshArgs") or []
+        if not isinstance(refresh_args, list):
+            refresh_args = []
         fetchers[key] = {
             "label": label,
             "argv": _argv(script, *map(str, extra_args)),
+            "refreshArgs": [str(a) for a in refresh_args],
             "metaKey": entry.get("metaKey", key),
             "group": entry.get("group", "library"),
             "color": entry.get("color"),
+            "requires": requires,
         }
     return fetchers
 
 
+def _missing_requirements(requires: list[dict[str, Any]]) -> list[str]:
+    missing: list[str] = []
+    for req in requires:
+        if not isinstance(req, dict):
+            continue
+        env_name = (req.get("env") or "").strip()
+        if env_name and not os.getenv(env_name, "").strip():
+            missing.append(env_name)
+    return missing
+
+
 FETCHERS: dict[str, dict[str, Any]] = _load_fetchers()
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _terminate_pid(pid: int) -> None:
+    if pid <= 0:
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            capture_output=True,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    else:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+
+
+def _read_json_file(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return default
+
+
+def _write_json_atomic(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _read_active_runs() -> list[dict[str, Any]]:
+    data = _read_json_file(ACTIVE_RUNS_FILE, {"runs": []})
+    runs = data.get("runs") if isinstance(data, dict) else []
+    return runs if isinstance(runs, list) else []
+
+
+def _write_active_runs(runs: list[dict[str, Any]]) -> None:
+    _write_json_atomic(ACTIVE_RUNS_FILE, {"runs": runs})
+
+
+def _load_run_history() -> list[dict[str, Any]]:
+    data = _read_json_file(RUN_HISTORY_FILE, [])
+    return data if isinstance(data, list) else []
+
+
+def _save_run_history(entries: list[dict[str, Any]]) -> None:
+    _write_json_atomic(RUN_HISTORY_FILE, entries[:MAX_HISTORY])
 
 
 class Run:
@@ -199,19 +301,26 @@ class Run:
 
     __slots__ = (
         "id", "key", "label", "status", "started_at", "ended_at", "exit_code",
-        "lines", "_lock", "_listeners", "_finished",
+        "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
+        "_log_path", "_runs_dir",
     )
 
-    def __init__(self, key: str) -> None:
+    def __init__(self, key: str, refresh: bool = False, *, runs_dir: Path = RUNS_DIR) -> None:
         spec = FETCHERS[key]
         self.id: str = uuid.uuid4().hex[:12]
         self.key: str = key
         self.label: str = spec["label"]
-        self.status: str = "queued"  # queued | running | done | failed
+        self.refresh: bool = refresh
+        self.status: str = "queued"  # queued | running | done | failed | cancelled
         self.started_at: float | None = None
         self.ended_at: float | None = None
         self.exit_code: int | None = None
-        # Capped ring buffer so a runaway script can't OOM the server.
+        self.cancelled: bool = False
+        self._proc: subprocess.Popen[str] | None = None
+        self._runs_dir = runs_dir
+        self._runs_dir.mkdir(parents=True, exist_ok=True)
+        self._log_path = self._runs_dir / f"{self.id}.jsonl"
+        # Ring buffer for live listeners; full log is on disk for replay.
         self.lines: deque[dict[str, Any]] = deque(maxlen=MAX_LINES_PER_RUN)
         self._lock = threading.Lock()
         self._listeners: set[queue.Queue] = set()
@@ -233,6 +342,11 @@ class Run:
         msg = {"t": time.time(), "stream": stream, "text": text}
         with self._lock:
             self.lines.append(msg)
+            try:
+                with self._log_path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(msg, ensure_ascii=False) + "\n")
+            except OSError as exc:
+                print(f"[runs] log write failed {self.id}: {exc!r}", file=sys.stderr)
             for q in list(self._listeners):
                 try:
                     q.put_nowait(("line", msg))
@@ -248,11 +362,27 @@ class Run:
                 except queue.Full:
                     self._listeners.discard(q)
 
+    def replay_lines(self) -> list[dict[str, Any]]:
+        if self._log_path.exists():
+            replay: list[dict[str, Any]] = []
+            try:
+                with self._log_path.open(encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        replay.append(json.loads(line))
+                return replay
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"[runs] log read failed {self.id}: {exc!r}", file=sys.stderr)
+        with self._lock:
+            return list(self.lines)
+
     def attach_listener(self) -> tuple[queue.Queue, list[dict[str, Any]], bool]:
         """Return (queue, replay-buffer, already-finished)."""
         q: queue.Queue = queue.Queue(maxsize=1024)
         with self._lock:
-            replay = list(self.lines)
+            replay = self.replay_lines()
             done = self._finished.is_set()
             if not done:
                 self._listeners.add(q)
@@ -265,29 +395,150 @@ class Run:
     def mark_finished(self) -> None:
         self._finished.set()
 
+    def argv(self) -> list[str]:
+        spec = FETCHERS[self.key]
+        argv = list(spec["argv"])
+        if self.refresh:
+            for arg in spec.get("refreshArgs") or []:
+                if arg not in argv:
+                    argv.append(arg)
+        return argv
+
+    def cancel(self) -> bool:
+        proc = None
+        notify_done = False
+        with self._lock:
+            if self.status in ("done", "failed", "cancelled") or self._finished.is_set():
+                return False
+            if self.status == "queued":
+                self.status = "cancelled"
+                self.exit_code = -1
+                self.ended_at = time.time()
+                notify_done = True
+            elif self.status == "running":
+                self.cancelled = True
+                proc = self._proc
+            else:
+                return False
+        if notify_done:
+            self.add_line("stderr", "[server] cancelled before start")
+            self.mark_finished()
+            self.broadcast(
+                "done",
+                {
+                    "status": self.status,
+                    "exit_code": self.exit_code,
+                    "started_at": self.started_at,
+                    "ended_at": self.ended_at,
+                },
+            )
+            return True
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+        return True
+
 
 class RunManager:
     """Single-worker queue. Fetchers may share locks (PSN session, etc.) so
     we deliberately serialize them rather than spawn in parallel."""
 
-    def __init__(self) -> None:
+    def __init__(self, runs_dir: Path | None = None) -> None:
+        self._runs_dir = runs_dir or RUNS_DIR
+        self._runs_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._queue: queue.Queue[Run] = queue.Queue()
         self._pending: list[Run] = []  # queued + active, in submission order
-        self._history: deque[Run] = deque(maxlen=MAX_HISTORY)
+        self._history: deque[dict[str, Any]] = deque(
+            _load_run_history()[-MAX_HISTORY:],
+            maxlen=MAX_HISTORY,
+        )
         self._active: Run | None = None
         self._runs_by_id: dict[str, Run] = {}
+        self._reap_orphan_processes()
         threading.Thread(target=self._worker_loop, name="run-worker", daemon=True).start()
 
-    def submit(self, key: str) -> Run:
+    def _append_history(self, summary: dict[str, Any]) -> None:
+        with self._lock:
+            self._history.appendleft(summary)
+            _save_run_history(list(self._history))
+
+    def _register_active_process(self, run: Run, pid: int) -> None:
+        entry = {
+            "id": run.id,
+            "pid": pid,
+            "key": run.key,
+            "label": run.label,
+            "started_at": run.started_at,
+        }
+        active = [e for e in _read_active_runs() if e.get("id") != run.id]
+        active.append(entry)
+        _write_active_runs(active)
+
+    def _unregister_active_process(self, run_id: str) -> None:
+        active = [e for e in _read_active_runs() if e.get("id") != run_id]
+        _write_active_runs(active)
+
+    def _reap_orphan_processes(self) -> None:
+        for entry in _read_active_runs():
+            pid = int(entry.get("pid") or 0)
+            if _pid_alive(pid):
+                _terminate_pid(pid)
+            summary = {
+                "id": entry.get("id", "?"),
+                "key": entry.get("key", "?"),
+                "label": entry.get("label", "?"),
+                "status": "failed",
+                "started_at": entry.get("started_at"),
+                "ended_at": time.time(),
+                "exit_code": -1,
+                "line_count": 0,
+                "note": "orphaned — previous server stopped while this fetcher was running",
+            }
+            self._append_history(summary)
+        _write_active_runs([])
+
+    def shutdown(self) -> None:
+        with self._lock:
+            pending = list(self._pending)
+            active = self._active
+        for run in pending:
+            run.cancel()
+        if active is not None:
+            active.cancel()
+            proc = active._proc
+            if proc is not None and proc.poll() is None:
+                try:
+                    proc.terminate()
+                except OSError:
+                    pass
+        _write_active_runs([])
+
+    def submit(self, key: str, *, refresh: bool = False) -> Run:
         if key not in FETCHERS:
             raise KeyError(key)
-        run = Run(key)
+        with self._lock:
+            if any(r.key == key and r.status in ("queued", "running") for r in self._pending):
+                raise ValueError(f"{key} already queued or running")
+        run = Run(key, refresh=refresh, runs_dir=self._runs_dir)
         with self._lock:
             self._pending.append(run)
             self._runs_by_id[run.id] = run
         self._queue.put(run)
         return run
+
+    def cancel(self, run_id: str) -> tuple[Run | None, str | None]:
+        with self._lock:
+            run = self._runs_by_id.get(run_id)
+            if run is None:
+                return None, "not_found"
+            if run.status in ("done", "failed", "cancelled") or run._finished.is_set():
+                return None, "already_finished"
+        if not run.cancel():
+            return None, "already_finished"
+        with self._lock:
+            if run in self._pending:
+                self._pending.remove(run)
+        return run, None
 
     def get(self, run_id: str) -> Run | None:
         with self._lock:
@@ -297,41 +548,53 @@ class RunManager:
         with self._lock:
             active = self._active.to_summary() if self._active else None
             queued = [r.to_summary() for r in self._pending if r.status == "queued"]
-            history = [r.to_summary() for r in self._history]
+            history = list(self._history)
         return {"active": active, "queue": queued, "history": history}
 
-    def _worker_loop(self) -> None:
-        while True:
-            run = self._queue.get()
-            with self._lock:
-                self._active = run
-            try:
-                self._execute(run)
-            except Exception as exc:  # noqa: BLE001 - surface anything the subprocess plumbing might raise.
-                run.status = "failed"
-                run.exit_code = -1
-                run.add_line("stderr", f"[server] worker error: {exc!r}")
-            finally:
+    def _finalize_run(self, run: Run) -> None:
+        if not run._finished.is_set():
+            if run.ended_at is None:
                 run.ended_at = time.time()
-                run.mark_finished()
-                run.broadcast("done", {
+            run.mark_finished()
+            run.broadcast(
+                "done",
+                {
                     "status": run.status,
                     "exit_code": run.exit_code,
                     "started_at": run.started_at,
                     "ended_at": run.ended_at,
-                })
+                },
+            )
+        with self._lock:
+            if self._active is run:
+                self._active = None
+            if run in self._pending:
+                self._pending.remove(run)
+        self._unregister_active_process(run.id)
+        self._append_history(run.to_summary())
+
+    def _worker_loop(self) -> None:
+        while True:
+            run = self._queue.get()
+            if not run._finished.is_set():
                 with self._lock:
-                    self._active = None
-                    if run in self._pending:
-                        self._pending.remove(run)
-                    self._history.appendleft(run)
+                    self._active = run
+                try:
+                    if run.status != "cancelled":
+                        self._execute(run)
+                except Exception as exc:  # noqa: BLE001 - surface anything the subprocess plumbing might raise.
+                    if not run.cancelled:
+                        run.status = "failed"
+                        run.exit_code = -1
+                        run.add_line("stderr", f"[server] worker error: {exc!r}")
+            self._finalize_run(run)
 
     def _execute(self, run: Run) -> None:
-        spec = FETCHERS[run.key]
+        argv = run.argv()
         run.status = "running"
         run.started_at = time.time()
         run.broadcast("status", {"status": run.status, "started_at": run.started_at})
-        run.add_line("stdout", f"$ {' '.join(spec['argv'])}")
+        run.add_line("stdout", f"$ {' '.join(argv)}")
 
         env = os.environ.copy()
         # Force unbuffered Python output so we see progress in real time.
@@ -340,7 +603,7 @@ class RunManager:
 
         try:
             proc = subprocess.Popen(  # noqa: S603 - argv is fixed in FETCHERS, not user input
-                spec["argv"],
+                argv,
                 cwd=str(ROOT),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -356,12 +619,66 @@ class RunManager:
             run.add_line("stderr", f"[server] cannot launch: {exc}")
             return
 
+        run._proc = proc
+        if proc.pid:
+            self._register_active_process(run, proc.pid)
         assert proc.stdout is not None
-        for line in proc.stdout:
-            run.add_line("stdout", line.rstrip("\n"))
+
+        line_queue: queue.Queue[str | None] = queue.Queue()
+
+        def _reader() -> None:
+            try:
+                for raw in proc.stdout:
+                    line_queue.put(raw.rstrip("\n"))
+            finally:
+                line_queue.put(None)
+
+        threading.Thread(target=_reader, daemon=True).start()
+
+        last_line_at = time.monotonic()
+        last_stall_notice_at = 0.0
+        reader_done = False
+
+        while not reader_done:
+            if run.cancelled:
+                break
+            try:
+                line = line_queue.get(timeout=STALL_POLL_SEC)
+            except queue.Empty:
+                line = "__POLL__"
+            now = time.monotonic()
+            if line == "__POLL__":
+                if proc.poll() is not None and line_queue.empty():
+                    break
+                silent = now - last_line_at
+                if silent >= STALL_FIRST_NOTICE_SEC and (
+                    last_stall_notice_at == 0.0
+                    or now - last_stall_notice_at >= STALL_REPEAT_SEC
+                ):
+                    sec = int(silent)
+                    run.add_line(
+                        "stderr",
+                        f"[server] no output for {sec}s — still running (PID {proc.pid})",
+                    )
+                    last_stall_notice_at = now
+                continue
+            if line is None:
+                reader_done = True
+                break
+            run.add_line("stdout", line)
+            last_line_at = now
+            last_stall_notice_at = 0.0
+
         proc.wait()
         run.exit_code = proc.returncode
-        run.status = "done" if proc.returncode == 0 else "failed"
+        if run.cancelled:
+            run.status = "cancelled"
+            run.add_line("stderr", "[server] cancelled")
+        elif proc.returncode == 0:
+            run.status = "done"
+        else:
+            run.status = "failed"
+        run._proc = None
 
 
 MANAGER = RunManager()
@@ -404,7 +721,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - http.server API
         if self.path.startswith("/api/run/"):
-            self._handle_submit(self.path[len("/api/run/"):])
+            rest = self.path[len("/api/run/"):].strip("/")
+            if rest.endswith("/cancel"):
+                run_id = rest[: -len("/cancel")].strip("/")
+                self._handle_cancel(run_id)
+            else:
+                self._handle_submit(rest)
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
@@ -416,6 +738,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---- handlers ----------------------------------------------------------
     def _handle_fetchers(self) -> None:
+        try:
+            from dotenv import load_dotenv
+
+            load_dotenv(ROOT / ".env", override=True)
+        except ImportError:
+            pass
         data = {
             "fetchers": [
                 {
@@ -425,11 +753,25 @@ class Handler(SimpleHTTPRequestHandler):
                     "metaKey": v.get("metaKey", k),
                     "group": v.get("group", "library"),
                     "color": v.get("color"),
+                    "requires": v.get("requires") or [],
+                    "missing_requirements": _missing_requirements(v.get("requires") or []),
+                    "supports_refresh": bool(v.get("refreshArgs")),
                 }
                 for k, v in FETCHERS.items()
             ]
         }
         _send_json(self, HTTPStatus.OK, data)
+
+    @staticmethod
+    def _parse_run_submit_path(rest: str) -> tuple[str, bool]:
+        from urllib.parse import parse_qs
+
+        path, _, qs = rest.partition("?")
+        key = path.strip("/").split("/", 1)[0]
+        params = parse_qs(qs) if qs else {}
+        refresh_val = (params.get("refresh") or ["0"])[0].lower()
+        refresh = refresh_val in ("1", "true", "yes")
+        return key, refresh
 
     def _handle_personal_get(self) -> None:
         try:
@@ -470,12 +812,19 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_runs(self) -> None:
         _send_json(self, HTTPStatus.OK, MANAGER.snapshot())
 
-    def _handle_submit(self, key: str) -> None:
-        key = key.strip("/").split("/", 1)[0]
+    def _handle_submit(self, rest: str) -> None:
+        key, refresh = self._parse_run_submit_path(rest)
         if key not in FETCHERS:
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown fetcher: {key}"})
             return
-        run = MANAGER.submit(key)
+        if refresh and not FETCHERS[key].get("refreshArgs"):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"{key} does not support refresh"})
+            return
+        try:
+            run = MANAGER.submit(key, refresh=refresh)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.CONFLICT, {"error": str(exc)})
+            return
         _send_json(self, HTTPStatus.ACCEPTED, {
             "run_id": run.id,
             "key": run.key,
@@ -483,12 +832,35 @@ class Handler(SimpleHTTPRequestHandler):
             "status": run.status,
         })
 
+    def _handle_cancel(self, run_id: str) -> None:
+        run_id = run_id.strip("/").split("/", 1)[0]
+        run, err = MANAGER.cancel(run_id)
+        if err == "not_found":
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown run: {run_id}"})
+            return
+        if err == "already_finished":
+            _send_json(self, HTTPStatus.CONFLICT, {"error": "run already finished"})
+            return
+        assert run is not None
+        _send_json(self, HTTPStatus.OK, run.to_summary())
+
     def _handle_stream(self, run_id: str) -> None:
+        global _sse_connections
         run_id = run_id.strip("/").split("/", 1)[0]
         run = MANAGER.get(run_id)
         if run is None:
             self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")
             return
+
+        with _sse_lock:
+            if _sse_connections >= MAX_SSE_CONNECTIONS:
+                _send_json(
+                    self,
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": f"too many stream connections (max {MAX_SSE_CONNECTIONS})"},
+                )
+                return
+            _sse_connections += 1
 
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/event-stream")
@@ -536,6 +908,8 @@ class Handler(SimpleHTTPRequestHandler):
             pass
         finally:
             run.detach_listener(q)
+            with _sse_lock:
+                _sse_connections = max(0, _sse_connections - 1)
 
     # ---- SSE helpers -------------------------------------------------------
     def _sse_write(self, event: str, data: Any) -> None:
@@ -559,14 +933,30 @@ class Handler(SimpleHTTPRequestHandler):
         super().log_message(format, *args)
 
 
+def _shutdown_server() -> None:
+    MANAGER.shutdown()
+
+
 def main() -> None:
+    atexit.register(_shutdown_server)
+
+    def _handle_exit(signum: int, _frame: Any) -> None:
+        print(f"\nShutting down (signal {signum}).")
+        _shutdown_server()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGINT, _handle_exit)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _handle_exit)
+
     handler = partial(Handler, directory=str(ROOT))
-    with ThreadingHTTPServer((HOST, PORT), handler) as server:
+    with ThreadingHTTPServer((HOST, PORT), handler) as httpd:
         print(f"Steam Backlog dev server on http://{HOST}:{PORT}")
         print(f"Python for fetchers: {_python_executable()}")
         print(f"Registered fetchers: {len(FETCHERS)}")
+        print(f"Run history: {RUN_HISTORY_FILE} (max {MAX_HISTORY})")
         try:
-            server.serve_forever()
+            httpd.serve_forever()
         except KeyboardInterrupt:
             print("\nShutting down.")
 

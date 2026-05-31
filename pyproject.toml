@@ -5,6 +5,7 @@ description = "Local multi-store game library dashboard and fetchers"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "browser-cookie3>=0.20.0",
     "python-dotenv>=1.0.0",
 ]
 

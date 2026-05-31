@@ -102,11 +102,18 @@ python fetch_amazon.py
 python fetch_xbox.py --skip-hltb
 ```
 
-**Battle.net (unofficial):** Sign in at account.battle.net, visit `/games`, copy the full `Cookie` header sent to `/api/games-and-subs` into `BATTLENET_COOKIE=`. Cookies expire — if the fetcher exits 1 with `401`, sign in again and paste a fresh cookie.
+**Battle.net (unofficial):** Modern Edge / Chrome (v127+) use app-bound cookie encryption, so the automatic browser jar read usually fails on Windows even with admin. The reliable path is the manual `.env` cookie:
+
+1. Sign in at [account.battle.net/games](https://account.battle.net/games) in Edge.
+2. DevTools (F12) → Network → reload → click the `games-and-subs` request → copy the full `Cookie:` request header.
+3. Paste it into `BATTLENET_COOKIE=` in `.env` (one line, no quotes).
+4. Run:
 
 ```bash
-python fetch_battlenet.py --skip-hltb
+python fetch_battlenet.py --browser env --skip-hltb
 ```
+
+The session expires every few weeks; repeat steps 1–3 when you see a 401. Firefox's jar can be read without admin (`--browser firefox`) if you sign in there instead. `BATTLENET_BROWSER=env` makes `env` the default for future runs.
 
 **Ubisoft Connect (unofficial):** Sign in at ubisoft.com, DevTools → Network → filter `public-ubi`, copy `Authorization` and `Ubi-SessionId` into `.env`.
 
@@ -144,10 +151,16 @@ Wishlist JSON files (`games_wishlist.json`, `games_wishlist_gog.json`, `games_wi
 
 Fetcher options (all scripts):
 
-- `--refresh` — ignore cache, refetch everything
+- `--refresh` — ignore cache, refetch everything (Shift+click on supported library/wishlist chips)
+- `--retry-misses` — re-attempt enricher rows cached as no match (Shift+click on HLTB, Reviews, Covers)
 - `--only-new` — only fetch games not already in the store JSON file
 - `--skip-hltb` — skip HowLongToBeat lookups (faster)
+- `--allow-empty` — allow writing a zero-item result (default: refuse and exit 2 so stale data is preserved)
 - Store-specific: `--appid`, `--id`, etc.
+
+**Exit codes:** `0` success · `1` auth/config error · `2` suspicious empty result (or ITAD resolved zero titles). Every script prints `=== name started at … ===` and a footer summary with elapsed time.
+
+**Stall watchdog:** when a fetcher runs via `server.py`, if stdout is silent for 30s the server injects `[server] no output for Ns — still running (PID …)` into the log panel (repeats every 60s). This is informational only — the process is not killed.
 
 First Steam run may take several minutes for a large library (Store API is rate-limited). Subsequent runs use cache and are much faster.
 
@@ -155,8 +168,8 @@ First Steam run may take several minutes for a large library (Store API is rate-
 
 | Script | Purpose |
 |--------|---------|
-| `enrich_steam_reviews.py` | Backfill Steam review % on GOG/PSN/Epic/Amazon/itch rows via store search (`--stores itch` for itch only) |
-| `enrich_cross_store_images.py` | Backfill covers from Steam CDN |
+| `enrich_steam_reviews.py` | Backfill Steam review % on non-Steam rows via Steam store search (gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, itch). Use `--stores nintendo` etc. to limit; Shift+click adds `--retry-misses`. |
+| `enrich_cross_store_images.py` | Backfill `header_image` / `library_image` from the Steam CDN for non-Steam rows (gog, psn, epic, amazon, xbox, battlenet, ubisoft, nintendo). |
 | `enrich_hltb.py` | Backfill HLTB hours on any `games_*.json` row missing them |
 | `fetch_itad.py` | Cross-store deal prices → `itad_prices.json` (wishlist by default) |
 
@@ -168,7 +181,7 @@ First Steam run may take several minutes for a large library (Store API is rate-
 python server.py
 ```
 
-Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes. Runs are serialized (single-worker queue) so concurrent clicks won't corrupt shared caches. The server binds to `127.0.0.1` only; override with `PORT=9000 python server.py` to change the port.
+Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes. Enrichment chips **HLTB**, **Reviews** (`enrich_steam_reviews.py`), and **Covers** (`enrich_cross_store_images.py`) backfill non-Steam rows; **Steam** refreshes your owned Steam library. Runs are serialized (single-worker queue) so concurrent clicks won't corrupt shared caches. The server binds to `127.0.0.1` only; override with `PORT=9000 python server.py` to change the port. Restart `server.py` after editing `fetchers/manifest.json` so new chips register.
 
 **Option B (read-only):** `python -m http.server 8080` if you only want to browse and prefer to run fetchers in your terminal.
 
@@ -227,7 +240,7 @@ schtasks /create /SC WEEKLY /D SUN /TN "Steam Backlog Refresh" /TR "powershell -
 | `epic_client.py` | Epic OAuth client |
 | `amazon_client.py` | Amazon Games SQLite reader |
 | `xbox_client.py` | OpenXBL title history client |
-| `battlenet_client.py` | Battle.net cookie scraper |
+| `battlenet_client.py` | Battle.net session (Edge cookie jar + optional .env fallback) |
 | `ubisoft_client.py` | Ubisoft Connect API client |
 | `nintendo_client.py` | Nintendo eShop transactions client |
 | `itch_client.py` | itch.io API client |

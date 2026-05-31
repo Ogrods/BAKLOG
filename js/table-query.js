@@ -206,10 +206,9 @@ function itchIsGame(g) {
 }
 
 function priorityScore(ctx, g) {
-  const p = getPersonalRecord(ctx.personal, g);
   const review = ratingValue(g);
   const h = hltbMain(ctx.personal, g) || 20;
-  return (review * (p.priority + 1)) / Math.log2(h + 2);
+  return review / Math.log2(h + 2);
 }
 
 function effectiveDiscountPercent(ctx, g) {
@@ -237,12 +236,22 @@ function passesFilter(ctx, g) {
       const target = g.wishlist_store || g.store_target || (g.manual ? 'manual' : 'steam');
       if (target !== prefs.wishlistStoreFilter) return false;
     }
+    if (hiddenKeys && hiddenKeys.has(gameKey(g))) return false;
     if (!passesDealFilters(ctx, g)) return false;
   }
   if (view === 'itch' && prefs.itchHideNonGames && !itchIsGame(g)) return false;
   if (ctx.cleanupModeActive && view === 'library' && !isCleanupCandidate(ctx, g)) return false;
   if (params.q && !g.name.toLowerCase().includes(params.q)) return false;
   if ((view === 'library' || view === 'itch') && params.status) {
+    if (params.status === '__none__') {
+      if (hasPersonalEntry(personal, g)) return false;
+    } else if (params.status === 'backlog') {
+      if (hasPersonalEntry(personal, g) && p.status !== 'backlog') return false;
+    } else if (p.status !== params.status) {
+      return false;
+    }
+  }
+  if (view === 'wishlist' && params.status) {
     if (params.status === '__none__') {
       if (hasPersonalEntry(personal, g)) return false;
     } else if (params.status === 'backlog') {
@@ -281,7 +290,6 @@ function sortCompare(ctx, a, b) {
   let vb;
   switch (sortKey) {
     case 'status': va = pa.status; vb = pb.status; break;
-    case 'priority': va = pa.priority; vb = pb.priority; break;
     case 'priority_score': va = priorityScore(ctx, a); vb = priorityScore(ctx, b); break;
     case 'last_played': va = a.last_played || 0; vb = b.last_played || 0; break;
     case 'release_date': va = parseReleaseForSort(a.release_date); vb = parseReleaseForSort(b.release_date); break;
@@ -302,7 +310,9 @@ export function buildQueryContext(state, params) {
     prefs: state.prefs,
     params,
     personal: state.personal,
-    hiddenKeys: state.crossStoreHiddenKeys,
+    hiddenKeys: state.activeView === 'wishlist'
+      ? state.wishlistCrossStoreHiddenKeys
+      : state.crossStoreHiddenKeys,
     ownedNormNames: state.ownedNormNames,
     itadByKey: state.itadByKey,
     cleanupModeActive: state.cleanupModeActive,
@@ -345,7 +355,11 @@ export function queryGamesAsync(state, params) {
     source,
     ctx: {
       ...buildQueryContext(state, params),
-      hiddenKeys: [...state.crossStoreHiddenKeys],
+      hiddenKeys: [
+        ...(state.activeView === 'wishlist'
+          ? state.wishlistCrossStoreHiddenKeys
+          : state.crossStoreHiddenKeys),
+      ],
       ownedNormNames: [...state.ownedNormNames],
     },
   };
@@ -354,7 +368,9 @@ export function queryGamesAsync(state, params) {
       source,
       ctx: {
         ...payload.ctx,
-        hiddenKeys: state.crossStoreHiddenKeys,
+        hiddenKeys: state.activeView === 'wishlist'
+          ? state.wishlistCrossStoreHiddenKeys
+          : state.crossStoreHiddenKeys,
         ownedNormNames: state.ownedNormNames,
       },
     }));

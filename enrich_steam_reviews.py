@@ -1,8 +1,11 @@
 """Backfill steam_review_percent for non-Steam library rows.
 
-For each game in games_gog.json / games_epic.json / games_psn.json / games_itch.json
-that lacks a steam_review_percent, search Steam's store for a matching title, then
-pull the review summary. Saves a small mapping file so repeat runs are fast.
+For each game in any non-Steam games_*.json that lacks a steam_review_percent,
+search Steam's store for a matching title, then pull the review summary. Saves
+a small mapping file so repeat runs are fast. Pass --retry-misses to re-attempt
+rows previously cached as having no Steam app match (appid 0).
+
+Covered stores: gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, itch.
 
 itch.io: only rows with classification == "game" (skips TTRPG PDFs, assets, tools).
 """
@@ -12,10 +15,12 @@ import re
 import sys
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
+from fetchers._progress import RunStats, started
 from steam_client import SteamClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -33,6 +38,11 @@ STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
     ("games_gog.json", "gog", None),
     ("games_epic.json", "epic", None),
     ("games_psn.json", "psn", None),
+    ("games_amazon.json", "amazon", None),
+    ("games_xbox.json", "xbox", None),
+    ("games_battlenet.json", "battlenet", None),
+    ("games_ubisoft.json", "ubisoft", None),
+    ("games_nintendo.json", "nintendo", None),
     ("games_itch.json", "itch", _itch_is_videogame),
 ]
 
@@ -61,6 +71,7 @@ def load_mapping() -> dict:
 
 
 def save_mapping(mapping: dict) -> None:
+    mapping["fetched_at"] = datetime.now(timezone.utc).isoformat()
     MAPPING_FILE.parent.mkdir(parents=True, exist_ok=True)
     MAPPING_FILE.write_text(json.dumps(mapping, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -76,10 +87,15 @@ def steam_search(name: str) -> int | None:
             timeout=15,
         )
         if r.status_code != 200:
+            snippet = (r.text or "")[:120].replace("\n", " ")
+            print(
+                f"  HTTP {r.status_code} for {r.url}: {snippet}",
+                flush=True,
+            )
             return None
         items = r.json().get("items") or []
     except Exception as e:
-        print(f"  search error: {e}")
+        print(f"  search error for {name!r}: {e}", flush=True)
         return None
     if not items:
         return None
@@ -112,11 +128,18 @@ def main() -> int:
     parser.add_argument(
         "--stores",
         nargs="+",
-        choices=["gog", "epic", "psn", "itch"],
+        choices=["gog", "epic", "psn", "amazon", "xbox", "battlenet", "ubisoft", "nintendo", "itch"],
         metavar="STORE",
-        help="Only process these stores (default: all). Example: --stores itch",
+        help="Only process these stores (default: all). Example: --stores nintendo",
+    )
+    parser.add_argument(
+        "--retry-misses",
+        action="store_true",
+        help='Re-attempt rows previously cached as "no Steam app match" (appid 0).',
     )
     args = parser.parse_args()
+    t0 = started("enrich_steam_reviews")
+    stats = RunStats()
 
     store_files = STORE_FILES
     if args.stores:
@@ -127,8 +150,8 @@ def main() -> int:
     api_key = os.getenv("STEAM_API_KEY", "").strip()
     steam_id = os.getenv("STEAM_ID", "").strip()
     if not api_key or not steam_id:
-        print("STEAM_API_KEY/STEAM_ID required in .env", file=sys.stderr)
-        return 1
+        stats.error("STEAM_API_KEY/STEAM_ID required in .env")
+        return stats.finish("enrich_steam_reviews", t0, exit_code=1)
 
     steam = SteamClient(api_key=api_key, steam_id=steam_id)
     mapping = load_mapping()
@@ -141,8 +164,9 @@ def main() -> int:
         data = json.loads(path.read_text(encoding="utf-8"))
         games = data.get("games", [])
         eligible = [g for g in games if row_filter is None or row_filter(g)]
-        print(f"\n=== {filename} ({len(eligible)} eligible / {len(games)} rows) ===")
+        print(f"\n=== {filename} ({len(eligible)} eligible / {len(games)} rows) ===", flush=True)
         updated = 0
+        searched = 0
         for i, g in enumerate(games, 1):
             if row_filter is not None and not row_filter(g):
                 continue
@@ -151,15 +175,23 @@ def main() -> int:
             key = f"{store}:{g['id']}"
             cached_appid = mapping.get(key)
 
-            if cached_appid == 0:
+            if cached_appid == 0 and not args.retry_misses:
                 continue
+            if cached_appid == 0 and args.retry_misses:
+                del mapping[key]
+                cached_appid = None
             appid: int | None = cached_appid
 
             if appid is None:
                 appid = steam_search(g["name"])
+                searched += 1
                 mapping[key] = appid if appid else 0
-                if i % 10 == 0:
+                if searched % 10 == 0:
                     save_mapping(mapping)
+                    print(
+                        f"  [{i}/{len(games)}] searched {searched}, {updated} updated so far",
+                        flush=True,
+                    )
 
             if not appid:
                 continue
@@ -170,7 +202,7 @@ def main() -> int:
             try:
                 reviews = steam.get_review_summary(appid)
             except Exception as e:
-                print(f"  reviews error for {g['name']} ({appid}): {e}")
+                stats.warn(f"reviews error for {g['name']} ({appid}): {e}")
                 continue
             if not reviews or reviews.get("percent_positive") is None:
                 continue
@@ -178,17 +210,21 @@ def main() -> int:
             g["steam_review_count"] = reviews.get("total_reviews")
             g["steam_review_desc"] = reviews.get("review_score_desc")
             updated += 1
+            stats.ok += 1
             if updated % 25 == 0:
-                print(f"  [{i}/{len(games)}] {updated} updated so far ({g['name']} -> {reviews['percent_positive']}%)")
+                print(
+                    f"  [{i}/{len(games)}] {updated} updated so far "
+                    f"({g['name']} -> {reviews['percent_positive']}%)",
+                    flush=True,
+                )
 
         data["game_count"] = len(games)
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        print(f"  updated {updated} rows in {filename}")
+        print(f"  updated {updated} rows in {filename}", flush=True)
         save_mapping(mapping)
 
     save_mapping(mapping)
-    print("\nDone.")
-    return 0
+    return stats.finish("enrich_steam_reviews", t0, exit_code=0, extra=f"{stats.ok} rows")
 
 
 if __name__ == "__main__":

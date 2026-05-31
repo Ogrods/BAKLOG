@@ -114,6 +114,10 @@ class ItchClient:
             # Stop if the API returns a page that's all duplicates (defensive).
             if new_in_page == 0:
                 break
+            print(
+                f"  · itch owned-keys page {page}: {len(out)} games so far",
+                flush=True,
+            )
             page += 1
             if page > 200:  # hard safety cap (~10k games)
                 break

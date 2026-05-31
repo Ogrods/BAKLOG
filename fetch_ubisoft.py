@@ -15,6 +15,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from fetchers._progress import RunStats, started
 from ubisoft_client import UbisoftAuthError, UbisoftClient
 
 GAMES_UBISOFT_JSON = Path("games_ubisoft.json")
@@ -264,28 +265,29 @@ def main() -> int:
     )
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_ubisoft")
+    stats = RunStats()
     load_dotenv()
     auth = os.getenv("UBISOFT_AUTH", "").strip()
     session_id = os.getenv("UBISOFT_SESSION_ID", "").strip()
     app_id = os.getenv("UBISOFT_APP_ID", "").strip() or None
     if not auth or not session_id:
-        print(
+        stats.error(
             "Set UBISOFT_AUTH and UBISOFT_SESSION_ID in .env. To get them:\n"
             "  1. Sign in at https://connect.ubisoft.com/ and open your library\n"
             "  2. DevTools → Network → click any request to public-ubiservices.ubi.com\n"
             "  3. Copy the 'Authorization' value (starts with 'Ubi_v1 t=')\n"
             "     and the 'Ubi-SessionId' value\n"
-            "  4. Paste into .env as UBISOFT_AUTH and UBISOFT_SESSION_ID",
-            file=sys.stderr,
+            "  4. Paste into .env as UBISOFT_AUTH and UBISOFT_SESSION_ID"
         )
-        return 1
+        return stats.finish("fetch_ubisoft", t0, exit_code=1)
 
     try:
         client = UbisoftClient(auth, session_id, app_id=app_id)
         raw, endpoint = client.get_library()
     except UbisoftAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_ubisoft", t0, exit_code=1)
 
     print(f"Hit Ubisoft endpoint: {endpoint}")
 
@@ -309,12 +311,11 @@ def main() -> int:
     print(f"Found {len(deduped)} unique Ubisoft entries (from {len(raw_games)} raw).")
 
     if not deduped:
-        print(
+        stats.error(
             "No game records found in the response. Re-run with --dump-raw and "
-            f"inspect {RAW_DUMP_JSON} to confirm the endpoint hit your library.",
-            file=sys.stderr,
+            f"inspect {RAW_DUMP_JSON} to confirm the endpoint hit your library."
         )
-        return 2
+        return stats.finish("fetch_ubisoft", t0, exit_code=2)
 
     hltb_client = HltbClient()
     games_out: list[dict] = []
@@ -340,9 +341,10 @@ def main() -> int:
     GAMES_UBISOFT_JSON.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\nWrote {len(games_out)} games to {GAMES_UBISOFT_JSON}.")
-    print("Reload the dashboard to see your Ubisoft Connect library.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_UBISOFT_JSON}.", flush=True)
+    print("Reload the dashboard to see your Ubisoft Connect library.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_ubisoft", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

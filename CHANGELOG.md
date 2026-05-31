@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Fetcher observability hardening** — shared progress helpers (`fetchers/_progress.py`), start/end timing footers on all fetch/enrich scripts, heartbeats during long silent phases (HLTB cache skips, itch pagination, ITAD lookup, cover enrichment thread pool).
+- **Server stall watchdog** — `server.py` emits `[server] no output for Ns — still running` when a subprocess is quiet for 30s (repeats every 60s).
+- **`--allow-empty` flag** on GOG/Epic wishlist, Steam wishlist, Xbox, Epic library, GOG library, Steam library, PSN library, and ITAD fetchers — default refuses to overwrite JSON when zero items are returned (exit 2).
+- **Reviews `--retry-misses`** — Shift+click on the Reviews chip re-attempts rows cached as no Steam app match (parity with HLTB/Covers).
+- **Manifest `requires`** for Steam library, WL Steam, ITAD, and Reviews chips (missing-env warnings in Fetcher health).
+
+### Changed
+
+- HTTP failures in GOG wishlist product/price fetch, Steam cover search, Steam review search, and Ubisoft catalog batches now log status + URL instead of failing silently.
+- HLTB enricher heartbeats during cached-miss skips as well as network lookups.
+
 ## [0.6.0] - 2026-05-30
 
 ### Added

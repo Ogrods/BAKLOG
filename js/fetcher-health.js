@@ -1,22 +1,296 @@
-import { state } from './state.js';
+import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 
 const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
+// ITAD is a deal feed — library-style 7d/30d thresholds are misleading.
+const STALE_OVERRIDES = {
+  itad: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
+};
+export const ITAD_LAST_AUTO_RUN_KEY = 'itad-last-auto-run';
+export const ITAD_AUTO_REFRESH_INTERVAL_MS = 60 * 60_000;
+export const ITAD_AUTO_QUIET_HOUR_END = 7;
+
+export function thresholdsForMetaKey(metaKey) {
+  return STALE_OVERRIDES[metaKey] || FRESH_THRESHOLDS;
+}
+
+/** Count new sales / historical lows after an ITAD refresh. */
+export function diffItadDeals(prev, next) {
+  let newSales = 0;
+  let newHistoricalLows = 0;
+  for (const [key, n] of Object.entries(next || {})) {
+    const p = prev?.[key];
+    const cut = n?.cut || 0;
+    const prevCut = p?.cut || 0;
+    if (cut > 0 && prevCut === 0) newSales += 1;
+    if (n?.is_historical_low && !p?.is_historical_low) newHistoricalLows += 1;
+  }
+  return { newSales, newHistoricalLows };
+}
+
+let itadPendingAutoRun = false;
+
+export function consumeItadAutoRunFlag() {
+  const v = itadPendingAutoRun;
+  itadPendingAutoRun = false;
+  return v;
+}
+const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers']);
+const MAX_SSE_HINT = 'max 8 live streams';
+const GROUP_ORDER = ['library', 'wishlist', 'prices', 'enrich'];
+const GROUP_LABELS = {
+  library: 'Library',
+  wishlist: 'Wishlist',
+  prices: 'Prices',
+  enrich: 'Enrichment',
+};
 
 const COUNT_FNS = {
   itad: m => Object.keys(m?.by_key || {}).length,
   hltb: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
+  steamReviews: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
+  steamCovers: m => (m?.last_updated != null ? m.last_updated : null),
 };
+
+// Plain-English description of what a normal click does for each fetcher.
+// Falls back to a generic per-group hint if a key isn't listed here.
+const CLICK_HINTS = {
+  steam: 'Sync your Steam library — picks up new purchases & updated playtime',
+  gog: 'Sync your GOG library — picks up new purchases & metadata',
+  psn: 'Sync your PSN library',
+  epic: 'Sync your Epic library',
+  amazon: 'Sync your Amazon Prime Gaming library',
+  xbox: 'Sync your Xbox library',
+  battlenet: 'Sync your Battle.net library',
+  ubisoft: 'Sync your Ubisoft Connect library',
+  nintendo: 'Sync your Nintendo Switch library',
+  itch: 'Sync your itch.io library',
+  wishlistSteam: 'Sync your Steam wishlist',
+  wishlistGog: 'Sync your GOG wishlist',
+  wishlistEpic: 'Sync your Epic wishlist',
+  itad: 'Refresh wishlist price quotes from IsThereAnyDeal',
+  hltb: "Look up HowLongToBeat hours for games we haven't checked yet",
+  steamReviews: 'Pull missing Steam review scores for non-Steam games',
+  steamCovers: 'Generate covers for non-Steam games missing artwork',
+};
+
+// What Shift+click (--refresh) actually changes, per fetcher.
+const REFRESH_HINTS = {
+  steam: 'Re-fetch every game from Steam, ignoring local cache (slower, full rebuild)',
+  gog: 'Re-fetch every game from GOG, ignoring local cache (slower, full rebuild)',
+  psn: 'Re-fetch every PSN entry, ignoring local cache',
+  epic: 'Re-fetch every Epic entry, ignoring local cache',
+  wishlistGog: 'Re-fetch every wishlist entry from GOG, ignoring cached details',
+  hltb: 'Also retry titles previously cached as "no HLTB match" — use after HLTB adds new entries',
+  steamReviews:
+    'Also retry titles previously cached as "no Steam app match" — use after Steam lists the game',
+  steamCovers: 'Also retry rows previously cached as "no Steam match" — use after Steam adds new entries',
+};
+
+// Pending breakdown for the enrichment chips so the tooltip can say
+// "nothing to look up" vs "X new lookups pending" — turns a misleading
+// 76% data-coverage number into clear messaging about what a click will
+// actually do.
+//
+// Three states per missing row:
+//   unchecked → never tried by the fetcher; click will produce fresh work.
+//   retry    → tried before, the upstream returned nothing useful, but the
+//              fetcher will keep retrying. Click does work, but probably
+//              won't change the numbers much.
+//   noMatch  → cached as "no match" so the fetcher skips on a normal click.
+//              Only Shift+click (HLTB) can revisit.
+function pendingForEnrich(key) {
+  if (key === 'hltb') {
+    const cache = state.libraryMeta.hltb || {};
+    const rows = allLibraryRows();
+    let unchecked = 0;
+    let retry = 0;
+    let noMatch = 0;
+    for (const g of rows) {
+      if (g.hltb_main_hours != null) continue;
+      const v = cache[`${g.store || 'steam'}:${g.id}`];
+      if (v === false) noMatch++;
+      else unchecked++;
+    }
+    return { unchecked, retry, noMatch };
+  }
+  if (key === 'steamReviews') {
+    const cache = state.libraryMeta.steamReviews || {};
+    const rows = reviewableRows();
+    let unchecked = 0;
+    let retry = 0;
+    let noMatch = 0;
+    for (const g of rows) {
+      if (g.steam_review_percent != null) continue;
+      const v = cache[`${g.store || 'steam'}:${g.id}`];
+      if (v === 0) noMatch++;
+      else if (v == null) unchecked++;
+      else retry++;
+    }
+    return { unchecked, retry, noMatch };
+  }
+  if (key === 'steamCovers') {
+    const meta = state.libraryMeta.steamCovers || {};
+    const skipped = new Set(meta.no_steam_match || []);
+    const rows = coverableRows();
+    let unchecked = 0;
+    let noMatch = 0;
+    for (const g of rows) {
+      const lib = g.library_image || '';
+      const hdr = g.header_image || '';
+      const ok = (lib || hdr) && !String(lib).endsWith('.eprt') && !String(hdr).endsWith('.eprt');
+      if (ok) continue;
+      if (skipped.has(`${g.store || 'steam'}:${g.id}`)) noMatch++;
+      else unchecked++;
+    }
+    return { unchecked, retry: 0, noMatch };
+  }
+  return null;
+}
+
+function clickHintFor(src) {
+  const base = CLICK_HINTS[src.key] || `Run ${src.label} fetcher`;
+  const pending = pendingForEnrich(src.key);
+  if (!pending) return base;
+  if (pending.unchecked > 0) {
+    return `${base} (${formatNum(pending.unchecked)} pending)`;
+  }
+  if (pending.retry > 0) {
+    return `Re-tries ${formatNum(pending.retry)} previously-attempted rows that didn't return data. Usually won't change the score — safe to skip.`;
+  }
+  if (pending.noMatch > 0) {
+    const note = src.supportsRefresh
+      ? ' Use Shift+click to retry them.'
+      : '';
+    return `Nothing new to look up — the remaining ${formatNum(pending.noMatch)} are cached as "no match".${note}`;
+  }
+  return 'Everything is enriched — nothing to do.';
+}
+
+function refreshHintFor(src) {
+  if (!src.supportsRefresh) return null;
+  const base = REFRESH_HINTS[src.key] || 'Re-fetch ignoring local cache (slower, full rebuild)';
+  if (src.key === 'hltb' || src.key === 'steamReviews') {
+    const pending = pendingForEnrich(src.key);
+    if (pending?.noMatch > 0) {
+      return `${base} (~${formatNum(pending.noMatch)} cached misses would be retried)`;
+    }
+  }
+  return base;
+}
+
+function itchIsGame(g) {
+  const c = g.classification;
+  if (!c || c === 'game') return true;
+  return !ITCH_NON_GAME_CLASSIFICATIONS.has(c);
+}
+
+function allLibraryRows() {
+  const itchGames = (state.itchGames || []).filter(itchIsGame);
+  return [...(state.allGames || []), ...itchGames];
+}
+
+function nonSteamRows() {
+  return (state.allGames || []).filter(g => (g.store || 'steam') !== 'steam');
+}
+
+function reviewableRows() {
+  return [...nonSteamRows(), ...(state.itchGames || []).filter(itchIsGame)];
+}
+
+function coverableRows() {
+  return nonSteamRows();
+}
+
+function coverageOf(rows, pred) {
+  const total = rows.length;
+  if (!total) return { covered: 0, total: 0, pct: null };
+  const covered = rows.filter(pred).length;
+  return { covered, total, pct: Math.round((covered / total) * 100) };
+}
+
+const COVERAGE_FNS = {
+  hltb: () => coverageOf(allLibraryRows(), g => g.hltb_main_hours != null),
+  steamReviews: () => coverageOf(reviewableRows(), g => g.steam_review_percent != null),
+  steamCovers: () => coverageOf(
+    coverableRows(),
+    g => {
+      const lib = g.library_image || '';
+      const hdr = g.header_image || '';
+      if (!lib && !hdr) return false;
+      return !String(lib).endsWith('.eprt') && !String(hdr).endsWith('.eprt');
+    },
+  ),
+};
+
+function coverageLabel(key) {
+  const fn = COVERAGE_FNS[key];
+  if (!fn) return null;
+  const { covered, total, pct } = fn();
+  if (!total) return '—';
+  const base = `${pct != null ? pct : 0}% · ${formatNum(covered)}/${formatNum(total)}`;
+  const pending = pendingForEnrich(key);
+  if (!pending) return base;
+  if (pending.unchecked > 0) return `${base} · ${formatNum(pending.unchecked)} new`;
+  // "retry" and "noMatch" are not actionable enough to deserve a banner —
+  // keep the chip quiet and let the tooltip explain. "max" means there's
+  // simply nothing left a click would do.
+  return `${base} · max`;
+}
+
+function coverageTooltipLine(key) {
+  const fn = COVERAGE_FNS[key];
+  if (!fn) return null;
+  const { covered, total } = fn();
+  if (!total) return null;
+  const pending = pendingForEnrich(key);
+  const verb = key === 'hltb'
+    ? 'have HowLongToBeat hours'
+    : key === 'steamReviews'
+      ? 'have Steam review scores'
+      : 'have artwork';
+  let line = `${formatNum(covered)} of ${formatNum(total)} ${verb}.`;
+  if (!pending) return line;
+  if (pending.unchecked > 0) {
+    line += ` ${formatNum(pending.unchecked)} still to try.`;
+  } else if (pending.retry > 0 && key === 'steamReviews') {
+    line += ` ${formatNum(pending.retry)} were tried before with no review score — clicking will re-check but rarely changes the number.`;
+  } else if (pending.noMatch > 0) {
+    const src = key === 'hltb' ? 'HowLongToBeat' : 'Steam';
+    line += ` Remaining ${formatNum(pending.noMatch)} have no match on ${src} — clicking won't add more.`;
+  } else {
+    line += ' Nothing pending.';
+  }
+  return line;
+}
 
 let fetcherSources = [];
 let reloadGamesFn = async () => {};
+let reloadAfterFetcherFn = null;
+let runStaleCooldownUntil = 0;
 
-export function configureFetcherHealth({ reloadGames }) {
+export function configureFetcherHealth({ reloadGames, reloadAfterFetcher }) {
   reloadGamesFn = reloadGames;
+  reloadAfterFetcherFn = reloadAfterFetcher || null;
 }
 
-export async function loadFetcherSources() {
-  if (fetcherSources.length) return fetcherSources;
+async function manifestRefreshKeys() {
+  try {
+    const res = await fetch('fetchers/manifest.json');
+    if (!res.ok) return {};
+    const data = await res.json();
+    const keys = {};
+    for (const entry of data.fetchers || []) {
+      if ((entry.refreshArgs || []).length) keys[entry.key] = true;
+    }
+    return keys;
+  } catch (_) {
+    return {};
+  }
+}
+
+export async function loadFetcherSources(force = false) {
+  const refreshByKey = await manifestRefreshKeys();
   try {
     const res = await fetch('/api/fetchers');
     if (res.ok) {
@@ -29,10 +303,14 @@ export async function loadFetcherSources() {
         metaKey: entry.metaKey || entry.key,
         cmd: entry.cmd ? `python ${entry.cmd}` : '',
         countFn: COUNT_FNS[entry.key] || null,
+        requires: entry.requires || [],
+        missingRequirements: entry.missing_requirements || [],
+        supportsRefresh: !!(entry.supports_refresh || refreshByKey[entry.key]),
       }));
       return fetcherSources;
     }
   } catch (_) {}
+  if (fetcherSources.length && !force) return fetcherSources;
   try {
     const res = await fetch('fetchers/manifest.json');
     if (res.ok) {
@@ -43,15 +321,43 @@ export async function loadFetcherSources() {
         group: entry.group || 'library',
         color: entry.color || '#94a3b8',
         metaKey: entry.metaKey || entry.key,
-        cmd: `python ${entry.script}`,
+        cmd: `python ${entry.script}${(entry.args || []).length ? ` ${(entry.args || []).join(' ')}` : ''}`,
         countFn: COUNT_FNS[entry.key] || null,
+        requires: entry.requires || [],
+        missingRequirements: [],
+        supportsRefresh: !!refreshByKey[entry.key],
       }));
     }
   } catch (_) {}
   return fetcherSources;
 }
 
-function humanizeAge(ms) {
+function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
+  const el = document.getElementById('fetcherGlobalStatus');
+  if (!el) return;
+  const running = [];
+  const queued = [];
+  for (const [key, st] of runStateByKey) {
+    const src = sourceFn(key);
+    const label = src?.label || key;
+    if (st === 'running') running.push(label);
+    else if (st === 'queued') queued.push(label);
+  }
+  if (!running.length && !queued.length) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  if (running.length) {
+    const extra = queued.length ? ` (+${queued.length} queued)` : '';
+    el.textContent = `Fetching: ${running.join(', ')}${extra}`;
+  } else {
+    el.textContent = `Queued: ${queued.join(', ')}`;
+  }
+}
+
+export function humanizeAge(ms) {
   if (!Number.isFinite(ms)) return '—';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -67,6 +373,7 @@ function humanizeAge(ms) {
 }
 
 export function fetcherFreshness(source) {
+  const thresholds = thresholdsForMetaKey(source.metaKey);
   const meta = state.libraryMeta[source.metaKey];
   const count = meta
     ? (source.countFn ? source.countFn(meta) : (meta.game_count ?? null))
@@ -77,19 +384,52 @@ export function fetcherFreshness(source) {
   const ts = Date.parse(meta.fetched_at);
   const ageMs = Number.isFinite(ts) ? Date.now() - ts : Infinity;
   let status = 'stale';
-  if (ageMs < FRESH_THRESHOLDS.fresh) status = 'fresh';
-  else if (ageMs < FRESH_THRESHOLDS.recent) status = 'recent';
+  if (ageMs < thresholds.fresh) status = 'fresh';
+  else if (ageMs < thresholds.recent) status = 'recent';
   return { status, ageMs, count, ageLabel: humanizeAge(ageMs), iso: meta.fetched_at };
+}
+
+const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
+
+/** Auto-queue ITAD when prices are older than 60min (7am–midnight local). */
+export function maybeAutoRefreshItad(deps = {}) {
+  if (state.prefs.itadAutoRefreshDisabled) return false;
+  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
+  if (!isApiAvailableFn()) return false;
+  const getHour = deps.getHour ?? (() => new Date().getHours());
+  if (getHour() < ITAD_AUTO_QUIET_HOUR_END) return false;
+  const stateForFn = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
+  if (stateForFn('itad')) return false;
+  const fresh = fetcherFreshness(ITAD_SOURCE);
+  if (fresh.ageMs < ITAD_AUTO_REFRESH_INTERVAL_MS) return false;
+  const now = deps.now ?? Date.now();
+  const lastRun = deps.getLastRun
+    ?? (() => Number(localStorage.getItem(ITAD_LAST_AUTO_RUN_KEY) || 0));
+  if (now - lastRun() < ITAD_AUTO_REFRESH_INTERVAL_MS) return false;
+  const setLastRun = deps.setLastRun
+    ?? (t => localStorage.setItem(ITAD_LAST_AUTO_RUN_KEY, String(t)));
+  setLastRun(now);
+  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
+  runFn('itad', { auto: true });
+  return true;
 }
 
 export const fetcherRunner = (() => {
   let apiAvailable = null;
   const runStateByKey = new Map();
-  let activeRunId = null;
-  let activeKey = null;
-  let activeSource = null;
+  // One EventSource per run (queued or running). Keeping all of them open
+  // means a still-running fetcher keeps streaming lines even after the user
+  // queues another one, and every run gets its own `done` event so its chip
+  // can clear independently.
+  const sourcesByRunId = new Map();
+  // Whichever run is currently emitting stdout — used to set the panel title
+  // and the top-right status pill. Only one server-side run is active at a
+  // time because the worker queue is single-threaded, so this is safe.
+  let liveRunId = null;
   let logEl = null;
   let logBodyEl = null;
+  let pollTimer = null;
+  let syncedOnce = false;
 
   function logPanel() {
     if (!logEl) logEl = document.getElementById('fetcherRunLog');
@@ -103,10 +443,15 @@ export const fetcherRunner = (() => {
     return logBodyEl;
   }
 
-  async function probeApi() {
+  function invalidateApiProbe() {
+    apiAvailable = null;
+  }
+
+  async function probeApi(force = false) {
+    if (force) apiAvailable = null;
     if (apiAvailable !== null) return apiAvailable;
     try {
-      await loadFetcherSources();
+      await loadFetcherSources(force);
       const res = await fetch('/api/fetchers', { method: 'GET' });
       apiAvailable = res.ok;
     } catch {
@@ -117,6 +462,10 @@ export const fetcherRunner = (() => {
 
   function isApiAvailable() {
     return apiAvailable === true;
+  }
+
+  function apiProbeFinished() {
+    return apiAvailable !== null;
   }
 
   function stateFor(key) {
@@ -136,6 +485,7 @@ export const fetcherRunner = (() => {
           <span class="fh-log-title" data-role="title">Fetcher log</span>
           <span class="fh-log-status" data-role="status">idle</span>
           <span class="fh-log-spacer"></span>
+          <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel">Cancel</button>
           <button type="button" class="fh-log-btn" data-role="clear">Clear</button>
           <button type="button" class="fh-log-btn" data-role="close">Close</button>
         </div>
@@ -147,12 +497,40 @@ export const fetcherRunner = (() => {
         if (!btn) return;
         if (btn.dataset.role === 'close') closePanel();
         else if (btn.dataset.role === 'clear') clearLog();
+        else if (btn.dataset.role === 'cancel') cancelActiveRun();
       });
     }
     panel.classList.add('open');
     panel.querySelector('[data-role="title"]').textContent = src ? `Running: ${src.label}` : 'Fetcher log';
     setStatus('queued');
+    updateCancelButton();
     logBodyEl = panel.querySelector('[data-role="body"]');
+  }
+
+  function updateCancelButton() {
+    const panel = logPanel();
+    if (!panel) return;
+    const btn = panel.querySelector('[data-role="cancel"]');
+    if (!btn) return;
+    const show = !!liveRunId && isApiAvailable();
+    btn.classList.toggle('hidden', !show);
+    btn.disabled = !show;
+  }
+
+  async function cancelActiveRun() {
+    if (!liveRunId || !isApiAvailable()) return;
+    const runId = liveRunId;
+    try {
+      const res = await fetch(`/api/run/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
+      if (res.ok) {
+        appendLine('[cancelled]', 'meta');
+      } else {
+        const txt = await res.text().catch(() => '');
+        appendLine(`[cancel failed ${res.status}] ${txt}`, 'stderr');
+      }
+    } catch (err) {
+      appendLine(`[cancel failed] ${err}`, 'stderr');
+    }
   }
 
   function closePanel() {
@@ -171,6 +549,14 @@ export const fetcherRunner = (() => {
     if (!el) return;
     el.className = `fh-log-status ${status}`;
     el.textContent = extra ? `${status} · ${extra}` : status;
+    const body = panel.querySelector('[data-role="body"]');
+    if (body) {
+      if (status === 'running' || status === 'queued') {
+        body.setAttribute('data-running', '1');
+      } else {
+        body.removeAttribute('data-running');
+      }
+    }
   }
 
   function appendLine(text, kind = 'stdout') {
@@ -187,28 +573,57 @@ export const fetcherRunner = (() => {
   function markChipState(key, runState) {
     if (runState) runStateByKey.set(key, runState);
     else runStateByKey.delete(key);
+    updateGlobalFetcherIndicator(runStateByKey, source);
     renderDashboardFetcherHealth();
   }
 
-  async function run(key) {
+  async function run(key, { refresh = false, auto = false } = {}) {
     if (!isApiAvailable()) return;
+    await loadFetcherSources(true);
     const src = source(key);
     if (!src || runStateByKey.has(key)) return;
+    if (refresh && !src.supportsRefresh) {
+      appendLine(
+        `[${src.label}: this fetcher has no force-refresh mode — a normal click already pulls the latest data]`,
+        'stderr',
+      );
+      return;
+    }
 
-    ensurePanel(src);
-    appendLine(`$ ${src.cmd}`, 'cmd');
+    if (auto && key === 'itad') {
+      itadPendingAutoRun = true;
+    } else {
+      ensurePanel(src);
+      if (src.missingRequirements?.length) {
+        appendLine(
+          `[warning: ${src.missingRequirements.join(', ')} not set — run will likely fail]`,
+          'meta',
+        );
+      }
+      const cmdSuffix = refresh ? ' --refresh' : '';
+      appendLine(`$ ${src.cmd}${cmdSuffix}`, 'cmd');
+    }
     markChipState(key, 'queued');
 
+    const url = `/api/run/${encodeURIComponent(key)}${refresh ? '?refresh=1' : ''}`;
     let res;
     try {
-      res = await fetch(`/api/run/${encodeURIComponent(key)}`, { method: 'POST' });
+      res = await fetch(url, { method: 'POST' });
     } catch (err) {
+      invalidateApiProbe();
       appendLine(`[client] cannot reach server: ${err}`, 'stderr');
       setStatus('failed');
       markChipState(key, null);
       return;
     }
+    if (res.status === 409) {
+      const txt = await res.text().catch(() => '');
+      appendLine(`[server 409] ${txt || 'already queued or running'}`, 'stderr');
+      markChipState(key, null);
+      return;
+    }
     if (!res.ok) {
+      invalidateApiProbe();
       const txt = await res.text().catch(() => '');
       appendLine(`[server ${res.status}] ${txt || 'submit failed'}`, 'stderr');
       setStatus('failed');
@@ -216,30 +631,59 @@ export const fetcherRunner = (() => {
       return;
     }
     const { run_id: runId } = await res.json();
-    if (activeKey && activeKey !== key) {
-      appendLine(`(queued after ${source(activeKey)?.label || activeKey})`, 'meta');
+    if (liveRunId && liveRunId !== runId) {
+      const liveSrc = sourcesByRunId.get(liveRunId)?.src;
+      appendLine(`(queued after ${liveSrc?.label || 'current run'})`, 'meta');
     }
-    activeRunId = runId;
-    activeKey = key;
     subscribe(runId, key, src);
   }
 
-  function subscribe(runId, key, src) {
-    if (activeSource) {
-      try { activeSource.close(); } catch (_) {}
-      activeSource = null;
+  async function runAllStale() {
+    if (!isApiAvailable()) return;
+    runStaleCooldownUntil = Date.now() + 2000;
+    renderDashboardFetcherHealth();
+    await loadFetcherSources(true);
+    const staleKeys = fetcherSources
+      .filter(src => {
+        const { status } = fetcherFreshness(src);
+        if (status !== 'stale' && status !== 'missing') return false;
+        if (src.missingRequirements?.length) return false;
+        if (runStateByKey.has(src.key)) return false;
+        return true;
+      })
+      .map(src => src.key);
+    if (!staleKeys.length) return;
+    for (const key of staleKeys) {
+      await run(key);
+    }
+  }
+
+  function subscribe(runId, key, src, { reconnect = false } = {}) {
+    const prior = sourcesByRunId.get(runId);
+    if (prior) {
+      try { prior.es.close(); } catch (_) {}
+      sourcesByRunId.delete(runId);
     }
     const es = new EventSource(`/api/stream/${encodeURIComponent(runId)}`);
-    activeSource = es;
+    sourcesByRunId.set(runId, { es, key, src });
 
     es.addEventListener('status', evt => {
       try {
         const data = JSON.parse(evt.data);
         if (data.status === 'running') {
           markChipState(key, 'running');
+          liveRunId = runId;
           const panel = logPanel();
           if (panel) panel.querySelector('[data-role="title"]').textContent = `Running: ${src.label}`;
+          if (reconnect) {
+            appendLine(`[reconnected · ${src.label} running]`, 'meta');
+          } else {
+            appendLine(`--- ${src.label} starting ---`, 'meta');
+          }
           setStatus('running');
+          updateCancelButton();
+        } else if (data.status === 'queued') {
+          markChipState(key, 'queued');
         }
       } catch (_) {}
     });
@@ -254,14 +698,24 @@ export const fetcherRunner = (() => {
     es.addEventListener('done', async evt => {
       try {
         const data = JSON.parse(evt.data);
+        const cancelled = data.status === 'cancelled';
         const ok = data.status === 'done' && data.exit_code === 0;
         const duration = data.started_at && data.ended_at
           ? `${(data.ended_at - data.started_at).toFixed(1)}s`
           : '';
-        appendLine(`[exit ${data.exit_code}] ${ok ? 'done' : 'failed'}${duration ? ` in ${duration}` : ''}`, 'meta');
-        setStatus(ok ? 'done' : 'failed', duration);
+        const outcome = cancelled ? 'cancelled' : ok ? 'done' : 'failed';
+        appendLine(
+          `[${src.label}: exit ${data.exit_code}] ${outcome}${duration ? ` in ${duration}` : ''}`,
+          'meta',
+        );
+        if (liveRunId === runId) {
+          setStatus(cancelled ? 'failed' : ok ? 'done' : 'failed', duration);
+          updateCancelButton();
+        }
         if (ok) {
           await refreshAfterFetch(key);
+          markChipState(key, null);
+        } else if (cancelled) {
           markChipState(key, null);
         } else {
           markChipState(key, 'failed');
@@ -276,10 +730,10 @@ export const fetcherRunner = (() => {
         appendLine(`[client] parse error on done: ${err}`, 'stderr');
       } finally {
         try { es.close(); } catch (_) {}
-        if (activeSource === es) activeSource = null;
-        if (activeRunId === runId) {
-          activeRunId = null;
-          activeKey = null;
+        sourcesByRunId.delete(runId);
+        if (liveRunId === runId) {
+          liveRunId = null;
+          updateCancelButton();
         }
       }
     });
@@ -287,50 +741,128 @@ export const fetcherRunner = (() => {
     es.onerror = async () => {
       if (es.readyState === EventSource.CONNECTING) return;
       try { es.close(); } catch (_) {}
-      if (activeSource === es) activeSource = null;
+      sourcesByRunId.delete(runId);
       try {
         const snap = await fetch('/api/runs').then(r => r.json());
         const stillActive = snap.active?.id === runId;
         const inQueue = (snap.queue || []).some(r => r.id === runId);
         const finished = (snap.history || []).find(r => r.id === runId);
         if (stillActive || inQueue) {
-          appendLine('[client] stream dropped — reconnecting', 'meta');
+          appendLine(`[${src.label}: stream dropped — reconnecting]`, 'meta');
           setTimeout(() => subscribe(runId, key, src), 500);
           return;
         }
         if (finished) {
           const ok = finished.status === 'done' && finished.exit_code === 0;
-          appendLine(`[client] stream dropped after exit ${finished.exit_code}`, 'meta');
-          setStatus(ok ? 'done' : 'failed');
+          appendLine(`[${src.label}: stream dropped after exit ${finished.exit_code}]`, 'meta');
+          if (liveRunId === runId) setStatus(ok ? 'done' : 'failed');
           if (ok) await refreshAfterFetch(key);
           markChipState(key, null);
+          if (liveRunId === runId) liveRunId = null;
           return;
         }
       } catch (_) {}
-      appendLine('[client] stream error (server may have shut down)', 'stderr');
-      setStatus('failed');
+      appendLine(
+        `[${src.label}: stream error — server stopped, too many tabs, or connection limit (${MAX_SSE_HINT})]`,
+        'stderr',
+      );
+      if (liveRunId === runId) {
+        setStatus('failed');
+        liveRunId = null;
+      }
       markChipState(key, null);
     };
   }
 
   async function refreshAfterFetch(key) {
     try {
-      await reloadGamesFn();
+      if (reloadAfterFetcherFn) await reloadAfterFetcherFn(key);
+      else await reloadGamesFn();
     } catch (err) {
       appendLine(`[client] reload failed: ${err}`, 'stderr');
     }
-    const src = source(key);
-    if (src) {
-      const meta = state.libraryMeta[src.metaKey];
-      if (meta && typeof meta === 'object' && !meta.fetched_at) {
-        meta.fetched_at = new Date().toISOString();
-      } else if (!meta) {
-        state.libraryMeta[src.metaKey] = { fetched_at: new Date().toISOString() };
+    renderDashboardFetcherHealth();
+  }
+
+  /** Re-attach SSE streams after a page load (or tab return). */
+  async function syncFromServer() {
+    if (!isApiAvailable()) return;
+    await loadFetcherSources(true);
+    let snap;
+    try {
+      const res = await fetch('/api/runs');
+      if (!res.ok) return;
+      snap = await res.json();
+    } catch {
+      return;
+    }
+
+    const pending = [];
+    if (snap.active) pending.push(snap.active);
+    for (const q of snap.queue || []) pending.push(q);
+
+    if (pending.length) {
+      const panelSrc = source(snap.active?.key) || source(pending[0].key);
+      ensurePanel(panelSrc);
+      const isFirstSync = !syncedOnce;
+      syncedOnce = true;
+      if (isFirstSync) {
+        appendLine('[reconnected to in-flight fetcher(s)]', 'meta');
       }
+      for (const run of pending) {
+        const src = source(run.key);
+        if (!src) continue;
+        const chipState = run.status === 'running' ? 'running' : 'queued';
+        markChipState(run.key, chipState);
+        if (run.status === 'running') liveRunId = run.id;
+        if (sourcesByRunId.has(run.id)) continue;
+        subscribe(run.id, run.key, src, { reconnect: true });
+      }
+      updateCancelButton();
+      if (snap.active?.status === 'running') setStatus('running');
+      else if (snap.queue?.length) setStatus('queued');
+      renderDashboardFetcherHealth();
+      updateGlobalFetcherIndicator(runStateByKey, source);
+      return;
+    }
+
+    updateCancelButton();
+    updateGlobalFetcherIndicator(runStateByKey, source);
+    const recentDone = (snap.history || []).find(r => {
+      if (r.status !== 'done' || r.exit_code !== 0 || !r.ended_at) return false;
+      return Date.now() - r.ended_at * 1000 < 5 * 60_000;
+    });
+    if (recentDone) {
+      await refreshAfterFetch(recentDone.key);
     }
   }
 
-  return { probeApi, isApiAvailable, stateFor, run };
+  function startDashboardPolling() {
+    if (pollTimer || !isApiAvailable()) return;
+    maybeAutoRefreshItad();
+    pollTimer = setInterval(() => {
+      syncFromServer();
+      maybeAutoRefreshItad();
+    }, 30_000);
+  }
+
+  function stopDashboardPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  return {
+    probeApi,
+    invalidateApiProbe,
+    isApiAvailable,
+    apiProbeFinished,
+    stateFor,
+    run,
+    runAllStale,
+    syncFromServer,
+    startDashboardPolling,
+    stopDashboardPolling,
+  };
 })();
 
 export function renderDashboardFetcherHealth() {
@@ -340,6 +872,12 @@ export function renderDashboardFetcherHealth() {
   const rows = fetcherSources.map(src => ({ src, ...fetcherFreshness(src) }));
   const staleRows = rows.filter(r => r.status === 'stale');
   const missingRows = rows.filter(r => r.status === 'missing');
+  const runnableStale = rows.filter(r => {
+    if (r.status !== 'stale' && r.status !== 'missing') return false;
+    if (r.src.missingRequirements?.length) return false;
+    if (fetcherRunner.stateFor(r.src.key)) return false;
+    return true;
+  });
   const visible = showOnlyStale
     ? rows.filter(r => r.status === 'stale' || r.status === 'missing')
     : rows;
@@ -351,41 +889,102 @@ export function renderDashboardFetcherHealth() {
   if (missingRows.length) summaryParts.push(`${missingRows.length} missing`);
   const summaryText = summaryParts.length ? summaryParts.join(' · ') : 'All fresh';
   const apiReady = fetcherRunner.isApiAvailable();
+  const probeDone = fetcherRunner.apiProbeFinished();
+  const showReadonly = probeDone && !apiReady;
+  const summaryTooltip = [
+    'Click a chip → run an incremental sync (fast — fills gaps, uses cache where safe).',
+    'Shift+click → force a full refresh that ignores local cache (slower; only on chips that support it).',
+    'Hover any chip to see exactly what click vs. Shift+click will do for that source.',
+  ].join('\n');
   const apiNotice = apiReady
-    ? '<span class="fh-summary" title="Click a chip to run that fetcher">· click to fetch</span>'
-    : '<span class="fh-summary" title="Launch with `python server.py` for click-to-fetch">· read-only (run server.py to enable)</span>';
+    ? `<span class="fh-summary" title="${escapeAttr(summaryTooltip)}">· click = sync · Shift+click = full refresh</span>`
+    : '';
+  const readonlyBanner = showReadonly
+    ? `<div class="fh-readonly-banner" role="status">
+        Fetcher health is read-only. Run <code>python server.py</code> and open
+        <a href="http://127.0.0.1:8765" class="fh-readonly-link">http://127.0.0.1:8765</a>
+        to click chips and stream logs.
+      </div>`
+    : '';
+
+  function chipHtml({ src, status, count, ageLabel, iso }) {
+    const covLabel = ENRICH_KEYS.has(src.key) ? coverageLabel(src.key) : null;
+    const countStr = covLabel != null
+      ? covLabel
+      : (count != null && count > 0 ? formatNum(count) : '—');
+    const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
+    const runState = fetcherRunner.stateFor(src.key);
+    const displayStatus = runState || status;
+    const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
+    const needsConfig = (src.missingRequirements || []).length > 0;
+    const configHint = needsConfig
+      ? ` · missing: ${src.missingRequirements.join(', ')} (see README / .env.example)`
+      : '';
+    const clickHint = clickHintFor(src);
+    const refreshHint = refreshHintFor(src);
+    const enrichLine = ENRICH_KEYS.has(src.key) ? coverageTooltipLine(src.key) : null;
+    const titleLines = apiReady
+      ? [
+          `${src.label} · ${countStr} · fetched ${fetchedLine}${runLabel}`,
+          enrichLine,
+          `Click: ${clickHint}`,
+          refreshHint ? `Shift+click: ${refreshHint}` : 'Shift+click: not supported for this fetcher',
+          `Command: ${src.cmd}${refreshHint ? ' [+ --refresh on Shift+click]' : ''}`,
+          configHint ? `Note: ${src.missingRequirements.join(', ')} not set (see README / .env.example)` : '',
+        ].filter(Boolean)
+      : [
+          `${src.label} · ${countStr} · fetched ${fetchedLine}`,
+          enrichLine,
+          `Click: ${clickHint}`,
+          `Command: ${src.cmd}`,
+          configHint ? `Note: ${src.missingRequirements.join(', ')} not set (see README / .env.example)` : '',
+          'Server is offline — start `python server.py` to run fetchers from the UI.',
+        ].filter(Boolean);
+    const title = titleLines.join('\n');
+    const disabled = !apiReady || runState === 'running' || runState === 'queued';
+    const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
+    const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
+    const warnBadge = needsConfig ? '<span class="fh-chip-warn" title="Missing credentials">!</span>' : '';
+    return `<button type="button" class="fh-chip fh-chip-${displayStatus}${needsClass}${readonlyClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
+      <span class="fh-chip-dot"></span>
+      ${warnBadge}
+      <span class="fh-chip-label">${escapeHtml(src.label)}</span>
+      <span class="fh-chip-count">${escapeHtml(countStr)}</span>
+      <span class="fh-chip-age">${escapeHtml(runState ? runState : ageLabel)}</span>
+    </button>`;
+  }
 
   const chipsHtml = visible.length
-    ? visible.map(({ src, status, count, ageLabel, iso }) => {
-        const countStr = count != null && count > 0 ? formatNum(count) : '—';
-        const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
-        const runState = fetcherRunner.stateFor(src.key);
-        const displayStatus = runState || status;
-        const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
-        const title = apiReady
-          ? `${src.label} · ${countStr} entries · fetched ${fetchedLine}${runLabel} — click to run \`${src.cmd}\``
-          : `${src.label} · ${countStr} entries · fetched ${fetchedLine} · ${src.cmd}`;
-        const disabled = !apiReady || runState === 'running' || runState === 'queued';
-        return `<button type="button" class="fh-chip fh-chip-${displayStatus}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''}>
-          <span class="fh-chip-dot"></span>
-          <span class="fh-chip-label">${escapeHtml(src.label)}</span>
-          <span class="fh-chip-count">${escapeHtml(countStr)}</span>
-          <span class="fh-chip-age">${escapeHtml(runState ? runState : ageLabel)}</span>
-        </button>`;
-      }).join('')
+    ? (showOnlyStale
+      ? `<div class="fh-group-chips">${visible.map(chipHtml).join('')}</div>`
+      : GROUP_ORDER.map(group => {
+          const groupRows = visible.filter(r => r.src.group === group);
+          if (!groupRows.length) return '';
+          return `<div class="fh-group">
+            <div class="fh-group-label">${escapeHtml(GROUP_LABELS[group] || group)}</div>
+            <div class="fh-group-chips">${groupRows.map(chipHtml).join('')}</div>
+          </div>`;
+        }).join(''))
     : '<span class="fh-empty">No stale or missing fetchers — nice.</span>';
 
+  const staleBtnDisabled = !apiReady || !runnableStale.length || Date.now() < runStaleCooldownUntil;
+  const staleBtnLabel = `Run stale (${runnableStale.length})`;
+
   slot.innerHTML = `
-    <div class="fh-head">
+    ${readonlyBanner}
+    <div class="fh-head${apiReady ? '' : ' fh-readonly'}">
       <div class="fh-head-left">
         <span class="fh-title">Fetcher health</span>
         <span class="fh-summary">${escapeHtml(summaryText)}</span>
         ${apiNotice}
       </div>
-      <label class="fh-toggle">
-        <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />
-        Only stale / missing
-      </label>
+      <div class="fh-head-actions">
+        <button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>
+        <label class="fh-toggle">
+          <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />
+          Only stale / missing
+        </label>
+      </div>
     </div>
     <div class="fh-chips">${chipsHtml}</div>
   `;

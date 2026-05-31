@@ -2,17 +2,29 @@
 
 There is no public Blizzard API for "list every game I own". The endpoint that
 powers account.battle.net/games returns the data we want, but requires being
-logged in - we replay the session by sending the full Cookie header copied from
-DevTools.
+logged in. Auto-reading Edge/Chrome cookies usually fails on Windows because of
+app-bound encryption (v127+) — even with admin. The recommended path is to
+paste the Cookie header into BATTLENET_COOKIE in .env and run with
+`--browser env`. The browser jar loaders are kept for Firefox and for users
+who manage to read Edge cookies on their machine.
 """
 
 from __future__ import annotations
 
 import re
+from typing import ClassVar
 
+import browser_cookie3 as bc3
 import requests
 
 ACCOUNT_URL = "https://account.battle.net/api/games-and-subs"
+
+_BROWSER_LOADERS: dict[str, object] = {
+    "edge": bc3.edge,
+    "chrome": bc3.chrome,
+    "brave": bc3.brave,
+    "firefox": bc3.firefox,
+}
 
 
 class BattleNetAuthError(Exception):
@@ -20,12 +32,15 @@ class BattleNetAuthError(Exception):
 
 
 class BattleNetClient:
+    SUPPORTED_BROWSERS: ClassVar[tuple[str, ...]] = tuple(_BROWSER_LOADERS.keys())
+
     def __init__(self, cookie_header: str, user_agent: str | None = None):
         cookie = (cookie_header or "").strip()
         if not cookie:
             raise BattleNetAuthError(
-                "Set BATTLENET_COOKIE in .env (copy the Cookie header from "
-                "account.battle.net DevTools → Network → games-and-subs request)."
+                "No Battle.net session cookie available. Sign in at "
+                "https://account.battle.net/ in Edge (default), or set "
+                "BATTLENET_COOKIE in .env as a fallback."
             )
         self.session = requests.Session()
         headers = {
@@ -44,12 +59,50 @@ class BattleNetClient:
             headers["X-XSRF-TOKEN"] = m.group(1).strip()
         self.session.headers.update(headers)
 
+    @classmethod
+    def from_browser(cls, browser: str = "edge", **kw) -> BattleNetClient:
+        name = (browser or "edge").strip().lower()
+        loader = _BROWSER_LOADERS.get(name)
+        if loader is None:
+            supported = ", ".join(cls.SUPPORTED_BROWSERS)
+            raise BattleNetAuthError(
+                f"Unsupported browser {browser!r}. Choose one of: {supported}, env."
+            )
+        try:
+            jar = loader(domain_name=".battle.net")
+        except Exception as e:
+            hint = (
+                "Modern Edge/Chrome (v127+) use app-bound cookie encryption that "
+                "browser-cookie3 can't decrypt on Windows, even from an elevated "
+                "shell. Recommended: paste the Cookie header into "
+                "BATTLENET_COOKIE in .env and run with --browser env."
+                if name in ("edge", "chrome", "brave")
+                else f"Ensure {name} is installed and signed in at account.battle.net."
+            )
+            raise BattleNetAuthError(
+                f"Could not read {name} cookie jar: {e}\n{hint}"
+            ) from e
+        cookies = [
+            f"{c.name}={c.value}"
+            for c in jar
+            if c.domain and c.domain.lstrip(".").endswith("battle.net")
+        ]
+        if not cookies:
+            raise BattleNetAuthError(
+                f"No battle.net cookies found in {name}. Sign in at "
+                "https://account.battle.net/ in that browser, then retry."
+            )
+        return cls("; ".join(cookies), **kw)
+
     def get_raw_account(self) -> dict:
         resp = self.session.get(ACCOUNT_URL, timeout=30)
         if resp.status_code in (401, 403):
             raise BattleNetAuthError(
-                f"Battle.net rejected the cookie ({resp.status_code}). Sign in again at "
-                "account.battle.net and copy a fresh Cookie header into BATTLENET_COOKIE."
+                f"Battle.net rejected the session ({resp.status_code}). "
+                "The session likely expired — sign in again at "
+                "https://account.battle.net/games in Edge, then refresh "
+                "BATTLENET_COOKIE in .env (DevTools → Network → games-and-subs → "
+                "Cookie header) and run with --browser env."
             )
         if resp.status_code == 500:
             raise BattleNetAuthError(
@@ -63,5 +116,5 @@ class BattleNetClient:
         except ValueError as e:
             raise BattleNetAuthError(
                 f"Battle.net returned non-JSON ({resp.headers.get('content-type')}). "
-                "Cookie likely invalid - re-copy from DevTools."
+                "Session likely expired — sign in at account.battle.net in Edge."
             ) from e

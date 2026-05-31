@@ -34,6 +34,7 @@ from fetchers._base import (
     print_id_diff,
     write_games_json,
 )
+from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 from itch_client import ItchApiError, ItchAuthError, ItchClient
 
@@ -163,15 +164,14 @@ def main() -> int:
     add_dry_run_arg(parser)
     args = parser.parse_args()
     configure_stdout()
+    t0 = started("fetch_itch")
+    stats = RunStats()
     load_dotenv()
 
     api_key = os.getenv("ITCH_API_KEY", "").strip()
     if not api_key:
-        print(
-            "Set ITCH_API_KEY in .env (https://itch.io/user/settings/api-keys)",
-            file=sys.stderr,
-        )
-        return 1
+        stats.error("Set ITCH_API_KEY in .env (https://itch.io/user/settings/api-keys)")
+        return stats.finish("fetch_itch", t0, exit_code=1)
 
     try:
         client = ItchClient(api_key)
@@ -181,15 +181,15 @@ def main() -> int:
         print("Walking owned-keys pages (this can take a minute for big libraries)...")
         keys = client.all_owned_keys()
     except ItchAuthError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_itch", t0, exit_code=1)
     except ItchApiError as e:
-        print(f"itch.io API error: {e}", file=sys.stderr)
-        return 1
+        stats.error(f"itch.io API error: {e}")
+        return stats.finish("fetch_itch", t0, exit_code=1)
 
     if not keys:
-        print("No owned games returned from itch.io.", file=sys.stderr)
-        return 2
+        stats.error("No owned games returned from itch.io.")
+        return stats.finish("fetch_itch", t0, exit_code=2)
 
     print(f"Found {len(keys)} owned keys.")
 
@@ -263,14 +263,15 @@ def main() -> int:
         print(f"  {preserved_enrichment} rows kept enrichment from cache (reviews/HLTB)")
 
     if args.dry_run:
-        print("\nDry run — not writing games_itch.json.")
-        return 0
+        print("\nDry run — not writing games_itch.json.", flush=True)
+        return stats.finish("fetch_itch", t0, exit_code=0, extra="dry run")
 
     sorted_games = sorted(games_out, key=lambda g: g["name"].lower())
     write_games_json(GAMES_ITCH_JSON, store="itch", games=sorted_games)
-    print(f"\nWrote {len(sorted_games)} games to {GAMES_ITCH_JSON}.")
-    print("Reload the dashboard to see your itch.io library.")
-    return 0
+    print(f"\nWrote {len(sorted_games)} games to {GAMES_ITCH_JSON}.", flush=True)
+    print("Reload the dashboard to see your itch.io library.", flush=True)
+    stats.ok = len(sorted_games)
+    return stats.finish("fetch_itch", t0, exit_code=0, extra=f"{len(sorted_games)} games")
 
 
 if __name__ == "__main__":

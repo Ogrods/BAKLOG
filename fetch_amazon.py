@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
+from fetchers._progress import RunStats, started
 
 GAMES_AMAZON_JSON = Path("games_amazon.json")
 HLTB_DELAY_SEC = 1.0
@@ -95,10 +96,12 @@ def main() -> int:
     parser.add_argument("--only-new", action="store_true", help="Only HLTB-fetch games missing HLTB data")
     args = parser.parse_args()
     _configure_stdout()
+    t0 = started("fetch_amazon")
+    stats = RunStats()
 
     if sys.platform != "win32":
-        print("fetch_amazon.py only runs on Windows (DPAPI).", file=sys.stderr)
-        return 1
+        stats.error("fetch_amazon.py only runs on Windows (DPAPI).")
+        return stats.finish("fetch_amazon", t0, exit_code=1)
 
     load_dotenv()
     sql_dir = args.sql_dir
@@ -113,15 +116,15 @@ def main() -> int:
         print(f"Reading Amazon Games library from:\n  {client.sql_dir}")
         records = client.get_library_records()
     except ImportError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_amazon", t0, exit_code=1)
     except AmazonGamesError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+        stats.error(str(e))
+        return stats.finish("fetch_amazon", t0, exit_code=1)
 
     if not records:
-        print("No games found in Amazon entitlements.", file=sys.stderr)
-        return 2
+        stats.error("No games found in Amazon entitlements.")
+        return stats.finish("fetch_amazon", t0, exit_code=2)
 
     print(f"Found {len(records)} Amazon Games titles.")
 
@@ -164,9 +167,10 @@ def main() -> int:
     GAMES_AMAZON_JSON.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\nWrote {len(games_out)} games to {GAMES_AMAZON_JSON}.")
-    print("Reload the dashboard to see your Amazon library.")
-    return 0
+    print(f"\nWrote {len(games_out)} games to {GAMES_AMAZON_JSON}.", flush=True)
+    print("Reload the dashboard to see your Amazon library.", flush=True)
+    stats.ok = len(games_out)
+    return stats.finish("fetch_amazon", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
 if __name__ == "__main__":

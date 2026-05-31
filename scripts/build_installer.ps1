@@ -27,7 +27,7 @@ Get-ChildItem -Path $Root -Force | Where-Object {
 @"
 @echo off
 cd /d "%~dp0"
-echo Starting Game Backlog server on http://127.0.0.1:8765
+echo Starting BAKLOG server on http://127.0.0.1:8765
 python server.py
 pause
 "@ | Set-Content -Encoding ASCII (Join-Path $Out "Start Backlog.bat")

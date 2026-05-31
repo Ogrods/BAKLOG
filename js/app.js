@@ -2008,6 +2008,7 @@ function updateViewChrome() {
   document.getElementById("toolbarSection")?.classList.toggle("hidden", isDash || isConn);
   document.getElementById("tableShell")?.classList.toggle("hidden", isDash || isConn);
   document.getElementById("rowCount")?.classList.toggle("hidden", isDash || isConn);
+  document.getElementById("summary")?.classList.toggle("hidden", isConn);
   document.getElementById("alphaNav")?.classList.toggle("dashboard-hidden", isDash || isConn);
   document.getElementById("dashboardContainer")?.classList.toggle("hidden", !isDash);
   document.getElementById("connectionsContainer")?.classList.toggle("hidden", !isConn);
@@ -2324,6 +2325,11 @@ const WISHLIST_FETCHER_JSON = {
   wishlistGog: "games_wishlist_gog.json",
   wishlistEpic: "games_wishlist_epic.json",
 };
+const WISHLIST_FETCHER_META_KEY = {
+  wishlistSteam: "wishlist",
+  wishlistGog: "wishlistGog",
+  wishlistEpic: "wishlistEpic",
+};
 const ENRICH_FETCHER_KEYS = new Set(["hltb", "steamReviews", "steamCovers"]);
 
 function rebuildAllGamesFromMetas() {
@@ -2391,7 +2397,7 @@ async function reloadAfterFetcher(key) {
     if (key === "steamReviews") await loadSteamReviewCache();
     if (key === "steamCovers") await loadSteamCoversMeta();
   } else if (WISHLIST_FETCHER_JSON[key]) {
-    const metaKey = key === "wishlistSteam" ? "wishlist" : key === "wishlistGog" ? "wishlistGog" : "wishlistEpic";
+    const metaKey = WISHLIST_FETCHER_META_KEY[key];
     state.libraryMeta[metaKey] = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
     rebuildWishlistFromMetas();
   } else if (LIBRARY_STORE_JSON[key]) {

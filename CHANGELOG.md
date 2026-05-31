@@ -6,6 +6,7 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **BAKLOG branding** — product title, favicon, README tagline, header subtitle (“Cross-store backlog · local-only”).
 - **Connections tab** — unified sign-in for all stores: form fields for API keys (Steam, Xbox, itch, ITAD), Playwright browser login for cookie/OAuth providers (GOG, PSN, Epic, Battle.net, Nintendo, Ubisoft), encrypted at rest via OS keychain + AES-GCM (`auth/` package).
 - **Reconnect banner** when a fetcher fails auth (401/403) — links to Connections tab.
 - **`scripts/build_installer.ps1`** — bundles app + Playwright Chromium into `dist/steam-backlog/`.

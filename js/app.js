@@ -605,8 +605,12 @@ function wishlistBadgeHtml(g) {
 function formatHours(minutes) { return !minutes ? "0h" : `${(minutes / 60).toFixed(1)}h`; }
 function formatDate(unixOrStr) {
   if (!unixOrStr) return "—";
-  if (typeof unixOrStr === "number") return unixOrStr === 0 ? "—" : new Date(unixOrStr * 1000).toLocaleDateString();
-  return unixOrStr;
+  if (typeof unixOrStr === "number") {
+    if (unixOrStr === 0) return "—";
+    const dt = new Date(unixOrStr * 1000);
+    return `${RELEASE_MONTHS[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
+  }
+  return formatReleaseDate(unixOrStr);
 }
 function parseReleaseForSort(d) { const t = Date.parse(d || ""); return isNaN(t) ? 0 : t; }
 const RELEASE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

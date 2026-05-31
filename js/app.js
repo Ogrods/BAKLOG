@@ -1775,14 +1775,14 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       </td>
       ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
-      <td class="p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
+      <td class="col-played p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
       <td class="p-2 text-right">
         <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
       <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
       <td class="p-2 text-slate-300">${formatReleaseDate(g.release_date)}</td>
-      <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
+      <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
       <td class="p-2 notes-cell">
         <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
@@ -1866,7 +1866,10 @@ async function renderTable(opts) {
   }
   const showScore = !!state.prefs.showScoreColumn;
   const isWish = state.activeView === "wishlist";
-  document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !showScore);
+  const wrap = document.getElementById("tableWrap");
+  wrap?.classList.toggle("table-hide-score", !showScore);
+  wrap?.classList.toggle("table-hide-playtime", isWish);
+  wrap?.classList.toggle("table-hide-lastplayed", isWish);
   const statusHdr = document.getElementById("statusHeader");
   if (statusHdr) statusHdr.textContent = isWish ? "Tracking" : "Status";
   const priceHdr = document.getElementById("priceHeader");
@@ -3623,7 +3626,10 @@ async function bootstrap() {
   savePrefs();
   bindEvents();
   document.getElementById("showScoreColumn").checked = !!state.prefs.showScoreColumn;
-  document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !state.prefs.showScoreColumn);
+  const tableWrap = document.getElementById("tableWrap");
+  tableWrap?.classList.toggle("table-hide-score", !state.prefs.showScoreColumn);
+  tableWrap?.classList.toggle("table-hide-playtime", state.activeView === "wishlist");
+  tableWrap?.classList.toggle("table-hide-lastplayed", state.activeView === "wishlist");
   document.getElementById("genreMode").value = state.prefs.genreFilterMode;
   document.getElementById("quickWinMax").value = state.prefs.quickWinMaxHours;
   document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;

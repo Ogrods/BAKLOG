@@ -1599,17 +1599,22 @@ function formatPrice(g) {
   if (itad?.price_str) {
     const onSale = (itad.cut || 0) > 0;
     const cutTxt = onSale ? ` (-${itad.cut}%)` : "";
-    const priceHtml = onSale
+    const priceInner = onSale
       ? `<span class="text-emerald-300 font-semibold">${escapeHtml(itad.price_str)}${escapeHtml(cutTxt)}</span>`
       : escapeHtml(itad.price_str);
     const d = getDealInfo(g);
     const lowBadge = d ? dealLowBadgeHtml(d).replace(/^/, "&nbsp;") : "";
     const dropBadge = dealDroppedBadgeHtml(g).replace(/^/, "&nbsp;");
     const shopHtml = itad.shop ? `@ ${escapeHtml(itad.shop)}` : "";
-    return `<div class="flex flex-col items-end leading-tight">
-      <span class="whitespace-nowrap">${priceHtml}${dropBadge}${lowBadge}</span>
+    const dealUrl = itad.url || (d && d.url) || null;
+    const linkOpen = dealUrl
+      ? `<a href="${escapeAttr(dealUrl)}" target="_blank" rel="noopener" class="deal-price-link flex flex-col items-end leading-tight" title="Open this deal on ${escapeAttr(itad.shop || "store")}">`
+      : `<div class="flex flex-col items-end leading-tight">`;
+    const linkClose = dealUrl ? `</a>` : `</div>`;
+    return `${linkOpen}
+      <span class="whitespace-nowrap">${priceInner}${dropBadge}${lowBadge}</span>
       ${shopHtml ? `<span class="text-[10px] text-slate-400 truncate w-full text-right" title="${escapeAttr(itad.shop)}">${shopHtml}</span>` : ""}
-    </div>`;
+    ${linkClose}`;
   }
   if (!g.price && g.discount_percent == null) return "—";
   const base = g.price || "N/A";

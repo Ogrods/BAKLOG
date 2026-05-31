@@ -215,12 +215,6 @@ window.coverFallback = function (img) {
   const cls = img.classList.contains("pick-cover") ? "pick-cover placeholder" : "cover placeholder";
   img.outerHTML = `<div class="${cls}" title="${name.replace(/"/g, "&quot;")}">${name.slice(0, 18)}</div>`;
 };
-function coverWrapStyle(url) {
-  if (!url) return "";
-  const safe = String(url).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  return ` style="--cover:url('${safe}')"`;
-}
-
 window.markLandscape = function (img) {
   if (!img?.classList) return;
   const isLandscape = !!(img.naturalWidth && img.naturalHeight && img.naturalWidth > img.naturalHeight * 1.1);
@@ -676,7 +670,7 @@ function dealHeroCardHtml(g) {
   return `<button type="button" class="deal-card-clickable deal-hero dash-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist">
     <div class="dash-kpi-label">Today&apos;s top deal</div>
     <div class="deal-hero-body mt-2">
-      <span class="cover-wrap deal-hero-cover-wrap"${coverWrapStyle(cover)}>
+      <span class="cover-wrap deal-hero-cover-wrap">
         <img class="deal-hero-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </span>
@@ -1220,7 +1214,7 @@ function pickCardHtml(g) {
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
       <span class="pick-store store-badge ${store}">${badge}</span>
-      <div class="cover-wrap w-full block"${coverWrapStyle(cover)}>
+      <div class="cover-wrap w-full block">
         <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
@@ -1331,7 +1325,7 @@ function dealCardHtml(g) {
   return `
     <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
       <span class="pick-store store-badge ${wishlistTarget}" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLetter(wishlistTarget)}</span>
-      <div class="cover-wrap w-full block"${coverWrapStyle(cover)}>
+      <div class="cover-wrap w-full block">
         <img class="pick-cover" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
@@ -1380,6 +1374,12 @@ function renderSummary() {
   if (state.activeView === "wishlist") {
     const wl = state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)));
     const hiddenCount = state.wishlistGames.length - wl.length;
+    const sourceSet = new Set();
+    for (const g of state.wishlistGames) {
+      const s = (g.wishlist_store || g.store_target || (g.store === "wishlist" ? "steam" : g.store) || "").toLowerCase();
+      if (s) sourceSet.add(s);
+    }
+    const sourcesList = [...sourceSet].map(s => s.toUpperCase()).sort().join(", ");
     const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
     const lows = wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; });
     const owned = wl.filter(g => isOwnedByTitle(g.name)).length;
@@ -1402,9 +1402,13 @@ function renderSummary() {
       ? `<button type="button" class="summary-deal-chip owned${hideOwnedActive ? " active" : ""}" data-wishlist-deal-filter="hideOwned" title="${hideOwnedActive ? "Currently hiding already-owned wishlist items — click to show" : "Hide wishlist items you already own elsewhere"}">Already owned <span class="text-amber-200 font-semibold ml-1">${owned}</span></button>`
       : "";
     const statusChips = renderStatusChipsHtml(wl, WISHLIST_STATUS_CHIP_DEFS);
+    const sourcesChip = sourceSet.size
+      ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs" title="Wishlist sources: ${escapeAttr(sourcesList)}">Sources <span class="text-slate-100 font-semibold ml-1">${sourceSet.size}</span></div>`
+      : "";
     el.innerHTML = `
       <div class="w-full flex flex-wrap gap-2">
         ${resetChip}
+        ${sourcesChip}
         ${onSaleChip}
         ${lowChip}
         ${avgDisc != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
@@ -1706,7 +1710,6 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
         </div>
         <div class="mt-1 flex items-center gap-1.5 flex-wrap">
           ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
-          ${crossStoreOwnPillHtml(g)}
           ${coopPillsHtml(g)}
         </div>
         ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}

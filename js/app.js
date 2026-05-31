@@ -609,6 +609,14 @@ function formatDate(unixOrStr) {
   return unixOrStr;
 }
 function parseReleaseForSort(d) { const t = Date.parse(d || ""); return isNaN(t) ? 0 : t; }
+function formatReleaseDate(d) {
+  if (!d) return "—";
+  const s = String(d).trim();
+  if (!s) return "—";
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return s;
+}
 
 function formatDollar(n) {
   const num = Number(n);
@@ -1535,7 +1543,7 @@ function updateRowInPlace(tr, g) {
 function tagCellHtml(g) {
   const key = gameKey(g);
   const p = getPersonal(g);
-  return (p.tags || []).map(t => `<span class="row-tag inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-700/40 border border-amber-500/40 text-[11px] text-amber-100">${escapeHtml(t)}<button type="button" class="row-tag-remove text-amber-200 hover:text-white" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("") + `<button type="button" class="row-tag-add text-[11px] px-1.5 py-0.5 rounded-full border border-dashed border-slate-500 text-slate-400 hover:text-slate-100 hover:border-slate-300" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>`;
+  return (p.tags || []).map(t => `<span class="row-tag inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-700/40 border border-amber-500/40 text-[11px] text-amber-100">${escapeHtml(t)}<button type="button" class="row-tag-remove text-amber-200 hover:text-white" style="cursor: pointer" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("") + `<button type="button" class="row-tag-add text-[11px] px-1.5 py-0.5 rounded-full border border-dashed border-slate-500 text-slate-400 hover:text-slate-100 hover:border-slate-300" style="cursor: pointer" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>`;
 }
 
 function updateTagCellInPlace(tr, g) {
@@ -1749,7 +1757,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       </td>
       <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
-      <td class="p-2 text-slate-300">${g.release_date || "—"}</td>
+      <td class="p-2 text-slate-300">${formatReleaseDate(g.release_date)}</td>
       <td class="p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
       <td class="p-2 notes-cell">

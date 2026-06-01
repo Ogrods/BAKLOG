@@ -18,7 +18,6 @@ import { personalStore, showMigrationBanner } from './personal-store.js';
 import {
   fetcherRunner,
   loadFetcherSources,
-  renderDashboardFetcherHealth,
   configureFetcherHealth,
 } from './fetcher-health.js';
 import { initConnections } from './connections.js';
@@ -150,33 +149,31 @@ async function bootstrap() {
       if (state.activeView === "dashboard") scheduleDashboardRender();
     });
   }
-  try {
-    await reloadGames();
-  } catch {
+  /** Load fetcher manifest + probe API in parallel with library JSON so the
+   *  first scheduleDashboardRender (from applyMergedLibrary) paints real chips. */
+  async function bootstrapFetcherChrome() {
+    await loadFetcherSources();
+    initConnections();
+    const available = await fetcherRunner.probeApi();
+    if (!available) return;
+    await fetcherRunner.syncFromServer();
+    if (state.activeView === "dashboard") fetcherRunner.startDashboardPolling();
+  }
+  const reloadPromise = reloadGames().catch(() => {
     const banner = document.getElementById("bootErrorBanner");
     if (banner) {
       banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">No library data found. Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span></div>';
       banner.classList.remove("hidden");
     }
-  }
-  hideViewLoading();
-  await loadFetcherSources();
-  initConnections();
-  fetcherRunner.probeApi().then(async available => {
-    if (!available) return;
-    await fetcherRunner.syncFromServer();
-    if (state.activeView === "dashboard") {
-      fetcherRunner.startDashboardPolling();
-      renderDashboardFetcherHealth();
-    }
   });
+  await Promise.all([reloadPromise, bootstrapFetcherChrome()]);
+  hideViewLoading();
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {
       escapeHtml,
       onUploaded: () => reloadGames().then(() => scheduleDashboardRender()),
     });
   }
-  if (state.activeView === "dashboard") scheduleDashboardRender();
 }
 
 hydrateState();

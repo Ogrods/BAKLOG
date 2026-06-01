@@ -46,6 +46,26 @@ let _dashMegaShellBuilt = false;
 let _dashRenderedFingerprint = "";
 const _dashLastCounters = {};
 
+// Entrance animations may only replay when switchView('dashboard') sets the
+// token and calls renderDashboard({ replay: true }). Bootstrap schedules and
+// personalStore.notify never set the token, so a second schedule after the
+// first full render is a no-op instead of chart.reset() + update() again.
+let _dashReplayAllowed = false;
+let _dashRenderInFlight = false;
+const _dashRenderStats = {
+  full: 0,
+  replay: 0,
+  skippedReentrant: 0,
+  skippedAutoReplay: 0,
+  lastFullAt: 0,
+};
+if (typeof window !== "undefined") window.__baklogDash = { stats: _dashRenderStats };
+
+/** Only switchView('dashboard') should call this, bracketing renderDashboard({ replay: true }). */
+export function setDashReplayAllowed(allowed) {
+  _dashReplayAllowed = !!allowed;
+}
+
 function dashboardFingerprint() {
   return JSON.stringify({
     dv: window._dataVersion || 0,
@@ -205,6 +225,15 @@ function renderDashboardMega(games) {
 
 export function renderDashboard(opts = {}) {
   if (state.activeView !== "dashboard") return;
+  // Re-entrant guard. renderDashboard isn't async, but Chart.js init can call
+  // back into user code (legend plugins, tooltip handlers) and any path that
+  // hits savePrefs() will trigger personalStore.notify →
+  // scheduleDashboardRender during this render. Counter is exposed via
+  // window.__baklogDash.stats so debug-overlay surfaces if we ever trip it.
+  if (_dashRenderInFlight) {
+    _dashRenderStats.skippedReentrant++;
+    return;
+  }
   const loading = document.getElementById("dashboardLoading");
   const content = document.getElementById("dashboardContent");
   if (typeof Chart === "undefined") {
@@ -222,42 +251,58 @@ export function renderDashboard(opts = {}) {
   loading?.classList.add("hidden");
   content?.classList.remove("hidden");
 
-  // Same-data revisit: skip the full re-render (charts stay built), just
-  // replay the entrance animations and resume the rotation timers.
   const fp = dashboardFingerprint();
+  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
   if (!opts.force && fp === _dashRenderedFingerprint && _dashMegaShellBuilt) {
-    const games = dashboardLibraryGames();
-    const spotlightPool = getSpotlightPool().length ? getSpotlightPool() : pickSpotlightGames(games);
-    startSpotlightRotation(spotlightPool);
-    startInsightRotation(buildInsightPool(games));
-    replayDashboardChartAnimations();
+    if (opts.replay && _dashReplayAllowed) {
+      _dashRenderInFlight = true;
+      try {
+        const games = dashboardLibraryGames();
+        const spotlightPool = getSpotlightPool().length ? getSpotlightPool() : pickSpotlightGames(games);
+        startSpotlightRotation(spotlightPool);
+        startInsightRotation(buildInsightPool(games));
+        replayDashboardChartAnimations();
+        _dashRenderStats.replay++;
+      } finally {
+        _dashRenderInFlight = false;
+      }
+    } else {
+      _dashRenderStats.skippedAutoReplay++;
+    }
     return;
   }
 
-  destroyDashboardCharts();
-  Chart.defaults.color = "#94a3b8";
-  Chart.defaults.borderColor = "#334155";
-  const games = dashboardLibraryGames();
-  renderDashboardFetcherHealth();
-  renderDashboardMega(games);
-  renderDashboardItchRecap();
+  _dashRenderInFlight = true;
   try {
-    renderDashboardCharts(games);
-  } catch (err) {
-    console.error("Dashboard charts error:", err);
+    destroyDashboardCharts();
+    Chart.defaults.color = "#94a3b8";
+    Chart.defaults.borderColor = "#334155";
+    const games = dashboardLibraryGames();
+    renderDashboardFetcherHealth();
+    renderDashboardMega(games);
+    renderDashboardItchRecap();
+    try {
+      renderDashboardCharts(games);
+    } catch (err) {
+      console.error("Dashboard charts error:", err);
+    }
+    renderDashboardWishlistStats();
+    try {
+      renderDashboardCoopSpotlight(games);
+    } catch (err) {
+      console.error("Dashboard co-op spotlight error:", err);
+    }
+    try {
+      renderDashboardPicksVersus(games);
+    } catch (err) {
+      console.error("Dashboard picks versus error:", err);
+    }
+    _dashRenderedFingerprint = fp;
+    _dashRenderStats.full++;
+    _dashRenderStats.lastFullAt = now;
+  } finally {
+    _dashRenderInFlight = false;
   }
-  renderDashboardWishlistStats();
-  try {
-    renderDashboardCoopSpotlight(games);
-  } catch (err) {
-    console.error("Dashboard co-op spotlight error:", err);
-  }
-  try {
-    renderDashboardPicksVersus(games);
-  } catch (err) {
-    console.error("Dashboard picks versus error:", err);
-  }
-  _dashRenderedFingerprint = fp;
 }
 
 export function cancelScheduledDashboardRender() {

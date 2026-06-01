@@ -51,6 +51,7 @@ import {
   renderDashboardWishlistStats,
   renderDashboard,
   dashboardWasRendered,
+  setDashReplayAllowed,
 } from './dashboard.js';
 import { fetcherRunner } from './fetcher-health.js';
 import { refreshConnections, startConnectionsPolling, stopConnectionsPolling } from './connections.js';
@@ -121,6 +122,72 @@ export function renderFiltersButtonBadge() {
   badge.classList.toggle("hidden", n === 0);
 }
 
+/**
+ * Apply a prefs/session-prefs patch in one call instead of hand-rolling
+ * the savePrefs + syncFilterDomFromState + recomputeCrossStoreHidden +
+ * renderSummary + refreshFilterUI dance at every call site.
+ *
+ * Lives in filters-ui.js because every dependency already does — putting
+ * it in prefs.js would create a circular import.
+ *
+ * @param {object} [patch]
+ * @param {object} [patch.prefs]        Shallow-merge into state.prefs (persistent).
+ * @param {object} [patch.sessionPrefs] Shallow-merge into state.sessionPrefs (session-only).
+ *
+ * @param {object} [options]
+ * @param {boolean}   [options.recomputeDedup=false]
+ *   Call recomputeCrossStoreHidden() + renderSummary() before the refresh.
+ *   Used by the cross-store dedup toggle path.
+ * @param {boolean}   [options.refresh=true]
+ *   Run refreshFilterUI() at the end. Set false when the caller will paint
+ *   the table itself (e.g. dashboard drills that own their scroll target).
+ * @param {boolean}   [options.debounced=false]
+ *   Use refreshFilterUIDebounced (slider / search-style inputs).
+ * @param {object}    [options.refreshOptions]
+ *   Forwarded to refreshFilterUI / refreshFilterUIDebounced.
+ * @param {Function[]} [options.renderers]
+ *   Extra renderers to run before the refresh (renderStoreChips,
+ *   renderGenreChips, syncDealFilterControls, etc.). Each is invoked
+ *   with no arguments. Errors are caught + warned so a bad chip
+ *   renderer can't kill the whole apply.
+ * @param {boolean}   [options.skipDomSync=false]
+ *   Skip syncFilterDomFromState() even when sessionPrefs changed. Used
+ *   by input event handlers where the DOM is already the source of the
+ *   new value (pushing it back would just no-op).
+ * @param {boolean}   [options.persist=true]
+ *   Save state.prefs to localStorage when patch.prefs is present.
+ *   Rarely false; only set for ephemeral prefs writes that another
+ *   path is about to persist itself.
+ */
+export function applyPrefsChange(patch = {}, options = {}) {
+  const hasPrefs = patch.prefs && typeof patch.prefs === "object";
+  const hasSession = patch.sessionPrefs && typeof patch.sessionPrefs === "object";
+
+  if (hasPrefs) Object.assign(state.prefs, patch.prefs);
+  if (hasSession) Object.assign(state.sessionPrefs, patch.sessionPrefs);
+
+  if (hasPrefs && options.persist !== false) savePrefs();
+  if (hasSession && !options.skipDomSync) syncFilterDomFromState();
+
+  if (options.recomputeDedup) {
+    recomputeCrossStoreHidden();
+    renderSummary();
+  }
+
+  if (Array.isArray(options.renderers)) {
+    for (const fn of options.renderers) {
+      if (typeof fn !== "function") continue;
+      try { fn(); }
+      catch (err) { console.warn("[applyPrefsChange] renderer threw", err); }
+    }
+  }
+
+  if (options.refresh !== false) {
+    if (options.debounced) refreshFilterUIDebounced(options.refreshOptions);
+    else refreshFilterUI(options.refreshOptions);
+  }
+}
+
 export function renderActiveFilterPills() {
   const wrap = document.getElementById("activeFilterPills");
   if (!wrap) return;
@@ -150,111 +217,130 @@ export function renderActiveFilterPills() {
   });
 }
 
+/** Sync a single DOM input to a value, no-op if the element is missing. */
+function setInputValue(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = String(val);
+}
+function setInputChecked(id, checked) {
+  const el = document.getElementById(id);
+  if (el) el.checked = !!checked;
+}
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(text);
+}
+
 export function removeActiveFilter(kind, value) {
-  const sp = state.sessionPrefs;
   switch (kind) {
-    case "search": sp.search = ""; syncFilterDomFromState(); break;
-    case "status": sp.statusFilter = ""; syncFilterDomFromState(); break;
-    case "store": state.prefs.storeFilter = ""; savePrefs(); renderStoreChips(); break;
-    case "releaseYear":
-      state.prefs.releaseYearFilter = "";
-      savePrefs();
-      break;
-    case "wishlistStore": state.prefs.wishlistStoreFilter = ""; savePrefs(); renderWishlistStoreChips(); break;
+    case "search":          return applyPrefsChange({ sessionPrefs: { search: "" } });
+    case "status":          return applyPrefsChange({ sessionPrefs: { statusFilter: "" } });
+    case "unplayed":        return applyPrefsChange({ sessionPrefs: { unplayedOnly: false } });
+    case "earlyAccess":     return applyPrefsChange({ sessionPrefs: { earlyAccessOnly: false } });
+    case "minRating":       return applyPrefsChange({ sessionPrefs: { minRating: 0 } });
+    case "maxHours":        return applyPrefsChange({ sessionPrefs: { maxHours: 200 } });
+    case "store":           return applyPrefsChange({ prefs: { storeFilter: "" } },           { renderers: [renderStoreChips] });
+    case "releaseYear":     return applyPrefsChange({ prefs: { releaseYearFilter: "" } });
+    case "wishlistStore":   return applyPrefsChange({ prefs: { wishlistStoreFilter: "" } },   { renderers: [renderWishlistStoreChips] });
+    case "hltbBucket":      return applyPrefsChange({ prefs: { hltbBucket: null } });
     case "genre":
-      state.prefs.genreFilters = (state.prefs.genreFilters || []).filter(x => x !== value);
-      savePrefs();
-      break;
+      return applyPrefsChange({ prefs: { genreFilters: (state.prefs.genreFilters || []).filter(x => x !== value) } });
     case "tag":
-      state.prefs.tagFilters = (state.prefs.tagFilters || []).filter(x => x !== value);
-      savePrefs();
-      break;
-    case "unplayed": sp.unplayedOnly = false; syncFilterDomFromState(); break;
-    case "earlyAccess": sp.earlyAccessOnly = false; syncFilterDomFromState(); break;
+      return applyPrefsChange({ prefs: { tagFilters: (state.prefs.tagFilters || []).filter(x => x !== value) } });
+    case "tagMode":
+      return applyPrefsChange(
+        { prefs: { tagFilterMode: "OR" } },
+        { renderers: [() => setInputValue("tagFilterMode", "OR")] },
+      );
     case "coop":
     case "coopOnline":
     case "coopLocal":
     case "coopAny":
+      // setCoopFilterMode persists + syncs the segmented control itself.
       setCoopFilterMode("off");
-      break;
-    case "minRating": sp.minRating = 0; syncFilterDomFromState(); break;
-    case "maxHours": sp.maxHours = 200; syncFilterDomFromState(); break;
-    case "hltbBucket": state.prefs.hltbBucket = null; savePrefs(); break;
-    case "cleanup": state.cleanupModeActive = false; updateCleanupBtnState(); break;
+      return applyPrefsChange();
+    case "cleanup":
+      state.cleanupModeActive = false;
+      updateCleanupBtnState();
+      return applyPrefsChange();
     case "dedup":
-      state.sessionPrefs.crossStoreDedup = false;
-      document.getElementById("crossStoreDedup").checked = false;
-      recomputeCrossStoreHidden();
-      renderSummary();
-      break;
-    case "itchHideNonGames": {
-      state.sessionPrefs.itchHideNonGames = false;
-      const itchToggle = document.getElementById("itchShowNonGames");
-      if (itchToggle) itchToggle.checked = true;
-      break;
-    }
-    case "tagMode":
-      state.prefs.tagFilterMode = "OR";
-      savePrefs();
-      document.getElementById("tagFilterMode").value = "OR";
-      break;
+      return applyPrefsChange(
+        { sessionPrefs: { crossStoreDedup: false } },
+        { recomputeDedup: true, renderers: [() => setInputChecked("crossStoreDedup", false)] },
+      );
+    case "itchHideNonGames":
+      return applyPrefsChange(
+        { sessionPrefs: { itchHideNonGames: false } },
+        { renderers: [() => setInputChecked("itchShowNonGames", true)] },
+      );
     case "dealOnSale":
-      state.prefs.dealOnSaleOnly = false;
-      savePrefs();
-      document.getElementById("dealOnSaleOnly").checked = false;
-      break;
+      return applyPrefsChange(
+        { prefs: { dealOnSaleOnly: false } },
+        { renderers: [() => setInputChecked("dealOnSaleOnly", false)] },
+      );
     case "dealLow":
-      state.prefs.dealHistoricalLowOnly = false;
-      savePrefs();
-      document.getElementById("dealHistoricalLowOnly").checked = false;
-      break;
+      return applyPrefsChange(
+        { prefs: { dealHistoricalLowOnly: false } },
+        { renderers: [() => setInputChecked("dealHistoricalLowOnly", false)] },
+      );
     case "dealHideOwned":
-      state.prefs.dealHideOwned = false;
-      savePrefs();
-      document.getElementById("dealHideOwned").checked = false;
-      break;
+      return applyPrefsChange(
+        { prefs: { dealHideOwned: false } },
+        { renderers: [() => setInputChecked("dealHideOwned", false)] },
+      );
     case "dealMinDiscount":
-      state.prefs.dealMinDiscount = 0;
-      savePrefs();
-      document.getElementById("dealMinDiscount").value = "0";
-      document.getElementById("dealMinDiscountVal").textContent = "0";
-      break;
+      return applyPrefsChange(
+        { prefs: { dealMinDiscount: 0 } },
+        { renderers: [
+          () => setInputValue("dealMinDiscount", "0"),
+          () => setText("dealMinDiscountVal", "0"),
+        ] },
+      );
     case "dealMaxPrice":
-      state.prefs.dealMaxPrice = 100;
-      savePrefs();
-      document.getElementById("dealMaxPrice").value = "100";
-      document.getElementById("dealMaxPriceVal").textContent = "any";
-      break;
+      return applyPrefsChange(
+        { prefs: { dealMaxPrice: 100 } },
+        { renderers: [
+          () => setInputValue("dealMaxPrice", "100"),
+          () => setText("dealMaxPriceVal", "any"),
+        ] },
+      );
   }
-  refreshFilterUI();
+  applyPrefsChange();
 }
 
 export function clearAllFilters() {
-  const sp = state.sessionPrefs;
-  sp.search = "";
-  sp.statusFilter = "";
-  sp.unplayedOnly = false;
-  sp.earlyAccessOnly = false;
-  sp.minRating = 0;
-  sp.maxHours = 200;
   setCoopFilterMode("off");
-  state.prefs.storeFilter = "";
-  state.prefs.wishlistStoreFilter = "";
-  state.prefs.releaseYearFilter = "";
-  state.prefs.hltbBucket = null;
-  state.prefs.genreFilters = [];
-  state.prefs.tagFilters = [];
-  state.prefs.tagFilterMode = "OR";
   state.cleanupModeActive = false;
-  savePrefs();
-  syncFilterDomFromState();
-  document.getElementById("crossStoreDedup").checked = false;
-  state.sessionPrefs.crossStoreDedup = false;
-  document.getElementById("tagFilterMode").value = "OR";
-  recomputeCrossStoreHidden();
-  renderSummary();
-  updateCleanupBtnState();
-  refreshFilterUI();
+  applyPrefsChange(
+    {
+      prefs: {
+        storeFilter: "",
+        wishlistStoreFilter: "",
+        releaseYearFilter: "",
+        hltbBucket: null,
+        genreFilters: [],
+        tagFilters: [],
+        tagFilterMode: "OR",
+      },
+      sessionPrefs: {
+        search: "",
+        statusFilter: "",
+        unplayedOnly: false,
+        earlyAccessOnly: false,
+        minRating: 0,
+        maxHours: 200,
+        crossStoreDedup: false,
+      },
+    },
+    {
+      recomputeDedup: true,
+      renderers: [
+        () => setInputChecked("crossStoreDedup", false),
+        () => setInputValue("tagFilterMode", "OR"),
+        updateCleanupBtnState,
+      ],
+    },
+  );
 }
 
 export function openFiltersDrawer() {
@@ -491,7 +577,9 @@ export function switchView(view) {
       // Explicit tab click — skip the 80ms scheduleDashboardRender debounce and
       // render this frame so the overlay/blank state doesn't linger.
       cancelScheduledDashboardRender();
-      renderDashboard();
+      setDashReplayAllowed(true);
+      renderDashboard({ replay: true });
+      setDashReplayAllowed(false);
       fetcherRunner.probeApi().then(async ok => {
         if (!ok) return;
         await fetcherRunner.syncFromServer();

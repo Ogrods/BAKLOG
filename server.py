@@ -739,6 +739,17 @@ def _sse_format(event: str, data: Any) -> bytes:
 class Handler(SimpleHTTPRequestHandler):
     server_version = "SteamBacklogDev/1.0"
 
+    # Static assets that change during frontend work — never cache in dev so a
+    # normal reload can't serve a mix of old and new ES modules (e.g. bind-events
+    # calling fetcherRunner.reopenLogPanel while fetcher-health.js is still stale).
+    _NO_CACHE_SUFFIXES = (".js", ".mjs", ".css")
+
+    def end_headers(self) -> None:
+        path = self.path.split("?", 1)[0].lower()
+        if path.endswith(self._NO_CACHE_SUFFIXES):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     # ---- routing -----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802 - http.server API
         if self.path == "/api/runs":

@@ -315,6 +315,22 @@ class EpicStoreClient:
         return all_elements
 
 
+def validate_store_wishlist_cookie(cookie: str) -> bool:
+    """True when the storefront cookie can read the wishlist GraphQL API."""
+    try:
+        client = EpicStoreClient(cookie)
+        client.graphql(
+            _WISHLIST_QUERY,
+            {"country": "US", "locale": "en-US", "start": 0, "count": 1},
+            "getWishlistQuery",
+        )
+        return True
+    except EpicAuthError:
+        return False
+    except Exception:  # noqa: BLE001
+        return False
+
+
 _WISHLIST_QUERY = """
 query getWishlistQuery($country: String!, $locale: String, $start: Int, $count: Int) {
   Wishlist {

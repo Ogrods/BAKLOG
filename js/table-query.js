@@ -40,11 +40,28 @@ export function collectTableParams() {
     status: document.getElementById('statusFilter')?.value || '',
     unplayed: !!document.getElementById('unplayedOnly')?.checked,
     earlyAccess: !!document.getElementById('earlyAccessOnly')?.checked,
-    coopOnline: !!document.getElementById('coopOnlineOnly')?.checked,
-    coopLocal: !!document.getElementById('coopLocalOnly')?.checked,
     minRating: +(document.getElementById('minRating')?.value || 0),
     maxHours: +(document.getElementById('maxHours')?.value || 200),
   };
+}
+
+const COOP_FILTER_MODES = new Set(['off', 'any', 'online', 'local', 'both']);
+
+/** @returns {'off'|'any'|'online'|'local'|'both'} */
+export function resolveCoopFilterMode(prefs) {
+  const m = prefs?.coopFilterMode;
+  if (COOP_FILTER_MODES.has(m)) return m;
+  if (prefs?.coopAny) return 'any';
+  return 'off';
+}
+
+export function passesCoopFilter(g, mode) {
+  if (mode === 'off') return true;
+  if (mode === 'any') return !!(g.coop_online || g.coop_local);
+  if (mode === 'online') return !!g.coop_online;
+  if (mode === 'local') return !!g.coop_local;
+  if (mode === 'both') return !!(g.coop_online && g.coop_local);
+  return true;
 }
 
 export function isEarlyAccess(g) {
@@ -295,9 +312,7 @@ function passesFilter(ctx, g) {
   }
   if (params.unplayed && (g.playtime_minutes || 0) > 0) return false;
   if (params.earlyAccess && !isEarlyAccess(g)) return false;
-  if (params.coopOnline && !g.coop_online) return false;
-  if (params.coopLocal && !g.coop_local) return false;
-  if (prefs.coopAny && !(g.coop_online || g.coop_local)) return false;
+  if (!passesCoopFilter(g, resolveCoopFilterMode(prefs))) return false;
   const rating = ratingValue(g);
   if (params.minRating > 0 && rating < params.minRating) return false;
   const h = hltbMain(personal, g);

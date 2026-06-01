@@ -46,6 +46,17 @@ HEADER_IMAGE_TYPES = (
 )
 
 
+def _epic_auth_hint(exc: EpicAuthError) -> str:
+    msg = str(exc)
+    if "notLoggedIn" in msg:
+        return (
+            "Epic storefront session expired or never captured. On Connections, "
+            "use Epic (wishlist) → Connect, sign in at store.epicgames.com/wishlist, "
+            "and wait until your wishlist finishes loading."
+        )
+    return msg
+
+
 def _configure_stdout() -> None:
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -204,14 +215,10 @@ def main() -> int:
     cookie = resolve_env("EPIC_STORE_COOKIE", provider="epic_wishlist")
     if not cookie:
         print(
-            "EPIC_STORE_COOKIE is not set in .env.\n\n"
-            "How to grab it:\n"
-            "  1. Sign in at https://store.epicgames.com in your browser.\n"
-            "  2. Open https://store.epicgames.com/en-US/wishlist .\n"
-            "  3. DevTools (F12) -> Network -> filter 'graphql' -> click any\n"
-            "     POST /graphql request -> Headers tab -> Request Headers ->\n"
-            "     copy the entire 'Cookie:' header value.\n"
-            "  4. Paste it into .env as: EPIC_STORE_COOKIE=...\n",
+            "EPIC_STORE_COOKIE is not set.\n\n"
+            "On Connections, use Epic (wishlist) → Connect, sign in at "
+            "store.epicgames.com/wishlist, clear any Cloudflare check, and "
+            "wait until your wishlist finishes loading.\n",
             file=sys.stderr,
         )
         return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
@@ -219,16 +226,18 @@ def main() -> int:
     try:
         client = EpicStoreClient(cookie=cookie)
     except EpicAuthError as e:
-        mark_invalid("epic_wishlist", error=str(e))
-        stats.error(str(e))
+        hint = _epic_auth_hint(e)
+        mark_invalid("epic_wishlist", error=hint)
+        stats.error(hint)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
 
     print("Fetching Epic wishlist via storefront GraphQL...", flush=True)
     try:
         elements = client.get_wishlist(country=args.country, locale=args.locale)
     except EpicAuthError as e:
-        mark_invalid("epic_wishlist", error=str(e))
-        stats.error(str(e))
+        hint = _epic_auth_hint(e)
+        mark_invalid("epic_wishlist", error=hint)
+        stats.error(hint)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
 
     print(f"  {len(elements)} wishlist items", flush=True)

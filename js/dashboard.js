@@ -29,6 +29,17 @@ const SPOTLIGHT_INTERVAL_MS = 7000;
 const SPOTLIGHT_FADE_MS = 300;
 
 let _dashCountersInitialized = false;
+let _dashMegaShellBuilt = false;
+let _dashRenderedFingerprint = "";
+
+function dashboardFingerprint() {
+  return JSON.stringify({
+    dv: window._dataVersion || 0,
+    itch: (state.itchGames || []).length > 0,
+    qw: state.prefs.quickWinMaxHours || 0,
+    ihn: !!state.prefs.itchHideNonGames,
+  });
+}
 const _dashLastCounters = {};
 
 function animateCount(el, from, to, format, durationMs = 900) {
@@ -188,6 +199,16 @@ export function destroyDashboardCharts() {
     chartRenderTimer = null;
   }
   lastChartRenderAt = 0;
+}
+
+/** Replay the entrance animation on every live chart without rebuilding it. */
+export function replayDashboardChartAnimations() {
+  for (const chart of Object.values(dashboardCharts)) {
+    try {
+      chart.reset();
+      chart.update();
+    } catch (_) { /* chart was disposed externally */ }
+  }
 }
 
 export function dashboardLibraryGames() {
@@ -463,10 +484,7 @@ function dashResetLibraryFiltersExceptDedup() {
   if (unplayed) unplayed.checked = false;
   const ea = document.getElementById("earlyAccessOnly");
   if (ea) ea.checked = false;
-  const co = document.getElementById("coopOnlineOnly");
-  if (co) co.checked = false;
-  const cc = document.getElementById("coopLocalOnly");
-  if (cc) cc.checked = false;
+  c('setCoopFilterMode')('off');
   const minR = document.getElementById("minRating");
   if (minR) minR.value = "0";
   const minRVal = document.getElementById("minRatingVal");
@@ -626,19 +644,12 @@ function bindItchRecapClick() {
 }
 
 export function dashDrillCoop({ online = false, local = false, any = false } = {}) {
-  const onlineEl = document.getElementById("coopOnlineOnly");
-  const localEl = document.getElementById("coopLocalOnly");
-  // "Any co-op" is the union (online OR local); clear the strict per-flag
-  // checkboxes so they don't accidentally narrow the result with AND logic.
-  if (any) {
-    if (onlineEl) onlineEl.checked = false;
-    if (localEl) localEl.checked = false;
-    state.prefs.coopAny = true;
-  } else {
-    if (onlineEl) onlineEl.checked = !!online;
-    if (localEl) localEl.checked = !!local;
-    state.prefs.coopAny = false;
-  }
+  let mode = "off";
+  if (any) mode = "any";
+  else if (online && local) mode = "both";
+  else if (online) mode = "online";
+  else if (local) mode = "local";
+  c('setCoopFilterMode')(mode);
   document.getElementById("statusFilter").value = "";
   state.prefs.storeFilter = "";
   c('savePrefs')();
@@ -931,6 +942,21 @@ function renderSpotlightHtml(g) {
     </button>`;
 }
 
+function primeSpotlightArt(btn) {
+  const img = btn?.querySelector('.dash-spotlight-art');
+  if (!img) return;
+  if (img.complete && img.naturalWidth > 0) img.classList.add('is-loaded');
+}
+
+function wireSpotlightHover(el) {
+  if (!el || el.dataset.hoverWired) return;
+  el.dataset.hoverWired = '1';
+  let paused = false;
+  el.addEventListener('mouseenter', () => { paused = true; });
+  el.addEventListener('mouseleave', () => { paused = false; });
+  el._spotlightPaused = () => paused;
+}
+
 function startSpotlightRotation(pool) {
   if (!pool || pool.length <= 1) {
     stopSpotlightRotation();
@@ -939,21 +965,42 @@ function startSpotlightRotation(pool) {
   }
   const el = document.getElementById('dashboardSpotlight');
   if (!el) return;
-  // If the pool sequence is unchanged AND a timer is already running, leave it alone:
-  // the DOM was just re-painted to the same first game so there's nothing to reset.
-  const sameSequence = _spotlightTimer && poolKeysEqual(_spotlightPool, pool);
+  const domMatches = !!pool[0] && el.dataset.key === c('gameKey')(pool[0]);
   _spotlightPool = pool;
-  if (sameSequence) return;
+  // Same slide still mounted: resume rotation only (no innerHTML swap / fade-in).
+  if (domMatches) {
+    if (_spotlightTimer) return;
+    wireSpotlightHover(el);
+    _spotlightTimer = setInterval(() => {
+      const paused = el._spotlightPaused?.() ?? false;
+      if (paused) return;
+      if (!document.getElementById('dashboardSpotlight')) {
+        stopSpotlightRotation();
+        return;
+      }
+      _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
+      const next = _spotlightPool[_spotlightIndex];
+      el.classList.add('is-fading');
+      if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+      _spotlightFadeTimer = setTimeout(() => {
+        el.innerHTML = spotlightInnerHtml(next);
+        el.dataset.key = c('gameKey')(next);
+        el.title = `Jump to ${next.name} in library`;
+        el.classList.remove('is-fading');
+        primeSpotlightArt(el);
+        _spotlightCurrentKey = c('gameKey')(next);
+      }, SPOTLIGHT_FADE_MS);
+    }, SPOTLIGHT_INTERVAL_MS);
+    return;
+  }
   stopSpotlightRotation();
   // _spotlightIndex is intentionally NOT reset — pickSpotlightGames has already
   // arranged the pool so the previously-displayed game is at index 0; on first
   // load _spotlightIndex is already 0 from module init.
   _spotlightIndex = 0;
-  let paused = false;
-  el.addEventListener('mouseenter', () => { paused = true; });
-  el.addEventListener('mouseleave', () => { paused = false; });
+  wireSpotlightHover(el);
   _spotlightTimer = setInterval(() => {
-    if (paused) return;
+    if (el._spotlightPaused?.()) return;
     if (!document.getElementById('dashboardSpotlight')) {
       stopSpotlightRotation();
       return;
@@ -967,6 +1014,7 @@ function startSpotlightRotation(pool) {
       el.dataset.key = c('gameKey')(next);
       el.title = `Jump to ${next.name} in library`;
       el.classList.remove('is-fading');
+      primeSpotlightArt(el);
       _spotlightCurrentKey = c('gameKey')(next);
     }, SPOTLIGHT_FADE_MS);
   }, SPOTLIGHT_INTERVAL_MS);
@@ -1253,7 +1301,7 @@ function startInsightRotation(insights) {
   }, 6000);
 }
 
-function renderDashboardMega(games) {
+function computeMegaHeroStats(games) {
   const backlog = games.filter(g => c('getPersonal')(g).status === "backlog");
   const backlogHrs = backlog.reduce((s, g) => s + (c('hltbMain')(g) || 0), 0);
   const playedHrs = games.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
@@ -1265,7 +1313,90 @@ function renderDashboardMega(games) {
   const wlDeals = state.wishlistGames.filter(g => { const d = c('getDealInfo')(g); return d && (d.cut || 0) > 0; }).length;
   const stores = new Set(games.map(g => c('normalizeGame')(g).store)).size;
   const years = backlogHrs > 0 ? (backlogHrs / (2 * 365)).toFixed(1) : "0";
-  const total = games.length;
+  return {
+    total: games.length,
+    backlogHrs,
+    playedHrs,
+    completion,
+    avgRating,
+    wlDeals,
+    stores,
+    years,
+  };
+}
+
+function applyMegaHeroCounters(stats) {
+  const fmtH = n => `${formatNum(Math.round(n))}h`;
+  const fmtN = n => formatNum(Math.round(n));
+  const fmtPct = n => `${Math.round(n)}%`;
+  const counters = [
+    { id: "dashHeroCount", to: stats.total, format: fmtN },
+    { id: "dashHeroPlayed", to: Math.round(stats.playedHrs), format: fmtH },
+    { id: "dashHeroBacklog", to: Math.round(stats.backlogHrs), format: fmtH },
+  ];
+  if (stats.avgRating !== "—") {
+    counters.push({ id: "dashHeroAvg", to: stats.avgRating, format: fmtPct });
+  }
+  for (const item of counters) {
+    const node = document.getElementById(item.id);
+    if (!node) continue;
+    if (_dashCountersInitialized) node.textContent = item.format(item.to);
+    else animateCount(node, 0, item.to, item.format, 900);
+    _dashLastCounters[item.id] = item.to;
+  }
+  _dashCountersInitialized = true;
+}
+
+function syncSpotlightInMega(el, spotlight) {
+  const hero = el.querySelector('.dash-mega-hero');
+  const existing = document.getElementById('dashboardSpotlight');
+  const newKey = spotlight ? c('gameKey')(spotlight) : null;
+  if (spotlight && existing?.dataset.key === newKey) {
+    primeSpotlightArt(existing);
+    return;
+  }
+  if (spotlight && existing) {
+    existing.outerHTML = renderSpotlightHtml(spotlight);
+    primeSpotlightArt(document.getElementById('dashboardSpotlight'));
+    return;
+  }
+  if (spotlight && !existing && hero) {
+    hero.insertAdjacentHTML('afterbegin', renderSpotlightHtml(spotlight));
+    primeSpotlightArt(document.getElementById('dashboardSpotlight'));
+    return;
+  }
+  existing?.remove();
+}
+
+function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems) {
+  const el = document.getElementById("dashboardMega");
+  if (!el) return;
+  el.className = spotlight ? 'dash-mega dash-mega--has-spotlight' : 'dash-mega';
+  syncSpotlightInMega(el, spotlight);
+  const sub = el.querySelector('.dash-hero-sub');
+  if (sub) sub.textContent = `games owned across ${stats.stores} stores`;
+  const tagline = el.querySelector('.dash-hero-tagline');
+  if (tagline) {
+    tagline.innerHTML = `
+        <span><strong>${stats.completion}%</strong> complete</span>
+        <span class="sep">·</span>
+        <span><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
+        <span class="sep">·</span>
+        <span><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>`;
+  }
+  applyMegaHeroCounters(stats);
+  const marquee = document.getElementById('dashboardMarquee');
+  if (marquee) marquee.outerHTML = renderMarqueeHtml(marqueeItems);
+  else {
+    const divider = el.querySelector('.dash-mega-divider');
+    divider?.insertAdjacentHTML('beforebegin', renderMarqueeHtml(marqueeItems));
+  }
+  startInsightRotation(buildInsightPool(games));
+  startSpotlightRotation(spotlightPool);
+}
+
+function renderDashboardMega(games) {
+  const stats = computeMegaHeroStats(games);
   const el = document.getElementById("dashboardMega");
   if (!el) return;
 
@@ -1274,32 +1405,39 @@ function renderDashboardMega(games) {
   if (spotlight) _spotlightCurrentKey = c('gameKey')(spotlight);
   else _spotlightCurrentKey = null;
   const marqueeItems = buildMarqueeItems(games);
+
+  if (_dashMegaShellBuilt && document.getElementById('dashHeroCount')) {
+    updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems);
+    return;
+  }
+
+  _dashMegaShellBuilt = true;
   el.className = spotlight ? 'dash-mega dash-mega--has-spotlight' : 'dash-mega';
 
   el.innerHTML = `
     <div class="dash-mega-hero">
       ${spotlight ? renderSpotlightHtml(spotlight) : ''}
       <div class="dash-hero-eyebrow">Your library</div>
-      <div class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(total))}</div>
-      <div class="dash-hero-sub">games owned across ${escapeHtml(String(stores))} stores</div>
+      <div class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(stats.total))}</div>
+      <div class="dash-hero-sub">games owned across ${escapeHtml(String(stats.stores))} stores</div>
       <div class="dash-hero-tagline">
-        <span><strong>${completion}%</strong> complete</span>
+        <span><strong>${stats.completion}%</strong> complete</span>
         <span class="sep">·</span>
-        <span><strong>${years}</strong> yrs to clear at 2h/day</span>
+        <span><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
-        <span><strong>${escapeHtml(formatNum(wlDeals))}</strong> deals live</span>
+        <span><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>
       </div>
       <div class="dash-hero-pillars">
         <div class="dash-hero-pillar">
-          <div class="dash-hero-pillar-value" id="dashHeroPlayed">${escapeHtml(formatNum(Math.round(playedHrs)))}h</div>
+          <div class="dash-hero-pillar-value" id="dashHeroPlayed">${escapeHtml(formatNum(Math.round(stats.playedHrs)))}h</div>
           <div class="dash-hero-pillar-label">Played</div>
         </div>
         <div class="dash-hero-pillar">
-          <div class="dash-hero-pillar-value" id="dashHeroBacklog">${escapeHtml(formatNum(Math.round(backlogHrs)))}h</div>
+          <div class="dash-hero-pillar-value" id="dashHeroBacklog">${escapeHtml(formatNum(Math.round(stats.backlogHrs)))}h</div>
           <div class="dash-hero-pillar-label">Backlog</div>
         </div>
         <div class="dash-hero-pillar">
-          <div class="dash-hero-pillar-value" id="dashHeroAvg">${avgRating === "—" ? "—" : escapeHtml(String(avgRating)) + "%"}</div>
+          <div class="dash-hero-pillar-value" id="dashHeroAvg">${stats.avgRating === "—" ? "—" : escapeHtml(String(stats.avgRating)) + "%"}</div>
           <div class="dash-hero-pillar-label">Avg review</div>
         </div>
       </div>
@@ -1326,30 +1464,8 @@ function renderDashboardMega(games) {
     </div>
   `;
 
-  const fmtH = n => `${formatNum(Math.round(n))}h`;
-  const fmtN = n => formatNum(Math.round(n));
-  const fmtPct = n => `${Math.round(n)}%`;
-  const counters = [
-    { id: "dashHeroCount",   to: total,                 format: fmtN },
-    { id: "dashHeroPlayed",  to: Math.round(playedHrs), format: fmtH },
-    { id: "dashHeroBacklog", to: Math.round(backlogHrs),format: fmtH },
-  ];
-  if (avgRating !== "—") {
-    counters.push({ id: "dashHeroAvg", to: avgRating, format: fmtPct });
-  }
-  for (const item of counters) {
-    const node = document.getElementById(item.id);
-    if (!node) continue;
-    if (_dashCountersInitialized) {
-      // Revisit: snap to final value, no re-animation (mirrors the spotlight rule).
-      node.textContent = item.format(item.to);
-    } else {
-      animateCount(node, 0, item.to, item.format, 900);
-    }
-    _dashLastCounters[item.id] = item.to;
-  }
-  _dashCountersInitialized = true;
-
+  applyMegaHeroCounters(stats);
+  primeSpotlightArt(document.getElementById('dashboardSpotlight'));
   startInsightRotation(buildInsightPool(games));
   startSpotlightRotation(spotlightPool);
 }
@@ -2319,7 +2435,7 @@ function renderDashboardCharts(games) {
 
 }
 
-export function renderDashboard() {
+export function renderDashboard(opts = {}) {
   if (state.activeView !== "dashboard") return;
   const loading = document.getElementById("dashboardLoading");
   const content = document.getElementById("dashboardContent");
@@ -2337,6 +2453,19 @@ export function renderDashboard() {
   }
   loading?.classList.add("hidden");
   content?.classList.remove("hidden");
+
+  // Same-data revisit: skip the full re-render (charts stay built), just
+  // replay the entrance animations and resume the rotation timers.
+  const fp = dashboardFingerprint();
+  if (!opts.force && fp === _dashRenderedFingerprint && _dashMegaShellBuilt) {
+    const games = dashboardLibraryGames();
+    const spotlightPool = _spotlightPool.length ? _spotlightPool : pickSpotlightGames(games);
+    startSpotlightRotation(spotlightPool);
+    startInsightRotation(buildInsightPool(games));
+    replayDashboardChartAnimations();
+    return;
+  }
+
   destroyDashboardCharts();
   Chart.defaults.color = "#94a3b8";
   Chart.defaults.borderColor = "#334155";
@@ -2360,6 +2489,7 @@ export function renderDashboard() {
   } catch (err) {
     console.error("Dashboard picks versus error:", err);
   }
+  _dashRenderedFingerprint = fp;
 }
 
 export function cancelScheduledDashboardRender() {
@@ -2371,4 +2501,9 @@ export function scheduleDashboardRender() {
   if (state.activeView !== "dashboard") return;
   clearTimeout(_dashboardRenderTimer);
   _dashboardRenderTimer = setTimeout(renderDashboard, 80);
+}
+
+/** Has the dashboard ever been rendered in this session? */
+export function dashboardWasRendered() {
+  return _dashMegaShellBuilt;
 }

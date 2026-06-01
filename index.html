@@ -39,7 +39,10 @@
     <div id="authReconnectBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="mb-4">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap shrink-0" style="margin: 0 1rem 0 0;">BAKLOG</h1>
+        <a href="#" id="brandMark" class="flex items-center gap-2 shrink-0 no-underline" aria-label="BAKLOG home" style="margin: 0 1rem 0 0;">
+          <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap m-0">BAKLOG</h1>
+          <img src="assets/baklog-logo.svg" alt="" aria-hidden="true" class="shrink-0" style="height: 30px; width: auto;" />
+        </a>
         <nav class="flex flex-wrap items-center gap-1.5" aria-label="Main views">
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="dashboard">Dashboard</button>
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="library">Library</button>
@@ -60,10 +63,59 @@
           <strong id="connHeroCount">Loading connections…</strong>
           <div class="conn-progress"><span id="connProgressFill"></span></div>
         </div>
-        <button type="button" id="connectAllBtn" class="conn-hero-btn">Connect all</button>
-        <button type="button" id="connSettingsBtn" class="conn-icon-btn" aria-label="Settings" aria-expanded="false">&#9881;</button>
-        <div id="connSettingsPopover" class="conn-settings-popover hidden">
-          <p class="text-xs text-slate-400 mb-2">Portable master password (optional — overrides OS keychain)</p>
+      </div>
+      <details id="connHowTo" class="conn-howto">
+        <summary>
+          <span class="conn-howto-title">How connections work</span>
+          <span class="conn-howto-sub">Read this once before signing in</span>
+        </summary>
+        <div class="conn-howto-body">
+          <div class="conn-howto-row">
+            <div class="conn-howto-glyph" aria-hidden="true">A</div>
+            <div>
+              <p class="conn-howto-heading">Automatic browser sign-in</p>
+              <p class="conn-howto-text">
+                <strong>Steam, GOG, PlayStation, Xbox (play history), Xbox Store wishlist, Battle.net, Nintendo, Ubisoft, Epic wishlist.</strong>
+                Click <em>Connect</em> on the card and a Chromium window opens automatically. Sign in normally — when the page lands on the right spot, the window closes itself and the card flips to <em>Connected</em>. Don't close the window manually unless you cancel.
+              </p>
+            </div>
+          </div>
+          <div class="conn-howto-row">
+            <div class="conn-howto-glyph" aria-hidden="true">B</div>
+            <div>
+              <p class="conn-howto-heading">Manual sign-in (paste-a-code)</p>
+              <p class="conn-howto-text">
+                <strong>Epic (library):</strong> click <em>Open sign-in page</em>, sign in, copy the <code>authorizationCode</code> you see, paste it in the card, hit <em>Save key</em>. We trade it for a 30-day refresh token automatically.
+              </p>
+            </div>
+          </div>
+          <div class="conn-howto-row">
+            <div class="conn-howto-glyph" aria-hidden="true">C</div>
+            <div>
+              <p class="conn-howto-heading">Manual API key</p>
+              <p class="conn-howto-text">
+                <strong>itch.io, IsThereAnyDeal (ITAD):</strong> open the linked settings page, generate an API key, paste it in the card, hit <em>Save key</em>. Their auth pages can't be automated, so this is one-time.
+              </p>
+            </div>
+          </div>
+          <div class="conn-howto-row">
+            <div class="conn-howto-glyph" aria-hidden="true">D</div>
+            <div>
+              <p class="conn-howto-heading">Local-only</p>
+              <p class="conn-howto-text">
+                <strong>Amazon Games:</strong> nothing to sign in to — we read the local Amazon Games launcher database on this PC. If you don't have it installed, this card just stays disconnected.
+              </p>
+            </div>
+          </div>
+          <p class="conn-howto-note">
+            Everything is stored encrypted on this machine (OS keychain by default). Sessions expire eventually — when a fetcher fails with an auth error, the card flips to <em>Session expired</em> and you just click <em>Reconnect</em> to refresh.
+          </p>
+        </div>
+      </details>
+      <details id="connAdvanced" class="conn-advanced">
+        <summary>Advanced</summary>
+        <div class="conn-advanced-body">
+          <p class="text-xs text-slate-400 mb-2">Portable master password (optional — overrides OS keychain). Most users can leave this blank.</p>
           <label class="block text-xs text-slate-300">Encryption passphrase
             <input id="masterPasswordInput" type="password" autocomplete="new-password" placeholder="Leave blank to use OS keychain"
               class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
@@ -73,8 +125,9 @@
             <span id="masterPasswordHint" class="text-slate-500 text-xs">Using OS keychain by default.</span>
           </div>
         </div>
-      </div>
+      </details>
       <div id="connectionsGrid"></div>
+      <div id="connectionsManualRow"></div>
     </section>
 
     <section id="picksSection" class="bg-slate-800 rounded-lg mb-4">
@@ -310,7 +363,7 @@
           <input id="crossStoreDedup" type="checkbox" class="rounded" />
           Hide duplicates
         </label>
-        <p class="text-[11px] text-slate-500 mt-1 leading-snug">Filter by store using the chips at the top of the page.</p>
+        <p id="crossStoreDedupHint" class="text-[11px] text-slate-500 mt-1 leading-snug">Filter by store using the chips at the top of the page.</p>
       </div>
       <div id="wishlistStoreSection" class="drawer-section hidden">
         <label class="text-xs text-slate-400 block mb-2">Wishlist source</label>
@@ -319,6 +372,8 @@
           <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="steam">Steam</button>
           <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="gog">GOG</button>
           <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="epic">Epic</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="psn">PlayStation</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="ubisoft">Ubisoft</button>
         </div>
         <p class="text-[11px] text-slate-500 mt-2 leading-snug">Filters the Wishlist tab to a single source store. Manual entries remain visible under "All".</p>
       </div>
@@ -363,18 +418,15 @@
         <p class="text-[11px] text-slate-500 mt-1 leading-snug">Only show games tagged as Early Access (e.g. <em>Hyper Light Breaker</em>, <em>Slay the Spire 2</em>).</p>
       </div>
       <div id="coopSection" class="drawer-section">
-        <label class="text-xs text-slate-400 block mb-1">Co-op</label>
-        <label class="flex items-center gap-2 text-xs text-slate-300">
-          <input id="coopOnlineOnly" type="checkbox" class="rounded" />
-          Online co-op
-          <span class="coop-pill coop-pill-online ml-1" title="Online co-op">ONLINE CO-OP</span>
-        </label>
-        <label class="flex items-center gap-2 text-xs text-slate-300 mt-1">
-          <input id="coopLocalOnly" type="checkbox" class="rounded" />
-          Couch co-op
-          <span class="coop-pill coop-pill-local ml-1" title="Shared / split-screen co-op">COUCH CO-OP</span>
-        </label>
-        <p class="text-[11px] text-slate-500 mt-1 leading-snug">Steam-only signal (parsed from store categories). Check both to require games that support both flavors; leave both unchecked to ignore co-op when filtering.</p>
+        <label class="text-xs text-slate-400 block mb-2">Co-op</label>
+        <div id="coopFilterSegmented" class="filter-segmented" role="radiogroup" aria-label="Co-op filter">
+          <button type="button" class="filter-segment active" data-coop-mode="off" aria-pressed="true">Off</button>
+          <button type="button" class="filter-segment" data-coop-mode="any" aria-pressed="false">Any</button>
+          <button type="button" class="filter-segment" data-coop-mode="online" aria-pressed="false">Online</button>
+          <button type="button" class="filter-segment" data-coop-mode="local" aria-pressed="false">Couch</button>
+          <button type="button" class="filter-segment" data-coop-mode="both" aria-pressed="false">Both</button>
+        </div>
+        <p class="text-[11px] text-slate-500 mt-1.5 leading-snug">Steam category tags. <strong>Any</strong> = online or couch. <strong>Both</strong> = must support both.</p>
       </div>
       <div id="libraryMiscSection" class="drawer-section space-y-2">
         <label class="flex items-center gap-2 text-xs text-slate-300">

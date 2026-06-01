@@ -134,6 +134,33 @@
       "requires": [{ "env": "EPIC_STORE_COOKIE", "note": "Storefront Cookie from store.epicgames.com" }]
     },
     {
+      "key": "wishlistPsn",
+      "label": "WL PSN",
+      "group": "wishlist",
+      "script": "fetch_psn_wishlist.py",
+      "metaKey": "wishlistPsn",
+      "color": "#003791",
+      "requires": [{ "env": "PSN_NPSSO", "note": "Same NPSSO token as PSN library fetch" }]
+    },
+    {
+      "key": "wishlistUbisoft",
+      "label": "WL Ubisoft",
+      "group": "wishlist",
+      "script": "fetch_ubisoft_wishlist.py",
+      "metaKey": "wishlistUbisoft",
+      "color": "#FFD200",
+      "requires": [{ "note": "Reuses your Ubisoft Connect browser profile (cache/auth/profiles/ubisoft); no extra env vars" }]
+    },
+    {
+      "key": "wishlistXbox",
+      "label": "WL Xbox",
+      "group": "wishlist",
+      "script": "fetch_xbox_wishlist.py",
+      "metaKey": "wishlistXbox",
+      "color": "#107C10",
+      "requires": [{ "note": "Reuses your Xbox Store browser profile (cache/auth/profiles/xbox_wishlist); no extra env vars" }]
+    },
+    {
       "key": "itad",
       "label": "ITAD",
       "group": "prices",

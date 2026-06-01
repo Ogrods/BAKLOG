@@ -28,6 +28,9 @@ WISHLIST_FETCHER_JSON = {
     "wishlistSteam": "games_wishlist.json",
     "wishlistGog": "games_wishlist_gog.json",
     "wishlistEpic": "games_wishlist_epic.json",
+    "wishlistPsn": "games_wishlist_psn.json",
+    "wishlistUbisoft": "games_wishlist_ubisoft.json",
+    "wishlistXbox": "games_wishlist_xbox.json",
 }
 ENRICH_KEYS = {"hltb", "steamReviews", "steamCovers"}
 
@@ -91,6 +94,9 @@ REFUSE_EMPTY_SCRIPTS = {
     "fetch_xbox.py",
     "fetch_gog_wishlist.py",
     "fetch_epic_wishlist.py",
+    "fetch_psn_wishlist.py",
+    "fetch_ubisoft_wishlist.py",
+    "fetch_xbox_wishlist.py",
     "fetch_wishlist.py",
     "fetch_itad.py",
 }

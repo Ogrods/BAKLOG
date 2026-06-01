@@ -18,6 +18,7 @@ from auth import resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from itad_client import ItadClient, ItadError
+from shared.safe_write import safe_write_text
 
 ITAD_JSON = Path("itad_prices.json")
 LIBRARY_FILES = [
@@ -144,7 +145,7 @@ def main() -> int:
         "count": len(by_key),
         "by_key": by_key,
     }
-    ITAD_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    safe_write_text(ITAD_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"Wrote {len(by_key)} price rows to {ITAD_JSON}.", flush=True)
     stats.ok = len(by_key)
     exit_code = 0 if by_key or args.allow_empty else 2

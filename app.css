@@ -1,3 +1,211 @@
+/* === Global error toast ===
+   Surfaces uncaught errors + unhandled promise rejections. Top-right so it
+   never collides with the bottom-right undoToast / debug overlay. Sticky
+   (no auto-dismiss) because errors are not ephemeral — the user has to
+   actively dismiss or fix them. */
+.baklog-error-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10000;
+  width: min(420px, calc(100vw - 32px));
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #f87171;
+  border-left-width: 4px;
+  border-radius: 8px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55);
+  color: #fee2e2;
+  font-size: 13px;
+  line-height: 1.45;
+  animation: baklogErrorIn 180ms ease-out;
+}
+@keyframes baklogErrorIn {
+  from { transform: translateY(-8px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.baklog-error-toast-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid rgba(248, 113, 113, 0.25);
+}
+.baklog-error-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f87171;
+  color: #1a0b0b;
+  font-weight: 800;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.baklog-error-toast-title {
+  font-weight: 600;
+  color: #fecaca;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+.baklog-error-toast-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.18);
+  color: #fecaca;
+  font-variant-numeric: tabular-nums;
+}
+.baklog-error-toast-dismiss {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.baklog-error-toast-dismiss:hover { color: #fff5f5; background: rgba(248, 113, 113, 0.18); }
+.baklog-error-toast-body { padding: 8px 12px 6px; }
+.baklog-error-toast-message {
+  color: #fee2e2;
+  font-weight: 500;
+  word-break: break-word;
+}
+.baklog-error-toast-source {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #fca5a5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+.baklog-error-toast-details {
+  border-top: 1px solid rgba(248, 113, 113, 0.2);
+  padding: 6px 10px;
+  max-height: 220px;
+  overflow: auto;
+}
+.baklog-error-toast-stack {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #fed7aa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.baklog-error-toast-foot {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px 8px;
+  border-top: 1px solid rgba(248, 113, 113, 0.2);
+}
+.baklog-error-toast-btn {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.baklog-error-toast-btn:hover { background: rgba(248, 113, 113, 0.28); color: #fff5f5; }
+
+/* === Debug overlay (?debug=1) ===
+   Tiny fixed-position panel showing runtime introspection state. Opt-in via
+   ?debug=1 or localStorage baklog-debug=1, so we can leave the rules in the
+   production stylesheet without paying a layout cost in normal use. */
+.baklog-debug-overlay {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  z-index: 9999;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 6px;
+  padding: 6px 8px 7px;
+  min-width: 220px;
+  max-width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+  user-select: text;
+  opacity: 0.88;
+  transition: opacity 0.15s ease;
+}
+.baklog-debug-overlay:hover { opacity: 1; }
+.baklog-debug-overlay--hidden { display: none; }
+.baklog-debug-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.55);
+}
+.baklog-debug-overlay-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #38bdf8;
+  font-weight: 600;
+}
+.baklog-debug-overlay-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.baklog-debug-overlay-close:hover { color: #f8fafc; background: rgba(51, 65, 85, 0.6); }
+.baklog-debug-overlay-rows {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  column-gap: 8px;
+  row-gap: 1px;
+  margin: 0;
+}
+.baklog-debug-overlay-rows dt {
+  color: #64748b;
+  text-align: right;
+  font-weight: 500;
+}
+.baklog-debug-overlay-rows dd {
+  margin: 0;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.baklog-debug-overlay-foot {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(71, 85, 105, 0.55);
+  font-size: 9.5px;
+  color: #64748b;
+}
+.baklog-debug-overlay-foot code {
+  background: rgba(51, 65, 85, 0.6);
+  padding: 0 3px;
+  border-radius: 2px;
+  font-size: 9.5px;
+}
+
 /* === Initial-view chrome (FOUC guard) ===
    The inline <script> in <head> stamps html[data-init-view] from the saved
    prefs. These rules hide sections that don't belong to the initial view
@@ -356,13 +564,20 @@ body.bulk-bar-open { padding-bottom: 56px; }
 @keyframes view-spin { to { transform: rotate(360deg); } }
 .view-tab[disabled] { opacity: 0.5; cursor: progress; }
 /* === A–Z jump nav === */
-#alphaNav {
+#alphaNavWrap {
   position: fixed;
   right: 4px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 35;
   display: none;
+}
+@media (min-width: 1280px) {
+  #alphaNavWrap { display: block; }
+}
+#alphaNav {
+  position: relative;
+  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
@@ -372,9 +587,6 @@ body.bulk-bar-open { padding-bottom: 56px; }
   background: rgba(15, 23, 42, 0.88);
   border: 1px solid rgb(51 65 85);
   border-radius: 6px;
-}
-@media (min-width: 1280px) {
-  #alphaNav { display: flex; }
 }
 .alpha-nav-btn {
   font-size: 11px;
@@ -393,25 +605,26 @@ body.bulk-bar-open { padding-bottom: 56px; }
   cursor: pointer;
 }
 .alpha-nav-btn.enabled:hover { color: #38bdf8; }
-/* === Back to top === */
+/* === Back to top (sits above the A–Z rail) === */
 #backToTop {
-  position: fixed; top: 12px; right: 12px; z-index: 40;
-  width: 34px; height: 34px;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(15, 23, 42, 0.6); color: #94a3b8;
-  border: 1px solid rgba(71, 85, 105, 0.6); border-radius: 999px;
+  padding: 3px 2px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #94a3b8;
+  border: 1px solid rgb(51 65 85);
+  border-radius: 6px;
   cursor: pointer;
   opacity: 0; pointer-events: none;
-  transition: opacity 0.2s ease, color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-  backdrop-filter: blur(4px);
+  transition: opacity 0.2s ease, color 0.15s ease, transform 0.15s ease;
 }
-#backToTop.show { opacity: 0.35; pointer-events: auto; }
-#backToTop:hover { opacity: 1; color: #38bdf8; background: rgba(15, 23, 42, 0.92); transform: translateY(-1px); }
+#backToTop.show { opacity: 0.85; pointer-events: auto; }
+#backToTop:hover { opacity: 1; color: #38bdf8; transform: translateY(-1px); }
 #backToTop:focus-visible { opacity: 1; outline: 2px solid #38bdf8; outline-offset: 2px; }
-#backToTop svg { width: 16px; height: 16px; }
-@media (min-width: 1280px) {
-  #backToTop { right: 48px; }
-}
+#backToTop svg { width: 14px; height: 14px; }
 /* === Status breakdown chips === */
 .status-chip {
   display: inline-flex;
@@ -1133,6 +1346,38 @@ body.bulk-bar-open { padding-bottom: 56px; }
 .deal-hero-regular { font-size: 0.78rem; color: #64748b; text-decoration: line-through; }
 .deal-hero-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
 .deal-cut-badge { font-size: 0.72rem; font-weight: 700; padding: 0.12rem 0.4rem; border-radius: 4px; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.35); }
+/* Cut-depth gradient text — restored from the pre-CSS-extract project (commit 6d58be5).
+   big (50–74%): emerald → amber. huge (75%+): amber → red → pink.
+   Sub-50% keeps the default emerald pill. */
+.deal-cut-badge.deal-cut-big {
+  background: linear-gradient(90deg, #34d399 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  border-color: rgba(251, 191, 36, 0.4);
+}
+.deal-cut-badge.deal-cut-huge {
+  background: linear-gradient(90deg, #fbbf24 0%, #f87171 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  border-color: rgba(244, 114, 182, 0.45);
+}
+/* Price column text inherits the same cut-depth scale as the deal badge.
+   Sub-50% stays flat emerald, 50–74% emerald→amber, 75%+ amber→red→pink. */
+.price-cut { color: #6ee7b7; }
+.price-cut.deal-cut-big {
+  background: linear-gradient(90deg, #34d399 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.price-cut.deal-cut-huge {
+  background: linear-gradient(90deg, #fbbf24 0%, #f87171 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 .deal-hero-stats { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .deal-hero-stats-row { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .deal-hero-stat {
@@ -1153,6 +1398,22 @@ body.bulk-bar-open { padding-bottom: 56px; }
 .deal-hero-genres { font-size: 0.7rem; color: #94a3b8; line-height: 1.3; }
 .deal-badge-low { display: inline-block; white-space: nowrap; font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.35); }
 .deal-badge-low-year { background: rgba(251, 191, 36, 0.1); color: #fde68a; border-color: rgba(253, 224, 71, 0.3); }
+/* Compact star used to the left of the price in the library/wishlist price
+   column. Mirrors .steal-row-low on the dashboard so users learn one shape.
+   Lives outside the deal-price-link <a> so it never inherits the link's
+   underline / pointer cursor — the cursor + text-decoration overrides below
+   keep it visually inert if it ever does get nested under a link. */
+.price-low-star {
+  color: #fbbf24;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  cursor: default;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.price-low-star-year { color: #fde68a; }
 .deal-badge-drop { display: inline-block; white-space: nowrap; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(52, 211, 153, 0.12); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.35); }
 .owned-elsewhere-pill { font-size: 0.65rem; font-weight: 600; color: #fbbf24; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25); padding: 0.05rem 0.35rem; border-radius: 4px; white-space: nowrap; }
 /* Sale scoreboard card */
@@ -1162,7 +1423,24 @@ body.bulk-bar-open { padding-bottom: 56px; }
 .sale-stat-value { font-size: 1.75rem; font-weight: 800; color: #f1f5f9; line-height: 1.1; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
 .sale-stat-suffix { font-size: 0.85rem; font-weight: 500; color: #64748b; }
 .sale-stat-muted { color: #64748b; font-weight: 700; }
-.sale-stat-best {
+/* Avg / Best Cut numbers — inherit the same cut-depth scale as .deal-cut-badge.
+   Sub-50% stays emerald, 50–74 emerald→amber, 75%+ amber→red→pink. */
+.sale-stat-cut { color: #6ee7b7; }
+.sale-stat-cut.deal-cut-big {
+  background: linear-gradient(90deg, #34d399 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.sale-stat-cut.deal-cut-huge {
+  background: linear-gradient(90deg, #fbbf24 0%, #f87171 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* sale-stat-best keeps the dramatic gradient even at sub-50% (it's still the
+   "best" by definition) — but bucket overrides above take precedence when present. */
+.sale-stat-best:not(.deal-cut-big):not(.deal-cut-huge) {
   background: linear-gradient(90deg, #34d399 0%, #fbbf24 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1184,7 +1462,7 @@ body.bulk-bar-open { padding-bottom: 56px; }
 .sale-bucket-light { background: #64748b; }
 .sale-bucket-medium { background: #34d399; }
 .sale-bucket-deep { background: #fbbf24; }
-.sale-bucket-huge { background: linear-gradient(90deg, #f472b6 0%, #ec4899 100%); }
+.sale-bucket-huge { background: linear-gradient(90deg, #fb923c 0%, #ef4444 100%); }
 .sale-distribution-legend { display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.65rem; color: #cbd5e1; flex-wrap: wrap; }
 .sale-distribution-tick { display: inline-flex; align-items: center; gap: 0.35rem; flex: 0 0 auto; min-width: 0; }
 .sale-distribution-tick-empty { color: #64748b; }
@@ -1339,7 +1617,23 @@ button.coop-connector-stat:focus-visible { outline: 2px solid #38bdf8; outline-o
 .steal-row-cover { width: 22px; height: 32px; object-fit: cover; border-radius: 3px; background: #1e293b; flex-shrink: 0; }
 .steal-row-name { flex: 1; min-width: 0; color: #e2e8f0; }
 .steal-row-low { color: #fbbf24; font-size: 0.7rem; line-height: 1; }
-.steal-row-cut { color: #34d399; font-weight: 700; font-size: 0.72rem; }
+.steal-row-cut { color: #34d399; font-weight: 700; font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+/* Same gradient as .deal-cut-badge for big / huge cuts. Sub-50% stays emerald. */
+.steal-row-cut.deal-cut-big {
+  background: linear-gradient(90deg, #34d399 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.steal-row-cut.deal-cut-huge {
+  background: linear-gradient(90deg, #fbbf24 0%, #f87171 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* "View on wishlist →" footer is useful from the dashboard, redundant on the
+   wishlist tab itself (row is right there). Hide when viewing wishlist. */
+html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .steal-row-price { margin-left: auto; color: #cbd5e1; font-variant-numeric: tabular-nums; font-size: 0.72rem; min-width: 38px; text-align: right; flex-shrink: 0; }
 .steal-row-shop {
   font-size: 0.6rem; font-weight: 600; letter-spacing: 0.02em;
@@ -1529,6 +1823,8 @@ button.coop-connector-stat:focus-visible { outline: 2px solid #38bdf8; outline-o
 .games-table th, .games-table td { overflow: hidden; }
 .games-table tbody tr { height: 76px; }
 .games-table tbody tr td { max-height: 76px; vertical-align: middle; }
+.games-table tr.virtual-spacer { height: auto; pointer-events: none; }
+.games-table tr.virtual-spacer td { padding: 0; border: none; vertical-align: top; line-height: 0; font-size: 0; }
 /* Notes cell: tags wrap inside the cell, but the cell itself is clipped so a
    game with many tags can't push the row arbitrarily tall. The notes input
    stays anchored to the bottom; surplus tags are clipped (still listed in the
@@ -1735,7 +2031,7 @@ button.coop-connector-stat:focus-visible { outline: 2px solid #38bdf8; outline-o
   .dash-versus-grid { grid-template-columns: 1fr; }
   .dash-versus-divider { display: none; }
 }
-#alphaNav.dashboard-hidden { display: none !important; }
+#alphaNavWrap.dashboard-hidden { display: none !important; }
 /* === Connections (sleek cards) === */
 .conn-hero {
   display: flex;

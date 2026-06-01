@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Cancel earlier runs of the same branch/PR when a new commit lands —
+# saves minutes and stops stale red checks.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (ruff + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install the project + its dev extras (ruff, pytest). pyproject.toml
+          # is the source of truth for dependency versions; requirements.txt is
+          # mirrored for the cloning-and-running-locally path.
+          pip install -e ".[dev]"
+
+      # Ruff is advisory for now: the codebase has accumulated lint debt that
+      # shouldn't block the first green CI run. The step still surfaces every
+      # finding in the job summary so it stays visible. Flip
+      # `continue-on-error` to false once the existing warnings are cleaned up.
+      - name: Lint with ruff (advisory)
+        continue-on-error: true
+        run: ruff check .
+
+      - name: Run pytest
+        run: pytest -q
+
+  javascript:
+    name: JavaScript (vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run vitest
+        run: npm test

@@ -29,6 +29,7 @@ DENYLIST_IDS: set[str] = {
     "CUSA03390_00",  # NFL app
     "CUSA06566_00",  # NBA app
     "CUSA02012_00",  # Media Player
+    "CUSA18774_00",  # 4 YoRHa (NieR demo chapter — not owned full game)
 }
 
 

@@ -34,14 +34,22 @@ export function escapeAttr(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-export function collectTableParams() {
+/**
+ * Snapshot the 6 in-flight filter controls.
+ *
+ * Reads from the supplied `sessionPrefs` object — typically `state.sessionPrefs`.
+ * Pass it explicitly so this module stays importable from the worker (which
+ * has no DOM and no live `state` reference).
+ */
+export function collectTableParams(sessionPrefs) {
+  const s = sessionPrefs || {};
   return {
-    q: (document.getElementById('search')?.value || '').trim().toLowerCase(),
-    status: document.getElementById('statusFilter')?.value || '',
-    unplayed: !!document.getElementById('unplayedOnly')?.checked,
-    earlyAccess: !!document.getElementById('earlyAccessOnly')?.checked,
-    minRating: +(document.getElementById('minRating')?.value || 0),
-    maxHours: +(document.getElementById('maxHours')?.value || 200),
+    q: String(s.search || '').trim().toLowerCase(),
+    status: s.statusFilter || '',
+    unplayed: !!s.unplayedOnly,
+    earlyAccess: !!s.earlyAccessOnly,
+    minRating: +(s.minRating || 0),
+    maxHours: s.maxHours == null ? 200 : +s.maxHours,
   };
 }
 
@@ -289,7 +297,7 @@ function passesFilter(ctx, g) {
     if (hiddenKeys && hiddenKeys.has(gameKey(g))) return false;
     if (!passesDealFilters(ctx, g)) return false;
   }
-  if (view === 'itch' && prefs.itchHideNonGames && !itchIsGame(g)) return false;
+  if (view === 'itch' && ctx.sessionPrefs?.itchHideNonGames && !itchIsGame(g)) return false;
   if (ctx.cleanupModeActive && view === 'library' && !isCleanupCandidate(ctx, g)) return false;
   if (params.q && !g.name.toLowerCase().includes(params.q)) return false;
   if ((view === 'library' || view === 'itch') && params.status) {
@@ -363,6 +371,9 @@ export function buildQueryContext(state, params) {
   return {
     view: state.activeView,
     prefs: state.prefs,
+    // Session-scoped prefs (itchHideNonGames, crossStoreDedup) — serialize across
+    // to the worker so passesFilter() can read them on the off-main-thread path too.
+    sessionPrefs: { ...(state.sessionPrefs || {}) },
     params,
     personal: state.personal,
     hiddenKeys: state.activeView === 'wishlist'

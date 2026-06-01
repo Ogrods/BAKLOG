@@ -33,6 +33,31 @@ export const state = {
   genreChipsExpanded: false,
   _visibleList: null,
   _visibleListView: null,
+  /** True while a cross-view drill-in should keep the loading overlay until scroll lands. */
+  _drillHideOverlay: false,
+  /** Anchor row index that paintTableBody just scrolled to; consumePendingFocus reuses it. */
+  _anchorScrollHandled: -1,
+  /**
+   * Session-scoped prefs — like `prefs` but never persisted to localStorage.
+   * Each tab/reload starts fresh with the defaults in loadSessionPrefs().
+   *
+   * This is the single source of truth for the live filter UI controls
+   * (search box, status filter, unplayed/early-access toggles, min-rating
+   * and max-hours sliders, dedup, itch hide-non-games). The DOM controls
+   * mirror these values; never read filter state directly off the DOM.
+   * Use prefs.js::syncFilterDomFromState() after a programmatic write to
+   * push the values back into the visible controls.
+   */
+  sessionPrefs: {
+    crossStoreDedup: true,
+    itchHideNonGames: true,
+    search: "",
+    statusFilter: "",
+    unplayedOnly: false,
+    earlyAccessOnly: false,
+    minRating: 0,
+    maxHours: 200,
+  },
 };
 
 export const CLEANUP_MAX_RATING = 60;

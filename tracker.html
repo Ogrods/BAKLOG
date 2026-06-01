@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BAKLOG · Project Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-panel: #1e293b;
+      --bg-elev: #334155;
+      --bg-soft: #475569;
+      --border: #334155;
+      --border-soft: #475569;
+      --text: #e2e8f0;
+      --text-dim: #cbd5e1;
+      --text-mute: #94a3b8;
+      --text-faint: #64748b;
+      --accent: #38bdf8;
+      --accent-dim: #0284c7;
+      --red: #f87171;
+      --amber: #fbbf24;
+      --grey: #94a3b8;
+      --green: #34d399;
+    }
+    * { box-sizing: border-box; }
+    html, body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; line-height: 1.5; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background: var(--bg-elev); color: var(--text-dim); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; }
+    strong { color: var(--text); }
+    em { color: var(--text-dim); font-style: normal; font-weight: 600; }
+    h1, h2, h3, h4 { color: var(--text); margin: 0 0 0.5rem; line-height: 1.2; font-weight: 600; }
+    h1 { font-size: 1.875rem; letter-spacing: 0.02em; }
+    h2 { font-size: 1.25rem; margin-top: 0.5rem; }
+    h3 { font-size: 1rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin-top: 1rem; }
+    p { margin: 0 0 0.75rem; color: var(--text-dim); }
+    .muted { color: var(--text-mute); }
+    .faint { color: var(--text-faint); }
+
+    .app { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
+
+    header.topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .brand { display: flex; align-items: center; gap: 0.65rem; margin-right: 0.75rem; }
+    .brand-title { font-size: 1.5rem; font-weight: 700; color: var(--accent); letter-spacing: 0.06em; }
+    .brand-sub { font-size: 0.7rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 0.15rem; }
+    .topbar-actions { display: flex; gap: 0.5rem; margin-left: auto; }
+    .btn { background: var(--bg-elev); color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 0.375rem; padding: 0.4rem 0.75rem; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+    .btn:hover { background: var(--bg-soft); color: var(--text); }
+    .btn-primary { background: var(--accent-dim); border-color: var(--accent); color: #f0f9ff; }
+    .btn-primary:hover { background: var(--accent); color: #0c1f33; }
+    .btn-danger { color: var(--red); border-color: var(--red); }
+    .btn-danger:hover { background: var(--red); color: #1a0b0b; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+
+    .tabbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
+    .tab { background: var(--bg-panel); color: var(--text-dim); border: 1px solid var(--border-soft); padding: 0.4rem 0.85rem; border-radius: 0.375rem; font-size: 0.85rem; cursor: pointer; font-family: inherit; font-weight: 500; transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease; }
+    .tab:hover { background: var(--bg-elev); color: var(--text); }
+    .tab.active { background: var(--accent-dim); border-color: var(--accent); color: #f0f9ff; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .card-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; }
+    @media (max-width: 900px) { .grid-3, .grid-4, .grid-5 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; } }
+
+    .stat { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.85rem 1rem; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-mute); margin-top: 0.35rem; }
+    .stat-info .stat-value { color: var(--accent); }
+    .stat-success .stat-value { color: var(--green); }
+    .stat-warning .stat-value { color: var(--amber); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.55rem 0.65rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.7rem; font-weight: 600; }
+    tbody tr:hover { background: rgba(56, 189, 248, 0.04); }
+    td code { white-space: nowrap; }
+
+    .pill { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid var(--border-soft); background: var(--bg-elev); color: var(--text-dim); }
+    .pill-success { background: rgba(52, 211, 153, 0.12); color: var(--green); border-color: var(--green); }
+    .pill-info { background: rgba(56, 189, 248, 0.12); color: var(--accent); border-color: var(--accent); }
+    .pill-warning { background: rgba(251, 191, 36, 0.12); color: var(--amber); border-color: var(--amber); }
+    .pill-danger { background: rgba(248, 113, 113, 0.12); color: var(--red); border-color: var(--red); }
+    .pill-neutral { background: var(--bg-elev); color: var(--text-mute); border-color: var(--border-soft); }
+
+    .sev { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; vertical-align: middle; }
+    .sev-red { background: var(--red); }
+    .sev-amber { background: var(--amber); }
+    .sev-grey { background: var(--grey); }
+
+    .check-row { display: flex; gap: 0.6rem; padding: 0.55rem 0.65rem; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .check-row:last-child { border-bottom: none; }
+    .check-row input[type="checkbox"] { margin-top: 0.25rem; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; width: 1rem; height: 1rem; }
+    .check-row label { cursor: pointer; flex: 1; color: var(--text-dim); font-size: 0.9rem; line-height: 1.45; }
+    .check-row input[type="checkbox"]:checked + label { color: var(--text-mute); text-decoration: line-through; text-decoration-color: var(--text-faint); }
+
+    .finding { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.85rem 1rem; margin-bottom: 0.6rem; background: var(--bg-panel); }
+    .finding-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .finding-title { font-weight: 600; color: var(--text); font-size: 0.95rem; flex: 1; min-width: 0; }
+    .finding-meta { display: flex; gap: 0.35rem; flex-shrink: 0; }
+    .finding-body { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 0.5rem; line-height: 1.55; }
+    .finding-decide { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .finding-decide button { background: var(--bg-elev); border: 1px solid var(--border-soft); color: var(--text-mute); padding: 0.25rem 0.65rem; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer; font-family: inherit; }
+    .finding-decide button:hover { background: var(--bg-soft); color: var(--text-dim); }
+    .finding-decide button.accept.active { background: rgba(52, 211, 153, 0.15); border-color: var(--green); color: var(--green); }
+    .finding-decide button.reject.active { background: rgba(248, 113, 113, 0.1); border-color: var(--red); color: var(--red); }
+    .finding-decide button.defer.active { background: rgba(251, 191, 36, 0.12); border-color: var(--amber); color: var(--amber); }
+    .finding-decide button.done.active { background: var(--green); border-color: var(--green); color: #0b1220; font-weight: 600; }
+    .finding.is-done { opacity: 0.65; }
+    .finding.is-done .finding-title { text-decoration: line-through; text-decoration-color: rgba(148, 163, 184, 0.45); }
+    .finding-notes { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border-soft); border-radius: 0.25rem; padding: 0.35rem 0.5rem; font-size: 0.8rem; font-family: inherit; resize: vertical; min-height: 2.25rem; margin-top: 0.4rem; }
+    .finding-notes:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+
+    details.phase { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0 1rem; margin-bottom: 0.75rem; }
+    details.phase[open] { padding-bottom: 0.75rem; }
+    details.phase > summary { cursor: pointer; list-style: none; padding: 0.85rem 0; display: flex; align-items: center; gap: 0.75rem; }
+    details.phase > summary::-webkit-details-marker { display: none; }
+    details.phase > summary::after { content: "+"; margin-left: auto; color: var(--text-mute); font-size: 1.2rem; line-height: 1; }
+    details.phase[open] > summary::after { content: "−"; }
+    .phase-title { font-weight: 600; font-size: 1rem; color: var(--text); }
+    .phase-status { display: inline-flex; gap: 0.4rem; align-items: center; color: var(--text-mute); font-size: 0.75rem; }
+    .progress-bar { width: 80px; height: 4px; background: var(--bg-elev); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--accent); transition: width 0.25s ease; }
+
+    .callout { background: rgba(56, 189, 248, 0.08); border: 1px solid var(--accent); border-radius: 0.5rem; padding: 0.85rem 1rem; margin-bottom: 1rem; }
+    .callout.success { background: rgba(52, 211, 153, 0.08); border-color: var(--green); }
+    .callout.warning { background: rgba(251, 191, 36, 0.08); border-color: var(--amber); }
+    .callout-title { font-weight: 600; color: var(--text); margin-bottom: 0.35rem; font-size: 0.95rem; }
+    .callout .callout-body { color: var(--text-dim); font-size: 0.85rem; }
+
+    .field-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.85rem 1rem; }
+    .field-card .field-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.35rem; }
+    .field-card .field-name { font-weight: 600; color: var(--text); }
+    .field-card .field-body { color: var(--text-dim); font-size: 0.85rem; }
+
+    .freenotes { width: 100%; min-height: 200px; background: var(--bg); color: var(--text); border: 1px solid var(--border-soft); border-radius: 0.375rem; padding: 0.75rem; font-family: inherit; font-size: 0.9rem; line-height: 1.5; resize: vertical; }
+    .freenotes:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+
+    .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--bg-elev); color: var(--text); border: 1px solid var(--accent); padding: 0.65rem 1.2rem; border-radius: 0.375rem; font-size: 0.85rem; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 50; }
+    .toast.show { opacity: 1; }
+
+    svg.flow { display: block; max-width: 100%; height: auto; background: var(--bg); border-radius: 0.375rem; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-mute); }
+    .legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border-soft); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <img src="assets/baklog-logo.svg" alt="" aria-hidden="true" style="height: 36px; width: auto;" onerror="this.style.display='none'" />
+        <div>
+          <div class="brand-title">BAKLOG</div>
+          <div class="brand-sub">Project Tracker</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="btn btn-sm" id="exportBtn" title="Download tracker state as JSON">Export</button>
+        <button type="button" class="btn btn-sm" id="importBtn" title="Import tracker state from JSON">Import</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none" />
+        <button type="button" class="btn btn-sm btn-danger" id="resetAllBtn" title="Wipe all tracker state">Reset all</button>
+        <a class="btn btn-sm" href="index.html" title="Back to BAKLOG dashboard">← App</a>
+      </div>
+    </header>
+
+    <nav class="tabbar" id="tabbar"></nav>
+
+    <main id="panels"></main>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script>
+  "use strict";
+
+  const STORAGE_KEY = "baklog-tracker-v1";
+
+  // ---------- Tabs ----------
+  const TABS = [
+    { id: "now", label: "Now" },
+    { id: "phases", label: "Phases" },
+    { id: "arch", label: "Architecture" },
+    { id: "pipeline", label: "Pipeline" },
+    { id: "wishlist", label: "Wishlist matrix" },
+    { id: "findings", label: "Audit findings" },
+    { id: "blindspots", label: "Blind spots" },
+    { id: "debug", label: "Debug tools" },
+    { id: "monetize", label: "Monetization" },
+  ];
+
+  // ---------- Phases (checklists) ----------
+  const PHASES = [
+    {
+      id: "p1",
+      title: "Phase 1 — Stabilize (current)",
+      tagline: "Initial build wrap. UI consistency. Bug triage. Feature freeze for the audit.",
+      items: [
+        { id: "p1_hide_dupes_consistency", label: "Hide-duplicates control: persists, visible in filter sidebar on library + wishlist, off-state recovers on refresh" },
+        { id: "p1_coop_segmented", label: "Co-op filter: segmented control (Off · Any · Online · Couch · Both); dashboard drills map onto it" },
+        { id: "p1_conn_howto", label: "Connections page: how-to copy block for each auth kind (browser / paste / API key / local-only)" },
+        { id: "p1_conn_manual_row", label: "Connections page: manual cards collapsed into their own row so heights don't break the grid" },
+        { id: "p1_dash_spotlight_flicker", label: "Dashboard spotlight stops flickering on dash→library→dash revisit (compositor layer fix)" },
+        { id: "p1_dash_charts_replay", label: "Dashboard charts replay animation on revisit without rebuilding (no destroy/recreate)" },
+        { id: "p1_table_virtual", label: "Library/itch table uses true viewport windowing (spacer rows + ~viewport DOM rows), back-to-top button stacked above the A–Z rail" },
+        { id: "p1_table_drill", label: "Dashboard drill-in: overlay-on-drill, defer renderSummary/picks via rIC, anchor by scroll-position (no 0…N flush paint)" },
+        { id: "p1_table_perf_instr", label: "Phase A perf instrumentation (?perf=1) — per-renderTable marks, chunk timings, history in window.__baklogPerf" },
+        { id: "p1_feature_freeze", label: "Feature freeze declared: no new features land until the audit triage in Phase 2 is complete" },
+        { id: "p1_full_backup", label: "Full project backup taken (out-of-repo snapshot folder with games_*.json + data/)" },
+        { id: "p1_canvases_retired", label: "Three canvases retired; tracker.html is the single source of project truth" },
+      ],
+    },
+    {
+      id: "p2",
+      title: "Phase 2 — Senior audit + refactor",
+      tagline: "Triage the Audit findings tab. Each Accept becomes its own focused follow-up plan. No refactor without a triage decision.",
+      items: [
+        { id: "p2_triage_arch", label: "Triage architecture findings: accept/reject/defer each item in the Audit findings tab" },
+        { id: "p2_triage_ux", label: "Triage UX findings: walk every view (Dashboard / Library / Wishlist / Itch / Connections) and decide per item" },
+        { id: "p2_triage_debug", label: "Triage debug refactor findings: pick what's worth doing now vs. parking" },
+        { id: "p2_followup_plans", label: "Each Accepted finding gets its own focused plan (small, reviewable, single concern)" },
+        { id: "p2_no_bandaids", label: "Rule: no fixes during Phase 2 that aren't part of an accepted-finding follow-up plan" },
+        { id: "p2_deferred_ux_surfaces", label: "Surface deferred UX audits during triage: tags (find_ux_tags_unaudited), notes (find_ux_notes_unaudited), responsiveness (find_ux_responsiveness), add-row (find_ux_add_row), remove-row (find_ux_remove_row). None are bandaid material — each gets its own dedicated pass." },
+      ],
+    },
+    {
+      id: "p3",
+      title: "Phase 3 — Hardening",
+      tagline: "Make it survive bad inputs, second contributors, and the first stranger who tries to install it.",
+      items: [
+        { id: "p3_games_backup", label: "[DONE] Rotated backups of games_*.json + itad_prices.json — shared/safe_write.py wired through fetchers/_base.py + fetch_itad.py; data/games_backups/<stem>/ keeps last 10" },
+        { id: "p3_gitattributes", label: ".gitattributes file: stop the LF/CRLF warnings on every commit" },
+        { id: "p3_license", label: "Add a LICENSE file (MIT or Apache-2.0 — pick before going public)" },
+        { id: "p3_js_tests", label: "JS test runner (Vitest) + first tests for table-query, dedup, normalization" },
+        { id: "p3_js_tests_deals", label: "Vitest: deals.js — getDealInfo ITAD-over-Steam precedence, dealLowBadgeHtml lowKind branches, dealShopShort fallback" },
+        { id: "p3_js_tests_prefs", label: "Vitest: prefs.js — loadPrefs strips legacy crossStoreDedup, applySavedSortForView clamps invalid keys, viewSorts persistence" },
+        { id: "p3_js_tests_fingerprint", label: "Vitest: table-ui.js tableFingerprint — differs on every input it should, identical for same input (regression magnet)" },
+        { id: "p3_js_tests_dashboard_fp", label: "Vitest: dashboard.js dashboardFingerprint — qw / itch presence / dv changes trigger re-render, no-op when unchanged" },
+        { id: "p3_js_tests_dedup_state", label: "Vitest: game-core.recomputeCrossStoreHidden — small state fixture; expected hidden keys match store-priority order; respects sessionPrefs.crossStoreDedup" },
+        { id: "p3_ci", label: "[DONE] GitHub Actions: ruff (advisory) + Python pytest + JS vitest on push/PR to main/master — see .github/workflows/ci.yml" },
+        { id: "p3_ci_ruff_required", label: "Make ruff lint a required CI gate — clean the ~150 inherited warnings (81 E501 long-line, 26 F401 unused-import, 24 UP017 datetime-timezone-utc, 14 I001 unsorted-imports, 5 UP035/UP012 modernization), flip continue-on-error→false in ci.yml" },
+        { id: "p3_drill_anchor_audit", label: "Drill-in scroll audit (FULL) — unify the scroll-target story across spotlight / picks-versus / itch-hero / category drills / focusGame. Spotlight 2nd-click stays at top when picks is open, category drills land in different spots, picks-deferred reanchor only half-fixes it. See find_drill_anchor_inconsistent for repros + architectural seams." },
+        { id: "p3_error_boundary", label: "[DONE] Global window.onerror + unhandledrejection handler that surfaces a toast — js/error-boundary.js, installs on app boot, top-right red sticky toast with Copy/Details/Dismiss; debug overlay shows running error count; window.__baklogErrors holds the session log" },
+        { id: "p3_debug_overlay", label: "?debug=1 overlay: data version, last render ms, table fingerprint, active filter count, current view" },
+        { id: "p3_fetcher_backoff", label: "Fetcher backoff: after N consecutive auth failures, the chip says 'Reconnect required' instead of retrying silently" },
+        { id: "p3_readme_install", label: "README install section verified by a fresh clone on a new Windows machine" },
+        { id: "p3_changelog_discipline", label: "Adopt semver tags + CHANGELOG entries on every release" },
+      ],
+    },
+    {
+      id: "p4",
+      title: "Phase 4 — Productize",
+      tagline: "Make a new user's first 10 minutes feel inevitable. Onboarding, screenshots, hosted demo decision.",
+      items: [
+        { id: "p4_onboarding_flow", label: "Onboarding: empty-state UX. 'You have 0 stores connected — Start with Steam' CTA on Connections" },
+        { id: "p4_readme_rewrite", label: "README rewrite: hero shot, 30-second pitch, three-step install, screenshot gallery" },
+        { id: "p4_landing_page", label: "Landing page (GitHub Pages or similar): name, screenshots, ITAD-style deal radar value prop" },
+        { id: "p4_hosted_demo", label: "Decide: hosted demo with stub data? Or local-only forever?" },
+        { id: "p4_privacy_doc", label: "Privacy doc: what's stored, where, why; what's NEVER sent anywhere" },
+        { id: "p4_cross_platform_decision", label: "Decide: stay Windows-only, or invest in macOS / Linux (Amazon SQLite paths, DPAPI alternatives)" },
+        { id: "p4_packaging", label: "Decide: pip-installable? PyInstaller exe? Tauri shell? Stay 'clone and run'?" },
+      ],
+    },
+    {
+      id: "p5",
+      title: "Phase 5 — Monetize / launch",
+      tagline: "Pick a business shape. Pick a launch channel. Don't pick both at once.",
+      items: [
+        { id: "p5_pick_model", label: "Pick a model (OSS + paid hosted sync, one-time paid app, or affiliate-only). See Monetization tab" },
+        { id: "p5_pick_channel", label: "Pick one launch channel (HN Show / r/patientgamers / r/Steam / Twitter / YouTube long-form) — not multiple" },
+        { id: "p5_pricing", label: "Pricing decided (if paid): one number, no tiers at launch" },
+        { id: "p5_soft_launch", label: "Soft launch: invite-only beta with 10–20 friends before going public" },
+        { id: "p5_metrics", label: "Decide what success looks like: stars, signups, retention, MRR? Pick one north-star" },
+      ],
+    },
+  ];
+
+  // ---------- Findings (audit) ----------
+  const FINDINGS = [
+    // Architecture
+    { id: "find_appjs_size", area: "Arch", severity: "grey", title: "[RESOLVED] app.js split landed — ~150-line orchestrator",
+      body: "Done. js/app.js is now a thin orchestrator (~150 lines) that hydrates state, wires the downstream-sync + fetcher-health callback bags, and kicks off bootstrap + bindEvents. The heavy logic lives in focused modules: game-core, deals, genres, table-ui, table-query, picks-ui, personal-storage, filters-ui, bind-events, library-load, add-game-modal, covers, prefs. Keep this finding around as a grey breadcrumb so future contributors can find the rationale; close on next tracker prune." },
+    { id: "find_dashboard_di_shim", area: "Arch", severity: "grey", title: "[RESOLVED] Runtime DI shim removed from js/dashboard.js",
+      body: "Done. The c('fnName') runtime DI lookup is gone — dashboard.js and its sub-modules now use direct ES imports from game-core, deals, genres, personal-storage, prefs, filters-ui, table-ui. Pairs with the dashboard split (find_dashboard_size)." },
+    { id: "find_dashboard_size", area: "Arch", severity: "grey", title: "[RESOLVED] dashboard.js split into 6 focused modules",
+      body: "Done. dashboard.js is now ~280-line orchestrator + re-exports. The 2.3k-line monolith was split into dashboard-charts (Chart.js, scatter, era bands), dashboard-cards (coop, picks-versus, wishlist stats, itch), dashboard-insights (insight marquee), dashboard-spotlight (rotating hero), dashboard-drilldown (dash* drill helpers), dashboard-shared (constants + animateCount + dashboardLibraryGames)." },
+    { id: "find_dedup_pref_force", area: "Arch", severity: "grey", title: "[RESOLVED] Session-prefs concept introduced — crossStoreDedup migrated",
+      body: "Done. Added state.sessionPrefs (state.js) + loadSessionPrefs() (prefs.js) for toggles that should never persist across reloads. crossStoreDedup moved out of the localStorage prefs bag entirely — defaults to true via loadSessionPrefs() on every bootstrap, off-state lasts only the current tab/session. Removed the force-overwrite in app.js (was `state.prefs.crossStoreDedup = true`), the savePrefs() in the toggle handler (bind-events.js) and pill clear (filters-ui.js), and stripped crossStoreDedup from the prefs fallback. loadPrefs() also `delete merged.crossStoreDedup` so old persisted values are dropped on read. tableFingerprint reads state.sessionPrefs.crossStoreDedup so the table cache still invalidates when the toggle flips. Pattern is now reusable: any future session-scoped toggle goes into state.sessionPrefs / loadSessionPrefs() with no other ceremony." },
+    { id: "find_crlf", area: "Arch", severity: "grey", title: "[RESOLVED] .gitattributes — LF in repo, CRLF for .bat/.ps1",
+      body: "Done. Root .gitattributes: * text=auto eol=lf for source (js/py/html/css/json/md/svg/etc.), eol=crlf for *.bat/*.cmd/*.ps1, binary for images/fonts/archives. Stops the per-commit LF/CRLF warning noise on Windows. One-time: if files were already committed with mixed endings, run `git add --renormalize .` then commit so the index matches." },
+    { id: "find_no_js_tests", area: "Arch", severity: "amber", title: "JS test coverage — first 59 tests landed (Vitest)",
+      body: "First pass done. Vitest 3 + happy-dom (lighter than jsdom; needed because personal-store.js touches window.addEventListener at module scope). 59 passing tests across tests/table-query.test.js (filter/sort + coop + early-access + key + hidden-key dedup integration), tests/game-core.test.js (normalizeNameForDedup, scoreEntry, storePriority, isJunkEntry, dedupeWithinStore, normalizeGame, gameKey, alphaBucket, formatHours, formatReleaseDate), and the pre-existing tests/fetcher-health.test.js. Config: vitest.config.js (env: happy-dom, include: tests/**/*.test.js). Run via `npm test` or `npm run test:js:watch`. Still open: deals.js (getDealInfo, dealLowBadge), prefs.js (loadPrefs strips legacy crossStoreDedup, viewSorts coercion), dashboard fingerprint, table-perf snapshots. Severity dropped from amber to grey-amber — infrastructure is now in place, just needs more cases as we find bug-magnet areas." },
+    { id: "find_no_ci", area: "Arch", severity: "grey", title: "[RESOLVED] CI wired up via GitHub Actions",
+      body: "Done. .github/workflows/ci.yml runs on every push + PR to main/master with two parallel jobs: (1) Python 3.11 — `pip install -e .[dev]`, ruff lint (currently advisory via continue-on-error so the ~150 inherited warnings don't block the first green run), then `pytest -q` (112 tests); (2) Node 20 — `npm ci` + `npm test` (59 vitest tests). Concurrency group cancels stale runs on the same branch/PR. Follow-up p3_ci_ruff_required tracks tightening lint once the existing warnings are cleaned up." },
+    { id: "find_games_no_backup", area: "Arch", severity: "grey", title: "[RESOLVED] games_*.json + itad_prices.json now atomic-write + rotated backup",
+      body: "Done. New shared/safe_write.py generalizes the data/personal.json pattern (atomic temp + os.replace, plus a rolling N-deep backup directory). Plumbed through fetchers/_base.py::write_games_json (covers every fetch_*.py + every refresh) and fetch_itad.py. Backups land in data/games_backups/<stem>/<stem>-YYYYMMDD-HHMMSS-mmm.json, keep=10 by default (configurable). data/ is already in .gitignore so backups stay local. Millisecond-resolution stamps avoid same-second collisions. 9 new tests in tests/test_safe_write.py cover atomic create/replace, tmp cleanup on failure, no-op when source missing, rotation, prune-to-keep, and default prefix=stem behavior." },
+    { id: "find_state_dom_split", area: "Arch", severity: "grey", title: "[RESOLVED] Filter state is now state.sessionPrefs; DOM mirrors state",
+      body: "Done. The 6 live-filter controls (search, statusFilter, unplayedOnly, earlyAccessOnly, minRating, maxHours) now live in state.sessionPrefs — the same session-scoped pattern as crossStoreDedup and itchHideNonGames. collectTableParams(sessionPrefs) takes prefs as a parameter so the worker import graph stays DOM-free. New prefs.js::syncFilterDomFromState() helper pushes state into the visible controls (used by drill-ins, pill removal, clear-all, and the wishlist switchView reset). Every DOM read of those 6 ids has been replaced: bind-events.js (main input handler + status chip click + wishlist reset + tbody sort guard), filters-ui.js (collectActiveFilters, removeActiveFilter, clearAllFilters, switchView, renderSummary), dashboard-drilldown.js (dashResetLibraryFiltersExceptDedup + every dashDrill* writer), game-core.js renderStatusChipsHtml, table-ui.js tableFingerprint. Boot path calls syncFilterDomFromState() so the controls match the freshly-loaded session defaults. 4 new Vitest tests in tests/table-query.test.js cover collectTableParams(sessionPrefs): empty/missing args → defaults, full prefs → expected shape, stringy slider values → coerced to numbers. Net effect: a regression where a filter changes but its DOM input doesn't (or vice versa) is now structurally impossible." },
+    { id: "find_prefs_quartet", area: "Arch", severity: "amber", title: "savePrefs + recompute + refreshFilterUI + renderSummary is called 5+ ways",
+      body: "Every filter-change handler reinvents the same dance. A single applyPrefsChange(patch) helper would make every filter look identical and stop forgetting one of the four steps." },
+    { id: "find_drill_anchor_inconsistent", area: "Arch", severity: "amber", title: "Drill-in anchoring is inconsistent — full audit of scroll behavior needed",
+      body: "Collected symptoms (verified by user during this session):\n\n(A) SPOTLIGHT REPEAT-CLICK BUG — Spotlight works on the FIRST dashboard→library drill. On the SECOND drill (dashboard → spotlight → dashboard → spotlight again), the focused-row class IS applied to the correct row but the page never scrolls (stays at scrollY=0). User-confirmed: 'it does focus the row but doesnt scroll'.\n\n(B) PICKS-OPEN VS PICKS-COLLAPSED — User-confirmed: the spotlight bug ONLY repros when picksContainer is OPEN (state.prefs.picksCollapsed === false). When picks is collapsed (Show/Hide toggle in togglePicks), the same spotlight click DOES scroll on repeat clicks. User: 'it works if picks is hidden. but if it shows it breaks'. Important: user clarified 'it's not throwing the height. it just doesn't scroll if it's open' — so the symptom isn't 'wrong target Y', it's 'no scroll fires at all' when picks is open.\n\n(C) SPOTLIGHT-ONLY — Only the spotlight is broken on repeats. Other dash-list-jump targets (picks-versus card rows in #dashPicksVersusCard, itch hero card in #dashItchRecap, coop spotlight pick) all work on repeat clicks even with picks open. User: 'if i drill from a lower card, it works on repeat clicks. it's only the spotlight that doesnt'. They all share the same delegated click handler (onDashListClick → focusGame(key)) and the same data-action='dash-list-jump' attribute, so the bug must be triggered by something specific to the spotlight's DOM lineage (#dashboardMega → .dash-mega-hero → #dashboardSpotlight) and/or its rotation lifecycle (innerHTML swap every 7s in startSpotlightRotation, plus syncSpotlightInMega on every dashboard re-render).\n\n(D) CATEGORY DRILLS LAND IN DIFFERENT SPOTS — Dashboard category drills (store, status, genre, co-op, year, hltb bucket, min-rating) all call scrollDrillResultsIntoView() which targets #toolbarSection. Game drills (focusGame) target row-center. The two strategies fight each other when picks/summary expand mid-flight. User: 'categories especially land in weird different places'.\n\nKnown architectural seams to investigate during the audit:\n  • paintTableBody computes scrollTopForRowCenter(idx) BEFORE the deferred deferChrome path renders picks/summary — so tableShell.offsetTop reflects pre-picks layout on first paint.\n  • The reanchorPickedRow rAF added 2026-06-01 in filters-ui.js / table-ui.js half-fixes this (first drill works), but only fires when deferChrome's idle callback actually executes AND the row is in the painted virtual window — neither guarantee holds on the spotlight-repeat path.\n  • Cache-hit branch in renderTable (fp matches, list unchanged) skips paintTableBody entirely. consumePendingFocus then routes through requestScrollToIndex, which re-reads scrollTopForRowCenter against possibly-stale layout.\n  • finishDrillScroll's 2-rAF deferred scrollRowToCenter fires BEFORE the requestIdleCallback deferChrome on real browsers, so it scrolls against an incomplete layout when picks is still rendering.\n  • paintTableBody → consumePendingFocus → finishDrillScroll → deferred reanchorPickedRow are all doing overlapping 'scroll to anchor' work via four different code paths.\n  • Spotlight innerHTML rotation may interact badly with the click handler bubble — needs verification (e.g., is the spotlight's data-key in sync with state at click time on repeat clicks?).\n\nAcceptance criteria when we circle back:\n  1. ONE anchor strategy per drill kind — category-drill anchors above search bar, game-drill anchors at row-center. Documented at the entry point.\n  2. Works on the 1st and Nth invocation identically. Tested via Vitest with a happy-dom fixture.\n  3. Works with picks both expanded and collapsed (verify both states in the same test).\n  4. Kill the dual code paths — replace paintTableBody anchor scroll + consumePendingFocus requestScrollToIndex + deferred reanchorPickedRow + finishDrillScroll with a single 'pendingScrollTarget' object that survives the paint→deferChrome→idle handoff and is consumed exactly once after layout settles.\n  5. Spotlight repeat-click case becomes a Vitest regression test." },
+
+    // UX
+    { id: "find_ux_dash_rotation", area: "UX", severity: "grey", title: "Dashboard spotlight rotation may be calmer-off",
+      body: "7-second auto-rotate competes with the rest of the page. Consider letting it stay fixed unless the user hovers/clicks (already the hover-pause case)." },
+    { id: "find_ux_library_focus", area: "UX", severity: "grey", title: "[REJECTED] Library has no clear primary affordance",
+      body: "Rejected by owner. Library is designed to combine multiple-store libraries and offer browse/filter/sort; the 'what to play next' job is owned by the Dashboard (spotlight + picks-versus + insights). The competing affordances (A–Z, filter drawer, summary chips, picks, sort headers) are intentional surface area, not noise to collapse into a single hero." },
+    { id: "find_ux_wishlist_stack", area: "UX", severity: "grey", title: "Wishlist deal hero + sale scoreboard + steals waiting feels like three deal cards",
+      body: "Each card is useful; together they're noisy. Consider collapsing into a single 'Deals' module when wishlist < 10 items, or rotating between them on a single hero card. A unified 2-column 'Deal radar' was prototyped on 2026-06-01 and reverted — keeping three cards for now while other UX work continues; revisit once the broader UX phase starts." },
+    { id: "find_ux_itch_empty", area: "UX", severity: "grey", title: "Itch.io empty states are rough when filters bite",
+      body: "1,047 keys → 163 games default-filtered is fine. But when you stack genre + status + min-rating filters, you hit a blank wall with no 'relax this filter' affordance." },
+    { id: "find_ux_conn_density", area: "UX", severity: "amber", title: "Connections page is dense for first-run users",
+      body: "How-to + 12 cards + Advanced disclosure all visible at once. A 'Start here: connect Steam first' CTA would let new users get to the dashboard with a single click instead of triaging 12 cards." },
+    { id: "find_ux_tags_unaudited", area: "UX", severity: "amber", title: "[DEFERRED] Tags surface is unaudited end-to-end",
+      body: "Parked. Per-game tags exist (state.prefs.tagFilters, passesTagFilter, the tag chips in filters-ui, applied to picks via passesTagFilter) but the full surface has not been designed/reviewed: where you add tags, where you see all tags, how they sync across stores when the same game appears multiple times, how tag-based smart-lists would work. Pick this up in a dedicated UX pass once Phase 2 triage is done — not a bandaid one-off." },
+    { id: "find_ux_notes_unaudited", area: "UX", severity: "amber", title: "[DEFERRED] Per-game notes surface is unaudited end-to-end",
+      body: "Parked. Notes exist in data/personal.json (Export/Import notes in the kebab menu), but the per-row editing UX, multi-line notes vs. quick comment, search-across-notes, and export shape are not designed. Mirror of find_ux_tags_unaudited — pick up in a dedicated UX pass." },
+    { id: "find_ux_responsiveness", area: "UX", severity: "amber", title: "[DEFERRED] Responsiveness / mobile + narrow-viewport pass not done",
+      body: "Parked. The whole UI assumes a wide desktop viewport. Dashboard chart cards, picks grid, table layout, filter drawer, kebab menu, and the deal cards have not been audited at <1024px / <768px / <480px. No deliberate mobile story, no print stylesheet. Pick up after the major UX phase decisions land so we don't restyle twice." },
+    { id: "find_ux_add_row", area: "UX", severity: "amber", title: "[DEFERRED] Add-game flow needs a UX audit",
+      body: "Parked. The 'Add game' button + modal exist (addGameBtn → add-game-modal.js) but the flow has not been reviewed for: duplicate detection vs. existing games across stores, manual entry of a game that later auto-imports from a fetcher, store assignment for manual rows, what fields are required vs. optional, error states. Pick up once the Phase 2 triage settles." },
+    { id: "find_ux_remove_row", area: "UX", severity: "amber", title: "[DEFERRED] Remove/cleanup-row flow needs a UX audit",
+      body: "Parked. Cleanup mode + bulk delete exist (cleanupModeActive, undo toast) but the surface has not been audited: what 'remove' actually means (hide vs. delete vs. mark dropped), per-store rows vs. canonical entry, recoverability story (the undo toast is short-lived), what happens when a fetcher re-imports a row the user removed. Pick up alongside find_ux_add_row." },
+
+    // Debug refactor
+    { id: "find_dbg_dom_truth", area: "Debug", severity: "grey", title: "[RESOLVED] collectTableParams reads from state, not DOM",
+      body: "Resolved alongside find_state_dom_split. collectTableParams(sessionPrefs) is now pure (no DOM access). The 6 live filter controls live in state.sessionPrefs; DOM is a mirror. See find_state_dom_split for the full sweep details and test coverage." },
+    { id: "find_dbg_apply_helper", area: "Debug", severity: "amber", title: "Single applyPrefsChange(patch) helper",
+      body: "Same as the architecture finding from the other angle. Every checkbox/slider event handler shrinks to one line. Stops the 'forgot to call recomputeCrossStoreHidden' family of bugs." },
+    { id: "find_dbg_overlay", area: "Debug", severity: "grey", title: "[RESOLVED] ?debug=1 overlay for runtime introspection",
+      body: "Done. New module js/debug-overlay.js with isDebugEnabled() (checks ?debug=1 OR localStorage 'baklog-debug=1') + startDebugOverlay() that mounts a tiny fixed-position panel (bottom-right) and polls state every 500ms. Shows: current view, _dataVersion, visible row count, active filter count, tableFingerprint (truncated, full string in tooltip), last renderTable totalMs (from window.__baklogPerf.last). Polling instead of hooking every mutation site keeps it durable as new code paths land — overlay is opt-in so the cost only applies to debug sessions. Includes an × close button (per-session hide), and styling in app.css under '.baklog-debug-overlay*'. Wired into app.js bootstrap after the initial chrome paint. Reuses the existing tableFingerprint + collectActiveFilters exports — no new state surface." },
+    { id: "find_dbg_error_handler", area: "Debug", severity: "grey", title: "[RESOLVED] Global error handler that surfaces, not silences",
+      body: "Done. js/error-boundary.js wires window.error + unhandledrejection listeners (installed at the very top of app.js before any other module-level code runs). Captures uncaught throws AND rejected promises that nobody caught, dedupes rapid-fire repeats with a 2-second window per signature (so a render loop firing 1000 of the same error produces one toast), keeps a rolling 50-entry session log on window.__baklogErrors, and surfaces a sticky red toast top-right with the latest message + source/line + an error count + Copy (clipboard JSON) / Details (expand stack inline) / Dismiss buttons. Never auto-dismisses (errors are not ephemeral). Debug overlay surfaces the running count in its errors field. Also exports reportError(err, opts) for opt-in try/catch sites that want to log without rethrowing." },
+    { id: "find_perf_row_paint_chug", area: "Debug", severity: "grey", title: "[RESOLVED] Library row paint — viewport windowing + drill-in overlay shipped",
+      body: "Done across three phases. Phase A (table-perf.js): opt-in instrumentation via ?perf=1, per-renderTable marks (query / chrome / paint / post), chunk samples in window.__baklogPerf. Phase B / B+: removed anchor-sync (no more painting 0…anchorIndex sync), added _pendingScroll + requestScrollToIndex, drill-in loading overlay that survives until the row centers, refreshFilterUI({ drillIn }) defers renderSummary + renderPicks to requestIdleCallback, updateViewChrome skips its own renderSummary on drill. Phase C: true viewport windowing — usesVirtualScroll() for >50 rows, paintVirtualSlice() keeps only ~viewport + 10 overscan rows in the DOM, top/bottom spacer <tr>s preserve total scroll height (ROW_HEIGHT=76 must match .games-table tbody tr in app.css), scheduleVirtualScrollUpdate() repaints on scroll/resize via rAF, drill / A–Z / keyboard scroll by index→pixel offset and paint the window around that row, syncCoverFits deferred to requestIdleCallback. Back-to-top now snaps instant (smooth scroll through 1700+ fixed rows was the source of the 3s freeze) and stacks above the A–Z rail. Open polish: (a) updateRowInPlace edits to off-window rows are silently dropped — pre-existing tradeoff, document or solve later; (b) tag-chip batch refresh still per-row; (c) measure query:filter-sort at 1711 rows if drill ever feels slow again." },
+    { id: "find_virtual_window_cache_stale", area: "Debug", severity: "grey", title: "[RESOLVED] Virtual window early-return ignored list identity — column header sort silently no-op'd",
+      body: "User-reported regression on 2026-06-01: 'row headers are not sorting — i see the event fire in console on click but this seems very broken'. Diagnosis: column header click → state.sortKey/sortDir flipped → renderTable() fired → fingerprint changed → query cache missed → queryGamesAsync returned a freshly-sorted list (correctly). The bug lived in paintVirtualSlice: the early-return guard checked (_virtualWindow.start === start && _virtualWindow.end === end && tbody has rows) without comparing the underlying list reference. After a resort the visible window is still indices 0..N — guard passes, paint short-circuits, DOM keeps the pre-sort rows. Originally the guard was meant to skip redundant repaints when scroll handlers asked for the same window; it never accounted for the list under those indices being swapped.\n\nFix: added a module-scope _virtualWindowList = null tracker. paintVirtualSlice now writes _virtualWindowList = list whenever it actually paints, and the early-return requires _virtualWindowList === list. All three reset sites (invalidateTableCache, empty-list branch, one-shot branch in paintTableBody) clear _virtualWindowList to null so the next paint always renders. Small lists (<virtual threshold) and one-shot paints were never affected — only the virtual code path.\n\nLesson for the audit: any rendering optimization that key's on 'where' (indices, scroll position, viewport range) without also keying on 'what' (the data being rendered) is a regression magnet. paintVirtualSlice was the obvious one; sweep similar guards in table-ui (consumePendingFocus, _pendingScroll re-use), dashboard.js dashboardFingerprint, and the alpha-nav letter set caching when this finding gets full-audited." },
+  ];
+
+  // ---------- Blind spots ----------
+  const BLINDSPOTS = [
+    { id: "bs_license", title: "No LICENSE file", body: "The moment you push public or accept a contribution, this is a real problem. MIT or Apache-2.0 are the safe defaults for an OSS tool of this shape." },
+    { id: "bs_privacy", title: "Privacy posture is informal", body: "OAuth refresh tokens and cookies live in .env or a DPAPI blob. README mentions it; no formal privacy doc. A productized version needs an explicit page: what's stored, where, why; what's never sent anywhere." },
+    { id: "bs_xplatform", title: "Cross-platform: Windows-only by accident", body: "DPAPI for secret storage, .ps1 refresh script, Amazon Games local SQLite path. macOS / Linux users hit walls. Either invest, or put a 'Windows-only for now' line at the top of the README before someone tries." },
+    { id: "bs_tos", title: "Storefront scraping has TOS exposure once productized", body: "Scraping store.ubisoft.com SSR HTML and Epic storefront GraphQL is fine for personal use. The moment money or a hosted variant enters the picture, the legal posture changes. Worth knowing now, not later." },
+    { id: "bs_multiuser", title: "Multi-account assumed away", body: "One Steam ID, one PSN account, one Epic. Anyone with a household-shared library, multiple regions, or a 'work vs. play' split needs a profile concept. Productizing forces this." },
+    { id: "bs_i18n", title: "Internationalization / currency", body: "ITAD returns USD-shaped data; the dashboard hardcodes '$'. Anyone outside USD sees wrong-looking prices." },
+    { id: "bs_a11y", title: "Accessibility has not been audited", body: "Keyboard shortcuts exist; ARIA, focus management, screen reader story are untested. Easy to get wrong; cheap to fix early." },
+    { id: "bs_perf_budget", title: "No performance budget", body: "App is fast enough on your machine. A productized version needs measurements: cold load ms, time-to-interactive, bundle size, memory ceiling with N games." },
+    { id: "bs_fetcher_backoff", title: "No exponential backoff on failing fetchers", body: "auth/runner.py watchdog + taskkill /F handles silent hangs. Nothing handles 'this fetcher has failed 3 times today, stop nagging me and surface a Reconnect button'." },
+    { id: "bs_semver", title: "No semver tags / version discipline", body: "CHANGELOG.md exists, no git tags. The moment a second person installs this, 'which version do you have?' is ambiguous." },
+    { id: "bs_telemetry", title: "Telemetry / error reporting decision is unmade", body: "Today: zero. Productizing usually wants opt-in error reporting (Sentry-style). Decide before shipping — retrofitting consent is harder than starting clean." },
+    { id: "bs_xbox_wishlist_empty", title: "fetch_xbox_wishlist.py output is 0.1 KB (empty array)", body: "Either confirmed-empty Xbox wishlist on your account, or the fetcher silently fails. Worth a smoke test before claiming Xbox wishlist support in the matrix." },
+    { id: "bs_secret_recovery", title: "No 'export my secrets' path", body: "If you switch machines or your DPAPI keychain corrupts, every connection has to be re-authenticated from scratch. A portable encrypted bundle (already partly designed for the master-password flow) needs to be finished + documented." },
+    { id: "bs_data_drift", title: "No fetcher-output integrity check", body: "If a fetcher returns 3 games instead of the usual 600, nothing alerts you. A simple 'last run wrote {n} rows, expected ≥ {floor}' guard would catch broken auth and broken APIs in one stroke." },
+    { id: "bs_pricing_currency", title: "Wishlist prices are mixed-store, mixed-currency", body: "Each fetcher writes whatever the store returned. A 12.99 next to a £9.99 next to a €5 is hard to compare. Consider a single 'display currency' pref that converts at fetch time." },
+  ];
+
+  // ---------- Architecture content (from canvas, kept current) ----------
+  const STORE_BREAKDOWN = [
+    { key: "epic", label: "Epic", games: 671 },
+    { key: "psn", label: "PlayStation", games: 597 },
+    { key: "gog", label: "GOG", games: 259 },
+    { key: "steam", label: "Steam library", games: 257 },
+    { key: "amazon", label: "Amazon", games: 154 },
+    { key: "nintendo", label: "Nintendo", games: 44 },
+    { key: "xbox", label: "Xbox", games: 38 },
+    { key: "ubisoft", label: "Ubisoft", games: 26 },
+    { key: "battlenet", label: "Battle.net", games: 9 },
+  ];
+
+  const ENRICHMENT_MATRIX = [
+    { service: "Store fetcher", provides: "Name, cover, genres, store URL, native price (where API offers it)", when: "During fetch_<store>.py", stores: "Each store only", output: "games_<store>.json fields" },
+    { service: "HowLongToBeat", provides: "Main / extra / completionist hours + match confidence", when: "enrich_hltb.py (opt-in; --skip-hltb is now the fetcher default)", stores: "All library fetchers + wishlist + itch", output: "hltb_* fields" },
+    { service: "Steam reviews", provides: "Review %, count, descriptor", when: "fetch_games.py, fetch_wishlist.py", stores: "Steam library + Steam wishlist only", output: "steam_review_* fields" },
+    { service: "enrich_steam_reviews.py", provides: "Same steam_review_* via Steam store title search", when: "Separate backfill (refresh.ps1 runs it on itch by default)", stores: "GOG, PSN, Epic, Amazon, Xbox, Battle.net, Ubisoft, Nintendo, itch (game-class only)", output: "Patches games_*.json in place" },
+    { service: "IsThereAnyDeal", provides: "Best current price anywhere, historical-low flag, deal link, per-row shop badge", when: "fetch_itad.py (needs ITAD_API_KEY)", stores: "Wishlist by default; --include-library widens to owned games", output: "itad_prices.json → merged on load" },
+    { service: "Cross-store images", provides: "Steam CDN cover art for matched non-Steam titles", when: "enrich_cross_store_images.py", stores: "GOG, PSN, Epic, Amazon, Xbox, Battle.net, Ubisoft, Nintendo, itch", output: "Patches header_image / library_image" },
+  ];
+
+  const FETCHERS = [
+    { fetcher: "fetch_games.py", client: "steam_client.py", writes: "games_steam.json", notes: "Owned library · playtime · Steam reviews · co-op flags" },
+    { fetcher: "fetch_gog.py", client: "gog_client.py", writes: "games_gog.json", notes: "Galaxy session · reviews via enrich_steam_reviews" },
+    { fetcher: "fetch_psn.py", client: "psn_client.py", writes: "games_psn.json", notes: "Trophies + playtime · reviews via enrich" },
+    { fetcher: "fetch_epic.py", client: "epic_client.py", writes: "games_epic.json", notes: "Entitlements + catalog · reviews via enrich" },
+    { fetcher: "fetch_amazon.py", client: "amazon_client.py", writes: "games_amazon.json", notes: "Prime Gaming local SQLite · reviews via enrich" },
+    { fetcher: "fetch_xbox.py", client: "xbox_client.py", writes: "games_xbox.json", notes: "OpenXBL title history · reviews via enrich" },
+    { fetcher: "fetch_battlenet.py", client: "battlenet_client.py", writes: "games_battlenet.json", notes: "account.battle.net cookie + XSRF · franchise → store URL" },
+    { fetcher: "fetch_ubisoft.py", client: "ubisoft_client.py", writes: "games_ubisoft.json", notes: "public-ubiservices ticket + session id · probes 4 endpoints" },
+    { fetcher: "fetch_nintendo.py", client: "nintendo_client.py", writes: "games_nintendo.json", notes: "ec.nintendo.com transactions API · digital only · last ~2yr only" },
+    { fetcher: "fetch_itch.py", client: "itch_client.py", writes: "games_itch.json", notes: "1,047 keys · 163 games + ~843 TTRPG zines · default-hide non-games" },
+    { fetcher: "fetch_wishlist.py", client: "steam_client.py", writes: "games_wishlist.json", notes: "Steam wishlist · reviews + price" },
+    { fetcher: "fetch_gog_wishlist.py", client: "gog_client.py", writes: "games_wishlist_gog.json", notes: "GOG_AL cookie shared with library" },
+    { fetcher: "fetch_epic_wishlist.py", client: "(direct)", writes: "games_wishlist_epic.json", notes: "EPIC_STORE_COOKIE storefront session" },
+    { fetcher: "fetch_psn_wishlist.py", client: "psn_client.py", writes: "games_wishlist_psn.json", notes: "metGetStoreWishlist GraphQL via NPSSO bearer (new)" },
+    { fetcher: "fetch_ubisoft_wishlist.py", client: "(direct)", writes: "games_wishlist_ubisoft.json", notes: "Reuses Ubisoft Playwright profile · SSR HTML parse (new)" },
+    { fetcher: "fetch_xbox_wishlist.py", client: "(direct)", writes: "games_wishlist_xbox.json", notes: "Reuses Xbox Store Playwright profile (new · verify output)" },
+    { fetcher: "fetch_itad.py", client: "itad_client.py", writes: "itad_prices.json", notes: "Cross-store best price · wishlist by default" },
+    { fetcher: "enrich_hltb.py", client: "(scraper)", writes: "(patches all games_*.json)", notes: "Opt-in HLTB enrichment on its own cadence" },
+    { fetcher: "enrich_steam_reviews.py", client: "steam_client.py", writes: "(patches games_*.json)", notes: "Backfill steam_review_* on non-Steam stores" },
+    { fetcher: "enrich_cross_store_images.py", client: "(scraper)", writes: "(patches games_*.json)", notes: "Steam CDN covers for matched non-Steam titles" },
+  ];
+
+  const GAME_FIELDS = [
+    { group: "Identity", fields: "store · id · appid · gog_id · psn_id · epic_catalog_id · amazon_id · itch_id", source: "Store fetcher" },
+    { group: "Display", fields: "name · header_image · library_image · release_date · type", source: "Store fetcher" },
+    { group: "Playtime", fields: "playtime_minutes · last_played · first_played · trophy_progress", source: "Steam or PSN API only" },
+    { group: "Scoring", fields: "steam_review_percent · steam_review_count · steam_review_desc", source: "Steam / wishlist fetch, or enrich_steam_reviews.py" },
+    { group: "Length", fields: "hltb_main_hours · hltb_main_extra_hours · hltb_completionist_hours · hltb_match_confidence", source: "enrich_hltb.py" },
+    { group: "Pricing", fields: "price · price_initial · discount_percent · currency", source: "Store API; ITAD overlays best deal on wishlist" },
+    { group: "Taxonomy", fields: "genres · tags (store) · personal tags (data/personal.json)", source: "Store metadata + you" },
+    { group: "Co-op", fields: "coop_online · coop_local", source: "Steam categories (parsed at fetch)" },
+    { group: "Linking", fields: "store_url (with storeUrlForGame fallbacks)", source: "Fetcher + dashboard" },
+  ];
+
+  const PERSONAL_FIELDS = [
+    { field: "status", values: "backlog · next · playing · unfinished · live · finished · skip", scope: "per game" },
+    { field: "priority", values: "0 – 5", scope: "per game" },
+    { field: "tags", values: "free-form personal tags (chip filterable)", scope: "per game" },
+    { field: "notes", values: "free text", scope: "per game" },
+    { field: "hltb_override", values: "manual hours when HLTB is wrong", scope: "per game" },
+    { field: "manual", values: "user-added games not present in any fetcher (Add Game flow)", scope: "global array" },
+    { field: "prefs", values: "active view · status/store/genre/tag filters · picks tab · sort orders · score column · deal filters · coop segmented mode · early-access toggle · cross-store dedup (session-only)", scope: "global" },
+  ];
+
+  const DATA_FLOW = [
+    { stage: "0. Auth / Connections", what: "auth/ package (registry · manager · runner · secrets) owns credentials for 12 providers. js/connections.js drives an in-app browser/OAuth/manual flow via /api/auth/*. Pasted keys + sniffed cookies + OAuth refresh tokens land in .env (or a DPAPI blob on Windows)." },
+    { stage: "1. Fetch", what: "Per-store Python scripts → games_<store>.json. Wishlist + itch.io live in their own corpora (separate tabs, not deduped into library). refresh.ps1 runs everything end-to-end with --skip-hltb on most fetchers for speed." },
+    { stage: "2. Enrich at fetch", what: "Steam reviews on Steam + Steam wishlist only. Co-op flags from Steam categories. HLTB is no longer fetch-time — moved to enrich_hltb.py opt-in." },
+    { stage: "2b. Enrich scripts", what: "enrich_hltb.py backfills hours. enrich_steam_reviews.py backfills reviews on GOG/PSN/Epic/Amazon/Xbox/BNet/Ubi/Nintendo/itch. enrich_cross_store_images.py grabs Steam CDN covers. fetch_itad.py writes cross-store deals." },
+    { stage: "3. Local server", what: "server.py (127.0.0.1:8765, SimpleHTTPRequestHandler). Owns data/personal.json (atomic writes + rotated backups in data/personal_backups/). Exposes /api/personal, /api/fetchers, /api/runs, /api/auth/*, POST /api/run/<key> (whitelisted from fetchers/manifest.json). Watchdog kills silent subprocesses." },
+    { stage: "4. Load", what: "index.html boots js/app.js (ESM modules: state · dom-util · memo · row-templates · table-query + worker · dashboard · personal-store · fetcher-health · connections · events). Fetches all games_*.json + itad_prices.json + /api/personal in parallel, then renders. Page styling in app.css." },
+    { stage: "5. Normalize", what: "normalizeGame() unifies fields; gameKey() = `${store}:${id}`. allGames / wishlistGames / itchGames are three separate arrays." },
+    { stage: "6. Dedupe", what: "Library + wishlist: recomputeCrossStoreHidden() hides duplicate titles using a primary-store priority, shows all owned-store badges on the surviving row. itch.io tab dedupes within-store only." },
+    { stage: "7. Personal", what: "personalStore reads /api/personal on boot, hydrates state.personal + state.manual + state.prefs, mirrors changes to localStorage for instant feel and PUTs to data/personal.json (debounced + sendBeacon on unload)." },
+    { stage: "8. Render", what: "Five views (Dashboard / Library / Wishlist / itch.io / Connections). Library/itch table is chunked progressive paint (first 50 rows sync, remainder rAF-batched). Dashboard reuses chart instances + replays animations on revisit." },
+  ];
+
+  // ---------- Wishlist matrix ----------
+  const WISHLIST_STORES = [
+    { name: "Steam", status: "done", auth: "Steam web API key + Steam ID", output: "games_wishlist.json", notes: "IWishlistService/GetWishlist; profile + wishlist must be public." },
+    { name: "PSN", status: "done", auth: "PSN_NPSSO token (same as library fetch)", output: "games_wishlist_psn.json", notes: "metGetStoreWishlist GraphQL on m.np.playstation.com via psnawp bearer. Reuses the NPSSO already connected on the Connections page." },
+    { name: "GOG", status: "done", auth: "GOG_AL session cookie", output: "games_wishlist_gog.json", notes: "embed.gog.com user/wishlist.json + public api.gog.com product & price endpoints. Connections page reconnects via Playwright when cookie expires (default 14d)." },
+    { name: "Epic", status: "done", auth: "EPIC_STORE_COOKIE (storefront session cookie)", output: "games_wishlist_epic.json", notes: "www.epicgames.com/graphql with the user's storefront session cookie. Storefront sits behind separate auth from the launcher OAuth used for the library." },
+    { name: "Ubisoft", status: "done", auth: "Shared cache/auth/profiles/ubisoft Playwright profile", output: "games_wishlist_ubisoft.json", notes: "store.ubisoft.com is SSR HTML, not the library API. Reuses the saved browser profile + parses product tiles. --include-dlc keeps skin/currency packs." },
+    { name: "Xbox", status: "blocked", auth: "Shared cache/auth/profiles/xbox_wishlist Playwright profile", output: "games_wishlist_xbox.json", notes: "Both Xbox paths under active debug — library fetcher + wishlist fetcher. Wishlist currently writes an empty array; need to determine whether it's a confirmed-empty wishlist on the account or the fetcher walks the wrong selector. Library fetcher (fetch_xbox.py via OpenXBL) also in scope." },
+    { name: "itch.io", status: "blocked", auth: "itch session cookie", output: "—", notes: "Collections/Following acts as wishlist; only available as HTML scraping. Fragile." },
+    { name: "Nintendo", status: "skip", auth: "—", output: "—", notes: "eShop has no first-class wishlist; the 'My Nintendo wishlist' page is HTML-only and shallow." },
+    { name: "Amazon Games", status: "skip", auth: "—", output: "—", notes: "Prime Gaming has no wishlist concept." },
+    { name: "Battle.net", status: "skip", auth: "—", output: "—", notes: "Blizzard shop has no wishlist." },
+  ];
+
+  // ---------- Monetization sketch ----------
+  const MONETIZE_OPTIONS = [
+    { name: "OSS + paid hosted sync ('BAKLOG Cloud')", pro: "Lowest legal exposure. Recurring MRR. Aligns with how Steam-collectors actually behave (multi-PC).", con: "Cheapest-to-build = personal.json sync. Hard to charge much. Modest revenue ceiling.", verdict: "Most defensible." },
+    { name: "One-time paid installable app", pro: "Cleanest UX. No login. Familiar buy-once model.", con: "Distribution friction (Windows installers, code signing). No recurring revenue. Cross-platform packaging burden.", verdict: "Higher upfront, lower compounding." },
+    { name: "Affiliate-only (free forever)", pro: "Free is the best growth channel. ITAD-style affiliate fits the deal-radar value prop natively.", con: "Revenue dependent on traffic. Affiliate rates are low. Hard to predict.", verdict: "Best if you don't want to operate a business." },
+    { name: "Hybrid: free local + paid hosted + affiliate links everywhere", pro: "Captures everyone. Local users contribute affiliate revenue; cloud users pay subscription.", con: "Two products to maintain. Affiliate ethics need a disclosure pass.", verdict: "Most ambitious; most operational overhead." },
+  ];
+
+  // ---------- State (localStorage) ----------
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.v !== 1) return defaultState();
+      return parsed;
+    } catch {
+      return defaultState();
+    }
+  }
+  function defaultState() {
+    return { v: 1, items: {}, decisions: {}, pageNotes: {}, activeTab: "now" };
+  }
+  let state = loadState();
+  function saveState() {
+    try {
+      state.ts = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (err) {
+      console.warn("[tracker] save failed", err);
+    }
+  }
+  function setItem(id, checked) { state.items[id] = { checked: !!checked }; saveState(); }
+  function getItem(id) { return state.items[id]?.checked === true; }
+  function setDecision(id, decision) {
+    const cur = state.decisions[id] || {};
+    state.decisions[id] = { ...cur, decision };
+    saveState();
+  }
+  function setDecisionNote(id, notes) {
+    const cur = state.decisions[id] || {};
+    state.decisions[id] = { ...cur, notes };
+    saveState();
+  }
+  function getDecision(id) { return state.decisions[id] || {}; }
+  function setPageNote(key, value) { state.pageNotes[key] = value; saveState(); }
+  function getPageNote(key) { return state.pageNotes[key] || ""; }
+
+  // ---------- DOM helpers ----------
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") node.className = v;
+      else if (k === "html") node.innerHTML = v;
+      else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (v !== undefined && v !== null) node.setAttribute(k, v);
+    }
+    for (const c of children) {
+      if (c == null) continue;
+      if (Array.isArray(c)) c.forEach((x) => node.appendChild(x.nodeType ? x : document.createTextNode(String(x))));
+      else node.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
+    }
+    return node;
+  }
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function toast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(t._tid);
+    t._tid = setTimeout(() => t.classList.remove("show"), 1800);
+  }
+
+  // ---------- Render: Tab bar ----------
+  function renderTabBar() {
+    const bar = document.getElementById("tabbar");
+    bar.innerHTML = "";
+    for (const t of TABS) {
+      const b = el("button", { type: "button", class: "tab" + (t.id === state.activeTab ? " active" : ""), "data-tab": t.id, onClick: () => activateTab(t.id) }, t.label);
+      bar.appendChild(b);
+    }
+  }
+  function activateTab(id) {
+    state.activeTab = id;
+    saveState();
+    renderTabBar();
+    document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === "panel-" + id));
+  }
+
+  // ---------- Checkbox row ----------
+  function checkboxRow(id, label) {
+    const cb = el("input", { type: "checkbox", id });
+    cb.checked = getItem(id);
+    cb.addEventListener("change", () => setItem(id, cb.checked));
+    return el("div", { class: "check-row" }, cb, el("label", { for: id, html: label }));
+  }
+
+  // ---------- Render: Now ----------
+  function panelNow() {
+    const p1 = PHASES[0];
+    const done = p1.items.filter((i) => getItem(i.id)).length;
+    const total = p1.items.length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const shipped = [
+      "Co-op filter rebuilt as a 5-state segmented control (Off · Any · Online · Couch · Both).",
+      "Hide-duplicates control now visible on Library AND Wishlist tabs (was Library-only).",
+      "Connections page got a How-to disclosure + manual cards collapsed into one row.",
+      "Dashboard spotlight no longer flickers on revisit (compositor layer fix).",
+      "Library/itch table now uses true viewport windowing (Phase C) — ~60 DOM rows for a 1700+ row library, drill-in/A–Z jump by scroll position, deferred cover hydration, back-to-top docked to alpha rail.",
+      "BAKLOG logo + brand mark in the header.",
+      "Three new wishlist fetchers: PSN, Ubisoft, Xbox.",
+      "Full out-of-repo project backup taken; main pushed to origin.",
+      "GitHub Actions CI: ruff (advisory) + pytest (112) + vitest (59) on every push/PR.",
+      "Atomic write + rotated backups for every games_*.json and itad_prices.json — a killed fetcher or bad run can no longer corrupt or wipe fetched data.",
+      "Filter state moved to state.sessionPrefs as the single source of truth — DOM mirrors state, ~12 hand-rolled DOM reads collapsed into one helper.",
+      "?debug=1 overlay: corner panel with view, data version, visible rows, active filter count, table fingerprint, last render ms.",
+      "Global error toast — uncaught throws and unhandled promise rejections now surface as a sticky red toast (Copy / Details / Dismiss) instead of dying in the console.",
+      "Price column polish: discount text follows the deal-cut palette (emerald → emerald/amber → amber/red/pink) so 50%+ and 75%+ cuts read at a glance; the all-time / 1yr / generic-low badge collapsed into a small amber star to the LEFT of the price (outside the deal <a>, default cursor, no underline, tooltip preserved) — mirrors the dashboard steals row so users learn one shape.",
+      "Column header sort regression fixed — paintVirtualSlice was short-circuiting whenever the visible window indices matched, even after a resort handed it the same indices over a freshly-sorted list. Added _virtualWindowList identity check so the early-return only fires when the LIST is also the same; small lists / one-shot paints were unaffected. Filed find_virtual_window_cache_stale so the audit learns the pattern.",
+      "Library junk-name filter expanded to drop HBO Max + HBO GO (PSN reports them as type=game). Filter runs on load in dedupeWithinStore → isJunkEntry, so a re-fetch of games_psn.json can't reintroduce them.",
+    ];
+    const blockers = [
+      "Verify fetch_xbox_wishlist.py actually writes rows (current output is 0 KB).",
+      "Audit walk-through still pending — most Architecture findings are now resolved post-refactor; triage what's left.",
+    ];
+    const next = [
+      "Open the Audit findings tab. Triage each finding (accept / reject / defer).",
+      "Pick the first three Accepted findings — those become focused Phase 2 plans.",
+      "Decide whether to declare feature freeze for the audit window.",
+    ];
+    return el("section", { id: "panel-now", class: "panel" + (state.activeTab === "now" ? " active" : "") },
+      el("div", { class: "card-row" },
+        el("h1", {}, "Phase 1 — Stabilize"),
+        el("div", {}, el("span", { class: "pill pill-info" }, `${done} / ${total} · ${pct}%`)),
+      ),
+      el("p", {}, p1.tagline),
+      el("div", { class: "grid-3" },
+        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, String(shipped.length)), el("div", { class: "stat-label" }, "Just shipped")),
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(next.length)), el("div", { class: "stat-label" }, "Up next")),
+        el("div", { class: "stat" + (blockers.length ? " stat-warning" : "") }, el("div", { class: "stat-value" }, String(blockers.length)), el("div", { class: "stat-label" }, "Blockers")),
+      ),
+      el("h3", {}, "Just shipped"),
+      el("div", { class: "card" }, ...shipped.map((s) => el("div", { class: "check-row" }, el("input", { type: "checkbox", checked: "checked", disabled: "disabled" }), el("label", {}, s)))),
+      el("h3", {}, "Up next"),
+      el("div", { class: "card" }, ...next.map((s, i) => checkboxRow("now_next_" + i, escapeHtml(s)))),
+      el("h3", {}, "Blockers"),
+      blockers.length
+        ? el("div", { class: "card" }, ...blockers.map((s, i) => checkboxRow("now_block_" + i, escapeHtml(s))))
+        : el("div", { class: "card" }, el("p", { class: "muted" }, "No blockers.")),
+    );
+  }
+
+  // ---------- Render: Phases ----------
+  function panelPhases() {
+    const items = PHASES.map((phase, idx) => {
+      const done = phase.items.filter((i) => getItem(i.id)).length;
+      const total = phase.items.length;
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      const summary = el("summary", {},
+        el("span", { class: "phase-title" }, phase.title),
+        el("span", { class: "phase-status" },
+          el("span", {}, `${done}/${total}`),
+          el("span", { class: "progress-bar" }, el("span", { class: "progress-fill", style: `width:${pct}%` })),
+        ),
+      );
+      const body = el("div", {},
+        el("p", { class: "muted" }, phase.tagline),
+        ...phase.items.map((i) => checkboxRow(i.id, escapeHtml(i.label))),
+      );
+      return el("details", { class: "phase", ...(idx === 0 ? { open: "open" } : {}) }, summary, body);
+    });
+    return el("section", { id: "panel-phases", class: "panel" + (state.activeTab === "phases" ? " active" : "") },
+      el("h1", {}, "Phases"),
+      el("p", { class: "muted" }, "Five phases from where you are today to launch. Phase 1 is current; the others are seeded with concrete items — fill in / re-order as you go."),
+      ...items,
+    );
+  }
+
+  // ---------- Render: Architecture ----------
+  function panelArch() {
+    const totalLib = STORE_BREAKDOWN.reduce((s, x) => s + x.games, 0);
+
+    // Static SVG store flow (positions baked in)
+    const flowSvg = `
+      <svg class="flow" viewBox="0 0 1000 540" width="100%" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arr-fwd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8" /></marker>
+        </defs>
+        <!-- Library group -->
+        <rect x="40" y="20" width="920" height="180" rx="10" fill="#1e293b" stroke="#475569" />
+        <text x="56" y="40" fill="#94a3b8" font-size="10" font-weight="700" letter-spacing="0.05em">LIBRARY · 10 SOURCES</text>
+        ${[
+          { x: 56, y: 56, label: "Steam library", color: "#D9521B" },
+          { x: 240, y: 56, label: "GOG", color: "#9d4edd" },
+          { x: 424, y: 56, label: "PlayStation", color: "#0070D1" },
+          { x: 608, y: 56, label: "Epic", color: "#cbd5e1" },
+          { x: 792, y: 56, label: "Amazon", color: "#FF9900" },
+          { x: 56, y: 130, label: "Xbox · Game Pass", color: "#107C10" },
+          { x: 240, y: 130, label: "Battle.net", color: "#148EFF" },
+          { x: 424, y: 130, label: "Ubisoft Connect", color: "#FFD200" },
+          { x: 608, y: 130, label: "Nintendo Switch", color: "#E60012" },
+          { x: 792, y: 130, label: "itch.io (quarantined)", color: "#FF2449" },
+        ].map(c => `
+          <g>
+            <rect x="${c.x}" y="${c.y}" width="160" height="56" rx="6" fill="#334155" stroke="#475569" />
+            <rect x="${c.x}" y="${c.y}" width="4" height="56" rx="1" fill="${c.color}" />
+            <text x="${c.x + 12}" y="${c.y + 22}" fill="#e2e8f0" font-size="12" font-weight="600">${c.label}</text>
+            <text x="${c.x + 12}" y="${c.y + 40}" fill="#94a3b8" font-size="10">games_${c.label.toLowerCase().split(/[ .·]/)[0]}.json</text>
+          </g>
+        `).join("")}
+
+        <!-- Wishlist group -->
+        <rect x="40" y="220" width="600" height="100" rx="10" fill="#1e293b" stroke="#475569" />
+        <text x="56" y="240" fill="#94a3b8" font-size="10" font-weight="700" letter-spacing="0.05em">WISHLIST · 6 SOURCES</text>
+        ${["Steam", "GOG", "Epic", "PSN", "Ubisoft", "Xbox"].map((label, i) => {
+          const x = 56 + i * 98; const y = 254;
+          return `<g><rect x="${x}" y="${y}" width="86" height="50" rx="6" fill="#334155" stroke="#475569" /><text x="${x + 8}" y="${y + 20}" fill="#e2e8f0" font-size="11" font-weight="600">${label}</text><text x="${x + 8}" y="${y + 36}" fill="#94a3b8" font-size="9">wishlist</text></g>`;
+        }).join("")}
+
+        <!-- Itch already quarantined inside library group; this slot for ITAD -->
+        <rect x="660" y="220" width="300" height="100" rx="10" fill="#1e293b" stroke="#475569" />
+        <text x="676" y="240" fill="#94a3b8" font-size="10" font-weight="700" letter-spacing="0.05em">CROSS-STORE PRICING</text>
+        <g><rect x="676" y="254" width="268" height="50" rx="6" fill="#334155" stroke="#22d3ee" /><text x="688" y="274" fill="#e2e8f0" font-size="12" font-weight="600">IsThereAnyDeal</text><text x="688" y="292" fill="#94a3b8" font-size="10">itad_prices.json · wishlist overlay</text></g>
+
+        <!-- Server -->
+        <rect x="300" y="360" width="400" height="60" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+        <text x="500" y="384" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">server.py · 127.0.0.1:8765</text>
+        <text x="500" y="404" fill="#94a3b8" font-size="11" text-anchor="middle">/api/personal · /api/auth · /api/run + watchdog</text>
+
+        <!-- Dashboard -->
+        <rect x="220" y="450" width="560" height="68" rx="8" fill="#0f172a" stroke="#38bdf8" />
+        <text x="500" y="476" fill="#e2e8f0" font-size="14" font-weight="700" text-anchor="middle">index.html · js/app.js · ESM modules</text>
+        <text x="500" y="495" fill="#94a3b8" font-size="11" text-anchor="middle">dashboard · library · wishlist · itch · connections</text>
+
+        <!-- Connectors: groups → server -->
+        <line x1="500" y1="200" x2="500" y2="360" stroke="#475569" stroke-dasharray="4 3" marker-end="url(#arr-fwd)" />
+        <line x1="340" y1="320" x2="430" y2="360" stroke="#475569" stroke-dasharray="4 3" marker-end="url(#arr-fwd)" />
+        <line x1="810" y1="320" x2="600" y2="360" stroke="#475569" stroke-dasharray="4 3" marker-end="url(#arr-fwd)" />
+        <line x1="500" y1="420" x2="500" y2="450" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arr-fwd)" />
+      </svg>
+    `;
+
+    return el("section", { id: "panel-arch", class: "panel" + (state.activeTab === "arch" ? " active" : "") },
+      el("h1", {}, "Steam Backlog · Data Architecture"),
+      el("p", {}, "Local multi-store game library dashboard. The ", el("strong", {}, "auth/"), " package owns credentials for 12 providers and feeds the in-app ", el("strong", {}, "Connections"), " page. Python fetchers write per-store JSON; enrichment layers add hours, reviews, deals. ", el("strong", {}, "js/app.js"), " (ESM orchestrator + modules; styling in app.css) merges everything with personal state owned by ", el("strong", {}, "server.py"), " in ", el("strong", {}, "data/personal.json"), ", mirrored to localStorage."),
+
+      el("div", { class: "grid-5" },
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, totalLib.toLocaleString()), el("div", { class: "stat-label" }, "Library rows")),
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, "~1,700"), el("div", { class: "stat-label" }, "After dedup")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, "6"), el("div", { class: "stat-label" }, "Wishlist sources")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, "163 / 1,047"), el("div", { class: "stat-label" }, "Itch games / keys")),
+        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, "10"), el("div", { class: "stat-label" }, "Library sources live")),
+      ),
+
+      el("h2", {}, "Library composition"),
+      el("p", { class: "muted" }, `${totalLib.toLocaleString()} owned rows across ${STORE_BREAKDOWN.length} stores. Nintendo covers only ~2 years of digital eShop history; older purchases and cartridges are added manually.`),
+      el("div", { class: "card" }, tableEl(["Store", "Games"], STORE_BREAKDOWN.map((s) => [s.label, s.games.toLocaleString()]))),
+
+      el("h2", {}, "Data flow"),
+      el("div", { class: "card", html: flowSvg }),
+      el("p", { class: "muted" }, "Diagram simplifies the actual wiring — see the table below for stage detail."),
+      el("div", { class: "card" }, tableEl(["Stage", "What happens"], DATA_FLOW.map((d) => [d.stage, d.what]))),
+
+      el("h2", {}, "Who services what"),
+      el("p", { class: "muted" }, "Enrichment is not one service — each layer owns different fields and store coverage."),
+      el("div", { class: "card" }, tableEl(["Service", "Provides", "When", "Stores", "Output"], ENRICHMENT_MATRIX.map((r) => [r.service, r.provides, r.when, r.stores, r.output]))),
+
+      el("h2", {}, "Fetchers & scripts"),
+      el("div", { class: "card" }, tableEl(["Script", "Client", "Output", "Notes"], FETCHERS.map((f) => [codeText(f.fetcher), codeText(f.client), codeText(f.writes), f.notes]))),
+
+      el("h2", {}, "Game record schema"),
+      el("div", { class: "grid-2" }, ...GAME_FIELDS.map((g) => el("div", { class: "field-card" },
+        el("div", { class: "field-head" }, el("span", { class: "field-name" }, g.group), el("span", { class: "pill pill-info" }, g.source)),
+        el("div", { class: "field-body" }, g.fields),
+      ))),
+
+      el("h2", {}, "Personal state (data/personal.json)"),
+      el("div", { class: "card" }, tableEl(["Field", "Values", "Scope"], PERSONAL_FIELDS.map((p) => [codeText(p.field), p.values, p.scope]))),
+    );
+  }
+
+  function codeText(s) { return el("code", {}, s); }
+  function tableEl(headers, rows) {
+    const t = el("table");
+    const thead = el("thead", {}, el("tr", {}, ...headers.map((h) => el("th", {}, h))));
+    const tbody = el("tbody");
+    for (const r of rows) {
+      const tr = el("tr");
+      for (const cell of r) {
+        const td = el("td");
+        if (cell && cell.nodeType) td.appendChild(cell);
+        else td.textContent = cell == null ? "" : String(cell);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    t.appendChild(thead);
+    t.appendChild(tbody);
+    return t;
+  }
+
+  // ---------- Render: Pipeline ----------
+  function panelPipeline() {
+    const STORE_ROWS = [
+      { store: "Steam", fetcher: "fetch_games.py", auth: "API key + SteamID64", output: "games_steam.json" },
+      { store: "GOG", fetcher: "fetch_gog.py", auth: "GOG_AL cookie", output: "games_gog.json" },
+      { store: "PSN", fetcher: "fetch_psn.py", auth: "NPSSO token", output: "games_psn.json" },
+      { store: "Epic", fetcher: "fetch_epic.py", auth: "OAuth refresh token", output: "games_epic.json" },
+      { store: "Amazon", fetcher: "fetch_amazon.py", auth: "Local SQLite (DPAPI)", output: "games_amazon.json" },
+      { store: "Xbox", fetcher: "fetch_xbox.py", auth: "OpenXBL API key", output: "games_xbox.json" },
+      { store: "Battle.net", fetcher: "fetch_battlenet.py", auth: "Session cookie + XSRF", output: "games_battlenet.json" },
+      { store: "Ubisoft", fetcher: "fetch_ubisoft.py", auth: "Ubi-SessionId + auth", output: "games_ubisoft.json" },
+      { store: "Nintendo", fetcher: "fetch_nintendo.py", auth: "Transactions cookie", output: "games_nintendo.json" },
+      { store: "itch.io", fetcher: "fetch_itch.py", auth: "API key", output: "games_itch.json" },
+      { store: "Steam (wishlist)", fetcher: "fetch_wishlist.py", auth: "API key + SteamID64", output: "games_wishlist.json" },
+      { store: "GOG (wishlist)", fetcher: "fetch_gog_wishlist.py", auth: "GOG_AL cookie", output: "games_wishlist_gog.json" },
+      { store: "Epic (wishlist)", fetcher: "fetch_epic_wishlist.py", auth: "EPIC_STORE_COOKIE", output: "games_wishlist_epic.json" },
+      { store: "PSN (wishlist)", fetcher: "fetch_psn_wishlist.py", auth: "NPSSO token (shared)", output: "games_wishlist_psn.json" },
+      { store: "Ubisoft (wishlist)", fetcher: "fetch_ubisoft_wishlist.py", auth: "Playwright profile", output: "games_wishlist_ubisoft.json" },
+      { store: "Xbox (wishlist)", fetcher: "fetch_xbox_wishlist.py", auth: "Playwright profile", output: "games_wishlist_xbox.json" },
+    ];
+
+    return el("section", { id: "panel-pipeline", class: "panel" + (state.activeTab === "pipeline" ? " active" : "") },
+      el("h1", {}, "Data pipeline"),
+      el("p", {}, "End-to-end flow from each store's API down to the local dashboard. The ", el("strong", {}, "auth/"), " package sits in front of every fetcher: ", codeText("auth/registry.py"), " declares 12 providers (env keys, expiry, success URL pattern, which fetchers each unlocks) and ", codeText("auth/runner.py"), " drives a Playwright flow from the Connections page to harvest cookies / API keys into ", codeText(".env"), "."),
+      el("p", {}, el("strong", {}, "Steam review %"), " is the single rating signal across all stores — Metacritic was removed in favor of one consistent score."),
+      el("p", {}, el("strong", {}, "server.py"), " sits between the dashboard and disk: it owns ", codeText("data/personal.json"), " (atomic writes + rotated backups), brokers ", codeText("/api/auth/*"), ", and queues fetcher subprocesses on demand from the whitelist in ", codeText("fetchers/manifest.json"), " with a watchdog that kills silent runs."),
+
+      el("h2", {}, "Per-store fetchers"),
+      el("div", { class: "card" }, tableEl(["Store", "Fetcher", "Auth", "Output file"], STORE_ROWS.map((s) => [
+        el("strong", {}, s.store), codeText(s.fetcher), s.auth, codeText(s.output),
+      ]))),
+
+      el("h2", {}, "Rating signal"),
+      el("div", { class: "card" },
+        el("div", { class: "card-row" }, el("strong", {}, "Single source of truth"), el("span", { class: "pill pill-success" }, "Steam %")),
+        el("p", {}, "Every row's rating comes from ", codeText("steam_review_percent"), ". For non-Steam libraries the value is backfilled by ", codeText("enrich_steam_reviews.py"), ", which searches Steam's store for a title match and copies the percent-positive + review count."),
+        el("p", { class: "muted" }, "Why not Metacritic / OpenCritic? Steam only surfaces Metacritic when the publisher provides it (~10% coverage). OpenCritic's API now requires RapidAPI. Two scores side-by-side doubled as a misleading signal. One rating, applied consistently, is honest."),
+      ),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Run order"),
+        el("div", { class: "callout-body" }, "A full refresh runs ", codeText("fetch_<store>.py"), " per source (with ", codeText("--skip-hltb"), " for speed), then ", codeText("enrich_steam_reviews.py --stores itch"), " to backfill ratings on indie titles, then the wishlist fetchers, then ", codeText("fetch_itad.py"), ", then ", codeText("enrich_cross_store_images.py"), ". The included ", codeText("refresh.ps1"), " does this end-to-end. HLTB enrichment runs separately via ", codeText("enrich_hltb.py"), " on its own cadence."),
+      ),
+
+      el("div", { class: "callout success" },
+        el("div", { class: "callout-title" }, "In-app refresh"),
+        el("div", { class: "callout-body" }, "Each fetcher in ", codeText("fetchers/manifest.json"), " shows up as a chip on the dashboard's fetcher-health strip. Clicking a chip posts ", codeText("/api/run/<key>"), " to ", codeText("server.py"), ", which spawns the script as a subprocess and tracks state via ", codeText("/api/runs"), ". A server-side watchdog kills runs that go silent; cancel falls back to ", codeText("taskkill /F"), " on Windows. The corresponding ", codeText("games_*.json"), " hot-reloads on success."),
+      ),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Connections page — in-app credential management"),
+        el("div", { class: "callout-body" }, codeText("js/connections.js"), " drives ", codeText("/api/auth/*"), ". Each of the 12 providers in ", codeText("auth/registry.py"), " declares its kind: ", el("strong", {}, "browser"), " (Steam, GOG, PSN, Epic storefront, Xbox, Battle.net, Nintendo, Ubisoft), ", el("strong", {}, "oauth"), " (Epic launcher: refresh token), ", el("strong", {}, "local"), " (Amazon: local SQLite), or ", el("strong", {}, "manual"), " (itch.io + ITAD: paste API key). Status chips: connected / unverified / expired / disconnected, with last-fetcher-failure surfaced as Session expired."),
+      ),
+    );
+  }
+
+  // ---------- Render: Wishlist matrix ----------
+  function panelWishlist() {
+    const done = WISHLIST_STORES.filter((s) => s.status === "done").length;
+    const inProg = WISHLIST_STORES.filter((s) => s.status === "in-progress").length;
+    const blocked = WISHLIST_STORES.filter((s) => s.status === "blocked").length;
+    const skip = WISHLIST_STORES.filter((s) => s.status === "skip").length;
+
+    const statusPill = (status) => {
+      const tone = status === "done" ? "success" : status === "in-progress" ? "info" : status === "blocked" ? "warning" : "neutral";
+      const label = status === "done" ? "Done" : status === "in-progress" ? "In progress" : status === "blocked" ? "Blocked" : "Skip";
+      return el("span", { class: "pill pill-" + tone }, label);
+    };
+
+    return el("section", { id: "panel-wishlist", class: "panel" + (state.activeTab === "wishlist" ? " active" : "") },
+      el("h1", {}, "Wishlist integrations"),
+      el("p", {}, "Multi-store deal radar. Each integrated store writes a ", codeText("games_wishlist_<store>.json"), " file that the dashboard merges into the Wishlist tab and the dashboard deal cards (Today's Top Deal hero, Sale Scoreboard, Steals Waiting). All live integrations ride the shared ", codeText("auth/"), " runner — cookies sniffed via Playwright; Ubisoft and Xbox skip the cookie and reuse saved Playwright profiles."),
+
+      el("div", { class: "grid-4" },
+        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, String(done)), el("div", { class: "stat-label" }, "Done")),
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(inProg)), el("div", { class: "stat-label" }, "In progress")),
+        el("div", { class: "stat stat-warning" }, el("div", { class: "stat-value" }, String(blocked)), el("div", { class: "stat-label" }, "Blocked")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(skip)), el("div", { class: "stat-label" }, "Skip")),
+      ),
+
+      el("h2", {}, "Per-store status"),
+      el("div", { class: "card" }, tableEl(["Store", "Status", "Auth", "Output", "Notes"], WISHLIST_STORES.map((s) => [
+        el("strong", {}, s.name),
+        statusPill(s.status),
+        s.auth,
+        s.output === "—" ? el("span", { class: "faint" }, "—") : codeText(s.output),
+        s.notes,
+      ]))),
+
+      el("h2", {}, "Ubisoft wishlist — landed"),
+      el("div", { class: "card" },
+        el("div", { class: "card-row" }, el("strong", {}, "store.ubisoft.com (SSR HTML, not the library API)")),
+        el("p", {}, "Initial assumption was that the existing ", codeText("UbisoftClient"), " on ", codeText("ubiservices.ubi.com"), " could reach a 'Want to play' endpoint. Probing the live wishlist URL with Playwright showed otherwise: the storefront is Salesforce Commerce Cloud behind a separate ", codeText("dwsid"), " session cookie, and the wishlist page makes ", el("strong", {}, "no XHR call"), " — items are server-rendered into the HTML."),
+        el("p", { class: "muted" }, "Solution: reuse the existing browser profile at ", codeText("cache/auth/profiles/ubisoft"), " (already saved by the Connections page on Ubisoft Connect sign-in). One headless page load yields the rendered wishlist; parser keys off the outer ", codeText("product-tile wishlist-product-tile"), " card class and pairs each tile with its inline ", codeText("var product = {…}"), " JSON blob. A ", codeText("--include-dlc"), " flag keeps skin/currency packs; default drops them."),
+      ),
+
+      el("h2", {}, "Xbox — both paths blocked"),
+      el("div", { class: "card" },
+        el("p", {}, codeText("fetch_xbox_wishlist.py"), " mirrors the Ubisoft approach: reuse the Xbox Store Playwright profile at ", codeText("cache/auth/profiles/xbox_wishlist"), " and parse the rendered wishlist page. ", el("strong", {}, "Current output is 0 KB"), " — unclear whether the wishlist is genuinely empty on the account or the fetcher walks the wrong selector."),
+        el("p", { class: "muted" }, "The library path (", codeText("fetch_xbox.py"), " via OpenXBL) is also under active debug. Both Xbox paths are currently the blocker keeping the wishlist matrix from full green."),
+      ),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "How the dashboard merges these"),
+        el("div", { class: "callout-body" }, "Each fetcher writes ", codeText("games_wishlist_<store>.json"), " with the shared schema. ", codeText("loadGames()"), " in ", codeText("js/app.js"), " reads them all into ", codeText("state.wishlistGames"), " tagged with ", codeText("wishlist_store"), ". On the Wishlist tab the per-row badge is the source-store badge; the tab itself signals the row is a wishlist entry. Cross-store dedup applies on the wishlist too — the Hide-duplicates toggle in the Filters sidebar consolidates the same title across multiple wishlists."),
+      ),
+
+      el("div", { class: "callout success" },
+        el("div", { class: "callout-title" }, "Cross-store deals via ITAD"),
+        el("div", { class: "callout-body" }, codeText("fetch_itad.py"), " overlays the best price ", el("strong", {}, "anywhere"), " (not just the wishlisted store). The dashboard's Today's Top Deal hero ranks by deal score; the Sale Scoreboard groups deals into Light / Medium / Deep / Huge bands; the Steals Waiting card decorates each row with a colored store badge — Steam · GOG · Humble · GMG · Fanatical · Microsoft · Epic · Ubisoft · Battle.net · Nintendo · PSN · IndieGala · GamersGate · GamesPlanet. ", codeText("getDealInfo()"), " falls back to the native Steam price if no ITAD row exists."),
+      ),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Epic wishlist — resolved via storefront cookie"),
+        el("div", { class: "callout-body" }, codeText("graphql.epicgames.com"), " was discontinued. Epic now hits ", codeText("www.epicgames.com/graphql"), " with the user's storefront session cookie in ", codeText("EPIC_STORE_COOKIE"), " — same separate-auth-context pattern as GOG (storefront vs library). Ubisoft and Xbox went further and skip the cookie entirely, reusing the saved Playwright profile."),
+      ),
+    );
+  }
+
+  // ---------- Render: Findings ----------
+  function findingBlock(f) {
+    const dec = getDecision(f.id);
+    const wrap = el("div", { class: "finding" + (dec.decision === "done" ? " is-done" : "") });
+    wrap.appendChild(el("div", { class: "finding-head" },
+      el("div", { class: "finding-title" }, el("span", { class: "sev sev-" + f.severity }), f.title),
+      el("div", { class: "finding-meta" },
+        el("span", { class: "pill pill-neutral" }, f.area),
+        el("span", { class: "pill pill-" + (f.severity === "red" ? "danger" : f.severity === "amber" ? "warning" : "neutral") }, f.severity.toUpperCase()),
+      ),
+    ));
+    wrap.appendChild(el("div", { class: "finding-body" }, f.body));
+    const decide = el("div", { class: "finding-decide" });
+    const makeBtn = (label, value, cls) => {
+      const b = el("button", { type: "button", class: cls + (dec.decision === value ? " active" : "") }, label);
+      b.addEventListener("click", () => { setDecision(f.id, dec.decision === value ? null : value); renderActive(); });
+      return b;
+    };
+    decide.appendChild(makeBtn("Accept", "accept", "accept"));
+    decide.appendChild(makeBtn("Defer", "defer", "defer"));
+    decide.appendChild(makeBtn("Reject", "reject", "reject"));
+    decide.appendChild(makeBtn("Done", "done", "done"));
+    wrap.appendChild(decide);
+    const notes = el("textarea", { class: "finding-notes", placeholder: "Notes…" });
+    notes.value = dec.notes || "";
+    notes.addEventListener("input", () => setDecisionNote(f.id, notes.value));
+    wrap.appendChild(notes);
+    return wrap;
+  }
+
+  function panelFindings() {
+    const groups = {
+      Arch: FINDINGS.filter((f) => f.area === "Arch"),
+      UX: FINDINGS.filter((f) => f.area === "UX"),
+      Debug: FINDINGS.filter((f) => f.area === "Debug"),
+    };
+    const findingIds = new Set(FINDINGS.map((f) => f.id));
+    const findingDecisions = Object.entries(state.decisions).filter(([id]) => findingIds.has(id)).map(([, d]) => d);
+    const triaged = findingDecisions.filter((d) => d.decision === "accept" || d.decision === "reject" || d.decision === "defer" || d.decision === "done").length;
+    const doneCount = findingDecisions.filter((d) => d.decision === "done").length;
+    return el("section", { id: "panel-findings", class: "panel" + (state.activeTab === "findings" ? " active" : "") },
+      el("div", { class: "card-row" },
+        el("h1", {}, "Audit findings"),
+        el("span", { class: "pill pill-info" }, `${triaged} / ${FINDINGS.length} triaged`),
+        el("span", { class: "pill pill-success" }, `${doneCount} done`),
+      ),
+      el("p", {}, "First-pass senior-eye findings. Each item gets one of four calls: ", el("strong", {}, "Accept"), " (worth a focused follow-up plan), ", el("strong", {}, "Defer"), " (later, not now), ", el("strong", {}, "Reject"), " (won't do — explain why in notes), ", el("strong", {}, "Done"), " (shipped — clears the card)."),
+      el("div", { class: "legend" },
+        el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--red)" }), "Red — fix before launch"),
+        el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--amber)" }), "Amber — worth doing"),
+        el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--grey)" }), "Grey — nice to have"),
+      ),
+      el("h3", {}, `Architecture (${groups.Arch.length})`),
+      el("div", {}, ...groups.Arch.map(findingBlock)),
+      el("h3", {}, `User experience (${groups.UX.length})`),
+      el("div", {}, ...groups.UX.map(findingBlock)),
+      el("h3", {}, `Debug refactor (${groups.Debug.length})`),
+      el("div", {}, ...groups.Debug.map(findingBlock)),
+    );
+  }
+
+  // ---------- Render: Blind spots ----------
+  function panelBlindspots() {
+    const decided = BLINDSPOTS.filter((b) => {
+      const d = state.decisions[b.id];
+      return d && d.decision;
+    }).length;
+    return el("section", { id: "panel-blindspots", class: "panel" + (state.activeTab === "blindspots" ? " active" : "") },
+      el("div", { class: "card-row" },
+        el("h1", {}, "Blind spots"),
+        el("span", { class: "pill pill-info" }, `${decided} / ${BLINDSPOTS.length} triaged`),
+      ),
+      el("p", {}, "Things you may not have thought of yet. Same triage as findings — Accept promotes into the roadmap, Defer parks for later, Reject says 'not relevant'."),
+      ...BLINDSPOTS.map((b) => findingBlock({ id: b.id, area: "Risk", severity: "grey", title: b.title, body: b.body })),
+    );
+  }
+
+  // ---------- Render: Debug tools ----------
+  function panelDebug() {
+    const fieldsTable = el("table", {},
+      el("thead", {}, el("tr", {},
+        el("th", { style: "width: 110px" }, "Field"),
+        el("th", { style: "width: 140px" }, "Source"),
+        el("th", {}, "What it tells you"),
+      )),
+      el("tbody", {},
+        el("tr", {},
+          el("td", {}, el("code", {}, "view")),
+          el("td", {}, el("code", {}, "state.activeView")),
+          el("td", {}, "Current top-level view: dashboard / library / wishlist / itch / connections. Confirms a view switch actually took effect."),
+        ),
+        el("tr", {},
+          el("td", {}, el("code", {}, "dataVer")),
+          el("td", {}, el("code", {}, "window._dataVersion")),
+          el("td", {}, "Monotonic counter bumped on every full library reload. If you ran a fetcher and the number didn't change, the reload didn't happen."),
+        ),
+        el("tr", {},
+          el("td", {}, el("code", {}, "visible")),
+          el("td", {}, el("code", {}, "state._visibleList.length")),
+          el("td", {}, "Row count after the current filter/sort. Compare against the row-count text under the toolbar — if they disagree, something is stale."),
+        ),
+        el("tr", {},
+          el("td", {}, el("code", {}, "filters")),
+          el("td", {}, el("code", {}, "collectActiveFilters().length")),
+          el("td", {}, "Number of active filter pills (matches the count badge on the Filters button). Useful when a filter is invisibly stuck on."),
+        ),
+        el("tr", {},
+          el("td", {}, el("code", {}, "fp")),
+          el("td", {}, el("code", {}, "tableFingerprint()")),
+          el("td", {}, "Truncated table fingerprint (first 28 chars; full string in hover tooltip). If two clicks land the same fp, the cached render path is being hit — explains a 'why didn't anything happen?' moment."),
+        ),
+        el("tr", {},
+          el("td", {}, el("code", {}, "render")),
+          el("td", {}, el("code", {}, "__baklogPerf.last.totalMs")),
+          el("td", {}, "Wall-clock duration of the most recent renderTable() in milliseconds. Bumps every paint so you can eyeball whether a change made things slower."),
+        ),
+        el("tr", {},
+          el("td", {}, el("code", {}, "errors")),
+          el("td", {}, el("code", {}, "getErrorCount()")),
+          el("td", {}, "Running count of uncaught errors + unhandled promise rejections captured this session. Non-zero = something quietly broke — pop ", el("code", {}, "window.__baklogErrors"), " in the console to see them all."),
+        ),
+      ),
+    );
+    return el("section", { id: "panel-debug", class: "panel" + (state.activeTab === "debug" ? " active" : "") },
+      el("h1", {}, "Debug tools"),
+      el("p", {}, "Two opt-in runtime tools that replace ", el("code", {}, "console.log"), " spelunking when the app misbehaves. Both are off by default and inert in production use — they only cost something when explicitly enabled."),
+
+      el("h2", {}, "?debug=1 overlay"),
+      el("p", {}, "A tiny fixed-position panel in the bottom-right corner that polls app state every 500ms and shows the six fields below. It's the fastest way to answer ", el("em", {}, "\"did my click change anything?\""), " without opening DevTools."),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Turn it on"),
+        el("div", { class: "callout-body" },
+          el("p", {}, "Add ", el("code", {}, "?debug=1"), " to the URL (one-shot, persists across the session via history), ", el("strong", {}, "or"), " run this in DevTools to make it sticky across reloads:"),
+          el("p", { style: "margin:0" }, el("code", {}, "localStorage.setItem('baklog-debug', '1')")),
+        ),
+      ),
+      el("div", { class: "callout warning" },
+        el("div", { class: "callout-title" }, "Turn it off"),
+        el("div", { class: "callout-body" },
+          el("p", {}, "Drop the ", el("code", {}, "?debug=1"), " from the URL and reload, ", el("strong", {}, "or"), " clear the sticky flag:"),
+          el("p", { style: "margin:0" }, el("code", {}, "localStorage.removeItem('baklog-debug')")),
+          el("p", { style: "margin-top:0.5rem; margin-bottom:0" }, el("span", { class: "muted" }, "The × in the overlay header hides it for the session without disabling debug mode — useful when it covers something."), ),
+        ),
+      ),
+
+      el("h3", {}, "Fields"),
+      fieldsTable,
+
+      el("h3", {}, "Reading the panel"),
+      el("ul", { style: "color:var(--text-dim); font-size:0.9rem; line-height:1.55; padding-left:1.25rem; margin:0 0 1rem" },
+        el("li", {}, "Each field updates ~500ms. If a field looks ", el("em", {}, "stuck"), ", that ", el("strong", {}, "is"), " the signal — the underlying state really hasn't changed."),
+        el("li", {}, el("code", {}, "fp"), " changing on a click but ", el("code", {}, "visible"), " unchanged means: filter triggered re-query, query returned the same rows. Cache hit, expected."),
+        el("li", {}, el("code", {}, "render"), " spiking after a click but ", el("code", {}, "visible"), " roughly the same means a sort/order changed (full repaint, same row set)."),
+        el("li", {}, el("code", {}, "dataVer"), " unchanged after running a fetcher means the dashboard didn't reload — usually the fetcher errored or the API isn't reachable."),
+      ),
+
+      el("h2", { style: "margin-top:1.5rem" }, "?perf=1 table render logs"),
+      el("p", {}, "Older sibling of the overlay — table render instrumentation that logs every ", el("code", {}, "renderTable()"), " call to the console with per-phase timings (query / chrome / paint / post) and a list of the slowest paint chunks."),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Turn it on"),
+        el("div", { class: "callout-body" },
+          el("p", { style: "margin:0" }, "Add ", el("code", {}, "?perf=1"), " (or ", el("code", {}, "?debug=1"), " — that enables both), or sticky-set ", el("code", {}, "localStorage.setItem('baklog-perf', '1')"), "."),
+        ),
+      ),
+      el("p", {}, "Inspect the most recent run anytime with ", el("code", {}, "window.__baklogPerf.last"), " in the console. History (last 8 runs) is at ", el("code", {}, "window.__baklogPerf.history"), "."),
+
+      el("h2", { style: "margin-top:1.5rem" }, "Global error toast"),
+      el("p", {}, "Always-on (no opt-in required). The app installs ", el("code", {}, "window.addEventListener('error', …)"), " and ", el("code", {}, "window.addEventListener('unhandledrejection', …)"), " at boot, and surfaces any uncaught throw or rejected promise as a sticky red toast in the top-right corner. The toast is sticky on purpose — errors are not ephemeral, and silencing them is what we're trying to stop."),
+      el("h3", {}, "What the toast shows"),
+      el("ul", { style: "color:var(--text-dim); font-size:0.9rem; line-height:1.55; padding-left:1.25rem; margin:0 0 1rem" },
+        el("li", {}, el("strong", {}, "Header"), " — error count badge (updates as new errors come in)"),
+        el("li", {}, el("strong", {}, "Message"), " — ", el("code", {}, "name: message"), " truncated to 240 chars"),
+        el("li", {}, el("strong", {}, "Source"), " — filename:line for plain errors, or ", el("code", {}, "unhandledrejection"), " label for promises"),
+        el("li", {}, el("strong", {}, "Details"), " — expands inline to show the full stack trace"),
+        el("li", {}, el("strong", {}, "Copy"), " — puts the full session error log (up to 50 entries) on the clipboard as JSON. Paste into a bug report."),
+        el("li", {}, el("strong", {}, "×"), " — dismiss for this session. The handler keeps capturing, but the toast won't reappear until the next reload."),
+      ),
+      el("h3", {}, "Dedupe behaviour"),
+      el("p", { style: "font-size:0.85rem" }, "If the same error fires repeatedly within 2 seconds (e.g. a render loop calling the same broken function), only the first hit produces a toast — the rest are still captured in ", el("code", {}, "window.__baklogErrors"), " but don't spam the UI. After 2 seconds of quiet, the same signature can toast again."),
+      el("h3", {}, "Inspecting captured errors"),
+      el("p", { style: "font-size:0.85rem" }, "From DevTools: ", el("code", {}, "window.__baklogErrors"), " gives you ", el("code", {}, "{ count, items, help }"), ". ", el("code", {}, "items"), " is an array of ", el("code", {}, "{ time, kind, message, stack, source, lineno, colno, name }"), " — newest at the end, capped at 50 entries."),
+      el("h3", {}, "Explicit reporting (opt-in)"),
+      el("p", { style: "font-size:0.85rem" }, "Modules with their own ", el("code", {}, "try/catch"), " that swallow the error can opt into surfacing it without rethrowing:"),
+      el("p", { style: "margin:0 0 1rem" }, el("code", {}, "import { reportError } from './error-boundary.js'; reportError(err, { source: 'my-module' });")),
+
+      el("h2", { style: "margin-top:1.5rem" }, "Cheap debugging plays"),
+      el("p", { class: "muted", style: "font-size:0.85rem" }, "Quick recipes that go further when something is off:"),
+      el("div", { class: "grid-2" },
+        el("div", { class: "field-card" },
+          el("div", { class: "field-head" }, el("div", { class: "field-name" }, "\"Filter looks stuck\"")),
+          el("div", { class: "field-body" },
+            el("p", { style: "margin:0" }, "Open overlay → check ", el("code", {}, "filters"), " count. If non-zero but you don't see a pill, look at ", el("code", {}, "state.prefs"), " and ", el("code", {}, "state.sessionPrefs"), " in DevTools to identify the stuck key. Clear via the pill row in the app, or:"),
+            el("p", { style: "margin:0.4rem 0 0" }, el("code", {}, "localStorage.removeItem('baklog-prefs')"), " (nukes all prefs — last resort)"),
+          ),
+        ),
+        el("div", { class: "field-card" },
+          el("div", { class: "field-head" }, el("div", { class: "field-name" }, "\"Table feels slow\"")),
+          el("div", { class: "field-body" },
+            el("p", { style: "margin:0" }, "Add ", el("code", {}, "?perf=1"), ", reproduce the click. Check the console group for the slowest measure (usually ", el("code", {}, "query:filter-sort"), " or ", el("code", {}, "paint:body"), "). Compare ", el("code", {}, "render"), " on the overlay before and after."),
+          ),
+        ),
+        el("div", { class: "field-card" },
+          el("div", { class: "field-head" }, el("div", { class: "field-name" }, "\"Data didn't refresh\"")),
+          el("div", { class: "field-body" },
+            el("p", { style: "margin:0" }, "Run the fetcher (manually or via Connections). Watch ", el("code", {}, "dataVer"), " on the overlay — it should bump within a few seconds of the fetcher finishing. If it doesn't, the API health chip will show why."),
+          ),
+        ),
+        el("div", { class: "field-card" },
+          el("div", { class: "field-head" }, el("div", { class: "field-name" }, "\"Drill-in scrolled wrong\"")),
+          el("div", { class: "field-body" },
+            el("p", { style: "margin:0" }, "Known issue — see ", el("code", {}, "find_drill_anchor_inconsistent"), " in Audit findings. ", el("code", {}, "?perf=1"), " logs include the resolved ", el("code", {}, "anchorIndex"), " and which paint path ran."),
+          ),
+        ),
+        el("div", { class: "field-card" },
+          el("div", { class: "field-head" }, el("div", { class: "field-name" }, "\"Something broke silently\"")),
+          el("div", { class: "field-body" },
+            el("p", { style: "margin:0" }, "Watch the overlay's ", el("code", {}, "errors"), " field. If non-zero, the red toast already told you. If you dismissed it, paste ", el("code", {}, "copy(JSON.stringify(window.__baklogErrors, null, 2))"), " in DevTools."),
+          ),
+        ),
+      ),
+
+      el("h2", { style: "margin-top:1.5rem" }, "Privacy"),
+      el("p", { style: "font-size:0.85rem" }, "Neither tool sends anything anywhere — overlay polling is purely local DOM reads, and perf logs go to the browser console only. The ", el("code", {}, "localStorage"), " flags persist on this device only. Safe to leave enabled, but the overlay does add a 220px corner panel that can block UI; turn it off when not actively debugging."),
+    );
+  }
+
+  // ---------- Render: Monetization ----------
+  function panelMonetize() {
+    const ta = el("textarea", { class: "freenotes", placeholder: "Free notes — pricing thoughts, brand names, channel ideas, who you'd email for feedback…" });
+    ta.value = getPageNote("monetize");
+    ta.addEventListener("input", () => setPageNote("monetize", ta.value));
+    return el("section", { id: "panel-monetize", class: "panel" + (state.activeTab === "monetize" ? " active" : "") },
+      el("h1", {}, "Monetization sketch"),
+      el("p", {}, "Notes, not commitments. Four plausible shapes, with one-line trade-offs each. Pick after Phase 4 (Productize), not before."),
+      el("div", { class: "grid-2" }, ...MONETIZE_OPTIONS.map((m) => el("div", { class: "card" },
+        el("h2", { style: "font-size:1rem;margin:0 0 0.4rem;" }, m.name),
+        el("p", { style: "margin:0 0 0.4rem" }, el("strong", { style: "color:var(--green)" }, "Pro: "), m.pro),
+        el("p", { style: "margin:0 0 0.4rem" }, el("strong", { style: "color:var(--red)" }, "Con: "), m.con),
+        el("p", { class: "muted", style: "margin:0" }, el("strong", {}, "Verdict: "), m.verdict),
+      ))),
+      el("h2", {}, "Free notes"),
+      ta,
+    );
+  }
+
+  // ---------- Render: all panels ----------
+  function renderActive() {
+    const host = document.getElementById("panels");
+    host.innerHTML = "";
+    host.appendChild(panelNow());
+    host.appendChild(panelPhases());
+    host.appendChild(panelArch());
+    host.appendChild(panelPipeline());
+    host.appendChild(panelWishlist());
+    host.appendChild(panelFindings());
+    host.appendChild(panelBlindspots());
+    host.appendChild(panelDebug());
+    host.appendChild(panelMonetize());
+    activateTab(state.activeTab);
+  }
+
+  // ---------- Export / Import / Reset ----------
+  function exportState() {
+    const data = JSON.stringify(state, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+    a.href = url;
+    a.download = `baklog-tracker-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("Exported.");
+  }
+
+  function importStateFromText(text) {
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object") throw new Error("not an object");
+      if (parsed.v !== 1) throw new Error("unknown version " + parsed.v);
+      state = { ...defaultState(), ...parsed };
+      saveState();
+      renderActive();
+      toast("Imported.");
+    } catch (err) {
+      toast("Import failed: " + err.message);
+    }
+  }
+
+  function resetAll() {
+    if (!confirm("Wipe ALL tracker state? This clears every checkbox, decision, and note. Cannot be undone (export first if unsure).")) return;
+    state = defaultState();
+    saveState();
+    renderActive();
+    toast("Reset.");
+  }
+
+  // ---------- Wire up ----------
+  document.addEventListener("DOMContentLoaded", () => {
+    renderTabBar();
+    renderActive();
+    document.getElementById("exportBtn").addEventListener("click", exportState);
+    document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
+    document.getElementById("importFile").addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => importStateFromText(String(reader.result || ""));
+      reader.readAsText(file);
+      e.target.value = "";
+    });
+    document.getElementById("resetAllBtn").addEventListener("click", resetAll);
+  });
+  </script>
+</body>
+</html>

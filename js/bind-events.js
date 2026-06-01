@@ -1,0 +1,691 @@
+import { state } from './state.js';
+import {
+  gameKey,
+  findGameByKey,
+  recomputeCrossStoreHidden,
+} from './game-core.js';
+import {
+  getPersonal,
+  setPersonal,
+  savePersonal,
+  addTagToGame,
+  removeTagFromGame,
+} from './personal-storage.js';
+import {
+  savePrefs,
+  persistCurrentSort,
+  setCoopFilterMode,
+  syncFilterDomFromState,
+} from './prefs.js';
+import {
+  renderTable,
+  invalidateTableCache,
+  updateBulkBar,
+  updateRowInPlace,
+  updateTagCellInPlace,
+  scheduleTagChipsRefresh,
+  toggleSelection,
+  bulkSetStatus,
+  performUndo,
+  canUndo,
+  hideUndoToast,
+  initAlphaNav,
+  focusGame,
+  focusRow,
+  visibleListForKeyboard,
+  scrollToRowIndex,
+  openStoreForFocused,
+  filteredGames,
+  sortedGames,
+} from './table-ui.js';
+import {
+  renderPicks,
+  normalizePicksLimit,
+  renderPicksLimitButtons,
+} from './picks-ui.js';
+import {
+  openFiltersDrawer,
+  closeFiltersDrawer,
+  updateCleanupBtnState,
+  updateGenreChipsCollapse,
+  refreshFilterUI,
+  refreshFilterUIDebounced,
+  scheduleTableRerender,
+  renderSummary,
+  renderStoreChips,
+  renderWishlistStoreChips,
+  renderGenreChips,
+  renderTagChips,
+  switchView,
+  exportCsv,
+  exportTopBacklogMarkdown,
+  download,
+} from './filters-ui.js';
+import {
+  getDealInfo,
+  syncDealFilterControls,
+  drillWishlistDealFilter,
+} from './deals.js';
+import { reloadGames } from './library-load.js';
+import { bindAddGameModal } from './add-game-modal.js';
+import { createGlobalKeydownHandler } from './events.js';
+import {
+  fetcherRunner,
+  renderDashboardFetcherHealth,
+} from './fetcher-health.js';
+import {
+  dashDrillCoop,
+  renderDashboardWishlistStats,
+} from './dashboard.js';
+
+/**
+ * Collapse the picks panel if it's currently expanded.
+ *
+ * Called when the user clicks a filter chip in #summary (status / store /
+ * deal / wishlist-reset). Picks lives above the table, so leaving it open
+ * pushes the row count + filtered rows below the fold and the user can't
+ * see their click take effect. Collapsing here keeps the persisted pref in
+ * sync with the actual DOM state and updates the toggle button label.
+ * No-op when picks is already collapsed.
+ */
+function closePicksIfOpen() {
+  if (state.prefs.picksCollapsed) return;
+  state.prefs.picksCollapsed = true;
+  savePrefs();
+  document.getElementById("picksContainer")?.classList.add("hidden");
+  const toggle = document.getElementById("togglePicks");
+  if (toggle) toggle.textContent = "Show";
+}
+
+const SUMMARY_FILTER_CHIP_SELECTOR =
+  ".status-chip, .summary-store-chip, .summary-deal-chip[data-wishlist-deal-filter], .summary-wishlist-reset";
+
+export function bindEvents() {
+  document.getElementById("undoToast")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-undo-action]");
+    if (!btn) return;
+    if (btn.dataset.undoAction === "undo") performUndo();
+    else if (btn.dataset.undoAction === "dismiss") hideUndoToast();
+  });
+
+  document.getElementById("dashboardFetcherHealth")?.addEventListener("change", e => {
+    if (e.target.id === "fetcherHealthStaleOnly") {
+      state.prefs.fetcherHealthStaleOnly = e.target.checked;
+      savePrefs();
+      renderDashboardFetcherHealth();
+    }
+  });
+
+  document.getElementById("dashboardFetcherHealth")?.addEventListener("click", e => {
+    const staleBtn = e.target.closest(".fh-run-stale");
+    if (staleBtn && !staleBtn.disabled) {
+      e.preventDefault();
+      fetcherRunner.runAllStale();
+      return;
+    }
+    const chip = e.target.closest(".fh-chip[data-fetcher-key]");
+    if (!chip || chip.disabled) return;
+    e.preventDefault();
+    fetcherRunner.run(chip.dataset.fetcherKey, { refresh: e.shiftKey });
+  });
+
+  const onWishlistStatsClick = (e) => {
+    const card = e.target.closest("[data-action]");
+    if (!card) return;
+    const action = card.dataset.action;
+    // On the wishlist view itself the deal-hero card opens the actual sale URL
+    // (ITAD shop link or Steam store) instead of refocusing the same row that's
+    // already visible in the table below. Dashboard path still drills into the row.
+    if (action === "deal-hero" && card.dataset.dealUrl && state.activeView === "wishlist") {
+      window.open(card.dataset.dealUrl, "_blank", "noopener");
+      return;
+    }
+    if ((action === "deal-hero" || action === "deal-steal-jump") && card.dataset.key) {
+      focusGame(card.dataset.key);
+      return;
+    }
+    if (action === "deal-on-sale") {
+      drillWishlistDealFilter({ onSaleOnly: true });
+      return;
+    }
+    if (action === "deal-steals") {
+      drillWishlistDealFilter({ minDiscount: 50 });
+    }
+  };
+  document.getElementById("dashboardWishlistStats")?.addEventListener("click", onWishlistStatsClick);
+  document.getElementById("wishlistDealRadar")?.addEventListener("click", onWishlistStatsClick);
+
+  const onDashListClick = e => {
+    const row = e.target.closest('[data-action="dash-list-jump"]');
+    if (!row || !row.dataset.key) return;
+    focusGame(row.dataset.key);
+  };
+  document.getElementById("dashPicksVersusCard")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashItchRecap")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashboardMega")?.addEventListener("click", onDashListClick);
+
+  const handleCoopActivate = (e) => {
+    const target = e.target.closest("[data-action]");
+    if (!target) return;
+    const action = target.dataset.action;
+    if (action === "coop-pick-jump" && target.dataset.key) {
+      e.stopPropagation();
+      focusGame(target.dataset.key);
+      return;
+    }
+    if (action === "coop-drill") {
+      try {
+        const args = JSON.parse(target.dataset.drill || "{}");
+        dashDrillCoop(args);
+      } catch (err) { console.error("co-op drill payload error", err); }
+    }
+  };
+  const coopSpotlightEl = document.getElementById("dashboardCoopSpotlight");
+  if (coopSpotlightEl) {
+    coopSpotlightEl.addEventListener("click", handleCoopActivate);
+    coopSpotlightEl.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const target = e.target.closest('[role="button"][data-action]');
+      if (!target) return;
+      e.preventDefault();
+      handleCoopActivate(e);
+    });
+  }
+
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", e => {
+      let key = th.dataset.sort;
+      if (key === "discount_percent" && e.shiftKey && state.activeView === "wishlist") {
+        key = "deal_price";
+      }
+      if (state.sortKey === key) state.sortDir *= -1;
+      else {
+        state.sortKey = key;
+        state.sortDir = (key === "discount_percent" || key === "deal_price") ? -1 : 1;
+      }
+      persistCurrentSort();
+      renderTable();
+    });
+  });
+  document.getElementById("openFiltersBtn").addEventListener("click", openFiltersDrawer);
+  document.getElementById("closeFiltersBtn").addEventListener("click", closeFiltersDrawer);
+  document.getElementById("filterDrawerBackdrop").addEventListener("click", closeFiltersDrawer);
+  document.getElementById("toggleGenreChipsBtn").addEventListener("click", () => {
+    state.genreChipsExpanded = !state.genreChipsExpanded;
+    updateGenreChipsCollapse();
+  });
+  const kebabBtn = document.getElementById("kebabBtn");
+  const kebabMenu = document.getElementById("kebabMenu");
+  kebabBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    kebabMenu.classList.toggle("open");
+  });
+  document.addEventListener("click", () => kebabMenu.classList.remove("open"));
+  const itadAutoRefreshToggle = document.getElementById("itadAutoRefreshToggle");
+  if (itadAutoRefreshToggle) {
+    itadAutoRefreshToggle.checked = !state.prefs.itadAutoRefreshDisabled;
+    itadAutoRefreshToggle.addEventListener("change", () => {
+      state.prefs.itadAutoRefreshDisabled = !itadAutoRefreshToggle.checked;
+      savePrefs();
+    });
+  }
+  document.getElementById("coopFilterSegmented")?.addEventListener("click", e => {
+    const btn = e.target.closest(".filter-segment[data-coop-mode]");
+    if (!btn) return;
+    setCoopFilterMode(btn.dataset.coopMode);
+    refreshFilterUI();
+  });
+  // The 6 live filters are stored in state.sessionPrefs (single source of
+  // truth); every input event pushes the DOM value into state, then triggers
+  // a debounced refresh. The min/max slider value labels also live here so
+  // the readout follows the slider without code anywhere else having to know.
+  const FILTER_DOM_TO_STATE = {
+    search:           el => ({ key: "search",          val: el.value }),
+    statusFilter:     el => ({ key: "statusFilter",    val: el.value }),
+    unplayedOnly:     el => ({ key: "unplayedOnly",    val: !!el.checked }),
+    earlyAccessOnly:  el => ({ key: "earlyAccessOnly", val: !!el.checked }),
+    minRating:        el => ({ key: "minRating",       val: +el.value || 0 }),
+    maxHours:         el => ({ key: "maxHours",        val: +el.value || 0 }),
+  };
+  Object.entries(FILTER_DOM_TO_STATE).forEach(([id, extract]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      const { key, val } = extract(el);
+      state.sessionPrefs[key] = val;
+      if (id === "minRating") {
+        document.getElementById("minRatingVal").textContent = String(val);
+      } else if (id === "maxHours") {
+        document.getElementById("maxHoursVal").textContent = val >= 200 ? "200+" : String(val);
+      }
+      refreshFilterUIDebounced({ skipPicks: id === "search" });
+    });
+  });
+  const itchShowNonGamesEl = document.getElementById("itchShowNonGames");
+  if (itchShowNonGamesEl) {
+    itchShowNonGamesEl.addEventListener("change", () => {
+      state.sessionPrefs.itchHideNonGames = !itchShowNonGamesEl.checked;
+      refreshFilterUI();
+    });
+  }
+  initAlphaNav();
+  const bindDealCheckbox = (id, key) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.checked = !!state.prefs[key];
+    el.addEventListener("change", () => {
+      state.prefs[key] = el.checked;
+      savePrefs();
+      refreshFilterUI();
+    });
+  };
+  bindDealCheckbox("dealOnSaleOnly", "dealOnSaleOnly");
+  bindDealCheckbox("dealHistoricalLowOnly", "dealHistoricalLowOnly");
+  bindDealCheckbox("dealHideOwned", "dealHideOwned");
+  const dealMinDiscountEl = document.getElementById("dealMinDiscount");
+  const dealMinDiscountVal = document.getElementById("dealMinDiscountVal");
+  if (dealMinDiscountEl) {
+    dealMinDiscountEl.value = String(state.prefs.dealMinDiscount || 0);
+    dealMinDiscountVal.textContent = String(state.prefs.dealMinDiscount || 0);
+    dealMinDiscountEl.addEventListener("input", () => {
+      state.prefs.dealMinDiscount = +dealMinDiscountEl.value;
+      dealMinDiscountVal.textContent = String(state.prefs.dealMinDiscount);
+      savePrefs();
+      refreshFilterUIDebounced();
+    });
+  }
+  const dealMaxPriceEl = document.getElementById("dealMaxPrice");
+  const dealMaxPriceVal = document.getElementById("dealMaxPriceVal");
+  if (dealMaxPriceEl) {
+    const initMax = state.prefs.dealMaxPrice ?? 100;
+    dealMaxPriceEl.value = String(initMax);
+    dealMaxPriceVal.textContent = initMax >= 100 ? "any" : `$${initMax}`;
+    dealMaxPriceEl.addEventListener("input", () => {
+      state.prefs.dealMaxPrice = +dealMaxPriceEl.value;
+      dealMaxPriceVal.textContent = state.prefs.dealMaxPrice >= 100 ? "any" : `$${state.prefs.dealMaxPrice}`;
+      savePrefs();
+      refreshFilterUIDebounced();
+    });
+  }
+  const resetDealFiltersBtn = document.getElementById("resetDealFiltersBtn");
+  if (resetDealFiltersBtn) {
+    resetDealFiltersBtn.addEventListener("click", () => {
+      state.prefs.dealOnSaleOnly = false;
+      state.prefs.dealHistoricalLowOnly = false;
+      state.prefs.dealHideOwned = false;
+      state.prefs.dealMinDiscount = 0;
+      state.prefs.dealMaxPrice = 100;
+      savePrefs();
+      if (dealMinDiscountEl) { dealMinDiscountEl.value = "0"; dealMinDiscountVal.textContent = "0"; }
+      if (dealMaxPriceEl) { dealMaxPriceEl.value = "100"; dealMaxPriceVal.textContent = "any"; }
+      ["dealOnSaleOnly", "dealHistoricalLowOnly", "dealHideOwned"].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+      refreshFilterUI();
+    });
+  }
+  document.getElementById("genreMode").addEventListener("change", e => {
+    state.prefs.genreFilterMode = e.target.value;
+    savePrefs();
+    refreshFilterUI();
+  });
+  document.getElementById("showScoreColumn").addEventListener("change", e => {
+    state.prefs.showScoreColumn = e.target.checked;
+    savePrefs();
+    document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !e.target.checked);
+  });
+  document.getElementById("quickWinMax").addEventListener("input", e => {
+    state.prefs.quickWinMaxHours = +e.target.value;
+    document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;
+    savePrefs();
+    // Only the Quick Wins tab consumes quickWinMaxHours; re-rendering the picks
+    // grid on other tabs would needlessly reload every cover (and bounce the
+    // landscape detection). Refresh only when the visible tab is affected.
+    if (state.prefs.picksTab === "quickWins") renderPicks();
+  });
+  normalizePicksLimit();
+  renderPicksLimitButtons();
+  document.getElementById("picksLimitGroup").addEventListener("click", e => {
+    const btn = e.target.closest(".picks-limit-btn");
+    if (!btn) return;
+    state.prefs.picksLimit = +btn.dataset.limit || 16;
+    savePrefs();
+    renderPicksLimitButtons();
+    renderPicks();
+  });
+  document.getElementById("togglePicks").addEventListener("click", () => {
+    state.prefs.picksCollapsed = !state.prefs.picksCollapsed;
+    savePrefs();
+    document.getElementById("picksContainer").classList.toggle("hidden", state.prefs.picksCollapsed);
+    document.getElementById("togglePicks").textContent = state.prefs.picksCollapsed ? "Show" : "Hide";
+  });
+  document.querySelectorAll(".pick-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.tab;
+      state.prefs.picksTab = tab;
+      // Tabs without an explicit pick-view (e.g., the shared "Top Rated") apply
+      // to whichever pickView the active view maps to, so save against that.
+      const pv = btn.dataset.pickView
+        || (state.activeView === "wishlist" ? "wishlist"
+          : state.activeView === "itch" ? "itch"
+          : "library");
+      if (pv === "library") state.prefs.libraryPicksTab = tab;
+      if (pv === "itch") state.prefs.itchPicksTab = tab;
+      savePrefs();
+      renderPicks();
+    });
+  });
+  // The drawer's store-chip row was removed in the filter consolidation;
+  // the top-bar summary chips are the only store-filter UI now. Click handling
+  // for those lives in the #summary listener below.
+  document.getElementById("wishlistStoreChips")?.addEventListener("click", e => {
+    const chip = e.target.closest(".wishlist-store-chip");
+    if (!chip) return;
+    state.prefs.wishlistStoreFilter = chip.dataset.wishlistStore || "";
+    savePrefs();
+    renderWishlistStoreChips();
+    refreshFilterUI();
+  });
+  document.getElementById("summary").addEventListener("click", e => {
+    // Collapse picks first when the user clicks a filter chip above the table.
+    // Picks sits between #summary and the table, so leaving it open hides the
+    // filter result below the fold. Excludes .summary-jump-chip (those switch
+    // views, not apply filters in-place).
+    if (e.target.closest(SUMMARY_FILTER_CHIP_SELECTOR)) {
+      closePicksIfOpen();
+    }
+    const statusChip = e.target.closest(".status-chip");
+    if (statusChip) {
+      const val = statusChip.dataset.statusFilter;
+      state.sessionPrefs.statusFilter =
+        state.sessionPrefs.statusFilter === val ? "" : val;
+      syncFilterDomFromState();
+      refreshFilterUI();
+      return;
+    }
+    const storeChip = e.target.closest(".summary-store-chip");
+    if (storeChip) {
+      const val = storeChip.dataset.storeFilter || "";
+      state.prefs.storeFilter = state.prefs.storeFilter === val ? "" : val;
+      savePrefs();
+      refreshFilterUI();
+      return;
+    }
+    const dealChip = e.target.closest(".summary-deal-chip[data-wishlist-deal-filter]");
+    if (dealChip) {
+      const kind = dealChip.dataset.wishlistDealFilter;
+      if (kind === "onSale") state.prefs.dealOnSaleOnly = !state.prefs.dealOnSaleOnly;
+      else if (kind === "historicalLow") state.prefs.dealHistoricalLowOnly = !state.prefs.dealHistoricalLowOnly;
+      else if (kind === "hideOwned") state.prefs.dealHideOwned = !state.prefs.dealHideOwned;
+      savePrefs();
+      syncDealFilterControls();
+      refreshFilterUI();
+      return;
+    }
+    if (e.target.closest(".summary-wishlist-reset")) {
+      state.prefs.dealOnSaleOnly = false;
+      state.prefs.dealHistoricalLowOnly = false;
+      state.prefs.dealHideOwned = false;
+      state.prefs.wishlistStoreFilter = "";
+      state.sessionPrefs.statusFilter = "";
+      syncFilterDomFromState();
+      savePrefs();
+      syncDealFilterControls();
+      renderWishlistStoreChips();
+      refreshFilterUI();
+      return;
+    }
+    const chip = e.target.closest(".summary-jump-chip");
+    if (!chip) return;
+    const view = chip.dataset.jumpView;
+    if (view) switchView(view);
+  });
+  document.getElementById("dashboardContent")?.addEventListener("click", e => {
+    const chip = e.target.closest("[data-jump-view]");
+    if (chip?.dataset.jumpView) switchView(chip.dataset.jumpView);
+  });
+  const dedupEl = document.getElementById("crossStoreDedup");
+  if (dedupEl) {
+    dedupEl.addEventListener("change", () => {
+      state.sessionPrefs.crossStoreDedup = dedupEl.checked;
+      recomputeCrossStoreHidden();
+      renderSummary();
+      refreshFilterUI();
+    });
+  }
+  document.getElementById("genreChips").addEventListener("click", e => {
+    const chip = e.target.closest(".genre-chip");
+    if (!chip) return;
+    const genre = chip.dataset.genre;
+    if (state.prefs.genreFilters.includes(genre)) state.prefs.genreFilters = state.prefs.genreFilters.filter(x => x !== genre);
+    else state.prefs.genreFilters.push(genre);
+    savePrefs();
+    renderGenreChips();
+    refreshFilterUI();
+  });
+  document.getElementById("tagChips").addEventListener("click", e => {
+    const chip = e.target.closest(".personal-tag-chip");
+    if (!chip) return;
+    const tag = chip.dataset.tag;
+    const cur = state.prefs.tagFilters || [];
+    state.prefs.tagFilters = cur.includes(tag) ? cur.filter(x => x !== tag) : [...cur, tag];
+    savePrefs();
+    renderTagChips();
+    refreshFilterUI();
+  });
+  const tagModeEl = document.getElementById("tagFilterMode");
+  tagModeEl.value = state.prefs.tagFilterMode || "OR";
+  tagModeEl.addEventListener("change", () => {
+    state.prefs.tagFilterMode = tagModeEl.value;
+    savePrefs();
+    refreshFilterUI();
+  });
+  document.getElementById("addTagBtn").addEventListener("click", () => {
+    const list = sortedGames(filteredGames());
+    const targets = [];
+    if (state.selectedKeys.size) {
+      for (const k of state.selectedKeys) {
+        const g = findGameByKey(k);
+        if (g) targets.push(g);
+      }
+    } else if (state.focusedRowIndex >= 0 && list[state.focusedRowIndex]) {
+      targets.push(list[state.focusedRowIndex]);
+    }
+    if (!targets.length) { alert("Select rows (or focus a row with arrow keys) before adding a tag."); return; }
+    const raw = prompt(`Add a tag to ${targets.length} game${targets.length === 1 ? "" : "s"} (lowercase, e.g. co-op, cozy, bedtime):`);
+    if (!raw) return;
+    let added = 0;
+    for (const g of targets) if (addTagToGame(g, raw)) added++;
+    renderTagChips();
+    renderTable();
+  });
+  document.getElementById("tbody").addEventListener("change", e => {
+    const t = e.target;
+    if (t.classList.contains("row-select")) {
+      const tr = t.closest("tr");
+      toggleSelection(t.dataset.gameKey, t.checked);
+      if (tr) tr.classList.toggle("row-selected", t.checked);
+      return;
+    }
+    if (!t.dataset.gameKey || !t.dataset.field) return;
+    const g = findGameByKey(t.dataset.gameKey);
+    if (!g) return;
+    const field = t.dataset.field;
+    setPersonal(g, field, t.value);
+    const tr = t.closest("tr");
+    if (tr) updateRowInPlace(tr, g);
+    const statusFilterActive = !!state.sessionPrefs?.statusFilter;
+    const sortAffected = state.sortKey === field || state.sortKey === "status";
+    if ((field === "status" && (statusFilterActive || state.cleanupModeActive)) || sortAffected) {
+      scheduleTableRerender();
+    }
+  });
+  document.getElementById("selectAllVisible").addEventListener("change", e => {
+    const list = state._visibleList || sortedGames(filteredGames());
+    if (e.target.checked) list.forEach(g => state.selectedKeys.add(gameKey(g)));
+    else list.forEach(g => state.selectedKeys.delete(gameKey(g)));
+    updateBulkBar();
+    invalidateTableCache();
+    renderTable();
+  });
+  document.querySelectorAll(".view-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const view = btn.dataset.view || "library";
+      if (view === state.activeView) return;
+      // Top-tab clicks (never drill-ins, never the dashboard drill helpers)
+      // should land the user at the top of the page so they see the header,
+      // summary, then picks, then table. Scroll BEFORE switchView so the
+      // overlay → new content paints from y=0. Drill-ins go through
+      // dashboard-drilldown.js which manages its own scroll target.
+      window.scrollTo(0, 0);
+      switchView(view);
+    });
+  });
+  document.getElementById("cleanupModeBtn").addEventListener("click", () => {
+    if (state.activeView !== "library") return;
+    state.cleanupModeActive = !state.cleanupModeActive;
+    updateCleanupBtnState();
+    state.focusedRowIndex = 0;
+    refreshFilterUI();
+  });
+  document.getElementById("bulkBar")?.addEventListener("click", e => {
+    const btn = e.target.closest(".bulk-status");
+    if (btn?.dataset.status) bulkSetStatus(btn.dataset.status);
+  });
+  document.getElementById("bulkClear").addEventListener("click", () => {
+    state.selectedKeys.clear();
+    updateBulkBar();
+    invalidateTableCache();
+    renderTable();
+  });
+  document.getElementById("tbody").addEventListener("blur", e => {
+    const t = e.target;
+    if (!t.classList.contains("notes-input")) return;
+    const g = findGameByKey(t.dataset.gameKey);
+    if (g) setPersonal(g, "notes", t.value);
+  }, true);
+  document.getElementById("tbody").addEventListener("click", e => {
+    if (!e.target.closest("select, input, a, button, .row-tag-remove, .row-tag-add, [data-hltb-edit]")) {
+      const tr = e.target.closest("tr[data-row-key]");
+      if (tr) {
+        state.focusedRowIndex = Number(tr.dataset.rowIndex || -1);
+        focusRow(tr.dataset.rowKey);
+      }
+    }
+    const removeBtn = e.target.closest(".row-tag-remove");
+    if (removeBtn) {
+      e.stopPropagation();
+      const g = findGameByKey(removeBtn.dataset.gameKey);
+      if (g) {
+        removeTagFromGame(g, removeBtn.dataset.tag);
+        const tr = removeBtn.closest("tr");
+        updateTagCellInPlace(tr, g);
+        scheduleTagChipsRefresh();
+      }
+      return;
+    }
+    const addBtn = e.target.closest(".row-tag-add");
+    if (addBtn) {
+      e.stopPropagation();
+      const g = findGameByKey(addBtn.dataset.gameKey);
+      if (!g) return;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "tag…";
+      input.maxLength = 32;
+      input.className = "row-tag-input text-[11px] px-1.5 py-0.5 rounded-full border border-amber-500/60 bg-slate-700 text-amber-100 w-20 focus:outline-none focus:border-amber-300";
+      addBtn.replaceWith(input);
+      let done = false;
+      const tr = input.closest("tr");
+      const commit = () => {
+        if (done) return;
+        done = true;
+        const raw = input.value;
+        if (raw && raw.trim()) {
+          addTagToGame(g, raw);
+          updateTagCellInPlace(tr, g);
+          scheduleTagChipsRefresh();
+        } else if (input.parentNode) {
+          input.replaceWith(addBtn);
+        }
+      };
+      const cancel = () => {
+        if (done) return;
+        done = true;
+        if (input.parentNode) input.replaceWith(addBtn);
+      };
+      input.addEventListener("keydown", ev => {
+        if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+        else if (ev.key === "Escape") { ev.preventDefault(); cancel(); }
+      });
+      input.addEventListener("blur", commit);
+      setTimeout(() => input.focus(), 0);
+      return;
+    }
+    const btn = e.target.closest("[data-hltb-edit]");
+    if (!btn) return;
+    const g = findGameByKey(btn.dataset.hltbEdit);
+    if (!g) return;
+    if (e.shiftKey || e.altKey) {
+      const existing = getPersonal(g).hltb_override ?? "";
+      const next = prompt("Override HLTB main hours (blank to reset):", existing);
+      if (next === null) return;
+      const value = String(next).trim();
+      setPersonal(g, "hltb_override", value === "" ? null : Number(value));
+      renderTable();
+      return;
+    }
+    const hltbName = g.hltb_name || g.name || "";
+    if (!hltbName) return;
+    const url = `https://howlongtobeat.com/?q=${encodeURIComponent(hltbName)}`;
+    window.open(url, "_blank", "noopener");
+  });
+  document.addEventListener("click", e => {
+    const card = e.target.closest(".pick-card");
+    if (card) focusGame(card.dataset.gameKey);
+  });
+  document.addEventListener("keydown", createGlobalKeydownHandler({
+    canUndo,
+    performUndo,
+    closeFiltersDrawer,
+    updateBulkBar,
+    renderTable,
+    visibleListForKeyboard,
+    scrollToRowIndex,
+    openStoreForFocused,
+    setPersonal,
+    gameKey,
+    toggleSelection,
+  }));
+  document.getElementById("pickForMe").addEventListener("click", e => {
+    let list = filteredGames();
+    if (state.activeView === "library") {
+      if (!e.shiftKey) list = list.filter(g => getPersonal(g).status === "backlog");
+    } else if (!e.shiftKey) {
+      const onSale = list.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
+      if (onSale.length) list = onSale;
+    }
+    if (!list.length) return;
+    const pick = list[Math.floor(Math.random() * list.length)];
+    focusGame(gameKey(pick));
+  });
+  document.getElementById("reloadData").addEventListener("click", async () => {
+    kebabMenu.classList.remove("open");
+    try { await reloadGames(); } catch { alert("Could not reload library files. Run the fetch scripts (fetch_games.py, fetch_gog.py, etc.) and reload."); }
+  });
+  kebabMenu.querySelectorAll("button, label").forEach(el => {
+    el.addEventListener("click", () => kebabMenu.classList.remove("open"));
+  });
+  bindAddGameModal();
+  document.getElementById("exportCsv").addEventListener("click", exportCsv);
+  document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
+  document.getElementById("exportNotes").addEventListener("click", () => download("baklog-notes.json", JSON.stringify(state.personal, null, 2), "application/json"));
+  document.getElementById("importNotes").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    state.personal = { ...state.personal, ...JSON.parse(await file.text()) };
+    savePersonal();
+    renderSummary();
+    renderPicks();
+    renderTable();
+    e.target.value = "";
+  });
+}

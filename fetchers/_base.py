@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from shared.json_util import dumps_games_json
+from shared.safe_write import safe_write_text
 
 
 def configure_stdout() -> None:
@@ -82,7 +83,13 @@ def write_games_json(
     games: list[dict[str, Any]],
     dry_run: bool = False,
 ) -> bool:
-    """Write games_*.json; return True if written."""
+    """Write games_*.json atomically with a rotated backup.
+
+    Routes through ``shared.safe_write.safe_write_text``: the previous on-disk
+    file is copied to ``data/games_backups/<stem>/`` (keeping the last 10
+    successful runs), then the new content is written via temp file +
+    os.replace so a kill-mid-write cannot leave a truncated file.
+    """
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "store": store,
@@ -91,7 +98,7 @@ def write_games_json(
     }
     if dry_run:
         return False
-    path.write_text(dumps_games_json(payload), encoding="utf-8")
+    safe_write_text(path, dumps_games_json(payload))
     return True
 
 

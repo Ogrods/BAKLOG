@@ -13,6 +13,7 @@ export const JUNK_NAMES = new Set([
   "hbo go",
   "shadow costume for sonic",
   "sonic holiday costume",
+  "lego sonic skin",
 ]);
 const JUNK_NAME_PATTERNS = [
   /\btech beta\b/i,

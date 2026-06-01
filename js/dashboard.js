@@ -45,6 +45,7 @@ let _dashCountersInitialized = false;
 let _dashMegaShellBuilt = false;
 let _dashRenderedFingerprint = "";
 const _dashLastCounters = {};
+let _marqueeItemsKey = "";
 
 // Entrance animations may only replay when switchView('dashboard') sets the
 // token and calls renderDashboard({ replay: true }). Bootstrap schedules and
@@ -138,11 +139,15 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
         <span><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>`;
   }
   applyMegaHeroCounters(stats);
-  const marquee = document.getElementById('dashboardMarquee');
-  if (marquee) marquee.outerHTML = renderMarqueeHtml(marqueeItems);
-  else {
-    const divider = el.querySelector('.dash-mega-divider');
-    divider?.insertAdjacentHTML('beforebegin', renderMarqueeHtml(marqueeItems));
+  const marqueeKey = marqueeItems.map(it => `${it.glyph}|${it.label}|${it.valueHtml}`).join("\n");
+  if (marqueeKey !== _marqueeItemsKey) {
+    _marqueeItemsKey = marqueeKey;
+    const marquee = document.getElementById('dashboardMarquee');
+    if (marquee) marquee.outerHTML = renderMarqueeHtml(marqueeItems);
+    else {
+      const divider = el.querySelector('.dash-mega-divider');
+      divider?.insertAdjacentHTML('beforebegin', renderMarqueeHtml(marqueeItems));
+    }
   }
   startInsightRotation(buildInsightPool(games));
   startSpotlightRotation(spotlightPool);

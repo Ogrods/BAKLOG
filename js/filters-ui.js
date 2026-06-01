@@ -391,7 +391,7 @@ export async function refreshFilterUI(options) {
   renderFiltersButtonBadge();
   renderActiveFilterPills();
   if (state.activeView === "dashboard") {
-    scheduleDashboardRender();
+    if (!options?.skipDashboardSchedule) scheduleDashboardRender();
     return;
   }
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
@@ -486,7 +486,7 @@ export function updateViewChrome(options) {
   document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
   document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash || isConn);
   document.getElementById("coopSection")?.classList.toggle("hidden", isDash || isConn);
-  if (isDash) scheduleDashboardRender();
+  if (isDash && !options?.skipDashboardSchedule) scheduleDashboardRender();
   else {
     // Keep charts built so a later return-to-dashboard can replay their
     // entrance animations cheaply. Just pause the rotation timers.
@@ -553,8 +553,9 @@ export function switchView(view) {
     savePrefs();
     updateCleanupBtnState();
     updateBulkBar();
-    updateViewChrome({ drillIn });
-    refreshFilterUI({ force: true, drillIn });
+    const skipDashboardSchedule = view === "dashboard";
+    updateViewChrome({ drillIn, skipDashboardSchedule });
+    refreshFilterUI({ force: true, drillIn, skipDashboardSchedule });
     if (view === "dashboard") {
       // Explicit tab click — skip the 80ms scheduleDashboardRender debounce and
       // render this frame so the overlay/blank state doesn't linger.

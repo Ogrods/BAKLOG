@@ -507,6 +507,9 @@ export const fetcherRunner = (() => {
   let logBodyEl = null;
   let pollTimer = null;
   let syncedOnce = false;
+  /** Avoid re-running refreshAfterFetch on every dashboard tab return when syncFromServer
+   *  keeps seeing the same recent "done" run in the 5-minute window. */
+  let _lastAppliedDoneRunId = null;
 
   function logPanel() {
     if (!logEl) logEl = document.getElementById('fetcherRunLog');
@@ -955,7 +958,8 @@ export const fetcherRunner = (() => {
       if (r.status !== 'done' || r.exit_code !== 0 || !r.ended_at) return false;
       return Date.now() - r.ended_at * 1000 < 5 * 60_000;
     });
-    if (recentDone) {
+    if (recentDone && recentDone.id !== _lastAppliedDoneRunId) {
+      _lastAppliedDoneRunId = recentDone.id;
       await refreshAfterFetch(recentDone.key);
     }
   }

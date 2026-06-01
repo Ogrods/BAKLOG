@@ -49,6 +49,26 @@ class PsnGameEntry:
     store_url: str | None
 
 
+@dataclass
+class PsnWishlistEntry:
+    id: str
+    name: str
+    image_url: str | None
+    platforms: list[str]
+    store_classification: str | None
+    localized_classification: str | None
+    kind: str
+    price: str | None
+    price_initial: str | None
+    discount_percent: int | None
+    store_url: str | None
+
+
+WISHLIST_GQL_URL = "https://m.np.playstation.com/api/graphql/v1/op"
+WISHLIST_OPERATION = "metGetStoreWishlist"
+WISHLIST_PERSISTED_HASH = "571149e8aa4d76af7dd33b92e1d6f8f828ebc5fa8f0f6bf51a8324a0e6d71324"
+
+
 _SUFFIX_NOISE = (
     r"\bps4\s*(?:and|&|\+)?\s*ps5\b",
     r"\bps5\s*(?:and|&|\+)?\s*ps4\b",
@@ -238,6 +258,40 @@ def _store_url(concept_id: str | None, np_communication_id: str | None) -> str |
     return None
 
 
+def _wishlist_store_url(product_id: str) -> str:
+    pid = (product_id or "").strip()
+    if not pid:
+        return "https://store.playstation.com/en-us/"
+    if pid.isdigit():
+        return f"https://store.playstation.com/en-us/concept/{pid}"
+    return f"https://store.playstation.com/en-us/product/{pid}"
+
+
+def _parse_usd_price(value: str | None) -> float | None:
+    if not value:
+        return None
+    s = value.strip().replace("$", "").replace(",", "")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _parse_wishlist_price(price_obj: dict | None) -> tuple[str | None, str | None, int | None]:
+    if not price_obj:
+        return None, None, None
+    base = _parse_usd_price(price_obj.get("basePrice"))
+    final = _parse_usd_price(price_obj.get("discountedPrice"))
+    price_str = price_obj.get("discountedPrice") or price_obj.get("basePrice")
+    if price_obj.get("isFree"):
+        price_str = "Free"
+    price_initial_str = price_obj.get("basePrice")
+    discount = None
+    if base and final and base > 0 and final < base:
+        discount = round(100 * (1 - final / base))
+    return price_str, price_initial_str, discount
+
+
 class PsnClient:
     def __init__(self, npsso: str):
         self.last_dedupe_dropped = 0
@@ -257,6 +311,68 @@ class PsnClient:
             raise PsnAuthError(
                 "PSN profile is private or inaccessible. Set profile/trophies to Public in PSN privacy settings."
             ) from exc
+
+    def collect_wishlist(self) -> list[PsnWishlistEntry]:
+        """Fetch the signed-in user's PlayStation Store wishlist (heart icon).
+
+        Uses the mobile GraphQL gateway ``metGetStoreWishlist`` with the same
+        NPSSO session as the library fetcher — no browser cookie required.
+        """
+        import json
+
+        params = {
+            "operationName": WISHLIST_OPERATION,
+            "variables": json.dumps({}),
+            "extensions": json.dumps(
+                {"persistedQuery": {"version": 1, "sha256Hash": WISHLIST_PERSISTED_HASH}}
+            ),
+        }
+        headers = {
+            "x-apollo-operation-name": WISHLIST_OPERATION,
+            "apollographql-client-name": "PlayStationApp-Web",
+            "content-type": "application/json",
+        }
+        try:
+            resp = self._psnawp.authenticator.get(
+                url=WISHLIST_GQL_URL,
+                params=params,
+                headers=headers,
+            )
+        except PSNAWPAuthenticationError as exc:
+            raise PsnAuthError(
+                "PSN session expired or invalid. Reconnect PSN on the Connections page."
+            ) from exc
+        payload = resp.json()
+        errors = payload.get("errors") or []
+        if errors:
+            raise PsnAuthError(f"PSN wishlist GraphQL error: {errors[0].get('message', errors[0])}")
+        raw_items = (payload.get("data") or {}).get("storeWishlist") or []
+        entries: list[PsnWishlistEntry] = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            pid = str(item.get("id") or "").strip()
+            if not pid:
+                continue
+            box = item.get("boxArt") or {}
+            image = box.get("url") if isinstance(box, dict) else None
+            price, price_initial, discount = _parse_wishlist_price(item.get("price"))
+            entries.append(
+                PsnWishlistEntry(
+                    id=pid,
+                    name=_display_name(item.get("name") or f"PSN {pid}"),
+                    image_url=image,
+                    platforms=[str(p) for p in (item.get("platforms") or []) if p],
+                    store_classification=item.get("storeDisplayClassification"),
+                    localized_classification=item.get("localizedStoreDisplayClassification"),
+                    kind=str(item.get("__typename") or "Product"),
+                    price=price,
+                    price_initial=price_initial,
+                    discount_percent=discount,
+                    store_url=_wishlist_store_url(pid),
+                )
+            )
+        return entries
 
     def collect_library(self) -> list[PsnGameEntry]:
         stats_by_title_id: dict[str, object] = {}

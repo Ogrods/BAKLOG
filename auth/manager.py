@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import threading
 import uuid
@@ -18,6 +19,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 _active_sessions: dict[str, AuthSession] = {}
 _sessions_lock = threading.Lock()
+
+
+def _migrate_unified_epic() -> None:
+    """Split a previously-unified epic blob back into epic + epic_wishlist."""
+    epic = get_provider_blob("epic")
+    if not epic.get("EPIC_STORE_COOKIE"):
+        return
+    wl = get_provider_blob("epic_wishlist")
+    wl["EPIC_STORE_COOKIE"] = epic["EPIC_STORE_COOKIE"]
+    for key in ("status", "connected_at", "last_verified"):
+        if epic.get(key) and not wl.get(key):
+            wl[key] = epic[key]
+    set_provider_blob("epic_wishlist", wl)
+    epic.pop("EPIC_STORE_COOKIE", None)
+    set_provider_blob("epic", epic)
+
+
+_migrate_unified_epic()
 
 
 def _now_iso() -> str:
@@ -170,6 +189,26 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
             raise ValueError(
                 "ITAD rejected this API key — copy the API key UUID from isthereanydeal.com/apps/my/"
             )
+    if provider == "epic":
+        from epic_client import EpicAuthError, EpicClient
+
+        code = cleaned["EPIC_AUTH_CODE"].strip()
+        if len(code) < 16 or not re.fullmatch(r"[A-Za-z0-9_\-]+", code):
+            raise ValueError(
+                "That doesn't look like an Epic authorizationCode. Copy just the "
+                "value between the quotes (no quotes, no commas, no spaces)."
+            )
+        try:
+            client = EpicClient(auth_code=code)
+            client.login()
+        except EpicAuthError as e:
+            msg = str(e)
+            if "OAuth 400" in msg or "invalid_grant" in msg or "expired" in msg.lower():
+                raise ValueError(
+                    "That authorizationCode is invalid or already used. Open in browser, "
+                    "refresh the page so a new code appears, then paste it here."
+                ) from e
+            raise ValueError(f"Epic rejected this code: {msg}") from e
     mark_connected(provider, cleaned)
     return {"ok": True, "status": "connected"}
 

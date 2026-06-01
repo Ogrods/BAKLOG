@@ -63,21 +63,35 @@ _STEALTH_INIT = r"""
 
 def _launch_persistent_context(p, user_data: str):
     """Prefer installed Chrome — bundled Chromium triggers Cloudflare bot challenges."""
-    common: dict[str, Any] = {
+    base: dict[str, Any] = {
         "headless": False,
         "viewport": {"width": 1280, "height": 900},
         "locale": "en-US",
-        "user_agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-        ),
-        "args": ["--no-first-run"],
-        "ignore_default_args": ["--enable-automation", "--no-sandbox"],
+        # --disable-blink-features=AutomationControlled is the single most
+        # important Cloudflare-bypass flag: without it, navigator.webdriver is
+        # exposed *before* our init script runs, which Turnstile detects and
+        # locks into a permanent challenge loop.
+        "args": [
+            "--no-first-run",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--no-default-browser-check",
+        ],
+        "ignore_default_args": ["--enable-automation"],
     }
+    # Fallback UA only used if we have to fall back to bundled Chromium —
+    # overriding the UA on real Chrome makes Cloudflare suspicious because the
+    # value won't match the actual binary version Playwright is driving.
+    fallback_ua = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
     try:
-        context = p.chromium.launch_persistent_context(user_data, channel="chrome", **common)
+        context = p.chromium.launch_persistent_context(user_data, channel="chrome", **base)
     except Exception:
-        context = p.chromium.launch_persistent_context(user_data, **common)
+        context = p.chromium.launch_persistent_context(
+            user_data, **base, user_agent=fallback_ua
+        )
     context.add_init_script(_STEALTH_INIT)
 
     # Rewrite target=_blank to current tab so dashboard scraping never opens new
@@ -293,43 +307,42 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
     )
 
 
-def _extract_epic_wishlist(context) -> dict[str, str]:
-    cookies = context.cookies()
-    header = _cookie_header(cookies, ("epicgames.com",))
-    if not header:
-        raise RuntimeError("No Epic storefront cookies — sign in at store.epicgames.com")
-    return {"EPIC_STORE_COOKIE": header}
-
-
-def _validate_epic_store_cookie(cookie_header: str) -> bool:
-    """Round-trip the cookie against store.epicgames.com/graphql so we don't
-    save an anonymous session and call it a win."""
-    try:
-        from epic_client import EpicAuthError, EpicStoreClient
-    except Exception:  # noqa: BLE001
-        return False
-    try:
-        client = EpicStoreClient(cookie=cookie_header)
-        data = client.graphql(
-            """query bakCheck($country: String!, $locale: String, $start: Int, $count: Int) {
-              Wishlist { wishlistItems(country: $country, locale: $locale, start: $start, count: $count) { elements { id } } }
-            }""",
-            {"country": "US", "locale": "en-US", "start": 0, "count": 1},
-            "bakCheck",
-        )
-        return bool(data and "Wishlist" in data)
-    except EpicAuthError:
-        return False
-    except Exception:  # noqa: BLE001
-        return False
+EPIC_WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
 
 
 def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
-    """Wait until the captured cookies actually authenticate against the
-    storefront. Plain SSO cookies (set during login on www.epicgames.com) are
-    not enough — the storefront issues a separate session only after a real
-    page load on store.epicgames.com while signed in."""
-    EPIC_WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
+    """Wait until store.epicgames.com/wishlist GraphQL succeeds, then save that cookie.
+
+    Storefront is behind aggressive Cloudflare Turnstile — the user may need to
+    click the checkbox manually. We sniff the live Cookie header from a 200
+    wishlist GraphQL response (proven to work) and never re-validate from
+    Python (cf_clearance is UA/TLS-bound to the browser).
+    """
+    sniffed: dict[str, str] = {}
+
+    def on_response(response) -> None:
+        if sniffed:
+            return
+        try:
+            if "store.epicgames.com/graphql" not in response.url:
+                return
+            req = response.request
+            body = req.post_data or ""
+            if "Wishlist" not in body and "wishlistItems" not in body:
+                return
+            if response.status != 200:
+                return
+            payload = response.json()
+            data = payload.get("data") or {}
+            if "Wishlist" not in data:
+                return
+            cookie = (req.headers.get("cookie") or "").strip()
+            if cookie:
+                sniffed["EPIC_STORE_COOKIE"] = cookie
+        except Exception:  # noqa: BLE001
+            pass
+
+    page.on("response", on_response)
     try:
         page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
     except Exception:  # noqa: BLE001
@@ -337,42 +350,160 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
-    last_tried = ""
     while time.time() < deadline:
-        url = page.url or ""
-        cookies = context.cookies()
-        header = _cookie_header(cookies, ("epicgames.com",))
-        if header and header != last_tried:
-            last_tried = header
-            if _validate_epic_store_cookie(header):
-                return {"EPIC_STORE_COOKIE": header}
+        cookie = sniffed.get("EPIC_STORE_COOKIE", "").strip()
+        if cookie:
+            return {"EPIC_STORE_COOKIE": cookie}
 
         now = time.time()
-        if session and now - last_msg > 6:
+        if session and now - last_msg > 8:
             last_msg = now
-            lower = url.lower()
-            if "login" in lower or "id.epicgames.com" in lower:
+            url = (page.url or "").lower()
+            if "challenge" in url or "cloudflare" in url:
+                msg = "Cloudflare challenge — click the checkbox if shown."
+            elif "login" in url or "id.epicgames.com" in url:
                 msg = "Sign in to your Epic account in the browser window."
-            elif "store.epicgames.com" not in lower:
+            elif "epicgames.com" not in url:
                 msg = "Open store.epicgames.com/wishlist after signing in."
+            elif "store.epicgames.com" not in url:
+                msg = "Almost there — head to store.epicgames.com/wishlist once signed in."
             else:
-                msg = (
-                    "Signed in? Click the wishlist tab so the storefront issues "
-                    "a session cookie."
-                )
+                msg = "On the wishlist page? Give it a moment to load."
             session.emit("waiting_for_user", {"message": msg})
-
-        if "epicgames.com" not in url.lower():
-            try:
-                page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=15000)
-            except Exception:  # noqa: BLE001
-                pass
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
 
     raise RuntimeError(
         "Could not capture a working Epic storefront session — sign in at "
-        "store.epicgames.com/wishlist and keep the window open until it closes."
+        "store.epicgames.com/wishlist, clear any Cloudflare challenge, and let "
+        "your wishlist finish loading."
+    )
+
+
+XBOX_WISHLIST_URL = "https://www.xbox.com/en-us/wishlist"
+XBOX_WISHLIST_POLL_SEC = 2.5
+
+
+def _parse_xbox_preloaded_state(html: str) -> dict | None:
+    """Carve ``window.__PRELOADED_STATE__ = { ... }`` out of the SSR HTML.
+
+    The global is consumed and deleted by React after hydration so we never
+    see it on ``window``; the raw assignment is always in the response body.
+    """
+    marker = "window.__PRELOADED_STATE__"
+    idx = html.find(marker)
+    if idx == -1:
+        return None
+    eq = html.find("=", idx + len(marker))
+    if eq == -1:
+        return None
+    start = eq + 1
+    while start < len(html) and html[start] in " \t\r\n":
+        start += 1
+    if start >= len(html) or html[start] != "{":
+        return None
+
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(html)):
+        ch = html[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(html[start : i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+def _xbox_signed_in_state(context) -> dict | None:
+    """Fetch xbox.com/wishlist with the persistent cookies and return the
+    parsed state when ``user.isSignedIn`` is true (else ``None``)."""
+    try:
+        resp = context.request.get(XBOX_WISHLIST_URL, timeout=20000)
+    except Exception:  # noqa: BLE001
+        return None
+    if resp.status >= 400:
+        return None
+    try:
+        html = resp.text()
+    except Exception:  # noqa: BLE001
+        return None
+    state = _parse_xbox_preloaded_state(html)
+    if not state:
+        return None
+    user = state.get("user") or {}
+    if not user.get("isSignedIn"):
+        return None
+    page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
+    err = page_meta.get("error") or {}
+    if err.get("httpStatusCode") == 403:
+        # MSA cookie present but xbox.com hasn't issued the wishlist auth
+        # token yet — wait for the next poll cycle.
+        return None
+    return state
+
+
+def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
+    """Open xbox.com/wishlist, wait for MSA sign-in (detected via SSR HTML),
+    then return a marker cred. The real credential is the persistent profile.
+    """
+    try:
+        page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
+    except Exception:  # noqa: BLE001
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_msg = 0.0
+    last_signin_check = False
+    while time.time() < deadline:
+        state = _xbox_signed_in_state(context)
+        if state is not None:
+            # Reload the visible page so the user sees their signed-in
+            # wishlist before the window closes (xbox.com's React doesn't
+            # always pick up MSA cookies on the same render cycle).
+            try:
+                page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=15000)
+                page.wait_for_timeout(800)
+            except Exception:  # noqa: BLE001
+                pass
+            return {"XBOX_WISHLIST_PROFILE": "ready"}
+
+        now = time.time()
+        if session and now - last_msg > 8:
+            last_msg = now
+            url = (page.url or "").lower()
+            if "login.live.com" in url or "login.microsoftonline" in url or "signin" in url:
+                msg = "Sign in to your Microsoft account in the browser window."
+            elif "xbox.com" not in url:
+                msg = "Open xbox.com/wishlist after signing in."
+            elif last_signin_check:
+                msg = "Signed in \u2014 waiting for xbox.com to issue your wishlist session."
+            else:
+                msg = "On the wishlist page? Sign in via the Sign in link if you haven't already."
+            session.emit("waiting_for_user", {"message": msg})
+
+        last_signin_check = bool(state)
+        page.wait_for_timeout(int(XBOX_WISHLIST_POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Could not detect an Xbox sign-in \u2014 sign in to xbox.com/wishlist "
+        "and keep the window open until it closes."
     )
 
 
@@ -404,27 +535,6 @@ def _extract_ubisoft(page, context) -> dict[str, str]:
     )
 
 
-def _extract_epic_oauth(page) -> dict[str, str]:
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    while time.time() < deadline:
-        try:
-            body = page.content()
-        except Exception:
-            page.wait_for_timeout(500)
-            continue
-        m = re.search(r'"authorizationCode"\s*:\s*"([^"]+)"', body)
-        if m:
-            code = m.group(1)
-            # Exchange immediately and persist refresh token via epic_client
-            from epic_client import EpicClient
-
-            client = EpicClient(auth_code=code)
-            client.login()
-            return {"EPIC_AUTH_CODE": code}
-        page.wait_for_timeout(500)
-    raise RuntimeError("Epic authorization code not received — complete sign-in in the browser window")
-
-
 EXTRACTORS = {
     "battlenet": lambda page, ctx: _extract_battlenet(ctx),
     "nintendo": lambda page, ctx: _extract_nintendo(ctx),
@@ -434,13 +544,13 @@ EXTRACTORS = {
     "itch": lambda page, ctx: extract_itch(page, ctx),
     "itad": lambda page, ctx: extract_itad(page, ctx),
     "xbox": lambda page, ctx: extract_xbox(page, ctx),
-    "epic_wishlist": lambda page, ctx: _extract_epic_wishlist(ctx),
+    "xbox_wishlist": lambda page, ctx: _extract_xbox_wishlist_inline(page, ctx, None),
     "ubisoft": lambda page, ctx: _extract_ubisoft(page, ctx),
-    "epic": lambda page, ctx: _extract_epic_oauth(page),
+    "epic_wishlist": lambda page, ctx: _extract_epic_wishlist_inline(page, ctx, None),
 }
 
 # Custom wait/extract loops — not the URL-pattern path in run_browser_auth.
-INLINE_PROVIDERS = {"psn", "steam", "itch", "itad", "xbox", "ubisoft", "epic", "epic_wishlist"}
+INLINE_PROVIDERS = {"psn", "steam", "itch", "itad", "xbox", "xbox_wishlist", "ubisoft", "epic_wishlist"}
 
 
 def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | None:
@@ -458,11 +568,19 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
 
     user_data = str(profile_dir(provider))
     _CONNECT_HINTS = {
-        "psn": "Sign in on the PlayStation Store (Sign In, top-right). Leave this window open.",
-        "steam": "Sign in to Steam. We'll register your API key automatically.",
+        "psn": "Sign in to PlayStation Store (Sign In, top-right). Keep this window open.",
+        "steam": "Sign in to Steam. We'll save your API key automatically.",
         "itch": "Sign in to itch.io. We'll save your API key automatically.",
         "itad": "Sign in to IsThereAnyDeal. We'll register an app and save your API key.",
-        "xbox": "Sign in to OpenXBL (xbl.io) with Microsoft. Leave this window open.",
+        "xbox": "Sign in to OpenXBL with your Microsoft account. We'll save your API key automatically.",
+        "xbox_wishlist": (
+            "Sign in to xbox.com with your Microsoft account. We'll detect your "
+            "wishlist session automatically \u2014 no need to refresh the page."
+        ),
+        "epic_wishlist": (
+            "Sign in if prompted, then stay on store.epicgames.com/wishlist "
+            "until your wishlist finishes loading. Clear any Cloudflare check if shown."
+        ),
     }
     session.emit(
         "waiting_for_user",
@@ -482,6 +600,8 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
                 creds = _extract_psn(page, context, session)
             elif provider == "epic_wishlist":
                 creds = _extract_epic_wishlist_inline(page, context, session)
+            elif provider == "xbox_wishlist":
+                creds = _extract_xbox_wishlist_inline(page, context, session)
             elif provider in ("steam", "itch", "itad", "xbox"):
                 try:
                     page.goto(spec.login_url, wait_until="domcontentloaded", timeout=20000)

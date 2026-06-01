@@ -12,7 +12,7 @@ export const state = {
   libraryMeta: {
     steam: null, gog: null, psn: null, epic: null, amazon: null,
     xbox: null, battlenet: null, ubisoft: null, nintendo: null, itch: null,
-    wishlist: null, wishlistGog: null, wishlistEpic: null,
+    wishlist: null, wishlistGog: null, wishlistEpic: null, wishlistPsn: null, wishlistUbisoft: null, wishlistXbox: null,
     itad: null, hltb: null,
   },
   crossStoreHiddenKeys: new Set(),
@@ -32,8 +32,7 @@ export const state = {
   filtersDrawerOpen: false,
   genreChipsExpanded: false,
   _visibleList: null,
-  _virtualActive: false,
-  _virtualStart: 0,
+  _visibleListView: null,
 };
 
 export const CLEANUP_MAX_RATING = 60;

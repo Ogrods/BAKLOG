@@ -12,15 +12,15 @@ import {
   WISHLIST_STATUS_CHIP_DEFS,
   STATUS_FILTER_LABELS,
 } from './state.js';
-import { collectTableParams, isEarlyAccess, queryGamesAsync } from './table-query.js';
 import {
-  shouldVirtualize,
-  virtualRange,
-  virtualRangeAroundIndex,
-  tableVirtualMetrics,
-  setMeasuredRowHeight,
-  measuredRowHeight,
-} from './virtual-table.js';
+  collectTableParams,
+  isEarlyAccess,
+  queryGames,
+  queryGamesAsync,
+  buildQueryContext,
+  querySourceForView,
+  resolveCoopFilterMode,
+} from './table-query.js';
 import { buildStatusSelect, STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { createMemo } from './memo.js';
 
@@ -32,11 +32,12 @@ import {
   initDashboard,
   scheduleDashboardRender,
   cancelScheduledDashboardRender,
-  destroyDashboardCharts,
   stopDashboardRotations,
   dashboardLibraryGames,
   dashDrillCoop,
   renderDashboardWishlistStats,
+  renderDashboard,
+  dashboardWasRendered,
 } from './dashboard.js';
 import { createGlobalKeydownHandler } from './events.js';
 
@@ -306,9 +307,43 @@ function flushSavePersonal() {
 }
 window.addEventListener("beforeunload", flushSavePersonal);
 window.addEventListener("blur", flushSavePersonal);
+const COOP_FILTER_LABELS = {
+  any: "Any co-op",
+  online: "Online co-op",
+  local: "Couch co-op",
+  both: "Online + couch co-op",
+};
+
+function getCoopFilterMode() {
+  return resolveCoopFilterMode(state.prefs);
+}
+
+function setCoopFilterMode(mode) {
+  const ok = new Set(["off", "any", "online", "local", "both"]);
+  state.prefs.coopFilterMode = ok.has(mode) ? mode : "off";
+  delete state.prefs.coopAny;
+  savePrefs();
+  syncCoopFilterSegmented();
+}
+
+function syncCoopFilterSegmented() {
+  const mode = getCoopFilterMode();
+  document.querySelectorAll("#coopFilterSegmented .filter-segment").forEach(btn => {
+    const on = btn.dataset.coopMode === mode;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
 function loadPrefs() {
-  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, coopAny: false };
-  try { return { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
+  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", itchHideNonGames: true, picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", crossStoreDedup: true, picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, coopFilterMode: "off" };
+  let merged;
+  try { merged = { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
+  if (!["off", "any", "online", "local", "both"].includes(merged.coopFilterMode)) {
+    merged.coopFilterMode = merged.coopAny ? "any" : "off";
+  }
+  delete merged.coopAny;
+  return merged;
 }
 function savePrefs() {
   localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
@@ -1179,16 +1214,13 @@ function scrollToRowIndex(idx, { smooth = false } = {}) {
   state.focusedRowIndex = idx;
   const key = gameKey(list[idx]);
   state.pickedKey = key;
-
-  if (state._virtualActive) {
-    // Paint a slice that contains the target row, then scroll directly to the
-    // real DOM position. An earlier "rough" scrollTo based on default row
-    // height (76px) was producing a visible jump on dashboard drill-ins: when
-    // the real rows are taller, the rough target was off by idx*delta pixels.
-    paintTableBody(list, { anchorIndex: idx });
-    const row = markFocusedRow(key);
-    if (row) scrollRowToCenter(row, { smooth });
-    return;
+  const tbody = document.getElementById("tbody");
+  if (tbody && !tbody.querySelector(`tr[data-row-index="${idx}"]`)) {
+    flushChunksUpTo(tbody, list, idx, {
+      isWish: state.activeView === "wishlist",
+      showScore: !!state.prefs.showScoreColumn,
+    });
+    syncCoverFits(tbody);
   }
 
   focusRow(key);
@@ -1758,11 +1790,6 @@ function focusGame(key) {
     return;
   }
   state.focusedRowIndex = idx;
-  // Virtualized tables only mount a slice of rows — always scroll by index first.
-  if (state._virtualActive || shouldVirtualize(list.length)) {
-    scrollToRowIndex(idx, { smooth: true });
-    return;
-  }
   const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
   if (existing) {
     markFocusedRow(key);
@@ -1792,7 +1819,6 @@ function scrollFocusedRow() {
   if (row) {
     scrollRowToCenter(row);
     focusRow(key);
-    if (state._virtualActive) paintTableBody(list, { anchorIndex: idx });
     return;
   }
   scrollToRowIndex(idx);
@@ -1838,8 +1864,7 @@ function tableFingerprint() {
     maxH: +(document.getElementById("maxHours")?.value || 200),
     unp: !!document.getElementById("unplayedOnly")?.checked,
     ea: !!document.getElementById("earlyAccessOnly")?.checked,
-    co: !!document.getElementById("coopOnlineOnly")?.checked,
-    cc: !!document.getElementById("coopLocalOnly")?.checked,
+    coop: getCoopFilterMode(),
     cleanup: !!state.cleanupModeActive,
     score: !!state.prefs.showScoreColumn,
     dedupe: !!state.prefs.crossStoreDedup,
@@ -1854,10 +1879,64 @@ function tableFingerprint() {
 function invalidateTableCache() {
   _tableFingerprint = "";
   state._visibleList = null;
+  state._visibleListView = null;
+  _lastRenderedView = null;
+  _renderTableGen++;
+  cancelIdleChunks();
+  const tbody = document.getElementById("tbody");
+  if (tbody) tbody.innerHTML = "";
 }
 
 let _renderTableGen = 0;
-let _virtualScrollRaf = 0;
+let _paintGen = 0;
+let _paintIdleHandle = 0;
+const FIRST_CHUNK = 50;
+const IDLE_CHUNK = 200;
+
+function cancelIdleChunks() {
+  _paintGen++;
+  if (_paintIdleHandle) {
+    cancelAnimationFrame(_paintIdleHandle);
+    _paintIdleHandle = 0;
+  }
+}
+
+function tbodyRowCount() {
+  return document.getElementById("tbody")?.querySelectorAll("tr[data-row-index]").length || 0;
+}
+
+function appendChunk(list, start, end, ctx) {
+  const out = [];
+  for (let i = start; i < end; i++) out.push(tableRowHtml(list[i], i, ctx));
+  return out.join("");
+}
+
+function scheduleIdleChunks(tbody, list, nextIndex, gen, ctx) {
+  const pump = () => {
+    if (gen !== _paintGen || !tbody || !tbody.isConnected) return;
+    const end = Math.min(list.length, nextIndex + IDLE_CHUNK);
+    tbody.insertAdjacentHTML("beforeend", appendChunk(list, nextIndex, end, ctx));
+    syncCoverFits(tbody);
+    nextIndex = end;
+    if (nextIndex < list.length) {
+      _paintIdleHandle = requestAnimationFrame(pump);
+    } else {
+      _paintIdleHandle = 0;
+    }
+  };
+  _paintIdleHandle = requestAnimationFrame(pump);
+}
+
+function flushChunksUpTo(tbody, list, targetIdx, ctx) {
+  if (!tbody) return;
+  const clampedIdx = Math.max(0, Math.min(targetIdx, list.length - 1));
+  const rendered = tbody.querySelectorAll("tr[data-row-index]").length;
+  const needed = clampedIdx + 1;
+  if (rendered >= needed) return;
+  const start = rendered;
+  const end = Math.min(list.length, needed);
+  if (start < end) tbody.insertAdjacentHTML("beforeend", appendChunk(list, start, end, ctx));
+}
 
 function tableRowHtml(g, idx, { isWish, showScore }) {
   const p = getPersonal(g);
@@ -1912,102 +1991,76 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
 
 function paintTableBody(list, opts = {}) {
   const tbody = document.getElementById("tbody");
-  const scrollEl = document.getElementById("tableWrap");
-  const colSpan = tableColSpan();
+  if (!tbody) return;
+  cancelIdleChunks();
+  const gen = _paintGen;
+  if (opts.resetScroll) {
+    const shell = document.getElementById("tableShell");
+    if (shell) window.scrollTo({ top: shell.offsetTop - 8, behavior: "auto" });
+  }
   const isWish = state.activeView === "wishlist";
   const showScore = !!state.prefs.showScoreColumn;
-  let start = 0;
-  let end = list.length;
-  let topPad = 0;
-  let bottomPad = 0;
-  state._virtualActive = shouldVirtualize(list.length);
-  if (state._virtualActive && scrollEl && !opts.resetScroll) {
-    let range;
-    if (typeof opts.anchorIndex === "number") {
-      range = virtualRangeAroundIndex(opts.anchorIndex, list.length);
-    } else {
-      const { scrollTop, clientHeight } = tableVirtualMetrics(scrollEl);
-      range = virtualRange(scrollTop, clientHeight, list.length);
-    }
-    if (range.start >= range.end && list.length > 0) {
-      range = virtualRangeAroundIndex(0, list.length);
-    }
-    ({ start, end, topPad, bottomPad } = range);
-  } else if (opts.resetScroll) {
-    const shell = document.getElementById("tableShell");
-    if (shell) window.scrollTo({ top: shell.offsetTop - 8, behavior: "instant" in window ? "instant" : "auto" });
+  const ctx = { isWish, showScore };
+
+  if (!list.length) {
+    tbody.innerHTML = "";
+    return;
   }
-  state._virtualStart = start;
-  const parts = [];
-  parts.push(`<tr class="virtual-spacer" aria-hidden="true"><td colspan="${colSpan}" style="height:${topPad}px;padding:0;border:0"></td></tr>`);
-  for (let i = start; i < end; i++) {
-    parts.push(tableRowHtml(list[i], i, { isWish, showScore }));
+
+  // Small lists: one-shot paint (most reliable).
+  if (list.length <= FIRST_CHUNK) {
+    tbody.innerHTML = appendChunk(list, 0, list.length, ctx);
+    syncCoverFits(tbody);
+    return;
   }
-  parts.push(`<tr class="virtual-spacer" aria-hidden="true"><td colspan="${colSpan}" style="height:${bottomPad}px;padding:0;border:0"></td></tr>`);
-  tbody.innerHTML = parts.join("");
+
+  const anchorIdx = typeof opts.anchorIndex === "number" ? opts.anchorIndex : -1;
+  // Deep anchor (dashboard drill): paint through target synchronously so scroll works.
+  if (anchorIdx >= FIRST_CHUNK) {
+    const through = Math.min(list.length, anchorIdx + 1);
+    tbody.innerHTML = appendChunk(list, 0, through, ctx);
+    syncCoverFits(tbody);
+    if (through < list.length) scheduleIdleChunks(tbody, list, through, gen, ctx);
+    return;
+  }
+
+  // Default: first chunk sync, rest in rAF batches (deferred load).
+  tbody.innerHTML = appendChunk(list, 0, FIRST_CHUNK, ctx);
   syncCoverFits(tbody);
-  // Re-measure on first real render of a view — never on virtual-scroll repaints,
-  // and average multiple rows so per-row variation (tag chips, etc.) doesn't oscillate.
-  if (state._virtualActive && end > start && opts.measure) {
-    requestAnimationFrame(() => {
-      const rows = tbody.querySelectorAll("tr[data-row-index]");
-      if (!rows.length) return;
-      const sampleCount = Math.min(rows.length, 8);
-      let total = 0;
-      for (let i = 0; i < sampleCount; i++) total += rows[i].offsetHeight;
-      const avg = Math.round(total / sampleCount);
-      if (avg && Math.abs(avg - measuredRowHeight()) > 4) {
-        // Remember where the focused row sits in the viewport BEFORE the
-        // remeasure-driven rerender. After the rerender, topPad changes by
-        // (idx * delta) pixels and the row would visually jump unless we
-        // compensate window.scrollY by the exact same delta. This is what
-        // the user perceives as "sticky header or something loads in after
-        // paint" after a dashboard drill.
-        const focusedKey = state.pickedKey;
-        let beforeTop = null;
-        if (focusedKey) {
-          const before = document.querySelector(`tr[data-row-key="${CSS.escape(focusedKey)}"]`);
-          if (before) beforeTop = before.getBoundingClientRect().top;
-        }
-        setMeasuredRowHeight(avg);
-        cancelAnimationFrame(_virtualScrollRaf);
-        const anchor = state.focusedRowIndex >= 0 ? state.focusedRowIndex : undefined;
-        _virtualScrollRaf = requestAnimationFrame(() => {
-          renderTable({ virtualOnly: true, anchorIndex: anchor });
-          if (focusedKey != null && beforeTop != null) {
-            const after = document.querySelector(`tr[data-row-key="${CSS.escape(focusedKey)}"]`);
-            if (after) {
-              const afterTop = after.getBoundingClientRect().top;
-              const delta = afterTop - beforeTop;
-              if (Math.abs(delta) > 0.5) {
-                window.scrollBy({ top: delta, behavior: "auto" });
-              }
-            }
-          }
-        });
-      }
-    });
-  }
+  if (FIRST_CHUNK < list.length) scheduleIdleChunks(tbody, list, FIRST_CHUNK, gen, ctx);
 }
 
 async function renderTable(opts) {
   const force = !!opts?.force;
-  const virtualOnly = !!opts?.virtualOnly;
   const fp = tableFingerprint();
-  if (!force && !virtualOnly && fp === _tableFingerprint && _lastRenderedView === state.activeView) {
+  const tbodyHasRows = tbodyRowCount() > 0;
+  if (!force && fp === _tableFingerprint && _lastRenderedView === state.activeView && tbodyHasRows) {
     if (state._pendingFocusKey && state._visibleList) consumePendingFocus(state._visibleList);
     return;
   }
   const gen = ++_renderTableGen;
-  let list = state._visibleList;
-  if (!virtualOnly) {
-    const params = collectTableParams();
+  const params = collectTableParams();
+  let list;
+  try {
     list = await queryGamesAsync(state, params);
-    if (gen !== _renderTableGen) return;
-    state._visibleList = list;
-  } else if (!list) {
-    return;
+  } catch (err) {
+    console.warn("[renderTable] query failed, retrying on main thread", err);
+    list = queryGames({
+      source: querySourceForView(state),
+      ctx: {
+        ...buildQueryContext(state, params),
+        hiddenKeys: state.activeView === "wishlist"
+          ? state.wishlistCrossStoreHiddenKeys
+          : state.crossStoreHiddenKeys,
+        ownedNormNames: state.ownedNormNames,
+      },
+    });
   }
+  if (gen !== _renderTableGen) return;
+  if (!Array.isArray(list)) list = [];
+  state._visibleList = list;
+  state._visibleListView = state.activeView;
+
   const showScore = !!state.prefs.showScoreColumn;
   const isWish = state.activeView === "wishlist";
   const wrap = document.getElementById("tableWrap");
@@ -2037,14 +2090,15 @@ async function renderTable(opts) {
     const pidx = list.findIndex(g => gameKey(g) === state._pendingFocusKey);
     if (pidx >= 0) anchorIndex = pidx;
   }
-  // Do NOT default anchorIndex to focusedRowIndex on virtualOnly repaints — that
-  // locked the slice to the last-focused row and scrolling stopped populating rows.
 
   paintTableBody(list, {
-    resetScroll: force && !virtualOnly,
+    resetScroll: (force || opts?.resetScroll) && anchorIndex == null,
     anchorIndex,
-    measure: !virtualOnly,
   });
+  if (list.length > 0 && tbodyRowCount() === 0) {
+    console.warn("[renderTable] tbody empty after paint, retrying sync");
+    paintTableBody(list, { anchorIndex });
+  }
 
   let base;
   if (state.activeView === "wishlist") {
@@ -2070,6 +2124,11 @@ async function renderTable(opts) {
   _tableFingerprint = fp;
   _lastRenderedView = state.activeView;
   consumePendingFocus(list);
+  // Cursor's embedded browser sometimes settles layout late on first paint —
+  // tbody is populated but cells render blank until a window resize triggers
+  // a layout recompute. A no-op scrollTo forces that recompute without
+  // changing the user's scroll position. Harmless in real Chrome/Edge.
+  if (list.length > 0) window.scrollTo(window.scrollX, window.scrollY);
 }
 
 // === Drawer + active pills ===
@@ -2118,7 +2177,7 @@ function collectActiveFilters() {
     pills.push({ kind: "releaseYear", value: state.prefs.releaseYearFilter, label: `Released: ${state.prefs.releaseYearFilter}` });
   }
   if (state.activeView === "wishlist" && state.prefs.wishlistStoreFilter) {
-    const labelMap = { steam: "Steam", gog: "GOG", epic: "Epic" };
+    const labelMap = { steam: "Steam", gog: "GOG", epic: "Epic", psn: "PlayStation", ubisoft: "Ubisoft" };
     const v = state.prefs.wishlistStoreFilter;
     pills.push({ kind: "wishlistStore", value: v, label: `Wishlist source: ${labelMap[v] || v}` });
   }
@@ -2126,9 +2185,10 @@ function collectActiveFilters() {
   for (const t of state.prefs.tagFilters || []) pills.push({ kind: "tag", value: t, label: `#${t}` });
   if (document.getElementById("unplayedOnly").checked) pills.push({ kind: "unplayed", value: "1", label: "Unplayed only" });
   if (document.getElementById("earlyAccessOnly")?.checked) pills.push({ kind: "earlyAccess", value: "1", label: "Early Access only" });
-  if (document.getElementById("coopOnlineOnly")?.checked) pills.push({ kind: "coopOnline", value: "1", label: "Online co-op" });
-  if (document.getElementById("coopLocalOnly")?.checked) pills.push({ kind: "coopLocal", value: "1", label: "Couch co-op" });
-  if (state.prefs.coopAny) pills.push({ kind: "coopAny", value: "1", label: "Any co-op" });
+  const coopMode = getCoopFilterMode();
+  if (coopMode !== "off") {
+    pills.push({ kind: "coop", value: coopMode, label: COOP_FILTER_LABELS[coopMode] || coopMode });
+  }
   const minR = +document.getElementById("minRating").value;
   if (minR > 0) pills.push({ kind: "minRating", value: String(minR), label: `Rating ≥ ${minR}%` });
   const maxH = +document.getElementById("maxHours").value;
@@ -2208,21 +2268,12 @@ function removeActiveFilter(kind, value) {
       if (el) el.checked = false;
       break;
     }
-    case "coopOnline": {
-      const el = document.getElementById("coopOnlineOnly");
-      if (el) el.checked = false;
+    case "coop":
+    case "coopOnline":
+    case "coopLocal":
+    case "coopAny":
+      setCoopFilterMode("off");
       break;
-    }
-    case "coopLocal": {
-      const el = document.getElementById("coopLocalOnly");
-      if (el) el.checked = false;
-      break;
-    }
-    case "coopAny": {
-      state.prefs.coopAny = false;
-      savePrefs();
-      break;
-    }
     case "minRating": document.getElementById("minRating").value = "0"; document.getElementById("minRatingVal").textContent = "0"; break;
     case "maxHours": document.getElementById("maxHours").value = "200"; document.getElementById("maxHoursVal").textContent = "200+"; break;
     case "hltbBucket": state.prefs.hltbBucket = null; savePrefs(); break;
@@ -2283,11 +2334,7 @@ function clearAllFilters() {
   document.getElementById("unplayedOnly").checked = false;
   const eaEl = document.getElementById("earlyAccessOnly");
   if (eaEl) eaEl.checked = false;
-  const coEl = document.getElementById("coopOnlineOnly");
-  if (coEl) coEl.checked = false;
-  const ccEl = document.getElementById("coopLocalOnly");
-  if (ccEl) ccEl.checked = false;
-  state.prefs.coopAny = false;
+  setCoopFilterMode("off");
   document.getElementById("minRating").value = "0";
   document.getElementById("minRatingVal").textContent = "0";
   document.getElementById("maxHours").value = "200";
@@ -2350,7 +2397,8 @@ function updateGenreChipsCollapse() {
   el.classList.toggle("expanded", state.genreChipsExpanded);
 }
 
-function refreshFilterUI(options) {
+async function refreshFilterUI(options) {
+  syncCoopFilterSegmented();
   renderFiltersButtonBadge();
   renderActiveFilterPills();
   if (state.activeView === "dashboard") {
@@ -2358,7 +2406,10 @@ function refreshFilterUI(options) {
     return;
   }
   renderSummary();
-  renderTable();
+  if (!options?.skipTable) {
+    if (options?.force) await renderTable({ force: true });
+    else renderTable();
+  }
   if (options?.skipPicks) return;
   renderPicks();
 }
@@ -2406,14 +2457,22 @@ function updateViewChrome() {
   document.getElementById("connectionsContainer")?.classList.toggle("hidden", !isConn);
   document.getElementById("libraryStatusSection")?.classList.add("hidden");
   document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
-  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
+  // Cross-store dedup applies to library and wishlist (not itch — single store).
+  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isItch || isDash || isConn);
   document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish);
+  const dedupHint = document.getElementById("crossStoreDedupHint");
+  if (dedupHint) {
+    dedupHint.textContent = isWish
+      ? "Hides the same title listed on multiple wishlist stores. Store priority matches Library."
+      : "Filter by store using the chips at the top of the page.";
+  }
   document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
   document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash || isConn);
   document.getElementById("coopSection")?.classList.toggle("hidden", isDash || isConn);
   if (isDash) scheduleDashboardRender();
   else {
-    destroyDashboardCharts();
+    // Keep charts built so a later return-to-dashboard can replay their
+    // entrance animations cheaply. Just pause the rotation timers.
     stopDashboardRotations();
   }
   if (isConn) refreshConnections();
@@ -2453,14 +2512,19 @@ function switchView(view) {
   if (view === state.activeView) return;
   const fromView = state.activeView;
   const fpBefore = view !== "dashboard" ? tableFingerprint().replace(/"v":"[^"]+"/, `"v":"${view}"`) : "";
-  const willBeCached = view !== "dashboard" && view === _lastRenderedView && fpBefore === _tableFingerprint;
-  const useOverlay = !willBeCached;
+  const tableCached = view !== "dashboard" && view === _lastRenderedView && fpBefore === _tableFingerprint;
+  const dashCached = view === "dashboard" && dashboardWasRendered();
+  const useOverlay = !tableCached && !dashCached;
+  // Light-up the clicked tab immediately so the click feels responsive even on
+  // first-render paths where doSwitch is deferred to the next rAF.
+  document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   const label = view === "dashboard" ? "Loading dashboard…" : view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : view === "connections" ? "Loading connections…" : "Loading library…";
   if (useOverlay) showViewLoading(label);
   const doSwitch = () => {
     if (fromView === "dashboard") {
       cancelScheduledDashboardRender();
-      destroyDashboardCharts();
+      // Charts left intact so the return trip can replay animations
+      // via renderDashboard's same-data fast path. See replayDashboardChartAnimations.
       stopDashboardRotations();
     }
     invalidateTableCache();
@@ -2468,7 +2532,6 @@ function switchView(view) {
     state.prefs.activeView = view;
     state.selectedKeys.clear();
     if (!state._pendingFocusKey) state.focusedRowIndex = 0;
-    document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
     if (view === "dashboard") {
       state.cleanupModeActive = false;
     } else if (view === "wishlist") {
@@ -2492,8 +2555,12 @@ function switchView(view) {
     updateCleanupBtnState();
     updateBulkBar();
     updateViewChrome();
-    refreshFilterUI();
+    refreshFilterUI({ force: true });
     if (view === "dashboard") {
+      // Explicit tab click — skip the 80ms scheduleDashboardRender debounce and
+      // render this frame so the overlay/blank state doesn't linger.
+      cancelScheduledDashboardRender();
+      renderDashboard();
       fetcherRunner.probeApi().then(async ok => {
         if (!ok) return;
         await fetcherRunner.syncFromServer();
@@ -2721,7 +2788,7 @@ async function loadSteamCoversMeta() {
   await loadCacheMeta("cache/cross_store_images_meta.json", "steamCovers");
 }
 
-function applyMergedLibrary() {
+async function applyMergedLibrary() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   personalMemo.bump();
   invalidateTableCache();
@@ -2741,7 +2808,7 @@ function applyMergedLibrary() {
   if (state.activeView === "dashboard") scheduleDashboardRender();
   else {
     renderPicks();
-    refreshFilterUI();
+    await refreshFilterUI({ force: true });
     if (state.activeView === "wishlist") {
       // dashboardDataReady just flipped true — re-evaluate the radar gate.
       updateWishlistDrawerVisibility();
@@ -2771,11 +2838,17 @@ const WISHLIST_FETCHER_JSON = {
   wishlistSteam: "games_wishlist.json",
   wishlistGog: "games_wishlist_gog.json",
   wishlistEpic: "games_wishlist_epic.json",
+  wishlistPsn: "games_wishlist_psn.json",
+  wishlistUbisoft: "games_wishlist_ubisoft.json",
+  wishlistXbox: "games_wishlist_xbox.json",
 };
 const WISHLIST_FETCHER_META_KEY = {
   wishlistSteam: "wishlist",
   wishlistGog: "wishlistGog",
   wishlistEpic: "wishlistEpic",
+  wishlistPsn: "wishlistPsn",
+  wishlistUbisoft: "wishlistUbisoft",
+  wishlistXbox: "wishlistXbox",
 };
 const ENRICH_FETCHER_KEYS = new Set(["hltb", "steamReviews", "steamCovers"]);
 
@@ -2804,11 +2877,14 @@ function rebuildAllGamesFromMetas() {
 function rebuildWishlistFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
   const manualWishlist = allManual.filter(g => !!g.wishlist);
-  const { wishlist, wishlistGog, wishlistEpic } = state.libraryMeta;
+  const { wishlist, wishlistGog, wishlistEpic, wishlistPsn, wishlistUbisoft, wishlistXbox } = state.libraryMeta;
   const fetchedWishlist = [
     ...((wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }))),
     ...((wishlistGog?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: `gog-${g.id ?? g.gog_id}`, wishlist_store: "gog" }))),
     ...((wishlistEpic?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `epic-${g.epic_namespace}:${g.epic_offer_id}`, wishlist_store: "epic" }))),
+    ...((wishlistPsn?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `psn-${g.psn_product_id}`, wishlist_store: "psn" }))),
+    ...((wishlistUbisoft?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `ubisoft-${g.ubisoft_product_id}`, wishlist_store: "ubisoft" }))),
+    ...((wishlistXbox?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `xbox-${g.xbox_product_id}`, wishlist_store: "xbox" }))),
   ];
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
 }
@@ -2854,7 +2930,7 @@ async function reloadAfterFetcher(key) {
     await reloadGames();
     return;
   }
-  applyMergedLibrary();
+  await applyMergedLibrary();
 }
 
 configureFetcherHealth({ reloadGames, reloadAfterFetcher });
@@ -2884,15 +2960,21 @@ async function reloadGames() {
   const wishlist = await fetchLibraryJson("games_wishlist.json");
   const wishlistGog = await fetchLibraryJson("games_wishlist_gog.json");
   const wishlistEpic = await fetchLibraryJson("games_wishlist_epic.json");
+  const wishlistPsn = await fetchLibraryJson("games_wishlist_psn.json");
+  const wishlistUbisoft = await fetchLibraryJson("games_wishlist_ubisoft.json");
+  const wishlistXbox = await fetchLibraryJson("games_wishlist_xbox.json");
   state.libraryMeta.wishlist = wishlist;
   state.libraryMeta.wishlistGog = wishlistGog;
   state.libraryMeta.wishlistEpic = wishlistEpic;
+  state.libraryMeta.wishlistPsn = wishlistPsn;
+  state.libraryMeta.wishlistUbisoft = wishlistUbisoft;
+  state.libraryMeta.wishlistXbox = wishlistXbox;
   rebuildWishlistFromMetas();
   await loadItadPrices();
   await loadHltbCache();
   await loadSteamReviewCache();
   await loadSteamCoversMeta();
-  applyMergedLibrary();
+  await applyMergedLibrary();
 }
 
 function refreshAfterManualChange() {
@@ -2903,7 +2985,7 @@ function refreshAfterManualChange() {
   state.allGames = [...nonManualLibrary, ...dedupeWithinStore(manualLibrary)];
   const fetchedWishlist = state.wishlistGames.filter(g => !g.manual);
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
-  applyMergedLibrary();
+  void applyMergedLibrary();
 }
 
 function renderStoreChips() {
@@ -3168,14 +3250,6 @@ function bindAddGameModal() {
 
 // === Event wiring ===
 function bindEvents() {
-  const onTableVirtualScroll = () => {
-    if (!state._virtualActive) return;
-    cancelAnimationFrame(_virtualScrollRaf);
-    _virtualScrollRaf = requestAnimationFrame(() => renderTable({ virtualOnly: true }));
-  };
-  window.addEventListener("scroll", onTableVirtualScroll, { passive: true });
-  window.addEventListener("resize", onTableVirtualScroll, { passive: true });
-
   document.getElementById("undoToast")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-undo-action]");
     if (!btn) return;
@@ -3297,7 +3371,13 @@ function bindEvents() {
       savePrefs();
     });
   }
-  ["search", "statusFilter", "unplayedOnly", "earlyAccessOnly", "coopOnlineOnly", "coopLocalOnly", "minRating", "maxHours"].forEach(id => {
+  document.getElementById("coopFilterSegmented")?.addEventListener("click", e => {
+    const btn = e.target.closest(".filter-segment[data-coop-mode]");
+    if (!btn) return;
+    setCoopFilterMode(btn.dataset.coopMode);
+    refreshFilterUI();
+  });
+  ["search", "statusFilter", "unplayedOnly", "earlyAccessOnly", "minRating", "maxHours"].forEach(id => {
     document.getElementById(id).addEventListener("input", () => {
       document.getElementById("minRatingVal").textContent = document.getElementById("minRating").value;
       const h = +document.getElementById("maxHours").value;
@@ -3481,11 +3561,6 @@ function bindEvents() {
   });
   const dedupEl = document.getElementById("crossStoreDedup");
   if (dedupEl) {
-    // Hide duplicates always defaults back to on across page refreshes;
-    // toggling it off only lasts for the current session.
-    state.prefs.crossStoreDedup = true;
-    savePrefs();
-    dedupEl.checked = true;
     dedupEl.addEventListener("change", () => {
       state.prefs.crossStoreDedup = dedupEl.checked;
       savePrefs();
@@ -3756,6 +3831,7 @@ async function bootstrap() {
     invalidateTableCache,
     renderTable,
     focusGame,
+    setCoopFilterMode,
   });
   let migrationInfo = { migrated: true, pendingMigration: null };
   try {
@@ -3783,8 +3859,11 @@ async function bootstrap() {
   document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;
   document.getElementById("picksContainer").classList.toggle("hidden", state.prefs.picksCollapsed);
   document.getElementById("togglePicks").textContent = state.prefs.picksCollapsed ? "Show" : "Hide";
+  // Hide duplicates defaults on after every refresh; off only lasts this session.
+  state.prefs.crossStoreDedup = true;
+  recomputeCrossStoreHidden();
   const dedupEl = document.getElementById("crossStoreDedup");
-  if (dedupEl) dedupEl.checked = !!state.prefs.crossStoreDedup;
+  if (dedupEl) dedupEl.checked = true;
   document.getElementById("tagFilterMode").value = state.prefs.tagFilterMode || "OR";
   if (typeof state.prefs.itchHideNonGames !== "boolean") state.prefs.itchHideNonGames = true;
   const itchShowNonGamesEl = document.getElementById("itchShowNonGames");
@@ -3815,6 +3894,7 @@ async function bootstrap() {
       banner.classList.remove("hidden");
     }
   }
+  hideViewLoading();
   await loadFetcherSources();
   initConnections();
   fetcherRunner.probeApi().then(async available => {

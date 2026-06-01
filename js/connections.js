@@ -32,6 +32,7 @@ const PROVIDER_BRAND = {
   epic_wishlist: { color: '#888888', initial: 'E' },
   amazon: { color: '#ff9900', initial: 'A' },
   xbox: { color: '#107c10', initial: 'X' },
+  xbox_wishlist: { color: '#107c10', initial: 'X' },
   battlenet: { color: '#148eff', initial: 'B' },
   nintendo: { color: '#e60012', initial: 'N' },
   ubisoft: { color: '#0072ff', initial: 'U' },
@@ -54,24 +55,6 @@ function primaryLabel(st) {
   return 'Connect';
 }
 
-function closeAllMenus() {
-  document.querySelectorAll('.conn-menu:not(.hidden)').forEach(menu => {
-    menu.classList.add('hidden');
-  });
-}
-
-function closeSettingsPopover() {
-  const pop = document.getElementById('connSettingsPopover');
-  const btn = document.getElementById('connSettingsBtn');
-  pop?.classList.add('hidden');
-  if (btn) btn.setAttribute('aria-expanded', 'false');
-}
-
-function togglePastePanel(card) {
-  const panel = card?.querySelector('.conn-paste-panel');
-  if (panel) panel.classList.toggle('hidden');
-}
-
 function renderHero() {
   const countEl = document.getElementById('connHeroCount');
   const fillEl = document.getElementById('connProgressFill');
@@ -83,7 +66,7 @@ function renderHero() {
   }
   const connected = authStatus.filter(p => p.status === 'connected').length;
   const total = authStatus.length;
-  countEl.textContent = `${connected} of ${total} stores connected`;
+  countEl.textContent = `${connected} of ${total} connections made`;
   fillEl.style.width = total ? `${(connected / total) * 100}%` : '0%';
 }
 
@@ -94,132 +77,138 @@ function buildFormFields(p) {
     </label>`).join('');
 }
 
-function buildMenuItems(p, st) {
-  const items = [];
-  if (st !== 'disconnected') {
-    items.push('<button type="button" data-action="disconnect">Disconnect</button>');
-  }
-  if ((p.form_fields || []).length) {
-    items.push('<button type="button" data-action="paste-key">Paste API key</button>');
-  }
-  if (p.kind === 'manual') {
-    items.push('<button type="button" data-action="open-url">Open sign-in page</button>');
-  }
-  return items.join('');
+function buildFormPanel(p) {
+  return `
+    <div class="conn-paste-panel">
+      ${buildFormFields(p)}
+      <div class="conn-paste-actions">
+        <button type="button" class="conn-paste-clip" data-paste-clipboard>Paste</button>
+        <button type="button" class="conn-save-btn conn-save" data-provider="${escapeAttr(p.key)}">Save key</button>
+      </div>
+    </div>`;
 }
 
 function buildCardFooter(p, st) {
-  const showLocal = p.kind === 'local';
-  const showBrowser = p.kind === 'browser' || p.kind === 'oauth';
-  const showForm = p.kind === 'form';
-  const showManual = p.kind === 'manual';
-  const menuItems = buildMenuItems(p, st);
-  const hasMenu = menuItems.length > 0;
-
-  if (showLocal) {
+  if (p.kind === 'local') {
     return `
       <div class="conn-card-footer">
         <span class="conn-local-label">Auto-detected from Amazon Games launcher</span>
-        ${hasMenu ? `<button type="button" class="conn-overflow" aria-label="More" data-open-menu>&#8943;</button>
-        <div class="conn-menu hidden" role="menu">${menuItems}</div>` : ''}
+      </div>`;
+  }
+
+  if (p.kind === 'manual') {
+    return `
+      <div class="conn-card-footer">
+        <button type="button" class="conn-open-url" data-open-url data-provider="${escapeAttr(p.key)}">Open sign-in page</button>
       </div>`;
   }
 
   const label = primaryLabel(st);
-  const primaryAction = (showBrowser || p.kind === 'oauth')
-    ? 'browser'
-    : (showForm || showManual ? 'paste' : 'browser');
-
   return `
     <div class="conn-card-footer">
-      <button type="button" class="conn-primary" data-primary="${primaryAction}" data-provider="${escapeAttr(p.key)}">${label}</button>
-      ${hasMenu ? `<button type="button" class="conn-overflow" aria-label="More" data-open-menu>&#8943;</button>
-      <div class="conn-menu hidden" role="menu">${menuItems}</div>` : ''}
+      <button type="button" class="conn-primary" data-primary="browser" data-provider="${escapeAttr(p.key)}">${label}</button>
     </div>`;
+}
+
+async function pasteFromClipboard(card) {
+  const log = card?.querySelector('.conn-log');
+  const input = card?.querySelector('.conn-paste-panel [data-field]');
+  if (!input) return;
+  try {
+    const text = await navigator.clipboard.readText();
+    input.value = (text || '').trim();
+    if (log) {
+      log.classList.remove('hidden');
+      log.textContent = 'Pasted from clipboard.';
+    }
+  } catch {
+    if (log) {
+      log.classList.remove('hidden');
+      log.textContent = 'Could not read clipboard — paste into the field manually (Ctrl+V).';
+    }
+  }
+}
+
+function buildCardHtml(p) {
+  const st = p.status || 'disconnected';
+  const brand = providerBrand(p);
+  const expiry = p.expiry_days ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>` : '';
+  const note = STATUS_NOTE[st] ? `<p class="conn-note">${escapeHtml(STATUS_NOTE[st])}</p>` : '';
+  const err = p.last_error ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>` : '';
+  const hasFormFields = (p.form_fields || []).length > 0;
+  const showFormPanel = hasFormFields && (p.kind === 'form' || p.kind === 'manual' || p.kind === 'browser');
+  const showDisconnect = st !== 'disconnected' && p.kind !== 'local';
+
+  return `
+    <article class="conn-card${p.kind === 'manual' ? ' conn-card--manual' : ''}" data-provider="${escapeAttr(p.key)}">
+      <div class="conn-card-stripe" style="background:${escapeAttr(brand.color)}"></div>
+      <div class="conn-card-head">
+        <div class="conn-brand-badge" style="background:${escapeAttr(brand.color)}">${escapeHtml(brand.initial)}</div>
+        <div class="conn-head-actions">
+          <span class="${STATUS_CLASS[st] || STATUS_CLASS.disconnected}">${STATUS_LABEL[st] || st}</span>
+          ${showDisconnect ? `<button type="button" class="conn-disconnect-x" data-disconnect-quick data-provider="${escapeAttr(p.key)}" aria-label="Disconnect ${escapeAttr(p.label)}">&times;</button>` : ''}
+        </div>
+      </div>
+      <div class="conn-card-body">
+        <h3>${escapeHtml(p.label)}</h3>
+        <p class="conn-desc">${escapeHtml(p.description || '')}</p>
+        ${note}
+        ${err}
+        ${expiry}
+        <p class="conn-log hidden" aria-live="polite"></p>
+      </div>
+      ${showFormPanel ? buildFormPanel(p) : ''}
+      ${buildCardFooter(p, st)}
+    </article>`;
 }
 
 function renderConnections() {
   const grid = document.getElementById('connectionsGrid');
+  const manualRow = document.getElementById('connectionsManualRow');
   if (!grid) return;
   renderHero();
   if (!authStatus.length) {
     grid.innerHTML = '<p class="text-sm text-slate-400">Loading connections…</p>';
+    if (manualRow) manualRow.innerHTML = '';
     return;
   }
-  grid.innerHTML = authStatus.map(p => {
-    const st = p.status || 'disconnected';
-    const brand = providerBrand(p);
-    const expiry = p.expiry_days ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>` : '';
-    const note = STATUS_NOTE[st] ? `<p class="conn-note">${escapeHtml(STATUS_NOTE[st])}</p>` : '';
-    const err = p.last_error ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>` : '';
-    const hasFormFields = (p.form_fields || []).length > 0;
-    const showFormPanel = hasFormFields && (p.kind === 'form' || p.kind === 'manual' || p.kind === 'browser');
-
-    return `
-      <article class="conn-card" data-provider="${escapeAttr(p.key)}">
-        <div class="conn-card-stripe" style="background:${escapeAttr(brand.color)}"></div>
-        <div class="conn-card-head">
-          <div class="conn-brand-badge" style="background:${escapeAttr(brand.color)}">${escapeHtml(brand.initial)}</div>
-          <span class="${STATUS_CLASS[st] || STATUS_CLASS.disconnected}">${STATUS_LABEL[st] || st}</span>
-        </div>
-        <div class="conn-card-body">
-          <h3>${escapeHtml(p.label)}</h3>
-          <p class="conn-desc">${escapeHtml(p.description || '')}</p>
-          ${note}
-          ${err}
-          ${expiry}
-          <p class="conn-log hidden" aria-live="polite"></p>
-        </div>
-        ${buildCardFooter(p, st)}
-        ${showFormPanel ? `
-          <div class="conn-paste-panel hidden">
-            ${buildFormFields(p)}
-            <button type="button" class="conn-save-btn conn-save" data-provider="${escapeAttr(p.key)}">Save key</button>
-          </div>` : ''}
-      </article>`;
-  }).join('');
+  const manual = authStatus.filter(p => p.kind === 'manual');
+  const others = authStatus.filter(p => p.kind !== 'manual');
+  grid.innerHTML = others.map(buildCardHtml).join('');
+  if (manualRow) manualRow.innerHTML = manual.map(buildCardHtml).join('');
 }
 
 function handleGridClick(ev) {
   const target = ev.target;
+  const card = target.closest('.conn-card');
+  const provider = card?.dataset.provider;
 
-  const openBtn = target.closest('[data-open-menu]');
-  if (openBtn) {
-    ev.stopPropagation();
-    const footer = openBtn.closest('.conn-card-footer');
-    const menu = footer?.querySelector('.conn-menu');
-    if (!menu) return;
-    const wasOpen = !menu.classList.contains('hidden');
-    closeAllMenus();
-    if (!wasOpen) menu.classList.remove('hidden');
+  const disconnectBtn = target.closest('[data-disconnect-quick]');
+  if (disconnectBtn && provider) {
+    disconnectProvider(provider);
     return;
   }
 
-  const actionBtn = target.closest('[data-action]');
-  if (actionBtn) {
-    ev.stopPropagation();
-    const card = actionBtn.closest('.conn-card');
-    const provider = card?.dataset.provider;
-    if (!provider) return;
-    const action = actionBtn.dataset.action;
-    closeAllMenus();
-    if (action === 'disconnect') disconnectProvider(provider);
-    else if (action === 'paste-key') togglePastePanel(card);
-    else if (action === 'open-url') openManualUrl(provider);
+  const pasteBtn = target.closest('[data-paste-clipboard]');
+  if (pasteBtn && card) {
+    pasteFromClipboard(card);
+    return;
+  }
+
+  const openUrlBtn = target.closest('[data-open-url]');
+  if (openUrlBtn && provider) {
+    openManualUrl(provider);
     return;
   }
 
   const primaryBtn = target.closest('.conn-primary');
-  if (primaryBtn) {
-    const provider = primaryBtn.dataset.provider;
-    const card = primaryBtn.closest('.conn-card');
-    const action = primaryBtn.dataset.primary;
-    if (action === 'browser') startBrowserConnect(provider);
-    else if (action === 'paste') togglePastePanel(card);
+  if (primaryBtn?.dataset.provider) {
+    startBrowserConnect(primaryBtn.dataset.provider);
+    return;
   }
 
   const saveBtn = target.closest('.conn-save');
-  if (saveBtn) {
+  if (saveBtn?.dataset.provider) {
     saveFormCredentials(saveBtn.dataset.provider);
   }
 }
@@ -232,22 +221,6 @@ function wireGridEvents() {
   gridWired = true;
 }
 
-function wireGlobalDismiss() {
-  document.addEventListener('click', ev => {
-    if (!ev.target.closest('.conn-card-footer') && !ev.target.closest('.conn-menu')) {
-      closeAllMenus();
-    }
-    if (!ev.target.closest('#connSettingsPopover') && !ev.target.closest('#connSettingsBtn')) {
-      closeSettingsPopover();
-    }
-  });
-  document.addEventListener('keydown', ev => {
-    if (ev.key === 'Escape') {
-      closeAllMenus();
-      closeSettingsPopover();
-    }
-  });
-}
 
 export function showReconnectBanner(providers) {
   for (const p of providers || []) reconnectProviders.add(p);
@@ -402,39 +375,8 @@ export function stopConnectionsPolling() {
   pollTimer = null;
 }
 
-export async function connectAllWizard() {
-  const pending = authStatus.filter(p => p.status !== 'connected' && (p.kind === 'browser' || p.kind === 'oauth' || p.kind === 'form'));
-  if (!pending.length) return;
-  document.querySelector('.view-tab[data-view="connections"]')?.click();
-  for (const p of pending) {
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise(r => setTimeout(r, 300));
-    if (p.kind === 'form') {
-      // eslint-disable-next-line no-continue
-      continue;
-    }
-    // eslint-disable-next-line no-await-in-loop
-    await startBrowserConnect(p.key);
-  }
-}
-
 export function wireConnectionsUi() {
   wireGridEvents();
-  wireGlobalDismiss();
-  document.getElementById('connectAllBtn')?.addEventListener('click', connectAllWizard);
-  document.getElementById('connSettingsBtn')?.addEventListener('click', ev => {
-    ev.stopPropagation();
-    const pop = document.getElementById('connSettingsPopover');
-    const btn = document.getElementById('connSettingsBtn');
-    if (!pop || !btn) return;
-    const open = pop.classList.contains('hidden');
-    closeSettingsPopover();
-    closeAllMenus();
-    if (open) {
-      pop.classList.remove('hidden');
-      btn.setAttribute('aria-expanded', 'true');
-    }
-  });
   document.getElementById('masterPasswordSave')?.addEventListener('click', async () => {
     const pw = document.getElementById('masterPasswordInput')?.value || '';
     await fetch('/api/auth/master-password', {
@@ -467,6 +409,9 @@ export const FETCHER_AUTH_PROVIDER = {
   wishlistSteam: 'steam',
   wishlistGog: 'gog',
   wishlistEpic: 'epic_wishlist',
+  wishlistPsn: 'psn',
+  wishlistUbisoft: 'ubisoft',
+  wishlistXbox: 'xbox_wishlist',
   itad: 'itad',
 };
 

@@ -2,7 +2,6 @@ import { state } from './state.js';
 import {
   gameKey,
   findGameByKey,
-  recomputeCrossStoreHidden,
 } from './game-core.js';
 import {
   getPersonal,
@@ -15,7 +14,6 @@ import {
   savePrefs,
   persistCurrentSort,
   setCoopFilterMode,
-  syncFilterDomFromState,
 } from './prefs.js';
 import {
   renderTable,
@@ -60,6 +58,7 @@ import {
   exportCsv,
   exportTopBacklogMarkdown,
   download,
+  applyPrefsChange,
 } from './filters-ui.js';
 import {
   getDealInfo,
@@ -274,9 +273,7 @@ export function bindEvents() {
     if (!el) return;
     el.checked = !!state.prefs[key];
     el.addEventListener("change", () => {
-      state.prefs[key] = el.checked;
-      savePrefs();
-      refreshFilterUI();
+      applyPrefsChange({ prefs: { [key]: el.checked } });
     });
   };
   bindDealCheckbox("dealOnSaleOnly", "dealOnSaleOnly");
@@ -288,10 +285,9 @@ export function bindEvents() {
     dealMinDiscountEl.value = String(state.prefs.dealMinDiscount || 0);
     dealMinDiscountVal.textContent = String(state.prefs.dealMinDiscount || 0);
     dealMinDiscountEl.addEventListener("input", () => {
-      state.prefs.dealMinDiscount = +dealMinDiscountEl.value;
-      dealMinDiscountVal.textContent = String(state.prefs.dealMinDiscount);
-      savePrefs();
-      refreshFilterUIDebounced();
+      const v = +dealMinDiscountEl.value;
+      dealMinDiscountVal.textContent = String(v);
+      applyPrefsChange({ prefs: { dealMinDiscount: v } }, { debounced: true });
     });
   }
   const dealMaxPriceEl = document.getElementById("dealMaxPrice");
@@ -301,31 +297,39 @@ export function bindEvents() {
     dealMaxPriceEl.value = String(initMax);
     dealMaxPriceVal.textContent = initMax >= 100 ? "any" : `$${initMax}`;
     dealMaxPriceEl.addEventListener("input", () => {
-      state.prefs.dealMaxPrice = +dealMaxPriceEl.value;
-      dealMaxPriceVal.textContent = state.prefs.dealMaxPrice >= 100 ? "any" : `$${state.prefs.dealMaxPrice}`;
-      savePrefs();
-      refreshFilterUIDebounced();
+      const v = +dealMaxPriceEl.value;
+      dealMaxPriceVal.textContent = v >= 100 ? "any" : `$${v}`;
+      applyPrefsChange({ prefs: { dealMaxPrice: v } }, { debounced: true });
     });
   }
   const resetDealFiltersBtn = document.getElementById("resetDealFiltersBtn");
   if (resetDealFiltersBtn) {
     resetDealFiltersBtn.addEventListener("click", () => {
-      state.prefs.dealOnSaleOnly = false;
-      state.prefs.dealHistoricalLowOnly = false;
-      state.prefs.dealHideOwned = false;
-      state.prefs.dealMinDiscount = 0;
-      state.prefs.dealMaxPrice = 100;
-      savePrefs();
-      if (dealMinDiscountEl) { dealMinDiscountEl.value = "0"; dealMinDiscountVal.textContent = "0"; }
-      if (dealMaxPriceEl) { dealMaxPriceEl.value = "100"; dealMaxPriceVal.textContent = "any"; }
-      ["dealOnSaleOnly", "dealHistoricalLowOnly", "dealHideOwned"].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
-      refreshFilterUI();
+      applyPrefsChange(
+        {
+          prefs: {
+            dealOnSaleOnly: false,
+            dealHistoricalLowOnly: false,
+            dealHideOwned: false,
+            dealMinDiscount: 0,
+            dealMaxPrice: 100,
+          },
+        },
+        {
+          renderers: [
+            () => {
+              if (dealMinDiscountEl) { dealMinDiscountEl.value = "0"; dealMinDiscountVal.textContent = "0"; }
+              if (dealMaxPriceEl) { dealMaxPriceEl.value = "100"; dealMaxPriceVal.textContent = "any"; }
+              ["dealOnSaleOnly", "dealHistoricalLowOnly", "dealHideOwned"]
+                .forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+            },
+          ],
+        },
+      );
     });
   }
   document.getElementById("genreMode").addEventListener("change", e => {
-    state.prefs.genreFilterMode = e.target.value;
-    savePrefs();
-    refreshFilterUI();
+    applyPrefsChange({ prefs: { genreFilterMode: e.target.value } });
   });
   document.getElementById("showScoreColumn").addEventListener("change", e => {
     state.prefs.showScoreColumn = e.target.checked;
@@ -379,10 +383,10 @@ export function bindEvents() {
   document.getElementById("wishlistStoreChips")?.addEventListener("click", e => {
     const chip = e.target.closest(".wishlist-store-chip");
     if (!chip) return;
-    state.prefs.wishlistStoreFilter = chip.dataset.wishlistStore || "";
-    savePrefs();
-    renderWishlistStoreChips();
-    refreshFilterUI();
+    applyPrefsChange(
+      { prefs: { wishlistStoreFilter: chip.dataset.wishlistStore || "" } },
+      { renderers: [renderWishlistStoreChips] },
+    );
   });
   document.getElementById("summary").addEventListener("click", e => {
     // Collapse picks first when the user clicks a filter chip above the table.
@@ -395,42 +399,40 @@ export function bindEvents() {
     const statusChip = e.target.closest(".status-chip");
     if (statusChip) {
       const val = statusChip.dataset.statusFilter;
-      state.sessionPrefs.statusFilter =
-        state.sessionPrefs.statusFilter === val ? "" : val;
-      syncFilterDomFromState();
-      refreshFilterUI();
+      const next = state.sessionPrefs.statusFilter === val ? "" : val;
+      applyPrefsChange({ sessionPrefs: { statusFilter: next } });
       return;
     }
     const storeChip = e.target.closest(".summary-store-chip");
     if (storeChip) {
       const val = storeChip.dataset.storeFilter || "";
-      state.prefs.storeFilter = state.prefs.storeFilter === val ? "" : val;
-      savePrefs();
-      refreshFilterUI();
+      const next = state.prefs.storeFilter === val ? "" : val;
+      applyPrefsChange({ prefs: { storeFilter: next } });
       return;
     }
     const dealChip = e.target.closest(".summary-deal-chip[data-wishlist-deal-filter]");
     if (dealChip) {
       const kind = dealChip.dataset.wishlistDealFilter;
-      if (kind === "onSale") state.prefs.dealOnSaleOnly = !state.prefs.dealOnSaleOnly;
-      else if (kind === "historicalLow") state.prefs.dealHistoricalLowOnly = !state.prefs.dealHistoricalLowOnly;
-      else if (kind === "hideOwned") state.prefs.dealHideOwned = !state.prefs.dealHideOwned;
-      savePrefs();
-      syncDealFilterControls();
-      refreshFilterUI();
+      const patch = {};
+      if (kind === "onSale") patch.dealOnSaleOnly = !state.prefs.dealOnSaleOnly;
+      else if (kind === "historicalLow") patch.dealHistoricalLowOnly = !state.prefs.dealHistoricalLowOnly;
+      else if (kind === "hideOwned") patch.dealHideOwned = !state.prefs.dealHideOwned;
+      applyPrefsChange({ prefs: patch }, { renderers: [syncDealFilterControls] });
       return;
     }
     if (e.target.closest(".summary-wishlist-reset")) {
-      state.prefs.dealOnSaleOnly = false;
-      state.prefs.dealHistoricalLowOnly = false;
-      state.prefs.dealHideOwned = false;
-      state.prefs.wishlistStoreFilter = "";
-      state.sessionPrefs.statusFilter = "";
-      syncFilterDomFromState();
-      savePrefs();
-      syncDealFilterControls();
-      renderWishlistStoreChips();
-      refreshFilterUI();
+      applyPrefsChange(
+        {
+          prefs: {
+            dealOnSaleOnly: false,
+            dealHistoricalLowOnly: false,
+            dealHideOwned: false,
+            wishlistStoreFilter: "",
+          },
+          sessionPrefs: { statusFilter: "" },
+        },
+        { renderers: [syncDealFilterControls, renderWishlistStoreChips] },
+      );
       return;
     }
     const chip = e.target.closest(".summary-jump-chip");
@@ -445,38 +447,32 @@ export function bindEvents() {
   const dedupEl = document.getElementById("crossStoreDedup");
   if (dedupEl) {
     dedupEl.addEventListener("change", () => {
-      state.sessionPrefs.crossStoreDedup = dedupEl.checked;
-      recomputeCrossStoreHidden();
-      renderSummary();
-      refreshFilterUI();
+      applyPrefsChange(
+        { sessionPrefs: { crossStoreDedup: dedupEl.checked } },
+        { recomputeDedup: true, skipDomSync: true },
+      );
     });
   }
   document.getElementById("genreChips").addEventListener("click", e => {
     const chip = e.target.closest(".genre-chip");
     if (!chip) return;
     const genre = chip.dataset.genre;
-    if (state.prefs.genreFilters.includes(genre)) state.prefs.genreFilters = state.prefs.genreFilters.filter(x => x !== genre);
-    else state.prefs.genreFilters.push(genre);
-    savePrefs();
-    renderGenreChips();
-    refreshFilterUI();
+    const cur = state.prefs.genreFilters || [];
+    const next = cur.includes(genre) ? cur.filter(x => x !== genre) : [...cur, genre];
+    applyPrefsChange({ prefs: { genreFilters: next } }, { renderers: [renderGenreChips] });
   });
   document.getElementById("tagChips").addEventListener("click", e => {
     const chip = e.target.closest(".personal-tag-chip");
     if (!chip) return;
     const tag = chip.dataset.tag;
     const cur = state.prefs.tagFilters || [];
-    state.prefs.tagFilters = cur.includes(tag) ? cur.filter(x => x !== tag) : [...cur, tag];
-    savePrefs();
-    renderTagChips();
-    refreshFilterUI();
+    const next = cur.includes(tag) ? cur.filter(x => x !== tag) : [...cur, tag];
+    applyPrefsChange({ prefs: { tagFilters: next } }, { renderers: [renderTagChips] });
   });
   const tagModeEl = document.getElementById("tagFilterMode");
   tagModeEl.value = state.prefs.tagFilterMode || "OR";
   tagModeEl.addEventListener("change", () => {
-    state.prefs.tagFilterMode = tagModeEl.value;
-    savePrefs();
-    refreshFilterUI();
+    applyPrefsChange({ prefs: { tagFilterMode: tagModeEl.value } });
   });
   document.getElementById("addTagBtn").addEventListener("click", () => {
     const list = sortedGames(filteredGames());
@@ -671,6 +667,22 @@ export function bindEvents() {
     kebabMenu.classList.remove("open");
     try { await reloadGames(); } catch { alert("Could not reload library files. Run the fetch scripts (fetch_games.py, fetch_gog.py, etc.) and reload."); }
   });
+  // The run-log panel lives inside #dashboardContainer; opening it from
+  // another view requires switching first so it's actually visible.
+  // Sequenced in two rAFs because switchView defers the dashboard chrome
+  // toggle to the next frame on the overlay path.
+  const reopenFetcherConsole = () => {
+    const wasOnDash = state.activeView === "dashboard";
+    if (!wasOnDash) switchView("dashboard");
+    const open = () => fetcherRunner.reopenLogPanel();
+    if (wasOnDash) open();
+    else requestAnimationFrame(() => requestAnimationFrame(open));
+  };
+  document.getElementById("showFetcherLog")?.addEventListener("click", () => {
+    kebabMenu.classList.remove("open");
+    reopenFetcherConsole();
+  });
+  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", reopenFetcherConsole);
   kebabMenu.querySelectorAll("button, label").forEach(el => {
     el.addEventListener("click", () => kebabMenu.classList.remove("open"));
   });

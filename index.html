@@ -55,7 +55,7 @@
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
         </nav>
         <span class="text-[11px] text-slate-500 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
-        <span id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto self-center" aria-live="polite"></span>
+        <button type="button" id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto self-center" aria-live="polite" title="Show fetcher log"></button>
       </div>
       <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
@@ -177,6 +177,7 @@
           <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions">⋯</button>
           <div id="kebabMenu" class="absolute right-0 top-full mt-1 z-30 min-w-[180px] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 text-sm">
             <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
+            <button type="button" id="showFetcherLog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reopen the fetcher console (helpful if you closed it during a run)">Show fetcher log</button>
             <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
             <button type="button" id="exportNotes" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes</button>
             <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700">Copy top 20 backlog (Markdown)</button>

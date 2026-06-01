@@ -57,6 +57,7 @@ function buildOverlay() {
       <dt>filters</dt><dd data-field="filters">—</dd>
       <dt>fp</dt><dd data-field="fp" title="">—</dd>
       <dt>render</dt><dd data-field="render">—</dd>
+      <dt>dash</dt><dd data-field="dash" title="full / replay / skipped (reentrant+cooldown)">—</dd>
       <dt>errors</dt><dd data-field="errors">—</dd>
     </dl>
     <div class="baklog-debug-overlay-foot">?debug=1 · <code>localStorage.removeItem('${STORAGE_KEY}')</code></div>
@@ -103,8 +104,22 @@ function tick() {
     : (fp || '—');
   setField('fp', shortFp, { title: fp });
   setField('render', readLastRenderMs());
+  setField('dash', readDashStats());
   const errCount = getErrorCount();
   setField('errors', errCount > 0 ? `${errCount} (see window.__baklogErrors)` : '0');
+}
+
+/**
+ * Compact dashboard-render counters. Format: "F:1 R:0 S:0" where F=full
+ * renders, R=animation replays (explicit dashboard tab revisit only), S=
+ * suppressed (re-entrant + auto-replay blocked — boot schedules should bump
+ * skippedAutoReplay, not R).
+ */
+function readDashStats() {
+  const s = (typeof window !== "undefined" && window.__baklogDash?.stats) || null;
+  if (!s) return "—";
+  const skipped = (s.skippedReentrant || 0) + (s.skippedAutoReplay || 0);
+  return `F:${s.full} R:${s.replay} S:${skipped}`;
 }
 
 /**

@@ -350,15 +350,19 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   if (!running.length && !queued.length) {
     el.classList.add('hidden');
     el.textContent = '';
+    el.title = 'Show fetcher log';
     return;
   }
   el.classList.remove('hidden');
+  let text;
   if (running.length) {
     const extra = queued.length ? ` (+${queued.length} queued)` : '';
-    el.textContent = `Fetching: ${running.join(', ')}${extra}`;
+    text = `Fetching: ${running.join(', ')}${extra}`;
   } else {
-    el.textContent = `Queued: ${queued.join(', ')}`;
+    text = `Queued: ${queued.join(', ')}`;
   }
+  el.textContent = text;
+  el.title = `${text} — click to show log`;
 }
 
 export function humanizeAge(ms) {
@@ -549,35 +553,72 @@ export const fetcherRunner = (() => {
     return fetcherSources.find(s => s.key === key) || null;
   }
 
-  function ensurePanel(src) {
+  /**
+   * Build the panel's DOM shell + click delegation if it hasn't been built
+   * yet. Idempotent and safe to call from both run-starting paths
+   * (ensurePanel) and reopen paths (reopenLogPanel). Doesn't open the panel
+   * or change status — callers decide.
+   */
+  function buildLogPanelChrome() {
     const panel = logPanel();
+    if (!panel) return null;
+    if (panel.dataset.built) return panel;
+    panel.innerHTML = `
+      <div class="fh-log-head">
+        <span class="fh-log-title" data-role="title">Fetcher log</span>
+        <span class="fh-log-status" data-role="status">idle</span>
+        <span class="fh-log-spacer"></span>
+        <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel">Cancel</button>
+        <button type="button" class="fh-log-btn" data-role="clear">Clear</button>
+        <button type="button" class="fh-log-btn" data-role="close">Close</button>
+      </div>
+      <div class="fh-log-body" data-role="body"></div>
+    `;
+    panel.dataset.built = '1';
+    panel.addEventListener('click', e => {
+      const btn = e.target.closest('[data-role]');
+      if (!btn) return;
+      if (btn.dataset.role === 'close') closePanel();
+      else if (btn.dataset.role === 'clear') clearLog();
+      else if (btn.dataset.role === 'cancel') cancelActiveRun();
+    });
+    return panel;
+  }
+
+  function ensurePanel(src) {
+    const panel = buildLogPanelChrome();
     if (!panel) return;
-    if (!panel.dataset.built) {
-      panel.innerHTML = `
-        <div class="fh-log-head">
-          <span class="fh-log-title" data-role="title">Fetcher log</span>
-          <span class="fh-log-status" data-role="status">idle</span>
-          <span class="fh-log-spacer"></span>
-          <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel">Cancel</button>
-          <button type="button" class="fh-log-btn" data-role="clear">Clear</button>
-          <button type="button" class="fh-log-btn" data-role="close">Close</button>
-        </div>
-        <div class="fh-log-body" data-role="body"></div>
-      `;
-      panel.dataset.built = '1';
-      panel.addEventListener('click', e => {
-        const btn = e.target.closest('[data-role]');
-        if (!btn) return;
-        if (btn.dataset.role === 'close') closePanel();
-        else if (btn.dataset.role === 'clear') clearLog();
-        else if (btn.dataset.role === 'cancel') cancelActiveRun();
-      });
-    }
     panel.classList.add('open');
     panel.querySelector('[data-role="title"]').textContent = src ? `Running: ${src.label}` : 'Fetcher log';
     setStatus('queued');
     updateCancelButton();
     logBodyEl = panel.querySelector('[data-role="body"]');
+  }
+
+  /**
+   * Reopen the run-log panel (e.g. after the user clicked Close mid-run and
+   * wants it back). Builds the chrome shell if it hasn't been built yet so
+   * the kebab "Show fetcher log" entry works on a fresh page load with no
+   * activity. Doesn't change status or clear existing log lines — preserves
+   * whatever's already there so the user picks up where they left off.
+   *
+   * Note: the panel lives inside #dashboardContainer; callers from other
+   * views should switchView('dashboard') first so it's actually visible.
+   * @returns {boolean} true if the panel exists and was opened.
+   */
+  function reopenLogPanel() {
+    const panel = buildLogPanelChrome();
+    if (!panel) return false;
+    panel.classList.add('open');
+    const body = panel.querySelector('[data-role="body"]');
+    if (body && !body.children.length) {
+      const empty = document.createElement('div');
+      empty.className = 'fh-log-empty';
+      empty.textContent = 'No fetcher activity yet. Run a fetcher from the dashboard chips to populate.';
+      body.appendChild(empty);
+    }
+    logBodyEl = body || null;
+    return true;
   }
 
   function updateCancelButton() {
@@ -945,6 +986,7 @@ export const fetcherRunner = (() => {
     startDashboardPolling,
     stopDashboardPolling,
     closeAllStreams,
+    reopenLogPanel,
   };
 })();
 

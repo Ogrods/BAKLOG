@@ -194,13 +194,18 @@ export function bindEvents() {
   document.querySelectorAll("th[data-sort]").forEach(th => {
     th.addEventListener("click", e => {
       let key = th.dataset.sort;
-      if (key === "discount_percent" && e.shiftKey && state.activeView === "wishlist") {
-        key = "deal_price";
+      // Price header: shift-click swaps to discount % so power users can still
+      // surface biggest sales. Plain click sorts by the current price after
+      // sales (the visible value), which is what "Price" implies.
+      if (key === "deal_price" && e.shiftKey) {
+        key = "discount_percent";
       }
       if (state.sortKey === key) state.sortDir *= -1;
       else {
         state.sortKey = key;
-        state.sortDir = (key === "discount_percent" || key === "deal_price") ? -1 : 1;
+        // discount_percent → big sale first; deal_price → cheapest first;
+        // everything else → A-Z / oldest first.
+        state.sortDir = key === "discount_percent" ? -1 : 1;
       }
       persistCurrentSort();
       renderTable();

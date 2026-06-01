@@ -44,6 +44,9 @@ import {
   reanchorPickedRow,
 } from './table-ui.js';
 import { renderPicks } from './picks-ui.js';
+import { showViewOverlay, hideViewOverlay } from './loading-curtain.js';
+
+export { hideViewOverlay as hideViewLoading } from './loading-curtain.js';
 import {
   scheduleDashboardRender,
   cancelScheduledDashboardRender,
@@ -503,26 +506,6 @@ export function updatePickTabsVisibility() {
   });
 }
 
-export function showViewLoading(label) {
-  const ov = document.getElementById("viewLoadingOverlay");
-  const lbl = document.getElementById("viewLoadingLabel");
-  if (lbl && label) lbl.textContent = label;
-  if (ov) {
-    ov.setAttribute("aria-hidden", "false");
-    ov.classList.add("show");
-  }
-  document.querySelectorAll(".view-tab").forEach(b => { b.disabled = true; });
-}
-
-export function hideViewLoading() {
-  const ov = document.getElementById("viewLoadingOverlay");
-  if (ov) {
-    ov.classList.remove("show");
-    ov.setAttribute("aria-hidden", "true");
-  }
-  document.querySelectorAll(".view-tab").forEach(b => { b.disabled = false; });
-}
-
 export function switchView(view) {
   if (view === state.activeView) return;
   const fromView = state.activeView;
@@ -534,8 +517,7 @@ export function switchView(view) {
   // Light-up the clicked tab immediately so the click feels responsive even on
   // first-render paths where doSwitch is deferred to the next rAF.
   document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-  const label = view === "dashboard" ? "Loading dashboard…" : view === "wishlist" ? "Loading wishlist…" : view === "itch" ? "Loading itch.io…" : view === "connections" ? "Loading connections…" : "Loading library…";
-  if (useOverlay) showViewLoading(label);
+  if (useOverlay) showViewOverlay(view);
   const doSwitch = () => {
     if (fromView === "dashboard") {
       cancelScheduledDashboardRender();
@@ -594,7 +576,7 @@ export function switchView(view) {
       fetcherRunner.stopDashboardPolling();
       stopConnectionsPolling();
     }
-    if (useOverlay && !drillIn) hideViewLoading();
+    if (useOverlay && !drillIn) hideViewOverlay();
   };
   if (useOverlay) {
     requestAnimationFrame(() => requestAnimationFrame(doSwitch));

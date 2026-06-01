@@ -742,11 +742,15 @@ class Handler(SimpleHTTPRequestHandler):
     # Static assets that change during frontend work — never cache in dev so a
     # normal reload can't serve a mix of old and new ES modules (e.g. bind-events
     # calling fetcherRunner.reopenLogPanel while fetcher-health.js is still stale).
-    _NO_CACHE_SUFFIXES = (".js", ".mjs", ".css")
+    # .html is included because index.html ships an inline FOUC script that
+    # drives the boot curtain — a stale cached HTML can keep the curtain in
+    # an outdated state even after the JS bundle is refreshed.
+    _NO_CACHE_SUFFIXES = (".js", ".mjs", ".css", ".html")
 
     def end_headers(self) -> None:
         path = self.path.split("?", 1)[0].lower()
-        if path.endswith(self._NO_CACHE_SUFFIXES):
+        # Root path serves index.html, which has no suffix — treat it the same.
+        if path.endswith(self._NO_CACHE_SUFFIXES) or path == "/" or path == "":
             self.send_header("Cache-Control", "no-store")
         super().end_headers()
 

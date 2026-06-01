@@ -47,8 +47,12 @@ import {
   renderWishlistStoreChips,
   updateCleanupBtnState,
   updateViewChrome,
-  hideViewLoading,
 } from './filters-ui.js';
+import {
+  setBootCurtainLabel,
+  liftBootCurtain,
+  hideViewOverlay,
+} from './loading-curtain.js';
 import { reloadGames, reloadAfterFetcher } from './library-load.js';
 import { bindEvents } from './bind-events.js';
 import { startDebugOverlay } from './debug-overlay.js';
@@ -72,9 +76,11 @@ function hydrateState() {
   state.personal = loadPersonal();
   state.prefs = loadPrefs();
   state.sessionPrefs = loadSessionPrefs();
+  setBootCurtainLabel(state.prefs.activeView);
 }
 
 async function bootstrap() {
+  const tBoot = typeof performance !== "undefined" ? performance.now() : Date.now();
   // Dashboard now uses direct ES imports for its dependencies (game-core,
   // deals, genres, personal-storage, prefs, filters-ui, table-ui). The
   // initDashboard() call stays as a hook in case the dashboard ever needs
@@ -166,8 +172,19 @@ async function bootstrap() {
       banner.classList.remove("hidden");
     }
   });
-  await Promise.all([reloadPromise, bootstrapFetcherChrome()]);
-  hideViewLoading();
+  // Belt-and-suspenders: if either bootstrap chain rejects (fetcher API
+  // unreachable, manifest 404, etc.) we still need to lift the curtain.
+  // Without this the boot overlay can persist on Dashboard view because
+  // probeApi/syncFromServer threw and Promise.all never settled cleanly.
+  const fetcherPromise = bootstrapFetcherChrome().catch(err => {
+    console.warn("[bootstrap] fetcher chrome init failed", err);
+  });
+  try {
+    await Promise.all([reloadPromise, fetcherPromise]);
+  } finally {
+    liftBootCurtain(tBoot);
+    hideViewOverlay();
+  }
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {
       escapeHtml,
@@ -177,4 +194,10 @@ async function bootstrap() {
 }
 
 hydrateState();
-bootstrap();
+bootstrap().catch(err => {
+  console.error("[bootstrap] unhandled failure — lifting boot curtain", err);
+  // Belt-and-suspenders alongside the inline 8s safety net + the try/finally
+  // around Promise.all inside bootstrap().
+  liftBootCurtain(0, { force: true });
+  hideViewOverlay();
+});

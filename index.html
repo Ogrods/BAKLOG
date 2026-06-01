@@ -22,9 +22,27 @@
         var valid = { dashboard: 1, library: 1, wishlist: 1, itch: 1, connections: 1 };
         if (!valid[view]) view = 'dashboard';
         document.documentElement.setAttribute('data-init-view', view);
+        // Boot curtain covers every view consistently so the swap from
+        // empty HTML to populated chrome is one fade, not five different
+        // half-loaded states. The bundle removes the attribute once the
+        // first paint of the active view is ready.
+        document.documentElement.setAttribute('data-boot-loading', view);
       } catch (_) {
         document.documentElement.setAttribute('data-init-view', 'dashboard');
+        document.documentElement.setAttribute('data-boot-loading', 'dashboard');
       }
+      // Safety net: if bootstrap() throws or hangs (network stall, module
+      // import failure, infinite await, etc.), the boot curtain would trap
+      // the user behind a permanent spinner. Force-lift it after 8 seconds
+      // unconditionally. The normal dismiss path runs in <500ms on a warm
+      // cache, so this only fires in true failure scenarios.
+      setTimeout(function () {
+        if (document.documentElement.hasAttribute('data-boot-loading')) {
+          document.documentElement.removeAttribute('data-boot-loading');
+          var ov = document.getElementById('bootLoadingOverlay');
+          if (ov) ov.setAttribute('aria-busy', 'false');
+        }
+      }, 8000);
     })();
   </script>
   <link rel="stylesheet" href="tailwind.css" />
@@ -60,6 +78,13 @@
       <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
     </header>
+
+    <div id="bootLoadingOverlay" role="status" aria-live="polite" aria-busy="true">
+      <div class="boot-loading-card">
+        <div class="view-spinner" aria-hidden="true"></div>
+        <span id="bootLoadingLabel" class="boot-loading-label">Loading…</span>
+      </div>
+    </div>
 
     <section id="connectionsContainer" class="hidden mb-4">
       <div class="conn-hero">
@@ -116,6 +141,8 @@
           </p>
         </div>
       </details>
+      <div id="connectionsGrid"></div>
+      <div id="connectionsManualRow"></div>
       <details id="connAdvanced" class="conn-advanced">
         <summary>Advanced</summary>
         <div class="conn-advanced-body">
@@ -130,8 +157,6 @@
           </div>
         </div>
       </details>
-      <div id="connectionsGrid"></div>
-      <div id="connectionsManualRow"></div>
     </section>
 
     <section id="picksSection" class="bg-slate-800 rounded-lg mb-4">
@@ -193,7 +218,6 @@
     </section>
 
     <section id="dashboardContainer" class="hidden space-y-4 mb-4">
-      <div id="dashboardLoading" class="dash-card text-sm text-slate-400 text-center py-8">Loading charts…</div>
       <div id="dashboardContent" class="hidden space-y-4">
         <div id="dashboardFetcherHealth" class="dash-card dash-fetcher-health"></div>
         <div id="fetcherRunLog" class="fh-log"></div>
@@ -281,7 +305,7 @@
             <th data-sort="playtime_minutes" class="col-played p-2 text-right">Played</th>
             <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
             <th data-sort="steam_review_percent" class="p-2 text-right">Steam %</th>
-            <th id="priceHeader" data-sort="discount_percent" class="p-2 text-right">Price</th>
+            <th id="priceHeader" data-sort="deal_price" class="p-2 text-right" title="Click: sort by current price (low → high) · Shift-click: sort by discount % (biggest sale first)">Price</th>
             <th data-sort="release_date" class="p-2 text-left">Released</th>
             <th data-sort="last_played" class="col-lastplayed p-2 text-left">Last played</th>
             <th class="p-2 text-left">Genres</th>

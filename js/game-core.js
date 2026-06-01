@@ -6,12 +6,23 @@ import { getPersonal, hasPersonalEntry } from './personal-storage.js';
 
 // === Constants & config ===
 export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "other", "manual"];
-export const JUNK_NAMES = new Set(["live", "fortnite", "hbo max", "hbo go"]);
+export const JUNK_NAMES = new Set([
+  "live",
+  "fortnite",
+  "hbo max",
+  "hbo go",
+  "shadow costume for sonic",
+  "sonic holiday costume",
+]);
 const JUNK_NAME_PATTERNS = [
   /\btech beta\b/i,
   /\b(pre[- ]game )?editor\b/i,
   /\bresource archiver\b/i,
   /\bbeta\b$/i,
+  // "<Character> Costume for <Game>" pattern — Nintendo eShop lists these as
+  // full SKUs alongside real games. "Costume Quest" is a legit title so we
+  // require the "for" form to avoid false positives.
+  /\bcostume for\b/i,
 ];
 
 const MIN_REVIEW_COUNT = 50;

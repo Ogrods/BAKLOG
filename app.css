@@ -229,6 +229,47 @@ html[data-init-view="connections"] .view-tab[data-view="connections"] {
   color: #e2e8f0;
   background: rgba(14, 165, 233, 0.15);
 }
+/* === Bootstrap curtain (all five views) ===
+   html[data-boot-loading="<view>"] is set synchronously in <head>. The curtain
+   covers the active view's primary container plus chrome that paints into the
+   header strip so the cold-load swap is one fade, not five.
+
+   Tab switches use #viewLoadingOverlay (tableShell scrim) via loading-curtain.js. */
+#bootLoadingOverlay { display: none; }
+html[data-boot-loading] #bootLoadingOverlay {
+  display: block;
+  margin-bottom: 1rem;
+}
+.boot-loading-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  background: rgb(30 41 59);
+  border: 1px solid rgb(51 65 85);
+  border-radius: 0.5rem;
+}
+.boot-loading-label {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  letter-spacing: 0.01em;
+}
+/* Hide chrome that belongs to a loaded view; visibility (not display)
+   preserves layout so the reveal is a fade-style swap for below-curtain
+   sections. */
+html[data-boot-loading] #picksSection,
+html[data-boot-loading] #toolbarSection,
+html[data-boot-loading] #wishlistDealRadar,
+html[data-boot-loading] #tableShell,
+html[data-boot-loading] #rowCount,
+html[data-boot-loading] #dashboardContainer,
+html[data-boot-loading] #connectionsContainer { visibility: hidden; }
+/* #summary lives INSIDE the <header>, above the curtain. If chips get
+   appended during boot via renderSummary(), header grows and shoves the
+   curtain down. display:none keeps its footprint at zero until the boot
+   finishes. */
+html[data-boot-loading] #summary { display: none; }
 /* === Base === */
 /* Reserve the vertical scrollbar's gutter so the page never shifts
    horizontally the moment content overflows the viewport (especially
@@ -237,6 +278,16 @@ html { scrollbar-gutter: stable; }
 body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
 th { cursor: pointer; user-select: none; }
 th:hover { background: rgb(51 65 85); }
+.sort-arrow {
+  display: inline-block;
+  margin-left: 0.25rem;
+  font-size: 0.7em;
+  color: #38bdf8;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  min-width: 0.6rem;
+}
+.th-sorted { color: #e2e8f0; }
 /* Tailwind v4 removed the default pointer cursor on <button>; restore it.
    Specificity stays at a single element so class-level overrides like
    `.conn-pill { cursor: default }` continue to win. */
@@ -1164,17 +1215,25 @@ body.bulk-bar-open { padding-bottom: 56px; }
 }
 .dash-spotlight-body {
   position: absolute;
-  bottom: 18px;
-  right: 22px;
+  bottom: 14px;
+  right: 14px;
   left: auto;
-  max-width: 38%;
+  max-width: 42%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   text-align: right;
   align-items: flex-end;
   color: #f1f5f9;
   z-index: 2;
+  /* Compact translucent backplate so spotlight text stays readable when the
+     cover art is light (white CHUCHEL etc.). Same bg/border style as
+     .dash-hero-pillar, just tighter padding for the 3 small lines. */
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  border-radius: 8px;
+  padding: 8px 12px;
+  backdrop-filter: blur(2px);
 }
 .dash-spotlight-eyebrow {
   font-size: 10px;
@@ -2132,7 +2191,9 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   background: #0f172a;
   border: 1px solid #334155;
   border-radius: 8px;
-  margin: 0 0 14px;
+  /* Sits at bottom of #connectionsContainer (below the connection grid +
+     manual row). Top margin gives breathing room from the cards above. */
+  margin: 18px 0 0;
   font-size: 12px;
 }
 .conn-advanced > summary {

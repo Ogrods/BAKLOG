@@ -975,8 +975,43 @@ function paintTableBody(list, opts = {}) {
   }
 }
 
+/**
+ * Decorate every `<th data-sort>` with an aria-sort attribute and a small
+ * arrow span (.sort-arrow) reflecting the current state.sortKey / sortDir.
+ *
+ * The Price header has a special case — its data-sort is `deal_price`, but
+ * shift-click also routes the same column to `discount_percent`. So when
+ * sortKey is `discount_percent`, the Price header should still show as
+ * "active" with a `%` glyph so the user knows the column is sorting by
+ * discount instead of by price.
+ */
+export function renderSortIndicators() {
+  const key = state.sortKey;
+  const dir = state.sortDir;
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    const ownKey = th.dataset.sort;
+    const isPriceHeader = th.id === "priceHeader";
+    const matchesAlt = isPriceHeader && key === "discount_percent";
+    const active = ownKey === key || matchesAlt;
+    const arrowGlyph = matchesAlt
+      ? (dir < 0 ? "%↓" : "%↑")
+      : (dir < 0 ? "↓" : "↑");
+    th.setAttribute("aria-sort", active ? (dir < 0 ? "descending" : "ascending") : "none");
+    th.classList.toggle("th-sorted", active);
+    let arrow = th.querySelector(".sort-arrow");
+    if (!arrow) {
+      arrow = document.createElement("span");
+      arrow.className = "sort-arrow";
+      arrow.setAttribute("aria-hidden", "true");
+      th.appendChild(arrow);
+    }
+    arrow.textContent = active ? arrowGlyph : "";
+  });
+}
+
 export async function renderTable(opts) {
   const force = !!opts?.force;
+  renderSortIndicators();
   const fp = tableFingerprint();
   if (!force && fp === _tableFingerprint && _lastRenderedView === state.activeView && state._visibleList && isTablePainted(state._visibleList)) {
     if (state._pendingFocusKey && state._visibleList) consumePendingFocus(state._visibleList);

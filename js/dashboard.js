@@ -234,21 +234,10 @@ export function renderDashboard(opts = {}) {
     _dashRenderStats.skippedReentrant++;
     return;
   }
-  const loading = document.getElementById("dashboardLoading");
   const content = document.getElementById("dashboardContent");
-  if (typeof Chart === "undefined") {
-    loading?.classList.remove("hidden");
-    content?.classList.add("hidden");
-    if (loading) loading.textContent = "Loading charts…";
-    return;
-  }
-  if (!state.dashboardDataReady) {
-    loading?.classList.remove("hidden");
-    content?.classList.add("hidden");
-    if (loading) loading.textContent = "Loading library…";
-    return;
-  }
-  loading?.classList.add("hidden");
+  // Boot curtain covers Chart.js / data-not-ready during cold load; no in-card loader.
+  if (typeof Chart === "undefined") return;
+  if (!state.dashboardDataReady) return;
   content?.classList.remove("hidden");
 
   const fp = dashboardFingerprint();

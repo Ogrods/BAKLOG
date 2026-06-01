@@ -20,6 +20,7 @@ import { state } from './state.js';
 import { tableFingerprint } from './table-ui.js';
 import { collectActiveFilters } from './filters-ui.js';
 import { getErrorCount } from './error-boundary.js';
+import { getCurtainState } from './loading-curtain.js';
 
 const STORAGE_KEY = 'baklog-debug';
 const POLL_INTERVAL_MS = 500;
@@ -58,6 +59,7 @@ function buildOverlay() {
       <dt>fp</dt><dd data-field="fp" title="">—</dd>
       <dt>render</dt><dd data-field="render">—</dd>
       <dt>dash</dt><dd data-field="dash" title="full / replay / skipped (reentrant+cooldown)">—</dd>
+      <dt>curtain</dt><dd data-field="curtain" title="boot data-boot-loading + view overlay">—</dd>
       <dt>errors</dt><dd data-field="errors">—</dd>
     </dl>
     <div class="baklog-debug-overlay-foot">?debug=1 · <code>localStorage.removeItem('${STORAGE_KEY}')</code></div>
@@ -105,6 +107,7 @@ function tick() {
   setField('fp', shortFp, { title: fp });
   setField('render', readLastRenderMs());
   setField('dash', readDashStats());
+  setField('curtain', readCurtainState());
   const errCount = getErrorCount();
   setField('errors', errCount > 0 ? `${errCount} (see window.__baklogErrors)` : '0');
 }
@@ -120,6 +123,22 @@ function readDashStats() {
   if (!s) return "—";
   const skipped = (s.skippedReentrant || 0) + (s.skippedAutoReplay || 0);
   return `F:${s.full} R:${s.replay} S:${skipped}`;
+}
+
+function readCurtainState() {
+  try {
+    const c = getCurtainState();
+    const boot =
+      c.bootReason != null
+        ? `${c.bootReason}${c.bootElapsedMs != null ? ` ${c.bootElapsedMs}ms` : ""}`
+        : "—";
+    const view = c.viewOverlayShown
+      ? (c.viewOverlayLabel || "on")
+      : "—";
+    return `boot:${boot} · view:${view}`;
+  } catch (_) {
+    return "—";
+  }
 }
 
 /**

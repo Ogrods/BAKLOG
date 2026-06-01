@@ -90,6 +90,11 @@ export function destroyDashboardCharts() {
 
 /** Replay the entrance animation on every live chart without rebuilding it. */
 export function replayDashboardChartAnimations() {
+  // Single animated pass on every live chart. reset() rewinds the animation
+  // state to its `from` values; update() then animates back to current data.
+  // Pair with animations.resize.duration:0 (in dashChartOptions) so the
+  // container unhide on tab change can't trigger a second resize animation
+  // racing with this one.
   for (const chart of Object.values(dashboardCharts)) {
     try {
       chart.reset();
@@ -99,11 +104,16 @@ export function replayDashboardChartAnimations() {
 }
 
 function dashChartOptions(extra = {}) {
+  const { animations: extraAnim, ...rest } = extra;
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { labels: { color: "#ffffff", boxWidth: 12 } } },
-    ...extra,
+    animations: {
+      resize: { duration: 0 },
+      ...extraAnim,
+    },
+    ...rest,
   };
 }
 

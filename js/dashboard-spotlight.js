@@ -1,0 +1,244 @@
+// Rotating dashboard spotlight (hero card with auto-fade).
+// Extracted from dashboard.js as part of the dashboard module split.
+
+import { state } from './state.js';
+import { escapeAttr, escapeHtml } from './dom-util.js';
+import { gameKey, hltbMain, ratingValue, coverFallbackFor, hasEnoughReviews } from './game-core.js';
+import { getPersonal } from './personal-storage.js';
+
+const SPOTLIGHT_INTERVAL_MS = 7000;
+const SPOTLIGHT_FADE_MS = 300;
+
+let _spotlightTimer = null;
+let _spotlightFadeTimer = null;
+let _spotlightIndex = 0;
+let _spotlightPool = [];
+let _spotlightCurrentKey = null;
+
+export function getSpotlightPool() { return _spotlightPool; }
+export function getSpotlightCurrentKey() { return _spotlightCurrentKey; }
+export function setSpotlightCurrentKey(key) { _spotlightCurrentKey = key; }
+
+export function stopSpotlightRotation() {
+  if (_spotlightTimer) clearInterval(_spotlightTimer);
+  if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+  _spotlightTimer = null;
+  _spotlightFadeTimer = null;
+  // Intentionally NOT clearing _spotlightIndex / _spotlightCurrentKey / _spotlightPool —
+  // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
+}
+
+function poolKeysEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (gameKey(a[i]) !== gameKey(b[i])) return false;
+  }
+  return true;
+}
+
+function gameSpotlightReason(g) {
+  const rating = ratingValue(g);
+  const hltb = hltbMain(g);
+  const personal = getPersonal(g);
+  const enough = hasEnoughReviews(g);
+  const playtime = g.playtime_minutes || 0;
+  const status = personal.status || 'backlog';
+  if (['finished', 'skip', 'live'].includes(status)) return null;
+  if (!['backlog', 'next', 'playing', 'unfinished'].includes(status)) return null;
+
+  if ((status === 'playing' || status === 'unfinished') && playtime >= 30 && rating >= 70) {
+    return { eyebrow: 'Return to', score: rating + 6 };
+  }
+  if (status === 'next' && rating >= 70) {
+    return { eyebrow: 'Up next', score: rating + 10 };
+  }
+  if (rating >= 88 && enough && hltb && hltb <= 8) {
+    return { eyebrow: 'Top-rated quick pick', score: rating + 8 };
+  }
+  if (rating >= 90 && enough) {
+    return { eyebrow: 'Critically acclaimed', score: rating + 4 };
+  }
+  if (rating >= 78 && hltb && hltb <= 5) {
+    return { eyebrow: 'Quick win', score: rating + 2 };
+  }
+  if (rating >= 82 && enough) {
+    return { eyebrow: 'Highly rated', score: rating };
+  }
+  if (rating >= 80 && !enough) {
+    return { eyebrow: 'Hidden gem', score: rating - 3 };
+  }
+  if (rating >= 75 && enough) {
+    return { eyebrow: 'Solid pick', score: rating - 5 };
+  }
+  if (hltb && hltb <= 4 && rating > 0) {
+    return { eyebrow: 'Fast finish', score: rating - 6 };
+  }
+  if (rating >= 70) {
+    return { eyebrow: 'Worth a look', score: rating - 10 };
+  }
+  return null;
+}
+
+export function pickSpotlightGames(games) {
+  const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
+  const hasArt = g => !!(g.header_image || g.library_image) && !failed.has(gameKey(g));
+  const eligible = games.filter(hasArt);
+  const target = Math.max(60, Math.round(eligible.length * 0.35));
+
+  const tagged = [];
+  for (const g of eligible) {
+    const reason = gameSpotlightReason(g);
+    if (reason) tagged.push({ g, reason });
+  }
+  tagged.sort((a, b) => b.reason.score - a.reason.score);
+  const top = tagged.slice(0, target);
+
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j], top[i]];
+  }
+  const pool = top.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
+
+  // Preserve the previously-displayed game across dashboard revisits: if it's still
+  // eligible, rotate it to index 0 so re-paint doesn't visibly switch games.
+  if (_spotlightCurrentKey) {
+    const idx = pool.findIndex(g => gameKey(g) === _spotlightCurrentKey);
+    if (idx > 0) {
+      const [head] = pool.splice(idx, 1);
+      pool.unshift(head);
+    }
+  }
+  return pool;
+}
+
+const SPOTLIGHT_STATUS_LABEL = {
+  backlog: 'in backlog',
+  next: 'next up',
+  playing: 'in progress',
+  unfinished: 'unfinished',
+};
+
+export function spotlightInnerHtml(g) {
+  const art = g.header_image || g.library_image || coverFallbackFor(g);
+  const rating = ratingValue(g);
+  const hltb = hltbMain(g);
+  const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
+  const status = (getPersonal(g).status) || 'backlog';
+  const statusLabel = SPOTLIGHT_STATUS_LABEL[status] || 'in your library';
+  const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
+  return `
+    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded');window.coverFallback(this)" />
+    <div class="dash-spotlight-gradient" aria-hidden="true"></div>
+    <div class="dash-spotlight-body">
+      <span class="dash-spotlight-eyebrow">${escapeHtml(eyebrow)}</span>
+      <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
+      <span class="dash-spotlight-meta"><strong>${rating}%</strong> review · <strong>${escapeHtml(hltbStr)}</strong> main · ${escapeHtml(statusLabel)}</span>
+    </div>`;
+}
+
+export function renderSpotlightHtml(g) {
+  const key = gameKey(g);
+  return `
+    <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in library">
+      ${spotlightInnerHtml(g)}
+    </button>`;
+}
+
+export function primeSpotlightArt(btn) {
+  const img = btn?.querySelector('.dash-spotlight-art');
+  if (!img) return;
+  if (img.complete && img.naturalWidth > 0) img.classList.add('is-loaded');
+}
+
+function wireSpotlightHover(el) {
+  if (!el || el.dataset.hoverWired) return;
+  el.dataset.hoverWired = '1';
+  let paused = false;
+  el.addEventListener('mouseenter', () => { paused = true; });
+  el.addEventListener('mouseleave', () => { paused = false; });
+  el._spotlightPaused = () => paused;
+}
+
+export function startSpotlightRotation(pool) {
+  if (!pool || pool.length <= 1) {
+    stopSpotlightRotation();
+    _spotlightPool = pool || [];
+    return;
+  }
+  const el = document.getElementById('dashboardSpotlight');
+  if (!el) return;
+  const domMatches = !!pool[0] && el.dataset.key === gameKey(pool[0]);
+  _spotlightPool = pool;
+  // Same slide still mounted: resume rotation only (no innerHTML swap / fade-in).
+  if (domMatches) {
+    if (_spotlightTimer) return;
+    wireSpotlightHover(el);
+    _spotlightTimer = setInterval(() => {
+      const paused = el._spotlightPaused?.() ?? false;
+      if (paused) return;
+      if (!document.getElementById('dashboardSpotlight')) {
+        stopSpotlightRotation();
+        return;
+      }
+      _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
+      const next = _spotlightPool[_spotlightIndex];
+      el.classList.add('is-fading');
+      if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+      _spotlightFadeTimer = setTimeout(() => {
+        el.innerHTML = spotlightInnerHtml(next);
+        el.dataset.key = gameKey(next);
+        el.title = `Jump to ${next.name} in library`;
+        el.classList.remove('is-fading');
+        primeSpotlightArt(el);
+        _spotlightCurrentKey = gameKey(next);
+      }, SPOTLIGHT_FADE_MS);
+    }, SPOTLIGHT_INTERVAL_MS);
+    return;
+  }
+  stopSpotlightRotation();
+  // _spotlightIndex is intentionally NOT reset — pickSpotlightGames has already
+  // arranged the pool so the previously-displayed game is at index 0; on first
+  // load _spotlightIndex is already 0 from module init.
+  _spotlightIndex = 0;
+  wireSpotlightHover(el);
+  _spotlightTimer = setInterval(() => {
+    if (el._spotlightPaused?.()) return;
+    if (!document.getElementById('dashboardSpotlight')) {
+      stopSpotlightRotation();
+      return;
+    }
+    _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
+    const next = _spotlightPool[_spotlightIndex];
+    el.classList.add('is-fading');
+    if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+    _spotlightFadeTimer = setTimeout(() => {
+      el.innerHTML = spotlightInnerHtml(next);
+      el.dataset.key = gameKey(next);
+      el.title = `Jump to ${next.name} in library`;
+      el.classList.remove('is-fading');
+      primeSpotlightArt(el);
+      _spotlightCurrentKey = gameKey(next);
+    }, SPOTLIGHT_FADE_MS);
+  }, SPOTLIGHT_INTERVAL_MS);
+}
+
+export function syncSpotlightInMega(el, spotlight) {
+  const hero = el.querySelector('.dash-mega-hero');
+  const existing = document.getElementById('dashboardSpotlight');
+  const newKey = spotlight ? gameKey(spotlight) : null;
+  if (spotlight && existing?.dataset.key === newKey) {
+    primeSpotlightArt(existing);
+    return;
+  }
+  if (spotlight && existing) {
+    existing.outerHTML = renderSpotlightHtml(spotlight);
+    primeSpotlightArt(document.getElementById('dashboardSpotlight'));
+    return;
+  }
+  if (spotlight && !existing && hero) {
+    hero.insertAdjacentHTML('afterbegin', renderSpotlightHtml(spotlight));
+    primeSpotlightArt(document.getElementById('dashboardSpotlight'));
+    return;
+  }
+  existing?.remove();
+}

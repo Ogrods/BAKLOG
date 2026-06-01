@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:js": "vitest run"
+    "test": "vitest run",
+    "test:js": "vitest run",
+    "test:js:watch": "vitest"
   },
   "devDependencies": {
+    "happy-dom": "^20.9.0",
     "vitest": "^3.0.0"
   }
 }

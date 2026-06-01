@@ -28,7 +28,11 @@
     })();
   </script>
   <link rel="stylesheet" href="tailwind.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+  <!-- Chart.js self-hosted from vendor/ (Edge tracking-prevention blocks storage
+       access for cdn.jsdelivr.net, producing console noise). Pin version when
+       upgrading: re-download chart.umd.min.js from
+       https://cdn.jsdelivr.net/npm/chart.js@<ver>/dist/chart.umd.min.js -->
+  <script src="vendor/chart.umd.min.js" defer></script>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -134,7 +138,7 @@
       <div class="flex flex-wrap items-center gap-2 p-3 border-b border-slate-700 relative z-10">
         <button id="togglePicks" class="px-2 py-1 rounded bg-slate-700 text-xs">Hide</button>
         <h2 class="text-sm font-semibold tracking-wide text-slate-200 uppercase">Picks</h2>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs active" data-tab="topRated">Top Rated</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs active" data-tab="topRated" data-pick-view="library">Top Rated</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp" data-pick-view="library">Next Up</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins" data-pick-view="library">Quick Wins</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems" data-pick-view="library">Hidden Gems</button>
@@ -290,13 +294,14 @@
     <p id="rowCount" class="text-slate-400 text-sm mt-2"></p>
   </div>
 
-  <nav id="alphaNav" aria-label="Jump to letter"></nav>
-
-  <button id="backToTop" type="button" title="Back to top" aria-label="Back to top">
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M10 16 L10 4 M4 10 L10 4 L16 10" />
-    </svg>
-  </button>
+  <div id="alphaNavWrap">
+    <button id="backToTop" type="button" title="Back to top" aria-label="Back to top">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10 13 L10 7 M6 10 L10 6 L14 10" />
+      </svg>
+    </button>
+    <nav id="alphaNav" aria-label="Jump to letter"></nav>
+  </div>
   <script>
     (function () {
       var btn = document.getElementById('backToTop');
@@ -308,7 +313,9 @@
       window.addEventListener('scroll', sync, { passive: true });
       window.addEventListener('resize', sync, { passive: true });
       btn.addEventListener('click', function () {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Instant jump — smooth-scrolling a 1700-row table forces a paint per
+        // animation frame and stalls for seconds. Snap to top instead.
+        window.scrollTo(0, 0);
       });
       sync();
     })();

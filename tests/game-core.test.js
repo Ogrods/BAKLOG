@@ -23,6 +23,7 @@ import {
   combinedPlaytime,
   combinedPlaytimeTooltip,
   storeUrlForGame,
+  trophyProgressPillHtml,
 } from '../js/game-core.js';
 import { state } from '../js/state.js';
 
@@ -342,5 +343,20 @@ describe('formatReleaseDate', () => {
 
   it('parses year-only strings as-is', () => {
     expect(formatReleaseDate('2020')).toMatch(/2020/);
+  });
+});
+
+describe('trophyProgressPillHtml', () => {
+  it('returns empty when trophy_progress is absent', () => {
+    expect(trophyProgressPillHtml(null)).toBe('');
+    expect(trophyProgressPillHtml({ store: 'steam', id: 1 })).toBe('');
+    expect(trophyProgressPillHtml({ store: 'psn', id: 'abc', trophy_progress: null })).toBe('');
+  });
+
+  it('renders a slim pill with rounded percent when trophy_progress is set', () => {
+    const html = trophyProgressPillHtml({ store: 'psn', id: 'abc', trophy_progress: 73.4 });
+    expect(html).toContain('trophy-pill');
+    expect(html).toContain('73%');
+    expect(html).toContain('PSN trophy completion: 73%');
   });
 });

@@ -143,6 +143,12 @@
 
     .freenotes { width: 100%; min-height: 200px; background: var(--bg); color: var(--text); border: 1px solid var(--border-soft); border-radius: 0.375rem; padding: 0.75rem; font-family: inherit; font-size: 0.9rem; line-height: 1.5; resize: vertical; }
     .freenotes:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .owner-pref { width: 100%; min-height: 130px; background: var(--bg); color: var(--text); border: 1px solid var(--border-soft); border-radius: 0.375rem; padding: 0.65rem; font-family: inherit; font-size: 0.85rem; line-height: 1.45; resize: vertical; }
+    .owner-pref:focus { outline: 2px solid var(--amber); outline-offset: 1px; border-color: transparent; }
+    .owner-lane { border-left: 4px solid var(--amber); }
+    .agency-lane h2::after { content: "Agency draft"; margin-left: 0.45rem; font-size: 0.65rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; }
+    .monetize-subnav { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 1rem; }
+    .monetize-subnav .tab { padding: 0.3rem 0.65rem; font-size: 0.78rem; }
 
     .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--bg-elev); color: var(--text); border: 1px solid var(--accent); padding: 0.65rem 1.2rem; border-radius: 0.375rem; font-size: 0.85rem; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 50; }
     .toast.show { opacity: 1; }
@@ -192,11 +198,16 @@
     { id: "arch", label: "Architecture" },
     { id: "pipeline", label: "Pipeline" },
     { id: "wishlist", label: "Wishlist matrix" },
-    { id: "findings", label: "Audit findings" },
-    { id: "blindspots", label: "Blind spots" },
+    { id: "triage", label: "Triage" },
     { id: "debug", label: "Debug tools" },
     { id: "monetize", label: "Monetization" },
   ];
+
+  // ---------- Persisted state: legacy tab migration ----------
+  // The two original tabs ("findings" + "blindspots") were consolidated into
+  // a single "Triage" tab. Old localStorage state pointed activeTab at the
+  // gone tabs and would otherwise leave the user staring at a blank panel.
+  const LEGACY_TAB_MAP = { findings: "triage", blindspots: "triage" };
 
   // ---------- Phases (checklists) ----------
   const PHASES = [
@@ -275,7 +286,7 @@
       title: "Phase 5 — Monetize / launch",
       tagline: "Pick a business shape. Pick a launch channel. Don't pick both at once.",
       items: [
-        { id: "p5_pick_model", label: "Pick a model (OSS + paid hosted sync, one-time paid app, or affiliate-only). See Monetization tab" },
+        { id: "p5_pick_model", label: "Pick a model in Monetization -> Model iterations (OSS + paid hosted sync, one-time paid app, affiliate-only, or hybrid)" },
         { id: "p5_pick_channel", label: "Pick one launch channel (HN Show / r/patientgamers / r/Steam / Twitter / YouTube long-form) — not multiple" },
         { id: "p5_pricing", label: "Pricing decided (if paid): one number, no tiers at launch" },
         { id: "p5_soft_launch", label: "Soft launch: invite-only beta with 10–20 friends before going public" },
@@ -359,6 +370,8 @@
       body: "Diagnosed 2026-06-01. Every non-Steam fetcher (GOG, Epic, PSN, Amazon, Xbox, Battle.net, Ubisoft, Nintendo) built fresh rows from the store API and overwrote the on-disk JSON with them. Steam-review-percent / steam-review-count / steam-review-desc are written by enrich_steam_reviews.py — they aren't in the store API payload, so every re-fetch zeroed them. HLTB hours had the same vulnerability except a hand-rolled 'preserve HLTB' branch in each fetcher.\n\nFix: new fetchers/_base.py::merge_cached_row(fresh, cached, authoritative, hltb_updated) + per-store authoritative-field sets in fetchers/_authoritative.py. Each fetcher passes its own authoritative set (e.g. GOG = library_authoritative('gog_id'), PSN adds psn_id / np_communication_id / title_id / concept_id / psn_platforms / trophy_progress / first_played). merge_cached_row writes fresh values for fields the store owns, preserves cached enrichment for everything else, and respects hltb_updated to opt into a fresh HLTB overwrite. 11 sites migrated. 4 new pytest cases in tests/test_merge_cached_row.py cover Steam-reviews-preserved + HLTB-updated-when-flagged + authoritative-field-overwrite.\n\nAudit lesson: silent data loss across fetcher boundaries is invisible by definition — there's no test that fails when a column quietly resets to null. The fix turns the merge contract into a typed, per-store explicit set so 'who owns this field?' is a 30-second answer instead of a code spelunk. The fetcher manifest audit test should grow a case that asserts every fetcher imports an authoritative set." },
     { id: "find_steam_review_enricher_loose_match", area: "Arch", severity: "grey", title: "[RESOLVED] Steam review enricher's substring fallback matched sequels and DLC",
       body: "Diagnosed 2026-06-01 during a Death Stranding HD Wallpaper investigation. enrich_steam_reviews.py::steam_search() falls back to the first store-search result if its normalized title 'looks close enough' to the query. The original close-enough check ('substring either way') let 'death stranding' match 'death stranding 2 on beach', 'death stranding director s cut', and 'death stranding digital artbook'. Reviews from the wrong appid got written to the row.\n\nFix: tightened _close_enough_title with (a) _number_tokens(candidate) - _number_tokens(target) rejects sequel numerals not present in the target ('death stranding' vs 'death stranding 2'), (b) candidate must startswith target (no infix matches), (c) _SPINOFF_MARKERS regex rejects suffix tokens like director / artbook / soundtrack / wallpaper / dlc / upgrade / deluxe / bundle / pack / skin / ost, (d) tail subtitle limited to ≤2 words so 'control' → 'control ultimate edition' still matches but 'age of wonders' → 'age of wonders 4' is rejected. Added --refresh-empty flag to retry rows with appid mapped but null reviews (skips the store search). Manually cleared then corrected the Death Stranding entry in cache/steam_review_map.json. 7 new pytest parametrize cases in tests/test_enrich_steam_reviews.py lock the sequel + spinoff + edition rules.\n\nAudit lesson: name-matching heuristics have a long tail of failure modes that only surface when you spot-check user data. The fix is to surface the failure cases via tests and add a refresh-empty escape hatch so the user can re-run after the matcher gets smarter, without nuking the working entries." },
+    { id: "find_dbg_fetcher_resilience", area: "Debug", severity: "grey", title: "[RESOLVED] Fetcher cancel + queue cap + reconnect-loop fix",
+      body: "Resolved 2026-06-02. Three reinforcing bugs in the fetcher run plumbing surfaced as a runaway 'stream dropped — reconnecting in 2s/4s/8s…' log loop the user couldn't escape via Cancel.\n\n(1) Server: RunManager had no concurrency cap. A fast double-click could land GOG + itch + a third run on the queue. Fix: cap of 1 running + 1 queued in submit() (raises ValueError → 409 to client). UI guards via fetcherRunner.inFlightCount()/isQueueFull(); chipHtml disables every chip when the queue is full elsewhere; runAllStale uses waitForQueueSlot() to drip new submissions in rather than burst.\n\n(2) Server: Cancel wedged the single HTTP thread. Run.cancel() called proc.terminate() + proc.wait(TERMINATE_GRACE_SEC=5). SimpleHTTPRequestHandler is single-threaded, so the cancel POST blocked every other request — including subsequent /cancel attempts — for up to 5s per stuck process. Fix: cancel uses _terminate_pid() (taskkill /T /F on Windows) immediately; broadcast/finalize fires synchronously off the queued state.\n\n(3) Client: Cancel only knew about liveRunId. If GOG was running and itch was queued, the old Cancel button cancelled GOG and left itch behind — itch's EventSource kept reconnecting against a server with no matching run, so the user got endless 'stream dropped' meta-lines. Fix: new POST /api/runs/cancel walks active + queue + cancels everything; client cancelInFlightRuns() snapshots the run ids first, stuffs them into suppressedRunIds, closes every EventSource, and clears all chip state. scheduleReconnect/subscribe/syncFromServer all check suppressedRunIds before resubscribing so the loop is structurally impossible. pruneSuppressedRuns() drops ids the server has forgotten so the set doesn't grow.\n\nAlso closed: Cancel button now appears whenever inFlightCount() > 0 (not just when liveRunId is set), so a queued-but-not-yet-running fetcher can be cancelled before it starts. New tests/test_run_manager.py::test_cancel_all_clears_active_and_queue covers the cancel-all path. Lesson for future audits: any operation that 'cancels' state needs an answer for 'cancel which one?' — the bias toward singular liveRunId leaked into reconnect/resubscribe and made a dead run indistinguishable from a live one." },
     { id: "find_coop_tag_enrichment", area: "Arch", severity: "grey", title: "[RESOLVED] Co-op tag enrichment for non-Steam libraries",
       body: "Shipped 2026-06-01. fetch_games.py had been parsing 'Online Co-op' / 'Shared/Split Screen Co-op' / 'LAN Co-op' out of Steam category descriptions and writing coop_online + coop_local on every Steam row. Non-Steam libraries shipped both flags as undefined because their store APIs don't carry the concept. js/coop-overrides.js was the manual escape hatch (5 entries) but didn't scale.\n\nNew enrich_steam_tags.py reads the cache/steam_review_map.json appid mapping (already built and maintained by enrich_steam_reviews.py) and, for every non-Steam row with a Steam appid match, calls SteamClient.get_app_details(appid) — reuses the existing on-disk appdetails cache so most calls are free — and writes coop_online / coop_local from the same _coop_flags_from_categories logic Steam fetch uses. Also fills missing genres / release_date where the store didn't provide them (FILL_IF_MISSING semantics — store data wins when present).\n\nShared steam_metadata.py owns the classifier so both fetch_games.py and the new enricher import the same rules. fetchers/manifest.json gains the steamTags chip (group: enrich, label: 'Co-op tags'); js/fetcher-health.js shows coverage % + pending-row count; js/library-load.js auto-reloads library JSON on chip click so the new flags surface immediately. python -m enrichers steam-tags is the unified entry point. 15 unit + 3 offline-integration tests cover the classifier, the merge contract (no extra fields leak onto rows), dry-run idempotence, and the no-mapping bail." },
   ];
@@ -373,7 +386,8 @@
     { id: "bs_i18n", title: "Internationalization / currency", body: "ITAD returns USD-shaped data; the dashboard hardcodes '$'. Anyone outside USD sees wrong-looking prices." },
     { id: "bs_a11y", title: "Accessibility has not been audited", body: "Keyboard shortcuts exist; ARIA, focus management, screen reader story are untested. Easy to get wrong; cheap to fix early." },
     { id: "bs_perf_budget", title: "No performance budget", body: "App is fast enough on your machine. A productized version needs measurements: cold load ms, time-to-interactive, bundle size, memory ceiling with N games." },
-    { id: "bs_fetcher_backoff", title: "No exponential backoff on failing fetchers", body: "auth/runner.py watchdog + taskkill /F handles silent hangs. Nothing handles 'this fetcher has failed 3 times today, stop nagging me and surface a Reconnect button'." },
+    { id: "bs_fetcher_backoff", title: "[PARTIAL] Fetcher resilience pass — cancel/queue/reconnect hardened; chip-level auth-failure backoff still TBD",
+      body: "Partially resolved 2026-06-02. Shipped (see find_dbg_fetcher_resilience):\n\n• Server-side queue cap (max 1 running + 1 queued) — RunManager.submit returns 409 when in_flight >= 2, mirrored client-side via fetcherRunner.isQueueFull() so the UI never lets a third run land.\n\n• Cancel-all endpoint (POST /api/runs/cancel) — old per-run cancel button only knew about liveRunId, so a queued sibling would keep emitting 'stream dropped — reconnecting…' after the active run died. New endpoint walks both active + queue and cancels them in one call; client adds suppressedRunIds so scheduleReconnect/subscribe/syncFromServer can't resurrect a cancelled run id.\n\n• Cancel no longer wedges the HTTP thread — Run.cancel() used to call proc.terminate() then proc.wait(5s), blocking SimpleHTTPRequestHandler (single-threaded) from accepting another request. Now uses immediate _terminate_pid() (taskkill /T /F on Windows), so /cancel returns instantly.\n\n• EventSource reconnect already has bounded exponential backoff (2s → 30s, 8 attempts) + post-cap user-facing 'refresh the page or use Cancel' message.\n\nStill open: chip-level 'this fetcher has failed N times today, stop nagging me' affordance. Today, fetcher-health marks the chip 'failed' for 10s then clears; a persistent reconnect-required state per provider (with a dismiss button) is the remaining UX gap and feeds the original blind spot." },
     { id: "bs_semver", title: "[RESOLVED] Semver source-of-truth + release discipline documented", body: "Resolved 2026-06-01. pyproject.toml is the single source of truth (currently 0.6.0); package.json mirrors it. CHANGELOG.md now has a 'Release discipline' block at the top documenting the SemVer contract + the bump → rename Unreleased block → tag → push workflow. First git tag (v0.6.0) intentionally left unpushed — that's a deliberate user action, not a tool action; the contract is in place so the tag itself is a one-liner." },
     { id: "bs_telemetry", title: "Telemetry / error reporting decision is unmade", body: "Today: zero. Productizing usually wants opt-in error reporting (Sentry-style). Decide before shipping — retrofitting consent is harder than starting clean." },
     { id: "bs_xbox_wishlist_empty", title: "fetch_xbox_wishlist.py output is 0.1 KB (empty array)", body: "Either confirmed-empty Xbox wishlist on your account, or the fetcher silently fails. Worth a smoke test before claiming Xbox wishlist support in the matrix." },
@@ -478,12 +492,64 @@
     { name: "Battle.net", status: "skip", auth: "—", output: "—", notes: "Blizzard shop has no wishlist." },
   ];
 
-  // ---------- Monetization sketch ----------
-  const MONETIZE_OPTIONS = [
-    { name: "OSS + paid hosted sync ('BAKLOG Cloud')", pro: "Lowest legal exposure. Recurring MRR. Aligns with how Steam-collectors actually behave (multi-PC).", con: "Cheapest-to-build = personal.json sync. Hard to charge much. Modest revenue ceiling.", verdict: "Most defensible." },
-    { name: "One-time paid installable app", pro: "Cleanest UX. No login. Familiar buy-once model.", con: "Distribution friction (Windows installers, code signing). No recurring revenue. Cross-platform packaging burden.", verdict: "Higher upfront, lower compounding." },
-    { name: "Affiliate-only (free forever)", pro: "Free is the best growth channel. ITAD-style affiliate fits the deal-radar value prop natively.", con: "Revenue dependent on traffic. Affiliate rates are low. Hard to predict.", verdict: "Best if you don't want to operate a business." },
-    { name: "Hybrid: free local + paid hosted + affiliate links everywhere", pro: "Captures everyone. Local users contribute affiliate revenue; cloud users pay subscription.", con: "Two products to maintain. Affiliate ethics need a disclosure pass.", verdict: "Most ambitious; most operational overhead." },
+  // ---------- Monetization suite ----------
+  const MONETIZE_SECTIONS = [
+    { id: "vision", label: "Grand scheme" },
+    { id: "hooks", label: "Why users choose this" },
+    { id: "audience", label: "Audience" },
+    { id: "market", label: "Market + numbers" },
+    { id: "compete", label: "Competitive set" },
+    { id: "models", label: "Model iterations" },
+    { id: "pricing", label: "Pricing" },
+    { id: "gtm", label: "Go-to-market" },
+    { id: "campaign", label: "Campaign suite" },
+    { id: "risk", label: "Risk + ethics" },
+  ];
+
+  const MONETIZE_MARKET = [
+    { metric: "Steam monthly active users", value: "~130M", source: "Valve year-in-review", as_of: "2024", implication: "Massive Steam-first top of funnel." },
+    { metric: "Steam peak concurrent users", value: "39M+", source: "SteamDB / Valve updates", as_of: "2025", implication: "High daily usage supports recurring engagement tools." },
+    { metric: "PC gaming market", value: "$40B+ annual", source: "Industry analyst ranges", as_of: "2024-2025", implication: "Niche workflow tools can still sustain a business." },
+    { metric: "Epic free-game claim economy", value: "1+ free PC game / week, multi-year", source: "Epic Games Store weekly free program", as_of: "2018-2025", implication: "Built-in audience of accidental hoarders with libraries they never inventoried." },
+    { metric: "Amazon Prime Gaming free claims", value: "Dozens of titles / month bundled with Prime", source: "Prime Gaming monthly drops", as_of: "Ongoing", implication: "Same hoarder behavior, even less visibility (no native dashboard worth a damn)." },
+    { metric: "GOG Giveaways + free claims", source: "GOG promotions + Twitch drops", as_of: "Ongoing", value: "Several free titles / year", implication: "Adds another forgotten library shard." },
+    { metric: "Fanatical bundles", value: "5-20 Steam keys / bundle, often $1-$15", source: "Fanatical Build-a-Bundle + Star Deals", as_of: "Ongoing", implication: "Steam libraries balloon with bundle keys nobody installs — the same hoarder behavior, just routed through Steam." },
+    { metric: "Wario64 / deal-alert culture", value: "Multiple free or near-free Steam key alerts / week", source: "@Wario64 + r/GameDeals", as_of: "Ongoing", implication: "Always-on free-key firehose; users redeem on reflex and forget by the next alert." },
+    { metric: "itch.io BLM bundle (2020)", value: "1,741 items for $5", source: "itch.io Bundle for Racial Justice and Equality", as_of: "2020", implication: "Real users own >1,400-item bundles they cannot inventory or even classify as games vs assets/zines." },
+  ];
+
+  // Concrete owner-truths from the actual founder's library — these illustrate
+  // the pain the product exists to solve. Edit freely; user is the source.
+  const MONETIZE_TRUTHS = [
+    "I have been claiming free games from Amazon, Epic, Steam, and GOG for years — my libraries are almost entirely free games and I have no idea what is in them.",
+    "I have been redeeming Steam keys from Wario64 alerts and Fanatical bundles for so long that my Steam library has games I cannot remember activating, from bundles I cannot remember buying.",
+    "I bought (or claimed) a ~1,400-item bundle from itch.io and could not tell you what most of those entries even are, let alone how many are actual playable games vs assets, zines, or soundtracks.",
+    "Looking at a launcher screen of 200+ titles I never bought intentionally is the opposite of fun — it is decision paralysis dressed up as abundance.",
+    "Storefronts have no incentive to help me see across stores; they want me inside their walled garden.",
+    "Wishlist deal alerts are useless without ownership context — half the 'great deals' I get are for games I already own on another store, or already redeemed from a bundle and forgot about.",
+  ];
+
+  const MONETIZE_PERSONAS = [
+    { name: "Free-game claimer (the founder's own profile)", description: "Years of Epic free Thursdays, Prime Gaming, GOG giveaways, Steam free weekends, Wario64 alerts, Fanatical bundles, and at least one giant itch.io bundle. Even the Steam library — supposedly 'curated' — is bloated with redeemed bundle keys. Libraries are 80%+ unplayed, mostly free or near-free, and span 4-6 stores.", pain: "Has no idea what they own. Cannot tell games from assets in the itch bundle. Cannot remember which Steam titles came from which bundle. Opens a launcher, feels overwhelmed, closes it, plays the same comfort title again.", winsWith: "One private table that flattens every store, marks junk, surfaces what is actually a playable game, and remembers it for next time." },
+    { name: "Cross-store completionist", description: "Started on Steam, picked up PS5 and an Epic library on the side. Tracks playtime obsessively but in three places at once.", pain: "Has the same game on two stores, accidentally rebuys, never knows true total playtime.", winsWith: "Combined playtime, store badges, duplicate detection that just works." },
+    { name: "Deal-aware hoarder", description: "Wishlist is 200+ deep. Buys during every sale. Has a 'someday' folder that has been someday for five years.", pain: "Buys deals for games already owned elsewhere. No system to retire stale wishlist items.", winsWith: "Wishlist radar with ownership context, status chips, and a sane 'stop buying this kind of game' loop." },
+    { name: "Privacy-first power user", description: "Refuses cloud-by-default tools. Will run a Python script locally before they will sign up.", pain: "Every existing tool wants an account and analytics opt-out is buried.", winsWith: "Local-first, no telemetry, optional sync only when they ask." },
+  ];
+
+  const MONETIZE_MODELS = [
+    { name: "OSS + BAKLOG Cloud", pitch: "Private local app, paid convenience sync.", whoPays: "Power users across devices", priceBand: "$3-$8/mo", mvp: "Encrypted personal/profile sync", math: "25k MAU x 2.5% x $5 = $37.5k ARR", legal: "Keep local mode first-class", agencySays: "Recurring revenue is compounding.", actuallyShip: "One paid tier + trial." },
+    { name: "One-time paid app", pitch: "Buy once, offline forever.", whoPays: "Subscription-averse users", priceBand: "$15-$29", mvp: "Signed installer + updates", math: "4k buys x $19 = $76k gross", legal: "Packaging/support overhead", agencySays: "Simple conversion story.", actuallyShip: "Only after packaging is stable." },
+    { name: "Affiliate-only", pitch: "Free forever, monetize deal intent.", whoPays: "No direct payer", priceBand: "N/A", mvp: "Attribution links + disclosure", math: "Traffic-dependent, low-to-mid five figures", legal: "Disclosure + neutrality policy", agencySays: "Audience first, intent monetization.", actuallyShip: "Viable low-op path." },
+    { name: "Hybrid", pitch: "Free local + paid cloud + affiliate.", whoPays: "Subscribers + merchants", priceBand: "$4-$7/mo + affiliate", mvp: "Cloud sync plus deal attribution", math: "Diversified revenue floor", legal: "Most operationally complex", agencySays: "Capture every segment.", actuallyShip: "Likely end-state, not day one." },
+    { name: "Tips / Sponsors", pitch: "Community-funded OSS support.", whoPays: "Power users and fans", priceBand: "$3/$5/$10", mvp: "Sponsor CTA + roadmap", math: "Unpredictable upside", legal: "Low legal burden", agencySays: "Good signal, weak model.", actuallyShip: "Enable as bonus channel." },
+    { name: "B2B / white-label", pitch: "Enterprise backlog intelligence.", whoPays: "Studios/tools partners", priceBand: "Custom", mvp: "Would need account/data rights architecture", math: "Potentially high but unrealistic now", legal: "Conflicts with local-first promise", agencySays: "Big checks.", actuallyShip: "Explicitly defer." },
+  ];
+
+  const MONETIZE_CAMPAIGNS = [
+    { name: "Stop alt-tabbing your libraries", objective: "Convert multi-store owners", audience: "Steam-first users with 2+ stores", visual: "Launchers collapse into one table", cta: "Load Steam now", headlines: ["One backlog. All your stores.", "Your games should not live in five apps.", "Backlog clarity in 15 minutes."], shortPost: "BAKLOG gives you one local dashboard across your stores. Free, private, Steam-ready out of the box.", landing: "Hero, trust strip, screenshot, 3-step quickstart", metrics: "Activation and 7-day return" },
+    { name: "The honest backlog", objective: "Position as decision system", audience: "Players with choice paralysis", visual: "Status chips + picks tabs", cta: "Turn backlog chaos into weekly picks", headlines: ["Finish more, buy smarter.", "From backlog guilt to backlog plan.", "Play what matters first."], shortPost: "Not just a list. BAKLOG gives statuses and picks so your backlog becomes actionable.", landing: "Problem framing + workflow + proof", metrics: "Weekly active users and status edits" },
+    { name: "Deal radar, not spreadsheet", objective: "Own wishlist/deal narrative", audience: "Price-sensitive players", visual: "Wishlist radar with ownership context", cta: "Catch the right sale", headlines: ["Your wishlist deserves context.", "Buy fewer games you will not start.", "Deal alerts with ownership intelligence."], shortPost: "See sales with context from what you own and what you will actually play.", landing: "Wishlist value + disclosure + CTA", metrics: "Deal click-through" },
+    { name: "The library you forgot you owned", objective: "Recruit accidental hoarders", audience: "Epic / Prime / GOG / itch.io free-claim users + Wario64 / Fanatical / bundle-key redeemers", visual: "Split-screen: chaotic launcher grids + a redeem-key inbox -> one calm BAKLOG table with status chips", cta: "See what you actually own", headlines: ["You did not buy 600 games. They piled up.", "Free game Thursday has consequences.", "Your Steam library is also a bundle graveyard.", "What is even in your itch.io bundle?", "Your library is honest with you for once."], shortPost: "If you have claimed every Epic free game for five years, redeemed every Wario64 / Fanatical bundle key you saw, own a 1,400-item itch.io bundle, and still re-play the same comfort title — BAKLOG was built for you. Local, private, free to start.", landing: "Founder story + screenshots of giant filtered libraries + 3-step start", metrics: "Sign-ups from /r/patientgamers, /r/itchio, /r/EpicGamesPC, /r/GameDeals; activation completion rate" },
   ];
 
   // ---------- State (localStorage) ----------
@@ -492,14 +558,23 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
-      if (!parsed || parsed.v !== 1) return defaultState();
+      if (!parsed || (parsed.v !== 1 && parsed.v !== 2)) return defaultState();
+      if (parsed.activeTab && LEGACY_TAB_MAP[parsed.activeTab]) {
+        parsed.activeTab = LEGACY_TAB_MAP[parsed.activeTab];
+      }
+      if (!parsed.triage) parsed.triage = defaultTriageFilters();
+      if (!parsed.monetizeSection) parsed.monetizeSection = "vision";
+      parsed.v = 2;
       return parsed;
     } catch {
       return defaultState();
     }
   }
+  function defaultTriageFilters() {
+    return { area: "all", show: "active" };
+  }
   function defaultState() {
-    return { v: 1, items: {}, decisions: {}, pageNotes: {}, activeTab: "now" };
+    return { v: 2, items: {}, decisions: {}, pageNotes: {}, activeTab: "now", triage: defaultTriageFilters(), monetizeSection: "vision" };
   }
   let state = loadState();
   function saveState() {
@@ -662,6 +737,14 @@
       ? (done >= total ? 100 : Math.floor((done / total) * 100))
       : 0;
     const shipped = [
+      "Fetcher resilience pass (2026-06-02) — cancel-all endpoint (POST /api/runs/cancel) takes down active + queued runs in one click; server-side queue cap (max 1 running + 1 queued, enforced in RunManager.submit + mirrored client-side via inFlightCount/isQueueFull); cancel uses immediate taskkill so the single-threaded HTTP server no longer wedges; client suppressedRunIds set prevents scheduleReconnect/subscribe/syncFromServer from resurrecting a cancelled run id, killing the 'stream dropped — reconnecting in 2s/4s/8s' loop. New test_cancel_all_clears_active_and_queue locks the path. See find_dbg_fetcher_resilience.",
+      "Percent display: no rounding-up to 100% — fetcher coverage chips, tracker phase progress, and dashboard counts all use Math.floor((covered/total)*100) for partial coverage; only exact covered>=total reports 100%. Was reporting 100% at 99.86% before.",
+      "Tracker accordion preserves open state on check — preserveDetailsOpen() now matches on stable data-key (phase/drawer ids) before falling back to summary text. Old text-based match broke whenever a checkbox tick changed the embedded 'done/total' count, collapsing the phase you were working in.",
+      "Brand mark is no longer a link — BAKLOG header is a <div id=\"brandMark\"> instead of an <a>, fixing the unwanted hover/underline on app-shell click targets.",
+      "Picks drawer collapsed-state corner fix — #picksSection:has(> #picksContainer.hidden) > div:first-of-type clears its border-bottom so the divider doesn't draw against the rounded card corner when the drawer is collapsed.",
+      "Sticky table header 1px gap closed — #tableWrap drops top border and gets square top corners; thead th uses top:-1px + inset bottom-shadow so scrolled rows don't show through the seam.",
+      "Drill-to-row scroll for virtual lists — added scrollToVirtualRowIndex() + virtual branch in consumePendingScrollTarget; paintVirtualSlice now calls it when anchorIdx>=0 instead of leaving the user staring at a blank window mid-table. focusGame uses afterChrome only when crossing views (picksOpen && !crossingView), fixing the 'spotlight → blank table until mousewheel' regression. Tests at tests/drill-anchor.test.js include a 120+ row virtual list assertion.",
+      "Steam appid remap for orphaned PSN review map entries — two PSN rows in cache/steam_review_map.json pointed at Steam package IDs (132479, 124923) instead of app IDs, so /api/appdetails returned success: false and the co-op tag enricher reported them as 'unchecked'. Remapped to canonical app IDs (287700 = MGSV: TPP, 292030 = Witcher 3) so enrich_steam_tags.py --stores psn closes them. Co-op tags chip now reports 100% coverage with 0 unchecked-with-appid-match rows.",
       "Co-op filter rebuilt as a 5-state segmented control (Off · Any · Online · Couch · Both).",
       "Hide-duplicates control now visible on Library AND Wishlist tabs (was Library-only).",
       "Connections page got a How-to disclosure + manual cards collapsed into one row.",
@@ -706,8 +789,9 @@
       "Verify fetch_xbox_wishlist.py actually writes rows (current output is 0 KB).",
     ];
     const next = [
-      "Open the Audit findings tab. Triage each finding (accept / reject / defer).",
-      "Pick the first three Accepted findings — those become focused Phase 2 plans.",
+      "Open the Triage tab (consolidated Audit findings + Blind spots). Walk every Active item; mark Accept / Defer / Reject / Done.",
+      "Pick the first three Accepted items — those become focused Phase 2 plans.",
+      "Chip-level fetcher 'reconnect required' UX — the queue/cancel pass closed the loop bug, but persistent N-failure auth chips still need a dismissable per-provider state (see bs_fetcher_backoff [PARTIAL]).",
       "Decide whether to declare feature freeze for the audit window.",
     ];
     return el("section", { id: "panel-now", class: "panel" + (state.activeTab === "now" ? " active" : "") },
@@ -721,14 +805,14 @@
         el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(next.length)), el("div", { class: "stat-label" }, "Up next")),
         el("div", { class: "stat" + (blockers.length ? " stat-warning" : "") }, el("div", { class: "stat-value" }, String(blockers.length)), el("div", { class: "stat-label" }, "Blockers")),
       ),
-      el("h3", {}, "Just shipped"),
-      el("div", { class: "card" }, ...shipped.map((s) => el("div", { class: "check-row" }, el("input", { type: "checkbox", checked: "checked", disabled: "disabled" }), el("label", {}, s)))),
       el("h3", {}, "Up next"),
       el("div", { class: "card" }, ...next.map((s, i) => checkboxRow("now_next_" + i, escapeHtml(s)))),
       el("h3", {}, "Blockers"),
       blockers.length
         ? el("div", { class: "card" }, ...blockers.map((s, i) => checkboxRow("now_block_" + i, escapeHtml(s))))
         : el("div", { class: "card" }, el("p", { class: "muted" }, "No blockers.")),
+      el("h3", {}, "Just shipped"),
+      el("div", { class: "card" }, ...shipped.map((s) => el("div", { class: "check-row" }, el("input", { type: "checkbox", checked: "checked", disabled: "disabled" }), el("label", {}, s)))),
     );
   }
 
@@ -1039,72 +1123,163 @@
     return wrap;
   }
 
-  function panelFindings() {
-    const groups = {
-      Arch: FINDINGS.filter((f) => f.area === "Arch"),
-      UX: FINDINGS.filter((f) => f.area === "UX"),
-      Debug: FINDINGS.filter((f) => f.area === "Debug"),
-    };
-    const findingIds = new Set(FINDINGS.map((f) => f.id));
-    const findingDecisions = Object.entries(state.decisions).filter(([id]) => findingIds.has(id)).map(([, d]) => d);
-    const triaged = findingDecisions.filter((d) => d.decision === "accept" || d.decision === "reject" || d.decision === "defer" || d.decision === "done").length;
-    const doneCount = FINDINGS.filter(isFindingDone).length;
+  // ---------- Render: Triage (Audit findings + Blind spots consolidated) ----------
+  // One unified surface for senior-eye findings AND blind spots, filtered by
+  // origin/area + status. Replaces the two old tabs ("Audit findings" and
+  // "Blind spots"); legacy activeTab values are migrated in loadState.
+  const TRIAGE_AREA_LABELS = {
+    all: "All",
+    Arch: "Architecture",
+    UX: "User experience",
+    Debug: "Debug refactor",
+    Risk: "Blind spots",
+  };
+  const TRIAGE_SHOW_LABELS = {
+    active: "Active",
+    all: "All",
+    completed: "Completed only",
+  };
+  const SEVERITY_RANK = { red: 0, amber: 1, grey: 2 };
 
-    // Render one area's findings split into active vs completed, with the
-    // completed bucket tucked into a closed drawer.
-    function renderArea(label, list) {
-      const active = list.filter((f) => !isFindingDone(f));
-      const done = list.filter((f) => isFindingDone(f));
-      const heading = el("h3", {}, `${label} (${active.length} active${done.length ? ` · ${done.length} completed` : ""})`);
-      const activeBlocks = active.length
-        ? active.map(findingBlock)
-        : [el("p", { class: "muted", style: "margin:0 0 0.75rem" }, "Nothing active in this area.")];
-      const drawer = completedDrawer("Completed findings", done.map(findingBlock), "findings-completed");
-      const children = [heading, ...activeBlocks];
-      if (drawer) children.push(drawer);
-      return el("div", {}, ...children);
+  function triageItems() {
+    return [
+      ...FINDINGS.map((f) => ({ ...f, kind: "finding" })),
+      ...BLINDSPOTS.map((b) => ({
+        id: b.id,
+        area: "Risk",
+        severity: "grey",
+        title: b.title,
+        body: b.body,
+        kind: "blindspot",
+      })),
+    ];
+  }
+
+  function setTriageFilter(patch) {
+    state.triage = { ...defaultTriageFilters(), ...(state.triage || {}), ...patch };
+    saveState();
+    renderActive();
+  }
+
+  function chipBtn(label, active, onClick) {
+    return el(
+      "button",
+      {
+        type: "button",
+        class: "tab" + (active ? " active" : ""),
+        style: "padding: 0.3rem 0.7rem; font-size: 0.78rem;",
+        onClick,
+      },
+      label,
+    );
+  }
+
+  function panelTriage() {
+    const filters = state.triage || defaultTriageFilters();
+    const all = triageItems();
+
+    const totalCount = all.length;
+    const doneCount = all.filter(isFindingDone).length;
+    const decidedCount = all.filter((x) => {
+      const d = state.decisions[x.id];
+      return d && (d.decision === "accept" || d.decision === "reject" || d.decision === "defer" || d.decision === "done");
+    }).length;
+
+    function passesShow(x) {
+      const done = isFindingDone(x);
+      if (filters.show === "active") return !done;
+      if (filters.show === "completed") return done;
+      return true;
+    }
+    function passesArea(x) {
+      return filters.area === "all" || x.area === filters.area;
     }
 
-    return el("section", { id: "panel-findings", class: "panel" + (state.activeTab === "findings" ? " active" : "") },
+    const filtered = all
+      .filter(passesShow)
+      .filter(passesArea)
+      .slice()
+      .sort((a, b) => {
+        const aDone = isFindingDone(a) ? 1 : 0;
+        const bDone = isFindingDone(b) ? 1 : 0;
+        if (aDone !== bDone) return aDone - bDone;
+        const aRank = SEVERITY_RANK[a.severity] ?? 9;
+        const bRank = SEVERITY_RANK[b.severity] ?? 9;
+        if (aRank !== bRank) return aRank - bRank;
+        return a.title.localeCompare(b.title);
+      });
+
+    function areaCount(areaId) {
+      const items = areaId === "all" ? all : all.filter((x) => x.area === areaId);
+      const active = items.filter((x) => !isFindingDone(x)).length;
+      return { active, total: items.length };
+    }
+
+    const areaChips = ["all", "Arch", "UX", "Debug", "Risk"].map((id) => {
+      const { active, total } = areaCount(id);
+      const label = filters.show === "completed"
+        ? `${TRIAGE_AREA_LABELS[id]} · ${total - active}`
+        : `${TRIAGE_AREA_LABELS[id]} · ${active}`;
+      return chipBtn(label, filters.area === id, () => setTriageFilter({ area: id }));
+    });
+
+    const showChips = ["active", "all", "completed"].map((id) => {
+      return chipBtn(TRIAGE_SHOW_LABELS[id], filters.show === id, () => setTriageFilter({ show: id }));
+    });
+
+    const kindBadge = (item) => {
+      const isBs = item.kind === "blindspot";
+      return el(
+        "span",
+        { class: "pill pill-" + (isBs ? "warning" : "info") },
+        isBs ? "Blind spot" : "Finding",
+      );
+    };
+
+    function triageBlock(item) {
+      const wrap = findingBlock(item);
+      const head = wrap.querySelector(".finding-head .finding-meta");
+      if (head) head.insertBefore(kindBadge(item), head.firstChild);
+      return wrap;
+    }
+
+    const list = filtered.length
+      ? filtered.map(triageBlock)
+      : [el("p", { class: "muted" }, "Nothing matches the current filters.")];
+
+    return el("section", { id: "panel-triage", class: "panel" + (state.activeTab === "triage" ? " active" : "") },
       el("div", { class: "card-row" },
-        el("h1", {}, "Audit findings"),
-        el("span", { class: "pill pill-info" }, `${triaged} / ${FINDINGS.length} triaged`),
+        el("h1", {}, "Triage"),
+        el("span", { class: "pill pill-info" }, `${decidedCount} / ${totalCount} triaged`),
         el("span", { class: "pill pill-success" }, `${doneCount} done`),
       ),
-      el("p", {}, "First-pass senior-eye findings. Each item gets one of four calls: ", el("strong", {}, "Accept"), " (worth a focused follow-up plan), ", el("strong", {}, "Defer"), " (later, not now), ", el("strong", {}, "Reject"), " (won't do — explain why in notes), ", el("strong", {}, "Done"), " (shipped — clears the card). Resolved + rejected items collapse into a ", el("strong", {}, "Completed"), " drawer beneath each area."),
+      el("p", {},
+        "Senior-eye findings ", el("strong", {}, "and"), " blind spots in one place. Each item gets ",
+        el("strong", {}, "Accept"), " (becomes a focused plan), ",
+        el("strong", {}, "Defer"), " (later), ",
+        el("strong", {}, "Reject"), " (won't do — note the why), or ",
+        el("strong", {}, "Done"), " (shipped). The ",
+        el("span", { class: "pill pill-info", style: "padding:0.05rem 0.4rem; font-size: 0.65rem;" }, "Finding"),
+        " / ",
+        el("span", { class: "pill pill-warning", style: "padding:0.05rem 0.4rem; font-size: 0.65rem;" }, "Blind spot"),
+        " badge marks each item's origin so the two streams stay distinguishable inside the consolidated view.",
+      ),
       el("div", { class: "legend" },
         el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--red)" }), "Red — fix before launch"),
         el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--amber)" }), "Amber — worth doing"),
         el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--grey)" }), "Grey — nice to have"),
       ),
-      renderArea("Architecture", groups.Arch),
-      renderArea("User experience", groups.UX),
-      renderArea("Debug refactor", groups.Debug),
-    );
-  }
-
-  // ---------- Render: Blind spots ----------
-  function panelBlindspots() {
-    const decided = BLINDSPOTS.filter((b) => {
-      const d = state.decisions[b.id];
-      return d && d.decision;
-    }).length;
-    const wrapped = BLINDSPOTS.map((b) => ({ id: b.id, area: "Risk", severity: "grey", title: b.title, body: b.body }));
-    const active = wrapped.filter((b) => !isFindingDone(b));
-    const done = wrapped.filter((b) => isFindingDone(b));
-    const activeBlocks = active.length
-      ? active.map(findingBlock)
-      : [el("p", { class: "muted" }, "All blind spots are resolved or rejected.")];
-    const drawer = completedDrawer("Completed blind spots", done.map(findingBlock), "blindspots-completed");
-    return el("section", { id: "panel-blindspots", class: "panel" + (state.activeTab === "blindspots" ? " active" : "") },
-      el("div", { class: "card-row" },
-        el("h1", {}, "Blind spots"),
-        el("span", { class: "pill pill-info" }, `${decided} / ${BLINDSPOTS.length} triaged`),
-        el("span", { class: "pill pill-success" }, `${done.length} resolved`),
+      el("h3", { style: "margin-top: 0.75rem;" }, "Area"),
+      el("div", { class: "tabbar", style: "margin: 0 0 0.5rem; padding: 0; border: none;" }, ...areaChips),
+      el("h3", { style: "margin-top: 0.5rem;" }, "Status"),
+      el("div", { class: "tabbar", style: "margin: 0 0 1rem; padding: 0; border: none;" }, ...showChips),
+      el("p", { class: "muted", style: "font-size: 0.8rem; margin: 0 0 1rem;" },
+        `Showing ${filtered.length} of ${totalCount} items`,
+        filters.area !== "all" ? ` · ${TRIAGE_AREA_LABELS[filters.area]}` : "",
+        ` · ${TRIAGE_SHOW_LABELS[filters.show].toLowerCase()}`,
+        ".",
       ),
-      el("p", {}, "Things you may not have thought of yet. Same triage as findings — Accept promotes into the roadmap, Defer parks for later, Reject says 'not relevant'. Resolved + rejected items live in the drawer below."),
-      ...activeBlocks,
-      drawer,
+      ...list,
     );
   }
 
@@ -1258,19 +1433,136 @@
   }
 
   // ---------- Render: Monetization ----------
+  function ownerPref(id, label, placeholder) {
+    const key = `monetize.owner.${id}`;
+    const ta = el("textarea", { class: "owner-pref", placeholder });
+    ta.value = getPageNote(key);
+    ta.addEventListener("input", () => setPageNote(key, ta.value));
+    return el("div", { class: "card owner-lane" },
+      el("h3", {}, "Your preferences"),
+      el("p", { class: "muted" }, label),
+      ta,
+    );
+  }
+
+  function monetizeSubnav() {
+    return el("div", { class: "monetize-subnav" },
+      ...MONETIZE_SECTIONS.map((s) => {
+        const b = el("button", { type: "button", class: "tab" + (state.monetizeSection === s.id ? " active" : "") }, s.label);
+        b.addEventListener("click", () => { state.monetizeSection = s.id; saveState(); renderActive(); });
+        return b;
+      }),
+    );
+  }
+
   function panelMonetize() {
-    const ta = el("textarea", { class: "freenotes", placeholder: "Free notes — pricing thoughts, brand names, channel ideas, who you'd email for feedback…" });
+    const ta = el("textarea", { class: "freenotes", placeholder: "Free notes - pricing thoughts, brand names, channel ideas, who you'd email for feedback-" });
     ta.value = getPageNote("monetize");
     ta.addEventListener("input", () => setPageNote("monetize", ta.value));
+    const section = state.monetizeSection || "vision";
+    const cards = [];
+    if (section === "vision") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Grand scheme"),
+        el("p", {}, "BAKLOG becomes the private command center for backlog decisions: fast activation, cross-store clarity, and optional monetization layered on top."),
+        el("p", { class: "muted" }, "12-month: activation and retention. 36-month: optional cloud convenience plus affiliate deal intent."),
+      ));
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Founder truths (the real reason this exists)"),
+        el("p", { class: "muted" }, "These are not hypothetical user research. They are the actual library the founder is living in."),
+        el("ul", {}, ...MONETIZE_TRUTHS.map((t) => el("li", {}, t))),
+        el("p", {}, el("strong", {}, "Reframed pitch: "), "Modern game libraries are accidental — yours, mine, everyone's. BAKLOG is the first tool built for people who own more games than they remember claiming."),
+      ));
+      cards.push(ownerPref("vision", "Define your personal north-star and hard limits.", "Success looks like...\nI will not do..."));
+    } else if (section === "hooks") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Why users choose this"),
+        el("p", { class: "muted" }, "Court users with simple truths: free to start, Steam works first, cross-store clarity, and privacy-first defaults."),
+        el("p", {}, "Core line: 'One honest backlog across all your stores, private by default.'"),
+        el("h3", {}, "Pain stories we lead with"),
+        el("ul", {},
+          el("li", {}, el("strong", {}, "The accidental library: "), "Years of Epic free Thursdays, Prime Gaming drops, GOG giveaways, and Steam free weekends. You did not buy a 600-game library — it accumulated while you were not looking."),
+          el("li", {}, el("strong", {}, "The itch.io blackout: "), "You bought a 1,400-item bundle. You cannot tell which entries are playable games, which are assets, which are zines. No storefront helps you sort it out."),
+          el("li", {}, el("strong", {}, "The five-launcher tax: "), "Steam, Epic, GOG, PSN, Xbox. Every launcher is a silo, and 'what should I play tonight?' requires checking five places."),
+          el("li", {}, el("strong", {}, "The duplicate buy: "), "You bought a deal on Epic for a game already in your Steam library. Wishlist alerts have no idea what you already own elsewhere."),
+        ),
+        el("p", { class: "muted" }, "Counter-positioning: Storefronts profit when you cannot see across stores. BAKLOG is on your side because it runs on your machine and refuses to be one."),
+      ));
+      cards.push(ownerPref("hooks", "Capture your preferred product pitch voice.", "My one-sentence pitch..."));
+    } else if (section === "audience") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Audience"),
+        el("p", { class: "muted" }, "Primary personas: backlog hoarders, deal hunters, and cross-store collectors. Secondary: privacy-first power users and creators."),
+        ...MONETIZE_PERSONAS.map((p) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, p.name),
+          el("p", { class: "finding-body" }, p.description),
+          el("p", { style: "margin:0" }, el("strong", {}, "Pain: "), p.pain),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Wins with: "), p.winsWith),
+        )),
+      ));
+      cards.push(ownerPref("audience", "Pick who you are actively building for this quarter.", "Primary persona...\nSecondary persona...\nIgnore for now..."));
+    } else if (section === "market") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Market + numbers"),
+        el("table", {},
+          el("thead", {}, el("tr", {}, el("th", {}, "Metric"), el("th", {}, "Value"), el("th", {}, "Source"), el("th", {}, "Implication"))),
+          el("tbody", {}, ...MONETIZE_MARKET.map((m) => el("tr", {}, el("td", {}, m.metric), el("td", {}, m.value), el("td", {}, m.source), el("td", {}, m.implication))))
+        ),
+      ));
+      cards.push(ownerPref("market", "Write down assumptions you trust versus assumptions to validate.", "Assumptions I trust...\nAssumptions to validate..."));
+    } else if (section === "compete") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Competitive set"),
+        el("p", { class: "muted" }, "Position BAKLOG as a local-first decision system, not just another launcher or pure deal feed."),
+      ));
+      cards.push(ownerPref("compete", "Draft your positioning against launchers and wishlist tools.", "We win because..."));
+    } else if (section === "models") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Model iterations"),
+        ...MONETIZE_MODELS.map((m) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, m.name),
+          el("p", { class: "finding-body" }, m.pitch),
+          el("p", { style: "margin:0" }, el("strong", {}, "Price: "), m.priceBand, " - ", el("strong", {}, "Math: "), m.math),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Agency says: "), m.agencySays),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "You'd ship: "), m.actuallyShip),
+        )),
+      ));
+      cards.push(ownerPref("model_pick", "Pick your current model and deal-breakers.", "Model I'm leaning toward...\nDeal-breakers..."));
+    } else if (section === "campaign") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Campaign suite"),
+        ...MONETIZE_CAMPAIGNS.map((c) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, c.name),
+          el("p", { class: "finding-body" }, c.shortPost),
+          el("p", { style: "margin:0" }, el("strong", {}, "CTA: "), c.cta, " - ", el("strong", {}, "Metric: "), c.metrics),
+        )),
+      ));
+      cards.push(ownerPref("campaign", "Capture preferred tone and forbidden angles.", "Tone I like...\nNever do..."));
+    } else if (section === "pricing") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Pricing"),
+        el("p", { class: "muted" }, "Recommended first pricing test: one cloud convenience tier around $4.99/month. Keep launch simple: one number, one promise."),
+      ));
+      cards.push(ownerPref("pricing", "Lock your first pricing hypothesis.", "Launch price...\nFloor...\nCeiling..."));
+    } else if (section === "gtm") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Go-to-market"),
+        el("p", { class: "muted" }, "Run one launch channel at a time. Start where backlog pain is explicit (Reddit/GitHub), then expand only after retention signal."),
+      ));
+      cards.push(ownerPref("gtm", "Pick first channel and success metric.", "First channel...\nSuccess metric..."));
+    } else {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Risk + ethics"),
+        el("p", { class: "muted" }, "Big risks: hidden affiliate incentives, breaking privacy trust with cloud defaults, and overextending solo bandwidth."),
+      ));
+      cards.push(ownerPref("risk", "Document legal/trust constraints before monetization buildout.", "Disclosure language...\nRed lines...\nQuestions for counsel..."));
+    }
+
     return el("section", { id: "panel-monetize", class: "panel" + (state.activeTab === "monetize" ? " active" : "") },
-      el("h1", {}, "Monetization sketch"),
-      el("p", {}, "Notes, not commitments. Four plausible shapes, with one-line trade-offs each. Pick after Phase 4 (Productize), not before."),
-      el("div", { class: "grid-2" }, ...MONETIZE_OPTIONS.map((m) => el("div", { class: "card" },
-        el("h2", { style: "font-size:1rem;margin:0 0 0.4rem;" }, m.name),
-        el("p", { style: "margin:0 0 0.4rem" }, el("strong", { style: "color:var(--green)" }, "Pro: "), m.pro),
-        el("p", { style: "margin:0 0 0.4rem" }, el("strong", { style: "color:var(--red)" }, "Con: "), m.con),
-        el("p", { class: "muted", style: "margin:0" }, el("strong", {}, "Verdict: "), m.verdict),
-      ))),
+      el("h1", {}, "Monetization & launch suite"),
+      el("p", {}, "Agency-style draft plus your editable preference lane. Use this to choose what to test first."),
+      monetizeSubnav(),
+      ...cards,
       el("h2", {}, "Free notes"),
       ta,
     );
@@ -1285,8 +1577,7 @@
     host.appendChild(panelArch());
     host.appendChild(panelPipeline());
     host.appendChild(panelWishlist());
-    host.appendChild(panelFindings());
-    host.appendChild(panelBlindspots());
+    host.appendChild(panelTriage());
     host.appendChild(panelDebug());
     host.appendChild(panelMonetize());
     activateTab(state.activeTab);
@@ -1312,8 +1603,8 @@
     try {
       const parsed = JSON.parse(text);
       if (!parsed || typeof parsed !== "object") throw new Error("not an object");
-      if (parsed.v !== 1) throw new Error("unknown version " + parsed.v);
-      state = { ...defaultState(), ...parsed };
+      if (parsed.v !== 1 && parsed.v !== 2) throw new Error("unknown version " + parsed.v);
+      state = { ...defaultState(), ...parsed, v: 2, monetizeSection: parsed.monetizeSection || "vision" };
       saveState();
       renderActive();
       toast("Imported.");

@@ -566,8 +566,8 @@ button[disabled] { cursor: not-allowed; }
   animation: dealHugePulse 2.4s ease-in-out infinite;
 }
 @keyframes dealHugePulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.25); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.78; }
 }
 /* === Table virtual scroll & compact controls === */
 .row-ctl { max-width: 6.5rem; padding: 0.1rem 0.2rem; font-size: 0.7rem; line-height: 1.1; }
@@ -725,6 +725,16 @@ body.bulk-bar-open { padding-bottom: 56px; }
   .dash-insight { transition: none; }
   .dash-marquee-track { animation: none !important; }
   tr.row-flash { animation: none; }
+  .deal-flag-cut.deal-flag-cut--huge { animation: none; opacity: 1; }
+  .fh-global-status::before,
+  .fh-chip-running .fh-chip-dot { animation: none; transform: none; }
+  .fh-log-status.running::after,
+  .fh-log-status.queued::after { animation: none; content: ''; }
+  .fh-log-body[data-running="1"]::after { animation: none; content: 'working'; }
+  .dash-scatter-list.is-pulsing { animation: none; }
+  #filterDrawer,
+  #filterDrawerBackdrop,
+  #viewLoadingOverlay { transition: none; }
 }
 
 #viewLoadingOverlay {
@@ -1013,6 +1023,8 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .fh-title { font-size: 0.75rem; font-weight: 600; color: #cbd5e1; letter-spacing: 0.04em; text-transform: uppercase; }
 .fh-summary { font-size: 0.7rem; color: #94a3b8; }
 .fh-toggle { font-size: 0.7rem; color: #94a3b8; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; user-select: none; }
+.fh-itad-auto { margin-left: 0.15rem; }
+.fh-group-chips { align-items: center; }
 .fh-global-status {
   display: inline-flex; align-items: center; gap: 0.35rem;
   padding: 0.1rem 0.45rem; border-radius: 9999px;

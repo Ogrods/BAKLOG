@@ -1,3 +1,4 @@
+import { cancelAllLibraryCountAnimations } from './library-count-animation.js';
 import {
   state,
   GENRE_CHIP_COLLAPSE_AT,
@@ -495,6 +496,7 @@ export function updatePickTabsVisibility() {
 
 export function switchView(view) {
   if (view === state.activeView) return;
+  cancelAllLibraryCountAnimations();
   const fromView = state.activeView;
   const drillIn = !!state._pendingFocusKey;
   let drillOverlaySafety = null;
@@ -715,7 +717,7 @@ export function renderSummary() {
   const statusChips = renderStatusChipsHtml(visible);
   el.innerHTML = `
     <div class="w-full flex flex-wrap gap-2">
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="text-slate-100 font-semibold ml-1">${visible.length}</span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
+      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
       ${storeChips}
       <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
       <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(played))}h</span></div>

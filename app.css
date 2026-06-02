@@ -1199,6 +1199,8 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   color: transparent;
   position: relative;
   z-index: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 .dash-hero-sub { color: #94a3b8; font-size: 14px; margin-top: 6px; position: relative; z-index: 1; }
 .dash-hero-tagline {
@@ -2684,3 +2686,66 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 #connectionsContainer .conn-paste-clip,
 #connectionsContainer .conn-disconnect-x { cursor: pointer; }
 #connectionsContainer button:disabled { cursor: not-allowed; }
+
+/* Library-count "1UP" animation: rolling counter + scrolling combat text. */
+.library-count-host {
+  position: relative;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+.library-count-host [data-count-target] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+.dash-mega .library-count-host:has(> .dash-hero-number) {
+  display: inline-block;
+  width: max-content;
+  max-width: min(640px, 60%);
+}
+.dash-mega .library-count-host > .dash-hero-number {
+  max-width: none;
+  display: block;
+}
+@media (max-width: 900px) {
+  .dash-mega .library-count-host:has(> .dash-hero-number) {
+    max-width: none;
+  }
+}
+.library-count-popup {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 0.25em;
+  transform: translate(var(--baklog-dx, 0px), 0) scale(0.85);
+  transform-origin: left center;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.5em;
+  line-height: 1;
+  color: #6ee7b7;
+  text-shadow: 0 0 8px rgba(110, 231, 183, 0.55), 0 1px 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 5;
+  will-change: transform, opacity;
+  animation: baklog-libcount-pop 700ms ease-out forwards;
+}
+@keyframes baklog-libcount-pop {
+  0% {
+    opacity: 0;
+    transform: translate(var(--baklog-dx, 0px), 6px) scale(0.85);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(calc(var(--baklog-dx, 0px) + 4px), -10px) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--baklog-dx, 0px) + 12px), -58px) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .library-count-popup { display: none; }
+}

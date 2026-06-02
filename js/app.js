@@ -56,6 +56,7 @@ import {
   hideViewOverlay,
 } from './loading-curtain.js';
 import { reloadGames, reloadAfterFetcher } from './library-load.js';
+import { runLibraryCountDemo, runLibraryCountSmallDemo } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
@@ -205,6 +206,15 @@ async function bootstrap() {
       onUploaded: () => reloadGames().then(() => scheduleDashboardRender()),
     });
   }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo');
+    if (state.activeView === 'dashboard') {
+      if (demo === 'count') setTimeout(() => runLibraryCountDemo(), 1200);
+      else if (demo === 'count-small') setTimeout(() => runLibraryCountSmallDemo(), 1200);
+    }
+  } catch (_) {}
 }
 
 hydrateState();

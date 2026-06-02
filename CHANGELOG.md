@@ -23,6 +23,7 @@ version is `pyproject.toml` (mirrored into `package.json`).
 
 ### Added
 
+- **Library count 1UP** — after a fetch adds games, the library / wishlist count rolls over ~1s with floating green "+N" popups (Mario 1UP / scrolling-combat-text style). Popups anchor on the right edge of the number, spawn ~70ms apart (up to 10 per burst). Only fires on fetch-driven increases; cancels on tab switch or `prefers-reduced-motion`. Demos: `?demo=count`, `?demo=count-small`, or `baklogDemoLibraryCount()` / `baklogDemoLibraryCountSmall()` in the console.
 - **BAKLOG branding** — product title, favicon, README tagline, header subtitle (“Cross-store backlog · local-only”).
 - **Deal badges** — price-dropped-since-last-ITAD (↓), all-time vs 1-year historical low, owned-elsewhere on dashboard deal cards.
 - **Library cross-store pill** — “also on GOG · …” when deduped copies exist on multiple stores.

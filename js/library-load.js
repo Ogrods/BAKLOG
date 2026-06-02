@@ -5,6 +5,7 @@ import {
   dedupeWithinStore,
   recomputeCrossStoreHidden,
   applyCoopOverrides,
+  gameKey,
 } from './game-core.js';
 import {
   applyItadPriceSnapshot,
@@ -15,6 +16,7 @@ import {
   loadManualGames,
   bumpPersonalMemo,
   canonicalizeNotesAcrossTitles,
+  filterOutHidden,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { invalidateTableCache } from './table-ui.js';
@@ -30,8 +32,14 @@ import {
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 import { consumeItadAutoRunFlag, diffItadDeals } from './fetcher-health.js';
+import { fireLibraryCountFlash } from './library-count-animation.js';
 
 export const ITAD_SNAPSHOT_KEY = "baklog-itad-snapshot";
+
+// Module-scoped previous counts so we only animate real fetch-driven jumps.
+// Null sentinels mean "first paint" — no popups on cold start.
+let _prevLibraryCount = null;
+let _prevWishlistCount = null;
 
 export async function loadItadPrices() {
   let prevByKey = {};
@@ -136,6 +144,15 @@ export async function loadSteamTagsMeta() {
   await loadCacheMeta("cache/steam_tags_meta.json", "steamTags");
 }
 
+function countLibraryVisible() {
+  return filterOutHidden(
+    state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))),
+  ).length;
+}
+function countWishlistVisible() {
+  return state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g))).length;
+}
+
 export async function applyMergedLibrary() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   bumpPersonalMemo();
@@ -149,6 +166,14 @@ export async function applyMergedLibrary() {
     banner.classList.add("hidden");
     banner.innerHTML = "";
   }
+
+  const libNow = countLibraryVisible();
+  const wlNow = countWishlistVisible();
+  const libPrev = _prevLibraryCount;
+  const wlPrev = _prevWishlistCount;
+  _prevLibraryCount = libNow;
+  _prevWishlistCount = wlNow;
+
   renderStoreChips();
   renderWishlistStoreChips();
   renderGenreChips();
@@ -161,6 +186,17 @@ export async function applyMergedLibrary() {
       // dashboardDataReady just flipped true — re-evaluate the radar gate.
       updateWishlistDrawerVisibility();
     }
+  }
+
+  try {
+    if (libPrev != null && libNow > libPrev) {
+      fireLibraryCountFlash('library', libPrev, libNow);
+    }
+    if (wlPrev != null && wlNow > wlPrev) {
+      fireLibraryCountFlash('wishlist', wlPrev, wlNow);
+    }
+  } catch (err) {
+    console.warn('[library-count-anim]', err);
   }
 }
 

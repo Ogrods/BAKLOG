@@ -14,6 +14,7 @@ import { renderDashboardFetcherHealth } from './fetcher-health.js';
 import { gameKey, hltbMain, ratingValue, normalizeGame } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
+import { ensureChartJs } from './chart-loader.js';
 import { animateCount, dashboardLibraryGames } from './dashboard-shared.js';
 import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts } from './dashboard-charts.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
@@ -228,8 +229,19 @@ function renderDashboardMega(games) {
   startSpotlightRotation(spotlightPool);
 }
 
-export function renderDashboard(opts = {}) {
+function runWhenIdle(fn, timeoutMs = 1200) {
+  if (typeof requestIdleCallback === "function") requestIdleCallback(fn, { timeout: timeoutMs });
+  else setTimeout(fn, 0);
+}
+
+export async function renderDashboard(opts = {}) {
   if (state.activeView !== "dashboard") return;
+  try {
+    await ensureChartJs();
+  } catch (err) {
+    console.warn("[dashboard] Chart.js load failed", err);
+    return;
+  }
   // Re-entrant guard. renderDashboard isn't async, but Chart.js init can call
   // back into user code (legend plugins, tooltip handlers) and any path that
   // hits savePrefs() will trigger personalStore.notify →
@@ -280,17 +292,21 @@ export function renderDashboard(opts = {}) {
     } catch (err) {
       console.error("Dashboard charts error:", err);
     }
-    renderDashboardWishlistStats();
-    try {
-      renderDashboardCoopSpotlight(games);
-    } catch (err) {
-      console.error("Dashboard co-op spotlight error:", err);
-    }
-    try {
-      renderDashboardPicksVersus(games);
-    } catch (err) {
-      console.error("Dashboard picks versus error:", err);
-    }
+    const fpAfterCharts = dashboardFingerprint();
+    runWhenIdle(() => {
+      if (state.activeView !== "dashboard" || dashboardFingerprint() !== fpAfterCharts) return;
+      renderDashboardWishlistStats();
+      try {
+        renderDashboardCoopSpotlight(games);
+      } catch (err) {
+        console.error("Dashboard co-op spotlight error:", err);
+      }
+      try {
+        renderDashboardPicksVersus(games);
+      } catch (err) {
+        console.error("Dashboard picks versus error:", err);
+      }
+    });
     _dashRenderedFingerprint = fp;
     _dashRenderStats.full++;
     _dashRenderStats.lastFullAt = now;

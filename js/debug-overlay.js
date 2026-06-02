@@ -9,7 +9,7 @@
  * "is the data version bumping?" / "is the fingerprint changing?" /
  * "how slow was the last render?" / "is a filter still applied?".
  *
- * Implementation note: polls state every 500ms instead of hooking into every
+ * Implementation note: polls state every 1000ms instead of hooking into every
  * mutation site. Cheap (one DOM update, no layout thrash because the panel is
  * position:fixed), durable (no need to remember to call a refresh from new
  * code paths), and the overlay is opt-in so the cost only applies to debug
@@ -24,7 +24,7 @@ import { getCurtainState } from './loading-curtain.js';
 import { countOrphanPersonalKeys } from './personal-storage.js';
 
 const STORAGE_KEY = 'baklog-debug';
-const POLL_INTERVAL_MS = 500;
+const POLL_INTERVAL_MS = 1000;
 const FINGERPRINT_DISPLAY_LEN = 28;
 
 let _overlayEl = null;
@@ -112,7 +112,11 @@ function tick() {
   setField('curtain', readCurtainState());
   const errCount = getErrorCount();
   setField('errors', errCount > 0 ? `${errCount} (see window.__baklogErrors)` : '0');
-  setField('orphans', readOrphanCount());
+  if (!_overlayEl.classList.contains('baklog-debug-overlay--hidden')) {
+    setField('orphans', readOrphanCount());
+  } else {
+    setField('orphans', '—');
+  }
 }
 
 function readOrphanCount() {

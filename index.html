@@ -46,11 +46,7 @@
     })();
   </script>
   <link rel="stylesheet" href="tailwind.css" />
-  <!-- Chart.js self-hosted from vendor/ (Edge tracking-prevention blocks storage
-       access for cdn.jsdelivr.net, producing console noise). Pin version when
-       upgrading: re-download chart.umd.min.js from
-       https://cdn.jsdelivr.net/npm/chart.js@<ver>/dist/chart.umd.min.js -->
-  <script src="vendor/chart.umd.min.js" defer></script>
+  <!-- Chart.js loaded on demand via js/chart-loader.js when Dashboard is opened -->
   <link rel="stylesheet" href="app.css" />
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -279,6 +275,10 @@
           <div class="view-spinner"></div>
           <span id="viewLoadingLabel" class="text-xs uppercase tracking-wide text-slate-300">Loading…</span>
         </div>
+      </div>
+      <div id="rowLoadingOverlay" class="row-loading-overlay" aria-hidden="true" role="status">
+        <div class="row-loading-spinner" aria-hidden="true"></div>
+        <span class="sr-only">Updating results…</span>
       </div>
     <div id="tableWrap" class="rounded-lg border border-slate-700">
       <table class="w-full text-sm games-table">

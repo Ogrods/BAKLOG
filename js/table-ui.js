@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
+import { beginRowLoader, endRowLoader, forceHideRowLoader } from './loading-curtain.js';
 import {
   collectTableParams,
   queryGames,
@@ -1006,7 +1007,7 @@ export function renderSortIndicators() {
       arrow.setAttribute("aria-hidden", "true");
       th.appendChild(arrow);
     }
-    arrow.textContent = active ? arrowGlyph : "";
+    arrow.textContent = active ? arrowGlyph : "\u2195";
   });
 }
 
@@ -1021,6 +1022,8 @@ export async function renderTable(opts) {
     }
     return;
   }
+  const loaderToken = beginRowLoader();
+  try {
   const perfRun = perfBeginRun({
     view: state.activeView,
     force,
@@ -1159,4 +1162,7 @@ export async function renderTable(opts) {
     fingerprint: fp.slice(0, 80) + (fp.length > 80 ? '…' : ''),
   });
   perfEndRun(perfRun);
+  } finally {
+    endRowLoader(loaderToken);
+  }
 }

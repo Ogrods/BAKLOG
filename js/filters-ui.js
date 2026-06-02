@@ -42,9 +42,11 @@ import {
   tableFingerprint,
   isViewCached,
   reanchorPickedRow,
+  prewarmTableQueryForView,
 } from './table-ui.js';
 import { renderPicks } from './picks-ui.js';
 import { showViewOverlay, hideViewOverlay } from './loading-curtain.js';
+import { ensureChartJs } from './chart-loader.js';
 
 export { hideViewOverlay as hideViewLoading } from './loading-curtain.js';
 import {
@@ -543,12 +545,16 @@ export function switchView(view) {
     updateViewChrome({ drillIn, skipDashboardSchedule });
     refreshFilterUI({ force: true, drillIn, skipDashboardSchedule });
     if (view === "dashboard") {
-      // Explicit tab click — skip the 80ms scheduleDashboardRender debounce and
-      // render this frame so the overlay/blank state doesn't linger.
+      // Explicit tab click — load Chart.js then render so the overlay doesn't linger.
       cancelScheduledDashboardRender();
       setDashReplayAllowed(true);
-      renderDashboard({ replay: true });
-      setDashReplayAllowed(false);
+      ensureChartJs()
+        .then(() => {
+          if (state.activeView !== "dashboard") return;
+          renderDashboard({ replay: true });
+        })
+        .catch(err => console.warn("[switchView] Chart.js load failed", err))
+        .finally(() => setDashReplayAllowed(false));
       fetcherRunner.probeApi().then(async ok => {
         if (!ok) return;
         await fetcherRunner.syncFromServer();
@@ -563,7 +569,18 @@ export function switchView(view) {
       fetcherRunner.stopDashboardPolling();
       stopConnectionsPolling();
     }
-    if (useOverlay && !drillIn) hideViewOverlay();
+    if (view === "library" && state.dashboardDataReady) {
+      const warm = () => prewarmTableQueryForView("wishlist").catch(() => {});
+      if (typeof requestIdleCallback === "function") requestIdleCallback(warm, { timeout: 4000 });
+      else setTimeout(warm, 500);
+    }
+    if (useOverlay && !drillIn) {
+      if (view === "dashboard") {
+        ensureChartJs().finally(() => hideViewOverlay());
+      } else {
+        hideViewOverlay();
+      }
+    }
   };
   if (useOverlay) {
     requestAnimationFrame(() => requestAnimationFrame(doSwitch));

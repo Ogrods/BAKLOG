@@ -9,7 +9,6 @@ import {
   getTitleKeyIndex,
   normalizeNameForDedup,
 } from './game-core.js';
-import { savePrefs } from './prefs.js';
 
 const personalMemo = createMemo();
 
@@ -33,6 +32,30 @@ export function migrateV3() {
   next.__migrated_v3 = true;
   state.personal = next;
   savePersonal();
+}
+
+/** One-shot: strip legacy `tags` field and tag filter prefs. Idempotent via __tags_removed_v1. */
+export function stripLegacyTags() {
+  if (state.personal.__tags_removed_v1) return false;
+  let changed = false;
+  for (const val of Object.values(state.personal)) {
+    if (!val || typeof val !== "object") continue;
+    if ("tags" in val) {
+      delete val.tags;
+      changed = true;
+    }
+  }
+  if ("__tags_canonicalized_v1" in state.personal) {
+    delete state.personal.__tags_canonicalized_v1;
+    changed = true;
+  }
+  state.personal.__tags_removed_v1 = true;
+  if (state.prefs) {
+    if ("tagFilters" in state.prefs) { delete state.prefs.tagFilters; changed = true; }
+    if ("tagFilterMode" in state.prefs) { delete state.prefs.tagFilterMode; changed = true; }
+  }
+  if (changed) savePersonal();
+  return changed;
 }
 
 let _savePersonalTimer = null;
@@ -87,10 +110,10 @@ configurePersonalStore({
   setManualGames: (list) => { manualGames = list; },
 });
 
-const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, tags: [] };
-const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, tags: Object.freeze([]) });
+const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null };
+const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null });
 
-const META_KEYS = new Set(["__migrated_v3", "__tags_canonicalized_v1", "__notes_canonicalized_v1"]);
+const META_KEYS = new Set(["__migrated_v3", "__notes_canonicalized_v1", "__tags_removed_v1"]);
 
 function isMetaPersonalKey(key) {
   return META_KEYS.has(key) || String(key).startsWith("__");
@@ -106,7 +129,6 @@ export function getPersonal(g) {
     if (found.notes == null) found.notes = "";
     if (found.priority == null) found.priority = 0;
     if (found.hltb_override === undefined) found.hltb_override = null;
-    if (!Array.isArray(found.tags)) found.tags = [];
     return found;
   });
 }
@@ -145,16 +167,12 @@ export function mergeImportedPersonal(incoming) {
   for (const [key, val] of Object.entries(incoming || {})) {
     if (isMetaPersonalKey(key)) continue;
     if (!val || typeof val !== "object") continue;
-    const existing = state.personal[key] || { ...PERSONAL_DEFAULT, tags: [] };
-    if (!Array.isArray(existing.tags)) existing.tags = [];
-    const incomingTags = Array.isArray(val.tags) ? val.tags : [];
-    state.personal[key] = {
-      ...existing,
-      ...val,
-      tags: Array.from(new Set([...(existing.tags || []), ...incomingTags])),
-    };
+    const existing = state.personal[key] || { ...PERSONAL_DEFAULT };
+    const { tags: _ignored, ...rest } = val;
+    state.personal[key] = { ...existing, ...rest };
   }
   state.personal.__migrated_v3 = true;
+  state.personal.__tags_removed_v1 = true;
   window._dataVersion = (window._dataVersion || 0) + 1;
   personalMemo.bump();
   savePersonal();
@@ -179,7 +197,7 @@ function mirrorNoteToKeys(keys, note, options) {
   let changed = false;
   for (const key of keys) {
     if (isMetaPersonalKey(key)) continue;
-    if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT, tags: [] };
+    if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT };
     if (String(state.personal[key].notes ?? "") === text) continue;
     state.personal[key].notes = text;
     changed = true;
@@ -232,8 +250,7 @@ export function canonicalizeNotesAcrossTitles() {
 
 export function setPersonalByKey(key, field, value, options) {
   if (isMetaPersonalKey(key)) return;
-  if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT, tags: [] };
-  if (!Array.isArray(state.personal[key].tags)) state.personal[key].tags = [];
+  if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT };
   state.personal[key][field] = value;
   window._dataVersion = (window._dataVersion || 0) + 1;
   personalMemo.bump();
@@ -248,186 +265,6 @@ export function setPersonal(g, field, value, options) {
     return;
   }
   setPersonalByKey(gameKey(g), field, value, options);
-}
-
-export function normalizeTag(t) {
-  return String(t || "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 32);
-}
-
-function remapTagInPrefs(oldTag, newTag) {
-  const filters = state.prefs.tagFilters || [];
-  if (!filters.includes(oldTag)) return;
-  const next = [...new Set(filters.map(t => (t === oldTag ? newTag : t)))];
-  state.prefs.tagFilters = next;
-  savePrefs();
-}
-
-function removeTagFromPrefs(tag) {
-  const filters = state.prefs.tagFilters || [];
-  if (!filters.includes(tag)) return;
-  state.prefs.tagFilters = filters.filter(t => t !== tag);
-  savePrefs();
-}
-
-function sortedUniqueTags(tags) {
-  return [...new Set(tags)].sort();
-}
-
-export function addTagToGame(g, raw) {
-  const tag = normalizeTag(raw);
-  if (!tag) return false;
-  let changed = false;
-  for (const key of getSameTitleKeys(g)) {
-    const cur = state.personal[key]?.tags || [];
-    if (cur.includes(tag)) continue;
-    setPersonalByKey(key, "tags", [...cur, tag].sort(), { silent: true });
-    changed = true;
-  }
-  if (changed) scheduleDownstreamSync();
-  return changed;
-}
-
-export function removeTagFromGame(g, tag) {
-  const normalized = normalizeTag(tag);
-  if (!normalized) return false;
-  let changed = false;
-  for (const key of getSameTitleKeys(g)) {
-    const cur = state.personal[key]?.tags || [];
-    if (!cur.includes(normalized)) continue;
-    setPersonalByKey(key, "tags", cur.filter(x => x !== normalized), { silent: true });
-    changed = true;
-  }
-  if (changed) scheduleDownstreamSync();
-  return changed;
-}
-
-export function renameTagGlobally(oldTag, newTag) {
-  const src = normalizeTag(oldTag);
-  const dst = normalizeTag(newTag);
-  if (!src || !dst || src === dst) return false;
-  let changed = false;
-  for (const [key, val] of Object.entries(state.personal)) {
-    if (isMetaPersonalKey(key) || !val || !Array.isArray(val.tags)) continue;
-    if (!val.tags.includes(src)) continue;
-    const next = sortedUniqueTags(val.tags.map(t => (t === src ? dst : t)));
-    setPersonalByKey(key, "tags", next, { silent: true });
-    changed = true;
-  }
-  if (changed) {
-    remapTagInPrefs(src, dst);
-    scheduleDownstreamSync();
-  }
-  return changed;
-}
-
-export function mergeTagGlobally(srcTag, dstTag) {
-  const src = normalizeTag(srcTag);
-  const dst = normalizeTag(dstTag);
-  if (!src || !dst || src === dst) return false;
-  let changed = false;
-  for (const [key, val] of Object.entries(state.personal)) {
-    if (isMetaPersonalKey(key) || !val || !Array.isArray(val.tags)) continue;
-    if (!val.tags.includes(src)) continue;
-    const next = sortedUniqueTags(val.tags.filter(t => t !== src).concat(dst));
-    setPersonalByKey(key, "tags", next, { silent: true });
-    changed = true;
-  }
-  if (changed) {
-    remapTagInPrefs(src, dst);
-    scheduleDownstreamSync();
-  }
-  return changed;
-}
-
-export function deleteTagGlobally(tag) {
-  const normalized = normalizeTag(tag);
-  if (!normalized) return false;
-  let changed = false;
-  for (const [key, val] of Object.entries(state.personal)) {
-    if (isMetaPersonalKey(key) || !val || !Array.isArray(val.tags)) continue;
-    if (!val.tags.includes(normalized)) continue;
-    setPersonalByKey(key, "tags", val.tags.filter(t => t !== normalized), { silent: true });
-    changed = true;
-  }
-  if (changed) {
-    removeTagFromPrefs(normalized);
-    scheduleDownstreamSync();
-  }
-  return changed;
-}
-
-export function canonicalizeTagsAcrossTitles() {
-  if (state.personal.__tags_canonicalized_v1) return false;
-  const index = getTitleKeyIndex();
-  const processed = new Set();
-  let changed = false;
-
-  const applyUnionToKeys = (keys) => {
-    const sig = keys.slice().sort().join("|");
-    if (processed.has(sig)) return;
-    processed.add(sig);
-    const union = new Set();
-    for (const key of keys) {
-      const tags = state.personal[key]?.tags;
-      if (Array.isArray(tags)) tags.forEach(t => union.add(t));
-    }
-    if (!union.size) return;
-    const sorted = [...union].sort();
-    for (const key of keys) {
-      const cur = state.personal[key]?.tags || [];
-      if (cur.length === sorted.length && sorted.every((t, i) => cur[i] === t)) continue;
-      setPersonalByKey(key, "tags", sorted, { silent: true });
-      changed = true;
-    }
-  };
-
-  for (const keys of index.values()) applyUnionToKeys(keys);
-
-  for (const [key] of Object.entries(state.personal)) {
-    if (isMetaPersonalKey(key)) continue;
-    const g = findGameByKey(key);
-    if (!g) continue;
-    const norm = normalizeNameForDedup(g.name);
-    if (!norm) continue;
-    const keys = index.get(norm) || [key];
-    applyUnionToKeys(keys);
-  }
-
-  state.personal.__tags_canonicalized_v1 = true;
-  window._dataVersion = (window._dataVersion || 0) + 1;
-  personalMemo.bump();
-  savePersonal();
-  return changed;
-}
-
-export function allPersonalTags() {
-  const counts = new Map();
-  const seenTitleTag = new Set();
-
-  const countForGame = (g) => {
-    const norm = normalizeNameForDedup(g.name);
-    if (!norm) return;
-    for (const t of getPersonal(g).tags || []) {
-      const sig = `${norm}::${t}`;
-      if (seenTitleTag.has(sig)) continue;
-      seenTitleTag.add(sig);
-      counts.set(t, (counts.get(t) || 0) + 1);
-    }
-  };
-
-  for (const g of [...(state.allGames || []), ...(state.wishlistGames || []), ...(state.itchGames || [])]) {
-    countForGame(g);
-  }
-
-  for (const [key, val] of Object.entries(state.personal)) {
-    if (isMetaPersonalKey(key) || !val || !Array.isArray(val.tags)) continue;
-    if (findGameByKey(key)) continue;
-    for (const t of val.tags) {
-      counts.set(t, (counts.get(t) || 0) + 1);
-    }
-  }
-
-  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
 /**
@@ -446,19 +283,16 @@ export function findOrphanPersonalKeys() {
     if (findGameByKey(key)) continue;
     const status = String(rec.status || "").trim();
     const notes = String(rec.notes || "").trim();
-    const tags = Array.isArray(rec.tags) ? rec.tags.filter(Boolean) : [];
     const hltbOverride = rec.hltb_override;
     const hasData = Boolean(
       (status && status !== "backlog") ||
       notes ||
-      tags.length > 0 ||
       (hltbOverride != null && hltbOverride !== ""),
     );
     orphans.push({
       key,
       status: status || "backlog",
       notes,
-      tags,
       hltbOverride: hltbOverride ?? null,
       hasData,
     });
@@ -500,11 +334,4 @@ export function prunePersonalKeys(keys) {
     scheduleDownstreamSync();
   }
   return removed;
-}
-
-export function rebuildPersonalTagsDatalist() {
-  const el = document.getElementById("personalTagsList");
-  if (!el) return;
-  const tags = allPersonalTags().map(([t]) => t);
-  el.innerHTML = tags.map(t => `<option value="${String(t).replace(/"/g, "&quot;")}"></option>`).join("");
 }

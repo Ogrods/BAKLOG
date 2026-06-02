@@ -22,12 +22,8 @@ function dashResetLibraryFiltersExceptDedup() {
   state.prefs.releaseYearFilter = "";
   state.prefs.hltbBucket = null;
   state.prefs.genreFilters = [];
-  state.prefs.tagFilters = [];
-  state.prefs.tagFilterMode = "OR";
   state.cleanupModeActive = false;
   syncFilterDomFromState();
-  const tagModeEl = document.getElementById("tagFilterMode");
-  if (tagModeEl) tagModeEl.value = "OR";
 }
 
 /**

@@ -8,7 +8,6 @@ import {
   GENRE_ALIASES,
   ITCH_NON_GAME_CLASSIFICATIONS,
 } from './state.js';
-import { passesTagFilterFromPrefs } from './tag-filter.js';
 
 const HLTB_BUCKETS_QUERY = [
   { minExclusive: null, maxInclusive: 2 },
@@ -131,14 +130,13 @@ function getPersonalRecord(personal, g) {
   const key = gameKey(g);
   const found = personal[key] || (typeof personal[gameId(g)] === 'object' ? personal[gameId(g)] : null);
   if (!found) {
-    return { status: 'backlog', notes: '', priority: 0, hltb_override: null, tags: [] };
+    return { status: 'backlog', notes: '', priority: 0, hltb_override: null };
   }
   return {
     status: found.status ?? 'backlog',
     notes: found.notes ?? '',
     priority: found.priority ?? 0,
     hltb_override: found.hltb_override ?? null,
-    tags: Array.isArray(found.tags) ? found.tags : [],
   };
 }
 
@@ -285,8 +283,6 @@ function passesSearchQuery(g, p, q) {
   if (g.name.toLowerCase().includes(q)) return true;
   const notes = String(p.notes || "").toLowerCase();
   if (notes.includes(q)) return true;
-  const tags = (p.tags || []).join(" ").toLowerCase();
-  if (tags.includes(q)) return true;
   return false;
 }
 
@@ -343,7 +339,6 @@ function passesFilter(ctx, g) {
   }
   const genres = prefs.genreFilters || [];
   if (genres.length && !gameMatchesGenreFilters(g, genres, prefs.genreFilterMode)) return false;
-  if (!passesTagFilterFromPrefs(prefs, p.tags || [])) return false;
   return true;
 }
 

@@ -25,7 +25,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { gameGenresCanonical, aliasCanonicalGenre } from './genres.js';
-import { getPersonal, allPersonalTags, rebuildPersonalTagsDatalist } from './personal-storage.js';
+import { getPersonal } from './personal-storage.js';
 import {
   savePrefs,
   applySavedSortForView,
@@ -85,7 +85,6 @@ export function collectActiveFilters() {
     pills.push({ kind: "wishlistStore", value: v, label: `Wishlist source: ${labelMap[v] || v}` });
   }
   for (const g of state.prefs.genreFilters || []) pills.push({ kind: "genre", value: g, label: g });
-  for (const t of state.prefs.tagFilters || []) pills.push({ kind: "tag", value: t, label: `#${t}` });
   if (sp.unplayedOnly) pills.push({ kind: "unplayed", value: "1", label: "Unplayed only" });
   if (sp.earlyAccessOnly) pills.push({ kind: "earlyAccess", value: "1", label: "Early Access only" });
   const coopMode = getCoopFilterMode();
@@ -104,9 +103,6 @@ export function collectActiveFilters() {
   if (state.cleanupModeActive && state.activeView === "library") pills.push({ kind: "cleanup", value: "1", label: "Cleanup mode" });
   if (state.activeView === "itch" && state.sessionPrefs.itchHideNonGames) pills.push({ kind: "itchHideNonGames", value: "1", label: "Hide tools, soundtracks, etc." });
   if (state.sessionPrefs.crossStoreDedup) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
-  if ((state.prefs.tagFilters || []).length > 1 && state.prefs.tagFilterMode === "AND") {
-    pills.push({ kind: "tagMode", value: "AND", label: "Tags: all" });
-  }
   if (state.activeView === "wishlist") {
     if (state.prefs.dealOnSaleOnly) pills.push({ kind: "dealOnSale", value: "1", label: "On sale only" });
     if (state.prefs.dealHistoricalLowOnly) pills.push({ kind: "dealLow", value: "1", label: "Historical low only" });
@@ -248,13 +244,6 @@ export function removeActiveFilter(kind, value) {
     case "hltbBucket":      return applyPrefsChange({ prefs: { hltbBucket: null } });
     case "genre":
       return applyPrefsChange({ prefs: { genreFilters: (state.prefs.genreFilters || []).filter(x => x !== value) } });
-    case "tag":
-      return applyPrefsChange({ prefs: { tagFilters: (state.prefs.tagFilters || []).filter(x => x !== value) } });
-    case "tagMode":
-      return applyPrefsChange(
-        { prefs: { tagFilterMode: "OR" } },
-        { renderers: [() => setInputValue("tagFilterMode", "OR")] },
-      );
     case "coop":
     case "coopOnline":
     case "coopLocal":
@@ -322,8 +311,6 @@ export function clearAllFilters() {
         releaseYearFilter: "",
         hltbBucket: null,
         genreFilters: [],
-        tagFilters: [],
-        tagFilterMode: "OR",
       },
       sessionPrefs: {
         search: "",
@@ -339,7 +326,6 @@ export function clearAllFilters() {
       recomputeDedup: true,
       renderers: [
         () => setInputChecked("crossStoreDedup", false),
-        () => setInputValue("tagFilterMode", "OR"),
         updateCleanupBtnState,
       ],
     },
@@ -740,25 +726,6 @@ export function renderGenreChips() {
   updateGenreChipsCollapse();
 }
 
-export function renderTagChips() {
-  rebuildPersonalTagsDatalist();
-  const tags = allPersonalTags();
-  const wrap = document.getElementById("tagChips");
-  if (!wrap) return;
-  if (!tags.length) {
-    wrap.innerHTML = '<span class="text-xs text-slate-500 italic">No personal tags yet. Use "+ Tag selected" or the tag input on a row.</span>';
-    return;
-  }
-  wrap.innerHTML = tags.map(([t, n]) => {
-    const active = (state.prefs.tagFilters || []).includes(t);
-    const activeCls = active ? "personal-tag-chip--active" : "";
-    return `<span class="personal-tag-chip-wrap inline-flex items-center gap-0.5">
-      <button type="button" class="personal-tag-chip ${activeCls}" data-tag="${escapeAttr(t)}">${escapeHtml(t)}<span class="personal-tag-count">${n}</span></button>
-      <button type="button" class="personal-tag-menu-btn" data-tag="${escapeAttr(t)}" aria-label="Options for tag ${escapeAttr(t)}" title="Rename, merge, or delete">▾</button>
-    </span>`;
-  }).join("");
-}
-
 // === Export ===
 export function exportTopBacklogMarkdown() {
   const visible = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
@@ -797,8 +764,8 @@ export function exportCsv() {
   const list = state._visibleList || [];
   const isWish = state.activeView === "wishlist";
   const headers = isWish
-    ? ["store", "wishlist_store", "id", "name", "tracking_status", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "hltb_main", "release_date", "genres", "tags", "notes", "store_url"]
-    : ["store", "id", "name", "status", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "price", "discount_percent", "release_date", "genres", "tags", "notes"];
+    ? ["store", "wishlist_store", "id", "name", "tracking_status", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "hltb_main", "release_date", "genres", "notes", "store_url"]
+    : ["store", "id", "name", "status", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "price", "discount_percent", "release_date", "genres", "notes"];
   const rows = list.map(g => {
     const p = getPersonal(g);
     const ng = normalizeGame(g);
@@ -809,14 +776,14 @@ export function exportCsv() {
         d?.price != null ? d.price.toFixed(2) : "", effectiveDiscountPercent(g) || "",
         d?.shop ?? "", d?.isHistoricalLow ? "yes" : "",
         g.steam_review_percent ?? "", hltbMain(g) ?? "",
-        g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes,
+        g.release_date ?? "", (g.genres || []).join("; "), p.notes,
         g.store_url ?? d?.url ?? "",
       ];
     }
     return [
       ng.store, ng.id, g.name, p.status, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
       hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "",
-      g.price ?? "", effectiveDiscountPercent(g) || (g.discount_percent ?? ""), g.release_date ?? "", (g.genres || []).join("; "), (p.tags || []).join("; "), p.notes
+      g.price ?? "", effectiveDiscountPercent(g) || (g.discount_percent ?? ""), g.release_date ?? "", (g.genres || []).join("; "), p.notes
     ];
   }).map(cells => cells.map(x => `"${String(x).replace(/"/g, '""')}"`).join(","));
   const fname = isWish ? "steam-backlog-wishlist.csv" : "steam-backlog-library.csv";

@@ -192,7 +192,7 @@
 
     <section id="toolbarSection" class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
       <div class="flex flex-wrap gap-2 items-center">
-        <input id="search" type="search" placeholder="Search games, notes, tags..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
+        <input id="search" type="search" placeholder="Search games or notes..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
         <button type="button" id="openFiltersBtn" class="relative bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm whitespace-nowrap">
           Filters <span id="filtersBtnBadge" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-sky-600 text-[10px] font-bold">0</span>
         </button>
@@ -204,10 +204,9 @@
             <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
             <button type="button" id="showFetcherLog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reopen the fetcher console (helpful if you closed it during a run)">Show fetcher log</button>
             <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
-            <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export personal data (status, notes, tags)</button>
+            <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export personal data (status, notes)</button>
             <button type="button" id="exportNotesOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes only</button>
-            <button type="button" id="exportTagsOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export tags only</button>
-            <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Find stored statuses/notes/tags whose game is no longer in any catalog (uninstalled, store disconnected, etc.)">Clean up unknown games…</button>
+            <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Find stored statuses/notes whose game is no longer in any catalog (uninstalled, store disconnected, etc.)">Clean up unknown games…</button>
             <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700">Copy top 20 backlog (Markdown)</button>
             <label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-700 cursor-pointer text-left" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
               <input type="checkbox" id="itadAutoRefreshToggle" class="rounded" checked />
@@ -424,18 +423,6 @@
         </div>
         <div id="genreChips" class="flex flex-wrap gap-1.5 collapsed"></div>
         <button type="button" id="toggleGenreChipsBtn" class="hidden mt-2 text-xs text-sky-400 hover:underline"></button>
-      </div>
-      <div class="drawer-section">
-        <div class="flex flex-wrap items-center gap-2 mb-2">
-          <span class="text-xs text-slate-400">My tags</span>
-          <select id="tagFilterMode" class="bg-slate-700 border border-slate-600 rounded text-xs px-1 py-0.5" title="How multiple tag filters combine">
-            <option value="OR">Any tag</option>
-            <option value="AND">All tags</option>
-          </select>
-          <button type="button" id="addTagBtn" class="px-2 py-0.5 rounded border border-slate-600 text-xs text-slate-300 hover:bg-slate-700">+ Tag selected</button>
-        </div>
-        <datalist id="personalTagsList"></datalist>
-        <div id="tagChips" class="flex flex-wrap gap-1.5"></div>
       </div>
       <div class="drawer-section space-y-3">
         <label class="block text-xs text-slate-300">Min rating % <span id="minRatingVal" class="text-slate-100">0</span>

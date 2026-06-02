@@ -18,13 +18,8 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { getPersonal } from './personal-storage.js';
-import { passesTagFilterFromPrefs } from './tag-filter.js';
 import { savePrefs } from './prefs.js';
 import { syncCoverFits } from './covers.js';
-
-export function passesTagFilter(g) {
-  return passesTagFilterFromPrefs(state.prefs, getPersonal(g).tags || []);
-}
 
 export function pickCardHtml(g) {
   const key = gameKey(g);
@@ -43,20 +38,8 @@ export function pickCardHtml(g) {
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
-      ${pickTagsHtml(g)}
       <div class="text-xs text-slate-400 flex justify-between"><span>${rating}</span><span>${h != null ? `${h}h` : ""}</span></div>
     </div>`;
-}
-
-function pickTagsHtml(g) {
-  const tags = getPersonal(g).tags || [];
-  if (!tags.length) return "";
-  const max = 3;
-  const shown = tags.slice(0, max);
-  const extra = tags.length - shown.length;
-  const chips = shown.map(t => `<span class="pick-tag-chip">${escapeHtml(t)}</span>`).join("");
-  const more = extra > 0 ? `<span class="pick-tag-more">+${extra}</span>` : "";
-  return `<div class="pick-tag-row">${chips}${more}</div>`;
 }
 
 export function dealCardHtml(g) {
@@ -88,7 +71,6 @@ export function dealCardHtml(g) {
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
-      ${pickTagsHtml(g)}
       <div class="text-xs text-slate-400 flex justify-between items-center gap-1">
         <span class="text-slate-100">${priceLabel}</span>
         <span class="flex items-center gap-1 shrink-0">
@@ -145,8 +127,8 @@ export function effectivePicksTab() {
 export function renderPicks() {
   const tab = effectivePicksTab();
   const pickView = state.activeView === "wishlist" ? "wishlist" : state.activeView === "itch" ? "itch" : "library";
-  const visibleLibrary = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)) && passesTagFilter(g));
-  const visibleItch = state.itchGames.filter(g => passesTagFilter(g));
+  const visibleLibrary = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
+  const visibleItch = state.itchGames;
   const visible = pickView === "itch" ? visibleItch : visibleLibrary;
   const backlogRated = visible
     .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) > 0 && (pickView === "itch" || hasEnoughReviews(g)))
@@ -167,7 +149,6 @@ export function renderPicks() {
     });
   const wishlistDeals = state.wishlistGames
     .filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)))
-    .filter(g => passesTagFilter(g))
     .filter(g => {
       const d = getDealInfo(g);
       if (!d) return false;

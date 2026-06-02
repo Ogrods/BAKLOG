@@ -189,13 +189,50 @@ playwright install chromium   # one-time, for Connections browser sign-in
 python server.py
 ```
 
+On Windows, prefer the project venv interpreter (`.venv\Scripts\python.exe server.py`) rather than the Microsoft Store `python.exe` stub. Fetcher subprocesses launched from the stub can hang `subprocess.Popen` and wedge the run queue.
+
 **Connections tab:** sign in once per store from the dashboard — API keys via form fields, cookie/OAuth stores via a headed Chromium window. Credentials are encrypted in `cache/auth/` (OS keychain by default). `.env` still works as a fallback.
 
-Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes. Use the **Connections** tab to sign in to each store once (encrypted locally via Playwright); `.env` still works as a fallback for API keys and cookies.
+#### Moving to a new machine
+
+1. On the old machine: **Connections** → ⋮ → **Portable bundle…** → **Export bundle…**. Choose a passphrase and save the downloaded `baklog-secrets-*.bundle` somewhere safe (USB, cloud folder, etc.).
+2. Install BAKLOG on the new machine (`pip install -r requirements.txt`, `playwright install chromium`, `python server.py`).
+3. **Connections** → ⋮ → **Portable bundle…** → **Import bundle…**, pick the file, enter the same passphrase. The page reloads with every provider restored — including Playwright cookie profiles.
+
+Terminal alternative:
+
+```bash
+python -m auth export-bundle --out baklog-secrets.bundle
+python -m auth import-bundle baklog-secrets.bundle
+```
+
+See [PRIVACY.md](PRIVACY.md#portable-secret-bundle) for what's inside the bundle and the threat model.
+
+Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes.
 
 **Option B (read-only):** `python -m http.server 8080` if you only want to browse and prefer to run fetchers in your terminal.
 
 **Option C:** open `index.html` directly (browsers block automatic local file loading without a server — use Option A or B for the full experience).
+
+### Reporting a bug
+
+When something goes wrong, BAKLOG captures uncaught errors and unhandled
+promise rejections automatically and surfaces a sticky red toast in the
+top-right corner. Three buttons:
+
+- **Copy bug bundle** — assembles a sanitized JSON payload (errors + app
+  context: version, view, data version, filter count, table fingerprint,
+  last render time, dashboard counters) and copies it to your clipboard.
+  Paste it into a [new GitHub issue](https://github.com/Ogrods/steam-backlog/issues/new). Nothing is sent anywhere by the app — what you do with the
+  clipboard is up to you. Personal notes, library JSON, and credentials are
+  never included (see [PRIVACY.md](PRIVACY.md#error-logs-and-bug-reporting) for
+  the full whitelist).
+- **Errors only** — copies just the error array, without app context.
+- **Details** — expand the stack trace inline.
+
+The last 200 errors are kept in browser `localStorage` so the bundle can
+include history across reloads. Clear the ring with
+`localStorage.removeItem('baklog-error-log')` in DevTools.
 
 ### Personal data storage
 

@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
 import { beginRowLoader, endRowLoader, forceHideRowLoader } from './loading-curtain.js';
+import { isSurfaceAnimating } from './library-count-animation.js';
 import {
   collectTableParams,
   queryGames,
@@ -1029,7 +1030,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
       <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
-      <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
+      <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2 game-name-cell">
         <div class="flex items-center gap-2">
           <div class="flex-1 min-w-0">
@@ -1188,12 +1189,38 @@ export function formatRowCountText(view, list) {
   return base + extra;
 }
 
+/** Paint #rowCount; library/wishlist views get a popup mount target for 1UP animation. */
+export function renderRowCountEl(el, view, list) {
+  if (!el) return;
+  const rows = list || [];
+  if (view === "library") {
+    const total = Math.max(0, state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))).length - countUserHiddenLibrary());
+    const extra = state.cleanupModeActive ? " · cleanup mode" : "";
+    el.innerHTML = `Showing <span class="library-count-host" data-libcount-host><span data-count-target="rowcount-library">${rows.length}</span></span> of ${total} games${escapeHtml(extra)}`;
+    return;
+  }
+  if (view === "wishlist") {
+    const onSale = rows.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
+    const lows = rows.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; }).length;
+    const dealBits = [];
+    if (onSale) dealBits.push(`${onSale} on sale`);
+    if (lows) dealBits.push(`${lows} at historical low`);
+    const tail = dealBits.length ? ` · ${escapeHtml(dealBits.join(", "))}` : "";
+    const total = Math.max(0, state.wishlistGames.length - state.wishlistCrossStoreHiddenKeys.size - countUserHiddenWishlist());
+    el.innerHTML = `Wishlist: <span class="library-count-host" data-libcount-host><span data-count-target="rowcount-wishlist">${rows.length}</span></span> of ${total}${tail}`;
+    return;
+  }
+  el.textContent = formatRowCountText(view, list);
+}
+
 /** Keep #rowCount in sync with activeView (e.g. after tab switch before async renderTable finishes). */
 export function syncRowCountLabel() {
   const el = document.getElementById("rowCount");
   if (!el) return;
   const view = state.activeView;
   if (view === "dashboard" || view === "connections") return;
+  const animTarget = el.querySelector('[data-count-target^="rowcount-"]');
+  if (animTarget && isSurfaceAnimating(animTarget)) return;
   let list = state._visibleListView === view ? state._visibleList : null;
   if (!Array.isArray(list)) {
     const params = collectTableParams(state.sessionPrefs);
@@ -1208,7 +1235,7 @@ export function syncRowCountLabel() {
       },
     });
   }
-  el.textContent = formatRowCountText(view, list);
+  renderRowCountEl(el, view, list);
 }
 
 export async function renderTable(opts) {
@@ -1333,7 +1360,11 @@ export async function renderTable(opts) {
     virtualWindow: perfRun?.meta?.virtualWindow,
   });
 
-  document.getElementById("rowCount").textContent = formatRowCountText(state.activeView, list);
+  const rowCountEl = document.getElementById("rowCount");
+  const rowAnim = rowCountEl?.querySelector('[data-count-target^="rowcount-"]');
+  if (!rowAnim || !isSurfaceAnimating(rowAnim)) {
+    renderRowCountEl(rowCountEl, state.activeView, list);
+  }
   perfMark(perfRun, 'post:start');
   updateBulkBar();
   buildAlphaNav(list);

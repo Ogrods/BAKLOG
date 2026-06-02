@@ -26,7 +26,7 @@ export function syncCoopFilterSegmented() {
   document.querySelectorAll("#coopFilterSegmented .filter-segment").forEach(btn => {
     const on = btn.dataset.coopMode === mode;
     btn.classList.toggle("active", on);
-    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.setAttribute("aria-checked", on ? "true" : "false");
   });
 }
 

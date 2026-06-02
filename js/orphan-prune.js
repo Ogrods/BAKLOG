@@ -17,11 +17,13 @@ import {
   prunePersonalKeys,
   flushSavePersonal,
 } from './personal-storage.js';
+import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
 const MODAL_ID = 'orphanPruneModal';
 const LIST_ID = 'orphanPruneList';
 const SUMMARY_ID = 'orphanPruneSummary';
 const EMPTY_FILTER_ID = 'orphanPruneEmptyOnly';
+let _orphanPruneRelease = null;
 
 function el(id) { return document.getElementById(id); }
 
@@ -83,12 +85,23 @@ function open() {
     alert("Library is still loading. Wait until the boot curtain lifts before pruning so we don't flag valid games as orphan.");
     return;
   }
+  const dialog = modal.querySelector('[role="dialog"]') || modal;
   render();
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+  _orphanPruneRelease?.();
+  const releaseTrap = trapFocus(dialog);
+  const releaseEsc = bindEscapeClose(dialog, close);
+  _orphanPruneRelease = () => {
+    releaseTrap();
+    releaseEsc();
+    _orphanPruneRelease = null;
+  };
+  el('orphanPruneClose')?.focus();
 }
 
 function close() {
+  _orphanPruneRelease?.();
   const modal = el(MODAL_ID);
   if (!modal) return;
   modal.classList.add('hidden');

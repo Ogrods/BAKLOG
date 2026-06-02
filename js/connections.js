@@ -1,6 +1,10 @@
 import { escapeAttr, escapeHtml } from './dom-util.js';
+import { bindEscapeClose, trapFocus } from './focus-trap.js';
+import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
 
+export { FETCHER_AUTH_PROVIDER };
 
+let _connPopoverRelease = null;
 
 let authStatus = [];
 
@@ -641,6 +645,9 @@ function wireGridEvents() {
 
 function closeConnPopover() {
 
+  _connPopoverRelease?.();
+  _connPopoverRelease = null;
+
   const pop = document.getElementById('connPopover');
 
   const bd = document.getElementById('connPopoverBackdrop');
@@ -667,7 +674,13 @@ function openConnPopover(which) {
 
   if (!pop || !bd || !body) return;
 
-  const tplId = which === 'howto' ? 'tplConnHowToPopover' : 'tplConnPassphrasePopover';
+  const tplMap = {
+    howto: 'tplConnHowToPopover',
+    passphrase: 'tplConnPassphrasePopover',
+    bundle: 'tplConnBundlePopover',
+  };
+
+  const tplId = tplMap[which] || 'tplConnHowToPopover';
 
   const tpl = document.getElementById(tplId);
 
@@ -682,7 +695,25 @@ function openConnPopover(which) {
   pop.hidden = false;
 
   if (which === 'passphrase') wireMasterPasswordSave();
+  if (which === 'bundle') wireSecretsBundle();
 
+  const titleMap = {
+    howto: 'How connections work',
+    passphrase: 'Encryption passphrase',
+    bundle: 'Portable bundle',
+  };
+  const dialogTitle = document.getElementById('connPopoverDialogTitle');
+  if (dialogTitle) dialogTitle.textContent = titleMap[which] || 'Connections';
+
+  _connPopoverRelease?.();
+  const releaseTrap = trapFocus(pop);
+  const releaseEsc = bindEscapeClose(pop, closeConnPopover);
+  _connPopoverRelease = () => {
+    releaseTrap();
+    releaseEsc();
+    _connPopoverRelease = null;
+  };
+  pop.querySelector('.conn-popover-close')?.focus();
 }
 
 
@@ -733,6 +764,172 @@ function wireMasterPasswordSave() {
 
   });
 
+}
+
+
+
+function setSecretsBundleHint(text, isError = false) {
+  const hint = document.getElementById('secretsBundleHint');
+  if (!hint) return;
+  hint.textContent = text || '';
+  hint.classList.toggle('text-red-400', !!isError);
+  hint.classList.toggle('text-slate-400', !isError);
+}
+
+
+
+function promptSecretsBundlePassphrase({ mode = 'export' } = {}) {
+  return new Promise((resolve) => {
+    const dialog = document.getElementById('secretsBundleDialog');
+    const form = document.getElementById('secretsBundleDialogForm');
+    const title = document.getElementById('secretsBundleDialogTitle');
+    const help = document.getElementById('secretsBundleDialogHelp');
+    const pw = document.getElementById('secretsBundlePassphrase');
+    const confirmWrap = document.getElementById('secretsBundleConfirmWrap');
+    const confirmPw = document.getElementById('secretsBundlePassphraseConfirm');
+    const cancelBtn = document.getElementById('secretsBundleCancel');
+    if (!dialog || !form || !pw) {
+      resolve(null);
+      return;
+    }
+    const isExport = mode === 'export';
+    if (title) title.textContent = isExport ? 'Export bundle passphrase' : 'Import bundle passphrase';
+    if (help) {
+      help.textContent = isExport
+        ? 'Choose a passphrase for this backup file. You will need it to import on another machine.'
+        : 'Enter the passphrase you used when exporting this bundle.';
+    }
+    pw.value = '';
+    if (confirmPw) confirmPw.value = '';
+    if (confirmWrap) confirmWrap.classList.toggle('hidden', !isExport);
+    const cleanup = () => {
+      form.removeEventListener('submit', onSubmit);
+      cancelBtn?.removeEventListener('click', onCancel);
+      dialog.removeEventListener('close', onClose);
+    };
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const onCancel = (ev) => {
+      ev.preventDefault();
+      finish(null);
+    };
+    const onClose = () => {
+      finish(null);
+    };
+    const onSubmit = (ev) => {
+      ev.preventDefault();
+      const value = pw.value || '';
+      if (value.length < 8) {
+        setSecretsBundleHint('Passphrase must be at least 8 characters.', true);
+        return;
+      }
+      if (isExport && confirmPw && value !== confirmPw.value) {
+        setSecretsBundleHint('Passphrases do not match.', true);
+        return;
+      }
+      finish(value);
+    };
+    form.addEventListener('submit', onSubmit);
+    cancelBtn?.addEventListener('click', onCancel);
+    dialog.addEventListener('close', onClose);
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.removeAttribute('hidden');
+    pw.focus();
+  });
+}
+
+
+
+async function exportSecretsBundle() {
+  const passphrase = await promptSecretsBundlePassphrase({ mode: 'export' });
+  if (!passphrase) return;
+  setSecretsBundleHint('Exporting bundle…');
+  try {
+    const resp = await fetch('/api/auth/secrets/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase, include_profiles: true }),
+    });
+    if (!resp.ok) {
+      let msg = `Export failed (${resp.status})`;
+      try {
+        const err = await resp.json();
+        if (err?.error) msg = err.error;
+      } catch (_) { /* binary or empty */ }
+      setSecretsBundleHint(msg, true);
+      return;
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="([^"]+)"/);
+    const filename = match?.[1] || 'baklog-secrets.bundle';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setSecretsBundleHint('Bundle downloaded. Store it somewhere safe — we cannot recover the passphrase.');
+  } catch (err) {
+    setSecretsBundleHint(err?.message || 'Export failed.', true);
+  }
+}
+
+
+
+async function importSecretsBundle(file) {
+  if (!file) return;
+  const passphrase = await promptSecretsBundlePassphrase({ mode: 'import' });
+  if (!passphrase) return;
+  setSecretsBundleHint('Importing bundle…');
+  try {
+    const buf = await file.arrayBuffer();
+    const resp = await fetch(`/api/auth/secrets/import?passphrase=${encodeURIComponent(passphrase)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf,
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      setSecretsBundleHint(payload?.error || `Import failed (${resp.status})`, true);
+      return;
+    }
+    const nProv = (payload.providers_imported || []).length;
+    const nProf = (payload.profiles_imported || []).length;
+    setSecretsBundleHint(`Imported ${nProv} provider(s) and ${nProf} profile(s). Reloading…`);
+    window.setTimeout(() => window.location.reload(), 1200);
+  } catch (err) {
+    setSecretsBundleHint(err?.message || 'Import failed.', true);
+  }
+}
+
+
+
+function wireSecretsBundle() {
+  const exportBtn = document.getElementById('secretsExportBtn');
+  const importBtn = document.getElementById('secretsImportBtn');
+  const importFile = document.getElementById('secretsImportFile');
+  if (!exportBtn || !importBtn || !importFile) return;
+  if (exportBtn.dataset.bound === '1') return;
+  exportBtn.dataset.bound = '1';
+  importBtn.dataset.bound = '1';
+  exportBtn.addEventListener('click', () => { exportSecretsBundle(); });
+  importBtn.addEventListener('click', () => {
+    importFile.value = '';
+    importFile.click();
+  });
+  importFile.addEventListener('change', () => {
+    const file = importFile.files?.[0];
+    if (file) importSecretsBundle(file);
+  });
 }
 
 
@@ -1142,46 +1339,6 @@ export function initConnections() {
 
 
 /** Map fetcher chip key -> auth provider for reconnect hints. */
-
-export const FETCHER_AUTH_PROVIDER = {
-
-  steam: 'steam',
-
-  gog: 'gog',
-
-  psn: 'psn',
-
-  epic: 'epic',
-
-  amazon: 'amazon',
-
-  xbox: 'xbox',
-
-  battlenet: 'battlenet',
-
-  ubisoft: 'ubisoft',
-
-  nintendo: 'nintendo',
-
-  itch: 'itch',
-
-  wishlistSteam: 'steam',
-
-  wishlistGog: 'gog',
-
-  wishlistEpic: 'epic_wishlist',
-
-  wishlistPsn: 'psn',
-
-  wishlistUbisoft: 'ubisoft',
-
-  wishlistXbox: 'xbox_wishlist',
-
-  itad: 'itad',
-
-};
-
-
 
 export function providerForFetcher(key) {
 

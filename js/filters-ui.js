@@ -1,3 +1,5 @@
+import { bindEscapeClose, trapFocus } from './focus-trap.js';
+import { cancelAllLibraryCountAnimations } from './library-count-animation.js';
 import {
   state,
   GENRE_CHIP_COLLAPSE_AT,
@@ -338,16 +340,28 @@ export function clearAllFilters() {
   );
 }
 
+let _filterDrawerRelease = null;
+
 export function openFiltersDrawer() {
   state.filtersDrawerOpen = true;
   document.getElementById("filterDrawerBackdrop").classList.add("open");
-  document.getElementById("filterDrawer").classList.add("open");
+  const drawer = document.getElementById("filterDrawer");
+  drawer.classList.add("open");
   document.getElementById("filterDrawerBackdrop").setAttribute("aria-hidden", "false");
-  document.getElementById("filterDrawer").setAttribute("aria-hidden", "false");
+  drawer.setAttribute("aria-hidden", "false");
+  _filterDrawerRelease?.();
+  const releaseTrap = trapFocus(drawer);
+  const releaseEsc = bindEscapeClose(drawer, closeFiltersDrawer);
+  _filterDrawerRelease = () => {
+    releaseTrap();
+    releaseEsc();
+    _filterDrawerRelease = null;
+  };
 }
 
 export function closeFiltersDrawer() {
   state.filtersDrawerOpen = false;
+  _filterDrawerRelease?.();
   document.getElementById("filterDrawerBackdrop").classList.remove("open");
   document.getElementById("filterDrawer").classList.remove("open");
   document.getElementById("filterDrawerBackdrop").setAttribute("aria-hidden", "true");
@@ -493,8 +507,18 @@ export function updatePickTabsVisibility() {
   });
 }
 
+export function syncViewTabAria(view) {
+  document.querySelectorAll(".view-tab").forEach((b) => {
+    const active = b.dataset.view === view;
+    b.classList.toggle("active", active);
+    if (active) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  });
+}
+
 export function switchView(view) {
   if (view === state.activeView) return;
+  cancelAllLibraryCountAnimations();
   const fromView = state.activeView;
   const drillIn = !!state._pendingFocusKey;
   let drillOverlaySafety = null;
@@ -504,7 +528,7 @@ export function switchView(view) {
   const useOverlay = drillIn || (!tableCached && !dashCached);
   // Light-up the clicked tab immediately so the click feels responsive even on
   // first-render paths where doSwitch is deferred to the next rAF.
-  document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  syncViewTabAria(view);
   if (useOverlay) showViewOverlay(view);
   if (drillIn && state._drillHideOverlay) {
     drillOverlaySafety = setTimeout(() => {
@@ -626,7 +650,7 @@ export function renderSummary() {
     const wishlistFiltersDirty = onSaleActive || lowOnlyActive || hideOwnedActive
       || !!state.prefs.wishlistStoreFilter
       || !!state.sessionPrefs?.statusFilter;
-    const resetChip = `<button type="button" class="summary-wishlist-reset px-3 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-xs cursor-pointer border border-slate-700${wishlistFiltersDirty ? " text-slate-200" : " text-slate-400 cursor-default"}" title="${wishlistFiltersDirty ? "Clear all wishlist filters" : "All wishlist entries"}"><span>Wishlist</span> <span class="text-slate-100 font-semibold ml-1">${wl.length}</span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</button>`;
+    const resetChip = `<button type="button" class="summary-wishlist-reset px-3 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-xs cursor-pointer border border-slate-700${wishlistFiltersDirty ? " text-slate-200" : " text-slate-400 cursor-default"}" title="${wishlistFiltersDirty ? "Clear all wishlist filters" : "All wishlist entries"}"><span>Wishlist</span> <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="wishlist">${wl.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</button>`;
     const onSaleChip = `<button type="button" class="summary-deal-chip${onSaleActive ? " active" : ""}" data-wishlist-deal-filter="onSale" title="${onSaleActive ? "Clear: show only on-sale wishlist items" : "Show only on-sale wishlist items"}">On sale <span class="text-emerald-200 font-semibold ml-1">${onSale.length}</span></button>`;
     const lowChip = lows.length
       ? `<button type="button" class="summary-deal-chip historical${lowOnlyActive ? " active" : ""}" data-wishlist-deal-filter="historicalLow" title="${lowOnlyActive ? "Clear: show only historical lows" : "Show only historical lows"}">Historical low <span class="text-amber-300 font-semibold ml-1">${lows.length}</span></button>`
@@ -715,7 +739,7 @@ export function renderSummary() {
   const statusChips = renderStatusChipsHtml(visible);
   el.innerHTML = `
     <div class="w-full flex flex-wrap gap-2">
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="text-slate-100 font-semibold ml-1">${visible.length}</span>${hiddenCount ? ` <span class="text-slate-500 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
+      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
       ${storeChips}
       <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
       <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(played))}h</span></div>

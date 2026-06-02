@@ -23,6 +23,7 @@ export const personalStore = (() => {
       personal: JSON.parse(JSON.stringify(state.personal || {})),
       prefs: JSON.parse(JSON.stringify(state.prefs || {})),
       manual: JSON.parse(JSON.stringify(getManualGamesFn())),
+      libraryFirstSeen: JSON.parse(JSON.stringify(state.libraryFirstSeenByKey || {})),
     };
   }
 
@@ -72,6 +73,9 @@ export const personalStore = (() => {
       }
     }
     state.prefs = merged;
+    state.libraryFirstSeenByKey = (doc.libraryFirstSeen && typeof doc.libraryFirstSeen === 'object')
+      ? doc.libraryFirstSeen
+      : {};
     const manual = Array.isArray(doc.manual) ? doc.manual : [];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
     localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));

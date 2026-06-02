@@ -8,7 +8,7 @@ import { state } from './state.js';
 // Side-effect import: installs window.coverFallback / window.markLandscape
 // before any module emits row HTML that references them inline.
 import './covers.js';
-import { installGlobalErrorHandler } from './error-boundary.js';
+import { installGlobalErrorHandler, registerBugBundleContext } from './error-boundary.js';
 
 // Install the global error + unhandled-rejection listeners as early as
 // possible — before any other module-level code runs in this file — so that
@@ -49,6 +49,8 @@ import {
   renderWishlistStoreChips,
   updateCleanupBtnState,
   updateViewChrome,
+  collectActiveFilters,
+  syncViewTabAria,
 } from './filters-ui.js';
 import {
   setBootCurtainLabel,
@@ -56,10 +58,11 @@ import {
   hideViewOverlay,
 } from './loading-curtain.js';
 import { reloadGames, reloadAfterFetcher } from './library-load.js';
+import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
-import { prewarmTableQueryForView } from './table-ui.js';
+import { prewarmTableQueryForView, tableFingerprint } from './table-ui.js';
 
 // Personal-storage's setPersonal triggers a downstream render of
 // summary/picks/dashboard. Those callbacks live in filters-ui/picks-ui/
@@ -75,6 +78,16 @@ configureDownstreamSync({
 // fetcher run completes. Wired here for the same reason — keeps library-load
 // out of fetcher-health's import graph.
 configureFetcherHealth({ reloadGames, reloadAfterFetcher });
+
+// Wire the bug-bundle's runtime context. error-boundary.js is intentionally
+// dependency-free so it can be installed before anything else loads (catches
+// boot-time errors). The fingerprint + active-filter-count come from
+// table-ui / filters-ui, which load later — register the lookups here so the
+// "Copy bug bundle" button can include them.
+registerBugBundleContext({
+  getFingerprint: tableFingerprint,
+  getActiveFilterCount: () => collectActiveFilters().length,
+});
 
 function hydrateState() {
   state.personal = loadPersonal();
@@ -105,7 +118,7 @@ async function bootstrap() {
     state.activeView = state.prefs.activeView;
   }
   applySavedSortForView(state.activeView);
-  document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === state.activeView));
+  syncViewTabAria(state.activeView);
   savePrefs();
   bindEvents();
   document.getElementById("showScoreColumn").checked = !!state.prefs.showScoreColumn;
@@ -198,6 +211,10 @@ async function bootstrap() {
     } else {
       scheduleIdlePrewarm();
     }
+    // Arm the count-up combat text only AFTER boot. The initial page-load
+    // count-up (including any 0 -> full jump during boot) stays silent; popups
+    // only appear when a live fetcher/manual action adds games afterward.
+    armLibraryCountAnimations();
   }
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {
@@ -205,6 +222,19 @@ async function bootstrap() {
       onUploaded: () => reloadGames().then(() => scheduleDashboardRender()),
     });
   }
+
+  // ?demo=count auto-fires the library-count 1UP demo (3-6 fake store
+  // landings on the hero number). Useful for screen recordings without
+  // burning a real refresh. Window-global baklogDemoLibraryCount() works
+  // at any time from devtools.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo');
+    if (state.activeView === 'dashboard') {
+      if (demo === 'count') setTimeout(() => runLibraryCountDemo(), 1200);
+      else if (demo === 'count-small') setTimeout(() => runLibraryCountSmallDemo(), 1200);
+    }
+  } catch (_) {}
 }
 
 hydrateState();

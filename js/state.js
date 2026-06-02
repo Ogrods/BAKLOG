@@ -39,6 +39,8 @@ export const state = {
   cleanupModeActive: false,
   focusedRowIndex: -1,
   ownedNormNames: new Set(),
+  /** gameKey -> ms epoch when this library row was first observed (0 = silent seed). */
+  libraryFirstSeenByKey: {},
   filtersDrawerOpen: false,
   genreChipsExpanded: false,
   _visibleList: null,

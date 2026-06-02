@@ -1,10 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   fetcherFreshness,
   humanizeAge,
   diffItadDeals,
   maybeAutoRefreshItad,
   ITAD_AUTO_REFRESH_INTERVAL_MS,
+  serverChipState,
+  fetchWithTimeout,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -133,5 +135,47 @@ describe('maybeAutoRefreshItad', () => {
       runFn,
     })).toBe(false);
     expect(runFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('serverChipState', () => {
+  it('maps launching and cancelling to running chip state', () => {
+    expect(serverChipState('launching')).toBe('running');
+    expect(serverChipState('cancelling')).toBe('running');
+    expect(serverChipState('running')).toBe('running');
+    expect(serverChipState('queued')).toBe('queued');
+    expect(serverChipState('done')).toBeNull();
+  });
+});
+
+describe('fetchWithTimeout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('resolves when fetch completes before timeout', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const p = fetchWithTimeout('/api/runs', {}, 1000);
+    await expect(p).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/runs',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('rejects with server not responding when fetch hangs', async () => {
+    vi.useRealTimers();
+    vi.stubGlobal('fetch', (_url, opts) => new Promise((_, reject) => {
+      opts.signal.addEventListener('abort', () => {
+        reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+      });
+    }));
+    await expect(fetchWithTimeout('/api/runs', {}, 30)).rejects.toThrow('server not responding');
   });
 });

@@ -5,7 +5,15 @@ import {
   dedupeWithinStore,
   recomputeCrossStoreHidden,
   applyCoopOverrides,
+  gameKey,
 } from './game-core.js';
+import { personalStore } from './personal-store.js';
+import {
+  LIBRARY_STORE_JSON,
+  WISHLIST_FETCHER_JSON,
+  WISHLIST_FETCHER_META_KEY,
+  ENRICH_FETCHER_KEYS,
+} from './fetcher-registry.js';
 import {
   applyItadPriceSnapshot,
   slimItadSnapshot,
@@ -15,6 +23,7 @@ import {
   loadManualGames,
   bumpPersonalMemo,
   canonicalizeNotesAcrossTitles,
+  filterOutHidden,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { invalidateTableCache } from './table-ui.js';
@@ -30,8 +39,15 @@ import {
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 import { consumeItadAutoRunFlag, diffItadDeals } from './fetcher-health.js';
+import { fireLibraryCountFlash } from './library-count-animation.js';
 
 export const ITAD_SNAPSHOT_KEY = "baklog-itad-snapshot";
+
+// Module-scoped previous counts so we only animate real fetch-driven jumps.
+// Null sentinels mean "first paint" — no popups on cold start, just the
+// initial roll handled inside applyMegaHeroCounters.
+let _prevLibraryCount = null;
+let _prevWishlistCount = null;
 
 export async function loadItadPrices() {
   let prevByKey = {};
@@ -136,11 +152,41 @@ export async function loadSteamTagsMeta() {
   await loadCacheMeta("cache/steam_tags_meta.json", "steamTags");
 }
 
+/** Stamp first-seen timestamps for library keys (silent seed on first load). */
+export function recordLibraryFirstSeen() {
+  if (!state.libraryFirstSeenByKey || typeof state.libraryFirstSeenByKey !== 'object') {
+    state.libraryFirstSeenByKey = {};
+  }
+  const seeded = !!state.prefs.librarySeenSeeded;
+  let changed = false;
+  for (const g of state.allGames) {
+    const key = gameKey(g);
+    if (key in state.libraryFirstSeenByKey) continue;
+    state.libraryFirstSeenByKey[key] = seeded ? Date.now() : 0;
+    changed = true;
+  }
+  if (!state.prefs.librarySeenSeeded) {
+    state.prefs.librarySeenSeeded = true;
+    changed = true;
+  }
+  if (changed) personalStore.notify();
+}
+
+function countLibraryVisible() {
+  return filterOutHidden(
+    state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))),
+  ).length;
+}
+function countWishlistVisible() {
+  return state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g))).length;
+}
+
 export async function applyMergedLibrary() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   bumpPersonalMemo();
   invalidateTableCache();
   recomputeCrossStoreHidden();
+  recordLibraryFirstSeen();
   canonicalizeNotesAcrossTitles();
   state.dashboardDataReady = true;
   buildOwnedNormNames();
@@ -149,6 +195,15 @@ export async function applyMergedLibrary() {
     banner.classList.add("hidden");
     banner.innerHTML = "";
   }
+
+  // Diff before render so the UI repaints AND we know what delta to flash.
+  const libNow = countLibraryVisible();
+  const wlNow = countWishlistVisible();
+  const libPrev = _prevLibraryCount;
+  const wlPrev = _prevWishlistCount;
+  _prevLibraryCount = libNow;
+  _prevWishlistCount = wlNow;
+
   renderStoreChips();
   renderWishlistStoreChips();
   renderGenreChips();
@@ -162,6 +217,19 @@ export async function applyMergedLibrary() {
       updateWishlistDrawerVisibility();
     }
   }
+
+  // Fire after the render so popup hosts exist in the DOM. Wrapped in
+  // try/catch — this is pure polish; never let it break a real merge.
+  try {
+    if (libPrev != null && libNow > libPrev) {
+      fireLibraryCountFlash('library', libPrev, libNow);
+    }
+    if (wlPrev != null && wlNow > wlPrev) {
+      fireLibraryCountFlash('wishlist', wlPrev, wlNow);
+    }
+  } catch (err) {
+    console.warn('[library-count-anim]', err);
+  }
 }
 
 export async function fetchLibraryJson(path) {
@@ -170,35 +238,7 @@ export async function fetchLibraryJson(path) {
   return res.json();
 }
 
-export const LIBRARY_STORE_JSON = {
-  steam: "games_steam.json",
-  gog: "games_gog.json",
-  psn: "games_psn.json",
-  epic: "games_epic.json",
-  amazon: "games_amazon.json",
-  nintendo: "games_nintendo.json",
-  itch: "games_itch.json",
-  xbox: "games_xbox.json",
-  battlenet: "games_battlenet.json",
-  ubisoft: "games_ubisoft.json",
-};
-const WISHLIST_FETCHER_JSON = {
-  wishlistSteam: "games_wishlist.json",
-  wishlistGog: "games_wishlist_gog.json",
-  wishlistEpic: "games_wishlist_epic.json",
-  wishlistPsn: "games_wishlist_psn.json",
-  wishlistUbisoft: "games_wishlist_ubisoft.json",
-  wishlistXbox: "games_wishlist_xbox.json",
-};
-const WISHLIST_FETCHER_META_KEY = {
-  wishlistSteam: "wishlist",
-  wishlistGog: "wishlistGog",
-  wishlistEpic: "wishlistEpic",
-  wishlistPsn: "wishlistPsn",
-  wishlistUbisoft: "wishlistUbisoft",
-  wishlistXbox: "wishlistXbox",
-};
-const ENRICH_FETCHER_KEYS = new Set(["hltb", "steamReviews", "steamCovers", "steamTags"]);
+export { LIBRARY_STORE_JSON };
 
 export function rebuildAllGamesFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));

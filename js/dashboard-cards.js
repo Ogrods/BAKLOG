@@ -169,7 +169,7 @@ export function renderDashboardPicksVersus(games) {
     return `<button type="button" class="dash-list-row dash-versus-row ${accentCls}${isCross ? " is-cross" : ""}" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}${star}</span><span class="text-slate-400">${escapeHtml(scoreFn(g))}</span></button>`;
   };
 
-  const empty = '<p class="text-xs text-slate-500 italic">No matches yet.</p>';
+  const empty = '<p class="text-xs text-slate-400 italic">No matches yet.</p>';
   const ratedEl = document.getElementById("dashVersusRated");
   const fastEl = document.getElementById("dashVersusFast");
   if (ratedEl) {

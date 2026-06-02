@@ -5,7 +5,8 @@ All notable changes to this project are documented here.
 This project follows [Semantic Versioning](https://semver.org/): MAJOR for
 breaking changes, MINOR for backwards-compatible features, PATCH for
 backwards-compatible bug fixes. The single source of truth for the current
-version is `pyproject.toml` (mirrored into `package.json`).
+version is `pyproject.toml` (mirrored into `package.json` and the
+`<meta name="baklog-version">` tag in `index.html` for bug-bundle metadata).
 
 ## Release discipline
 
@@ -23,6 +24,9 @@ version is `pyproject.toml` (mirrored into `package.json`).
 
 ### Added
 
+- **Library count 1UP** — after a fetch adds games, the library / wishlist count rolls over ~1s with floating green "+N" popups (Mario 1UP / scrolling-combat-text style). Popups anchor on the right edge of the number, spawn ~70ms apart (up to 10 per burst) so several climb at once, and the rolling number uses `tabular-nums` so digits don't shift sideways as it counts. Only fires on fetch-driven *increases*, not filters or cold boot. Cancels cleanly on tab switch, view change, or `prefers-reduced-motion`. Chained fetcher landings (Steam, then GOG, then PSN) keep prior popups climbing instead of cutting them off mid-flight. Surfaces: Dashboard hero number and Library / Wishlist summary chips. Demos for screen recordings: load `index.html?demo=count` (six fake stores landing) or `?demo=count-small` (five `+1` bursts), or run `baklogDemoLibraryCount()` / `baklogDemoLibraryCountSmall()` from the console.
+- **Portable secrets bundle** — passphrase-encrypted export/import of all Connections credentials plus Playwright profile dirs (`auth/bundle.py`, format version 1: magic `BAKLOGSB`, scrypt + AES-GCM). Dashboard: Connections ⋮ → Portable bundle… → Export / Import. API: `POST /api/auth/secrets/export` and `POST /api/auth/secrets/import`. CLI: `python -m auth export-bundle` / `import-bundle` (with `--dry-run`). Import snapshots existing profiles to `cache/auth/profiles_pre_import_<timestamp>/` before overwrite. See PRIVACY.md.
+- **Local-only bug bundle** — sticky error toast and `?debug=1` overlay gain a "Copy bug bundle" button that puts a sanitized JSON payload on the clipboard (app version, view, data version, table fingerprint, filter count, last render time, session + persisted error log). Persisted log is a rolling 200-entry localStorage ring at `baklog-error-log`. Nothing is sent anywhere automatically. Kebab menu adds "Report a bug…" for the same bundle without needing a live error. See PRIVACY.md.
 - **BAKLOG branding** — product title, favicon, README tagline, header subtitle (“Cross-store backlog · local-only”).
 - **Deal badges** — price-dropped-since-last-ITAD (↓), all-time vs 1-year historical low, owned-elsewhere on dashboard deal cards.
 - **Library cross-store pill** — “also on GOG · …” when deduped copies exist on multiple stores.
@@ -35,6 +39,7 @@ version is `pyproject.toml` (mirrored into `package.json`).
 
 ### Changed
 
+- **Accessibility audit (bs_a11y)** — Lighthouse-aligned axe-core gate in CI (`tests/a11y/index-axe.test.js`); skip-to-main link + `<main id="main">`; focus trap/Escape on filter drawer, Connections popover, and modals; `aria-current` view tabs; co-op filter radiogroup pattern; contrast bump (`text-slate-500` → `text-slate-400` on slate-800); global `:focus-visible` outline. See [docs/a11y.md](docs/a11y.md).
 - Fetch scripts read credentials from encrypted store first, then `.env` fallback (`auth.resolve_env`).
 
 ### Added (fetcher observability)

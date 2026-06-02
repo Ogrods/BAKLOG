@@ -89,6 +89,88 @@ describe("spotlight replay category", () => {
   });
 });
 
+describe("spotlight recently added category", () => {
+  let pickSpotlightGames;
+  let computeRecentSpotlightKeys;
+  let state;
+
+  beforeEach(async () => {
+    const win = new Window({ url: "http://127.0.0.1:8765/" });
+    global.window = win;
+    global.document = win.document;
+    global.localStorage = win.localStorage;
+    win.__dashFailedCovers = new Set();
+
+    vi.resetModules();
+    ({ state } = await import("../js/state.js"));
+    state.personal = {};
+    state.libraryFirstSeenByKey = {};
+    state.prefs = {};
+    win._dataVersion = (win._dataVersion || 0) + 1;
+    ({ pickSpotlightGames, computeRecentSpotlightKeys } = await import("../js/dashboard-spotlight.js"));
+  });
+
+  const libraryGame = (id, rating, count = 500) => ({
+    store: "steam",
+    id,
+    name: `Game ${id}`,
+    steam_review_percent: rating,
+    steam_review_count: count,
+    library_image: "x.jpg",
+    header_image: "x.jpg",
+  });
+
+  it("surfaces seeded recent additions with the Recently added eyebrow", () => {
+    state.prefs.librarySeenSeeded = true;
+    state.libraryFirstSeenByKey = {
+      "steam:1": 2000,
+      "steam:2": 3000,
+    };
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    const games = [libraryGame(1, 85), libraryGame(2, 85), libraryGame(3, 80)];
+    const pool = pickSpotlightGames(games);
+    const recent = pool.filter(g => g._spotlightReason?.eyebrow === "Recently added");
+    expect(recent.map(g => `${g.store}:${g.id}`).sort()).toEqual(["steam:1", "steam:2"]);
+    const ordered = [...computeRecentSpotlightKeys(games)];
+    expect(ordered[0]).toBe("steam:2");
+    expect(ordered[1]).toBe("steam:1");
+  });
+
+  it("does not surface Recently added before the library is seeded", () => {
+    state.prefs.librarySeenSeeded = false;
+    state.libraryFirstSeenByKey = { "steam:1": 9000 };
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    const pool = pickSpotlightGames([libraryGame(1, 92)]);
+    expect(pool.find(g => g._spotlightReason?.eyebrow === "Recently added")).toBeFalsy();
+    expect(computeRecentSpotlightKeys([libraryGame(1, 92)]).size).toBe(0);
+  });
+
+  it("guarantees recent additions in the pool when score cutoff would drop them", () => {
+    state.prefs.librarySeenSeeded = true;
+    const now = Date.now();
+    state.libraryFirstSeenByKey = {
+      "steam:10": now - 3000,
+      "steam:11": now - 2000,
+      "steam:12": now - 1000,
+    };
+    const games = [
+      libraryGame(10, 82),
+      libraryGame(11, 82),
+      libraryGame(12, 82),
+    ];
+    for (let i = 0; i < 80; i++) {
+      games.push(libraryGame(1000 + i, 99));
+    }
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    const pool = pickSpotlightGames(games);
+    const recentEyebrows = pool.filter(g => g._spotlightReason?.eyebrow === "Recently added");
+    expect(recentEyebrows.length).toBe(3);
+    for (const g of recentEyebrows) {
+      expect(g._spotlightReason.isRecent).toBe(true);
+    }
+  });
+});
+
 describe("spotlight rotation safety", () => {
   beforeEach(async () => {
     const win = new Window({ url: "http://127.0.0.1:8765/" });

@@ -14,6 +14,7 @@ import {
   alphaBucket,
   isHiddenGem,
   coverFallbackFor,
+  libraryCoverFor,
   storeLinkHtml,
   storeUrlForGame,
   storeBadgeHtml,
@@ -571,9 +572,46 @@ export function consumePendingScrollTarget(list = state._visibleList) {
 
 /** Wait for picks/summary/table layout to settle, then scroll once. */
 export function scheduleScrollAfterLayoutSettled() {
+  const runConsume = () => consumePendingScrollTarget(state._visibleList);
+  const doScroll = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(runConsume);
+    });
+  };
+
+  if (!_pendingScrollTarget?.afterChrome) {
+    doScroll();
+    return;
+  }
+
+  const picksEl = document.getElementById("picksSection") || document.getElementById("picksGrid");
+  if (!picksEl || typeof ResizeObserver === "undefined") {
+    doScroll();
+    return;
+  }
+
+  let done = false;
+  let debounce = 0;
+  let obs;
+  let maxWait = 0;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    obs?.disconnect();
+    clearTimeout(maxWait);
+    clearTimeout(debounce);
+    doScroll();
+  };
+
+  obs = new ResizeObserver(() => {
+    clearTimeout(debounce);
+    debounce = setTimeout(finish, 50);
+  });
+  obs.observe(picksEl);
+  maxWait = setTimeout(finish, 300);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      consumePendingScrollTarget(state._visibleList);
+      debounce = setTimeout(finish, 50);
     });
   });
 }
@@ -1098,6 +1136,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const hiddenGem = isHiddenGem(g);
   const key = gameKey(g);
   const headerFallback = coverFallbackFor(g);
+  const cover = libraryCoverFor(g);
   const cleanup = state.activeView === "library" && isCleanupCandidate(g);
   const ownedWish = state.activeView === "wishlist" && isOwnedByTitle(g.name);
   const selected = state.selectedKeys.has(key);
@@ -1105,7 +1144,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
       <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
-      <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(g.library_image || headerFallback)}"><img class="cover${window.coverLandscapeAttr(g.library_image || headerFallback)}" src="${g.library_image || headerFallback}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
+      <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2 game-name-cell">
         <div class="flex items-center gap-2">
           <div class="flex-1 min-w-0">
@@ -1415,7 +1454,7 @@ export async function renderTable(opts) {
   updateBulkBar();
   buildAlphaNav(list);
   consumePendingFocus(list);
-  if (hasPendingScrollTarget() && !_pendingScrollTarget?.afterChrome) {
+  if (hasPendingScrollTarget()) {
     scheduleScrollAfterLayoutSettled();
   }
   perfMeasure(perfRun, 'post:bulk-alpha-focus', 'post:start');

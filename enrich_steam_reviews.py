@@ -48,6 +48,23 @@ STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
 ]
 
 
+def _number_tokens(s: str) -> set[str]:
+    return set(re.findall(r"\b(\d+)\b", s))
+
+
+def _close_enough_title(target: str, candidate: str) -> bool:
+    """Substring fallback for Steam store search — reject obvious sequels."""
+    if not candidate:
+        return False
+    if candidate == target:
+        return True
+    if candidate not in target and target not in candidate:
+        return False
+    # e.g. "death stranding" must not match "death stranding 2 on beach"
+    extra = _number_tokens(candidate) - _number_tokens(target)
+    return not extra
+
+
 def normalize(name: str) -> str:
     s = (name or "").lower()
     s = re.sub(r"[\u2122\u00ae\u00a9]", "", s)
@@ -107,7 +124,7 @@ def steam_search(name: str) -> int | None:
     # fall back to first result if its title is "close enough"
     first = items[0]
     first_norm = normalize(first.get("name", ""))
-    if first_norm and (first_norm in target or target in first_norm):
+    if first_norm and _close_enough_title(target, first_norm):
         return int(first["id"])
     return None
 
@@ -137,6 +154,14 @@ def main() -> int:
         "--retry-misses",
         action="store_true",
         help='Re-attempt rows previously cached as "no Steam app match" (appid 0).',
+    )
+    parser.add_argument(
+        "--refresh-empty",
+        action="store_true",
+        help=(
+            "Re-fetch Steam review summaries for rows that have a mapped appid "
+            "but steam_review_percent is still null (skips store search)."
+        ),
     )
     args = parser.parse_args()
     t0 = started("enrich_steam_reviews")
@@ -184,6 +209,8 @@ def main() -> int:
             appid: int | None = cached_appid
 
             if appid is None:
+                if args.refresh_empty:
+                    continue
                 appid = steam_search(g["name"])
                 searched += 1
                 mapping[key] = appid if appid else 0
@@ -193,7 +220,6 @@ def main() -> int:
                         f"  [{i}/{len(games)}] searched {searched}, {updated} updated so far",
                         flush=True,
                     )
-
             if not appid:
                 continue
 
@@ -201,7 +227,7 @@ def main() -> int:
                 pass
 
             try:
-                reviews = steam.get_review_summary(appid)
+                reviews = steam.get_review_summary(appid, refresh=args.refresh_empty)
             except Exception as e:
                 stats.warn(f"reviews error for {g['name']} ({appid}): {e}")
                 continue

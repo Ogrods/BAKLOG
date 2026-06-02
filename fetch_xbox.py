@@ -14,7 +14,13 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._authoritative import XBOX
+from fetchers._base import (
+    add_allow_empty_arg,
+    merge_cached_row,
+    refuse_drift_result,
+    refuse_empty_result,
+)
 from auth import mark_invalid, resolve_env
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
@@ -37,7 +43,9 @@ def _https(url: str | None) -> str | None:
         return None
     u = str(url).strip()
     if u.startswith("http://"):
-        return "https://" + u[7:]
+        u = "https://" + u[7:]
+    # OpenXBL sometimes returns the non-SSL EDS host; cert is on -ssl variant.
+    u = u.replace("://images-eds.xboxlive.com/", "://images-eds-ssl.xboxlive.com/")
     return u if u.startswith("https://") else u
 
 
@@ -47,6 +55,13 @@ def _store_url(title: dict) -> str:
     if tid:
         return f"https://www.xbox.com/en-us/games/store/_/{tid}"
     return f"https://www.xbox.com/en-us/search/results?q={quote(name)}"
+
+
+def load_existing() -> dict[str, dict]:
+    if not GAMES_XBOX_JSON.exists():
+        return {}
+    data = json.loads(GAMES_XBOX_JSON.read_text(encoding="utf-8"))
+    return {str(g["id"]): g for g in data.get("games", [])}
 
 
 def _build_row(title: dict, hltb: dict | None) -> dict:
@@ -149,19 +164,31 @@ def main() -> int:
         return stats.finish("fetch_xbox", t0, exit_code=drift_exit)
 
     hltb_client = HltbClient()
+    existing = load_existing()
     games_out: list[dict] = []
 
     for i, title in enumerate(games, 1):
         name = title.get("name") or tid_placeholder(title)
+        tid = str(title.get("titleId") or title.get("modernTitleId") or "")
         print(f"[{i}/{len(games)}] {name}", flush=True)
+        cached = existing.get(tid)
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb:
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
+                hltb_updated = bool(hltb)
             except Exception as e:
                 stats.warn(f"HLTB for {name!r}: {e}")
-        games_out.append(_build_row(title, hltb))
+        games_out.append(
+            merge_cached_row(
+                _build_row(title, hltb),
+                cached,
+                authoritative=XBOX,
+                hltb_updated=hltb_updated,
+            )
+        )
         stats.ok += 1
 
     payload = {

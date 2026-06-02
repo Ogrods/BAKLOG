@@ -3,7 +3,7 @@
 
 import { state, STATUS_CHIP_DEFS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, itchIsGame, chipStatusKey } from './game-core.js';
+import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
@@ -51,7 +51,7 @@ export function renderDashboardCoopSpotlight(games) {
       .slice(0, 3);
     const picksHtml = picks.length
       ? picks.map(g => {
-          const cover = g.library_image || coverFallbackFor(g);
+          const cover = libraryCoverFor(g);
           const key = gameKey(g);
           return `<button type="button" class="coop-pick-row" data-action="coop-pick-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library">
             <img class="coop-pick-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
@@ -162,7 +162,7 @@ export function renderDashboardPicksVersus(games) {
   const crossKeys = new Set([...ratedKeys].filter(k => fastKeys.has(k)));
 
   const row = (g, scoreFn, accentCls) => {
-    const cover = g.library_image || coverFallbackFor(g);
+    const cover = libraryCoverFor(g);
     const key = gameKey(g);
     const isCross = crossKeys.has(key);
     const star = isCross ? ' <span class="dash-versus-star" title="Also in the other list">*</span>' : "";
@@ -288,7 +288,7 @@ function renderItchHeroHtml(candidates) {
   }
   const idx = ((itchHeroIndex % candidates.length) + candidates.length) % candidates.length;
   const g = candidates[idx];
-  const cover = g.library_image || coverFallbackFor(g);
+  const cover = libraryCoverFor(g);
   const fb = coverFallbackFor(g);
   const key = gameKey(g);
   const rating = ratingValue(g);

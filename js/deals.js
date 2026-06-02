@@ -7,6 +7,7 @@ import {
   ratingValue,
   hltbMain,
   coverFallbackFor,
+  libraryCoverFor,
   formatDollar,
   wishlistBadgeHtml,
   earlyAccessRibbonHtml,
@@ -68,7 +69,7 @@ export function drillWishlistDealFilter({ onSaleOnly, minDiscount }) {
 export function dealHeroCardHtml(g) {
   const d = getDealInfo(g);
   const key = gameKey(g);
-  const cover = g.library_image || coverFallbackFor(g);
+  const cover = libraryCoverFor(g);
   const headerFallback = coverFallbackFor(g);
   const cut = d?.cut || 0;
   const price = d?.price;
@@ -216,7 +217,7 @@ export function dealStealsCardHtml(steals) {
   const shown = ranked.slice(0, 6);
   const remaining = ranked.length - shown.length;
   const rows = shown.map(g => {
-    const cover = g.library_image || coverFallbackFor(g);
+    const cover = libraryCoverFor(g);
     const fb = coverFallbackFor(g);
     const d = getDealInfo(g) || {};
     const cut = d.cut || 0;

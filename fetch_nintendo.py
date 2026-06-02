@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
+from fetchers._authoritative import NINTENDO
+from fetchers._base import merge_cached_row
 from fetchers._progress import RunStats, started
 from nintendo_client import NintendoAuthError, NintendoClient
 
@@ -102,6 +104,13 @@ def _merge_transactions(transactions: list[dict]) -> list[dict]:
             row["tags"].append("dlc")
 
     return list(by_title.values())
+
+
+def load_existing() -> dict[str, dict]:
+    if not GAMES_NINTENDO_JSON.exists():
+        return {}
+    data = json.loads(GAMES_NINTENDO_JSON.read_text(encoding="utf-8"))
+    return {str(g["id"]): g for g in data.get("games", [])}
 
 
 def _build_row(item: dict, hltb: dict | None) -> dict:
@@ -198,17 +207,28 @@ def main() -> int:
         return stats.finish("fetch_nintendo", t0, exit_code=2)
 
     hltb_client = HltbClient()
+    existing = load_existing()
     games_out: list[dict] = []
     for i, item in enumerate(merged, 1):
         print(f"[{i}/{len(merged)}] {item['name']}")
+        cached = existing.get(str(item["id"]))
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb:
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(item["name"])
+                hltb_updated = bool(hltb)
             except Exception as e:
                 print(f"  HLTB warning: {e}")
-        games_out.append(_build_row(item, hltb))
+        games_out.append(
+            merge_cached_row(
+                _build_row(item, hltb),
+                cached,
+                authoritative=NINTENDO,
+                hltb_updated=hltb_updated,
+            )
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

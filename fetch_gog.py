@@ -12,7 +12,13 @@ import os
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._authoritative import GOG
+from fetchers._base import (
+    add_allow_empty_arg,
+    merge_cached_row,
+    refuse_drift_result,
+    refuse_empty_result,
+)
 from fetchers._progress import RunStats, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
@@ -278,12 +284,14 @@ def main() -> int:
                 print(f"  Details warning: {e}")
 
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb and (
             args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None
         ):
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
+                hltb_updated = bool(hltb)
             except Exception as e:
                 print(f"  HLTB warning: {e}")
         elif cached_row:
@@ -299,7 +307,9 @@ def main() -> int:
         if row is None:
             skipped += 1
             continue
-        games_out.append(row)
+        games_out.append(
+            merge_cached_row(row, cached_row, authoritative=GOG, hltb_updated=hltb_updated)
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

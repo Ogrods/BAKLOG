@@ -13,7 +13,13 @@ from dotenv import load_dotenv
 
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._authoritative import PSN
+from fetchers._base import (
+    add_allow_empty_arg,
+    merge_cached_row,
+    refuse_drift_result,
+    refuse_empty_result,
+)
 from fetchers._progress import RunStats, started
 from psn_client import PsnAuthError, PsnClient, PsnGameEntry
 
@@ -165,12 +171,14 @@ def main() -> int:
         cached_row = existing.get(entry.id)
 
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb and (
             args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None
         ):
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(entry.name)
+                hltb_updated = bool(hltb)
             except Exception as exc:
                 print(f"  HLTB warning: {exc}")
         elif cached_row:
@@ -182,7 +190,14 @@ def main() -> int:
                 "hltb_name": cached_row.get("hltb_name"),
             }
 
-        games_out.append(_build_game_row(entry, hltb))
+        games_out.append(
+            merge_cached_row(
+                _build_game_row(entry, hltb),
+                cached_row,
+                authoritative=PSN,
+                hltb_updated=hltb_updated,
+            )
+        )
 
     empty_exit = refuse_empty_result(
         games_out,

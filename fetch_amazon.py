@@ -13,8 +13,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from hltb_client import HltbClient
+from fetchers._authoritative import AMAZON
+from fetchers._base import merge_cached_row
 from fetchers._progress import RunStats, started
+from hltb_client import HltbClient
 
 GAMES_AMAZON_JSON = Path("games_amazon.json")
 HLTB_DELAY_SEC = 1.0
@@ -139,12 +141,14 @@ def main() -> int:
 
         cached = existing.get(pid)
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb and not (
             args.only_new and cached and cached.get("hltb_main_hours") is not None
         ):
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
+                hltb_updated = bool(hltb)
             except Exception as e:
                 print(f"  HLTB warning: {e}")
         elif cached:
@@ -156,7 +160,14 @@ def main() -> int:
                 "hltb_name": cached.get("hltb_name"),
             }
 
-        games_out.append(_build_row(rec, hltb))
+        games_out.append(
+            merge_cached_row(
+                _build_row(rec, hltb),
+                cached,
+                authoritative=AMAZON,
+                hltb_updated=hltb_updated,
+            )
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

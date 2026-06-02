@@ -12,16 +12,26 @@ describe("drill-anchor pending scroll target", () => {
     win = new Window({ url: "http://127.0.0.1:8765/" });
     global.window = win;
     global.document = win.document;
+    global.ResizeObserver = class {
+      observe() {}
+      disconnect() {}
+    };
     global.requestAnimationFrame = (cb) => {
       cb(0);
       return 1;
     };
     global.cancelAnimationFrame = () => {};
+    global.setTimeout = (cb, ms) => {
+      if (typeof cb === "function") cb();
+      return 1;
+    };
+    global.clearTimeout = () => {};
     global.CSS = { escape: (s) => String(s).replace(/"/g, '\\"') };
 
     scrollToSpy = vi.spyOn(win, "scrollTo").mockImplementation(() => {});
 
     document.body.innerHTML = `
+      <section id="picksSection" style="height:120px"><div id="picksGrid"></div></section>
       <div id="toolbarSection" style="height:80px;margin-top:200px">toolbar</div>
       <div id="tableShell" style="margin-top:400px">
         <table class="games-table"><thead></thead>
@@ -72,5 +82,19 @@ describe("drill-anchor pending scroll target", () => {
     expect(consumePendingScrollTarget([])).toBe(true);
     expect(consumePendingScrollTarget([])).toBe(false);
     expect(scrollToSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("scheduleScrollAfterLayoutSettled consumes afterChrome row target", async () => {
+    const { state } = await import("../js/state.js");
+    const { setPendingScrollTarget, scheduleScrollAfterLayoutSettled, hasPendingScrollTarget } =
+      await import("../js/table-ui.js");
+    const list = [{ store: "steam", id: "42", name: "Test Game" }];
+    state._visibleList = list;
+    setPendingScrollTarget({ kind: "row", key: "steam:42", idx: 5, afterChrome: true });
+    expect(hasPendingScrollTarget()).toBe(true);
+    scheduleScrollAfterLayoutSettled();
+    expect(hasPendingScrollTarget()).toBe(false);
+    expect(scrollToSpy).toHaveBeenCalled();
+    expect(document.querySelector("tr.row-focused")).toBeTruthy();
   });
 });

@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 from battlenet_client import BattleNetAuthError, BattleNetClient
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
+from fetchers._authoritative import BATTLENET
+from fetchers._base import merge_cached_row
 from fetchers._progress import RunStats, started
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
@@ -96,6 +98,13 @@ def _last_played_iso(item: dict) -> str | None:
     if not isinstance(ms, (int, float)) or ms <= 0:
         return None
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()
+
+
+def load_existing() -> dict[str, dict]:
+    if not GAMES_BATTLENET_JSON.exists():
+        return {}
+    data = json.loads(GAMES_BATTLENET_JSON.read_text(encoding="utf-8"))
+    return {str(g["id"]): g for g in data.get("games", [])}
 
 
 def _build_row(item: dict, hltb: dict | None) -> dict:
@@ -235,18 +244,30 @@ def main() -> int:
         return stats.finish("fetch_battlenet", t0, exit_code=2)
 
     hltb_client = HltbClient()
+    existing = load_existing()
     games_out: list[dict] = []
     for i, item in enumerate(deduped, 1):
         name = _name(item)
         print(f"[{i}/{len(deduped)}] {name}")
+        cached = existing.get(_id(item, name or ""))
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb:
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
+                hltb_updated = bool(hltb)
             except Exception as e:
                 print(f"  HLTB warning: {e}")
-        games_out.append(_build_row(item, hltb))
+        row = _build_row(item, hltb)
+        games_out.append(
+            merge_cached_row(
+                row,
+                cached,
+                authoritative=BATTLENET,
+                hltb_updated=hltb_updated,
+            )
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

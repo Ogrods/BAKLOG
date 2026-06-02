@@ -41,7 +41,9 @@ import {
   updateBulkBar,
   tableFingerprint,
   isViewCached,
-  reanchorPickedRow,
+  scheduleScrollAfterLayoutSettled,
+  hasPendingScrollTarget,
+  setPendingScrollTarget,
   prewarmTableQueryForView,
   syncRowCountLabel,
 } from './table-ui.js';
@@ -395,20 +397,18 @@ export async function refreshFilterUI(options) {
     const deferChrome = () => {
       renderSummary();
       if (!options?.skipPicks) renderPicks();
-      // Picks/summary just paint above the table, shifting tableShell down.
-      // paintTableBody's earlier scroll measured tableShell BEFORE that shift,
-      // so the focused row is now off-center (often above the fold for high
-      // indices, or under the picks card for low indices like the spotlight
-      // pool which sorts alphabetically near the top). Re-anchor against the
-      // live row rect now that the layout has settled.
-      requestAnimationFrame(() => reanchorPickedRow());
+      scheduleScrollAfterLayoutSettled();
     };
     if (typeof requestIdleCallback === "function") requestIdleCallback(deferChrome, { timeout: 800 });
     else setTimeout(deferChrome, 0);
     return;
   }
-  if (options?.skipPicks) return;
+  if (options?.skipPicks) {
+    if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
+    return;
+  }
   renderPicks();
+  if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
 }
 
 let _filterDebounceTimer = null;

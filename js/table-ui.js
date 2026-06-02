@@ -465,19 +465,128 @@ export function formatPrice(g) {
 }
 
 // === Focus helpers ===
+/** @typedef {{ kind: 'row'|'toolbar', key?: string, idx?: number, smooth?: boolean, hideOverlay?: boolean, afterChrome?: boolean, consumed?: boolean }} PendingScrollTarget */
+
+let _pendingScrollTarget = null;
+
+export function setPendingScrollTarget(target) {
+  if (!target) {
+    _pendingScrollTarget = null;
+    return;
+  }
+  _pendingScrollTarget = {
+    consumed: false,
+    smooth: false,
+    hideOverlay: false,
+    afterChrome: false,
+    ...target,
+  };
+}
+
+export function cancelPendingScrollTarget() {
+  _pendingScrollTarget = null;
+}
+
+export function hasPendingScrollTarget() {
+  return !!(_pendingScrollTarget && !_pendingScrollTarget.consumed);
+}
+
+function scrollToToolbarAnchor({ smooth = false } = {}) {
+  const toolbar = document.getElementById("toolbarSection");
+  if (!toolbar) {
+    window.scrollTo(0, 0);
+    return;
+  }
+  const rect = toolbar.getBoundingClientRect();
+  const targetY = Math.max(0, rect.top + window.scrollY - 12);
+  window.scrollTo({ top: targetY, behavior: smooth ? "smooth" : "auto" });
+}
+
+function ensureRowPaintedForScroll(list, idx, key) {
+  if (!list?.length || idx < 0 || !key) return null;
+  let row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (row) return row;
+  if (usesVirtualScroll(list) && _virtualList === list) {
+    const { start, end } = computeVirtualRange(list.length, idx);
+    paintVirtualSlice(start, end);
+    row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  }
+  return row;
+}
+
+function completeDrillOverlayIfNeeded(hideOverlay) {
+  if (hideOverlay || state._drillHideOverlay) {
+    state._drillHideOverlay = false;
+    hideViewLoading();
+  }
+}
+
+/** Consume the pending scroll target exactly once after layout has settled. */
+export function consumePendingScrollTarget(list = state._visibleList) {
+  const t = _pendingScrollTarget;
+  if (!t || t.consumed) return false;
+
+  if (t.kind === "toolbar") {
+    scrollToToolbarAnchor({ smooth: !!t.smooth });
+    t.consumed = true;
+    _pendingScrollTarget = null;
+    completeDrillOverlayIfNeeded(t.hideOverlay);
+    return true;
+  }
+
+  if (t.kind === "row") {
+    const key = t.key;
+    if (!key || !Array.isArray(list) || !list.length) return false;
+    const idx = typeof t.idx === "number" && t.idx >= 0
+      ? t.idx
+      : list.findIndex(g => gameKey(g) === key);
+    if (idx < 0) {
+      console.warn("[consumePendingScrollTarget] row not in list", { key, listLen: list.length });
+      t.consumed = true;
+      _pendingScrollTarget = null;
+      completeDrillOverlayIfNeeded(t.hideOverlay);
+      return false;
+    }
+    t.idx = idx;
+    state.pickedKey = key;
+    state.focusedRowIndex = idx;
+
+    const row = ensureRowPaintedForScroll(list, idx, key);
+    if (row) {
+      markFocusedRow(key);
+      focusRow(key);
+      scrollRowToCenter(row, { smooth: !!t.smooth });
+      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
+    } else if (usesVirtualScroll(list)) {
+      window.scrollTo({ top: scrollTopForRowCenter(idx), behavior: "auto" });
+    }
+
+    t.consumed = true;
+    _pendingScrollTarget = null;
+    completeDrillOverlayIfNeeded(t.hideOverlay);
+    return true;
+  }
+  return false;
+}
+
+/** Wait for picks/summary/table layout to settle, then scroll once. */
+export function scheduleScrollAfterLayoutSettled() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      consumePendingScrollTarget(state._visibleList);
+    });
+  });
+}
+
 export function focusGame(key) {
   state.pickedKey = key;
   const targetIsWishlist = String(key).startsWith("wishlist:");
   const targetIsItch = String(key).startsWith("itch:");
   const targetView = targetIsWishlist ? "wishlist" : targetIsItch ? "itch" : "library";
   const crossingView = state.activeView !== targetView;
+  const picksOpen = state.prefs.picksCollapsed === false;
+  const afterChrome = crossingView || picksOpen;
 
-  // Whether we're switching views or not, the user's intent is "show me this
-  // game." Active navigation filters in the target view can hide the row, so
-  // clear them up-front. This makes the row guaranteed-visible and means
-  // consumePendingFocus / the same-view branch below can rely on the list
-  // containing the key. Pre-2026-06 versions of this code papered over the
-  // problem with a scroll-to-top fallback; that was the bandaid we're removing.
   const targetList = crossingView ? null : visibleListForKeyboard();
   const alreadyVisible = targetList && targetList.findIndex(g => gameKey(g) === key) >= 0;
   if (!alreadyVisible) {
@@ -487,30 +596,32 @@ export function focusGame(key) {
   if (crossingView) {
     state._pendingFocusKey = key;
     state._drillHideOverlay = true;
+    setPendingScrollTarget({ kind: "row", key, smooth: false, hideOverlay: true, afterChrome: true });
     switchView(targetView);
     return;
   }
 
-  // Same-view jump.
   const list = visibleListForKeyboard();
-  let idx = list.findIndex(g => gameKey(g) === key);
+  const idx = list.findIndex(g => gameKey(g) === key);
   if (idx < 0) {
-    // After the filter reset above the row should be in the list. If it
-    // still isn't, the key doesn't exist in the data set at all — log loudly
-    // so we don't silently scroll to the wrong place.
     console.warn('[focusGame] key not found in visible list even after filter reset', { key, view: state.activeView, listLen: list.length });
     state._pendingFocusKey = key;
-    renderTable();
+    setPendingScrollTarget({ kind: "row", key, smooth: false, hideOverlay: false, afterChrome });
+    renderTable({ force: true });
     return;
   }
   state.focusedRowIndex = idx;
+  setPendingScrollTarget({ kind: "row", key, idx, smooth: true, hideOverlay: false, afterChrome });
+
   const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
   if (existing) {
     markFocusedRow(key);
-    scrollRowToCenter(existing, { smooth: true });
+    if (afterChrome) scheduleScrollAfterLayoutSettled();
+    else consumePendingScrollTarget(list);
     return;
   }
-  scrollToRowIndex(idx, { smooth: true });
+  state._pendingFocusKey = key;
+  renderTable({ force: true, anchorIndex: idx });
 }
 
 function consumePendingFocus(list) {
@@ -526,34 +637,23 @@ function consumePendingFocus(list) {
       view: state.activeView,
       listLen: list.length,
     });
-    if (state._drillHideOverlay) {
-      state._drillHideOverlay = false;
-      hideViewLoading();
-    }
-    state._anchorScrollHandled = -1;
+    cancelPendingScrollTarget();
+    completeDrillOverlayIfNeeded(true);
     return;
   }
   state.pickedKey = key;
   state.focusedRowIndex = idx;
-  // paintTableBody already scrolled to scrollTopForRowCenter(idx) and painted
-  // the window around the anchor. If the row is in the DOM, just mark + run
-  // finishDrillScroll (no second scrollTo, no second paintVirtualSlice).
-  if (state._anchorScrollHandled === idx) {
-    state._anchorScrollHandled = -1;
-    const row = document.querySelector(`tr[data-row-index="${idx}"]`);
-    if (row) {
-      markFocusedRow(key);
-      focusRow(key);
-      finishDrillScroll(key, false, state._drillHideOverlay);
-      if (run) run.meta.anchorReused = true;
-      return;
-    }
+  if (_pendingScrollTarget?.kind === "row" && !_pendingScrollTarget.consumed) {
+    _pendingScrollTarget.key = key;
+    _pendingScrollTarget.idx = idx;
   }
-  state._anchorScrollHandled = -1;
-  requestScrollToIndex(list, idx, {
-    smooth: false,
-    hideOverlayOnComplete: state._drillHideOverlay,
-  });
+  ensureRowPaintedForScroll(list, idx, key);
+  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (row) {
+    markFocusedRow(key);
+    focusRow(key);
+  }
+  if (run) run.meta.anchorPrepared = true;
 }
 
 export function scrollFocusedRow() {
@@ -571,23 +671,10 @@ export function scrollFocusedRow() {
 }
 
 /**
- * Re-anchor the picked/focused row after a cross-view drill-in.
- *
- * paintTableBody scrolls to scrollTopForRowCenter(anchorIdx) BEFORE the
- * deferred picks/summary render. When picks then paints above the table the
- * layout shifts down and the row falls off-screen (or appears below the
- * fold). Calling this from the deferred deferChrome path after picks has
- * settled re-measures the row's live position and snaps it back to center.
- *
- * Uses getBoundingClientRect (live) so it's correct regardless of how much
- * the layout shifted. No-op if no pickedKey or the row isn't painted.
+ * Re-anchor after layout shift — delegates to the unified pending-scroll path.
  */
 export function reanchorPickedRow() {
-  const key = state.pickedKey;
-  if (!key) return;
-  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-  if (!row) return;
-  scrollRowToCenter(row, { smooth: false });
+  scheduleScrollAfterLayoutSettled();
 }
 
 export function focusRow(key) {
@@ -1060,7 +1147,6 @@ function paintTableBody(list, opts = {}) {
   const tbody = document.getElementById("tbody");
   if (!tbody) return;
   cancelPaintJobs();
-  state._anchorScrollHandled = -1;
   const run = perfActiveRun();
   if (run) perfMark(run, 'paint:start');
   if (opts.resetScroll) {
@@ -1108,9 +1194,8 @@ function paintTableBody(list, opts = {}) {
     run.meta.anchorIndex = anchorIdx >= 0 ? anchorIdx : undefined;
   }
   if (anchorIdx >= 0) {
-    window.scrollTo({ top: scrollTopForRowCenter(anchorIdx), behavior: "auto" });
-    // Flag so consumePendingFocus skips its own redundant scrollTo/paint pair.
-    state._anchorScrollHandled = anchorIdx;
+    // Virtual window only — scroll deferred to consumePendingScrollTarget after
+    // picks/summary layout settles (scheduleScrollAfterLayoutSettled).
   }
   const { start, end } = computeVirtualRange(list.length, anchorIdx >= 0 ? anchorIdx : null);
   paintVirtualSlice(start, end);
@@ -1209,6 +1294,7 @@ export async function renderTable(opts) {
   const fp = tableFingerprint();
   if (!force && fp === _tableFingerprint && _lastRenderedView === state.activeView && state._visibleList && isTablePainted(state._visibleList)) {
     if (state._pendingFocusKey && state._visibleList) consumePendingFocus(state._visibleList);
+    if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
     syncRowCountLabel();
     if (isTablePerfEnabled()) {
       console.log('[baklog-perf] renderTable skipped (fingerprint cache hit)', { view: state.activeView, fpLen: fp.length });
@@ -1329,6 +1415,9 @@ export async function renderTable(opts) {
   updateBulkBar();
   buildAlphaNav(list);
   consumePendingFocus(list);
+  if (hasPendingScrollTarget() && !_pendingScrollTarget?.afterChrome) {
+    scheduleScrollAfterLayoutSettled();
+  }
   perfMeasure(perfRun, 'post:bulk-alpha-focus', 'post:start');
   _tableFingerprint = fp;
   _lastRenderedView = state.activeView;

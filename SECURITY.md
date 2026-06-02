@@ -1,0 +1,149 @@
+# Security model
+
+BAKLOG is a **local-first** desktop tool. It has no project-owned server,
+account system, or telemetry. This document is the threat model: what BAKLOG
+defends, what it explicitly does **not**, and the cryptography behind the
+claims. For the plain-language data inventory and network-host list, see
+[PRIVACY.md](PRIVACY.md).
+
+Last updated: 2026-06-02.
+
+## TL;DR
+
+- Your store credentials are generated, used, and stored **only on your
+  machine**. There is no BAKLOG server, so there is no central store of
+  secrets to breach.
+- Storefront logins run from **your own browser session and IP**, not from a
+  shared cloud — so they look like you, not like a bot farm hitting thousands
+  of accounts from a datacenter.
+- The credential document is **encrypted at rest** (AES-256-GCM) with a key
+  held in your **OS keychain**. An optional master password derives the key
+  via scrypt instead.
+- The only thing that ever leaves your machine is traffic **you** initiate to
+  the storefronts themselves, and any file **you** choose to export.
+
+## Trust boundary
+
+```mermaid
+flowchart LR
+  subgraph machine [Your machine - trusted]
+    browser["Browser tab (localhost UI)"]
+    server["127.0.0.1 Python server"]
+    fetchers["Fetchers + Playwright"]
+    secrets["cache/auth/secrets.bin (AES-256-GCM)"]
+    keychain["OS keychain (master key)"]
+    data["games_*.json / personal.json / localStorage"]
+    browser <--> server
+    server --> fetchers
+    fetchers --> secrets
+    secrets --> keychain
+    server --> data
+  end
+  subgraph outside [Outside - untrusted]
+    stores["Storefront + enrichment APIs"]
+  end
+  fetchers -->|"your credentials, your IP"| stores
+```
+
+Everything inside the machine boundary is assumed to run as **your** OS user.
+BAKLOG's security goal is that nothing crosses the boundary except the
+storefront calls you ask for and the files you explicitly export. There is no
+fourth box for a "BAKLOG cloud" because none exists.
+
+## Assets we protect
+
+| Asset | Where it lives | Sensitivity |
+|-------|----------------|-------------|
+| API keys (Steam, OpenXBL, ITAD, HLTB) | `.env`, encrypted secrets doc | High |
+| Session cookies / NPSSO (GOG, PSN, Xbox, Ubisoft, itch, Epic storefront) | `.env`, Playwright profiles, encrypted secrets doc | High |
+| OAuth refresh tokens (Epic, Battle.net, Nintendo) | `cache/<store>/session.json`, OS keychain, encrypted secrets doc | High |
+| Library / wishlist data | `games_*.json`, `itad_prices.json` | Low |
+| Personal annotations (status, notes, priority) | `data/personal.json`, `localStorage` | Low–medium |
+
+The design treats **credentials as high-value and catalog data as
+low-value**, and keeps them separable — that split is what makes any future
+opt-in catalog sync possible without ever moving a credential.
+
+## Cryptography
+
+### Credential document at rest (`cache/auth/secrets.bin`)
+
+- **Cipher:** AES-256-GCM (`cryptography` AEAD), fresh random 12-byte nonce on
+  every write, authentication tag verified on read.
+- **Key, default:** 32 random bytes from a CSPRNG, stored in the OS keychain
+  via `keyring` (Windows Credential Manager / DPAPI, macOS Keychain, Linux
+  Secret Service).
+- **Key, master-password mode:** derived from your passphrase with
+  **scrypt (N=2¹⁴, r=8, p=1, 32-byte key)** over a random 16-byte salt; the
+  derived key is never written to disk.
+- **Fallback:** if no keyring backend is available, the random key is written
+  to `cache/auth/.master_key`. This is weaker (a plaintext key file protected
+  only by OS file permissions) — see residual risks.
+
+Source: [auth/secrets.py](auth/secrets.py).
+
+### Portable secrets bundle (export/import)
+
+- Format: magic `BAKLOGSB`, version byte, scrypt parameters, 16-byte salt,
+  12-byte nonce, then AES-256-GCM ciphertext.
+- **Always** passphrase-encrypted (minimum 8 characters) with
+  **scrypt (N=2¹⁴) + AES-256-GCM**, independent of the local keychain/master
+  key, so a bundle is safe to carry on a USB stick or email to yourself.
+- Losing the bundle passphrase is unrecoverable by design — there is no reset
+  path and no escrow.
+
+Source: [auth/bundle.py](auth/bundle.py).
+
+### Containment guarantees
+
+- Credentials are **never** written into `games_*.json`, **never** logged in
+  plaintext to stdout, and **never** included in the "Copy bug bundle" payload
+  (which is a strict field whitelist — see PRIVACY.md).
+- The local server binds to **127.0.0.1**, so it is not reachable from other
+  machines on your network by default.
+
+## What is explicitly out of scope
+
+BAKLOG is not trying to defend against these, and you should not assume it
+does:
+
+- **A local attacker or malware running as your OS user.** Anything with your
+  user privileges can read the OS keychain and decrypt the secrets doc, exactly
+  like any other app you have logged into. Full-disk encryption and a secure OS
+  account are your responsibility.
+- **Plaintext `.env` and Playwright cookie jars.** Some credentials live in
+  `.env` and `cache/auth/profiles/<store>/` as the storefronts' own cookie
+  files. These are protected by OS file permissions, not by BAKLOG encryption.
+- **The `.master_key` fallback** when no keychain exists — a key file on disk.
+  Prefer a real keychain or enable the master password.
+- **Browser `localStorage`.** Anything that can read the served origin can read
+  your annotations and UI prefs there. It holds no credentials.
+- **Storefront terms of service and account flagging.** Automated fetches run
+  under your account at your own risk. Running from your own IP is a
+  mitigation, not a guarantee.
+- **Supply-chain / dependency compromise.** Standard for any local app; pin and
+  review what you install.
+- **Exposing the server yourself** (binding to `0.0.0.0`, port-forwarding, or
+  sharing the port) moves the trust boundary and is on you.
+
+## Why local-first is the security posture, not just a preference
+
+A hosted version would have to hold every user's live storefront sessions —
+sessions tied to payment methods — in one place. That central store is the
+single most valuable thing an attacker could target, and it would not exist if
+the product were not hosted. By keeping auth and fetching on each user's
+machine:
+
+- there is **no honeypot**: a breach of the project compromises no user
+  secrets, because the project holds none;
+- storefront fraud systems see **a normal user from a residential IP**, not one
+  server logging into thousands of accounts;
+- the blast radius of any single mistake is **one machine**, not the user base.
+
+## Reporting a security issue
+
+Email the author at the address in [pyproject.toml](pyproject.toml) for issues
+that could expose **someone else's** data or credentials. Issues that only
+affect your own local files are fine as regular GitHub issues. Please do not
+open public issues for anything that could put another user's storefront
+accounts at risk.

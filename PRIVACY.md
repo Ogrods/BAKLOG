@@ -188,6 +188,13 @@ Delete the folders above to remove everything. To rotate or revoke individual
 credentials, do it on the storefront's account page and then drop the matching
 file in `cache/` / row in `.env`.
 
+## Threat model
+
+For the attacker's-eye view — assets, trust boundary, the cryptography behind
+the at-rest and portable-bundle encryption, and an explicit list of what is
+**not** defended (local malware, plaintext `.env`, the `.master_key`
+fallback, storefront ToS) — see [SECURITY.md](SECURITY.md).
+
 ## Reporting a security issue
 
 Email the project author at the address listed in `pyproject.toml` if you find

@@ -8,7 +8,7 @@ BAKLOG helps you browse, sort, and prioritize games across Steam, GOG, PlayStati
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
-See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves your machine). Released under the [MIT license](LICENSE).
+See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves your machine) and [SECURITY.md](SECURITY.md) for the threat model (TL;DR: there is no server to breach). Released under the [MIT license](LICENSE).
 
 ## Stack
 
@@ -206,7 +206,7 @@ python -m auth export-bundle --out baklog-secrets.bundle
 python -m auth import-bundle baklog-secrets.bundle
 ```
 
-See [PRIVACY.md](PRIVACY.md#portable-secret-bundle) for what's inside the bundle and the threat model.
+See [PRIVACY.md](PRIVACY.md#portable-secret-bundle) for what's inside the bundle and [SECURITY.md](SECURITY.md) for the full threat model.
 
 Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes.
 

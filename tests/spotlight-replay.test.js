@@ -258,17 +258,6 @@ describe("spotlight expanded categories", () => {
     })];
     expect(eyebrowFor(games, 6)).toBe("Weekend-sized");
   });
-
-  it("tags stale backlog titles as Gathering dust", () => {
-    state.personal = { "steam:7": { status: "backlog" } };
-    const games = [libraryGame(7, {
-      steam_review_percent: 72,
-      hltb_main_hours: 30,
-      release_date: "2015-01-01",
-      playtime_minutes: 0,
-    })];
-    expect(eyebrowFor(games, 7)).toBe("Gathering dust");
-  });
 });
 
 describe("spotlight rotation safety", () => {

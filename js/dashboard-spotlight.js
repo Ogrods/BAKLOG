@@ -7,8 +7,6 @@ import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sani
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 
-const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
   return t > 0 && (Date.now() - t) <= months * 30 * 24 * 60 * 60 * 1000;
@@ -130,11 +128,6 @@ function gameSpotlightReason(g, recentKeys) {
   }
   if (hltb && hltb >= 8 && hltb <= 15 && rating >= 72) {
     return { eyebrow: 'Weekend-sized', score: rating - 4 };
-  }
-  if (status === 'backlog' && playtime === 0 && rating >= 70
-    && parseReleaseForSort(g.release_date) > 0
-    && (Date.now() - parseReleaseForSort(g.release_date)) > 4 * YEAR_MS) {
-    return { eyebrow: 'Gathering dust', score: rating - 8 };
   }
   if (hltb && hltb <= 4 && rating > 0) {
     return { eyebrow: 'Fast finish', score: rating - 6 };

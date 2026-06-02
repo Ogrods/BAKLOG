@@ -51,11 +51,11 @@ export const HLTB_BUCKETS = [
   { minExclusive: 40, maxInclusive: null, label: "HLTB 40h+" },
 ];
 
+import { prefersReducedMotion } from './motion.js';
+
 export function animateCount(el, from, to, format, durationMs = 900) {
   if (!el) return;
-  const prefersReduced = typeof matchMedia === 'function'
-    && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (prefersReduced || durationMs <= 0 || from === to) {
+  if (prefersReducedMotion() || durationMs <= 0 || from === to) {
     el.textContent = format(to);
     return;
   }

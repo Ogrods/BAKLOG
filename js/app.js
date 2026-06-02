@@ -57,6 +57,8 @@ import {
 import { reloadGames, reloadAfterFetcher } from './library-load.js';
 import { bindEvents } from './bind-events.js';
 import { startDebugOverlay } from './debug-overlay.js';
+import { ensureChartJs } from './chart-loader.js';
+import { prewarmTableQueryForView } from './table-ui.js';
 
 // Personal-storage's setPersonal triggers a downstream render of
 // summary/picks/dashboard. Those callbacks live in filters-ui/picks-ui/
@@ -149,12 +151,14 @@ async function bootstrap() {
   renderBulkStatusButtons();
   renderPicksLimitButtons();
   startDebugOverlay();
-  const chartScript = document.querySelector('script[src*="chart.js"]');
-  if (chartScript && !chartScript.dataset.bound) {
-    chartScript.dataset.bound = "1";
-    chartScript.addEventListener("load", () => {
-      if (state.activeView === "dashboard") scheduleDashboardRender();
-    });
+  function scheduleIdlePrewarm() {
+    const run = () => {
+      if (state.activeView === "library" && state.dashboardDataReady) {
+        prewarmTableQueryForView("wishlist").catch(() => {});
+      }
+    };
+    if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 4000 });
+    else setTimeout(run, 2000);
   }
   /** Load fetcher manifest + probe API in parallel with library JSON so the
    *  first scheduleDashboardRender (from applyMergedLibrary) paints real chips. */
@@ -185,6 +189,13 @@ async function bootstrap() {
   } finally {
     liftBootCurtain(tBoot);
     hideViewOverlay();
+    if (state.activeView === "dashboard") {
+      ensureChartJs()
+        .then(() => { if (state.activeView === "dashboard") scheduleDashboardRender(); })
+        .catch(err => console.warn("[bootstrap] Chart.js load failed", err));
+    } else {
+      scheduleIdlePrewarm();
+    }
   }
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {

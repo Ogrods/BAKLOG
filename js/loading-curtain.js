@@ -100,3 +100,9 @@ export function getCurtainState() {
 if (typeof document !== "undefined") {
   markBootCurtainShown();
 }
+
+export {
+  beginRowLoader,
+  endRowLoader,
+  forceHideRowLoader,
+} from './row-loader.js';

@@ -8,6 +8,7 @@ import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { focusGame } from './table-ui.js';
 import { DASH_STORE_COLORS, DASH_STATUS_COLORS, DASH_REVIEW_COLORS, DASH_STORE_LABELS, HLTB_BUCKETS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
+import { prefersReducedMotion } from './motion.js';
 // Click handlers route into drilldown helpers. One-way import; drilldown
 // does not import this module.
 import { dashDrillStore, dashDrillStatus, dashDrillStoreStatus, dashSetReleaseYear, dashDrillHltbBucket, dashDrillMinRating, dashDrillGenre, dashFinishDrillToLibrary, dashResetLibraryFiltersExceptDedup } from './dashboard-drilldown.js';
@@ -104,14 +105,18 @@ export function replayDashboardChartAnimations() {
 }
 
 function dashChartOptions(extra = {}) {
-  const { animations: extraAnim, ...rest } = extra;
+  const { animations: extraAnim, animation: extraAnimation, ...rest } = extra;
+  const reduced = prefersReducedMotion();
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { labels: { color: "#ffffff", boxWidth: 12 } } },
+    ...(reduced || extraAnimation != null ? {
+      animation: reduced ? { duration: 0 } : extraAnimation,
+    } : {}),
     animations: {
       resize: { duration: 0 },
-      ...extraAnim,
+      ...(reduced ? {} : extraAnim),
     },
     ...rest,
   };

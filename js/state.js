@@ -35,8 +35,6 @@ export const state = {
   _visibleListView: null,
   /** True while a cross-view drill-in should keep the loading overlay until scroll lands. */
   _drillHideOverlay: false,
-  /** Anchor row index that paintTableBody just scrolled to; consumePendingFocus reuses it. */
-  _anchorScrollHandled: -1,
   /**
    * Session-scoped prefs — like `prefs` but never persisted to localStorage.
    * Each tab/reload starts fresh with the defaults in loadSessionPrefs().

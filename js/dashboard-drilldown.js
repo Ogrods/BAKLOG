@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { savePrefs, setCoopFilterMode, syncFilterDomFromState } from './prefs.js';
 import { refreshFilterUI, renderGenreChips, renderStoreChips, switchView } from './filters-ui.js';
-import { invalidateTableCache, renderTable } from './table-ui.js';
+import { invalidateTableCache, setPendingScrollTarget } from './table-ui.js';
 import { HLTB_BUCKETS } from './dashboard-shared.js';
 
 export /** Reset every active library filter except cross-store dedup before drilling. */
@@ -27,38 +27,21 @@ function dashResetLibraryFiltersExceptDedup() {
 }
 
 /**
- * Land a dashboard drill-in just above the search bar.
- *
- * The toolbar section contains the search input + filter button + active
- * pills. Scrolling to its top means the user immediately sees: search bar,
- * active filter pills, then the filtered table — exactly what they expect
- * after clicking a chart category. Works whether picks is collapsed or
- * expanded; when expanded the picks grid is intentionally above the fold.
+ * Land a dashboard drill-in just above the search bar (toolbar section).
+ * Scroll is deferred until picks/summary layout settles.
  */
 export function scrollDrillResultsIntoView() {
-  const land = () => {
-    const toolbar = document.getElementById("toolbarSection");
-    if (!toolbar) {
-      window.scrollTo(0, 0);
-      return;
-    }
-    const rect = toolbar.getBoundingClientRect();
-    const targetY = Math.max(0, rect.top + window.scrollY - 12);
-    try { window.scrollTo({ top: targetY, behavior: "auto" }); }
-    catch (_) { window.scrollTo(0, targetY); }
-  };
-  // Two rAFs: first lets renderTable commit, second lets picks/summary layout settle.
-  requestAnimationFrame(() => requestAnimationFrame(land));
+  setPendingScrollTarget({ kind: "toolbar", smooth: false });
 }
 
 export function dashDrillStore(store) {
   dashResetLibraryFiltersExceptDedup();
   state.prefs.storeFilter = store || "";
   savePrefs();
+  setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderStoreChips();
   refreshFilterUI();
-  scrollDrillResultsIntoView();
 }
 
 export function dashDrillStatus(status) {
@@ -66,10 +49,10 @@ export function dashDrillStatus(status) {
   state.sessionPrefs.statusFilter = status || "";
   syncFilterDomFromState();
   savePrefs();
+  setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderStoreChips();
   refreshFilterUI();
-  scrollDrillResultsIntoView();
 }
 
 export function dashDrillStoreStatus(store, status) {
@@ -78,19 +61,19 @@ export function dashDrillStoreStatus(store, status) {
   state.sessionPrefs.statusFilter = status || "";
   syncFilterDomFromState();
   savePrefs();
+  setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderStoreChips();
   refreshFilterUI();
-  scrollDrillResultsIntoView();
 }
 
 export function dashFinishDrillToLibrary() {
   savePrefs();
+  setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderStoreChips();
   renderGenreChips();
   refreshFilterUI();
-  scrollDrillResultsIntoView();
 }
 
 export function dashSetReleaseYear(value) {
@@ -119,20 +102,20 @@ export function dashDrillGenre(genre) {
   dashResetLibraryFiltersExceptDedup();
   state.prefs.genreFilters = [genre];
   savePrefs();
+  setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderGenreChips();
   refreshFilterUI();
-  scrollDrillResultsIntoView();
 }
 
 export function dashDrillItchGenre(genre) {
   dashResetLibraryFiltersExceptDedup();
   state.prefs.genreFilters = [genre];
   savePrefs();
+  setPendingScrollTarget({ kind: "toolbar" });
   switchView("itch");
   renderGenreChips();
   refreshFilterUI();
-  scrollDrillResultsIntoView();
 }
 
 export function dashDrillCoop({ online = false, local = false, any = false } = {}) {
@@ -147,9 +130,8 @@ export function dashDrillCoop({ online = false, local = false, any = false } = {
   state.prefs.storeFilter = "";
   savePrefs();
   invalidateTableCache();
+  setPendingScrollTarget({ kind: "toolbar" });
   if (state.activeView !== "library") switchView("library");
   renderStoreChips();
-  refreshFilterUI();
-  renderTable();
-  scrollDrillResultsIntoView();
+  refreshFilterUI({ force: true });
 }

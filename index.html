@@ -88,71 +88,81 @@
           <strong id="connHeroCount">Loading connections…</strong>
           <div class="conn-progress"><span id="connProgressFill"></span></div>
         </div>
+        <div class="conn-hero-actions">
+          <button type="button" id="connKebabBtn" class="conn-kebab-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Connections options">&#8942;</button>
+          <div id="connKebabMenu" class="conn-kebab-menu" role="menu" hidden>
+            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="howto">How connections work</button>
+            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="passphrase">Encryption passphrase</button>
+          </div>
+        </div>
       </div>
-      <details id="connHowTo" class="conn-howto">
-        <summary>
-          <span class="conn-howto-title">How connections work</span>
-          <span class="conn-howto-sub">Read this once before signing in</span>
-        </summary>
-        <div class="conn-howto-body">
-          <div class="conn-howto-row">
-            <div class="conn-howto-glyph" aria-hidden="true">A</div>
-            <div>
-              <p class="conn-howto-heading">Automatic browser sign-in</p>
-              <p class="conn-howto-text">
-                <strong>Steam, GOG, PlayStation, Xbox (play history), Xbox Store wishlist, Battle.net, Nintendo, Ubisoft, Epic wishlist.</strong>
-                Click <em>Connect</em> on the card and a Chromium window opens automatically. Sign in normally — when the page lands on the right spot, the window closes itself and the card flips to <em>Connected</em>. Don't close the window manually unless you cancel.
-              </p>
-            </div>
-          </div>
-          <div class="conn-howto-row">
-            <div class="conn-howto-glyph" aria-hidden="true">B</div>
-            <div>
-              <p class="conn-howto-heading">Manual sign-in (paste-a-code)</p>
-              <p class="conn-howto-text">
-                <strong>Epic (library):</strong> click <em>Open sign-in page</em>, sign in, copy the <code>authorizationCode</code> you see, paste it in the card, hit <em>Save key</em>. We trade it for a 30-day refresh token automatically.
-              </p>
-            </div>
-          </div>
-          <div class="conn-howto-row">
-            <div class="conn-howto-glyph" aria-hidden="true">C</div>
-            <div>
-              <p class="conn-howto-heading">Manual API key</p>
-              <p class="conn-howto-text">
-                <strong>itch.io, IsThereAnyDeal (ITAD):</strong> open the linked settings page, generate an API key, paste it in the card, hit <em>Save key</em>. Their auth pages can't be automated, so this is one-time.
-              </p>
-            </div>
-          </div>
-          <div class="conn-howto-row">
-            <div class="conn-howto-glyph" aria-hidden="true">D</div>
-            <div>
-              <p class="conn-howto-heading">Local-only</p>
-              <p class="conn-howto-text">
-                <strong>Amazon Games:</strong> nothing to sign in to — we read the local Amazon Games launcher database on this PC. If you don't have it installed, this card just stays disconnected.
-              </p>
-            </div>
-          </div>
-          <p class="conn-howto-note">
-            Everything is stored encrypted on this machine (OS keychain by default). Sessions expire eventually — when a fetcher fails with an auth error, the card flips to <em>Session expired</em> and you just click <em>Reconnect</em> to refresh.
-          </p>
-        </div>
-      </details>
-      <div id="connectionsGrid"></div>
-      <div id="connectionsManualRow"></div>
-      <details id="connAdvanced" class="conn-advanced">
-        <summary>Advanced</summary>
-        <div class="conn-advanced-body">
-          <p class="text-xs text-slate-400 mb-2">Portable master password (optional — overrides OS keychain). Most users can leave this blank.</p>
-          <label class="block text-xs text-slate-300">Encryption passphrase
-            <input id="masterPasswordInput" type="password" autocomplete="new-password" placeholder="Leave blank to use OS keychain"
-              class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
-          </label>
-          <div class="flex flex-wrap gap-2 items-center mt-2">
-            <button type="button" id="masterPasswordSave" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Apply</button>
-            <span id="masterPasswordHint" class="text-slate-500 text-xs">Using OS keychain by default.</span>
+      <p class="conn-hint">Click <strong>Connect</strong> or <strong>Verify</strong>. A sign-in window opens and closes itself when done.
+        <button type="button" class="conn-hint-help" data-conn-open="howto" aria-haspopup="dialog" aria-label="How connections work" title="How connections work">?</button>
+      </p>
+      <div id="connLayout">
+        <nav id="connRail" role="listbox" aria-label="Providers"></nav>
+        <div id="connPane"></div>
+      </div>
+      <div id="connPopoverBackdrop" class="conn-popover-backdrop" hidden></div>
+      <div id="connPopover" class="conn-popover" role="dialog" aria-modal="true" hidden>
+        <button type="button" class="conn-popover-close" data-conn-close aria-label="Close">&times;</button>
+        <div id="connPopoverBody"></div>
+      </div>
+      <template id="tplConnHowToPopover">
+        <h3 class="conn-popover-title">How connections work</h3>
+        <div class="conn-howto-row">
+          <div class="conn-howto-glyph" aria-hidden="true">A</div>
+          <div>
+            <p class="conn-howto-heading">Automatic browser sign-in</p>
+            <p class="conn-howto-text">
+              <strong>Steam, GOG, PlayStation, Xbox (play history), Xbox Store wishlist, Battle.net, Nintendo, Ubisoft, Epic wishlist.</strong>
+              Click <em>Connect</em> on the card and a Chromium window opens automatically. Sign in normally &mdash; when the page lands on the right spot, the window closes itself and the card flips to <em>Connected</em>. Don't close the window manually unless you cancel.
+            </p>
           </div>
         </div>
-      </details>
+        <div class="conn-howto-row">
+          <div class="conn-howto-glyph" aria-hidden="true">B</div>
+          <div>
+            <p class="conn-howto-heading">Manual sign-in (paste-a-code)</p>
+            <p class="conn-howto-text">
+              <strong>Epic (library):</strong> click <em>Open sign-in page</em>, sign in, copy the <code>authorizationCode</code> you see, paste it in the card, hit <em>Save key</em>. We trade it for a 30-day refresh token automatically.
+            </p>
+          </div>
+        </div>
+        <div class="conn-howto-row">
+          <div class="conn-howto-glyph" aria-hidden="true">C</div>
+          <div>
+            <p class="conn-howto-heading">Manual API key</p>
+            <p class="conn-howto-text">
+              <strong>itch.io, IsThereAnyDeal (ITAD):</strong> open the linked settings page, generate an API key, paste it in the card, hit <em>Save key</em>. Their auth pages can't be automated, so this is one-time.
+            </p>
+          </div>
+        </div>
+        <div class="conn-howto-row">
+          <div class="conn-howto-glyph" aria-hidden="true">D</div>
+          <div>
+            <p class="conn-howto-heading">Local-only</p>
+            <p class="conn-howto-text">
+              <strong>Amazon Games:</strong> nothing to sign in to &mdash; we read the local Amazon Games launcher database on this PC. If you don't have it installed, this card just stays disconnected.
+            </p>
+          </div>
+        </div>
+        <p class="conn-howto-note">
+          Everything is stored encrypted on this machine (OS keychain by default). Sessions expire eventually &mdash; when a fetcher fails with an auth error, the card flips to <em>Session expired</em> and you just click <em>Reconnect</em> to refresh.
+        </p>
+      </template>
+      <template id="tplConnPassphrasePopover">
+        <h3 class="conn-popover-title">Encryption passphrase</h3>
+        <p class="text-xs text-slate-400 mb-2">Portable master password (optional &mdash; overrides OS keychain). Most users can leave this blank.</p>
+        <label class="block text-xs text-slate-300">Passphrase
+          <input id="masterPasswordInput" type="password" autocomplete="new-password" placeholder="Leave blank to use OS keychain"
+            class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
+        </label>
+        <div class="flex flex-wrap gap-2 items-center mt-2">
+          <button type="button" id="masterPasswordSave" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Apply</button>
+          <span id="masterPasswordHint" class="text-slate-500 text-xs">Using OS keychain by default.</span>
+        </div>
+      </template>
     </section>
 
     <section id="picksSection" class="bg-slate-800 rounded-lg mb-4">

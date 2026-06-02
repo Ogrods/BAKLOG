@@ -1897,18 +1897,30 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .games-table tbody tr td { max-height: 76px; vertical-align: middle; }
 .games-table tr.virtual-spacer { height: auto; pointer-events: none; }
 .games-table tr.virtual-spacer td { padding: 0; border: none; vertical-align: top; line-height: 0; font-size: 0; }
-/* Notes cell: tags wrap inside the cell, but the cell itself is clipped so a
+/* Notes cell: tags wrap inside the cell, but the cell itself is bounded so a
    game with many tags can't push the row arbitrarily tall. The notes input
-   stays anchored to the bottom; surplus tags are clipped (still listed in the
-   filter chips). */
+   stays anchored to the bottom; surplus tags become scrollable within their
+   wrap so every chip is reachable in-row (no need to read the tooltip). */
 .games-table td.notes-cell {
   white-space: normal;
   overflow: hidden;
   vertical-align: top;
 }
 .games-table td.notes-cell .tag-chip-wrap {
-  max-height: 38px;
-  overflow: hidden;
+  max-height: 44px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.4) transparent;
+}
+.games-table td.notes-cell .tag-chip-wrap::-webkit-scrollbar {
+  width: 4px;
+}
+.games-table td.notes-cell .tag-chip-wrap::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.4);
+  border-radius: 2px;
+}
+.games-table td.notes-cell .tag-chip-wrap::-webkit-scrollbar-track {
+  background: transparent;
 }
 .games-table .game-name-cell { min-width: 0; }
 .games-table .game-name-cell .game-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%; }

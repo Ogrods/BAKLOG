@@ -48,7 +48,7 @@ import {
   bumpPersonalMemo,
 } from './personal-storage.js';
 import { getCoopFilterMode } from './prefs.js';
-import { renderSummary, switchView, renderTagChips, hideViewLoading } from './filters-ui.js';
+import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 // dashboard-drilldown imports from table-ui already; the cycle is safe because
@@ -267,29 +267,6 @@ export function bulkSetStatus(status) {
 }
 
 // === Row helpers ===
-export function updateHasTagsIndicatorInPlace(tr, g) {
-  if (!tr) return;
-  const meta = tr.querySelector(".row-meta");
-  if (!meta) return;
-  const tags = getPersonal(g).tags || [];
-  const dot = meta.querySelector(".has-tags-dot");
-  if (tags.length) {
-    const tooltip = tags.join(", ").slice(0, 160);
-    const label = `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
-    if (dot) {
-      dot.title = tooltip;
-      dot.textContent = label;
-    } else {
-      meta.insertAdjacentHTML(
-        "beforeend",
-        `<span class="has-tags-dot" title="${escapeAttr(tooltip)}" aria-label="Has tags">${label}</span>`,
-      );
-    }
-  } else if (dot) {
-    dot.remove();
-  }
-}
-
 export function updateHasNotesIndicatorInPlace(tr, g) {
   if (!tr) return;
   const meta = tr.querySelector(".row-meta");
@@ -301,10 +278,10 @@ export function updateHasNotesIndicatorInPlace(tr, g) {
     if (dot) {
       dot.title = tooltip;
     } else {
-      const tagsDot = meta.querySelector(".has-tags-dot");
-      const html = `<span class="has-notes-dot" title="${escapeAttr(tooltip)}" aria-label="Has notes">&#9998; note</span>`;
-      if (tagsDot) tagsDot.insertAdjacentHTML("beforebegin", html);
-      else meta.insertAdjacentHTML("beforeend", html);
+      meta.insertAdjacentHTML(
+        "beforeend",
+        `<span class="has-notes-dot" title="${escapeAttr(tooltip)}" aria-label="Has notes">&#9998; note</span>`,
+      );
     }
   } else if (dot) {
     dot.remove();
@@ -318,25 +295,6 @@ export function updateRowInPlace(tr, g) {
   const selected = state.selectedKeys.has(key);
   const focused = tr.classList.contains("row-focused");
   tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
-}
-
-export function tagCellHtml(g) {
-  const key = gameKey(g);
-  const p = getPersonal(g);
-  const chips = (p.tags || []).map(t => `<span class="row-tag tag-chip">${escapeHtml(t)}<button type="button" class="row-tag-remove tag-chip-remove" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("");
-  return `${chips}<button type="button" class="row-tag-add tag-chip-add" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>`;
-}
-
-export function updateTagCellInPlace(tr, g) {
-  if (!tr) return;
-  const wrap = tr.querySelector(".tag-chip-wrap");
-  if (wrap) wrap.innerHTML = tagCellHtml(g);
-}
-
-let _tagChipsRefreshTimer = null;
-export function scheduleTagChipsRefresh() {
-  clearTimeout(_tagChipsRefreshTimer);
-  _tagChipsRefreshTimer = setTimeout(renderTagChips, 150);
 }
 
 function rowClass(g, lowConf) {
@@ -566,8 +524,6 @@ export function tableFingerprint() {
     hltbBucket: state.prefs.hltbBucket ?? null,
     gen: state.prefs.genreFilters || [],
     gm: state.prefs.genreFilterMode,
-    tags: state.prefs.tagFilters || [],
-    tm: state.prefs.tagFilterMode,
     deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
     coop: getCoopFilterMode(),
     cleanup: !!state.cleanupModeActive,
@@ -927,7 +883,6 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
               ${coopPillsHtml(g)}
               ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))}" aria-label="Has notes">&#9998; note</span>` : ""}
-              ${(p.tags || []).length ? `<span class="has-tags-dot" title="${escapeAttr((p.tags || []).join(", ").slice(0, 160))}" aria-label="Has tags">${(p.tags || []).length} tag${(p.tags || []).length === 1 ? "" : "s"}</span>` : ""}
             </div>
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </div>
@@ -949,7 +904,6 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
       <td class="p-2 notes-cell">
-        <div class="tag-chip-wrap flex flex-wrap gap-1 mb-1">${tagCellHtml(g)}</div>
         <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
       </td>
     </tr>`;

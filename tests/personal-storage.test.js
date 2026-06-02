@@ -1,5 +1,7 @@
 /**
- * Tests for js/personal-storage.js — notes writes and import merge.
+ * Tests for js/personal-storage.js — notes writes, import merge, orphan
+ * cleanup, and the one-shot legacy-tag stripper. Personal tags are gone;
+ * stripLegacyTags is the single migration that drops them on first boot.
  */
 
 import { describe, expect, it, beforeEach } from 'vitest';
@@ -8,21 +10,14 @@ import {
   setPersonal,
   mergeImportedPersonal,
   getPersonal,
-  normalizeTag,
-  addTagToGame,
-  removeTagFromGame,
-  renameTagGlobally,
-  mergeTagGlobally,
-  deleteTagGlobally,
-  allPersonalTags,
-  canonicalizeTagsAcrossTitles,
   canonicalizeNotesAcrossTitles,
   reconcileNotesAcrossTitles,
   findOrphanPersonalKeys,
   countOrphanPersonalKeys,
   prunePersonalKeys,
+  stripLegacyTags,
 } from '../js/personal-storage.js';
-import { gameKey, getSameTitleKeys } from '../js/game-core.js';
+import { gameKey } from '../js/game-core.js';
 
 const testGame = { store: 'steam', id: 42, appid: 42, name: 'Test Game' };
 const hadesSteam = { store: 'steam', id: 1, appid: 1, name: 'Hades' };
@@ -33,134 +28,56 @@ beforeEach(() => {
   state.allGames = [];
   state.wishlistGames = [];
   state.itchGames = [];
-  state.prefs = { tagFilters: [], tagFilterMode: 'OR' };
+  state.prefs = {};
   window._dataVersion = 0;
 });
 
 describe('setPersonal — notes', () => {
-  it('writes notes without clobbering status or tags', () => {
+  it('writes notes without clobbering status', () => {
     const key = gameKey(testGame);
     state.personal[key] = {
       status: 'playing',
       notes: '',
       priority: 0,
       hltb_override: null,
-      tags: ['cozy'],
     };
     setPersonal(testGame, 'notes', 'try on deck', { silent: true });
     expect(state.personal[key].notes).toBe('try on deck');
     expect(state.personal[key].status).toBe('playing');
-    expect(state.personal[key].tags).toEqual(['cozy']);
     expect(window._dataVersion).toBe(1);
     expect(getPersonal(testGame).notes).toBe('try on deck');
   });
 });
 
 describe('mergeImportedPersonal', () => {
-  it('preserves existing status and tags when import only has notes', () => {
+  it('preserves existing status when import only has notes', () => {
     const key = gameKey(testGame);
     state.personal[key] = {
       status: 'next',
       notes: 'old note',
       priority: 0,
       hltb_override: null,
-      tags: ['backlog'],
     };
     mergeImportedPersonal({
       [key]: { notes: 'imported note' },
     });
     expect(state.personal[key].notes).toBe('imported note');
     expect(state.personal[key].status).toBe('next');
-    expect(state.personal[key].tags).toEqual(['backlog']);
   });
 
-  it('unions tags instead of replacing', () => {
+  it('drops legacy tags fields silently on import', () => {
     const key = gameKey(testGame);
     state.personal[key] = {
       status: 'backlog',
       notes: '',
       priority: 0,
       hltb_override: null,
-      tags: ['co-op'],
     };
     mergeImportedPersonal({
-      [key]: { tags: ['cozy', 'co-op'] },
+      [key]: { status: 'next', tags: ['cozy', 'co-op'] },
     });
-    expect(state.personal[key].tags.sort()).toEqual(['co-op', 'cozy']);
-  });
-});
-
-describe('normalizeTag', () => {
-  it('lowercases, trims, collapses spaces, caps at 32 chars', () => {
-    expect(normalizeTag('  Co-Op  ')).toBe('co-op');
-    expect(normalizeTag('A'.repeat(40)).length).toBe(32);
-    expect(normalizeTag('')).toBe('');
-  });
-});
-
-describe('canonical cross-store tags', () => {
-  beforeEach(() => {
-    state.allGames = [hadesSteam, hadesEpic];
-  });
-
-  it('getSameTitleKeys returns every store copy', () => {
-    const keys = getSameTitleKeys(hadesSteam).sort();
-    expect(keys).toEqual(['epic:hades-epic', 'steam:1'].sort());
-  });
-
-  it('addTagToGame mirrors across same-title keys', () => {
-    addTagToGame(hadesSteam, 'cozy');
-    expect(getPersonal(hadesSteam).tags).toEqual(['cozy']);
-    expect(getPersonal(hadesEpic).tags).toEqual(['cozy']);
-  });
-
-  it('removeTagFromGame mirrors across same-title keys', () => {
-    addTagToGame(hadesSteam, 'cozy');
-    removeTagFromGame(hadesEpic, 'cozy');
-    expect(getPersonal(hadesSteam).tags).toEqual([]);
-    expect(getPersonal(hadesEpic).tags).toEqual([]);
-  });
-
-  it('allPersonalTags counts one game per title group', () => {
-    addTagToGame(hadesSteam, 'cozy');
-    expect(allPersonalTags()).toEqual([['cozy', 1]]);
-  });
-
-  it('canonicalizeTagsAcrossTitles unions tags and is idempotent', () => {
-    state.personal['steam:1'] = { status: 'backlog', notes: '', priority: 0, hltb_override: null, tags: ['cozy'] };
-    state.personal['epic:hades-epic'] = { status: 'backlog', notes: '', priority: 0, hltb_override: null, tags: ['co-op'] };
-    delete state.personal.__tags_canonicalized_v1;
-    expect(canonicalizeTagsAcrossTitles()).toBe(true);
-    expect(getPersonal(hadesSteam).tags.sort()).toEqual(['co-op', 'cozy']);
-    expect(getPersonal(hadesEpic).tags.sort()).toEqual(['co-op', 'cozy']);
-    expect(canonicalizeTagsAcrossTitles()).toBe(false);
-  });
-});
-
-describe('global tag management', () => {
-  beforeEach(() => {
-    state.allGames = [testGame];
-    addTagToGame(testGame, 'cozy');
-  });
-
-  it('renameTagGlobally updates every key and prefs filter', () => {
-    state.prefs.tagFilters = ['cozy'];
-    renameTagGlobally('cozy', 'cosy');
-    expect(getPersonal(testGame).tags).toEqual(['cosy']);
-    expect(state.prefs.tagFilters).toEqual(['cosy']);
-  });
-
-  it('mergeTagGlobally collapses duplicate tags on a key', () => {
-    addTagToGame(testGame, 'co-op');
-    mergeTagGlobally('co-op', 'cozy');
-    expect(getPersonal(testGame).tags).toEqual(['cozy']);
-  });
-
-  it('deleteTagGlobally removes tag everywhere and clears filter', () => {
-    state.prefs.tagFilters = ['cozy'];
-    deleteTagGlobally('cozy');
-    expect(getPersonal(testGame).tags).toEqual([]);
-    expect(state.prefs.tagFilters).toEqual([]);
+    expect(state.personal[key].status).toBe('next');
+    expect(state.personal[key]).not.toHaveProperty('tags');
   });
 });
 
@@ -179,8 +96,8 @@ describe('canonical cross-store notes', () => {
   });
 
   it('canonicalizeNotesAcrossTitles picks longest note per group', () => {
-    state.personal['steam:1'] = { status: 'backlog', notes: 'short', tags: [], priority: 0, hltb_override: null };
-    state.personal['epic:hades-epic'] = { status: 'backlog', notes: 'much longer note text', tags: [], priority: 0, hltb_override: null };
+    state.personal['steam:1'] = { status: 'backlog', notes: 'short', priority: 0, hltb_override: null };
+    state.personal['epic:hades-epic'] = { status: 'backlog', notes: 'much longer note text', priority: 0, hltb_override: null };
     delete state.personal.__notes_canonicalized_v1;
     expect(canonicalizeNotesAcrossTitles()).toBe(true);
     expect(getPersonal(hadesSteam).notes).toBe('much longer note text');
@@ -198,30 +115,28 @@ describe('orphan personal keys', () => {
   it('findOrphanPersonalKeys returns keys with no matching game', () => {
     state.allGames = [{ store: 'steam', id: 1, name: 'Hades' }];
     state.personal = {
-      'steam:1': { status: 'next', notes: '', tags: [] },
-      'gog:gone': { status: 'finished', notes: '', tags: [] },
-      'epic:abandoned': { status: 'backlog', notes: 'still want', tags: ['cozy'] },
+      'steam:1': { status: 'next', notes: '' },
+      'gog:gone': { status: 'finished', notes: '' },
+      'epic:abandoned': { status: 'backlog', notes: 'still want' },
       __migrated_v3: true,
-      __tags_canonicalized_v1: true,
+      __tags_removed_v1: true,
     };
     const orphans = findOrphanPersonalKeys();
     const keys = orphans.map(o => o.key).sort();
     expect(keys).toEqual(['epic:abandoned', 'gog:gone']);
   });
 
-  it('orphan rows mark hasData=true when status/notes/tags/hltb differ from defaults', () => {
+  it('orphan rows mark hasData=true when status/notes/hltb differ from defaults', () => {
     state.allGames = [];
     state.personal = {
-      'gog:empty': { status: 'backlog', notes: '', tags: [], hltb_override: null },
-      'gog:withNote': { status: 'backlog', notes: 'finish', tags: [] },
-      'gog:withTag': { status: 'backlog', notes: '', tags: ['short'] },
-      'gog:withStatus': { status: 'finished', notes: '', tags: [] },
-      'gog:withHltb': { status: 'backlog', notes: '', tags: [], hltb_override: 5 },
+      'gog:empty': { status: 'backlog', notes: '', hltb_override: null },
+      'gog:withNote': { status: 'backlog', notes: 'finish' },
+      'gog:withStatus': { status: 'finished', notes: '' },
+      'gog:withHltb': { status: 'backlog', notes: '', hltb_override: 5 },
     };
     const byKey = Object.fromEntries(findOrphanPersonalKeys().map(o => [o.key, o]));
     expect(byKey['gog:empty'].hasData).toBe(false);
     expect(byKey['gog:withNote'].hasData).toBe(true);
-    expect(byKey['gog:withTag'].hasData).toBe(true);
     expect(byKey['gog:withStatus'].hasData).toBe(true);
     expect(byKey['gog:withHltb'].hasData).toBe(true);
   });
@@ -229,10 +144,10 @@ describe('orphan personal keys', () => {
   it('countOrphanPersonalKeys ignores meta keys', () => {
     state.allGames = [{ store: 'steam', id: 1, name: 'Hades' }];
     state.personal = {
-      'steam:1': { status: 'next', notes: '', tags: [] },
-      'gog:gone': { status: 'backlog', notes: '', tags: [] },
+      'steam:1': { status: 'next', notes: '' },
+      'gog:gone': { status: 'backlog', notes: '' },
       __migrated_v3: true,
-      __tags_canonicalized_v1: true,
+      __tags_removed_v1: true,
     };
     expect(countOrphanPersonalKeys()).toBe(1);
   });
@@ -240,8 +155,8 @@ describe('orphan personal keys', () => {
   it('prunePersonalKeys removes selected keys and bumps _dataVersion', () => {
     state.allGames = [];
     state.personal = {
-      'gog:a': { status: 'backlog', notes: '', tags: [] },
-      'gog:b': { status: 'next', notes: '', tags: [] },
+      'gog:a': { status: 'backlog', notes: '' },
+      'gog:b': { status: 'next', notes: '' },
     };
     window._dataVersion = 5;
     const removed = prunePersonalKeys(['gog:a']);
@@ -252,8 +167,34 @@ describe('orphan personal keys', () => {
   });
 
   it('prunePersonalKeys refuses to remove meta keys', () => {
-    state.personal = { __migrated_v3: true, 'gog:a': { status: 'backlog', tags: [] } };
+    state.personal = { __migrated_v3: true, 'gog:a': { status: 'backlog' } };
     prunePersonalKeys(['__migrated_v3']);
     expect(state.personal.__migrated_v3).toBe(true);
+  });
+});
+
+describe('stripLegacyTags', () => {
+  it('drops the tags field from every record and stamps the migration flag', () => {
+    state.personal = {
+      'steam:1': { status: 'backlog', notes: '', tags: ['cozy', 'short'] },
+      'gog:7':   { status: 'next',    notes: 'note', tags: [] },
+      __migrated_v3: true,
+    };
+    state.prefs = { tagFilters: ['cozy'], tagFilterMode: 'AND', storeFilter: '' };
+    expect(stripLegacyTags()).toBe(true);
+    expect(state.personal['steam:1']).not.toHaveProperty('tags');
+    expect(state.personal['gog:7']).not.toHaveProperty('tags');
+    expect(state.personal.__tags_removed_v1).toBe(true);
+    expect(state.prefs.tagFilters).toBeUndefined();
+    expect(state.prefs.tagFilterMode).toBeUndefined();
+    expect(state.prefs.storeFilter).toBe('');
+  });
+
+  it('is idempotent — second call is a no-op', () => {
+    state.personal = {
+      'steam:1': { status: 'backlog', notes: '', tags: ['cozy'] },
+    };
+    stripLegacyTags();
+    expect(stripLegacyTags()).toBe(false);
   });
 });

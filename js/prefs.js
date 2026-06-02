@@ -31,7 +31,7 @@ export function syncCoopFilterSegmented() {
 }
 
 export function loadPrefs() {
-  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16, tagFilters: [], tagFilterMode: "OR", dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, coopFilterMode: "off" };
+  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16, dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, coopFilterMode: "off" };
   let merged;
   try { merged = { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
   if (!["off", "any", "online", "local", "both"].includes(merged.coopFilterMode)) {
@@ -42,6 +42,8 @@ export function loadPrefs() {
   // are found, drop them so they don't pollute future saves.
   delete merged.crossStoreDedup;
   delete merged.itchHideNonGames;
+  delete merged.tagFilters;
+  delete merged.tagFilterMode;
   return merged;
 }
 

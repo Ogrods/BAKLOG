@@ -13,7 +13,6 @@ import {
 import {
   loadManualGames,
   bumpPersonalMemo,
-  canonicalizeTagsAcrossTitles,
   canonicalizeNotesAcrossTitles,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
@@ -22,7 +21,6 @@ import {
   refreshFilterUI,
   renderSummary,
   renderGenreChips,
-  renderTagChips,
   renderStoreChips,
   renderWishlistStoreChips,
   switchView,
@@ -138,7 +136,6 @@ export async function applyMergedLibrary() {
   bumpPersonalMemo();
   invalidateTableCache();
   recomputeCrossStoreHidden();
-  canonicalizeTagsAcrossTitles();
   canonicalizeNotesAcrossTitles();
   state.dashboardDataReady = true;
   buildOwnedNormNames();
@@ -150,7 +147,6 @@ export async function applyMergedLibrary() {
   renderStoreChips();
   renderWishlistStoreChips();
   renderGenreChips();
-  renderTagChips();
   renderSummary();
   if (state.activeView === "dashboard") scheduleDashboardRender();
   else {

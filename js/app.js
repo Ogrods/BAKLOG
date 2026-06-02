@@ -29,6 +29,7 @@ import { escapeHtml } from './dom-util.js';
 import {
   loadPersonal,
   migrateV3,
+  stripLegacyTags,
   configureDownstreamSync,
 } from './personal-storage.js';
 import {
@@ -93,6 +94,7 @@ async function bootstrap() {
     console.warn("[personalStore] init failed, falling back to localStorage", err);
   }
   migrateV3();
+  stripLegacyTags();
   state.prefs.genreFilters = (state.prefs.genreFilters || []).map(aliasCanonicalGenre);
   const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch", "connections"]);
   if (VALID_VIEWS.has(state.prefs.activeView)) {
@@ -117,7 +119,6 @@ async function bootstrap() {
   recomputeCrossStoreHidden();
   const dedupEl = document.getElementById("crossStoreDedup");
   if (dedupEl) dedupEl.checked = !!state.sessionPrefs.crossStoreDedup;
-  document.getElementById("tagFilterMode").value = state.prefs.tagFilterMode || "OR";
   // itchHideNonGames is a session pref (state.sessionPrefs.itchHideNonGames);
   // defaults on each reload via loadSessionPrefs(), never persisted.
   const itchShowNonGamesEl = document.getElementById("itchShowNonGames");

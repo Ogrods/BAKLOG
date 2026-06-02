@@ -114,10 +114,19 @@ export function bindEvents() {
       state.prefs.fetcherHealthStaleOnly = e.target.checked;
       savePrefs();
       renderDashboardFetcherHealth();
+    } else if (e.target.id === "itadAutoRefreshToggle") {
+      state.prefs.itadAutoRefreshDisabled = !e.target.checked;
+      savePrefs();
     }
   });
 
   document.getElementById("dashboardFetcherHealth")?.addEventListener("click", e => {
+    const logBtn = e.target.closest(".fh-log-open");
+    if (logBtn) {
+      e.preventDefault();
+      fetcherRunner.reopenLogPanel();
+      return;
+    }
     const staleBtn = e.target.closest(".fh-run-stale");
     if (staleBtn && !staleBtn.disabled) {
       e.preventDefault();
@@ -233,14 +242,6 @@ export function bindEvents() {
     kebabMenu.classList.remove("open");
     kebabBtn.setAttribute("aria-expanded", "false");
   });
-  const itadAutoRefreshToggle = document.getElementById("itadAutoRefreshToggle");
-  if (itadAutoRefreshToggle) {
-    itadAutoRefreshToggle.checked = !state.prefs.itadAutoRefreshDisabled;
-    itadAutoRefreshToggle.addEventListener("change", () => {
-      state.prefs.itadAutoRefreshDisabled = !itadAutoRefreshToggle.checked;
-      savePrefs();
-    });
-  }
   document.getElementById("coopFilterSegmented")?.addEventListener("click", e => {
     const btn = e.target.closest(".filter-segment[data-coop-mode]");
     if (!btn) return;

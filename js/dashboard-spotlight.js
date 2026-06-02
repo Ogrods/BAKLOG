@@ -87,6 +87,16 @@ function gameSpotlightReason(g, recentKeys) {
   }
   if (!['backlog', 'next', 'playing', 'unfinished'].includes(status)) return null;
 
+  const trophy = g.trophy_progress;
+  if ((status === 'playing' || status === 'unfinished') && trophy != null) {
+    if (trophy >= 80 && trophy < 100) {
+      return { eyebrow: 'Almost mastered', score: rating + 8 };
+    }
+    if (trophy >= 20 && trophy < 80) {
+      return { eyebrow: 'Pick back up', score: rating + 3 };
+    }
+  }
+
   if ((status === 'playing' || status === 'unfinished') && playtime >= 30 && rating >= 70) {
     return { eyebrow: 'Return to', score: rating + 6 };
   }

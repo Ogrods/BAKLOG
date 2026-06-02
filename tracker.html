@@ -501,7 +501,7 @@
     { id: "hooks", label: "Why users choose this" },
     { id: "audience", label: "Audience" },
     { id: "market", label: "Market + numbers" },
-    { id: "compete", label: "Competitive set" },
+    { id: "landscape", label: "Competitive landscape" },
     { id: "models", label: "Model iterations" },
     { id: "pricing", label: "Pricing" },
     { id: "gtm", label: "Go-to-market" },
@@ -563,6 +563,24 @@
     { name: "Free game Thursday, finally counted", objective: "Convert weekly free-game claimers — Epic, Prime Gaming, GOG, Steam free weekends — into BAKLOG users on the day they claim", audience: "Subreddit and Discord communities organized around weekly free-game claims (/r/FreeGameFindings, /r/EpicGamesPC, /r/GameDeals, Prime Gaming subreddits)", visual: "Calendar grid of 52 Thursdays with a different free Epic title in each cell, all flowing into a single BAKLOG library row — duplicates auto-flagged where the same title appeared via Prime or a Steam free weekend", cta: "Roll up every free Thursday into one table", headlines: ["52 Thursdays. One library.", "Epic + Prime + GOG + Steam free weekends — all of them, in one place.", "Stop claiming games you cannot find.", "Free this week. Filterable forever."], shortPost: "Claim every Epic free Thursday, every Prime drop, every GOG giveaway. None of them helps you remember what you have. BAKLOG runs the fetchers and merges all of them into one local table you can filter, sort, and mark up. Even better — duplicates across stores auto-collapse so the same title from Prime and Steam shows once.", landing: "Hero with a real founder library count + breakdown by store, screenshot of the cross-store dedupe pill ('also on Epic / GOG / Prime'), and the 3-step Connect-Refresh-Browse quickstart", metrics: "Activation rate from Thursday/Friday claim-day traffic, ratio of users with 3+ stores connected within 24 hours" },
   ];
 
+  const MONETIZE_LANDSCAPE = [
+    { segment: "Multi-store launchers", players: "Playnite, GOG Galaxy 2.0", whatTheyDo: "Unify installed and owned games across stores; launch from one UI; metadata and playtime.", gap: "No deal intelligence, no backlog decision layer, no ownership-aware wishlist. Launchers want you inside their shell, not making purchase decisions.", roomFor: "BAKLOG sits above launchers as the decision dashboard — what to play, what to buy, what's on sale — without replacing how you launch." },
+    { segment: "Social / backlog trackers", players: "Backloggd, GG, Grouvee, Completionator, Infinite Backlog, HowLongToBeat", whatTheyDo: "Manual logging, ratings, reviews, social feeds, completion stats, HLTB time estimates.", gap: "Cloud accounts, manual entry, no automatic cross-store owned-library truth, no live deal fusion.", roomFor: "BAKLOG auto-imports real libraries from 10+ stores and layers status + deals on top of actual ownership data." },
+    { segment: "Deal / price trackers", players: "IsThereAnyDeal + Augmented Steam, GG.deals, CheapShark", whatTheyDo: "Price history, waitlists, alerts, authorized-store comparison, browser overlays on Steam.", gap: "Deal-only — no backlog status, no playtime, no 'you already own this on Epic' context.", roomFor: "BAKLOG already consumes ITAD pricing and fuses it with owned-library + backlog decisioning locally." },
+    { segment: "Steam-native organizers", players: "Depressurizer, Steam collections", whatTheyDo: "Auto-categorize Steam library by genre, year, HLTB, user score; push categories back into Steam.", gap: "Single-store, categorization-only; Depressurizer repo archived read-only Feb 2026.", roomFor: "BAKLOG is cross-store, actively developed, and a full decision + deal layer — not just Steam categories." },
+  ];
+
+  const MONETIZE_COMPETITORS = [
+    { name: "Playnite", segment: "Multi-store launcher", platform: "Windows desktop", model: "Free / OSS (MIT)", strength: "44+ store plugins, local-only data, IGDB metadata, controller-friendly fullscreen, active community, portable mode.", gap: "It is a launcher, not a decision or deal layer. Windows desktop app, not a web dashboard. Community connectors break when stores change APIs.", edge: "BAKLOG adds deal radar, ownership-aware picks, status workflow, and cross-store dedupe as a local web dashboard — complementary, not competitive on launch." },
+    { name: "GOG Galaxy 2.0", segment: "Multi-store launcher", platform: "Windows / macOS", model: "Free (GOG-owned)", strength: "Official client, cloud library sync across devices, DRM-free focus, social features.", gap: "Storefront-owned — library integration is no longer a focus. ~20 connectors, mostly community-maintained and decaying. IGDB-dependent; missing games break import.", edge: "BAKLOG is store-neutral with no walled-garden incentive. Local-first — credentials never leave the machine." },
+    { name: "Backloggd", segment: "Social / backlog tracker", platform: "Web only", model: "Free / ~$3 Patreon", strength: "Market leader (~650k users end-2025). Letterboxd-for-games UX. Active community, lists, reviews, stats. Solo dev, Patreon-funded.", gap: "Manual logging only. No store auto-import. No deals. Web-only — no native Android app. Social/review focus, not ownership truth.", edge: "BAKLOG auto-fetches real owned libraries across 10+ stores. Deal + ownership context built in. Magic-moment demo sells itself." },
+    { name: "GG (ggapp.io)", segment: "Social / backlog tracker", platform: "iOS + Android + web", model: "Freemium · $4.99/mo or $48.99/yr Elite", strength: "Only major tracker with native mobile apps. Clean UI, lists, replays (Elite), social discovery.", gap: "Cloud account required. Paywall called aggressive in reviews. Sluggish load times. No cross-store owned-library import. No deals.", edge: "Local-first, no account, no subscription. Ownership + deals without $4.99/mo." },
+    { name: "HowLongToBeat", segment: "Social / backlog tracker", platform: "Web", model: "Free", strength: "Definitive completion-time database. Community-contributed estimates (main / extra / 100%).", gap: "Time estimates only — minimal tracking, no library import, no deals, no cross-store view.", edge: "BAKLOG consumes HLTB as one enrichment input among many (reviews, deals, co-op, trophies) rather than being just the time DB." },
+    { name: "IsThereAnyDeal + Augmented Steam", segment: "Deal / price tracker", platform: "Web + browser extension", model: "Free · affiliate revenue", strength: "Authorized-store price comparison, waitlist/alerts, price history, Augmented Steam overlay on Steam pages. Trusted brand.", gap: "Deal-only. No backlog status, playtime, or cross-store ownership context.", edge: "BAKLOG integrates ITAD pricing locally and fuses it with owned-library + backlog decisioning — 'on sale AND you don't own it AND it's a quick win'." },
+    { name: "GG.deals", segment: "Deal / price tracker", platform: "Web", model: "Free · affiliate revenue", strength: "Multi-platform (PC, Xbox, PS, Switch). Price history, alerts, bundles. Platform context switch.", gap: "Deal-only. Includes grey-market resellers (filterable). No library management or backlog workflow.", edge: "Ownership-aware decisioning. Authorized-store focus. Owned games flagged so deals don't surface dupes." },
+    { name: "Depressurizer", segment: "Steam-native organizer", platform: "Windows desktop", model: "Free / OSS", strength: "Auto-categorize Steam library by genre, year, HLTB, user score, dev/publisher. Push categories into Steam.", gap: "Steam-only. Categorization-only — no deals, no cross-store, no status workflow. Repo archived read-only Feb 2026.", edge: "BAKLOG is cross-store, actively developed, and a full decision + deal layer — not just Steam categories." },
+  ];
+
   // ---------- State (localStorage) ----------
   function loadState() {
     try {
@@ -575,6 +593,7 @@
       }
       if (!parsed.triage) parsed.triage = defaultTriageFilters();
       if (!parsed.monetizeSection) parsed.monetizeSection = "vision";
+      if (parsed.monetizeSection === "compete") parsed.monetizeSection = "landscape";
       parsed.v = 2;
       return parsed;
     } catch {
@@ -1531,12 +1550,42 @@
         ),
       ));
       cards.push(ownerPref("market", "Write down assumptions you trust versus assumptions to validate.", "Assumptions I trust...\nAssumptions to validate..."));
-    } else if (section === "compete") {
+    } else if (section === "landscape") {
       cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Competitive set"),
-        el("p", { class: "muted" }, "Position BAKLOG as a local-first decision system, not just another launcher or pure deal feed."),
+        el("h2", {}, "Competitive landscape"),
+        el("p", {}, "BAKLOG is the only local-first tool that fuses ", el("strong", {}, "automatic cross-store owned-library ingestion"), " + ", el("strong", {}, "deal/price intelligence"), " + ", el("strong", {}, "backlog decisioning"), " in one no-account package."),
+        el("p", { class: "muted" }, "The market splits into four segments. Each solves one slice; none combines all three layers BAKLOG targets."),
+        el("h3", {}, "Market segments"),
+        ...MONETIZE_LANDSCAPE.map((s) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, s.segment),
+          el("p", { class: "muted", style: "margin:0 0 0.25rem" }, s.players),
+          el("p", { class: "finding-body" }, s.whatTheyDo),
+          el("p", { style: "margin:0" }, el("strong", {}, "Gap: "), s.gap),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Room for BAKLOG: "), s.roomFor),
+        )),
       ));
-      cards.push(ownerPref("compete", "Draft your positioning against launchers and wishlist tools.", "We win because..."));
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Competitor deep dives"),
+        ...MONETIZE_COMPETITORS.map((c) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, c.name),
+          el("p", { class: "muted", style: "margin:0 0 0.25rem" }, `${c.segment} · ${c.platform} · ${c.model}`),
+          el("p", { class: "finding-body" }, c.strength),
+          el("p", { style: "margin:0" }, el("strong", {}, "Gap: "), c.gap),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "BAKLOG edge: "), c.edge),
+        )),
+      ));
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Where BAKLOG is weak (honest read)"),
+        el("p", { class: "muted" }, "Credibility requires naming what incumbents do better today."),
+        el("ul", {},
+          el("li", {}, el("strong", {}, "No native mobile app: "), "GG wins on iOS/Android. BAKLOG is desktop-local only for now."),
+          el("li", {}, el("strong", {}, "Install friction: "), "Backloggd/GG offer instant web signup. BAKLOG requires Python + local server — reframed as the privacy moat, but it is real friction."),
+          el("li", {}, el("strong", {}, "No social/community layer: "), "Backloggd and GG have active feeds, follows, and reviews. BAKLOG is solo workflow — by design, but it limits viral growth."),
+          el("li", {}, el("strong", {}, "Smaller / younger: "), "Backloggd has 650k users and IGDB backing. BAKLOG is pre-launch with a founder library as proof."),
+          el("li", {}, el("strong", {}, "Manual credential setup: "), "Each store needs cookies/OAuth/API keys configured locally. No one-click cloud OAuth like hosted competitors."),
+        ),
+      ));
+      cards.push(ownerPref("compete", "Draft your positioning against launchers, trackers, and deal sites.", "We win because..."));
     } else if (section === "models") {
       cards.push(el("div", { class: "card agency-lane" },
         el("h2", {}, "Model iterations"),

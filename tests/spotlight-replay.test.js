@@ -258,6 +258,18 @@ describe("spotlight expanded categories", () => {
     })];
     expect(eyebrowFor(games, 6)).toBe("Weekend-sized");
   });
+
+  it("tags near-complete unfinished games as Almost mastered", () => {
+    state.personal = { "steam:7": { status: "unfinished" } };
+    const games = [libraryGame(7, { trophy_progress: 90 })];
+    expect(eyebrowFor(games, 7)).toBe("Almost mastered");
+  });
+
+  it("tags mid-progress unfinished games as Pick back up", () => {
+    state.personal = { "steam:8": { status: "unfinished" } };
+    const games = [libraryGame(8, { trophy_progress: 50 })];
+    expect(eyebrowFor(games, 8)).toBe("Pick back up");
+  });
 });
 
 describe("spotlight rotation safety", () => {

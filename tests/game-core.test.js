@@ -359,4 +359,11 @@ describe('trophyProgressPillHtml', () => {
     expect(html).toContain('73%');
     expect(html).toContain('PSN trophy completion: 73%');
   });
+
+  it('labels the tooltip per store', () => {
+    expect(trophyProgressPillHtml({ store: 'xbox', id: '1', trophy_progress: 50 }))
+      .toContain('Xbox achievement completion: 50%');
+    expect(trophyProgressPillHtml({ store: 'gog', id: '1', trophy_progress: 20 }))
+      .toContain('Completion: 20%');
+  });
 });

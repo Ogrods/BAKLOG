@@ -90,12 +90,11 @@ export function dealHeroCardHtml(g) {
   if (reviewPct) statPills.push(`<span class="deal-hero-stat" title="Steam review score"><span class="deal-hero-stat-dot deal-hero-stat-dot-review"></span>${reviewPct}</span>`);
   if (hltbLabel) statPills.push(`<span class="deal-hero-stat" title="HLTB main story"><span class="deal-hero-stat-dot deal-hero-stat-dot-hltb"></span>${hltbLabel}</span>`);
   const genreLine = genres.length
-    ? `<div class="deal-hero-genres">${genres.map(escapeHtml).join(" · ")}</div>`
+    ? `<span class="deal-hero-genres">${genres.map(escapeHtml).join(" · ")}</span>`
     : "";
   const statStrip = (statPills.length || genreLine)
     ? `<div class="deal-hero-stats">
-        ${statPills.length ? `<div class="deal-hero-stats-row">${statPills.join("")}</div>` : ""}
-        ${genreLine}
+        <div class="deal-hero-stats-row">${statPills.join("")}${genreLine}</div>
       </div>`
     : "";
   const heroBadges = [];

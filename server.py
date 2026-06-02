@@ -883,8 +883,29 @@ class RunManager:
             last_line_at = now
             last_stall_notice_at = 0.0
 
-        proc.wait()
-        run.exit_code = proc.returncode
+        # On cancel the HTTP thread already issued _terminate_pid(); re-issue
+        # here in case that missed (Windows AppX Python can survive the first
+        # taskkill), then never block the worker indefinitely — a lingering
+        # zombie must not wedge the queue. We finalize after a bounded wait so
+        # the next queued run can start regardless.
+        if run.cancelled and proc.poll() is None:
+            if proc.pid:
+                _terminate_pid(proc.pid)
+            try:
+                proc.wait(timeout=TERMINATE_GRACE_SEC)
+            except Exception:  # noqa: BLE001 - subprocess.TimeoutExpired or platform variants
+                run.add_line(
+                    "stderr",
+                    f"[server] PID {proc.pid} did not exit after kill; "
+                    f"abandoning it and advancing the queue",
+                )
+        else:
+            try:
+                proc.wait(timeout=TERMINATE_GRACE_SEC)
+            except Exception:  # noqa: BLE001
+                if proc.pid:
+                    _terminate_pid(proc.pid)
+        run.exit_code = proc.returncode if proc.returncode is not None else -1
         if run.cancelled:
             run.status = "cancelled"
             run.add_line("stderr", "[server] cancelled")

@@ -16,6 +16,7 @@ import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, dashboardLibraryGames } from './dashboard-shared.js';
+import { isSurfaceAnimating } from './library-count-animation.js';
 import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts } from './dashboard-charts.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
@@ -116,8 +117,21 @@ function applyMegaHeroCounters(stats) {
   for (const item of counters) {
     const node = document.getElementById(item.id);
     if (!node) continue;
-    if (_dashCountersInitialized) node.textContent = item.format(item.to);
-    else animateCount(node, 0, item.to, item.format, 900);
+    const prev = _dashLastCounters[item.id];
+    if (_dashCountersInitialized) {
+      // dashHeroCount may already be mid-roll from fireLibraryCountFlash; don't snap.
+      if (isSurfaceAnimating(node)) {
+        _dashLastCounters[item.id] = item.to;
+        continue;
+      }
+      if (item.id === 'dashHeroCount' && Number.isFinite(prev) && item.to > prev) {
+        animateCount(node, prev, item.to, item.format, 1000);
+      } else {
+        node.textContent = item.format(item.to);
+      }
+    } else {
+      animateCount(node, 0, item.to, item.format, 1000);
+    }
     _dashLastCounters[item.id] = item.to;
   }
   _dashCountersInitialized = true;
@@ -177,7 +191,7 @@ function renderDashboardMega(games) {
     <div class="dash-mega-hero">
       ${spotlight ? renderSpotlightHtml(spotlight) : ''}
       <div class="dash-hero-eyebrow">Your library</div>
-      <div class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(stats.total))}</div>
+      <span class="library-count-host" data-libcount-host><span class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(stats.total))}</span></span>
       <div class="dash-hero-sub">games owned across ${escapeHtml(String(stats.stores))} stores</div>
       <div class="dash-hero-tagline">
         <span><strong>${stats.completion}%</strong> complete</span>

@@ -47,7 +47,15 @@ import {
   setPersonal,
   savePersonal,
   bumpPersonalMemo,
+  removeManualGame,
+  addManualGame,
+  loadManualGames,
+  saveManualGames,
+  setGameHidden,
+  countUserHiddenLibrary,
+  countUserHiddenWishlist,
 } from './personal-storage.js';
+import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
 import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
 import { renderPicks } from './picks-ui.js';
@@ -189,6 +197,19 @@ function pushUndo({ label, undo }) {
   showUndoToast(label);
 }
 
+/** Snapshot personal keys, push undo that restores them (for hidden-panel restore, etc.). */
+export function pushPersonalUndo({ label, keys, afterUndo }) {
+  const snap = snapshotPersonalForKeys(keys);
+  pushUndo({
+    label,
+    undo: () => {
+      restorePersonalFromSnapshot(snap);
+      if (typeof window.updateHiddenGamesMenuCount === "function") window.updateHiddenGamesMenuCount();
+      afterUndo?.();
+    },
+  });
+}
+
 export function performUndo() {
   const entry = _undoStack.pop();
   if (!entry) return false;
@@ -264,6 +285,99 @@ export function bulkSetStatus(status) {
   pushUndo({
     label: `Set ${affectedKeys.length} game${affectedKeys.length === 1 ? "" : "s"} to ${statusLabel}`,
     undo: () => restorePersonalFromSnapshot(snap),
+  });
+}
+
+function snapshotRemoveState(keys) {
+  const personalSnap = snapshotPersonalForKeys(keys);
+  const manualSnap = [];
+  for (const key of keys) {
+    const g = findGameByKey(key);
+    if (g?.manual) manualSnap.push(JSON.parse(JSON.stringify(g)));
+  }
+  return { personalSnap, manualSnap };
+}
+
+function restoreRemoveSnapshot({ personalSnap, manualSnap }) {
+  restorePersonalFromSnapshot(personalSnap);
+  const manual = loadManualGames();
+  const restored = [...manualSnap];
+  const restoredKeys = new Set(manualSnap.map(g => `${g.store}:${g.id}`));
+  for (const m of manual) {
+    const k = `${m.store}:${m.id}`;
+    if (!restoredKeys.has(k)) restored.push(m);
+  }
+  saveManualGames(restored);
+  refreshAfterManualChange();
+}
+
+export function bulkRemove() {
+  const affectedKeys = [...state.selectedKeys];
+  if (!affectedKeys.length) return;
+  let customCount = 0;
+  let pulledCount = 0;
+  for (const key of affectedKeys) {
+    const g = findGameByKey(key);
+    if (g?.manual) customCount++;
+    else pulledCount++;
+  }
+  const parts = [];
+  if (customCount) parts.push(`${customCount} custom`);
+  if (pulledCount) parts.push(`${pulledCount} hidden`);
+  const detail = parts.length ? ` (${parts.join(", ")})` : "";
+  const ok = confirm(
+    `Remove ${affectedKeys.length} game${affectedKeys.length === 1 ? "" : "s"}${detail}?\n\n` +
+    "Custom entries are deleted. Pulled entries are hidden and can be restored from the kebab menu.",
+  );
+  if (!ok) return;
+  const snap = snapshotRemoveState(affectedKeys);
+  for (const key of affectedKeys) {
+    const g = findGameByKey(key);
+    if (!g) continue;
+    if (g.manual) {
+      removeManualGame(g.store, g.id);
+      delete state.personal[key];
+    } else setGameHidden(g, true, { silent: true });
+  }
+  savePersonal();
+  bumpPersonalMemo();
+  state.selectedKeys.clear();
+  updateBulkBar();
+  invalidateTableCache();
+  recomputeCrossStoreHidden();
+  refreshAfterManualChange();
+  renderTable();
+  renderSummary();
+  renderPicks();
+  if (state.activeView === "dashboard") scheduleDashboardRender();
+  if (typeof window.updateHiddenGamesMenuCount === "function") window.updateHiddenGamesMenuCount();
+  pushUndo({
+    label: `Removed ${affectedKeys.length} game${affectedKeys.length === 1 ? "" : "s"}`,
+    undo: () => {
+      restoreRemoveSnapshot(snap);
+      if (typeof window.updateHiddenGamesMenuCount === "function") window.updateHiddenGamesMenuCount();
+    },
+  });
+}
+
+const _pendingFlashKeys = new Set();
+
+function applyRowFlash(key) {
+  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (!row) return false;
+  row.classList.add("row-flash");
+  setTimeout(() => row.classList.remove("row-flash"), 2000);
+  _pendingFlashKeys.delete(key);
+  return true;
+}
+
+export function flashGameRow(key) {
+  _pendingFlashKeys.add(key);
+  focusGame(key);
+  requestAnimationFrame(() => {
+    if (!applyRowFlash(key) && _pendingFlashKeys.has(key)) {
+      setTimeout(() => applyRowFlash(key), 100);
+    }
   });
 }
 
@@ -779,6 +893,7 @@ function tryCompletePendingScroll(list) {
   markFocusedRow(key);
   focusRow(key);
   finishDrillScroll(key, smooth, hideOverlayOnComplete);
+  if (_pendingFlashKeys.has(key)) applyRowFlash(key);
   return true;
 }
 
@@ -1042,12 +1157,59 @@ export function renderSortIndicators() {
   });
 }
 
+export function formatRowCountText(view, list) {
+  const rows = list || [];
+  let base;
+  if (view === "wishlist") {
+    const onSale = rows.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
+    const lows = rows.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; }).length;
+    const dealBits = [];
+    if (onSale) dealBits.push(`${onSale} on sale`);
+    if (lows) dealBits.push(`${lows} at historical low`);
+    const tail = dealBits.length ? ` · ${dealBits.join(", ")}` : "";
+    base = `Wishlist: ${rows.length} of ${Math.max(0, state.wishlistGames.length - state.wishlistCrossStoreHiddenKeys.size - countUserHiddenWishlist())}${tail}`;
+  } else if (view === "itch") {
+    const total = state.itchGames.length;
+    const gamesOnly = state.itchGames.filter(itchIsGame).length;
+    const suffix = state.sessionPrefs.itchHideNonGames && gamesOnly !== total ? ` (${gamesOnly} games of ${total} items)` : "";
+    base = `Itch.io: ${rows.length} of ${state.itchGames.length}${suffix}`;
+  } else {
+    base = `Showing ${rows.length} of ${Math.max(0, state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))).length - countUserHiddenLibrary())} games`;
+  }
+  const extra = state.cleanupModeActive && view === "library" ? " · cleanup mode" : "";
+  return base + extra;
+}
+
+/** Keep #rowCount in sync with activeView (e.g. after tab switch before async renderTable finishes). */
+export function syncRowCountLabel() {
+  const el = document.getElementById("rowCount");
+  if (!el) return;
+  const view = state.activeView;
+  if (view === "dashboard" || view === "connections") return;
+  let list = state._visibleListView === view ? state._visibleList : null;
+  if (!Array.isArray(list)) {
+    const params = collectTableParams(state.sessionPrefs);
+    list = queryGames({
+      source: querySourceForView(state),
+      ctx: {
+        ...buildQueryContext(state, params),
+        hiddenKeys: view === "wishlist"
+          ? state.wishlistCrossStoreHiddenKeys
+          : state.crossStoreHiddenKeys,
+        ownedNormNames: state.ownedNormNames,
+      },
+    });
+  }
+  el.textContent = formatRowCountText(view, list);
+}
+
 export async function renderTable(opts) {
   const force = !!opts?.force;
   renderSortIndicators();
   const fp = tableFingerprint();
   if (!force && fp === _tableFingerprint && _lastRenderedView === state.activeView && state._visibleList && isTablePainted(state._visibleList)) {
     if (state._pendingFocusKey && state._visibleList) consumePendingFocus(state._visibleList);
+    syncRowCountLabel();
     if (isTablePerfEnabled()) {
       console.log('[baklog-perf] renderTable skipped (fingerprint cache hit)', { view: state.activeView, fpLen: fp.length });
     }
@@ -1162,25 +1324,7 @@ export async function renderTable(opts) {
     virtualWindow: perfRun?.meta?.virtualWindow,
   });
 
-  let base;
-  if (state.activeView === "wishlist") {
-    const onSale = list.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
-    const lows = list.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; }).length;
-    const dealBits = [];
-    if (onSale) dealBits.push(`${onSale} on sale`);
-    if (lows) dealBits.push(`${lows} at historical low`);
-    const tail = dealBits.length ? ` · ${dealBits.join(", ")}` : "";
-    base = `Wishlist: ${list.length} of ${state.wishlistGames.length - state.wishlistCrossStoreHiddenKeys.size}${tail}`;
-  } else if (state.activeView === "itch") {
-    const total = state.itchGames.length;
-    const gamesOnly = state.itchGames.filter(itchIsGame).length;
-    const suffix = state.sessionPrefs.itchHideNonGames && gamesOnly !== total ? ` (${gamesOnly} games of ${total} items)` : "";
-    base = `Itch.io: ${list.length} of ${state.itchGames.length}${suffix}`;
-  } else {
-    base = `Showing ${list.length} of ${state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))).length} games`;
-  }
-  const extra = state.cleanupModeActive && state.activeView === "library" ? " · cleanup mode" : "";
-  document.getElementById("rowCount").textContent = base + extra;
+  document.getElementById("rowCount").textContent = formatRowCountText(state.activeView, list);
   perfMark(perfRun, 'post:start');
   updateBulkBar();
   buildAlphaNav(list);

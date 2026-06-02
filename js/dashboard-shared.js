@@ -3,6 +3,8 @@
 
 import { state } from './state.js';
 import { gameKey } from './game-core.js';
+import { filterOutHidden } from './personal-storage.js';
+import { prefersReducedMotion } from './motion.js';
 
 export const ITCH_CLASS_LABELS = {
   game: "Games",
@@ -51,8 +53,6 @@ export const HLTB_BUCKETS = [
   { minExclusive: 40, maxInclusive: null, label: "HLTB 40h+" },
 ];
 
-import { prefersReducedMotion } from './motion.js';
-
 export function animateCount(el, from, to, format, durationMs = 900) {
   if (!el) return;
   if (prefersReducedMotion() || durationMs <= 0 || from === to) {
@@ -73,5 +73,5 @@ export function animateCount(el, from, to, format, durationMs = 900) {
 }
 
 export function dashboardLibraryGames() {
-  return state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
+  return filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
 }

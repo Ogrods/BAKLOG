@@ -4,14 +4,24 @@ import {
   loadManualGames,
   saveManualGames,
   addManualGame,
+  setGameHidden,
 } from './personal-storage.js';
 import { refreshAfterManualChange } from './library-load.js';
 import { download } from './filters-ui.js';
+import {
+  findDuplicateMatch,
+  duplicateMatchLabel,
+  duplicateMatchKey,
+} from './game-duplicate.js';
+import { flashGameRow } from './table-ui.js';
 
 let addGameTarget = "library";
+let _pendingAdd = null;
+/** @type {(() => void) | null} */
+let _bypassFor = null;
 
 export function setAddGameTarget(target) {
-  addGameTarget = target === "wishlist" ? "wishlist" : "library";
+  addGameTarget = target === "wishlist" ? "wishlist" : target === "itch" ? "itch" : "library";
   document.querySelectorAll(".add-target-btn").forEach(b => {
     b.classList.toggle("active", b.dataset.target === addGameTarget);
   });
@@ -21,6 +31,9 @@ export function setAddGameTarget(target) {
   if (addGameTarget === "wishlist") {
     titleEl.textContent = "Add to wishlist";
     hint.textContent = "Tracking a deal? Add an optional price and/or discount % and store URL. Discount-only entries still match On sale / Min discount filters even without a price.";
+  } else if (addGameTarget === "itch") {
+    titleEl.textContent = "Add to itch.io";
+    hint.textContent = "Type a title and click Search Steam to import cover/rating, or save without a match. The game will be saved under your chosen platform.";
   } else {
     titleEl.textContent = "Add a game";
     hint.textContent = "Type a title and click Search Steam. Pick the closest match to import its cover, Steam rating, and store link. The game will be saved under your chosen platform.";
@@ -31,8 +44,27 @@ function openAddGameModal() {
   const m = document.getElementById("addGameModal");
   m.classList.remove("hidden");
   m.classList.add("flex");
-  setAddGameTarget(state.activeView === "wishlist" ? "wishlist" : "library");
+  setAddGameTarget(state.activeView === "wishlist" ? "wishlist" : state.activeView === "itch" ? "itch" : "library");
   document.getElementById("addGameTitle").focus();
+}
+
+function hideDuplicateWarn() {
+  const box = document.getElementById("addGameDuplicateWarn");
+  if (box) box.classList.add("hidden");
+  _pendingAdd = null;
+}
+
+function showDuplicateWarn(match, onProceed) {
+  const box = document.getElementById("addGameDuplicateWarn");
+  const text = document.getElementById("addGameDuplicateText");
+  if (!box || !text) {
+    onProceed();
+    return;
+  }
+  const where = addGameTarget === "wishlist" ? "wishlist" : "library";
+  text.innerHTML = `This looks like <strong>${escapeHtml(duplicateMatchLabel(match, addGameTarget))}</strong> already in your ${where}.`;
+  _pendingAdd = onProceed;
+  box.classList.remove("hidden");
 }
 
 function closeAddGameModal() {
@@ -45,6 +77,24 @@ function closeAddGameModal() {
   document.getElementById("addGameWishPrice").value = "";
   document.getElementById("addGameWishDiscount").value = "";
   document.getElementById("addGameWishUrl").value = "";
+  hideDuplicateWarn();
+  _bypassFor = null;
+}
+
+function runWithDuplicateCheck(title, proceed) {
+  if (_bypassFor === proceed) {
+    _bypassFor = null;
+    proceed();
+    return;
+  }
+  _bypassFor = null;
+  const match = findDuplicateMatch(title, addGameTarget);
+  if (!match) {
+    hideDuplicateWarn();
+    proceed();
+    return;
+  }
+  showDuplicateWarn(match, proceed);
 }
 
 async function steamSearch(term) {
@@ -100,6 +150,7 @@ function applyWishlistMeta(game) {
 
 async function importSteamMatch(title, platform, match) {
   const status = document.getElementById("addGameStatus");
+  const doImport = async () => {
   status.textContent = "Pulling details from Steam...";
   const reviews = await steamAppReviews(match.id) || {};
   const isWishlist = addGameTarget === "wishlist";
@@ -135,12 +186,16 @@ async function importSteamMatch(title, platform, match) {
   status.textContent = `Saved "${game.name}" under ${where}.`;
   refreshAfterManualChange();
   setTimeout(closeAddGameModal, 700);
+  };
+  const name = title || match.name;
+  runWithDuplicateCheck(name, doImport);
 }
 
 function importTitleOnly() {
   const title = document.getElementById("addGameTitle").value.trim();
   const platform = document.getElementById("addGamePlatform").value;
   if (!title) { document.getElementById("addGameStatus").textContent = "Enter a title first."; return; }
+  const doImport = () => {
   const isWishlist = addGameTarget === "wishlist";
   const game = {
     store: isWishlist ? "wishlist" : platform,
@@ -172,6 +227,8 @@ function importTitleOnly() {
   document.getElementById("addGameStatus").textContent = `Saved "${title}" under ${where} (no Steam data).`;
   refreshAfterManualChange();
   setTimeout(closeAddGameModal, 700);
+  };
+  runWithDuplicateCheck(title, doImport);
 }
 
 export function bindAddGameModal() {
@@ -231,6 +288,25 @@ export function bindAddGameModal() {
     await importSteamMatch(titleEl.value.trim(), platformEl.value, match);
   });
   document.getElementById("addGameSkipSteam").addEventListener("click", importTitleOnly);
+
+  document.getElementById("addGameDupCancel")?.addEventListener("click", hideDuplicateWarn);
+  document.getElementById("addGameDupAnyway")?.addEventListener("click", () => {
+    const fn = _pendingAdd;
+    hideDuplicateWarn();
+    _bypassFor = fn;
+    if (fn) fn();
+  });
+  document.getElementById("addGameDupGo")?.addEventListener("click", () => {
+    const title = titleEl.value.trim();
+    const match = findDuplicateMatch(title, addGameTarget, { includeHidden: true });
+    const key = duplicateMatchKey(match);
+    hideDuplicateWarn();
+    closeAddGameModal();
+    if (match) setGameHidden(match, false, { silent: true });
+    if (key) flashGameRow(key);
+  });
+
+  titleEl.addEventListener("input", () => { _bypassFor = null; });
 
   document.getElementById("addGameExport").addEventListener("click", () => {
     download("steam-backlog-manual-games.json", JSON.stringify(loadManualGames(), null, 2), "application/json");

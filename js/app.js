@@ -30,6 +30,7 @@ import {
   loadPersonal,
   migrateV3,
   stripLegacyTags,
+  seedPreHiddenDefaults,
   configureDownstreamSync,
 } from './personal-storage.js';
 import {
@@ -97,6 +98,7 @@ async function bootstrap() {
   }
   migrateV3();
   stripLegacyTags();
+  seedPreHiddenDefaults();
   state.prefs.genreFilters = (state.prefs.genreFilters || []).map(aliasCanonicalGenre);
   const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch", "connections"]);
   if (VALID_VIEWS.has(state.prefs.activeView)) {

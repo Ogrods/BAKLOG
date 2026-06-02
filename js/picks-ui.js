@@ -17,7 +17,7 @@ import {
   dealDroppedBadgeHtml,
   isOwnedByTitle,
 } from './deals.js';
-import { getPersonal } from './personal-storage.js';
+import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { syncCoverFits } from './covers.js';
 
@@ -127,8 +127,8 @@ export function effectivePicksTab() {
 export function renderPicks() {
   const tab = effectivePicksTab();
   const pickView = state.activeView === "wishlist" ? "wishlist" : state.activeView === "itch" ? "itch" : "library";
-  const visibleLibrary = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
-  const visibleItch = state.itchGames;
+  const visibleLibrary = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
+  const visibleItch = filterOutHidden(state.itchGames);
   const visible = pickView === "itch" ? visibleItch : visibleLibrary;
   const backlogRated = visible
     .filter(g => getPersonal(g).status === "backlog" && ratingValue(g) > 0 && (pickView === "itch" || hasEnoughReviews(g)))

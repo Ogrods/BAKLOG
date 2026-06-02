@@ -320,9 +320,18 @@ export function singleStoreBadgeHtml(s, title) {
 }
 
 export function storeBadgeHtml(g) {
+  // When a manual row shares an id with a fetched row, each catalog entry keeps
+  // its own badge: manual rows show the dashed custom outline; fetched rows show
+  // cross-store ownership when applicable.
   const primary = normalizeGame(g).store;
   const owned = state.crossStoreOwnedStores.get(gameKey(g));
-  if (!owned || owned.length < 2) return singleStoreBadgeHtml(primary);
+  if (!owned || owned.length < 2) {
+    if (g.manual) {
+      const tip = `${primary.toUpperCase()} (custom)`;
+      return `<span class="store-badge ${primary} manual" title="${tip}">${storeLetter(primary)}</span>`;
+    }
+    return singleStoreBadgeHtml(primary);
+  }
   const tip = `Owned on: ${owned.map(s => s.toUpperCase()).join(", ")}`;
   return `<span class="inline-flex items-center gap-0.5 align-middle" title="${tip}">${owned.map(s => singleStoreBadgeHtml(s, tip)).join("")}</span>`;
 }

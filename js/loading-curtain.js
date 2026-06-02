@@ -46,6 +46,7 @@ export function liftBootCurtain(startedAt, opts = {}) {
     document.documentElement.removeAttribute("data-boot-loading");
     const ov = document.getElementById("bootLoadingOverlay");
     if (ov) ov.setAttribute("aria-busy", "false");
+    setTabsDisabled(false);
     _bootCurtainShownAt = null;
   };
   if (opts.force) {
@@ -97,8 +98,20 @@ export function getCurtainState() {
   };
 }
 
+function setTabsDisabled(disabled) {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll(".view-tab").forEach(b => {
+    b.disabled = !!disabled;
+    if (disabled) b.setAttribute("aria-disabled", "true");
+    else b.removeAttribute("aria-disabled");
+  });
+}
+
 if (typeof document !== "undefined") {
   markBootCurtainShown();
+  if (document.documentElement?.hasAttribute("data-boot-loading")) {
+    setTabsDisabled(true);
+  }
 }
 
 export {

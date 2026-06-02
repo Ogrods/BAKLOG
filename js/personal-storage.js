@@ -9,6 +9,7 @@ import {
   getTitleKeyIndex,
   normalizeNameForDedup,
 } from './game-core.js';
+import { PRE_HIDDEN_KEYS, getPreHiddenFallback } from './hidden-defaults.js';
 
 const personalMemo = createMemo();
 
@@ -110,13 +111,23 @@ configurePersonalStore({
   setManualGames: (list) => { manualGames = list; },
 });
 
-const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null };
-const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null });
+const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false };
+const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false });
 
-const META_KEYS = new Set(["__migrated_v3", "__notes_canonicalized_v1", "__tags_removed_v1"]);
+const META_KEYS = new Set(["__migrated_v3", "__notes_canonicalized_v1", "__tags_removed_v1", "__pre_hidden_v1_seeded"]);
 
 function isMetaPersonalKey(key) {
   return META_KEYS.has(key) || String(key).startsWith("__");
+}
+
+function normalizePersonalRecord(found) {
+  return {
+    status: found.status ?? "backlog",
+    notes: found.notes ?? "",
+    priority: found.priority ?? 0,
+    hltb_override: found.hltb_override === undefined ? null : found.hltb_override,
+    hidden: found.hidden === true,
+  };
 }
 
 export function getPersonal(g) {
@@ -125,11 +136,7 @@ export function getPersonal(g) {
   return personalMemo.get(`${key}:${ver}`, () => {
     const found = state.personal[key] || (typeof state.personal[gameId(g)] === "object" ? state.personal[gameId(g)] : null);
     if (!found) return PERSONAL_EMPTY;
-    if (found.status == null) found.status = "backlog";
-    if (found.notes == null) found.notes = "";
-    if (found.priority == null) found.priority = 0;
-    if (found.hltb_override === undefined) found.hltb_override = null;
-    return found;
+    return normalizePersonalRecord(found);
   });
 }
 
@@ -267,6 +274,92 @@ export function setPersonal(g, field, value, options) {
   setPersonalByKey(gameKey(g), field, value, options);
 }
 
+export function isGameHidden(g) {
+  return getPersonal(g).hidden === true;
+}
+
+export function filterOutHidden(list) {
+  return list.filter(g => !isGameHidden(g));
+}
+
+/** One-shot: seed pre-hidden defaults from former fetcher denylists. */
+export function seedPreHiddenDefaults() {
+  if (state.personal.__pre_hidden_v1_seeded) return false;
+  let changed = false;
+  for (const { key } of PRE_HIDDEN_KEYS) {
+    if (state.personal[key]) continue;
+    state.personal[key] = { ...PERSONAL_DEFAULT, hidden: true };
+    changed = true;
+  }
+  state.personal.__pre_hidden_v1_seeded = true;
+  window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
+  savePersonal();
+  return changed;
+}
+
+export function setGameHidden(g, hidden, options) {
+  setPersonalByKey(gameKey(g), "hidden", !!hidden, options);
+}
+
+function entryDisplayName(entry) {
+  if (entry.game?.name) return entry.game.name;
+  if (entry.fallbackName) return entry.fallbackName;
+  return entry.key;
+}
+
+/** Keys with user-hidden flag (game may still exist in catalog). */
+export function listUserHiddenEntries() {
+  const out = [];
+  for (const [key, rec] of Object.entries(state.personal)) {
+    if (isMetaPersonalKey(key)) continue;
+    if (!rec || rec.hidden !== true) continue;
+    const g = findGameByKey(key);
+    const fallback = g ? null : getPreHiddenFallback(key);
+    out.push({
+      key,
+      game: g || null,
+      status: rec.status || "backlog",
+      notes: String(rec.notes || ""),
+      fallbackName: fallback?.name || null,
+      fallbackStore: fallback?.store || null,
+    });
+  }
+  out.sort((a, b) => entryDisplayName(a).localeCompare(entryDisplayName(b)));
+  return out;
+}
+
+export function countUserHiddenGames() {
+  let n = 0;
+  for (const [key, rec] of Object.entries(state.personal)) {
+    if (isMetaPersonalKey(key)) continue;
+    if (rec?.hidden === true) n++;
+  }
+  return n;
+}
+
+export function countUserHiddenLibrary() {
+  let n = 0;
+  for (const [key, rec] of Object.entries(state.personal)) {
+    if (isMetaPersonalKey(key)) continue;
+    if (rec?.hidden !== true) continue;
+    if (String(key).startsWith("wishlist:")) continue;
+    n++;
+  }
+  return n;
+}
+
+export function countUserHiddenWishlist() {
+  let n = 0;
+  for (const [key, rec] of Object.entries(state.personal)) {
+    if (isMetaPersonalKey(key)) continue;
+    if (rec?.hidden !== true) continue;
+    if (!String(key).startsWith("wishlist:")) continue;
+    n++;
+  }
+  return n;
+}
+
 /**
  * Personal keys whose game is no longer present in any loaded catalog.
  *
@@ -285,6 +378,7 @@ export function findOrphanPersonalKeys() {
     const notes = String(rec.notes || "").trim();
     const hltbOverride = rec.hltb_override;
     const hasData = Boolean(
+      rec.hidden === true ||
       (status && status !== "backlog") ||
       notes ||
       (hltbOverride != null && hltbOverride !== ""),

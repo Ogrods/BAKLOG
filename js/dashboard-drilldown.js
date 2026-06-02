@@ -26,14 +26,6 @@ function dashResetLibraryFiltersExceptDedup() {
   syncFilterDomFromState();
 }
 
-/**
- * Land a dashboard drill-in just above the search bar (toolbar section).
- * Scroll is deferred until picks/summary layout settles.
- */
-export function scrollDrillResultsIntoView() {
-  setPendingScrollTarget({ kind: "toolbar", smooth: false });
-}
-
 export function dashDrillStore(store) {
   dashResetLibraryFiltersExceptDedup();
   state.prefs.storeFilter = store || "";
@@ -41,7 +33,6 @@ export function dashDrillStore(store) {
   setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderStoreChips();
-  refreshFilterUI();
 }
 
 export function dashDrillStatus(status) {
@@ -52,7 +43,6 @@ export function dashDrillStatus(status) {
   setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderStoreChips();
-  refreshFilterUI();
 }
 
 export function dashDrillStoreStatus(store, status) {
@@ -64,7 +54,6 @@ export function dashDrillStoreStatus(store, status) {
   setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderStoreChips();
-  refreshFilterUI();
 }
 
 export function dashFinishDrillToLibrary() {
@@ -73,7 +62,6 @@ export function dashFinishDrillToLibrary() {
   switchView("library");
   renderStoreChips();
   renderGenreChips();
-  refreshFilterUI();
 }
 
 export function dashSetReleaseYear(value) {
@@ -105,7 +93,6 @@ export function dashDrillGenre(genre) {
   setPendingScrollTarget({ kind: "toolbar" });
   switchView("library");
   renderGenreChips();
-  refreshFilterUI();
 }
 
 export function dashDrillItchGenre(genre) {
@@ -115,7 +102,6 @@ export function dashDrillItchGenre(genre) {
   setPendingScrollTarget({ kind: "toolbar" });
   switchView("itch");
   renderGenreChips();
-  refreshFilterUI();
 }
 
 export function dashDrillCoop({ online = false, local = false, any = false } = {}) {

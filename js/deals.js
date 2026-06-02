@@ -12,6 +12,7 @@ import {
   wishlistBadgeHtml,
   earlyAccessRibbonHtml,
   parseReleaseForSort,
+  combinedPlaytime,
 } from './game-core.js';
 import { isPlatformToken } from './genres.js';
 import { getPersonal } from './personal-storage.js';
@@ -279,7 +280,7 @@ export function isOwnedByTitle(name) {
 export function isCleanupCandidate(g) {
   const p = getPersonal(g);
   if (p.status !== "backlog") return false;
-  if ((g.playtime_minutes || 0) > 0) return false;
+  if (combinedPlaytime(g) > 0) return false;
   const rating = ratingValue(g);
   if (rating > 0 && rating >= CLEANUP_MAX_RATING) return false;
   const released = parseReleaseForSort(g.release_date);

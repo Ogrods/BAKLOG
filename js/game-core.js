@@ -3,12 +3,12 @@ import { escapeHtml, escapeAttr } from './dom-util.js';
 import { isEarlyAccess } from './table-query.js';
 import { STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { getPersonal, hasPersonalEntry } from './personal-storage.js';
+import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
 
 // === Constants & config ===
 export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "other", "manual"];
 export const JUNK_NAMES = new Set([
   "live",
-  "fortnite",
   "hbo max",
   "hbo go",
   "shadow costume for sonic",
@@ -48,6 +48,43 @@ export function normalizeNameForDedup(name) {
     .replace(/\b(remastered|edition|complete|gold|definitive|enhanced|classic|goty|of the year|game of the year|special|standard|deluxe|collection|anthology|pack|the)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Resolved at first call to keep startup ordering simple. Map<normalizedName, { coop_online?, coop_local? }>.
+ */
+let _coopOverrideMap = null;
+
+function coopOverrideMap() {
+  if (_coopOverrideMap) return _coopOverrideMap;
+  _coopOverrideMap = new Map();
+  for (const o of COOP_NAME_OVERRIDES) {
+    const norm = normalizeNameForDedup(o.name);
+    if (!norm) continue;
+    _coopOverrideMap.set(norm, o);
+  }
+  return _coopOverrideMap;
+}
+
+/**
+ * Applies COOP_NAME_OVERRIDES to a freshly-loaded library row.
+ *
+ * Mutates the row in place. Steam rows are skipped — fetch_games.py is
+ * authoritative for Steam co-op flags. Override flags only ever turn co-op
+ * ON (never clear an existing true), so a future Steam category change can't
+ * silently override our hand-set non-Steam flags.
+ */
+export function applyCoopOverrides(g) {
+  if (!g) return g;
+  const store = (g.store || "").toLowerCase();
+  if (store === "steam") return g;
+  const norm = normalizeNameForDedup(g.name);
+  if (!norm) return g;
+  const o = coopOverrideMap().get(norm);
+  if (!o) return g;
+  if (o.coop_online) g.coop_online = true;
+  if (o.coop_local) g.coop_local = true;
+  return g;
 }
 
 export function isJunkEntry(g) {
@@ -95,6 +132,7 @@ export function scoreEntry(g) {
 export function recomputeCrossStoreHidden() {
   state.crossStoreHiddenKeys = new Set();
   state.crossStoreOwnedStores = new Map();
+  state.crossStorePlaytimeByKey = new Map();
   const groups = new Map();
   for (const g of state.allGames) {
     const norm = normalizeNameForDedup(g.name);
@@ -119,12 +157,49 @@ export function recomputeCrossStoreHidden() {
       state.crossStoreOwnedStores.set(gameKey(list[0]), orderedStores);
     }
     if (state.sessionPrefs.crossStoreDedup) {
+      const repKey = gameKey(list[0]);
+      let total = 0;
+      const perStore = [];
+      for (const g of list) {
+        const minutes = Math.max(0, Number(g.playtime_minutes) || 0);
+        total += minutes;
+        perStore.push({ store: normalizeGame(g).store, minutes });
+      }
+      // Only record an aggregate when at least one sibling has playtime;
+      // otherwise combinedPlaytime() can short-circuit to the raw value.
+      if (total > 0) {
+        state.crossStorePlaytimeByKey.set(repKey, { total, perStore });
+      }
       for (let i = 1; i < list.length; i++) {
         state.crossStoreHiddenKeys.add(gameKey(list[i]));
       }
     }
   }
   recomputeWishlistCrossStore();
+}
+
+/**
+ * Returns the playtime to display for a row. For cross-store dedup
+ * representatives this is the SUM across every store in the group; otherwise
+ * the row's own `playtime_minutes`. Always returns a finite number (0 when no
+ * data). Read-only — there is no UI for editing this value.
+ */
+export function combinedPlaytime(g) {
+  if (!g) return 0;
+  const entry = state.crossStorePlaytimeByKey?.get(gameKey(g));
+  if (entry) return entry.total;
+  return Math.max(0, Number(g.playtime_minutes) || 0);
+}
+
+/** Title-attribute breakdown like "Steam: 12.3h · PSN: 4.7h". Empty when no aggregate. */
+export function combinedPlaytimeTooltip(g) {
+  const entry = state.crossStorePlaytimeByKey?.get(gameKey(g));
+  if (!entry) return "";
+  const parts = entry.perStore
+    .filter(p => p.minutes > 0)
+    .map(p => `${p.store.toUpperCase()}: ${(p.minutes / 60).toFixed(1)}h`);
+  if (parts.length < 2) return "";
+  return `Combined across stores — ${parts.join(" · ")}`;
 }
 
 export function wishlistEntryStore(g) {
@@ -228,6 +303,22 @@ export function storeUrlForGame(g) {
   if (ng.store === "gog" && url.startsWith("/")) {
     return "https://www.gog.com" + url;
   }
+  // PSN: prefer the store concept page over the cached store_url. Historical
+  // data on disk often has a psnprofiles trophy URL even when a concept_id is
+  // present (cross-platform dedup inherited concept_id but kept the
+  // trophy-fallback URL). Skip the generic store_url short-circuit for PSN so
+  // the resolver below can pick the concept page first.
+  if (ng.store === "psn") {
+    if (ng.concept_id) {
+      return `https://store.playstation.com/en-us/concept/${ng.concept_id}`;
+    }
+    // No concept_id — send users to PSN store search instead of the cached
+    // trophy URL, which isn't a store link at all.
+    if (ng.name) {
+      return `https://store.playstation.com/en-us/search/${encodeURIComponent(ng.name)}`;
+    }
+    return "https://store.playstation.com/en-us/";
+  }
   if (url && url.startsWith("http") && !isGenericStoreUrl(url)) {
     if (ng.store === "epic" && url.includes("/p/")) {
       const slug = url.split("/p/").pop()?.split(/[?#]/)[0] || "";
@@ -241,9 +332,6 @@ export function storeUrlForGame(g) {
   }
   if (ng.store === "gog" && ng.gog_id) {
     return `https://www.gog.com/en/game/${ng.gog_id}`;
-  }
-  if (ng.store === "psn" && ng.concept_id) {
-    return `https://store.playstation.com/en-us/concept/${ng.concept_id}`;
   }
   if (ng.store === "epic") {
     return `https://store.epicgames.com/en-US/browse?q=${encodeURIComponent(ng.name || "")}`;

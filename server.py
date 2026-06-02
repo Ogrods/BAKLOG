@@ -9,7 +9,8 @@ browser changes, port changes, and cache wipes.
 Endpoints:
     GET  /api/runs                 -> {active, queue, history}
     POST /api/run/<key>            -> {run_id, status}    (queues a fetcher)
-    POST /api/run/<run_id>/cancel  -> cancel queued or running fetcher
+    POST /api/run/<run_id>/cancel  -> cancel one queued or running fetcher
+    POST /api/runs/cancel          -> cancel all in-flight fetchers (active + queue)
     GET  /api/stream/<run_id>      -> SSE: line / done / error events
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
@@ -434,6 +435,12 @@ class Run:
             elif self.status == "running":
                 self.cancelled = True
                 proc = self._proc
+                if proc is None:
+                    # Worker marked running but subprocess not started yet.
+                    self.status = "cancelled"
+                    self.exit_code = -1
+                    self.ended_at = time.time()
+                    notify_done = True
             else:
                 return False
         if notify_done:
@@ -450,15 +457,10 @@ class Run:
             )
             return True
         if proc is not None and proc.poll() is None:
-            try:
-                proc.terminate()
-            except Exception:  # noqa: BLE001
-                pass
-            try:
-                proc.wait(timeout=TERMINATE_GRACE_SEC)
-            except Exception:  # noqa: BLE001 - includes TimeoutExpired
-                if proc.pid:
-                    _terminate_pid(proc.pid)
+            # Force-kill immediately so POST /cancel returns and the single HTTP
+            # thread is not wedged while GOG/itch subprocesses ignore SIGTERM.
+            if proc.pid:
+                _terminate_pid(proc.pid)
         return True
 
 
@@ -543,6 +545,19 @@ class RunManager:
         with self._lock:
             if any(r.key == key and r.status in ("queued", "running") for r in self._pending):
                 raise ValueError(f"{key} already queued or running")
+            # Enforce a global cap of one active + one queued. Fetchers can take
+            # minutes (PSN, Xbox, itch.io), and a backlog of three or four runs
+            # made cancelling/replanning impossible without restarting the
+            # server. Anything beyond "next up" should be re-queued by the user
+            # after the current one finishes.
+            in_flight = sum(
+                1 for r in self._pending if r.status in ("queued", "running")
+            )
+            if in_flight >= 2:
+                raise ValueError(
+                    "queue full — one run is in progress and one is queued; "
+                    "wait for a slot before submitting another"
+                )
         run = Run(key, refresh=refresh, runs_dir=self._runs_dir)
         with self._lock:
             self._pending.append(run)
@@ -563,6 +578,19 @@ class RunManager:
             if run in self._pending:
                 self._pending.remove(run)
         return run, None
+
+    def cancel_all(self) -> list[dict[str, Any]]:
+        """Cancel every queued or running fetcher (active + next in queue)."""
+        with self._lock:
+            targets = [
+                r for r in self._pending if r.status in ("queued", "running")
+            ]
+        summaries: list[dict[str, Any]] = []
+        for run in targets:
+            cancelled, err = self.cancel(run.id)
+            if cancelled is not None and err is None:
+                summaries.append(cancelled.to_summary())
+        return summaries
 
     def get(self, run_id: str) -> Run | None:
         with self._lock:
@@ -781,6 +809,9 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802 - http.server API
+        if self.path.rstrip("/") == "/api/runs/cancel":
+            self._handle_cancel_all()
+            return
         if self.path.startswith("/api/run/"):
             rest = self.path[len("/api/run/"):].strip("/")
             if rest.endswith("/cancel"):
@@ -923,6 +954,10 @@ class Handler(SimpleHTTPRequestHandler):
             return
         assert run is not None
         _send_json(self, HTTPStatus.OK, run.to_summary())
+
+    def _handle_cancel_all(self) -> None:
+        summaries = MANAGER.cancel_all()
+        _send_json(self, HTTPStatus.OK, {"cancelled": summaries})
 
     def _handle_auth_status(self) -> None:
         try:

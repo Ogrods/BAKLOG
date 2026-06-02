@@ -52,8 +52,13 @@ def _number_tokens(s: str) -> set[str]:
     return set(re.findall(r"\b(\d+)\b", s))
 
 
+_SPINOFF_MARKERS = re.compile(
+    r"\b(director|artbook|soundtrack|wallpaper|dlc|upgrade|deluxe|bundle|pack|skin|ost)\b"
+)
+
+
 def _close_enough_title(target: str, candidate: str) -> bool:
-    """Substring fallback for Steam store search — reject obvious sequels."""
+    """Substring fallback for Steam store search — reject sequels and spin-offs."""
     if not candidate:
         return False
     if candidate == target:
@@ -61,8 +66,17 @@ def _close_enough_title(target: str, candidate: str) -> bool:
     if candidate not in target and target not in candidate:
         return False
     # e.g. "death stranding" must not match "death stranding 2 on beach"
-    extra = _number_tokens(candidate) - _number_tokens(target)
-    return not extra
+    if _number_tokens(candidate) - _number_tokens(target):
+        return False
+    if not candidate.startswith(target):
+        return False
+    suffix = candidate[len(target) :].strip()
+    if not suffix:
+        return True
+    if _SPINOFF_MARKERS.search(suffix):
+        return False
+    # Allow short subtitles only (e.g. "death stranding 2" -> "… on beach")
+    return len(suffix.split()) <= 2
 
 
 def normalize(name: str) -> str:

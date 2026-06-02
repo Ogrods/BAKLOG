@@ -238,7 +238,7 @@
       tagline: "Make it survive bad inputs, second contributors, and the first stranger who tries to install it.",
       items: [
         { id: "p3_games_backup", label: "[DONE] Rotated backups of games_*.json + itad_prices.json — shared/safe_write.py wired through fetchers/_base.py + fetch_itad.py; data/games_backups/<stem>/ keeps last 10" },
-        { id: "p3_gitattributes", label: ".gitattributes file: stop the LF/CRLF warnings on every commit" },
+        { id: "p3_gitattributes", label: "[DONE] .gitattributes file — LF in repo, CRLF for .bat/.cmd/.ps1, binary for images/fonts/archives. Stops the per-commit LF/CRLF warning noise. See find_crlf for the one-time renormalize step." },
         { id: "p3_license", label: "[DONE] LICENSE file added (MIT) — repo root + pyproject.toml + package.json + README header link" },
         { id: "p3_js_tests", label: "JS test runner (Vitest) + first tests for table-query, dedup, normalization" },
         { id: "p3_js_tests_deals", label: "Vitest: deals.js — getDealInfo ITAD-over-Steam precedence, dealLowBadgeHtml lowKind branches, dealShopShort fallback" },
@@ -248,9 +248,9 @@
         { id: "p3_js_tests_dedup_state", label: "Vitest: game-core.recomputeCrossStoreHidden — small state fixture; expected hidden keys match store-priority order; respects sessionPrefs.crossStoreDedup" },
         { id: "p3_ci", label: "[DONE] GitHub Actions: ruff (advisory) + Python pytest + JS vitest on push/PR to main/master — see .github/workflows/ci.yml" },
         { id: "p3_ci_ruff_required", label: "Make ruff lint a required CI gate — clean the ~150 inherited warnings (81 E501 long-line, 26 F401 unused-import, 24 UP017 datetime-timezone-utc, 14 I001 unsorted-imports, 5 UP035/UP012 modernization), flip continue-on-error→false in ci.yml" },
-        { id: "p3_drill_anchor_audit", label: "Drill-in scroll audit (FULL) — unify the scroll-target story across spotlight / picks-versus / itch-hero / category drills / focusGame. Spotlight 2nd-click stays at top when picks is open, category drills land in different spots, picks-deferred reanchor only half-fixes it. See find_drill_anchor_inconsistent for repros + architectural seams." },
+        { id: "p3_drill_anchor_audit", label: "[DONE] Drill-in scroll unification — pendingScrollTarget in table-ui.js. Follow-up: find_drill_post_scroll_jump (~20–30px table shift after dashboard→library/itch drill; shelved as acceptable for now)." },
         { id: "p3_error_boundary", label: "[DONE] Global window.onerror + unhandledrejection handler that surfaces a toast — js/error-boundary.js, installs on app boot, top-right red sticky toast with Copy/Details/Dismiss; debug overlay shows running error count; window.__baklogErrors holds the session log" },
-        { id: "p3_debug_overlay", label: "?debug=1 overlay: data version, last render ms, table fingerprint, active filter count, current view" },
+        { id: "p3_debug_overlay", label: "[DONE] ?debug=1 overlay — js/debug-overlay.js polls state every 500ms in a corner panel: view · _dataVersion · visible row count · active filter count · tableFingerprint · last renderTable totalMs · captured-error count. Enables via ?debug=1 or sticky localStorage 'baklog-debug=1'." },
         { id: "p3_fetcher_backoff", label: "Fetcher backoff: after N consecutive auth failures, the chip says 'Reconnect required' instead of retrying silently" },
         { id: "p3_readme_install", label: "README install section verified by a fresh clone on a new Windows machine" },
         { id: "p3_changelog_discipline", label: "[DONE] SemVer source-of-truth (pyproject.toml + package.json) + Release discipline block in CHANGELOG documenting the bump → rename Unreleased → tag workflow. First tag push is a user action." },
@@ -307,8 +307,10 @@
       body: "Done. The 6 live-filter controls (search, statusFilter, unplayedOnly, earlyAccessOnly, minRating, maxHours) now live in state.sessionPrefs — the same session-scoped pattern as crossStoreDedup and itchHideNonGames. collectTableParams(sessionPrefs) takes prefs as a parameter so the worker import graph stays DOM-free. New prefs.js::syncFilterDomFromState() helper pushes state into the visible controls (used by drill-ins, pill removal, clear-all, and the wishlist switchView reset). Every DOM read of those 6 ids has been replaced: bind-events.js (main input handler + status chip click + wishlist reset + tbody sort guard), filters-ui.js (collectActiveFilters, removeActiveFilter, clearAllFilters, switchView, renderSummary), dashboard-drilldown.js (dashResetLibraryFiltersExceptDedup + every dashDrill* writer), game-core.js renderStatusChipsHtml, table-ui.js tableFingerprint. Boot path calls syncFilterDomFromState() so the controls match the freshly-loaded session defaults. 4 new Vitest tests in tests/table-query.test.js cover collectTableParams(sessionPrefs): empty/missing args → defaults, full prefs → expected shape, stringy slider values → coerced to numbers. Net effect: a regression where a filter changes but its DOM input doesn't (or vice versa) is now structurally impossible." },
     { id: "find_prefs_quartet", area: "Arch", severity: "grey", title: "[RESOLVED] applyPrefsChange(patch, options) helper added; quartet sites migrated",
       body: "Done. New filters-ui.js::applyPrefsChange(patch, options) consolidates the savePrefs + syncFilterDomFromState + recomputeCrossStoreHidden + renderSummary + refreshFilterUI dance into one call. Patch shape: { prefs?, sessionPrefs? } shallow-merged into state.prefs / state.sessionPrefs. Options: { recomputeDedup, refresh, debounced, refreshOptions, renderers, skipDomSync, persist }. Behaviour: persistent prefs auto-savePrefs() when patch.prefs present; session prefs auto-syncFilterDomFromState() unless skipDomSync; recomputeDedup runs recomputeCrossStoreHidden + renderSummary before the refresh; renderers run before the refresh (errors caught + warned).\n\nMigrated sites: filters-ui.js::removeActiveFilter (huge switch — 25 cases collapsed to one-liners each), filters-ui.js::clearAllFilters (single call replaces 25 lines), bind-events.js (bindDealCheckbox factory, dealMinDiscount slider, dealMaxPrice slider, resetDealFiltersBtn, genreMode, wishlistStoreChips, summary status/store/deal chips, summary-wishlist-reset, crossStoreDedup toggle, genreChips, tagChips, tagFilterMode). Dropped now-dead imports of recomputeCrossStoreHidden, syncFilterDomFromState from bind-events.js.\n\nLeft alone: the 6 sessionPref input handler (already minimal — DOM-already-synced path), picks/score-column toggles (toggle a class or render picks, different concern), dashboard-drilldown.js (reset-then-route around switchView is a different shape — has its own dashFinishDrillToLibrary consolidation already). Lives in filters-ui.js (not prefs.js) to avoid a circular import; every dependency was already imported there.\n\nFollow-up not done: a Vitest test for applyPrefsChange — would require mocking the filters-ui import tree (table-ui, dashboard, picks-ui) which is out of scope. The 63 existing tests still pass after the migration." },
-    { id: "find_drill_anchor_inconsistent", area: "Arch", severity: "amber", title: "Drill-in anchoring — unified pendingScrollTarget landed (verify spotlight repeat)",
-      body: "Partial fix 2026-06-01. Replaced four overlapping scroll paths (paintTableBody pre-picks scrollTop, consumePendingFocus→requestScrollToIndex, finishDrillScroll 2-rAF, deferChrome reanchorPickedRow) with one pendingScrollTarget descriptor in table-ui.js: setPendingScrollTarget / consumePendingScrollTarget / scheduleScrollAfterLayoutSettled. Row drills (focusGame) defer scroll until after deferChrome paints picks+summary when picks is open or view is crossing; category drills (dashDrill*) set kind=toolbar and consume after refreshFilterUI layout settles. paintTableBody no longer scrolls on anchor — only paints the virtual window. Removed state._anchorScrollHandled. 4 Vitest cases in tests/drill-anchor.test.js cover toolbar vs row consumption and single-fire semantics.\n\nStill open until user verifies: (A) spotlight 2nd-click with picks open — may also involve spotlight innerHTML rotation in dashboard-spotlight.js; (C) spotlight-only vs other dash-list-jump targets. Acceptance criteria 2–3 (Nth invocation + picks expanded/collapsed integration test with full renderTable mock) not yet covered." },
+    { id: "find_drill_anchor_inconsistent", area: "Arch", severity: "grey", title: "[RESOLVED] Drill-in scroll — unified pendingScrollTarget",
+      body: "Done 2026-06-01. Replaced four overlapping scroll paths with one pendingScrollTarget descriptor in table-ui.js (setPendingScrollTarget / consumePendingScrollTarget / scheduleScrollAfterLayoutSettled). Row drills defer scroll via requestIdleCallback deferChrome (summary + picks, then consume); category drills use kind=toolbar. Vitest in tests/drill-anchor.test.js. Minor post-scroll table shift tracked separately as find_drill_post_scroll_jump." },
+    { id: "find_drill_post_scroll_jump", area: "UX", severity: "grey", title: "Drill-in: ~20–30px table shift after scroll lands (shelved)",
+      body: "Known issue, accepted for now (2026-06-02). Repro: dashboard → library or itch via spotlight or scatter single-point; summary row stays put, table content jumps down ~20–30px shortly after landing. Wishlist drill does not reproduce. Attempted mitigations reverted (sync summary+picks before table, #summary min-height, afterChrome ResizeObserver, compensateScrollForPicksExpand, drill-probe diagnostic). Root cause not identified — likely deferred chrome (summary/picks) or content between summary and tableShell. Revisit with scroll-anchor polyfill or layout snapshot once it annoys enough." },
 
     // UX
     { id: "find_ux_dash_rotation", area: "UX", severity: "grey", title: "Dashboard spotlight rotation may be calmer-off",
@@ -351,6 +353,14 @@
       body: "Done across three phases. Phase A (table-perf.js): opt-in instrumentation via ?perf=1, per-renderTable marks (query / chrome / paint / post), chunk samples in window.__baklogPerf. Phase B / B+: removed anchor-sync (no more painting 0…anchorIndex sync), added _pendingScroll + requestScrollToIndex, drill-in loading overlay that survives until the row centers, refreshFilterUI({ drillIn }) defers renderSummary + renderPicks to requestIdleCallback, updateViewChrome skips its own renderSummary on drill. Phase C: true viewport windowing — usesVirtualScroll() for >50 rows, paintVirtualSlice() keeps only ~viewport + 10 overscan rows in the DOM, top/bottom spacer <tr>s preserve total scroll height (ROW_HEIGHT=76 must match .games-table tbody tr in app.css), scheduleVirtualScrollUpdate() repaints on scroll/resize via rAF, drill / A–Z / keyboard scroll by index→pixel offset and paint the window around that row, syncCoverFits deferred to requestIdleCallback. Back-to-top now snaps instant (smooth scroll through 1700+ fixed rows was the source of the 3s freeze) and stacks above the A–Z rail. Open polish: (a) updateRowInPlace edits to off-window rows are silently dropped — pre-existing tradeoff, document or solve later; (b) tag-chip batch refresh still per-row; (c) measure query:filter-sort at 1711 rows if drill ever feels slow again." },
     { id: "find_virtual_window_cache_stale", area: "Debug", severity: "grey", title: "[RESOLVED] Virtual window early-return ignored list identity — column header sort silently no-op'd",
       body: "User-reported regression on 2026-06-01: 'row headers are not sorting — i see the event fire in console on click but this seems very broken'. Diagnosis: column header click → state.sortKey/sortDir flipped → renderTable() fired → fingerprint changed → query cache missed → queryGamesAsync returned a freshly-sorted list (correctly). The bug lived in paintVirtualSlice: the early-return guard checked (_virtualWindow.start === start && _virtualWindow.end === end && tbody has rows) without comparing the underlying list reference. After a resort the visible window is still indices 0..N — guard passes, paint short-circuits, DOM keeps the pre-sort rows. Originally the guard was meant to skip redundant repaints when scroll handlers asked for the same window; it never accounted for the list under those indices being swapped.\n\nFix: added a module-scope _virtualWindowList = null tracker. paintVirtualSlice now writes _virtualWindowList = list whenever it actually paints, and the early-return requires _virtualWindowList === list. All three reset sites (invalidateTableCache, empty-list branch, one-shot branch in paintTableBody) clear _virtualWindowList to null so the next paint always renders. Small lists (<virtual threshold) and one-shot paints were never affected — only the virtual code path.\n\nLesson for the audit: any rendering optimization that key's on 'where' (indices, scroll position, viewport range) without also keying on 'what' (the data being rendered) is a regression magnet. paintVirtualSlice was the obvious one; sweep similar guards in table-ui (consumePendingFocus, _pendingScroll re-use), dashboard.js dashboardFingerprint, and the alpha-nav letter set caching when this finding gets full-audited." },
+    { id: "find_psn_url_dedupe_drift", area: "Arch", severity: "grey", title: "[RESOLVED] PSN title links — dedupe merged concept_id but kept the trophy-fallback URL",
+      body: "User report 2026-06-01: 'playstation urls from the title are broken'. Two reinforcing bugs:\n\n(1) psn_client.py::_dedupe_by_name() — when a trophy-only keeper merged with a sibling that had a concept_id, the keeper inherited the concept_id (line: 'if not keeper.concept_id and sibling.concept_id'). But the next line 'if not keeper.store_url and sibling.store_url' refused to overwrite the keeper's already-set psnprofiles URL. Result: keeper ends up with concept_id 235227 + store_url='https://psnprofiles.com/trophies/NPWR22859_00'. Fix: rebuild store_url from the merged (concept_id, np_communication_id) at the end of the merge, so the URL always tracks the IDs.\n\n(2) js/game-core.js::storeUrlForGame() — the function returned the cached store_url before falling through to the concept_id branch. Even after the Python fix, existing on-disk data still has stale psnprofiles URLs. Solution: dedicated PSN branch at the top of the function: prefer the concept URL when present, fall back to PSN store search (not psnprofiles) when there's no concept_id. 348/596 PSN rows route correctly without a re-fetch; 2 new game-core Vitest cases lock the behavior.\n\nSame structural lesson as find_virtual_window_cache_stale: a dedupe / cache pattern that updates one piece of identity but not the derived strings built from it is a silent-corruption magnet. Audit the other store dedupes for the same pattern (epic_namespace ↔ store_url, xbox_title_id ↔ store_url) when the broader audit picks this up." },
+    { id: "find_fetcher_review_wipe", area: "Arch", severity: "grey", title: "[RESOLVED] Non-Steam fetchers were silently wiping Steam reviews on re-fetch",
+      body: "Diagnosed 2026-06-01. Every non-Steam fetcher (GOG, Epic, PSN, Amazon, Xbox, Battle.net, Ubisoft, Nintendo) built fresh rows from the store API and overwrote the on-disk JSON with them. Steam-review-percent / steam-review-count / steam-review-desc are written by enrich_steam_reviews.py — they aren't in the store API payload, so every re-fetch zeroed them. HLTB hours had the same vulnerability except a hand-rolled 'preserve HLTB' branch in each fetcher.\n\nFix: new fetchers/_base.py::merge_cached_row(fresh, cached, authoritative, hltb_updated) + per-store authoritative-field sets in fetchers/_authoritative.py. Each fetcher passes its own authoritative set (e.g. GOG = library_authoritative('gog_id'), PSN adds psn_id / np_communication_id / title_id / concept_id / psn_platforms / trophy_progress / first_played). merge_cached_row writes fresh values for fields the store owns, preserves cached enrichment for everything else, and respects hltb_updated to opt into a fresh HLTB overwrite. 11 sites migrated. 4 new pytest cases in tests/test_merge_cached_row.py cover Steam-reviews-preserved + HLTB-updated-when-flagged + authoritative-field-overwrite.\n\nAudit lesson: silent data loss across fetcher boundaries is invisible by definition — there's no test that fails when a column quietly resets to null. The fix turns the merge contract into a typed, per-store explicit set so 'who owns this field?' is a 30-second answer instead of a code spelunk. The fetcher manifest audit test should grow a case that asserts every fetcher imports an authoritative set." },
+    { id: "find_steam_review_enricher_loose_match", area: "Arch", severity: "grey", title: "[RESOLVED] Steam review enricher's substring fallback matched sequels and DLC",
+      body: "Diagnosed 2026-06-01 during a Death Stranding HD Wallpaper investigation. enrich_steam_reviews.py::steam_search() falls back to the first store-search result if its normalized title 'looks close enough' to the query. The original close-enough check ('substring either way') let 'death stranding' match 'death stranding 2 on beach', 'death stranding director s cut', and 'death stranding digital artbook'. Reviews from the wrong appid got written to the row.\n\nFix: tightened _close_enough_title with (a) _number_tokens(candidate) - _number_tokens(target) rejects sequel numerals not present in the target ('death stranding' vs 'death stranding 2'), (b) candidate must startswith target (no infix matches), (c) _SPINOFF_MARKERS regex rejects suffix tokens like director / artbook / soundtrack / wallpaper / dlc / upgrade / deluxe / bundle / pack / skin / ost, (d) tail subtitle limited to ≤2 words so 'control' → 'control ultimate edition' still matches but 'age of wonders' → 'age of wonders 4' is rejected. Added --refresh-empty flag to retry rows with appid mapped but null reviews (skips the store search). Manually cleared then corrected the Death Stranding entry in cache/steam_review_map.json. 7 new pytest parametrize cases in tests/test_enrich_steam_reviews.py lock the sequel + spinoff + edition rules.\n\nAudit lesson: name-matching heuristics have a long tail of failure modes that only surface when you spot-check user data. The fix is to surface the failure cases via tests and add a refresh-empty escape hatch so the user can re-run after the matcher gets smarter, without nuking the working entries." },
+    { id: "find_coop_tag_enrichment", area: "Arch", severity: "grey", title: "[RESOLVED] Co-op tag enrichment for non-Steam libraries",
+      body: "Shipped 2026-06-01. fetch_games.py had been parsing 'Online Co-op' / 'Shared/Split Screen Co-op' / 'LAN Co-op' out of Steam category descriptions and writing coop_online + coop_local on every Steam row. Non-Steam libraries shipped both flags as undefined because their store APIs don't carry the concept. js/coop-overrides.js was the manual escape hatch (5 entries) but didn't scale.\n\nNew enrich_steam_tags.py reads the cache/steam_review_map.json appid mapping (already built and maintained by enrich_steam_reviews.py) and, for every non-Steam row with a Steam appid match, calls SteamClient.get_app_details(appid) — reuses the existing on-disk appdetails cache so most calls are free — and writes coop_online / coop_local from the same _coop_flags_from_categories logic Steam fetch uses. Also fills missing genres / release_date where the store didn't provide them (FILL_IF_MISSING semantics — store data wins when present).\n\nShared steam_metadata.py owns the classifier so both fetch_games.py and the new enricher import the same rules. fetchers/manifest.json gains the steamTags chip (group: enrich, label: 'Co-op tags'); js/fetcher-health.js shows coverage % + pending-row count; js/library-load.js auto-reloads library JSON on chip click so the new flags surface immediately. python -m enrichers steam-tags is the unified entry point. 15 unit + 3 offline-integration tests cover the classifier, the merge contract (no extra fields leak onto rows), dry-run idempotence, and the no-mapping bail." },
   ];
 
   // ---------- Blind spots ----------
@@ -390,6 +400,7 @@
     { service: "HowLongToBeat", provides: "Main / extra / completionist hours + match confidence", when: "enrich_hltb.py (opt-in; --skip-hltb is now the fetcher default)", stores: "All library fetchers + wishlist + itch", output: "hltb_* fields" },
     { service: "Steam reviews", provides: "Review %, count, descriptor", when: "fetch_games.py, fetch_wishlist.py", stores: "Steam library + Steam wishlist only", output: "steam_review_* fields" },
     { service: "enrich_steam_reviews.py", provides: "Same steam_review_* via Steam store title search", when: "Separate backfill (refresh.ps1 runs it on itch by default)", stores: "GOG, PSN, Epic, Amazon, Xbox, Battle.net, Ubisoft, Nintendo, itch (game-class only)", output: "Patches games_*.json in place" },
+    { service: "enrich_steam_tags.py", provides: "coop_online · coop_local from Steam categories; fills missing genres / release_date", when: "Reuses the cache/steam_review_map.json appid map (run after Steam reviews)", stores: "GOG, PSN, Epic, Amazon, Xbox, Battle.net, Ubisoft, Nintendo, itch (game-class only)", output: "Patches games_*.json + cache/steam_tags_meta.json" },
     { service: "IsThereAnyDeal", provides: "Best current price anywhere, historical-low flag, deal link, per-row shop badge", when: "fetch_itad.py (needs ITAD_API_KEY)", stores: "Wishlist by default; --include-library widens to owned games", output: "itad_prices.json → merged on load" },
     { service: "Cross-store images", provides: "Steam CDN cover art for matched non-Steam titles", when: "enrich_cross_store_images.py", stores: "GOG, PSN, Epic, Amazon, Xbox, Battle.net, Ubisoft, Nintendo, itch", output: "Patches header_image / library_image" },
   ];
@@ -414,6 +425,7 @@
     { fetcher: "fetch_itad.py", client: "itad_client.py", writes: "itad_prices.json", notes: "Cross-store best price · wishlist by default" },
     { fetcher: "enrich_hltb.py", client: "(scraper)", writes: "(patches all games_*.json)", notes: "Opt-in HLTB enrichment on its own cadence" },
     { fetcher: "enrich_steam_reviews.py", client: "steam_client.py", writes: "(patches games_*.json)", notes: "Backfill steam_review_* on non-Steam stores" },
+    { fetcher: "enrich_steam_tags.py", client: "steam_client.py", writes: "(patches games_*.json + cache/steam_tags_meta.json)", notes: "Backfill coop_online / coop_local on non-Steam rows · fills missing genres / release_date" },
     { fetcher: "enrich_cross_store_images.py", client: "(scraper)", writes: "(patches games_*.json)", notes: "Steam CDN covers for matched non-Steam titles" },
   ];
 
@@ -425,7 +437,7 @@
     { group: "Length", fields: "hltb_main_hours · hltb_main_extra_hours · hltb_completionist_hours · hltb_match_confidence", source: "enrich_hltb.py" },
     { group: "Pricing", fields: "price · price_initial · discount_percent · currency", source: "Store API; ITAD overlays best deal on wishlist" },
     { group: "Taxonomy", fields: "genres · tags (store) · personal tags (data/personal.json)", source: "Store metadata + you" },
-    { group: "Co-op", fields: "coop_online · coop_local", source: "Steam categories (parsed at fetch)" },
+    { group: "Co-op", fields: "coop_online · coop_local", source: "Steam categories — fetch_games.py for Steam rows + enrich_steam_tags.py for non-Steam rows with a Steam match; js/coop-overrides.js for manually-flagged Steam-less titles" },
     { group: "Linking", fields: "store_url (with storeUrlForGame fallbacks)", source: "Fetcher + dashboard" },
   ];
 
@@ -561,8 +573,84 @@
   function checkboxRow(id, label) {
     const cb = el("input", { type: "checkbox", id });
     cb.checked = getItem(id);
-    cb.addEventListener("change", () => setItem(id, cb.checked));
+    cb.addEventListener("change", () => {
+      setItem(id, cb.checked);
+      // Re-render so the item slides between the active list and the
+      // completed drawer. preserveDetailsOpen() snapshots which <details>
+      // were open by their summary text so we don't reset every accordion
+      // every time someone ticks a checkbox.
+      preserveDetailsOpen(renderActive);
+    });
     return el("div", { class: "check-row" }, cb, el("label", { for: id, html: label }));
+  }
+
+  // Capture which <details> elements are open across the panels container
+  // (phases + completed drawers), run a renderer, then re-open the matching
+  // ones in the freshly-rendered DOM.
+  //
+  // Prefers a stable data-key set by the renderer (phases / drawers) over
+  // summary text content. Summary text was unstable because it embeds the
+  // progress count (e.g. "3/10") — ticking a checkbox changes the count, the
+  // text-based match misses, and the phase collapses every time. data-key
+  // survives because it's set from the phase/drawer identity, not the count.
+  function preserveDetailsOpen(renderFn) {
+    const host = document.getElementById("panels");
+    const openKeys = new Set();
+    const openSummaries = new Set();
+    if (host) {
+      host.querySelectorAll("details[open]").forEach((d) => {
+        if (d.dataset.key) openKeys.add(d.dataset.key);
+        const s = d.querySelector("summary");
+        if (s) openSummaries.add(s.textContent.trim());
+      });
+    }
+    renderFn();
+    const newHost = document.getElementById("panels");
+    if (!newHost) return;
+    newHost.querySelectorAll("details").forEach((d) => {
+      if (d.dataset.key && openKeys.has(d.dataset.key)) {
+        d.setAttribute("open", "open");
+        return;
+      }
+      if (d.dataset.key) return;
+      const s = d.querySelector("summary");
+      if (s && openSummaries.has(s.textContent.trim())) d.setAttribute("open", "open");
+    });
+  }
+
+  // ---------- Completed-item drawer ----------
+  // An item counts as "done" when either the user has checked it OR the label
+  // is prefixed with [DONE]/[RESOLVED]/[REMOVED]/[REJECTED]. We keep both
+  // signals so historical [DONE]-prefixed items collapse without the user
+  // having to re-tick them, and so user-checked items hide even when the
+  // label predates the drawer feature.
+  const COMPLETED_LABEL_RE = /^\s*\[(DONE|RESOLVED|REMOVED|REJECTED)\]/i;
+
+  function isPhaseItemDone(item) {
+    if (getItem(item.id)) return true;
+    return COMPLETED_LABEL_RE.test(item.label || "");
+  }
+
+  function isFindingDone(f) {
+    const dec = getDecision(f.id);
+    if (dec.decision === "done" || dec.decision === "reject") return true;
+    return COMPLETED_LABEL_RE.test(f.title || "");
+  }
+
+  // Build a closed <details> drawer hosting already-completed items.
+  // Returns null when there's nothing to stash so callers can spread it
+  // safely into a child list.
+  function completedDrawer(label, children, key) {
+    if (!children || !children.length) return null;
+    const summary = el("summary", {},
+      el("span", { class: "phase-title", style: "color:var(--text-mute); font-weight:500; font-size:0.85rem;" },
+        `${label} — ${children.length}`,
+      ),
+    );
+    const body = el("div", { style: "opacity:0.75" }, ...children);
+    const attrs = { class: "phase", style: "margin-top:0.75rem; background:transparent; border-color:var(--border); padding:0 0.75rem;" };
+    if (key) attrs["data-key"] = key;
+    return el("details", attrs, summary, body);
   }
 
   // ---------- Render: Now ----------
@@ -570,7 +658,9 @@
     const p1 = PHASES[0];
     const done = p1.items.filter((i) => getItem(i.id)).length;
     const total = p1.items.length;
-    const pct = total ? Math.round((done / total) * 100) : 0;
+    const pct = total
+      ? (done >= total ? 100 : Math.floor((done / total) * 100))
+      : 0;
     const shipped = [
       "Co-op filter rebuilt as a 5-state segmented control (Off · Any · Online · Couch · Both).",
       "Hide-duplicates control now visible on Library AND Wishlist tabs (was Library-only).",
@@ -603,10 +693,17 @@
       "Boot UX hardening — navigation tabs are disabled during the data-boot-loading window (re-enabled by liftBootCurtain or the 8s safety net). Row-count label (#rowCount) syncs synchronously on tab switch via syncRowCountLabel() so 'Wishlist: 53 of 53' no longer lingers after switching to Library. Row meta pills (.store-badge, .coop-pill, .has-notes-dot) now share height=16px / line-height=1 so the badge / co-op / note pills sit on the same horizontal midline.",
       "Blind-spot quick wins (4) — LICENSE (MIT) at repo root + mirrored in pyproject.toml + package.json + README header link; PRIVACY.md documents credentials, data files, every network host, deletion checklist; CHANGELOG.md gained a Release discipline block (SemVer + bump/rename-Unreleased/tag workflow); fetchers/_base.py gained refuse_drift_result + --allow-drift flag, wired into all 11 fetcher entry points so a fetcher returning 3 rows where it used to return 600 fails loudly (exit 3) instead of silently overwriting the on-disk file. 7 new pytest cases cover the drift guard.",
       "Drill-in scroll unification — pendingScrollTarget in table-ui.js replaces four overlapping scroll paths; row drills defer scroll until picks/summary layout settles; category drills use kind=toolbar consumed after refreshFilterUI. 4 Vitest cases in tests/drill-anchor.test.js.",
+      "Tab loading flash fix — navigation tabs (.view-tab) now start dim via CSS rule on html[data-boot-loading], removing the bright→dim→bright flash on boot. Sticky-header 1px gap closed by stripping border-top from #tableWrap and applying border-top-radius to the first/last sticky <th>.",
+      "Cross-store playtime aggregation — state.crossStorePlaytimeByKey populated in recomputeCrossStoreHidden() sums playtime_minutes across every duplicate row when dedup is on. combinedPlaytime(g) + combinedPlaytimeTooltip(g) drive the library 'Played' cell (with a per-store breakdown tooltip), dashboard totals, 'unplayed' filter, and the playtime sort — main thread + worker (table-query.worker.js rebuilds the Map from a structured-clone-safe entries array). 6 Vitest cases cover the dedup-on / dedup-off / zero-minutes / per-store-tooltip paths.",
+      "Co-op overrides registry — js/coop-overrides.js holds a normalized-name registry for non-Steam co-op titles that Steam doesn't categorize for us (Fortnite, Rocket League, Ghost of Tsushima both editions, Ghost of Yotei). applyCoopOverrides() runs at load, never clears an existing true (Steam stays authoritative when it knows), and matches via normalizeNameForDedup so a single entry covers every store copy of the game.",
+      "Steam co-op tag enricher landed — new enrich_steam_tags.py + shared steam_metadata.py module backfill coop_online/coop_local on every non-Steam library row that has a Steam appid match in cache/steam_review_map.json. Also fills missing genres / release_date when the store didn't provide them; ALWAYS_WRITE vs FILL_IF_MISSING partition is tested (15 unit + 3 offline integration tests, all monkey-patched so they run in <1s without network). Wired into the dashboard chip strip with coverage % + pending count + click/refresh hints. fetch_games.py now imports the same coop classifier so Steam fetch + non-Steam enrich agree on Online Co-op vs Shared/Split Screen Co-op vs LAN Co-op semantics.",
+      "PSN title links go to the PlayStation Store again — two reinforcing bugs: (1) psn_client.py dedupe inherited concept_id from a sibling but kept the keeper's psnprofiles trophy URL (the existing 'if not keeper.store_url' guard refused to upgrade it); (2) storeUrlForGame in game-core.js returned the cached store_url before checking concept_id, so even after the Python fix the on-disk psnprofiles URLs would still leak. Python now rebuilds store_url from the merged concept_id at the end of dedupe; JS gained a PSN-specific branch that prefers the concept URL and falls back to PSN store search (not psnprofiles) when there's no concept_id. 348/596 PSN rows route correctly without re-fetch; 2 new game-core Vitest cases lock the behavior.",
+      "Fetcher review-wipe fix — every non-Steam fetcher (GOG, Epic, PSN, Amazon, Xbox, Battle.net, Ubisoft, Nintendo) now uses fetchers/_base.py::merge_cached_row() with a per-store authoritative-field set (fetchers/_authoritative.py). Refetching a store no longer overwrites enriched fields the store can't provide (Steam reviews, HLTB hours) with nulls. New tests/test_merge_cached_row.py covers the Steam-reviews-preserved / HLTB-updated-when-flagged paths.",
+      "Steam review enricher tightened — enrich_steam_reviews.py's substring fallback was matching base games to sequels and DLC (Death Stranding → Death Stranding 2 / Director's Cut / Digital Artbook). New _close_enough_title gates on _number_tokens diff + _SPINOFF_MARKERS regex so 'death stranding' no longer matches 'death stranding 2 on beach' or '… director s cut'. New --refresh-empty flag retries rows that have a mapped appid but a null review percent (no second store search). 7 new pytest cases cover the sequel guard.",
+      "Junk-name + pre-hide registry tweaks — Fortnite removed from JUNK_NAMES and treated as a legitimate game. Death Stranding — HD Wallpaper added to js/hidden-defaults.js PRE_HIDDEN_KEYS so it's pre-hidden alongside the other Death Stranding DLC entries.",
     ];
     const blockers = [
       "Verify fetch_xbox_wishlist.py actually writes rows (current output is 0 KB).",
-      "Audit walk-through still pending — most Architecture findings are now resolved post-refactor; triage what's left.",
     ];
     const next = [
       "Open the Audit findings tab. Triage each finding (accept / reject / defer).",
@@ -638,9 +735,13 @@
   // ---------- Render: Phases ----------
   function panelPhases() {
     const items = PHASES.map((phase, idx) => {
-      const done = phase.items.filter((i) => getItem(i.id)).length;
+      const activeItems = phase.items.filter((i) => !isPhaseItemDone(i));
+      const completedItems = phase.items.filter((i) => isPhaseItemDone(i));
       const total = phase.items.length;
-      const pct = total ? Math.round((done / total) * 100) : 0;
+      const done = completedItems.length;
+      const pct = total
+        ? (done >= total ? 100 : Math.floor((done / total) * 100))
+        : 0;
       const summary = el("summary", {},
         el("span", { class: "phase-title" }, phase.title),
         el("span", { class: "phase-status" },
@@ -648,15 +749,20 @@
           el("span", { class: "progress-bar" }, el("span", { class: "progress-fill", style: `width:${pct}%` })),
         ),
       );
+      const activeChildren = activeItems.length
+        ? activeItems.map((i) => checkboxRow(i.id, escapeHtml(i.label)))
+        : [el("p", { class: "muted", style: "margin:0.5rem 0 0" }, "All items in this phase are complete. ")];
+      const drawer = completedDrawer("Completed", completedItems.map((i) => checkboxRow(i.id, escapeHtml(i.label))), `phase-completed-${phase.id}`);
       const body = el("div", {},
         el("p", { class: "muted" }, phase.tagline),
-        ...phase.items.map((i) => checkboxRow(i.id, escapeHtml(i.label))),
+        ...activeChildren,
+        drawer,
       );
-      return el("details", { class: "phase", ...(idx === 0 ? { open: "open" } : {}) }, summary, body);
+      return el("details", { class: "phase", "data-key": `phase-${phase.id}`, ...(idx === 0 ? { open: "open" } : {}) }, summary, body);
     });
     return el("section", { id: "panel-phases", class: "panel" + (state.activeTab === "phases" ? " active" : "") },
       el("h1", {}, "Phases"),
-      el("p", { class: "muted" }, "Five phases from where you are today to launch. Phase 1 is current; the others are seeded with concrete items — fill in / re-order as you go."),
+      el("p", { class: "muted" }, "Five phases from where you are today to launch. Phase 1 is current; the others are seeded with concrete items — fill in / re-order as you go. Finished items collapse into a per-phase ", el("strong", {}, "Completed"), " drawer."),
       ...items,
     );
   }
@@ -942,25 +1048,38 @@
     const findingIds = new Set(FINDINGS.map((f) => f.id));
     const findingDecisions = Object.entries(state.decisions).filter(([id]) => findingIds.has(id)).map(([, d]) => d);
     const triaged = findingDecisions.filter((d) => d.decision === "accept" || d.decision === "reject" || d.decision === "defer" || d.decision === "done").length;
-    const doneCount = findingDecisions.filter((d) => d.decision === "done").length;
+    const doneCount = FINDINGS.filter(isFindingDone).length;
+
+    // Render one area's findings split into active vs completed, with the
+    // completed bucket tucked into a closed drawer.
+    function renderArea(label, list) {
+      const active = list.filter((f) => !isFindingDone(f));
+      const done = list.filter((f) => isFindingDone(f));
+      const heading = el("h3", {}, `${label} (${active.length} active${done.length ? ` · ${done.length} completed` : ""})`);
+      const activeBlocks = active.length
+        ? active.map(findingBlock)
+        : [el("p", { class: "muted", style: "margin:0 0 0.75rem" }, "Nothing active in this area.")];
+      const drawer = completedDrawer("Completed findings", done.map(findingBlock), "findings-completed");
+      const children = [heading, ...activeBlocks];
+      if (drawer) children.push(drawer);
+      return el("div", {}, ...children);
+    }
+
     return el("section", { id: "panel-findings", class: "panel" + (state.activeTab === "findings" ? " active" : "") },
       el("div", { class: "card-row" },
         el("h1", {}, "Audit findings"),
         el("span", { class: "pill pill-info" }, `${triaged} / ${FINDINGS.length} triaged`),
         el("span", { class: "pill pill-success" }, `${doneCount} done`),
       ),
-      el("p", {}, "First-pass senior-eye findings. Each item gets one of four calls: ", el("strong", {}, "Accept"), " (worth a focused follow-up plan), ", el("strong", {}, "Defer"), " (later, not now), ", el("strong", {}, "Reject"), " (won't do — explain why in notes), ", el("strong", {}, "Done"), " (shipped — clears the card)."),
+      el("p", {}, "First-pass senior-eye findings. Each item gets one of four calls: ", el("strong", {}, "Accept"), " (worth a focused follow-up plan), ", el("strong", {}, "Defer"), " (later, not now), ", el("strong", {}, "Reject"), " (won't do — explain why in notes), ", el("strong", {}, "Done"), " (shipped — clears the card). Resolved + rejected items collapse into a ", el("strong", {}, "Completed"), " drawer beneath each area."),
       el("div", { class: "legend" },
         el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--red)" }), "Red — fix before launch"),
         el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--amber)" }), "Amber — worth doing"),
         el("span", { class: "legend-item" }, el("span", { class: "legend-swatch", style: "background:var(--grey)" }), "Grey — nice to have"),
       ),
-      el("h3", {}, `Architecture (${groups.Arch.length})`),
-      el("div", {}, ...groups.Arch.map(findingBlock)),
-      el("h3", {}, `User experience (${groups.UX.length})`),
-      el("div", {}, ...groups.UX.map(findingBlock)),
-      el("h3", {}, `Debug refactor (${groups.Debug.length})`),
-      el("div", {}, ...groups.Debug.map(findingBlock)),
+      renderArea("Architecture", groups.Arch),
+      renderArea("User experience", groups.UX),
+      renderArea("Debug refactor", groups.Debug),
     );
   }
 
@@ -970,13 +1089,22 @@
       const d = state.decisions[b.id];
       return d && d.decision;
     }).length;
+    const wrapped = BLINDSPOTS.map((b) => ({ id: b.id, area: "Risk", severity: "grey", title: b.title, body: b.body }));
+    const active = wrapped.filter((b) => !isFindingDone(b));
+    const done = wrapped.filter((b) => isFindingDone(b));
+    const activeBlocks = active.length
+      ? active.map(findingBlock)
+      : [el("p", { class: "muted" }, "All blind spots are resolved or rejected.")];
+    const drawer = completedDrawer("Completed blind spots", done.map(findingBlock), "blindspots-completed");
     return el("section", { id: "panel-blindspots", class: "panel" + (state.activeTab === "blindspots" ? " active" : "") },
       el("div", { class: "card-row" },
         el("h1", {}, "Blind spots"),
         el("span", { class: "pill pill-info" }, `${decided} / ${BLINDSPOTS.length} triaged`),
+        el("span", { class: "pill pill-success" }, `${done.length} resolved`),
       ),
-      el("p", {}, "Things you may not have thought of yet. Same triage as findings — Accept promotes into the roadmap, Defer parks for later, Reject says 'not relevant'."),
-      ...BLINDSPOTS.map((b) => findingBlock({ id: b.id, area: "Risk", severity: "grey", title: b.title, body: b.body })),
+      el("p", {}, "Things you may not have thought of yet. Same triage as findings — Accept promotes into the roadmap, Defer parks for later, Reject says 'not relevant'. Resolved + rejected items live in the drawer below."),
+      ...activeBlocks,
+      drawer,
     );
   }
 
@@ -1113,7 +1241,7 @@
         el("div", { class: "field-card" },
           el("div", { class: "field-head" }, el("div", { class: "field-name" }, "\"Drill-in scrolled wrong\"")),
           el("div", { class: "field-body" },
-            el("p", { style: "margin:0" }, "Known issue — see ", el("code", {}, "find_drill_anchor_inconsistent"), " in Audit findings. ", el("code", {}, "?perf=1"), " logs include the resolved ", el("code", {}, "anchorIndex"), " and which paint path ran."),
+            el("p", { style: "margin:0" }, "Minor ~20–30px table shift after landing is a known shelved issue — see ", el("code", {}, "find_drill_post_scroll_jump"), " in Audit findings. Scroll unification is ", el("code", {}, "find_drill_anchor_inconsistent"), ". ", el("code", {}, "?perf=1"), " logs ", el("code", {}, "anchorIndex"), " and paint path."),
           ),
         ),
         el("div", { class: "field-card" },

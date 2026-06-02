@@ -17,6 +17,7 @@ import {
   renderBulkStatusButtons,
   recomputeCrossStoreHidden,
   itchIsGame,
+  combinedPlaytime,
 } from './game-core.js';
 import {
   getDealInfo,
@@ -386,9 +387,6 @@ export async function refreshFilterUI(options) {
     return;
   }
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
-  // Dashboard drill-in: paint the table first; summary chips scan allGames and
-  // picks re-query deals — defer both so we don't block the first row paint.
-  if (!drillIn) renderSummary();
   if (!options?.skipTable) {
     if (options?.force || drillIn) await renderTable({ force: true });
     else renderTable();
@@ -407,6 +405,7 @@ export async function refreshFilterUI(options) {
     if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
     return;
   }
+  renderSummary();
   renderPicks();
   if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
 }
@@ -442,8 +441,6 @@ export function updateViewChrome(options) {
   const isItch = state.activeView === "itch";
   const isDash = state.activeView === "dashboard";
   const isConn = state.activeView === "connections";
-  // refreshFilterUI runs renderSummary later. On drill-in we defer it to
-  // requestIdleCallback so the chip scan never blocks the first row paint.
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
   // Keep the FOUC guard in sync so its !important rules don't outlive the
   // initial view. Once the user switches views, the attribute matches reality.
@@ -500,6 +497,7 @@ export function switchView(view) {
   if (view === state.activeView) return;
   const fromView = state.activeView;
   const drillIn = !!state._pendingFocusKey;
+  let drillOverlaySafety = null;
   const fpBefore = view !== "dashboard" ? tableFingerprint().replace(/"v":"[^"]+"/, `"v":"${view}"`) : "";
   const tableCached = !drillIn && view !== "dashboard" && isViewCached(view, fpBefore);
   const dashCached = view === "dashboard" && dashboardWasRendered();
@@ -508,6 +506,14 @@ export function switchView(view) {
   // first-render paths where doSwitch is deferred to the next rAF.
   document.querySelectorAll(".view-tab").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   if (useOverlay) showViewOverlay(view);
+  if (drillIn && state._drillHideOverlay) {
+    drillOverlaySafety = setTimeout(() => {
+      if (state._drillHideOverlay) {
+        state._drillHideOverlay = false;
+        hideViewOverlay();
+      }
+    }, 600);
+  }
   const doSwitch = () => {
     if (fromView === "dashboard") {
       cancelScheduledDashboardRender();
@@ -674,7 +680,7 @@ export function renderSummary() {
   const visible = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
   const backlog = visible.filter(g => getPersonal(g).status === "backlog");
   const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
-  const played = visible.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
+  const played = visible.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
   const storeLabels = {
     steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic",
     amazon: "Amazon", xbox: "Xbox", battlenet: "Battle.net",
@@ -800,7 +806,7 @@ export function exportCsv() {
       ];
     }
     return [
-      ng.store, ng.id, g.name, p.status, priorityScore(g).toFixed(2), (g.playtime_minutes / 60).toFixed(1),
+      ng.store, ng.id, g.name, p.status, priorityScore(g).toFixed(2), (combinedPlaytime(g) / 60).toFixed(1),
       hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "",
       g.price ?? "", effectiveDiscountPercent(g) || (g.discount_percent ?? ""), g.release_date ?? "", (g.genres || []).join("; "), p.notes
     ];

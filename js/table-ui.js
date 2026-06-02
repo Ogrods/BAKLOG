@@ -31,6 +31,8 @@ import {
   findGameByKey,
   renderBulkStatusButtons,
   recomputeCrossStoreHidden,
+  combinedPlaytime,
+  combinedPlaytimeTooltip,
 } from './game-core.js';
 import {
   isCleanupCandidate,
@@ -140,9 +142,35 @@ function markFocusedRow(key) {
 export function scrollToRowIndex(idx, { smooth = false } = {}) {
   const list = state._visibleList || sortedGames(filteredGames());
   if (!list.length || idx < 0 || idx >= list.length) return;
-  // Smooth scroll through thousands of fixed rows forces a layout pass per frame.
+  const key = gameKey(list[idx]);
   const useSmooth = smooth && list.length <= FIRST_CHUNK;
-  requestScrollToIndex(list, idx, { smooth: useSmooth });
+  setPendingScrollTarget({
+    kind: "row",
+    key,
+    smooth: useSmooth,
+  });
+  state.focusedRowIndex = idx;
+  state.pickedKey = key;
+
+  if (!usesVirtualScroll(list)) {
+    const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+    if (!row) {
+      const tbody = document.getElementById("tbody");
+      if (tbody) {
+        const ctx = {
+          isWish: state.activeView === "wishlist",
+          showScore: !!state.prefs.showScoreColumn,
+        };
+        const rendered = tbodyRowCount();
+        if (idx + 1 - rendered > 0 && idx + 1 - rendered <= FIRST_CHUNK) {
+          tbody.insertAdjacentHTML("beforeend", appendChunk(list, rendered, idx + 1, ctx));
+          timeSyncCoverFits(tbody);
+        }
+      }
+    }
+  }
+
+  consumePendingScrollTarget(list);
 }
 
 function jumpToLetter(letter) {
@@ -466,9 +494,10 @@ export function formatPrice(g) {
 }
 
 // === Focus helpers ===
-/** @typedef {{ kind: 'row'|'toolbar', key?: string, idx?: number, smooth?: boolean, hideOverlay?: boolean, afterChrome?: boolean, consumed?: boolean }} PendingScrollTarget */
+/** @typedef {{ kind: 'row'|'toolbar', key?: string, idx?: number, smooth?: boolean, hideOverlay?: boolean, consumed?: boolean }} PendingScrollTarget */
 
 let _pendingScrollTarget = null;
+let _lastConsumeWasSmooth = false;
 
 export function setPendingScrollTarget(target) {
   if (!target) {
@@ -479,7 +508,6 @@ export function setPendingScrollTarget(target) {
     consumed: false,
     smooth: false,
     hideOverlay: false,
-    afterChrome: false,
     ...target,
   };
 }
@@ -537,10 +565,12 @@ export function consumePendingScrollTarget(list = state._visibleList) {
 
   if (t.kind === "row") {
     const key = t.key;
-    if (!key || !Array.isArray(list) || !list.length) return false;
-    const idx = typeof t.idx === "number" && t.idx >= 0
-      ? t.idx
-      : list.findIndex(g => gameKey(g) === key);
+    if (!key || !Array.isArray(list) || !list.length) {
+      t.consumed = true;
+      _pendingScrollTarget = null;
+      return false;
+    }
+    const idx = list.findIndex(g => gameKey(g) === key);
     if (idx < 0) {
       console.warn("[consumePendingScrollTarget] row not in list", { key, listLen: list.length });
       t.consumed = true;
@@ -555,13 +585,15 @@ export function consumePendingScrollTarget(list = state._visibleList) {
     const row = ensureRowPaintedForScroll(list, idx, key);
     if (row) {
       markFocusedRow(key);
-      focusRow(key);
       scrollRowToCenter(row, { smooth: !!t.smooth });
       if (_pendingFlashKeys.has(key)) applyRowFlash(key);
     } else if (usesVirtualScroll(list)) {
-      window.scrollTo({ top: scrollTopForRowCenter(idx), behavior: "auto" });
+      scrollToVirtualRowIndex(idx, { behavior: "auto" });
+      markFocusedRow(key);
+      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
     }
 
+    _lastConsumeWasSmooth = !!t.smooth && !!row && !usesVirtualScroll(list);
     t.consumed = true;
     _pendingScrollTarget = null;
     completeDrillOverlayIfNeeded(t.hideOverlay);
@@ -570,48 +602,13 @@ export function consumePendingScrollTarget(list = state._visibleList) {
   return false;
 }
 
-/** Wait for picks/summary/table layout to settle, then scroll once. */
+/** Two rAF ticks after layout, then consume the pending scroll target once. */
 export function scheduleScrollAfterLayoutSettled() {
-  const runConsume = () => consumePendingScrollTarget(state._visibleList);
-  const doScroll = () => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(runConsume);
-    });
-  };
-
-  if (!_pendingScrollTarget?.afterChrome) {
-    doScroll();
-    return;
-  }
-
-  const picksEl = document.getElementById("picksSection") || document.getElementById("picksGrid");
-  if (!picksEl || typeof ResizeObserver === "undefined") {
-    doScroll();
-    return;
-  }
-
-  let done = false;
-  let debounce = 0;
-  let obs;
-  let maxWait = 0;
-  const finish = () => {
-    if (done) return;
-    done = true;
-    obs?.disconnect();
-    clearTimeout(maxWait);
-    clearTimeout(debounce);
-    doScroll();
-  };
-
-  obs = new ResizeObserver(() => {
-    clearTimeout(debounce);
-    debounce = setTimeout(finish, 50);
-  });
-  obs.observe(picksEl);
-  maxWait = setTimeout(finish, 300);
+  const t = _pendingScrollTarget;
+  if (!t || t.consumed) return;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      debounce = setTimeout(finish, 50);
+      consumePendingScrollTarget(state._visibleList);
     });
   });
 }
@@ -622,8 +619,6 @@ export function focusGame(key) {
   const targetIsItch = String(key).startsWith("itch:");
   const targetView = targetIsWishlist ? "wishlist" : targetIsItch ? "itch" : "library";
   const crossingView = state.activeView !== targetView;
-  const picksOpen = state.prefs.picksCollapsed === false;
-  const afterChrome = crossingView || picksOpen;
 
   const targetList = crossingView ? null : visibleListForKeyboard();
   const alreadyVisible = targetList && targetList.findIndex(g => gameKey(g) === key) >= 0;
@@ -634,7 +629,7 @@ export function focusGame(key) {
   if (crossingView) {
     state._pendingFocusKey = key;
     state._drillHideOverlay = true;
-    setPendingScrollTarget({ kind: "row", key, smooth: false, hideOverlay: true, afterChrome: true });
+    setPendingScrollTarget({ kind: "row", key, smooth: false, hideOverlay: true });
     switchView(targetView);
     return;
   }
@@ -644,18 +639,17 @@ export function focusGame(key) {
   if (idx < 0) {
     console.warn('[focusGame] key not found in visible list even after filter reset', { key, view: state.activeView, listLen: list.length });
     state._pendingFocusKey = key;
-    setPendingScrollTarget({ kind: "row", key, smooth: false, hideOverlay: false, afterChrome });
+    setPendingScrollTarget({ kind: "row", key, smooth: false });
     renderTable({ force: true });
     return;
   }
   state.focusedRowIndex = idx;
-  setPendingScrollTarget({ kind: "row", key, idx, smooth: true, hideOverlay: false, afterChrome });
+  setPendingScrollTarget({ kind: "row", key, idx, smooth: true });
 
   const existing = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
   if (existing) {
     markFocusedRow(key);
-    if (afterChrome) scheduleScrollAfterLayoutSettled();
-    else consumePendingScrollTarget(list);
+    consumePendingScrollTarget(list);
     return;
   }
   state._pendingFocusKey = key;
@@ -687,32 +681,8 @@ function consumePendingFocus(list) {
   }
   ensureRowPaintedForScroll(list, idx, key);
   const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-  if (row) {
-    markFocusedRow(key);
-    focusRow(key);
-  }
+  if (row) markFocusedRow(key);
   if (run) run.meta.anchorPrepared = true;
-}
-
-export function scrollFocusedRow() {
-  const list = visibleListForKeyboard();
-  const idx = state.focusedRowIndex;
-  if (idx < 0 || !list[idx]) return;
-  const key = gameKey(list[idx]);
-  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-  if (row) {
-    scrollRowToCenter(row);
-    focusRow(key);
-    return;
-  }
-  scrollToRowIndex(idx);
-}
-
-/**
- * Re-anchor after layout shift — delegates to the unified pending-scroll path.
- */
-export function reanchorPickedRow() {
-  scheduleScrollAfterLayoutSettled();
 }
 
 export function focusRow(key) {
@@ -778,6 +748,7 @@ export function tableFingerprint() {
 }
 
 export function invalidateTableCache() {
+  cancelPendingScrollTarget();
   forceHideRowLoader();
   _tableFingerprint = "";
   state._visibleList = null;
@@ -843,8 +814,6 @@ export async function prewarmTableQueryForView(view) {
 
 let _renderTableGen = 0;
 let _paintGen = 0;
-/** Scroll is deferred until the target row exists in the virtual window. */
-let _pendingScroll = null;
 const FIRST_CHUNK = 50;
 /** Must match .games-table tbody tr { height } in app.css */
 const ROW_HEIGHT = 76;
@@ -866,7 +835,6 @@ function cancelPaintJobs() {
     cancelAnimationFrame(_virtualScrollRaf);
     _virtualScrollRaf = 0;
   }
-  _pendingScroll = null;
 }
 
 function usesVirtualScroll(list) {
@@ -889,6 +857,12 @@ function getRow0DocY() {
 function scrollTopForRowCenter(idx) {
   const rowCenterY = getRow0DocY() + idx * ROW_HEIGHT + ROW_HEIGHT / 2;
   return Math.max(0, rowCenterY - window.innerHeight * 0.42);
+}
+
+/** Sync viewport to a virtual row index (drill anchor). Must run when painting an anchored slice. */
+function scrollToVirtualRowIndex(idx, { behavior = "auto" } = {}) {
+  if (idx < 0) return;
+  window.scrollTo({ top: scrollTopForRowCenter(idx), behavior });
 }
 
 function computeVirtualRange(listLen, preferIdx = null) {
@@ -931,7 +905,6 @@ function scheduleVirtualScrollUpdate() {
     if (!_virtualList) return;
     const { start, end } = computeVirtualRange(_virtualList.length);
     paintVirtualSlice(start, end);
-    tryCompletePendingScroll(_virtualList);
   });
 }
 
@@ -994,94 +967,6 @@ function paintVirtualSlice(start, end) {
     run.meta.virtualWindow = { start, end, total: list.length, domRows: end - start };
   }
   scheduleCoverFitSync(tbody);
-}
-
-function finishDrillScroll(key, smooth, hideOverlayOnComplete) {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-      if (el) scrollRowToCenter(el, { smooth });
-      if (hideOverlayOnComplete) {
-        state._drillHideOverlay = false;
-        hideViewLoading();
-      }
-    });
-  });
-}
-
-function tryCompletePendingScroll(list) {
-  if (!_pendingScroll || _pendingScroll.paintGen !== _paintGen) return false;
-  const { idx, key, smooth, hideOverlayOnComplete } = _pendingScroll;
-  const row = document.querySelector(`tr[data-row-index="${idx}"]`);
-  if (!row) return false;
-  _pendingScroll = null;
-  markFocusedRow(key);
-  focusRow(key);
-  finishDrillScroll(key, smooth, hideOverlayOnComplete);
-  if (_pendingFlashKeys.has(key)) applyRowFlash(key);
-  return true;
-}
-
-/** Scroll to row index; virtual lists jump by scroll position instead of painting 0..idx. */
-function requestScrollToIndex(list, idx, { smooth = false, hideOverlayOnComplete = false } = {}) {
-  if (!list.length || idx < 0 || idx >= list.length) return;
-  const key = gameKey(list[idx]);
-  state.focusedRowIndex = idx;
-  state.pickedKey = key;
-
-  if (usesVirtualScroll(list)) {
-    window.scrollTo({ top: scrollTopForRowCenter(idx), behavior: smooth ? "smooth" : "auto" });
-    if (_virtualList === list) {
-      const { start, end } = computeVirtualRange(list.length, idx);
-      paintVirtualSlice(start, end);
-    }
-    const row = document.querySelector(`tr[data-row-index="${idx}"]`);
-    if (row) {
-      markFocusedRow(key);
-      focusRow(key);
-      finishDrillScroll(key, smooth, hideOverlayOnComplete);
-      return;
-    }
-    _pendingScroll = { idx, key, smooth, hideOverlayOnComplete, paintGen: _paintGen };
-    scheduleVirtualScrollUpdate();
-    return;
-  }
-
-  const existing = document.querySelector(`tr[data-row-index="${idx}"]`);
-  if (existing) {
-    markFocusedRow(key);
-    focusRow(key);
-    scrollRowToCenter(existing, { smooth });
-    if (hideOverlayOnComplete) {
-      state._drillHideOverlay = false;
-      hideViewLoading();
-    }
-    return;
-  }
-  const tbody = document.getElementById("tbody");
-  if (!tbody) return;
-  const ctx = {
-    isWish: state.activeView === "wishlist",
-    showScore: !!state.prefs.showScoreColumn,
-  };
-  const rendered = tbodyRowCount();
-  if (idx + 1 - rendered <= FIRST_CHUNK) {
-    tbody.insertAdjacentHTML("beforeend", appendChunk(list, rendered, idx + 1, ctx));
-    timeSyncCoverFits(tbody);
-    const row = document.querySelector(`tr[data-row-index="${idx}"]`);
-    if (row) {
-      markFocusedRow(key);
-      focusRow(key);
-      scrollRowToCenter(row, { smooth });
-      if (hideOverlayOnComplete) {
-        state._drillHideOverlay = false;
-        hideViewLoading();
-      }
-    }
-    return;
-  }
-  _pendingScroll = { idx, key, smooth, hideOverlayOnComplete, paintGen: _paintGen };
-  tryCompletePendingScroll(list);
 }
 
 function tbodyRowCount() {
@@ -1167,7 +1052,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       </td>
       ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
-      <td class="col-played p-2 text-right text-slate-300">${formatHours(g.playtime_minutes)}</td>
+      <td class="col-played p-2 text-right text-slate-300"${combinedPlaytimeTooltip(g) ? ` title="${escapeAttr(combinedPlaytimeTooltip(g))}"` : ""}>${formatHours(combinedPlaytime(g))}</td>
       <td class="p-2 text-right">
         <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
@@ -1232,12 +1117,11 @@ function paintTableBody(list, opts = {}) {
     run.meta.paintPath = anchorIdx >= 0 ? 'virtual+anchor' : 'virtual-window';
     run.meta.anchorIndex = anchorIdx >= 0 ? anchorIdx : undefined;
   }
-  if (anchorIdx >= 0) {
-    // Virtual window only — scroll deferred to consumePendingScrollTarget after
-    // picks/summary layout settles (scheduleScrollAfterLayoutSettled).
-  }
   const { start, end } = computeVirtualRange(list.length, anchorIdx >= 0 ? anchorIdx : null);
   paintVirtualSlice(start, end);
+  if (anchorIdx >= 0 && !hasPendingScrollTarget()) {
+    scrollToVirtualRowIndex(anchorIdx, { behavior: "auto" });
+  }
   if (run) {
     perfMeasure(run, 'paint:total', 'paint:start', {
       rows: list.length,
@@ -1463,8 +1347,11 @@ export async function renderTable(opts) {
   // Cursor's embedded browser sometimes settles layout late on first paint —
   // tbody is populated but cells render blank until a window resize triggers
   // a layout recompute. A no-op scrollTo forces that recompute without
-  // changing the user's scroll position. Harmless in real Chrome/Edge.
-  if (list.length > 0) window.scrollTo(window.scrollX, window.scrollY);
+  // changing the user's scroll position. Skip when a smooth drill scroll just
+  // ran — it can cancel the in-flight smooth animation.
+  if (list.length > 0 && !_lastConsumeWasSmooth && !hasPendingScrollTarget()) {
+    window.scrollTo(window.scrollX, window.scrollY);
+  }
   perfMeasure(perfRun, 'renderTable:total', 'renderTable:start', {
     tbodyRows: tbodyRowCount(),
     fingerprint: fp.slice(0, 80) + (fp.length > 80 ? '…' : ''),

@@ -71,6 +71,7 @@ export function destroyDashboardCharts() {
   // Rotations (insight + spotlight) are deliberately NOT stopped here so an in-place
   // dashboard re-render doesn't reset the spotlight. Use stopDashboardRotations()
   // from the actual teardown sites (view switch).
+  cancelScatterHoverFrame();
   clearScatterList();
   Object.values(dashboardCharts).forEach(ch => { try { ch.destroy(); } catch (_) {} });
   Object.keys(dashboardCharts).forEach(k => delete dashboardCharts[k]);
@@ -89,15 +90,24 @@ export function destroyDashboardCharts() {
   lastChartRenderAt = 0;
 }
 
+/** Above this point count, scatter skips entrance animation (paint cost). */
+const SCATTER_ANIM_POINT_MAX = 200;
+
 /** Replay the entrance animation on every live chart without rebuilding it. */
 export function replayDashboardChartAnimations() {
   // Single animated pass on every live chart. reset() rewinds the animation
   // state to its `from` values; update() then animates back to current data.
   // Pair with animations.resize.duration:0 (in dashChartOptions) so the
   // container unhide on tab change can't trigger a second resize animation
-  // racing with this one.
-  for (const chart of Object.values(dashboardCharts)) {
+  // racing with this one. Large scatter skips replay — hundreds of points
+  // animating y/color on tab revisit was the main dashboard chug.
+  for (const [chartId, chart] of Object.entries(dashboardCharts)) {
     try {
+      const n = chart._scatterPtCount;
+      if (chartId === "chartScatter" && typeof n === "number" && n > SCATTER_ANIM_POINT_MAX) {
+        chart.update("none");
+        continue;
+      }
       chart.reset();
       chart.update();
     } catch (_) { /* chart was disposed externally */ }
@@ -364,8 +374,14 @@ function makeBarEndLabelsPlugin(getLabelForBarIndex) {
 }
 
 const SCATTER_HIT_RADIUS_PX = 8;
+/** Spatial hash cell size — matches hit radius so only 3×3 neighbor cells are scanned. */
+const SCATTER_CELL_PX = SCATTER_HIT_RADIUS_PX;
 const SCATTER_STATUS_PRIORITY = { next: 0, playing: 1, unfinished: 2, backlog: 3, finished: 4, live: 5, skip: 6 };
 const SCATTER_TIP_MAX = 6;
+
+let _scatterHoverRaf = null;
+let _scatterHoverPending = null;
+let _scatterHoverLastKey = null;
 
 let _scatterListClickBound = false;
 let _scatterListLastKey = null;
@@ -402,20 +418,128 @@ function ensureScatterListResizeObserver() {
   _scatterListResizeObs.observe(el);
 }
 
+function scatterGridKey(gx, gy) {
+  return `${gx},${gy}`;
+}
+
+/** Bucket point indices by canvas pixel cell — O(n) build, O(1) neighbor lookup. */
+function buildScatterSpatialGrid(px, py) {
+  const grid = new Map();
+  const cell = SCATTER_CELL_PX;
+  for (let i = 0; i < px.length; i++) {
+    const key = scatterGridKey(Math.floor(px[i] / cell), Math.floor(py[i] / cell));
+    let bucket = grid.get(key);
+    if (!bucket) {
+      bucket = [];
+      grid.set(key, bucket);
+    }
+    bucket.push(i);
+  }
+  return grid;
+}
+
+function countScatterClusters(px, py, grid) {
+  const counts = new Array(px.length).fill(0);
+  const r2 = SCATTER_HIT_RADIUS_PX * SCATTER_HIT_RADIUS_PX;
+  const cell = SCATTER_CELL_PX;
+  for (let i = 0; i < px.length; i++) {
+    const gx = Math.floor(px[i] / cell);
+    const gy = Math.floor(py[i] / cell);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const bucket = grid.get(scatterGridKey(gx + dx, gy + dy));
+        if (!bucket) continue;
+        for (const j of bucket) {
+          if (j <= i) continue;
+          const ddx = px[i] - px[j];
+          const ddy = py[i] - py[j];
+          if (ddx * ddx + ddy * ddy <= r2) {
+            counts[i]++;
+            counts[j]++;
+          }
+        }
+      }
+    }
+  }
+  return counts;
+}
+
 function hitsAtScatterClick(chart, canvasX, canvasY) {
   const pts = chart._scatterPts;
   const px = chart._scatterPxX;
   const py = chart._scatterPxY;
-  if (!pts || !px || !py) return [];
+  const grid = chart._scatterGrid;
+  if (!pts || !px || !py || !grid) return [];
   const r2 = SCATTER_HIT_RADIUS_PX * SCATTER_HIT_RADIUS_PX;
+  const cell = SCATTER_CELL_PX;
+  const gx = Math.floor(canvasX / cell);
+  const gy = Math.floor(canvasY / cell);
   const hits = [];
-  for (let i = 0; i < pts.length; i++) {
-    const dx = px[i] - canvasX;
-    const dy = py[i] - canvasY;
-    if (dx * dx + dy * dy <= r2) hits.push({ pt: pts[i], i, d2: dx * dx + dy * dy });
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const bucket = grid.get(scatterGridKey(gx + dx, gy + dy));
+      if (!bucket) continue;
+      for (const i of bucket) {
+        const ddx = px[i] - canvasX;
+        const ddy = py[i] - canvasY;
+        if (ddx * ddx + ddy * ddy <= r2) hits.push({ pt: pts[i], i, d2: ddx * ddx + ddy * ddy });
+      }
+    }
   }
   hits.sort((a, b) => a.d2 - b.d2);
   return hits;
+}
+
+function scatterHitsKey(hits) {
+  if (!hits.length) return "";
+  return hits.map((h) => h.i).join(",");
+}
+
+function cancelScatterHoverFrame() {
+  if (_scatterHoverRaf != null) {
+    cancelAnimationFrame(_scatterHoverRaf);
+    _scatterHoverRaf = null;
+  }
+  _scatterHoverPending = null;
+}
+
+function runScatterHover(evt, chart) {
+  if (!evt) return;
+  if (evt.native?.type === "mouseout") {
+    _scatterHoverLastKey = null;
+    hideScatterCursorTooltip();
+    return;
+  }
+  const cx = evt.x ?? (evt.native?.offsetX ?? 0);
+  const cy = evt.y ?? (evt.native?.offsetY ?? 0);
+  const hits = hitsAtScatterClick(chart, cx, cy);
+  const key = scatterHitsKey(hits);
+  if (key === _scatterHoverLastKey) return;
+  _scatterHoverLastKey = key;
+  if (hits.length >= 2) {
+    showScatterCursorTooltip(chart, hits, cx, cy);
+  } else {
+    hideScatterCursorTooltip();
+  }
+  if (_scatterListFrozen) return;
+  if (hits.length >= 1) renderScatterList(hits);
+}
+
+function scheduleScatterHover(evt, chart) {
+  if (evt?.native?.type === "mouseout") {
+    cancelScatterHoverFrame();
+    runScatterHover(evt, chart);
+    return;
+  }
+  _scatterHoverPending = { evt, chart };
+  if (_scatterHoverRaf != null) return;
+  _scatterHoverRaf = requestAnimationFrame(() => {
+    _scatterHoverRaf = null;
+    const pending = _scatterHoverPending;
+    _scatterHoverPending = null;
+    if (!pending) return;
+    runScatterHover(pending.evt, pending.chart);
+  });
 }
 
 function sortClusterForPicker(hits) {
@@ -829,6 +953,7 @@ export function renderDashboardCharts(games) {
       ],
     },
     options: dashChartOptions({
+      animation: { duration: 400, easing: "easeOutQuart" },
       plugins: {
         legend: {
           display: true,
@@ -908,22 +1033,15 @@ export function renderDashboardCharts(games) {
       chart._scatterPts = scatterPts;
       chart._scatterPxX = px;
       chart._scatterPxY = py;
-      // Cluster count per data index: how many *other* points fall within hit radius.
-      const r2 = SCATTER_HIT_RADIUS_PX * SCATTER_HIT_RADIUS_PX;
-      const counts = new Array(scatterPts.length).fill(0);
-      for (let i = 0; i < scatterPts.length; i++) {
-        for (let j = i + 1; j < scatterPts.length; j++) {
-          const dx = px[i] - px[j];
-          const dy = py[i] - py[j];
-          if (dx * dx + dy * dy <= r2) {
-            counts[i]++;
-            counts[j]++;
-          }
-        }
-      }
-      chart._scatterClusterCounts = counts;
+      chart._scatterPtCount = scatterPts.length;
+      const grid = buildScatterSpatialGrid(px, py);
+      chart._scatterGrid = grid;
+      chart._scatterClusterCounts = countScatterClusters(px, py, grid);
     },
   };
+  const scatterHeavy = scatterPts.length > SCATTER_ANIM_POINT_MAX;
+  const scatterAnimReduced = prefersReducedMotion() || scatterHeavy;
+  const scatterAnimDuration = scatterHeavy ? 0 : 600;
   const ratingGradient = (rating, alpha) => {
     const t = Math.max(0, Math.min(1, rating / 100));
     const r = Math.round(245 + (16 - 245) * t);
@@ -945,34 +1063,25 @@ export function renderDashboardCharts(games) {
       }],
     },
     options: dashChartOptions({
-      animation: {
-        duration: 900,
-        easing: "easeOutQuart",
-      },
-      animations: {
-        y: {
-          type: "number",
-          duration: 900,
-          easing: "easeOutQuart",
-          from: (ctx) => {
-            if (ctx.type !== "data") return undefined;
-            const yScale = ctx.chart.scales?.y;
-            return yScale ? yScale.getPixelForValue(0) : undefined;
+      ...(scatterAnimReduced ? {
+        animation: { duration: 0 },
+        animations: {},
+      } : {
+        animation: { duration: scatterAnimDuration, easing: "easeOutQuart" },
+        animations: {
+          // Only animate y rise — per-point color interpolation was ~3× canvas cost.
+          y: {
+            type: "number",
+            duration: scatterAnimDuration,
+            easing: "easeOutQuart",
+            from: (ctx) => {
+              if (ctx.type !== "data") return undefined;
+              const yScale = ctx.chart.scales?.y;
+              return yScale ? yScale.getPixelForValue(0) : undefined;
+            },
           },
         },
-        backgroundColor: {
-          type: "color",
-          duration: 900,
-          easing: "easeOutQuart",
-          from: "rgba(148, 163, 184, 0)",
-        },
-        borderColor: {
-          type: "color",
-          duration: 900,
-          easing: "easeOutQuart",
-          from: "rgba(148, 163, 184, 0)",
-        },
-      },
+      }),
       scales: {
         x: {
           type: "logarithmic",
@@ -1018,21 +1127,7 @@ export function renderDashboardCharts(games) {
       },
       onHover(evt, _elements, chart) {
         if (!evt) return;
-        if (evt.native?.type === "mouseout") {
-          hideScatterCursorTooltip();
-          return;
-        }
-        const cx = evt.x ?? (evt.native?.offsetX ?? 0);
-        const cy = evt.y ?? (evt.native?.offsetY ?? 0);
-        const hits = hitsAtScatterClick(chart, cx, cy);
-        if (hits.length >= 2) {
-          showScatterCursorTooltip(chart, hits, cx, cy);
-        } else {
-          hideScatterCursorTooltip();
-        }
-        if (_scatterListFrozen) return;
-        if (hits.length >= 1) renderScatterList(hits);
-        // hits.length === 0 (and not frozen): leave the list sticky until another hover replaces it.
+        scheduleScatterHover(evt, chart);
       },
       onClick(evt, _elements, chart) {
         const cx = evt.x ?? (evt.native?.offsetX ?? 0);

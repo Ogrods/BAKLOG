@@ -3,8 +3,21 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, hasEnoughReviews, combinedPlaytime } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, hasEnoughReviews, combinedPlaytime, parseReleaseForSort } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
+import { getDealInfo } from './deals.js';
+
+const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+function releasedWithinMonths(g, months) {
+  const t = parseReleaseForSort(g.release_date);
+  return t > 0 && (Date.now() - t) <= months * 30 * 24 * 60 * 60 * 1000;
+}
+
+function isOnSale(g) {
+  const d = getDealInfo(g);
+  return !!(d && ((d.cut || 0) > 0 || d.isHistoricalLow));
+}
 
 const SPOTLIGHT_INTERVAL_MS = 7000;
 const SPOTLIGHT_FADE_MS = 300;
@@ -82,6 +95,21 @@ function gameSpotlightReason(g, recentKeys) {
   if (status === 'next' && rating >= 70) {
     return { eyebrow: 'Up next', score: rating + 10 };
   }
+  if (isOnSale(g) && rating >= 70) {
+    return { eyebrow: 'On sale now', score: rating + 9 };
+  }
+  if (releasedWithinMonths(g, 12) && rating >= 70) {
+    return { eyebrow: 'New release', score: rating + 7 };
+  }
+  if (g.coop_online && rating >= 72 && enough) {
+    return { eyebrow: 'Co-op campaign', score: rating + 5 };
+  }
+  if (g.coop_local && rating >= 70) {
+    return { eyebrow: 'Couch co-op', score: rating + 4 };
+  }
+  if (hltb && hltb >= 40 && rating >= 80 && enough) {
+    return { eyebrow: 'Long haul', score: rating + 1 };
+  }
   if (rating >= 88 && enough && hltb && hltb <= 8) {
     return { eyebrow: 'Top-rated quick pick', score: rating + 8 };
   }
@@ -99,6 +127,14 @@ function gameSpotlightReason(g, recentKeys) {
   }
   if (rating >= 75 && enough) {
     return { eyebrow: 'Solid pick', score: rating - 5 };
+  }
+  if (hltb && hltb >= 8 && hltb <= 15 && rating >= 72) {
+    return { eyebrow: 'Weekend-sized', score: rating - 4 };
+  }
+  if (status === 'backlog' && playtime === 0 && rating >= 70
+    && parseReleaseForSort(g.release_date) > 0
+    && (Date.now() - parseReleaseForSort(g.release_date)) > 4 * YEAR_MS) {
+    return { eyebrow: 'Gathering dust', score: rating - 8 };
   }
   if (hltb && hltb <= 4 && rating > 0) {
     return { eyebrow: 'Fast finish', score: rating - 6 };

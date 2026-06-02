@@ -39,6 +39,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **Dashboard spotlight categories** — seven new rotating hero eyebrows: On sale now (ITAD/Steam deal via `getDealInfo`), New release (last 12 months), Co-op campaign (`coop_online`, excludes `live`/`skip`), Couch co-op (`coop_local`), Long haul (HLTB ≥40h), Weekend-sized (8–15h), Gathering dust (backlog, zero playtime, release &gt;4 years ago). First-match priority places time-sensitive and co-op picks above the rating ladder.
 - **Dashboard chart animation performance** — scatter no longer animates per-point colors; libraries over 200 points paint instantly; hover is rAF-throttled with spatial-hash hit tests (O(n) layout); line releases chart uses a shorter entrance; large scatter skips replay on tab revisit. CSS: huge-deal pulse uses opacity instead of filter; extended `prefers-reduced-motion` for fetcher/deal/scatter pulses.
 - **Accessibility audit (bs_a11y)** — Lighthouse-aligned axe-core gate in CI (`tests/a11y/index-axe.test.js`); skip-to-main link + `<main id="main">`; focus trap/Escape on filter drawer, Connections popover, and modals; `aria-current` view tabs; co-op filter radiogroup pattern; contrast bump (`text-slate-500` → `text-slate-400` on slate-800); global `:focus-visible` outline. See [docs/a11y.md](docs/a11y.md).
 - Fetch scripts read credentials from encrypted store first, then `.env` fallback (`auth.resolve_env`).

@@ -278,16 +278,20 @@ html { scrollbar-gutter: stable; }
 body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
 th { cursor: pointer; user-select: none; }
 th:hover { background: rgb(51 65 85); }
+.games-table thead th[data-sort] { white-space: nowrap; }
 .sort-arrow {
   display: inline-block;
   width: 0.75rem;
   margin-left: 0.25rem;
-  font-size: 0.7em;
+  font-size: 0.9em;
+  line-height: 1;
   color: #38bdf8;
   font-weight: 700;
   letter-spacing: -0.02em;
   text-align: center;
-  vertical-align: middle;
+  vertical-align: baseline;
+  position: relative;
+  top: -1px;
   opacity: 0.4;
 }
 th:hover .sort-arrow { opacity: 0.8; }
@@ -613,31 +617,42 @@ body.bulk-bar-open { padding-bottom: 56px; }
 
 .row-loading-overlay {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 25;
+  top: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0.35rem;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 9999px;
-  background: rgba(15, 23, 42, 0.75);
-  border: 1px solid rgba(51, 65, 85, 0.9);
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.45);
+  color: #bae6fd;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.08s ease;
 }
 .row-loading-overlay.show {
   opacity: 1;
-  pointer-events: auto;
+  transition: opacity 0.04s ease;
+}
+.row-loading-overlay::after {
+  content: "Updating…";
 }
 .row-loading-spinner {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(148, 163, 184, 0.35);
   border-top-color: #38bdf8;
   border-radius: 50%;
   animation: view-spin 0.75s linear infinite;
+  flex: 0 0 auto;
 }
 @media (prefers-reduced-motion: reduce) {
   .row-loading-overlay { transition: none; }
@@ -1239,11 +1254,11 @@ body.bulk-bar-open { padding-bottom: 56px; }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: 35% center;
   opacity: 0;
   transition: transform 0.6s ease, opacity 0.45s ease;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 18%, rgba(0, 0, 0, 0.18) 38%, rgba(0, 0, 0, 0.6) 60%, rgba(0, 0, 0, 0.92) 82%, #000 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, transparent 18%, rgba(0, 0, 0, 0.18) 38%, rgba(0, 0, 0, 0.6) 60%, rgba(0, 0, 0, 0.92) 82%, #000 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
+  mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
   /* Promote so the mask doesn't get re-rasterized when sibling charts animate. */
   will-change: opacity, transform;
   backface-visibility: hidden;
@@ -1952,6 +1967,14 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   white-space: normal;
   overflow: hidden;
   vertical-align: middle;
+}
+.games-table td.notes-cell .notes-input {
+  display: block;
+  width: 100%;
+  height: 64px;
+  resize: none;
+  line-height: 1.3;
+  font-family: inherit;
 }
 .games-table .game-name-cell { min-width: 0; }
 .games-table .game-name-cell .game-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%; }

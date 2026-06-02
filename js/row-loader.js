@@ -5,14 +5,18 @@
 
 import { prefersReducedMotion } from './motion.js';
 
-const SHOW_DELAY_MS = 120;
-const HIDE_DELAY_MS = 100;
+const SHOW_DELAY_MS = 60;
+const MIN_VISIBLE_MS = 0;
+const HIDE_DELAY_MS = 0;
 
 let _tokenSeq = 0;
 let _activeToken = 0;
 let _showTimer = null;
 let _hideTimer = null;
+let _minVisibleTimer = null;
+let _shownAt = 0;
 let _visible = false;
+let _hidePending = false;
 
 function tableShell() {
   return document.getElementById('tableShell');
@@ -22,11 +26,16 @@ function overlayEl() {
   return document.getElementById('rowLoadingOverlay');
 }
 
+function nowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
 function showOverlay() {
   const shell = tableShell();
   const ov = overlayEl();
   if (!ov || !shell || _visible) return;
   _visible = true;
+  _shownAt = nowMs();
   shell.setAttribute('aria-busy', 'true');
   ov.setAttribute('aria-hidden', 'false');
   ov.classList.add('show');
@@ -36,13 +45,28 @@ function hideOverlayNow() {
   const shell = tableShell();
   const ov = overlayEl();
   _visible = false;
+  _hidePending = false;
   ov?.classList.remove('show');
   ov?.setAttribute('aria-hidden', 'true');
   shell?.removeAttribute('aria-busy');
 }
 
 function hideOverlay() {
-  if (!_visible) return;
+  if (!_visible) {
+    _hidePending = false;
+    return;
+  }
+  const elapsed = nowMs() - _shownAt;
+  const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
+  if (remaining > 0) {
+    _hidePending = true;
+    clearTimeout(_minVisibleTimer);
+    _minVisibleTimer = setTimeout(() => {
+      _minVisibleTimer = null;
+      if (_hidePending) hideOverlay();
+    }, remaining);
+    return;
+  }
   if (prefersReducedMotion()) {
     hideOverlayNow();
     return;
@@ -58,8 +82,10 @@ function hideOverlay() {
 export function beginRowLoader() {
   const token = ++_tokenSeq;
   _activeToken = token;
+  _hidePending = false;
   clearTimeout(_showTimer);
   clearTimeout(_hideTimer);
+  clearTimeout(_minVisibleTimer);
   _showTimer = setTimeout(() => {
     if (_activeToken !== token) return;
     showOverlay();
@@ -81,6 +107,7 @@ export function forceHideRowLoader() {
   _activeToken = 0;
   clearTimeout(_showTimer);
   clearTimeout(_hideTimer);
-  _showTimer = _hideTimer = null;
+  clearTimeout(_minVisibleTimer);
+  _showTimer = _hideTimer = _minVisibleTimer = null;
   hideOverlayNow();
 }

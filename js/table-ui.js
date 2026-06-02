@@ -539,6 +539,7 @@ export function tableFingerprint() {
 }
 
 export function invalidateTableCache() {
+  forceHideRowLoader();
   _tableFingerprint = "";
   state._visibleList = null;
   state._visibleListView = null;
@@ -568,6 +569,36 @@ function rememberQueryResult(fp, list) {
   while (_queryResultCache.size > QUERY_CACHE_MAX) {
     const oldest = _queryResultCache.keys().next().value;
     _queryResultCache.delete(oldest);
+  }
+}
+
+/** Warm query cache for another view during idle (library tab → faster wishlist switch). */
+export async function prewarmTableQueryForView(view) {
+  if (!state.dashboardDataReady || state.activeView === view) return;
+  const prev = state.activeView;
+  try {
+    state.activeView = view;
+    const fp = tableFingerprint();
+    if (_queryResultCache.has(fp)) return;
+    const params = collectTableParams(state.sessionPrefs);
+    let list;
+    try {
+      list = await queryGamesAsync(state, params);
+    } catch (_) {
+      list = queryGames({
+        source: querySourceForView(state),
+        ctx: {
+          ...buildQueryContext(state, params),
+          hiddenKeys: view === "wishlist"
+            ? state.wishlistCrossStoreHiddenKeys
+            : state.crossStoreHiddenKeys,
+          ownedNormNames: state.ownedNormNames,
+        },
+      });
+    }
+    if (Array.isArray(list)) rememberQueryResult(fp, list);
+  } finally {
+    state.activeView = prev;
   }
 }
 
@@ -905,7 +936,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
       <td class="p-2 notes-cell">
-        <input type="text" data-game-key="${escapeAttr(key)}" data-field="notes" value="${escapeAttr(p.notes)}" placeholder="Notes..." class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1" />
+        <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1">${escapeHtml(p.notes || "")}</textarea>
       </td>
     </tr>`;
 }
@@ -1082,7 +1113,12 @@ export async function renderTable(opts) {
   wrap?.classList.toggle("table-hide-playtime", isWish);
   wrap?.classList.toggle("table-hide-lastplayed", isWish);
   const statusHdr = document.getElementById("statusHeader");
-  if (statusHdr) statusHdr.textContent = isWish ? "Tracking" : "Status";
+  if (statusHdr) {
+    const label = isWish ? "Tracking" : "Status";
+    const arrow = statusHdr.querySelector(".sort-arrow");
+    statusHdr.textContent = label;
+    if (arrow) statusHdr.appendChild(arrow);
+  }
   const priceHdr = document.getElementById("priceHeader");
   if (priceHdr) {
     priceHdr.title = isWish

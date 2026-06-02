@@ -422,8 +422,12 @@ button[disabled] { cursor: not-allowed; }
 .deal-badge-drop,
 .deal-badge-low,
 .owned-elsewhere-pill,
-.deal-hero-stat,
 .placeholder { cursor: default; }
+/* The whole top-deal hero is one clickable button — every child should read as
+   clickable, overriding the indicator-only defaults above (which still apply to
+   the same badges when they appear in table rows). */
+.deal-hero,
+.deal-hero * { cursor: pointer; }
 /* === Early Access === */
 .cover-wrap { position: relative; display: inline-block; line-height: 0; overflow: hidden; }
 .cover-wrap.landscape::before {
@@ -503,6 +507,8 @@ button[disabled] { cursor: not-allowed; }
   border: 1px solid rgba(148, 163, 184, 0.25);
   white-space: nowrap;
   flex-shrink: 0;
+  cursor: default;
+  user-select: none;
 }
 /* === Chips & badges === */
 .genre-chip.active { background: #0284c7; border-color: #0ea5e9; color: #f8fafc; }
@@ -1129,6 +1135,13 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .fh-chip-failed .fh-chip-dot { background: #f43f5e; }
 .fh-chip-needs-config { border-style: dashed; }
 .fh-chip-readonly { opacity: 0.55; cursor: not-allowed; }
+.fh-chip-auth-cooldown {
+  border-color: rgba(245, 158, 11, 0.6);
+  background: rgba(245, 158, 11, 0.1);
+  cursor: not-allowed;
+}
+.fh-chip-auth-cooldown .fh-chip-dot { background: #f59e0b; }
+.fh-chip-auth-cooldown .fh-chip-age { color: #fbbf24; }
 .fh-readonly-banner {
   font-size: 0.72rem; line-height: 1.35;
   padding: 0.45rem 0.55rem; margin-bottom: 0.35rem;
@@ -1470,6 +1483,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   font-size: 12px;
   color: #94a3b8;
   cursor: default;
+  user-select: none;
 }
 .dash-marquee-item strong { color: #f1f5f9; font-weight: 700; }
 .dash-marquee-item .dash-marquee-label { color: #94a3b8; }
@@ -1654,7 +1668,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .deal-hero-stat-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; background: #94a3b8; }
 .deal-hero-stat-dot-review { background: #34d399; }
 .deal-hero-stat-dot-hltb { background: #38bdf8; }
-.deal-hero-genres { font-size: 0.7rem; color: #94a3b8; line-height: 1.3; }
+.deal-hero-genres { font-size: 0.7rem; color: #94a3b8; line-height: 1.3; padding-left: 0.15rem; }
 .deal-badge-low { display: inline-block; white-space: nowrap; font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.35); }
 .deal-badge-low-year { background: rgba(251, 191, 36, 0.1); color: #fde68a; border-color: rgba(253, 224, 71, 0.3); }
 /* Compact star used to the left of the price in the library/wishlist price

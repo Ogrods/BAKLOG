@@ -24,6 +24,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Added
 
+- **Chip-level auth-failure backoff** — when a fetcher run ends in an auth-ish failure (401/403, expired cookie/session, rejected sign-in) the chip cools down with an escalating window on consecutive failures (5m → 15m → 60m). While cooling down the chip is disabled, shows an `auth Nm` badge + tooltip, and is skipped by both auto-refresh and the bulk "Run stale" sweep — closing the request-flood path against a provider that needs reconnecting. The cooldown clears on the next successful run, when the timer expires, or the moment the mapped provider shows "connected" in Connections (so reconnecting never leaves a chip stuck). Persisted across reloads.
 - **PSN trophy completion pill** — library rows with `trophy_progress` show a slim muted `🏆 N%` pill in the game-name meta line (no new column); wishlist rows omit it.
 - **SECURITY.md threat model** — formal local-first security model: trust-boundary diagram, protected assets, the at-rest crypto (AES-256-GCM with an OS-keychain key; scrypt N=2¹⁴ for the optional master password and the portable bundle), and an explicit out-of-scope list (local malware, plaintext `.env`/cookie jars, the `.master_key` fallback, storefront ToS). Linked from README and PRIVACY.md. Marketing suite gains a "Nothing to breach" security campaign and a founder-truth line on why local install *is* the security posture.
 - **Library count 1UP** — after a fetch adds games, the library / wishlist count rolls over ~1s with floating green "+N" popups (Mario 1UP / scrolling-combat-text style). Popups anchor on the right edge of the number, spawn ~70ms apart (up to 10 per burst) so several climb at once, and the rolling number uses `tabular-nums` so digits don't shift sideways as it counts. Only fires on fetch-driven *increases*, not filters or cold boot. Cancels cleanly on tab switch, view change, or `prefers-reduced-motion`. Chained fetcher landings (Steam, then GOG, then PSN) keep prior popups climbing instead of cutting them off mid-flight. Surfaces: Dashboard hero number and Library / Wishlist summary chips. Demos for screen recordings: load `index.html?demo=count` (six fake stores landing) or `?demo=count-small` (five `+1` bursts), or run `baklogDemoLibraryCount()` / `baklogDemoLibraryCountSmall()` from the console.
@@ -38,6 +39,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - **Connections tab** — unified sign-in for all stores: form fields for API keys (Steam, Xbox, itch, ITAD), Playwright browser login for cookie/OAuth providers (GOG, PSN, Epic, Battle.net, Nintendo, Ubisoft), encrypted at rest via OS keychain + AES-GCM (`auth/` package).
 - **Reconnect banner** when a fetcher fails auth (401/403) — links to Connections tab.
 - **`scripts/build_installer.ps1`** — bundles app + Playwright Chromium into `dist/steam-backlog/`.
+
+### Fixed
+
+- **Run queue can't wedge on a stubborn process** — the worker no longer blocks on `proc.wait()` forever. On cancel it re-issues the kill (Windows AppX Python can survive the first `taskkill`) and finalizes after a bounded `TERMINATE_GRACE_SEC` wait, logging and abandoning a lingering PID so the next queued run always advances.
+- **Scatter chart pop-in on large libraries** — the HLTB-vs-rating scatter no longer appears in a single frame. Points animate in on their own (rise from the x-axis + pop from radius 0) at any library size, while the grid and axes stay still. Per-point color interpolation (the original chug source) remains off. Tab revisit replays the same points-only entrance.
 
 ### Changed
 

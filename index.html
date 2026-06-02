@@ -76,7 +76,7 @@
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
         </nav>
         <span class="text-[11px] text-slate-400 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
-        <button type="button" id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto self-center" title="Show fetcher log"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText"></span></button>
+        <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle ml-auto self-center" title="Show fetcher log"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText">Fetcher log</span></button>
       </div>
       <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
@@ -267,10 +267,6 @@
             <button type="button" id="reportBug" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy a sanitized bug bundle (errors + app context) to your clipboard. Nothing is sent anywhere.">Report a bug…</button>
             <button type="button" id="hiddenGamesMenu" class="w-full text-left px-3 py-2 hover:bg-slate-700">Hidden games</button>
             <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700">Copy top 20 backlog (Markdown)</button>
-            <label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-700 cursor-pointer text-left" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
-              <input type="checkbox" id="itadAutoRefreshToggle" class="rounded" checked />
-              Auto-refresh ITAD prices
-            </label>
             <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
           </div>
         </div>

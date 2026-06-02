@@ -413,7 +413,13 @@ export function coopPillsHtml(g) {
 export function trophyProgressPillHtml(g) {
   if (!g || g.trophy_progress == null) return "";
   const pct = Math.round(g.trophy_progress);
-  return `<span class="trophy-pill" title="PSN trophy completion: ${pct}%">&#127942; ${pct}%</span>`;
+  const store = (g.store || "").toLowerCase();
+  const label = store === "psn"
+    ? "PSN trophy completion"
+    : store === "xbox"
+      ? "Xbox achievement completion"
+      : "Completion";
+  return `<span class="trophy-pill" title="${label}: ${pct}%">&#127942; ${pct}%</span>`;
 }
 
 export function storeLetter(s) {

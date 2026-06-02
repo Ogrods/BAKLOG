@@ -1,6 +1,99 @@
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { noteFetcherAuthFailure } from './connections.js';
+import { noteFetcherAuthFailure, isProviderConnected, FETCHER_AUTH_PROVIDER } from './connections.js';
+
+// ---------------------------------------------------------------------------
+// Chip-level auth-failure backoff
+// ---------------------------------------------------------------------------
+// When a fetcher run ends in an auth-ish failure (401/403, expired cookie,
+// rejected sign-in) we cool that chip down so automatic refreshes and the user
+// can't hammer a provider that needs reconnecting — the root cause of the
+// earlier request flood. Consecutive failures escalate 5m -> 15m -> 60m. The
+// cooldown clears on the next successful run, when the timer expires, or the
+// moment the mapped provider shows "connected" in Connections (so reconnecting
+// never leaves the chip stuck disabled).
+const AUTH_COOLDOWN_STEPS_MS = [5 * 60_000, 15 * 60_000, 60 * 60_000];
+const AUTH_COOLDOWN_LS_KEY = 'baklog-fetcher-auth-cooldown';
+
+/** Escalating cooldown duration for the Nth consecutive auth failure (1-based). */
+export function authCooldownDurationMs(strikes) {
+  const i = Math.min(Math.max(strikes, 1), AUTH_COOLDOWN_STEPS_MS.length) - 1;
+  return AUTH_COOLDOWN_STEPS_MS[i];
+}
+
+function loadAuthCooldowns() {
+  const m = new Map();
+  try {
+    const raw = JSON.parse(localStorage.getItem(AUTH_COOLDOWN_LS_KEY) || '{}');
+    const now = Date.now();
+    for (const [k, v] of Object.entries(raw)) {
+      if (v && typeof v.until === 'number' && v.until > now) {
+        m.set(k, { until: v.until, strikes: Number(v.strikes) || 1 });
+      }
+    }
+  } catch (_) { /* corrupt or unavailable storage — start clean */ }
+  return m;
+}
+
+const authCooldowns = loadAuthCooldowns();
+// Resume any cooldown persisted from a previous session.
+if (authCooldowns.size) setTimeout(() => scheduleAuthCooldownTick(), 0);
+
+function persistAuthCooldowns() {
+  try {
+    const obj = {};
+    for (const [k, v] of authCooldowns) obj[k] = v;
+    localStorage.setItem(AUTH_COOLDOWN_LS_KEY, JSON.stringify(obj));
+  } catch (_) { /* storage unavailable — in-memory map still enforces */ }
+}
+
+/** Record one auth failure for a fetcher key and (re)arm the escalating cooldown. */
+export function noteAuthCooldownStrike(key) {
+  const strikes = Math.min((authCooldowns.get(key)?.strikes || 0) + 1, AUTH_COOLDOWN_STEPS_MS.length);
+  authCooldowns.set(key, { until: Date.now() + authCooldownDurationMs(strikes), strikes });
+  persistAuthCooldowns();
+  scheduleAuthCooldownTick();
+}
+
+let authCooldownTimer = null;
+/** Re-render the chip strip when the soonest cooldown expires so a chip
+ *  re-enables on its own even with no run in flight. */
+function scheduleAuthCooldownTick() {
+  if (authCooldownTimer) { clearTimeout(authCooldownTimer); authCooldownTimer = null; }
+  let soonest = Infinity;
+  for (const c of authCooldowns.values()) soonest = Math.min(soonest, c.until);
+  if (!Number.isFinite(soonest)) return;
+  const delay = Math.max(0, soonest - Date.now()) + 250;
+  authCooldownTimer = setTimeout(() => {
+    authCooldownTimer = null;
+    for (const [k, c] of authCooldowns) { if (c.until <= Date.now()) authCooldowns.delete(k); }
+    persistAuthCooldowns();
+    try { renderDashboardFetcherHealth(); } catch (_) { /* not mounted */ }
+    scheduleAuthCooldownTick();
+  }, delay);
+}
+
+export function clearAuthCooldown(key) {
+  if (authCooldowns.delete(key)) persistAuthCooldowns();
+}
+
+/** Remaining cooldown for a fetcher key in ms, or 0. Self-heals on expiry or
+ *  when the mapped provider is reconnected. */
+export function authCooldownRemainingMs(key) {
+  const c = authCooldowns.get(key);
+  if (!c) return 0;
+  const provider = FETCHER_AUTH_PROVIDER[key];
+  if (provider && isProviderConnected(provider)) { clearAuthCooldown(key); return 0; }
+  const rem = c.until - Date.now();
+  if (rem <= 0) { clearAuthCooldown(key); return 0; }
+  return rem;
+}
+
+/** Short label for a cooldown badge, e.g. "auth 5m" / "auth 1h". */
+function authCooldownLabel(ms) {
+  const mins = Math.max(1, Math.ceil(ms / 60_000));
+  return mins >= 60 ? `auth ${Math.round(mins / 60)}h` : `auth ${mins}m`;
+}
 
 const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
 // ITAD is a deal feed — library-style 7d/30d thresholds are misleading.
@@ -410,13 +503,17 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
     else if (st === 'queued') queued.push(label);
   }
   if (!running.length && !queued.length) {
-    el.classList.add('hidden');
-    if (textEl) textEl.textContent = '';
+    // Stay visible as an idle affordance so the console is always reachable,
+    // not only while a run is in flight.
+    el.classList.remove('hidden');
+    el.classList.add('fh-global-status-idle');
+    if (textEl) textEl.textContent = 'Fetcher log';
     if (liveEl) liveEl.textContent = '';
     el.title = 'Show fetcher log';
     return;
   }
   el.classList.remove('hidden');
+  el.classList.remove('fh-global-status-idle');
   let text;
   if (running.length) {
     const extra = queued.length ? ` (+${queued.length} queued)` : '';
@@ -552,6 +649,7 @@ export const fetcherRunner = (() => {
     const pos = idx + 1;
     const waitFor = snap.active ? labelForKey(snap.active.key) : null;
     if (waitFor) return `${pos} of ${slots} — waiting for ${waitFor}`;
+    if (!snap.active) return 'waiting to start';
     return `${pos} of ${slots}`;
   }
 
@@ -610,12 +708,16 @@ export const fetcherRunner = (() => {
 
   function pruneSuppressedRuns(snap) {
     if (!snap) return;
-    const live = new Set();
-    if (snap.active) live.add(snap.active.id);
-    for (const q of snap.queue || []) live.add(q.id);
-    for (const id of suppressedRunIds) {
-      if (!live.has(id)) suppressedRunIds.delete(id);
+    const terminal = new Set();
+    for (const h of snap.history || []) {
+      if (h?.id && ['done', 'failed', 'cancelled'].includes(h.status)) {
+        terminal.add(h.id);
+      }
     }
+    for (const id of suppressedRunIds) {
+      if (terminal.has(id)) suppressedRunIds.delete(id);
+    }
+    persistSuppressedRunIds();
   }
 
   function scheduleReconnect(runId, key, src) {
@@ -907,6 +1009,20 @@ export const fetcherRunner = (() => {
     await loadFetcherSources(true);
     const src = source(key);
     if (!src || runStateByKey.has(key)) return;
+    // Auth-failure backoff: block while cooling down. Auto/bulk runs stay
+    // silent; a chip click is already prevented by the disabled attribute, so
+    // this only fires for programmatic callers — explain it once.
+    const cooldownMs = authCooldownRemainingMs(key);
+    if (cooldownMs > 0) {
+      if (!auto) {
+        ensurePanel(src);
+        appendLine(
+          `[${src.label}: auth cooldown — ${authCooldownLabel(cooldownMs)} left. Reconnect in Connections to clear.]`,
+          'meta',
+        );
+      }
+      return;
+    }
     // Hard cap mirrors server-side enforcement (max 1 active + 1 queued).
     // Without this guard a fast double-click could land two POSTs before the
     // server's lock saw the first one as pending.
@@ -992,6 +1108,7 @@ export const fetcherRunner = (() => {
         if (status !== 'stale' && status !== 'missing') return false;
         if (src.missingRequirements?.length) return false;
         if (runStateByKey.has(src.key)) return false;
+        if (authCooldownRemainingMs(src.key) > 0) return false;
         return true;
       })
       .map(src => src.key);
@@ -1078,12 +1195,14 @@ export const fetcherRunner = (() => {
             _lastAppliedDoneRunId = runId;
             await refreshAfterFetch(key);
           }
+          clearAuthCooldown(key);
           markChipState(key, null);
         } else if (cancelled) {
           markChipState(key, null);
         } else {
           markChipState(key, 'failed');
-          noteFetcherAuthFailure(key, recentLog.join('\n'));
+          const authish = noteFetcherAuthFailure(key, recentLog.join('\n'));
+          if (authish) noteAuthCooldownStrike(key);
           setTimeout(() => {
             if (runStateByKey.get(key) === 'failed') {
               runStateByKey.delete(key);
@@ -1177,8 +1296,9 @@ export const fetcherRunner = (() => {
     if (snap.active) pending.push(snap.active);
     for (const q of snap.queue || []) pending.push(q);
 
-    if (pending.length) {
-      const panelSrc = source(snap.active?.key) || source(pending[0].key);
+    const visiblePending = pending.filter(r => !suppressedRunIds.has(r.id));
+    if (visiblePending.length) {
+      const panelSrc = source(snap.active?.key) || source(visiblePending[0].key);
       ensurePanel(panelSrc);
       const isFirstSync = !syncedOnce;
       syncedOnce = true;
@@ -1202,8 +1322,7 @@ export const fetcherRunner = (() => {
           appendLine(`[reconnected · ${parts.join(', ')}]`, 'meta');
         }
       }
-      for (const run of pending) {
-        if (suppressedRunIds.has(run.id)) continue;
+      for (const run of visiblePending) {
         const src = source(run.key);
         if (!src) continue;
         const chipState = serverChipState(run.status) || 'queued';
@@ -1324,6 +1443,8 @@ export function renderDashboardFetcherHealth() {
       : (count != null && count > 0 ? formatNum(count) : '—');
     const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
     const runState = fetcherRunner.stateFor(src.key);
+    const authCooldownMs = runState ? 0 : authCooldownRemainingMs(src.key);
+    const inAuthCooldown = authCooldownMs > 0;
     const displayStatus = runState || status;
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0;
@@ -1359,18 +1480,30 @@ export function renderDashboardFetcherHealth() {
     if (queueFullElsewhere) {
       titleLines.push('Queue full — one run is in progress and one is queued. Wait for a slot.');
     }
+    if (inAuthCooldown) {
+      titleLines.push(`Auth failed — cooling down ${authCooldownLabel(authCooldownMs)}. Reconnect in Connections to clear, or wait it out.`);
+    }
     const title = titleLines.join('\n');
-    const disabled = !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere;
+    const disabled = !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere || inAuthCooldown;
     const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
     const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
+    const cooldownClass = inAuthCooldown ? ' fh-chip-auth-cooldown' : '';
     const warnBadge = needsConfig ? '<span class="fh-chip-warn" title="Missing credentials">!</span>' : '';
-    return `<button type="button" class="fh-chip fh-chip-${displayStatus}${needsClass}${readonlyClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
+    const ageText = runState ? runState : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel);
+    const chip = `<button type="button" class="fh-chip fh-chip-${displayStatus}${needsClass}${readonlyClass}${cooldownClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
       ${warnBadge}
       <span class="fh-chip-label">${escapeHtml(src.label)}</span>
       <span class="fh-chip-count">${escapeHtml(countStr)}</span>
-      <span class="fh-chip-age">${escapeHtml(runState ? runState : ageLabel)}</span>
+      <span class="fh-chip-age">${escapeHtml(ageText)}</span>
     </button>`;
+    if (src.key === 'itad') {
+      return chip + `<label class="fh-toggle fh-itad-auto" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
+        <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${state.prefs.itadAutoRefreshDisabled ? '' : 'checked'} />
+        Auto-refresh
+      </label>`;
+    }
+    return chip;
   }
 
   const chipsHtml = visible.length
@@ -1398,6 +1531,7 @@ export function renderDashboardFetcherHealth() {
         ${apiNotice}
       </div>
       <div class="fh-head-actions">
+        <button type="button" class="fh-log-open" title="Open the fetcher console / run log">Log</button>
         <button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>
         <label class="fh-toggle">
           <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />

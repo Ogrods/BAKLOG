@@ -200,6 +200,31 @@ export function buildMarqueeItems(games) {
     push('~', 'is-amber', `${ratedPct}%`, 'of library rated');
   }
 
+  const tracked = games.filter(g => g.trophy_progress != null);
+  if (tracked.length) {
+    const avgTrophy = Math.round(tracked.reduce((s, g) => s + g.trophy_progress, 0) / tracked.length);
+    push('~', 'is-amber', `${avgTrophy}%`, 'avg achievement completion');
+    const perfect = tracked.filter(g => g.trophy_progress >= 100).length;
+    if (perfect) push('+', 'is-emerald', formatNum(perfect), 'fully completed (100%)');
+    const nearComplete = tracked.filter(g => g.trophy_progress >= 90 && g.trophy_progress < 100).length;
+    if (nearComplete) push('*', 'is-amber', formatNum(nearComplete), 'one push from 100%');
+    const closest = [...tracked].sort((a, b) => b.trophy_progress - a.trophy_progress)[0];
+    if (closest && closest.trophy_progress < 100) {
+      push('^', 'is-rose', `${closest.name} · ${Math.round(closest.trophy_progress)}%`, 'closest to 100%');
+    }
+  }
+
+  const xboxScored = games.filter(g => (g.xbox_gamerscore_current || 0) > 0);
+  if (xboxScored.length) {
+    const sumCurrent = xboxScored.reduce((s, g) => s + (g.xbox_gamerscore_current || 0), 0);
+    push('*', 'is-amber', formatNum(sumCurrent), 'gamerscore earned');
+    const sumTotal = xboxScored.reduce((s, g) => s + (g.xbox_gamerscore_total || 0), 0);
+    if (sumTotal > 0) {
+      const pct = Math.round((sumCurrent / sumTotal) * 100);
+      push('~', 'is-amber', `${pct}%`, 'of available gamerscore');
+    }
+  }
+
   const top90 = backlog.filter(g => rating(g) >= 90 && hasEnoughReviews(g)).length;
   if (top90) push('*', 'is-amber', formatNum(top90), '90%+ unplayed');
   const top80 = backlog.filter(g => rating(g) >= 80 && hasEnoughReviews(g)).length;

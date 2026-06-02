@@ -1352,11 +1352,25 @@ export function noteFetcherAuthFailure(fetcherKey, logText) {
 
   const provider = providerForFetcher(fetcherKey);
 
-  if (!provider) return;
+  if (!provider) return false;
 
   const authish = /401|403|auth|cookie|session|credential|sign in|npsso|rejected/i.test(logText || '');
 
   if (authish) showReconnectBanner([provider]);
+
+  return authish;
+
+}
+
+
+
+/** True when the given auth provider is currently connected (used to lift a
+
+ * fetcher's auth-failure cooldown the moment the user reconnects). */
+
+export function isProviderConnected(provider) {
+
+  return authStatus.some(p => p.key === provider && p.status === 'connected');
 
 }
 

@@ -90,24 +90,16 @@ export function destroyDashboardCharts() {
   lastChartRenderAt = 0;
 }
 
-/** Above this point count, scatter skips entrance animation (paint cost). */
-const SCATTER_ANIM_POINT_MAX = 200;
-
 /** Replay the entrance animation on every live chart without rebuilding it. */
 export function replayDashboardChartAnimations() {
   // Single animated pass on every live chart. reset() rewinds the animation
   // state to its `from` values; update() then animates back to current data.
   // Pair with animations.resize.duration:0 (in dashChartOptions) so the
   // container unhide on tab change can't trigger a second resize animation
-  // racing with this one. Large scatter skips replay — hundreds of points
-  // animating y/color on tab revisit was the main dashboard chug.
-  for (const [chartId, chart] of Object.entries(dashboardCharts)) {
+  // racing with this one. Scatter replays its points-only entrance like the
+  // rest — only the points move (y rise + radius pop), never the grid/axes.
+  for (const chart of Object.values(dashboardCharts)) {
     try {
-      const n = chart._scatterPtCount;
-      if (chartId === "chartScatter" && typeof n === "number" && n > SCATTER_ANIM_POINT_MAX) {
-        chart.update("none");
-        continue;
-      }
       chart.reset();
       chart.update();
     } catch (_) { /* chart was disposed externally */ }
@@ -1033,15 +1025,13 @@ export function renderDashboardCharts(games) {
       chart._scatterPts = scatterPts;
       chart._scatterPxX = px;
       chart._scatterPxY = py;
-      chart._scatterPtCount = scatterPts.length;
       const grid = buildScatterSpatialGrid(px, py);
       chart._scatterGrid = grid;
       chart._scatterClusterCounts = countScatterClusters(px, py, grid);
     },
   };
-  const scatterHeavy = scatterPts.length > SCATTER_ANIM_POINT_MAX;
-  const scatterAnimReduced = prefersReducedMotion() || scatterHeavy;
-  const scatterAnimDuration = scatterHeavy ? 0 : 600;
+  const scatterAnimReduced = prefersReducedMotion();
+  const scatterAnimDuration = 600;
   const ratingGradient = (rating, alpha) => {
     const t = Math.max(0, Math.min(1, rating / 100));
     const r = Math.round(245 + (16 - 245) * t);
@@ -1069,7 +1059,10 @@ export function renderDashboardCharts(games) {
       } : {
         animation: { duration: scatterAnimDuration, easing: "easeOutQuart" },
         animations: {
-          // Only animate y rise — per-point color interpolation was ~3× canvas cost.
+          // Points-only entrance: each point rises from the x-axis (y) and
+          // pops from r=0 (radius). The grid and axes are part of the chart
+          // frame and stay still. No per-point color interpolation — that was
+          // the ~3× canvas cost that chugged at scale.
           y: {
             type: "number",
             duration: scatterAnimDuration,
@@ -1079,6 +1072,12 @@ export function renderDashboardCharts(games) {
               const yScale = ctx.chart.scales?.y;
               return yScale ? yScale.getPixelForValue(0) : undefined;
             },
+          },
+          radius: {
+            type: "number",
+            duration: scatterAnimDuration,
+            easing: "easeOutQuart",
+            from: 0,
           },
         },
       }),

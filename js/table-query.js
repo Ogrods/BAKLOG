@@ -8,6 +8,7 @@ import {
   GENRE_ALIASES,
   ITCH_NON_GAME_CLASSIFICATIONS,
 } from './state.js';
+import { passesTagFilterFromPrefs } from './tag-filter.js';
 
 const HLTB_BUCKETS_QUERY = [
   { minExclusive: null, maxInclusive: 2 },
@@ -280,6 +281,15 @@ function effectiveSortPrice(ctx, g) {
   return parsePriceLike(g.price);
 }
 
+function passesSearchQuery(g, p, q) {
+  if (g.name.toLowerCase().includes(q)) return true;
+  const notes = String(p.notes || "").toLowerCase();
+  if (notes.includes(q)) return true;
+  const tags = (p.tags || []).join(" ").toLowerCase();
+  if (tags.includes(q)) return true;
+  return false;
+}
+
 function passesFilter(ctx, g) {
   const { view, prefs, params, personal, hiddenKeys, ownedNormNames } = ctx;
   const ng = normalizeGame(g);
@@ -299,7 +309,7 @@ function passesFilter(ctx, g) {
   }
   if (view === 'itch' && ctx.sessionPrefs?.itchHideNonGames && !itchIsGame(g)) return false;
   if (ctx.cleanupModeActive && view === 'library' && !isCleanupCandidate(ctx, g)) return false;
-  if (params.q && !g.name.toLowerCase().includes(params.q)) return false;
+  if (params.q && !passesSearchQuery(g, p, params.q)) return false;
   if ((view === 'library' || view === 'itch') && params.status) {
     if (params.status === '__none__') {
       if (hasPersonalEntry(personal, g)) return false;
@@ -333,15 +343,7 @@ function passesFilter(ctx, g) {
   }
   const genres = prefs.genreFilters || [];
   if (genres.length && !gameMatchesGenreFilters(g, genres, prefs.genreFilterMode)) return false;
-  const tagFilters = prefs.tagFilters || [];
-  if (tagFilters.length) {
-    const gameTags = p.tags || [];
-    if (prefs.tagFilterMode === 'AND') {
-      if (!tagFilters.every(t => gameTags.includes(t))) return false;
-    } else if (!tagFilters.some(t => gameTags.includes(t))) {
-      return false;
-    }
-  }
+  if (!passesTagFilterFromPrefs(prefs, p.tags || [])) return false;
   return true;
 }
 

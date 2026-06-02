@@ -13,6 +13,8 @@ import {
 import {
   loadManualGames,
   bumpPersonalMemo,
+  canonicalizeTagsAcrossTitles,
+  canonicalizeNotesAcrossTitles,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { invalidateTableCache } from './table-ui.js';
@@ -136,6 +138,8 @@ export async function applyMergedLibrary() {
   bumpPersonalMemo();
   invalidateTableCache();
   recomputeCrossStoreHidden();
+  canonicalizeTagsAcrossTitles();
+  canonicalizeNotesAcrossTitles();
   state.dashboardDataReady = true;
   buildOwnedNormNames();
   const banner = document.getElementById("bootErrorBanner");

@@ -21,6 +21,7 @@ import { tableFingerprint } from './table-ui.js';
 import { collectActiveFilters } from './filters-ui.js';
 import { getErrorCount } from './error-boundary.js';
 import { getCurtainState } from './loading-curtain.js';
+import { countOrphanPersonalKeys } from './personal-storage.js';
 
 const STORAGE_KEY = 'baklog-debug';
 const POLL_INTERVAL_MS = 500;
@@ -61,6 +62,7 @@ function buildOverlay() {
       <dt>dash</dt><dd data-field="dash" title="full / replay / skipped (reentrant+cooldown)">—</dd>
       <dt>curtain</dt><dd data-field="curtain" title="boot data-boot-loading + view overlay">—</dd>
       <dt>errors</dt><dd data-field="errors">—</dd>
+      <dt>orphans</dt><dd data-field="orphans" title="state.personal keys with no matching game in any catalog. Surfaced read-only; clean up via kebab → Clean up unknown games.">—</dd>
     </dl>
     <div class="baklog-debug-overlay-foot">?debug=1 · <code>localStorage.removeItem('${STORAGE_KEY}')</code></div>
   `;
@@ -110,6 +112,16 @@ function tick() {
   setField('curtain', readCurtainState());
   const errCount = getErrorCount();
   setField('errors', errCount > 0 ? `${errCount} (see window.__baklogErrors)` : '0');
+  setField('orphans', readOrphanCount());
+}
+
+function readOrphanCount() {
+  try {
+    if (!state.dashboardDataReady) return 'waiting…';
+    return String(countOrphanPersonalKeys());
+  } catch (_) {
+    return '—';
+  }
 }
 
 /**

@@ -1912,6 +1912,143 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 }
 .games-table .game-name-cell { min-width: 0; }
 .games-table .game-name-cell .game-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; max-width: 100%; }
+.has-notes-dot,
+.has-tags-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 0 0.4rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.has-notes-dot {
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+.has-notes-dot:hover { background: rgba(56, 189, 248, 0.18); color: #bae6fd; }
+.has-tags-dot {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  font-weight: 500;
+}
+.has-tags-dot:hover { background: rgba(245, 158, 11, 0.2); color: #fef3c7; }
+.tag-chip,
+.row-tag.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  font-size: 11px;
+  line-height: 1.2;
+  background: rgba(180, 83, 9, 0.4);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fef3c7;
+}
+.tag-chip-remove,
+.row-tag-remove { cursor: pointer; color: #fde68a; background: none; border: none; padding: 0 2px; font-size: 12px; line-height: 1; }
+.tag-chip-remove:hover,
+.row-tag-remove:hover { color: #fff; }
+.tag-chip-add,
+.row-tag-add {
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  border: 1px dashed #64748b;
+  color: #94a3b8;
+  background: transparent;
+}
+.tag-chip-add:hover,
+.row-tag-add:hover { color: #e2e8f0; border-color: #94a3b8; }
+.personal-tag-chip-wrap { vertical-align: middle; }
+.personal-tag-chip {
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid #475569;
+  font-size: 12px;
+  background: #334155;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+.personal-tag-chip:hover { background: #475569; }
+.personal-tag-chip--active {
+  background: #d97706;
+  border-color: #fbbf24;
+  color: #fff;
+}
+.personal-tag-count { margin-left: 0.25rem; font-size: 10px; color: #94a3b8; }
+.personal-tag-chip--active .personal-tag-count { color: #fde68a; }
+.personal-tag-menu-btn {
+  padding: 0 0.25rem;
+  font-size: 10px;
+  line-height: 1;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  background: #1e293b;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.personal-tag-menu-btn:hover { color: #e2e8f0; border-color: #64748b; }
+.tag-manage-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 10rem;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 0.375rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 0.25rem 0;
+  display: flex;
+  flex-direction: column;
+}
+.tag-manage-menu button {
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  font-size: 12px;
+  color: #e2e8f0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.tag-manage-menu button:hover { background: #334155; }
+.tag-inline-input,
+.row-tag-input {
+  font-size: 11px;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  background: #334155;
+  color: #fef3c7;
+  width: 7rem;
+  max-width: 12rem;
+}
+.tag-inline-input:focus,
+.row-tag-input:focus { outline: none; border-color: #fbbf24; }
+.pick-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  max-height: 1.25rem;
+  overflow: hidden;
+}
+.pick-tag-chip {
+  font-size: 9px;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  background: rgba(180, 83, 9, 0.35);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+.pick-tag-more { font-size: 9px; color: #94a3b8; }
 .dash-itch-recap { color: #cbd5e1; line-height: 1.5; display: flex; flex-direction: column; gap: 0.65rem; flex: 1; min-height: 0; }
 .dash-itch-recap strong { color: #ffffff; font-weight: 600; }
 .dash-itch-recap .dash-itch-muted { color: #94a3b8; font-size: 0.75rem; margin-top: 0.35rem; }

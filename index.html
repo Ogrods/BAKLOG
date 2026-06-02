@@ -192,7 +192,7 @@
 
     <section id="toolbarSection" class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
       <div class="flex flex-wrap gap-2 items-center">
-        <input id="search" type="search" placeholder="Search games..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
+        <input id="search" type="search" placeholder="Search games, notes, tags..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
         <button type="button" id="openFiltersBtn" class="relative bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm whitespace-nowrap">
           Filters <span id="filtersBtnBadge" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-sky-600 text-[10px] font-bold">0</span>
         </button>
@@ -204,13 +204,16 @@
             <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
             <button type="button" id="showFetcherLog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reopen the fetcher console (helpful if you closed it during a run)">Show fetcher log</button>
             <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
-            <button type="button" id="exportNotes" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes</button>
+            <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export personal data (status, notes, tags)</button>
+            <button type="button" id="exportNotesOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes only</button>
+            <button type="button" id="exportTagsOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export tags only</button>
+            <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Find stored statuses/notes/tags whose game is no longer in any catalog (uninstalled, store disconnected, etc.)">Clean up unknown games…</button>
             <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700">Copy top 20 backlog (Markdown)</button>
             <label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-700 cursor-pointer text-left" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
               <input type="checkbox" id="itadAutoRefreshToggle" class="rounded" checked />
               Auto-refresh ITAD prices
             </label>
-            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Import notes<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
+            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
           </div>
         </div>
       </div>
@@ -431,6 +434,7 @@
           </select>
           <button type="button" id="addTagBtn" class="px-2 py-0.5 rounded border border-slate-600 text-xs text-slate-300 hover:bg-slate-700">+ Tag selected</button>
         </div>
+        <datalist id="personalTagsList"></datalist>
         <div id="tagChips" class="flex flex-wrap gap-1.5"></div>
       </div>
       <div class="drawer-section space-y-3">
@@ -513,6 +517,33 @@
       </div>
     </div>
   </aside>
+
+  <!-- Orphan personal-data cleanup modal -->
+  <div id="orphanPruneModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-700 p-3">
+        <h3 class="text-lg font-semibold text-slate-100">Clean up unknown games</h3>
+        <button id="orphanPruneClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
+      </div>
+      <div class="p-3 text-xs text-slate-400 border-b border-slate-700">
+        These entries have no matching game in any loaded catalog. Common causes: a fetcher hasn't been run for that store this session, a game was removed from your library, or a connector is disconnected.
+        Removing only deletes the personal data attached to that key; the server writes a timestamped backup to <code>data/personal_backups/</code> before each save, so a wrong delete can still be restored.
+      </div>
+      <div id="orphanPruneSummary" class="px-3 py-2 text-xs text-slate-300 border-b border-slate-700"></div>
+      <div id="orphanPruneList" class="overflow-y-auto p-3 space-y-1 flex-1"></div>
+      <div class="border-t border-slate-700 p-3 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 text-xs">
+          <button type="button" id="orphanPruneSelectAll" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">Select all</button>
+          <button type="button" id="orphanPruneSelectNone" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">Select none</button>
+          <label class="ml-2 text-slate-400 flex items-center gap-1"><input type="checkbox" id="orphanPruneEmptyOnly" /> only empty entries</label>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <button type="button" id="orphanPruneCancel" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Cancel</button>
+          <button type="button" id="orphanPruneConfirm" class="px-3 py-1.5 rounded bg-rose-700 hover:bg-rose-600 text-white">Remove selected</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Add-game modal -->
   <div id="addGameModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">

@@ -213,6 +213,83 @@ describe('queryGames — integration', () => {
     const out = queryGames({ source, ctx: ctx({ sortDir: -1 }) });
     expect(out.map(g => g.name)).toEqual(['B', 'A']);
   });
+
+  it('filters by notes substring', () => {
+    const source = [{ ...baseGame, id: 1, name: 'Zelda' }];
+    const personal = { 'steam:1': { status: 'backlog', notes: 'cozy bedtime', tags: [] } };
+    const out = queryGames({ source, ctx: ctx({ personal, params: { q: 'bedtime' } }) });
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe('Zelda');
+  });
+
+  it('filters by tag substring', () => {
+    const source = [{ ...baseGame, id: 1, name: 'Zelda' }];
+    const personal = { 'steam:1': { status: 'backlog', notes: '', tags: ['co-op', 'cozy'] } };
+    const out = queryGames({ source, ctx: ctx({ personal, params: { q: 'co-op' } }) });
+    expect(out).toHaveLength(1);
+  });
+
+  it('excludes games when search matches neither name, notes, nor tags', () => {
+    const source = [{ ...baseGame, id: 1, name: 'Zelda' }];
+    const personal = { 'steam:1': { status: 'backlog', notes: '', tags: [] } };
+    const out = queryGames({ source, ctx: ctx({ personal, params: { q: 'xyzzy' } }) });
+    expect(out).toHaveLength(0);
+  });
+
+  it('tagFilters OR — any listed tag passes', () => {
+    const source = [
+      { ...baseGame, id: 1, name: 'A' },
+      { ...baseGame, id: 2, name: 'B' },
+    ];
+    const personal = {
+      'steam:1': { status: 'backlog', notes: '', tags: ['cozy'] },
+      'steam:2': { status: 'backlog', notes: '', tags: ['co-op'] },
+    };
+    const out = queryGames({
+      source,
+      ctx: ctx({ personal, prefs: { tagFilters: ['cozy', 'co-op'], tagFilterMode: 'OR' } }),
+    });
+    expect(out).toHaveLength(2);
+  });
+
+  it('tagFilters OR — single tag', () => {
+    const source = [
+      { ...baseGame, id: 1, name: 'A' },
+      { ...baseGame, id: 2, name: 'B' },
+    ];
+    const personal = {
+      'steam:1': { status: 'backlog', notes: '', tags: ['cozy'] },
+      'steam:2': { status: 'backlog', notes: '', tags: [] },
+    };
+    const out = queryGames({
+      source,
+      ctx: ctx({ personal, prefs: { tagFilters: ['cozy'], tagFilterMode: 'OR' } }),
+    });
+    expect(out.map(g => g.id)).toEqual([1]);
+  });
+
+  it('tagFilters AND — must have every tag', () => {
+    const source = [
+      { ...baseGame, id: 1, name: 'A' },
+      { ...baseGame, id: 2, name: 'B' },
+    ];
+    const personal = {
+      'steam:1': { status: 'backlog', notes: '', tags: ['cozy', 'short'] },
+      'steam:2': { status: 'backlog', notes: '', tags: ['cozy'] },
+    };
+    const out = queryGames({
+      source,
+      ctx: ctx({ personal, prefs: { tagFilters: ['cozy', 'short'], tagFilterMode: 'AND' } }),
+    });
+    expect(out.map(g => g.id)).toEqual([1]);
+  });
+
+  it('empty tagFilters is a no-op', () => {
+    const source = [{ ...baseGame, id: 1, name: 'A' }];
+    const personal = { 'steam:1': { status: 'backlog', notes: '', tags: ['cozy'] } };
+    const out = queryGames({ source, ctx: ctx({ personal, prefs: { tagFilters: [] } }) });
+    expect(out).toHaveLength(1);
+  });
 });
 
 describe('collectTableParams', () => {

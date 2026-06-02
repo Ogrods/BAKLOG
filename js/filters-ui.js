@@ -25,7 +25,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { gameGenresCanonical, aliasCanonicalGenre } from './genres.js';
-import { getPersonal, allPersonalTags } from './personal-storage.js';
+import { getPersonal, allPersonalTags, rebuildPersonalTagsDatalist } from './personal-storage.js';
 import {
   savePrefs,
   applySavedSortForView,
@@ -741,6 +741,7 @@ export function renderGenreChips() {
 }
 
 export function renderTagChips() {
+  rebuildPersonalTagsDatalist();
   const tags = allPersonalTags();
   const wrap = document.getElementById("tagChips");
   if (!wrap) return;
@@ -750,7 +751,11 @@ export function renderTagChips() {
   }
   wrap.innerHTML = tags.map(([t, n]) => {
     const active = (state.prefs.tagFilters || []).includes(t);
-    return `<button class="personal-tag-chip px-2 py-0.5 rounded-full border text-xs ${active ? "bg-amber-600 border-amber-400 text-white" : "bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600"}" data-tag="${escapeAttr(t)}">${escapeHtml(t)}<span class="ml-1 text-[10px] text-slate-400">${n}</span></button>`;
+    const activeCls = active ? "personal-tag-chip--active" : "";
+    return `<span class="personal-tag-chip-wrap inline-flex items-center gap-0.5">
+      <button type="button" class="personal-tag-chip ${activeCls}" data-tag="${escapeAttr(t)}">${escapeHtml(t)}<span class="personal-tag-count">${n}</span></button>
+      <button type="button" class="personal-tag-menu-btn" data-tag="${escapeAttr(t)}" aria-label="Options for tag ${escapeAttr(t)}" title="Rename, merge, or delete">▾</button>
+    </span>`;
   }).join("");
 }
 

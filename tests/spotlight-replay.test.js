@@ -171,6 +171,106 @@ describe("spotlight recently added category", () => {
   });
 });
 
+describe("spotlight expanded categories", () => {
+  let pickSpotlightGames;
+  let state;
+
+  beforeEach(async () => {
+    const win = new Window({ url: "http://127.0.0.1:8765/" });
+    global.window = win;
+    global.document = win.document;
+    global.localStorage = win.localStorage;
+    win.__dashFailedCovers = new Set();
+
+    vi.resetModules();
+    ({ state } = await import("../js/state.js"));
+    state.personal = {};
+    state.itadByKey = {};
+    state.prefs = { librarySeenSeeded: true };
+    state.libraryFirstSeenByKey = {};
+    win._dataVersion = (win._dataVersion || 0) + 1;
+    ({ pickSpotlightGames } = await import("../js/dashboard-spotlight.js"));
+  });
+
+  const libraryGame = (id, overrides = {}) => ({
+    store: "steam",
+    id,
+    name: `Game ${id}`,
+    steam_review_percent: 85,
+    steam_review_count: 1000,
+    library_image: "x.jpg",
+    header_image: "x.jpg",
+    release_date: "2015-01-01",
+    hltb_main_hours: 20,
+    ...overrides,
+  });
+
+  function eyebrowFor(games, id) {
+    const pool = pickSpotlightGames(games);
+    return pool.find((g) => g.id === id)?._spotlightReason?.eyebrow;
+  }
+
+  it("tags coop_online backlog games as Co-op campaign", () => {
+    state.personal = { "steam:1": { status: "backlog" } };
+    const games = [libraryGame(1, { coop_online: true })];
+    expect(eyebrowFor(games, 1)).toBe("Co-op campaign");
+  });
+
+  it("excludes live-status games from the spotlight pool", () => {
+    state.personal = { "steam:1": { status: "live" } };
+    const games = [libraryGame(1, { coop_online: true })];
+    expect(pickSpotlightGames(games).length).toBe(0);
+  });
+
+  it("tags coop_local backlog games as Couch co-op", () => {
+    state.personal = { "steam:2": { status: "backlog" } };
+    const games = [libraryGame(2, { coop_local: true })];
+    expect(eyebrowFor(games, 2)).toBe("Couch co-op");
+  });
+
+  it("tags ITAD-backed deals as On sale now", () => {
+    state.personal = { "steam:3": { status: "backlog" } };
+    state.itadByKey = { "steam:3": { cut: 40, price: 9.99 } };
+    const games = [libraryGame(3)];
+    expect(eyebrowFor(games, 3)).toBe("On sale now");
+  });
+
+  it("tags recent releases as New release", () => {
+    state.personal = { "steam:4": { status: "backlog" } };
+    const recent = new Date();
+    recent.setMonth(recent.getMonth() - 2);
+    const games = [libraryGame(4, { release_date: recent.toISOString().slice(0, 10) })];
+    expect(eyebrowFor(games, 4)).toBe("New release");
+  });
+
+  it("tags long HLTB titles as Long haul", () => {
+    state.personal = { "steam:5": { status: "backlog" } };
+    const games = [libraryGame(5, { hltb_main_hours: 50, steam_review_percent: 88 })];
+    expect(eyebrowFor(games, 5)).toBe("Long haul");
+  });
+
+  it("tags 8–15h titles as Weekend-sized", () => {
+    state.personal = { "steam:6": { status: "backlog" } };
+    const games = [libraryGame(6, {
+      steam_review_percent: 73,
+      hltb_main_hours: 10,
+      release_date: "2022-06-01",
+    })];
+    expect(eyebrowFor(games, 6)).toBe("Weekend-sized");
+  });
+
+  it("tags stale backlog titles as Gathering dust", () => {
+    state.personal = { "steam:7": { status: "backlog" } };
+    const games = [libraryGame(7, {
+      steam_review_percent: 72,
+      hltb_main_hours: 30,
+      release_date: "2015-01-01",
+      playtime_minutes: 0,
+    })];
+    expect(eyebrowFor(games, 7)).toBe("Gathering dust");
+  });
+});
+
 describe("spotlight rotation safety", () => {
   beforeEach(async () => {
     const win = new Window({ url: "http://127.0.0.1:8765/" });

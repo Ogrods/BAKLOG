@@ -13,24 +13,12 @@ from dotenv import load_dotenv
 
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import RunStats, started
 from psn_client import PsnAuthError, PsnClient, PsnGameEntry
 
 GAMES_PSN_JSON = Path("games_psn.json")
 HLTB_DELAY_SEC = 1.0
-
-# Manual denylist of PSN ids (CUSA / NPWR / concept) for entries Sony reports
-# as "library" titles but are really streaming apps / utilities. Add an id here
-# whenever the fetcher picks up junk you don't want to see again.
-DENYLIST_IDS: set[str] = {
-    "CUSA20387_00",  # PeacockTV
-    "PPSA06399_00",  # PAC-MAN WORLD Re-PAC Chrome Noir Chogokin skin (cosmetic DLC)
-    "CUSA03390_00",  # NFL app
-    "CUSA06566_00",  # NBA app
-    "CUSA02012_00",  # Media Player
-    "CUSA18774_00",  # 4 YoRHa (NieR demo chapter — not owned full game)
-}
 
 
 def _configure_stdout() -> None:
@@ -155,9 +143,6 @@ def main() -> int:
         if empty_exit is not None:
             return stats.finish("fetch_psn", t0, exit_code=empty_exit)
 
-    denied = sum(1 for e in library if e.id in DENYLIST_IDS)
-    library = [e for e in library if e.id not in DENYLIST_IDS]
-
     dropped = getattr(psn, "last_dedupe_dropped", 0)
     filtered = getattr(psn, "last_filtered_non_games", 0)
     parts: list[str] = []
@@ -165,8 +150,6 @@ def main() -> int:
         parts.append(f"merged {dropped} cross-platform duplicates")
     if filtered:
         parts.append(f"filtered {filtered} non-games")
-    if denied:
-        parts.append(f"denylisted {denied}")
     suffix = f" ({', '.join(parts)})" if parts else ""
     print(f"Found {len(library)} titles{suffix}.")
 
@@ -209,6 +192,15 @@ def main() -> int:
     )
     if empty_exit is not None:
         return stats.finish("fetch_psn", t0, exit_code=empty_exit)
+    if not args.psn_id:
+        drift_exit = refuse_drift_result(
+            games_out,
+            label="PSN library rows",
+            allow_drift=args.allow_drift,
+            output_path=GAMES_PSN_JSON,
+        )
+        if drift_exit is not None:
+            return stats.finish("fetch_psn", t0, exit_code=drift_exit)
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

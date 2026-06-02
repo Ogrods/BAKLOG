@@ -130,13 +130,14 @@ function getPersonalRecord(personal, g) {
   const key = gameKey(g);
   const found = personal[key] || (typeof personal[gameId(g)] === 'object' ? personal[gameId(g)] : null);
   if (!found) {
-    return { status: 'backlog', notes: '', priority: 0, hltb_override: null };
+    return { status: 'backlog', notes: '', priority: 0, hltb_override: null, hidden: false };
   }
   return {
     status: found.status ?? 'backlog',
     notes: found.notes ?? '',
     priority: found.priority ?? 0,
     hltb_override: found.hltb_override ?? null,
+    hidden: found.hidden === true,
   };
 }
 
@@ -290,6 +291,7 @@ function passesFilter(ctx, g) {
   const { view, prefs, params, personal, hiddenKeys, ownedNormNames } = ctx;
   const ng = normalizeGame(g);
   const p = getPersonalRecord(personal, g);
+  if (p.hidden) return false;
   if (view === 'library') {
     if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
     if (prefs.releaseYearFilter && !matchesReleaseYearFilter(g, prefs.releaseYearFilter)) return false;

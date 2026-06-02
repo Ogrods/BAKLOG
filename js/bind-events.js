@@ -21,6 +21,7 @@ import {
   updateHasNotesIndicatorInPlace,
   toggleSelection,
   bulkSetStatus,
+  bulkRemove,
   performUndo,
   canUndo,
   hideUndoToast,
@@ -64,6 +65,7 @@ import {
 import { reloadGames } from './library-load.js';
 import { bindAddGameModal } from './add-game-modal.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
+import { bindHiddenPanelUI } from './hidden-panel.js';
 import { createGlobalKeydownHandler } from './events.js';
 import {
   fetcherRunner,
@@ -516,6 +518,10 @@ export function bindEvents() {
     refreshFilterUI();
   });
   document.getElementById("bulkBar")?.addEventListener("click", e => {
+    if (e.target.closest("#bulkRemove")) {
+      bulkRemove();
+      return;
+    }
     const btn = e.target.closest(".bulk-status");
     if (btn?.dataset.status) bulkSetStatus(btn.dataset.status);
   });
@@ -620,6 +626,7 @@ export function bindEvents() {
   });
   bindAddGameModal();
   bindOrphanPruneUI();
+  bindHiddenPanelUI();
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
   document.getElementById("exportPersonal").addEventListener("click", () => download("baklog-personal.json", JSON.stringify(state.personal, null, 2), "application/json"));

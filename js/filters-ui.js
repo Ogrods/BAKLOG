@@ -25,7 +25,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { gameGenresCanonical, aliasCanonicalGenre } from './genres.js';
-import { getPersonal } from './personal-storage.js';
+import { getPersonal, filterOutHidden } from './personal-storage.js';
 import {
   savePrefs,
   applySavedSortForView,
@@ -43,6 +43,7 @@ import {
   isViewCached,
   reanchorPickedRow,
   prewarmTableQueryForView,
+  syncRowCountLabel,
 } from './table-ui.js';
 import { renderPicks } from './picks-ui.js';
 import { showViewOverlay, hideViewOverlay } from './loading-curtain.js';
@@ -456,6 +457,7 @@ export function updateViewChrome(options) {
   document.getElementById("toolbarSection")?.classList.toggle("hidden", isDash || isConn);
   document.getElementById("tableShell")?.classList.toggle("hidden", isDash || isConn);
   document.getElementById("rowCount")?.classList.toggle("hidden", isDash || isConn);
+  if (!isDash && !isConn) syncRowCountLabel();
   document.getElementById("summary")?.classList.toggle("hidden", isConn);
   document.getElementById("alphaNavWrap")?.classList.toggle("dashboard-hidden", isDash || isConn);
   document.getElementById("dashboardContainer")?.classList.toggle("hidden", !isDash);
@@ -669,7 +671,7 @@ export function renderSummary() {
       ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
     return;
   }
-  const visible = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
+  const visible = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
   const backlog = visible.filter(g => getPersonal(g).status === "backlog");
   const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
   const played = visible.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
@@ -745,7 +747,7 @@ export function renderGenreChips() {
 
 // === Export ===
 export function exportTopBacklogMarkdown() {
-  const visible = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
+  const visible = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
   const backlog = visible
     .filter(g => chipStatusKey(g) === "backlog")
     .sort((a, b) => priorityScore(b) - priorityScore(a))

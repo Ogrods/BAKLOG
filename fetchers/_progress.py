@@ -1,4 +1,11 @@
-"""Shared progress / timing helpers for fetch and enrich scripts."""
+"""Shared progress / timing helpers for fetch and enrich scripts.
+
+Exit code contract (used across fetchers and enrichers):
+  0 — success
+  1 — runtime/config error
+  2 — refused to write (empty library result)
+  3 — refused to write (suspicious drift vs prior file)
+"""
 
 from __future__ import annotations
 

@@ -9,12 +9,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-COMMANDS: dict[str, list[str]] = {
-    "hltb": [sys.executable, str(ROOT / "enrich_hltb.py")],
-    "steam-reviews": [sys.executable, str(ROOT / "enrich_steam_reviews.py")],
-    "steam-tags": [sys.executable, str(ROOT / "enrich_steam_tags.py")],
-    "cross-store-images": [sys.executable, str(ROOT / "enrich_cross_store_images.py")],
+# Legacy CLI names -> manifest fetcher keys
+_LEGACY_ALIASES: dict[str, str] = {
+    "steam-reviews": "steamReviews",
+    "steam-tags": "steamTags",
+    "cross-store-images": "steamCovers",
 }
+
+
+def _commands_from_manifest() -> dict[str, list[str]]:
+    from fetchers.registry import manifest_entries
+
+    out: dict[str, list[str]] = {}
+    for entry in manifest_entries():
+        if entry.get("group") != "enrich":
+            continue
+        key = entry["key"]
+        script = entry.get("script")
+        if not key or not script:
+            continue
+        out[key] = [sys.executable, str(ROOT / script)]
+    for legacy, key in _LEGACY_ALIASES.items():
+        if key in out:
+            out[legacy] = out[key]
+    return out
+
+
+COMMANDS = _commands_from_manifest()
 
 
 def main(argv: list[str] | None = None) -> int:

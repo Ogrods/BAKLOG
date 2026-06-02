@@ -188,6 +188,13 @@ def print_id_diff(
     return added, removed
 
 
+# Image fields owned by a store fetcher only when the fetcher actually has a URL.
+# When the fresh row's value is falsy we keep whatever's cached — typically the
+# Steam-CDN URL written by enrich_cross_store_images.py — instead of clobbering
+# enrichment back to None on every fetcher rerun.
+_IMAGE_KEYS = frozenset({"header_image", "library_image"})
+
+
 def merge_cached_row(
     fresh: dict[str, Any],
     cached: dict[str, Any] | None,
@@ -207,8 +214,11 @@ def merge_cached_row(
         return fresh
     merged = dict(cached)
     for key in authoritative:
-        if key in fresh:
-            merged[key] = fresh[key]
+        if key not in fresh:
+            continue
+        if key in _IMAGE_KEYS and not fresh[key]:
+            continue
+        merged[key] = fresh[key]
     if hltb_updated:
         for key in hltb_keys:
             merged[key] = fresh.get(key)

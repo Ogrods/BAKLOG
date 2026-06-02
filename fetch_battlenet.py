@@ -18,7 +18,7 @@ from battlenet_client import BattleNetAuthError, BattleNetClient
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
 from fetchers._authoritative import BATTLENET
-from fetchers._base import merge_cached_row
+from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result
 from fetchers._progress import RunStats, started
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
@@ -183,6 +183,7 @@ def _build_client(browser: str, env_cookie: str) -> BattleNetClient:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Battle.net library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_allow_empty_arg(parser)
     load_dotenv()
     env_cookie = resolve_env("BATTLENET_COOKIE", provider="battlenet")
     default_browser = "env" if env_cookie else os.getenv("BATTLENET_BROWSER", "edge")
@@ -268,6 +269,15 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+
+    drift_exit = refuse_drift_result(
+        games_out,
+        label="Battle.net library rows",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_BATTLENET_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_battlenet", t0, exit_code=drift_exit)
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

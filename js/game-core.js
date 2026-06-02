@@ -24,6 +24,10 @@ const JUNK_NAME_PATTERNS = [
   // full SKUs alongside real games. "Costume Quest" is a legit title so we
   // require the "for" form to avoid false positives.
   /\bcostume for\b/i,
+  // Epic ships PTR/public-testing branches as separate library entries
+  // (e.g. "Chivalry 2 - Public Testing"). Drop them so they don't shadow
+  // the real release.
+  /\bpublic testing\b/i,
 ];
 
 const MIN_REVIEW_COUNT = 50;
@@ -427,6 +431,51 @@ export function findGameByKey(key) {
   return state.allGames.find(g => gameKey(g) === key)
     || state.itchGames.find(g => gameKey(g) === key)
     || state.wishlistGames.find(g => gameKey(g) === key);
+}
+
+/** norm title → gameKey[] across library + wishlist + itch catalogs. */
+let _titleKeyIndexVer = -1;
+let _titleKeyIndex = null;
+
+function catalogGamesFingerprint() {
+  return (state.allGames?.length || 0)
+    + (state.wishlistGames?.length || 0) * 1e6
+    + (state.itchGames?.length || 0) * 1e9;
+}
+
+export function buildTitleKeyIndex() {
+  const index = new Map();
+  const all = [...(state.allGames || []), ...(state.wishlistGames || []), ...(state.itchGames || [])];
+  for (const g of all) {
+    const norm = normalizeNameForDedup(g.name);
+    if (!norm) continue;
+    const key = gameKey(g);
+    if (!index.has(norm)) index.set(norm, []);
+    const list = index.get(norm);
+    if (!list.includes(key)) list.push(key);
+  }
+  return index;
+}
+
+export function getTitleKeyIndex() {
+  const ver = catalogGamesFingerprint();
+  if (!_titleKeyIndex || _titleKeyIndexVer !== ver) {
+    _titleKeyIndex = buildTitleKeyIndex();
+    _titleKeyIndexVer = ver;
+  }
+  return _titleKeyIndex;
+}
+
+/** Every store copy of the same normalized title (canonical tag group). */
+export function getSameTitleKeys(g) {
+  const norm = normalizeNameForDedup(g?.name);
+  if (!norm) return [gameKey(g)];
+  return getTitleKeyIndex().get(norm) || [gameKey(g)];
+}
+
+export function invalidateTitleKeyIndex() {
+  _titleKeyIndex = null;
+  _titleKeyIndexVer = -1;
 }
 
 export function chipStatusKey(g) {

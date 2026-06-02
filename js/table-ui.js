@@ -267,6 +267,50 @@ export function bulkSetStatus(status) {
 }
 
 // === Row helpers ===
+export function updateHasTagsIndicatorInPlace(tr, g) {
+  if (!tr) return;
+  const meta = tr.querySelector(".row-meta");
+  if (!meta) return;
+  const tags = getPersonal(g).tags || [];
+  const dot = meta.querySelector(".has-tags-dot");
+  if (tags.length) {
+    const tooltip = tags.join(", ").slice(0, 160);
+    const label = `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
+    if (dot) {
+      dot.title = tooltip;
+      dot.textContent = label;
+    } else {
+      meta.insertAdjacentHTML(
+        "beforeend",
+        `<span class="has-tags-dot" title="${escapeAttr(tooltip)}" aria-label="Has tags">${label}</span>`,
+      );
+    }
+  } else if (dot) {
+    dot.remove();
+  }
+}
+
+export function updateHasNotesIndicatorInPlace(tr, g) {
+  if (!tr) return;
+  const meta = tr.querySelector(".row-meta");
+  if (!meta) return;
+  const notes = String(getPersonal(g).notes || "").trim();
+  const dot = meta.querySelector(".has-notes-dot");
+  if (notes) {
+    const tooltip = notes.slice(0, 160);
+    if (dot) {
+      dot.title = tooltip;
+    } else {
+      const tagsDot = meta.querySelector(".has-tags-dot");
+      const html = `<span class="has-notes-dot" title="${escapeAttr(tooltip)}" aria-label="Has notes">&#9998; note</span>`;
+      if (tagsDot) tagsDot.insertAdjacentHTML("beforebegin", html);
+      else meta.insertAdjacentHTML("beforeend", html);
+    }
+  } else if (dot) {
+    dot.remove();
+  }
+}
+
 export function updateRowInPlace(tr, g) {
   const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
   const cleanup = state.activeView === "library" && isCleanupCandidate(g);
@@ -279,7 +323,8 @@ export function updateRowInPlace(tr, g) {
 export function tagCellHtml(g) {
   const key = gameKey(g);
   const p = getPersonal(g);
-  return (p.tags || []).map(t => `<span class="row-tag inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-700/40 border border-amber-500/40 text-[11px] text-amber-100">${escapeHtml(t)}<button type="button" class="row-tag-remove text-amber-200 hover:text-white" style="cursor: pointer" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("") + `<button type="button" class="row-tag-add text-[11px] px-1.5 py-0.5 rounded-full border border-dashed border-slate-500 text-slate-400 hover:text-slate-100 hover:border-slate-300" style="cursor: pointer" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>`;
+  const chips = (p.tags || []).map(t => `<span class="row-tag tag-chip">${escapeHtml(t)}<button type="button" class="row-tag-remove tag-chip-remove" data-game-key="${escapeAttr(key)}" data-tag="${escapeAttr(t)}" title="Remove tag" aria-label="Remove tag">×</button></span>`).join("");
+  return `${chips}<button type="button" class="row-tag-add tag-chip-add" data-game-key="${escapeAttr(key)}" title="Add a tag">+ tag</button>`;
 }
 
 export function updateTagCellInPlace(tr, g) {
@@ -878,9 +923,11 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
               ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate flex-1 min-w-0", escapeHtml(g.name))}
               ${ownedWish ? '<span class="text-amber-400 text-xs shrink-0" title="You already own this (matched by title)">owned</span>' : ""}
             </div>
-            <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+            <div class="row-meta mt-1 flex items-center gap-1.5 flex-wrap">
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
               ${coopPillsHtml(g)}
+              ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))}" aria-label="Has notes">&#9998; note</span>` : ""}
+              ${(p.tags || []).length ? `<span class="has-tags-dot" title="${escapeAttr((p.tags || []).join(", ").slice(0, 160))}" aria-label="Has tags">${(p.tags || []).length} tag${(p.tags || []).length === 1 ? "" : "s"}</span>` : ""}
             </div>
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </div>

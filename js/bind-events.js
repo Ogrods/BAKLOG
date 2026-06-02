@@ -6,10 +6,15 @@ import {
 import {
   getPersonal,
   setPersonal,
-  savePersonal,
+  mergeImportedPersonal,
   addTagToGame,
   removeTagFromGame,
+  renameTagGlobally,
+  mergeTagGlobally,
+  deleteTagGlobally,
+  normalizeTag,
 } from './personal-storage.js';
+import { escapeAttr } from './dom-util.js';
 import {
   savePrefs,
   persistCurrentSort,
@@ -21,6 +26,8 @@ import {
   updateBulkBar,
   updateRowInPlace,
   updateTagCellInPlace,
+  updateHasNotesIndicatorInPlace,
+  updateHasTagsIndicatorInPlace,
   scheduleTagChipsRefresh,
   toggleSelection,
   bulkSetStatus,
@@ -67,6 +74,7 @@ import {
 } from './deals.js';
 import { reloadGames } from './library-load.js';
 import { bindAddGameModal } from './add-game-modal.js';
+import { bindOrphanPruneUI } from './orphan-prune.js';
 import { createGlobalKeydownHandler } from './events.js';
 import {
   fetcherRunner,
@@ -466,7 +474,113 @@ export function bindEvents() {
     const next = cur.includes(genre) ? cur.filter(x => x !== genre) : [...cur, genre];
     applyPrefsChange({ prefs: { genreFilters: next } }, { renderers: [renderGenreChips] });
   });
+  let _tagManageMenu = null;
+
+  function closeTagManageMenu() {
+    _tagManageMenu?.remove();
+    _tagManageMenu = null;
+  }
+
+  function afterTagMutation() {
+    renderTagChips();
+    renderTable();
+    renderPicks();
+  }
+
+  function showTagInlineInput(anchor, { placeholder, initial = "", onCommit }) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = placeholder;
+    input.value = initial;
+    input.maxLength = 32;
+    input.setAttribute("list", "personalTagsList");
+    input.autocomplete = "off";
+    input.className = "tag-inline-input";
+    anchor.replaceWith(input);
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      if (commit) onCommit(input.value);
+      else renderTagChips();
+    };
+    input.addEventListener("keydown", ev => {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener("blur", () => finish(true));
+    setTimeout(() => input.focus(), 0);
+  }
+
+  function openTagManageMenu(anchor, tag) {
+    closeTagManageMenu();
+    const menu = document.createElement("div");
+    menu.id = "tagManageMenu";
+    menu.className = "tag-manage-menu";
+    menu.innerHTML = `
+      <button type="button" data-action="rename" data-tag="${escapeAttr(tag)}">Rename</button>
+      <button type="button" data-action="merge" data-tag="${escapeAttr(tag)}">Merge into…</button>
+      <button type="button" data-action="delete" data-tag="${escapeAttr(tag)}">Delete from all games</button>
+    `;
+    document.body.appendChild(menu);
+    const rect = anchor.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    menu.style.left = `${rect.left + window.scrollX}px`;
+    _tagManageMenu = menu;
+    const onDocClick = (ev) => {
+      if (menu.contains(ev.target) || anchor.contains(ev.target)) return;
+      closeTagManageMenu();
+      document.removeEventListener("click", onDocClick, true);
+    };
+    setTimeout(() => document.addEventListener("click", onDocClick, true), 0);
+    menu.addEventListener("click", ev => {
+      const btn = ev.target.closest("button[data-action]");
+      if (!btn) return;
+      ev.stopPropagation();
+      const action = btn.dataset.action;
+      const srcTag = btn.dataset.tag;
+      closeTagManageMenu();
+      document.removeEventListener("click", onDocClick, true);
+      const wrap = anchor.closest(".personal-tag-chip-wrap");
+      if (action === "delete") {
+        if (confirm(`Remove tag "${srcTag}" from every game?`)) {
+          deleteTagGlobally(srcTag);
+          afterTagMutation();
+        }
+        return;
+      }
+      if (action === "rename") {
+        showTagInlineInput(wrap || anchor, {
+          placeholder: "New tag name",
+          initial: srcTag,
+          onCommit: (raw) => {
+            if (renameTagGlobally(srcTag, raw)) afterTagMutation();
+            else renderTagChips();
+          },
+        });
+        return;
+      }
+      if (action === "merge") {
+        showTagInlineInput(wrap || anchor, {
+          placeholder: `Merge "${srcTag}" into…`,
+          onCommit: (raw) => {
+            const dst = normalizeTag(raw);
+            if (!dst || dst === srcTag) { renderTagChips(); return; }
+            if (mergeTagGlobally(srcTag, dst)) afterTagMutation();
+            else renderTagChips();
+          },
+        });
+      }
+    });
+  }
+
   document.getElementById("tagChips").addEventListener("click", e => {
+    const menuBtn = e.target.closest(".personal-tag-menu-btn");
+    if (menuBtn) {
+      e.stopPropagation();
+      openTagManageMenu(menuBtn, menuBtn.dataset.tag);
+      return;
+    }
     const chip = e.target.closest(".personal-tag-chip");
     if (!chip) return;
     const tag = chip.dataset.tag;
@@ -479,7 +593,9 @@ export function bindEvents() {
   tagModeEl.addEventListener("change", () => {
     applyPrefsChange({ prefs: { tagFilterMode: tagModeEl.value } });
   });
-  document.getElementById("addTagBtn").addEventListener("click", () => {
+  document.getElementById("addTagBtn").addEventListener("click", e => {
+    const btn = e.currentTarget;
+    if (btn.nextElementSibling?.classList.contains("tag-inline-input")) return;
     const list = sortedGames(filteredGames());
     const targets = [];
     if (state.selectedKeys.size) {
@@ -490,13 +606,36 @@ export function bindEvents() {
     } else if (state.focusedRowIndex >= 0 && list[state.focusedRowIndex]) {
       targets.push(list[state.focusedRowIndex]);
     }
-    if (!targets.length) { alert("Select rows (or focus a row with arrow keys) before adding a tag."); return; }
-    const raw = prompt(`Add a tag to ${targets.length} game${targets.length === 1 ? "" : "s"} (lowercase, e.g. co-op, cozy, bedtime):`);
-    if (!raw) return;
-    let added = 0;
-    for (const g of targets) if (addTagToGame(g, raw)) added++;
-    renderTagChips();
-    renderTable();
+    if (!targets.length) {
+      alert("Select rows (or focus a row with arrow keys) before adding a tag.");
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = `Tag ${targets.length} game${targets.length === 1 ? "" : "s"}…`;
+    input.maxLength = 32;
+    input.setAttribute("list", "personalTagsList");
+    input.autocomplete = "off";
+    input.className = "tag-inline-input";
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      input.remove();
+      btn.style.display = "";
+      if (commit && input.value.trim()) {
+        for (const g of targets) addTagToGame(g, input.value);
+        afterTagMutation();
+      }
+    };
+    input.addEventListener("keydown", ev => {
+      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener("blur", () => finish(true));
+    btn.style.display = "none";
+    btn.insertAdjacentElement("afterend", input);
+    setTimeout(() => input.focus(), 0);
   });
   document.getElementById("tbody").addEventListener("change", e => {
     const t = e.target;
@@ -512,7 +651,10 @@ export function bindEvents() {
     const field = t.dataset.field;
     setPersonal(g, field, t.value);
     const tr = t.closest("tr");
-    if (tr) updateRowInPlace(tr, g);
+    if (tr) {
+      updateRowInPlace(tr, g);
+      if (field === "notes") updateHasNotesIndicatorInPlace(tr, g);
+    }
     const statusFilterActive = !!state.sessionPrefs?.statusFilter;
     const sortAffected = state.sortKey === field || state.sortKey === "status";
     if ((field === "status" && (statusFilterActive || state.cleanupModeActive)) || sortAffected) {
@@ -557,14 +699,32 @@ export function bindEvents() {
     invalidateTableCache();
     renderTable();
   });
-  document.getElementById("tbody").addEventListener("blur", e => {
+  document.getElementById("tbody").addEventListener("keydown", e => {
     const t = e.target;
-    if (!t.classList.contains("notes-input")) return;
+    if (!t.classList.contains("notes-input") || e.key !== "Escape") return;
+    e.preventDefault();
     const g = findGameByKey(t.dataset.gameKey);
-    if (g) setPersonal(g, "notes", t.value);
-  }, true);
+    if (g) t.value = getPersonal(g).notes || "";
+    t.blur();
+  });
   document.getElementById("tbody").addEventListener("click", e => {
-    if (!e.target.closest("select, input, a, button, .row-tag-remove, .row-tag-add, [data-hltb-edit]")) {
+    const notesDot = e.target.closest(".has-notes-dot");
+    if (notesDot) {
+      e.stopPropagation();
+      const tr = notesDot.closest("tr[data-row-key]");
+      tr?.querySelector(".notes-input")?.focus();
+      return;
+    }
+    const tagsDot = e.target.closest(".has-tags-dot");
+    if (tagsDot) {
+      e.stopPropagation();
+      const tr = tagsDot.closest("tr[data-row-key]");
+      const wrap = tr?.querySelector(".tag-chip-wrap");
+      wrap?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      tr?.querySelector(".row-tag-add")?.focus();
+      return;
+    }
+    if (!e.target.closest("select, input, a, button, .row-tag-remove, .row-tag-add, [data-hltb-edit], .has-notes-dot, .has-tags-dot")) {
       const tr = e.target.closest("tr[data-row-key]");
       if (tr) {
         state.focusedRowIndex = Number(tr.dataset.rowIndex || -1);
@@ -579,6 +739,7 @@ export function bindEvents() {
         removeTagFromGame(g, removeBtn.dataset.tag);
         const tr = removeBtn.closest("tr");
         updateTagCellInPlace(tr, g);
+        updateHasTagsIndicatorInPlace(tr, g);
         scheduleTagChipsRefresh();
       }
       return;
@@ -592,6 +753,8 @@ export function bindEvents() {
       input.type = "text";
       input.placeholder = "tag…";
       input.maxLength = 32;
+      input.setAttribute("list", "personalTagsList");
+      input.autocomplete = "off";
       input.className = "row-tag-input text-[11px] px-1.5 py-0.5 rounded-full border border-amber-500/60 bg-slate-700 text-amber-100 w-20 focus:outline-none focus:border-amber-300";
       addBtn.replaceWith(input);
       let done = false;
@@ -603,6 +766,7 @@ export function bindEvents() {
         if (raw && raw.trim()) {
           addTagToGame(g, raw);
           updateTagCellInPlace(tr, g);
+          updateHasTagsIndicatorInPlace(tr, g);
           scheduleTagChipsRefresh();
         } else if (input.parentNode) {
           input.replaceWith(addBtn);
@@ -692,14 +856,36 @@ export function bindEvents() {
     el.addEventListener("click", () => kebabMenu.classList.remove("open"));
   });
   bindAddGameModal();
+  bindOrphanPruneUI();
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
-  document.getElementById("exportNotes").addEventListener("click", () => download("baklog-notes.json", JSON.stringify(state.personal, null, 2), "application/json"));
+  document.getElementById("exportPersonal").addEventListener("click", () => download("baklog-personal.json", JSON.stringify(state.personal, null, 2), "application/json"));
+  document.getElementById("exportNotesOnly")?.addEventListener("click", () => {
+    const rows = [];
+    for (const [key, rec] of Object.entries(state.personal)) {
+      if (key.startsWith("__")) continue;
+      const notes = String(rec?.notes || "").trim();
+      if (!notes) continue;
+      const g = findGameByKey(key);
+      rows.push({ key, name: g?.name || key, notes });
+    }
+    download("baklog-notes-only.json", JSON.stringify(rows, null, 2), "application/json");
+  });
+  document.getElementById("exportTagsOnly")?.addEventListener("click", () => {
+    const rows = [];
+    for (const [key, rec] of Object.entries(state.personal)) {
+      if (key.startsWith("__")) continue;
+      const tags = Array.isArray(rec?.tags) ? rec.tags.filter(Boolean) : [];
+      if (!tags.length) continue;
+      const g = findGameByKey(key);
+      rows.push({ key, name: g?.name || key, tags });
+    }
+    download("baklog-tags-only.json", JSON.stringify(rows, null, 2), "application/json");
+  });
   document.getElementById("importNotes").addEventListener("change", async e => {
     const file = e.target.files[0];
     if (!file) return;
-    state.personal = { ...state.personal, ...JSON.parse(await file.text()) };
-    savePersonal();
+    mergeImportedPersonal(JSON.parse(await file.text()));
     renderSummary();
     renderPicks();
     renderTable();

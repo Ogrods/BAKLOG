@@ -15,10 +15,12 @@ import {
   dedupeWithinStore,
   normalizeGame,
   gameKey,
+  getSameTitleKeys,
   alphaBucket,
   formatHours,
   formatReleaseDate,
 } from '../js/game-core.js';
+import { state } from '../js/state.js';
 
 describe('normalizeNameForDedup', () => {
   it('lowercases and strips punctuation', () => {
@@ -186,6 +188,21 @@ describe('formatHours', () => {
     expect(formatHours(0)).toBe('0h');
     expect(formatHours(null)).toBe('0h');
     expect(formatHours(undefined)).toBe('0h');
+  });
+});
+
+describe('getSameTitleKeys', () => {
+  it('groups Steam, Epic, and GOG copies of the same title', () => {
+    state.allGames = [
+      { store: 'steam', id: 1, name: 'Hades' },
+      { store: 'epic', id: 'e1', name: 'Hades' },
+      { store: 'gog', id: 'g1', name: 'Hades' },
+      { store: 'steam', id: 2, name: 'Zelda' },
+    ];
+    state.wishlistGames = [];
+    state.itchGames = [];
+    const keys = getSameTitleKeys({ store: 'steam', id: 1, name: 'Hades' }).sort();
+    expect(keys).toEqual(['epic:e1', 'gog:g1', 'steam:1'].sort());
   });
 });
 

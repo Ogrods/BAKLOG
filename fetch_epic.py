@@ -16,7 +16,13 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from epic_client import EpicAuthError, EpicClient, LOGIN_URL
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._authoritative import EPIC
+from fetchers._base import (
+    add_allow_empty_arg,
+    merge_cached_row,
+    refuse_drift_result,
+    refuse_empty_result,
+)
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 
@@ -367,6 +373,7 @@ def main() -> int:
         print(f"[{i}/{len(apps_sorted)}] {name}")
 
         hltb = None
+        hltb_updated = False
         cached_row = existing.get(row_id)
         if not args.skip_hltb and (
             args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None
@@ -374,6 +381,7 @@ def main() -> int:
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
+                hltb_updated = bool(hltb)
             except Exception as e:
                 print(f"  HLTB warning: {e}")
         elif cached_row:
@@ -389,7 +397,9 @@ def main() -> int:
         if row is None:
             skipped += 1
             continue
-        games_out.append(row)
+        games_out.append(
+            merge_cached_row(row, cached_row, authoritative=EPIC, hltb_updated=hltb_updated)
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

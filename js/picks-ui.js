@@ -8,6 +8,7 @@ import {
   hasEnoughReviews,
   isHiddenGem,
   coverFallbackFor,
+  libraryCoverFor,
   storeLetter,
   earlyAccessRibbonHtml,
 } from './game-core.js';
@@ -24,7 +25,7 @@ import { syncCoverFits } from './covers.js';
 export function pickCardHtml(g) {
   const key = gameKey(g);
   const headerFallback = coverFallbackFor(g);
-  const cover = g.library_image || headerFallback;
+  const cover = libraryCoverFor(g);
   const ratingVal = ratingValue(g);
   const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—";
   const h = hltbMain(g);
@@ -45,7 +46,7 @@ export function pickCardHtml(g) {
 export function dealCardHtml(g) {
   const key = gameKey(g);
   const headerFallback = coverFallbackFor(g);
-  const cover = g.library_image || headerFallback;
+  const cover = libraryCoverFor(g);
   const d = getDealInfo(g);
   const priceLabel = d && d.price != null ? `$${d.price.toFixed(2)}` : "—";
   const cutLabel = d && d.cut ? `-${d.cut}%` : "";

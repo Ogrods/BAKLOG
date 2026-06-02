@@ -3,7 +3,7 @@
 
 import { state, STATUS_CHIP_DEFS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, itchIsGame, chipStatusKey } from './game-core.js';
+import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { focusGame } from './table-ui.js';
@@ -841,7 +841,7 @@ export function renderDashboardCharts(games) {
     label: g.name,
     key: gameKey(g),
     status: (getPersonal(g).status) || 'backlog',
-    cover: g.library_image || g.header_image || coverFallbackFor(g),
+    cover: sanitizeCoverUrl(g.header_image) || libraryCoverFor(g),
   }));
   const scatterClusterPlugin = {
     id: 'scatterCluster',

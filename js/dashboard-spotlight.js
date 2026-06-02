@@ -3,7 +3,7 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, coverFallbackFor, hasEnoughReviews } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, hasEnoughReviews } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 
 const SPOTLIGHT_INTERVAL_MS = 7000;
@@ -43,7 +43,17 @@ function gameSpotlightReason(g) {
   const enough = hasEnoughReviews(g);
   const playtime = g.playtime_minutes || 0;
   const status = personal.status || 'backlog';
-  if (['finished', 'skip', 'live'].includes(status)) return null;
+  if (status === 'skip' || status === 'live') return null;
+
+  if (status === 'finished') {
+    // "Replay" — capped to ~6% of pool in pickSpotlightGames so finished games
+    // appear less often than the other categories. Only worth-revisiting
+    // titles (well-reviewed, enough sample) qualify.
+    if (rating >= 82 && enough) {
+      return { eyebrow: 'Replay', score: rating - 25, isReplay: true };
+    }
+    return null;
+  }
   if (!['backlog', 'next', 'playing', 'unfinished'].includes(status)) return null;
 
   if ((status === 'playing' || status === 'unfinished') && playtime >= 30 && rating >= 70) {
@@ -93,6 +103,29 @@ export function pickSpotlightGames(games) {
   tagged.sort((a, b) => b.reason.score - a.reason.score);
   const top = tagged.slice(0, target);
 
+  // Cap "Replay" entries at ~6% so finished games appear noticeably less often
+  // than the other rotating categories. If the natural sort overshoots, drop
+  // the lowest-scoring replays; if it undershoots, pull in additional replay
+  // candidates that fell outside the score cutoff so the category still
+  // surfaces (minimum of 1) in libraries with lots of high-rated finished
+  // games.
+  const REPLAY_RATIO = 0.06;
+  const replayQuota = Math.max(1, Math.round(top.length * REPLAY_RATIO));
+  const replaysInTop = top.filter(t => t.reason.isReplay).length;
+  if (replaysInTop > replayQuota) {
+    let toDrop = replaysInTop - replayQuota;
+    for (let i = top.length - 1; i >= 0 && toDrop > 0; i--) {
+      if (top[i].reason.isReplay) {
+        top.splice(i, 1);
+        toDrop--;
+      }
+    }
+  } else if (replaysInTop < replayQuota) {
+    const extras = tagged.slice(target).filter(t => t.reason.isReplay);
+    const need = Math.min(replayQuota - replaysInTop, extras.length);
+    for (let i = 0; i < need; i++) top.push(extras[i]);
+  }
+
   for (let i = top.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [top[i], top[j]] = [top[j], top[i]];
@@ -116,10 +149,11 @@ const SPOTLIGHT_STATUS_LABEL = {
   next: 'next up',
   playing: 'in progress',
   unfinished: 'unfinished',
+  finished: 'completed',
 };
 
 export function spotlightInnerHtml(g) {
-  const art = g.header_image || g.library_image || coverFallbackFor(g);
+  const art = sanitizeCoverUrl(g.header_image) || libraryCoverFor(g);
   const rating = ratingValue(g);
   const hltb = hltbMain(g);
   const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';

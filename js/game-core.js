@@ -188,11 +188,22 @@ export function gameNumericId(g) {
   return gameId(g);
 }
 
+export function sanitizeCoverUrl(url) {
+  if (!url) return "";
+  const u = String(url).trim();
+  return u.replace("://images-eds.xboxlive.com/", "://images-eds-ssl.xboxlive.com/");
+}
+
 export function coverFallbackFor(g) {
   const ng = normalizeGame(g);
-  if (ng.header_image) return ng.header_image;
+  if (ng.header_image) return sanitizeCoverUrl(ng.header_image);
   if (ng.store === "steam") return `https://cdn.akamai.steamstatic.com/steam/apps/${ng.id}/header.jpg`;
   return "";
+}
+
+/** Primary library cover URL with CDN hostname fixes applied. */
+export function libraryCoverFor(g) {
+  return sanitizeCoverUrl(g?.library_image) || coverFallbackFor(g);
 }
 
 const EPIC_PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]*$/;

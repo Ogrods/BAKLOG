@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
+from fetchers._authoritative import UBISOFT
+from fetchers._base import merge_cached_row
 from fetchers._progress import RunStats, started
 from ubisoft_client import UbisoftAuthError, UbisoftClient
 
@@ -212,6 +214,13 @@ def _store_url(item: dict, name: str) -> str:
     return f"https://store.ubisoft.com/us/search?q={quote(name)}"
 
 
+def load_existing() -> dict[str, dict]:
+    if not GAMES_UBISOFT_JSON.exists():
+        return {}
+    data = json.loads(GAMES_UBISOFT_JSON.read_text(encoding="utf-8"))
+    return {str(g["id"]): g for g in data.get("games", [])}
+
+
 def _build_row(item: dict, hltb: dict | None) -> dict:
     name = _name_of(item) or "Unknown Ubisoft title"
     uid = _id_of(item, name)
@@ -320,18 +329,29 @@ def main() -> int:
         return stats.finish("fetch_ubisoft", t0, exit_code=2)
 
     hltb_client = HltbClient()
+    existing = load_existing()
     games_out: list[dict] = []
     for i, item in enumerate(deduped, 1):
         name = _name_of(item)
         print(f"[{i}/{len(deduped)}] {name}")
+        cached = existing.get(_id_of(item, name or ""))
         hltb = None
+        hltb_updated = False
         if not args.skip_hltb:
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
+                hltb_updated = bool(hltb)
             except Exception as e:
                 print(f"  HLTB warning: {e}")
-        games_out.append(_build_row(item, hltb))
+        games_out.append(
+            merge_cached_row(
+                _build_row(item, hltb),
+                cached,
+                authoritative=UBISOFT,
+                hltb_updated=hltb_updated,
+            )
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

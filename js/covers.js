@@ -3,6 +3,8 @@
 // module installs them on import (side effect) and also exports
 // `syncCoverFits` for callers that need to re-prime cached images.
 
+import { sanitizeCoverUrl } from "./game-core.js";
+
 const DASH_FAILED_COVERS_KEY = "baklog-dash-failed-covers";
 window.__dashFailedCovers = window.__dashFailedCovers || (() => {
   try {
@@ -24,7 +26,13 @@ function persistDashFailedCovers() {
   }, 800);
 }
 window.coverFallback = function (img) {
-  const fb = img.dataset.fallback;
+  const sslRetry = sanitizeCoverUrl(img.src);
+  if (sslRetry && sslRetry !== img.src && !img.dataset.sslRetried) {
+    img.dataset.sslRetried = "1";
+    img.src = sslRetry;
+    return;
+  }
+  const fb = sanitizeCoverUrl(img.dataset.fallback);
   if (fb && img.src !== fb) {
     img.src = fb;
     img.dataset.fallback = "";

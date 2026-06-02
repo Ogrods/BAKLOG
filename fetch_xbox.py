@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from auth import mark_invalid, resolve_env
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
@@ -139,6 +139,14 @@ def main() -> int:
     )
     if empty_exit is not None:
         return stats.finish("fetch_xbox", t0, exit_code=empty_exit)
+    drift_exit = refuse_drift_result(
+        games,
+        label="Xbox library",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_XBOX_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_xbox", t0, exit_code=drift_exit)
 
     hltb_client = HltbClient()
     games_out: list[dict] = []

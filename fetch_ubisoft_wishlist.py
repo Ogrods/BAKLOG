@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid
 from auth.secrets import profile_dir
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 
@@ -365,6 +365,14 @@ def main() -> int:
     )
     if empty_exit is not None:
         return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=empty_exit)
+    drift_exit = refuse_drift_result(
+        kept,
+        label="Ubisoft wishlist",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_UBISOFT_WISHLIST_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=drift_exit)
 
     hltb_client = HltbClient() if args.hltb else None
     existing = _load_existing()

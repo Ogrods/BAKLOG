@@ -22,7 +22,7 @@ import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import RunStats, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
@@ -246,6 +246,14 @@ def main() -> int:
     )
     if empty_exit is not None:
         return stats.finish("fetch_gog_wishlist", t0, exit_code=empty_exit)
+    drift_exit = refuse_drift_result(
+        ids,
+        label="GOG wishlist",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_WISHLIST_GOG_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_gog_wishlist", t0, exit_code=drift_exit)
 
     print(f"Found {len(ids)} GOG wishlist items.", flush=True)
     session = requests.Session()

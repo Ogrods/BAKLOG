@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+This project follows [Semantic Versioning](https://semver.org/): MAJOR for
+breaking changes, MINOR for backwards-compatible features, PATCH for
+backwards-compatible bug fixes. The single source of truth for the current
+version is `pyproject.toml` (mirrored into `package.json`).
+
+## Release discipline
+
+1. Land changes under `[Unreleased]` as they happen — categorize under Added /
+   Changed / Fixed / Removed.
+2. When cutting a release: bump `pyproject.toml` + `package.json`, rename the
+   `[Unreleased]` block to `[X.Y.Z] - YYYY-MM-DD`, open a fresh
+   `[Unreleased]` heading above it.
+3. Tag the commit: `git tag -a vX.Y.Z -m "BAKLOG vX.Y.Z"` then
+   `git push origin vX.Y.Z`. The tag is the install-reproducibility contract;
+   without it, "which version do you have?" is unanswerable for a second
+   contributor.
+
 ## [Unreleased]
 
 ### Added

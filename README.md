@@ -8,6 +8,8 @@ BAKLOG helps you browse, sort, and prioritize games across Steam, GOG, PlayStati
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
+See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves your machine). Released under the [MIT license](LICENSE).
+
 ## Stack
 
 | Layer | Tech |

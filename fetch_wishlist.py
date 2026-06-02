@@ -13,7 +13,7 @@ import requests
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from auth import resolve_env
 from fetchers._progress import RunStats, started
 from steam_client import SteamClient
@@ -159,6 +159,14 @@ def main() -> int:
     )
     if empty_exit is not None:
         return stats.finish("fetch_wishlist", t0, exit_code=empty_exit)
+    drift_exit = refuse_drift_result(
+        games_out,
+        label="Steam wishlist rows",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_WISHLIST_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_wishlist", t0, exit_code=drift_exit)
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

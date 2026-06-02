@@ -11,7 +11,7 @@
 import { state } from './state.js';
 import { escapeHtml, formatNum } from './dom-util.js';
 import { renderDashboardFetcherHealth } from './fetcher-health.js';
-import { gameKey, hltbMain, ratingValue, normalizeGame } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, normalizeGame, combinedPlaytime } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
@@ -80,7 +80,7 @@ function dashboardFingerprint() {
 function computeMegaHeroStats(games) {
   const backlog = games.filter(g => getPersonal(g).status === "backlog");
   const backlogHrs = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
-  const playedHrs = games.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
+  const playedHrs = games.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
   const nonSkip = games.filter(g => getPersonal(g).status !== "skip");
   const finished = games.filter(g => getPersonal(g).status === "finished").length;
   const completion = nonSkip.length ? Math.round((finished / nonSkip.length) * 100) : 0;

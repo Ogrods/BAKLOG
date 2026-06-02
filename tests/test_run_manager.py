@@ -41,6 +41,25 @@ def test_submit_rejects_duplicate_key(runs_env):
         mgr.submit("demo")
 
 
+def test_cancel_all_clears_active_and_queue(runs_env):
+    mgr, runs_dir = runs_env
+    active = server.Run("demo", runs_dir=runs_dir)
+    active.status = "running"
+    active.started_at = time.time()
+    queued = server.Run("demo", runs_dir=runs_dir)
+    with mgr._lock:
+        mgr._pending.extend([active, queued])
+        mgr._runs_by_id[active.id] = active
+        mgr._runs_by_id[queued.id] = queued
+        mgr._active = active
+    summaries = mgr.cancel_all()
+    assert len(summaries) == 2
+    assert active.status == "cancelled"
+    assert queued.status == "cancelled"
+    snap = mgr.snapshot()
+    assert snap["queue"] == []
+
+
 def test_cancel_queued_run(runs_env):
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)

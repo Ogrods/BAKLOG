@@ -183,6 +183,19 @@
         { "env": "STEAM_ID", "note": "Steam Web API identity (same as library fetch)" }
       ]
     },
-    { "key": "steamCovers", "label": "Covers", "group": "enrich", "script": "enrich_cross_store_images.py", "refreshArgs": ["--retry-misses"], "metaKey": "steamCovers", "color": "#1b2838" }
+    { "key": "steamCovers", "label": "Covers", "group": "enrich", "script": "enrich_cross_store_images.py", "refreshArgs": ["--retry-misses"], "metaKey": "steamCovers", "color": "#1b2838" },
+    {
+      "key": "steamTags",
+      "label": "Co-op tags",
+      "group": "enrich",
+      "script": "enrich_steam_tags.py",
+      "refreshArgs": ["--refresh"],
+      "metaKey": "steamTags",
+      "color": "#3b82f6",
+      "requires": [
+        { "env": "STEAM_API_KEY", "note": "Reuses Steam appdetails cache to backfill coop tags + genres for non-Steam rows" },
+        { "env": "STEAM_ID", "note": "Steam Web API identity (same as library fetch)" }
+      ]
+    }
   ]
 }

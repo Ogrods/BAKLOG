@@ -33,12 +33,14 @@ import {
   openStoreForFocused,
   filteredGames,
   sortedGames,
+  cancelPendingScrollTarget,
 } from './table-ui.js';
 import {
   renderPicks,
   normalizePicksLimit,
   renderPicksLimitButtons,
 } from './picks-ui.js';
+import { stopSpotlightRotation } from './dashboard-spotlight.js';
 import {
   openFiltersDrawer,
   closeFiltersDrawer,
@@ -156,6 +158,7 @@ export function bindEvents() {
   const onDashListClick = e => {
     const row = e.target.closest('[data-action="dash-list-jump"]');
     if (!row || !row.dataset.key) return;
+    if (row.id === "dashboardSpotlight") stopSpotlightRotation();
     focusGame(row.dataset.key);
   };
   document.getElementById("dashPicksVersusCard")?.addEventListener("click", onDashListClick);
@@ -506,6 +509,7 @@ export function bindEvents() {
       // summary, then picks, then table. Scroll BEFORE switchView so the
       // overlay → new content paints from y=0. Drill-ins go through
       // dashboard-drilldown.js which manages its own scroll target.
+      cancelPendingScrollTarget();
       window.scrollTo(0, 0);
       switchView(view);
     });

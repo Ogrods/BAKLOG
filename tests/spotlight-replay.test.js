@@ -1,5 +1,5 @@
 /** Spotlight "Replay" category — surfaces finished games occasionally. */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
 
 describe("spotlight replay category", () => {
@@ -86,5 +86,49 @@ describe("spotlight replay category", () => {
     const ratio = replays / pool.length;
     expect(ratio).toBeGreaterThan(0);
     expect(ratio).toBeLessThanOrEqual(0.12);
+  });
+});
+
+describe("spotlight rotation safety", () => {
+  beforeEach(async () => {
+    const win = new Window({ url: "http://127.0.0.1:8765/" });
+    global.window = win;
+    global.document = win.document;
+    global.localStorage = win.localStorage;
+    win.__dashFailedCovers = new Set();
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stopSpotlightRotation prevents fade timer from mutating innerHTML after click", async () => {
+    const { startSpotlightRotation, stopSpotlightRotation } = await import("../js/dashboard-spotlight.js");
+    const games = [
+      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
+      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
+    ];
+    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
+    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
+
+    document.body.innerHTML = `
+      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1">
+        <span id="spot-inner">slide-1</span>
+      </button>
+    `;
+    const el = document.getElementById("dashboardSpotlight");
+    el.dataset.key = "steam:1";
+
+    startSpotlightRotation(games);
+    vi.advanceTimersByTime(7000);
+    expect(el.classList.contains("is-fading")).toBe(true);
+
+    stopSpotlightRotation();
+    const htmlBefore = el.innerHTML;
+    vi.advanceTimersByTime(500);
+    expect(el.innerHTML).toBe(htmlBefore);
+    expect(el.classList.contains("is-fading")).toBe(false);
   });
 });

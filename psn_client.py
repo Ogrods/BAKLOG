@@ -534,5 +534,13 @@ class PsnClient:
                     keeper.concept_id = sibling.concept_id
                 if not keeper.store_url and sibling.store_url:
                     keeper.store_url = sibling.store_url
+            # Rebuild store_url so it tracks the merged concept_id. Without
+            # this, a trophy-only keeper that inherits concept_id from a
+            # sibling keeps the psnprofiles URL it was built with — the link
+            # in the dashboard then goes to PSNProfiles instead of the PSN
+            # store page for that concept.
+            rebuilt = _store_url(keeper.concept_id, keeper.np_communication_id)
+            if rebuilt:
+                keeper.store_url = rebuilt
             result.append(keeper)
         return result

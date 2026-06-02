@@ -3,7 +3,7 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, hasEnoughReviews } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, hasEnoughReviews, combinedPlaytime } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 
 const SPOTLIGHT_INTERVAL_MS = 7000;
@@ -24,6 +24,8 @@ export function stopSpotlightRotation() {
   if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
   _spotlightTimer = null;
   _spotlightFadeTimer = null;
+  const el = document.getElementById('dashboardSpotlight');
+  if (el) el.classList.remove('is-fading');
   // Intentionally NOT clearing _spotlightIndex / _spotlightCurrentKey / _spotlightPool —
   // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
 }
@@ -41,7 +43,7 @@ function gameSpotlightReason(g) {
   const hltb = hltbMain(g);
   const personal = getPersonal(g);
   const enough = hasEnoughReviews(g);
-  const playtime = g.playtime_minutes || 0;
+  const playtime = combinedPlaytime(g);
   const status = personal.status || 'backlog';
   if (status === 'skip' || status === 'live') return null;
 
@@ -265,6 +267,7 @@ export function syncSpotlightInMega(el, spotlight) {
     return;
   }
   if (spotlight && existing) {
+    stopSpotlightRotation();
     existing.outerHTML = renderSpotlightHtml(spotlight);
     primeSpotlightArt(document.getElementById('dashboardSpotlight'));
     return;

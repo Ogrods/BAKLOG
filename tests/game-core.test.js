@@ -6,7 +6,7 @@
  * A regression here means a duplicate row appears (or a legit game disappears).
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   normalizeNameForDedup,
   scoreEntry,
@@ -19,6 +19,10 @@ import {
   alphaBucket,
   formatHours,
   formatReleaseDate,
+  recomputeCrossStoreHidden,
+  combinedPlaytime,
+  combinedPlaytimeTooltip,
+  storeUrlForGame,
 } from '../js/game-core.js';
 import { state } from '../js/state.js';
 
@@ -91,12 +95,13 @@ describe('isJunkEntry', () => {
 
   it('flags explicit junk names from JUNK_NAMES', () => {
     expect(isJunkEntry({ name: 'live' })).toBe(true);
-    expect(isJunkEntry({ name: 'Fortnite' })).toBe(true);
+    expect(isJunkEntry({ name: 'HBO Max' })).toBe(true);
   });
 
   it('lets real games through', () => {
     expect(isJunkEntry({ name: 'Hades' })).toBe(false);
     expect(isJunkEntry({ name: 'Hollow Knight' })).toBe(false);
+    expect(isJunkEntry({ name: 'Fortnite' })).toBe(false);
   });
 });
 
@@ -158,6 +163,129 @@ describe('gameKey', () => {
 
   it('falls back through alternative id fields', () => {
     expect(gameKey({ appid: 1 })).toBe('steam:1');
+  });
+});
+
+describe('combinedPlaytime (cross-store)', () => {
+  let savedAllGames;
+  let savedHidden;
+  let savedOwned;
+  let savedPlaytime;
+  let savedWishlist;
+  let savedWishlistGames;
+  let savedDedup;
+
+  beforeEach(() => {
+    savedAllGames = state.allGames;
+    savedHidden = state.crossStoreHiddenKeys;
+    savedOwned = state.crossStoreOwnedStores;
+    savedPlaytime = state.crossStorePlaytimeByKey;
+    savedWishlist = state.wishlistCrossStoreHiddenKeys;
+    savedWishlistGames = state.wishlistGames;
+    savedDedup = state.sessionPrefs.crossStoreDedup;
+    state.wishlistGames = [];
+    state.sessionPrefs.crossStoreDedup = true;
+  });
+
+  afterEach(() => {
+    state.allGames = savedAllGames;
+    state.crossStoreHiddenKeys = savedHidden;
+    state.crossStoreOwnedStores = savedOwned;
+    state.crossStorePlaytimeByKey = savedPlaytime;
+    state.wishlistCrossStoreHiddenKeys = savedWishlist;
+    state.wishlistGames = savedWishlistGames;
+    state.sessionPrefs.crossStoreDedup = savedDedup;
+  });
+
+  it('sums playtime across stores when dedup is on', () => {
+    state.allGames = [
+      { store: 'steam', id: 1, name: 'Death Stranding', playtime_minutes: 120 },
+      { store: 'psn', id: 'NPWR1', name: 'Death Stranding', playtime_minutes: 2780 },
+    ];
+    recomputeCrossStoreHidden();
+    expect(combinedPlaytime(state.allGames[0])).toBe(2900);
+    expect(combinedPlaytime(state.allGames[1])).toBe(2780);
+  });
+
+  it('returns raw playtime when dedup is off', () => {
+    state.sessionPrefs.crossStoreDedup = false;
+    state.allGames = [
+      { store: 'steam', id: 1, name: 'Death Stranding', playtime_minutes: 120 },
+      { store: 'psn', id: 'NPWR1', name: 'Death Stranding', playtime_minutes: 2780 },
+    ];
+    recomputeCrossStoreHidden();
+    expect(state.crossStorePlaytimeByKey.size).toBe(0);
+    expect(combinedPlaytime(state.allGames[0])).toBe(120);
+  });
+
+  it('skips groups where every store has 0 minutes', () => {
+    state.allGames = [
+      { store: 'steam', id: 2, name: 'Untouched', playtime_minutes: 0 },
+      { store: 'psn', id: 'NPWR2', name: 'Untouched', playtime_minutes: 0 },
+    ];
+    recomputeCrossStoreHidden();
+    expect(state.crossStorePlaytimeByKey.size).toBe(0);
+    expect(combinedPlaytime(state.allGames[0])).toBe(0);
+  });
+
+  it('produces a per-store tooltip only when 2+ stores have playtime', () => {
+    state.allGames = [
+      { store: 'steam', id: 3, name: 'Doom', playtime_minutes: 600 },
+      { store: 'psn', id: 'NPWR3', name: 'Doom', playtime_minutes: 60 },
+    ];
+    recomputeCrossStoreHidden();
+    const rep = state.allGames[0];
+    const tip = combinedPlaytimeTooltip(rep);
+    expect(tip).toContain('STEAM: 10.0h');
+    expect(tip).toContain('PSN: 1.0h');
+  });
+
+  it('returns empty tooltip when only one sibling has playtime', () => {
+    state.allGames = [
+      { store: 'steam', id: 4, name: 'Solo', playtime_minutes: 300 },
+      { store: 'psn', id: 'NPWR4', name: 'Solo', playtime_minutes: 0 },
+    ];
+    recomputeCrossStoreHidden();
+    const rep = state.allGames[0];
+    expect(combinedPlaytimeTooltip(rep)).toBe('');
+    expect(combinedPlaytime(rep)).toBe(300);
+  });
+
+  it('coerces NaN / negative playtime to 0', () => {
+    state.allGames = [
+      { store: 'steam', id: 5, name: 'Wobble', playtime_minutes: 'oops' },
+      { store: 'psn', id: 'NPWR5', name: 'Wobble', playtime_minutes: -50 },
+      { store: 'gog', id: 9, name: 'Wobble', playtime_minutes: 90 },
+    ];
+    recomputeCrossStoreHidden();
+    expect(combinedPlaytime(state.allGames[0])).toBe(90);
+  });
+});
+
+describe('storeUrlForGame — PSN', () => {
+  it('uses concept_id even when store_url points to psnprofiles', () => {
+    const g = {
+      store: 'psn',
+      id: 'NPWR22859_00',
+      name: 'Ghost of Tsushima',
+      concept_id: '235227',
+      store_url: 'https://psnprofiles.com/trophies/NPWR22859_00',
+    };
+    expect(storeUrlForGame(g)).toBe('https://store.playstation.com/en-us/concept/235227');
+  });
+
+  it('falls back to PSN store search when no concept_id', () => {
+    const g = {
+      store: 'psn',
+      id: 'NPWR16225_00',
+      name: 'DEATH STRANDING',
+      concept_id: null,
+      store_url: 'https://psnprofiles.com/trophies/NPWR16225_00',
+    };
+    const out = storeUrlForGame(g);
+    expect(out).toContain('store.playstation.com/en-us/search/');
+    expect(out).toContain('DEATH%20STRANDING');
+    expect(out).not.toContain('psnprofiles');
   });
 });
 

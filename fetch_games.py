@@ -15,6 +15,7 @@ from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import RunStats, started
 from steam_client import SteamClient
+from steam_metadata import coop_flags_from_categories
 
 GAMES_STEAM_JSON = Path("games_steam.json")
 HLTB_DELAY_SEC = 1.0
@@ -39,21 +40,6 @@ def _finalize_steam_row(row: dict) -> dict:
 def _parse_release_date(data: dict) -> str | None:
     rd = data.get("release_date", {}) or {}
     return rd.get("date") or None
-
-
-def _coop_flags_from_categories(categories: list[dict] | None) -> tuple[bool, bool]:
-    """Return (coop_online, coop_local) by scanning Steam category descriptions.
-
-    Steam categories include "Co-op", "Online Co-op", "Shared/Split Screen Co-op",
-    and "LAN Co-op". We treat LAN Co-op as online. A bare "Co-op" with no flavor
-    sets both flags to False (unknown flavor) so the UI doesn't mislabel it.
-    """
-    if not categories:
-        return (False, False)
-    names = {str(c.get("description") or "").strip().lower() for c in categories}
-    online = "online co-op" in names or "lan co-op" in names
-    local = "shared/split screen co-op" in names
-    return (online, local)
 
 
 def _build_game_row(
@@ -100,7 +86,7 @@ def _build_game_row(
     genres = [g["description"] for g in details.get("genres", [])]
     categories = details.get("categories") or []
     tags = [c["description"] for c in categories[:16]]
-    coop_online, coop_local = _coop_flags_from_categories(categories)
+    coop_online, coop_local = coop_flags_from_categories(categories)
 
     price = details.get("price_overview") or {}
 

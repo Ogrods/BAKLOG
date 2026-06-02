@@ -3,7 +3,7 @@
 
 import { state, STATUS_CHIP_DEFS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey } from './game-core.js';
+import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey, combinedPlaytime } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
@@ -44,7 +44,7 @@ export function renderDashboardCoopSpotlight(games) {
       : null;
     const failedCoop = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
     const picks = list
-      .filter(g => getPersonal(g).status !== "finished" && (g.playtime_minutes || 0) === 0)
+      .filter(g => getPersonal(g).status !== "finished" && combinedPlaytime(g) === 0)
       .filter(g => ratingValue(g) > 0 && hasEnoughReviews(g))
       .filter(g => !!(g.library_image || g.header_image) && !failedCoop.has(gameKey(g)))
       .sort((a, b) => ratingValue(b) - ratingValue(a))
@@ -397,7 +397,7 @@ export function renderDashboardItchRecap() {
 
   const failedItch = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
   const heroCandidates = gamesOnly
-    .filter(g => getPersonal(g).status !== "finished" && (g.playtime_minutes || 0) === 0)
+    .filter(g => getPersonal(g).status !== "finished" && combinedPlaytime(g) === 0)
     .filter(g => ratingValue(g) > 0 && hasEnoughReviews(g))
     .filter(g => !!(g.library_image || g.header_image) && !failedItch.has(gameKey(g)))
     .sort((a, b) => ratingValue(b) - ratingValue(a))

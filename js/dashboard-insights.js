@@ -3,7 +3,7 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, itchIsGame } from './game-core.js';
+import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, itchIsGame, combinedPlaytime } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo, dealScore, isStealDeal, wishlistGamesWithDeals } from './deals.js';
@@ -35,9 +35,9 @@ export function buildInsightPool(games) {
     insights.push(`Biggest backlog: <strong>${escapeHtml(topGenre[0])}</strong> · ${escapeHtml(formatNum(Math.round(topGenre[1])))}h`);
   }
 
-  const byPlay = [...games].filter(g => (g.playtime_minutes || 0) > 0).sort((a, b) => (b.playtime_minutes || 0) - (a.playtime_minutes || 0));
+  const byPlay = [...games].filter(g => combinedPlaytime(g) > 0).sort((a, b) => combinedPlaytime(b) - combinedPlaytime(a));
   if (byPlay[0]) {
-    const hrs = Math.round((byPlay[0].playtime_minutes || 0) / 60);
+    const hrs = Math.round(combinedPlaytime(byPlay[0]) / 60);
     insights.push(`Most played: <strong>${escapeHtml(byPlay[0].name)}</strong> · ${escapeHtml(formatNum(hrs))}h`);
   }
 
@@ -47,7 +47,7 @@ export function buildInsightPool(games) {
     insights.push(`Avg HLTB main: <strong>${escapeHtml(formatNum(avg))}h</strong>`);
   }
 
-  const unplayed = backlog.filter(g => !(g.playtime_minutes || 0)).sort((a, b) => (hltbMain(b) || 0) - (hltbMain(a) || 0));
+  const unplayed = backlog.filter(g => !combinedPlaytime(g)).sort((a, b) => (hltbMain(b) || 0) - (hltbMain(a) || 0));
   if (unplayed[0]) {
     const h = hltbMain(unplayed[0]);
     insights.push(`Longest unplayed: <strong>${escapeHtml(unplayed[0].name)}</strong> · ${h != null ? escapeHtml(formatNum(Math.round(h))) + 'h' : '?'}`);
@@ -77,7 +77,7 @@ export function buildInsightPool(games) {
     insights.push(`Newest add: <strong>${escapeHtml(withDate[0].g.name)}</strong>`);
   }
 
-  const playedHrs = games.reduce((s, g) => s + (g.playtime_minutes || 0), 0) / 60;
+  const playedHrs = games.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
   if (games.length) {
     const ratio = (playedHrs / games.length).toFixed(1);
     insights.push(`Hours per game: <strong>${ratio}h</strong>`);
@@ -94,7 +94,7 @@ function formatDollarMarquee(n) {
 export function buildMarqueeItems(games) {
   const maxHrs = state.prefs.quickWinMaxHours || 15;
   const status = (g) => getPersonal(g).status || 'backlog';
-  const playMin = (g) => g.playtime_minutes || 0;
+  const playMin = (g) => combinedPlaytime(g);
   const rating = (g) => ratingValue(g);
   const hltb = (g) => hltbMain(g);
 

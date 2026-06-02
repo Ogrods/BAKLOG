@@ -17,6 +17,16 @@ export const state = {
   },
   crossStoreHiddenKeys: new Set(),
   crossStoreOwnedStores: new Map(),
+  /**
+   * Map<gameKey, { total: number, perStore: [{store, minutes}] }>
+   *
+   * For library rows that are the visible representative of a cross-store dedup
+   * group (e.g. Steam wins for "Death Stranding" while a PSN sibling is hidden),
+   * this holds the SUM of `playtime_minutes` across every entry in that group.
+   * Only populated when `state.sessionPrefs.crossStoreDedup` is on so stats
+   * don't double-count when dedup is off.
+   */
+  crossStorePlaytimeByKey: new Map(),
   wishlistCrossStoreHiddenKeys: new Set(),
   wishlistCrossStoreOwnedStores: new Map(),
   wishlistGames: [],

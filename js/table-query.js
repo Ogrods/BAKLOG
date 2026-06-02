@@ -245,10 +245,22 @@ function passesDealFilters(ctx, g) {
   return true;
 }
 
+/**
+ * Combined playtime for a row, honoring cross-store dedup aggregation.
+ * `ctx.combinedPlaytime` is built fresh per query (Map on main thread, hydrated
+ * from an array of entries inside the worker — see queryGamesAsync + the worker
+ * bridge). Falls back to the row's own `playtime_minutes` when no aggregate.
+ */
+function rowPlaytime(ctx, g) {
+  const entry = ctx?.combinedPlaytime?.get(gameKey(g));
+  if (entry != null) return entry;
+  return Math.max(0, Number(g.playtime_minutes) || 0);
+}
+
 function isCleanupCandidate(ctx, g) {
   const p = getPersonalRecord(ctx.personal, g);
   if (p.status !== 'backlog') return false;
-  if ((g.playtime_minutes || 0) > 0) return false;
+  if (rowPlaytime(ctx, g) > 0) return false;
   const rating = ratingValue(g);
   if (rating > 0 && rating >= CLEANUP_MAX_RATING) return false;
   const released = parseReleaseForSort(g.release_date);
@@ -326,7 +338,7 @@ function passesFilter(ctx, g) {
       return false;
     }
   }
-  if (params.unplayed && (g.playtime_minutes || 0) > 0) return false;
+  if (params.unplayed && rowPlaytime(ctx, g) > 0) return false;
   if (params.earlyAccess && !isEarlyAccess(g)) return false;
   if (!passesCoopFilter(g, resolveCoopFilterMode(prefs))) return false;
   const rating = ratingValue(g);
@@ -358,6 +370,7 @@ function sortCompare(ctx, a, b) {
     case 'hltb_main_hours': va = hltbMain(personal, a); vb = hltbMain(personal, b); break;
     case 'discount_percent': va = effectiveDiscountPercent(ctx, a); vb = effectiveDiscountPercent(ctx, b); break;
     case 'deal_price': va = effectiveSortPrice(ctx, a); vb = effectiveSortPrice(ctx, b); break;
+    case 'playtime_minutes': va = rowPlaytime(ctx, a); vb = rowPlaytime(ctx, b); break;
     default: va = a[sortKey]; vb = b[sortKey];
   }
   if (va == null) va = sortDir > 0 ? Infinity : -Infinity;
@@ -383,7 +396,19 @@ export function buildQueryContext(state, params) {
     cleanupModeActive: state.cleanupModeActive,
     sortKey: state.sortKey,
     sortDir: state.sortDir,
+    // Map<gameKey, totalMinutes> — only populated for cross-store dedup
+    // representatives. Used by rowPlaytime() so the worker path stays
+    // consistent with the main-thread display.
+    combinedPlaytime: combinedPlaytimeLookup(state),
   };
+}
+
+function combinedPlaytimeLookup(state) {
+  const src = state.crossStorePlaytimeByKey;
+  if (!src || src.size === 0) return new Map();
+  const out = new Map();
+  for (const [key, entry] of src) out.set(key, entry.total);
+  return out;
 }
 
 export function querySourceForView(state) {
@@ -416,16 +441,21 @@ function getWorker() {
 
 export function queryGamesAsync(state, params) {
   const source = querySourceForView(state);
+  const baseCtx = buildQueryContext(state, params);
   const payload = {
     source,
     ctx: {
-      ...buildQueryContext(state, params),
+      ...baseCtx,
       hiddenKeys: [
         ...(state.activeView === 'wishlist'
           ? state.wishlistCrossStoreHiddenKeys
           : state.crossStoreHiddenKeys),
       ],
       ownedNormNames: [...state.ownedNormNames],
+      // Maps don't survive structured clone for our worker bridge cleanly when
+      // we treat the payload as opaque, so flatten to entries; the worker
+      // rebuilds the Map on the other side.
+      combinedPlaytime: [...baseCtx.combinedPlaytime],
     },
   };
   if (source.length < WORKER_THRESHOLD) {
@@ -437,6 +467,7 @@ export function queryGamesAsync(state, params) {
           ? state.wishlistCrossStoreHiddenKeys
           : state.crossStoreHiddenKeys,
         ownedNormNames: state.ownedNormNames,
+        combinedPlaytime: baseCtx.combinedPlaytime,
       },
     }));
   }

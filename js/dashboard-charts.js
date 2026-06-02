@@ -11,7 +11,7 @@ import { DASH_STORE_COLORS, DASH_STATUS_COLORS, DASH_REVIEW_COLORS, DASH_STORE_L
 import { prefersReducedMotion } from './motion.js';
 // Click handlers route into drilldown helpers. One-way import; drilldown
 // does not import this module.
-import { dashDrillStore, dashDrillStatus, dashDrillStoreStatus, dashSetReleaseYear, dashDrillHltbBucket, dashDrillMinRating, dashDrillGenre, dashFinishDrillToLibrary, dashResetLibraryFiltersExceptDedup } from './dashboard-drilldown.js';
+import { dashDrillStore, dashDrillStatus, dashDrillStoreStatus, dashSetReleaseYear, dashDrillHltbBucket, dashDrillMinRating, dashDrillGenre, dashFinishDrillToLibrary } from './dashboard-drilldown.js';
 
 export const dashboardCharts = {};
 const pendingChartRenders = new Map();
@@ -369,8 +369,38 @@ const SCATTER_TIP_MAX = 6;
 
 let _scatterListClickBound = false;
 let _scatterListLastKey = null;
+let _scatterListLastFitCount = 0;
+let _scatterListLastHits = null;
+let _scatterListResizeObs = null;
 let _scatterListFrozen = false;
 let _scatterListFrozenKey = null;
+
+const SCATTER_TILE_W = 72;
+const SCATTER_TILE_GAP = 6;
+const SCATTER_STRIP_PAD_X = 16;
+
+function computeScatterFitCount(stripEl) {
+  if (!stripEl) return 0;
+  const w = stripEl.clientWidth - SCATTER_STRIP_PAD_X;
+  if (w <= 0) return 0;
+  // Each tile + gap takes (W + GAP), but the last tile doesn't need a trailing gap.
+  return Math.max(1, Math.floor((w + SCATTER_TILE_GAP) / (SCATTER_TILE_W + SCATTER_TILE_GAP)));
+}
+
+function ensureScatterListResizeObserver() {
+  if (_scatterListResizeObs || typeof ResizeObserver === "undefined") return;
+  const el = document.getElementById('chartScatterList');
+  if (!el) return;
+  _scatterListResizeObs = new ResizeObserver(() => {
+    if (!_scatterListLastHits?.length) return;
+    const stripEl = el.querySelector('.dash-scatter-list-strip');
+    const next = computeScatterFitCount(stripEl);
+    if (next === _scatterListLastFitCount) return;
+    _scatterListLastKey = null;
+    renderScatterList(_scatterListLastHits);
+  });
+  _scatterListResizeObs.observe(el);
+}
 
 function hitsAtScatterClick(chart, canvasX, canvasY) {
   const pts = chart._scatterPts;
@@ -408,13 +438,14 @@ function ensureScatterListClickHandler() {
     if (!row?.dataset.key) return;
     e.preventDefault();
     e.stopPropagation();
-    dashResetLibraryFiltersExceptDedup();
     focusGame(row.dataset.key);
   });
 }
 
 function clearScatterList() {
   _scatterListLastKey = null;
+  _scatterListLastHits = null;
+  _scatterListLastFitCount = 0;
   _scatterListFrozen = false;
   _scatterListFrozenKey = null;
   hideScatterCursorTooltip();
@@ -425,9 +456,7 @@ function pulseScatterList() {
   const el = document.getElementById('chartScatterList');
   if (!el) return;
   el.classList.remove('is-pulsing');
-  // Reflow so the animation restarts.
-  void el.offsetWidth;
-  el.classList.add('is-pulsing');
+  requestAnimationFrame(() => el.classList.add('is-pulsing'));
 }
 
 function setScatterListFrozen(frozen) {
@@ -444,27 +473,40 @@ function renderScatterList(hits) {
   const el = document.getElementById('chartScatterList');
   if (!el) return;
   ensureScatterListClickHandler();
+  ensureScatterListResizeObserver();
 
   if (!hits.length) {
     el.innerHTML = '<div class="dash-scatter-list-hint">Hover a point or cluster to inspect</div>';
+    _scatterListLastKey = null;
+    _scatterListLastHits = null;
+    _scatterListLastFitCount = 0;
     return;
   }
 
-  const key = hits.map(h => h.pt.key).join('|');
+  _scatterListLastHits = hits;
+  const sorted = sortClusterForPicker(hits);
+  // Width-driven cap. Measure the strip we'll paint into; on first render
+  // (.strip not in DOM yet) fall back to the container width minus chrome.
+  const measureEl = el.querySelector('.dash-scatter-list-strip') || el;
+  const fitCount = Math.max(1, computeScatterFitCount(measureEl));
+  _scatterListLastFitCount = fitCount;
+  // Reserve one tile for the "+N more" badge when we actually have overflow.
+  const overflow = Math.max(0, sorted.length - fitCount);
+  const visibleCount = overflow > 0 ? Math.max(1, fitCount - 1) : sorted.length;
+  const shown = sorted.slice(0, visibleCount);
+  const remaining = sorted.length - visibleCount;
+
+  const key = `${hits.map(h => h.pt.key).join('|')}|fit=${fitCount}|frozen=${_scatterListFrozen ? 1 : 0}`;
   if (key === _scatterListLastKey) return;
   _scatterListLastKey = key;
 
-  const CAP = 12;
-  const sorted = sortClusterForPicker(hits);
-  const shown = sorted.slice(0, CAP);
-  const extra = sorted.length - shown.length;
   const isCluster = hits.length >= 2;
   const pinBadge = _scatterListFrozen
     ? '<span class="dash-scatter-list-pin" title="Click the chart background or another cluster to unpin">Pinned</span>'
     : '';
   const headLabel = isCluster
     ? `${hits.length} games here · click to jump`
-    : `${shown[0].pt.label} · click to jump`;
+    : `${sorted[0].pt.label} · click to jump`;
   const headText = `${headLabel}${pinBadge}`;
 
   const rowHtml = shown.map(({ pt }) => {
@@ -479,10 +521,16 @@ function renderScatterList(hits) {
     </button>`;
   }).join('');
 
+  const overflowTile = remaining > 0
+    ? `<div class="dash-scatter-list-more" aria-hidden="true" title="${remaining} more game${remaining === 1 ? '' : 's'} in this cluster — narrows as the window widens">
+        <span class="dash-scatter-list-more-num">+${remaining}</span>
+        <span class="dash-scatter-list-more-label">more</span>
+      </div>`
+    : '';
+
   el.innerHTML = `
     <div class="dash-scatter-list-head">${headText}</div>
-    <div class="dash-scatter-list-strip">${rowHtml}</div>
-    ${extra > 0 ? `<div class="dash-scatter-list-foot">+${extra} more — refine with a filter</div>` : ''}
+    <div class="dash-scatter-list-strip">${rowHtml}${overflowTile}</div>
   `;
 }
 
@@ -727,7 +775,9 @@ export function renderDashboardCharts(games) {
   const ratedTotal = Object.entries(reviewBuckets)
     .filter(([k]) => k !== 'Unreviewed')
     .reduce((s, [, n]) => s + n, 0);
-  const positivePct = ratedTotal ? Math.round(positive / ratedTotal * 100) : 0;
+  const positivePct = ratedTotal
+    ? (positive >= ratedTotal ? 100 : Math.floor(positive / ratedTotal * 100))
+    : 0;
   const reviewHeadlineEl = document.getElementById('ribbonReviewHeadline');
   if (reviewHeadlineEl) {
     reviewHeadlineEl.innerHTML = `<strong>${positivePct}%</strong> positive`;
@@ -997,7 +1047,6 @@ export function renderDashboardCharts(games) {
           return;
         }
         if (hits.length === 1) {
-          dashResetLibraryFiltersExceptDedup();
           focusGame(hits[0].pt.key);
           return;
         }

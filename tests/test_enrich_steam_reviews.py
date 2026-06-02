@@ -24,6 +24,8 @@ normalize = _mod.normalize
     ("target", "candidate", "expected"),
     [
         ("death stranding", "death stranding 2 on beach", False),
+        ("death stranding", "death stranding director s cut", False),
+        ("death stranding", "death stranding digital artbook", False),
         ("death stranding", "death stranding", True),
         ("death stranding 2", "death stranding 2 on beach", True),
         ("control", "control ultimate edition", True),

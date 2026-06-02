@@ -32,7 +32,7 @@ WISHLIST_FETCHER_JSON = {
     "wishlistUbisoft": "games_wishlist_ubisoft.json",
     "wishlistXbox": "games_wishlist_xbox.json",
 }
-ENRICH_KEYS = {"hltb", "steamReviews", "steamCovers"}
+ENRICH_KEYS = {"hltb", "steamReviews", "steamCovers", "steamTags"}
 
 
 def _script_flags(script: str) -> set[str]:
@@ -111,6 +111,7 @@ NO_EMPTY_GUARD_SCRIPTS = {
     "enrich_hltb.py",
     "enrich_steam_reviews.py",
     "enrich_cross_store_images.py",
+    "enrich_steam_tags.py",
 }
 
 

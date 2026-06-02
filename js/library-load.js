@@ -4,6 +4,7 @@ import {
   normalizeGame,
   dedupeWithinStore,
   recomputeCrossStoreHidden,
+  applyCoopOverrides,
 } from './game-core.js';
 import {
   applyItadPriceSnapshot,
@@ -131,6 +132,10 @@ export async function loadSteamCoversMeta() {
   await loadCacheMeta("cache/cross_store_images_meta.json", "steamCovers");
 }
 
+export async function loadSteamTagsMeta() {
+  await loadCacheMeta("cache/steam_tags_meta.json", "steamTags");
+}
+
 export async function applyMergedLibrary() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   bumpPersonalMemo();
@@ -193,7 +198,7 @@ const WISHLIST_FETCHER_META_KEY = {
   wishlistUbisoft: "wishlistUbisoft",
   wishlistXbox: "wishlistXbox",
 };
-const ENRICH_FETCHER_KEYS = new Set(["hltb", "steamReviews", "steamCovers"]);
+const ENRICH_FETCHER_KEYS = new Set(["hltb", "steamReviews", "steamCovers", "steamTags"]);
 
 export function rebuildAllGamesFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
@@ -211,10 +216,10 @@ export function rebuildAllGamesFromMetas() {
     (ubisoft?.games || []).map(g => normalizeGame({ ...g, store: "ubisoft", id: g.id ?? g.ubisoft_id })),
     manualLibrary,
   ];
-  state.allGames = sources.flatMap(dedupeWithinStore);
+  state.allGames = sources.flatMap(dedupeWithinStore).map(applyCoopOverrides);
   state.itchGames = dedupeWithinStore(
     (itch?.games || []).map(g => normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id })),
-  );
+  ).map(applyCoopOverrides);
 }
 
 export function rebuildWishlistFromMetas() {
@@ -262,6 +267,7 @@ export async function reloadAfterFetcher(key) {
     if (key === "hltb") await loadHltbCache();
     if (key === "steamReviews") await loadSteamReviewCache();
     if (key === "steamCovers") await loadSteamCoversMeta();
+    if (key === "steamTags") await loadSteamTagsMeta();
   } else if (WISHLIST_FETCHER_JSON[key]) {
     const metaKey = WISHLIST_FETCHER_META_KEY[key];
     state.libraryMeta[metaKey] = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
@@ -316,6 +322,7 @@ export async function reloadGames() {
   await loadHltbCache();
   await loadSteamReviewCache();
   await loadSteamCoversMeta();
+  await loadSteamTagsMeta();
   await applyMergedLibrary();
 }
 
@@ -324,7 +331,7 @@ export function refreshAfterManualChange() {
   const manualLibrary = allManual.filter(g => !g.wishlist);
   const manualWishlist = allManual.filter(g => !!g.wishlist);
   const nonManualLibrary = state.allGames.filter(g => !g.manual);
-  state.allGames = [...nonManualLibrary, ...dedupeWithinStore(manualLibrary)];
+  state.allGames = [...nonManualLibrary, ...dedupeWithinStore(manualLibrary).map(applyCoopOverrides)];
   const fetchedWishlist = state.wishlistGames.filter(g => !g.manual);
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
   void applyMergedLibrary();

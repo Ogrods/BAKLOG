@@ -36,7 +36,7 @@ export function consumeItadAutoRunFlag() {
   itadPendingAutoRun = false;
   return v;
 }
-const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers']);
+const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers', 'steamTags']);
 const MAX_SSE_HINT = 'max 8 live streams';
 const GROUP_ORDER = ['library', 'wishlist', 'prices', 'enrich'];
 const GROUP_LABELS = {
@@ -51,6 +51,7 @@ const COUNT_FNS = {
   hltb: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
   steamReviews: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
   steamCovers: m => (m?.last_updated != null ? m.last_updated : null),
+  steamTags: m => (m?.rows_updated != null ? m.rows_updated : null),
 };
 
 // Plain-English description of what a normal click does for each fetcher.
@@ -76,6 +77,7 @@ const CLICK_HINTS = {
   hltb: "Look up HowLongToBeat hours for games we haven't checked yet",
   steamReviews: 'Pull missing Steam review scores for non-Steam games',
   steamCovers: 'Generate covers for non-Steam games missing artwork',
+  steamTags: 'Backfill co-op tags + missing genres on non-Steam games using Steam category data',
 };
 
 // What Shift+click (--refresh) actually changes, per fetcher.
@@ -89,6 +91,7 @@ const REFRESH_HINTS = {
   steamReviews:
     'Also retry titles previously cached as "no Steam app match" — use after Steam lists the game',
   steamCovers: 'Also retry rows previously cached as "no Steam match" — use after Steam adds new entries',
+  steamTags: 'Re-fetch Steam appdetails ignoring the local cache — picks up newly-added Steam categories',
 };
 
 // Pending breakdown for the enrichment chips so the tooltip can say
@@ -146,6 +149,23 @@ function pendingForEnrich(key) {
       if (ok) continue;
       if (skipped.has(`${g.store || 'steam'}:${g.id}`)) noMatch++;
       else unchecked++;
+    }
+    return { unchecked, retry: 0, noMatch };
+  }
+  if (key === 'steamTags') {
+    const cache = state.libraryMeta.steamReviews || {};
+    const rows = nonSteamRows();
+    let unchecked = 0;
+    let noMatch = 0;
+    for (const g of rows) {
+      const v = cache[`${g.store || 'steam'}:${g.id}`];
+      // No appid match → nothing this enricher can do.
+      if (!v) {
+        noMatch++;
+        continue;
+      }
+      // coop_online/coop_local is the canonical "have we run this" signal.
+      if (g.coop_online === undefined && g.coop_local === undefined) unchecked++;
     }
     return { unchecked, retry: 0, noMatch };
   }
@@ -210,7 +230,8 @@ function coverageOf(rows, pred) {
   const total = rows.length;
   if (!total) return { covered: 0, total: 0, pct: null };
   const covered = rows.filter(pred).length;
-  return { covered, total, pct: Math.round((covered / total) * 100) };
+  const pct = covered >= total ? 100 : Math.floor((covered / total) * 100);
+  return { covered, total, pct };
 }
 
 const COVERAGE_FNS = {
@@ -225,6 +246,18 @@ const COVERAGE_FNS = {
       return !String(lib).endsWith('.eprt') && !String(hdr).endsWith('.eprt');
     },
   ),
+  // Universe = non-Steam rows where we have a Steam appid match. Covered =
+  // rows the enricher has touched (coop fields are the canonical signal).
+  steamTags: () => {
+    const cache = state.libraryMeta.steamReviews || {};
+    const rows = nonSteamRows().filter(
+      g => cache[`${g.store || 'steam'}:${g.id}`],
+    );
+    return coverageOf(
+      rows,
+      g => g.coop_online !== undefined || g.coop_local !== undefined,
+    );
+  },
 };
 
 function coverageLabel(key) {
@@ -252,7 +285,9 @@ function coverageTooltipLine(key) {
     ? 'have HowLongToBeat hours'
     : key === 'steamReviews'
       ? 'have Steam review scores'
-      : 'have artwork';
+      : key === 'steamTags'
+        ? 'have Steam-derived co-op tags'
+        : 'have artwork';
   let line = `${formatNum(covered)} of ${formatNum(total)} ${verb}.`;
   if (!pending) return line;
   if (pending.unchecked > 0) {
@@ -432,6 +467,8 @@ export const fetcherRunner = (() => {
   const sourcesByRunId = new Map();
   const reconnectTimers = new Map();
   const reconnectAttempts = new Map();
+  /** Run ids the user cancelled — do not reconnect or re-subscribe until gone from server. */
+  const suppressedRunIds = new Set();
   const RECONNECT_BASE_MS = 2000;
   const RECONNECT_MAX_MS = 30000;
   const RECONNECT_MAX_ATTEMPTS = 8;
@@ -472,7 +509,18 @@ export const fetcherRunner = (() => {
     reconnectTimers.delete(runId);
   }
 
+  function pruneSuppressedRuns(snap) {
+    if (!snap) return;
+    const live = new Set();
+    if (snap.active) live.add(snap.active.id);
+    for (const q of snap.queue || []) live.add(q.id);
+    for (const id of suppressedRunIds) {
+      if (!live.has(id)) suppressedRunIds.delete(id);
+    }
+  }
+
   function scheduleReconnect(runId, key, src) {
+    if (suppressedRunIds.has(runId)) return;
     if (reconnectTimers.has(runId)) return;
     const attempt = (reconnectAttempts.get(runId) || 0) + 1;
     if (attempt > RECONNECT_MAX_ATTEMPTS) {
@@ -494,6 +542,7 @@ export const fetcherRunner = (() => {
     appendLine(`[${src.label}: stream dropped — reconnecting in ${Math.round(delay / 1000)}s]`, 'meta');
     const timer = setTimeout(() => {
       reconnectTimers.delete(runId);
+      if (suppressedRunIds.has(runId)) return;
       if (!sourcesByRunId.has(runId)) subscribe(runId, key, src, { reconnect: true });
     }, delay);
     reconnectTimers.set(runId, timer);
@@ -552,6 +601,27 @@ export const fetcherRunner = (() => {
     return runStateByKey.get(key) || null;
   }
 
+  // Count of fetchers currently running + queued client-side. The server
+  // enforces a hard cap of 2 (1 active + 1 queued); we mirror that here so
+  // the UI can disable other chips before the user wastes a click on a 409.
+  const MAX_IN_FLIGHT = 2;
+  function inFlightCount() {
+    return runStateByKey.size;
+  }
+  function isQueueFull() {
+    return inFlightCount() >= MAX_IN_FLIGHT;
+  }
+  function waitForQueueSlot() {
+    if (!isQueueFull()) return Promise.resolve();
+    return new Promise(resolve => {
+      const tick = () => {
+        if (!isQueueFull()) resolve();
+        else setTimeout(tick, 200);
+      };
+      tick();
+    });
+  }
+
   function source(key) {
     return fetcherSources.find(s => s.key === key) || null;
   }
@@ -583,7 +653,7 @@ export const fetcherRunner = (() => {
       if (!btn) return;
       if (btn.dataset.role === 'close') closePanel();
       else if (btn.dataset.role === 'clear') clearLog();
-      else if (btn.dataset.role === 'cancel') cancelActiveRun();
+      else if (btn.dataset.role === 'cancel') cancelInFlightRuns();
     });
     return panel;
   }
@@ -629,19 +699,33 @@ export const fetcherRunner = (() => {
     if (!panel) return;
     const btn = panel.querySelector('[data-role="cancel"]');
     if (!btn) return;
-    const show = !!liveRunId && isApiAvailable();
+    const show = inFlightCount() > 0 && isApiAvailable();
     btn.classList.toggle('hidden', !show);
     btn.disabled = !show;
   }
 
-  async function cancelActiveRun() {
-    if (!liveRunId || !isApiAvailable()) return;
-    const runId = liveRunId;
-    closeAllStreams();
+  async function cancelInFlightRuns() {
+    if (!isApiAvailable() || inFlightCount() === 0) return;
+    let snap = null;
     try {
-      const res = await fetch(`/api/run/${encodeURIComponent(runId)}/cancel`, { method: 'POST' });
+      snap = await fetchRunsSnapshot();
+    } catch (_) {}
+    const ids = [];
+    if (snap?.active) ids.push(snap.active.id);
+    for (const q of snap?.queue || []) ids.push(q.id);
+    for (const id of ids) suppressedRunIds.add(id);
+    closeAllStreams();
+    for (const key of [...runStateByKey.keys()]) markChipState(key, null);
+    liveRunId = null;
+    setStatus('failed');
+    updateCancelButton();
+    renderDashboardFetcherHealth();
+    try {
+      const res = await fetch('/api/runs/cancel', { method: 'POST' });
       if (res.ok) {
-        appendLine('[cancelled]', 'meta');
+        const data = await res.json();
+        const n = data.cancelled?.length ?? 0;
+        appendLine(n ? `[cancelled ${n} run(s)]` : '[cancelled]', 'meta');
       } else {
         const txt = await res.text().catch(() => '');
         appendLine(`[cancel failed ${res.status}] ${txt}`, 'stderr');
@@ -649,6 +733,10 @@ export const fetcherRunner = (() => {
     } catch (err) {
       appendLine(`[cancel failed] ${err}`, 'stderr');
     }
+    try {
+      snap = await fetchRunsSnapshot();
+      pruneSuppressedRuns(snap);
+    } catch (_) {}
   }
 
   function closePanel() {
@@ -700,6 +788,17 @@ export const fetcherRunner = (() => {
     await loadFetcherSources(true);
     const src = source(key);
     if (!src || runStateByKey.has(key)) return;
+    // Hard cap mirrors server-side enforcement (max 1 active + 1 queued).
+    // Without this guard a fast double-click could land two POSTs before the
+    // server's lock saw the first one as pending.
+    if (isQueueFull()) {
+      ensurePanel(src);
+      appendLine(
+        `[${src.label}: queue full — one run is in progress and one is queued]`,
+        'meta',
+      );
+      return;
+    }
     if (refresh && !src.supportsRefresh) {
       appendLine(
         `[${src.label}: this fetcher has no force-refresh mode — a normal click already pulls the latest data]`,
@@ -771,12 +870,17 @@ export const fetcherRunner = (() => {
       })
       .map(src => src.key);
     if (!staleKeys.length) return;
+    // Respect the global cap. Wait for an open slot between submits so we
+    // never stack the queue beyond 1 active + 1 queued, matching the rule
+    // the server enforces and the chip-disable logic in chipHtml.
     for (const key of staleKeys) {
+      await waitForQueueSlot();
       await run(key);
     }
   }
 
   function subscribe(runId, key, src, { reconnect = false } = {}) {
+    if (suppressedRunIds.has(runId)) return;
     clearReconnect(runId);
     const prior = sourcesByRunId.get(runId);
     if (prior) {
@@ -865,6 +969,7 @@ export const fetcherRunner = (() => {
     });
 
     es.onerror = async () => {
+      if (suppressedRunIds.has(runId)) return;
       if (es.readyState === EventSource.CONNECTING) return;
       if (!sourcesByRunId.has(runId)) return;
       try { es.close(); } catch (_) {}
@@ -922,6 +1027,7 @@ export const fetcherRunner = (() => {
     } catch {
       return;
     }
+    pruneSuppressedRuns(snap);
 
     const pending = [];
     if (snap.active) pending.push(snap.active);
@@ -936,6 +1042,7 @@ export const fetcherRunner = (() => {
         appendLine('[reconnected to in-flight fetcher(s)]', 'meta');
       }
       for (const run of pending) {
+        if (suppressedRunIds.has(run.id)) continue;
         const src = source(run.key);
         if (!src) continue;
         const chipState = run.status === 'running' ? 'running' : 'queued';
@@ -984,6 +1091,8 @@ export const fetcherRunner = (() => {
     isApiAvailable,
     apiProbeFinished,
     stateFor,
+    inFlightCount,
+    isQueueFull,
     run,
     runAllStale,
     syncFromServer,
@@ -1069,8 +1178,17 @@ export function renderDashboardFetcherHealth() {
           configHint ? `Note: ${src.missingRequirements.join(', ')} not set (see README / .env.example)` : '',
           'Server is offline — start `python server.py` to run fetchers from the UI.',
         ].filter(Boolean);
+    // Disable when the queue cap is reached AND this chip isn't already in
+    // the pipeline — without this, clicking a third chip while two are
+    // active/queued would silently 409 on the server. inFlightCount comes
+    // from fetcherRunner so chipHtml never touches the runner's private
+    // runStateByKey directly.
+    const queueFullElsewhere = fetcherRunner.inFlightCount() >= 2 && !runState;
+    if (queueFullElsewhere) {
+      titleLines.push('Queue full — one run is in progress and one is queued. Wait for a slot.');
+    }
     const title = titleLines.join('\n');
-    const disabled = !apiReady || runState === 'running' || runState === 'queued';
+    const disabled = !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere;
     const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
     const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
     const warnBadge = needsConfig ? '<span class="fh-chip-warn" title="Missing credentials">!</span>' : '';

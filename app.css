@@ -332,6 +332,16 @@ button[disabled] { cursor: not-allowed; }
 .pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
 .pick-card { transition: transform 0.1s ease, background 0.1s ease; }
 .pick-card:hover { transform: translateY(-2px); background: rgb(51 65 85); }
+/* When the picks drawer is collapsed (#picksContainer.hidden), the section
+   shrinks to just the header strip. That strip's `border-b border-slate-700`
+   would then become the section's bottom edge, but because #picksSection has
+   `rounded-lg` and no overflow clip, the straight 1px line pokes past the
+   rounded bottom corners and leaves a visible sliver. Drop the colour (not
+   the width) so the rounded edge stays clean without shifting layout when
+   the drawer is re-opened. */
+#picksSection:has(> #picksContainer.hidden) > div:first-of-type {
+  border-bottom-color: transparent;
+}
 .pick-tab.active { border-color: #38bdf8; color: #e2e8f0; background: rgba(14, 165, 233, 0.15); }
 .picks-limit-btn.active { background: #0284c7; border-color: #0ea5e9; color: #f8fafc; }
 .pick-store { position: absolute; top: 4px; right: 4px; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; z-index: 2; pointer-events: none; }
@@ -664,6 +674,13 @@ body.bulk-bar-open { padding-bottom: 56px; }
 @media (prefers-reduced-motion: reduce) {
   .row-loading-overlay { transition: none; }
   .row-loading-spinner { animation: none; border-top-color: #38bdf8; opacity: 0.85; }
+  #viewLoadingOverlay .view-spinner { animation: none; border-top-color: #38bdf8; opacity: 0.85; }
+  .dash-spotlight,
+  .dash-spotlight-art { transition: none !important; }
+  .dash-spotlight:hover .dash-spotlight-art { transform: none; }
+  .dash-insight { transition: none; }
+  .dash-marquee-track { animation: none !important; }
+  tr.row-flash { animation: none; }
 }
 
 #viewLoadingOverlay {
@@ -685,6 +702,9 @@ body.bulk-bar-open { padding-bottom: 56px; }
 }
 @keyframes view-spin { to { transform: rotate(360deg); } }
 .view-tab[disabled] { opacity: 0.5; cursor: progress; }
+/* Tabs start dim while the boot curtain is up so they don't flash
+   bright → dim → bright when loading-curtain.js calls setTabsDisabled. */
+html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 /* === A–Z jump nav === */
 #alphaNavWrap {
   position: fixed;
@@ -1849,8 +1869,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .dash-scatter-cursor-tip-more { color: #94a3b8; font-size: 10px; margin-top: 2px; }
 .dash-scatter-list {
   margin-top: 8px;
-  min-height: 96px;
-  max-height: 110px;
+  min-height: 120px;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 8px;
@@ -1895,6 +1914,9 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 }
 .dash-scatter-list-head {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   color: #94a3b8;
   padding: 6px 10px 4px;
@@ -1907,8 +1929,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   flex-direction: row;
   gap: 6px;
   padding: 6px 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
   align-items: stretch;
 }
 .dash-scatter-list-row {
@@ -1941,12 +1962,32 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   line-height: 1.2;
 }
 .dash-scatter-list-meta { color: #94a3b8; font-size: 9px; white-space: nowrap; }
-.dash-scatter-list-foot {
-  flex-shrink: 0;
-  font-size: 10px;
-  color: #64748b;
-  padding: 4px 10px 6px;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
+.dash-scatter-list-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  width: 72px;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.06);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  color: #94a3b8;
+  text-align: center;
+  pointer-events: none;
+}
+.dash-scatter-list-more-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: #cbd5e1;
+  line-height: 1;
+}
+.dash-scatter-list-more-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .table-hide-score .col-score { display: none; }
 .table-hide-score col.col-score { width: 0; }
@@ -1954,11 +1995,30 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .table-hide-playtime col.col-played { width: 0; }
 .table-hide-lastplayed .col-lastplayed { display: none; }
 .table-hide-lastplayed col.col-lastplayed { width: 0; }
-#tableWrap { width: 100%; }
-.games-table { width: 100%; table-layout: fixed; min-width: 1280px; }
+#tableWrap {
+  width: 100%;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-width: 0;
+}
+.games-table {
+  width: 100%;
+  table-layout: fixed;
+  min-width: 1280px;
+  /* Collapse table borders so the default border-spacing 2px band INSIDE
+     <thead> (above each <th>) disappears. Without this, the band is painted
+     by <thead>'s bg-slate-800 only while the thead is in normal flow; once
+     each <th> goes sticky and pins to viewport top, the thead element scrolls
+     away and that 2px band becomes a transparent gap through which tbody rows
+     bleed. */
+  border-collapse: collapse;
+}
 .games-table thead th {
   position: sticky;
-  top: 0;
+  /* -1px (paired with border-collapse: collapse above) absorbs any half-pixel
+     rounding when the browser paints the sticky cell so the top edge always
+     sits at or above the viewport top, never below. */
+  top: -1px;
   z-index: 10;
   background: rgb(30 41 59);
   box-shadow: inset 0 -1px 0 #334155;

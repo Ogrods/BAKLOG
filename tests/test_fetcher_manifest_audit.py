@@ -7,32 +7,23 @@ from pathlib import Path
 
 import pytest
 
+import server
+from fetchers.registry import (
+    ENRICH_FETCHER_KEYS,
+    LIBRARY_JSON_BY_KEY,
+    MANIFEST_PATH,
+    WISHLIST_JSON_BY_KEY,
+    validate_manifest,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = json.loads((ROOT / "fetchers" / "manifest.json").read_text(encoding="utf-8"))
+MANIFEST = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 ENTRIES = MANIFEST["fetchers"]
 
-# Mirrors js/app.js
-LIBRARY_STORE_JSON = {
-    "steam": "games_steam.json",
-    "gog": "games_gog.json",
-    "psn": "games_psn.json",
-    "epic": "games_epic.json",
-    "amazon": "games_amazon.json",
-    "nintendo": "games_nintendo.json",
-    "itch": "games_itch.json",
-    "xbox": "games_xbox.json",
-    "battlenet": "games_battlenet.json",
-    "ubisoft": "games_ubisoft.json",
-}
-WISHLIST_FETCHER_JSON = {
-    "wishlistSteam": "games_wishlist.json",
-    "wishlistGog": "games_wishlist_gog.json",
-    "wishlistEpic": "games_wishlist_epic.json",
-    "wishlistPsn": "games_wishlist_psn.json",
-    "wishlistUbisoft": "games_wishlist_ubisoft.json",
-    "wishlistXbox": "games_wishlist_xbox.json",
-}
-ENRICH_KEYS = {"hltb", "steamReviews", "steamCovers", "steamTags"}
+# Mirrors js/fetcher-registry.js (generated from fetchers/registry.py)
+LIBRARY_STORE_JSON = LIBRARY_JSON_BY_KEY
+WISHLIST_FETCHER_JSON = WISHLIST_JSON_BY_KEY
+ENRICH_KEYS = set(ENRICH_FETCHER_KEYS)
 
 
 def _script_flags(script: str) -> set[str]:
@@ -132,6 +123,7 @@ def test_refuse_empty_helper(script: str) -> None:
 def test_manual_empty_guard(script: str) -> None:
     text = (ROOT / script).read_text(encoding="utf-8")
     assert "exit_code=2" in text
+    assert "refuse_drift_result" in text
 
 
 @pytest.mark.parametrize(
@@ -141,3 +133,11 @@ def test_manual_empty_guard(script: str) -> None:
 def test_documented_no_standard_empty_guard(script: str) -> None:
     """Enrichers mutate in place; Steam/PSN trust non-zero library from API."""
     assert script in NO_EMPTY_GUARD_SCRIPTS
+
+
+def test_registry_validate_manifest() -> None:
+    assert validate_manifest() == []
+
+
+def test_server_fetchers_match_manifest() -> None:
+    assert set(server.FETCHERS.keys()) == {e["key"] for e in ENTRIES}

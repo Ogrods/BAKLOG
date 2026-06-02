@@ -26,12 +26,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from fetchers._base import (
+    add_allow_empty_arg,
     add_dry_run_arg,
     add_hltb_args,
     configure_stdout,
     load_existing_games,
     merge_cached_row,
     print_id_diff,
+    refuse_drift_result,
     write_games_json,
 )
 from auth import mark_invalid, resolve_env
@@ -163,6 +165,7 @@ def main() -> int:
         help="Skip games whose listed min_price is below this (in cents). Useful to drop free jam games.",
     )
     add_dry_run_arg(parser)
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     configure_stdout()
     t0 = started("fetch_itch")
@@ -266,6 +269,15 @@ def main() -> int:
     if args.dry_run:
         print("\nDry run — not writing games_itch.json.", flush=True)
         return stats.finish("fetch_itch", t0, exit_code=0, extra="dry run")
+
+    drift_exit = refuse_drift_result(
+        games_out,
+        label="itch.io library rows",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_ITCH_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_itch", t0, exit_code=drift_exit)
 
     sorted_games = sorted(games_out, key=lambda g: g["name"].lower())
     write_games_json(GAMES_ITCH_JSON, store="itch", games=sorted_games)

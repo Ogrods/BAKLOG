@@ -19,6 +19,9 @@ Endpoints:
     GET  /api/auth/<id>/stream -> SSE auth flow events
     PUT  /api/auth/<p>/credentials -> save form API keys
     POST /api/auth/<p>/disconnect  -> wipe stored credentials
+    POST /api/auth/master-password -> set optional portable encryption passphrase
+    POST /api/auth/secrets/export  -> download encrypted portable bundle
+    POST /api/auth/secrets/import  -> restore bundle (?passphrase=...)
     GET  /oauth/epic/callback -> Epic OAuth redirect handler
 
 Bind: 127.0.0.1 only. The fetcher whitelist is loaded from fetchers/manifest.json
@@ -62,9 +65,19 @@ STALL_REPEAT_SEC = 60
 STALL_POLL_SEC = 1.0
 SILENT_STALL_KILL_SEC = 180  # if a fetcher emits zero lines AND proc still alive after this, force-kill
 TERMINATE_GRACE_SEC = 5  # how long to wait after proc.terminate() before falling back to taskkill /F
+LAUNCH_TIMEOUT_SEC = 30  # max wait for subprocess.Popen() to return before declaring the run failed.
+# On Windows the AppX/WindowsApps Python stub can deadlock inside CreateProcess
+# when spawned from another AppX Python process — the worker thread blocks
+# indefinitely with no zombie child to kill. The launch watchdog aborts the
+# wait so subsequent queued runs can still execute.
 RUNS_DIR = ROOT / "cache" / "runs"
 ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
 RUN_HISTORY_FILE = RUNS_DIR / "history.json"
+QUEUE_FILE = RUNS_DIR / "queue.json"
+_runs_file_lock = threading.Lock()
+
+# Statuses that occupy a queue slot (cap = 2: one active + one queued).
+_IN_FLIGHT_STATUSES = frozenset({"queued", "launching", "running", "cancelling"})
 
 _sse_connections = 0
 _sse_lock = threading.Lock()
@@ -87,6 +100,7 @@ def _empty_personal_doc() -> dict[str, Any]:
         "personal": {},
         "prefs": {},
         "manual": [],
+        "libraryFirstSeen": {},
         "updated_at": None,
         "schema_version": 1,
     }
@@ -106,6 +120,7 @@ def _load_personal_doc() -> dict[str, Any]:
         doc.setdefault("personal", {})
         doc.setdefault("prefs", {})
         doc.setdefault("manual", [])
+        doc.setdefault("libraryFirstSeen", {})
         doc.setdefault("updated_at", None)
         doc.setdefault("schema_version", 1)
         return doc
@@ -117,13 +132,21 @@ def _validate_personal_payload(payload: Any) -> dict[str, Any]:
     personal = payload.get("personal", {})
     prefs = payload.get("prefs", {})
     manual = payload.get("manual", [])
+    library_first_seen = payload.get("libraryFirstSeen", {})
     if not isinstance(personal, dict):
         raise ValueError("personal must be an object")
     if not isinstance(prefs, dict):
         raise ValueError("prefs must be an object")
     if not isinstance(manual, list):
         raise ValueError("manual must be an array")
-    return {"personal": personal, "prefs": prefs, "manual": manual}
+    if not isinstance(library_first_seen, dict):
+        raise ValueError("libraryFirstSeen must be an object")
+    return {
+        "personal": personal,
+        "prefs": prefs,
+        "manual": manual,
+        "libraryFirstSeen": library_first_seen,
+    }
 
 
 def _rotate_personal_backup() -> None:
@@ -195,7 +218,12 @@ MANIFEST_FILE = ROOT / "fetchers" / "manifest.json"
 def _load_fetchers() -> dict[str, dict[str, Any]]:
     """Build the fetcher registry from fetchers/manifest.json."""
     try:
-        raw = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+        from fetchers.registry import MANIFEST_PATH, validate_manifest
+
+        errs = validate_manifest(MANIFEST_PATH)
+        for err in errs:
+            print(f"[fetchers] manifest: {err}", file=sys.stderr)
+        raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         entries = raw.get("fetchers", [])
     except (OSError, json.JSONDecodeError) as exc:
         print(f"[fetchers] manifest load failed: {exc!r}", file=sys.stderr)
@@ -295,13 +323,27 @@ def _write_json_atomic(path: Path, payload: Any) -> None:
 
 
 def _read_active_runs() -> list[dict[str, Any]]:
-    data = _read_json_file(ACTIVE_RUNS_FILE, {"runs": []})
+    with _runs_file_lock:
+        data = _read_json_file(ACTIVE_RUNS_FILE, {"runs": []})
     runs = data.get("runs") if isinstance(data, dict) else []
     return runs if isinstance(runs, list) else []
 
 
 def _write_active_runs(runs: list[dict[str, Any]]) -> None:
-    _write_json_atomic(ACTIVE_RUNS_FILE, {"runs": runs})
+    with _runs_file_lock:
+        _write_json_atomic(ACTIVE_RUNS_FILE, {"runs": runs})
+
+
+def _load_durable_queue() -> list[dict[str, Any]]:
+    with _runs_file_lock:
+        data = _read_json_file(QUEUE_FILE, {"runs": []})
+    runs = data.get("runs") if isinstance(data, dict) else []
+    return runs if isinstance(runs, list) else []
+
+
+def _save_durable_queue(entries: list[dict[str, Any]]) -> None:
+    with _runs_file_lock:
+        _write_json_atomic(QUEUE_FILE, {"runs": entries})
 
 
 def _load_run_history() -> list[dict[str, Any]]:
@@ -328,7 +370,7 @@ class Run:
         self.key: str = key
         self.label: str = spec["label"]
         self.refresh: bool = refresh
-        self.status: str = "queued"  # queued | running | done | failed | cancelled
+        self.status: str = "queued"  # queued | launching | running | cancelling | done | failed | cancelled
         self.started_at: float | None = None
         self.ended_at: float | None = None
         self.exit_code: int | None = None
@@ -432,15 +474,22 @@ class Run:
                 self.exit_code = -1
                 self.ended_at = time.time()
                 notify_done = True
+            elif self.status == "launching":
+                self.cancelled = True
+                proc = self._proc
             elif self.status == "running":
                 self.cancelled = True
                 proc = self._proc
                 if proc is None:
-                    # Worker marked running but subprocess not started yet.
                     self.status = "cancelled"
                     self.exit_code = -1
                     self.ended_at = time.time()
                     notify_done = True
+                else:
+                    self.status = "cancelling"
+                    self.broadcast("status", {"status": self.status, "started_at": self.started_at})
+            elif self.status == "cancelling":
+                return False
             else:
                 return False
         if notify_done:
@@ -482,6 +531,43 @@ class RunManager:
         self._runs_by_id: dict[str, Run] = {}
         self._reap_orphan_processes()
         threading.Thread(target=self._worker_loop, name="run-worker", daemon=True).start()
+        self._restore_durable_queue()
+
+    def _persist_queue(self) -> None:
+        with self._lock:
+            entries = [
+                {"id": r.id, "key": r.key, "refresh": r.refresh}
+                for r in self._pending
+                if r.status == "queued"
+            ]
+        _save_durable_queue(entries)
+
+    def _restore_durable_queue(self) -> None:
+        history_ids = {h.get("id") for h in self._history}
+        restored = 0
+        for entry in _load_durable_queue():
+            key = entry.get("key")
+            if not key or key not in FETCHERS:
+                continue
+            if entry.get("id") in history_ids:
+                continue
+            try:
+                self.submit(key, refresh=bool(entry.get("refresh")))
+                restored += 1
+            except ValueError:
+                break
+        if restored:
+            print(f"[runs] restored {restored} queued run(s) from durable queue", file=sys.stderr)
+
+    def _prune_runs_by_id(self) -> None:
+        with self._lock:
+            if len(self._runs_by_id) <= MAX_HISTORY:
+                return
+            keep_ids = {r.id for r in self._pending}
+            keep_ids.update(h.get("id") for h in self._history if h.get("id"))
+            for rid in list(self._runs_by_id):
+                if rid not in keep_ids:
+                    del self._runs_by_id[rid]
 
     def _append_history(self, summary: dict[str, Any]) -> None:
         with self._lock:
@@ -532,37 +618,30 @@ class RunManager:
         if active is not None:
             active.cancel()
             proc = active._proc
-            if proc is not None and proc.poll() is None:
-                try:
-                    proc.terminate()
-                except OSError:
-                    pass
+            if proc is not None and proc.poll() is None and proc.pid:
+                _terminate_pid(proc.pid)
         _write_active_runs([])
+        _save_durable_queue([])
 
     def submit(self, key: str, *, refresh: bool = False) -> Run:
         if key not in FETCHERS:
             raise KeyError(key)
         with self._lock:
-            if any(r.key == key and r.status in ("queued", "running") for r in self._pending):
+            if any(r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending):
                 raise ValueError(f"{key} already queued or running")
-            # Enforce a global cap of one active + one queued. Fetchers can take
-            # minutes (PSN, Xbox, itch.io), and a backlog of three or four runs
-            # made cancelling/replanning impossible without restarting the
-            # server. Anything beyond "next up" should be re-queued by the user
-            # after the current one finishes.
             in_flight = sum(
-                1 for r in self._pending if r.status in ("queued", "running")
+                1 for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             )
             if in_flight >= 2:
                 raise ValueError(
                     "queue full — one run is in progress and one is queued; "
                     "wait for a slot before submitting another"
                 )
-        run = Run(key, refresh=refresh, runs_dir=self._runs_dir)
-        with self._lock:
+            run = Run(key, refresh=refresh, runs_dir=self._runs_dir)
             self._pending.append(run)
             self._runs_by_id[run.id] = run
-        self._queue.put(run)
+            self._queue.put(run)
+        self._persist_queue()
         return run
 
     def cancel(self, run_id: str) -> tuple[Run | None, str | None]:
@@ -577,13 +656,14 @@ class RunManager:
         with self._lock:
             if run in self._pending:
                 self._pending.remove(run)
+        self._persist_queue()
         return run, None
 
     def cancel_all(self) -> list[dict[str, Any]]:
         """Cancel every queued or running fetcher (active + next in queue)."""
         with self._lock:
             targets = [
-                r for r in self._pending if r.status in ("queued", "running")
+                r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             ]
         summaries: list[dict[str, Any]] = []
         for run in targets:
@@ -598,7 +678,11 @@ class RunManager:
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
-            active = self._active.to_summary() if self._active else None
+            active = (
+                self._active.to_summary()
+                if self._active and self._active.status in ("launching", "running", "cancelling")
+                else None
+            )
             queued = [r.to_summary() for r in self._pending if r.status == "queued"]
             history = list(self._history)
         return {"active": active, "queue": queued, "history": history}
@@ -624,6 +708,8 @@ class RunManager:
                 self._pending.remove(run)
         self._unregister_active_process(run.id)
         self._append_history(run.to_summary())
+        self._persist_queue()
+        self._prune_runs_by_id()
 
     def _worker_loop(self) -> None:
         while True:
@@ -642,8 +728,13 @@ class RunManager:
             self._finalize_run(run)
 
     def _execute(self, run: Run) -> None:
+        if run.cancelled:
+            run.status = "cancelled"
+            run.exit_code = -1
+            return
+
         argv = run.argv()
-        run.status = "running"
+        run.status = "launching"
         run.started_at = time.time()
         run.broadcast("status", {"status": run.status, "started_at": run.started_at})
         run.add_line("stdout", f"$ {' '.join(argv)}")
@@ -653,25 +744,84 @@ class RunManager:
         env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
 
+        # Run Popen on a launcher thread so a wedged CreateProcess can't wedge
+        # the queue worker. If the launch doesn't return within
+        # LAUNCH_TIMEOUT_SEC the run is marked failed and the worker moves on
+        # to the next queued item; late launches are terminated immediately.
+        launch_q: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+        launch_abandoned = threading.Event()
+
+        def _launch() -> None:
+            try:
+                p = subprocess.Popen(  # noqa: S603 - argv is fixed in FETCHERS, not user input
+                    argv,
+                    cwd=str(ROOT),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    bufsize=1,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    env=env,
+                )
+            except BaseException as e:  # noqa: BLE001 - surface any launch failure to the worker
+                if not launch_abandoned.is_set():
+                    launch_q.put(("err", e))
+                return
+            if launch_abandoned.is_set():
+                if p.poll() is None and p.pid:
+                    _terminate_pid(p.pid)
+                run.add_line(
+                    "stderr",
+                    "[server] late launch after timeout — terminated stray subprocess",
+                )
+                return
+            launch_q.put(("ok", p))
+
+        threading.Thread(target=_launch, name=f"run-launch-{run.id}", daemon=True).start()
         try:
-            proc = subprocess.Popen(  # noqa: S603 - argv is fixed in FETCHERS, not user input
-                argv,
-                cwd=str(ROOT),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                bufsize=1,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                env=env,
-            )
-        except FileNotFoundError as exc:
+            tag, payload = launch_q.get(timeout=LAUNCH_TIMEOUT_SEC)
+        except queue.Empty:
+            launch_abandoned.set()
             run.status = "failed"
             run.exit_code = -1
-            run.add_line("stderr", f"[server] cannot launch: {exc}")
+            run.add_line(
+                "stderr",
+                f"[server] subprocess launch did not return within {LAUNCH_TIMEOUT_SEC}s "
+                f"(likely Windows AppX Python activation deadlock); abandoning the launcher thread. "
+                f"Restart the server if subsequent runs also fail to start.",
+            )
+            return
+        if run.cancelled or run._finished.is_set():
+            if tag == "ok" and payload is not None and payload.poll() is None and payload.pid:
+                _terminate_pid(payload.pid)
+            run.status = "cancelled"
+            run.exit_code = -1
+            run.add_line("stderr", "[server] cancelled during launch")
+            return
+        if tag == "err":
+            exc = payload
+            if isinstance(exc, FileNotFoundError):
+                run.status = "failed"
+                run.exit_code = -1
+                run.add_line("stderr", f"[server] cannot launch: {exc}")
+                return
+            run.status = "failed"
+            run.exit_code = -1
+            run.add_line("stderr", f"[server] launch error: {exc!r}")
+            return
+        proc = payload
+
+        if run.cancelled:
+            if proc.poll() is None and proc.pid:
+                _terminate_pid(proc.pid)
+            run.status = "cancelled"
+            run.exit_code = -1
             return
 
         run._proc = proc
+        run.status = "running"
+        run.broadcast("status", {"status": run.status, "started_at": run.started_at})
         if proc.pid:
             self._register_active_process(run, proc.pid)
         assert proc.stdout is not None
@@ -703,10 +853,10 @@ class RunManager:
                 if proc.poll() is not None and line_queue.empty():
                     break
                 silent = now - last_line_at
-                if silent >= SILENT_STALL_KILL_SEC and len(run.lines) <= 1:
+                if silent >= SILENT_STALL_KILL_SEC:
                     run.add_line(
                         "stderr",
-                        f"[server] no output for {int(silent)}s and no lines produced — force-killing PID {proc.pid}",
+                        f"[server] no output for {int(silent)}s — force-killing PID {proc.pid}",
                     )
                     if proc.pid:
                         _terminate_pid(proc.pid)
@@ -754,6 +904,24 @@ def _send_json(handler: SimpleHTTPRequestHandler, status: int, payload: Any) -> 
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _send_bytes(
+    handler: SimpleHTTPRequestHandler,
+    status: int,
+    body: bytes,
+    *,
+    content_type: str,
+    filename: str | None = None,
+) -> None:
+    handler.send_response(status)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store")
+    if filename:
+        handler.send_header("Content-Disposition", f'attachment; filename="{filename}"')
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -834,6 +1002,12 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/auth/master-password":
             self._handle_auth_master_password()
+            return
+        if self.path == "/api/auth/secrets/export":
+            self._handle_auth_secrets_export()
+            return
+        if self.path.startswith("/api/auth/secrets/import"):
+            self._handle_auth_secrets_import()
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
@@ -1045,6 +1219,67 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.OK, {"ok": True})
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _handle_auth_secrets_export(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+            payload = json.loads(raw)
+            from auth.bundle import BundleError, BundleTooLarge
+            from auth.bundle import bundle_filename, export_bundle
+
+            passphrase = (payload.get("passphrase") or "").strip()
+            include_profiles = payload.get("include_profiles", True)
+            if not isinstance(include_profiles, bool):
+                include_profiles = True
+            blob = export_bundle(passphrase, include_profiles=include_profiles)
+            _send_bytes(
+                self,
+                HTTPStatus.OK,
+                blob,
+                content_type="application/octet-stream",
+                filename=bundle_filename(),
+            )
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "invalid_passphrase"})
+        except BundleTooLarge as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "too_large"})
+        except BundleError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "bundle_error"})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_auth_secrets_import(self) -> None:
+        from urllib.parse import parse_qs, urlparse
+
+        try:
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            passphrase = (params.get("passphrase") or [""])[0]
+            length = int(self.headers.get("Content-Length") or 0)
+            blob = self.rfile.read(length) if length else b""
+            from auth.bundle import (
+                BadMagic,
+                BadPassphrase,
+                BundleTooLarge,
+                UnsupportedVersion,
+                import_bundle,
+            )
+
+            summary = import_bundle(blob, passphrase, dry_run=False)
+            _send_json(self, HTTPStatus.OK, summary.as_dict())
+        except BadPassphrase as exc:
+            _send_json(self, HTTPStatus.FORBIDDEN, {"error": str(exc), "code": "bad_passphrase"})
+        except BadMagic as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "bad_magic"})
+        except UnsupportedVersion as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "unsupported_version"})
+        except BundleTooLarge as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "too_large"})
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "invalid_passphrase"})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     def _handle_epic_oauth_callback(self) -> None:
         from urllib.parse import parse_qs, urlparse

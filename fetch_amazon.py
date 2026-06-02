@@ -14,7 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from fetchers._authoritative import AMAZON
-from fetchers._base import merge_cached_row
+from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 
@@ -96,6 +96,7 @@ def main() -> int:
     )
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     parser.add_argument("--only-new", action="store_true", help="Only HLTB-fetch games missing HLTB data")
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_amazon")
@@ -168,6 +169,15 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+
+    drift_exit = refuse_drift_result(
+        games_out,
+        label="Amazon library rows",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_AMAZON_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_amazon", t0, exit_code=drift_exit)
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

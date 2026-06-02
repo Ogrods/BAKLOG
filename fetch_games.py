@@ -255,6 +255,8 @@ def main() -> int:
     if drift_exit is not None:
         return stats.finish("fetch_games", t0, exit_code=drift_exit)
 
+    # Inline write (not write_games_json) because the payload includes steam_id at root.
+    # Per-row enrichment is preserved via cached_row in the loop above.
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "steam_id": steam_id,

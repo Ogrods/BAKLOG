@@ -60,6 +60,7 @@ def test_personal_get_empty_doc(personal_server: str):
     assert doc["personal"] == {}
     assert doc["prefs"] == {}
     assert doc["manual"] == []
+    assert doc["libraryFirstSeen"] == {}
     assert doc["schema_version"] == 1
 
 
@@ -68,6 +69,7 @@ def test_personal_put_round_trip(personal_server: str):
         "personal": {"steam:570": {"status": "backlog"}},
         "prefs": {"picksTab": "topRated"},
         "manual": [{"store": "manual", "id": "demo", "name": "Demo"}],
+        "libraryFirstSeen": {"steam:570": 1_700_000_000_000},
     }
     put_status, saved = _request(personal_server, "PUT", "/api/personal", payload)
     assert put_status == 200
@@ -80,6 +82,7 @@ def test_personal_put_round_trip(personal_server: str):
     assert loaded["personal"] == saved["personal"]
     assert loaded["prefs"] == saved["prefs"]
     assert loaded["manual"] == saved["manual"]
+    assert loaded["libraryFirstSeen"] == saved["libraryFirstSeen"]
 
 
 def test_personal_put_invalid_payload(personal_server: str):

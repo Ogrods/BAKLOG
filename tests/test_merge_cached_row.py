@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fetchers._authoritative import GOG
+from fetchers._authoritative import AMAZON, GOG
 from fetchers._base import merge_cached_row
 
 
@@ -32,6 +32,56 @@ def test_merge_preserves_steam_reviews() -> None:
     assert merged["steam_review_count"] == 1000
     assert merged["steam_review_desc"] == "Very Positive"
     assert merged["hltb_main_hours"] == 12.0
+
+
+def test_merge_preserves_enriched_images_when_fresh_is_empty() -> None:
+    """An Amazon refetch with no native cover URL must not clobber the Steam-CDN
+    URLs that enrich_cross_store_images.py wrote on a previous run."""
+    cached = {
+        "store": "amazon",
+        "id": "abc",
+        "amazon_id": "abc",
+        "name": "RAD",
+        "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2307350/header.jpg",
+        "library_image": "https://cdn.akamai.steamstatic.com/steam/apps/2307350/library_600x900_2x.jpg",
+        "steam_appid": 2307350,
+        "image_source": "steam_search",
+    }
+    fresh = {
+        "store": "amazon",
+        "id": "abc",
+        "amazon_id": "abc",
+        "name": "RAD",
+        "header_image": None,
+        "library_image": None,
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=AMAZON, hltb_updated=False)
+    assert merged["header_image"].startswith("https://cdn.akamai.steamstatic.com")
+    assert merged["library_image"].endswith("/library_600x900_2x.jpg")
+    assert merged["image_source"] == "steam_search"
+    assert merged["steam_appid"] == 2307350
+
+
+def test_merge_lets_fresh_image_override_enrichment() -> None:
+    """If the store fetcher later publishes a real cover URL, it wins."""
+    cached = {
+        "store": "amazon",
+        "id": "abc",
+        "amazon_id": "abc",
+        "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2307350/header.jpg",
+        "library_image": "https://cdn.akamai.steamstatic.com/steam/apps/2307350/library_600x900_2x.jpg",
+        "image_source": "steam_search",
+    }
+    fresh = {
+        "store": "amazon",
+        "id": "abc",
+        "amazon_id": "abc",
+        "header_image": "https://images-na.ssl-images-amazon.com/rad-header.jpg",
+        "library_image": "https://images-na.ssl-images-amazon.com/rad-library.jpg",
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=AMAZON, hltb_updated=False)
+    assert merged["header_image"] == fresh["header_image"]
+    assert merged["library_image"] == fresh["library_image"]
 
 
 def test_merge_overwrites_hltb_when_updated() -> None:

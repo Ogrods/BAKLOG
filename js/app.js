@@ -56,7 +56,7 @@ import {
   hideViewOverlay,
 } from './loading-curtain.js';
 import { reloadGames, reloadAfterFetcher } from './library-load.js';
-import { runLibraryCountDemo, runLibraryCountSmallDemo } from './library-count-animation.js';
+import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
@@ -199,6 +199,10 @@ async function bootstrap() {
     } else {
       scheduleIdlePrewarm();
     }
+    // Arm the count-up combat text only AFTER boot. The initial page-load
+    // count-up (including any 0 -> full jump during boot) stays silent; popups
+    // only appear when a live fetcher/manual action adds games afterward.
+    armLibraryCountAnimations();
   }
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {

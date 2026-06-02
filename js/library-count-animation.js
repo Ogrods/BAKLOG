@@ -214,12 +214,32 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
   episode.rafId = requestAnimationFrame(tick);
 }
 
+// The combat-text popups must NOT fire during the initial page-load count-up
+// (boot does at least one applyMergedLibrary, sometimes 0 -> full, which would
+// otherwise read as a giant addition). We stay disarmed until bootstrap
+// finishes and explicitly arms us, so popups only appear on genuine live
+// fetcher/manual additions. The rolling count-up on the hero is unaffected —
+// that's animateCount, not this module.
+let _armed = false;
+
+/** Called once at the end of bootstrap so live additions can animate. */
+export function armLibraryCountAnimations() {
+  _armed = true;
+}
+
+/** Test/diagnostic helper — re-disarm (used by tests). */
+export function disarmLibraryCountAnimations() {
+  _armed = false;
+}
+
 /**
  * High-level entry point: animate every mounted surface for this `kind`.
  * Called from applyMergedLibrary() with `prev` and `next` counts.
  */
 export function fireLibraryCountFlash(kind, prev, next) {
   if (typeof document === 'undefined') return;
+  // Disarmed until boot completes — initial count-up never spawns popups.
+  if (!_armed) return;
   if (!Number.isFinite(prev) || !Number.isFinite(next)) return;
   if (next === prev) return;
   // We never visualize decreases as "−1" popups; just settle text quietly.

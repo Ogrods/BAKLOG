@@ -9,6 +9,8 @@ import {
   cancelAllLibraryCountAnimations,
   isSurfaceAnimating,
   runLibraryCountSmallDemo,
+  armLibraryCountAnimations,
+  disarmLibraryCountAnimations,
 } from '../js/library-count-animation.js';
 import { state } from '../js/state.js';
 
@@ -42,6 +44,9 @@ describe('flashCountUp', () => {
       configurable: true,
       value: 'visible',
     });
+    // fireLibraryCountFlash is gated behind the post-boot arm; tests that
+    // exercise it need it armed. flashCountUp (called directly) is not gated.
+    armLibraryCountAnimations();
   });
 
   afterEach(() => {
@@ -127,6 +132,24 @@ describe('flashCountUp', () => {
     cancelAllLibraryCountAnimations();
     expect(isSurfaceAnimating(node)).toBe(false);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(0);
+  });
+
+  it('fireLibraryCountFlash stays silent until armed (no popups on page-load count-up)', () => {
+    document.body.innerHTML = `
+      <span class="library-count-host" data-libcount-host>
+        <span data-count-target="library">10</span>
+      </span>`;
+    state.activeView = 'library';
+    disarmLibraryCountAnimations();
+    // Simulate the boot 0 -> full jump: must NOT spawn combat text.
+    fireLibraryCountFlash('library', 0, 1946);
+    vi.advanceTimersByTime(800);
+    expect(document.querySelectorAll('.library-count-popup').length).toBe(0);
+    // Once armed (post-boot), a live addition animates.
+    armLibraryCountAnimations();
+    fireLibraryCountFlash('library', 1946, 1949);
+    vi.advanceTimersByTime(300);
+    expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 
   it('fireLibraryCountFlash is a silent no-op when no surfaces are mounted', () => {

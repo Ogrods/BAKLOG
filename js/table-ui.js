@@ -22,6 +22,7 @@ import {
   wishlistBadgeHtml,
   wishlistStatusSelectHtml,
   coopPillsHtml,
+  trophyProgressPillHtml,
   earlyAccessRibbonHtml,
   earlyAccessPillHtml,
   priorityScore,
@@ -1041,6 +1042,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
             <div class="row-meta mt-1 flex items-center gap-1.5 flex-wrap">
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
               ${coopPillsHtml(g)}
+              ${state.activeView === "wishlist" ? "" : trophyProgressPillHtml(g)}
               ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))}" aria-label="Has notes">&#9998; note</span>` : ""}
             </div>
             ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}

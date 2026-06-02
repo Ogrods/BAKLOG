@@ -493,6 +493,17 @@ button[disabled] { cursor: not-allowed; }
 }
 .coop-pill-online { background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%); color: #06141f; }
 .coop-pill-local { background: linear-gradient(180deg, #34d399 0%, #047857 100%); color: #052017; }
+.trophy-pill {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 0 5px; height: 16px;
+  border-radius: 999px;
+  font-size: 10px; line-height: 1; font-weight: 600;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 /* === Chips & badges === */
 .genre-chip.active { background: #0284c7; border-color: #0ea5e9; color: #f8fafc; }
 .store-chip.active { background: #7c3aed; border-color: #a78bfa; color: #f8fafc; }
@@ -1020,6 +1031,16 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 }
 .fh-run-stale:hover:not(:disabled) { background: rgb(51 65 85); }
 .fh-run-stale:disabled { opacity: 0.45; cursor: not-allowed; }
+.fh-log-open {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgb(51 65 85);
+  background: rgb(30 41 59);
+  color: #cbd5e1;
+  cursor: pointer;
+}
+.fh-log-open:hover { background: rgb(51 65 85); }
 .fh-title { font-size: 0.75rem; font-weight: 600; color: #cbd5e1; letter-spacing: 0.04em; text-transform: uppercase; }
 .fh-summary { font-size: 0.7rem; color: #94a3b8; }
 .fh-toggle { font-size: 0.7rem; color: #94a3b8; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; user-select: none; }
@@ -1048,6 +1069,18 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   animation: fh-pulse 1.2s ease-in-out infinite;
 }
 .fh-global-status.hidden { display: none; }
+.fh-global-status-idle {
+  color: #94a3b8;
+  background: rgba(100, 116, 139, 0.12);
+  border-color: rgba(100, 116, 139, 0.35);
+}
+.fh-global-status-idle:hover {
+  background: rgba(100, 116, 139, 0.2);
+  border-color: rgba(100, 116, 139, 0.6);
+}
+.fh-global-status-idle::before {
+  background: #64748b; box-shadow: none; animation: none;
+}
 .fh-chips { display: flex; flex-direction: column; gap: 0.55rem; }
 .fh-group { display: flex; flex-direction: column; gap: 0.25rem; }
 .fh-group-label {

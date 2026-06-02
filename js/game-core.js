@@ -410,6 +410,12 @@ export function coopPillsHtml(g) {
   return bits.join("");
 }
 
+export function trophyProgressPillHtml(g) {
+  if (!g || g.trophy_progress == null) return "";
+  const pct = Math.round(g.trophy_progress);
+  return `<span class="trophy-pill" title="PSN trophy completion: ${pct}%">&#127942; ${pct}%</span>`;
+}
+
 export function storeLetter(s) {
   return s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "itch" ? "I" : s === "xbox" ? "X" : s === "battlenet" ? "B" : s === "ubisoft" ? "U" : s === "other" ? "?" : s === "manual" ? "M" : "S";
 }

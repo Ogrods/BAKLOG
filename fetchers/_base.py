@@ -45,6 +45,15 @@ def add_allow_empty_arg(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Allow writing an empty result (e.g. genuinely empty wishlist).",
     )
+    parser.add_argument(
+        "--allow-drift",
+        action="store_true",
+        help=(
+            "Allow writing a result that is sharply smaller than the previous "
+            "fetch (default threshold: 50%%). Use when a store legitimately "
+            "lost titles (delisted, deauthorized devices, etc.)."
+        ),
+    )
 
 
 def refuse_empty_result(
@@ -66,6 +75,67 @@ def refuse_empty_result(
         flush=True,
     )
     return 2
+
+
+def _previous_game_count(output_path: Path | None) -> int | None:
+    """Read game_count from the previous on-disk file, if any. Resilient to
+    malformed JSON or schema drift — callers should treat None as 'no baseline'."""
+    if output_path is None or not output_path.exists():
+        return None
+    try:
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    gc = data.get("game_count")
+    if isinstance(gc, int) and gc >= 0:
+        return gc
+    games = data.get("games")
+    if isinstance(games, list):
+        return len(games)
+    return None
+
+
+def refuse_drift_result(
+    items: list[Any] | int,
+    *,
+    label: str,
+    allow_drift: bool,
+    output_path: Path | None,
+    threshold: float = 0.5,
+) -> int | None:
+    """Return exit code 3 when the new result is sharply smaller than the
+    previous on-disk file.
+
+    Pairs with ``refuse_empty_result`` so a fetcher whose API silently returns
+    3 rows instead of the usual 600 fails loudly instead of overwriting good
+    data. ``threshold`` is the fraction of the previous count the new count
+    must clear (default 0.5 — i.e. anything <50% of the last successful run is
+    refused). ``--allow-drift`` opts out (delisted accounts, region swaps,
+    etc.).
+
+    First-run behavior: when no previous file exists or it has no count
+    field, this function returns None (no baseline → can't measure drift).
+    """
+    new_count = len(items) if isinstance(items, list) else items
+    prev = _previous_game_count(output_path)
+    if prev is None or prev <= 0 or allow_drift:
+        return None
+    # Strict-less so a result that exactly matches the floor is allowed.
+    floor = max(1, int(prev * threshold))
+    if new_count >= floor:
+        return None
+    pct = (new_count / prev * 100) if prev else 0.0
+    where = f" ({output_path})" if output_path else ""
+    print(
+        f"ERROR: {label} returned {new_count} items{where}, but the previous run "
+        f"had {prev} (≈{pct:.0f}% — under the {int(threshold * 100)}% floor).\n"
+        "Likely a broken auth or upstream API. If this drop is real, re-run with --allow-drift.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 3
 
 
 def load_existing_games(path: Path, *, id_key: str = "id") -> dict[str, dict[str, Any]]:

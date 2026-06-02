@@ -23,7 +23,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 from psn_client import PsnAuthError, PsnClient, PsnWishlistEntry
@@ -145,6 +145,14 @@ def main() -> int:
     )
     if empty_exit is not None:
         return stats.finish("fetch_psn_wishlist", t0, exit_code=empty_exit)
+    drift_exit = refuse_drift_result(
+        items,
+        label="PSN wishlist",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_WISHLIST_PSN_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_psn_wishlist", t0, exit_code=drift_exit)
 
     print(f"  {len(items)} wishlist items", flush=True)
 

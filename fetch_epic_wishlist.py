@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 from epic_client import EpicAuthError, EpicStoreClient
 from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import RunStats, started
 from hltb_client import HltbClient
 
@@ -250,6 +250,14 @@ def main() -> int:
     )
     if empty_exit is not None:
         return stats.finish("fetch_epic_wishlist", t0, exit_code=empty_exit)
+    drift_exit = refuse_drift_result(
+        elements,
+        label="Epic wishlist",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_WISHLIST_EPIC_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=drift_exit)
 
     hltb_client = HltbClient() if args.hltb else None
     existing = _load_existing()

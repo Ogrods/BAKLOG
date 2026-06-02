@@ -19,7 +19,7 @@
 import { state } from './state.js';
 import { tableFingerprint } from './table-ui.js';
 import { collectActiveFilters } from './filters-ui.js';
-import { getErrorCount } from './error-boundary.js';
+import { getErrorCount, buildBugBundle } from './error-boundary.js';
 import { getCurtainState } from './loading-curtain.js';
 import { countOrphanPersonalKeys } from './personal-storage.js';
 
@@ -50,7 +50,7 @@ function buildOverlay() {
   el.innerHTML = `
     <div class="baklog-debug-overlay-head">
       <span class="baklog-debug-overlay-title">baklog · debug</span>
-      <button type="button" class="baklog-debug-overlay-close" title="Hide overlay (refresh to show again)">×</button>
+      <button type="button" class="baklog-debug-overlay-close" title="Hide overlay (refresh to show again)" aria-label="Hide debug overlay">×</button>
     </div>
     <dl class="baklog-debug-overlay-rows">
       <dt>view</dt><dd data-field="view">—</dd>
@@ -64,12 +64,50 @@ function buildOverlay() {
       <dt>errors</dt><dd data-field="errors">—</dd>
       <dt>orphans</dt><dd data-field="orphans" title="state.personal keys with no matching game in any catalog. Surfaced read-only; clean up via kebab → Clean up unknown games.">—</dd>
     </dl>
-    <div class="baklog-debug-overlay-foot">?debug=1 · <code>localStorage.removeItem('${STORAGE_KEY}')</code></div>
+    <div class="baklog-debug-overlay-foot">
+      <button type="button" class="baklog-debug-overlay-bundle" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a sanitized JSON bug bundle to clipboard. Nothing is sent anywhere.">Copy bug bundle</button>
+      <div class="baklog-debug-overlay-hint">?debug=1 · <code>localStorage.removeItem('${STORAGE_KEY}')</code></div>
+    </div>
   `;
   el.querySelector('.baklog-debug-overlay-close')?.addEventListener('click', () => {
     el.classList.add('baklog-debug-overlay--hidden');
   });
+  el.querySelector('[data-action="copy-bundle"]')?.addEventListener('click', (ev) => {
+    copyBundleFromOverlay(ev.currentTarget);
+  });
   return el;
+}
+
+function copyBundleFromOverlay(btn) {
+  try {
+    const payload = JSON.stringify(buildBugBundle(), null, 2);
+    const finish = (ok) => {
+      if (!btn) return;
+      const original = btn.dataset.originalLabel || btn.textContent;
+      btn.dataset.originalLabel = original;
+      btn.textContent = ok ? 'Copied' : 'Copy failed';
+      setTimeout(() => {
+        if (btn.textContent === 'Copied' || btn.textContent === 'Copy failed') {
+          btn.textContent = original;
+        }
+      }, 1400);
+    };
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(payload).then(() => finish(true), () => finish(false));
+      return;
+    }
+    const ta = document.createElement('textarea');
+    ta.value = payload;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    finish(ok);
+  } catch (_) {
+    /* clipboard unavailable — user can copy from window.__baklogErrors instead */
+  }
 }
 
 function setField(name, value, opts) {

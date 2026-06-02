@@ -36,6 +36,31 @@ export function consumeItadAutoRunFlag() {
   itadPendingAutoRun = false;
   return v;
 }
+
+/** Map server run status to dashboard chip state. */
+export function serverChipState(status) {
+  if (status === 'running' || status === 'launching' || status === 'cancelling') return 'running';
+  if (status === 'queued') return 'queued';
+  return null;
+}
+
+export const FETCH_TIMEOUT_MS = 15_000;
+
+/** Fetch with timeout; throws when the server does not respond in time. */
+export async function fetchWithTimeout(url, options = {}, ms = FETCH_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('server not responding');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers', 'steamTags']);
 const MAX_SSE_HINT = 'max 8 live streams';
 const GROUP_ORDER = ['library', 'wishlist', 'prices', 'enrich'];
@@ -374,6 +399,8 @@ export async function loadFetcherSources(force = false) {
 function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   const el = document.getElementById('fetcherGlobalStatus');
   if (!el) return;
+  const textEl = document.getElementById('fetcherGlobalStatusText');
+  const liveEl = document.getElementById('fetcherGlobalStatusLive');
   const running = [];
   const queued = [];
   for (const [key, st] of runStateByKey) {
@@ -384,7 +411,8 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   }
   if (!running.length && !queued.length) {
     el.classList.add('hidden');
-    el.textContent = '';
+    if (textEl) textEl.textContent = '';
+    if (liveEl) liveEl.textContent = '';
     el.title = 'Show fetcher log';
     return;
   }
@@ -396,7 +424,8 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   } else {
     text = `Queued: ${queued.join(', ')}`;
   }
-  el.textContent = text;
+  if (textEl) textEl.textContent = text;
+  if (liveEl) liveEl.textContent = text;
   el.title = `${text} — click to show log`;
 }
 
@@ -460,6 +489,7 @@ export function maybeAutoRefreshItad(deps = {}) {
 export const fetcherRunner = (() => {
   let apiAvailable = null;
   const runStateByKey = new Map();
+  const runIdByKey = new Map();
   // One EventSource per run (queued or running). Keeping all of them open
   // means a still-running fetcher keeps streaming lines even after the user
   // queues another one, and every run gets its own `done` event so its chip
@@ -469,12 +499,78 @@ export const fetcherRunner = (() => {
   const reconnectAttempts = new Map();
   /** Run ids the user cancelled — do not reconnect or re-subscribe until gone from server. */
   const suppressedRunIds = new Set();
+  const SUPPRESSED_RUNS_KEY = 'fetcher-suppressed-run-ids';
+  const IN_FLIGHT_POLL_MS = 10_000;
+  const WAIT_QUEUE_SLOT_MS = 120_000;
   const RECONNECT_BASE_MS = 2000;
   const RECONNECT_MAX_MS = 30000;
   const RECONNECT_MAX_ATTEMPTS = 8;
   let runsSnapshotPromise = null;
   let runsSnapshotAt = 0;
   const RUNS_SNAPSHOT_MIN_MS = 1500;
+  let inFlightPollTimer = null;
+
+  function loadSuppressedRunIds() {
+    try {
+      const raw = sessionStorage.getItem(SUPPRESSED_RUNS_KEY);
+      if (!raw) return;
+      const ids = JSON.parse(raw);
+      if (Array.isArray(ids)) ids.forEach(id => suppressedRunIds.add(id));
+    } catch (_) {}
+  }
+
+  function persistSuppressedRunIds() {
+    try {
+      sessionStorage.setItem(SUPPRESSED_RUNS_KEY, JSON.stringify([...suppressedRunIds]));
+    } catch (_) {}
+  }
+
+  loadSuppressedRunIds();
+
+  async function fetchWithTimeoutAndProbe(url, options = {}, ms = FETCH_TIMEOUT_MS) {
+    try {
+      return await fetchWithTimeout(url, options, ms);
+    } catch (err) {
+      if (String(err?.message || err).includes('server not responding')) {
+        invalidateApiProbe();
+      }
+      throw err;
+    }
+  }
+
+  function labelForKey(key) {
+    return source(key)?.label || key;
+  }
+
+  /** Human-readable queue position for the run log panel. */
+  function queueStatusExtra(snap, runId) {
+    if (!snap) return '';
+    const queue = snap.queue || [];
+    const idx = queue.findIndex(r => r.id === runId);
+    if (idx < 0) return '';
+    const slots = (snap.active ? 1 : 0) + queue.length;
+    const pos = idx + 1;
+    const waitFor = snap.active ? labelForKey(snap.active.key) : null;
+    if (waitFor) return `${pos} of ${slots} — waiting for ${waitFor}`;
+    return `${pos} of ${slots}`;
+  }
+
+  function ensureInFlightPolling() {
+    if (inFlightPollTimer || !isApiAvailable()) return;
+    if (runStateByKey.size === 0 && sourcesByRunId.size === 0) return;
+    inFlightPollTimer = setInterval(() => {
+      syncFromServer().catch(() => {});
+      if (runStateByKey.size === 0 && sourcesByRunId.size === 0) {
+        clearInterval(inFlightPollTimer);
+        inFlightPollTimer = null;
+      }
+    }, IN_FLIGHT_POLL_MS);
+  }
+
+  function stopInFlightPolling() {
+    if (inFlightPollTimer) clearInterval(inFlightPollTimer);
+    inFlightPollTimer = null;
+  }
 
   function closeAllStreams() {
     for (const timer of reconnectTimers.values()) clearTimeout(timer);
@@ -494,9 +590,12 @@ export const fetcherRunner = (() => {
       return runsSnapshotPromise;
     }
     runsSnapshotAt = now;
-    runsSnapshotPromise = fetch('/api/runs')
+    runsSnapshotPromise = fetchWithTimeoutAndProbe('/api/runs')
       .then(r => (r.ok ? r.json() : null))
-      .catch(() => null)
+      .catch(err => {
+        if (String(err?.message || err).includes('not responding')) return null;
+        return null;
+      })
       .finally(() => {
         setTimeout(() => { runsSnapshotPromise = null; }, RUNS_SNAPSHOT_MIN_MS);
       });
@@ -613,10 +712,18 @@ export const fetcherRunner = (() => {
   }
   function waitForQueueSlot() {
     if (!isQueueFull()) return Promise.resolve();
-    return new Promise(resolve => {
+    const start = Date.now();
+    return new Promise((resolve, reject) => {
       const tick = () => {
-        if (!isQueueFull()) resolve();
-        else setTimeout(tick, 200);
+        if (!isQueueFull()) {
+          resolve();
+          return;
+        }
+        if (Date.now() - start > WAIT_QUEUE_SLOT_MS) {
+          reject(new Error('queue wait timeout'));
+          return;
+        }
+        setTimeout(tick, 200);
       };
       tick();
     });
@@ -714,6 +821,7 @@ export const fetcherRunner = (() => {
     if (snap?.active) ids.push(snap.active.id);
     for (const q of snap?.queue || []) ids.push(q.id);
     for (const id of ids) suppressedRunIds.add(id);
+    persistSuppressedRunIds();
     closeAllStreams();
     for (const key of [...runStateByKey.keys()]) markChipState(key, null);
     liveRunId = null;
@@ -721,7 +829,7 @@ export const fetcherRunner = (() => {
     updateCancelButton();
     renderDashboardFetcherHealth();
     try {
-      const res = await fetch('/api/runs/cancel', { method: 'POST' });
+      const res = await fetchWithTimeoutAndProbe('/api/runs/cancel', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         const n = data.cancelled?.length ?? 0;
@@ -729,9 +837,13 @@ export const fetcherRunner = (() => {
       } else {
         const txt = await res.text().catch(() => '');
         appendLine(`[cancel failed ${res.status}] ${txt}`, 'stderr');
+        appendLine('[cancel may not have reached server — syncing…]', 'stderr');
+        await syncFromServer();
       }
     } catch (err) {
       appendLine(`[cancel failed] ${err}`, 'stderr');
+      appendLine('[cancel may not have reached server — syncing…]', 'stderr');
+      await syncFromServer();
     }
     try {
       snap = await fetchRunsSnapshot();
@@ -776,11 +888,18 @@ export const fetcherRunner = (() => {
     body.scrollTop = body.scrollHeight;
   }
 
-  function markChipState(key, runState) {
-    if (runState) runStateByKey.set(key, runState);
-    else runStateByKey.delete(key);
+  function markChipState(key, runState, runId = null) {
+    if (runState) {
+      runStateByKey.set(key, runState);
+      if (runId) runIdByKey.set(key, runId);
+    } else {
+      runStateByKey.delete(key);
+      runIdByKey.delete(key);
+    }
     updateGlobalFetcherIndicator(runStateByKey, source);
     renderDashboardFetcherHealth();
+    if (runState) ensureInFlightPolling();
+    else if (runStateByKey.size === 0) stopInFlightPolling();
   }
 
   async function run(key, { refresh = false, auto = false } = {}) {
@@ -820,17 +939,14 @@ export const fetcherRunner = (() => {
       const cmdSuffix = refresh ? ' --refresh' : '';
       appendLine(`$ ${src.cmd}${cmdSuffix}`, 'cmd');
     }
-    markChipState(key, 'queued');
 
     const url = `/api/run/${encodeURIComponent(key)}${refresh ? '?refresh=1' : ''}`;
     let res;
     try {
-      res = await fetch(url, { method: 'POST' });
+      res = await fetchWithTimeoutAndProbe(url, { method: 'POST' });
     } catch (err) {
-      invalidateApiProbe();
       appendLine(`[client] cannot reach server: ${err}`, 'stderr');
       setStatus('failed');
-      markChipState(key, null);
       return;
     }
     if (res.status === 409) {
@@ -848,7 +964,17 @@ export const fetcherRunner = (() => {
       return;
     }
     const { run_id: runId } = await res.json();
-    if (liveRunId && liveRunId !== runId) {
+    markChipState(key, 'queued', runId);
+    ensureInFlightPolling();
+    let snapAfterSubmit = null;
+    try {
+      snapAfterSubmit = await fetchRunsSnapshot();
+    } catch (_) {}
+    const queueExtra = queueStatusExtra(snapAfterSubmit, runId);
+    if (queueExtra) {
+      appendLine(`(queue ${queueExtra})`, 'meta');
+      setStatus('queued', queueExtra);
+    } else if (liveRunId && liveRunId !== runId) {
       const liveSrc = sourcesByRunId.get(liveRunId)?.src;
       appendLine(`(queued after ${liveSrc?.label || 'current run'})`, 'meta');
     }
@@ -874,12 +1000,17 @@ export const fetcherRunner = (() => {
     // never stack the queue beyond 1 active + 1 queued, matching the rule
     // the server enforces and the chip-disable logic in chipHtml.
     for (const key of staleKeys) {
-      await waitForQueueSlot();
-      await run(key);
+      try {
+        await waitForQueueSlot();
+        await run(key);
+      } catch (err) {
+        appendLine(`[run stale aborted: ${err}]`, 'stderr');
+        break;
+      }
     }
   }
 
-  function subscribe(runId, key, src, { reconnect = false } = {}) {
+  function subscribe(runId, key, src, { reconnect = false, quiet = false } = {}) {
     if (suppressedRunIds.has(runId)) return;
     clearReconnect(runId);
     const prior = sourcesByRunId.get(runId);
@@ -894,20 +1025,23 @@ export const fetcherRunner = (() => {
     es.addEventListener('status', evt => {
       try {
         const data = JSON.parse(evt.data);
-        if (data.status === 'running') {
-          markChipState(key, 'running');
+        if (data.status === 'running' || data.status === 'launching') {
+          markChipState(key, 'running', runId);
           liveRunId = runId;
           const panel = logPanel();
           if (panel) panel.querySelector('[data-role="title"]').textContent = `Running: ${src.label}`;
           if (reconnect) {
-            appendLine(`[reconnected · ${src.label} running]`, 'meta');
+            if (!quiet) appendLine(`[reconnected · ${src.label} running]`, 'meta');
           } else {
             appendLine(`--- ${src.label} starting ---`, 'meta');
           }
-          setStatus('running');
+          setStatus(data.status === 'launching' ? 'queued' : 'running');
           updateCancelButton();
         } else if (data.status === 'queued') {
-          markChipState(key, 'queued');
+          markChipState(key, 'queued', runId);
+        } else if (data.status === 'cancelling') {
+          markChipState(key, 'running', runId);
+          setStatus('running', 'cancelling');
         }
       } catch (_) {}
     });
@@ -940,7 +1074,10 @@ export const fetcherRunner = (() => {
           updateCancelButton();
         }
         if (ok) {
-          await refreshAfterFetch(key);
+          if (runId !== _lastAppliedDoneRunId) {
+            _lastAppliedDoneRunId = runId;
+            await refreshAfterFetch(key);
+          }
           markChipState(key, null);
         } else if (cancelled) {
           markChipState(key, null);
@@ -988,7 +1125,10 @@ export const fetcherRunner = (() => {
           const ok = finished.status === 'done' && finished.exit_code === 0;
           appendLine(`[${src.label}: stream dropped after exit ${finished.exit_code}]`, 'meta');
           if (liveRunId === runId) setStatus(ok ? 'done' : 'failed');
-          if (ok) await refreshAfterFetch(key);
+          if (ok && finished.id !== _lastAppliedDoneRunId) {
+            _lastAppliedDoneRunId = finished.id;
+            await refreshAfterFetch(key);
+          }
           markChipState(key, null);
           if (liveRunId === runId) liveRunId = null;
           return;
@@ -1023,8 +1163,12 @@ export const fetcherRunner = (() => {
     let snap;
     try {
       snap = await fetchRunsSnapshot();
-      if (!snap) return;
+      if (!snap) {
+        invalidateApiProbe();
+        return;
+      }
     } catch {
+      invalidateApiProbe();
       return;
     }
     pruneSuppressedRuns(snap);
@@ -1039,21 +1183,47 @@ export const fetcherRunner = (() => {
       const isFirstSync = !syncedOnce;
       syncedOnce = true;
       if (isFirstSync) {
-        appendLine('[reconnected to in-flight fetcher(s)]', 'meta');
+        const parts = [];
+        if (snap.active && !suppressedRunIds.has(snap.active.id)) {
+          const aLabel = source(snap.active.key)?.label || snap.active.key;
+          const aState = snap.active.status === 'launching'
+            ? 'launching'
+            : snap.active.status === 'cancelling'
+              ? 'cancelling'
+              : 'running';
+          parts.push(`${aLabel} ${aState}`);
+        }
+        for (const q of snap.queue || []) {
+          if (suppressedRunIds.has(q.id)) continue;
+          const qLabel = source(q.key)?.label || q.key;
+          parts.push(`${qLabel} queued`);
+        }
+        if (parts.length) {
+          appendLine(`[reconnected · ${parts.join(', ')}]`, 'meta');
+        }
       }
       for (const run of pending) {
         if (suppressedRunIds.has(run.id)) continue;
         const src = source(run.key);
         if (!src) continue;
-        const chipState = run.status === 'running' ? 'running' : 'queued';
-        markChipState(run.key, chipState);
-        if (run.status === 'running') liveRunId = run.id;
+        const chipState = serverChipState(run.status) || 'queued';
+        markChipState(run.key, chipState, run.id);
+        if (run.status === 'running' || run.status === 'launching' || run.status === 'cancelling') {
+          liveRunId = run.id;
+        }
+        if (run.status === 'cancelling') continue;
         if (sourcesByRunId.has(run.id)) continue;
-        subscribe(run.id, run.key, src, { reconnect: true });
+        subscribe(run.id, run.key, src, { reconnect: true, quiet: true });
       }
       updateCancelButton();
       if (snap.active?.status === 'running') setStatus('running');
-      else if (snap.queue?.length) setStatus('queued');
+      else if (snap.active?.status === 'launching') setStatus('queued', 'launching');
+      else if (snap.active?.status === 'cancelling') setStatus('running', 'cancelling');
+      else if (snap.queue?.length) {
+        const qExtra = queueStatusExtra(snap, snap.queue[0].id);
+        setStatus('queued', qExtra || undefined);
+      }
+      ensureInFlightPolling();
       renderDashboardFetcherHealth();
       updateGlobalFetcherIndicator(runStateByKey, source);
       return;
@@ -1083,6 +1253,7 @@ export const fetcherRunner = (() => {
   function stopDashboardPolling() {
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = null;
+    stopInFlightPolling();
   }
 
   return {
@@ -1100,6 +1271,7 @@ export const fetcherRunner = (() => {
     stopDashboardPolling,
     closeAllStreams,
     reopenLogPanel,
+    fetchWithTimeout: fetchWithTimeoutAndProbe,
   };
 })();
 

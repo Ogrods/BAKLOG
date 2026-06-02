@@ -66,6 +66,7 @@ import {
 } from './deals.js';
 import { reloadGames } from './library-load.js';
 import { bindAddGameModal } from './add-game-modal.js';
+import { copyBugBundleToClipboard } from './error-boundary.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
 import { bindHiddenPanelUI } from './hidden-panel.js';
 import { createGlobalKeydownHandler } from './events.js';
@@ -224,9 +225,14 @@ export function bindEvents() {
   const kebabMenu = document.getElementById("kebabMenu");
   kebabBtn.addEventListener("click", e => {
     e.stopPropagation();
-    kebabMenu.classList.toggle("open");
+    const open = !kebabMenu.classList.contains("open");
+    kebabMenu.classList.toggle("open", open);
+    kebabBtn.setAttribute("aria-expanded", open ? "true" : "false");
   });
-  document.addEventListener("click", () => kebabMenu.classList.remove("open"));
+  document.addEventListener("click", () => {
+    kebabMenu.classList.remove("open");
+    kebabBtn.setAttribute("aria-expanded", "false");
+  });
   const itadAutoRefreshToggle = document.getElementById("itadAutoRefreshToggle");
   if (itadAutoRefreshToggle) {
     itadAutoRefreshToggle.checked = !state.prefs.itadAutoRefreshDisabled;
@@ -644,6 +650,20 @@ export function bindEvents() {
       rows.push({ key, name: g?.name || key, notes });
     }
     download("baklog-notes-only.json", JSON.stringify(rows, null, 2), "application/json");
+  });
+  document.getElementById("reportBug")?.addEventListener("click", async () => {
+    const ok = await copyBugBundleToClipboard();
+    const banner = document.getElementById("bootErrorBanner");
+    if (!banner) return;
+    banner.className = "migration-banner";
+    banner.textContent = ok
+      ? "Bug bundle copied. Paste it into a new GitHub issue."
+      : "Could not copy — use ?debug=1 overlay or trigger an error and click Copy bug bundle.";
+    banner.classList.remove("hidden");
+    window.setTimeout(() => {
+      banner.classList.add("hidden");
+      banner.textContent = "";
+    }, 5000);
   });
   document.getElementById("importNotes").addEventListener("change", async e => {
     const file = e.target.files[0];

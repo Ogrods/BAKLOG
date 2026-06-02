@@ -14,11 +14,13 @@ import {
   duplicateMatchKey,
 } from './game-duplicate.js';
 import { flashGameRow } from './table-ui.js';
+import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
 let addGameTarget = "library";
 let _pendingAdd = null;
 /** @type {(() => void) | null} */
 let _bypassFor = null;
+let _addGameModalRelease = null;
 
 export function setAddGameTarget(target) {
   addGameTarget = target === "wishlist" ? "wishlist" : target === "itch" ? "itch" : "library";
@@ -42,9 +44,18 @@ export function setAddGameTarget(target) {
 
 function openAddGameModal() {
   const m = document.getElementById("addGameModal");
+  const dialog = m.querySelector('[role="dialog"]') || m;
   m.classList.remove("hidden");
   m.classList.add("flex");
   setAddGameTarget(state.activeView === "wishlist" ? "wishlist" : state.activeView === "itch" ? "itch" : "library");
+  _addGameModalRelease?.();
+  const releaseTrap = trapFocus(dialog);
+  const releaseEsc = bindEscapeClose(dialog, closeAddGameModal);
+  _addGameModalRelease = () => {
+    releaseTrap();
+    releaseEsc();
+    _addGameModalRelease = null;
+  };
   document.getElementById("addGameTitle").focus();
 }
 
@@ -68,6 +79,7 @@ function showDuplicateWarn(match, onProceed) {
 }
 
 function closeAddGameModal() {
+  _addGameModalRelease?.();
   const m = document.getElementById("addGameModal");
   m.classList.add("hidden");
   m.classList.remove("flex");

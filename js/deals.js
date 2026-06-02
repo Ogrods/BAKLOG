@@ -211,7 +211,7 @@ export function dealStealsCardHtml(steals) {
     return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-steals" title="Show wishlist steals (50%+ off, 80%+ rated)">
       <div class="dash-kpi-label">Steals waiting</div>
       <div class="text-xs text-slate-400 mt-1">50%+ off or historical low · 80%+ rated</div>
-      <div class="text-xs text-slate-500 mt-3">No steals match right now.</div>
+      <div class="text-xs text-slate-400 mt-3">No steals match right now.</div>
     </button>`;
   }
   const ranked = [...steals].sort((a, b) => dealScore(b) - dealScore(a));
@@ -254,7 +254,7 @@ export function dealStealsCardHtml(steals) {
     <div class="flex items-baseline justify-between gap-2">
       <div>
         <div class="dash-kpi-label">Steals waiting</div>
-        <div class="text-[10px] text-slate-500 mt-0.5">50%+ off or historical low · 80%+ rated</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">50%+ off or historical low · 80%+ rated</div>
       </div>
       <div class="text-sm font-semibold text-slate-300">${steals.length}</div>
     </div>

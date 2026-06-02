@@ -6,7 +6,7 @@ system, telemetry, or analytics. The "server" referenced in the README is a
 browser tab. Nothing leaves your machine except direct calls you make to the
 storefronts and enrichment services listed below.
 
-Last updated: 2026-06-01.
+Last updated: 2026-06-02.
 
 ## TL;DR
 
@@ -55,6 +55,85 @@ plain text to stdout, and never sent to the project authors.
 - `localStorage` mirrors the same `personal.json` shape plus UI preferences
   (sort order, picks tab, picks collapsed, etc.). Nothing in `localStorage`
   leaves the browser tab.
+- `localStorage.baklog-error-log` — rolling 200-entry capture of uncaught
+  errors and unhandled promise rejections from this browser tab. Survives
+  reloads so a "Copy bug bundle" click can include history across sessions.
+  Never sent anywhere. See **Error logs and bug reporting** below.
+
+### Error logs and bug reporting
+When an uncaught error or unhandled promise rejection fires, BAKLOG:
+
+1. Captures it (message, stack, source/line, timestamp) into
+   `window.__baklogErrors` for this tab.
+2. Mirrors it into the `baklog-error-log` localStorage ring (last 200
+   entries, oldest evicted).
+3. Surfaces a sticky red toast in the top-right corner with **Copy bug
+   bundle / Errors only / Details / Dismiss** buttons.
+
+**"Copy bug bundle"** places a sanitized JSON payload on your clipboard. The
+bundle is a whitelist — only these fields are included:
+
+| Field | Why |
+|-------|-----|
+| `app_version` | from the `<meta name="baklog-version">` tag |
+| `generated_at` | ISO timestamp of the click |
+| `ua` | `navigator.userAgent`, truncated to 256 chars |
+| `runtime.view` | current view name (e.g. `library`) |
+| `runtime.data_version` | internal `_dataVersion` counter |
+| `runtime.active_filter_count` | how many filters are applied |
+| `runtime.table_fingerprint` | opaque hash-shaped string used for cache invalidation |
+| `runtime.last_render_ms` | most recent `renderTable()` duration |
+| `runtime.dash_stats` | dashboard render counters (full/replay/skipped) |
+| `errors.session[]` | uncaught errors captured in the current tab |
+| `errors.persisted[]` | rolling history from `baklog-error-log` |
+
+The bundle deliberately **does not** include `state.personal` (your notes,
+statuses, priorities), `manualGames`, library/wishlist JSON, credentials,
+`.env` contents, cookies, or any path that contains your home directory.
+Browser stack traces reference the served URL (e.g.
+`http://localhost:8765/js/foo.js:123:45`), not your filesystem path.
+
+Once on your clipboard, the bundle is JSON you can paste anywhere — a
+GitHub issue, an email, a paste buffer for inspection. What happens after
+the clipboard is entirely your decision; BAKLOG never auto-sends it.
+
+### Portable secret bundle
+
+The Connections page (⋮ menu → **Portable bundle…**) includes **Export
+bundle…** / **Import bundle…** for moving every connection to another machine
+or recovering from a corrupted OS keychain.
+
+| What | Where | Why |
+|------|-------|-----|
+| Encrypted bundle file | Wherever *you* save it (USB, cloud folder, email to yourself) | One-file backup of all connections |
+| Bundle passphrase | Your memory — **not stored by BAKLOG** | Unlocks the bundle; separate from the optional local master password |
+
+The bundle (`baklog-secrets-<timestamp>.bundle`) contains:
+
+- The encrypted credentials document (`cache/auth/secrets.bin` contents, as
+  JSON inside the bundle ciphertext).
+- Playwright user-data directories under `cache/auth/profiles/<store>/`
+  (cookie-based providers such as GOG and PSN).
+
+It is **always encrypted with its own passphrase** (minimum 8 characters) using
+scrypt + AES-GCM. The local OS keychain / master-password key never leaves
+your machine. Losing the bundle passphrase means the file cannot be recovered
+— there is no reset path.
+
+Import moves any existing `cache/auth/profiles/` tree to
+`cache/auth/profiles_pre_import_<timestamp>/` before overwriting, so a bad
+import can be rolled back manually.
+
+CLI equivalent:
+
+```bash
+python -m auth export-bundle --out baklog-secrets.bundle
+python -m auth import-bundle baklog-secrets.bundle
+python -m auth import-bundle baklog-secrets.bundle --dry-run
+```
+
+The bundle never leaves your machine unless **you** copy it somewhere. BAKLOG
+does not upload it.
 
 ## What goes over the network
 
@@ -82,12 +161,14 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
 
 ## What does *not* happen
 
-- No telemetry, analytics, crash reports, or pings home.
+- No telemetry, analytics, crash reports, or pings home — including the
+  error log: it stays in your browser until *you* explicitly copy it via
+  the "Copy bug bundle" button.
 - No third-party ad/affiliate scripts (the deal links go straight to the store
   via ITAD).
 - No project-owned cloud service.
-- No background sync between machines (open issue: see
-  `bs_secret_recovery` — portable encrypted bundle is on the roadmap).
+- No automatic sync between machines — use the portable secrets bundle
+  (Connections → Export bundle…) if you move to a new PC.
 
 ## Removing your data
 
@@ -98,6 +179,7 @@ Everything is on disk:
 - `games_*.json`, `itad_prices.json`, `data/games_backups/` — fetched
   libraries and their rotated backups.
 - `cache/` — Playwright profiles, fetcher caches, OAuth refresh tokens.
+- `cache/auth/profiles_pre_import_*` — snapshots taken before a bundle import.
 - `.env` — API keys + session cookies.
 - Browser `localStorage` for whatever origin you served the app from
   (typically `http://127.0.0.1:<port>`).

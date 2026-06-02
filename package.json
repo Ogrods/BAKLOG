@@ -10,6 +10,7 @@
     "test:js:watch": "vitest"
   },
   "devDependencies": {
+    "axe-core": "^4.12.0",
     "happy-dom": "^20.9.0",
     "vitest": "^3.0.0"
   }

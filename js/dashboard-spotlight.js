@@ -8,6 +8,8 @@ import { getPersonal } from './personal-storage.js';
 
 const SPOTLIGHT_INTERVAL_MS = 7000;
 const SPOTLIGHT_FADE_MS = 300;
+const RECENT_SPOTLIGHT_CAP = 5;
+const RECENT_QUOTA = 5;
 
 let _spotlightTimer = null;
 let _spotlightFadeTimer = null;
@@ -38,7 +40,19 @@ function poolKeysEqual(a, b) {
   return true;
 }
 
-function gameSpotlightReason(g) {
+export function computeRecentSpotlightKeys(games) {
+  if (!state.prefs.librarySeenSeeded) return new Set();
+  const seen = state.libraryFirstSeenByKey || {};
+  const keys = games
+    .map(g => ({ key: gameKey(g), at: seen[gameKey(g)] ?? 0 }))
+    .filter(e => e.at > 0)
+    .sort((a, b) => b.at - a.at)
+    .slice(0, RECENT_SPOTLIGHT_CAP)
+    .map(e => e.key);
+  return new Set(keys);
+}
+
+function gameSpotlightReason(g, recentKeys) {
   const rating = ratingValue(g);
   const hltb = hltbMain(g);
   const personal = getPersonal(g);
@@ -46,6 +60,10 @@ function gameSpotlightReason(g) {
   const playtime = combinedPlaytime(g);
   const status = personal.status || 'backlog';
   if (status === 'skip' || status === 'live') return null;
+
+  if (recentKeys?.has(gameKey(g))) {
+    return { eyebrow: 'Recently added', score: 96, isRecent: true };
+  }
 
   if (status === 'finished') {
     // "Replay" — capped to ~6% of pool in pickSpotlightGames so finished games
@@ -92,6 +110,7 @@ function gameSpotlightReason(g) {
 }
 
 export function pickSpotlightGames(games) {
+  const recentKeys = computeRecentSpotlightKeys(games);
   const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
   const hasArt = g => !!(g.header_image || g.library_image) && !failed.has(gameKey(g));
   const eligible = games.filter(hasArt);
@@ -99,11 +118,27 @@ export function pickSpotlightGames(games) {
 
   const tagged = [];
   for (const g of eligible) {
-    const reason = gameSpotlightReason(g);
+    const reason = gameSpotlightReason(g, recentKeys);
     if (reason) tagged.push({ g, reason });
   }
   tagged.sort((a, b) => b.reason.score - a.reason.score);
   const top = tagged.slice(0, target);
+
+  const recentQuota = Math.min(RECENT_QUOTA, recentKeys.size);
+  const recentsInTop = top.filter(t => t.reason.isRecent).length;
+  if (recentsInTop > recentQuota) {
+    let toDrop = recentsInTop - recentQuota;
+    for (let i = top.length - 1; i >= 0 && toDrop > 0; i--) {
+      if (top[i].reason.isRecent) {
+        top.splice(i, 1);
+        toDrop--;
+      }
+    }
+  } else if (recentsInTop < recentQuota) {
+    const extras = tagged.slice(target).filter(t => t.reason.isRecent);
+    const need = Math.min(recentQuota - recentsInTop, extras.length);
+    for (let i = 0; i < need; i++) top.push(extras[i]);
+  }
 
   // Cap "Replay" entries at ~6% so finished games appear noticeably less often
   // than the other rotating categories. If the natural sort overshoots, drop

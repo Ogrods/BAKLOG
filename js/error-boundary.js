@@ -19,16 +19,36 @@
  *   - installGlobalErrorHandler() — call once at module top-level in app.js.
  *   - reportError(err, opts?) — opt-in for modules with their own try/catch.
  *   - getErrorCount() — used by the debug overlay to surface a non-zero count.
+ *   - buildBugBundle() — assembles a sanitized JSON payload (errors + app
+ *     context) that the "Copy bug bundle" button writes to the clipboard.
+ *   - registerBugBundleContext({ getFingerprint, getActiveFilterCount }) —
+ *     app.js wires this once after table-ui/filters-ui are loaded; lets the
+ *     bundle include the live table fingerprint and filter count without
+ *     forcing error-boundary.js to import those modules at boot.
+ *
+ * Persistence:
+ *   The session error list (_errors) is small (50 entries, drops on reload).
+ *   We also mirror every recorded entry into a localStorage-backed ring
+ *   (PERSIST_STORAGE_KEY, MAX_PERSISTED=200) so bug bundles can include
+ *   history across reloads. Nothing is sent anywhere — the only way the log
+ *   leaves your machine is the "Copy bug bundle" button you click yourself.
  */
 
 const MAX_CAPTURED = 50;
+const MAX_PERSISTED = 200; // localStorage ring — survives reloads for bug bundles
+const MAX_PERSIST_STACK_LEN = 4096; // cap persisted stacks so the ring stays under quota
 const DEDUPE_WINDOW_MS = 2000;
 const MESSAGE_TRUNCATE = 240;
+const UA_TRUNCATE = 256; // avoid leaking absurd UA-spoofing strings into bundles
+const PERSIST_STORAGE_KEY = 'baklog-error-log';
+const PERSIST_STACK_TRUNCATED = '\n(... truncated for storage)';
 
 let _installed = false;
 let _toastEl = null;
 let _detailsOpen = false;
 let _dismissed = false;
+let _persistedRing = []; // larger than _errors so bundles can include history across reloads
+let _bundleCtx = null; // { getFingerprint, getActiveFilterCount } — injected by app.js
 const _errors = [];
 const _signatures = new Map(); // sig -> last seen timestamp
 
@@ -100,8 +120,65 @@ function publishToWindow() {
   window.__baklogErrors = {
     count: _errors.length,
     items: _errors.slice(),
-    help: 'Uncaught errors + unhandled rejections captured this session. Cleared on reload.',
+    persisted: _persistedRing.slice(),
+    help: 'Uncaught errors + unhandled rejections. Session items live in items[]; the persisted ring (last 200 across reloads) lives in persisted[].',
   };
+}
+
+/**
+ * Restore the persisted ring from localStorage. Best-effort — corrupt JSON or
+ * disabled storage is silently ignored so the live capture path is never blocked.
+ */
+function loadPersistedErrors() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage?.getItem(PERSIST_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      _persistedRing = parsed.slice(-MAX_PERSISTED);
+    }
+  } catch (_) { /* corrupt or disabled storage — start fresh */ }
+}
+
+/**
+ * Append the most recent entry to the persisted ring + write. Synchronous +
+ * tiny because error rate is bounded by the dedupe window (max ~30/min in the
+ * pathological case).
+ */
+function persistError(entry) {
+  if (typeof window === 'undefined') return;
+  _persistedRing.push(entryForStorage(entry));
+  while (_persistedRing.length > MAX_PERSISTED) _persistedRing.shift();
+  try {
+    window.localStorage?.setItem(PERSIST_STORAGE_KEY, JSON.stringify(_persistedRing));
+  } catch (_) { /* quota / disabled / private mode — bundle still works from in-memory _persistedRing */ }
+}
+
+/** Clone an entry for the persisted ring — truncate stacks, default repeats. */
+function entryForStorage(entry) {
+  const stored = { ...entry };
+  if (typeof stored.stack === 'string' && stored.stack.length > MAX_PERSIST_STACK_LEN) {
+    stored.stack = stored.stack.slice(0, MAX_PERSIST_STACK_LEN) + PERSIST_STACK_TRUNCATED;
+  }
+  if (!stored.repeats) stored.repeats = 1;
+  return stored;
+}
+
+function bumpRepeatsForSignature(sig) {
+  for (let i = _errors.length - 1; i >= 0; i -= 1) {
+    if (makeSignature(_errors[i]) !== sig) continue;
+    _errors[i].repeats = (_errors[i].repeats || 1) + 1;
+    for (let j = _persistedRing.length - 1; j >= 0; j -= 1) {
+      if (makeSignature(_persistedRing[j]) !== sig) continue;
+      _persistedRing[j].repeats = (_persistedRing[j].repeats || 1) + 1;
+      try {
+        window.localStorage?.setItem(PERSIST_STORAGE_KEY, JSON.stringify(_persistedRing));
+      } catch (_) { /* best-effort */ }
+      return;
+    }
+    return;
+  }
 }
 
 function buildToast() {
@@ -125,8 +202,9 @@ function buildToast() {
       <pre class="baklog-error-toast-stack" data-field="stack"></pre>
     </div>
     <div class="baklog-error-toast-foot">
-      <button type="button" class="baklog-error-toast-btn" data-action="copy" title="Copy error log as JSON">Copy</button>
-      <button type="button" class="baklog-error-toast-btn" data-action="toggle-details">Details</button>
+      <button type="button" class="baklog-error-toast-btn" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a JSON bug bundle (errors + app context) to your clipboard so you can paste it into a GitHub issue. Nothing is sent anywhere — what you do with the clipboard is up to you.">Copy bug bundle</button>
+      <button type="button" class="baklog-error-toast-btn" data-action="copy" title="Copy just the error list as JSON">Errors only</button>
+      <button type="button" class="baklog-error-toast-btn" data-action="toggle-details" aria-label="Toggle error details">Details</button>
     </div>
   `;
   el.addEventListener('click', (ev) => {
@@ -138,6 +216,8 @@ function buildToast() {
       _dismissed = true;
     } else if (action === 'copy') {
       copyErrorLog(btn);
+    } else if (action === 'copy-bundle') {
+      copyBugBundle(btn);
     } else if (action === 'toggle-details') {
       _detailsOpen = !_detailsOpen;
       const details = el.querySelector('[data-field="details"]');
@@ -170,7 +250,9 @@ function showOrUpdateToast() {
   const msg = latest.message.length > MESSAGE_TRUNCATE
     ? latest.message.slice(0, MESSAGE_TRUNCATE) + '…'
     : latest.message;
-  setField('count', String(_errors.length));
+  setField('count', latest.repeats > 1
+    ? `${_errors.length} (×${latest.repeats} repeats)`
+    : String(_errors.length));
   setField('message', `${latest.name}: ${msg}`);
   const sourceParts = [];
   if (latest.source) {
@@ -184,22 +266,160 @@ function showOrUpdateToast() {
 }
 
 function copyErrorLog(btn) {
-  const payload = JSON.stringify(_errors, null, 2);
+  copyTextToClipboard(JSON.stringify(_errors, null, 2), btn);
+}
+
+/**
+ * Build a sanitized bug-bundle payload. Whitelist-only — nothing makes it in
+ * unless we explicitly add it here, so personal notes / library JSON /
+ * credentials can never leak by accident.
+ *
+ * What's included:
+ *   - app + ua context (version, generated_at, user-agent)
+ *   - current view + data version + active filter count
+ *   - opaque tableFingerprint (no row contents, just a stable hash-shaped string)
+ *   - last renderTable timing
+ *   - dashboard render stats counter
+ *   - error list (in-memory session + persisted ring, with stack traces)
+ *
+ * What's deliberately NOT included:
+ *   - state.personal / notes / statuses
+ *   - state.manualGames / library contents / state.gamesBySource
+ *   - localStorage contents (besides the error ring, which we own)
+ *   - credentials / .env values / cookies
+ */
+export function buildBugBundle() {
+  const win = (typeof window !== 'undefined') ? window : null;
+  const doc = (typeof document !== 'undefined') ? document : null;
+  const versionMeta = doc?.querySelector('meta[name="baklog-version"]');
+  const appVersion = versionMeta?.getAttribute('content') || 'unknown';
+  const ua = (win?.navigator?.userAgent || '').slice(0, UA_TRUNCATE);
+  const dataVersion = (win && '_dataVersion' in win) ? win._dataVersion : null;
+  const perf = win?.__baklogPerf?.last || null;
+  const dashStats = win?.__baklogDash?.stats || null;
+  return {
+    bundle: 'baklog-bug-bundle',
+    bundle_version: 2,
+    app_version: appVersion,
+    generated_at: new Date().toISOString(),
+    ua,
+    runtime: {
+      view: readWindowField(win, 'state.activeView') ?? null,
+      data_version: dataVersion,
+      active_filter_count: safeCount(),
+      table_fingerprint: safeFingerprint(),
+      last_render_ms: typeof perf?.totalMs === 'number' ? perf.totalMs : null,
+      dash_stats: dashStats ? { ...dashStats } : null,
+    },
+    errors: {
+      session_count: _errors.length,
+      persisted_count: _persistedRing.length,
+      session: _errors.slice(),
+      persisted: _persistedRing.slice(),
+    },
+    notice: 'This bundle was assembled locally. Nothing was sent anywhere. Paste it into a GitHub issue if you want to share it.',
+  };
+}
+
+function readWindowField(win, dotted) {
+  if (!win) return undefined;
+  try {
+    const parts = dotted.split('.');
+    let cur = win;
+    for (const p of parts) {
+      if (cur == null) return undefined;
+      cur = cur[p];
+    }
+    return cur;
+  } catch (_) { return undefined; }
+}
+
+function safeFingerprint() {
+  try {
+    const fn = _bundleCtx?.getFingerprint;
+    if (typeof fn !== 'function') return null;
+    const fp = fn();
+    return typeof fp === 'string' ? fp : null;
+  } catch (_) { return null; }
+}
+
+function safeCount() {
+  try {
+    const fn = _bundleCtx?.getActiveFilterCount;
+    if (typeof fn !== 'function') return null;
+    const n = fn();
+    return typeof n === 'number' ? n : null;
+  } catch (_) { return null; }
+}
+
+/**
+ * Wire deferred context the bundle wants without forcing error-boundary.js
+ * to import table-ui / filters-ui (which would defeat the "install before
+ * anything else" property — circular import + early-error blindness).
+ *
+ * Call once from app.js after the modules are loaded.
+ *
+ * @param {{ getFingerprint?: () => string, getActiveFilterCount?: () => number }} ctx
+ */
+export function registerBugBundleContext(ctx) {
+  if (!ctx || typeof ctx !== 'object') return;
+  _bundleCtx = {
+    getFingerprint: typeof ctx.getFingerprint === 'function' ? ctx.getFingerprint : null,
+    getActiveFilterCount: typeof ctx.getActiveFilterCount === 'function' ? ctx.getActiveFilterCount : null,
+  };
+}
+
+function copyBugBundle(btn) {
+  copyTextToClipboard(JSON.stringify(buildBugBundle(), null, 2), btn);
+}
+
+/**
+ * Copy the bug bundle to the clipboard (for kebab menu / programmatic callers).
+ * @returns {Promise<boolean>}
+ */
+export async function copyBugBundleToClipboard() {
+  const payload = JSON.stringify(buildBugBundle(), null, 2);
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(payload);
+      return true;
+    }
+  } catch (_) { /* fall through */ }
+  try {
+    if (typeof document === 'undefined' || !document.body) return false;
+    const ta = document.createElement('textarea');
+    ta.value = payload;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (_) { return false; }
+}
+
+function copyTextToClipboard(text, btn) {
   const finish = (ok) => {
     if (!btn) return;
-    const original = btn.textContent;
+    const original = btn.dataset.originalLabel || btn.textContent;
+    btn.dataset.originalLabel = original;
     btn.textContent = ok ? 'Copied' : 'Copy failed';
-    setTimeout(() => { if (btn.textContent !== original) btn.textContent = original; }, 1400);
+    setTimeout(() => {
+      if (btn.textContent === 'Copied' || btn.textContent === 'Copy failed') {
+        btn.textContent = original;
+      }
+    }, 1400);
   };
   try {
     if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(payload).then(() => finish(true), () => finish(false));
+      navigator.clipboard.writeText(text).then(() => finish(true), () => finish(false));
       return;
     }
   } catch (_) { /* fall through */ }
   try {
     const ta = document.createElement('textarea');
-    ta.value = payload;
+    ta.value = text;
     ta.style.position = 'fixed';
     ta.style.opacity = '0';
     document.body.appendChild(ta);
@@ -211,9 +431,17 @@ function copyErrorLog(btn) {
 }
 
 function record(entry) {
-  if (shouldDedupe(entry)) return;
+  const sig = makeSignature(entry);
+  if (shouldDedupe(entry)) {
+    bumpRepeatsForSignature(sig);
+    publishToWindow();
+    showOrUpdateToast();
+    return;
+  }
+  entry.repeats = 1;
   _errors.push(entry);
   while (_errors.length > MAX_CAPTURED) _errors.shift();
+  persistError(entry);
   publishToWindow();
   showOrUpdateToast();
 }
@@ -225,6 +453,7 @@ function record(entry) {
 export function installGlobalErrorHandler() {
   if (_installed || typeof window === 'undefined') return;
   _installed = true;
+  loadPersistedErrors();
   window.addEventListener('error', (e) => {
     try {
       record(captureFromErrorEvent(e));
@@ -268,7 +497,10 @@ export function getCapturedErrors() { return _errors.slice(); }
 export function _resetForTests() {
   _errors.length = 0;
   _signatures.clear();
+  _persistedRing = [];
+  _bundleCtx = null;
   _dismissed = false;
   hideToast();
+  try { window?.localStorage?.removeItem(PERSIST_STORAGE_KEY); } catch (_) { /* noop */ }
   publishToWindow();
 }

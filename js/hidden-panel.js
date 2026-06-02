@@ -12,11 +12,13 @@ import { renderSummary } from './filters-ui.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 import { state } from './state.js';
+import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
 const MODAL_ID = 'hiddenPanelModal';
 const LIST_ID = 'hiddenPanelList';
 const SUMMARY_ID = 'hiddenPanelSummary';
 const MENU_ID = 'hiddenGamesMenu';
+let _hiddenPanelRelease = null;
 
 function el(id) { return document.getElementById(id); }
 
@@ -83,12 +85,23 @@ function render() {
 function open() {
   const modal = el(MODAL_ID);
   if (!modal) return;
+  const dialog = modal.querySelector('[role="dialog"]') || modal;
   render();
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+  _hiddenPanelRelease?.();
+  const releaseTrap = trapFocus(dialog);
+  const releaseEsc = bindEscapeClose(dialog, close);
+  _hiddenPanelRelease = () => {
+    releaseTrap();
+    releaseEsc();
+    _hiddenPanelRelease = null;
+  };
+  el('hiddenPanelClose')?.focus();
 }
 
 function close() {
+  _hiddenPanelRelease?.();
   const modal = el(MODAL_ID);
   if (!modal) return;
   modal.classList.add('hidden');

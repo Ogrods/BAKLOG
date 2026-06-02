@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BAKLOG</title>
   <meta name="description" content="BAKLOG — cross-store game backlog and wishlist deal radar. Local-only; your libraries stay on your machine." />
+  <!-- Must match pyproject.toml + package.json (see CHANGELOG release discipline). Read at runtime by js/error-boundary.js for bug-bundle metadata. -->
+  <meta name="baklog-version" content="0.6.0" />
   <meta name="theme-color" content="#0f172a" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <script>
@@ -54,6 +56,7 @@
   <link rel="stylesheet" href="app.css" />
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
+  <a href="#main" class="skip-link">Skip to main content</a>
   <div class="max-w-[1600px] mx-auto p-4 md:p-6">
     <div id="migrationBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
     <div id="undoToast" class="hidden" role="status" aria-live="polite"></div>
@@ -72,13 +75,14 @@
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
         </nav>
-        <span class="text-[11px] text-slate-500 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
-        <button type="button" id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto self-center" aria-live="polite" title="Show fetcher log"></button>
+        <span class="text-[11px] text-slate-400 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
+        <button type="button" id="fetcherGlobalStatus" class="fh-global-status hidden ml-auto self-center" title="Show fetcher log"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText"></span></button>
       </div>
       <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
     </header>
 
+    <main id="main">
     <div id="bootLoadingOverlay" role="status" aria-live="polite" aria-busy="true">
       <div class="boot-loading-card">
         <div class="view-spinner" aria-hidden="true"></div>
@@ -97,6 +101,7 @@
           <div id="connKebabMenu" class="conn-kebab-menu" role="menu" hidden>
             <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="howto">How connections work</button>
             <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="passphrase">Encryption passphrase</button>
+            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="bundle">Portable bundle&hellip;</button>
           </div>
         </div>
       </div>
@@ -108,7 +113,8 @@
         <div id="connPane"></div>
       </div>
       <div id="connPopoverBackdrop" class="conn-popover-backdrop" hidden></div>
-      <div id="connPopover" class="conn-popover" role="dialog" aria-modal="true" hidden>
+      <div id="connPopover" class="conn-popover" role="dialog" aria-modal="true" aria-labelledby="connPopoverDialogTitle" hidden>
+        <h2 id="connPopoverDialogTitle" class="sr-only">Connections</h2>
         <button type="button" class="conn-popover-close" data-conn-close aria-label="Close">&times;</button>
         <div id="connPopoverBody"></div>
       </div>
@@ -164,8 +170,49 @@
         </label>
         <div class="flex flex-wrap gap-2 items-center mt-2">
           <button type="button" id="masterPasswordSave" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Apply</button>
-          <span id="masterPasswordHint" class="text-slate-500 text-xs">Using OS keychain by default.</span>
+          <span id="masterPasswordHint" class="text-slate-400 text-xs">Using OS keychain by default.</span>
         </div>
+      </template>
+      <template id="tplConnBundlePopover">
+        <h3 class="conn-popover-title">Portable bundle</h3>
+        <p class="conn-howto-note">
+          Export every connection (credentials + Playwright cookie profiles) as a single
+          encrypted file you can copy to another machine, keep as a backup, or use to
+          recover from a corrupted OS keychain.
+        </p>
+        <p class="conn-howto-note">
+          The bundle is encrypted with <strong>its own passphrase</strong> &mdash; pick something you'll
+          remember. We can't recover it for you.
+        </p>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button type="button" id="secretsExportBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm">Export bundle&hellip;</button>
+          <button type="button" id="secretsImportBtn" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Import bundle&hellip;</button>
+          <input type="file" id="secretsImportFile" accept=".bundle,application/octet-stream" class="hidden" />
+        </div>
+        <p id="secretsBundleHint" class="text-xs text-slate-400 mt-2"></p>
+        <p class="text-xs text-slate-400 mt-2">
+          Terminal users:
+          <code class="text-slate-300">python -m auth export-bundle</code> /
+          <code class="text-slate-300">import-bundle</code> (also supports <code>--dry-run</code>).
+        </p>
+        <dialog id="secretsBundleDialog" class="bg-slate-800 border border-slate-600 rounded-lg p-4 text-slate-100 max-w-sm w-full">
+          <form method="dialog" id="secretsBundleDialogForm">
+            <h4 id="secretsBundleDialogTitle" class="text-sm font-semibold mb-2">Bundle passphrase</h4>
+            <p id="secretsBundleDialogHelp" class="text-xs text-slate-400 mb-2"></p>
+            <label class="block text-xs text-slate-300">Passphrase
+              <input id="secretsBundlePassphrase" type="password" autocomplete="new-password" minlength="8"
+                class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
+            </label>
+            <label id="secretsBundleConfirmWrap" class="block text-xs text-slate-300 mt-2 hidden">Confirm passphrase
+              <input id="secretsBundlePassphraseConfirm" type="password" autocomplete="new-password" minlength="8"
+                class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
+            </label>
+            <div class="flex flex-wrap gap-2 mt-3 justify-end">
+              <button type="button" id="secretsBundleCancel" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Cancel</button>
+              <button type="submit" id="secretsBundleSubmit" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm">Continue</button>
+            </div>
+          </form>
+        </dialog>
       </template>
     </section>
 
@@ -209,7 +256,7 @@
         <button id="pickForMe" class="bg-amber-700 hover:bg-amber-600 px-3 py-2 rounded text-sm whitespace-nowrap">Pick for me</button>
         <button id="addGameBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded text-sm whitespace-nowrap" title="Manually add a game">+ Add game</button>
         <div class="relative">
-          <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions">⋯</button>
+          <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions" aria-haspopup="menu" aria-expanded="false">⋯</button>
           <div id="kebabMenu" class="absolute right-0 top-full mt-1 z-30 min-w-[180px] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 text-sm">
             <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
             <button type="button" id="showFetcherLog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reopen the fetcher console (helpful if you closed it during a run)">Show fetcher log</button>
@@ -217,6 +264,7 @@
             <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export personal data (status, notes)</button>
             <button type="button" id="exportNotesOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes only</button>
             <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Find stored statuses/notes whose game is no longer in any catalog (uninstalled, store disconnected, etc.)">Clean up unknown games…</button>
+            <button type="button" id="reportBug" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy a sanitized bug bundle (errors + app context) to your clipboard. Nothing is sent anywhere.">Report a bug…</button>
             <button type="button" id="hiddenGamesMenu" class="w-full text-left px-3 py-2 hover:bg-slate-700">Hidden games</button>
             <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700">Copy top 20 backlog (Markdown)</button>
             <label class="flex items-center gap-2 px-3 py-2 hover:bg-slate-700 cursor-pointer text-left" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
@@ -314,8 +362,8 @@
         </colgroup>
         <thead class="bg-slate-800 text-slate-300">
           <tr>
-            <th class="p-2"><input type="checkbox" id="selectAllVisible" title="Select all visible rows" /></th>
-            <th class="p-2"></th>
+            <th class="p-2"><label class="sr-only" for="selectAllVisible">Select all visible rows</label><input type="checkbox" id="selectAllVisible" /></th>
+            <th class="p-2" scope="col"><span class="sr-only">Cover art</span></th>
             <th data-sort="name" class="p-2 text-left">Game</th>
             <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
             <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>
@@ -334,9 +382,10 @@
     </div>
     </div>
     <p id="rowCount" class="text-slate-400 text-sm mt-2"></p>
+    </main>
   </div>
 
-  <div id="alphaNavWrap">
+  <div id="alphaNavWrap" role="region" aria-label="Table navigation">
     <button id="backToTop" type="button" title="Back to top" aria-label="Back to top">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M10 13 L10 7 M6 10 L10 6 L14 10" />
@@ -363,10 +412,10 @@
     })();
   </script>
 
-  <div id="bulkBar" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-800 border-t border-slate-600 hidden">
+  <div id="bulkBar" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-800 border-t border-slate-600 hidden" role="region" aria-label="Bulk actions">
     <div class="max-w-[1600px] mx-auto px-4 py-2 flex flex-wrap items-center gap-2 text-sm">
       <span id="bulkCount" class="text-slate-200 font-medium mr-2">0 selected</span>
-      <span class="text-slate-500 text-xs mr-2">Status:</span>
+      <span class="text-slate-400 text-xs mr-2">Status:</span>
       <div id="bulkStatusButtons" class="flex flex-wrap gap-2 items-center"></div>
       <button type="button" id="bulkRemove" class="px-2 py-1 rounded bg-rose-900/80 hover:bg-rose-800 border border-rose-700/60 text-rose-100 text-xs font-medium" title="Delete custom entries; hide pulled entries (restorable from kebab menu)">Remove</button>
       <button type="button" id="bulkClear" class="ml-auto px-2 py-1 rounded text-slate-400 hover:text-slate-200 text-xs">Clear selection</button>
@@ -375,9 +424,9 @@
 
   <!-- Filter drawer -->
   <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/50 z-40" aria-hidden="true"></div>
-  <aside id="filterDrawer" class="fixed top-0 right-0 h-full w-[min(360px,92vw)] bg-slate-800 border-l border-slate-600 z-50 flex flex-col shadow-2xl" aria-hidden="true">
+  <aside id="filterDrawer" class="fixed top-0 right-0 h-full w-[min(360px,92vw)] bg-slate-800 border-l border-slate-600 z-50 flex flex-col shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="filterDrawerTitle" aria-hidden="true">
     <div class="flex items-center justify-between p-3 border-b border-slate-700 shrink-0">
-      <h2 class="text-sm font-semibold text-slate-100 uppercase tracking-wide">Filters</h2>
+      <h2 id="filterDrawerTitle" class="text-sm font-semibold text-slate-100 uppercase tracking-wide">Filters</h2>
       <button type="button" id="closeFiltersBtn" class="text-slate-400 hover:text-slate-100 text-xl leading-none px-2" aria-label="Close filters">&times;</button>
     </div>
     <div class="flex-1 overflow-y-auto p-3 space-y-0 text-sm">
@@ -405,7 +454,7 @@
           <input id="itchShowNonGames" type="checkbox" class="rounded" />
           Show tools, soundtracks, etc.
         </label>
-        <p class="text-[11px] text-slate-500 mt-1 leading-snug">By default only itch.io games are shown. Check to include tools, assets, comics, books, and soundtracks.</p>
+        <p class="text-[11px] text-slate-400 mt-1 leading-snug">By default only itch.io games are shown. Check to include tools, assets, comics, books, and soundtracks.</p>
       </div>
       <div id="libraryStoreSection" class="drawer-section">
         <label class="text-xs text-slate-400 block mb-2">Cross-store</label>
@@ -413,7 +462,7 @@
           <input id="crossStoreDedup" type="checkbox" class="rounded" />
           Hide duplicates
         </label>
-        <p id="crossStoreDedupHint" class="text-[11px] text-slate-500 mt-1 leading-snug">Filter by store using the chips at the top of the page.</p>
+        <p id="crossStoreDedupHint" class="text-[11px] text-slate-400 mt-1 leading-snug">Filter by store using the chips at the top of the page.</p>
       </div>
       <div id="wishlistStoreSection" class="drawer-section hidden">
         <label class="text-xs text-slate-400 block mb-2">Wishlist source</label>
@@ -425,7 +474,7 @@
           <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="psn">PlayStation</button>
           <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="ubisoft">Ubisoft</button>
         </div>
-        <p class="text-[11px] text-slate-500 mt-2 leading-snug">Filters the Wishlist tab to a single source store. Manual entries remain visible under "All".</p>
+        <p class="text-[11px] text-slate-400 mt-2 leading-snug">Filters the Wishlist tab to a single source store. Manual entries remain visible under "All".</p>
       </div>
       <div class="drawer-section">
         <div class="flex items-center justify-between mb-2">
@@ -454,18 +503,18 @@
           Early Access only
           <span class="ea-pill ml-1" title="Early Access">EA</span>
         </label>
-        <p class="text-[11px] text-slate-500 mt-1 leading-snug">Only show games tagged as Early Access (e.g. <em>Hyper Light Breaker</em>, <em>Slay the Spire 2</em>).</p>
+        <p class="text-[11px] text-slate-400 mt-1 leading-snug">Only show games tagged as Early Access (e.g. <em>Hyper Light Breaker</em>, <em>Slay the Spire 2</em>).</p>
       </div>
       <div id="coopSection" class="drawer-section">
         <label class="text-xs text-slate-400 block mb-2">Co-op</label>
         <div id="coopFilterSegmented" class="filter-segmented" role="radiogroup" aria-label="Co-op filter">
-          <button type="button" class="filter-segment active" data-coop-mode="off" aria-pressed="true">Off</button>
-          <button type="button" class="filter-segment" data-coop-mode="any" aria-pressed="false">Any</button>
-          <button type="button" class="filter-segment" data-coop-mode="online" aria-pressed="false">Online</button>
-          <button type="button" class="filter-segment" data-coop-mode="local" aria-pressed="false">Couch</button>
-          <button type="button" class="filter-segment" data-coop-mode="both" aria-pressed="false">Both</button>
+          <button type="button" class="filter-segment active" data-coop-mode="off" role="radio" aria-checked="true">Off</button>
+          <button type="button" class="filter-segment" data-coop-mode="any" role="radio" aria-checked="false">Any</button>
+          <button type="button" class="filter-segment" data-coop-mode="online" role="radio" aria-checked="false">Online</button>
+          <button type="button" class="filter-segment" data-coop-mode="local" role="radio" aria-checked="false">Couch</button>
+          <button type="button" class="filter-segment" data-coop-mode="both" role="radio" aria-checked="false">Both</button>
         </div>
-        <p class="text-[11px] text-slate-500 mt-1.5 leading-snug">Steam category tags. <strong>Any</strong> = online or couch. <strong>Both</strong> = must support both.</p>
+        <p class="text-[11px] text-slate-400 mt-1.5 leading-snug">Steam category tags. <strong>Any</strong> = online or couch. <strong>Both</strong> = must support both.</p>
       </div>
       <div id="libraryMiscSection" class="drawer-section space-y-2">
         <label class="flex items-center gap-2 text-xs text-slate-300">
@@ -522,10 +571,10 @@
   </aside>
 
   <!-- Orphan personal-data cleanup modal -->
-  <div id="orphanPruneModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
-    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
+  <div id="orphanPruneModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="orphanPruneTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
-        <h3 class="text-lg font-semibold text-slate-100">Clean up unknown games</h3>
+        <h3 id="orphanPruneTitle" class="text-lg font-semibold text-slate-100">Clean up unknown games</h3>
         <button id="orphanPruneClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
       <div class="p-3 text-xs text-slate-400 border-b border-slate-700">
@@ -549,10 +598,10 @@
   </div>
 
   <!-- Hidden games panel -->
-  <div id="hiddenPanelModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
-    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
+  <div id="hiddenPanelModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="hiddenPanelTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
-        <h3 class="text-lg font-semibold text-slate-100">Hidden games</h3>
+        <h3 id="hiddenPanelTitle" class="text-lg font-semibold text-slate-100">Hidden games</h3>
         <button id="hiddenPanelClose" type="button" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
       <div id="hiddenPanelSummary" class="px-3 py-2 text-xs text-slate-300 border-b border-slate-700"></div>
@@ -565,8 +614,8 @@
   </div>
 
   <!-- Add-game modal -->
-  <div id="addGameModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
-    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col">
+  <div id="addGameModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="addGameModalTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="addGameModalTitle" class="text-lg font-semibold text-slate-100">Add a game</h3>
         <button id="addGameClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
@@ -622,7 +671,7 @@
       </div>
       <div class="border-t border-slate-700 p-3 flex justify-between items-center gap-2">
         <button id="addGameSkipSteam" class="text-xs text-slate-400 hover:text-slate-200 underline">Save without Steam match (title only)</button>
-        <div class="text-xs text-slate-500">Custom entries sync with your personal data file when the server is running. <button id="addGameExport" class="underline hover:text-slate-300">Export</button> / <label class="underline hover:text-slate-300 cursor-pointer">Import<input id="addGameImport" type="file" accept=".json" class="hidden" /></label></div>
+        <div class="text-xs text-slate-400">Custom entries sync with your personal data file when the server is running. <button id="addGameExport" class="underline hover:text-slate-300">Export</button> / <label class="underline hover:text-slate-300 cursor-pointer">Import<input id="addGameImport" type="file" accept=".json" class="hidden" /></label></div>
       </div>
     </div>
   </div>

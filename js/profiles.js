@@ -3,6 +3,7 @@
  * Switching active profile triggers a full page reload (no hot-swap).
  */
 
+import { baklogFetch } from './api-client.js';
 import { PREFS_KEY } from './state.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
@@ -66,7 +67,7 @@ async function api(method, path, body) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
-  const res = await fetch(path, opts);
+  const res = await baklogFetch(path, opts);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data?.error || res.statusText || 'Request failed';

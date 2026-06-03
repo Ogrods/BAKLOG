@@ -56,6 +56,7 @@ def _delete_profile(base: str, profile_id: str) -> tuple[int, dict]:
     req = urllib.request.Request(
         f"{base}/api/profiles/{profile_id}",
         method="DELETE",
+        headers={server._BAKLOG_LOCAL_HEADER: "1"},
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:

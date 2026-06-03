@@ -36,10 +36,11 @@ so the browser cannot execute arbitrary commands.
 from __future__ import annotations
 
 import atexit
+import html
 import json
 import os
-import queue
 import re
+import queue
 import signal
 import subprocess
 import socket
@@ -53,6 +54,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 
@@ -91,6 +93,34 @@ _IN_FLIGHT_STATUSES = frozenset({"queued", "launching", "running", "cancelling"}
 
 _sse_connections = 0
 _sse_lock = threading.Lock()
+
+_BAKLOG_LOCAL_HEADER = "X-BAKLOG-Local"
+_BAKLOG_IMPORT_PASSPHRASE_HEADER = "X-BAKLOG-Import-Passphrase"
+_LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "[::1]"})
+_epic_oauth_states: dict[str, float] = {}
+_LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(Cookie:\s*)([^\s]+)", re.I), r"\1[redacted]"),
+    (re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*)[\"']?[\w\-]+", re.I), r"\1[redacted]"),
+]
+
+
+def _redact_log_line(text: str) -> str:
+    out = text
+    for pattern, repl in _LOG_REDACT_PATTERNS:
+        out = pattern.sub(repl, out)
+    return out
+
+
+def _register_epic_oauth_state(state: str, *, ttl_sec: float = 600.0) -> None:
+    _epic_oauth_states[state] = time.time() + ttl_sec
+
+
+def _consume_epic_oauth_state(state: str | None) -> bool:
+    if not state:
+        return True
+    expires = _epic_oauth_states.pop(state, None)
+    return expires is not None and expires >= time.time()
 
 # Personal-data persistence (scoped to active profile via shared.profile_paths).
 from shared.platform_support import platform_supported  # noqa: E402
@@ -157,6 +187,36 @@ def _empty_personal_doc() -> dict[str, Any]:
     }
 
 
+class PersonalCorruptError(RuntimeError):
+    """personal.json is unreadable and no backup could be restored."""
+
+
+def _normalize_personal_doc(doc: dict[str, Any]) -> dict[str, Any]:
+    doc.setdefault("personal", {})
+    doc.setdefault("prefs", {})
+    doc.setdefault("manual", [])
+    doc.setdefault("libraryFirstSeen", {})
+    doc.setdefault("updated_at", None)
+    doc.setdefault("schema_version", 1)
+    return doc
+
+
+def _restore_personal_from_backup() -> dict[str, Any] | None:
+    backup_dir = personal_backup_dir()
+    if not backup_dir.is_dir():
+        return None
+    backups = sorted(backup_dir.glob("personal-*.json"), reverse=True)
+    for backup in backups:
+        try:
+            with backup.open("r", encoding="utf-8") as f:
+                doc = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(doc, dict):
+            return _normalize_personal_doc(doc)
+    return None
+
+
 def _load_personal_doc() -> dict[str, Any]:
     with _personal_lock:
         path = personal_path()
@@ -166,16 +226,20 @@ def _load_personal_doc() -> dict[str, Any]:
             with path.open("r", encoding="utf-8") as f:
                 doc = json.load(f)
         except (OSError, json.JSONDecodeError) as exc:
-            print(f"[personal] corrupted: {exc!r} -- returning empty doc", file=sys.stderr)
-            return _empty_personal_doc()
-        # Defensive defaults so the client can rely on shape.
-        doc.setdefault("personal", {})
-        doc.setdefault("prefs", {})
-        doc.setdefault("manual", [])
-        doc.setdefault("libraryFirstSeen", {})
-        doc.setdefault("updated_at", None)
-        doc.setdefault("schema_version", 1)
-        return doc
+            restored = _restore_personal_from_backup()
+            if restored is not None:
+                print(
+                    f"[personal] primary file corrupt ({exc!r}); serving newest backup",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return restored
+            raise PersonalCorruptError(
+                f"personal data at {path} is corrupt and no backup could be read"
+            ) from exc
+        if not isinstance(doc, dict):
+            raise PersonalCorruptError(f"personal data at {path} is not a JSON object")
+        return _normalize_personal_doc(doc)
 
 
 def _validate_personal_payload(payload: Any) -> dict[str, Any]:
@@ -482,7 +546,7 @@ class Run:
         return summary
 
     def add_line(self, stream: str, text: str) -> None:
-        msg = {"t": time.time(), "stream": stream, "text": text}
+        msg = {"t": time.time(), "stream": stream, "text": _redact_log_line(text)}
         with self._lock:
             self.lines.append(msg)
             try:
@@ -636,6 +700,13 @@ class RunManager:
             ]
         _save_durable_queue(entries)
 
+    def _latest_history_for_key(self, key: str) -> dict[str, Any] | None:
+        with self._lock:
+            for h in self._history:
+                if h.get("key") == key:
+                    return h
+        return None
+
     def _restore_durable_queue(self) -> None:
         history_ids = {h.get("id") for h in self._history}
         restored = 0
@@ -644,6 +715,9 @@ class RunManager:
             if not key or key not in FETCHERS:
                 continue
             if entry.get("id") in history_ids:
+                continue
+            latest = self._latest_history_for_key(key)
+            if latest and latest.get("status") == "done":
                 continue
             try:
                 self.submit(key, refresh=bool(entry.get("refresh")))
@@ -874,6 +948,9 @@ class RunManager:
             if not run._finished.is_set():
                 with self._lock:
                     self._active = run
+                    if run.status == "queued":
+                        run.status = "launching"
+                self._persist_queue()
                 try:
                     if run.status != "cancelled":
                         self._execute(run)
@@ -1081,6 +1158,36 @@ class RunManager:
 MANAGER = RunManager()
 
 
+def _header_hostname(value: str | None) -> str | None:
+    if not value:
+        return None
+    host = (urlparse(value).hostname or "").lower()
+    return host or None
+
+
+def _request_host_is_local(handler: SimpleHTTPRequestHandler) -> bool:
+    host_header = handler.headers.get("Host", "")
+    hostname = host_header.split(":")[0].strip().lower()
+    return hostname in _LOCAL_HOSTNAMES
+
+
+def _origin_is_local(handler: SimpleHTTPRequestHandler) -> bool:
+    for name in ("Origin", "Referer"):
+        host = _header_hostname(handler.headers.get(name))
+        if host in _LOCAL_HOSTNAMES:
+            return True
+    return False
+
+
+def _csrf_allowed(handler: SimpleHTTPRequestHandler) -> bool:
+    """Block cross-site POST/PUT/DELETE to localhost while the dev server runs."""
+    if not _request_host_is_local(handler):
+        return False
+    if handler.headers.get(_BAKLOG_LOCAL_HEADER) == "1":
+        return True
+    return _origin_is_local(handler)
+
+
 def _send_json(handler: SimpleHTTPRequestHandler, status: int, payload: Any) -> None:
     body = json.dumps(payload).encode("utf-8")
     handler.send_response(status)
@@ -1151,6 +1258,17 @@ def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] |
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def _reject_if_csrf(self) -> bool:
+        """Return True when the request was rejected (caller should return)."""
+        if _csrf_allowed(self):
+            return False
+        _send_json(
+            self,
+            HTTPStatus.FORBIDDEN,
+            {"error": "cross-origin request blocked — open BAKLOG from http://127.0.0.1 and retry"},
+        )
+        return True
+
     server_version = "SteamBacklogDev/1.0"
 
     # Static assets that change during frontend work — never cache in dev so a
@@ -1221,6 +1339,8 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:  # noqa: N802 - http.server API
+        if self._reject_if_csrf():
+            return
         if self.path.rstrip("/") == "/api/runs/cancel":
             self._handle_cancel_all()
             return
@@ -1269,6 +1389,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_DELETE(self) -> None:  # noqa: N802 - http.server API
+        if self._reject_if_csrf():
+            return
         path_only = self.path.split("?", 1)[0]
         if path_only.startswith("/api/profiles/"):
             profile_id = path_only[len("/api/profiles/") :].strip("/")
@@ -1278,6 +1400,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_PUT(self) -> None:  # noqa: N802 - http.server API
+        if self._reject_if_csrf():
+            return
         if self.path == "/api/personal":
             self._handle_personal_put()
             return
@@ -1416,6 +1540,9 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_personal_get(self) -> None:
         try:
             doc = _load_personal_doc()
+        except PersonalCorruptError as exc:
+            _send_json(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
+            return
         except Exception as exc:  # noqa: BLE001 - the file is small, anything is unexpected here
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"load failed: {exc!r}"})
             return
@@ -1457,6 +1584,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return
         try:
             doc = _save_personal_doc(payload)
+        except PersonalCorruptError as exc:
+            _send_json(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
+            return
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
@@ -1646,14 +1776,31 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     def _handle_auth_secrets_import(self) -> None:
+        import base64
         from urllib.parse import parse_qs, urlparse
 
         try:
-            parsed = urlparse(self.path)
-            params = parse_qs(parsed.query)
-            passphrase = (params.get("passphrase") or [""])[0]
             length = int(self.headers.get("Content-Length") or 0)
-            blob = self.rfile.read(length) if length else b""
+            raw = self.rfile.read(length) if length else b""
+            ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+            if ctype == "application/json":
+                payload = json.loads(raw.decode("utf-8") if raw else "{}")
+                if not isinstance(payload, dict):
+                    raise ValueError("import body must be a JSON object")
+                passphrase = str(payload.get("passphrase") or "")
+                blob_b64 = payload.get("blob")
+                if isinstance(blob_b64, str):
+                    blob = base64.b64decode(blob_b64, validate=True)
+                else:
+                    blob = b""
+            else:
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                passphrase = (
+                    self.headers.get(_BAKLOG_IMPORT_PASSPHRASE_HEADER)
+                    or (params.get("passphrase") or [""])[0]
+                )
+                blob = raw
             from auth.bundle import (
                 BadMagic,
                 BadPassphrase,
@@ -1683,6 +1830,15 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
         code = (params.get("code") or [None])[0]
+        state = (params.get("state") or [None])[0]
+        if state is not None and not _consume_epic_oauth_state(state):
+            self.send_response(HTTPStatus.BAD_REQUEST)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            body = b"<html><body><p>Invalid or expired OAuth state.</p></body></html>"
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if not code:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -1708,7 +1864,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         except Exception as exc:  # noqa: BLE001
-            body = f"<html><body><p>Epic sign-in failed: {exc}</p></body></html>".encode("utf-8")
+            safe = html.escape(str(exc), quote=True)
+            body = f"<html><body><p>Epic sign-in failed: {safe}</p></body></html>".encode("utf-8")
             self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))

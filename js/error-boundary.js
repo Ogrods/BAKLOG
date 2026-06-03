@@ -158,6 +158,10 @@ function persistError(entry) {
 /** Clone an entry for the persisted ring — truncate stacks, default repeats. */
 function entryForStorage(entry) {
   const stored = { ...entry };
+  if (typeof stored.message === 'string') stored.message = scrubErrorText(stored.message);
+  if (typeof stored.stack === 'string') {
+    stored.stack = scrubErrorText(stored.stack);
+  }
   if (typeof stored.stack === 'string' && stored.stack.length > MAX_PERSIST_STACK_LEN) {
     stored.stack = stored.stack.slice(0, MAX_PERSIST_STACK_LEN) + PERSIST_STACK_TRUNCATED;
   }
@@ -304,7 +308,7 @@ export function buildBugBundle() {
     generated_at: new Date().toISOString(),
     ua,
     runtime: {
-      view: readWindowField(win, 'state.activeView') ?? null,
+      view: safeActiveView(),
       data_version: dataVersion,
       active_filter_count: safeCount(),
       table_fingerprint: safeFingerprint(),
@@ -343,6 +347,25 @@ function safeFingerprint() {
   } catch (_) { return null; }
 }
 
+function safeActiveView() {
+  try {
+    const fn = _bundleCtx?.getActiveView;
+    if (typeof fn === 'function') {
+      const v = fn();
+      return typeof v === 'string' ? v : null;
+    }
+  } catch (_) { /* ignore */ }
+  return readWindowField(typeof window !== 'undefined' ? window : null, 'state.activeView') ?? null;
+}
+
+function scrubErrorText(text) {
+  if (typeof text !== 'string' || !text) return text;
+  return text
+    .replace(/Bearer\s+[A-Za-z0-9._\-]+/gi, 'Bearer [redacted]')
+    .replace(/(Cookie:\s*)([^\s;]+)/gi, '$1[redacted]')
+    .replace(/api[_-]?key["']?\s*[:=]\s*["']?[\w\-]+/gi, 'api_key=[redacted]');
+}
+
 function safeCount() {
   try {
     const fn = _bundleCtx?.getActiveFilterCount;
@@ -366,6 +389,7 @@ export function registerBugBundleContext(ctx) {
   _bundleCtx = {
     getFingerprint: typeof ctx.getFingerprint === 'function' ? ctx.getFingerprint : null,
     getActiveFilterCount: typeof ctx.getActiveFilterCount === 'function' ? ctx.getActiveFilterCount : null,
+    getActiveView: typeof ctx.getActiveView === 'function' ? ctx.getActiveView : null,
   };
 }
 

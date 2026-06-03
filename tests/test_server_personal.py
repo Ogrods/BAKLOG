@@ -42,6 +42,8 @@ def _request(base: str, method: str, path: str, body: dict | None = None) -> tup
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
+    if method != "GET":
+        headers[server._BAKLOG_LOCAL_HEADER] = "1"
     req = urllib.request.Request(f"{base}{path}", data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -53,6 +55,39 @@ def _request(base: str, method: str, path: str, body: dict | None = None) -> tup
         except json.JSONDecodeError:
             parsed = {"error": payload}
         return exc.code, parsed
+
+
+def test_personal_restores_from_backup_on_corrupt_primary(
+    personal_server: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backup_dir = server.personal_backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    good = {
+        "personal": {"g1": {"status": "backlog"}},
+        "prefs": {},
+        "manual": [],
+        "libraryFirstSeen": {},
+        "updated_at": 1.0,
+        "schema_version": 1,
+    }
+    (backup_dir / "personal-20260101-120000.json").write_text(
+        json.dumps(good), encoding="utf-8"
+    )
+    path = server.personal_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not json", encoding="utf-8")
+    status, doc = _request(personal_server, "GET", "/api/personal")
+    assert status == 200
+    assert doc["personal"]["g1"]["status"] == "backlog"
+
+
+def test_personal_corrupt_without_backup_returns_503(personal_server: str) -> None:
+    path = server.personal_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{bad", encoding="utf-8")
+    status, body = _request(personal_server, "GET", "/api/personal")
+    assert status == 503
+    assert "corrupt" in body.get("error", "").lower()
 
 
 def test_personal_get_empty_doc(personal_server: str):

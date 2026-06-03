@@ -52,7 +52,10 @@ def _post_json(base: str, path: str, body: dict) -> tuple[int, dict | bytes, dic
     req = urllib.request.Request(
         f"{base}{path}",
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
         method="POST",
     )
     try:
@@ -76,7 +79,10 @@ def _post_bytes(base: str, path: str, body: bytes) -> tuple[int, dict]:
     req = urllib.request.Request(
         f"{base}{path}",
         data=body,
-        headers={"Content-Type": "application/octet-stream"},
+        headers={
+            "Content-Type": "application/octet-stream",
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
         method="POST",
     )
     try:
@@ -120,10 +126,15 @@ def test_import_bad_passphrase_403(auth_bundle_server: str) -> None:
         {"passphrase": "correct-passphrase"},
     )
     assert isinstance(blob, bytes)
-    status, body = _post_bytes(
+    import base64
+
+    status, body, _headers = _post_json(
         auth_bundle_server,
-        "/api/auth/secrets/import?passphrase=wrong-passphrase-here",
-        blob,
+        "/api/auth/secrets/import",
+        {
+            "passphrase": "wrong-passphrase-here",
+            "blob": base64.b64encode(blob).decode("ascii"),
+        },
     )
     assert status == 403
     assert body["code"] == "bad_passphrase"

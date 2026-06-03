@@ -128,19 +128,45 @@ def _get_master_key() -> bytes:
     return key
 
 
+class SecretsCorruptError(RuntimeError):
+    """secrets.bin exists but cannot be decrypted or parsed."""
+
+
 def _empty_doc() -> dict[str, Any]:
     return {"providers": {}, "settings": {"master_password_enabled": False}}
 
 
+def _atomic_write_secrets(data: bytes) -> None:
+    path = _secrets_file()
+    _ensure_dir()
+    bak = path.with_suffix(path.suffix + ".bak")
+    if path.exists():
+        try:
+            bak.write_bytes(path.read_bytes())
+        except OSError:
+            pass
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
 def _decrypt_blob(raw: bytes) -> dict[str, Any]:
     if len(raw) < 28:
-        return _empty_doc()
+        raise ValueError("secrets blob is too short to be valid")
     nonce, ciphertext = raw[:12], raw[12:]
     key = _get_master_key()
     plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
     doc = json.loads(plaintext.decode("utf-8"))
     if not isinstance(doc, dict):
-        return _empty_doc()
+        raise ValueError("secrets payload is not a JSON object")
     doc.setdefault("providers", {})
     doc.setdefault("settings", {})
     return doc
@@ -165,16 +191,17 @@ def load_doc() -> dict[str, Any]:
             return json.loads(json.dumps(_cache))
         try:
             _cache = _decrypt_blob(secrets.read_bytes())
-        except Exception:
-            _cache = _empty_doc()
+        except Exception as exc:
+            raise SecretsCorruptError(
+                f"cannot read {_secrets_file()}: corrupt or wrong passphrase"
+            ) from exc
         return json.loads(json.dumps(_cache))
 
 
 def save_doc(doc: dict[str, Any]) -> None:
     global _cache
     with _lock:
-        _ensure_dir()
-        _secrets_file().write_bytes(_encrypt_doc(doc))
+        _atomic_write_secrets(_encrypt_doc(doc))
         _cache = json.loads(json.dumps(doc))
 
 

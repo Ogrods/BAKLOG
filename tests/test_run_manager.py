@@ -371,6 +371,52 @@ def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.Monke
     assert run._finished.wait(timeout=10)
 
 
+def test_durable_queue_skips_when_key_already_done(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+    hist = runs_dir / "history.json"
+    hist.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "finished-1",
+                    "key": "demo",
+                    "status": "done",
+                    "label": "Demo",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    queue_file = runs_dir / "queue.json"
+    queue_file.write_text(
+        json.dumps({"runs": [{"id": "stale", "key": "demo", "refresh": False}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
+    monkeypatch.setattr(server, "RUN_HISTORY_FILE", hist)
+    monkeypatch.setattr(server, "QUEUE_FILE", queue_file)
+    monkeypatch.setitem(
+        server.FETCHERS,
+        "demo",
+        {
+            "label": "Demo",
+            "argv": [server.sys.executable, "-c", "print('ok')"],
+            "refreshArgs": [],
+            "metaKey": "demo",
+            "group": "library",
+            "color": "#fff",
+            "requires": [],
+        },
+    )
+    mgr = server.RunManager(runs_dir=runs_dir)
+    snap = mgr.snapshot()
+    assert not snap["active"]
+    assert not snap["queue"]
+    mgr.shutdown()
+
+
 def test_durable_queue_restored_on_startup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()

@@ -1,3 +1,4 @@
+import { withBaklogHeaders } from './api-client.js';
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 import {
@@ -318,10 +319,12 @@ export const FETCH_TIMEOUT_MS = 15_000;
 
 /** Fetch with timeout; throws when the server does not respond in time. */
 export async function fetchWithTimeout(url, options = {}, ms = FETCH_TIMEOUT_MS) {
+  const method = (options.method || 'GET').toUpperCase();
+  const merged = method === 'GET' || method === 'HEAD' ? options : withBaklogHeaders(options);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    return await fetch(url, { ...options, signal: ctrl.signal });
+    return await fetch(url, { ...merged, signal: ctrl.signal });
   } catch (err) {
     if (err?.name === 'AbortError') {
       throw new Error('server not responding');

@@ -58,18 +58,13 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 - A–Z jump nav pinned to the right edge (xl+ screens)
 - **Wishlist deal radar:** filter by On Sale / Historical Low / Min Discount % / Max Price, hide already-owned cross-store
 
-## Dashboard CSS (optional)
+## Dashboard CSS
 
-Tailwind is precompiled into `tailwind.css` (no browser JIT). After you change Tailwind classes in `index.html` (or `js/`), rebuild:
-
-```bash
-npm install
-npm run build:css
-```
+Tailwind is precompiled into `tailwind.css` (no browser JIT in dev). Rebuild the CSS only if you change the Tailwind build pipeline in the repo.
 
 ## Setup
 
-1. Install Python 3.10+ and create a virtual environment (optional but recommended):
+1. Install Python **3.11+** and create a virtual environment (optional but recommended):
 
    ```bash
    python -m venv .venv
@@ -328,14 +323,14 @@ The cross-platform way to run fetchers is from the UI — click any chip in the 
 **Windows** (`refresh.ps1`):
 
 ```powershell
-Set-Location "c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog"
+Set-Location "C:\path\to\steam-backlog"
 .\refresh.ps1
 ```
 
-Create a weekly scheduled task (example: Sundays at 9:00):
+Create a weekly scheduled task (example: Sundays at 9:00; adjust the path):
 
 ```powershell
-schtasks /create /SC WEEKLY /D SUN /TN "BAKLOG Refresh" /TR "powershell -ExecutionPolicy Bypass -File \"c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog\refresh.ps1\"" /ST 09:00
+schtasks /create /SC WEEKLY /D SUN /TN "BAKLOG Refresh" /TR "powershell -ExecutionPolicy Bypass -File \"C:\path\to\steam-backlog\refresh.ps1\"" /ST 09:00
 ```
 
 **macOS / Linux** (`refresh.sh`):
@@ -415,6 +410,10 @@ The repo keeps most scripts in the project root on purpose — each fetcher is a
 No nested `src/` folder — run fetchers from the repo root so paths stay simple.
 
 ### Dev checks
+
+Run everything (pytest + vitest): `.\scripts\test-all.ps1` or `npm run test:all`.
+
+Original per-suite commands:
 
 ```bash
 pip install -e ".[dev]"

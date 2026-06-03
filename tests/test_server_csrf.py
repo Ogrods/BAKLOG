@@ -1,11 +1,9 @@
-"""HTTP integration tests for fetcher run API."""
+"""CSRF / localhost guard on mutating API routes."""
+
 from __future__ import annotations
 
 import json
 import threading
-import time
-import urllib.error
-import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -16,7 +14,7 @@ import server
 
 
 @pytest.fixture()
-def run_api_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def csrf_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     runs_dir = tmp_path / "runs"
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
@@ -28,19 +26,6 @@ def run_api_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         {
             "label": "Demo",
             "argv": [server.sys.executable, "-c", "print('ok')"],
-            "refreshArgs": [],
-            "metaKey": "demo",
-            "group": "library",
-            "color": "#fff",
-            "requires": [],
-        },
-    )
-    monkeypatch.setitem(
-        server.FETCHERS,
-        "demo",
-        {
-            "label": "Demo",
-            "argv": [server.sys.executable, "-c", "import time; time.sleep(2)"],
             "refreshArgs": [],
             "metaKey": "demo",
             "group": "library",
@@ -62,11 +47,27 @@ def run_api_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         thread.join(timeout=5)
 
 
-def _request(base: str, method: str, path: str) -> tuple[int, dict]:
-    headers = {}
-    if method != "GET":
+def _post(
+    base: str,
+    path: str,
+    *,
+    origin: str | None = None,
+    local_header: bool = False,
+) -> tuple[int, dict]:
+    import urllib.error
+    import urllib.request
+
+    headers: dict[str, str] = {}
+    if origin is not None:
+        headers["Origin"] = origin
+    if local_header:
         headers[server._BAKLOG_LOCAL_HEADER] = "1"
-    req = urllib.request.Request(f"{base}{path}", method=method, headers=headers)
+    req = urllib.request.Request(
+        f"{base}{path}",
+        method="POST",
+        headers=headers,
+        data=b"",
+    )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status, json.loads(resp.read().decode("utf-8"))
@@ -79,24 +80,18 @@ def _request(base: str, method: str, path: str) -> tuple[int, dict]:
         return exc.code, parsed
 
 
-def test_runs_cancel_all(run_api_server: str):
-    base = run_api_server
-    _request(base, "POST", "/api/run/demo")
-    status, data = _request(base, "POST", "/api/runs/cancel")
-    assert status == 200
-    assert isinstance(data.get("cancelled"), list)
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        _, snap = _request(base, "GET", "/api/runs")
-        if snap["active"] is None and snap["queue"] == []:
-            break
-        time.sleep(0.05)
-    else:
-        pytest.fail("runs not cleared after cancel")
+def test_cross_origin_post_blocked(csrf_server: str) -> None:
+    status, body = _post(csrf_server, "/api/runs/cancel", origin="https://evil.example")
+    assert status == 403
+    assert "cross-origin" in body.get("error", "").lower()
 
 
-def test_runs_snapshot_shape(run_api_server: str):
-    base = run_api_server
-    status, snap = _request(base, "GET", "/api/runs")
+def test_local_header_post_allowed(csrf_server: str) -> None:
+    status, _body = _post(csrf_server, "/api/runs/cancel", local_header=True)
     assert status == 200
-    assert "active" in snap and "queue" in snap and "history" in snap
+
+
+def test_local_origin_post_allowed(csrf_server: str) -> None:
+    base = csrf_server
+    status, _body = _post(base, "/api/runs/cancel", origin=base)
+    assert status == 200

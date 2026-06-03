@@ -7,7 +7,8 @@
   "scripts": {
     "test": "vitest run",
     "test:js": "vitest run",
-    "test:js:watch": "vitest"
+    "test:js:watch": "vitest",
+    "test:all": "python -m pytest -q && npm test"
   },
   "devDependencies": {
     "axe-core": "^4.12.0",

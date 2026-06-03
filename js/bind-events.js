@@ -717,10 +717,19 @@ export function bindEvents() {
   document.getElementById("importNotes").addEventListener("change", async e => {
     const file = e.target.files[0];
     if (!file) return;
-    mergeImportedPersonal(JSON.parse(await file.text()));
-    renderSummary();
-    renderPicks();
-    renderTable();
+    try {
+      mergeImportedPersonal(JSON.parse(await file.text()));
+      renderSummary();
+      renderPicks();
+      renderTable();
+    } catch (err) {
+      console.warn('[importNotes] invalid JSON', err);
+      const banner = document.getElementById('bootErrorBanner');
+      if (banner) {
+        banner.textContent = 'Notes import failed — file is not valid JSON.';
+        banner.classList.remove('hidden');
+      }
+    }
     e.target.value = "";
   });
 }

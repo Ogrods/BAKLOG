@@ -90,7 +90,12 @@ def test_amazon_fetcher_allowed_off_windows(auth_server: str):
     """POST /api/run/amazon is allowed on non-Windows (Prime Gaming web source)."""
     if sys.platform == "win32":
         pytest.skip("covered by launcher path on Windows")
-    req = urllib.request.Request(f"{auth_server}/api/run/amazon", data=b"", method="POST")
+    req = urllib.request.Request(
+        f"{auth_server}/api/run/amazon",
+        data=b"",
+        method="POST",
+        headers={server._BAKLOG_LOCAL_HEADER: "1"},
+    )
     with urllib.request.urlopen(req, timeout=5) as resp:
         status = resp.status
     assert status in (200, 202, 204)

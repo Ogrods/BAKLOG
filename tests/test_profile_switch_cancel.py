@@ -62,7 +62,10 @@ def _post_json(base: str, path: str, body: dict) -> tuple[int, dict]:
     req = urllib.request.Request(
         f"{base}{path}",
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=10) as resp:

@@ -1,3 +1,4 @@
+import { baklogFetch } from './api-client.js';
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
 import { activeProfileId, prefsStorageKey, profileScopedStorageKey } from './profiles.js';
 
@@ -147,7 +148,7 @@ export const personalStore = (() => {
   async function putPayload(payload) {
     inFlight = (async () => {
       try {
-        const res = await fetch('/api/personal', {
+        const res = await baklogFetch('/api/personal', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

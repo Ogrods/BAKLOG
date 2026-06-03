@@ -89,6 +89,7 @@ configureFetcherHealth({ reloadGames, reloadAfterFetcher });
 registerBugBundleContext({
   getFingerprint: tableFingerprint,
   getActiveFilterCount: () => collectActiveFilters().length,
+  getActiveView: () => state.activeView,
 });
 
 function hydrateState() {

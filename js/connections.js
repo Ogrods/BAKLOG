@@ -1,3 +1,4 @@
+import { baklogFetch } from './api-client.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
@@ -704,7 +705,7 @@ function handleLayoutClick(ev) {
 
   if (disconnectBtn && provider) {
 
-    disconnectProvider(provider);
+    runConnAction(provider, () => disconnectProvider(provider));
 
     return;
 
@@ -740,7 +741,7 @@ function handleLayoutClick(ev) {
 
   if (enableLocalBtn?.dataset.provider) {
 
-    enableLocalProvider(enableLocalBtn.dataset.provider);
+    runConnAction(enableLocalBtn.dataset.provider, () => enableLocalProvider(enableLocalBtn.dataset.provider));
 
     return;
 
@@ -752,7 +753,7 @@ function handleLayoutClick(ev) {
 
   if (primaryBtn?.dataset.provider) {
 
-    startBrowserConnect(primaryBtn.dataset.provider);
+    runConnAction(primaryBtn.dataset.provider, () => startBrowserConnect(primaryBtn.dataset.provider));
 
     return;
 
@@ -979,19 +980,39 @@ function wireMasterPasswordSave() {
 
     const pw = document.getElementById('masterPasswordInput')?.value || '';
 
-    await fetch('/api/auth/master-password', {
+    try {
 
-      method: 'POST',
+      const res = await baklogFetch('/api/auth/master-password', {
 
-      headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
 
-      body: JSON.stringify({ password: pw || null }),
+        headers: { 'Content-Type': 'application/json' },
 
-    });
+        body: JSON.stringify({ password: pw || null }),
 
-    const hint = document.getElementById('masterPasswordHint');
+      });
 
-    if (hint) hint.textContent = pw ? 'Master password set (portable encryption).' : 'Using OS keychain.';
+      const hint = document.getElementById('masterPasswordHint');
+
+      if (!res.ok) {
+
+        const data = await res.json().catch(() => ({}));
+
+        if (hint) hint.textContent = data.error || `Save failed (${res.status})`;
+
+        return;
+
+      }
+
+      if (hint) hint.textContent = pw ? 'Master password set (portable encryption).' : 'Using OS keychain.';
+
+    } catch (_) {
+
+      const hint = document.getElementById('masterPasswordHint');
+
+      if (hint) hint.textContent = 'Could not reach the local server.';
+
+    }
 
   });
 
@@ -1082,7 +1103,7 @@ async function exportSecretsBundle() {
   if (!passphrase) return;
   setSecretsBundleHint('Exporting bundle…');
   try {
-    const resp = await fetch('/api/auth/secrets/export', {
+    const resp = await baklogFetch('/api/auth/secrets/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ passphrase, include_profiles: true }),
@@ -1123,10 +1144,17 @@ async function importSecretsBundle(file) {
   setSecretsBundleHint('Importing bundle…');
   try {
     const buf = await file.arrayBuffer();
-    const resp = await fetch(`/api/auth/secrets/import?passphrase=${encodeURIComponent(passphrase)}`, {
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const blobB64 = btoa(binary);
+    const resp = await baklogFetch('/api/auth/secrets/import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: buf,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase, blob: blobB64 }),
     });
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok) {
@@ -1395,7 +1423,7 @@ async function saveFormCredentials(provider) {
 
   }
 
-  const res = await fetch(`/api/auth/${provider}/credentials`, {
+  const res = await baklogFetch(`/api/auth/${provider}/credentials`, {
 
     method: 'PUT',
 
@@ -1423,9 +1451,77 @@ async function saveFormCredentials(provider) {
 
 
 
+function connLogError(provider, message) {
+
+  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
+
+  const log = card?.querySelector('.conn-log');
+
+  if (log) {
+
+    log.classList.remove('hidden');
+
+    log.textContent = message;
+
+  }
+
+}
+
+
+
+function runConnAction(provider, fn) {
+
+  void fn().catch(err => {
+
+    connLogError(provider, err?.message || 'Action failed');
+
+  });
+
+}
+
+
+
 async function disconnectProvider(provider) {
 
-  await fetch(`/api/auth/${provider}/disconnect`, { method: 'POST' });
+  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
+
+  const log = card?.querySelector('.conn-log');
+
+  let res;
+
+  try {
+
+    res = await baklogFetch(`/api/auth/${provider}/disconnect`, { method: 'POST' });
+
+  } catch (_) {
+
+    if (log) {
+
+      log.classList.remove('hidden');
+
+      log.textContent = 'Could not reach the local server (is server.py running?).';
+
+    }
+
+    return;
+
+  }
+
+  if (!res.ok) {
+
+    const data = await res.json().catch(() => ({}));
+
+    if (log) {
+
+      log.classList.remove('hidden');
+
+      log.textContent = data.error || `Disconnect failed (${res.status})`;
+
+    }
+
+    return;
+
+  }
 
   reconnectProviders.delete(provider);
 
@@ -1458,7 +1554,7 @@ async function enableLocalProvider(provider) {
 
   try {
 
-    res = await fetch(`/api/auth/${provider}/enable`, { method: 'POST' });
+    res = await baklogFetch(`/api/auth/${provider}/enable`, { method: 'POST' });
 
   } catch (_) {
 
@@ -1502,7 +1598,19 @@ async function startBrowserConnect(provider) {
 
   }
 
-  const res = await fetch(`/api/auth/${provider}/start`, { method: 'POST' });
+  let res;
+
+  try {
+
+    res = await baklogFetch(`/api/auth/${provider}/start`, { method: 'POST' });
+
+  } catch (_) {
+
+    if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
+
+    return;
+
+  }
 
   const data = await res.json().catch(() => ({}));
 

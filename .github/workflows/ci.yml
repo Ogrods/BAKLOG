@@ -45,6 +45,29 @@ jobs:
       - name: Run pytest
         run: pytest -q
 
+  python-macos:
+    name: Python (macOS smoke)
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # Catches cross-platform regressions (imports, paths, Amazon guards) on a
+      # non-Windows OS. Amazon integration tests are skipped off Windows.
+      - name: Run pytest
+        run: pytest -q
+
   javascript:
     name: JavaScript (vitest)
     runs-on: ubuntu-latest

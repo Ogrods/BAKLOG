@@ -83,6 +83,8 @@ _IN_FLIGHT_STATUSES = frozenset({"queued", "launching", "running", "cancelling"}
 _sse_connections = 0
 _sse_lock = threading.Lock()
 
+from shared.platform_support import platform_supported  # noqa: E402
+
 # Personal-data persistence.
 # This file is the source of truth for the user's edits. localStorage in the
 # browser is treated as a hydration cache that is overwritten from this file
@@ -246,6 +248,9 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
         refresh_args = entry.get("refreshArgs") or []
         if not isinstance(refresh_args, list):
             refresh_args = []
+        platforms = entry.get("platforms") or []
+        if not isinstance(platforms, list):
+            platforms = []
         fetchers[key] = {
             "label": label,
             "argv": _argv(script, *map(str, extra_args)),
@@ -254,6 +259,7 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
             "group": entry.get("group", "library"),
             "color": entry.get("color"),
             "requires": requires,
+            "platforms": [str(p) for p in platforms],
         }
     return fetchers
 
@@ -1074,6 +1080,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ImportError:
             pass
         data = {
+            "server_platform": sys.platform,
             "fetchers": [
                 {
                     "key": k,
@@ -1085,6 +1092,8 @@ class Handler(SimpleHTTPRequestHandler):
                     "requires": v.get("requires") or [],
                     "missing_requirements": _missing_requirements(v.get("requires") or []),
                     "supports_refresh": bool(v.get("refreshArgs")),
+                    "platforms": v.get("platforms") or [],
+                    "available": platform_supported(v.get("platforms")),
                 }
                 for k, v in FETCHERS.items()
             ]
@@ -1146,6 +1155,14 @@ class Handler(SimpleHTTPRequestHandler):
         if key not in FETCHERS:
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown fetcher: {key}"})
             return
+        fetcher_platforms = FETCHERS[key].get("platforms")
+        if not platform_supported(fetcher_platforms):
+            allowed = ", ".join(fetcher_platforms or [])
+            _send_json(self, HTTPStatus.BAD_REQUEST, {
+                "error": f"{FETCHERS[key]['label']} is only available on {allowed} "
+                         f"(this server runs on {sys.platform})."
+            })
+            return
         if refresh and not FETCHERS[key].get("refreshArgs"):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"{key} does not support refresh"})
             return
@@ -1181,7 +1198,11 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             from auth.manager import get_status
 
-            _send_json(self, HTTPStatus.OK, {"providers": get_status()})
+            _send_json(
+                self,
+                HTTPStatus.OK,
+                {"server_platform": sys.platform, "providers": get_status()},
+            )
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 

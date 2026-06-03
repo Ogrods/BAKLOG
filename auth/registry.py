@@ -31,6 +31,9 @@ class ProviderSpec:
     # Short, additive "good to know" bullets shown on the Connections card.
     # Keep each line scannable; deep step-by-step instructions live elsewhere.
     tips: tuple[str, ...] = ()
+    # OS restriction for this provider. Empty = all platforms (the common case).
+    # Amazon Games reads a Windows-only launcher DB, so it sets ("win32",).
+    platforms: tuple[str, ...] = ()
 
 
 PROVIDERS: dict[str, ProviderSpec] = {
@@ -133,10 +136,12 @@ PROVIDERS: dict[str, ProviderSpec] = {
         description="Your Prime Gaming library, read from the Amazon Games launcher on this PC.",
         env_keys=("AMAZON_GAMES_SQL_DIR",),
         fetcher_keys=("amazon",),
+        platforms=("win32",),
         tips=(
             "No sign-in window \u2014 we read the Amazon Games launcher's local database on this PC.",
             "Just install the Amazon Games launcher and sign in there once; keep it installed.",
             "Nothing leaves your machine for this source; it's a local file read only.",
+            "Windows only \u2014 the launcher database uses Windows DPAPI, so this source is unavailable on macOS/Linux.",
         ),
     ),
     "xbox": ProviderSpec(

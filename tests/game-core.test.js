@@ -173,6 +173,57 @@ describe('gameKey', () => {
   });
 });
 
+describe('recomputeCrossStoreHidden — hidden keys', () => {
+  let savedAllGames;
+  let savedHidden;
+  let savedDedup;
+
+  beforeEach(() => {
+    savedAllGames = state.allGames;
+    savedHidden = state.crossStoreHiddenKeys;
+    savedDedup = state.sessionPrefs.crossStoreDedup;
+    state.sessionPrefs.crossStoreDedup = true;
+  });
+
+  afterEach(() => {
+    state.allGames = savedAllGames;
+    state.crossStoreHiddenKeys = savedHidden;
+    state.sessionPrefs.crossStoreDedup = savedDedup;
+  });
+
+  it('hides lower-priority store copies; steam wins over psn and gog', () => {
+    state.allGames = [
+      { store: 'psn', id: 'NPWR1', name: 'Death Stranding' },
+      { store: 'steam', id: 1, appid: 1, name: 'Death Stranding' },
+      { store: 'gog', id: 'gog-1', name: 'Death Stranding' },
+    ];
+    recomputeCrossStoreHidden();
+    expect(state.crossStoreHiddenKeys.has('steam:1')).toBe(false);
+    expect(state.crossStoreHiddenKeys.has('psn:NPWR1')).toBe(true);
+    expect(state.crossStoreHiddenKeys.has('gog:gog-1')).toBe(true);
+  });
+
+  it('keeps the higher scoreEntry sibling when store priority ties', () => {
+    state.allGames = [
+      { store: 'gog', id: 'a', name: 'Indie Title', release_date: '2020-01-01' },
+      { store: 'gog', id: 'b', name: 'Indie Title', header_image: 'https://x' },
+    ];
+    recomputeCrossStoreHidden();
+    expect(state.crossStoreHiddenKeys.has('gog:b')).toBe(false);
+    expect(state.crossStoreHiddenKeys.has('gog:a')).toBe(true);
+  });
+
+  it('does not hide siblings when crossStoreDedup is off', () => {
+    state.sessionPrefs.crossStoreDedup = false;
+    state.allGames = [
+      { store: 'steam', id: 1, appid: 1, name: 'Doom' },
+      { store: 'psn', id: 'NPWR9', name: 'Doom' },
+    ];
+    recomputeCrossStoreHidden();
+    expect(state.crossStoreHiddenKeys.size).toBe(0);
+  });
+});
+
 describe('combinedPlaytime (cross-store)', () => {
   let savedAllGames;
   let savedHidden;

@@ -69,7 +69,7 @@ export function setDashReplayAllowed(allowed) {
   _dashReplayAllowed = !!allowed;
 }
 
-function dashboardFingerprint() {
+export function dashboardFingerprint() {
   return JSON.stringify({
     dv: window._dataVersion || 0,
     itch: (state.itchGames || []).length > 0,

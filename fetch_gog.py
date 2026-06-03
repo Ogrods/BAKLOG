@@ -3,18 +3,21 @@
 
 import argparse
 import json
+import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import os
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from auth.manager import is_local_provider_disabled, mark_connected
 from fetchers._authoritative import GOG
 from fetchers._base import (
     add_allow_empty_arg,
+    carry_enrichment,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
@@ -23,10 +26,12 @@ from fetchers._base import (
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from gog_client import GogAuthError, GogClient
+from gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
 from hltb_client import HltbClient
 
 GAMES_GOG_JSON = Path("games_gog.json")
 HLTB_DELAY_SEC = 1.0
+LEGACY_ROW_SOURCE = "web"
 
 
 def _configure_stdout() -> None:
@@ -122,6 +127,8 @@ def _build_game_row(
         or (details or {}).get("title")
         or f"GOG {gog_id}"
     )
+    if should_skip_gog_title(name):
+        return None
     image = (
         product.get("image")
         or product.get("img")
@@ -189,6 +196,188 @@ def _build_game_row(
     return row
 
 
+def _effective_row_source(row: dict) -> str:
+    s = row.get("source")
+    if s in ("local", "web"):
+        return str(s)
+    return LEGACY_ROW_SOURCE
+
+
+def _normalize_name(name: str) -> str:
+    return re.sub(r"\s+", " ", (name or "").strip().lower())
+
+
+def _match_key(row: dict) -> str:
+    gid = row.get("gog_id") or row.get("id")
+    if gid is not None:
+        return f"gog_id:{gid}"
+    name = _normalize_name(str(row.get("name") or ""))
+    if name:
+        return f"name:{name}"
+    return f"id:{row.get('id')}"
+
+
+def _source_priority(source: str) -> int:
+    return 2 if source == "local" else 1
+
+
+def _pick_winner(row_a: dict, row_b: dict, current_source: str) -> dict:
+    sa = _effective_row_source(row_a)
+    sb = _effective_row_source(row_b)
+    pa, pb = _source_priority(sa), _source_priority(sb)
+    if pa > pb:
+        return carry_enrichment(row_a, row_b)
+    if pb > pa:
+        return carry_enrichment(row_b, row_a)
+    if sa == current_source:
+        return carry_enrichment(row_a, row_b)
+    return carry_enrichment(row_b, row_a)
+
+
+def merge_gog_sources(
+    current_rows: list[dict],
+    carried_rows: list[dict],
+    current_source: str,
+) -> list[dict]:
+    by_key: dict[str, dict] = {}
+    order: list[str] = []
+    for row in carried_rows + current_rows:
+        key = _match_key(row)
+        if key in by_key:
+            by_key[key] = _pick_winner(by_key[key], row, current_source)
+        else:
+            by_key[key] = row
+            order.append(key)
+    return [by_key[k] for k in order]
+
+
+def _count_rows_for_source(games: list[dict], source: str) -> int:
+    return sum(1 for g in games if _effective_row_source(g) == source)
+
+
+def refuse_gog_source_drift(
+    new_same_source_count: int,
+    *,
+    source: str,
+    allow_drift: bool,
+    output_path: Path,
+    threshold: float = 0.5,
+) -> int | None:
+    if allow_drift:
+        return None
+    path = catalog_file(output_path)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    games = data.get("games")
+    if not isinstance(games, list):
+        return None
+    prev = _count_rows_for_source(games, source)
+    if prev <= 0:
+        return None
+    floor = max(1, int(prev * threshold))
+    if new_same_source_count >= floor:
+        return None
+    pct = (new_same_source_count / prev * 100) if prev else 0.0
+    print(
+        f"ERROR: GOG {source} slice drift refused — new={new_same_source_count}, "
+        f"previous={prev}, floor={floor} (≥{int(threshold * 100)}% of prior), "
+        f"ratio≈{pct:.0f}%.\n"
+        "Reason: same-source row count fell below the drift guard (broken auth/API, "
+        "or a legitimate library shrink from filtering). Re-run with --allow-drift "
+        "if the drop is expected.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 3
+
+
+def _galaxy_db_ready(db_path: Path | None) -> bool:
+    if is_local_provider_disabled("gog_galaxy"):
+        return False
+    from gog_galaxy_client import default_galaxy_db
+
+    path = db_path if db_path is not None else default_galaxy_db()
+    return path.is_file()
+
+
+def _web_creds_ready() -> bool:
+    return bool(resolve_env("GOG_AL", provider="gog"))
+
+
+def resolve_source(requested: str, db_path: Path | None) -> str:
+    src = (requested or "auto").strip().lower()
+    if src not in ("auto", "web", "local"):
+        raise ValueError(f"unknown --source {requested!r}")
+    if src != "auto":
+        return src
+    if _galaxy_db_ready(db_path):
+        return "local"
+    if _web_creds_ready():
+        return "web"
+    raise RuntimeError(
+        "GOG Galaxy database not found and no GOG web session saved.\n"
+        "Install/sign in to GOG Galaxy on this PC, or connect GOG on the Connections page."
+    )
+
+
+def _build_game_row_from_local(rec: dict, hltb: dict | None, source: str) -> dict:
+    gog_id = int(rec["gog_id"])
+    header_url, library_url = _gog_image_urls(
+        rec.get("raw_image") or rec.get("header_image")
+    )
+    row = {
+        "store": "gog",
+        "id": gog_id,
+        "gog_id": gog_id,
+        "name": rec["name"],
+        "source": source,
+        "playtime_minutes": 0,
+        "last_played": rec.get("last_played"),
+        "header_image": header_url,
+        "library_image": library_url,
+        "release_date": rec.get("release_date"),
+        "genres": rec.get("genres") or [],
+        "tags": [],
+        "steam_review_percent": None,
+        "steam_review_count": None,
+        "steam_review_desc": None,
+        "hltb_main_hours": None,
+        "hltb_main_extra_hours": None,
+        "hltb_completionist_hours": None,
+        "hltb_match_confidence": None,
+        "hltb_name": None,
+        "store_url": rec.get("store_url") or f"https://www.gog.com/en/game/{gog_id}",
+        "type": "game",
+        "price": None,
+        "price_initial": None,
+        "discount_percent": None,
+        "currency": None,
+    }
+    if hltb:
+        row.update(
+            {
+                "hltb_main_hours": hltb.get("hltb_main_hours"),
+                "hltb_main_extra_hours": hltb.get("hltb_main_extra_hours"),
+                "hltb_completionist_hours": hltb.get("hltb_completionist_hours"),
+                "hltb_match_confidence": hltb.get("hltb_match_confidence"),
+                "hltb_name": hltb.get("hltb_name"),
+            }
+        )
+    return row
+
+
+def _load_local_records(db_path: Path | None) -> list[dict]:
+    from gog_galaxy_client import GogGalaxyClient
+
+    client = GogGalaxyClient(db_path)
+    print(f"Reading GOG library from Galaxy database:\n  {client.db_path}", flush=True)
+    return client.get_library_records()
+
+
 def load_existing() -> dict[int, dict]:
     if not catalog_file(GAMES_GOG_JSON).exists():
         return {}
@@ -196,9 +385,29 @@ def load_existing() -> dict[int, dict]:
     return {g["id"]: g for g in data.get("games", [])}
 
 
+def _tag_web_row(row: dict) -> dict:
+    row = dict(row)
+    row["source"] = "web"
+    return row
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Fetch GOG library into games_gog.json")
-    parser.add_argument("--refresh", action="store_true", help="Ignore API cache")
+    parser = argparse.ArgumentParser(
+        description="Fetch GOG library (Galaxy local DB or web cookie)"
+    )
+    parser.add_argument(
+        "--source",
+        choices=("auto", "web", "local"),
+        default=os.getenv("GOG_SOURCE", "auto").strip().lower() or "auto",
+        help="auto: Galaxy DB when present, else web cookie (default: auto)",
+    )
+    parser.add_argument(
+        "--db-path",
+        type=Path,
+        default=None,
+        help="Override GOG Galaxy galaxy-2.0.db path (local source only)",
+    )
+    parser.add_argument("--refresh", action="store_true", help="Ignore API cache (web)")
     parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games_gog.json")
     parser.add_argument("--id", type=int, dest="gog_id", help="Fetch a single product by GOG ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
@@ -207,121 +416,248 @@ def main() -> int:
     _configure_stdout()
     t0 = started("fetch_gog")
     stats = RunStats()
-
     load_dotenv()
-    gog_al = resolve_env("GOG_AL", provider="gog")
-    if not gog_al:
-        stats.error("Set GOG_AL in .env (see README for cookie instructions).")
-        return stats.finish("fetch_gog", t0, exit_code=1)
+
+    db_path = args.db_path
+    if db_path is None:
+        env_db = os.getenv("GOG_GALAXY_DB", "").strip()
+        db_path = Path(env_db) if env_db else None
+    if db_path is not None and not db_path.is_file():
+        db_path = None  # ignore stale sentinel / bad override; use default Galaxy path
 
     try:
-        gog = GogClient(gog_al)
-        gog.validate_session()
-    except GogAuthError as e:
-        mark_invalid("gog", error=str(e))
+        source = resolve_source(args.source, db_path)
+    except (RuntimeError, ValueError) as e:
         stats.error(str(e))
-        return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+        return stats.finish("fetch_gog", t0, exit_code=1)
+
+    print(f"GOG source: {source}", flush=True)
 
     hltb_client = HltbClient()
     existing = load_existing()
+    carried_rows = [
+        row
+        for row in existing.values()
+        if _effective_row_source(row) != source
+    ]
+    if carried_rows:
+        print(
+            f"Keeping {len(carried_rows)} row(s) from the other GOG source.",
+            flush=True,
+        )
 
-    print("Fetching owned games from GOG...")
-    try:
-        products = gog.get_all_filtered_products(refresh=args.refresh)
-    except GogAuthError as e:
-        mark_invalid("gog", error=str(e))
-        stats.error(str(e))
-        return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+    current_rows: list[dict] = []
 
-    if not products:
-        owned_ids = gog.get_owned_game_ids()
-        print(f"Found {len(owned_ids)} owned IDs (building from details)...", flush=True)
-        products = [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
+    if source == "local":
+        try:
+            from gog_galaxy_client import GogGalaxyError
+
+            records = _load_local_records(db_path)
+        except ImportError as e:
+            stats.error(str(e))
+            return stats.finish("fetch_gog", t0, exit_code=1)
+        except GogGalaxyError as e:
+            stats.error(str(e))
+            return stats.finish("fetch_gog", t0, exit_code=1)
+
+        empty_exit = refuse_empty_result(
+            records,
+            label="GOG Galaxy library",
+            allow_empty=args.allow_empty,
+            output_path=GAMES_GOG_JSON,
+        )
+        if empty_exit is not None:
+            return stats.finish("fetch_gog", t0, exit_code=empty_exit)
+
+        print(f"Found {len(records)} GOG titles in Galaxy.", flush=True)
+
+        if args.gog_id:
+            records = [r for r in records if r["gog_id"] == args.gog_id]
+
+        for i, rec in enumerate(records, 1):
+            gog_id = rec["gog_id"]
+            name = rec["name"]
+            print(f"[{i}/{len(records)}] {name} ({gog_id})", flush=True)
+
+            cached = existing.get(gog_id)
+            if cached is not None and _effective_row_source(cached) != source:
+                cached = None
+
+            hltb = None
+            hltb_updated = False
+            if not args.skip_hltb and not (
+                args.only_new and cached and cached.get("hltb_main_hours") is not None
+            ):
+                try:
+                    time.sleep(HLTB_DELAY_SEC)
+                    hltb = hltb_client.lookup(name)
+                    hltb_updated = bool(hltb)
+                except Exception as e:
+                    print(f"  HLTB warning: {e}", flush=True)
+            elif cached:
+                hltb = {
+                    "hltb_main_hours": cached.get("hltb_main_hours"),
+                    "hltb_main_extra_hours": cached.get("hltb_main_extra_hours"),
+                    "hltb_completionist_hours": cached.get("hltb_completionist_hours"),
+                    "hltb_match_confidence": cached.get("hltb_match_confidence"),
+                    "hltb_name": cached.get("hltb_name"),
+                }
+
+            current_rows.append(
+                merge_cached_row(
+                    _build_game_row_from_local(rec, hltb, source),
+                    cached,
+                    authoritative=GOG,
+                    hltb_updated=hltb_updated,
+                )
+            )
     else:
-        print(f"Found {len(products)} products in library.", flush=True)
+        gog_al = resolve_env("GOG_AL", provider="gog")
+        if not gog_al:
+            stats.error("Set GOG_AL in .env or connect GOG on the Connections page.")
+            return stats.finish("fetch_gog", t0, exit_code=1)
 
-    empty_exit = refuse_empty_result(
-        products,
-        label="GOG library",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_GOG_JSON,
-    )
-    if empty_exit is not None:
-        return stats.finish("fetch_gog", t0, exit_code=empty_exit)
-    drift_exit = refuse_drift_result(
-        products,
-        label="GOG library",
+        try:
+            gog = GogClient(gog_al)
+            gog.validate_session()
+        except GogAuthError as e:
+            mark_invalid("gog", error=str(e))
+            stats.error(str(e))
+            return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+
+        print("Fetching owned games from GOG (web)...", flush=True)
+        try:
+            products = gog.get_all_filtered_products(refresh=args.refresh)
+        except GogAuthError as e:
+            mark_invalid("gog", error=str(e))
+            stats.error(str(e))
+            return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+
+        if not products:
+            owned_ids = gog.get_owned_game_ids()
+            print(f"Found {len(owned_ids)} owned IDs (building from details)...", flush=True)
+            products = [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
+        else:
+            print(f"Found {len(products)} products in library.", flush=True)
+
+        empty_exit = refuse_empty_result(
+            products,
+            label="GOG library",
+            allow_empty=args.allow_empty,
+            output_path=GAMES_GOG_JSON,
+        )
+        if empty_exit is not None:
+            return stats.finish("fetch_gog", t0, exit_code=empty_exit)
+
+        if args.gog_id:
+            products = [
+                p
+                for p in products
+                if int(p.get("id") or p.get("productId") or 0) == args.gog_id
+            ]
+            if not products:
+                products = [{"id": args.gog_id, "title": f"GOG {args.gog_id}"}]
+
+        skipped = 0
+        for i, product in enumerate(products, 1):
+            gog_id = int(product.get("id") or product.get("productId") or 0)
+            name = product.get("title") or product.get("name") or str(gog_id)
+
+            if args.only_new and gog_id in existing and not args.refresh and not args.gog_id:
+                row = existing[gog_id]
+                if _effective_row_source(row) == source:
+                    current_rows.append(row)
+                continue
+
+            print(f"[{i}/{len(products)}] {name} ({gog_id})", flush=True)
+
+            cached_row = existing.get(gog_id)
+            if cached_row is not None and _effective_row_source(cached_row) != source:
+                cached_row = None
+
+            need_details = args.refresh or cached_row is None or args.gog_id
+            details = None
+            if need_details:
+                try:
+                    details = gog.get_product_details(gog_id, refresh=args.refresh)
+                except Exception as e:
+                    print(f"  Details warning: {e}", flush=True)
+
+            hltb = None
+            hltb_updated = False
+            if not args.skip_hltb and (
+                args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None
+            ):
+                try:
+                    time.sleep(HLTB_DELAY_SEC)
+                    hltb = hltb_client.lookup(name)
+                    hltb_updated = bool(hltb)
+                except Exception as e:
+                    print(f"  HLTB warning: {e}", flush=True)
+            elif cached_row:
+                hltb = {
+                    "hltb_main_hours": cached_row.get("hltb_main_hours"),
+                    "hltb_main_extra_hours": cached_row.get("hltb_main_extra_hours"),
+                    "hltb_completionist_hours": cached_row.get("hltb_completionist_hours"),
+                    "hltb_match_confidence": cached_row.get("hltb_match_confidence"),
+                    "hltb_name": cached_row.get("hltb_name"),
+                }
+
+            row = _build_game_row(product, details, hltb)
+            if row is None:
+                skipped += 1
+                continue
+            current_rows.append(
+                merge_cached_row(
+                    _tag_web_row(row),
+                    cached_row,
+                    authoritative=GOG,
+                    hltb_updated=hltb_updated,
+                )
+            )
+        if skipped:
+            print(f"Skipped {skipped} non-game items.", flush=True)
+
+        before = len(current_rows)
+        current_rows = apply_gog_name_filters(current_rows)
+        collapsed = before - len(current_rows)
+        if collapsed:
+            print(
+                f"Collapsed {collapsed} promo/pack duplicate(s) on web slice.",
+                flush=True,
+            )
+
+    drift_exit = refuse_gog_source_drift(
+        len(current_rows),
+        source=source,
         allow_drift=args.allow_drift,
         output_path=GAMES_GOG_JSON,
     )
     if drift_exit is not None:
         return stats.finish("fetch_gog", t0, exit_code=drift_exit)
 
-    if args.gog_id:
-        products = [p for p in products if int(p.get("id") or p.get("productId") or 0) == args.gog_id]
-        if not products:
-            products = [{"id": args.gog_id, "title": f"GOG {args.gog_id}"}]
-
-    games_out: list[dict] = []
-    skipped = 0
-
-    for i, product in enumerate(products, 1):
-        gog_id = int(product.get("id") or product.get("productId") or 0)
-        name = product.get("title") or product.get("name") or str(gog_id)
-
-        if args.only_new and gog_id in existing and not args.refresh and not args.gog_id:
-            games_out.append(existing[gog_id])
-            continue
-
-        print(f"[{i}/{len(products)}] {name} ({gog_id})")
-
-        cached_row = existing.get(gog_id)
-        need_details = args.refresh or cached_row is None or args.gog_id
-
-        details = None
-        if need_details:
-            try:
-                details = gog.get_product_details(gog_id, refresh=args.refresh)
-            except Exception as e:
-                print(f"  Details warning: {e}")
-
-        hltb = None
-        hltb_updated = False
-        if not args.skip_hltb and (
-            args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None
-        ):
-            try:
-                time.sleep(HLTB_DELAY_SEC)
-                hltb = hltb_client.lookup(name)
-                hltb_updated = bool(hltb)
-            except Exception as e:
-                print(f"  HLTB warning: {e}")
-        elif cached_row:
-            hltb = {
-                "hltb_main_hours": cached_row.get("hltb_main_hours"),
-                "hltb_main_extra_hours": cached_row.get("hltb_main_extra_hours"),
-                "hltb_completionist_hours": cached_row.get("hltb_completionist_hours"),
-                "hltb_match_confidence": cached_row.get("hltb_match_confidence"),
-                "hltb_name": cached_row.get("hltb_name"),
-            }
-
-        row = _build_game_row(product, details, hltb)
-        if row is None:
-            skipped += 1
-            continue
-        games_out.append(
-            merge_cached_row(row, cached_row, authoritative=GOG, hltb_updated=hltb_updated)
+    games_out = merge_gog_sources(current_rows, carried_rows, source)
+    before_merge = len(games_out)
+    games_out = filter_gog_game_rows(games_out)
+    if len(games_out) < before_merge:
+        print(
+            f"Post-merge: dropped {before_merge - len(games_out)} pack/promo "
+            "duplicate(s) across mixed gog_id sources.",
+            flush=True,
         )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "store": "gog",
+        "source": source,
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
 
     write_catalog_text(GAMES_GOG_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
-    print(f"\nWrote {len(games_out)} games to {GAMES_GOG_JSON} (skipped {skipped} non-game items).", flush=True)
+    if source == "local":
+        mark_connected("gog_galaxy", {})
+    print(f"\nWrote {len(games_out)} games to {GAMES_GOG_JSON}.", flush=True)
     print("Open index.html in your browser to view the dashboard.", flush=True)
     stats.ok = len(games_out)
     return stats.finish("fetch_gog", t0, exit_code=0, extra=f"{len(games_out)} games")

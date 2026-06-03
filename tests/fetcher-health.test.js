@@ -22,6 +22,9 @@ import {
   stopFastAgeTick,
   isFastAgeTickActive,
   isFetcherDisconnected,
+  isFetcherReconnectRequired,
+  reconnectProviderForFetcher,
+  fetcherCredentialsSatisfied,
   connectProviderForFetcher,
   fetcherRunner,
 } from '../js/fetcher-health.js';
@@ -91,6 +94,28 @@ describe('isFetcherDisconnected', () => {
     connMock.statuses.amazon_web = 'disconnected';
     expect(connectProviderForFetcher('amazon')).toBe('amazon_web');
   });
+
+  it('gog not disconnected when gog_galaxy is connected', () => {
+    connMock.statuses.gog = 'disconnected';
+    connMock.statuses.gog_galaxy = 'connected';
+    expect(isFetcherDisconnected('gog')).toBe(false);
+    expect(fetcherCredentialsSatisfied('gog')).toBe(true);
+  });
+
+  it('gog reconnect suppressed when gog_galaxy is connected', () => {
+    connMock.statuses.gog = 'expired';
+    connMock.statuses.gog_galaxy = 'connected';
+    markReconnectRequired('gog');
+    expect(isFetcherReconnectRequired('gog')).toBe(false);
+    expect(reconnectProviderForFetcher('gog')).toBe(null);
+  });
+
+  it('itch not disconnected when itch_local is connected', () => {
+    connMock.statuses.itch = 'disconnected';
+    connMock.statuses.itch_local = 'connected';
+    expect(isFetcherDisconnected('itch')).toBe(false);
+    expect(fetcherCredentialsSatisfied('itch')).toBe(true);
+  });
 });
 
 describe('humanizeAge', () => {
@@ -154,6 +179,7 @@ describe('diffItadDeals', () => {
 
 describe('maybeAutoRefreshItad', () => {
   beforeEach(() => {
+    connMock.statuses = {};
     state.prefs = {};
     state.libraryMeta = {
       itad: {
@@ -277,6 +303,7 @@ describe('fetcherRunner.run disconnected wall', () => {
     }));
     await fetcherRunner.probeApi(true);
     await fetcherRunner.run('gog');
+    fetcherRunner.flushLinesNow();
     expect(runPosted).toBe(false);
     expect(showReconnectBanner).toHaveBeenCalledWith(['gog']);
     const log = document.querySelector('.fh-log-line');
@@ -496,6 +523,45 @@ describe('reconnect-required state', () => {
     clearReconnectRequired('gog');
     markReconnectRequired('gog');
     expect(isProviderReconnectRequired('gog')).toBe(true);
+  });
+});
+
+describe('syncLogPanelChrome', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <div id="fetcherRunLog" class="fh-log open">
+        <span class="fh-log-title" data-role="title">Fetcher log</span>
+        <span class="fh-log-status queued" data-role="status">queued</span>
+        <div class="fh-log-body" data-role="body"></div>
+      </div>`;
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('maps launching to Launching title and launching badge', () => {
+    fetcherRunner.syncLogPanelChrome({ label: 'Covers', key: 'steamCovers' }, 'launching');
+    const title = document.querySelector('[data-role="title"]');
+    const status = document.querySelector('[data-role="status"]');
+    expect(title?.textContent).toBe('Launching: Covers');
+    expect(status?.textContent).toBe('launching');
+    expect(status?.classList.contains('launching')).toBe(true);
+    expect(document.querySelector('.fh-log-body')?.getAttribute('data-running')).toBe('1');
+  });
+
+  it('maps queued with extra to Queued title and queue position badge', () => {
+    fetcherRunner.syncLogPanelChrome(
+      { label: 'Cross-store', key: 'crossStore' },
+      'queued',
+      '2 of 2 — waiting for Covers',
+    );
+    expect(document.querySelector('[data-role="title"]')?.textContent).toBe(
+      'Queued: Cross-store',
+    );
+    expect(document.querySelector('[data-role="status"]')?.textContent).toBe(
+      'queued · 2 of 2 — waiting for Covers',
+    );
   });
 });
 

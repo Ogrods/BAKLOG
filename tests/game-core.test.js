@@ -347,6 +347,53 @@ describe('storeUrlForGame — PSN', () => {
   });
 });
 
+describe('storeUrlForGame — Amazon', () => {
+  it('uses Steam store search when steam_review_percent is set', () => {
+    const g = {
+      store: 'amazon',
+      id: 'amzn-1',
+      name: 'Hades',
+      steam_review_percent: 98,
+      store_url: 'https://www.amazon.com/dp/B08XXXX',
+      asin: 'B08XXXX',
+    };
+    const out = storeUrlForGame(g);
+    expect(out).toContain('store.steampowered.com/search/');
+    expect(out).toContain(encodeURIComponent('Hades'));
+    expect(out).not.toContain('amazon.com/dp/');
+  });
+
+  it('ignores cached retail /dp/ store_url when no Steam match', () => {
+    const g = {
+      store: 'amazon',
+      id: 'amzn-2',
+      name: 'Obscure Prime Game',
+      store_url: 'https://www.amazon.com/dp/B0XXXX',
+      asin: 'B0XXXX',
+    };
+    expect(storeUrlForGame(g)).toBe('https://luna.amazon.com/');
+  });
+
+  it('falls back to Luna when no steam_review_percent and no store_url', () => {
+    const g = {
+      store: 'amazon',
+      id: 'amzn-3',
+      name: 'Prime Only Title',
+    };
+    expect(storeUrlForGame(g)).toBe('https://luna.amazon.com/');
+  });
+
+  it('falls back to Luna when steam_review_percent set but name missing', () => {
+    const g = {
+      store: 'amazon',
+      id: 'amzn-4',
+      steam_review_percent: 85,
+      name: '',
+    };
+    expect(storeUrlForGame(g)).toBe('https://luna.amazon.com/');
+  });
+});
+
 describe('alphaBucket', () => {
   it('uppercases the first letter', () => {
     expect(alphaBucket('hades')).toBe('H');

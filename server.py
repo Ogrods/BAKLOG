@@ -54,7 +54,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 
@@ -79,6 +79,8 @@ STALL_REPEAT_SEC = 60
 STALL_POLL_SEC = 1.0
 SILENT_STALL_KILL_SEC = 180  # if a fetcher emits zero lines AND proc still alive after this, force-kill
 TERMINATE_GRACE_SEC = 5  # how long to wait after proc.terminate() before falling back to taskkill /F
+CANCEL_STUCK_GRACE_SEC = TERMINATE_GRACE_SEC + 2
+WATCHDOG_INTERVAL_SEC = 3.0
 # Profile switch: wait for cancelled runs to finish (kill + re-kill window).
 SWITCH_CANCEL_WAIT_SEC = 2 * TERMINATE_GRACE_SEC
 LAUNCH_TIMEOUT_SEC = 30  # max wait for subprocess.Popen() to return before declaring the run failed.
@@ -135,6 +137,9 @@ from shared.profile_paths import (  # noqa: E402
     profile_root,
     runs_dir,
 )
+from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
+
+MAX_RUN_SECONDS = _max_run_seconds_from_env()
 
 
 def _release_server_profile_env() -> str | None:
@@ -434,6 +439,19 @@ def _terminate_pid(pid: int) -> None:
             pass
 
 
+def _kill_pids_async(pids: list[int]) -> None:
+    """Kill subprocess trees on a daemon thread so HTTP cancel handlers return immediately."""
+    unique = list(dict.fromkeys(p for p in pids if p > 0))
+    if not unique:
+        return
+
+    def _work() -> None:
+        for pid in unique:
+            _terminate_pid(pid)
+
+    threading.Thread(target=_work, name="run-kill", daemon=True).start()
+
+
 def _read_json_file(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
@@ -498,7 +516,7 @@ class Run:
     __slots__ = (
         "id", "key", "label", "status", "started_at", "ended_at", "exit_code",
         "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
-        "_log_path", "_runs_dir", "profile_id",
+        "_log_path", "_runs_dir", "profile_id", "_cancelling_since",
     )
 
     def __init__(
@@ -529,6 +547,7 @@ class Run:
         self._lock = threading.Lock()
         self._listeners: set[queue.Queue] = set()
         self._finished = threading.Event()
+        self._cancelling_since: float | None = None
 
     def to_summary(self) -> dict[str, Any]:
         summary: dict[str, Any] = {
@@ -611,35 +630,42 @@ class Run:
                     argv.append(arg)
         return argv
 
-    def cancel(self) -> bool:
+    def cancel(self) -> tuple[bool, list[int]]:
+        """Mark cancelled/cancelling. Returns (changed, pids_to_kill). Never kills inline.
+
+        broadcast()/mark_finished() acquire self._lock, so all notifications are
+        emitted AFTER releasing the lock here — Run._lock is a plain (non-reentrant)
+        Lock and broadcasting under it deadlocks the calling (HTTP) thread.
+        """
         proc = None
         notify_done = False
+        notify_cancelling = False
         with self._lock:
             if self.status in ("done", "failed", "cancelled") or self._finished.is_set():
-                return False
+                return False, []
             if self.status == "queued":
                 self.status = "cancelled"
                 self.exit_code = -1
                 self.ended_at = time.time()
                 notify_done = True
-            elif self.status == "launching":
+            elif self.status in ("launching", "running"):
                 self.cancelled = True
                 proc = self._proc
-            elif self.status == "running":
-                self.cancelled = True
-                proc = self._proc
-                if proc is None:
+                if proc is None or proc.poll() is not None:
                     self.status = "cancelled"
                     self.exit_code = -1
                     self.ended_at = time.time()
                     notify_done = True
                 else:
                     self.status = "cancelling"
-                    self.broadcast("status", {"status": self.status, "started_at": self.started_at})
+                    self._cancelling_since = time.monotonic()
+                    notify_cancelling = True
             elif self.status == "cancelling":
-                return False
+                return False, []
             else:
-                return False
+                return False, []
+        if notify_cancelling:
+            self.broadcast("status", {"status": self.status, "started_at": self.started_at})
         if notify_done:
             self.add_line("stderr", "[server] cancelled before start")
             self.mark_finished()
@@ -652,34 +678,192 @@ class Run:
                     "ended_at": self.ended_at,
                 },
             )
-            return True
-        if proc is not None and proc.poll() is None:
-            # Force-kill immediately so POST /cancel returns and the single HTTP
-            # thread is not wedged while GOG/itch subprocesses ignore SIGTERM.
-            if proc.pid:
-                _terminate_pid(proc.pid)
-        return True
+            return True, []
+        pids: list[int] = []
+        if proc is not None and proc.poll() is None and proc.pid:
+            pids.append(proc.pid)
+        return True, pids
 
 
 class RunManager:
     """Single-worker queue. Fetchers may share locks (PSN session, etc.) so
     we deliberately serialize them rather than spawn in parallel."""
 
-    def __init__(self, runs_dir: Path | None = None) -> None:
+    def __init__(self, runs_dir: Path | None = None, *, enable_watchdog: bool = True) -> None:
         self._runs_dir = runs_dir or RUNS_DIR
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._queue: queue.Queue[Run] = queue.Queue()
         self._pending: list[Run] = []  # queued + active, in submission order
         self._history: deque[dict[str, Any]] = deque(
-            _load_run_history()[-MAX_HISTORY:],
+            _load_run_history_from(self._runs_dir / "history.json")[-MAX_HISTORY:],
             maxlen=MAX_HISTORY,
         )
         self._active: Run | None = None
         self._runs_by_id: dict[str, Run] = {}
+        self._last_queue_kick_at = 0.0
+        self._watchdog_stop = threading.Event()
         self._reap_orphan_processes()
-        threading.Thread(target=self._worker_loop, name="run-worker", daemon=True).start()
+        self._start_worker_thread()
+        self._watchdog_thread: threading.Thread | None = None
+        if enable_watchdog:
+            self._watchdog_thread = threading.Thread(
+                target=self._watchdog_loop, name="run-watchdog", daemon=True
+            )
+            self._watchdog_thread.start()
         self._restore_durable_queue()
+
+    def _start_worker_thread(self) -> None:
+        self._worker_thread = threading.Thread(
+            target=self._worker_loop, name="run-worker", daemon=True
+        )
+        self._worker_thread.start()
+
+    def _ensure_worker_thread(self) -> None:
+        """Restart the queue worker if the daemon thread died (leaves runs stuck queued)."""
+        if self._worker_thread.is_alive():
+            return
+        print("[runs] worker thread died — restarting", file=sys.stderr, flush=True)
+        self._start_worker_thread()
+
+    def _resync_stalled_queue(self) -> int:
+        """Put pending queued runs back on the worker queue when nothing is active.
+
+        This heals the wedge where runs sit in ``_pending`` with status ``queued``
+        but were never handed to ``_queue.get()`` (typically after the worker thread
+        exited while the queue was empty).
+        """
+        to_put: list[Run] = []
+        with self._lock:
+            if self._active is not None:
+                return 0
+            if self._queue.qsize() > 0:
+                return 0
+            for r in self._pending:
+                if r.status == "queued" and not r._finished.is_set():
+                    to_put.append(r)
+        for r in to_put:
+            self._queue.put(r)
+        if to_put:
+            keys = ", ".join(r.key for r in to_put)
+            print(f"[runs] re-queued {len(to_put)} stalled run(s): {keys}", file=sys.stderr, flush=True)
+        return len(to_put)
+
+    def _kick_queue_if_stalled(self) -> None:
+        self._ensure_worker_thread()
+        self._resync_stalled_queue()
+
+    def _kick_queue_if_stalled_throttled(self) -> None:
+        now = time.monotonic()
+        if now - self._last_queue_kick_at < 1.0:
+            return
+        self._last_queue_kick_at = now
+        self._kick_queue_if_stalled()
+
+    def _watchdog_loop(self) -> None:
+        while not self._watchdog_stop.wait(WATCHDOG_INTERVAL_SEC):
+            try:
+                self._kick_queue_if_stalled()
+                self._force_finalize_stuck_cancelling()
+            except Exception as exc:  # noqa: BLE001
+                print(f"[runs] watchdog error: {exc!r}", file=sys.stderr, flush=True)
+
+    def _force_finalize_stuck_cancelling(self) -> None:
+        now = time.monotonic()
+        stuck: list[Run] = []
+        with self._lock:
+            for r in self._pending:
+                if (
+                    r.status == "cancelling"
+                    and r._cancelling_since is not None
+                    and now - r._cancelling_since > CANCEL_STUCK_GRACE_SEC
+                ):
+                    stuck.append(r)
+            active = self._active
+            if (
+                active
+                and active.status == "cancelling"
+                and active._cancelling_since is not None
+                and now - active._cancelling_since > CANCEL_STUCK_GRACE_SEC
+                and active not in stuck
+            ):
+                stuck.append(active)
+        for run in stuck:
+            pids = self._collect_pids_for_run(run, [])
+            if pids:
+                _kill_pids_async(pids)
+            with run._lock:
+                if not run._finished.is_set():
+                    run.status = "cancelled"
+                    run.exit_code = -1
+                    if run.ended_at is None:
+                        run.ended_at = time.time()
+            if not run._finished.is_set():
+                run.mark_finished()
+                run.broadcast(
+                    "done",
+                    {
+                        "status": run.status,
+                        "exit_code": run.exit_code,
+                        "started_at": run.started_at,
+                        "ended_at": run.ended_at,
+                    },
+                )
+            self._finalize_run(run)
+
+    def _collect_pids_for_run(self, run: Run, proc_pids: list[int]) -> list[int]:
+        pids = list(proc_pids)
+        if run._proc is not None and run._proc.poll() is None and run._proc.pid:
+            if run._proc.pid not in pids:
+                pids.append(run._proc.pid)
+        for entry in _read_active_runs():
+            if entry.get("id") == run.id:
+                pid = int(entry.get("pid") or 0)
+                if pid > 0 and pid not in pids:
+                    pids.append(pid)
+        return pids
+
+    def _complete_cancel_after_kill(self, run: Run) -> None:
+        proc = run._proc
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.wait(timeout=TERMINATE_GRACE_SEC)
+            except Exception:  # noqa: BLE001
+                pass
+        # mark_finished()/broadcast() acquire run._lock themselves, so we must
+        # NOT hold it here — Run._lock is a plain (non-reentrant) Lock.
+        should_finish = False
+        with run._lock:
+            if not run._finished.is_set():
+                run.status = "cancelled"
+                run.exit_code = -1
+                if run.ended_at is None:
+                    run.ended_at = time.time()
+                should_finish = True
+        if should_finish:
+            run.mark_finished()
+            run.broadcast(
+                "done",
+                {
+                    "status": run.status,
+                    "exit_code": run.exit_code,
+                    "started_at": run.started_at,
+                    "ended_at": run.ended_at,
+                },
+            )
+        self._finalize_run(run)
+
+    def stream_terminal_summary(self, run_id: str) -> dict[str, Any] | None:
+        """History summary for a run no longer in memory (SSE reconnect after finish)."""
+        with self._lock:
+            for h in self._history:
+                if h.get("id") == run_id:
+                    return h
+        hist_file = self._runs_dir / "history.json"
+        for h in _load_run_history_from(hist_file):
+            if h.get("id") == run_id:
+                return h
+        return None
 
     def rebind_profile_paths(self) -> None:
         """Point run storage at the active profile after POST /api/profiles/active."""
@@ -784,18 +968,34 @@ class RunManager:
         _write_active_runs([])
 
     def shutdown(self) -> None:
+        self._watchdog_stop.set()
         with self._lock:
             pending = list(self._pending)
             active = self._active
+        kill_pids: list[int] = []
         for run in pending:
-            run.cancel()
+            changed, pids = run.cancel()
+            if changed:
+                kill_pids.extend(self._collect_pids_for_run(run, pids))
         if active is not None:
-            active.cancel()
-            proc = active._proc
-            if proc is not None and proc.poll() is None and proc.pid:
-                _terminate_pid(proc.pid)
+            changed, pids = active.cancel()
+            if changed:
+                kill_pids.extend(self._collect_pids_for_run(active, pids))
+        if kill_pids:
+            for pid in dict.fromkeys(kill_pids):
+                _terminate_pid(pid)
         _write_active_runs([])
         _save_durable_queue([])
+        self.join_threads(timeout=5.0)
+
+    def join_threads(self, timeout: float = 5.0) -> None:
+        """Stop watchdog and wait for worker/watchdog threads (bounded)."""
+        self._watchdog_stop.set()
+        wt = getattr(self, "_watchdog_thread", None)
+        if wt is not None and wt.is_alive():
+            wt.join(timeout=timeout)
+        if self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=timeout)
 
     def submit(self, key: str, *, refresh: bool = False) -> Run:
         if key not in FETCHERS:
@@ -833,6 +1033,7 @@ class RunManager:
             self._runs_by_id[run.id] = run
             self._queue.put(run)
         self._persist_queue()
+        self._ensure_worker_thread()
         return run
 
     def cancel(self, run_id: str) -> tuple[Run | None, str | None]:
@@ -842,26 +1043,127 @@ class RunManager:
                 return None, "not_found"
             if run.status in ("done", "failed", "cancelled") or run._finished.is_set():
                 return None, "already_finished"
-        if not run.cancel():
+        changed, proc_pids = run.cancel()
+        if not changed:
             return None, "already_finished"
+        pids = self._collect_pids_for_run(run, proc_pids)
         with self._lock:
             if run in self._pending:
                 self._pending.remove(run)
         self._persist_queue()
+        if run._finished.is_set():
+            self._finalize_run(run)
+        elif run.status == "cancelling":
+            if pids:
+                _kill_pids_async(pids)
+            self._schedule_cancel_completion(run)
         return run, None
 
+    def _schedule_cancel_completion(self, run: Run) -> None:
+        if self._worker_thread.is_alive():
+            threading.Thread(
+                target=self._complete_cancel_after_kill,
+                args=(run,),
+                name=f"run-cancel-{run.id}",
+                daemon=True,
+            ).start()
+        else:
+            self._complete_cancel_after_kill(run)
+
     def cancel_all(self) -> list[dict[str, Any]]:
-        """Cancel every queued or running fetcher (active + next in queue)."""
+        """Cancel every queued or running fetcher (active + next in queue). Returns immediately."""
         with self._lock:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             ]
+            active = self._active
+            if (
+                active
+                and active.status in _IN_FLIGHT_STATUSES
+                and active not in targets
+            ):
+                targets.append(active)
+        all_pids: list[int] = []
+        summaries: list[dict[str, Any]] = []
+        to_finalize_now: list[Run] = []
+        to_complete_async: list[Run] = []
+        for run in targets:
+            changed, proc_pids = run.cancel()
+            if not changed:
+                continue
+            all_pids.extend(self._collect_pids_for_run(run, proc_pids))
+            with self._lock:
+                if run in self._pending:
+                    self._pending.remove(run)
+            if run._finished.is_set():
+                to_finalize_now.append(run)
+            elif run.status == "cancelling":
+                to_complete_async.append(run)
+            summaries.append(run.to_summary())
+        self._persist_queue()
+        if all_pids:
+            _kill_pids_async(all_pids)
+        for run in to_finalize_now:
+            self._finalize_run(run)
+        for run in to_complete_async:
+            self._schedule_cancel_completion(run)
+        return summaries
+
+    def force_reset(self) -> dict[str, Any]:
+        """Kill all tracked PIDs, clear queue state, finalize every in-flight run."""
+        with self._lock:
+            targets = [
+                r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
+            ]
+            active = self._active
+            if (
+                active
+                and active.status in _IN_FLIGHT_STATUSES
+                and active not in targets
+            ):
+                targets.append(active)
+        all_pids: list[int] = []
+        for entry in _read_active_runs():
+            pid = int(entry.get("pid") or 0)
+            if pid > 0:
+                all_pids.append(pid)
+        for run in targets:
+            run.cancelled = True
+            with run._lock:
+                if run.status in _IN_FLIGHT_STATUSES and not run._finished.is_set():
+                    run.status = "cancelled"
+                    run.exit_code = -1
+                    run.ended_at = time.time()
+            all_pids.extend(self._collect_pids_for_run(run, []))
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+        with self._lock:
+            self._pending.clear()
+            self._active = None
+        _write_active_runs([])
+        _save_durable_queue([])
+        if all_pids:
+            _kill_pids_async(list(dict.fromkeys(all_pids)))
         summaries: list[dict[str, Any]] = []
         for run in targets:
-            cancelled, err = self.cancel(run.id)
-            if cancelled is not None and err is None:
-                summaries.append(cancelled.to_summary())
-        return summaries
+            if not run._finished.is_set():
+                run.mark_finished()
+                run.broadcast(
+                    "done",
+                    {
+                        "status": "cancelled",
+                        "exit_code": run.exit_code or -1,
+                        "started_at": run.started_at,
+                        "ended_at": run.ended_at,
+                    },
+                )
+            self._finalize_run(run)
+            summaries.append(run.to_summary())
+        self._ensure_worker_thread()
+        return {"cancelled": summaries, "force": True}
 
     def has_runs_for_profile(self, profile_id: str) -> bool:
         """True if any queued or running fetcher is bound to this profile."""
@@ -908,6 +1210,7 @@ class RunManager:
             return self._runs_by_id.get(run_id)
 
     def snapshot(self) -> dict[str, Any]:
+        self._kick_queue_if_stalled_throttled()
         with self._lock:
             active = (
                 self._active.to_summary()
@@ -944,22 +1247,26 @@ class RunManager:
 
     def _worker_loop(self) -> None:
         while True:
-            run = self._queue.get()
-            if not run._finished.is_set():
-                with self._lock:
-                    self._active = run
-                    if run.status == "queued":
-                        run.status = "launching"
-                self._persist_queue()
-                try:
-                    if run.status != "cancelled":
-                        self._execute(run)
-                except Exception as exc:  # noqa: BLE001 - surface anything the subprocess plumbing might raise.
-                    if not run.cancelled:
-                        run.status = "failed"
-                        run.exit_code = -1
-                        run.add_line("stderr", f"[server] worker error: {exc!r}")
-            self._finalize_run(run)
+            try:
+                run = self._queue.get()
+                if not run._finished.is_set():
+                    with self._lock:
+                        self._active = run
+                        if run.status == "queued":
+                            run.status = "launching"
+                    self._persist_queue()
+                    try:
+                        if run.status != "cancelled":
+                            self._execute(run)
+                    except Exception as exc:  # noqa: BLE001 - surface anything the subprocess plumbing might raise.
+                        if not run.cancelled:
+                            run.status = "failed"
+                            run.exit_code = -1
+                            run.add_line("stderr", f"[server] worker error: {exc!r}")
+                self._finalize_run(run)
+            except Exception as exc:  # noqa: BLE001 - keep the worker alive
+                print(f"[runs] worker loop error: {exc!r}", file=sys.stderr, flush=True)
+                time.sleep(0.5)
 
     def _execute(self, run: Run) -> None:
         if run.cancelled:
@@ -992,7 +1299,7 @@ class RunManager:
 
         def _launch() -> None:
             try:
-                p = subprocess.Popen(  # noqa: S603 - argv is fixed in FETCHERS, not user input
+                p = popen_fetcher(  # noqa: S603 - argv is fixed in FETCHERS, not user input
                     argv,
                     cwd=str(profile_root(profile_id=run.profile_id)),
                     stdout=subprocess.PIPE,
@@ -1078,6 +1385,8 @@ class RunManager:
 
         last_line_at = time.monotonic()
         last_stall_notice_at = 0.0
+        run_started_mono = time.monotonic()
+        max_runtime_killed = False
         reader_done = False
 
         while not reader_done:
@@ -1090,6 +1399,21 @@ class RunManager:
             now = time.monotonic()
             if line == "__POLL__":
                 if proc.poll() is not None and line_queue.empty():
+                    break
+                elapsed = now - run_started_mono
+                if elapsed >= MAX_RUN_SECONDS:
+                    run.add_line(
+                        "stderr",
+                        f"[server] exceeded maximum runtime ({int(MAX_RUN_SECONDS)}s) — "
+                        f"force-killing PID {proc.pid}",
+                    )
+                    if proc.pid:
+                        _terminate_pid(proc.pid)
+                    try:
+                        proc.wait(timeout=TERMINATE_GRACE_SEC)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    max_runtime_killed = True
                     break
                 silent = now - last_line_at
                 if silent >= SILENT_STALL_KILL_SEC:
@@ -1145,7 +1469,10 @@ class RunManager:
                 if proc.pid:
                     _terminate_pid(proc.pid)
         run.exit_code = proc.returncode if proc.returncode is not None else -1
-        if run.cancelled:
+        if max_runtime_killed:
+            run.status = "failed"
+            run.exit_code = -1
+        elif run.cancelled:
             run.status = "cancelled"
             run.add_line("stderr", "[server] cancelled")
         elif proc.returncode == 0:
@@ -1639,8 +1966,15 @@ class Handler(SimpleHTTPRequestHandler):
         _send_json(self, HTTPStatus.OK, run.to_summary())
 
     def _handle_cancel_all(self) -> None:
-        summaries = MANAGER.cancel_all()
-        _send_json(self, HTTPStatus.OK, {"cancelled": summaries})
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        force_vals = qs.get("force", ["0"])
+        force = force_vals[0].lower() in ("1", "true", "yes")
+        if force:
+            payload = MANAGER.force_reset()
+        else:
+            payload = {"cancelled": MANAGER.cancel_all()}
+        _send_json(self, HTTPStatus.OK, payload)
 
     def _handle_auth_status(self) -> None:
         try:
@@ -1922,7 +2256,49 @@ class Handler(SimpleHTTPRequestHandler):
         run_id = run_id.strip("/").split("/", 1)[0]
         run = MANAGER.get(run_id)
         if run is None:
-            self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")
+            terminal = MANAGER.stream_terminal_summary(run_id)
+            if terminal is None:
+                self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")
+                return
+            with _sse_lock:
+                if _sse_connections >= MAX_SSE_CONNECTIONS:
+                    _send_json(
+                        self,
+                        HTTPStatus.SERVICE_UNAVAILABLE,
+                        {"error": f"too many stream connections (max {MAX_SSE_CONNECTIONS})"},
+                    )
+                    return
+                _sse_connections += 1
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+            try:
+                self._sse_write(
+                    "status",
+                    {
+                        "status": terminal.get("status"),
+                        "started_at": terminal.get("started_at"),
+                        "ended_at": terminal.get("ended_at"),
+                        "exit_code": terminal.get("exit_code"),
+                    },
+                )
+                self._sse_write(
+                    "done",
+                    {
+                        "status": terminal.get("status"),
+                        "exit_code": terminal.get("exit_code"),
+                        "started_at": terminal.get("started_at"),
+                        "ended_at": terminal.get("ended_at"),
+                    },
+                )
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                pass
+            finally:
+                with _sse_lock:
+                    _sse_connections = max(0, _sse_connections - 1)
             return
 
         with _sse_lock:

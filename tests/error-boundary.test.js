@@ -131,6 +131,42 @@ describe("error-boundary rehydration", () => {
     const bundle = buildBugBundle();
     expect(bundle.errors.persisted).toEqual([]);
   });
+
+  it("prunes stale and ignored entries from persisted ring on install", () => {
+    const seeded = JSON.stringify([
+      { kind: "error", time: 1, message: "ResizeObserver loop completed with undelivered notifications.", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
+      { kind: "unhandledrejection", time: 2, message: "authStatus is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
+      { kind: "reported", time: 3, message: "still relevant", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
+    ]);
+    installWindow({ localStorageRaw: seeded });
+    _resetForTests();
+    window.localStorage.setItem("baklog-error-log", seeded);
+    installGlobalErrorHandler();
+    const bundle = buildBugBundle();
+    expect(bundle.errors.persisted.length).toBe(1);
+    expect(bundle.errors.persisted[0].message).toBe("still relevant");
+    const stored = JSON.parse(window.localStorage.getItem("baklog-error-log"));
+    expect(stored.length).toBe(1);
+    expect(stored[0].message).toBe("still relevant");
+  });
+});
+
+describe("error-boundary ignored noise", () => {
+  beforeEach(() => {
+    installWindow();
+    _resetForTests();
+    installGlobalErrorHandler();
+  });
+  afterEach(() => { teardownWindow(); });
+
+  it("does not capture ResizeObserver loop warnings", () => {
+    reportError(new Error("ResizeObserver loop completed with undelivered notifications."));
+    expect(getCapturedErrors().length).toBe(0);
+    expect(window.localStorage.getItem("baklog-error-log")).toBeNull();
+    const bundle = buildBugBundle();
+    expect(bundle.errors.session.length).toBe(0);
+    expect(bundle.errors.persisted.length).toBe(0);
+  });
 });
 
 describe("buildBugBundle shape", () => {

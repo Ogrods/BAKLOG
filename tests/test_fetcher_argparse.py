@@ -19,6 +19,14 @@ def _run_help(script: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+_NO_DUPLICATE_ALLOW_DRIFT = (
+    "fetch_ea.py",
+    "fetch_itch.py",
+    "fetch_gog.py",
+    "fetch_amazon.py",
+)
+
+
 def test_fetch_ea_help_exits_zero() -> None:
     """Duplicate --allow-drift registration crashes argparse before --help."""
     proc = _run_help("fetch_ea.py")
@@ -26,6 +34,17 @@ def test_fetch_ea_help_exits_zero() -> None:
     assert proc.returncode == 0, combined
     assert "conflicting option" not in combined.lower()
     assert "--allow-drift" in combined
+
+
+def test_fetch_scripts_do_not_duplicate_allow_drift_in_source() -> None:
+    """Manual --allow-drift plus add_allow_empty_arg() causes argparse conflict."""
+    for script in _NO_DUPLICATE_ALLOW_DRIFT:
+        text = (ROOT / script).read_text(encoding="utf-8")
+        assert "add_allow_empty_arg" in text, f"{script} should use add_allow_empty_arg"
+        manual = text.count('parser.add_argument("--allow-drift"')
+        assert manual == 0, (
+            f"{script} registers --allow-drift manually; use add_allow_empty_arg only"
+        )
 
 
 def test_fetch_humble_accepts_skip_hltb_flag() -> None:

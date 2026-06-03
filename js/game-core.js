@@ -384,6 +384,13 @@ export function storeUrlForGame(g) {
     }
     return "https://store.playstation.com/en-us/";
   }
+  // Amazon: entitlement titles — ignore cached retail /dp/ or /s?k= store_url.
+  if (ng.store === "amazon") {
+    if (ng.name && ng.steam_review_percent != null) {
+      return `https://store.steampowered.com/search/?term=${encodeURIComponent(ng.name)}`;
+    }
+    return "https://luna.amazon.com/";
+  }
   if (url && url.startsWith("http") && !isGenericStoreUrl(url)) {
     if (ng.store === "epic" && url.includes("/p/")) {
       const slug = url.split("/p/").pop()?.split(/[?#]/)[0] || "";
@@ -400,10 +407,6 @@ export function storeUrlForGame(g) {
   }
   if (ng.store === "epic") {
     return `https://store.epicgames.com/en-US/browse?q=${encodeURIComponent(ng.name || "")}`;
-  }
-  if (ng.store === "amazon") {
-    if (ng.asin) return `https://www.amazon.com/dp/${ng.asin}`;
-    return `https://www.amazon.com/s?k=${encodeURIComponent(ng.name || "")}&i=videogames`;
   }
   if (ng.store === "itch" && ng.itch_slug) {
     return `https://itch.io/${ng.itch_slug}`;

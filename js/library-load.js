@@ -39,7 +39,7 @@ import {
 } from './filters-ui.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
-import { consumeItadAutoRunFlag, diffItadDeals } from './fetcher-health.js';
+import { consumeItadAutoRunFlag, diffItadDeals, maybeAutoEnrichNewAdditions } from './fetcher-health.js';
 import { fireLibraryCountFlash } from './library-count-animation.js';
 import { itadSnapshotStorageKey } from './profiles.js';
 
@@ -152,24 +152,28 @@ export async function loadSteamTagsMeta() {
   await loadCacheMeta("cache/steam_tags_meta.json", "steamTags");
 }
 
-/** Stamp first-seen timestamps for library keys (silent seed on first load). */
+/** Stamp first-seen timestamps for library keys (silent seed on first load).
+ *  Returns count of keys newly stamped with a real timestamp (0 on first seed). */
 export function recordLibraryFirstSeen() {
   if (!state.libraryFirstSeenByKey || typeof state.libraryFirstSeenByKey !== 'object') {
     state.libraryFirstSeenByKey = {};
   }
   const seeded = !!state.prefs.librarySeenSeeded;
   let changed = false;
+  let newlyStamped = 0;
   for (const g of state.allGames) {
     const key = gameKey(g);
     if (key in state.libraryFirstSeenByKey) continue;
     state.libraryFirstSeenByKey[key] = seeded ? Date.now() : 0;
     changed = true;
+    if (seeded) newlyStamped += 1;
   }
   if (!state.prefs.librarySeenSeeded) {
     state.prefs.librarySeenSeeded = true;
     changed = true;
   }
   if (changed) personalStore.notify();
+  return seeded ? newlyStamped : 0;
 }
 
 function countLibraryVisible() {
@@ -208,7 +212,7 @@ export async function applyMergedLibrary() {
   bumpPersonalMemo();
   invalidateTableCache();
   recomputeCrossStoreHidden();
-  recordLibraryFirstSeen();
+  state._lastNewlyAddedCount = recordLibraryFirstSeen();
   canonicalizeNotesAcrossTitles();
   state.dashboardDataReady = true;
   buildOwnedNormNames();
@@ -319,11 +323,27 @@ export async function reloadAllLibraryStoreFiles() {
   rebuildAllGamesFromMetas();
 }
 
+export async function reloadAllWishlistStoreFiles() {
+  const entries = await Promise.all(
+    Object.entries(WISHLIST_FETCHER_JSON).map(async ([fetcherKey, file]) => {
+      const metaKey = WISHLIST_FETCHER_META_KEY[fetcherKey];
+      try {
+        return [metaKey, await fetchLibraryJson(file)];
+      } catch {
+        return [metaKey, state.libraryMeta[metaKey] ?? null];
+      }
+    }),
+  );
+  for (const [metaKey, data] of entries) state.libraryMeta[metaKey] = data;
+  rebuildWishlistFromMetas();
+}
+
 export async function reloadAfterFetcher(key) {
   if (key === "itad") {
     const prevByKey = { ...state.itadByKey };
     const wasAuto = consumeItadAutoRunFlag();
     await loadItadPrices();
+    await reloadAllWishlistStoreFiles();
     if (wasAuto) {
       const diff = diffItadDeals(prevByKey, state.itadByKey);
       if (diff.newSales > 0 || diff.newHistoricalLows > 0) {
@@ -332,6 +352,7 @@ export async function reloadAfterFetcher(key) {
     }
   } else if (ENRICH_FETCHER_KEYS.has(key)) {
     await reloadAllLibraryStoreFiles();
+    await reloadAllWishlistStoreFiles();
     if (key === "hltb") await loadHltbCache();
     if (key === "steamReviews") await loadSteamReviewCache();
     if (key === "steamCovers") await loadSteamCoversMeta();
@@ -348,6 +369,10 @@ export async function reloadAfterFetcher(key) {
     return;
   }
   await applyMergedLibrary();
+  const newCount = state._lastNewlyAddedCount ?? 0;
+  if (LIBRARY_STORE_JSON[key] && !ENRICH_FETCHER_KEYS.has(key)) {
+    void maybeAutoEnrichNewAdditions(newCount);
+  }
   if (key === 'steam') {
     void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
   }

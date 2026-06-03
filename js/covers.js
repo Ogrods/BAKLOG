@@ -38,6 +38,18 @@ window.coverFallback = function (img) {
     img.dataset.fallback = "";
     return;
   }
+  // Recently-added rows keep a stable count (up to 10), so a failed cover must
+  // not collapse the row — that's what produced the "top + bottom only" gap.
+  // Swap the broken <img> for a compact initials placeholder and leave the row.
+  const recentRow = img.closest(".dash-recent-row");
+  if (recentRow) {
+    const rName = img.dataset.name || "";
+    const rWords = rName.split(/\s+/).filter(Boolean);
+    const rInitials = (rWords.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3);
+    const rSafe = rName.replace(/"/g, "&quot;");
+    img.outerHTML = `<div class="dash-list-cover placeholder" title="${rSafe}"><span class="placeholder-initials">${rInitials}</span></div>`;
+    return;
+  }
   const dashRow = img.closest(".dash-versus-row, .dash-list-row, .coop-pick-row, .dash-spotlight, .itch-hero-card");
   if (dashRow) {
     const key = dashRow.dataset.key || dashRow.dataset.gameKey;

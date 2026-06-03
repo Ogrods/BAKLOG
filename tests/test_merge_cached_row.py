@@ -98,3 +98,95 @@ def test_merge_overwrites_hltb_when_updated() -> None:
     merged = merge_cached_row(fresh, cached, authoritative=GOG, hltb_updated=True)
     assert merged["hltb_main_hours"] == 20.0
     assert merged["hltb_name"] == "New"
+
+
+def test_merge_preserves_playtime_when_fresh_is_zero() -> None:
+    cached = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "playtime_minutes": 120,
+        "last_played": "2024-06-01",
+    }
+    fresh = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "playtime_minutes": 0,
+        "last_played": None,
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=GOG, hltb_updated=False)
+    assert merged["playtime_minutes"] == 120
+    assert merged["last_played"] == "2024-06-01"
+
+
+def test_merge_overwrites_playtime_when_fresh_has_real_value() -> None:
+    cached = {"store": "gog", "id": 1, "gog_id": 1, "playtime_minutes": 120}
+    fresh = {"store": "gog", "id": 1, "gog_id": 1, "playtime_minutes": 240}
+    merged = merge_cached_row(fresh, cached, authoritative=GOG, hltb_updated=False)
+    assert merged["playtime_minutes"] == 240
+
+
+def test_merge_hltb_partial_update_keeps_cached_for_empty_fresh_keys() -> None:
+    cached = {
+        "store": "gog",
+        "id": 1,
+        "hltb_main_hours": 10.0,
+        "hltb_main_extra_hours": 15.0,
+        "hltb_name": "Old",
+    }
+    fresh = {
+        "store": "gog",
+        "id": 1,
+        "hltb_main_hours": 20.0,
+        "hltb_main_extra_hours": None,
+        "hltb_completionist_hours": None,
+        "hltb_match_confidence": None,
+        "hltb_name": None,
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=GOG, hltb_updated=True)
+    assert merged["hltb_main_hours"] == 20.0
+    assert merged["hltb_main_extra_hours"] == 15.0
+    assert merged["hltb_name"] == "Old"
+
+
+def test_merge_preserves_coop_when_fresh_is_false() -> None:
+    auth = GOG | frozenset({"coop_online", "coop_local"})
+    cached = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "coop_online": True,
+        "coop_local": True,
+    }
+    fresh = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "coop_online": False,
+        "coop_local": False,
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=auth, hltb_updated=False)
+    assert merged["coop_online"] is True
+    assert merged["coop_local"] is True
+
+
+def test_merge_sets_coop_when_fresh_is_true() -> None:
+    auth = GOG | frozenset({"coop_online", "coop_local"})
+    cached = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "coop_online": False,
+        "coop_local": False,
+    }
+    fresh = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "coop_online": True,
+        "coop_local": True,
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=auth, hltb_updated=False)
+    assert merged["coop_online"] is True
+    assert merged["coop_local"] is True

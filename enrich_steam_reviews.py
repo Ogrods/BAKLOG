@@ -7,7 +7,7 @@ rows previously cached as having no Steam app match (appid 0).
 
 Covered stores: gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, humble, itch.
 
-itch.io: only rows with classification == "game" (skips TTRPG PDFs, assets, tools).
+itch.io: only videogame rows per itch_game.itch_is_videogame (skips tools, assets, etc.).
 """
 
 import json
@@ -24,6 +24,7 @@ from auth import resolve_env
 from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
 from fetchers._progress import RunStats, started
 from shared.profile_paths import cache_json_path
+from itch_game import itch_is_videogame as _itch_is_videogame
 from steam_client import SteamClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -34,10 +35,6 @@ def mapping_file() -> Path:
 SEARCH_DELAY_SEC = 1.0
 SEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
-
-def _itch_is_videogame(row: dict) -> bool:
-    return row.get("classification") == "game"
-
 
 STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
     ("games_gog.json", "gog", None),

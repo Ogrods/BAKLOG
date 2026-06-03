@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from amazon_web_client import amazon_signin_url
+
 AuthKind = Literal["form", "browser", "oauth", "local", "manual"]
 
 
@@ -54,9 +56,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
     ),
     "gog": ProviderSpec(
         key="gog",
-        label="GOG",
+        label="GOG (web)",
         kind="browser",
-        description="Your GOG library and wishlist.",
+        description="Your GOG library and wishlist via gog.com session cookie.",
         env_keys=("GOG_AL",),
         login_url="https://www.gog.com/",
         success_url_pattern=r"gog\.com/(account|library|en)",
@@ -65,6 +67,23 @@ PROVIDERS: dict[str, ProviderSpec] = {
         tips=(
             "One sign-in covers both your GOG library and wishlist.",
             "Sessions last about two weeks — reconnect here if GOG games stop updating.",
+            "On Windows/macOS with GOG Galaxy installed, the local Galaxy source below "
+            "is preferred — no browser sign-in needed.",
+        ),
+    ),
+    "gog_galaxy": ProviderSpec(
+        key="gog_galaxy",
+        label="GOG Galaxy (local)",
+        kind="local",
+        description="Your GOG library from the GOG Galaxy app on this PC (no cookie sign-in).",
+        env_keys=("GOG_GALAXY_DB",),
+        fetcher_keys=("gog",),
+        platforms=("win32", "darwin"),
+        tips=(
+            "No sign-in window — we read Galaxy's local galaxy-2.0.db on this PC.",
+            "Install GOG Galaxy, sign in, and sync your library once.",
+            "Nothing leaves your machine for this source; it's a local file read only.",
+            "Windows and macOS only — Linux has no supported Galaxy DB path.",
         ),
     ),
     "psn": ProviderSpec(
@@ -154,12 +173,12 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Works on any OS; complements the Windows launcher source above."
         ),
         env_keys=("AMAZON_WEB_PROFILE",),
-        login_url="https://luna.amazon.com/claims/my-collection",
-        success_url_pattern=r"luna\.amazon\.com|amazon\.com",
+        login_url=amazon_signin_url(),
+        success_url_pattern=r"luna\.amazon\.com|gaming\.amazon\.com|amazon\.com",
         expiry_days=30,
         fetcher_keys=("amazon",),
         tips=(
-            "Sign in with your Amazon account and open My Collection so we can capture your claims.",
+            "Sign in on the Amazon page — BAKLOG sends you to My Collection after login.",
             "Imports Amazon-fulfilled Prime games only \u2014 external key drops (Epic, Steam, etc.) are skipped.",
             "Use this on macOS/Linux, or on Windows when you don't use the Amazon Games launcher.",
             "Sessions last about 30 days; reconnect if the Amazon fetcher reports auth failure.",
@@ -208,17 +227,31 @@ PROVIDERS: dict[str, ProviderSpec] = {
     ),
     "itch": ProviderSpec(
         key="itch",
-        label="itch.io",
+        label="itch.io (API key)",
         kind="manual",
-        description="Your itch.io library. Paste an API key from your itch settings — automated sign-in is blocked.",
+        description="Your itch.io library via API key. Paste a key from your itch settings — automated sign-in is blocked.",
         env_keys=("ITCH_API_KEY",),
         form_fields=(FormField("ITCH_API_KEY", "API key", secret=True),),
         login_url="https://itch.io/user/settings/api-keys",
         fetcher_keys=("itch",),
         tips=(
             "Open in browser goes straight to your itch API keys page \u2014 generate one and paste it below.",
-            "itch blocks automated sign-in, so the API key is the only supported path.",
+            "itch blocks automated sign-in, so the API key is the supported web path.",
+            "With the itch desktop app installed, the local source below is preferred.",
             "Bundle items you haven't claimed yet won't show up until you claim them on itch.io.",
+        ),
+    ),
+    "itch_local": ProviderSpec(
+        key="itch_local",
+        label="itch app (local)",
+        kind="local",
+        description="Your itch.io library from the itch desktop app's local database on this PC.",
+        env_keys=("ITCH_BUTLER_DB",),
+        fetcher_keys=("itch",),
+        tips=(
+            "No API key needed — we read the itch app's butler.db on this PC.",
+            "Install the itch desktop app, sign in, and open your library once.",
+            "Adds last-played / playtime when games are installed through the app.",
         ),
     ),
     "itad": ProviderSpec(
@@ -242,7 +275,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         kind="browser",
         description="Your Battle.net library.",
         env_keys=("BATTLENET_COOKIE",),
-        login_url="https://account.battle.net/",
+        login_url="https://account.battle.net/games",
         success_url_pattern=r"account\.battle\.net/(games|overview|details)",
         expiry_days=7,
         fetcher_keys=("battlenet",),
@@ -263,9 +296,8 @@ PROVIDERS: dict[str, ProviderSpec] = {
         expiry_days=14,
         fetcher_keys=("nintendo",),
         tips=(
-            "Heads up: the most reliable way to pull your eShop purchases right now is to add them "
-            "manually \u2014 the automated sign-in is flaky and Nintendo only exposes ~2 years of history.",
-            "Sign in with your Nintendo Account, then let the eShop transactions page load.",
+            "Sign in with your Nintendo Account and let the eShop transactions page finish loading.",
+            "Purchase history is read from your saved browser profile (not cookie text alone).",
             "Only digital eShop purchases from roughly the last two years are available \u2014 no physical carts.",
             "Sessions last about two weeks; reconnect when new eShop buys don't appear.",
         ),

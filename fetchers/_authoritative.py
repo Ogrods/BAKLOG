@@ -31,7 +31,7 @@ def library_authoritative(*extra: str) -> frozenset[str]:
     return _COMMON_LIBRARY | frozenset(extra)
 
 
-GOG = library_authoritative("gog_id")
+GOG = library_authoritative("gog_id", "source")
 EPIC = library_authoritative("epic_namespace", "epic_catalog_id")
 PSN = library_authoritative(
     "psn_id",

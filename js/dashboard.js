@@ -71,11 +71,22 @@ export function setDashReplayAllowed(allowed) {
 }
 
 export function dashboardFingerprint() {
+  const seen = state.libraryFirstSeenByKey || {};
+  let recentCount = 0;
+  let recentMax = 0;
+  for (const at of Object.values(seen)) {
+    if (at > 0) {
+      recentCount++;
+      if (at > recentMax) recentMax = at;
+    }
+  }
   return JSON.stringify({
     dv: window._dataVersion || 0,
     itch: (state.itchGames || []).length > 0,
     qw: state.prefs.quickWinMaxHours || 0,
     ihn: !!state.sessionPrefs.itchHideNonGames,
+    rc: recentCount,
+    rm: recentMax,
   });
 }
 
@@ -327,7 +338,11 @@ export async function renderDashboard(opts = {}) {
     Chart.defaults.borderColor = "#334155";
     const games = dashboardLibraryGames();
     renderDashboardFetcherHealth();
-    renderDashboardMega(games);
+    try {
+      renderDashboardMega(games);
+    } catch (err) {
+      console.error("Dashboard mega error:", err);
+    }
     renderDashboardItchRecap();
     try {
       renderDashboardCharts(games);

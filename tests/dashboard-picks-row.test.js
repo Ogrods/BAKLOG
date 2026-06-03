@@ -1,6 +1,10 @@
 /** Dashboard picks row layout — itch visibility and recents card. */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Window } from 'happy-dom';
+
+const INDEX_HTML = readFileSync(join(import.meta.dirname, '..', 'index.html'), 'utf8');
 
 describe('dashboard picks row', () => {
   let applyItchVisibility;
@@ -27,6 +31,15 @@ describe('dashboard picks row', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('ships index.html with itch hidden by default until library data exists', () => {
+    const picksRow = INDEX_HTML.match(/<div[^>]*id="dashboardPicksRow"[^>]*>/)?.[0] ?? '';
+    const itchCard = INDEX_HTML.match(/<div[^>]*id="dashItchCard"[^>]*>/)?.[0] ?? '';
+    const itchTab = INDEX_HTML.match(/<button[^>]*data-view="itch"[^>]*>/)?.[0] ?? '';
+    expect(picksRow).toMatch(/\bno-itch\b/);
+    expect(itchCard).toMatch(/\bhidden\b/);
+    expect(itchTab).toMatch(/\bhidden\b/);
   });
 
   it('shows recents card and no-itch when itch library is empty', () => {

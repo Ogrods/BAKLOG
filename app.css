@@ -402,6 +402,7 @@ button[disabled] { cursor: not-allowed; }
 .placeholder-caption { font-size: 8px; line-height: 1.05; color: #64748b; max-width: 100%; word-break: break-word; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .cover.placeholder .placeholder-initials { font-size: 14px; }
 .cover.placeholder .placeholder-caption { display: none; }
+.dash-list-cover.placeholder .placeholder-initials { font-size: 10px; }
 .pick-cover.placeholder .placeholder-initials { font-size: 30px; }
 .pick-cover.placeholder .placeholder-caption { font-size: 10px; }
 .pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
@@ -801,7 +802,8 @@ body.bulk-bar-open { padding-bottom: 56px; }
   .fh-global-status::before,
   .fh-chip-running .fh-chip-dot { animation: none; transform: none; }
   .fh-log-status.running::after,
-  .fh-log-status.queued::after { animation: none; content: ''; }
+  .fh-log-status.queued::after,
+  .fh-log-status.launching::after { animation: none; content: ''; }
   .fh-log-body[data-running="1"]::after { animation: none; content: 'working'; }
   .dash-scatter-list.is-pulsing { animation: none; }
   #filterDrawer,
@@ -828,9 +830,10 @@ body.bulk-bar-open { padding-bottom: 56px; }
 }
 @keyframes view-spin { to { transform: rotate(360deg); } }
 .view-tab[disabled] { opacity: 0.5; cursor: progress; }
-/* Tabs start dim while the boot curtain is up so they don't flash
-   bright → dim → bright when loading-curtain.js calls setTabsDisabled. */
-html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
+/* Tabs stay hidden while the boot curtain is up, then the whole bar reveals
+   as one unit when liftBootCurtain() removes data-boot-loading — no per-tab
+   pop-in. visibility (not display) preserves the header's height. */
+html[data-boot-loading] .view-tab { visibility: hidden; }
 /* === A–Z jump nav === */
 #alphaNavWrap {
   position: fixed;
@@ -1359,12 +1362,14 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 }
 .fh-log-title { font-size: 0.75rem; font-weight: 600; color: #e2e8f0; }
 .fh-log-status { font-size: 0.7rem; color: #94a3b8; }
-.fh-log-status.running { color: #38bdf8; }
+.fh-log-status.running,
+.fh-log-status.launching { color: #38bdf8; }
 .fh-log-status.done { color: #34d399; }
 .fh-log-status.failed { color: #f43f5e; }
 .fh-log-status.queued { color: #cbd5e1; }
 .fh-log-status.running::after,
-.fh-log-status.queued::after {
+.fh-log-status.queued::after,
+.fh-log-status.launching::after {
   content: '';
   display: inline-block;
   width: 1.4ch;
@@ -2630,7 +2635,8 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 4px;
   min-height: 0;
 }
 .dash-recent-age { flex-shrink: 0; font-size: 12px; }
@@ -2737,9 +2743,8 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   max-height: 52px;
 }
 .dash-recent-row {
-  flex: 1 1 0;
-  min-height: 44px;
-  max-height: 52px;
+  flex: 0 0 auto;
+  height: 52px;
   border-left-color: rgba(251, 191, 36, 0.45);
 }
 .dash-versus-row .dash-list-cover,
@@ -3259,6 +3264,19 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-tips li:first-child { color: #cbd5e1; }
 .conn-tips li:first-child::before { background: #38bdf8; }
 .conn-note { color: #64748b; font-size: 11px; margin-top: 4px; }
+.conn-group-note {
+  font-size: 12px;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  line-height: 1.45;
+}
+.conn-group-note strong { color: #cbd5e1; }
+.conn-group-note p { margin: 0; }
+.conn-group-note p + p { margin-top: 8px; }
 .conn-meta { color: #64748b; font-size: 11px; margin-top: 2px; }
 .conn-error { color: #fbbf24; font-size: 11px; margin-top: 4px; }
 .conn-log { color: #64748b; font-size: 11px; margin-top: 4px; }

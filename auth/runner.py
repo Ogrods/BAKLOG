@@ -112,7 +112,73 @@ def _extract_battlenet(context) -> dict[str, str]:
     header = _cookie_header(cookies, (".battle.net", "battle.net"))
     if not header:
         raise RuntimeError("No Battle.net cookies found — finish signing in at account.battle.net")
+    from battlenet_client import probe_session
+
+    probe_session(header)
     return {"BATTLENET_COOKIE": header}
+
+
+BATTLENET_GAMES_URL = "https://account.battle.net/games"
+
+
+def _battlenet_has_session(context) -> bool:
+    """True when the Playwright context can read the games-and-subs API."""
+    from battlenet_client import ACCOUNT_URL
+
+    try:
+        resp = context.request.get(ACCOUNT_URL, timeout=30_000)
+        if resp.status == 200:
+            body = resp.text().strip()
+            return body.startswith("{") or body.startswith("[")
+        if resp.status in (401, 403):
+            return False
+    except Exception:  # noqa: BLE001
+        pass
+    return False
+
+
+def _extract_battlenet_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
+    """Open account.battle.net/games and save cookies only after the library API works."""
+    try:
+        page.goto(BATTLENET_GAMES_URL, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:  # noqa: BLE001
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_msg = 0.0
+    while time.time() < deadline:
+        if _battlenet_has_session(context):
+            header = _cookie_header(context.cookies(), (".battle.net", "battle.net"))
+            if not header:
+                break
+            from battlenet_client import probe_session
+
+            probe_session(header)
+            if session:
+                session.emit("signed_in", {"url": page.url or BATTLENET_GAMES_URL})
+            return {"BATTLENET_COOKIE": header}
+
+        now = time.time()
+        if session and now - last_msg > 8:
+            last_msg = now
+            url = (page.url or "").lower()
+            if "login" in url or "signin" in url or "authorize" in url:
+                msg = "Sign in to your Battle.net account in the browser window."
+            elif "battle.net" not in url:
+                msg = "Open account.battle.net/games after signing in."
+            else:
+                msg = (
+                    "On your Games page? Wait until your library list finishes loading, "
+                    "then we'll save the session automatically."
+                )
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Could not verify a Battle.net library session — sign in at account.battle.net/games, "
+        "wait until your Games list loads, then click Connect again."
+    )
 
 
 def _extract_nintendo(context) -> dict[str, str]:
@@ -293,15 +359,61 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     )
 
 
+def pick_gog_al_from_cookies(cookies: list[dict]) -> str:
+    """Return the gog-al session value from Playwright cookie dicts, or \"\"."""
+    gog_al = next((c["value"] for c in cookies if c.get("name") == "gog-al" and c.get("value")), "")
+    if gog_al:
+        return str(gog_al)
+    header = _cookie_header(cookies, ("gog.com",))
+    if header and "gog-al=" in header:
+        return header.split("gog-al=")[-1].split(";")[0].strip()
+    if header:
+        return header.strip()
+    return ""
+
+
 def _extract_gog(context) -> dict[str, str]:
-    cookies = context.cookies()
-    gog_al = next((c["value"] for c in cookies if c.get("name") == "gog-al"), "")
+    gog_al = pick_gog_al_from_cookies(context.cookies())
     if not gog_al:
-        header = _cookie_header(cookies, ("gog.com",))
-        if not header:
-            raise RuntimeError("No GOG session — sign in at gog.com")
-        return {"GOG_AL": header.split("gog-al=")[-1].split(";")[0] if "gog-al=" in header else header}
+        raise RuntimeError("No GOG session — sign in at gog.com")
     return {"GOG_AL": gog_al}
+
+
+def _extract_gog_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
+    """Poll for gog-al after the user signs in — do not trust the /en homepage URL."""
+    try:
+        page.goto("https://www.gog.com/", wait_until="domcontentloaded", timeout=25_000)
+    except Exception:  # noqa: BLE001
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_msg = 0.0
+    while time.time() < deadline:
+        gog_al = pick_gog_al_from_cookies(context.cookies())
+        if gog_al:
+            if session:
+                session.emit("signed_in", {"url": page.url or "https://www.gog.com/"})
+            return {"GOG_AL": gog_al}
+
+        now = time.time()
+        if session and now - last_msg > 8:
+            last_msg = now
+            url = (page.url or "").lower()
+            if "login" in url or "signin" in url or "auth" in url:
+                msg = "Sign in to your GOG account in the browser window."
+            else:
+                msg = (
+                    "Sign in at gog.com if prompted. We'll save your session automatically "
+                    "once you're logged in."
+                )
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Could not capture a GOG session in time — sign in at gog.com in the browser window, "
+        "then click Connect again."
+    )
 
 
 def _psn_cookie(context) -> str:
@@ -840,6 +952,25 @@ UBISOFT_LIBRARY_URLS = (
 )
 
 
+def _ubisoft_active_page(live: list) -> object | None:
+    """Prefer login/success tabs over the marketing Connect landing page."""
+    if not live:
+        return None
+    for pg in live:
+        u = (pg.url or "").lower()
+        if (
+            "account.ubisoft" in u
+            or "connect.ubisoft" in u
+            or UBISOFT_SUCCESS_URL in u
+        ):
+            return pg
+    for pg in live:
+        u = (pg.url or "").lower()
+        if any(x in u for x in ("login", "signin", "authorize", "oauth")):
+            return pg
+    return live[0]
+
+
 def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[str, str]:
     captured: dict[str, str] = {}
 
@@ -872,18 +1003,12 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
             return captured
 
         live = [pg for pg in context.pages if not pg.is_closed]
-        # Drop orphan blank tabs (post-verify leftovers) so they can't steal focus.
+        main = _ubisoft_active_page(live) or (live[0] if live else context.new_page())
         if len(live) > 1:
-            for pg in live:
-                u = (pg.url or "").strip()
-                if is_blank_browser_url(u):
-                    try:
-                        pg.close()
-                    except Exception:
-                        pass
-            live = [pg for pg in context.pages if not pg.is_closed]
-
-        main = live[0] if live else context.new_page()
+            try:
+                main.bring_to_front()
+            except Exception:
+                pass
         urls = [(pg.url or "").lower() for pg in live]
         on_success = any(UBISOFT_SUCCESS_URL in u for u in urls)
 
@@ -912,8 +1037,8 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
             joined = " ".join(urls)
             if "account.ubisoft" in joined or "login" in joined:
                 msg = (
-                    "Finish Ubisoft sign-in and 2FA in the browser. If a verify step opens a "
-                    "blank tab, you can close it — we'll detect the sign-in automatically."
+                    "Finish Ubisoft sign-in and 2FA in the browser window (use the popup if it "
+                    "stays open). Close DevTools if you see a yellow 'Debugger paused' banner."
                 )
             elif seen_success and not captured:
                 msg = "Signed in — opening your Ubisoft games list to finish capturing the session."
@@ -1000,55 +1125,38 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
     )
 
 
-LUNA_CLAIMS_URL = "https://luna.amazon.com/claims/my-collection"
-
-
 def _extract_amazon_web(page, context, session: AuthSession | None = None) -> dict[str, str]:
-    """Confirm Prime Gaming claims load; durable credential is the saved browser profile."""
-    from amazon_web_client import try_parse_claims_from_text
+    """Confirm Prime Gaming session; durable credential is the saved browser profile."""
+    from amazon_web_client import (
+        _capture_claims_from_response,
+        _poll_prime_collection,
+    )
 
-    saw_claims = {"ok": False}
+    raw_claims: list[dict[str, Any]] = []
+    captured: dict[str, bool] = {"done": False}
 
     def on_response(resp: Any) -> None:
-        if saw_claims["ok"]:
-            return
-        try:
-            if getattr(resp, "status", 0) != 200:
-                return
-            if "graphql" not in (getattr(resp, "url", None) or "").lower():
-                return
-            if try_parse_claims_from_text(resp.text()) is not None:
-                saw_claims["ok"] = True
-        except Exception:
-            pass
+        _capture_claims_from_response(resp, raw_claims, captured)
 
     page.on("response", on_response)
-    try:
-        page.goto(LUNA_CLAIMS_URL, wait_until="domcontentloaded", timeout=25_000)
-    except Exception:
-        pass
+    _poll_prime_collection(
+        page,
+        context,
+        deadline=time.time() + SUCCESS_WAIT_SEC,
+        raw_claims=raw_claims,
+        captured=captured,
+        allow_session_only=True,
+        start_at_signin=True,
+        session=session,
+        poll_interval_ms=int(POLL_SEC * 1000),
+    )
 
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    last_hint = 0.0
-    while time.time() < deadline:
-        if saw_claims["ok"]:
-            return {"AMAZON_WEB_PROFILE": "ready"}
-
-        now = time.time()
-        if session and now - last_hint > 10:
-            last_hint = now
-            url = (page.url or "").lower()
-            if "signin" in url or "/ap/" in url:
-                msg = "Sign in to your Amazon account in the browser window."
-            else:
-                msg = "Keep the window open until My Collection finishes loading."
-            session.emit("waiting_for_user", {"message": msg})
-
-        page.wait_for_timeout(int(POLL_SEC * 1000))
+    if captured["done"]:
+        return {"AMAZON_WEB_PROFILE": "ready"}
 
     raise RuntimeError(
-        "Prime Gaming claims not detected — sign in at luna.amazon.com, open My Collection, "
-        "and wait for your games list before the window closes."
+        "Prime Gaming session not confirmed — sign in on the Amazon page, wait for "
+        "My Collection (or gaming.amazon.com) to load, then try Connect again."
     )
 
 
@@ -1075,7 +1183,7 @@ EXTRACTORS = {
 INLINE_PROVIDERS = {
     "psn", "steam", "itch", "itad", "xbox", "xbox_wishlist",
     "ubisoft", "ea", "epic_wishlist", "nintendo", "nintendo_wishlist", "epic",
-    "humble", "amazon_web",
+    "humble", "amazon_web", "battlenet", "gog",
 }
 
 
@@ -1091,7 +1199,7 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
         "steam": "Sign in to Steam. We'll save your API key automatically.",
         "itch": "Sign in to itch.io. We'll save your API key automatically.",
         "itad": "Sign in to IsThereAnyDeal. We'll register an app and save your API key.",
-        "xbox": "Sign in to OpenXBL with your Microsoft account. We'll save your API key automatically.",
+        "xbox": "Click \u201cSign in with Xbox Live\u201d on the xbl.io page, then sign in with your Microsoft account. We'll save your API key automatically once you have it.",
         "xbox_wishlist": (
             "Sign in to xbox.com with your Microsoft account. We'll detect your "
             "wishlist session automatically \u2014 no need to refresh the page."
@@ -1101,8 +1209,8 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             "until your wishlist finishes loading. Clear any Cloudflare check if shown."
         ),
         "ubisoft": (
-            "Sign in to Ubisoft and complete 2FA in the browser window. If a verify step "
-            "opens a blank tab, you can close it \u2014 we'll detect the sign-in automatically."
+            "Sign in to Ubisoft and complete 2FA in the browser (use the login popup if it "
+            "stays open). Close DevTools if you see a yellow 'Debugger paused' banner."
         ),
         "nintendo": (
             "Sign in to your Nintendo Account. We'll automatically open your eShop "
@@ -1125,8 +1233,16 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             "library token automatically."
         ),
         "amazon_web": (
-            "Sign in to Amazon and open Prime Gaming My Collection. We'll capture your "
-            "claims list automatically."
+            "Sign in on the Amazon page in the browser window. After login we'll open "
+            "My Collection and save your session automatically."
+        ),
+        "battlenet": (
+            "Sign in at account.battle.net and open your Games list. We'll verify the "
+            "library API before saving your session."
+        ),
+        "gog": (
+            "Sign in to your GOG account in the browser window. We'll save your session "
+            "automatically once you're logged in."
         ),
     }
     session.emit(
@@ -1175,6 +1291,10 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
                 creds = _extract_humble_inline(page, context, session)
             elif provider == "amazon_web":
                 creds = _extract_amazon_web(page, context, session)
+            elif provider == "battlenet":
+                creds = _extract_battlenet_inline(page, context, session)
+            elif provider == "gog":
+                creds = _extract_gog_inline(page, context, session)
             else:
                 page.goto(spec.login_url, wait_until="domcontentloaded")
                 session.emit("signed_in", {"url": page.url})

@@ -20,7 +20,8 @@ from auth import mark_invalid, resolve_env
 from fetchers._authoritative import NINTENDO
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from nintendo_client import NintendoAuthError, NintendoClient
+from auth.secrets import profile_dir
+from nintendo_client import NintendoAuthError, NintendoClient, NintendoEndpointError
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
 def raw_dump_json() -> Path:
@@ -185,8 +186,13 @@ def main() -> int:
         return stats.finish("fetch_nintendo", t0, exit_code=1)
 
     try:
-        client = NintendoClient(cookie)
+        client = NintendoClient(cookie, profile_path=profile_dir("nintendo"))
         raw_tx = client.fetch_all_transactions()
+    except NintendoEndpointError as e:
+        # Endpoint moved/removed — not an auth problem, so don't mark the
+        # account invalid (that would nag the user to reconnect pointlessly).
+        stats.error(str(e))
+        return stats.finish("fetch_nintendo", t0, exit_code=1)
     except NintendoAuthError as e:
         mark_invalid("nintendo", error=str(e))
         stats.error(str(e))

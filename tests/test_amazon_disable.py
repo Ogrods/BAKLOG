@@ -79,6 +79,7 @@ def test_provider_state_local_connected_when_sql_dir(
     monkeypatch.setattr("auth.manager.platform_supported", lambda platforms: True)
     sql_dir = tmp_path / "AmazonSql"
     sql_dir.mkdir()
+    (sql_dir / "Entitlements.sqlite").write_bytes(b"")
     set_provider_blob("amazon", {"AMAZON_GAMES_SQL_DIR": str(sql_dir)})
     monkeypatch.setattr("auth.manager._env_fallback_allowed", lambda: True)
     assert _provider_state("amazon") == "connected"

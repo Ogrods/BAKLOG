@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 from battlenet_client import BattleNetAuthError, BattleNetClient
 from hltb_client import HltbClient
-from auth import mark_invalid, resolve_env
+from auth import mark_connected, mark_invalid, resolve_env
 from fetchers._authoritative import BATTLENET
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
@@ -216,12 +216,39 @@ def main() -> int:
         stats.error(str(e))
         return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
 
+    raw = None
     try:
         raw = client.get_raw_account()
     except BattleNetAuthError as e:
-        mark_invalid("battlenet", error=str(e))
-        stats.error(str(e))
-        return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
+        err = str(e)
+        if (
+            args.browser == "env"
+            and env_cookie
+            and ("401" in err or "403" in err or "rejected the session" in err.lower())
+        ):
+            fallback_browser = os.getenv("BATTLENET_BROWSER", "edge")
+            try:
+                client = BattleNetClient.from_browser(fallback_browser)
+                raw = client.get_raw_account()
+                print(
+                    f"warning: stored BATTLENET_COOKIE was rejected; "
+                    f"using {fallback_browser} browser session instead.",
+                    file=sys.stderr,
+                )
+                cookie_header = (client.session.headers.get("Cookie") or "").strip()
+                if cookie_header:
+                    try:
+                        mark_connected("battlenet", {"BATTLENET_COOKIE": cookie_header})
+                    except Exception:  # noqa: BLE001
+                        pass
+            except BattleNetAuthError:
+                mark_invalid("battlenet", error=err)
+                stats.error(err)
+                return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
+        else:
+            mark_invalid("battlenet", error=err)
+            stats.error(err)
+            return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
 
     if args.dump_raw:
         raw_dump_json().parent.mkdir(parents=True, exist_ok=True)

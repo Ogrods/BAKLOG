@@ -9,6 +9,10 @@ Typical paths (``%LOCALAPPDATA%``):
 - ``Amazon Games/Data/Games/Sql/Entitlements.sqlite`` — owned titles (required)
 - ``Amazon Games/Data/Games/Sql/ProductDetails.sqlite`` — cached artwork/metadata
 - ``Amazon Games/Data/Games/Sql/GameUserInteractionsInfo.sqlite`` — last played
+
+Prime Gaming "Fuel" promos (``Twitch:FuelGame`` entitlements with non-ADG product
+ids) are skipped: they are external-store key drops (GOG/Epic/etc.), not playable
+Amazon Games titles, so they only duplicate the library they were redeemed in.
 """
 
 from __future__ import annotations
@@ -70,6 +74,27 @@ def dpapi_decrypt(data: bytes) -> bytes:
         return ctypes.string_at(blob_out.pbData, blob_out.cbData)
     finally:
         ctypes.windll.kernel32.LocalFree(blob_out.pbData)
+
+
+_NATIVE_PRODUCT_ID_PREFIX = "amzn1.adg.product"
+
+
+def _is_external_prime_claim(ent: dict) -> bool:
+    """True for Prime Gaming "Fuel" promos redeemed on an external store.
+
+    These ship as ``Twitch:FuelGame`` entitlements with a non-ADG product id
+    (a bare UUID instead of ``amzn1.adg.product.<uuid>``). They are delivered as
+    GOG/Epic/etc. keys -- not playable through Amazon Games -- so they only
+    duplicate the library the user actually redeemed them in. Native Amazon Games
+    titles always carry an ``amzn1.adg.product`` id, so they are never dropped.
+    """
+    product_line = (ent.get("ProductLine") or "").strip()
+    if not product_line.startswith("Twitch:"):
+        return False
+    product_id = str(
+        ent.get("ProductIdStr") or (ent.get("ProductId") or {}).get("Id") or ""
+    )
+    return not product_id.startswith(_NATIVE_PRODUCT_ID_PREFIX)
 
 
 def _normalize_title(title: str) -> str:
@@ -173,6 +198,8 @@ class AmazonGamesClient:
         seen_product_ids: set[str] = set()
 
         for ent in self.get_entitlements():
+            if _is_external_prime_claim(ent):
+                continue
             title = (ent.get("ProductTitle") or "").strip()
             if not title:
                 continue

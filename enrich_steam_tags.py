@@ -33,8 +33,11 @@ from pathlib import Path
 
 from auth import resolve_env
 from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
-from fetchers._progress import RunStats, started
+from fetchers._progress import RunStats, heartbeat, started
+
+HEARTBEAT_EVERY = 25  # Steam API lookups between progress lines (avoids server stall-kill)
 from shared.profile_paths import cache_json_path
+from itch_game import itch_is_videogame as _itch_is_videogame
 from steam_client import SteamClient
 from steam_metadata import (
     ALWAYS_WRITE_FIELDS,
@@ -51,10 +54,6 @@ def mapping_file() -> Path:
 
 def meta_file() -> Path:
     return cache_json_path("steam_tags_meta.json")
-
-
-def _itch_is_videogame(row: dict) -> bool:
-    return row.get("classification") == "game"
 
 
 STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
@@ -169,6 +168,11 @@ def main(argv: list[str] | None = None) -> int:
             if not appid:  # None or 0 → no Steam match recorded
                 continue
             rows_with_appid += 1
+            if rows_with_appid % HEARTBEAT_EVERY == 0:
+                heartbeat(
+                    f"{filename}: {rows_with_appid} Steam lookups, "
+                    f"{rows_updated} updated ({i}/{len(games)})"
+                )
 
             try:
                 result = steam.get_app_details(int(appid), refresh=args.refresh)

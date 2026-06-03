@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid
 from auth.manager import mark_connected
+from auth.manager import is_local_provider_disabled
 from auth.secrets import profile_dir
 from amazon_web_client import AmazonWebAuthError
 from fetchers._authoritative import AMAZON
@@ -51,6 +52,8 @@ def _configure_stdout() -> None:
 
 
 def _launcher_db_ready(sql_dir: Path | None) -> bool:
+    if is_local_provider_disabled("amazon"):
+        return False
     if sys.platform != "win32":
         return False
     try:

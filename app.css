@@ -1328,6 +1328,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .fh-empty { font-size: 0.75rem; color: #64748b; font-style: italic; }
 /* Live run log panel */
 .fh-log {
+  position: relative;
   border: 1px solid rgb(51 65 85);
   border-radius: 0.5rem;
   background: rgba(2, 6, 23, 0.7);
@@ -1339,8 +1340,13 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   flex-direction: column;
   min-height: 0;
 }
+/* Fill the full row height (matches the health card via the grid stretch).
+   The body is min-height:0 so its content scrolls instead of growing the
+   row — keeps the panel pinned to the health card height with no dead space. */
 .fh-row:has(.fh-log.open) .fh-log.open {
   min-height: 7.5rem;
+  width: 100%;
+  min-width: 0;
 }
 .fh-log-head {
   display: flex; align-items: center; gap: 0.5rem;
@@ -1348,6 +1354,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   background: rgba(15, 23, 42, 0.85);
   border-bottom: 1px solid rgb(30 41 59);
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 .fh-log-title { font-size: 0.75rem; font-weight: 600; color: #e2e8f0; }
 .fh-log-status { font-size: 0.7rem; color: #94a3b8; }
@@ -1409,6 +1416,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .fh-log-body {
   max-height: 16rem;
   overflow-y: auto;
+  overflow-x: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: calc(0.72rem - 1px);
   line-height: 1.45;
@@ -1416,12 +1424,50 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   color: #cbd5e1;
   white-space: pre-wrap;
   word-break: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(71 85 105) transparent;
+}
+.fh-log-body::-webkit-scrollbar {
+  width: 8px;
+}
+.fh-log-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.fh-log-body::-webkit-scrollbar-thumb {
+  background: rgb(51 65 85);
+  border-radius: 4px;
+}
+.fh-log-body::-webkit-scrollbar-thumb:hover {
+  background: rgb(71 85 105);
 }
 .fh-row:has(.fh-log.open) .fh-log-body {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 16rem;
+  max-height: none;
 }
+/* Jump-to-latest arrow: shown only when the user has scrolled up. */
+.fh-log-jump {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.7rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgb(71 85 105);
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+}
+.fh-log-jump:hover { background: rgb(30 41 59); }
+.fh-log-jump:focus-visible { outline: 2px solid #38bdf8; outline-offset: 1px; }
+.fh-log-jump.hidden { display: none; }
 .fh-log-line.stderr { color: #fda4af; }
 .fh-log-line.meta { color: #94a3b8; font-style: italic; }
 .fh-log-line.cmd { color: #38bdf8; }
@@ -1429,6 +1475,9 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 @media (max-width: 767px) {
   .fh-row:has(.fh-log.open) {
     grid-template-columns: 1fr;
+  }
+  .fh-row:has(.fh-log.open) .fh-log.open {
+    max-height: 14.5rem;
   }
   .fh-row:has(.fh-log.open) .fh-log-body {
     flex: none;

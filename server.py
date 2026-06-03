@@ -24,6 +24,7 @@ Endpoints:
     GET  /api/auth/<id>/stream -> SSE auth flow events
     PUT  /api/auth/<p>/credentials -> save form API keys
     POST /api/auth/<p>/disconnect  -> wipe stored credentials
+    POST /api/auth/<p>/enable     -> re-enable local-only provider (e.g. Amazon launcher)
     POST /api/auth/master-password -> set optional portable encryption passphrase
     POST /api/auth/secrets/export  -> download encrypted portable bundle
     POST /api/auth/secrets/import  -> restore bundle (?passphrase=...)
@@ -41,6 +42,7 @@ import queue
 import re
 import signal
 import subprocess
+import socket
 import sys
 import threading
 import time
@@ -63,6 +65,10 @@ except ImportError:
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
+_DEV_SERVER_BUSY_MSG = (
+    f"BAKLOG dev server is already running on http://{HOST}:{PORT} — "
+    "stop that instance first (it owns the port)."
+)
 MAX_HISTORY = 200
 MAX_LINES_PER_RUN = 25_000
 MAX_SSE_CONNECTIONS = 8
@@ -1238,6 +1244,10 @@ class Handler(SimpleHTTPRequestHandler):
             provider = self.path[len("/api/auth/") : -len("/disconnect")].strip("/")
             self._handle_auth_disconnect(provider)
             return
+        if self.path.startswith("/api/auth/") and self.path.endswith("/enable"):
+            provider = self.path[len("/api/auth/") : -len("/enable")].strip("/")
+            self._handle_auth_enable(provider)
+            return
         if self.path == "/api/auth/master-password":
             self._handle_auth_master_password()
             return
@@ -1551,6 +1561,19 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
+    def _handle_auth_enable(self, provider: str) -> None:
+        try:
+            from auth.manager import enable_local
+
+            enable_local(provider)
+            _send_json(self, HTTPStatus.OK, {"ok": True})
+        except KeyError:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
     def _handle_auth_credentials(self, provider: str) -> None:
         try:
             length = int(self.headers.get("Content-Length") or 0)
@@ -1852,6 +1875,25 @@ def _maybe_import_legacy_env() -> None:
         print(f"[auth] .env import skipped: {exc}", file=sys.stderr, flush=True)
 
 
+def _dev_server_port_busy() -> bool:
+    """True when something is already accepting TCP on HOST:PORT."""
+    try:
+        with socket.create_connection((HOST, PORT), timeout=0.3):
+            return True
+    except OSError:
+        return False
+
+
+def _exit_if_dev_server_busy() -> None:
+    if _dev_server_port_busy():
+        print(_DEV_SERVER_BUSY_MSG, file=sys.stderr, flush=True)
+        raise SystemExit(1)
+
+
+class BaklogDevServer(ThreadingHTTPServer):
+    allow_reuse_address = False
+
+
 def main() -> None:
     atexit.register(_shutdown_server)
     _maybe_import_legacy_env()
@@ -1865,8 +1907,14 @@ def main() -> None:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_exit)
 
+    _exit_if_dev_server_busy()
     handler = partial(Handler, directory=str(ROOT))
-    with ThreadingHTTPServer((HOST, PORT), handler) as httpd:
+    try:
+        httpd = BaklogDevServer((HOST, PORT), handler)
+    except OSError:
+        print(_DEV_SERVER_BUSY_MSG, file=sys.stderr, flush=True)
+        raise SystemExit(1) from None
+    with httpd:
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")
         print(f"Python for fetchers: {_python_executable()}")
         print(f"Registered fetchers: {len(FETCHERS)}")

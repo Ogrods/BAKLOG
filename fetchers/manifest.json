@@ -215,13 +215,13 @@
       "script": "enrich_steam_reviews.py",
       "refreshArgs": ["--retry-misses"],
       "metaKey": "steamReviews",
-      "color": "#66c0f4",
+      "color": "#ea580c",
       "requires": [
         { "env": "STEAM_API_KEY", "note": "Used for Steam store search when backfilling review %" },
         { "env": "STEAM_ID", "note": "Steam Web API identity (same as library fetch)" }
       ]
     },
-    { "key": "steamCovers", "label": "Covers", "group": "enrich", "script": "enrich_cross_store_images.py", "refreshArgs": ["--retry-misses"], "metaKey": "steamCovers", "color": "#1b2838" },
+    { "key": "steamCovers", "label": "Covers", "group": "enrich", "script": "enrich_cross_store_images.py", "refreshArgs": ["--retry-misses"], "metaKey": "steamCovers", "color": "#ea580c" },
     {
       "key": "steamTags",
       "label": "Co-op tags",
@@ -229,7 +229,7 @@
       "script": "enrich_steam_tags.py",
       "refreshArgs": ["--refresh"],
       "metaKey": "steamTags",
-      "color": "#3b82f6",
+      "color": "#ea580c",
       "requires": [
         { "env": "STEAM_API_KEY", "note": "Reuses Steam appdetails cache to backfill coop tags + genres for non-Steam rows" },
         { "env": "STEAM_ID", "note": "Steam Web API identity (same as library fetch)" }

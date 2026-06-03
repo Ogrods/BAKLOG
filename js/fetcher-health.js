@@ -340,6 +340,10 @@ const GROUP_LABELS = {
   prices: 'Prices',
   enrich: 'Enrichment',
 };
+// Fixed order within the Enrichment group: keep the three Steam-derived
+// enrichers (orange edge) adjacent, then HLTB. Overrides the status/label
+// sort so they always render next to each other.
+const ENRICH_ORDER = ['steamTags', 'steamCovers', 'steamReviews', 'hltb'];
 
 const COUNT_FNS = {
   itad: m => Object.keys(m?.by_key || {}).length,
@@ -1140,6 +1144,7 @@ export const fetcherRunner = (() => {
         <button type="button" class="fh-log-btn" data-role="close">Close</button>
       </div>
       <div class="fh-log-body" data-role="body"></div>
+      <button type="button" class="fh-log-jump hidden" data-role="jump" aria-label="Jump to latest line" title="Jump to latest">&darr;</button>
     `;
     panel.dataset.built = '1';
     panel.addEventListener('click', e => {
@@ -1148,7 +1153,10 @@ export const fetcherRunner = (() => {
       if (btn.dataset.role === 'close') closePanel();
       else if (btn.dataset.role === 'clear') clearLog();
       else if (btn.dataset.role === 'cancel') cancelInFlightRuns();
+      else if (btn.dataset.role === 'jump') scrollLogToBottom();
     });
+    const body = panel.querySelector('[data-role="body"]');
+    if (body) body.addEventListener('scroll', updateJumpButton);
     return panel;
   }
 
@@ -1289,6 +1297,29 @@ export const fetcherRunner = (() => {
   function clearLog() {
     const body = logBody();
     if (body) body.innerHTML = '';
+    updateJumpButton();
+  }
+
+  /** Is the log scrolled within ~24px of the bottom (i.e. pinned to latest)? */
+  function logNearBottom(body) {
+    return body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+  }
+
+  /** Show the jump-to-latest arrow only when scrolled away from the bottom. */
+  function updateJumpButton() {
+    const panel = logPanel();
+    if (!panel) return;
+    const body = panel.querySelector('[data-role="body"]');
+    const btn = panel.querySelector('[data-role="jump"]');
+    if (!body || !btn) return;
+    btn.classList.toggle('hidden', logNearBottom(body));
+  }
+
+  function scrollLogToBottom() {
+    const body = logBody();
+    if (!body) return;
+    body.scrollTop = body.scrollHeight;
+    updateJumpButton();
   }
 
   function setStatus(status, extra) {
@@ -1314,13 +1345,14 @@ export const fetcherRunner = (() => {
     // Only auto-scroll if the user is already pinned near the bottom; otherwise
     // leave their scroll position alone so they can read back through the log
     // while new lines keep streaming in.
-    const stick = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+    const stick = logNearBottom(body);
     const div = document.createElement('div');
     div.className = `fh-log-line ${kind}`;
     div.textContent = text;
     body.appendChild(div);
     while (body.children.length > 4000) body.removeChild(body.firstChild);
     if (stick) body.scrollTop = body.scrollHeight;
+    updateJumpButton();
   }
 
   function markChipState(key, runState, runId = null) {
@@ -1907,8 +1939,15 @@ export function renderDashboardFetcherHealth() {
     ? (showOnlyStale
       ? `<div class="fh-group-chips">${visible.map(chipHtml).join('')}</div>`
       : GROUP_ORDER.map(group => {
-          const groupRows = visible.filter(r => r.src.group === group);
+          let groupRows = visible.filter(r => r.src.group === group);
           if (!groupRows.length) return '';
+          if (group === 'enrich') {
+            const ord = k => {
+              const i = ENRICH_ORDER.indexOf(k);
+              return i < 0 ? ENRICH_ORDER.length : i;
+            };
+            groupRows = [...groupRows].sort((a, b) => ord(a.src.key) - ord(b.src.key));
+          }
           return `<div class="fh-group">
             <div class="fh-group-label">${escapeHtml(GROUP_LABELS[group] || group)}</div>
             <div class="fh-group-chips">${groupRows.map(chipHtml).join('')}</div>

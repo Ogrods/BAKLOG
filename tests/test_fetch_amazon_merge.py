@@ -163,3 +163,20 @@ class TestCarryForwardLogic:
             if fa._effective_row_source(row) != "web"
         ]
         assert carried == []
+
+
+class TestResolveSourceLauncherDisabled:
+    def test_launcher_db_ready_false_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(fa, "is_local_provider_disabled", lambda provider: True)
+        assert fa._launcher_db_ready(None) is False
+
+    def test_auto_skips_launcher_when_user_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(fa, "is_local_provider_disabled", lambda provider: provider == "amazon")
+        monkeypatch.setattr(fa, "_launcher_db_ready", lambda sql_dir: False)
+        monkeypatch.setattr(fa, "_web_profile_ready", lambda: True)
+        assert fa.resolve_source("auto", None) == "web"
+
+    def test_auto_launcher_when_not_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(fa, "is_local_provider_disabled", lambda provider: False)
+        monkeypatch.setattr(fa, "_launcher_db_ready", lambda sql_dir: True)
+        assert fa.resolve_source("auto", None) == "launcher"

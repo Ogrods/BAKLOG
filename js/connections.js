@@ -271,6 +271,13 @@ function buildFormPanel(p) {
 }
 
 
+function disconnectBtnHtml(p, st) {
+  const show = st !== 'disconnected' && st !== 'unverified' && p.kind !== 'local';
+  return show
+    ? `<button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}">Disconnect</button>`
+    : '';
+}
+
 
 function buildCardFooter(p, st) {
 
@@ -296,6 +303,8 @@ function buildCardFooter(p, st) {
 
         <button type="button" class="conn-open-url" data-open-url data-provider="${escapeAttr(p.key)}">Open sign-in page</button>
 
+        ${disconnectBtnHtml(p, st)}
+
       </div>`;
 
   }
@@ -309,6 +318,8 @@ function buildCardFooter(p, st) {
     <div class="conn-card-footer">
 
       <button type="button" class="conn-primary" data-primary="browser" data-provider="${escapeAttr(p.key)}">${label}</button>
+
+      ${disconnectBtnHtml(p, st)}
 
     </div>`;
 
@@ -375,8 +386,6 @@ function buildCardHtml(p) {
 
   const showFormPanel = hasFormFields && (p.kind === 'form' || p.kind === 'manual' || p.kind === 'browser');
 
-  const showDisconnect = st !== 'disconnected' && st !== 'unverified' && p.kind !== 'local';
-
 
 
   return `
@@ -392,8 +401,6 @@ function buildCardHtml(p) {
         <div class="conn-head-actions">
 
           <span class="${STATUS_CLASS[st] || STATUS_CLASS.disconnected}">${STATUS_LABEL[st] || st}</span>
-
-          ${showDisconnect ? `<button type="button" class="conn-disconnect-x" data-disconnect-quick data-provider="${escapeAttr(p.key)}" aria-label="Disconnect ${escapeAttr(p.label)}">&times;</button>` : ''}
 
         </div>
 
@@ -455,11 +462,15 @@ function buildRailItemHtml(p, selected) {
 
 function buildSteamRailBlock(p, selected) {
 
+  const caption = (p.status === 'connected')
+    ? ''
+    : '<span class="conn-rail-rec-caption">Recommended first</span>';
+
   return `
 
     <div class="conn-rail-steam-wrap">
 
-      <span class="conn-rail-rec-caption">Recommended first</span>
+      ${caption}
 
       ${buildRailItemHtml(p, selected)}
 

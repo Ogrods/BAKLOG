@@ -70,7 +70,9 @@ npm run build:css
 
 ## Fetch your libraries
 
-**Steam:**
+**Recommended:** run `python server.py`, open **Connections**, and click **Connect** for each store. A headed Chrome/Edge window opens for cookie/OAuth sign-in; credentials stay local in `cache/auth/`. Then run fetchers from the dashboard **Fetcher health** row or from the terminal below.
+
+**Steam:** Connections → Steam → Connect (grabs your API key automatically), or set `STEAM_API_KEY` + `STEAM_ID` in `.env` manually. Set **Game details** to **Public** in Steam profile privacy.
 
 ```bash
 python fetch_games.py
@@ -78,62 +80,92 @@ python fetch_games.py
 
 Writes `games_steam.json`.
 
-**GOG:** Sign in at [gog.com](https://www.gog.com), copy the `gog-al` cookie from DevTools → Application → Cookies, set `GOG_AL=` in `.env`, then:
+**GOG:** Connections → GOG → Connect and sign in at [gog.com](https://www.gog.com). One sign-in covers library + wishlist.
 
 ```bash
 python fetch_gog.py
 ```
 
-**PlayStation (PSN):** Sign in at [playstation.com](https://www.playstation.com), open https://ca.account.sony.com/api/v1/ssocookie, copy the `npsso` token into `PSN_NPSSO=`, set trophy/game privacy to **Anyone**, then:
+*Fallback:* copy the `gog-al` cookie from DevTools → Application → Cookies into `GOG_AL=` in `.env`.
+
+**PlayStation (PSN):** Connections → PlayStation → Connect and sign in at the PlayStation Store. Set trophy/game privacy to **Anyone** so the library and wishlist can load.
 
 ```bash
 python fetch_psn.py
 ```
 
-**Epic:** Run `python fetch_epic.py --auth-help` for OAuth steps. Paste the auth code into `EPIC_AUTH_CODE=` in `.env`, then:
+*Fallback:* open https://ca.account.sony.com/api/v1/ssocookie while logged in and paste the `npsso` token into `PSN_NPSSO=` in `.env`.
+
+**Epic (library):** Connections → Epic (library) → Connect — we capture and exchange the authorization code automatically.
 
 ```bash
 python fetch_epic.py
 ```
 
-**Amazon Games (Windows):** Reads the local Prime Gaming SQLite DB (DPAPI). Optional override: `AMAZON_GAMES_SQL_DIR=`.
+*Fallback:* run `python fetch_epic.py --auth-help` and paste the code into `EPIC_AUTH_CODE=` in `.env`.
+
+**Epic (wishlist):** Connections → Epic (wishlist) → Connect on the storefront (separate session from library).
+
+```bash
+python fetch_epic_wishlist.py
+```
+
+**Amazon Games (Windows):** No browser sign-in — reads the Prime Gaming launcher SQLite DB on this PC. Optional override: `AMAZON_GAMES_SQL_DIR=`.
 
 ```bash
 python fetch_amazon.py
 ```
 
-**Xbox / Game Pass / Microsoft Store:** Free key from https://xbl.io/ → `XBL_API_KEY=` in `.env`.
+**Xbox (play history):** Connections → Xbox → Connect at [xbl.io](https://xbl.io/login), or paste an OpenXBL API key into the card.
 
 ```bash
 python fetch_xbox.py --skip-hltb
 ```
 
-**Battle.net (unofficial):** Modern Edge / Chrome (v127+) use app-bound cookie encryption, so the automatic browser jar read usually fails on Windows even with admin. The reliable path is the manual `.env` cookie:
-
-1. Sign in at [account.battle.net/games](https://account.battle.net/games) in Edge.
-2. DevTools (F12) → Network → reload → click the `games-and-subs` request → copy the full `Cookie:` request header.
-3. Paste it into `BATTLENET_COOKIE=` in `.env` (one line, no quotes).
-4. Run:
+**Xbox Store wishlist:** Connections → Xbox Store wishlist → Connect on xbox.com (separate from play history above).
 
 ```bash
-python fetch_battlenet.py --browser env --skip-hltb
+python fetch_xbox_wishlist.py
 ```
 
-The session expires every few weeks; repeat steps 1–3 when you see a 401. Firefox's jar can be read without admin (`--browser firefox`) if you sign in there instead. `BATTLENET_BROWSER=env` makes `env` the default for future runs.
+**Battle.net (unofficial):** Connections → Battle.net → Connect and sign in at [account.battle.net](https://account.battle.net/). The managed browser saves your session cookie locally; the fetcher uses it automatically (`--browser env` when a stored cookie exists).
 
-**Ubisoft Connect (unofficial):** Sign in at ubisoft.com, DevTools → Network → filter `public-ubi`, copy `Authorization` and `Ubi-SessionId` into `.env`.
+```bash
+python fetch_battlenet.py --skip-hltb
+```
+
+*Fallback (if Connect fails or you prefer CLI-only):* DevTools → Network → `games-and-subs` → copy the full `Cookie:` header into `BATTLENET_COOKIE=` in `.env`, then `python fetch_battlenet.py --browser env --skip-hltb`. On Windows, Edge/Chrome v127+ app-bound encryption can block the legacy *fetch-time* browser-jar read (`--browser edge`); Connect + stored cookie avoids that. Firefox (`--browser firefox`) or the `.env` cookie path still work without admin.
+
+**Ubisoft Connect (unofficial):** Connections → Ubisoft Connect → Connect (one sign-in for library + Ubisoft Store wishlist).
 
 ```bash
 python fetch_ubisoft.py --skip-hltb
+python fetch_ubisoft_wishlist.py
 ```
 
-**Nintendo Switch (unofficial):** Sign in at https://ec.nintendo.com/my/transactions/, copy the `Cookie` header from a transactions request into `NINTENDO_COOKIE=`. Only ~2 years of eShop history; cartridge games and older purchases must be added manually.
+*Fallback:* DevTools → Network → `public-ubi` → copy `Authorization` and `Ubi-SessionId` into `.env`.
+
+**Nintendo (eShop library):** Connections → Nintendo → Connect. Only ~2 years of digital eShop history; cartridge games and older purchases must be added manually.
 
 ```bash
 python fetch_nintendo.py --skip-hltb
 ```
 
-**Humble Bundle:** Connections → Humble Bundle → sign in at humblebundle.com (library page). One profile unlocks library + store wishlist fetchers.
+*Fallback:* copy the `Cookie` header from a `ec.nintendo.com/my/transactions` request into `NINTENDO_COOKIE=` in `.env`.
+
+**Nintendo Store wishlist:** Connections → Nintendo Store wishlist → Connect on nintendo.com.
+
+```bash
+python fetch_nintendo_wishlist.py
+```
+
+**EA App:** Connections → EA App → Connect at ea.com.
+
+```bash
+python fetch_ea.py
+```
+
+**Humble Bundle:** Connections → Humble Bundle → Connect at humblebundle.com (library page). One profile unlocks library + store wishlist fetchers.
 
 ```bash
 python fetch_humble.py --skip-hltb

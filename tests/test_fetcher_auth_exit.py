@@ -15,7 +15,6 @@ AUTH_EXIT_SCRIPTS = [
     "fetch_psn.py",
     "fetch_psn_wishlist.py",
     "fetch_epic.py",
-    "fetch_epic_wishlist.py",
     "fetch_xbox.py",
     "fetch_battlenet.py",
     "fetch_nintendo.py",
@@ -25,6 +24,7 @@ AUTH_EXIT_SCRIPTS = [
 ]
 
 SESSION_AUTH_WISHLIST_SCRIPTS = [
+    "fetch_epic_wishlist.py",
     "fetch_xbox_wishlist.py",
     "fetch_ubisoft_wishlist.py",
 ]

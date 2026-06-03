@@ -18,6 +18,7 @@ import pytest
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("shared.profile_paths.profile_root", lambda profile_id=None: tmp_path)
     (tmp_path / "cache").mkdir()
     # Mapping built by enrich_steam_reviews.py — only "gog:1" has a match.
     (tmp_path / "cache" / "steam_review_map.json").write_text(
@@ -169,6 +170,7 @@ def test_enricher_bails_without_mapping(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("shared.profile_paths.profile_root", lambda profile_id=None: tmp_path)
     monkeypatch.setenv("STEAM_API_KEY", "test_key")
     monkeypatch.setenv("STEAM_ID", "76561197960287930")
     for mod in ("enrich_steam_tags",):

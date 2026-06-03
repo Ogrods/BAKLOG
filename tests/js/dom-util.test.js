@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatReleaseDate } from '../../js/dom-util.js';
+import { formatReleaseDate } from '../../js/game-core.js';
 
 describe('formatReleaseDate', () => {
   it('formats YYYY-MM-DD', () => {

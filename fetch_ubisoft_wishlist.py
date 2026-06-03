@@ -34,6 +34,7 @@ from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
+from shared.money import format_price, normalize_currency_code
 
 GAMES_UBISOFT_WISHLIST_JSON = Path("games_wishlist_ubisoft.json")
 WISHLIST_URL = "https://store.ubisoft.com/us/wishlist/?lang=en_US"
@@ -212,9 +213,7 @@ def _fmt_price(value: float | None, currency: str | None) -> str | None:
         return None
     if value == 0:
         return "Free"
-    if currency.upper() == "USD":
-        return f"${value:.2f}"
-    return f"{currency} {value:.2f}"
+    return format_price(value, normalize_currency_code(currency))
 
 
 def _build_row(item: WishlistItem, hltb: dict | None) -> dict:

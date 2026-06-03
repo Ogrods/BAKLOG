@@ -18,6 +18,7 @@ from auth import resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from itad_client import ItadClient, ItadError
+from shared.money import country_to_currency
 from shared.safe_write import safe_write_text
 
 ITAD_JSON = Path("itad_prices.json")
@@ -75,7 +76,12 @@ def _collect_titles(include_library: bool) -> list[tuple[str, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch ITAD prices into itad_prices.json")
-    parser.add_argument("--country", default="US", help="ITAD country code (default US)")
+    default_country = os.environ.get("ITAD_COUNTRY", "US").strip().upper() or "US"
+    parser.add_argument(
+        "--country",
+        default=default_country,
+        help="ITAD country code (default ITAD_COUNTRY env or US)",
+    )
     parser.add_argument("--limit", type=int, default=0, help="Max titles (0 = all)")
     parser.add_argument(
         "--include-library",
@@ -142,6 +148,7 @@ def main() -> int:
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "country": args.country,
+        "currency": country_to_currency(args.country),
         "count": len(by_key),
         "by_key": by_key,
     }

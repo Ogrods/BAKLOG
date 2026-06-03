@@ -35,6 +35,9 @@ export function setBootCurtainLabel(view) {
   markBootCurtainShown();
   const lbl = document.getElementById("bootLoadingLabel");
   if (lbl && LOADING_LABELS[view]) lbl.textContent = LOADING_LABELS[view];
+  if (document.documentElement?.hasAttribute("data-boot-loading")) {
+    startBootTipRotation(document.getElementById("bootLoadingTip"));
+  }
 }
 
 /**

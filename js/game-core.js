@@ -4,6 +4,7 @@ import { isEarlyAccess } from './table-query.js';
 import { STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { getPersonal, hasPersonalEntry } from './personal-storage.js';
 import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
+import { formatMoney, displayCurrency } from './currency.js';
 
 // === Constants & config ===
 export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "humble", "ea", "other", "manual"];
@@ -549,9 +550,7 @@ export function formatReleaseDate(d) {
 }
 
 export function formatDollar(n) {
-  const num = Number(n);
-  if (!Number.isFinite(num)) return "—";
-  return num.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: num % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  return formatMoney(n, displayCurrency());
 }
 
 export function itchIsGame(g) {

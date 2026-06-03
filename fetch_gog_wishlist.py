@@ -22,6 +22,7 @@ import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from shared.money import format_price, normalize_currency_code
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from gog_client import GogAuthError, GogClient
@@ -201,9 +202,9 @@ def _build_row(gog_id: int, product: dict | None, price_doc: dict | None, hltb_d
         "store_url": f"https://www.gog.com/en/game/{slug}",
         "type": "game",
         "price": price_str,
-        "price_initial": f"${base:.2f}" if base is not None else None,
+        "price_initial": format_price(base, cur_norm) if base is not None else None,
         "discount_percent": discount,
-        "currency": currency,
+        "currency": cur_norm,
     }
 
 

@@ -26,6 +26,7 @@ from fetch_humble import _launch_humble_ctx
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
+from shared.money import format_price, normalize_currency_code
 
 GAMES_HUMBLE_WISHLIST_JSON = Path("games_wishlist_humble.json")
 WISHLIST_URL = "https://www.humblebundle.com/store/wishlist"
@@ -134,17 +135,17 @@ def _prices(obj: dict) -> tuple[str | None, str | None, int | None, str | None]:
         reg = _num(pi.get("full")) or reg
         currency = pi.get("currency") or currency
 
+    cur_norm = normalize_currency_code(currency)
+
     def _fmt(v: float | None) -> str | None:
         if v is None:
             return None
-        if currency == "USD":
-            return f"${v:.2f}"
-        return f"{currency} {v:.2f}"
+        return format_price(v, cur_norm)
 
     discount = None
     if cur is not None and reg is not None and reg > 0 and cur < reg:
         discount = round(100 * (1 - cur / reg))
-    return _fmt(cur), _fmt(reg), discount, str(currency) if currency else None
+    return _fmt(cur), _fmt(reg), discount, cur_norm
 
 
 def _looks_like_product(obj: dict) -> bool:

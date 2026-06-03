@@ -16,6 +16,7 @@ from hltb_client import HltbClient
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from auth import resolve_env
 from fetchers._progress import RunStats, started
+from shared.money import format_price, normalize_currency_code
 from steam_client import SteamClient
 
 GAMES_WISHLIST_JSON = Path("games_wishlist.json")
@@ -144,10 +145,16 @@ def main() -> int:
             "hltb_name": hltb_data.get("hltb_name") if hltb_data else None,
             "store_url": f"https://store.steampowered.com/app/{appid}/",
             "type": "game",
-            "price": f"${price_block.get('final', 0) / 100:.2f}" if price_block.get("final") else None,
-            "price_initial": f"${price_block.get('initial', 0) / 100:.2f}" if price_block.get("initial") else None,
+            "price": format_price(
+                price_block.get("final", 0) / 100 if price_block.get("final") else None,
+                normalize_currency_code(price_block.get("currency")),
+            ),
+            "price_initial": format_price(
+                price_block.get("initial", 0) / 100 if price_block.get("initial") else None,
+                normalize_currency_code(price_block.get("currency")),
+            ),
             "discount_percent": price_block.get("discount_percent"),
-            "currency": price_block.get("currency"),
+            "currency": normalize_currency_code(price_block.get("currency")),
         }
         games_out.append(row)
 

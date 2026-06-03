@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -72,8 +73,8 @@ def test_default_butler_db_windows_includes_itch_folder(
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setenv("APPDATA", r"C:\Users\Test\AppData\Roaming")
     path = default_butler_db()
-    assert path == Path(r"C:\Users\Test\AppData\Roaming\itch\db\butler.db")
-    assert "itch" in path.parts
+    expected = Path(os.environ["APPDATA"]) / "itch" / "db" / "butler.db"
+    assert path == expected
     assert path.parts[-3:] == ("itch", "db", "butler.db")
 
 

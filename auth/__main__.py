@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     export_p.add_argument(
         "--no-profiles",
         action="store_true",
-        help="Export credentials only (omit Playwright profile dirs)",
+        help="Export credentials only (omit CDP browser profile dirs)",
     )
     export_p.set_defaults(func=cmd_export)
 

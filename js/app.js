@@ -58,6 +58,7 @@ import {
   hideViewOverlay,
 } from './loading-curtain.js';
 import { reloadGames, reloadAfterFetcher, finishEmptyLibraryLoad } from './library-load.js';
+import { initLibraryWatches } from './library-watch.js';
 import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
 import { initProfiles } from './profiles.js';
@@ -226,6 +227,7 @@ async function bootstrap() {
     // count-up (including any 0 -> full jump during boot) stays silent; popups
     // only appear when a live fetcher/manual action adds games afterward.
     armLibraryCountAnimations();
+    initLibraryWatches();
   }
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {

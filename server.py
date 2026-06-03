@@ -20,7 +20,7 @@ Endpoints:
     PUT  /api/profiles/<id>   -> rename profile {label}
     DELETE /api/profiles/<id> -> delete non-active profile
     GET  /api/auth/status     -> per-provider connection state
-    POST /api/auth/<p>/start  -> begin Playwright sign-in (returns session_id)
+    POST /api/auth/<p>/start  -> begin CDP browser sign-in (returns session_id)
     GET  /api/auth/<id>/stream -> SSE auth flow events
     PUT  /api/auth/<p>/credentials -> save form API keys
     POST /api/auth/<p>/disconnect  -> wipe stored credentials

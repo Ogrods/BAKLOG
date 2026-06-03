@@ -100,6 +100,20 @@ function authCooldownLabel(ms) {
   return mins >= 60 ? `auth ${Math.round(mins / 60)}h` : `auth ${mins}m`;
 }
 
+/** Map manifest env keys to user-facing Connections guidance. */
+function humanizeMissingRequirements(missing) {
+  if (!missing?.length) return '';
+  const keys = new Set(missing);
+  if (keys.has('STEAM_API_KEY') && keys.has('STEAM_ID')) return 'Steam not connected';
+  if (keys.has('STEAM_API_KEY') || keys.has('STEAM_ID')) return 'Steam not connected';
+  if (keys.has('GOG_AL')) return 'GOG not connected';
+  if (keys.has('PSN_NPSSO')) return 'PSN not connected';
+  if (keys.has('ITCH_API_KEY')) return 'itch.io API key missing';
+  if (keys.has('ITAD_API_KEY')) return 'ITAD API key missing';
+  if (keys.has('XBL_API_KEY')) return 'Xbox API key missing';
+  return missing.join(', ');
+}
+
 // ---------------------------------------------------------------------------
 // Per-provider reconnect-required (definitive auth / max-strike / server expired)
 // ---------------------------------------------------------------------------
@@ -1171,8 +1185,9 @@ export const fetcherRunner = (() => {
     } else {
       ensurePanel(src);
       if (src.missingRequirements?.length) {
+        const hint = humanizeMissingRequirements(src.missingRequirements);
         appendLine(
-          `[warning: ${src.missingRequirements.join(', ')} not set — run will likely fail]`,
+          `[warning: ${hint} — open Connections before running]`,
           'meta',
         );
       }

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -13,7 +14,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from auth import mark_connected, mark_invalid
+from auth import mark_invalid
+from auth.manager import mark_connected
 from auth.secrets import profile_dir
 from amazon_web_client import AmazonWebAuthError
 from fetchers._authoritative import AMAZON
@@ -23,19 +25,21 @@ try:
 except ImportError:
     class AmazonGamesError(Exception):  # type: ignore[no-redef]
         """Stub when amazon_client is unavailable (non-Windows)."""
-from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
+from fetchers._base import add_allow_empty_arg, catalog_file, merge_cached_row, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_AMAZON_JSON = Path("games_amazon.json")
+HLTB_DELAY_SEC = 1.0
+AMAZON_WEB_PROFILE = "amazon_web"
+# Rows written before per-row source tags are treated as launcher (web is newer).
+LEGACY_ROW_SOURCE = "launcher"
 
 
 def raw_dump_json() -> Path:
     from shared.profile_paths import profile_cache_dir
 
     return profile_cache_dir() / "amazon_web_raw.json"
-HLTB_DELAY_SEC = 1.0
-AMAZON_WEB_PROFILE = "amazon_web"
 
 
 def _configure_stdout() -> None:
@@ -89,7 +93,107 @@ def resolve_source(requested: str, sql_dir: Path | None) -> str:
     )
 
 
-def _build_row(rec: dict, hltb: dict | None) -> dict:
+def _effective_row_source(row: dict) -> str:
+    """Per-row source tag; legacy rows without a tag count as launcher."""
+    s = row.get("source")
+    if s in ("launcher", "web"):
+        return str(s)
+    return LEGACY_ROW_SOURCE
+
+
+def _normalize_name(name: str) -> str:
+    return re.sub(r"\s+", " ", (name or "").strip().lower())
+
+
+def _match_key(row: dict) -> str:
+    asin = row.get("asin")
+    if asin and str(asin).strip():
+        return f"asin:{str(asin).strip().lower()}"
+    name = _normalize_name(str(row.get("name") or ""))
+    if name:
+        return f"name:{name}"
+    return f"id:{row.get('id')}"
+
+
+def _source_priority(source: str) -> int:
+    return 2 if source == "launcher" else 1
+
+
+def _pick_winner(row_a: dict, row_b: dict, current_source: str) -> dict:
+    sa = _effective_row_source(row_a)
+    sb = _effective_row_source(row_b)
+    pa, pb = _source_priority(sa), _source_priority(sb)
+    if pa > pb:
+        return row_a
+    if pb > pa:
+        return row_b
+    if sa == current_source:
+        return row_a
+    return row_b
+
+
+def merge_amazon_sources(
+    current_rows: list[dict],
+    carried_rows: list[dict],
+    current_source: str,
+) -> list[dict]:
+    """Union launcher + web slices; collapse cross-source dupes (ASIN, then name)."""
+    by_key: dict[str, dict] = {}
+    order: list[str] = []
+    for row in carried_rows + current_rows:
+        key = _match_key(row)
+        if key in by_key:
+            by_key[key] = _pick_winner(by_key[key], row, current_source)
+        else:
+            by_key[key] = row
+            order.append(key)
+    return [by_key[k] for k in order]
+
+
+def _count_rows_for_source(games: list[dict], source: str) -> int:
+    return sum(1 for g in games if _effective_row_source(g) == source)
+
+
+def refuse_amazon_source_drift(
+    new_same_source_count: int,
+    *,
+    source: str,
+    allow_drift: bool,
+    output_path: Path,
+    threshold: float = 0.5,
+) -> int | None:
+    """Drift guard for the current source slice only (not combined file size)."""
+    if allow_drift:
+        return None
+    path = catalog_file(output_path)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    games = data.get("games")
+    if not isinstance(games, list):
+        return None
+    prev = _count_rows_for_source(games, source)
+    if prev <= 0:
+        return None
+    floor = max(1, int(prev * threshold))
+    if new_same_source_count >= floor:
+        return None
+    pct = (new_same_source_count / prev * 100) if prev else 0.0
+    print(
+        f"ERROR: Amazon {source} slice returned {new_same_source_count} rows, but the "
+        f"previous {source} slice had {prev} (≈{pct:.0f}% — under the "
+        f"{int(threshold * 100)}% floor).\n"
+        "Likely a broken auth or upstream API. If this drop is real, re-run with --allow-drift.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 3
+
+
+def _build_row(rec: dict, hltb: dict | None, source: str) -> dict:
     pid = rec["amazon_product_id"]
     row = {
         "store": "amazon",
@@ -98,6 +202,7 @@ def _build_row(rec: dict, hltb: dict | None) -> dict:
         "amazon_entitlement_id": rec.get("amazon_entitlement_id"),
         "amazon_adg_id": rec.get("amazon_adg_id"),
         "name": rec["name"],
+        "source": source,
         "playtime_minutes": 0,
         "last_played": rec.get("last_played"),
         "header_image": rec.get("header_image"),
@@ -144,7 +249,7 @@ def load_existing() -> dict[str, dict]:
 
 
 def _load_launcher_records(sql_dir: Path | None) -> list[dict]:
-    from amazon_client import AmazonGamesClient, AmazonGamesError
+    from amazon_client import AmazonGamesClient
 
     client = AmazonGamesClient(sql_dir)
     print(f"Reading Amazon Games library from:\n  {client.sql_dir}", flush=True)
@@ -152,7 +257,7 @@ def _load_launcher_records(sql_dir: Path | None) -> list[dict]:
 
 
 def _load_web_records(*, dump_raw: bool) -> list[dict]:
-    from amazon_web_client import AmazonWebAuthError, AmazonWebClient, sniff_claims
+    from amazon_web_client import AmazonWebClient, sniff_claims
 
     dump = raw_dump_json() if dump_raw else None
     try:
@@ -188,7 +293,11 @@ def main() -> int:
         help="Override Amazon Games Sql folder (launcher source only)",
     )
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
-    parser.add_argument("--only-new", action="store_true", help="Only HLTB-fetch games missing HLTB data")
+    parser.add_argument(
+        "--only-new",
+        action="store_true",
+        help="Only HLTB-fetch games missing HLTB data",
+    )
     parser.add_argument(
         "--dump-raw",
         action="store_true",
@@ -244,7 +353,18 @@ def main() -> int:
 
     hltb_client = HltbClient()
     existing = load_existing()
-    games_out: list[dict] = []
+    carried_rows = [
+        row
+        for row in existing.values()
+        if _effective_row_source(row) != source
+    ]
+    if carried_rows:
+        print(
+            f"Keeping {len(carried_rows)} row(s) from the other Amazon source.",
+            flush=True,
+        )
+
+    current_rows: list[dict] = []
 
     for i, rec in enumerate(records, 1):
         pid = rec["amazon_product_id"]
@@ -252,6 +372,9 @@ def main() -> int:
         print(f"[{i}/{len(records)}] {name}", flush=True)
 
         cached = existing.get(pid)
+        if cached is not None and _effective_row_source(cached) != source:
+            cached = None
+
         hltb = None
         hltb_updated = False
         if not args.skip_hltb and not (
@@ -272,23 +395,25 @@ def main() -> int:
                 "hltb_name": cached.get("hltb_name"),
             }
 
-        games_out.append(
+        current_rows.append(
             merge_cached_row(
-                _build_row(rec, hltb),
+                _build_row(rec, hltb, source),
                 cached,
                 authoritative=AMAZON,
                 hltb_updated=hltb_updated,
             )
         )
 
-    drift_exit = refuse_drift_result(
-        games_out,
-        label="Amazon library rows",
+    drift_exit = refuse_amazon_source_drift(
+        len(current_rows),
+        source=source,
         allow_drift=args.allow_drift,
         output_path=GAMES_AMAZON_JSON,
     )
     if drift_exit is not None:
         return stats.finish("fetch_amazon", t0, exit_code=drift_exit)
+
+    games_out = merge_amazon_sources(current_rows, carried_rows, source)
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

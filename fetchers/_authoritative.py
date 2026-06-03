@@ -49,6 +49,7 @@ AMAZON = library_authoritative(
     "asin",
     "product_line",
     "publisher",
+    "source",
 )
 XBOX = library_authoritative(
     "xbox_title_id",

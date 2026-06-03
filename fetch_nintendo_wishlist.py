@@ -3,7 +3,7 @@
 
 The storefront wish list at nintendo.com/us/wish-list/ is a client-rendered
 Next.js page. There is no public JSON API documented for third parties; we
-reuse the persistent Playwright profile from the Connections page
+reuse the persistent CDP browser profile from the Connections page
 (``cache/auth/profiles/nintendo_wishlist``), load the page headlessly, and
 parse embedded JSON (``__NEXT_DATA__``) plus any wishlist XHR responses
 captured during hydration.

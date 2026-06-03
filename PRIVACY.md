@@ -44,7 +44,7 @@ and the terms-of-service caveats, see
 | What | Where | Why |
 |------|-------|-----|
 | OAuth refresh tokens (Epic, Battle.net, Nintendo) | `cache/<store>/session.json` and/or the OS keychain via Python `keyring` | Re-auth without re-prompting |
-| Session cookies (GOG, PSN NPSSO, Xbox, Ubisoft, itch, Epic storefront) | `.env` and/or `cache/auth/profiles/<store>/` (Playwright user-data directory) | Same as above |
+| Session cookies (GOG, PSN NPSSO, Xbox, Ubisoft, itch, Epic storefront) | `.env` and/or `cache/auth/profiles/<store>/` (Chrome/Edge user-data from CDP sign-in) | Same as above |
 | API keys (Steam Web API, OpenXBL, ITAD, HowLongToBeat) | `.env` | Required by those APIs |
 | Encrypted secret bundle | DPAPI-protected blob (Windows) or the `cryptography` AES-GCM keyring fallback | Encrypted-at-rest variant used by the Connections page |
 
@@ -132,7 +132,7 @@ The bundle (`baklog-secrets-<timestamp>.bundle`) contains:
 
 - The encrypted credentials document (`cache/auth/secrets.bin` contents, as
   JSON inside the bundle ciphertext).
-- Playwright user-data directories under `cache/auth/profiles/<store>/`
+- Chrome/Edge browser profile directories under `cache/auth/profiles/<store>/` (CDP)
   (cookie-based providers such as GOG and PSN).
 
 It is **always encrypted with its own passphrase** (minimum 8 characters) using
@@ -201,7 +201,7 @@ Everything is on disk:
 - `data/personal_backups/` — rotated backups of the above.
 - `games_*.json`, `itad_prices.json`, `data/games_backups/` — fetched
   libraries and their rotated backups.
-- `cache/` — Playwright profiles, fetcher caches, OAuth refresh tokens.
+- `cache/` — CDP browser profiles, fetcher caches, OAuth refresh tokens.
 - `cache/auth/profiles_pre_import_*` — snapshots taken before a bundle import.
 - `.env` — API keys + session cookies.
 - Browser `localStorage` for whatever origin you served the app from

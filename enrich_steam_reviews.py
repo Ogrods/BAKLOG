@@ -21,7 +21,7 @@ from pathlib import Path
 import requests
 
 from auth import resolve_env
-from fetchers._base import catalog_file, write_catalog_text
+from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
 from fetchers._progress import RunStats, started
 from shared.profile_paths import cache_json_path
 from steam_client import SteamClient
@@ -197,7 +197,7 @@ def main() -> int:
     api_key = resolve_env("STEAM_API_KEY", provider="steam")
     steam_id = resolve_env("STEAM_ID", provider="steam")
     if not api_key or not steam_id:
-        stats.error("STEAM_API_KEY/STEAM_ID required in .env")
+        stats.error(STEAM_CREDENTIALS_HINT)
         return stats.finish("enrich_steam_reviews", t0, exit_code=1)
 
     steam = SteamClient(api_key=api_key, steam_id=steam_id)

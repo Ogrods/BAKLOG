@@ -65,6 +65,7 @@
     <div id="migrationBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
     <div id="undoToast" class="hidden" role="status" aria-live="polite"></div>
     <div id="itadAlertBanner" class="migration-banner itad-alert-banner hidden" role="status" aria-live="polite"></div>
+    <div id="libraryWatchBanner" class="migration-banner library-watch-banner hidden" role="status" aria-live="polite"></div>
     <div id="authReconnectBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="mb-4">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -123,6 +124,7 @@
           "Ctrl+Z undoes your last status change.",
           "Turn on Hide duplicates to collapse the same game across stores.",
           "Click any dashboard chart to drill into those exact games.",
+          "Just bought a game? Steam's API can take up to 24 hours to show it.",
         ];
         var el = document.getElementById("bootLoadingTip");
         if (el && tips.length) {
@@ -223,7 +225,7 @@
       <template id="tplConnBundlePopover">
         <h3 class="conn-popover-title">Portable bundle</h3>
         <p class="conn-howto-note">
-          Export every connection (credentials + Playwright cookie profiles) as a single
+          Export every connection (credentials + Chrome/Edge browser profiles from CDP sign-in) as a single
           encrypted file you can copy to another machine, keep as a backup, or use to
           recover from a corrupted OS keychain.
         </p>

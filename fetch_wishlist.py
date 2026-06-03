@@ -13,7 +13,14 @@ import requests
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
+from fetchers._base import (
+    STEAM_CREDENTIALS_HINT,
+    add_allow_empty_arg,
+    refuse_drift_result,
+    refuse_empty_result,
+    catalog_file,
+    write_catalog_text,
+)
 from auth import resolve_env
 from fetchers._progress import RunStats, started
 from shared.money import format_price, normalize_currency_code
@@ -56,7 +63,7 @@ def main() -> int:
     api_key = resolve_env("STEAM_API_KEY", provider="steam")
     steam_id = resolve_env("STEAM_ID", provider="steam")
     if not api_key or not steam_id:
-        stats.error("Set STEAM_API_KEY and STEAM_ID in .env")
+        stats.error(STEAM_CREDENTIALS_HINT)
         return stats.finish("fetch_wishlist", t0, exit_code=1)
 
     print("Fetching Steam wishlist...")

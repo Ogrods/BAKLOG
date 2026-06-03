@@ -1,4 +1,4 @@
-"""Portable passphrase-encrypted bundle for credentials + Playwright profiles."""
+"""Portable passphrase-encrypted bundle for credentials + CDP browser profiles."""
 
 from __future__ import annotations
 

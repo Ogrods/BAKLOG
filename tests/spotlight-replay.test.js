@@ -68,7 +68,7 @@ describe("spotlight replay category", () => {
     expect(pool.find(g => g._spotlightReason?.isReplay)).toBeFalsy();
   });
 
-  it("caps replay entries to roughly ~6% of the pool", () => {
+  it("caps replay entries to roughly ~3.5% of the pool", () => {
     state.personal = {};
     const games = [];
     for (let i = 0; i < 60; i++) {

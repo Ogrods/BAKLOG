@@ -24,12 +24,11 @@ def auth_bundle_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     profiles_root = auth_dir / "profiles"
     profiles_root.mkdir(parents=True)
     secrets_file = auth_dir / "secrets.bin"
+    # auth.bundle resolves all paths through auth.secrets helpers, so patching
+    # the secrets module alone isolates the bundle module too.
     monkeypatch.setattr("auth.secrets.AUTH_DIR", auth_dir)
     monkeypatch.setattr("auth.secrets.SECRETS_FILE", secrets_file)
     monkeypatch.setattr("auth.secrets.MASTER_KEY_FILE", auth_dir / ".master_key")
-    monkeypatch.setattr("auth.bundle.AUTH_DIR", auth_dir)
-    monkeypatch.setattr("auth.bundle.PROFILES_ROOT", profiles_root)
-    monkeypatch.setattr("auth.bundle.SECRETS_FILE", secrets_file)
     import auth.secrets as secrets_mod
 
     secrets_mod._cache = None

@@ -14,6 +14,9 @@ import server
 @pytest.fixture()
 def runs_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     runs_dir = tmp_path / "runs"
+    _runs_dir_fn = lambda *, profile_id=None: runs_dir
+    monkeypatch.setattr("shared.profile_paths.runs_dir", _runs_dir_fn)
+    monkeypatch.setattr(server, "runs_dir", _runs_dir_fn)
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
     monkeypatch.setattr(server, "RUN_HISTORY_FILE", runs_dir / "history.json")

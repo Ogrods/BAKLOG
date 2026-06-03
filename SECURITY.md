@@ -102,6 +102,38 @@ Source: [auth/bundle.py](auth/bundle.py).
 - The local server binds to **127.0.0.1**, so it is not reachable from other
   machines on your network by default.
 
+## How BAKLOG reaches each store
+
+Every fetch runs locally, authenticated as **you**, against **your own**
+account — never a shared server or pooled credential. What differs per store is
+*how* the request is authorized. The posture below, weakest-to-strongest from a
+terms-of-service standpoint:
+
+| Store | Method | ToS posture |
+|-------|--------|-------------|
+| Steam | Official Steam Web API key (yours) | **Sanctioned** — documented public API |
+| Xbox | OpenXBL API key (yours) | **Sanctioned** — third-party API you authorize |
+| ITAD / HLTB | Official/public API | **Sanctioned** |
+| Epic | Official OAuth (community launcher client) + your auth code | **Tolerated** — official OAuth, well-known client id |
+| GOG, PSN, Ubisoft, itch, Amazon | Replay **your own** web session cookie/token | **Gray** — same calls your browser makes; automated locally |
+| Nintendo, Humble, Epic wishlist, Xbox wishlist | Headless replay of **your own** saved browser profile | **Gray** — your session, your data, your IP |
+| Battle.net | Unofficial endpoint with **your own** session | **Gray** |
+| EA App | Replays **your own** ea.com web-session Bearer token (sniffed from your saved profile) and calls the same GraphQL endpoint ea.com itself uses | **Gray** — your session, your data; **no** desktop-client impersonation and **no** baked-in EA secret |
+
+Design rule for the gray rows: BAKLOG only ever **replays a session you
+established yourself** and only reads **your own** account's data. It does not
+ship stolen/first-party client secrets, does not solve CAPTCHAs for you, does
+not pool requests across users, and does not redistribute fetched catalogs.
+
+> EA specifically: an earlier draft authenticated by impersonating EA's desktop
+> app (a hardcoded client secret + `pc_sign` token). That was replaced with the
+> web-session-replay approach above so the "this is just me, automated" framing
+> stays literally true. The token BAKLOG uses is the exact one ea.com hands your
+> browser when you log in.
+
+This is *automation of your own access*, not third-party scraping. It still runs
+**at your own risk** under each store's terms — see the out-of-scope note below.
+
 ## What is explicitly out of scope
 
 BAKLOG is not trying to defend against these, and you should not assume it
@@ -119,8 +151,10 @@ does:
 - **Browser `localStorage`.** Anything that can read the served origin can read
   your annotations and UI prefs there. It holds no credentials.
 - **Storefront terms of service and account flagging.** Automated fetches run
-  under your account at your own risk. Running from your own IP is a
-  mitigation, not a guarantee.
+  under your account at your own risk. Replaying only your own session from your
+  own IP (see [How BAKLOG reaches each store](#how-baklog-reaches-each-store))
+  is a mitigation, not a guarantee — several stores' terms restrict any
+  automated access regardless of whose data it is.
 - **Supply-chain / dependency compromise.** Standard for any local app; pin and
   review what you install.
 - **Exposing the server yourself** (binding to `0.0.0.0`, port-forwarding, or

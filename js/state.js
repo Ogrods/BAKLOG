@@ -11,8 +11,8 @@ export const state = {
   pickedKey: null,
   libraryMeta: {
     steam: null, gog: null, psn: null, epic: null, amazon: null,
-    xbox: null, battlenet: null, ubisoft: null, nintendo: null, itch: null,
-    wishlist: null, wishlistGog: null, wishlistEpic: null, wishlistPsn: null, wishlistUbisoft: null, wishlistXbox: null,
+    xbox: null, battlenet: null, ubisoft: null, nintendo: null, itch: null, humble: null, ea: null,
+    wishlist: null, wishlistGog: null, wishlistEpic: null, wishlistPsn: null, wishlistUbisoft: null, wishlistXbox: null, wishlistNintendo: null, wishlistHumble: null,
     itad: null, hltb: null,
   },
   crossStoreHiddenKeys: new Set(),

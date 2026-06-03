@@ -1,4 +1,4 @@
-"""Playwright headed sign-in and credential extraction."""
+"""Headed Chrome/Edge sign-in and credential extraction via CDP."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from auth.api_keys import (
     extract_steam,
     extract_xbox,
 )
+from auth.cdp_browser import is_blank_browser_url, launch_persistent_profile
 from auth.registry import spec_for
 from auth.secrets import profile_dir
 
@@ -59,55 +60,6 @@ _STEALTH_INIT = r"""
   try { delete Object.getPrototypeOf(navigator).webdriver; } catch (e) {}
 })();
 """
-
-
-def _launch_persistent_context(p, user_data: str):
-    """Prefer installed Chrome — bundled Chromium triggers Cloudflare bot challenges."""
-    base: dict[str, Any] = {
-        "headless": False,
-        "viewport": {"width": 1280, "height": 900},
-        "locale": "en-US",
-        # --disable-blink-features=AutomationControlled is the single most
-        # important Cloudflare-bypass flag: without it, navigator.webdriver is
-        # exposed *before* our init script runs, which Turnstile detects and
-        # locks into a permanent challenge loop.
-        "args": [
-            "--no-first-run",
-            "--disable-blink-features=AutomationControlled",
-            "--disable-features=IsolateOrigins,site-per-process",
-            "--no-default-browser-check",
-        ],
-        "ignore_default_args": ["--enable-automation"],
-    }
-    # Fallback UA only used if we have to fall back to bundled Chromium —
-    # overriding the UA on real Chrome makes Cloudflare suspicious because the
-    # value won't match the actual binary version Playwright is driving.
-    fallback_ua = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-    )
-    try:
-        context = p.chromium.launch_persistent_context(user_data, channel="chrome", **base)
-    except Exception:
-        context = p.chromium.launch_persistent_context(
-            user_data, **base, user_agent=fallback_ua
-        )
-    context.add_init_script(_STEALTH_INIT)
-
-    # Rewrite target=_blank to current tab so dashboard scraping never opens new
-    # tabs that surprise the user. Affects fully-isolated profiles only.
-    def _on_new_page(new_page) -> None:
-        try:
-            url = new_page.url
-            new_page.close()
-            if url and url not in ("about:blank", ""):
-                old = context.pages[0] if context.pages else context.new_page()
-                old.goto(url, wait_until="domcontentloaded", timeout=15000)
-        except Exception:
-            pass
-
-    context.on("page", _on_new_page)
-    return context
 
 
 class AuthSession:
@@ -169,6 +121,176 @@ def _extract_nintendo(context) -> dict[str, str]:
     if not header:
         raise RuntimeError("No Nintendo cookies found — open ec.nintendo.com after signing in")
     return {"NINTENDO_COOKIE": header}
+
+
+NINTENDO_ACCOUNT_URL = "https://ec.nintendo.com/my/transactions/"
+# Nintendo session cookies that prove we can read the eShop purchase history.
+# Capturing any nintendo.com cookie isn't enough — sign-in completes on
+# accounts.nintendo.com, but the eShop session cookies only get set once we're
+# actually on ec.nintendo.com, so we must land there before reading the jar.
+_NINTENDO_SESSION_COOKIES = ("MIST", "JViDD", "_gh_sess", "NASID", "ecsid")
+
+
+def _nintendo_has_session(context) -> bool:
+    """True once ec.nintendo.com session cookies exist (not just any nintendo.com cookie)."""
+    for c in context.cookies():
+        domain = (c.get("domain") or "").lstrip(".")
+        if domain.startswith("ec.nintendo.com") and c.get("name") and c.get("value"):
+            return True
+    return False
+
+
+def _extract_nintendo_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
+    """Wait for Nintendo sign-in, then auto-navigate to ec.nintendo.com to capture cookies.
+
+    The earlier flow errored with "open ec.nintendo.com after signing in" because
+    sign-in lands on accounts.nintendo.com and the eShop cookies aren't set until
+    you're back on ec.nintendo.com. We now drive that navigation automatically and
+    only fall back to asking the user if it still doesn't land.
+    """
+    try:
+        page.goto(NINTENDO_ACCOUNT_URL, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_hint = 0.0
+    last_nav = 0.0
+    while time.time() < deadline:
+        live = [pg for pg in context.pages if not pg.is_closed]
+        main = live[0] if live else context.new_page()
+        url = (main.url or "").lower()
+        signed_in = "ec.nintendo.com" in url and "login" not in url and "connect" not in url
+
+        # Once signed in (we've returned to ec.nintendo.com), the eShop session
+        # cookies should be present — capture and finish.
+        if signed_in and _nintendo_has_session(context):
+            header = _cookie_header(context.cookies(), ("nintendo.com",))
+            if header:
+                return {"NINTENDO_COOKIE": header}
+
+        # User finished sign-in but we're parked on accounts.nintendo.com / home —
+        # auto-redirect to the transactions page so the eShop cookies get set.
+        on_account = (
+            "accounts.nintendo.com" in url
+            or "nintendo.com" in url
+            and "ec.nintendo.com" not in url
+        )
+        if on_account and "login" not in url and "signin" not in url and "authorize" not in url:
+            now = time.time()
+            if now - last_nav > 4:
+                last_nav = now
+                try:
+                    main.bring_to_front()
+                except Exception:
+                    pass
+                try:
+                    main.goto(NINTENDO_ACCOUNT_URL, wait_until="domcontentloaded", timeout=20_000)
+                except Exception:
+                    pass
+
+        now = time.time()
+        if session and now - last_hint > 10:
+            last_hint = now
+            if "login" in url or "signin" in url or "authorize" in url:
+                msg = "Sign in to your Nintendo Account in the browser window."
+            elif on_account:
+                msg = "Signed in — opening your eShop transactions page to capture the session."
+            else:
+                msg = "Loading your Nintendo eShop transactions — keep the window open."
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    # Last resort: capture whatever nintendo.com cookies exist (older accounts
+    # sometimes work without the ec session cookie set yet).
+    header = _cookie_header(context.cookies(), ("nintendo.com",))
+    if header:
+        return {"NINTENDO_COOKIE": header}
+    raise RuntimeError(
+        "No Nintendo session captured — sign in, then make sure the eShop transactions page "
+        "at ec.nintendo.com finished loading. Close any blank tab and click Connect again if needed."
+    )
+
+
+EPIC_REDIRECT_MARKER = "id/api/redirect"
+
+
+def _epic_code_from_text(text: str) -> str:
+    """Pull the authorizationCode out of Epic's redirect JSON (or HTML-wrapped JSON)."""
+    if not text:
+        return ""
+    try:
+        data = json.loads(text)
+        code = data.get("authorizationCode") if isinstance(data, dict) else None
+        if isinstance(code, str) and code.strip():
+            return code.strip()
+    except (json.JSONDecodeError, ValueError):
+        pass
+    m = re.search(r'"authorizationCode"\s*:\s*"([A-Za-z0-9_\-]+)"', text)
+    return m.group(1) if m else ""
+
+
+def _extract_epic_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
+    """Sign in to Epic in the managed window, then auto-capture + exchange the code.
+
+    Epic's launcher client redirects post-login to id/api/redirect, which renders a
+    JSON body containing a one-time `authorizationCode`. We scrape it and exchange it
+    for a refresh token immediately (codes are single-use), persisting the session so
+    the fetcher can reuse it. On any failure the user can still paste the code manually.
+    """
+    login_url = spec_for("epic").login_url
+    try:
+        page.goto(login_url, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_hint = 0.0
+    while time.time() < deadline:
+        live = [pg for pg in context.pages if not pg.is_closed]
+        main = live[0] if live else context.new_page()
+        url = (main.url or "").lower()
+
+        if EPIC_REDIRECT_MARKER in url:
+            body = ""
+            try:
+                body = main.evaluate("() => document.body ? document.body.innerText : ''") or ""
+            except Exception:
+                body = ""
+            code = _epic_code_from_text(body)
+            if not code:
+                try:
+                    code = _epic_code_from_text(main.content())
+                except Exception:
+                    code = ""
+            if code:
+                from epic_client import EpicAuthError, EpicClient
+
+                try:
+                    EpicClient(auth_code=code).login()
+                except EpicAuthError as exc:
+                    raise RuntimeError(
+                        f"Epic rejected the captured code ({exc}). Refresh the Epic page so a new "
+                        "code appears, or paste the authorizationCode into the fallback field below."
+                    ) from exc
+                return {"EPIC_AUTH_CODE": code}
+
+        now = time.time()
+        if session and now - last_hint > 10:
+            last_hint = now
+            if "login" in url or "id.epicgames.com" in url:
+                msg = "Sign in to your Epic account in the browser window."
+            else:
+                msg = "Capturing your Epic authorization code — keep the window open."
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Could not capture your Epic authorization code in time. If the Epic page shows an "
+        "authorizationCode, paste it into the fallback field below and click Save key."
+    )
 
 
 def _extract_gog(context) -> dict[str, str]:
@@ -310,73 +432,147 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
 EPIC_WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
 
 
-def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
-    """Wait until store.epicgames.com/wishlist GraphQL succeeds, then save that cookie.
+def _epic_wishlist_graphql_ok(payload: dict) -> bool:
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return False
+    return "Wishlist" in data
 
-    Storefront is behind aggressive Cloudflare Turnstile — the user may need to
-    click the checkbox manually. We sniff the live Cookie header from a 200
-    wishlist GraphQL response (proven to work) and never re-validate from
-    Python (cf_clearance is UA/TLS-bound to the browser).
+
+# Sign-in cookies (EPIC_DEVICE is set for anonymous visitors — excluded).
+_EPIC_SESSION_COOKIES = (
+    "epic_bearer_token",
+    "epic_sso",
+    "epic_sso_rm",
+    "epic_session_ap",
+    "epic_session_diesel",
+    "epic_session_reload",
+    "epic_eg1",
+    "refresh_epic_eg1",
+)
+
+
+def _epic_has_session(context) -> bool:
+    """True when the profile has Epic account or storefront session cookies."""
+    try:
+        cookies = context.cookies()
+    except Exception:  # noqa: BLE001
+        return False
+    for c in cookies:
+        name = (c.get("name") or "").lower()
+        domain = (c.get("domain") or "").lower()
+        if not c.get("value") or "epicgames.com" not in domain:
+            continue
+        if name in _EPIC_SESSION_COOKIES:
+            return True
+    return False
+
+
+def _epic_should_open_wishlist(url: str) -> bool:
+    """True when we should auto-navigate to the storefront wishlist."""
+    u = (url or "").lower()
+    if not u or is_blank_browser_url(u):
+        return True
+    if "challenge" in u or "cloudflare" in u:
+        return False
+    if "id.epicgames.com" in u and ("/login" in u or "signin" in u):
+        return False
+    if "store.epicgames.com" in u and "wishlist" in u:
+        return False
+    if "id.epicgames.com" in u:
+        return True
+    if "epicgames.com" in u and "store.epicgames.com" not in u:
+        return True
+    if "store.epicgames.com" in u and "wishlist" not in u:
+        return True
+    return False
+
+
+def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
+    """Open store.epicgames.com/wishlist, wait for sign-in, return profile marker.
+
+    The saved browser profile (cache/auth/profiles/epic_wishlist) is reused by
+    fetch_epic_wishlist.py headlessly. After Epic sign-in we auto-open the
+    wishlist (store cookies are often set only once the storefront loads).
     """
-    sniffed: dict[str, str] = {}
+    wishlist_loaded = False
+    # Reader-thread handlers must NOT call response.json()/getResponseBody — that
+    # issues another CDP command and waits on the very thread that pumps the
+    # reply, deadlocking until timeout and freezing cookie polling. Just stash
+    # candidate responses; the polling thread parses their bodies safely.
+    candidates: list[Any] = []
 
     def on_response(response) -> None:
-        if sniffed:
-            return
         try:
-            if "store.epicgames.com/graphql" not in response.url:
+            if "store.epicgames.com/graphql" not in (response.url or ""):
                 return
-            req = response.request
-            body = req.post_data or ""
-            if "Wishlist" not in body and "wishlistItems" not in body:
-                return
-            if response.status != 200:
-                return
-            payload = response.json()
-            data = payload.get("data") or {}
-            if "Wishlist" not in data:
-                return
-            cookie = (req.headers.get("cookie") or "").strip()
-            if cookie:
-                sniffed["EPIC_STORE_COOKIE"] = cookie
+            if response.status == 200:
+                candidates.append(response)
         except Exception:  # noqa: BLE001
             pass
 
+    def _drain_candidates() -> bool:
+        while candidates:
+            resp = candidates.pop(0)
+            try:
+                if _epic_wishlist_graphql_ok(resp.json()):
+                    return True
+            except Exception:  # noqa: BLE001
+                pass
+        return False
+
     page.on("response", on_response)
     try:
-        page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
+        page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
+    last_nav = 0.0
     while time.time() < deadline:
-        cookie = sniffed.get("EPIC_STORE_COOKIE", "").strip()
-        if cookie:
-            return {"EPIC_STORE_COOKIE": cookie}
+        if not wishlist_loaded and _drain_candidates():
+            wishlist_loaded = True
+        if wishlist_loaded or _epic_has_session(context):
+            try:
+                page.wait_for_timeout(800)
+            except Exception:  # noqa: BLE001
+                pass
+            return {"EPIC_STORE_COOKIE": "ready"}
 
+        url = page.url or ""
         now = time.time()
+        if _epic_should_open_wishlist(url) and now - last_nav > 4:
+            last_nav = now
+            try:
+                page.bring_to_front()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
+            except Exception:  # noqa: BLE001
+                pass
+
         if session and now - last_msg > 8:
             last_msg = now
-            url = (page.url or "").lower()
-            if "challenge" in url or "cloudflare" in url:
+            ul = url.lower()
+            if "challenge" in ul or "cloudflare" in ul:
                 msg = "Cloudflare challenge — click the checkbox if shown."
-            elif "login" in url or "id.epicgames.com" in url:
+            elif "login" in ul or ("id.epicgames.com" in ul and "authorize" in ul):
                 msg = "Sign in to your Epic account in the browser window."
-            elif "epicgames.com" not in url:
-                msg = "Open store.epicgames.com/wishlist after signing in."
-            elif "store.epicgames.com" not in url:
-                msg = "Almost there — head to store.epicgames.com/wishlist once signed in."
-            else:
+            elif _epic_should_open_wishlist(url):
+                msg = "Signed in — opening your Epic wishlist to capture the session."
+            elif "store.epicgames.com" in ul:
                 msg = "On the wishlist page? Give it a moment to load."
+            else:
+                msg = "Sign in, then we'll open store.epicgames.com/wishlist for you."
             session.emit("waiting_for_user", {"message": msg})
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
 
     raise RuntimeError(
-        "Could not capture a working Epic storefront session — sign in at "
-        "store.epicgames.com/wishlist, clear any Cloudflare challenge, and let "
-        "your wishlist finish loading."
+        "Could not detect Epic wishlist sign-in — sign in at store.epicgames.com/wishlist, "
+        "clear any Cloudflare challenge, and let your wishlist finish loading."
     )
 
 
@@ -507,37 +703,306 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
     )
 
 
-def _extract_ubisoft(page, context) -> dict[str, str]:
+NINTENDO_WISHLIST_URL = "https://www.nintendo.com/us/wish-list/"
+NINTENDO_WISHLIST_POLL_SEC = 2.5
+
+
+def _nintendo_wishlist_page_ready(html: str, url: str) -> bool:
+    """True when the wish-list page looks loaded and not stuck on sign-in only."""
+    u = (url or "").lower()
+    if "accounts.nintendo.com/login" in u:
+        return False
+    body = html or ""
+    if not body.strip():
+        return False
+    if "wish-list" not in u and "wishlist" not in u:
+        return False
+    lower = body.lower()
+    if "sign in" in lower and "wish list" not in lower and "wishlist" not in lower:
+        return False
+    # Empty wishlist copy still counts as a successful session.
+    if re.search(r"wish\s*list", lower, re.I):
+        return True
+    if re.search(r"explore,\s*purchase,\s*or\s*remove", lower, re.I):
+        return True
+    return "nsuid" in lower or "/store/products/" in lower
+
+
+def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
+    """Open nintendo.com/us/wish-list/, wait for sign-in, return marker cred."""
+    try:
+        page.goto(NINTENDO_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
+    except Exception:  # noqa: BLE001
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_msg = 0.0
+    while time.time() < deadline:
+        try:
+            html = page.content()
+        except Exception:  # noqa: BLE001
+            html = ""
+        url = page.url or ""
+        if _nintendo_wishlist_page_ready(html, url):
+            try:
+                page.wait_for_timeout(800)
+            except Exception:  # noqa: BLE001
+                pass
+            return {"NINTENDO_WISHLIST_PROFILE": "ready"}
+
+        now = time.time()
+        if session and now - last_msg > 8:
+            last_msg = now
+            ul = url.lower()
+            if "accounts.nintendo.com" in ul or "login" in ul:
+                msg = "Sign in to your Nintendo Account in the browser window."
+            elif "wish-list" not in ul:
+                msg = "Open nintendo.com/us/wish-list/ after signing in."
+            else:
+                msg = "On the wish list page? Sign in if prompted and wait for it to finish loading."
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(NINTENDO_WISHLIST_POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Could not detect a Nintendo wish-list session \u2014 sign in at "
+        "nintendo.com/us/wish-list/ and keep the window open until it closes."
+    )
+
+
+HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
+HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
+HUMBLE_POLL_SEC = 2.5
+
+
+def _humble_has_session(context) -> bool:
+    """True when the saved profile has a Humble auth cookie."""
+    for c in context.cookies():
+        name = (c.get("name") or "").lower()
+        if name in ("_simpleauth_sess", "csrf_cookie"):
+            if c.get("value"):
+                return True
+    try:
+        resp = context.request.get(HUMBLE_ORDERS_API, timeout=15_000)
+        if resp.status == 200:
+            body = resp.text().strip()
+            if body.startswith("[") or body.startswith("{"):
+                return True
+        if resp.status == 401 or resp.status == 403:
+            return False
+    except Exception:  # noqa: BLE001
+        pass
+    return False
+
+
+def _extract_humble_inline(page, context, session) -> dict[str, str]:
+    """Open humblebundle.com/home/library, wait for sign-in, return marker cred."""
+    try:
+        page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:  # noqa: BLE001
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_msg = 0.0
+    while time.time() < deadline:
+        if _humble_has_session(context):
+            try:
+                page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=15_000)
+                page.wait_for_timeout(800)
+            except Exception:  # noqa: BLE001
+                pass
+            return {"HUMBLE_PROFILE": "ready"}
+
+        now = time.time()
+        if session and now - last_msg > 8:
+            last_msg = now
+            url = (page.url or "").lower()
+            if "login" in url or "sign" in url and "library" not in url:
+                msg = "Sign in to Humble Bundle in the browser window (email or Google)."
+            elif "humblebundle.com" not in url:
+                msg = "Open humblebundle.com/home/library after signing in."
+            else:
+                msg = "On the library page? Finish sign-in if prompted, then wait a moment."
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(HUMBLE_POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Could not detect a Humble sign-in \u2014 sign in at humblebundle.com/home/library "
+        "and keep the window open until it closes."
+    )
+
+
+UBISOFT_SUCCESS_URL = "connect.ubisoft.com/logged-in.html"
+UBISOFT_LIBRARY_URLS = (
+    "https://connect.ubisoft.com/",
+    "https://www.ubisoft.com/en-us/ubisoft-connect/games",
+)
+
+
+def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[str, str]:
     captured: dict[str, str] = {}
 
     def on_request(request) -> None:
         if "public-ubiservices.ubi.com" not in request.url:
             return
         auth = request.headers.get("authorization") or request.headers.get("Authorization")
-        session = request.headers.get("ubi-sessionid") or request.headers.get("Ubi-SessionId")
+        ubi_session = request.headers.get("ubi-sessionid") or request.headers.get("Ubi-SessionId")
         app_id = request.headers.get("ubi-appid") or request.headers.get("Ubi-AppId")
         if auth:
             captured["UBISOFT_AUTH"] = auth
-        if session:
-            captured["UBISOFT_SESSION_ID"] = session
+        if ubi_session:
+            captured["UBISOFT_SESSION_ID"] = ubi_session
         if app_id:
             captured["UBISOFT_APP_ID"] = app_id
 
-    page.on("request", on_request)
-    page.goto("https://www.ubisoft.com/en-us/ubisoft-connect", wait_until="domcontentloaded")
+    # Sniff on every page so a request fired from the post-2FA landing tab still counts.
+    context.on("request", on_request)
+    try:
+        page.goto("https://www.ubisoft.com/en-us/ubisoft-connect", wait_until="domcontentloaded", timeout=25_000)
+    except Exception:
+        pass
+
     deadline = time.time() + SUCCESS_WAIT_SEC
+    last_hint = 0.0
+    seen_success = False
+    nudged = 0
     while time.time() < deadline:
         if captured.get("UBISOFT_AUTH") and captured.get("UBISOFT_SESSION_ID"):
             return captured
+
+        live = [pg for pg in context.pages if not pg.is_closed]
+        # Drop orphan blank tabs (post-verify leftovers) so they can't steal focus.
+        if len(live) > 1:
+            for pg in live:
+                u = (pg.url or "").strip()
+                if is_blank_browser_url(u):
+                    try:
+                        pg.close()
+                    except Exception:
+                        pass
+            live = [pg for pg in context.pages if not pg.is_closed]
+
+        main = live[0] if live else context.new_page()
+        urls = [(pg.url or "").lower() for pg in live]
+        on_success = any(UBISOFT_SUCCESS_URL in u for u in urls)
+
+        # Post-2FA we land on connect.ubisoft.com/logged-in.html. That page doesn't
+        # call ubiservices on its own, so drive a real tab to the library to trigger
+        # the authenticated API requests we sniff for credentials.
+        if on_success and not seen_success:
+            seen_success = True
+            if session:
+                session.emit("signed_in", {"url": UBISOFT_SUCCESS_URL})
+
+        if (on_success or seen_success) and nudged < len(UBISOFT_LIBRARY_URLS):
+            try:
+                main.bring_to_front()
+            except Exception:
+                pass
+            try:
+                main.goto(UBISOFT_LIBRARY_URLS[nudged], wait_until="domcontentloaded", timeout=20_000)
+            except Exception:
+                pass
+            nudged += 1
+
+        now = time.time()
+        if session and now - last_hint > 10:
+            last_hint = now
+            joined = " ".join(urls)
+            if "account.ubisoft" in joined or "login" in joined:
+                msg = (
+                    "Finish Ubisoft sign-in and 2FA in the browser. If a verify step opens a "
+                    "blank tab, you can close it — we'll detect the sign-in automatically."
+                )
+            elif seen_success and not captured:
+                msg = "Signed in — opening your Ubisoft games list to finish capturing the session."
+            elif not captured:
+                msg = "Signed in? Open your Ubisoft Connect games list so we can capture the session."
+            else:
+                msg = "Almost there — keep the window open while we finish capturing your session."
+            session.emit("waiting_for_user", {"message": msg})
+
         page.wait_for_timeout(int(POLL_SEC * 1000))
+
     raise RuntimeError(
-        "Ubisoft API headers not captured — browse to your library on ubisoft.com while the window is open"
+        "Ubisoft API headers not captured — sign in at ubisoft.com, complete 2FA, and open your "
+        "games library. If a verify step left a blank tab, close it and click Connect again."
+    )
+
+
+EA_GRAPHQL_HOST = "service-aggregation-layer.juno.ea.com"
+EA_LOGIN_URL = "https://www.ea.com/login"
+EA_DEALS_URL = "https://www.ea.com/sales/deals"
+
+
+def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, str]:
+    """Confirm an ea.com web login and persist the profile.
+
+    We only verify the session works (by seeing the user's own browser fire an
+    authenticated GraphQL request); the durable credential is the saved browser
+    profile, which fetch_ea.py replays headlessly. We never store EA's secrets
+    or impersonate the desktop client.
+    """
+    saw_token = {"ok": False}
+
+    def on_request(request) -> None:
+        if EA_GRAPHQL_HOST not in request.url:
+            return
+        auth = request.headers.get("authorization") or request.headers.get("Authorization")
+        if auth and auth.strip():
+            saw_token["ok"] = True
+
+    context.on("request", on_request)
+    try:
+        page.goto(EA_LOGIN_URL, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_hint = 0.0
+    nudged = False
+    while time.time() < deadline:
+        if saw_token["ok"]:
+            return {"EA_PROFILE": "ready"}
+
+        url = (page.url or "").lower()
+        signed_in = "ea.com" in url and "login" not in url and "signin.ea.com" not in url
+        if signed_in and not nudged:
+            nudged = True
+            if session:
+                session.emit("signed_in", {"url": page.url or EA_LOGIN_URL})
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
+            try:
+                page.goto(EA_DEALS_URL, wait_until="domcontentloaded", timeout=25_000)
+            except Exception:
+                pass
+
+        now = time.time()
+        if session and now - last_hint > 10:
+            last_hint = now
+            if "signin.ea.com" in url or "/login" in url:
+                msg = "Sign in to your EA account in the browser window."
+            elif signed_in and not saw_token["ok"]:
+                msg = "Signed in — loading EA deals to confirm your session."
+            else:
+                msg = "Keep the window open while we confirm your EA App session."
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "EA session not confirmed — sign in at ea.com, then wait on the deals page "
+        "before the window closes."
     )
 
 
 EXTRACTORS = {
     "battlenet": lambda page, ctx: _extract_battlenet(ctx),
-    "nintendo": lambda page, ctx: _extract_nintendo(ctx),
+    "nintendo": lambda page, ctx: _extract_nintendo_inline(page, ctx, None),
     "gog": lambda page, ctx: _extract_gog(ctx),
     "psn": lambda page, ctx: _extract_psn(page, ctx),
     "steam": lambda page, ctx: extract_steam(page, ctx),
@@ -545,22 +1010,22 @@ EXTRACTORS = {
     "itad": lambda page, ctx: extract_itad(page, ctx),
     "xbox": lambda page, ctx: extract_xbox(page, ctx),
     "xbox_wishlist": lambda page, ctx: _extract_xbox_wishlist_inline(page, ctx, None),
-    "ubisoft": lambda page, ctx: _extract_ubisoft(page, ctx),
+    "nintendo_wishlist": lambda page, ctx: _extract_nintendo_wishlist_inline(page, ctx, None),
+    "humble": lambda page, ctx: _extract_humble_inline(page, ctx, None),
+    "ubisoft": lambda page, ctx: _extract_ubisoft(page, ctx, None),
+    "ea": lambda page, ctx: _extract_ea(page, ctx, None),
+    "epic": lambda page, ctx: _extract_epic_inline(page, ctx, None),
     "epic_wishlist": lambda page, ctx: _extract_epic_wishlist_inline(page, ctx, None),
 }
 
 # Custom wait/extract loops — not the URL-pattern path in run_browser_auth.
-INLINE_PROVIDERS = {"psn", "steam", "itch", "itad", "xbox", "xbox_wishlist", "ubisoft", "epic_wishlist"}
+INLINE_PROVIDERS = {
+    "psn", "steam", "itch", "itad", "xbox", "xbox_wishlist",
+    "ubisoft", "ea", "epic_wishlist", "nintendo", "nintendo_wishlist", "epic",
+}
 
 
 def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | None:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        raise RuntimeError(
-            "Playwright is not installed. Run: pip install playwright && playwright install chromium"
-        ) from exc
-
     spec = spec_for(provider)
     extractor = EXTRACTORS.get(provider)
     if not extractor:
@@ -581,14 +1046,38 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             "Sign in if prompted, then stay on store.epicgames.com/wishlist "
             "until your wishlist finishes loading. Clear any Cloudflare check if shown."
         ),
+        "ubisoft": (
+            "Sign in to Ubisoft and complete 2FA in the browser window. If a verify step "
+            "opens a blank tab, you can close it \u2014 we'll detect the sign-in automatically."
+        ),
+        "nintendo": (
+            "Sign in to your Nintendo Account. We'll automatically open your eShop "
+            "transactions page to capture the session \u2014 no need to navigate yourself."
+        ),
+        "epic": (
+            "Sign in to your Epic account in the browser window. We'll capture and "
+            "exchange your authorization code automatically \u2014 no copy/paste needed."
+        ),
+        "nintendo_wishlist": (
+            "Sign in to nintendo.com with your Nintendo Account. We'll detect your "
+            "wish list session automatically \u2014 stay on the wish list page until it loads."
+        ),
+        "humble": (
+            "Sign in to Humble Bundle (humblebundle.com). We'll open your library page "
+            "to capture the session \u2014 complete any CAPTCHA in the browser window."
+        ),
+        "ea": (
+            "Sign in to your EA account. We'll open the EA deals page to capture your "
+            "library token automatically."
+        ),
     }
     session.emit(
         "waiting_for_user",
         {"message": _CONNECT_HINTS.get(provider, f"Sign in to {spec.label} in the browser window")},
     )
 
-    with sync_playwright() as p:
-        context = _launch_persistent_context(p, user_data)
+    with launch_persistent_profile(user_data, headless=False) as context:
+        context.add_init_script(_STEALTH_INIT)
         page = context.pages[0] if context.pages else context.new_page()
 
         if provider in INLINE_PROVIDERS:
@@ -602,6 +1091,8 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
                 creds = _extract_epic_wishlist_inline(page, context, session)
             elif provider == "xbox_wishlist":
                 creds = _extract_xbox_wishlist_inline(page, context, session)
+            elif provider == "nintendo_wishlist":
+                creds = _extract_nintendo_wishlist_inline(page, context, session)
             elif provider in ("steam", "itch", "itad", "xbox"):
                 try:
                     page.goto(spec.login_url, wait_until="domcontentloaded", timeout=20000)
@@ -614,14 +1105,20 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
                     "xbox": extract_xbox,
                 }
                 creds = api_extractors[provider](page, context, session)
-            elif provider != "ubisoft":
+            elif provider == "ubisoft":
+                creds = _extract_ubisoft(page, context, session)
+            elif provider == "ea":
+                creds = _extract_ea(page, context, session)
+            elif provider == "nintendo":
+                creds = _extract_nintendo_inline(page, context, session)
+            elif provider == "epic":
+                creds = _extract_epic_inline(page, context, session)
+            elif provider == "humble":
+                creds = _extract_humble_inline(page, context, session)
+            else:
                 page.goto(spec.login_url, wait_until="domcontentloaded")
                 session.emit("signed_in", {"url": page.url})
                 creds = extractor(page, context)
-            else:
-                session.emit("signed_in", {"url": page.url})
-                creds = extractor(page, context)
-            context.close()
             return creds
 
         page.goto(spec.login_url, wait_until="domcontentloaded")
@@ -633,7 +1130,6 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             if pattern.search(url):
                 signed_in = True
                 break
-            # Nintendo may need explicit navigation after login
             if provider == "nintendo" and "login" not in url.lower():
                 try:
                     page.goto(spec.login_url, wait_until="domcontentloaded", timeout=15000)
@@ -645,14 +1141,10 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             page.wait_for_timeout(int(POLL_SEC * 1000))
 
         if not signed_in and provider in ("nintendo", "psn", "gog"):
-            # Allow extraction attempt even if URL pattern didn't match
             signed_in = True
 
         if not signed_in:
-            context.close()
             return None
 
         session.emit("signed_in", {"url": page.url})
-        creds = extractor(page, context)
-        context.close()
-        return creds
+        return extractor(page, context)

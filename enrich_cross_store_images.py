@@ -35,6 +35,8 @@ STORE_FILES = [
     (Path("games_battlenet.json"), "battlenet"),
     (Path("games_ubisoft.json"), "ubisoft"),
     (Path("games_nintendo.json"), "nintendo"),
+    (Path("games_humble.json"), "humble"),
+    (Path("games_ea.json"), "ea"),
 ]
 
 

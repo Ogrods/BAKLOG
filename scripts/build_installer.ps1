@@ -1,5 +1,6 @@
-# Build a distributable folder with Playwright Chromium bundled.
-# Run from repo root after: pip install -r requirements.txt && playwright install chromium
+# Build a distributable folder for BAKLOG.
+# Run from repo root after: pip install -r requirements.txt
+# Connections sign-in requires Google Chrome or Microsoft Edge on the target machine.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
@@ -10,7 +11,6 @@ Set-Location $Root
 
 Write-Host "Installing Python dependencies..."
 python -m pip install -r requirements.txt
-python -m playwright install chromium
 
 $Out = Join-Path $Root "dist\baklog"
 if (Test-Path $Out) { Remove-Item -Recurse -Force $Out }
@@ -28,9 +28,10 @@ Get-ChildItem -Path $Root -Force | Where-Object {
 @echo off
 cd /d "%~dp0"
 echo Starting BAKLOG server on http://127.0.0.1:8765
+echo Connections sign-in requires Google Chrome or Microsoft Edge.
 python server.py
 pause
 "@ | Set-Content -Encoding ASCII (Join-Path $Out "Start BAKLOG.bat")
 
 Write-Host "Done. Output: $Out"
-Write-Host "First run: open Connections tab and sign in to each store."
+Write-Host "First run: open Connections tab and sign in to each store (Chrome or Edge required)."

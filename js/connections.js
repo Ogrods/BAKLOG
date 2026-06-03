@@ -80,7 +80,13 @@ const PROVIDER_BRAND = {
 
   nintendo: { color: '#e60012', initial: 'N' },
 
+  nintendo_wishlist: { color: '#e60012', initial: 'N' },
+
   ubisoft: { color: '#0072ff', initial: 'U' },
+
+  humble: { color: '#cc2929', initial: 'H' },
+
+  ea: { color: '#ff4747', initial: 'EA' },
 
   itch: { color: '#fa5c5c', initial: 'I' },
 
@@ -107,6 +113,30 @@ function providerBrand(p) {
 }
 
 
+const CONN_BADGE_LETTER = {
+  steam: 'S',
+  gog: 'G',
+  psn: 'P',
+  epic: 'E',
+  amazon: 'A',
+  xbox: 'X',
+  battlenet: 'B',
+  nintendo: 'N',
+  ubisoft: 'U',
+  humble: 'H',
+  ea: 'EA',
+  itch: 'I',
+  itad: 'I',
+};
+
+function connBadge(p) {
+  const cls = (p.key || '').replace(/_wishlist$/, '');
+  return {
+    cls,
+    letter: CONN_BADGE_LETTER[cls] || (p.label || '?').charAt(0).toUpperCase(),
+  };
+}
+
 
 function primaryLabel(st) {
 
@@ -120,20 +150,28 @@ function primaryLabel(st) {
 
 
 
-/** Rail order after Steam (friction + paired library/wishlist). */
+/**
+ * Rail order after Steam, sorted by ease of use (smoothest first), with each
+ * company's library + wishlist kept adjacent and the library always first.
+ * Tiers: smooth long-lived browser logins -> no-login / paste-once sources ->
+ * short-lived or flaky logins (EA's ~1-day token is the most painful).
+ */
 const RAIL_ORDER = [
   'gog',
   'psn',
   'xbox',
   'xbox_wishlist',
-  'epic_wishlist',
+  'humble',
   'epic',
+  'epic_wishlist',
+  'amazon',
+  'itch',
+  'itad',
   'battlenet',
   'ubisoft',
   'nintendo',
-  'itch',
-  'itad',
-  'amazon',
+  'nintendo_wishlist',
+  'ea',
 ];
 
 function railSortIndex(key) {
@@ -321,6 +359,7 @@ function buildCardHtml(p) {
   const st = p.status || 'disconnected';
 
   const brand = providerBrand(p);
+  const badge = connBadge(p);
 
   const expiry = p.expiry_days ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>` : '';
 
@@ -328,11 +367,15 @@ function buildCardHtml(p) {
 
   const err = p.last_error ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>` : '';
 
+  const tips = (p.tips || []).length
+    ? `<ul class="conn-tips">${p.tips.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+    : '';
+
   const hasFormFields = (p.form_fields || []).length > 0;
 
   const showFormPanel = hasFormFields && (p.kind === 'form' || p.kind === 'manual' || p.kind === 'browser');
 
-  const showDisconnect = st !== 'disconnected' && p.kind !== 'local';
+  const showDisconnect = st !== 'disconnected' && st !== 'unverified' && p.kind !== 'local';
 
 
 
@@ -344,7 +387,7 @@ function buildCardHtml(p) {
 
       <div class="conn-card-head">
 
-        <div class="conn-brand-badge" style="background:${escapeAttr(brand.color)}">${escapeHtml(brand.initial)}</div>
+        <span class="store-badge store-badge--lg ${escapeAttr(badge.cls)}">${escapeHtml(badge.letter)}</span>
 
         <div class="conn-head-actions">
 
@@ -361,6 +404,8 @@ function buildCardHtml(p) {
         <h3>${escapeHtml(p.label)}</h3>
 
         <p class="conn-desc">${escapeHtml(p.description || '')}</p>
+
+        ${tips}
 
         ${note}
 
@@ -386,7 +431,7 @@ function buildRailItemHtml(p, selected) {
 
   const st = p.status || 'disconnected';
 
-  const brand = providerBrand(p);
+  const badge = connBadge(p);
 
   const sel = selected ? ' is-selected' : '';
 
@@ -396,7 +441,7 @@ function buildRailItemHtml(p, selected) {
 
       <span class="conn-row-dot conn-row-dot--${escapeAttr(st)}" aria-hidden="true"></span>
 
-      <span class="conn-row-badge" style="background:${escapeAttr(brand.color)}">${escapeHtml(brand.initial)}</span>
+      <span class="store-badge conn-rail-badge ${escapeAttr(badge.cls)}">${escapeHtml(badge.letter)}</span>
 
       <span class="conn-row-label">${escapeHtml(p.label)}</span>
 
@@ -414,7 +459,7 @@ function buildSteamRailBlock(p, selected) {
 
     <div class="conn-rail-steam-wrap">
 
-      <span class="conn-rail-eyebrow">Recommended first</span>
+      <span class="conn-rail-rec-caption">Recommended first</span>
 
       ${buildRailItemHtml(p, selected)}
 

@@ -44,6 +44,7 @@ STORE_FILES = [
     ("games_nintendo.json", "nintendo", None),
     ("games_wishlist.json", "wishlist", None),
     ("games_itch.json", "itch", _itch_is_videogame),
+    ("games_ea.json", "ea", None),
 ]
 
 HLTB_FIELDS = (

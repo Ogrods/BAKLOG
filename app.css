@@ -258,6 +258,7 @@ html[data-boot-loading] #bootLoadingOverlay {
 }
 .boot-loading-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
@@ -266,10 +267,31 @@ html[data-boot-loading] #bootLoadingOverlay {
   border: 1px solid rgb(51 65 85);
   border-radius: 0.5rem;
 }
+.boot-loading-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
 .boot-loading-label {
   font-size: 0.875rem;
   color: #94a3b8;
   letter-spacing: 0.01em;
+}
+.boot-loading-tip {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  font-style: italic;
+  color: #38bdf8;
+  letter-spacing: 0.01em;
+  text-align: center;
+  max-width: 42ch;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+.boot-loading-tip.is-fading { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .boot-loading-tip { transition: none; }
 }
 /* Hide chrome that belongs to a loaded view; visibility (not display)
    preserves layout so the reveal is a fade-style swap for below-curtain
@@ -557,7 +579,11 @@ button[disabled] { cursor: not-allowed; }
 .store-badge.ubisoft { background: #00adef; color: #001930; }
 .store-badge.other { background: #475569; color: #f1f5f9; }
 .store-badge.itch { background: #fa5c5c; color: #2a0606; }
+.store-badge.humble { background: #cc2929; color: #fff; }
+.store-badge.ea { background: #ff4747; color: #fff; font-size: 0.5rem; font-weight: 800; letter-spacing: -0.04em; min-width: 1.35rem; }
+.store-badge.itad { background: #22d3ee; color: #06303a; }
 .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
+.store-badge--lg { height: 24px; min-width: 24px; font-size: 13px; border-radius: 6px; padding: 0 8px; }
 .view-tab.active { border-color: #38bdf8; color: #e2e8f0; background: rgba(14, 165, 233, 0.15); }
 .add-target-btn { color: #cbd5e1; }
 .add-target-btn.active { background: rgba(16, 185, 129, 0.25); color: #ecfdf5; box-shadow: inset 0 0 0 1px #10b981; }
@@ -927,6 +953,8 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .summary-store-chip[data-store="xbox"] { --store-accent: #107c10; }
 .summary-store-chip[data-store="battlenet"] { --store-accent: #148eff; }
 .summary-store-chip[data-store="ubisoft"] { --store-accent: #00adef; }
+.summary-store-chip[data-store="humble"] { --store-accent: #cc2929; }
+.summary-store-chip[data-store="ea"] { --store-accent: #ff4747; }
 .summary-store-chip[data-store="other"] { --store-accent: #475569; }
 /* === Dashboard === */
 .dash-card { background: rgb(30 41 59); border: 1px solid rgb(51 65 85); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; height: 100%; }
@@ -2240,30 +2268,32 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 }
 .itch-hero-shuffle:hover { opacity: 1; color: #e2e8f0; }
 .itch-hero-card {
-  display: flex; gap: 0.65rem; align-items: stretch;
+  display: flex; gap: 0.65rem; align-items: center;
   background: rgba(51, 65, 85, 0.35); border: 1px solid rgba(71, 85, 105, 0.6);
   border-radius: 6px; padding: 0.5rem; cursor: pointer; text-align: left;
-  width: 100%; transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  width: 100%; height: 7rem; overflow: hidden;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 .itch-hero-card:hover { background: rgba(51, 65, 85, 0.55); border-color: rgba(71, 85, 105, 0.9); transform: translateY(-1px); }
 .itch-hero-cover { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; background: #1e293b; flex-shrink: 0; }
-.itch-hero-body { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1; }
+.itch-hero-body { display: flex; flex-direction: column; justify-content: center; gap: 0.25rem; min-width: 0; flex: 1; height: 100%; overflow: hidden; }
 .itch-hero-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-.itch-hero-name { color: #f1f5f9; font-size: 0.9rem; font-weight: 600; line-height: 1.25; }
+.itch-hero-name { color: #f1f5f9; font-size: 0.9rem; font-weight: 600; line-height: 1.25; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .itch-hero-rating { color: #34d399; font-weight: 700; font-size: 0.8rem; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.itch-hero-meta { color: #94a3b8; font-size: 0.72rem; }
+.itch-hero-meta { color: #94a3b8; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .itch-hero-desc {
   color: #cbd5e1; font-size: 0.72rem; line-height: 1.35; margin: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.itch-hero-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.1rem; }
+.itch-hero-tags { display: flex; flex-wrap: nowrap; gap: 0.3rem; margin-top: 0.1rem; overflow: hidden; }
 .itch-hero-tag {
   background: rgba(99, 102, 241, 0.15); color: #c7d2fe;
   border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 3px;
-  padding: 0.05rem 0.35rem; font-size: 0.65rem;
+  padding: 0.05rem 0.35rem; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;
 }
 .itch-hero-empty {
   color: #94a3b8; font-size: 0.72rem; padding: 0.5rem; border: 1px dashed rgba(71, 85, 105, 0.6); border-radius: 6px;
+  height: 7rem; display: flex; align-items: center;
 }
 .itch-breakdown { display: flex; flex-direction: column; gap: 0.35rem; flex: 1 1 auto; min-height: 0; }
 .itch-breakdown-list { display: flex; flex-direction: column; justify-content: space-around; gap: 0.25rem; flex: 1; }
@@ -2530,32 +2560,27 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   flex-direction: column;
   gap: 4px;
 }
-.conn-rail-eyebrow {
-  display: inline-block;
-  align-self: flex-start;
-  background: rgba(56, 189, 248, 0.16);
-  color: #7dd3fc;
-  font-size: 10px;
+.conn-rail-rec-caption {
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+  padding: 0 0 0 4px;
 }
 .conn-rail-item {
   display: grid;
   grid-template-columns: auto auto 1fr auto;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 8px;
+  padding: 6px 10px;
   background: #1e293b;
   border: 1px solid #334155;
-  border-radius: 10px;
+  border-radius: 7px;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease;
   min-width: 0;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
 }
 .conn-rail-item:hover { background: #233146; border-color: #475569; }
 .conn-rail-item:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
@@ -2573,18 +2598,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-row-dot--unverified { background: #fbbf24; }
 .conn-row-dot--expired { background: #fb923c; }
 .conn-row-dot--disconnected { background: #475569; }
-.conn-row-badge {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+.conn-rail-badge { height: 18px; min-width: 18px; font-size: 10.5px; }
 .conn-row-label { color: #f1f5f9; font-size: 13px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conn-row-pill { font-size: 10px; white-space: nowrap; }
 @media (max-width: 720px) {
@@ -2607,7 +2621,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   }
   .conn-rail-item {
     flex-shrink: 0;
-    min-width: 200px;
+    min-width: 180px;
   }
 }
 .conn-popover-backdrop {
@@ -2702,26 +2716,36 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-card-stripe { position: absolute; left: 0; right: 0; top: 0; height: 3px; }
 .conn-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .conn-head-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.conn-brand-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  color: #fff;
-  font-weight: 700;
-  font-size: 15px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  flex-shrink: 0;
-  cursor: default;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  padding-top: 1px;
-}
 .conn-card-body { flex: 1; }
 .conn-card-body h3 { font-weight: 600; color: #f1f5f9; margin-top: 6px; font-size: 15px; }
 .conn-desc { color: #94a3b8; font-size: 12.5px; line-height: 1.4; margin-top: 4px; }
+.conn-tips {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.conn-tips li {
+  position: relative;
+  color: #94a3b8;
+  font-size: 11.5px;
+  line-height: 1.45;
+  padding-left: 16px;
+}
+.conn-tips li::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #475569;
+}
+.conn-tips li:first-child { color: #cbd5e1; }
+.conn-tips li:first-child::before { background: #38bdf8; }
 .conn-note { color: #64748b; font-size: 11px; margin-top: 4px; }
 .conn-meta { color: #64748b; font-size: 11px; margin-top: 2px; }
 .conn-error { color: #fbbf24; font-size: 11px; margin-top: 4px; }

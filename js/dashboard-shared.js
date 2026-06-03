@@ -20,7 +20,7 @@ export const ITCH_CLASS_LABELS = {
 export const DASH_STORE_COLORS = {
   steam: "#ea580c", gog: "#6d28d9", psn: "#003791", epic: "#64748b",
   amazon: "#c2410c", xbox: "#107C10", battlenet: "#148EFF", ubisoft: "#FFD200",
-  nintendo: "#E60012", itch: "#fa5c5c", other: "#94a3b8", manual: "#64748b",
+  nintendo: "#E60012", itch: "#fa5c5c", humble: "#cc2929", ea: "#FF4747", other: "#94a3b8", manual: "#64748b",
 };
 
 export const DASH_STATUS_COLORS = {
@@ -40,7 +40,7 @@ export const DASH_REVIEW_COLORS = {
 
 export const DASH_STORE_LABELS = {
   steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic", amazon: "Amazon",
-  xbox: "Xbox", battlenet: "Battle.net", ubisoft: "Ubisoft", nintendo: "Nintendo",
+  xbox: "Xbox", battlenet: "Battle.net", ubisoft: "Ubisoft", nintendo: "Nintendo", humble: "Humble", ea: "EA App",
   itch: "itch.io", other: "Other", manual: "Manual",
 };
 

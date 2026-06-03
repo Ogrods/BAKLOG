@@ -6,6 +6,8 @@
  * View overlay: #viewLoadingOverlay scrim on #tableShell (tab switches only).
  */
 
+import { startBootTipRotation, stopBootTipRotation } from './tips.js';
+
 export const LOADING_LABELS = {
   dashboard: "Loading dashboard…",
   library: "Loading library…",
@@ -43,6 +45,7 @@ export function setBootCurtainLabel(view) {
 export function liftBootCurtain(startedAt, opts = {}) {
   if (!document.documentElement.hasAttribute("data-boot-loading")) return;
   const doLift = () => {
+    stopBootTipRotation();
     document.documentElement.removeAttribute("data-boot-loading");
     const ov = document.getElementById("bootLoadingOverlay");
     if (ov) ov.setAttribute("aria-busy", "false");

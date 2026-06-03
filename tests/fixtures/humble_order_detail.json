@@ -1,0 +1,27 @@
+{
+  "gamekey": "AbCdEf",
+  "subproducts": [
+    {
+      "machine_name": "sample_game",
+      "human_name": "Sample Game",
+      "icon": "https://cdn.humblebundle.com/images/icons/sample_game.png",
+      "downloads": [{ "platform": "windows" }]
+    },
+    {
+      "machine_name": "sample_ebook",
+      "human_name": "Sample Ebook Only",
+      "downloads": []
+    },
+    {
+      "machine_name": "sample_steam_key",
+      "human_name": "Steam Key Game",
+      "tpks": { "all": ["tpk_steam_1"] }
+    }
+  ],
+  "tpkd_dict": {
+    "tpk_steam_1": {
+      "key_type": "steam",
+      "steam_app_id": "123456"
+    }
+  }
+}

@@ -85,8 +85,11 @@
     <main id="main">
     <div id="bootLoadingOverlay" role="status" aria-live="polite" aria-busy="true">
       <div class="boot-loading-card">
-        <div class="view-spinner" aria-hidden="true"></div>
-        <span id="bootLoadingLabel" class="boot-loading-label">Loading…</span>
+        <div class="boot-loading-head">
+          <div class="view-spinner" aria-hidden="true"></div>
+          <span id="bootLoadingLabel" class="boot-loading-label">Loading…</span>
+        </div>
+        <span id="bootLoadingTip" class="boot-loading-tip" aria-live="polite"></span>
       </div>
     </div>
 

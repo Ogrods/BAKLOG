@@ -22,12 +22,16 @@ AUTH_PROVIDER_BY_KEY: dict[str, str] = {
     "ubisoft": "ubisoft",
     "nintendo": "nintendo",
     "itch": "itch",
+    "humble": "humble",
+    "ea": "ea",
     "wishlistSteam": "steam",
     "wishlistGog": "gog",
     "wishlistEpic": "epic_wishlist",
     "wishlistPsn": "psn",
     "wishlistUbisoft": "ubisoft",
     "wishlistXbox": "xbox_wishlist",
+    "wishlistNintendo": "nintendo_wishlist",
+    "wishlistHumble": "humble",
     "itad": "itad",
 }
 
@@ -42,6 +46,8 @@ LIBRARY_JSON_BY_KEY: dict[str, str] = {
     "xbox": "games_xbox.json",
     "battlenet": "games_battlenet.json",
     "ubisoft": "games_ubisoft.json",
+    "humble": "games_humble.json",
+    "ea": "games_ea.json",
 }
 
 WISHLIST_JSON_BY_KEY: dict[str, str] = {
@@ -51,6 +57,8 @@ WISHLIST_JSON_BY_KEY: dict[str, str] = {
     "wishlistPsn": "games_wishlist_psn.json",
     "wishlistUbisoft": "games_wishlist_ubisoft.json",
     "wishlistXbox": "games_wishlist_xbox.json",
+    "wishlistNintendo": "games_wishlist_nintendo.json",
+    "wishlistHumble": "games_wishlist_humble.json",
 }
 
 WISHLIST_META_KEY_BY_FETCHER: dict[str, str] = {
@@ -60,6 +68,8 @@ WISHLIST_META_KEY_BY_FETCHER: dict[str, str] = {
     "wishlistPsn": "wishlistPsn",
     "wishlistUbisoft": "wishlistUbisoft",
     "wishlistXbox": "wishlistXbox",
+    "wishlistNintendo": "wishlistNintendo",
+    "wishlistHumble": "wishlistHumble",
 }
 
 ENRICH_FETCHER_KEYS = frozenset({"hltb", "steamReviews", "steamCovers", "steamTags"})

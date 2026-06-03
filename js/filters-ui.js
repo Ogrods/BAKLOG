@@ -708,7 +708,7 @@ export function renderSummary() {
   const storeLabels = {
     steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic",
     amazon: "Amazon", xbox: "Xbox", battlenet: "Battle.net",
-    ubisoft: "Ubisoft", nintendo: "Nintendo", itch: "itch.io",
+    ubisoft: "Ubisoft", nintendo: "Nintendo", itch: "itch.io", humble: "Humble", ea: "EA App",
   };
   const storeCounts = Object.keys(storeLabels)
     .map(k => ({

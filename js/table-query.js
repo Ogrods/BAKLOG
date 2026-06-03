@@ -89,7 +89,7 @@ function gameStore(g) {
 
 function gameId(g) {
   return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id
-    ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id;
+    ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id ?? g.humble_id ?? g.ea_id;
 }
 
 export function gameKey(g) {

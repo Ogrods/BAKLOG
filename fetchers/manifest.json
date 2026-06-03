@@ -102,6 +102,26 @@
       "requires": [{ "env": "ITCH_API_KEY", "note": "API key from itch.io user settings" }]
     },
     {
+      "key": "humble",
+      "label": "Humble",
+      "group": "library",
+      "script": "fetch_humble.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "humble",
+      "color": "#cc2929",
+      "requires": [{ "note": "Reuses your Humble browser profile (cache/auth/profiles/humble); no extra env vars" }]
+    },
+    {
+      "key": "ea",
+      "label": "EA App",
+      "group": "library",
+      "script": "fetch_ea.py",
+      "args": ["--skip-hltb"],
+      "metaKey": "ea",
+      "color": "#FF4747",
+      "requires": [{ "note": "Reuses your EA browser profile (cache/auth/profiles/ea); no extra env vars" }]
+    },
+    {
       "key": "wishlistSteam",
       "label": "WL Steam",
       "group": "wishlist",
@@ -131,7 +151,7 @@
       "script": "fetch_epic_wishlist.py",
       "metaKey": "wishlistEpic",
       "color": "#64748b",
-      "requires": [{ "env": "EPIC_STORE_COOKIE", "note": "Storefront Cookie from store.epicgames.com" }]
+      "requires": [{ "note": "Reuses your Epic Store browser profile (cache/auth/profiles/epic_wishlist); no extra env vars" }]
     },
     {
       "key": "wishlistPsn",
@@ -159,6 +179,24 @@
       "metaKey": "wishlistXbox",
       "color": "#107C10",
       "requires": [{ "note": "Reuses your Xbox Store browser profile (cache/auth/profiles/xbox_wishlist); no extra env vars" }]
+    },
+    {
+      "key": "wishlistNintendo",
+      "label": "WL Nintendo",
+      "group": "wishlist",
+      "script": "fetch_nintendo_wishlist.py",
+      "metaKey": "wishlistNintendo",
+      "color": "#E60012",
+      "requires": [{ "note": "Reuses your Nintendo Store browser profile (cache/auth/profiles/nintendo_wishlist); no extra env vars" }]
+    },
+    {
+      "key": "wishlistHumble",
+      "label": "WL Humble",
+      "group": "wishlist",
+      "script": "fetch_humble_wishlist.py",
+      "metaKey": "wishlistHumble",
+      "color": "#cc2929",
+      "requires": [{ "note": "Reuses your Humble browser profile (cache/auth/profiles/humble); no extra env vars" }]
     },
     {
       "key": "itad",

@@ -243,7 +243,7 @@ export { LIBRARY_STORE_JSON };
 export function rebuildAllGamesFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
   const manualLibrary = allManual.filter(g => !g.wishlist);
-  const { steam: steamData, gog, psn, epic, amazon, nintendo, xbox, battlenet, ubisoft, itch } = state.libraryMeta;
+  const { steam: steamData, gog, psn, epic, amazon, nintendo, xbox, battlenet, ubisoft, itch, humble } = state.libraryMeta;
   const sources = [
     (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
     (gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
@@ -254,6 +254,7 @@ export function rebuildAllGamesFromMetas() {
     (xbox?.games || []).map(g => normalizeGame({ ...g, store: "xbox", id: g.id ?? g.xbox_title_id })),
     (battlenet?.games || []).map(g => normalizeGame({ ...g, store: "battlenet", id: g.id ?? g.battlenet_id })),
     (ubisoft?.games || []).map(g => normalizeGame({ ...g, store: "ubisoft", id: g.id ?? g.ubisoft_id })),
+    (humble?.games || []).map(g => normalizeGame({ ...g, store: "humble", id: g.id ?? `humble-${g.humble_id}` })),
     manualLibrary,
   ];
   state.allGames = sources.flatMap(dedupeWithinStore).map(applyCoopOverrides);
@@ -265,7 +266,7 @@ export function rebuildAllGamesFromMetas() {
 export function rebuildWishlistFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
   const manualWishlist = allManual.filter(g => !!g.wishlist);
-  const { wishlist, wishlistGog, wishlistEpic, wishlistPsn, wishlistUbisoft, wishlistXbox } = state.libraryMeta;
+  const { wishlist, wishlistGog, wishlistEpic, wishlistPsn, wishlistUbisoft, wishlistXbox, wishlistNintendo, wishlistHumble } = state.libraryMeta;
   const fetchedWishlist = [
     ...((wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }))),
     ...((wishlistGog?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: `gog-${g.id ?? g.gog_id}`, wishlist_store: "gog" }))),
@@ -333,7 +334,9 @@ export async function reloadGames() {
   const xbox = await fetchLibraryJson("games_xbox.json");
   const battlenet = await fetchLibraryJson("games_battlenet.json");
   const ubisoft = await fetchLibraryJson("games_ubisoft.json");
-  if (!steam && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft) throw new Error("No library files found");
+  const humble = await fetchLibraryJson("games_humble.json");
+  const ea = await fetchLibraryJson("games_ea.json");
+  if (!steam && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft && !humble && !ea) throw new Error("No library files found");
   state.libraryMeta.steam = steam;
   state.libraryMeta.gog = gog;
   state.libraryMeta.psn = psn;
@@ -344,6 +347,8 @@ export async function reloadGames() {
   state.libraryMeta.xbox = xbox;
   state.libraryMeta.battlenet = battlenet;
   state.libraryMeta.ubisoft = ubisoft;
+  state.libraryMeta.humble = humble;
+  state.libraryMeta.ea = ea;
   rebuildAllGamesFromMetas();
   const wishlist = await fetchLibraryJson("games_wishlist.json");
   const wishlistGog = await fetchLibraryJson("games_wishlist_gog.json");
@@ -351,12 +356,16 @@ export async function reloadGames() {
   const wishlistPsn = await fetchLibraryJson("games_wishlist_psn.json");
   const wishlistUbisoft = await fetchLibraryJson("games_wishlist_ubisoft.json");
   const wishlistXbox = await fetchLibraryJson("games_wishlist_xbox.json");
+  const wishlistNintendo = await fetchLibraryJson("games_wishlist_nintendo.json");
+  const wishlistHumble = await fetchLibraryJson("games_wishlist_humble.json");
   state.libraryMeta.wishlist = wishlist;
   state.libraryMeta.wishlistGog = wishlistGog;
   state.libraryMeta.wishlistEpic = wishlistEpic;
   state.libraryMeta.wishlistPsn = wishlistPsn;
   state.libraryMeta.wishlistUbisoft = wishlistUbisoft;
   state.libraryMeta.wishlistXbox = wishlistXbox;
+  state.libraryMeta.wishlistNintendo = wishlistNintendo;
+  state.libraryMeta.wishlistHumble = wishlistHumble;
   rebuildWishlistFromMetas();
   await loadItadPrices();
   await loadHltbCache();

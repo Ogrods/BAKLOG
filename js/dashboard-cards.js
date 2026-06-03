@@ -398,7 +398,7 @@ export function renderDashboardItchRecap() {
   const failedItch = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
   const heroCandidates = gamesOnly
     .filter(g => getPersonal(g).status !== "finished" && combinedPlaytime(g) === 0)
-    .filter(g => ratingValue(g) > 0 && hasEnoughReviews(g))
+    .filter(g => ratingValue(g) >= 90 && hasEnoughReviews(g))
     .filter(g => !!(g.library_image || g.header_image) && !failedItch.has(gameKey(g)))
     .sort((a, b) => ratingValue(b) - ratingValue(a))
     .slice(0, 10);

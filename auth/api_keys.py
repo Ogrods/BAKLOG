@@ -6,6 +6,8 @@ import re
 import time
 from typing import TYPE_CHECKING, Any
 
+from auth.cdp_compat import click_by_text
+
 if TYPE_CHECKING:
     from auth.runner import AuthSession
 
@@ -257,17 +259,13 @@ def extract_itch(page, context, session: AuthSession | None = None) -> dict[str,
             # Generate a key if no working one was found yet.
             if not generated:
                 try:
-                    for sel in (
-                        'button:has-text("Generate new API key")',
-                        'a:has-text("Generate new API key")',
-                        'form button:has-text("Generate")',
+                    if click_by_text(
+                        page,
+                        ("generate new api key", "generate"),
+                        tags=("button", "a", "input[type='submit']"),
                     ):
-                        loc = page.locator(sel)
-                        if loc.count() > 0:
-                            loc.first.click(timeout=3000)
-                            generated = True
-                            page.wait_for_timeout(1500)
-                            break
+                        generated = True
+                        page.wait_for_timeout(1500)
                 except Exception:
                     pass
 
@@ -287,17 +285,8 @@ def extract_itch(page, context, session: AuthSession | None = None) -> dict[str,
 def _itad_register_app(page) -> None:
     """If no app exists, register one named 'Steam Backlog'."""
     try:
-        for sel in (
-            'a:has-text("Register")',
-            'button:has-text("Register")',
-            'a:has-text("New app")',
-            'button:has-text("New app")',
-            'a:has-text("Create")',
-            'button:has-text("Create")',
-        ):
-            loc = page.locator(sel)
-            if loc.count() > 0:
-                loc.first.click(timeout=3000)
+        for label in ("Register", "New app", "Create"):
+            if click_by_text(page, (label.lower(),)):
                 page.wait_for_timeout(1000)
                 break
         # Fill any required title/name field
@@ -306,15 +295,8 @@ def _itad_register_app(page) -> None:
             if inp.count() > 0:
                 inp.fill("Steam Backlog", timeout=2500)
                 break
-        for sel in (
-            'button:has-text("Register")',
-            'button:has-text("Create")',
-            'button:has-text("Save")',
-            'button[type="submit"]',
-        ):
-            loc = page.locator(sel)
-            if loc.count() > 0:
-                loc.first.click(timeout=3000)
+        for label in ("Register", "Create", "Save"):
+            if click_by_text(page, (label.lower(),), tags=("button", "input[type='submit']")):
                 page.wait_for_timeout(2500)
                 break
     except Exception:
@@ -468,15 +450,6 @@ def extract_itad(page, context, session: AuthSession | None = None) -> dict[str,
     )
 
 
-def _validate_xbox(creds: dict[str, str]) -> None:
-    from xbox_client import XboxAuthError, XboxClient
-
-    try:
-        XboxClient(creds["XBL_API_KEY"]).get_account()
-    except XboxAuthError as exc:
-        raise RuntimeError(str(exc)) from exc
-
-
 _XBL_DASHBOARD_PATHS = ("/dashboard", "/app", "/keys", "/")
 
 
@@ -489,14 +462,28 @@ def _xbl_signed_in(url: str) -> bool:
     return True
 
 
-def _xbl_scrape_keys(page) -> str:
-    """Look in DOM/input values/text for an OpenXBL key."""
+def _xbl_scrape_key_candidates(page) -> list[str]:
+    """Return ranked OpenXBL key candidates from the dashboard DOM/text.
+
+    OpenXBL keys are alphanumeric and commonly 24-31 chars, so we accept a
+    24-char floor (matching _XBL_KEY_RE) and return several ranked candidates
+    rather than the first match. The caller validates each against the API, so
+    relaxing the length never locks us onto a non-key token (CSRF/session ids).
+    """
     try:
         result = page.evaluate(
             """() => {
-                const looksLikeKey = s => typeof s === 'string'
-                    && /^[A-Za-z0-9_-]{20,128}$/.test(s)
-                    && !/^(localhost|undefined|null|true|false)$/i.test(s);
+                const out = [];
+                const seen = new Set();
+                const push = s => {
+                    if (typeof s !== 'string') return;
+                    s = s.trim();
+                    if (!/^[A-Za-z0-9_-]{24,128}$/.test(s)) return;
+                    if (/^(localhost|undefined|null|true|false)$/i.test(s)) return;
+                    if (seen.has(s)) return;
+                    seen.add(s);
+                    out.push(s);
+                };
 
                 // Reveal hidden keys — only safe clicks (no nav, no targets)
                 document.querySelectorAll('button, [role="button"]').forEach(el => {
@@ -508,39 +495,61 @@ def _xbl_scrape_keys(page) -> str:
                     }
                 });
 
-                // 1. Input fields (value attribute or live value)
-                for (const inp of document.querySelectorAll('input')) {
-                    const v = inp.value || inp.getAttribute('value') || '';
-                    if (looksLikeKey(v) && v.length >= 32) return v;
-                }
-                // 2. Code/pre/textarea blocks
-                for (const el of document.querySelectorAll('code, pre, textarea, [data-clipboard-text]')) {
-                    const v = (el.getAttribute && el.getAttribute('data-clipboard-text'))
-                        || el.innerText || el.textContent || '';
-                    const m = v.match(/[A-Za-z0-9_-]{32,128}/g);
-                    if (m) {
-                        for (const tok of m) {
-                            if (looksLikeKey(tok)) return tok;
-                        }
-                    }
-                }
-                // 3. Visible text near "API key" labels
+                // 1. Highest confidence: token right after an "API key" label
+                //    (xbl.io labels the key "authorizationCode" / "Authorization")
                 const body = document.body ? document.body.innerText : '';
-                const m = body.match(/(?:API\\s*Key|X-Authorization|apikey)[^A-Za-z0-9]+([A-Za-z0-9_-]{32,128})/i);
-                if (m) return m[1];
-                return '';
+                const labelled = body.match(
+                    /(?:authorizationCode|authorization|API\\s*Key|X-Authorization|apikey)[^A-Za-z0-9]+([A-Za-z0-9_-]{24,128})/ig
+                ) || [];
+                for (const chunk of labelled) {
+                    const m = chunk.match(/([A-Za-z0-9_-]{24,128})\\s*$/);
+                    if (m) push(m[1]);
+                }
+                // 2. data-clipboard-text (copy buttons usually carry the raw key)
+                for (const el of document.querySelectorAll('[data-clipboard-text]')) {
+                    push(el.getAttribute('data-clipboard-text') || '');
+                }
+                // 3. Input field values (readonly key fields)
+                for (const inp of document.querySelectorAll('input')) {
+                    push(inp.value || inp.getAttribute('value') || '');
+                }
+                // 4. Code/pre/textarea blocks
+                for (const el of document.querySelectorAll('code, pre, textarea')) {
+                    const v = el.innerText || el.textContent || '';
+                    const toks = v.match(/[A-Za-z0-9_-]{24,128}/g) || [];
+                    toks.forEach(push);
+                }
+                // 5. Bare body tokens (last resort)
+                const bare = body.match(/[A-Za-z0-9_-]{24,128}/g) || [];
+                bare.forEach(push);
+
+                return out.slice(0, 8);
             }"""
         )
-        if isinstance(result, str) and result:
-            return result.strip()
+        if isinstance(result, list):
+            return [s.strip() for s in result if isinstance(s, str) and s.strip()]
     except Exception:
         pass
-    return ""
+    return []
+
+
+def _xbox_key_valid(key: str) -> bool:
+    """Non-raising OpenXBL key probe — used to filter scrape candidates."""
+    from xbox_client import XboxAuthError, XboxClient
+
+    try:
+        XboxClient(key).get_account()
+        return True
+    except XboxAuthError:
+        return False
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Wait for OpenXBL sign-in, then scrape the API key from the dashboard."""
     captured: dict[str, str] = {}
+    header_key: dict[str, str] = {}
 
     def on_request(request) -> None:
         if "xbl.io" not in (request.url or "").lower():
@@ -548,7 +557,7 @@ def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str,
         for h in ("x-authorization", "X-Authorization"):
             value = request.headers.get(h)
             if value and len(value) >= 24:
-                captured["XBL_API_KEY"] = value.strip()
+                header_key["XBL_API_KEY"] = value.strip()
                 return
 
     page.on("request", on_request)
@@ -557,10 +566,19 @@ def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str,
     visited: set[str] = set()
     last_message = 0.0
 
+    def _accept(candidates: list[str]) -> dict[str, str] | None:
+        for cand in candidates:
+            if _xbox_key_valid(cand):
+                captured["XBL_API_KEY"] = cand
+                return captured
+        return None
+
     while time.time() < deadline:
-        if captured.get("XBL_API_KEY"):
-            _validate_xbox(captured)
-            return captured
+        # Request-header key is ground truth — prefer it, but still validate.
+        if header_key.get("XBL_API_KEY"):
+            hit = _accept([header_key["XBL_API_KEY"]])
+            if hit:
+                return hit
 
         url = (page.url or "").lower()
 
@@ -576,17 +594,13 @@ def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str,
                 except Exception:
                     visited.add(path)
                     continue
-                key = _xbl_scrape_keys(page)
-                if key:
-                    captured["XBL_API_KEY"] = key
-                    _validate_xbox(captured)
-                    return captured
+                hit = _accept(_xbl_scrape_key_candidates(page))
+                if hit:
+                    return hit
             # Re-scrape current page periodically — user might be clicking around
-            key = _xbl_scrape_keys(page)
-            if key:
-                captured["XBL_API_KEY"] = key
-                _validate_xbox(captured)
-                return captured
+            hit = _accept(_xbl_scrape_key_candidates(page))
+            if hit:
+                return hit
 
         if session and time.time() - last_message > 6:
             last_message = time.time()

@@ -133,6 +133,13 @@ python fetch_ubisoft.py --skip-hltb
 python fetch_nintendo.py --skip-hltb
 ```
 
+**Humble Bundle:** Connections → Humble Bundle → sign in at humblebundle.com (library page). One profile unlocks library + store wishlist fetchers.
+
+```bash
+python fetch_humble.py --skip-hltb
+python fetch_humble_wishlist.py
+```
+
 **itch.io:** API key from https://itch.io/user/settings/api-keys → `ITCH_API_KEY=` in `.env`.
 
 ```bash
@@ -148,12 +155,13 @@ Writes all owned keys (games + tools/TTRPG PDFs). The dashboard itch.io tab hide
 python fetch_wishlist.py --skip-hltb
 python fetch_gog_wishlist.py    # optional — needs GOG_AL; until run, WL GOG chip shows "missing"
 python fetch_epic_wishlist.py
+python fetch_nintendo_wishlist.py   # Connections → Nintendo Store wishlist (separate from eShop library login)
 python fetch_itad.py
 ```
 
-Wishlist JSON files (`games_wishlist.json`, `games_wishlist_gog.json`, `games_wishlist_epic.json`) are optional per store. The dashboard **Fetcher health** row marks any file that has not been fetched yet as *missing*; that is normal until you run the matching script.
+Wishlist JSON files (`games_wishlist.json`, `games_wishlist_gog.json`, `games_wishlist_epic.json`, `games_wishlist_nintendo.json`, etc.) are optional per store. The dashboard **Fetcher health** row marks any file that has not been fetched yet as *missing*; that is normal until you run the matching script.
 
-**Epic wishlist (storefront cookie):** the wishlist lives behind storefront auth, separate from the launcher OAuth that `fetch_epic.py` uses. Sign in at [store.epicgames.com](https://store.epicgames.com), open the wishlist page, DevTools → Network → filter `graphql` → click any POST `/graphql` → Headers → Request Headers → copy the entire `Cookie:` value into `EPIC_STORE_COOKIE` in `.env`.
+**Epic wishlist:** separate from launcher OAuth (`fetch_epic.py`). Connections → **Epic (wishlist)** → Connect at [store.epicgames.com/wishlist](https://store.epicgames.com/en-US/wishlist) (clear Cloudflare if shown). `fetch_epic_wishlist.py` reuses the saved browser profile headlessly — no `EPIC_STORE_COOKIE` paste.
 
 Fetcher options (all scripts):
 
@@ -185,19 +193,20 @@ First Steam run may take several minutes for a large library (Store API is rate-
 
 ```bash
 pip install -r requirements.txt
-playwright install chromium   # one-time, for Connections browser sign-in
 python server.py
 ```
 
+Requires **Google Chrome** or **Microsoft Edge** installed (Edge ships with Windows). Connections opens a headed browser window for cookie/OAuth sign-in. Override the browser path with `BAKLOG_CHROME_PATH` if needed.
+
 On Windows, prefer the project venv interpreter (`.venv\Scripts\python.exe server.py`) rather than the Microsoft Store `python.exe` stub. Fetcher subprocesses launched from the stub can hang `subprocess.Popen` and wedge the run queue.
 
-**Connections tab:** sign in once per store from the dashboard — API keys via form fields, cookie/OAuth stores via a headed Chromium window. Credentials are encrypted in `cache/auth/` (OS keychain by default). `.env` still works as a fallback.
+**Connections tab:** sign in once per store from the dashboard — API keys via form fields, cookie/OAuth stores via a headed Chrome/Edge window. Credentials are encrypted in `cache/auth/` (OS keychain by default). `.env` still works as a fallback.
 
 #### Moving to a new machine
 
 1. On the old machine: **Connections** → ⋮ → **Portable bundle…** → **Export bundle…**. Choose a passphrase and save the downloaded `baklog-secrets-*.bundle` somewhere safe (USB, cloud folder, etc.).
-2. Install BAKLOG on the new machine (`pip install -r requirements.txt`, `playwright install chromium`, `python server.py`).
-3. **Connections** → ⋮ → **Portable bundle…** → **Import bundle…**, pick the file, enter the same passphrase. The page reloads with every provider restored — including Playwright cookie profiles.
+2. Install BAKLOG on the new machine (`pip install -r requirements.txt`, `python server.py`). Chrome or Edge must be installed for Connections sign-in.
+3. **Connections** → ⋮ → **Portable bundle…** → **Import bundle…**, pick the file, enter the same passphrase. The page reloads with every provider restored — including browser cookie profiles.
 
 Terminal alternative:
 
@@ -270,10 +279,12 @@ schtasks /create /SC WEEKLY /D SUN /TN "BAKLOG Refresh" /TR "powershell -Executi
 | `fetch_battlenet.py` | Battle.net → `games_battlenet.json` |
 | `fetch_ubisoft.py` | Ubisoft Connect → `games_ubisoft.json` |
 | `fetch_nintendo.py` | Nintendo eShop (~2yr) → `games_nintendo.json` |
+| `fetch_humble.py` | Humble Bundle library (games only) → `games_humble.json` |
 | `fetch_itch.py` | itch.io owned keys → `games_itch.json` |
 | `fetch_wishlist.py` | Steam wishlist → `games_wishlist.json` |
 | `fetch_gog_wishlist.py` | GOG wishlist → `games_wishlist_gog.json` |
-| `fetch_epic_wishlist.py` | Epic Games Store wishlist → `games_wishlist_epic.json` (uses `EPIC_STORE_COOKIE`) |
+| `fetch_epic_wishlist.py` | Epic Games Store wishlist → `games_wishlist_epic.json` |
+| `fetch_humble_wishlist.py` | Humble Store wishlist → `games_wishlist_humble.json` |
 | `fetch_itad.py` | IsThereAnyDeal prices → `itad_prices.json` |
 | `enrich_steam_reviews.py` | Backfill Steam review fields on non-Steam rows |
 | `enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |
@@ -320,5 +331,13 @@ pip install -e ".[dev]"
 python -m pytest
 ruff check shared fetchers enrichers tests
 ```
+
+**Connections CDP smoke test** (requires Chrome or Edge; not run in default CI):
+
+```bash
+pytest tests/test_cdp_browser.py -m integration
+```
+
+On GitHub, use **Actions → CDP smoke (manual) → Run workflow** after a suspected Chrome/Edge regression.
 
 Phase 0 is **local-only** — no cloud accounts or billing. Supabase/Next.js (Phase 1) stays on the roadmap until you opt in.

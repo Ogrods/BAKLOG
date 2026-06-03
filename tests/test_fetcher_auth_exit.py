@@ -21,6 +21,7 @@ AUTH_EXIT_SCRIPTS = [
     "fetch_nintendo.py",
     "fetch_ubisoft.py",
     "fetch_itch.py",
+    "fetch_ea.py",
 ]
 
 SESSION_AUTH_WISHLIST_SCRIPTS = [

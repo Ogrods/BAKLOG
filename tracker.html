@@ -308,6 +308,10 @@
         { id: "p3_secret_leak_hardening", label: "[DONE] Import passphrase in POST body; Epic OAuth state + HTML-escape; run-log token redaction. See Engineering tab." },
         { id: "p3_windows_ci_test_all", label: "[DONE] Windows CI job + scripts/test-all.ps1 + npm run test:all. See Engineering tab." },
         { id: "p3_console_height_lock", label: "[DONE] Fetcher run-log panel height locked to fetcher-health card (syncLogHeightToCard). See Engineering tab." },
+        { id: "p3_run_timeout_guard", label: "[DONE] Runaway-process guard: server caps every fetcher at MAX_RUN_SECONDS (env BAKLOG_MAX_RUN_SECONDS), launches under a Windows job object so child trees die with the parent, and RunManager.join_threads() drains workers on shutdown. pytest-timeout (60s, faulthandler 70s) + tests/conftest.py thread/subprocess leak detector. shared/subprocess_guard.py. See Engineering tab." },
+        { id: "p3_console_log_batching", label: "[DONE] Fetcher console no longer freezes during large refreshes (e.g. itch) — log lines buffer and flush on requestAnimationFrame (appendLine/flushLines/flushLinesNow in js/fetcher-health.js); clearLog resets the buffer." },
+        { id: "p3_log_panel_chrome_sync", label: "[DONE] Run-log panel title + badge always track real server state (syncLogPanelChrome): no more 'Running: Covers' with a 'queued · launching' badge; queue position reads '2 of 2' (activeCount + idx + 1) instead of a confusing '1 of 2'." },
+        { id: "p3_enricher_heartbeats", label: "[DONE] enrich_steam_tags.py prints a heartbeat every HEARTBEAT_EVERY (25) Steam lookups so long silent stretches (e.g. co-op tags on Epic) aren't force-killed by the 180s server stall watchdog." },
       ],
     },
     {
@@ -416,6 +420,27 @@
       fix: "syncLogHeightToCard() measures #dashboardFetcherHealth and caps #fetcherRunLog to that height; body scrolls inside. CSS ceiling calc(100vh - 160px) as fallback.",
       where: "js/fetcher-health.js, app.css",
       tests: "tests/fetcher-health.test.js (syncLogHeightToCard)",
+    },
+    {
+      area: "Runaway process / test hang guard",
+      risk: "A fetcher (or a test that spawns one) could hang forever — no max runtime, child process trees survived a parent kill on Windows, and worker threads weren't drained on shutdown, so the dev server or CI could wedge with no diagnostic.",
+      fix: "MAX_RUN_SECONDS (env BAKLOG_MAX_RUN_SECONDS) caps every run; the watcher kills past the cap with a clear log line. popen_fetcher launches under a Windows job object so the whole child tree dies with the parent. RunManager.join_threads(timeout) drains workers on shutdown. pytest-timeout (timeout=60, faulthandler_timeout=70) + a conftest thread/subprocess leak detector dump stacks instead of hanging CI.",
+      where: "server.py (MAX_RUN_SECONDS, join_threads), shared/subprocess_guard.py, pyproject.toml, tests/conftest.py",
+      tests: "tests/test_run_manager.py (test_max_runtime_cap_kills_run, join_threads), tests/conftest.py self-checks",
+    },
+    {
+      area: "Console log batching",
+      risk: "During a large refresh (e.g. an itch.io run streaming thousands of lines) every SSE line triggered a synchronous DOM append, freezing the page.",
+      fix: "appendLine buffers lines; flushLines paints on requestAnimationFrame; flushLinesNow forces a synchronous flush at run end / on demand; clearLog resets the buffer. Pairs with the console height lock.",
+      where: "js/fetcher-health.js",
+      tests: "tests/fetcher-health.test.js (flushLinesNow + batching)",
+    },
+    {
+      area: "Nintendo eShop via browser GraphQL",
+      risk: "Nintendo retired the legacy REST endpoint /api/my/transactions — it now returns 404 HTML, which the old client mistook for a bad cookie and called mark_invalid, churning the Connections chip. A stored NINTENDO_COOKIE alone yields an empty /api/auth/session; raw requests replay of the Savanna GraphQL call returns 400 INVALID_PARAM even with a valid idToken.",
+      fix: "NintendoEndpointError classifies 404/HTML as 'endpoint moved' (exit 1, no mark_invalid). The real path drives the saved CDP profile (cache/auth/profiles/nintendo) headlessly: open ec.nintendo.com/my/transactions/1, intercept TransactionsClientRootClient GraphQL responses, paginate via the numeric page buttons, and map rows to the legacy dict shape. fetch_nintendo.py passes profile_dir('nintendo'); cookie-only with no profile raises a helpful reconnect error.",
+      where: "nintendo_client.py, fetch_nintendo.py, auth/registry.py, fetchers/manifest.json",
+      tests: "tests/test_nintendo_client.py (404/HTML classification, _map_graphql_item, browser GraphQL parse, cookie-only error)",
     },
   ];
 

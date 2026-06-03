@@ -19,7 +19,7 @@ from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
 from fetchers._authoritative import NINTENDO
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from nintendo_client import NintendoAuthError, NintendoClient
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
@@ -186,7 +186,7 @@ def main() -> int:
     except NintendoAuthError as e:
         mark_invalid("nintendo", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_nintendo", t0, exit_code=1)
+        return stats.finish("fetch_nintendo", t0, exit_code=EXIT_CODE_AUTH)
 
     print(f"Fetched {len(raw_tx)} raw transactions.")
 

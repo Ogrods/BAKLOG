@@ -20,7 +20,7 @@ from fetchers._base import (
     refuse_drift_result,
     refuse_empty_result,
 )
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from psn_client import PsnAuthError, PsnClient, PsnGameEntry
 
 GAMES_PSN_JSON = Path("games_psn.json")
@@ -122,7 +122,7 @@ def main() -> int:
     except PsnAuthError as exc:
         mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
-        return stats.finish("fetch_psn", t0, exit_code=1)
+        return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
 
     hltb_client = HltbClient()
     existing = load_existing()
@@ -131,8 +131,9 @@ def main() -> int:
     try:
         library = psn.collect_library()
     except PsnAuthError as exc:
+        mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
-        return stats.finish("fetch_psn", t0, exit_code=1)
+        return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
 
     if args.psn_id:
         library = [entry for entry in library if entry.id == args.psn_id]

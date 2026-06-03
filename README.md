@@ -164,7 +164,7 @@ Fetcher options (all scripts):
 - `--allow-empty` — allow writing a zero-item result (default: refuse and exit 2 so stale data is preserved)
 - Store-specific: `--appid`, `--id`, etc.
 
-**Exit codes:** `0` success · `1` auth/config error · `2` suspicious empty result (or ITAD resolved zero titles). Every script prints `=== name started at … ===` and a footer summary with elapsed time.
+**Exit codes:** `0` success · `1` runtime/config error · `2` suspicious empty result (or ITAD resolved zero titles) · `3` drift guard refused write · `4` auth failure (expired/invalid credential). Every script prints `=== name started at … ===` and a footer summary with elapsed time.
 
 **Stall watchdog:** when a fetcher runs via `server.py`, if stdout is silent for 30s the server injects `[server] no output for Ns — still running (PID …)` into the log panel (repeats every 60s). This is informational only — the process is not killed.
 

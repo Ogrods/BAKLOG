@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
 
@@ -229,7 +229,7 @@ def main() -> int:
     except GogAuthError as e:
         mark_invalid("gog", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_gog_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     print("Fetching GOG wishlist IDs...", flush=True)
     try:
@@ -237,7 +237,7 @@ def main() -> int:
     except GogAuthError as e:
         mark_invalid("gog", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_gog_wishlist", t0, exit_code=EXIT_CODE_AUTH)
     empty_exit = refuse_empty_result(
         ids,
         label="GOG wishlist",

@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from epic_client import EpicAuthError, EpicStoreClient
 from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_WISHLIST_EPIC_JSON = Path("games_wishlist_epic.json")
@@ -229,7 +229,7 @@ def main() -> int:
         hint = _epic_auth_hint(e)
         mark_invalid("epic_wishlist", error=hint)
         stats.error(hint)
-        return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     print("Fetching Epic wishlist via storefront GraphQL...", flush=True)
     try:
@@ -238,7 +238,7 @@ def main() -> int:
         hint = _epic_auth_hint(e)
         mark_invalid("epic_wishlist", error=hint)
         stats.error(hint)
-        return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     print(f"  {len(elements)} wishlist items", flush=True)
 

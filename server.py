@@ -386,7 +386,7 @@ class Run:
         self._finished = threading.Event()
 
     def to_summary(self) -> dict[str, Any]:
-        return {
+        summary: dict[str, Any] = {
             "id": self.id,
             "key": self.key,
             "label": self.label,
@@ -396,6 +396,9 @@ class Run:
             "exit_code": self.exit_code,
             "line_count": len(self.lines),
         }
+        if self.exit_code == 4:
+            summary["failure_kind"] = "auth"
+        return summary
 
     def add_line(self, stream: str, text: str) -> None:
         msg = {"t": time.time(), "stream": stream, "text": text}

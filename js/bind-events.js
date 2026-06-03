@@ -73,7 +73,9 @@ import { createGlobalKeydownHandler } from './events.js';
 import {
   fetcherRunner,
   renderDashboardFetcherHealth,
+  dismissReconnectRequired,
 } from './fetcher-health.js';
+import { reconnectProvider } from './connections.js';
 import {
   dashDrillCoop,
   renderDashboardWishlistStats,
@@ -125,6 +127,21 @@ export function bindEvents() {
     if (logBtn) {
       e.preventDefault();
       fetcherRunner.reopenLogPanel();
+      return;
+    }
+    const reconnectBtn = e.target.closest("[data-fetcher-reconnect]");
+    if (reconnectBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      reconnectProvider(reconnectBtn.dataset.provider);
+      return;
+    }
+    const dismissBtn = e.target.closest("[data-fetcher-reconnect-dismiss]");
+    if (dismissBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissReconnectRequired(dismissBtn.dataset.provider);
+      renderDashboardFetcherHealth();
       return;
     }
     const staleBtn = e.target.closest(".fh-run-stale");

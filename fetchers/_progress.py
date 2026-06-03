@@ -5,9 +5,12 @@ Exit code contract (used across fetchers and enrichers):
   1 — runtime/config error
   2 — refused to write (empty library result)
   3 — refused to write (suspicious drift vs prior file)
+  4 — auth failure (expired/invalid credential)
 """
 
 from __future__ import annotations
+
+EXIT_CODE_AUTH = 4
 
 import sys
 import time

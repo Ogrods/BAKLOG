@@ -19,7 +19,7 @@ from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
 from fetchers._authoritative import BATTLENET
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
 RAW_DUMP_JSON = Path("cache/battlenet_raw.json")
@@ -209,14 +209,14 @@ def main() -> int:
     except BattleNetAuthError as e:
         mark_invalid("battlenet", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_battlenet", t0, exit_code=1)
+        return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
 
     try:
         raw = client.get_raw_account()
     except BattleNetAuthError as e:
         mark_invalid("battlenet", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_battlenet", t0, exit_code=1)
+        return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
 
     if args.dump_raw:
         RAW_DUMP_JSON.parent.mkdir(parents=True, exist_ok=True)

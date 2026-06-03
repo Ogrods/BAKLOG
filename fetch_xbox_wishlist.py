@@ -40,7 +40,7 @@ from auth import mark_invalid
 from auth.runner import _parse_xbox_preloaded_state
 from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_XBOX_WISHLIST_JSON = Path("games_wishlist_xbox.json")
@@ -444,7 +444,7 @@ def main() -> int:
         msg = f"wishlist page fetch failed: {exc}"
         mark_invalid("xbox_wishlist", error=msg)
         stats.error(str(exc))
-        return stats.finish("fetch_xbox_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_xbox_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     user = state.get("user") or {}
     if not user.get("isSignedIn"):
@@ -455,7 +455,7 @@ def main() -> int:
         )
         mark_invalid("xbox_wishlist", error=msg)
         stats.error(msg)
-        return stats.finish("fetch_xbox_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_xbox_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     ids, wishlists_branch = _extract_wishlist_ids(state)
     if args.dump_state or not ids:

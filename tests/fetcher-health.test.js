@@ -7,8 +7,25 @@ import {
   ITAD_AUTO_REFRESH_INTERVAL_MS,
   serverChipState,
   fetchWithTimeout,
+  markReconnectRequired,
+  clearReconnectRequired,
+  dismissReconnectRequired,
+  isProviderReconnectRequired,
+  reconnectRequiredForFetcherKey,
+  syncReconnectFromAuthStatus,
+  noteAuthCooldownStrike,
+  authCooldownDurationMs,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
+
+vi.mock('../js/connections.js', () => ({
+  FETCHER_AUTH_PROVIDER: { gog: 'gog', psn: 'psn' },
+  isProviderConnected: vi.fn(() => false),
+  noteFetcherAuthFailure: vi.fn(() => false),
+  showReconnectBanner: vi.fn(),
+}));
+
+import { isProviderConnected } from '../js/connections.js';
 
 describe('humanizeAge', () => {
   it('formats seconds and minutes', () => {
@@ -177,5 +194,66 @@ describe('fetchWithTimeout', () => {
       });
     }));
     await expect(fetchWithTimeout('/api/runs', {}, 30)).rejects.toThrow('server not responding');
+  });
+});
+
+describe('reconnect-required state', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearReconnectRequired('gog');
+    clearReconnectRequired('psn');
+    isProviderConnected.mockReturnValue(false);
+  });
+
+  it('marks provider reconnect-required and maps to fetcher key', () => {
+    markReconnectRequired('gog');
+    expect(isProviderReconnectRequired('gog')).toBe(true);
+    expect(reconnectRequiredForFetcherKey('gog')).toBe(true);
+    expect(reconnectRequiredForFetcherKey('steam')).toBe(false);
+  });
+
+  it('dismiss hides reconnect-required until cleared', () => {
+    markReconnectRequired('psn');
+    dismissReconnectRequired('psn');
+    expect(isProviderReconnectRequired('psn')).toBe(false);
+    expect(localStorage.getItem('baklog-reconnect-dismissed')).toContain('psn');
+  });
+
+  it('clear on connected provider', () => {
+    markReconnectRequired('gog');
+    isProviderConnected.mockReturnValue(true);
+    expect(isProviderReconnectRequired('gog')).toBe(false);
+  });
+
+  it('syncReconnectFromAuthStatus marks expired providers', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        providers: [
+          { key: 'gog', status: 'expired' },
+          { key: 'psn', status: 'connected' },
+        ],
+      }),
+    })));
+    await syncReconnectFromAuthStatus();
+    expect(isProviderReconnectRequired('gog')).toBe(true);
+    expect(isProviderReconnectRequired('psn')).toBe(false);
+  });
+
+  it('max auth cooldown strike marks reconnect-required', () => {
+    const maxStrikes = 3;
+    for (let i = 0; i < maxStrikes - 1; i++) noteAuthCooldownStrike('gog');
+    expect(isProviderReconnectRequired('gog')).toBe(false);
+    noteAuthCooldownStrike('gog');
+    expect(isProviderReconnectRequired('gog')).toBe(true);
+    expect(authCooldownDurationMs(maxStrikes)).toBe(60 * 60_000);
+  });
+
+  it('clearReconnectRequired removes state and dismiss flag', () => {
+    markReconnectRequired('gog');
+    dismissReconnectRequired('gog');
+    clearReconnectRequired('gog');
+    markReconnectRequired('gog');
+    expect(isProviderReconnectRequired('gog')).toBe(true);
   });
 });

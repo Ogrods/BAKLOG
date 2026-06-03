@@ -1,6 +1,6 @@
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { noteFetcherAuthFailure, isProviderConnected, FETCHER_AUTH_PROVIDER } from './connections.js';
+import { noteFetcherAuthFailure, isProviderConnected, FETCHER_AUTH_PROVIDER, showReconnectBanner } from './connections.js';
 
 // ---------------------------------------------------------------------------
 // Chip-level auth-failure backoff
@@ -53,6 +53,10 @@ export function noteAuthCooldownStrike(key) {
   authCooldowns.set(key, { until: Date.now() + authCooldownDurationMs(strikes), strikes });
   persistAuthCooldowns();
   scheduleAuthCooldownTick();
+  if (strikes >= AUTH_COOLDOWN_STEPS_MS.length) {
+    const provider = FETCHER_AUTH_PROVIDER[key];
+    if (provider) markReconnectRequired(provider);
+  }
 }
 
 let authCooldownTimer = null;
@@ -93,6 +97,98 @@ export function authCooldownRemainingMs(key) {
 function authCooldownLabel(ms) {
   const mins = Math.max(1, Math.ceil(ms / 60_000));
   return mins >= 60 ? `auth ${Math.round(mins / 60)}h` : `auth ${mins}m`;
+}
+
+// ---------------------------------------------------------------------------
+// Per-provider reconnect-required (definitive auth / max-strike / server expired)
+// ---------------------------------------------------------------------------
+const RECONNECT_DISMISSED_LS_KEY = 'baklog-reconnect-dismissed';
+/** @type {Set<string>} */
+let reconnectDismissed = loadReconnectDismissedSet();
+/** @type {Map<string, { at: number }>} */
+const reconnectRequiredByProvider = new Map();
+
+function loadReconnectDismissedSet() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECONNECT_DISMISSED_LS_KEY) || '[]');
+    return new Set(Array.isArray(raw) ? raw.filter(x => typeof x === 'string') : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function persistReconnectDismissed() {
+  try {
+    localStorage.setItem(RECONNECT_DISMISSED_LS_KEY, JSON.stringify([...reconnectDismissed]));
+  } catch (_) { /* storage unavailable */ }
+}
+
+/** Mark a provider as needing reconnect (clears any prior dismiss). */
+export function markReconnectRequired(provider) {
+  if (!provider) return;
+  reconnectRequiredByProvider.set(provider, { at: Date.now() });
+  if (reconnectDismissed.delete(provider)) persistReconnectDismissed();
+}
+
+/** Clear reconnect-required for a provider (success or reconnected). */
+export function clearReconnectRequired(provider) {
+  if (!provider) return;
+  reconnectRequiredByProvider.delete(provider);
+  if (reconnectDismissed.delete(provider)) persistReconnectDismissed();
+}
+
+/** User dismissed the inline reconnect chip affordance for this provider. */
+export function dismissReconnectRequired(provider) {
+  if (!provider) return;
+  reconnectDismissed.add(provider);
+  persistReconnectDismissed();
+}
+
+export function isReconnectDismissed(provider) {
+  return reconnectDismissed.has(provider);
+}
+
+/** True when provider needs reconnect and user has not dismissed the chip hint. */
+export function isProviderReconnectRequired(provider) {
+  if (!provider || reconnectDismissed.has(provider)) return false;
+  if (isProviderConnected(provider)) {
+    clearReconnectRequired(provider);
+    return false;
+  }
+  return reconnectRequiredByProvider.has(provider);
+}
+
+/** Fetcher chip key → reconnect-required via mapped auth provider. */
+export function reconnectRequiredForFetcherKey(key) {
+  const provider = FETCHER_AUTH_PROVIDER[key];
+  return provider ? isProviderReconnectRequired(provider) : false;
+}
+
+/** Sync reconnect-required from GET /api/auth/status (survives reload).
+ *  Uses the shared timeout so a hung endpoint can't stall the sync loop. */
+export async function syncReconnectFromAuthStatus() {
+  try {
+    const res = await fetchWithTimeout('/api/auth/status');
+    if (!res.ok) return;
+    const data = await res.json();
+    for (const p of data.providers || []) {
+      if (p.status === 'expired') markReconnectRequired(p.key);
+      else if (p.status === 'connected') clearReconnectRequired(p.key);
+    }
+  } catch (_) { /* server offline or timed out */ }
+}
+
+function handleFetcherAuthOutcome(key, data, logText) {
+  const provider = FETCHER_AUTH_PROVIDER[key];
+  const authExit = data?.exit_code === 4 || data?.failure_kind === 'auth';
+  if (authExit) {
+    if (provider) markReconnectRequired(provider);
+    clearAuthCooldown(key);
+    if (provider) showReconnectBanner([provider]);
+    return;
+  }
+  const authish = noteFetcherAuthFailure(key, logText);
+  if (authish) noteAuthCooldownStrike(key);
 }
 
 const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
@@ -1196,13 +1292,14 @@ export const fetcherRunner = (() => {
             await refreshAfterFetch(key);
           }
           clearAuthCooldown(key);
+          const provider = FETCHER_AUTH_PROVIDER[key];
+          if (provider) clearReconnectRequired(provider);
           markChipState(key, null);
         } else if (cancelled) {
           markChipState(key, null);
         } else {
           markChipState(key, 'failed');
-          const authish = noteFetcherAuthFailure(key, recentLog.join('\n'));
-          if (authish) noteAuthCooldownStrike(key);
+          handleFetcherAuthOutcome(key, data, recentLog.join('\n'));
           setTimeout(() => {
             if (runStateByKey.get(key) === 'failed') {
               runStateByKey.delete(key);
@@ -1248,6 +1345,9 @@ export const fetcherRunner = (() => {
             _lastAppliedDoneRunId = finished.id;
             await refreshAfterFetch(key);
           }
+          if (!ok && finished.status === 'done') {
+            handleFetcherAuthOutcome(key, finished, '');
+          }
           markChipState(key, null);
           if (liveRunId === runId) liveRunId = null;
           return;
@@ -1278,6 +1378,7 @@ export const fetcherRunner = (() => {
   /** Re-attach SSE streams after a page load (or tab return). */
   async function syncFromServer() {
     if (!isApiAvailable()) return;
+    await syncReconnectFromAuthStatus();
     await loadFetcherSources(true);
     let snap;
     try {
@@ -1443,9 +1544,11 @@ export function renderDashboardFetcherHealth() {
       : (count != null && count > 0 ? formatNum(count) : '—');
     const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
     const runState = fetcherRunner.stateFor(src.key);
-    const authCooldownMs = runState ? 0 : authCooldownRemainingMs(src.key);
+    const provider = FETCHER_AUTH_PROVIDER[src.key];
+    const needsReconnect = !runState && provider && isProviderReconnectRequired(provider);
+    const authCooldownMs = (runState || needsReconnect) ? 0 : authCooldownRemainingMs(src.key);
     const inAuthCooldown = authCooldownMs > 0;
-    const displayStatus = runState || status;
+    const displayStatus = runState || (needsReconnect ? 'reconnect' : status);
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0;
     const configHint = needsConfig
@@ -1471,32 +1574,40 @@ export function renderDashboardFetcherHealth() {
           configHint ? `Note: ${src.missingRequirements.join(', ')} not set (see README / .env.example)` : '',
           'Server is offline — start `python server.py` to run fetchers from the UI.',
         ].filter(Boolean);
-    // Disable when the queue cap is reached AND this chip isn't already in
-    // the pipeline — without this, clicking a third chip while two are
-    // active/queued would silently 409 on the server. inFlightCount comes
-    // from fetcherRunner so chipHtml never touches the runner's private
-    // runStateByKey directly.
     const queueFullElsewhere = fetcherRunner.inFlightCount() >= 2 && !runState;
     if (queueFullElsewhere) {
       titleLines.push('Queue full — one run is in progress and one is queued. Wait for a slot.');
+    }
+    if (needsReconnect) {
+      titleLines.push('Session expired — reconnect to refresh credentials, or dismiss to hide this hint.');
     }
     if (inAuthCooldown) {
       titleLines.push(`Auth failed — cooling down ${authCooldownLabel(authCooldownMs)}. Reconnect in Connections to clear, or wait it out.`);
     }
     const title = titleLines.join('\n');
-    const disabled = !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere || inAuthCooldown;
+    const disabled = !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere || inAuthCooldown || needsReconnect;
     const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
     const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
     const cooldownClass = inAuthCooldown ? ' fh-chip-auth-cooldown' : '';
+    const reconnectClass = needsReconnect ? ' fh-chip-reconnect-required' : '';
     const warnBadge = needsConfig ? '<span class="fh-chip-warn" title="Missing credentials">!</span>' : '';
-    const ageText = runState ? runState : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel);
-    const chip = `<button type="button" class="fh-chip fh-chip-${displayStatus}${needsClass}${readonlyClass}${cooldownClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
+    const ageText = runState
+      ? runState
+      : (needsReconnect ? 'reconnect' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel));
+    const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
       ${warnBadge}
       <span class="fh-chip-label">${escapeHtml(src.label)}</span>
       <span class="fh-chip-count">${escapeHtml(countStr)}</span>
       <span class="fh-chip-age">${escapeHtml(ageText)}</span>
     </button>`;
+    const reconnectControls = needsReconnect
+      ? `<button type="button" class="fh-chip-reconnect-btn" data-fetcher-reconnect data-provider="${escapeAttr(provider)}" title="Reconnect ${escapeAttr(src.label)}">Reconnect</button>
+         <button type="button" class="fh-chip-reconnect-dismiss" data-fetcher-reconnect-dismiss data-provider="${escapeAttr(provider)}" aria-label="Dismiss reconnect hint">&times;</button>`
+      : '';
+    const chip = needsReconnect
+      ? `<div class="fh-chip-wrap fh-chip-wrap--reconnect">${chipBtn}${reconnectControls}</div>`
+      : chipBtn;
     if (src.key === 'itad') {
       return chip + `<label class="fh-toggle fh-itad-auto" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
         <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${state.prefs.itadAutoRefreshDisabled ? '' : 'checked'} />

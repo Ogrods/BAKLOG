@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 from psn_client import PsnAuthError, PsnClient, PsnWishlistEntry
 
@@ -120,7 +120,7 @@ def main() -> int:
     except PsnAuthError as exc:
         mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
-        return stats.finish("fetch_psn_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_psn_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     print(f"Fetching PSN wishlist for {online_id}...", flush=True)
     try:
@@ -128,7 +128,7 @@ def main() -> int:
     except PsnAuthError as exc:
         mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
-        return stats.finish("fetch_psn_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_psn_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     skipped = [
         e for e in items if (e.store_classification or "").upper() in _SKIP_CLASSIFICATIONS

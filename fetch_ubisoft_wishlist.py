@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid
 from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_UBISOFT_WISHLIST_JSON = Path("games_wishlist_ubisoft.json")
@@ -329,7 +329,7 @@ def main() -> int:
     except Exception as exc:
         mark_invalid("ubisoft", error=f"wishlist page fetch failed: {exc}")
         stats.error(str(exc))
-        return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     if "Sign in" in title or _EMPTY_PHRASE.search(html or "") and "<div" not in (html or ""):
         msg = (
@@ -339,7 +339,7 @@ def main() -> int:
         )
         mark_invalid("ubisoft", error=msg)
         stats.error(msg)
-        return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=1)
+        return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     parsed = _parse_tiles(html)
     print(f"  parsed {len(parsed)} wishlist tiles (kept all kinds)", flush=True)

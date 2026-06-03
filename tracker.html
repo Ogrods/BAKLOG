@@ -199,6 +199,7 @@
     { id: "arch", label: "Architecture" },
     { id: "pipeline", label: "Pipeline" },
     { id: "wishlist", label: "Wishlist matrix" },
+    { id: "connmatrix", label: "Connection matrix" },
     { id: "triage", label: "Triage" },
     { id: "debug", label: "Debug tools" },
     { id: "monetize", label: "Monetization" },
@@ -1156,6 +1157,125 @@
     );
   }
 
+  // ---------- Connection matrix ----------
+  // Every "pull" (library + wishlist + price feed) and the four end-to-end
+  // verification stages from bs_fetcher_testing. Checkboxes persist via the
+  // normal items state (conn_<key>_<stage>); na[] marks stages that don't
+  // apply to a given pull (rendered as a muted dash instead of a checkbox).
+  const CONN_STAGES = [
+    { id: "connect", label: "Connect" },
+    { id: "fetch", label: "Fetch" },
+    { id: "reconnect", label: "Reconnect" },
+    { id: "spot", label: "Spot-check" },
+  ];
+  const CONNECTION_PULLS = [
+    { key: "steam", name: "Steam", type: "Library", output: "games_steam.json" },
+    { key: "gog", name: "GOG", type: "Library", output: "games_gog.json" },
+    { key: "psn", name: "PSN", type: "Library", output: "games_psn.json" },
+    { key: "epic", name: "Epic", type: "Library", output: "games_epic.json" },
+    { key: "amazon", name: "Amazon", type: "Library", output: "games_amazon.json", na: ["reconnect"] },
+    { key: "xbox", name: "Xbox", type: "Library", output: "games_xbox.json" },
+    { key: "battlenet", name: "Battle.net", type: "Library", output: "games_battlenet.json" },
+    { key: "ubisoft", name: "Ubisoft", type: "Library", output: "games_ubisoft.json" },
+    { key: "nintendo", name: "Nintendo", type: "Library", output: "games_nintendo.json" },
+    { key: "itch", name: "itch.io", type: "Library", output: "games_itch.json" },
+    { key: "humble", name: "Humble", type: "Library", output: "games_humble.json" },
+    { key: "ea", name: "EA App", type: "Library", output: "games_ea.json" },
+    { key: "wl_steam", name: "Steam", type: "Wishlist", output: "games_wishlist.json" },
+    { key: "wl_gog", name: "GOG", type: "Wishlist", output: "games_wishlist_gog.json" },
+    { key: "wl_epic", name: "Epic", type: "Wishlist", output: "games_wishlist_epic.json" },
+    { key: "wl_psn", name: "PSN", type: "Wishlist", output: "games_wishlist_psn.json" },
+    { key: "wl_ubisoft", name: "Ubisoft", type: "Wishlist", output: "games_wishlist_ubisoft.json" },
+    { key: "wl_xbox", name: "Xbox", type: "Wishlist", output: "games_wishlist_xbox.json" },
+    { key: "wl_nintendo", name: "Nintendo", type: "Wishlist", output: "games_wishlist_nintendo.json" },
+    { key: "wl_humble", name: "Humble", type: "Wishlist", output: "games_wishlist_humble.json" },
+    { key: "itad", name: "ITAD", type: "Prices", output: "itad_prices.json", na: ["reconnect"] },
+  ];
+
+  function connStageApplies(pull, stageId) {
+    return !(pull.na || []).includes(stageId);
+  }
+  function connCellId(pull, stageId) {
+    return "conn_" + pull.key + "_" + stageId;
+  }
+  // A pull is "verified" when every applicable stage is checked.
+  function connPullVerified(pull) {
+    return CONN_STAGES.every((st) => !connStageApplies(pull, st.id) || getItem(connCellId(pull, st.id)));
+  }
+  function connCheckCell(pull, stageId) {
+    if (!connStageApplies(pull, stageId)) {
+      return el("span", { class: "faint", title: "Not applicable for this pull" }, "—");
+    }
+    const id = connCellId(pull, stageId);
+    const cb = el("input", { type: "checkbox", id });
+    cb.checked = getItem(id);
+    cb.addEventListener("change", () => {
+      setItem(id, cb.checked);
+      preserveDetailsOpen(renderActive);
+    });
+    return cb;
+  }
+
+  // ---------- Render: Connection matrix ----------
+  function panelConnMatrix() {
+    const totalPulls = CONNECTION_PULLS.length;
+    const verifiedPulls = CONNECTION_PULLS.filter(connPullVerified).length;
+    let totalChecks = 0;
+    let doneChecks = 0;
+    for (const pull of CONNECTION_PULLS) {
+      for (const st of CONN_STAGES) {
+        if (!connStageApplies(pull, st.id)) continue;
+        totalChecks += 1;
+        if (getItem(connCellId(pull, st.id))) doneChecks += 1;
+      }
+    }
+    const pct = totalChecks ? Math.floor((doneChecks / totalChecks) * 100) : 0;
+
+    const typePill = (type) => {
+      const tone = type === "Library" ? "success" : type === "Wishlist" ? "info" : "neutral";
+      return el("span", { class: "pill pill-" + tone }, type);
+    };
+
+    const headers = ["Pull", "Type", ...CONN_STAGES.map((s) => s.label), "Output", "Verified"];
+    const rows = CONNECTION_PULLS.map((pull) => [
+      el("strong", {}, pull.name),
+      typePill(pull.type),
+      ...CONN_STAGES.map((st) => connCheckCell(pull, st.id)),
+      codeText(pull.output),
+      connPullVerified(pull)
+        ? el("span", { class: "pill pill-success" }, "Yes")
+        : el("span", { class: "faint" }, "—"),
+    ]);
+
+    return el("section", { id: "panel-connmatrix", class: "panel" + (state.activeTab === "connmatrix" ? " active" : "") },
+      el("h1", {}, "Connection matrix"),
+      el("p", {}, "End-to-end confirmation that every pull works — not just that the integration exists (that's the ", el("strong", {}, "Pipeline"), " + ", el("strong", {}, "Wishlist matrix"), " tabs), but that it actually connects, fetches real rows, recovers from an expired session, and lands clean data in the app. Tick each stage as you verify it on a real run. This is the live worksheet for ", codeText("bs_fetcher_testing"), "."),
+
+      el("div", { class: "grid-3" },
+        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, String(verifiedPulls) + " / " + String(totalPulls)), el("div", { class: "stat-label" }, "Pulls fully verified")),
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(pct) + "%"), el("div", { class: "stat-label" }, "Checks done (" + doneChecks + " / " + totalChecks + ")")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(totalPulls)), el("div", { class: "stat-label" }, "Total pulls")),
+      ),
+
+      el("h2", {}, "Per-pull verification"),
+      el("div", { class: "card" }, tableEl(headers, rows)),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "What each stage means"),
+        el("div", { class: "callout-body" },
+          el("strong", {}, "Connect"), " — start from a clean/expired profile, run the managed login (or paste the API key), and confirm the token/cookie/profile is captured. ",
+          el("strong", {}, "Fetch"), " — run the fetcher and confirm it writes real rows to its output file (not an empty/short file) and passes the drift guard. ",
+          el("strong", {}, "Reconnect"), " — expire the session and confirm the dashboard reconnect-required chip fires, then clears after reconnecting. ",
+          el("strong", {}, "Spot-check"), " — eyeball the rows in the app: names, store URLs, scores, and cross-store dedupe look right.",
+        ),
+      ),
+      el("div", { class: "callout success" },
+        el("div", { class: "callout-title" }, "Reading the table"),
+        el("div", { class: "callout-body" }, "A muted ", el("span", { class: "faint" }, "—"), " in a stage cell means that stage doesn't apply to the pull (e.g. Amazon is a local SQLite read with no session to reconnect; ITAD is a manual API key). A pull flips to ", el("span", { class: "pill pill-success" }, "Yes"), " under Verified once every applicable stage is ticked."),
+      ),
+    );
+  }
+
   // ---------- Render: Findings ----------
   function findingBlock(f) {
     const dec = getDecision(f.id);
@@ -1704,6 +1824,7 @@
     host.appendChild(panelArch());
     host.appendChild(panelPipeline());
     host.appendChild(panelWishlist());
+    host.appendChild(panelConnMatrix());
     host.appendChild(panelTriage());
     host.appendChild(panelDebug());
     host.appendChild(panelMonetize());

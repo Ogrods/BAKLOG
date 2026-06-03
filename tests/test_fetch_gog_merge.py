@@ -93,6 +93,14 @@ class TestResolveSource:
         monkeypatch.setattr(fg, "_web_creds_ready", lambda: True)
         assert fg.resolve_source("auto", None) == "local"
 
+    def test_auto_local_without_web_creds(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(fg, "is_local_provider_disabled", lambda _p: False)
+        monkeypatch.setattr(fg, "_galaxy_db_ready", lambda _p: True)
+        monkeypatch.setattr(fg, "_web_creds_ready", lambda: False)
+        assert fg.resolve_source("auto", None) == "local"
+
     def test_auto_falls_back_to_web(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(fg, "_galaxy_db_ready", lambda _p: False)
         monkeypatch.setattr(fg, "_web_creds_ready", lambda: True)

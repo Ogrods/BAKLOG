@@ -15,10 +15,10 @@ See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves 
 | OS | Status |
 |----|--------|
 | **Windows 10/11** | Fully supported (primary development target) |
-| **macOS** | Supported with limits — every store except **Amazon Games** |
-| **Linux** | Supported with limits — every store except **Amazon Games** |
+| **macOS** | Supported with limits — every store except **Amazon Games** and **GOG Galaxy (local)** |
+| **Linux** | Supported with limits — every store except **Amazon Games** and **GOG Galaxy (local)** |
 
-The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. The one Windows-only source is **Amazon Games**: it reads the desktop launcher's local SQLite database, which is encrypted with Windows DPAPI and has no portable equivalent. On macOS/Linux, Amazon is shown as **Unavailable** in Connections and its fetcher chip is disabled — everything else works the same.
+The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. **Windows-only local sources:** **Amazon Games** reads the desktop launcher's DPAPI-encrypted SQLite (no portable equivalent). **GOG Galaxy (local)** reads `galaxy-2.0.db` from the Galaxy install (Windows ProgramData or macOS Shared) — there is no supported Linux path, so Linux users use the GOG web cookie instead. On macOS/Linux, Amazon is shown as **Unavailable** in Connections and its fetcher chip is disabled; GOG library still works via web Connect or cookie.
 
 Credentials are stored via your OS **keyring** (Windows Credential Manager, macOS Keychain, Linux Secret Service) with an AES-GCM file fallback — not DPAPI. See [`auth/secrets.py`](auth/secrets.py).
 
@@ -28,8 +28,10 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 
 | Store | Windows | macOS / Linux |
 |-------|:-------:|:-------------:|
-| Steam, GOG, PSN, Epic, Xbox, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA, ITAD | Yes | Yes |
-| Amazon Games | Yes | No (Windows-only launcher DB) |
+| Steam, GOG (web), PSN, Epic, Xbox, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA, ITAD | Yes | Yes |
+| GOG Galaxy (local `galaxy-2.0.db`) | Yes | macOS only (no Linux Galaxy path) |
+| itch butler (local `butler.db`) | Yes | Yes |
+| Amazon Games (launcher DB) | Yes | No |
 
 ## Stack
 
@@ -102,7 +104,14 @@ python fetch_games.py
 
 Writes `games_steam.json`.
 
-**GOG:** Connections → GOG → Connect and sign in at [gog.com](https://www.gog.com). One sign-in covers library + wishlist.
+**GOG** — two sources, one `games_gog.json`:
+
+| Source | Connections card | When to use |
+|--------|------------------|-------------|
+| **Galaxy (local)** | GOG Galaxy (launcher) | Richest data from `galaxy-2.0.db` (Windows ProgramData or macOS Shared). Optional: `GOG_GALAXY_DB=`. No Linux path — use web below. |
+| **Web** | GOG (web) | Any OS; sign in at gog.com for library + wishlist cookie. |
+
+`fetch_gog.py` picks **auto**: Galaxy DB when present, else the saved web session. Override with `--source local|web` or `GOG_SOURCE=`.
 
 ```bash
 python fetch_gog.py
@@ -202,7 +211,14 @@ python fetch_humble.py --skip-hltb
 python fetch_humble_wishlist.py
 ```
 
-**itch.io:** API key from https://itch.io/user/settings/api-keys → `ITCH_API_KEY=` in `.env`.
+**itch.io** — two sources, one `games_itch.json`:
+
+| Source | Connections card | When to use |
+|--------|------------------|-------------|
+| **Butler (local)** | itch butler (local) | Owned library + playtime from the itch app's `butler.db` (Windows / macOS / Linux). No API key required when the DB is present. |
+| **API** | itch.io (API key) | Richer metadata (publisher, full tag lists). API key from https://itch.io/user/settings/api-keys → `ITCH_API_KEY=` in `.env` or Connections. |
+
+`fetch_itch.py` picks **auto**: butler.db when present, else the API key. Override with `--source local|api` or `ITCH_SOURCE=`.
 
 ```bash
 python fetch_itch.py --skip-hltb

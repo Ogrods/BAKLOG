@@ -285,11 +285,25 @@ html[data-boot-loading] #bootLoadingOverlay {
   color: #38bdf8;
   letter-spacing: 0.01em;
   text-align: center;
-  max-width: 42ch;
+  /* Keep the tip on a single line on roomy screens so it doesn't jostle the
+     overlay layout; clip overflow with an ellipsis. */
+  max-width: min(90vw, 80ch);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   opacity: 1;
   transition: opacity 0.3s ease;
 }
 .boot-loading-tip.is-fading { opacity: 0; }
+/* On small screens let the tip wrap across lines instead of truncating. */
+@media (max-width: 640px) {
+  .boot-loading-tip {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    max-width: 42ch;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .boot-loading-tip { transition: none; }
 }
@@ -429,6 +443,12 @@ button[disabled] { cursor: not-allowed; }
 .deal-card-clickable,
 .alpha-nav-btn.enabled,
 .add-target-btn { cursor: pointer; }
+/* The deal/ITAD price wrapper relies on Tailwind utilities (justify-end,
+   items-start, leading-tight) that are stripped from the prebuilt tailwind.css
+   because they only appear inside JS template strings, never in index.html.
+   Pin them here so deal rows stay right-aligned like plain-price rows. */
+.deal-price-row { justify-content: flex-end; align-items: flex-start; }
+.deal-price-link, .deal-price-row > div { line-height: 1.15; }
 .deal-price-link { cursor: pointer; text-decoration: none; color: inherit; transition: opacity 0.1s ease; }
 .deal-price-link:hover { opacity: 0.85; text-decoration: underline; text-decoration-color: rgba(110, 231, 183, 0.4); text-underline-offset: 2px; }
 .deal-price-link:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; border-radius: 3px; }
@@ -2603,6 +2623,51 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   justify-content: center;
 }
 .conn-hint-help:hover { color: #e2e8f0; border-color: #475569; background: #1e293b; }
+/* First-run onboarding (0 connected) — shared with dashboard welcome banner */
+.conn-onboard {
+  margin: 0 0 1rem;
+  padding: 1rem 1.125rem 1.125rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+  border: 1px solid #334155;
+  border-left: 4px solid #a855f7;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+.conn-onboard-title {
+  margin: 0 0 0.35rem;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+.conn-onboard-lead {
+  margin: 0 0 0.75rem;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+.conn-onboard-btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background: linear-gradient(90deg, #a855f7, #22d3ee);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+.conn-onboard-btn:hover { opacity: 0.92; }
+.conn-onboard-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+.conn-onboard-muted {
+  margin: 0.65rem 0 0;
+  font-size: 11px;
+  color: #64748b;
+}
+#dashOnboard:not(:empty) { margin-bottom: 0.25rem; }
 #connLayout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);

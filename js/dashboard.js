@@ -21,6 +21,7 @@ import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboard
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation } from './dashboard-insights.js';
+import { connectedProviderCount } from './connections.js';
 
 // Re-exports — dashboard.js stays the single public entry point for the
 // dashboard surface. External callers (app.js / bind-events.js / etc.)
@@ -248,8 +249,26 @@ function runWhenIdle(fn, timeoutMs = 1200) {
   else setTimeout(fn, 0);
 }
 
+function renderDashboardOnboard() {
+  const el = document.getElementById("dashOnboard");
+  if (!el) return;
+  if (state.allGames.length === 0 && connectedProviderCount() === 0) {
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="conn-onboard" role="region" aria-label="Get started">
+        <p class="conn-onboard-title">Welcome</p>
+        <p class="conn-onboard-lead">Connect your first store to fill this dashboard with your library, deals, and stats.</p>
+        <button type="button" class="conn-onboard-btn" data-dash-goto-connections>Open Connections</button>
+      </div>`;
+  } else {
+    el.innerHTML = "";
+    el.hidden = true;
+  }
+}
+
 export async function renderDashboard(opts = {}) {
   if (state.activeView !== "dashboard") return;
+  renderDashboardOnboard();
   try {
     await ensureChartJs();
   } catch (err) {

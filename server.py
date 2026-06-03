@@ -33,6 +33,7 @@ import atexit
 import json
 import os
 import queue
+import re
 import signal
 import subprocess
 import sys
@@ -956,6 +957,22 @@ def _sse_format(event: str, data: Any) -> bytes:
     return out.encode("utf-8")
 
 
+# Known catalog files the dashboard probes on boot. When a store hasn't been
+# fetched yet the file simply doesn't exist — return an empty catalog instead
+# of 404 so the browser console stays clean during the connection pass.
+_LIBRARY_JSON_RE = re.compile(r"^/games_[a-z0-9_]+\.json$", re.I)
+
+
+def _maybe_serve_empty_library_json(handler: SimpleHTTPRequestHandler, path: str) -> bool:
+    if not _LIBRARY_JSON_RE.match(path):
+        return False
+    filename = path.lstrip("/")
+    if (ROOT / filename).is_file():
+        return False
+    _send_json(handler, HTTPStatus.OK, {"game_count": 0, "games": []})
+    return True
+
+
 class Handler(SimpleHTTPRequestHandler):
     server_version = "SteamBacklogDev/1.0"
 
@@ -997,6 +1014,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path.startswith("/api/stream/"):
             self._handle_stream(self.path[len("/api/stream/"):])
+            return
+        path_only = self.path.split("?", 1)[0]
+        if _maybe_serve_empty_library_json(self, path_only):
             return
         super().do_GET()
 

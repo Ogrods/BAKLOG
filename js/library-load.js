@@ -243,7 +243,7 @@ export { LIBRARY_STORE_JSON };
 export function rebuildAllGamesFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
   const manualLibrary = allManual.filter(g => !g.wishlist);
-  const { steam: steamData, gog, psn, epic, amazon, nintendo, xbox, battlenet, ubisoft, itch, humble } = state.libraryMeta;
+  const { steam: steamData, gog, psn, epic, amazon, nintendo, xbox, battlenet, ubisoft, itch, humble, ea } = state.libraryMeta;
   const sources = [
     (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
     (gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
@@ -255,6 +255,7 @@ export function rebuildAllGamesFromMetas() {
     (battlenet?.games || []).map(g => normalizeGame({ ...g, store: "battlenet", id: g.id ?? g.battlenet_id })),
     (ubisoft?.games || []).map(g => normalizeGame({ ...g, store: "ubisoft", id: g.id ?? g.ubisoft_id })),
     (humble?.games || []).map(g => normalizeGame({ ...g, store: "humble", id: g.id ?? `humble-${g.humble_id}` })),
+    (ea?.games || []).map(g => normalizeGame({ ...g, store: "ea", id: g.id ?? g.ea_id })),
     manualLibrary,
   ];
   state.allGames = sources.flatMap(dedupeWithinStore).map(applyCoopOverrides);
@@ -274,6 +275,8 @@ export function rebuildWishlistFromMetas() {
     ...((wishlistPsn?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `psn-${g.psn_product_id}`, wishlist_store: "psn" }))),
     ...((wishlistUbisoft?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `ubisoft-${g.ubisoft_product_id}`, wishlist_store: "ubisoft" }))),
     ...((wishlistXbox?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `xbox-${g.xbox_product_id}`, wishlist_store: "xbox" }))),
+    ...((wishlistNintendo?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `nintendo-${g.nintendo_product_id}`, wishlist_store: "nintendo" }))),
+    ...((wishlistHumble?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `humble-${g.humble_product_id}`, wishlist_store: "humble" }))),
   ];
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
 }

@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, hasEnoughReviews, combinedPlaytime, parseReleaseForSort } from './game-core.js';
-import { getPersonal } from './personal-storage.js';
+import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 
 function releasedWithinMonths(g, months) {
@@ -103,9 +103,9 @@ function gameSpotlightReason(g, recentKeys) {
   if (status === 'next' && rating >= 70) {
     return { eyebrow: 'Up next', score: rating + 10 };
   }
-  if (isOnSale(g) && rating >= 70) {
-    return { eyebrow: 'On sale now', score: rating + 9 };
-  }
+  // "On sale now" is intentionally NOT tagged for library games — a discount on
+  // something you already own isn't actionable. The category is sourced from the
+  // wishlist instead (see wishlist on-sale injection in pickSpotlightGames).
   if (releasedWithinMonths(g, 12) && rating >= 70) {
     return { eyebrow: 'New release', score: rating + 7 };
   }
@@ -160,6 +160,19 @@ export function pickSpotlightGames(games) {
     const reason = gameSpotlightReason(g, recentKeys);
     if (reason) tagged.push({ g, reason });
   }
+
+  // "On sale now" is sourced exclusively from the wishlist: surface discounts on
+  // games you want but don't own yet. Mirrors the visible-wishlist filter used by
+  // the deal radar (cross-store-hidden + user-hidden excluded).
+  const wlHidden = state.wishlistCrossStoreHiddenKeys || new Set();
+  const wishlistOnSale = filterOutHidden(
+    (state.wishlistGames || []).filter(g => !wlHidden.has(gameKey(g)))
+  )
+    .filter(hasArt)
+    .filter(g => isOnSale(g) && ratingValue(g) >= 70)
+    .map(g => ({ g, reason: { eyebrow: 'On sale now', score: ratingValue(g) + 9, isWishlistSale: true } }));
+  tagged.push(...wishlistOnSale);
+
   tagged.sort((a, b) => b.reason.score - a.reason.score);
   const top = tagged.slice(0, target);
 
@@ -228,13 +241,19 @@ const SPOTLIGHT_STATUS_LABEL = {
   finished: 'completed',
 };
 
+function spotlightJumpDest(g) {
+  return g.store === 'wishlist' ? 'wishlist' : g.store === 'itch' ? 'itch.io' : 'library';
+}
+
 export function spotlightInnerHtml(g) {
   const art = sanitizeCoverUrl(g.header_image) || libraryCoverFor(g);
   const rating = ratingValue(g);
   const hltb = hltbMain(g);
   const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
   const status = (getPersonal(g).status) || 'backlog';
-  const statusLabel = SPOTLIGHT_STATUS_LABEL[status] || 'in your library';
+  const statusLabel = g.store === 'wishlist'
+    ? 'on your wishlist'
+    : (SPOTLIGHT_STATUS_LABEL[status] || 'in your library');
   const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
   return `
     <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded');window.coverFallback(this)" />
@@ -249,7 +268,7 @@ export function spotlightInnerHtml(g) {
 export function renderSpotlightHtml(g) {
   const key = gameKey(g);
   return `
-    <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in library">
+    <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}">
       ${spotlightInnerHtml(g)}
     </button>`;
 }
@@ -297,7 +316,7 @@ export function startSpotlightRotation(pool) {
       _spotlightFadeTimer = setTimeout(() => {
         el.innerHTML = spotlightInnerHtml(next);
         el.dataset.key = gameKey(next);
-        el.title = `Jump to ${next.name} in library`;
+        el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
         el.classList.remove('is-fading');
         primeSpotlightArt(el);
         _spotlightCurrentKey = gameKey(next);
@@ -324,7 +343,7 @@ export function startSpotlightRotation(pool) {
     _spotlightFadeTimer = setTimeout(() => {
       el.innerHTML = spotlightInnerHtml(next);
       el.dataset.key = gameKey(next);
-      el.title = `Jump to ${next.name} in library`;
+      el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
       el.classList.remove('is-fading');
       primeSpotlightArt(el);
       _spotlightCurrentKey = gameKey(next);

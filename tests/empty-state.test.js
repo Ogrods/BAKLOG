@@ -47,7 +47,17 @@ describe('buildTableEmptyStateHtml', () => {
     const html = buildTableEmptyStateHtml('library', 13);
     expect(html).toContain('Your library is empty');
     expect(html).toContain('Connections');
+    expect(html).toContain('data-table-goto-connections');
+    expect(html).toContain('Open Connections');
     expect(html).not.toContain('data-table-clear-filters');
+  });
+
+  it('shows Open Connections when wishlist is empty and no filters', () => {
+    state.sessionPrefs.crossStoreDedup = false;
+    state.wishlistGames = [];
+    const html = buildTableEmptyStateHtml('wishlist', 13);
+    expect(html).toContain('Your wishlist is empty');
+    expect(html).toContain('data-table-goto-connections');
   });
 
   it('shows neutral itch hint when itch catalog is empty', () => {
@@ -56,6 +66,14 @@ describe('buildTableEmptyStateHtml', () => {
     state.itchGames = [];
     const html = buildTableEmptyStateHtml('itch', 13);
     expect(html).toContain('No itch.io library loaded');
+    expect(html).toContain('data-table-goto-connections');
     expect(html).not.toContain('data-table-clear-filters');
+  });
+
+  it('does not show Open Connections when library has games but filters hide them', () => {
+    state.sessionPrefs.search = 'zzznomatch';
+    const html = buildTableEmptyStateHtml('library', 13);
+    expect(html).toContain('data-table-clear-filters');
+    expect(html).not.toContain('data-table-goto-connections');
   });
 });

@@ -7,6 +7,13 @@ import { state } from './state.js';
 import { escapeHtml } from './dom-util.js';
 import { collectActiveFilters } from './active-filters.js';
 
+function shouldShowConnectionsCta(view) {
+  if (view === 'library') return state.allGames.length === 0;
+  if (view === 'wishlist') return state.wishlistGames.length === 0;
+  if (view === 'itch') return state.itchGames.length === 0;
+  return false;
+}
+
 /** Full-width tbody row when filter/sort yields zero visible games. */
 export function buildTableEmptyStateHtml(view, colspan = 13) {
   const col = Math.max(1, colspan);
@@ -48,8 +55,13 @@ export function buildTableEmptyStateHtml(view, colspan = 13) {
       : "Add your itch.io API key on Connections and run the itch fetcher.";
   }
 
+  const actions = shouldShowConnectionsCta(view)
+    ? `<div class="table-empty-state-actions"><button type="button" class="table-empty-state-btn" data-table-goto-connections>Open Connections</button></div>`
+    : '';
+
   return `<tr class="table-empty-state-row"><td colspan="${col}"><div class="table-empty-state" role="status">
     <p class="table-empty-state-title">${escapeHtml(title)}</p>
     <p class="table-empty-state-hint">${escapeHtml(hint)}</p>
+    ${actions}
   </div></td></tr>`;
 }

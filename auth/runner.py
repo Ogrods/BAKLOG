@@ -1022,6 +1022,7 @@ EXTRACTORS = {
 INLINE_PROVIDERS = {
     "psn", "steam", "itch", "itad", "xbox", "xbox_wishlist",
     "ubisoft", "ea", "epic_wishlist", "nintendo", "nintendo_wishlist", "epic",
+    "humble",
 }
 
 

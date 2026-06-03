@@ -567,11 +567,25 @@ button[disabled] { cursor: not-allowed; }
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
 }
-.store-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 4px; line-height: 1; flex-shrink: 0; }
+.store-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-align: center;
+  min-width: 16px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
 .store-badge.steam { background: #ea580c; color: #fff7ed; }
 .store-badge.gog { background: #6d28d9; color: #ede9fe; }
 .store-badge.psn { background: #003791; color: #dbeafe; }
-.store-badge.epic { background: #1e293b; color: #e2e8f0; border: 1px solid #64748b; }
+.store-badge.epic { background: #1e293b; color: #e2e8f0; box-shadow: inset 0 0 0 1px #64748b; }
 .store-badge.amazon { background: #ff9900; color: #1a1200; }
 .store-badge.nintendo { background: #e60012; color: #fff5f5; }
 .store-badge.xbox { background: #107c10; color: #f0fff4; }
@@ -580,7 +594,7 @@ button[disabled] { cursor: not-allowed; }
 .store-badge.other { background: #475569; color: #f1f5f9; }
 .store-badge.itch { background: #fa5c5c; color: #2a0606; }
 .store-badge.humble { background: #cc2929; color: #fff; }
-.store-badge.ea { background: #ff4747; color: #fff; font-size: 0.5rem; font-weight: 800; letter-spacing: -0.04em; min-width: 1.35rem; }
+.store-badge.ea { background: #ff4747; color: #fff; font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
 .store-badge.itad { background: #22d3ee; color: #06303a; }
 .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
 .store-badge--lg { height: 24px; min-width: 24px; font-size: 13px; border-radius: 6px; padding: 0 8px; }
@@ -2781,18 +2795,17 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   font-weight: 500;
 }
 .conn-open-url:hover { background: #475569; }
-.conn-disconnect-x {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid #475569;
+.conn-disconnect {
+  flex: 0 0 auto;
+  background: transparent;
   color: #94a3b8;
-  font-size: 16px;
-  line-height: 1;
-  padding: 0;
-  flex-shrink: 0;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
-.conn-disconnect-x:hover { border-color: #f87171; color: #fca5a5; background: #450a0a; }
+.conn-disconnect:hover { border-color: #f87171; color: #fca5a5; background: #450a0a; }
 .conn-paste-panel {
   background: #0f172a;
   border: 1px solid #334155;
@@ -2864,7 +2877,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 #connectionsContainer .conn-save-btn,
 #connectionsContainer .conn-open-url,
 #connectionsContainer .conn-paste-clip,
-#connectionsContainer .conn-disconnect-x { cursor: pointer; }
+#connectionsContainer .conn-disconnect { cursor: pointer; }
 #connectionsContainer button:disabled { cursor: not-allowed; }
 
 /* Library-count "1UP" animation: rolling counter + scrolling combat text.

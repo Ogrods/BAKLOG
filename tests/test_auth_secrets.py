@@ -57,3 +57,13 @@ def test_mark_connected_and_disconnect() -> None:
     disconnect("nintendo")
     doc = load_doc()
     assert "nintendo" not in doc.get("providers", {})
+
+
+def test_gog_and_battlenet_connect_blob_used_by_resolve_env() -> None:
+    """Connect saves cookie creds to the blob; fetchers read via resolve_env(provider=...)."""
+    mark_connected("gog", {"GOG_AL": "gog-session-token"})
+    assert get_credentials("gog")["GOG_AL"] == "gog-session-token"
+    assert resolve_env("GOG_AL", provider="gog") == "gog-session-token"
+    mark_connected("battlenet", {"BATTLENET_COOKIE": "cookie=blizzard"})
+    assert get_credentials("battlenet")["BATTLENET_COOKIE"] == "cookie=blizzard"
+    assert resolve_env("BATTLENET_COOKIE", provider="battlenet") == "cookie=blizzard"

@@ -30,8 +30,18 @@ from shared.money import format_price, normalize_currency_code
 
 GAMES_HUMBLE_WISHLIST_JSON = Path("games_wishlist_humble.json")
 WISHLIST_URL = "https://www.humblebundle.com/store/wishlist"
-DUMP_HTML = Path("cache/humble/wishlist_dump.html")
-DUMP_JSON = Path("cache/humble/wishlist_dump.json")
+def _humble_wishlist_cache() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "humble"
+
+
+def dump_html() -> Path:
+    return _humble_wishlist_cache() / "wishlist_dump.html"
+
+
+def dump_json() -> Path:
+    return _humble_wishlist_cache() / "wishlist_dump.json"
 HLTB_DELAY_SEC = 1.0
 
 _NEXT_DATA_RE = re.compile(
@@ -267,9 +277,9 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[str, str, list[Any]]:
         html = page_html if len(page_html) > len(req_html) else req_html
 
         if dump:
-            DUMP_HTML.parent.mkdir(parents=True, exist_ok=True)
-            DUMP_HTML.write_text(html, encoding="utf-8")
-            DUMP_JSON.write_text(
+            dump_html().parent.mkdir(parents=True, exist_ok=True)
+            dump_html().write_text(html, encoding="utf-8")
+            dump_json().write_text(
                 json.dumps(
                     {
                         "url": url,
@@ -283,7 +293,7 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[str, str, list[Any]]:
                 ),
                 encoding="utf-8",
             )
-            print(f"  wrote {DUMP_HTML} and {DUMP_JSON}", flush=True)
+            print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
 
         return html, url, api_payloads
 
@@ -337,7 +347,7 @@ def main() -> int:
     parser.add_argument(
         "--dump",
         action="store_true",
-        help=f"Save raw HTML + JSON to {DUMP_HTML.parent}/",
+        help=f"Save raw HTML + JSON to {dump_html().parent}/",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()

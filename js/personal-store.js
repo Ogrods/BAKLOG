@@ -1,5 +1,13 @@
-import { state, STORAGE_KEY, PREFS_KEY, MANUAL_KEY } from './state.js';
-import { prefsStorageKey } from './profiles.js';
+import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
+import { prefsStorageKey, profileScopedStorageKey } from './profiles.js';
+
+function personalStorageKey() {
+  return profileScopedStorageKey(STORAGE_KEY);
+}
+
+function manualStorageKey() {
+  return profileScopedStorageKey(MANUAL_KEY);
+}
 
 let getManualGamesFn = () => [];
 let setManualGamesFn = () => {};
@@ -78,9 +86,9 @@ export const personalStore = (() => {
       ? doc.libraryFirstSeen
       : {};
     const manual = Array.isArray(doc.manual) ? doc.manual : [];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
-    localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
-    localStorage.setItem(MANUAL_KEY, JSON.stringify(manual));
+    localStorage.setItem(personalStorageKey(), JSON.stringify(state.personal));
+    localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
+    localStorage.setItem(manualStorageKey(), JSON.stringify(manual));
     setManualGamesFn(manual);
   }
 

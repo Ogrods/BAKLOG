@@ -33,7 +33,10 @@ from hltb_client import HltbClient
 GAMES_HUMBLE_JSON = Path("games_humble.json")
 ORDERS_URL = "https://www.humblebundle.com/api/v1/user/order"
 ORDER_DETAIL_URL = "https://www.humblebundle.com/api/v1/order/{gamekey}?all_tpkds=true"
-DUMP_PATH = Path("cache/humble/library_dump.json")
+def dump_path() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "humble" / "library_dump.json"
 HLTB_DELAY_SEC = 1.0
 ORDER_DELAY_SEC = 0.35
 
@@ -212,7 +215,7 @@ def fetch_library_items(
             raise RuntimeError("Unexpected Humble orders API response (expected a list)")
 
         if dump:
-            DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+            dump_path().parent.mkdir(parents=True, exist_ok=True)
             sample: list[dict] = []
             for entry in orders_raw[:3]:
                 if not isinstance(entry, dict):
@@ -225,7 +228,7 @@ def fetch_library_items(
                     sample.append({"gamekey": gk, "detail": detail})
                 except Exception as err:  # noqa: BLE001
                     sample.append({"gamekey": gk, "error": str(err)})
-            DUMP_PATH.write_text(
+            dump_path().write_text(
                 json.dumps(
                     {"order_count": len(orders_raw), "sample_orders": sample},
                     indent=2,
@@ -234,7 +237,7 @@ def fetch_library_items(
                 ),
                 encoding="utf-8",
             )
-            print(f"  wrote {DUMP_PATH}", flush=True)
+            print(f"  wrote {dump_path()}", flush=True)
             return []
 
         existing_by_key = _load_existing_by_machine()
@@ -322,7 +325,7 @@ def main() -> int:
     parser.add_argument(
         "--dump",
         action="store_true",
-        help=f"Save sample API payloads to {DUMP_PATH} and exit",
+        help=f"Save sample API payloads to {dump_path()} and exit",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()

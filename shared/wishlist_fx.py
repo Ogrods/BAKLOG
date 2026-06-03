@@ -66,6 +66,9 @@ def apply_fx_to_game(
     if not isinstance(game, dict):
         return False
 
+    if game.get("fx_converted") and not game.get("currency_native"):
+        return False
+
     # Native source of truth: the original store values, even if a previous run
     # already overwrote ``currency``/``price`` with a converted value.
     was_converted = bool(game.get("currency_native"))

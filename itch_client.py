@@ -36,13 +36,21 @@ class ItchApiError(Exception):
     """Raised on transport or unexpected response errors."""
 
 
+def _default_itch_cache_dir() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "itch"
+
+
 class ItchClient:
     def __init__(
         self,
         api_key: str,
-        cache_dir: Path = Path("cache/itch"),
+        cache_dir: Path | None = None,
         timeout: int = 30,
     ) -> None:
+        if cache_dir is None:
+            cache_dir = _default_itch_cache_dir()
         if not api_key:
             raise ItchAuthError("Set ITCH_API_KEY in .env (https://itch.io/user/settings/api-keys)")
         self.api_key = api_key.strip()

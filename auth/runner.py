@@ -265,10 +265,10 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
                 except Exception:
                     code = ""
             if code:
-                from epic_client import EpicAuthError, EpicClient
+                from epic_client import EpicAuthError, EpicClient, default_epic_cache_dir
 
                 try:
-                    EpicClient(auth_code=code).login()
+                    EpicClient(auth_code=code, cache_dir=default_epic_cache_dir()).login()
                 except EpicAuthError as exc:
                     raise RuntimeError(
                         f"Epic rejected the captured code ({exc}). Refresh the Epic page so a new "

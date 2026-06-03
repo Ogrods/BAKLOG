@@ -23,7 +23,11 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from nintendo_client import NintendoAuthError, NintendoClient
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
-RAW_DUMP_JSON = Path("cache/nintendo_raw.json")
+def raw_dump_json() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "nintendo_raw.json"
+
 HLTB_DELAY_SEC = 1.0
 
 # Skip non-game purchases (funds, subscriptions, vouchers).
@@ -163,7 +167,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-raw",
         action="store_true",
-        help=f"Write raw transactions to {RAW_DUMP_JSON}",
+        help=f"Write raw transactions to {raw_dump_json()}",
     )
     args = parser.parse_args()
     _configure_stdout()
@@ -191,11 +195,11 @@ def main() -> int:
     print(f"Fetched {len(raw_tx)} raw transactions.")
 
     if args.dump_raw:
-        RAW_DUMP_JSON.parent.mkdir(parents=True, exist_ok=True)
-        RAW_DUMP_JSON.write_text(
+        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
+        raw_dump_json().write_text(
             json.dumps(raw_tx, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"Wrote raw dump to {RAW_DUMP_JSON}.")
+        print(f"Wrote raw dump to {raw_dump_json()}.")
 
     merged = _merge_transactions(raw_tx)
     print(f"Found {len(merged)} unique game/DLC titles (after filtering funds/NSO).")

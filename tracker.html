@@ -159,6 +159,30 @@
     .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-mute); }
     .legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
     .legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border-soft); }
+
+    .campaign-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 0.5rem; margin-bottom: 0.75rem; }
+    .campaign-card > summary { cursor: pointer; list-style: none; padding: 0.85rem 1rem; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; font-weight: 600; color: var(--text); }
+    .campaign-card > summary::-webkit-details-marker { display: none; }
+    .campaign-card > summary::after { content: "+"; margin-left: auto; color: var(--text-mute); font-size: 1.1rem; line-height: 1; }
+    .campaign-card[open] > summary::after { content: "−"; }
+    .campaign-summary-meta { font-weight: 400; color: var(--text-mute); font-size: 0.85rem; }
+    .campaign-body { padding: 0 1rem 1rem; border-top: 1px solid var(--border); }
+    .campaign-section { margin-top: 0.85rem; }
+    .campaign-section h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-mute); margin: 0 0 0.35rem; }
+    .copy-snippet { background: var(--bg); border: 1px solid var(--border-soft); border-radius: 0.375rem; padding: 0.65rem 0.75rem; font-size: 0.82rem; line-height: 1.5; color: var(--text-dim); white-space: pre-wrap; margin: 0.35rem 0 0; font-family: inherit; }
+    .copy-btn { background: var(--bg-elev); border: 1px solid var(--border-soft); color: var(--text-dim); padding: 0.2rem 0.55rem; border-radius: 0.25rem; font-size: 0.72rem; cursor: pointer; font-family: inherit; margin-left: 0.35rem; vertical-align: middle; }
+    .copy-btn:hover { background: var(--bg-soft); color: var(--text); }
+    .asset-card { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.85rem 1rem; margin-bottom: 0.65rem; background: var(--bg-panel); }
+    .asset-card-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+    .asset-card-title { font-weight: 600; color: var(--text); flex: 1; min-width: 0; }
+    .messaging-grid { overflow-x: auto; margin-top: 0.5rem; }
+    .messaging-grid table { font-size: 0.78rem; }
+    .messaging-grid td, .messaging-grid th { min-width: 8rem; }
+    .snippet-block { margin-bottom: 1rem; }
+    .snippet-block h4 { margin-bottom: 0.35rem; }
+    .pillar-card { border-left: 3px solid var(--accent); padding-left: 0.75rem; margin-bottom: 0.85rem; }
+    .recent-shipped { background: rgba(52, 211, 153, 0.06); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; }
+    .recent-shipped ul { margin: 0.35rem 0 0; padding-left: 1.2rem; color: var(--text-dim); }
   </style>
 </head>
 <body>
@@ -242,6 +266,12 @@
         { id: "p2_followup_plans", label: "Each Accepted finding gets its own focused plan (small, reviewable, single concern)" },
         { id: "p2_no_bandaids", label: "Rule: no fixes during Phase 2 that aren't part of an accepted-finding follow-up plan" },
         { id: "p2_deferred_ux_surfaces", label: "Surface deferred UX audits during triage: smart-lists (find_ux_tag_smart_lists), add-row (find_ux_add_row), remove-row (find_ux_remove_row). Tags + notes audits resolved. Responsiveness moved to Phase 4.5." },
+        { id: "p2_closeout_fx", label: "[DONE] FX hard ceiling + mixed-currency sort/filter guard" },
+        { id: "p2_closeout_profiles", label: "[DONE] Profile migration marker, run rebind, LS scoping, switch cancels runs" },
+        { id: "p2_closeout_cache_http", label: "[DONE] Profile-scoped /cache/*.json + no root leak on empty profile — Marketing: Monetization → Creative → explainer_fetcher_health" },
+        { id: "p2_closeout_creds", label: "[DONE] Per-profile ! on chips + subprocess env (no process .env bleed)" },
+        { id: "p2_closeout_fetcher_health", label: "[DONE] Fetcher health legend + profile label + honest failed state" },
+        { id: "p2_closeout_tests", label: "[DONE] Profile cache HTTP, env isolation, switch-cancel, rebind tests" },
       ],
     },
     {
@@ -260,7 +290,7 @@
         { id: "p3_js_tests_dedup_state", label: "[DONE] Vitest: game-core.recomputeCrossStoreHidden — hidden keys match store-priority + scoreEntry tie-break; dedup off leaves siblings visible. tests/game-core.test.js describe recomputeCrossStoreHidden — hidden keys." },
         { id: "p3_ci", label: "[DONE] GitHub Actions: ruff (advisory) + Python pytest + JS vitest on push/PR to main/master — see .github/workflows/ci.yml" },
         { id: "p3_ci_ruff_required", label: "Make ruff lint a required CI gate — clean the ~150 inherited warnings (81 E501 long-line, 26 F401 unused-import, 24 UP017 datetime-timezone-utc, 14 I001 unsorted-imports, 5 UP035/UP012 modernization), flip continue-on-error→false in ci.yml" },
-        { id: "p3_drill_anchor_audit", label: "[DONE] Drill-in scroll unification — pendingScrollTarget in table-ui.js. Follow-up: find_drill_post_scroll_jump (~20–30px table shift after dashboard→library/itch drill; shelved as acceptable for now)." },
+        { id: "p3_drill_anchor_audit", label: "[DONE] Drill-in scroll unification — pendingScrollTarget in table-ui.js. Follow-up: find_drill_post_scroll_jump (~20–30px table shift) deferred to Phase 4.5 (p45_drill_scroll_jump)." },
         { id: "p3_error_boundary", label: "[DONE] Global window.onerror + unhandledrejection handler that surfaces a toast — js/error-boundary.js, installs on app boot, top-right red sticky toast with Copy/Details/Dismiss; debug overlay shows running error count; window.__baklogErrors holds the session log" },
         { id: "p3_debug_overlay", label: "[DONE] ?debug=1 overlay — js/debug-overlay.js polls state every 500ms in a corner panel: view · _dataVersion · visible row count · active filter count · tableFingerprint · last renderTable totalMs · captured-error count. Enables via ?debug=1 or sticky localStorage 'baklog-debug=1'." },
         { id: "p3_fetcher_backoff", label: "[DONE] Fetcher backoff: per-provider reconnect-required chips with inline Reconnect (exit code 4 + /api/auth/status expired + max-strike escalation); dismiss persists in localStorage" },
@@ -274,8 +304,8 @@
       tagline: "Make a new user's first 10 minutes feel inevitable. Onboarding, screenshots, hosted demo decision.",
       items: [
         { id: "p4_onboarding_flow", label: "[DONE] Onboarding: empty-state UX — 0-connected Connections CTA (Start with Steam), dashboard welcome banner, Open Connections on empty library/wishlist/itch tables" },
-        { id: "p4_readme_rewrite", label: "README rewrite: hero shot, 30-second pitch, three-step install, screenshot gallery" },
-        { id: "p4_landing_page", label: "Landing page (GitHub Pages or similar): name, screenshots, ITAD-style deal radar value prop" },
+        { id: "p4_readme_rewrite", label: "README rewrite: hero shot, 30-second pitch, three-step install, screenshot gallery — copy source: Monetization → Creative (readme_above_fold) + Campaign: Watch your library appear" },
+        { id: "p4_landing_page", label: "Landing page (GitHub Pages or similar): name, screenshots, ITAD-style deal radar value prop — hero/copy from Creative → hero_accidental_library + Campaign: Watch your library appear" },
         { id: "p4_hosted_demo", label: "Decide: hosted demo with stub data? Or local-only forever?" },
         { id: "p4_privacy_doc", label: "[DONE] Privacy doc — PRIVACY.md at repo root: credentials table, data files inventory, network hosts, explicit 'what does NOT happen', deletion checklist" },
         { id: "p4_cross_platform_decision", label: "Decide: stay Windows-only, or invest in macOS / Linux (Amazon SQLite paths, DPAPI alternatives)" },
@@ -289,6 +319,7 @@
       title: "Phase 4.5 — Responsive / mobile",
       tagline: "Make the UI survive narrow viewports. The whole app currently assumes a wide desktop screen; restyle once, after the major UX decisions land.",
       items: [
+        { id: "p45_drill_scroll_jump", label: "Drill-in post-scroll table shift (~20–30px) after dashboard→library/itch drill — find_drill_post_scroll_jump. Revisit scroll-anchor / layout snapshot during responsive pass." },
         { id: "p45_viewport_audit", label: "Audit every view (Dashboard / Library / Wishlist / Itch / Connections) at <1024px / <768px / <480px: dashboard chart cards, picks grid, table layout, filter drawer, kebab menu, deal cards. (Was find_ux_responsiveness.)" },
         { id: "p45_mobile_story", label: "Decide a deliberate mobile story — what stacks, what collapses, what's hidden on small screens — then restyle once so we don't redo it twice." },
         { id: "p45_print_stylesheet", label: "Add a print stylesheet (no deliberate print output today)." },
@@ -335,8 +366,36 @@
       body: "Done. New filters-ui.js::applyPrefsChange(patch, options) consolidates the savePrefs + syncFilterDomFromState + recomputeCrossStoreHidden + renderSummary + refreshFilterUI dance into one call. Patch shape: { prefs?, sessionPrefs? } shallow-merged into state.prefs / state.sessionPrefs. Options: { recomputeDedup, refresh, debounced, refreshOptions, renderers, skipDomSync, persist }. Behaviour: persistent prefs auto-savePrefs() when patch.prefs present; session prefs auto-syncFilterDomFromState() unless skipDomSync; recomputeDedup runs recomputeCrossStoreHidden + renderSummary before the refresh; renderers run before the refresh (errors caught + warned).\n\nMigrated sites: filters-ui.js::removeActiveFilter (huge switch — 25 cases collapsed to one-liners each), filters-ui.js::clearAllFilters (single call replaces 25 lines), bind-events.js (bindDealCheckbox factory, dealMinDiscount slider, dealMaxPrice slider, resetDealFiltersBtn, genreMode, wishlistStoreChips, summary status/store/deal chips, summary-wishlist-reset, crossStoreDedup toggle, genreChips, tagChips, tagFilterMode). Dropped now-dead imports of recomputeCrossStoreHidden, syncFilterDomFromState from bind-events.js.\n\nLeft alone: the 6 sessionPref input handler (already minimal — DOM-already-synced path), picks/score-column toggles (toggle a class or render picks, different concern), dashboard-drilldown.js (reset-then-route around switchView is a different shape — has its own dashFinishDrillToLibrary consolidation already). Lives in filters-ui.js (not prefs.js) to avoid a circular import; every dependency was already imported there.\n\nFollow-up not done: a Vitest test for applyPrefsChange — would require mocking the filters-ui import tree (table-ui, dashboard, picks-ui) which is out of scope. The 63 existing tests still pass after the migration." },
     { id: "find_drill_anchor_inconsistent", area: "Arch", severity: "grey", title: "[RESOLVED] Drill-in scroll — unified pendingScrollTarget",
       body: "Done 2026-06-01. Replaced four overlapping scroll paths with one pendingScrollTarget descriptor in table-ui.js (setPendingScrollTarget / consumePendingScrollTarget / scheduleScrollAfterLayoutSettled). Row drills defer scroll via requestIdleCallback deferChrome (summary + picks, then consume); category drills use kind=toolbar. Vitest in tests/drill-anchor.test.js. Minor post-scroll table shift tracked separately as find_drill_post_scroll_jump." },
-    { id: "find_drill_post_scroll_jump", area: "UX", severity: "grey", title: "Drill-in: ~20–30px table shift after scroll lands (shelved)",
-      body: "Known issue, accepted for now (2026-06-02). Repro: dashboard → library or itch via spotlight or scatter single-point; summary row stays put, table content jumps down ~20–30px shortly after landing. Wishlist drill does not reproduce. Attempted mitigations reverted (sync summary+picks before table, #summary min-height, afterChrome ResizeObserver, compensateScrollForPicksExpand, drill-probe diagnostic). Root cause not identified — likely deferred chrome (summary/picks) or content between summary and tableShell. Revisit with scroll-anchor polyfill or layout snapshot once it annoys enough." },
+    { id: "find_drill_post_scroll_jump", area: "UX", severity: "grey", title: "Drill-in: ~20–30px table shift after scroll lands (deferred Phase 4.5)",
+      body: "Deferred to Phase 4.5 (p45_drill_scroll_jump), 2026-06-03. Repro: dashboard → library or itch via spotlight or scatter single-point; summary row stays put, table content jumps down ~20–30px shortly after landing. Wishlist drill does not reproduce. Attempted mitigations reverted. Root cause not identified — likely deferred chrome (summary/picks). Revisit during responsive/UX polish pass." },
+    { id: "find_fx_mixed_compare", area: "Arch", severity: "red", title: "[RESOLVED] FX: native magnitudes compared against converted display prices",
+      body: "Resolved 2026-06-03 (Phase 2 closeout). Rows without price_amount and with currency != display currency were parsed as raw native numbers (e.g. JPY 5980) in deal sort and dealMaxPrice filter. gameComparablePrice + table-query comparableStorePrice now return null for that case. tests/deals-fx.test.js." },
+    { id: "find_fx_stale_cache", area: "Arch", severity: "amber", title: "[RESOLVED] FX: unreachable stale warning + no hard cache ceiling",
+      body: "Resolved 2026-06-03. shared/fx.py: 7d warn was dead code inside <24h branch; moved to stale-cache fallback path. CACHE_HARD_MAX_AGE_SECONDS (30d) refuses conversion when API down and cache too old. wishlist_fx guards fx_converted without currency_native. tests/test_fx.py." },
+    { id: "find_profile_migration_marker", area: "Arch", severity: "red", title: "[RESOLVED] Profile migration flipped is_legacy_layout before copy finished",
+      body: "Resolved 2026-06-03. profiles/default/.migration_complete written only after ensure_default_profile_dir copy loop; is_legacy_layout stays true until marker exists (mid-copy interrupt safe). tests/test_profile_paths.py::test_migration_marker_gates_legacy_layout." },
+    { id: "find_profile_runmanager_rebind", area: "Arch", severity: "red", title: "[RESOLVED] RunManager run logs/history not rebound on profile switch",
+      body: "Resolved 2026-06-03. server.py: Run.profile_id pinned at submit; BAKLOG_PROFILE + cwd from that profile; _append_history writes to runs_dir(profile_id); MANAGER.rebind_profile_paths() on _refresh_personal_paths. tests/test_run_profile_rebind.py." },
+    { id: "find_profile_ls_personal", area: "Arch", severity: "red", title: "[RESOLVED] personal/manual localStorage not profile-scoped",
+      body: "Resolved 2026-06-03. personalStorageKey/manualStorageKey via profileScopedStorageKey; applyServerDoc uses prefsStorageKey; auth cooldown LS scoped; clearProfileLocalStorage clears personal/manual/cooldown suffixes. tests/profiles.test.js extended." },
+    { id: "find_amazon_web_chip", area: "UX", severity: "red", title: "[RESOLVED] Amazon fetcher reconnect chip ignored amazon_web expiry",
+      body: "Resolved 2026-06-03. fetcher-health.js: reconnectProviderForFetcher / isFetcherReconnectRequired for amazon group; exit-4 marks amazon_web; fetch_amazon.py mark_connected(amazon_web) on successful web fetch." },
+    { id: "find_amazon_web_merge", area: "Arch", severity: "amber", title: "[DEFERRED] Amazon web fetch can drop launcher-only titles",
+      body: "Deferred Phase 3+. fetch_amazon.py full-replaces games_amazon.json from active source only; launcher vs web ID schemes may not merge. Drift guard is count-only. Follow-up: union-merge or refuse when source flips." },
+    { id: "find_profile_env_global", area: "Arch", severity: "green", title: "[RESOLVED] Per-profile credentials isolated from process .env",
+      body: "2026-06-03. Process .env / exported env applies only to the default profile (_env_fallback_allowed). Named profiles: get_credentials/resolve_env/status ignore process env; fetcher subprocesses use subprocess_env_for_profile (blob keys only). Shared OS keyring master key is intentional — each profile has its own secrets.bin." },
+    { id: "find_profile_cache_http", area: "Arch", severity: "red", title: "[RESOLVED] Enrichment cache GET /cache/*.json not profile-scoped",
+      body: "Resolved 2026-06-03. server.Handler.translate_path always resolves cache JSON via cache_json_path() under profile_root()/cache — missing profile cache 404s (no root fallback). Serves hltb_map, steam_review_map, cross_store_images_meta, steam_tags_meta, fx_rates from profiles/<id>/cache. tests/test_profile_cache_http.py includes no-leak test. Fixes misleading fetcher-health ages on non-default profiles (e.g. Test profile showing Dan's enrichment ages)." },
+    { id: "find_fetcher_health_signals", area: "UX", severity: "grey", title: "[RESOLVED] Fetcher health chip semantics — honest status vs Connections",
+      body: "Resolved 2026-06-03 (UX audit). Chip signals are separate from Connections connected/expired: ! = missing API keys for this profile (resolve_env with allow_process_env=False); dim = never fetched or empty catalog; lit + age = cache/data timestamp from profile-scoped GET /cache/*.json or games_*.json mtime — not a proxy for 'connected'. failed persists until next success (lastRunFailedByKey). Collapsible in-app legend (fh-legend). Summary shows Profile: …. Marketing: 'Honest status — we don't pretend you're connected when you're not.' See bs_fetcher_health_honest + Monetization → Creative → explainer_fetcher_health." },
+    { id: "find_profile_switch_cancel_runs", area: "Arch", severity: "amber", title: "[RESOLVED] Profile switch cancels in-flight fetchers before rebind",
+      body: "Resolved 2026-06-03. POST /api/profiles/active calls MANAGER.cancel_all() before set_active_profile and path rebind. Manage profiles modal notes auto-cancel + reload." },
+    { id: "find_profile_cache_cwd", area: "Arch", severity: "green", title: "[RESOLVED] Cache paths use profile_cache_dir() not cwd",
+      body: "2026-06-03. API clients (steam/gog/itch/itad/epic), enrich scripts (lazy cache_json_path), and fetcher debug dumps route through profile_cache_dir() / epic_cache_dir(). Epic session + secrets thread patch in same pass." },
+    { id: "find_profile_multitab_put", area: "Arch", severity: "grey", title: "[DEFERRED] Multi-tab personal.json PUT race",
+      body: "Deferred. prepareForProfileSwitch covers single-tab switch; sendBeacon + second tab can still PUT to server's active profile. Follow-up: profile id in PUT body + reject mismatch." },
+    { id: "find_profile_delete_runs", area: "Arch", severity: "grey", title: "[DEFERRED] Delete profile does not wait for in-flight runs",
+      body: "Deferred. delete_profile can rmtree while a subprocess still writes profiles/<id>/. Block delete when MANAGER has runs for that profile." },
 
     // UX
     { id: "find_ux_dash_rotation", area: "UX", severity: "grey", title: "Dashboard spotlight rotation may be calmer-off",
@@ -395,13 +454,13 @@
 
   // ---------- Blind spots ----------
   const BLINDSPOTS = [
-    { id: "bs_fetcher_testing", title: "Individual fetcher testing — walk every connection one by one", body: "Current focus now that store-adding is done and managed login is generalized. Test each fetcher end-to-end on its own, not as a batch refresh, so per-store breakage is isolated. For every provider: (1) Connect from a clean/expired profile and confirm token/cookie capture; (2) run the fetcher and confirm it writes real rows (not an empty/short file) and passes the drift guard; (3) confirm the dashboard reconnect-required chip fires on an expired session and clears on reconnect; (4) spot-check the rows (names, store URLs, scores, dedupe). Log per-store findings as their own items as they surface.\n\nChecklist: Steam · GOG · PSN · Epic (library) · Epic (wishlist) · Amazon · Xbox · Xbox (wishlist) · Battle.net · Ubisoft · Ubisoft (wishlist) · Nintendo · Nintendo (wishlist) · itch.io · Humble · Humble (wishlist) · EA App · ITAD (prices). Ubisoft 2FA blank-tab UX resolved (find_ux_conn_ubi_blank_tab). First EA App sync still needs to populate games_ea.json." },
+    { id: "bs_fetcher_testing", title: "Individual fetcher testing — walk every connection one by one", body: "Current focus now that store-adding is done and managed login is generalized. Test each fetcher end-to-end on its own, not as a batch refresh, so per-store breakage is isolated. For every provider: (1) Connect from a clean/expired profile and confirm token/cookie capture; (2) run the fetcher and confirm it writes real rows (not an empty/short file) and passes the drift guard; (3) confirm the dashboard reconnect-required chip fires on an expired session and clears on reconnect; (4) spot-check the rows (names, store URLs, scores, dedupe). Log per-store findings as their own items as they surface.\n\nJun 3 profile testing: after find_profile_cache_http fix, verify fetcher chips on a non-default profile (e.g. Test) — enrichment shows — — / empty when profile cache missing; ! only when that profile lacks keys (not borrowed from default .env). Switch profiles mid-fetch and confirm cancel + reload.\n\nChecklist: Steam · GOG · PSN · Epic (library) · Epic (wishlist) · Amazon · Xbox · Xbox (wishlist) · Battle.net · Ubisoft · Ubisoft (wishlist) · Nintendo · Nintendo (wishlist) · itch.io · Humble · Humble (wishlist) · EA App · ITAD (prices). Ubisoft 2FA blank-tab UX resolved (find_ux_conn_ubi_blank_tab). First EA App sync still needs to populate games_ea.json." },
     { id: "bs_license", title: "[RESOLVED] LICENSE file added (MIT)", body: "Resolved 2026-06-01. Repo-root LICENSE file (MIT, © 2026 Dan Ogonoski). Mirrored in pyproject.toml ([project].license = { file = \"LICENSE\" }) and package.json (\"license\": \"MIT\"). README header links to it. Pairs with bs_semver — the version + license combo is the minimum contract a second installer needs." },
     { id: "bs_privacy", title: "[RESOLVED] PRIVACY.md added", body: "Resolved 2026-06-01. Repo-root PRIVACY.md documents: TL;DR (local-only, no servers), credentials table (where each cookie / OAuth token / API key lives — .env, OS keychain via keyring, DPAPI blob, Playwright user-data dirs), data files (games_*.json, itad_prices.json, data/personal.json + backups, manualGames), every storefront/enrichment host BAKLOG talks to, explicit 'what does NOT happen' list (no telemetry, no third-party scripts, no project cloud), and a 'Removing your data' section (file paths + delete steps). README header links to it next to the license badge." },
     { id: "bs_xplatform", title: "[RESOLVED] Cross-platform — Windows-primary, graceful degradation elsewhere", body: "Resolved 2026-06-02. Audit corrected the original framing: secret storage is keyring (Credential Manager / Keychain / Secret Service) + AES-GCM file fallback, NOT DPAPI — cross-platform by design (auth/secrets.py). The only Windows-only source is Amazon Games (amazon_client.py reads the launcher's DPAPI-encrypted SQLite; no portable equivalent). Server (_python_executable tries venv Scripts AND bin; taskkill only on win32), CDP browser (find_chromium_executable lists /Applications + /usr/bin paths off-nt), and pathlib-only profile_paths were already OS-agnostic; CI runs pytest+vitest on Ubuntu. Shipped: (1) shared/platform_support.py (platform_supported); (2) ProviderSpec.platforms + manifest 'platforms':['win32'] on amazon; (3) auth/manager._provider_state short-circuits to 'unavailable' off-platform so it never imports amazon_client and never 500s GET /api/auth/status on macOS/Linux; (4) get_status + /api/fetchers expose platforms/available + server_platform; (5) UI dims Amazon rail item + disables its fetcher chip with a 'Windows only' tooltip off-Windows (js/connections.js, js/fetcher-health.js, app.css); (6) server refuses POST /api/run/amazon off win32 with a 400; (7) refresh.sh (POSIX, skips Amazon) + cron docs; (8) README Supported-platforms + store matrix; (9) macos-latest pytest CI job; (10) tests/test_auth_status_platform.py. Out of scope: porting Amazon to macOS (different data source) — logged as the one intentional exception, not a blocker." },
     { id: "bs_tos", title: "[RESOLVED] Storefront ToS exposure — reframed as user-automates-own-access + guardrails logged", body: "Resolved 2026-06-02. The defensible posture is 'the user is automating access to their own data on their own machine,' which is already what BAKLOG does (local-only, user's own credentials/session/IP, no project server, no pooled requests, no redistributed catalog). That framing only holds as long as the code keeps behaving that way, so the four guardrails are now logged in Monetization -> Risk + ethics: (1) never centralize credentials or proxy fetches through our infra; (2) don't ship/host the scraped catalog as a dataset; (3) user-initiated + reasonable rate, their account only (fetchers already throttle); (4) precise copy — 'BAKLOG automates requests you could make in your own browser, using your credentials, on your machine,' never 'we aggregate store data.'\n\nSECURITY.md gains a 'How BAKLOG reaches each store' table grading per-store posture (sanctioned API -> official OAuth -> own-session replay -> unofficial endpoint with your session) and an explicit ToS caveat; PRIVACY.md gains an 'Acting on your behalf, with your own data' section. EA App was deliberately built on web-session replay (sniffs the user's own ea.com Bearer token from their saved profile, calls the same GraphQL endpoint the website uses) instead of desktop-client impersonation — an earlier draft hardcoded EA's client_secret + pc_sign and was replaced so the framing stays literally true. Remaining 'gray' stores (GOG, PSN, Ubisoft, Nintendo, Humble, Battle.net, EA) all replay only the user's own session for their own data; this is a mitigation, not immunity — several stores' terms restrict any automation regardless of whose data it is. Productized/hosted variant would still need counsel before any of the four guardrails are crossed." },
     { id: "bs_multiuser", title: "[SUPERSEDED] Multi-account / multi-user — split into local profiles vs app login", body: "Superseded 2026-06-02. See bs_multiuser_profiles (Shape 2: switchable local profiles, shipped) and bs_multiuser_app_login (Shape B: app users + logins, blocked on p4_hosted_demo / Phase 5 hosting decision). Merging two accounts on the same store into one view remains out of scope (touches dedup core)." },
-    { id: "bs_multiuser_profiles", title: "[RESOLVED] Local switchable profiles (work vs play)", body: "Resolved 2026-06-02. Shape 2: named profiles isolate games_*.json, itad_prices.json, data/personal.json, cache/auth/ per profiles/<id>/ without changing merge/dedup. Legacy installs keep repo root until the user adds a second profile (one-time copy to profiles/default/). Header menu + Manage modal; switch triggers full reload. shared/profile_paths.py + shared/profiles.py; /api/profiles; BAKLOG_PROFILE env for CLI fetchers; prefs + ITAD snapshot localStorage keyed by profile id." },
+    { id: "bs_multiuser_profiles", title: "[RESOLVED] Local switchable profiles (work vs play)", body: "Resolved 2026-06-02; hardened 2026-06-03. Shape 2: named profiles isolate games_*.json, itad_prices.json, data/personal.json, cache/auth/ per profiles/<id>/ without changing merge/dedup. Legacy installs keep repo root until the user adds a second profile (one-time copy to profiles/default/). Header menu + Manage modal; switch cancels in-flight fetchers then full reload. Profile-scoped cache HTTP (no root leak), per-profile credentials on chips, enrichment cache per profile.\n\nMarketing angle: 'Work library vs personal library on the same PC — zero bleed, one click to switch.' Pairs with privacy ('credentials never leave the machine') for streamers, couples, and shared-family PCs." },
     { id: "bs_multiuser_app_login", title: "App users + logins (hosted multi-tenant)", body: "Deferred until hosting decision (p4_hosted_demo). Requires backend auth, per-user data isolation, and counsel on the bs_tos guardrails before any shared infra. The local profile primitive (bs_multiuser_profiles) is the intended seam if this ships later." },
     { id: "bs_i18n", title: "[RESOLVED] Internationalization / currency — display currency from ITAD country", body: "Resolved 2026-06-02. Single display currency derived from ITAD fetch: ITAD_COUNTRY env + --country on fetch_itad.py write country + currency into itad_prices.json; JS displayCurrency() / formatMoney() (js/currency.js) replace hardcoded USD in formatDollar, dashboard marquee, deal filters, and wishlist price column. ITAD rows format via itad.currency; store-only rows show a price-currency-tag when g.currency differs. Cross-store store-only comparability: bs_fx_conversion (Frankfurter at fetch)." },
     { id: "bs_a11y", title: "[RESOLVED] Accessibility audit — axe-core CI gate + Lighthouse sweep",
@@ -418,7 +477,9 @@
       body: "Resolved 2026-06-02. Policy: single passphrase-encrypted file the user controls.\n\n• auth/bundle.py — export_bundle() / import_bundle() with BundleError subclasses (BadPassphrase, BadMagic, UnsupportedVersion, BundleTooLarge). Inner payload: gzip JSON with secrets_doc + base64-encoded Playwright profiles. Always encrypted with its own scrypt+AES-GCM key (min 8-char passphrase); local OS keychain key never leaves the machine.\n\n• POST /api/auth/secrets/export (octet-stream download) + POST /api/auth/secrets/import (?passphrase= + raw body). CLI: python -m auth export-bundle / import-bundle (--dry-run).\n\n• Connections ⋮ menu gains a top-level Portable bundle… item that opens a dedicated popover with Export bundle… / Import bundle… buttons and an inline dialog passphrase prompt.\n\n• Import moves existing cache/auth/profiles/ to profiles_pre_import_<timestamp>/ before overwrite.\n\n• PRIVACY.md + README (Moving to a new machine) document the workflow.\n\nDeferred:\n• Cloud-storage auto-sync (Dropbox / iCloud / OneDrive) — user can drop the bundle in their own cloud folder.\n• Bundle key-rotation flow — equivalent to export-then-import.\n• Argon2id KDF — scrypt matches auth/secrets.py; future bundle_format = 2.\n• .env migration into bundle — stale env values could overwrite working blob values on import." },
     { id: "bs_data_drift", title: "[RESOLVED] Fetcher row-count floor guard added", body: "Resolved 2026-06-01. fetchers/_base.py::refuse_drift_result() — reads the previous on-disk file's game_count, refuses to overwrite when the new run is <50% of that count (configurable threshold), exit code 3. Pairs with the existing refuse_empty_result (exit 2). New --allow-drift flag opts out for legitimate large drops (delisted accounts, region swaps). Wired into every fetcher: fetch_games, fetch_wishlist, fetch_psn, fetch_epic, fetch_epic_wishlist, fetch_psn_wishlist, fetch_ubisoft_wishlist, fetch_xbox_wishlist, fetch_gog_wishlist, fetch_xbox, fetch_gog (11 sites). First-run safe (no baseline → no check). 7 new tests in tests/test_fetcher_progress.py cover the no-baseline / within-threshold / under-threshold / allow-drift / custom-threshold / malformed-baseline / int-count paths." },
     { id: "bs_pricing_currency", title: "[RESOLVED] Wishlist prices — honest per-store currency labels", body: "Resolved 2026-06-02 (paired with bs_i18n). shared/money.py formats fetcher price strings with the real currency (Steam currency code, GOG/Epic/etc. fields); no more f\"${amt}\" on non-USD rows. Per-store wishlist rows keep native labels; FX conversion at fetch (bs_fx_conversion) adds display-currency price_amount for sort/filter while preserving currency_native / price_native." },
-    { id: "bs_fx_conversion", title: "[RESOLVED] Cross-currency FX conversion at fetch time", body: "Resolved 2026-06-03. Frankfurter daily rates cached at cache/fx_rates.json (24h refresh, warn if >7d). fetch_itad.py refreshes rates at run start, then post-processes all games_wishlist*.json into ITAD display currency (ITAD_COUNTRY / itad_prices.json currency). Native honesty preserved: currency_native, price_native, price_initial_native; comparable fields price_amount (+ price_amount_initial) and formatted price in display currency. JS effectiveSortPrice / deal max-price filter / table-query sort use price_amount; currencyMismatchTagForGame shows native tag when converted. Standalone fetch_fx.py for manual refresh. Missing FX pairs skip conversion (row stays native). Rates as of fx_rates_at on catalog payload." },
+    { id: "bs_fx_conversion", title: "[RESOLVED] Cross-currency FX conversion at fetch time", body: "Resolved 2026-06-03. Frankfurter daily rates cached at cache/fx_rates.json (24h refresh, warn if >7d). fetch_itad.py refreshes rates at run start, then post-processes all games_wishlist*.json into ITAD display currency (ITAD_COUNTRY / itad_prices.json currency). Native honesty preserved: currency_native, price_native, price_initial_native; comparable fields price_amount (+ price_amount_initial) and formatted price in display currency. JS effectiveSortPrice / deal max-price filter / table-query sort use price_amount; currencyMismatchTagForGame shows native tag when converted. Standalone fetch_fx.py for manual refresh. Missing FX pairs skip conversion (row stays native). Rates as of fx_rates_at on catalog payload.\n\nMarketing angle: 'Wishlist prices in your currency — sort and filter deals fairly across GBP, EUR, and JPY rows.' Phase 2 closeout hardened mixed-currency compare (unconverted rows excluded from numeric sort/filter) and stale-rate ceilings." },
+    { id: "bs_phase2_reliability", title: "[RESOLVED] Phase 2 closeout — profile + FX + run safety hardening", body: "Resolved 2026-06-03 (pre-connection-matrix testing). Not a user-facing feature launch — a trust story for marketing: migration marker prevents half-copied libraries; RunManager pins fetch history to the profile that started the job; personal/manual localStorage scoped per profile; Amazon web reconnect chip fixed; profile-scoped cache HTTP with 404 on missing profile cache; per-profile credential isolation; switch cancels runs; fetcher-health legend + honest failed/empty signals. Message for landing copy: 'Built to not corrupt your backlog when you switch profiles or refresh stores.' Connection matrix tab in tracker is the internal E2E worksheet (bs_fetcher_testing)." },
+    { id: "bs_fetcher_health_honest", title: "[RESOLVED] Fetcher health honesty — chips ≠ Connections", body: "Resolved 2026-06-03. Trust story for landing: fetcher chips report data age + per-profile config (! for missing keys), not connection state. Connections owns Connect/Reconnect; chips never fake green when catalog is empty or keys are missing for this profile. Empty profile shows empty/dim — not borrowed root cache (post find_profile_cache_http). Collapsible legend in-app. Marketing asset: explainer_fetcher_health. Cross-ref find_fetcher_health_signals." },
   ];
 
   // ---------- Architecture content (from canvas, kept current) ----------
@@ -499,8 +560,8 @@
     { stage: "1. Fetch", what: "Per-store Python scripts → games_<store>.json. Wishlist + itch.io live in their own corpora (separate tabs, not deduped into library). refresh.ps1 runs everything end-to-end with --skip-hltb on most fetchers for speed." },
     { stage: "2. Enrich at fetch", what: "Steam reviews on Steam + Steam wishlist only. Co-op flags from Steam categories. HLTB is no longer fetch-time — moved to enrich_hltb.py opt-in." },
     { stage: "2b. Enrich scripts", what: "enrich_hltb.py backfills hours. enrich_steam_reviews.py backfills reviews on GOG/PSN/Epic/Amazon/Xbox/BNet/Ubi/Nintendo/itch. enrich_cross_store_images.py grabs Steam CDN covers. fetch_itad.py writes cross-store deals." },
-    { stage: "3. Local server", what: "server.py (127.0.0.1:8765, SimpleHTTPRequestHandler). Owns data/personal.json (atomic writes + rotated backups in data/personal_backups/). Exposes /api/personal, /api/fetchers, /api/runs, /api/auth/*, POST /api/run/<key> (whitelisted from fetchers/manifest.json). Watchdog kills silent subprocesses." },
-    { stage: "4. Load", what: "index.html boots js/app.js (ESM modules: state · dom-util · memo · row-templates · table-query + worker · dashboard · personal-store · fetcher-health · connections · events). Fetches all games_*.json + itad_prices.json + /api/personal in parallel, then renders. Page styling in app.css." },
+    { stage: "3. Local server", what: "server.py (127.0.0.1:8765, SimpleHTTPRequestHandler). Owns data/personal.json under profile_root() (atomic writes + rotated backups). translate_path serves games_*.json, itad_prices.json, and cache/*.json from the active profile — missing profile cache 404s (no repo-root leak). Exposes /api/personal, /api/profiles, /api/fetchers, /api/runs, /api/auth/*, POST /api/run/<key>. Subprocess cwd + BAKLOG_PROFILE pinned per run. Watchdog kills silent subprocesses." },
+    { stage: "4. Load", what: "index.html boots js/app.js (ESM modules: state · dom-util · memo · row-templates · table-query + worker · dashboard · personal-store · fetcher-health · connections · events). Fetches games_*.json + itad_prices.json + profile-scoped /cache/*.json + /api/personal in parallel, then renders. Fetcher-health chips reflect data age + per-profile keys — reconnect is Connections-only. Page styling in app.css." },
     { stage: "5. Normalize", what: "normalizeGame() unifies fields; gameKey() = `${store}:${id}`. allGames / wishlistGames / itchGames are three separate arrays." },
     { stage: "6. Dedupe", what: "Library + wishlist: recomputeCrossStoreHidden() hides duplicate titles using a primary-store priority, shows all owned-store badges on the surviving row. itch.io tab dedupes within-store only." },
     { stage: "7. Personal", what: "personalStore reads /api/personal on boot, hydrates state.personal + state.manual + state.prefs, mirrors changes to localStorage for instant feel and PUTs to data/personal.json (debounced + sendBeacon on unload)." },
@@ -523,17 +584,147 @@
   ];
 
   // ---------- Monetization suite ----------
+  // User-facing bullets for README, landing page, social, and campaign copy.
+  const MARKETING_FEATURES = [
+    {
+      category: "One library across every store",
+      pitch: "Stop alt-tabbing five launchers — see Steam, Epic, GOG, PSN, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App in one table.",
+      bullets: [
+        "12 library fetchers + 8 wishlist feeds — largest accidental-hoarder stack in category.",
+        "One-click Connect (headed browser sign-in) for cookie stores — no DevTools paste for normal use.",
+        "Cross-store dedupe collapses the same title on Epic + Steam + Prime into one row.",
+        "Combined playtime rolls up duplicates so 'how long have I played this?' is one number.",
+        "Steam review % and co-op tags (online / couch) backfilled onto matched non-Steam rows.",
+        "Magic-moment demo: fetcher chips flip green and the library counter climbs live on first Refresh.",
+      ],
+    },
+    {
+      category: "Deal radar that knows what you own",
+      pitch: "Every other price tracker tells you something is on sale. BAKLOG tells you whether the sale is worth opening.",
+      bullets: [
+        "IsThereAnyDeal pricing fused with your real libraries — deals only matter when you do not already own the game somewhere.",
+        "Wishlist radar, sale scoreboard, and dashboard spotlight surface historical lows and ownership-filtered steals.",
+        "Display currency follows your ITAD region; wishlist prices convert at fetch time with native prices preserved (FX).",
+        "Sort and filter deals in one comparable currency — no comparing ¥5,980 against $12 by accident.",
+        "Duplicate-buy prevention: stop paying twice for the same title on another storefront.",
+      ],
+    },
+    {
+      category: "Private by design (marketing lead)",
+      pitch: "There is no BAKLOG server holding your logins — the install is the security model.",
+      bullets: [
+        "Local-first: games, notes, and credentials stay on your machine; optional cloud sync is a future paid tier only.",
+        "Store fetches use your browser session and your IP — they look like you, not a bot farm.",
+        "Encrypted credential store (OS keyring + AES-GCM blob); portable passphrase bundle for moving to a new PC.",
+        "Zero network telemetry — optional local bug bundle (Copy report) with no personal data in the payload.",
+        "MIT license + PRIVACY.md — explicit 'what does NOT happen' list for skeptical installers.",
+      ],
+    },
+    {
+      category: "Profiles & daily workflow",
+      pitch: "Built for people who treat gaming like two different lives on the same PC.",
+      bullets: [
+        "Switchable local profiles (e.g. work vs play) — isolated libraries, notes, auth, enrichment cache, and deal prefs; find_profile_* · bs_multiuser_profiles.",
+        "Profile switch cancels in-flight fetchers before rebind — no cross-profile run bleed (find_profile_switch_cancel_runs).",
+        "Status chips, weekly picks, co-op segmented filter, hide-duplicates, and dashboard drill-ins to a filtered library.",
+        "itch.io-friendly: filter real games vs assets/zines in giant bundles.",
+        "Empty-state onboarding: Start with Steam CTA, Connections guidance, zero-row table help.",
+        "Amazon Prime Gaming web on macOS/Linux; Amazon Games launcher on Windows.",
+      ],
+    },
+    {
+      category: "Fetcher health you can trust",
+      pitch: "Status chips tell you what your data actually is — not whether you feel connected.",
+      bullets: [
+        "! = missing API keys for this profile only (not a fake 'connected' badge) — find_profile_env_global.",
+        "Dim / empty when catalog or profile cache is missing — no borrowed root data after cache HTTP fix (find_profile_cache_http).",
+        "Lit + age = last fetch or cache timestamp — separate from Connections Connect/Reconnect (find_fetcher_health_signals · bs_fetcher_health_honest).",
+        "failed sticks until the next successful run — honest error state, not a flash of green.",
+        "Collapsible in-app legend — marketing copy in Creative → explainer_fetcher_health.",
+      ],
+    },
+    {
+      category: "Reliability you can feel",
+      pitch: "A backlog tool should never silently eat your library.",
+      bullets: [
+        "Atomic writes + rotated backups for every games_*.json and itad_prices.json.",
+        "Drift guard refuses to overwrite a catalog when a fetch returns suspiciously few rows.",
+        "Reconnect-required chips when a store session expires — inline Reconnect, no mystery empty libraries.",
+        "Fetcher queue cap + Cancel all — no runaway 'reconnecting…' loops.",
+        "Accessibility: axe-core CI gate, skip link, focus traps on drawers/modals (WCAG 2.1 AA target).",
+      ],
+    },
+  ];
+
+  const MARKETING_PILLARS = [
+    { id: "accidental_library", headline: "The accidental library", proof: "12 library + 8 wishlist fetchers; magic-moment demo; free-claimer persona", productHooks: ["MARKETING_FEATURES[0]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "The library you forgot you owned", "Free game Thursday, finally counted"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"] },
+    { id: "ownership_aware_deals", headline: "Ownership-aware deals", proof: "ITAD + FX + duplicate-buy prevention", productHooks: ["MARKETING_FEATURES[1]", "bs_fx_conversion"], relatedCampaigns: ["Deal radar, not spreadsheet"], relatedFindings: ["bs_fx_conversion", "bs_pricing_currency"] },
+    { id: "local_first_trust", headline: "Local-first trust", proof: "No server; per-profile secrets; portable bundle", productHooks: ["MARKETING_FEATURES[2]", "Nothing to breach"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_privacy", "bs_secret_recovery", "bs_telemetry"] },
+    { id: "profiles_one_pc", headline: "Profiles on one PC", proof: "Work vs play; cancel-on-switch; isolated cache", productHooks: ["MARKETING_FEATURES[3]"], relatedCampaigns: ["carousel_profiles"], relatedFindings: ["bs_multiuser_profiles", "find_profile_switch_cancel_runs", "find_profile_cache_http"] },
+    { id: "built_to_last", headline: "Built to last", proof: "Drift guard; atomic writes; honest fetcher signals", productHooks: ["MARKETING_FEATURES[4]", "MARKETING_FEATURES[5]"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_data_drift", "bs_fetcher_health_honest", "bs_phase2_reliability"] },
+  ];
+
+  const MARKETING_ASSETS = [
+    { id: "hero_accidental_library", title: "Landing hero — accidental library", format: "Landing hero · 16:9 + 9:16", goal: "First-screen conversion for hoarder persona", status: "draft", relatedPillars: ["accidental_library"], copyBlocks: { headline: ["Watch your library appear.", "You did not buy 600 games. They piled up.", "One backlog. Twelve stores."], body: ["Connect your stores once. Hit Refresh. Watch fetcher chips light up and your real library count climb — on your machine, in under two minutes.", "12 library sources + 8 wishlist feeds. Cross-store dedupe. No cloud account."], cta: ["Run it once — see everything you own", "Start free · Connect Steam"] }, visualNotes: "Screen recording hero: chips greening left-to-right; counter 0→2000. Screenshot fallback: filtered library table with store badges. Dark UI, accent #38bdf8." },
+    { id: "diagram_trust_boundary", title: "Trust boundary diagram", format: "SVG spec · export PNG/SVG", goal: "Privacy-led campaigns + landing trust strip", status: "draft", relatedPillars: ["local_first_trust"], copyBlocks: { headline: ["There is no BAKLOG server to breach."], body: ["Extend How it runs empty-server box: competitor cloud vault vs your PC with crossed-out server."], cta: ["Read SECURITY.md threat model"] }, visualNotes: "Reuse Monetization → How it runs endpoint diagram LEFT/RIGHT split. Red arrow on competitor only." },
+    { id: "video_magic_moment", title: "Magic moment screen recording", format: "30–60s video · 16:9", goal: "Demo-led social + landing embed", status: "draft", relatedPillars: ["accidental_library"], copyBlocks: { headline: ["The demo is the product."], body: ["Beat 1: empty dashboard · Beat 2: Connect Steam · Beat 3: Refresh · Beat 4: chips flip green store-by-store · Beat 5: count climbs · Beat 6: genre/deal panels paint · Beat 7: picks populate"], cta: ["Run it once"] }, visualNotes: "No cuts during fetch. Lower-third store name as each chip activates. End on dashboard + library tab." },
+    { id: "carousel_profiles", title: "Work vs play split visual", format: "Carousel · 1200×630 + story 9:16", goal: "Shared-PC / streamer audience", status: "draft", relatedPillars: ["profiles_one_pc"], copyBlocks: { headline: ["Two libraries. One PC. Zero bleed."], body: ["Left column: Work profile — sparse library, ITAD key missing (! on ITAD chip). Right: Play profile — full Epic/Steam haul. Switch cancels fetchers, reloads clean."], cta: ["Switch profiles in one click"] }, visualNotes: "Two-column before/after; header profile menu visible. No real account names — use Work / Play labels." },
+    { id: "social_tile_deal_radar", title: "Deal radar social tile", format: "1200×630 OG image", goal: "Reddit/Twitter link preview for deal posts", status: "draft", relatedPillars: ["ownership_aware_deals"], copyBlocks: { headline: ["Deal alerts that know what you already own."], body: ["Wishlist price in your currency. Duplicate-buy prevention. ITAD-powered."], cta: ["Catch the right sale"] }, visualNotes: "Wishlist row mock with 'also on Epic' dedupe pill + historical low badge. Keep text large — thumbnail legibility." },
+    { id: "readme_above_fold", title: "README above-the-fold", format: "Markdown copy block", goal: "p4_readme_rewrite", status: "draft", relatedPillars: ["accidental_library", "local_first_trust"], copyBlocks: { headline: ["BAKLOG — one honest backlog across every store you forgot you used."], body: ["pip install -e \".[dev]\" && python server.py → http://127.0.0.1:8765", "Local-first: your logins stay on your machine. 12 library + 8 wishlist fetchers."], cta: ["Connect Steam → Refresh → watch your library appear"] }, visualNotes: "Pair with 30s GIF of magic-moment demo under the pitch line." },
+    { id: "explainer_fetcher_health", title: "What the chips mean (blog/support)", format: "Long-form copy · mirrors in-app legend", goal: "Support + trust SEO", status: "draft", relatedPillars: ["built_to_last"], copyBlocks: { headline: ["Fetcher chips ≠ Connected"], body: ["! Missing keys for this profile\n— — Never fetched or empty catalog\n2h / 3d Age of last good data (not connection status)\nfailed Last run failed until next success\n\nReconnect expired sessions on Connections — not on the chip strip."], cta: ["Open the ⓘ Legend on your dashboard"] }, visualNotes: "Screenshot of collapsed fh-legend + one annotated chip row. Link find_fetcher_health_signals." },
+  ];
+
+  const MARKETING_CHANNEL_MATRIX = [
+    { persona: "Free-game claimer", channels: { reddit: { campaign: "Free game Thursday, finally counted", pillar: "accidental_library", hook: "52 Thursdays. One library." }, github_readme: { campaign: "Watch your library appear", pillar: "accidental_library", hook: "GIF of chips lighting up beats any screenshot" }, landing: { campaign: "Watch your library appear", pillar: "accidental_library", hook: "Embedded demo video above fold" }, short_video: { campaign: "Watch your library appear", pillar: "accidental_library", hook: "30s magic-moment screen recording" }, email_waitlist: { campaign: "The library you forgot you owned", pillar: "accidental_library", hook: "Founder-truth subject line" } } },
+    { persona: "Deal-aware hoarder", channels: { reddit: { campaign: "Deal radar, not spreadsheet", pillar: "ownership_aware_deals", hook: "Stop rebuying games you own on Epic" }, github_readme: { campaign: "Deal radar, not spreadsheet", pillar: "ownership_aware_deals", hook: "ITAD + ownership in one local table" }, landing: { campaign: "Deal radar, not spreadsheet", pillar: "ownership_aware_deals", hook: "Wishlist radar hero" }, short_video: { campaign: "Deal radar, not spreadsheet", pillar: "ownership_aware_deals", hook: "Side-by-side: blind deal alert vs BAKLOG owned flag" }, email_waitlist: { campaign: "Deal radar, not spreadsheet", pillar: "ownership_aware_deals", hook: "Your wishlist deserves context" } } },
+    { persona: "Privacy-first power user", channels: { reddit: { campaign: "Nothing to breach", pillar: "local_first_trust", hook: "No server = nothing to hand over" }, github_readme: { campaign: "Nothing to breach", pillar: "local_first_trust", hook: "MIT + PRIVACY.md lead" }, landing: { campaign: "Nothing to breach", pillar: "local_first_trust", hook: "Trust-boundary diagram hero" }, short_video: { campaign: "Nothing to breach", pillar: "local_first_trust", hook: "15s empty-server box animation" }, email_waitlist: { campaign: "Nothing to breach", pillar: "local_first_trust", hook: "AES-256 at rest. Zero in the cloud." } } },
+    { persona: "Cross-store completionist", channels: { reddit: { campaign: "Stop alt-tabbing your libraries", pillar: "accidental_library", hook: "Combined playtime across duplicates" }, github_readme: { campaign: "Stop alt-tabbing your libraries", pillar: "accidental_library", hook: "12 stores in one table" }, landing: { campaign: "Watch your library appear", pillar: "accidental_library", hook: "Store badge row + dedupe pill" }, short_video: { campaign: "Watch your library appear", pillar: "accidental_library", hook: "Multi-store chip sequence" }, email_waitlist: { campaign: "Stop alt-tabbing your libraries", pillar: "accidental_library", hook: "One backlog. All your stores." } } },
+  ];
+
+  const MONETIZE_COPY_SNIPPETS = {
+    taglines: [
+      "One honest backlog across every store.",
+      "Your library is honest with you for once.",
+      "Deal alerts that know what you already own.",
+      "There is no BAKLOG server to breach.",
+      "Watch your library appear.",
+      "Free Thursday haul — finally counted.",
+      "Built for accidental libraries.",
+      "Local-first. No telemetry. Your machine.",
+      "The demo is the product.",
+      "Stop alt-tabbing your launchers.",
+    ],
+    elevator30: "BAKLOG is a local dashboard that imports your real libraries from Steam, Epic, GOG, PSN, Xbox, Amazon, and more — then layers deal radar, status workflow, and cross-store dedupe on top. No cloud account. Connect once, hit Refresh, and watch your library appear on your own machine.",
+    elevator60: "If you've claimed free games for years across Epic, Prime, GOG, and Steam, you already have an accidental library — and no storefront will help you see it all. BAKLOG runs on your PC: you connect your stores, fetchers pull your real owned games into one table, and ITAD pricing shows deals only when you don't already own the title somewhere else. Credentials stay encrypted locally; there's no BAKLOG server to breach. The onboarding is a 60-second screen recording of chips lighting up as your count climbs — that's the product.",
+    faq: [
+      { q: "Is it safe?", a: "Credentials are stored on your machine (OS keyring + encrypted blob). Store fetches use your browser session and your IP. There is no project cloud holding your logins." },
+      { q: "Why local?", a: "So your storefront sessions never sit on someone else's server — and so a breach of BAKLOG cannot leak thousands of users' accounts at once." },
+      { q: "Why ads?", a: "Lead model is free + optional sponsored deal slots + low-cost No-ads tier — the audience mostly acquired games for $0; ads align with revealed preference." },
+      { q: "What are profiles?", a: "Switchable local libraries on one PC (e.g. work vs play) — isolated data, auth, cache; switch cancels in-flight fetchers and reloads." },
+    ],
+    objections: [
+      { objection: "Playnite already unifies my games", response: "Playnite is a launcher. BAKLOG is the decision layer — deals with ownership context, backlog status, wishlist radar, and cross-store dedupe without replacing how you launch." },
+      { objection: "Backloggd is free", response: "Backloggd is manual logging and social. BAKLOG auto-imports 12 library sources and fuses ITAD pricing with what you actually own." },
+      { objection: "I don't want to install Python", response: "Today it's clone-and-run; frozen installer is on the roadmap (p4_packaging). The install is the privacy model — not friction for its own sake." },
+      { objection: "Isn't scraping against ToS?", response: "BAKLOG automates requests you could make in your own browser, with your credentials, on your machine — see bs_tos guardrails and SECURITY.md." },
+    ],
+  };
+
   const MONETIZE_SECTIONS = [
     { id: "vision", label: "Grand scheme" },
     { id: "hooks", label: "Why users choose this" },
+    { id: "features", label: "Product features" },
+    { id: "creative", label: "Creative assets" },
+    { id: "messaging", label: "Messaging matrix" },
     { id: "howitworks", label: "How it runs" },
     { id: "audience", label: "Audience" },
     { id: "market", label: "Market + numbers" },
     { id: "landscape", label: "Competitive landscape" },
     { id: "models", label: "Model iterations" },
+    { id: "campaign", label: "Campaign suite" },
+    { id: "playbook", label: "Launch playbook" },
     { id: "pricing", label: "Pricing" },
     { id: "gtm", label: "Go-to-market" },
-    { id: "campaign", label: "Campaign suite" },
     { id: "risk", label: "Risk + ethics" },
   ];
 
@@ -585,15 +776,75 @@
     { name: "The honest backlog", objective: "Position as decision system", audience: "Players with choice paralysis", visual: "Status chips + picks tabs", cta: "Turn backlog chaos into weekly picks", headlines: ["Finish more, buy smarter.", "From backlog guilt to backlog plan.", "Play what matters first."], shortPost: "Not just a list. BAKLOG gives statuses and picks so your backlog becomes actionable.", landing: "Problem framing + workflow + proof", metrics: "Weekly active users and status edits" },
     { name: "Deal radar, not spreadsheet", objective: "Own wishlist/deal narrative", audience: "Price-sensitive players", visual: "Wishlist radar with ownership context", cta: "Catch the right sale", headlines: ["Your wishlist deserves context.", "Buy fewer games you will not start.", "Deal alerts with ownership intelligence."], shortPost: "See sales with context from what you own and what you will actually play.", landing: "Wishlist value + disclosure + CTA", metrics: "Deal click-through" },
     { name: "Free forever. Ads when you're hunting deals.", objective: "Position freemium / free + ads as the headline business model", audience: "The same accidental hoarders who never paid for the games — won't pay $4.99/mo, will absorb ads and tip $2-$3/mo to remove them", visual: "Hero with deal cards rendering both organic and 'Sponsored' badges, side-by-side with a clean No-ads variant after the upgrade click", cta: "Start free · Upgrade later", headlines: ["Free, because you didn't pay for the games either.", "Ads in deal cards. Cash in your pocket.", "Two dollars a month to make the ads go away.", "We don't sell your library. Ever."], shortPost: "BAKLOG is free with a couple of sponsored deal cards. If you want them gone, $2-$4/mo (and you get cloud sync). Library content never leaves your device — ads are context-only, never behavioral. That's the whole deal.", landing: "Side-by-side free vs No-ads screenshot · privacy posture block · 'How we make money' link in footer · disclosure of every affiliate partner", metrics: "Free-tier MAU, ad CTR + RPM on deal cards, upgrade conversion rate, churn after upgrade" },
-    { name: "The library you forgot you owned", objective: "Recruit accidental hoarders", audience: "Epic / Prime / GOG / itch.io free-claim users + Wario64 / Fanatical / bundle-key redeemers", visual: "Split-screen: chaotic launcher grids + a redeem-key inbox -> one calm BAKLOG table with status chips", cta: "See what you actually own", headlines: ["You did not buy 600 games. They piled up.", "Free game Thursday has consequences.", "Your Steam library is also a bundle graveyard.", "What is even in your itch.io bundle?", "Your library is honest with you for once."], shortPost: "If you have claimed every Epic free game for five years, redeemed every Wario64 / Fanatical bundle key you saw, own a 1,400-item itch.io bundle, and still re-play the same comfort title — BAKLOG was built for you. Local, private, free to start.", landing: "Founder story + screenshots of giant filtered libraries + 3-step start", metrics: "Sign-ups from /r/patientgamers, /r/itchio, /r/EpicGamesPC, /r/GameDeals; activation completion rate" },
-    { name: "Watch your library appear", objective: "Lead with the magic-moment demo — chips lighting up, library count climbing live during the first fetch", audience: "Anyone who has stockpiled Epic free Thursdays, Prime Gaming drops, GOG giveaways, Steam free weekends, or Fanatical bundle keys without ever auditing what is actually in their accounts", visual: "Screen recording of the dashboard during a fresh fetch: fetcher health chips flip from grey to green one by one (Steam first, then GOG, PSN, Epic, Xbox, Amazon, itch.io), the library tab counter climbs in real time (0 -> 257 -> +671 -> +597 -> +259 -> +154 -> +1044 itch.io), genre + co-op + deal panels paint in as each store's data lands, picks tab populates last", cta: "Run it once, see everything you own", headlines: ["Watch your library appear in real time.", "From empty to 2,000 games in 90 seconds.", "Five stores. One refresh. Every game you forgot you owned.", "The demo is the product.", "Free Thursday haul, every Thursday — finally counted."], shortPost: "BAKLOG's first-run demo IS the product: hit Refresh once and watch fetcher chips light up across Steam, Epic, PSN, GOG, Xbox, Amazon, itch.io. The library counter climbs live; genre charts, deal radar, and weekly picks paint in the moment their data lands. No spinner-then-reveal — every store renders progressively as its fetcher returns. Tested in front of people — it sells itself. Free, local, and the onboarding IS the magic.", landing: "Embedded 30-60s screen recording of a full first fetch (no cuts), side panel naming each store as its chip flips green and the count climbs, ending on the final filtered table + dashboard. Below the fold: 'Now what?' status-chip workflow and the privacy posture block.", metrics: "Demo video completion rate, time-to-first-fetch on first session, day-1 status edits per user (proof they engaged with the populated library, not just watched the demo)" },
-    { name: "Nothing to breach", objective: "Make local-first the headline trust feature — turn 'you have to install it' from a friction point into the whole security pitch", audience: "Privacy-first power users, people who connect 4-6 storefront accounts tied to payment methods, anyone burned by a cloud-service breach who refuses to hand another company their logins", visual: "Split diagram: LEFT a hosted competitor with a single cloud vault holding thousands of users' store sessions and a red 'one breach = everyone' arrow; RIGHT BAKLOG where each user's credentials sit encrypted on their own machine and the 'BAKLOG server' box is conspicuously empty / crossed out", cta: "Keep your logins on your machine", headlines: ["We can't leak your accounts. We never have them.", "There is no BAKLOG server to breach.", "Your store logins never leave your machine.", "Local-first isn't a vibe. It's the threat model.", "AES-256 at rest. Zero in the cloud."], shortPost: "Most trackers ask you to hand a cloud service your Steam, PSN, and Epic logins. BAKLOG doesn't have a server, so there's nothing to hand over and nothing to breach. Credentials are generated, used, and stored only on your machine — encrypted at rest with AES-256-GCM and a key in your OS keychain. Storefront fetches run from your own browser and IP, so they look like you, not a bot farm. The install isn't friction; it's the security model.", landing: "Trust-boundary diagram (the empty 'server' box is the hero), the SECURITY.md threat-model summary (what's defended vs explicitly out of scope), crypto one-liner (AES-256-GCM at rest, scrypt for master password + portable bundle, OS keychain), and a 'why not hosted' block on account-flagging + breach blast-radius", metrics: "Conversion from privacy-focused communities (/r/privacy, /r/selfhosted, /r/degoogle), share rate of the trust-boundary diagram, install completion rate when security is the lead message vs the demo-led variant" },
-    { name: "Free game Thursday, finally counted", objective: "Convert weekly free-game claimers — Epic, Prime Gaming, GOG, Steam free weekends — into BAKLOG users on the day they claim", audience: "Subreddit and Discord communities organized around weekly free-game claims (/r/FreeGameFindings, /r/EpicGamesPC, /r/GameDeals, Prime Gaming subreddits)", visual: "Calendar grid of 52 Thursdays with a different free Epic title in each cell, all flowing into a single BAKLOG library row — duplicates auto-flagged where the same title appeared via Prime or a Steam free weekend", cta: "Roll up every free Thursday into one table", headlines: ["52 Thursdays. One library.", "Epic + Prime + GOG + Steam free weekends — all of them, in one place.", "Stop claiming games you cannot find.", "Free this week. Filterable forever."], shortPost: "Claim every Epic free Thursday, every Prime drop, every GOG giveaway. None of them helps you remember what you have. BAKLOG runs the fetchers and merges all of them into one local table you can filter, sort, and mark up. Even better — duplicates across stores auto-collapse so the same title from Prime and Steam shows once.", landing: "Hero with a real founder library count + breakdown by store, screenshot of the cross-store dedupe pill ('also on Epic / GOG / Prime'), and the 3-step Connect-Refresh-Browse quickstart", metrics: "Activation rate from Thursday/Friday claim-day traffic, ratio of users with 3+ stores connected within 24 hours" },
+    {
+      name: "The library you forgot you owned", objective: "Recruit accidental hoarders", audience: "Epic / Prime / GOG / itch.io free-claim users + Wario64 / Fanatical / bundle-key redeemers",
+      visual: "Split-screen: chaotic launcher grids + redeem-key inbox → calm BAKLOG table with status chips",
+      cta: "See what you actually own",
+      headlines: ["You did not buy 600 games. They piled up.", "Free game Thursday has consequences.", "Your Steam library is also a bundle graveyard.", "What is even in your itch.io bundle?", "Your library is honest with you for once."],
+      shortPost: "If you have claimed every Epic free game for five years, redeemed every Wario64 / Fanatical bundle key you saw, own a 1,400-item itch.io bundle, and still re-play the same comfort title — BAKLOG was built for you. Local, private, free to start.",
+      landing: "Founder story + screenshots of giant filtered libraries + 3-step start",
+      metrics: "Sign-ups from /r/patientgamers, /r/itchio, /r/EpicGamesPC, /r/GameDeals; activation completion rate",
+      relatedPillars: ["accidental_library"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"],
+      headlineVariants: { reddit: "You did not buy 600 games. They piled up.", twitter: "Your library is honest with you for once.", landing: "See what you actually own across every free claim.", email: "The accidental library — finally visible" },
+      longForm: { problem: "Years of free claims with no cross-store inventory.", agitation: "Launchers hide what you own elsewhere; itch bundles are opaque.", solution: "BAKLOG fetches 12 libraries into one filterable table.", proof: "Founder library counts + dedupe pills.", cta: "Connect → Refresh → browse" },
+      storyboard: [{ beat: "Hook", visual: "Launcher grid chaos", duration: "3s", caption: "You didn't buy this library." }, { beat: "Reveal", visual: "BAKLOG table scroll", duration: "8s", caption: "One table. Every store." }, { beat: "Filter", visual: "itch hide non-games", duration: "5s", caption: "Games vs assets." }],
+      channels: [{ channel: "Reddit", format: "Text + screenshot", notes: "r/patientgamers · r/GameDeals — founder truth tone" }, { channel: "Landing", format: "Hero + gallery", notes: "hero_accidental_library asset" }],
+      assetChecklist: ["hero_accidental_library", "readme_above_fold"],
+      designNotes: "Dark split-screen; left desaturated launcher screenshots, right BAKLOG table with store badges. Founder quote pull-quote optional.",
+    },
+    {
+      name: "Watch your library appear", objective: "Lead with the magic-moment demo", audience: "Epic/Prime/GOG/Steam free-claim hoarders who never audited their accounts",
+      visual: "Screen recording: chips grey→green, library counter climbs, panels paint in progressively",
+      cta: "Run it once, see everything you own",
+      headlines: ["Watch your library appear in real time.", "From empty to 2,000 games in 90 seconds.", "Twelve stores. One refresh.", "The demo is the product.", "Free Thursday haul — finally counted."],
+      shortPost: "BAKLOG's first-run demo IS the product: hit Refresh once and watch fetcher chips light up across Steam, Epic, PSN, GOG, Xbox, Amazon, itch.io. The library counter climbs live; genre charts, deal radar, and weekly picks paint in as each store lands. No spinner-then-reveal. Free, local, onboarding IS the magic.",
+      landing: "Embedded 30-60s screen recording; store names as chips flip; privacy block below fold",
+      metrics: "Demo video completion; time-to-first-fetch; day-1 status edits",
+      relatedPillars: ["accidental_library"], relatedFindings: ["find_fetcher_health_signals", "find_store_integration_complete"],
+      headlineVariants: { reddit: "Watch your library appear in real time.", twitter: "The demo is the product.", landing: "From empty to 2,000 games in 90 seconds.", email: "See your real library in one refresh" },
+      longForm: { problem: "No storefront shows cross-store truth.", agitation: "Static screenshots don't prove it works on YOUR account.", solution: "Live progressive fetch demo on local install.", proof: "Tested in front of people — sells itself.", cta: "python server.py → Connect Steam → Refresh" },
+      storyboard: [{ beat: "Empty", visual: "Dashboard 0 games", duration: "2s", caption: "Before." }, { beat: "Refresh", visual: "Click Refresh", duration: "1s", caption: "One click." }, { beat: "Chips", visual: "Chips green sequentially", duration: "25s", caption: "Store by store." }, { beat: "Count", visual: "Counter ticks up", duration: "10s", caption: "Real numbers." }, { beat: "Panels", visual: "Charts + deals paint", duration: "15s", caption: "Dashboard fills in." }, { beat: "Table", visual: "Library tab scroll", duration: "8s", caption: "Now filter it." }],
+      channels: [{ channel: "Reddit", format: "Video/GIF post", notes: "Lead with GIF; link install in comment" }, { channel: "YouTube short", format: "30-60s vertical crop", notes: "video_magic_moment asset" }, { channel: "Landing", format: "Hero embed", notes: "Autoplay muted" }, { channel: "HN", format: "Show HN", notes: "Demo-first title" }],
+      assetChecklist: ["video_magic_moment", "hero_accidental_library"],
+      designNotes: "No jump cuts during fetch. Lower-third per store. End frame: library count + 'Local · Private' badge.",
+    },
+    {
+      name: "Nothing to breach", objective: "Make local-first the headline trust feature", audience: "Privacy-first users with 4-6 storefront accounts",
+      visual: "Trust diagram: empty BAKLOG server box vs competitor cloud vault",
+      cta: "Keep your logins on your machine",
+      headlines: ["We can't leak your accounts. We never have them.", "There is no BAKLOG server to breach.", "Your store logins never leave your machine.", "Local-first isn't a vibe. It's the threat model.", "AES-256 at rest. Zero in the cloud."],
+      shortPost: "Most trackers ask you to hand a cloud service your Steam, PSN, and Epic logins. BAKLOG doesn't have a server — nothing to hand over, nothing to breach. Credentials stay on your machine (AES-256-GCM + OS keyring). Fetches run from your browser and IP. The install is the security model.",
+      landing: "Trust-boundary diagram hero + SECURITY.md summary + why-not-hosted block",
+      metrics: "Conversion from /r/privacy · /r/selfhosted; diagram share rate; install completion security-led vs demo-led",
+      relatedPillars: ["local_first_trust"], relatedFindings: ["bs_privacy", "bs_fetcher_health_honest", "find_profile_env_global"],
+      headlineVariants: { reddit: "There is no BAKLOG server to breach.", twitter: "AES-256 at rest. Zero in the cloud.", landing: "Your store logins never leave your machine.", email: "Local-first is the threat model" },
+      longForm: { problem: "Cloud trackers centralize storefront sessions.", agitation: "One breach = everyone's logins.", solution: "No server; credentials encrypted locally; per-profile secrets.", proof: "PRIVACY.md + portable bundle + honest fetcher chips.", cta: "Read SECURITY.md → install locally" },
+      storyboard: [{ beat: "Competitor", visual: "Cloud vault diagram", duration: "5s", caption: "Their model." }, { beat: "BAKLOG", visual: "Empty server crossed out", duration: "5s", caption: "Our model." }, { beat: "Crypto", visual: "Keyring + blob icons", duration: "4s", caption: "At rest." }],
+      channels: [{ channel: "Reddit", format: "Diagram image post", notes: "r/privacy · r/selfhosted" }, { channel: "Landing", format: "Hero diagram", notes: "diagram_trust_boundary asset" }, { channel: "GitHub README", format: "Trust strip", notes: "Link PRIVACY.md + SECURITY.md" }],
+      assetChecklist: ["diagram_trust_boundary", "explainer_fetcher_health"],
+      designNotes: "Hero = empty server box (green border). Red only on competitor side. No fear-mongering stock photos.",
+    },
+    {
+      name: "Free game Thursday, finally counted", objective: "Convert weekly free-game claimers on claim day", audience: "/r/FreeGameFindings · /r/EpicGamesPC · Prime Gaming communities",
+      visual: "52-week calendar → single BAKLOG row; dedupe pill for cross-store dupes",
+      cta: "Roll up every free Thursday into one table",
+      headlines: ["52 Thursdays. One library.", "Epic + Prime + GOG + Steam free weekends — in one place.", "Stop claiming games you cannot find.", "Free this week. Filterable forever."],
+      shortPost: "Claim every Epic free Thursday, every Prime drop, every GOG giveaway — none of it helps you remember what you own. BAKLOG merges them into one local table. Duplicates across stores auto-collapse.",
+      landing: "Founder library count by store + dedupe pill screenshot + Connect-Refresh-Browse",
+      metrics: "Thursday/Friday activation; 3+ stores connected within 24h",
+      relatedPillars: ["accidental_library", "ownership_aware_deals"], relatedFindings: ["find_store_integration_complete"],
+      headlineVariants: { reddit: "52 Thursdays. One library.", twitter: "Free this week. Filterable forever.", landing: "Every free claim — counted", email: "Your Epic backlog, finally visible" },
+      longForm: { problem: "Weekly claims disappear into silos.", agitation: "Same game on Prime and Epic — bought twice in your head.", solution: "One refresh merges all free sources.", proof: "Cross-store dedupe + store breakdown.", cta: "Post in r/EpicGamesPC on claim day with GIF" },
+      storyboard: [{ beat: "Calendar", visual: "Thursday grid", duration: "4s", caption: "Every week." }, { beat: "Merge", visual: "Rows flow to table", duration: "6s", caption: "One library." }, { beat: "Dedupe", visual: "also on Epic pill", duration: "4s", caption: "Once." }],
+      channels: [{ channel: "Reddit", format: "Timing post", notes: "Thursday AM US — pair with claim thread" }, { channel: "X", format: "Short video", notes: "Calendar animation" }, { channel: "Landing", format: "Store breakdown stats", notes: "Real founder numbers" }],
+      assetChecklist: ["hero_accidental_library", "social_tile_deal_radar"],
+      designNotes: "Calendar heatmap optional. Highlight dedupe pill in screenshot — primary proof point.",
+    },
   ];
 
   const MONETIZE_LANDSCAPE = [
     { segment: "Multi-store launchers", players: "Playnite, GOG Galaxy 2.0", whatTheyDo: "Unify installed and owned games across stores; launch from one UI; metadata and playtime.", gap: "No deal intelligence, no backlog decision layer, no ownership-aware wishlist. Launchers want you inside their shell, not making purchase decisions.", roomFor: "BAKLOG sits above launchers as the decision dashboard — what to play, what to buy, what's on sale — without replacing how you launch." },
-    { segment: "Social / backlog trackers", players: "Backloggd, GG, Grouvee, Completionator, Infinite Backlog, HowLongToBeat", whatTheyDo: "Manual logging, ratings, reviews, social feeds, completion stats, HLTB time estimates.", gap: "Cloud accounts, manual entry, no automatic cross-store owned-library truth, no live deal fusion.", roomFor: "BAKLOG auto-imports real libraries from 10+ stores and layers status + deals on top of actual ownership data." },
+    { segment: "Social / backlog trackers", players: "Backloggd, GG, Grouvee, Completionator, Infinite Backlog, HowLongToBeat", whatTheyDo: "Manual logging, ratings, reviews, social feeds, completion stats, HLTB time estimates.", gap: "Cloud accounts, manual entry, no automatic cross-store owned-library truth, no live deal fusion.", roomFor: "BAKLOG auto-imports real libraries from 12 library + 8 wishlist sources and layers status + deals on top of actual ownership data." },
     { segment: "Deal / price trackers", players: "IsThereAnyDeal + Augmented Steam, GG.deals, CheapShark", whatTheyDo: "Price history, waitlists, alerts, authorized-store comparison, browser overlays on Steam.", gap: "Deal-only — no backlog status, no playtime, no 'you already own this on Epic' context.", roomFor: "BAKLOG already consumes ITAD pricing and fuses it with owned-library + backlog decisioning locally." },
     { segment: "Steam-native organizers", players: "Depressurizer, Steam collections", whatTheyDo: "Auto-categorize Steam library by genre, year, HLTB, user score; push categories back into Steam.", gap: "Single-store, categorization-only; Depressurizer repo archived read-only Feb 2026.", roomFor: "BAKLOG is cross-store, actively developed, and a full decision + deal layer — not just Steam categories." },
   ];
@@ -601,7 +852,7 @@
   const MONETIZE_COMPETITORS = [
     { name: "Playnite", segment: "Multi-store launcher", platform: "Windows desktop", model: "Free / OSS (MIT)", strength: "44+ store plugins, local-only data, IGDB metadata, controller-friendly fullscreen, active community, portable mode.", gap: "It is a launcher, not a decision or deal layer. Windows desktop app, not a web dashboard. Community connectors break when stores change APIs.", edge: "BAKLOG adds deal radar, ownership-aware picks, status workflow, and cross-store dedupe as a local web dashboard — complementary, not competitive on launch." },
     { name: "GOG Galaxy 2.0", segment: "Multi-store launcher", platform: "Windows / macOS", model: "Free (GOG-owned)", strength: "Official client, cloud library sync across devices, DRM-free focus, social features.", gap: "Storefront-owned — library integration is no longer a focus. ~20 connectors, mostly community-maintained and decaying. IGDB-dependent; missing games break import.", edge: "BAKLOG is store-neutral with no walled-garden incentive. Local-first — credentials never leave the machine." },
-    { name: "Backloggd", segment: "Social / backlog tracker", platform: "Web only", model: "Free / ~$3 Patreon", strength: "Market leader (~650k users end-2025). Letterboxd-for-games UX. Active community, lists, reviews, stats. Solo dev, Patreon-funded.", gap: "Manual logging only. No store auto-import. No deals. Web-only — no native Android app. Social/review focus, not ownership truth.", edge: "BAKLOG auto-fetches real owned libraries across 10+ stores. Deal + ownership context built in. Magic-moment demo sells itself." },
+    { name: "Backloggd", segment: "Social / backlog tracker", platform: "Web only", model: "Free / ~$3 Patreon", strength: "Market leader (~650k users end-2025). Letterboxd-for-games UX. Active community, lists, reviews, stats. Solo dev, Patreon-funded.", gap: "Manual logging only. No store auto-import. No deals. Web-only — no native Android app. Social/review focus, not ownership truth.", edge: "BAKLOG auto-fetches real owned libraries across 12 library + 8 wishlist sources. Deal + ownership context, FX-aware wishlist compare, and switchable local profiles. Magic-moment demo sells itself." },
     { name: "GG (ggapp.io)", segment: "Social / backlog tracker", platform: "iOS + Android + web", model: "Freemium · $4.99/mo or $48.99/yr Elite", strength: "Only major tracker with native mobile apps. Clean UI, lists, replays (Elite), social discovery.", gap: "Cloud account required. Paywall called aggressive in reviews. Sluggish load times. No cross-store owned-library import. No deals.", edge: "Local-first, no account, no subscription. Ownership + deals without $4.99/mo." },
     { name: "HowLongToBeat", segment: "Social / backlog tracker", platform: "Web", model: "Free", strength: "Definitive completion-time database. Community-contributed estimates (main / extra / 100%).", gap: "Time estimates only — minimal tracking, no library import, no deals, no cross-store view.", edge: "BAKLOG consumes HLTB as one enrichment input among many (reviews, deals, co-op, trophies) rather than being just the time DB." },
     { name: "IsThereAnyDeal + Augmented Steam", segment: "Deal / price tracker", platform: "Web + browser extension", model: "Free · affiliate revenue", strength: "Authorized-store price comparison, waitlist/alerts, price history, Augmented Steam overlay on Steam pages. Trusted brand.", gap: "Deal-only. No backlog status, playtime, or cross-store ownership context.", edge: "BAKLOG integrates ITAD pricing locally and fuses it with owned-library + backlog decisioning — 'on sale AND you don't own it AND it's a quick win'." },
@@ -684,6 +935,133 @@
     t.classList.add("show");
     clearTimeout(t._tid);
     t._tid = setTimeout(() => t.classList.remove("show"), 1800);
+  }
+
+  function copyText(text, label) {
+    const payload = String(text ?? "").trim();
+    if (!payload) { toast("Nothing to copy"); return; }
+    navigator.clipboard.writeText(payload).then(
+      () => toast(label ? "Copied: " + label : "Copied"),
+      () => toast("Copy failed"),
+    );
+  }
+
+  function copyBtn(label, text) {
+    const b = el("button", { type: "button", class: "copy-btn" }, "Copy");
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); copyText(text, label); });
+    return b;
+  }
+
+  function renderCampaignCard(c) {
+    const summary = el("summary", {},
+      c.name,
+      el("span", { class: "campaign-summary-meta" }, " · " + c.objective),
+    );
+    const sections = [];
+    sections.push(el("p", { class: "muted", style: "margin:0 0 0.5rem" },
+      el("strong", {}, "Audience: "), c.audience, " · ", el("strong", {}, "CTA: "), c.cta,
+    ));
+    if (c.relatedPillars?.length || c.relatedFindings?.length) {
+      sections.push(el("p", { style: "margin:0 0 0.5rem", class: "faint" },
+        ...(c.relatedPillars || []).map((p) => el("code", { style: "margin-right:0.35rem" }, p)),
+        ...(c.relatedFindings || []).map((f) => el("code", { style: "margin-right:0.35rem" }, f)),
+      ));
+    }
+    const overview = el("div", { class: "campaign-section" },
+      el("h4", {}, "Overview"),
+      el("p", { class: "copy-snippet" }, c.shortPost),
+      copyBtn("short post", c.shortPost),
+      el("p", { style: "margin:0.5rem 0 0" }, el("strong", {}, "Visual: "), c.visual),
+      el("p", { style: "margin:0.25rem 0 0" }, el("strong", {}, "Landing: "), c.landing),
+      el("p", { style: "margin:0.25rem 0 0" }, el("strong", {}, "Metrics: "), c.metrics),
+    );
+    sections.push(overview);
+    if (c.headlines?.length) {
+      const hlBlock = el("div", { class: "campaign-section" },
+        el("h4", {}, "Headlines"),
+        el("ul", {}, ...c.headlines.map((h) => el("li", {}, h))),
+        copyBtn("all headlines", (c.headlines || []).join("\n")),
+      );
+      if (c.headlineVariants) {
+        hlBlock.appendChild(el("table", { class: "data-table", style: "margin-top:0.5rem" },
+          el("tbody", {}, ...Object.entries(c.headlineVariants).map(([ch, txt]) =>
+            el("tr", {}, el("td", {}, ch), el("td", {}, txt)),
+          )),
+        ));
+      }
+      sections.push(hlBlock);
+    }
+    if (c.storyboard?.length) {
+      sections.push(el("div", { class: "campaign-section" },
+        el("h4", {}, "Storyboard"),
+        tableEl(["Beat", "Visual", "Duration", "Caption"], c.storyboard.map((s) => [s.beat, s.visual, s.duration, s.caption])),
+      ));
+    }
+    if (c.channels?.length) {
+      sections.push(el("div", { class: "campaign-section" },
+        el("h4", {}, "Channels"),
+        tableEl(["Channel", "Format", "Notes"], c.channels.map((ch) => [ch.channel, ch.format, ch.notes])),
+      ));
+    }
+    if (c.longForm) {
+      const lf = c.longForm;
+      sections.push(el("div", { class: "campaign-section" },
+        el("h4", {}, "Long form"),
+        el("p", {}, el("strong", {}, "Problem: "), lf.problem),
+        el("p", {}, el("strong", {}, "Agitation: "), lf.agitation),
+        el("p", {}, el("strong", {}, "Solution: "), lf.solution),
+        el("p", {}, el("strong", {}, "Proof: "), lf.proof),
+        el("p", {}, el("strong", {}, "CTA: "), lf.cta),
+      ));
+    }
+    if (c.designNotes) {
+      sections.push(el("div", { class: "campaign-section" },
+        el("h4", {}, "Design notes"),
+        el("p", { class: "copy-snippet" }, c.designNotes),
+      ));
+    }
+    if (c.assetChecklist?.length) {
+      const checklist = el("div", { class: "campaign-section" },
+        el("h4", {}, "Asset checklist"),
+        el("div", { class: "card", style: "padding:0.5rem 0.75rem;margin:0" },
+          ...c.assetChecklist.map((aid) => {
+            const asset = MARKETING_ASSETS.find((a) => a.id === aid);
+            const label = asset ? asset.title + " (" + aid + ")" : aid;
+            return checkboxRow("asset_check_" + aid, escapeHtml(label));
+          }),
+        ),
+      );
+      sections.push(checklist);
+    }
+    return el("details", { class: "campaign-card", "data-key": "campaign-" + c.name.replace(/\s+/g, "-").toLowerCase() }, summary, el("div", { class: "campaign-body" }, ...sections));
+  }
+
+  function exportMarketingBrief() {
+    const lines = ["# BAKLOG marketing brief", "", "Generated from tracker.html · " + new Date().toISOString().slice(0, 10), ""];
+    lines.push("## Product features\n");
+    for (const block of MARKETING_FEATURES) {
+      lines.push("### " + block.category);
+      lines.push(block.pitch);
+      for (const b of block.bullets) lines.push("- " + b);
+      lines.push("");
+    }
+    lines.push("## Pillars\n");
+    for (const p of MARKETING_PILLARS) {
+      lines.push("- **" + p.headline + "** — " + p.proof);
+    }
+    lines.push("", "## Campaigns\n");
+    for (const c of MONETIZE_CAMPAIGNS) {
+      lines.push("### " + c.name);
+      lines.push(c.shortPost);
+      if (c.headlines?.length) lines.push("\nHeadlines:\n" + c.headlines.map((h) => "- " + h).join("\n"));
+      lines.push("");
+    }
+    lines.push("## Copy snippets\n");
+    lines.push("Taglines: " + MONETIZE_COPY_SNIPPETS.taglines.join(" · "));
+    lines.push("\n30s: " + MONETIZE_COPY_SNIPPETS.elevator30);
+    lines.push("\n60s: " + MONETIZE_COPY_SNIPPETS.elevator60);
+    const md = lines.join("\n");
+    copyText(md, "marketing brief");
   }
 
   // ---------- Render: Tab bar ----------
@@ -926,9 +1304,35 @@
       );
       return el("details", { class: "phase", "data-key": `phase-${phase.id}`, ...(idx === 0 ? { open: "open" } : {}) }, summary, body);
     });
+    const jun3Closeout = PHASES.find((p) => p.id === "p2")?.items.filter((i) => i.id.startsWith("p2_closeout_")) || [];
+    const jun3Shipped = [
+      "FX hard ceiling + mixed-currency guard (find_fx_mixed_compare, find_fx_stale_cache)",
+      "Profile migration, run rebind, LS scoping, switch-cancel runs",
+      "Profile-scoped cache HTTP — no root leak (find_profile_cache_http)",
+      "Per-profile credentials on chips + subprocess env (find_profile_env_global)",
+      "Fetcher health legend + honest failed/empty (find_fetcher_health_signals)",
+      "Profile tests: cache HTTP, env isolation, switch-cancel, rebind",
+    ];
+
     return el("section", { id: "panel-phases", class: "panel" + (state.activeTab === "phases" ? " active" : "") },
       el("h1", {}, "Phases"),
       el("p", { class: "muted" }, "Five phases from where you are today to launch. Phase 1 is current; the others are seeded with concrete items — fill in / re-order as you go. Finished items collapse into a per-phase ", el("strong", {}, "Completed"), " drawer."),
+      el("div", { class: "recent-shipped" },
+        el("strong", {}, "Last shipped — Jun 3, 2026"),
+        el("ul", {}, ...jun3Shipped.map((s) => el("li", {}, s))),
+      ),
+      jun3Closeout.length
+        ? el("details", { class: "phase", "data-key": "phase-p2-jun3-closeout", open: "open" },
+          el("summary", {},
+            el("span", { class: "phase-title" }, "Jun 3, 2026 — Phase 2 closeout"),
+            el("span", { class: "phase-status" }, el("span", {}, "Session rollup")),
+          ),
+          el("div", {},
+            el("p", { class: "muted" }, "One checklist for today's shipped work — details in Triage (find_profile_*, find_fx_*, find_fetcher_health_signals)."),
+            ...jun3Closeout.map((i) => checkboxRow(i.id, escapeHtml(i.label))),
+          ),
+        )
+        : null,
       ...items,
     );
   }
@@ -945,7 +1349,7 @@
         </defs>
         <!-- Library group -->
         <rect x="40" y="20" width="920" height="180" rx="10" fill="#1e293b" stroke="#475569" />
-        <text x="56" y="40" fill="#94a3b8" font-size="10" font-weight="700" letter-spacing="0.05em">LIBRARY · 10 SOURCES</text>
+        <text x="56" y="40" fill="#94a3b8" font-size="10" font-weight="700" letter-spacing="0.05em">LIBRARY · 12 SOURCES</text>
         ${[
           { x: 56, y: 56, label: "Steam library", color: "#D9521B" },
           { x: 240, y: 56, label: "GOG", color: "#9d4edd" },
@@ -1004,9 +1408,14 @@
       el("div", { class: "grid-5" },
         el("div", { class: "stat" }, el("div", { class: "stat-value" }, totalLib.toLocaleString()), el("div", { class: "stat-label" }, "Library rows")),
         el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, "~1,700"), el("div", { class: "stat-label" }, "After dedup")),
-        el("div", { class: "stat" }, el("div", { class: "stat-value" }, "6"), el("div", { class: "stat-label" }, "Wishlist sources")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, "8"), el("div", { class: "stat-label" }, "Wishlist sources")),
         el("div", { class: "stat" }, el("div", { class: "stat-value" }, "163 / 1,047"), el("div", { class: "stat-label" }, "Itch games / keys")),
-        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, "10"), el("div", { class: "stat-label" }, "Library sources live")),
+        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, "12"), el("div", { class: "stat-label" }, "Library sources live")),
+      ),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Fetcher health vs Connections"),
+        el("div", { class: "callout-body" }, "Dashboard fetcher chips reflect ", el("strong", {}, "data age + per-profile config"), " (! for missing keys, dim/empty when never fetched). ", el("strong", {}, "Reconnect"), " for expired sessions lives on the Connections page only — chips do not fake connection state. See ", codeText("find_fetcher_health_signals"), " · ", codeText("bs_fetcher_health_honest"), "."),
       ),
 
       el("h2", {}, "Library composition"),
@@ -1419,6 +1828,7 @@
     return el("section", { id: "panel-connmatrix", class: "panel" + (state.activeTab === "connmatrix" ? " active" : "") },
       el("h1", {}, "Connection matrix"),
       el("p", {}, "End-to-end confirmation that every pull works — not just that the integration exists (that's the ", el("strong", {}, "Pipeline"), " + ", el("strong", {}, "Wishlist matrix"), " tabs), but that it actually connects, fetches real rows, recovers from an expired session, and lands clean data in the app. Tick each stage as you verify it on a real run. This is the live worksheet for ", codeText("bs_fetcher_testing"), "."),
+      el("p", { class: "muted" }, "Jun 3 expectation: test on a ", el("strong", {}, "non-default profile"), " (e.g. Test) after cache HTTP fix — enrichment chips show ", el("code", {}, "— —"), " / ", el("code", {}, "empty"), " when profile cache is missing; ", el("code", {}, "!"), " only when ", el("em", {}, "that"), " profile lacks keys (not borrowed from default ", el("code", {}, ".env"), ")."),
 
       el("div", { class: "grid-3" },
         el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, String(verifiedPulls) + " / " + String(totalPulls)), el("div", { class: "stat-label" }, "Pulls fully verified")),
@@ -1841,6 +2251,7 @@
         el("p", {}, "BAKLOG becomes the private command center for backlog decisions: fast activation, cross-store clarity, and ", el("strong", {}, "freemium (free + ads) monetization layered on top"), " with an optional 'No ads + cloud sync' upgrade for a couple of bucks a month."),
         el("p", { class: "muted" }, "12-month: activation and retention. 24-month: house ads / affiliate live in deal cards. 36-month: optional cloud convenience + No-ads tier complement the ad-supported free tier."),
         el("p", { style: "margin-top:0.4rem" }, el("strong", {}, "Lead model: "), "Free + ads. The audience is built almost entirely from people who claimed games they didn't pay for — pricing the core product anywhere above $0 fights the user's actual revealed preference. Ads (with a low-friction $2-$4/mo upgrade to remove them) align with how this audience already spends."),
+        el("p", { style: "margin-top:0.5rem" }, el("strong", {}, "2026 Q2 product truth: "), "Profiles + honest fetcher health + FX hardening ship before monetization scales — trust and data honesty are the pitch (", codeText("bs_phase2_reliability"), ", ", codeText("bs_fetcher_health_honest"), ", ", codeText("bs_fx_conversion"), ")."),
       ));
       cards.push(el("div", { class: "card agency-lane" },
         el("h2", {}, "Founder truths (the real reason this exists)"),
@@ -1878,11 +2289,139 @@
           el("li", {}, el("strong", {}, "Wishlist radar that retires itself: "), "the wishlist deal hero + sale scoreboard turn a 200-item 'someday' list into a short, ranked 'these are cheap right now and you'll actually play them' shortlist \u2014 backed by rating and quick-win signals, not just raw discount percentage."),
           el("li", {}, el("strong", {}, "Replaces a browser-tab habit: "), "the deal-hunter persona already keeps a price-tracker tab open. BAKLOG folds that habit into the same place they manage their backlog \u2014 one surface instead of a deal site plus five launchers."),
           el("li", {}, el("strong", {}, "Honest, authorized pricing: "), "ITAD-sourced, authorized-store focus (not grey-market keys), shown in the user's own display currency. The deal you see is one you can trust and act on."),
+          el("li", {}, el("strong", {}, "Multi-currency wishlists: "), "Frankfurter FX at fetch time converts wishlist rows into your display currency while keeping native price labels — sort and filter deals without comparing yen magnitudes to dollar amounts."),
+          el("li", {}, el("strong", {}, "Work vs play profiles: "), "switchable local profiles isolate libraries, credentials, and notes on one machine — no cross-contamination when you share a PC (", codeText("bs_multiuser_profiles"), ")."),
+          el("li", {}, el("strong", {}, "Honest fetcher UI: "), "chips show data age + per-profile keys — they do not fake connection state (", codeText("find_fetcher_health_signals"), " · ", codeText("bs_fetcher_health_honest"), ")."),
         ),
         el("p", {}, el("strong", {}, "Value line: "), "\u201CEvery other deal alert is guessing. BAKLOG knows what you already own \u2014 so it only tells you about sales that are actually worth it.\u201D"),
+        el("p", { class: "muted" }, "Full bullet list: Monetization \u2192 Product features tab."),
         el("p", { class: "muted" }, "Monetization tie-in (not the lead): because the deals are genuinely useful and ownership-filtered, the affiliate/house-ad surface rides on something users already want open \u2014 which is exactly why ads here read as helpful rather than intrusive. The user value comes first; the revenue is a byproduct of getting it right."),
       ));
       cards.push(ownerPref("hooks", "Capture your preferred product pitch voice.", "My one-sentence pitch...\nMy 30-second demo script..."));
+    } else if (section === "features") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Product features (copy bank)"),
+        el("p", { class: "muted" }, "Paste-ready bullets for README hero, landing page, GitHub description, and social posts. Each block has a one-line pitch plus detail bullets. Updated as shipped features land — see also resolved items in Triage (bs_*)."),
+      ));
+      for (const block of MARKETING_FEATURES) {
+        cards.push(el("div", { class: "card" },
+          el("h3", {}, block.category),
+          el("p", {}, el("strong", {}, "Pitch: "), block.pitch),
+          el("ul", {}, ...block.bullets.map((b) => {
+            const li = el("li", {});
+            const codeMatch = b.match(/(find_[a-z0-9_]+|bs_[a-z0-9_]+)/g);
+            if (!codeMatch) { li.textContent = b; return li; }
+            const parts = b.split(/(find_[a-z0-9_]+|bs_[a-z0-9_]+)/);
+            for (const part of parts) {
+              if (/^(find_|bs_)/.test(part)) li.appendChild(el("code", {}, part));
+              else if (part) li.appendChild(document.createTextNode(part));
+            }
+            return li;
+          })),
+        ));
+      }
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h3", {}, "Marketing pillars"),
+        ...MARKETING_PILLARS.map((p) => el("div", { class: "pillar-card" },
+          el("p", {}, el("strong", {}, p.headline)),
+          el("p", { class: "muted", style: "margin:0" }, p.proof),
+          el("p", { class: "faint", style: "margin:0.25rem 0 0" },
+            ...(p.relatedFindings || []).map((id) => el("code", { style: "margin-right:0.35rem" }, id)),
+          ),
+        )),
+      ));
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h3", {}, "Quick comparison sound bites"),
+        el("table", { class: "data-table", style: "margin-top:0.5rem" },
+          el("thead", {}, el("tr", {}, el("th", {}, "They"), el("th", {}, "BAKLOG"))),
+          el("tbody", {},
+            el("tr", {}, el("td", {}, "Deal sites (ITAD, GG.deals)"), el("td", {}, "Deals + ownership context + backlog status")),
+            el("tr", {}, el("td", {}, "Launchers (Playnite, Galaxy)"), el("td", {}, "Decision layer: what to play, what to buy, what's on sale")),
+            el("tr", {}, el("td", {}, "Backloggd / manual trackers"), el("td", {}, "Auto-import from 12 library + 8 wishlist sources; no manual logging")),
+            el("tr", {}, el("td", {}, "Hosted trackers"), el("td", {}, "No server — credentials never uploaded")),
+          ),
+        ),
+      ));
+      cards.push(ownerPref("features", "Note which bullets to lead with per channel.", "Reddit lead with...\nLanding hero should emphasize...\nScreenshots to capture next..."));
+    } else if (section === "creative") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Creative assets"),
+        el("p", { class: "muted" }, "Design-ready briefs — hand to Figma, Canva, or landing build. Status + copy blocks with one-click copy."),
+      ));
+      for (const asset of MARKETING_ASSETS) {
+        const statusTone = asset.status === "ready" ? "success" : asset.status === "shipped" ? "info" : "neutral";
+        const usedIn = MONETIZE_CAMPAIGNS.filter((c) => c.assetChecklist?.includes(asset.id)).map((c) => c.name);
+        const card = el("div", { class: "asset-card" },
+          el("div", { class: "asset-card-head" },
+            el("span", { class: "asset-card-title" }, asset.title),
+            el("span", { class: "pill pill-" + statusTone }, asset.status),
+            el("span", { class: "pill pill-neutral" }, asset.format),
+          ),
+          el("p", { class: "muted", style: "margin:0 0 0.35rem" }, asset.goal),
+          el("p", { class: "faint", style: "margin:0 0 0.5rem" }, "Pillars: ", (asset.relatedPillars || []).join(", ")),
+        );
+        if (usedIn.length) card.appendChild(el("p", { class: "faint", style: "margin:0 0 0.5rem" }, "Used in campaigns: ", usedIn.join(" · ")));
+        for (const [key, lines] of Object.entries(asset.copyBlocks || {})) {
+          const text = Array.isArray(lines) ? lines.join("\n") : String(lines);
+          card.appendChild(el("div", { style: "margin-top:0.35rem" },
+            el("strong", {}, key.charAt(0).toUpperCase() + key.slice(1) + ": "),
+            copyBtn(key, text),
+            el("pre", { class: "copy-snippet" }, text),
+          ));
+        }
+        if (asset.visualNotes) card.appendChild(el("p", { style: "margin:0.5rem 0 0" }, el("strong", {}, "Visual: "), asset.visualNotes));
+        cards.push(card);
+      }
+      cards.push(ownerPref("creative", "Asset production notes.", "Ship first...\nBlocked on...\nDesigner contact..."));
+    } else if (section === "messaging") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Persona × channel matrix"),
+        el("p", { class: "muted" }, "Recommended campaign + pillar + hook per cell."),
+        el("div", { class: "messaging-grid" },
+          tableEl(
+            ["Persona", "Reddit", "GitHub README", "Landing", "Short video", "Email waitlist"],
+            MARKETING_CHANNEL_MATRIX.map((row) => [
+              row.persona,
+              ...["reddit", "github_readme", "landing", "short_video", "email_waitlist"].map((ch) => {
+                const cell = row.channels[ch];
+                if (!cell) return "—";
+                return el("div", {},
+                  el("div", {}, el("strong", {}, cell.campaign)),
+                  el("div", { class: "faint" }, cell.hook),
+                  el("code", { style: "font-size:0.7rem" }, cell.pillar),
+                );
+              }),
+            ]),
+          ),
+        ),
+      ));
+      cards.push(el("div", { class: "card" },
+        el("h3", {}, "Copy snippet library"),
+        el("div", { class: "snippet-block" },
+          el("h4", {}, "Taglines"),
+          el("pre", { class: "copy-snippet" }, MONETIZE_COPY_SNIPPETS.taglines.join("\n")),
+          copyBtn("taglines", MONETIZE_COPY_SNIPPETS.taglines.join("\n")),
+        ),
+        el("div", { class: "snippet-block" },
+          el("h4", {}, "Elevator — 30s"),
+          el("pre", { class: "copy-snippet" }, MONETIZE_COPY_SNIPPETS.elevator30),
+          copyBtn("30s pitch", MONETIZE_COPY_SNIPPETS.elevator30),
+        ),
+        el("div", { class: "snippet-block" },
+          el("h4", {}, "Elevator — 60s"),
+          el("pre", { class: "copy-snippet" }, MONETIZE_COPY_SNIPPETS.elevator60),
+          copyBtn("60s pitch", MONETIZE_COPY_SNIPPETS.elevator60),
+        ),
+        el("div", { class: "snippet-block" },
+          el("h4", {}, "FAQ"),
+          ...MONETIZE_COPY_SNIPPETS.faq.map((f) => el("p", { style: "margin:0.35rem 0" }, el("strong", {}, f.q + " "), f.a)),
+        ),
+        el("div", { class: "snippet-block" },
+          el("h4", {}, "Objection handlers"),
+          ...MONETIZE_COPY_SNIPPETS.objections.map((o) => el("p", { style: "margin:0.35rem 0" }, el("strong", {}, o.objection + " — "), o.response)),
+        ),
+      ));
+      cards.push(ownerPref("messaging", "Channel I'm testing first…", "Primary channel...\nHook to A/B...\nPersona focus..."));
     } else if (section === "howitworks") {
       const runSvg = `
       <svg class="flow" viewBox="0 0 1000 580" width="100%" preserveAspectRatio="xMidYMid meet">
@@ -2218,13 +2757,24 @@
     } else if (section === "campaign") {
       cards.push(el("div", { class: "card agency-lane" },
         el("h2", {}, "Campaign suite"),
-        ...MONETIZE_CAMPAIGNS.map((c) => el("div", { class: "finding" },
-          el("div", { class: "finding-title" }, c.name),
-          el("p", { class: "finding-body" }, c.shortPost),
-          el("p", { style: "margin:0" }, el("strong", {}, "CTA: "), c.cta, " - ", el("strong", {}, "Metric: "), c.metrics),
-        )),
+        el("p", { class: "muted" }, "Expand each card for storyboard, channels, long-form, design notes, and asset checklist. Priority campaigns fully fleshed out first."),
+        ...MONETIZE_CAMPAIGNS.map((c) => renderCampaignCard(c)),
       ));
       cards.push(ownerPref("campaign", "Capture preferred tone and forbidden angles.", "Tone I like...\nNever do..."));
+    } else if (section === "playbook") {
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "Launch playbook (week-by-week)"),
+        el("p", { class: "muted" }, "Optional GTM checklist — one channel at a time (p5_pick_channel)."),
+        el("ol", {},
+          el("li", {}, el("strong", {}, "Week 0: "), "Ship magic-moment screen recording (", codeText("video_magic_moment"), ") + README above-fold (", codeText("readme_above_fold"), ")."),
+          el("li", {}, el("strong", {}, "Week 1: "), "Soft launch to 10–20 friends — measure time-to-first-fetch + day-1 status edits."),
+          el("li", {}, el("strong", {}, "Week 2: "), "Single Reddit post — ", codeText("Watch your library appear"), " GIF on r/patientgamers or r/GameDeals."),
+          el("li", {}, el("strong", {}, "Week 3: "), "Privacy variant on r/selfhosted — ", codeText("Nothing to breach"), " + trust diagram."),
+          el("li", {}, el("strong", {}, "Week 4: "), "Thursday claim-day post — ", codeText("Free game Thursday, finally counted"), "."),
+          el("li", {}, el("strong", {}, "Week 5+: "), "Only expand channel if retention signal holds — pick north-star in p5_metrics."),
+        ),
+      ));
+      cards.push(ownerPref("playbook", "Your launch sequencing.", "Week 1 channel...\nSuccess metric...\nKill criteria..."));
     } else if (section === "pricing") {
       cards.push(el("div", { class: "card agency-lane" },
         el("h2", {}, "Pricing"),
@@ -2271,6 +2821,10 @@
       el("p", {}, "Agency-style draft plus your editable preference lane. Use this to choose what to test first."),
       monetizeSubnav(),
       ...cards,
+      el("div", { class: "card-row", style: "margin-top:1rem" },
+        el("button", { type: "button", class: "btn btn-primary btn-sm", onClick: () => exportMarketingBrief() }, "Export marketing brief"),
+        el("span", { class: "muted", style: "font-size:0.85rem" }, "Copies MARKETING_FEATURES + campaigns + snippets to clipboard as Markdown"),
+      ),
       el("h2", {}, "Free notes"),
       ta,
     );

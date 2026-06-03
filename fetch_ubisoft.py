@@ -22,7 +22,11 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from ubisoft_client import UbisoftAuthError, UbisoftClient
 
 GAMES_UBISOFT_JSON = Path("games_ubisoft.json")
-RAW_DUMP_JSON = Path("cache/ubisoft_raw.json")
+def raw_dump_json() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "ubisoft_raw.json"
+
 HLTB_DELAY_SEC = 1.0
 
 _TM_CHARS = "".maketrans({"®": "", "™": "", "©": ""})
@@ -272,7 +276,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-raw",
         action="store_true",
-        help=f"Also write the raw API response to {RAW_DUMP_JSON} for debugging.",
+        help=f"Also write the raw API response to {raw_dump_json()} for debugging.",
     )
     args = parser.parse_args()
     _configure_stdout()
@@ -304,11 +308,11 @@ def main() -> int:
     print(f"Hit Ubisoft endpoint: {endpoint}")
 
     if args.dump_raw:
-        RAW_DUMP_JSON.parent.mkdir(parents=True, exist_ok=True)
-        RAW_DUMP_JSON.write_text(
+        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
+        raw_dump_json().write_text(
             json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"Wrote raw response to {RAW_DUMP_JSON}.")
+        print(f"Wrote raw response to {raw_dump_json()}.")
 
     raw_games = _extract_records(raw)
     seen: dict[str, dict] = {}
@@ -325,7 +329,7 @@ def main() -> int:
     if not deduped:
         stats.error(
             "No game records found in the response. Re-run with --dump-raw and "
-            f"inspect {RAW_DUMP_JSON} to confirm the endpoint hit your library."
+            f"inspect {raw_dump_json()} to confirm the endpoint hit your library."
         )
         return stats.finish("fetch_ubisoft", t0, exit_code=2)
 

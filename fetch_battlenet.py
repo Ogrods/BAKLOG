@@ -22,7 +22,12 @@ from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_r
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
-RAW_DUMP_JSON = Path("cache/battlenet_raw.json")
+
+
+def raw_dump_json() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "battlenet_raw.json"
 HLTB_DELAY_SEC = 1.0
 
 # Map Blizzard's franchise icon filename to the canonical game site.
@@ -196,7 +201,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-raw",
         action="store_true",
-        help=f"Also write the raw API response to {RAW_DUMP_JSON} for debugging.",
+        help=f"Also write the raw API response to {raw_dump_json()} for debugging.",
     )
     args = parser.parse_args()
     _configure_stdout()
@@ -219,11 +224,11 @@ def main() -> int:
         return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
 
     if args.dump_raw:
-        RAW_DUMP_JSON.parent.mkdir(parents=True, exist_ok=True)
-        RAW_DUMP_JSON.write_text(
+        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
+        raw_dump_json().write_text(
             json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"Wrote raw response to {RAW_DUMP_JSON}.")
+        print(f"Wrote raw response to {raw_dump_json()}.")
 
     raw_games = _extract_records(raw)
     seen: dict[str, dict] = {}
@@ -240,7 +245,7 @@ def main() -> int:
     if not deduped:
         stats.error(
             "No game records found in the response. Re-run with --dump-raw and inspect "
-            f"{RAW_DUMP_JSON} to confirm the cookie hit the right account."
+            f"{raw_dump_json()} to confirm the cookie hit the right account."
         )
         return stats.finish("fetch_battlenet", t0, exit_code=2)
 

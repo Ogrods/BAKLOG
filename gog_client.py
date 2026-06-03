@@ -6,8 +6,13 @@ from pathlib import Path
 
 import requests
 
-CACHE_DIR = Path("cache/gog")
 REQUEST_DELAY_SEC = 1.0
+
+
+def _default_gog_cache_dir() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "gog"
 EMBED_BASE = "https://embed.gog.com"
 
 # Per-endpoint cache TTLs. `None` means "cache forever" (legacy behaviour),
@@ -28,7 +33,9 @@ class GogAuthError(Exception):
 
 
 class GogClient:
-    def __init__(self, gog_al: str, cache_dir: Path = CACHE_DIR):
+    def __init__(self, gog_al: str, cache_dir: Path | None = None):
+        if cache_dir is None:
+            cache_dir = _default_gog_cache_dir()
         self.session = requests.Session()
         self.session.cookies.set("gog-al", gog_al, domain=".gog.com")
         self.session.headers.update(

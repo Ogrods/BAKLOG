@@ -109,6 +109,10 @@ def ensure_default_profile_dir() -> Path:
         copied += _copy_tree_if_missing(epic_src, dest / "cache" / "epic")
     if copied:
         print(f"[profiles] migrated {copied} file(s) into profiles/default/", flush=True)
+    marker = profile_paths.migration_complete_path(profile_paths.DEFAULT_PROFILE_ID)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    if not marker.is_file():
+        marker.write_text(profile_paths._now_iso(), encoding="utf-8")
     return dest
 
 

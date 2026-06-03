@@ -24,8 +24,16 @@ from pathlib import Path
 
 import requests
 
-CACHE_DIR = Path("cache/epic")
-SESSION_FILE = CACHE_DIR / "session.json"
+def _legacy_epic_cache_dir() -> Path:
+    from shared.profile_paths import ROOT
+
+    return ROOT / "cache" / "epic"
+
+
+def default_epic_cache_dir() -> Path:
+    from shared.profile_paths import epic_cache_dir
+
+    return epic_cache_dir()
 
 OAUTH_URL = "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token"
 LIBRARY_URL = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items"
@@ -49,10 +57,12 @@ class EpicAuthError(Exception):
 
 
 class EpicClient:
-    def __init__(self, auth_code: str | None = None):
+    def __init__(self, auth_code: str | None = None, *, cache_dir: Path | None = None):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "steam-backlog/1.0"})
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        self._cache_dir = cache_dir or default_epic_cache_dir()
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        self._session_file = self._cache_dir / "session.json"
         self._access_token: str | None = None
         self._refresh_token: str | None = None
         self._account_id: str | None = None
@@ -68,7 +78,7 @@ class EpicClient:
             self._last_request = time.time()
 
     def _save_session(self) -> None:
-        SESSION_FILE.write_text(
+        self._session_file.write_text(
             json.dumps(
                 {"refresh_token": self._refresh_token, "account_id": self._account_id},
                 indent=2,
@@ -76,11 +86,18 @@ class EpicClient:
             encoding="utf-8",
         )
 
+    def _migrate_legacy_session(self) -> None:
+        legacy = _legacy_epic_cache_dir() / "session.json"
+        if legacy.is_file() and not self._session_file.is_file():
+            self._cache_dir.mkdir(parents=True, exist_ok=True)
+            self._session_file.write_bytes(legacy.read_bytes())
+
     def _load_session(self) -> dict | None:
-        if not SESSION_FILE.exists():
+        self._migrate_legacy_session()
+        if not self._session_file.exists():
             return None
         try:
-            return json.loads(SESSION_FILE.read_text(encoding="utf-8"))
+            return json.loads(self._session_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return None
 

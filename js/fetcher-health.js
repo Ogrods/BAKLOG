@@ -1,7 +1,7 @@
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 import { noteFetcherAuthFailure, isProviderConnected, FETCHER_AUTH_PROVIDER, showReconnectBanner } from './connections.js';
-import { profileScopedStorageKey } from './profiles.js';
+import { activeProfileId, profileScopedStorageKey } from './profiles.js';
 
 // ---------------------------------------------------------------------------
 // Chip-level auth-failure backoff
@@ -14,7 +14,7 @@ import { profileScopedStorageKey } from './profiles.js';
 // moment the mapped provider shows "connected" in Connections (so reconnecting
 // never leaves the chip stuck disabled).
 const AUTH_COOLDOWN_STEPS_MS = [5 * 60_000, 15 * 60_000, 60 * 60_000];
-const AUTH_COOLDOWN_LS_KEY = 'baklog-fetcher-auth-cooldown';
+const AUTH_COOLDOWN_LS_KEY = profileScopedStorageKey('baklog-fetcher-auth-cooldown');
 
 /** Escalating cooldown duration for the Nth consecutive auth failure (1-based). */
 export function authCooldownDurationMs(strikes) {
@@ -179,10 +179,28 @@ export async function syncReconnectFromAuthStatus() {
   } catch (_) { /* server offline or timed out */ }
 }
 
-function handleFetcherAuthOutcome(key, data, logText) {
+/** Provider to reconnect for a fetcher chip (Amazon web vs launcher). */
+export function reconnectProviderForFetcher(key) {
+  if (key === 'amazon') {
+    if (isProviderReconnectRequired('amazon_web')) return 'amazon_web';
+    if (isProviderReconnectRequired('amazon')) return 'amazon';
+    return null;
+  }
+  return FETCHER_AUTH_PROVIDER[key] || null;
+}
+
+export function isFetcherReconnectRequired(key) {
+  if (key === 'amazon') {
+    return isProviderReconnectRequired('amazon_web') || isProviderReconnectRequired('amazon');
+  }
   const provider = FETCHER_AUTH_PROVIDER[key];
+  return !!(provider && isProviderReconnectRequired(provider));
+}
+
+function handleFetcherAuthOutcome(key, data, logText) {
   const authExit = data?.exit_code === 4 || data?.failure_kind === 'auth';
   if (authExit) {
+    const provider = key === 'amazon' ? 'amazon_web' : FETCHER_AUTH_PROVIDER[key];
     if (provider) markReconnectRequired(provider);
     clearAuthCooldown(key);
     if (provider) showReconnectBanner([provider]);
@@ -664,6 +682,9 @@ export function fetcherFreshness(source) {
 const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
 
 /** Auto-queue ITAD when prices are older than 60min (7am–midnight local). */
+/** Chip stays in failed styling until the next successful run (not just ~10s runState). */
+const lastRunFailedByKey = new Map();
+
 export function maybeAutoRefreshItad(deps = {}) {
   if (state.prefs.itadAutoRefreshDisabled) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
@@ -699,7 +720,7 @@ export const fetcherRunner = (() => {
   const reconnectAttempts = new Map();
   /** Run ids the user cancelled — do not reconnect or re-subscribe until gone from server. */
   const suppressedRunIds = new Set();
-  const SUPPRESSED_RUNS_KEY = 'fetcher-suppressed-run-ids';
+  const SUPPRESSED_RUNS_KEY = profileScopedStorageKey('fetcher-suppressed-run-ids');
   const IN_FLIGHT_POLL_MS = 10_000;
   const WAIT_QUEUE_SLOT_MS = 120_000;
   const RECONNECT_BASE_MS = 2000;
@@ -1294,6 +1315,7 @@ export const fetcherRunner = (() => {
           updateCancelButton();
         }
         if (ok) {
+          lastRunFailedByKey.delete(key);
           if (runId !== _lastAppliedDoneRunId) {
             _lastAppliedDoneRunId = runId;
             await refreshAfterFetch(key);
@@ -1305,6 +1327,7 @@ export const fetcherRunner = (() => {
         } else if (cancelled) {
           markChipState(key, null);
         } else {
+          lastRunFailedByKey.set(key, Date.now());
           markChipState(key, 'failed');
           handleFetcherAuthOutcome(key, data, recentLog.join('\n'));
           setTimeout(() => {
@@ -1521,10 +1544,13 @@ export function renderDashboardFetcherHealth() {
   const rank = { missing: 0, stale: 1, recent: 2, fresh: 3 };
   visible.sort((a, b) => rank[a.status] - rank[b.status] || a.src.label.localeCompare(b.src.label));
 
+  const profileLabel = document.getElementById('profileMenuLabel')?.textContent?.trim()
+    || activeProfileId();
   const summaryParts = [];
   if (staleRows.length) summaryParts.push(`${staleRows.length} stale`);
   if (missingRows.length) summaryParts.push(`${missingRows.length} missing`);
-  const summaryText = summaryParts.length ? summaryParts.join(' · ') : 'All fresh';
+  const healthSummary = summaryParts.length ? summaryParts.join(' · ') : 'All fresh';
+  const summaryText = `Profile: ${profileLabel} · ${healthSummary}`;
   const apiReady = fetcherRunner.isApiAvailable();
   const probeDone = fetcherRunner.apiProbeFinished();
   const showReadonly = probeDone && !apiReady;
@@ -1551,15 +1577,17 @@ export function renderDashboardFetcherHealth() {
       : (count != null && count > 0 ? formatNum(count) : '—');
     const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
     const runState = fetcherRunner.stateFor(src.key);
-    const provider = FETCHER_AUTH_PROVIDER[src.key];
-    const needsReconnect = !runState && provider && isProviderReconnectRequired(provider);
+    const provider = reconnectProviderForFetcher(src.key);
+    const needsReconnect = !runState && isFetcherReconnectRequired(src.key);
     const authCooldownMs = (runState || needsReconnect) ? 0 : authCooldownRemainingMs(src.key);
     const inAuthCooldown = authCooldownMs > 0;
-    const displayStatus = runState || (needsReconnect ? 'reconnect' : status);
+    const persistFailed = !runState && lastRunFailedByKey.has(src.key);
+    const displayStatus = runState
+      || (persistFailed ? 'failed' : (needsReconnect ? 'reconnect' : status));
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0;
     const configHint = needsConfig
-      ? ` · missing: ${src.missingRequirements.join(', ')} (see README / .env.example)`
+      ? ` · missing for this profile: ${src.missingRequirements.join(', ')} (Connections)`
       : '';
     const clickHint = clickHintFor(src);
     const refreshHint = refreshHintFor(src);
@@ -1571,14 +1599,16 @@ export function renderDashboardFetcherHealth() {
           `Click: ${clickHint}`,
           refreshHint ? `Shift+click: ${refreshHint}` : 'Shift+click: not supported for this fetcher',
           `Command: ${src.cmd}${refreshHint ? ' [+ --refresh on Shift+click]' : ''}`,
-          configHint ? `Note: ${src.missingRequirements.join(', ')} not set (see README / .env.example)` : '',
+          needsConfig ? 'Not configured for this profile — open Connections to add keys.' : '',
+          configHint ? `Note:${configHint}` : '',
         ].filter(Boolean)
       : [
           `${src.label} · ${countStr} · fetched ${fetchedLine}`,
           enrichLine,
           `Click: ${clickHint}`,
           `Command: ${src.cmd}`,
-          configHint ? `Note: ${src.missingRequirements.join(', ')} not set (see README / .env.example)` : '',
+          needsConfig ? 'Not configured for this profile — open Connections to add keys.' : '',
+          configHint ? `Note:${configHint}` : '',
           'Server is offline — start `python server.py` to run fetchers from the UI.',
         ].filter(Boolean);
     const queueFullElsewhere = fetcherRunner.inFlightCount() >= 2 && !runState;
@@ -1603,10 +1633,14 @@ export function renderDashboardFetcherHealth() {
     const cooldownClass = inAuthCooldown ? ' fh-chip-auth-cooldown' : '';
     const reconnectClass = needsReconnect ? ' fh-chip-reconnect-required' : '';
     const unavailableClass = platformUnavailable ? ' fh-chip-unavailable' : '';
-    const warnBadge = needsConfig ? '<span class="fh-chip-warn" title="Missing credentials">!</span>' : '';
-    const ageText = runState
+    const warnBadge = needsConfig
+      ? '<span class="fh-chip-warn" title="Missing credentials for this profile — Connections">!</span>'
+      : '';
+    let ageText = runState
       ? runState
       : (needsReconnect ? 'reconnect' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel));
+    if (persistFailed && !runState) ageText = 'failed';
+    else if (status === 'missing' && ageLabel === '?' && (count === 0 || count == null)) ageText = 'empty';
     const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
       ${warnBadge}
@@ -1663,6 +1697,15 @@ export function renderDashboardFetcherHealth() {
         </label>
       </div>
     </div>
+    <details class="fh-legend">
+      <summary>Legend</summary>
+      <div class="fh-legend-items">
+        <span class="fh-legend-item"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
+        <span class="fh-legend-item">dim dashed = never fetched</span>
+        <span class="fh-legend-item">dot color = cache age</span>
+        <span class="fh-legend-item">reconnect = session expired (Connections, not these chips)</span>
+      </div>
+    </details>
     <div class="fh-chips">${chipsHtml}</div>
   `;
 }

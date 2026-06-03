@@ -17,6 +17,7 @@ from shared.profile_paths import fx_rates_path
 FRANKFURTER_LATEST = "https://api.frankfurter.app/latest"
 CACHE_MAX_AGE_SECONDS = 24 * 3600
 STALE_WARN_SECONDS = 7 * 24 * 3600
+CACHE_HARD_MAX_AGE_SECONDS = 30 * 24 * 3600
 _ZERO_DECIMAL = frozenset({"JPY", "KRW"})
 
 
@@ -100,6 +101,35 @@ def _fetch_from_api() -> dict[str, Any]:
     }
 
 
+def _warn_stale_fx_cache(age: float) -> None:
+    print(
+        f"WARN: FX rates are {int(age / 86400)}d old (>{STALE_WARN_SECONDS // 86400}d); "
+        "re-run fetch_itad to refresh.",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def _return_cached_or_raise(
+    cached: dict[str, Any],
+    age: float | None,
+    *,
+    warn_stale: bool,
+    err: Exception | None = None,
+) -> dict[str, Any]:
+    """Use cached rates when fresh enough; refuse conversion past hard max age."""
+    if age is not None and age > CACHE_HARD_MAX_AGE_SECONDS:
+        detail = f" ({err})" if err else ""
+        raise RuntimeError(
+            f"FX cache too old ({int(age / 86400)}d) and refresh failed{detail}"
+        )
+    if warn_stale and age is not None and age >= STALE_WARN_SECONDS:
+        _warn_stale_fx_cache(age)
+    if err is not None:
+        print(f"WARN: FX fetch failed ({err}); using cached rates.", file=sys.stderr, flush=True)
+    return cached
+
+
 def save_fx_rates(doc: dict[str, Any], *, profile_id: str | None = None) -> Path:
     path = fx_rates_path(profile_id=profile_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -119,21 +149,13 @@ def ensure_fx_rates(
     cached = None if force else load_fx_rates(profile_id=profile_id)
     age = _cache_age_seconds(cached) if cached else None
     if cached and age is not None and age < CACHE_MAX_AGE_SECONDS:
-        if warn_stale and age >= STALE_WARN_SECONDS:
-            print(
-                f"WARN: FX rates are {int(age / 86400)}d old (>{STALE_WARN_SECONDS // 86400}d); "
-                "re-run fetch_itad to refresh.",
-                file=sys.stderr,
-                flush=True,
-            )
         return cached
 
     try:
         doc = _fetch_from_api()
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
         if cached:
-            print(f"WARN: FX fetch failed ({e}); using cached rates.", file=sys.stderr, flush=True)
-            return cached
+            return _return_cached_or_raise(cached, age, warn_stale=warn_stale, err=e)
         raise RuntimeError(f"FX rate fetch failed and no cache: {e}") from e
 
     save_fx_rates(doc, profile_id=profile_id)

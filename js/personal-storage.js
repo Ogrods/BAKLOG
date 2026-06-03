@@ -1,4 +1,23 @@
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
+
+const ACTIVE_PROFILE_LS = 'baklog-active-profile';
+
+function profileKeySuffix() {
+  try {
+    const id = localStorage.getItem(ACTIVE_PROFILE_LS) || 'default';
+    return id && id !== 'default' ? `:${id}` : '';
+  } catch {
+    return '';
+  }
+}
+
+export function personalStorageKey() {
+  return `${STORAGE_KEY}${profileKeySuffix()}`;
+}
+
+export function manualStorageKey() {
+  return `${MANUAL_KEY}${profileKeySuffix()}`;
+}
 import { personalStore, configurePersonalStore } from './personal-store.js';
 import { createMemo } from './memo.js';
 import {
@@ -19,7 +38,7 @@ export function bumpPersonalMemo() {
 
 // === Storage ===
 export function loadPersonal() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(personalStorageKey()) || "{}"); } catch { return {}; }
 }
 
 export function migrateV3() {
@@ -63,7 +82,7 @@ let _savePersonalTimer = null;
 export function savePersonal() {
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = setTimeout(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
+    localStorage.setItem(personalStorageKey(), JSON.stringify(state.personal));
     personalStore.notify();
   }, 250);
 }
@@ -72,7 +91,7 @@ export function flushSavePersonal() {
   if (!_savePersonalTimer) return;
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = null;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.personal));
+  localStorage.setItem(personalStorageKey(), JSON.stringify(state.personal));
   personalStore.notify();
 }
 
@@ -81,13 +100,13 @@ window.addEventListener("blur", flushSavePersonal);
 
 export function loadManualGames() {
   try {
-    const raw = JSON.parse(localStorage.getItem(MANUAL_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(manualStorageKey()) || "[]");
     return Array.isArray(raw) ? raw : [];
   } catch { return []; }
 }
 
 export function saveManualGames(list) {
-  localStorage.setItem(MANUAL_KEY, JSON.stringify(list));
+  localStorage.setItem(manualStorageKey(), JSON.stringify(list));
   personalStore.notify();
 }
 

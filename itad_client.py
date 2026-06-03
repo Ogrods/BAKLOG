@@ -17,8 +17,16 @@ class ItadError(Exception):
     pass
 
 
+def _default_itad_cache_dir() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "itad"
+
+
 class ItadClient:
-    def __init__(self, api_key: str, country: str = "US", cache_dir: Path = Path("cache/itad")):
+    def __init__(self, api_key: str, country: str = "US", cache_dir: Path | None = None):
+        if cache_dir is None:
+            cache_dir = _default_itad_cache_dir()
         self.api_key = api_key
         self.country = country
         self.cache_dir = cache_dir

@@ -46,7 +46,10 @@ from shared.money import format_price, normalize_currency_code
 
 GAMES_XBOX_WISHLIST_JSON = Path("games_wishlist_xbox.json")
 WISHLIST_URL = "https://www.xbox.com/en-us/wishlist"
-WISHLIST_STATE_DUMP = Path("cache/xbox/wishlist_state.json")
+def wishlist_state_dump() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "xbox" / "wishlist_state.json"
 HLTB_DELAY_SEC = 1.0
 
 # Microsoft Store product ids ("BigIds") are 10–16-char all-caps alphanumeric
@@ -407,7 +410,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-state",
         action="store_true",
-        help=f"Save the raw __PRELOADED_STATE__ wishlist branch to {WISHLIST_STATE_DUMP}",
+        help=f"Save the raw __PRELOADED_STATE__ wishlist branch to {wishlist_state_dump()}",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
@@ -441,8 +444,8 @@ def main() -> int:
     if args.dump_state or not ids:
         # Dumping the wishlist + sample catalog branch makes shape-drift
         # debugging trivial on a fresh sign-in (or zero-item wishlist).
-        WISHLIST_STATE_DUMP.parent.mkdir(parents=True, exist_ok=True)
-        WISHLIST_STATE_DUMP.write_text(
+        wishlist_state_dump().parent.mkdir(parents=True, exist_ok=True)
+        wishlist_state_dump().write_text(
             json.dumps(
                 {
                     "user": user,
@@ -457,9 +460,9 @@ def main() -> int:
             encoding="utf-8",
         )
         if not ids:
-            print(f"  wrote raw wishlist branch to {WISHLIST_STATE_DUMP}", flush=True)
+            print(f"  wrote raw wishlist branch to {wishlist_state_dump()}", flush=True)
         else:
-            print(f"  wrote raw wishlist branch to {WISHLIST_STATE_DUMP} (--dump-state)", flush=True)
+            print(f"  wrote raw wishlist branch to {wishlist_state_dump()} (--dump-state)", flush=True)
 
     catalog = _index_products(state)
     items = [_to_item(pid, added_at, catalog.get(pid)) for pid, added_at in ids]

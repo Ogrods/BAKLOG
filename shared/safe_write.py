@@ -23,13 +23,13 @@ DEFAULT_KEEP = 10
 
 
 def backup_root_for(path: Path) -> Path:
-    """Profile-scoped backup dir for catalog JSON (falls back to repo data/)."""
-    try:
-        from shared.profile_paths import games_backup_root
+    """Profile-scoped backup dir for catalog JSON."""
+    from shared.profile_paths import games_backup_root, profile_root
 
+    try:
         return games_backup_root()
     except Exception:
-        return ROOT / "data" / "games_backups"
+        return profile_root() / "data" / "games_backups"
 
 
 def _stamp() -> str:

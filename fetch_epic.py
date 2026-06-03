@@ -15,7 +15,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from epic_client import EpicAuthError, EpicClient, LOGIN_URL
+from epic_client import EpicAuthError, EpicClient, LOGIN_URL, default_epic_cache_dir
 from fetchers._authoritative import EPIC
 from fetchers._base import (
     add_allow_empty_arg,
@@ -291,7 +291,7 @@ def main() -> int:
     auth_code = resolve_env("EPIC_AUTH_CODE", provider="epic") or None
 
     try:
-        client = EpicClient(auth_code=auth_code)
+        client = EpicClient(auth_code=auth_code, cache_dir=default_epic_cache_dir())
         print("Logging in to Epic...")
         client.login()
         print(f"  account {client.account_id}")

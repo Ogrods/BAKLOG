@@ -3,7 +3,7 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, hasEnoughReviews, combinedPlaytime, parseReleaseForSort } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort } from './game-core.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 
@@ -151,7 +151,11 @@ function gameSpotlightReason(g, recentKeys) {
 export function pickSpotlightGames(games) {
   const recentKeys = computeRecentSpotlightKeys(games);
   const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
-  const hasArt = g => !!(g.header_image || g.library_image) && !failed.has(gameKey(g));
+  const hasArt = g => {
+    if (failed.has(gameKey(g))) return false;
+    if (g.header_image || g.library_image) return true;
+    return steamAppIdFromGame(g) != null;
+  };
   const eligible = games.filter(hasArt);
   const target = Math.max(60, Math.round(eligible.length * 0.35));
 
@@ -246,7 +250,9 @@ function spotlightJumpDest(g) {
 }
 
 export function spotlightInnerHtml(g) {
-  const art = sanitizeCoverUrl(g.header_image) || libraryCoverFor(g);
+  const candidates = spotlightArtCandidates(g);
+  const art = candidates[0] || "";
+  const candidateAttr = escapeAttr(candidates.join("|"));
   const rating = ratingValue(g);
   const hltb = hltbMain(g);
   const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
@@ -256,7 +262,8 @@ export function spotlightInnerHtml(g) {
     : (SPOTLIGHT_STATUS_LABEL[status] || 'in your library');
   const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
   return `
-    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded');window.coverFallback(this)" />
+    <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
+    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow">${escapeHtml(eyebrow)}</span>
@@ -276,7 +283,10 @@ export function renderSpotlightHtml(g) {
 export function primeSpotlightArt(btn) {
   const img = btn?.querySelector('.dash-spotlight-art');
   if (!img) return;
-  if (img.complete && img.naturalWidth > 0) img.classList.add('is-loaded');
+  if (img.complete && img.naturalWidth > 0) {
+    img.classList.add('is-loaded');
+    window.applySpotlightArtFit?.(img);
+  }
 }
 
 function wireSpotlightHover(el) {
@@ -314,6 +324,7 @@ export function startSpotlightRotation(pool) {
       el.classList.add('is-fading');
       if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
       _spotlightFadeTimer = setTimeout(() => {
+        el.classList.remove('has-portrait-art');
         el.innerHTML = spotlightInnerHtml(next);
         el.dataset.key = gameKey(next);
         el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
@@ -341,6 +352,7 @@ export function startSpotlightRotation(pool) {
     el.classList.add('is-fading');
     if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
     _spotlightFadeTimer = setTimeout(() => {
+      el.classList.remove('has-portrait-art');
       el.innerHTML = spotlightInnerHtml(next);
       el.dataset.key = gameKey(next);
       el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;

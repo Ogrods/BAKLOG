@@ -1,6 +1,14 @@
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { noteFetcherAuthFailure, isProviderConnected, FETCHER_AUTH_PROVIDER, showReconnectBanner } from './connections.js';
+import {
+  noteFetcherAuthFailure,
+  isProviderConnected,
+  FETCHER_AUTH_PROVIDER,
+  showReconnectBanner,
+  authStatusLoaded,
+  providerStatus,
+  ingestAuthStatusProviders,
+} from './connections.js';
 import { activeProfileId, profileScopedStorageKey } from './profiles.js';
 
 // ---------------------------------------------------------------------------
@@ -186,11 +194,26 @@ export async function syncReconnectFromAuthStatus() {
     const res = await fetchWithTimeout('/api/auth/status');
     if (!res.ok) return;
     const data = await res.json();
+    ingestAuthStatusProviders(data.providers || []);
     for (const p of data.providers || []) {
       if (p.status === 'expired') markReconnectRequired(p.key);
       else if (p.status === 'connected') clearReconnectRequired(p.key);
     }
   } catch (_) { /* server offline or timed out */ }
+}
+
+// Re-render the dashboard chips the instant auth status changes anywhere
+// (e.g. a connection made in the Connections tab), not just on the 30s poll.
+// connections.js fires this from its single auth-status cache write.
+if (typeof document !== 'undefined') {
+  document.addEventListener('baklog:auth-status', ev => {
+    const providers = ev?.detail?.providers || [];
+    for (const p of providers) {
+      if (p.status === 'expired') markReconnectRequired(p.key);
+      else if (p.status === 'connected') clearReconnectRequired(p.key);
+    }
+    try { renderDashboardFetcherHealth(); } catch (_) { /* not mounted */ }
+  });
 }
 
 /** Provider to reconnect for a fetcher chip (Amazon web vs launcher). */
@@ -209,6 +232,31 @@ export function isFetcherReconnectRequired(key) {
   }
   const provider = FETCHER_AUTH_PROVIDER[key];
   return !!(provider && isProviderReconnectRequired(provider));
+}
+
+/** Provider key to use for the chip Connect button when disconnected. */
+export function connectProviderForFetcher(key) {
+  if (key === 'amazon') {
+    if (providerStatus('amazon_web') === 'disconnected') return 'amazon_web';
+    if (providerStatus('amazon') === 'disconnected') return 'amazon';
+    return 'amazon_web';
+  }
+  return FETCHER_AUTH_PROVIDER[key] || null;
+}
+
+/** True when the fetcher's auth provider is hard disconnected (pre-flight wall). */
+export function isFetcherDisconnected(key) {
+  if (!authStatusLoaded()) return false;
+  if (key === 'amazon') {
+    const launcher = providerStatus('amazon');
+    const web = providerStatus('amazon_web');
+    const launcherDown = !launcher || launcher === 'disconnected';
+    const webDown = !web || web === 'disconnected';
+    return launcherDown && webDown;
+  }
+  const provider = FETCHER_AUTH_PROVIDER[key];
+  if (!provider) return false;
+  return providerStatus(provider) === 'disconnected';
 }
 
 function handleFetcherAuthOutcome(key, data, logText) {
@@ -799,6 +847,7 @@ if (typeof document !== 'undefined' && !document.__baklogFetcherAgeVisListener) 
 
 export function maybeAutoRefreshItad(deps = {}) {
   if (state.prefs.itadAutoRefreshDisabled) return false;
+  if (isFetcherDisconnected('itad')) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
   if (!isApiAvailableFn()) return false;
   const getHour = deps.getHour ?? (() => new Date().getHours());
@@ -918,9 +967,9 @@ export const fetcherRunner = (() => {
     updateCancelButton();
   }
 
-  async function fetchRunsSnapshot() {
+  async function fetchRunsSnapshot({ force = false } = {}) {
     const now = Date.now();
-    if (runsSnapshotPromise && now - runsSnapshotAt < RUNS_SNAPSHOT_MIN_MS) {
+    if (!force && runsSnapshotPromise && now - runsSnapshotAt < RUNS_SNAPSHOT_MIN_MS) {
       return runsSnapshotPromise;
     }
     runsSnapshotAt = now;
@@ -1149,21 +1198,53 @@ export const fetcherRunner = (() => {
     btn.disabled = !show;
   }
 
+  async function waitForRunsToClear(runIds, timeoutMs = 15_000) {
+    const pending = new Set(runIds);
+    const deadline = Date.now() + timeoutMs;
+    while (pending.size > 0 && Date.now() < deadline) {
+      let snap = null;
+      try {
+        snap = await fetchRunsSnapshot({ force: true });
+      } catch (_) {
+        break;
+      }
+      if (!snap) break;
+      for (const id of [...pending]) {
+        const onActive = snap.active?.id === id;
+        const onQueue = (snap.queue || []).some(r => r.id === id);
+        if (!onActive && !onQueue) {
+          const hist = (snap.history || []).find(r => r.id === id);
+          if (hist && ['done', 'failed', 'cancelled'].includes(hist.status)) {
+            pending.delete(id);
+          }
+        }
+      }
+      await syncFromServer();
+      if (pending.size > 0) {
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+    return pending;
+  }
+
   async function cancelInFlightRuns() {
     if (!isApiAvailable() || inFlightCount() === 0) return;
     let snap = null;
     try {
-      snap = await fetchRunsSnapshot();
+      snap = await fetchRunsSnapshot({ force: true });
     } catch (_) {}
     const ids = [];
     if (snap?.active) ids.push(snap.active.id);
     for (const q of snap?.queue || []) ids.push(q.id);
-    for (const id of ids) suppressedRunIds.add(id);
-    persistSuppressedRunIds();
     closeAllStreams();
-    for (const key of [...runStateByKey.keys()]) markChipState(key, null);
-    liveRunId = null;
-    setStatus('failed');
+    if (snap?.active) {
+      const src = source(snap.active.key);
+      if (src) {
+        ensurePanel(src);
+        markChipState(snap.active.key, serverChipState(snap.active.status) || 'running', snap.active.id);
+      }
+    }
+    setStatus('running', 'cancelling');
     updateCancelButton();
     renderDashboardFetcherHealth();
     try {
@@ -1176,17 +1257,29 @@ export const fetcherRunner = (() => {
         const txt = await res.text().catch(() => '');
         appendLine(`[cancel failed ${res.status}] ${txt}`, 'stderr');
         appendLine('[cancel may not have reached server — syncing…]', 'stderr');
-        await syncFromServer();
       }
     } catch (err) {
       appendLine(`[cancel failed] ${err}`, 'stderr');
       appendLine('[cancel may not have reached server — syncing…]', 'stderr');
-      await syncFromServer();
     }
+    const stillRunning = await waitForRunsToClear(ids);
+    for (const id of ids) {
+      if (!stillRunning.has(id)) suppressedRunIds.add(id);
+    }
+    persistSuppressedRunIds();
     try {
-      snap = await fetchRunsSnapshot();
+      snap = await fetchRunsSnapshot({ force: true });
       pruneSuppressedRuns(snap);
     } catch (_) {}
+    await syncFromServer();
+    const idle = !snap?.active && !(snap?.queue || []).length;
+    if (idle) {
+      for (const key of [...runStateByKey.keys()]) markChipState(key, null);
+      setStatus('failed');
+      liveRunId = null;
+    }
+    updateCancelButton();
+    renderDashboardFetcherHealth();
   }
 
   function closePanel() {
@@ -1263,6 +1356,18 @@ export const fetcherRunner = (() => {
       }
       return;
     }
+    if (isFetcherDisconnected(key)) {
+      if (!auto) {
+        ensurePanel(src);
+        const provider = connectProviderForFetcher(key);
+        appendLine(
+          `[${src.label}: not connected — connect in Connections before running. No request sent.]`,
+          'meta',
+        );
+        if (provider) showReconnectBanner([provider]);
+      }
+      return;
+    }
     // Hard cap mirrors server-side enforcement (max 1 active + 1 queued).
     // Without this guard a fast double-click could land two POSTs before the
     // server's lock saw the first one as pending.
@@ -1309,7 +1414,8 @@ export const fetcherRunner = (() => {
     if (res.status === 409) {
       const txt = await res.text().catch(() => '');
       appendLine(`[server 409] ${txt || 'already queued or running'}`, 'stderr');
-      markChipState(key, null);
+      appendLine('[syncing queue state…]', 'meta');
+      await syncFromServer();
       return;
     }
     if (!res.ok) {
@@ -1350,6 +1456,7 @@ export const fetcherRunner = (() => {
         if (src.missingRequirements?.length) return false;
         if (runStateByKey.has(src.key)) return false;
         if (authCooldownRemainingMs(src.key) > 0) return false;
+        if (isFetcherDisconnected(src.key)) return false;
         return true;
       })
       .map(src => src.key);
@@ -1656,6 +1763,7 @@ export function renderDashboardFetcherHealth() {
     if (r.status !== 'stale' && r.status !== 'missing') return false;
     if (r.src.missingRequirements?.length) return false;
     if (fetcherRunner.stateFor(r.src.key)) return false;
+    if (isFetcherDisconnected(r.src.key)) return false;
     return true;
   });
   const visible = showOnlyStale
@@ -1699,7 +1807,9 @@ export function renderDashboardFetcherHealth() {
     const runState = fetcherRunner.stateFor(src.key);
     const provider = reconnectProviderForFetcher(src.key);
     const needsReconnect = !runState && isFetcherReconnectRequired(src.key);
-    const authCooldownMs = (runState || needsReconnect) ? 0 : authCooldownRemainingMs(src.key);
+    const disconnected = !runState && !needsReconnect && isFetcherDisconnected(src.key);
+    const connectProvider = connectProviderForFetcher(src.key);
+    const authCooldownMs = (runState || needsReconnect || disconnected) ? 0 : authCooldownRemainingMs(src.key);
     const inAuthCooldown = authCooldownMs > 0;
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
     const displayStatus = runState
@@ -1738,6 +1848,9 @@ export function renderDashboardFetcherHealth() {
     if (needsReconnect) {
       titleLines.push('Session expired — reconnect to refresh credentials, or dismiss to hide this hint.');
     }
+    if (disconnected) {
+      titleLines.push('Not connected — click to connect in Connections.');
+    }
     if (inAuthCooldown) {
       titleLines.push(`Auth failed — cooling down ${authCooldownLabel(authCooldownMs)}. Reconnect in Connections to clear, or wait it out.`);
     }
@@ -1747,21 +1860,27 @@ export function renderDashboardFetcherHealth() {
       titleLines.push(`Unavailable on this OS — ${src.label} runs on ${plats} only.`);
     }
     const title = titleLines.join('\n');
+    // Disconnected chips stay clickable — the click routes to Connections to
+    // connect (handled in bind-events via data-fetcher-connect), not to a run.
     const disabled = platformUnavailable || !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere || inAuthCooldown || needsReconnect;
     const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
     const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
     const cooldownClass = inAuthCooldown ? ' fh-chip-auth-cooldown' : '';
     const reconnectClass = needsReconnect ? ' fh-chip-reconnect-required' : '';
+    const disconnectedClass = disconnected ? ' fh-chip-disconnected' : '';
     const unavailableClass = platformUnavailable ? ' fh-chip-unavailable' : '';
     const warnBadge = needsConfig
       ? '<span class="fh-chip-warn" title="Missing credentials for this profile — Connections">!</span>'
       : '';
     let ageText = runState
       ? runState
-      : (needsReconnect ? 'reconnect' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel));
+      : (needsReconnect ? 'reconnect' : (disconnected ? 'connect' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel)));
     if (persistFailed && !runState) ageText = 'failed';
     else if (status === 'missing' && ageLabel === '?' && (count === 0 || count == null)) ageText = 'empty';
-    const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
+    const connectAttr = disconnected && connectProvider
+      ? ` data-fetcher-connect="${escapeAttr(connectProvider)}"`
+      : '';
+    const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
       ${warnBadge}
       <span class="fh-chip-label">${escapeHtml(src.label)}</span>

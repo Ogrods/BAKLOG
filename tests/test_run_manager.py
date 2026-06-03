@@ -73,6 +73,18 @@ def test_submit_rejects_duplicate_key(runs_env):
         mgr.submit("demo")
 
 
+def test_submit_rejects_active_after_removed_from_pending(runs_env) -> None:
+    """cancel() drops a run from _pending while _active is still finishing."""
+    mgr, runs_dir = runs_env
+    run = server.Run("demo", runs_dir=runs_dir)
+    run.status = "cancelling"
+    with mgr._lock:
+        mgr._active = run
+        mgr._runs_by_id[run.id] = run
+    with pytest.raises(ValueError, match="already queued or running"):
+        mgr.submit("demo")
+
+
 def test_cancel_all_clears_active_and_queue(runs_env):
     mgr, runs_dir = runs_env
     active = server.Run("demo", runs_dir=runs_dir)

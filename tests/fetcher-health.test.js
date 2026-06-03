@@ -21,17 +21,77 @@ import {
   startFastAgeTick,
   stopFastAgeTick,
   isFastAgeTickActive,
+  isFetcherDisconnected,
+  connectProviderForFetcher,
+  fetcherRunner,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
+const connMock = vi.hoisted(() => ({
+  statuses: {},
+  loaded: true,
+}));
+
 vi.mock('../js/connections.js', () => ({
-  FETCHER_AUTH_PROVIDER: { gog: 'gog', psn: 'psn' },
+  FETCHER_AUTH_PROVIDER: {
+    gog: 'gog',
+    psn: 'psn',
+    itad: 'itad',
+    steam: 'steam',
+    amazon: 'amazon',
+  },
   isProviderConnected: vi.fn(() => false),
   noteFetcherAuthFailure: vi.fn(() => false),
   showReconnectBanner: vi.fn(),
+  authStatusLoaded: () => connMock.loaded,
+  providerStatus: (p) => connMock.statuses[p] ?? null,
+  ingestAuthStatusProviders: vi.fn(),
 }));
 
-import { isProviderConnected } from '../js/connections.js';
+import { isProviderConnected, showReconnectBanner } from '../js/connections.js';
+
+describe('isFetcherDisconnected', () => {
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = {};
+  });
+
+  it('fails open when auth status not loaded', () => {
+    connMock.loaded = false;
+    connMock.statuses.gog = 'disconnected';
+    expect(isFetcherDisconnected('gog')).toBe(false);
+  });
+
+  it('returns true for disconnected provider', () => {
+    connMock.statuses.gog = 'disconnected';
+    expect(isFetcherDisconnected('gog')).toBe(true);
+  });
+
+  it('returns false for connected or unverified', () => {
+    connMock.statuses.gog = 'connected';
+    expect(isFetcherDisconnected('gog')).toBe(false);
+    connMock.statuses.gog = 'unverified';
+    expect(isFetcherDisconnected('gog')).toBe(false);
+  });
+
+  it('returns false for enrichers without auth provider', () => {
+    connMock.statuses.steam = 'disconnected';
+    expect(isFetcherDisconnected('hltb')).toBe(false);
+  });
+
+  it('amazon requires both launcher and web disconnected', () => {
+    connMock.statuses.amazon = 'disconnected';
+    connMock.statuses.amazon_web = 'disconnected';
+    expect(isFetcherDisconnected('amazon')).toBe(true);
+    connMock.statuses.amazon = 'connected';
+    expect(isFetcherDisconnected('amazon')).toBe(false);
+  });
+
+  it('connectProviderForFetcher picks amazon_web when disconnected', () => {
+    connMock.statuses.amazon_web = 'disconnected';
+    expect(connectProviderForFetcher('amazon')).toBe('amazon_web');
+  });
+});
 
 describe('humanizeAge', () => {
   it('formats seconds and minutes', () => {
@@ -158,6 +218,69 @@ describe('maybeAutoRefreshItad', () => {
       runFn,
     })).toBe(false);
     expect(runFn).not.toHaveBeenCalled();
+  });
+
+  it('returns early when ITAD provider is disconnected', () => {
+    connMock.statuses.itad = 'disconnected';
+    const runFn = vi.fn();
+    expect(maybeAutoRefreshItad({
+      getHour: () => 10,
+      isApiAvailable: () => true,
+      stateFor: () => null,
+      runFn,
+    })).toBe(false);
+    expect(runFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetcherRunner.run disconnected wall', () => {
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = { gog: 'disconnected' };
+    document.body.innerHTML = '<div id="fetcherRunLog"></div><div id="dashboardFetcherHealth"></div>';
+    showReconnectBanner.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  it('does not POST when provider is disconnected', async () => {
+    let runPosted = false;
+    vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
+      const u = String(url);
+      if (u.includes('/api/runs') && !opts.method) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'gog',
+              label: 'GOG',
+              metaKey: 'gog',
+              group: 'library',
+              color: '#9d4edd',
+              cmd: 'fetch_gog.py',
+              available: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/run/') && opts.method === 'POST') {
+        runPosted = true;
+        return { ok: true, json: async () => ({ run_id: 'r1' }) };
+      }
+      return { ok: false };
+    }));
+    await fetcherRunner.probeApi(true);
+    await fetcherRunner.run('gog');
+    expect(runPosted).toBe(false);
+    expect(showReconnectBanner).toHaveBeenCalledWith(['gog']);
+    const log = document.querySelector('.fh-log-line');
+    expect(log?.textContent).toMatch(/not connected/i);
   });
 });
 

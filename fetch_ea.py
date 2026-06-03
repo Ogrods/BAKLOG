@@ -232,7 +232,6 @@ def main() -> int:
     add_allow_empty_arg(parser)
     parser.add_argument("--skip-hltb", action="store_true")
     parser.add_argument("--dump-raw", action="store_true")
-    parser.add_argument("--allow-drift", action="store_true")
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_ea")

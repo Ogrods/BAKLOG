@@ -31,6 +31,19 @@ class BattleNetAuthError(Exception):
     pass
 
 
+_SESSION_REJECTED_MSG = (
+    "Battle.net rejected the session ({status}). Reconnect Battle.net on the "
+    "Connections tab (sign in and wait until your Games list loads). "
+    "CLI fallback: refresh BATTLENET_COOKIE in .env from DevTools "
+    "(Network → games-and-subs → Cookie header) and run with --browser env."
+)
+
+
+def probe_session(cookie_header: str) -> dict:
+    """Verify the cookie can read the games-and-subs API; raise on 401/403."""
+    return BattleNetClient(cookie_header).get_raw_account()
+
+
 class BattleNetClient:
     SUPPORTED_BROWSERS: ClassVar[tuple[str, ...]] = tuple(_BROWSER_LOADERS.keys())
 
@@ -98,11 +111,7 @@ class BattleNetClient:
         resp = self.session.get(ACCOUNT_URL, timeout=30)
         if resp.status_code in (401, 403):
             raise BattleNetAuthError(
-                f"Battle.net rejected the session ({resp.status_code}). "
-                "The session likely expired — sign in again at "
-                "https://account.battle.net/games in Edge, then refresh "
-                "BATTLENET_COOKIE in .env (DevTools → Network → games-and-subs → "
-                "Cookie header) and run with --browser env."
+                _SESSION_REJECTED_MSG.format(status=resp.status_code)
             )
         if resp.status_code == 500:
             raise BattleNetAuthError(

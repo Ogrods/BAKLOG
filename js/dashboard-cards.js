@@ -256,20 +256,30 @@ export function renderDashboardPicksVersus(games) {
 export function renderDashboardRecentAdditions(games) {
   const el = document.getElementById('dashRecentAdditions');
   if (!el) return;
-  const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
-  const hasCover = g => !!(g.library_image || g.header_image) && !failed.has(gameKey(g));
-  const recents = computeRecentAdditions(games, 10).filter(hasCover);
+  // Show every recent addition (up to 10) regardless of cover art. Rows with a
+  // cover URL render an <img> that falls back to an initials placeholder via
+  // window.coverFallback; rows with no cover at all get the placeholder inline
+  // (an empty <img src> won't reliably fire onerror).
+  const recents = computeRecentAdditions(games, 10);
   const empty = '<p class="text-xs text-slate-400 italic">No additions tracked yet.</p>';
   if (!recents.length) {
     el.innerHTML = empty;
     return;
   }
   const ageTitle = 'Time since first tracked in your library';
+  const initialsFor = name => {
+    const words = String(name || '').split(/\s+/).filter(Boolean);
+    return (words.slice(0, 3).map(w => w[0]).join('') || '?').toUpperCase().slice(0, 3);
+  };
   el.innerHTML = recents.map(g => {
     const cover = libraryCoverFor(g);
+    const fallback = coverFallbackFor(g);
     const key = gameKey(g);
     const addedLabel = formatAddedAgo(g._addedAt);
-    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
+    const coverHtml = cover
+      ? `<img class="dash-list-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />`
+      : `<div class="dash-list-cover placeholder" title="${escapeAttr(g.name)}"><span class="placeholder-initials">${escapeHtml(initialsFor(g.name))}</span></div>`;
+    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library">${coverHtml}<span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
   }).join('');
 }
 

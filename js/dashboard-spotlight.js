@@ -70,7 +70,16 @@ export function computeRecentAdditions(games, cap = 10) {
   return games
     .map(g => ({ g, at: seen[gameKey(g)] ?? 0 }))
     .filter(e => e.at > 0)
-    .sort((a, b) => b.at - a.at)
+    .sort((a, b) => {
+      // Newest first. Within a batch (same first-seen timestamp, e.g. a bulk
+      // fetch import) rank by rating, then fall back to alphabetical so ties
+      // are deterministic even when neither game has a rating yet.
+      if (b.at !== a.at) return b.at - a.at;
+      const ra = ratingValue(a.g);
+      const rb = ratingValue(b.g);
+      if (rb !== ra) return rb - ra;
+      return (a.g.name || "").localeCompare(b.g.name || "");
+    })
     .slice(0, cap)
     .map(e => ({ ...e.g, _addedAt: e.at }));
 }

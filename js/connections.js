@@ -73,6 +73,7 @@ const PROVIDER_BRAND = {
   steam: { color: '#1b9cd8', initial: 'S' },
 
   gog: { color: '#a855f7', initial: 'G' },
+  gog_galaxy: { color: '#a855f7', initial: 'G' },
 
   psn: { color: '#0070d1', initial: 'P' },
 
@@ -100,6 +101,7 @@ const PROVIDER_BRAND = {
   ea: { color: '#ff4747', initial: 'EA' },
 
   itch: { color: '#fa5c5c', initial: 'I' },
+  itch_local: { color: '#fa5c5c', initial: 'I' },
 
   itad: { color: '#22d3ee', initial: 'I' },
 
@@ -143,7 +145,7 @@ const CONN_BADGE_LETTER = {
 function connBadge(p) {
   // Collapse store variants onto the base brand badge so they share the same
   // background/letter (e.g. amazon_web -> amazon, xbox_wishlist -> xbox).
-  const cls = (p.key || '').replace(/_(wishlist|web)$/, '');
+  const cls = (p.key || '').replace(/_(wishlist|web|galaxy|local)$/, '');
   return {
     cls,
     letter: CONN_BADGE_LETTER[cls] || (p.label || '?').charAt(0).toUpperCase(),
@@ -191,6 +193,8 @@ const RAIL_ORDER = [
 /** Collapsed rail entries: one button, multiple detail cards (web on top). */
 const PROVIDER_GROUPS = {
   amazon: { label: 'Amazon', members: ['amazon_web', 'amazon'] },
+  gog: { label: 'GOG', members: ['gog', 'gog_galaxy'] },
+  itch: { label: 'itch.io', members: ['itch', 'itch_local'] },
 };
 const GROUP_OF = Object.fromEntries(
   Object.entries(PROVIDER_GROUPS).flatMap(([g, d]) => d.members.map(k => [k, g])),
@@ -206,6 +210,30 @@ export function combinedGroupStatus(members) {
     const st = p.status || 'disconnected';
     return (STATUS_RANK[st] ?? 0) > (STATUS_RANK[best] ?? 0) ? st : best;
   }, 'disconnected');
+}
+
+/** Explanatory note above grouped provider cards (dual local + remote sources). */
+function groupConnectNote(groupKey, members) {
+  const anyConnected = (members || []).some(m => m.status === 'connected');
+  if (groupKey === 'amazon') {
+    const lead = anyConnected
+      ? 'Ready to pull — at least one source is connected.'
+      : 'Connect the launcher or Prime web below to start pulling.';
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one Amazon source. Run the Amazon fetcher and BAKLOG auto-detects what's available — it scans the Amazon Games launcher database first (file scan) and falls back to Prime Gaming (web).</p></div>`;
+  }
+  if (groupKey === 'gog') {
+    const lead = anyConnected
+      ? 'Ready to pull — Galaxy and/or web session detected.'
+      : 'Install GOG Galaxy on this PC, or connect GOG (web) below.';
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one GOG source. Run the GOG fetcher and BAKLOG reads the Galaxy database first when present, then falls back to your gog.com cookie session.</p></div>`;
+  }
+  if (groupKey === 'itch') {
+    const lead = anyConnected
+      ? 'Ready to pull — itch app and/or API key detected.'
+      : 'Install the itch desktop app, or paste an API key below.';
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one itch.io source. Run the itch fetcher and BAKLOG reads butler.db from the itch app first when present, then falls back to your API key.</p></div>`;
+  }
+  return '';
 }
 
 function railSortIndex(key) {
@@ -661,7 +689,8 @@ function renderConnections() {
     const members = PROVIDER_GROUPS[selKey].members
       .map(k => authStatus.find(x => x.key === k))
       .filter(Boolean);
-    pane.innerHTML = `<div class="conn-card-stack">${members.map(buildCardHtml).join('')}</div>`;
+    const note = groupConnectNote(selKey, members);
+    pane.innerHTML = `${note}<div class="conn-card-stack">${members.map(buildCardHtml).join('')}</div>`;
   } else {
     const selected = authStatus.find(p => p.key === selKey);
     pane.innerHTML = selected
@@ -1686,7 +1715,8 @@ export async function refreshConnections() {
 
     renderReconnectBanner();
 
-    void import('./filters-ui.js').then(({ applyItchTabVisibility }) => applyItchTabVisibility());
+    const { applyItchTabVisibility } = await import('./filters-ui.js');
+    applyItchTabVisibility();
 
   } catch {
 

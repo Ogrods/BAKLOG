@@ -19,6 +19,7 @@ from pathlib import Path
 from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, heartbeat, started
 from hltb_client import HltbClient
+from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -29,12 +30,6 @@ def mapping_file() -> Path:
 QUERY_DELAY_SEC = 0.4  # be polite to HLTB; howlongtobeatpy doesn't throttle itself
 SAVE_EVERY_N_LOOKUPS = 25
 HEARTBEAT_EVERY = 25
-
-def _itch_is_videogame(row: dict) -> bool:
-    # itch.io is full of TTRPG PDFs, asset packs, soundtracks etc. — only
-    # rows tagged `classification: "game"` are worth running through HLTB.
-    return row.get("classification") == "game"
-
 
 STORE_FILES = [
     ("games_steam.json", "steam", None),

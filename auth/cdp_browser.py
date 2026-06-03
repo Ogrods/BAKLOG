@@ -632,6 +632,15 @@ class CdpContext:
         self._send("Page.enable", session_id=session_id)
         self._send("Runtime.enable", session_id=session_id)
         self._send("Network.enable", session_id=session_id)
+        try:
+            self._send("Debugger.enable", session_id=session_id)
+            self._send(
+                "Debugger.setSkipAllPauses",
+                {"skip": True},
+                session_id=session_id,
+            )
+        except Exception:
+            pass
         for src in self._init_scripts:
             self._apply_init_script(page, src)
         return page
@@ -648,7 +657,7 @@ class CdpContext:
 
     def _merge_popup_worker(self, page: CdpPage) -> None:
         try:
-            deadline = time.time() + 20
+            deadline = time.time() + _POPUP_URL_WAIT_SEC
             url = ""
             while time.time() < deadline:
                 url = (page.url or "").strip()
@@ -656,15 +665,15 @@ class CdpContext:
                     break
                 time.sleep(0.25)
             url = (page.url or "").strip()
-            blank = is_blank_browser_url(url)
             others = [p for p in self.pages if p is not page and not p.is_closed]
-            if blank:
-                if others:
-                    try:
-                        page.close()
-                    except Exception:
-                        pass
+
+            if _should_preserve_popup(url):
+                try:
+                    page.bring_to_front()
+                except Exception:
+                    pass
                 return
+
             try:
                 page.close()
             except Exception:
@@ -917,3 +926,28 @@ def launch_persistent_profile(
 def is_blank_browser_url(url: str) -> bool:
     """True for about:blank and other empty popup URLs."""
     return (url or "").strip() in _BLANK_URLS
+
+
+_POPUP_MERGE_READY = re.compile(
+    r"connect\.ubisoft\.com/logged-in\.html",
+    re.I,
+)
+_POPUP_AUTH_PATTERNS = re.compile(
+    r"(?:login|signin|sign-in|authorize|oauth|account\.|connect\.)",
+    re.I,
+)
+
+
+def _should_preserve_popup(url: str) -> bool:
+    """True when an OAuth/login popup should stay open (not merged into main)."""
+    u = (url or "").strip()
+    if is_blank_browser_url(u):
+        return True
+    if _POPUP_MERGE_READY.search(u):
+        return False
+    if _POPUP_AUTH_PATTERNS.search(u):
+        return True
+    return False
+
+
+_POPUP_URL_WAIT_SEC = 45

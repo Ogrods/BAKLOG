@@ -121,6 +121,9 @@ export function bindEvents() {
     } else if (e.target.id === "itadAutoRefreshToggle") {
       state.prefs.itadAutoRefreshDisabled = !e.target.checked;
       savePrefs();
+    } else if (e.target.id === "autoEnrichOnAddToggle") {
+      state.prefs.autoEnrichOnAdd = e.target.checked;
+      savePrefs();
     }
   });
 

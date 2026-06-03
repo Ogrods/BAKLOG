@@ -107,17 +107,19 @@ REFUSE_EMPTY_SCRIPTS = {
     "fetch_humble_wishlist.py",
     "fetch_wishlist.py",
     "fetch_itad.py",
+    "fetch_itch.py",
 }
 MANUAL_EMPTY_EXIT_SCRIPTS = {
     "fetch_amazon.py",
     "fetch_battlenet.py",
     "fetch_nintendo.py",
-    "fetch_itch.py",
     "fetch_ubisoft.py",
     "fetch_ea.py",
 }
 DRIFT_GUARD_BY_SCRIPT: dict[str, str] = {
     "fetch_amazon.py": "refuse_amazon_source_drift",
+    "fetch_gog.py": "refuse_gog_source_drift",
+    "fetch_itch.py": "refuse_itch_source_drift",
 }
 NO_EMPTY_GUARD_SCRIPTS = {
     "enrich_hltb.py",

@@ -26,7 +26,13 @@ try:
 except ImportError:
     class AmazonGamesError(Exception):  # type: ignore[no-redef]
         """Stub when amazon_client is unavailable (non-Windows)."""
-from fetchers._base import add_allow_empty_arg, catalog_file, merge_cached_row, write_catalog_text
+from fetchers._base import (
+    add_allow_empty_arg,
+    carry_enrichment,
+    catalog_file,
+    merge_cached_row,
+    write_catalog_text,
+)
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
@@ -127,12 +133,12 @@ def _pick_winner(row_a: dict, row_b: dict, current_source: str) -> dict:
     sb = _effective_row_source(row_b)
     pa, pb = _source_priority(sa), _source_priority(sb)
     if pa > pb:
-        return row_a
+        return carry_enrichment(row_a, row_b)
     if pb > pa:
-        return row_b
+        return carry_enrichment(row_b, row_a)
     if sa == current_source:
-        return row_a
-    return row_b
+        return carry_enrichment(row_a, row_b)
+    return carry_enrichment(row_b, row_a)
 
 
 def merge_amazon_sources(
@@ -306,7 +312,6 @@ def main() -> int:
         action="store_true",
         help="Web source only: write cache/amazon_web_raw.json with full claims payload",
     )
-    parser.add_argument("--allow-drift", action="store_true")
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()

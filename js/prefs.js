@@ -32,7 +32,7 @@ export function syncCoopFilterSegmented() {
 }
 
 export function loadPrefs() {
-  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16, dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, coopFilterMode: "off" };
+  const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16, dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, autoEnrichOnAdd: true, coopFilterMode: "off" };
   let merged;
   try { merged = { ...fallback, ...(JSON.parse(localStorage.getItem(prefsStorageKey()) || "{}")) }; } catch { return fallback; }
   if (!["off", "any", "online", "local", "both"].includes(merged.coopFilterMode)) {

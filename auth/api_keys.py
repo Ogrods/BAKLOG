@@ -612,7 +612,7 @@ def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str,
                         "you may need to verify your phone/email first on xbl.io."
                     )
                     if _xbl_signed_in(url)
-                    else "Sign in to OpenXBL with your Xbox Live / Microsoft account."
+                    else "Click \u201cSign in with Xbox Live\u201d on the xbl.io page to get your API key \u2014 we'll capture it automatically."
                 },
             )
         page.wait_for_timeout(int(POLL_SEC * 1000))

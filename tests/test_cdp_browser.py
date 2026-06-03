@@ -22,7 +22,9 @@ import pytest
 from auth.cdp_browser import (
     _BROWSER_LAUNCH_HINT,
     CdpContext,
+    CdpPage,
     _cdp_websocket_error,
+    _should_preserve_popup,
     find_chromium_executable,
     is_blank_browser_url,
     launch_persistent_profile,
@@ -65,6 +67,45 @@ class TestBlankUrl:
 
     def test_real_url_not_blank(self) -> None:
         assert not is_blank_browser_url("https://connect.ubisoft.com/logged-in.html")
+
+
+class TestShouldPreservePopup:
+    @pytest.mark.parametrize("url", ["", "about:blank", "chrome://newtab/"])
+    def test_blank_preserves(self, url: str) -> None:
+        assert _should_preserve_popup(url)
+
+    def test_account_ubisoft_preserves(self) -> None:
+        assert _should_preserve_popup("https://account.ubisoft.com/en-US/login")
+
+    def test_logged_in_merges(self) -> None:
+        assert not _should_preserve_popup("https://connect.ubisoft.com/logged-in.html")
+
+    def test_ubisoft_connect_games_merges(self) -> None:
+        assert not _should_preserve_popup(
+            "https://www.ubisoft.com/en-us/ubisoft-connect/games"
+        )
+
+
+class TestRegisterPageDebugger:
+    def test_register_page_enables_skip_all_pauses(self) -> None:
+        ctx = _bare_context()
+        ctx._pages_by_session = {}
+        ctx._pages_by_target = {}
+        calls: list[tuple[str, str | None]] = []
+
+        def fake_send(method, params=None, *, session_id=None, timeout=60):
+            calls.append((method, session_id))
+            return {}
+
+        ctx._send = fake_send  # type: ignore[method-assign]
+        ctx._init_scripts = []
+        ctx._apply_init_script = lambda page, source: None  # type: ignore[method-assign]
+
+        page = ctx._register_page("TARGET-1", "SESSION-1")
+
+        assert isinstance(page, CdpPage)
+        assert ("Debugger.enable", "SESSION-1") in calls
+        assert ("Debugger.setSkipAllPauses", "SESSION-1") in calls
 
 
 class TestCdpErrors:

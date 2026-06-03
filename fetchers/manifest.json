@@ -22,8 +22,7 @@
       "args": ["--skip-hltb"],
       "refreshArgs": ["--refresh"],
       "metaKey": "gog",
-      "color": "#6d28d9",
-      "requires": [{ "env": "GOG_AL", "note": "Copy gog-al cookie from DevTools after signing in at gog.com" }]
+      "color": "#6d28d9"
     },
     {
       "key": "psn",
@@ -66,7 +65,7 @@
       "args": ["--skip-hltb"],
       "metaKey": "battlenet",
       "color": "#148EFF",
-      "requires": [{ "env": "BATTLENET_COOKIE", "note": "Paste Cookie header from DevTools — see README" }]
+      "requires": [{ "env": "BATTLENET_COOKIE", "note": "Connect on Connections (recommended); DevTools cookie fallback in README" }]
     },
     {
       "key": "ubisoft",
@@ -89,7 +88,7 @@
       "args": ["--skip-hltb"],
       "metaKey": "nintendo",
       "color": "#E60012",
-      "requires": [{ "env": "NINTENDO_COOKIE", "note": "Cookie from ec.nintendo.com transactions page" }]
+      "requires": [{ "env": "NINTENDO_COOKIE", "note": "Connect Nintendo in Connections (browser profile + session)" }]
     },
     {
       "key": "itch",

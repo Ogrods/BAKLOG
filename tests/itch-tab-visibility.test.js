@@ -81,7 +81,6 @@ describe('applyItchTabVisibility', () => {
   it('shows the itch tab after itch is connected', async () => {
     mockAuthStatus([{ key: 'itch', status: 'connected' }]);
     await refreshConnections();
-    applyItchTabVisibility();
     const tab = document.querySelector('.view-tab[data-view="itch"]');
     expect(tab.classList.contains('hidden')).toBe(false);
   });

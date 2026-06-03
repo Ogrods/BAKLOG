@@ -16,12 +16,32 @@ import json
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
-
-from auth.secrets import profile_dir
+from urllib.parse import quote, urlencode, urlparse
 
 LUNA_CLAIMS_URL = "https://luna.amazon.com/claims/my-collection"
+GAMING_HOME_URL = "https://gaming.amazon.com/home"
 PROFILE_KEY = "amazon_web"
+
+# Ordered collection targets after sign-in (Luna first, gaming.amazon.com fallback).
+COLLECTION_URLS: tuple[str, ...] = (LUNA_CLAIMS_URL, GAMING_HOME_URL)
+
+AMAZON_WEB_HUB_REDIRECT_SEC = 3
+AMAZON_WEB_RENUDGE_SEC = 15
+
+_OPENID_IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select"
+_OPENID_NS = "http://specs.openid.net/auth/2.0"
+
+_AMAZON_SESSION_COOKIE_NAMES = frozenset({
+    "session-id",
+    "session-id-time",
+    "at-main",
+    "sess-at-main",
+    "ubid-main",
+    "session-token",
+    "x-main",
+})
+
+_AMAZON_HOST_MARKERS = ("amazon.com", "luna.amazon.com", "gaming.amazon.com")
 
 # External launcher targets from Prime Gaming key drops (user DevTools sample: EPIC).
 _EXTERNAL_DESTINATION_TYPES = frozenset({
@@ -76,8 +96,162 @@ class AmazonWebError(Exception):
     """Prime Gaming claims could not be parsed."""
 
 
+def collection_urls() -> tuple[str, ...]:
+    """URLs to open so Prime Gaming loads the claims GraphQL payload."""
+    return COLLECTION_URLS
+
+
+def amazon_signin_url(return_to: str = LUNA_CLAIMS_URL) -> str:
+    """Stable Amazon OpenID sign-in URL (no single-use ``ssoResponse`` token)."""
+    params = {
+        "openid.pape.max_auth_age": "3600",
+        "openid.return_to": return_to,
+        "openid.identity": _OPENID_IDENTIFIER_SELECT,
+        "openid.assoc_handle": "tempo_us",
+        "openid.mode": "checkid_setup",
+        "language": "en_US",
+        "openid.claimed_id": _OPENID_IDENTIFIER_SELECT,
+        "pageId": "tempo_us",
+        "openid.ns": _OPENID_NS,
+    }
+    return f"https://www.amazon.com/ap/signin?{urlencode(params)}"
+
+
+def prime_goto_signin(page: Any, return_to: str = LUNA_CLAIMS_URL) -> str:
+    """Open Amazon sign-in with ``return_to`` defaulting to My Collection."""
+    target = amazon_signin_url(return_to)
+    try:
+        page.goto(target, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:
+        pass
+    return target
+
+
+def is_signin_url(url: str) -> bool:
+    u = (url or "").lower()
+    if "signin" in u or "sign-in" in u:
+        return True
+    if "/ap/signin" in u or "/ap/register" in u:
+        return True
+    return "/ap/" in u and "sign" in u
+
+
+def has_amazon_session_cookies(context: Any) -> bool:
+    """True when the profile has Amazon session cookies (post sign-in)."""
+    try:
+        cookies = context.cookies()
+    except Exception:
+        return False
+    for c in cookies:
+        name = (c.get("name") or "").lower()
+        domain = (c.get("domain") or "").lower()
+        if "amazon" not in domain:
+            continue
+        if name in _AMAZON_SESSION_COOKIE_NAMES or name.startswith("session"):
+            if c.get("value"):
+                return True
+    return False
+
+
+def signed_in(url: str, context: Any) -> bool:
+    """True when the user appears signed in to Amazon (not on a sign-in page)."""
+    if is_signin_url(url):
+        return False
+    if not has_amazon_session_cookies(context):
+        return False
+    u = (url or "").lower()
+    return any(marker in u for marker in _AMAZON_HOST_MARKERS)
+
+
+def is_luna_hub(url: str) -> bool:
+    """True on ``luna.amazon.com/`` (post-login hub), not My Collection."""
+    u = (url or "").lower()
+    if "luna.amazon.com" not in u:
+        return False
+    parsed = urlparse(url or "")
+    path = (parsed.path or "/").rstrip("/") or "/"
+    return path == "/"
+
+
+def on_collection_page(url: str) -> bool:
+    """True when the browser is on a Prime Gaming library / My Collection surface."""
+    u = (url or "").lower()
+    if is_luna_hub(url):
+        return False
+    if "my-collection" in u or "/claims/" in u:
+        return True
+    if "luna.amazon.com" in u and "claim" in u:
+        return True
+    if "gaming.amazon.com" in u:
+        return True
+    return False
+
+
+def needs_collection_redirect(url: str, context: Any) -> bool:
+    """Signed in but not on a loaded collection surface (e.g. Luna hub)."""
+    return signed_in(url, context) and (is_luna_hub(url) or not on_collection_page(url))
+
+
+def is_luna_error_page(html: str) -> bool:
+    lower = (html or "").lower()
+    return (
+        "technical difficulties" in lower
+        or "having issues with our service" in lower
+        or "please come back later" in lower
+    )
+
+
+def collection_page_ready(html: str, url: str) -> bool:
+    """Collection URL loaded without sign-in or Luna outage banner."""
+    if is_signin_url(url) or not on_collection_page(url):
+        return False
+    if is_luna_error_page(html):
+        return False
+    return True
+
+
+def prime_goto_collection(page: Any, url_index: int = 0) -> str:
+    """Navigate to a collection URL; return the URL attempted."""
+    urls = collection_urls()
+    target = urls[min(url_index, len(urls) - 1)]
+    try:
+        page.goto(target, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:
+        pass
+    return target
+
+
+def try_parse_claims_from_html(html: str) -> list[dict[str, Any]] | None:
+    """Parse claims from raw JSON or embedded ``data.claims`` in page HTML."""
+    body = (html or "").strip()
+    if not body:
+        return None
+    direct = try_parse_claims_from_text(body)
+    if direct:
+        return direct
+    if '"claims"' not in body and "'claims'" not in body:
+        return None
+    start = body.find('{"data"')
+    while start >= 0:
+        depth = 0
+        for end in range(start, min(start + 500_000, len(body))):
+            ch = body[end]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    chunk = body[start : end + 1]
+                    items = try_parse_claims_from_text(chunk)
+                    if items is not None:
+                        return items
+                    break
+        start = body.find('{"data"', start + 1)
+    return None
+
+
 def claims_visible_in_body(body: str) -> bool:
-    return try_parse_claims_from_text(body) is not None
+    return try_parse_claims_from_html(body) is not None
 
 
 def try_parse_claims_from_text(body: str) -> list[dict[str, Any]] | None:
@@ -202,6 +376,145 @@ def filter_codeless_claims(claims: list[dict[str, Any]]) -> list[dict[str, Any]]
     return sorted(records, key=lambda r: r["name"].lower())
 
 
+def _response_may_contain_claims(url: str) -> bool:
+    u = (url or "").lower()
+    return "graphql" in u or ("amazon" in u and "claims" in u)
+
+
+def _capture_claims_from_response(
+    resp: Any,
+    raw_claims: list[dict[str, Any]],
+    captured: dict[str, bool],
+) -> None:
+    if captured["done"]:
+        return
+    try:
+        if getattr(resp, "status", 0) != 200:
+            return
+        url = (getattr(resp, "url", None) or "").lower()
+        if not _response_may_contain_claims(url):
+            return
+        items = try_parse_claims_from_text(resp.text())
+        if items is not None:
+            raw_claims.clear()
+            raw_claims.extend(items)
+            captured["done"] = True
+    except Exception:
+        pass
+
+
+def _try_capture_from_page_html(
+    html: str,
+    url: str,
+    context: Any,
+    raw_claims: list[dict[str, Any]],
+    captured: dict[str, bool],
+    *,
+    allow_session_only: bool,
+) -> bool:
+    """Return True when connect/fetch capture criteria are met."""
+    items = try_parse_claims_from_html(html)
+    if items is not None:
+        raw_claims.clear()
+        raw_claims.extend(items)
+        captured["done"] = True
+        return True
+    if allow_session_only and collection_page_ready(html, url) and signed_in(url, context):
+        captured["done"] = True
+        return True
+    return False
+
+
+def _collection_redirect_interval(url: str, html: str) -> float:
+    if is_luna_hub(url) or is_luna_error_page(html):
+        return AMAZON_WEB_HUB_REDIRECT_SEC
+    return AMAZON_WEB_RENUDGE_SEC
+
+
+def _next_collection_index(url_idx: int, url: str, html: str) -> int:
+    if is_luna_error_page(html):
+        return 1 if len(COLLECTION_URLS) > 1 else 0
+    if is_luna_hub(url):
+        return 0
+    return (url_idx + 1) % len(COLLECTION_URLS)
+
+
+def _poll_prime_collection(
+    page: Any,
+    context: Any,
+    *,
+    deadline: float,
+    raw_claims: list[dict[str, Any]],
+    captured: dict[str, bool],
+    allow_session_only: bool = False,
+    start_at_signin: bool = False,
+    session: Any = None,
+    poll_interval_ms: int = 500,
+) -> None:
+    """Navigate sign-in / collection until claims or session criteria are met."""
+    if start_at_signin and not signed_in(page.url or "", context):
+        prime_goto_signin(page)
+    else:
+        prime_goto_collection(page, 0)
+    last_goto = time.time()
+    last_hint = 0.0
+    nudged = False
+    url_idx = 0
+    while time.time() < deadline and not captured["done"]:
+        url = page.url or ""
+        now = time.time()
+        try:
+            html = page.content()
+        except Exception:
+            html = ""
+        if _try_capture_from_page_html(
+            html, url, context, raw_claims, captured, allow_session_only=allow_session_only,
+        ):
+            break
+
+        si = signed_in(url, context)
+        if si and not nudged:
+            nudged = True
+            if session is not None:
+                session.emit("signed_in", {"url": url or LUNA_CLAIMS_URL})
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
+            prime_goto_collection(page, 0)
+            last_goto = now
+            url_idx = 0
+        elif si and needs_collection_redirect(url, context):
+            interval = _collection_redirect_interval(url, html)
+            if now - last_goto >= interval:
+                url_idx = _next_collection_index(url_idx, url, html)
+                prime_goto_collection(page, url_idx)
+                last_goto = now
+
+        if session is not None and now - last_hint > 10:
+            last_hint = now
+            if is_signin_url(url):
+                msg = "Sign in to your Amazon account in the browser window."
+            elif is_luna_error_page(html):
+                msg = (
+                    "Prime Gaming (Luna) is having issues — trying gaming.amazon.com instead. "
+                    "You can also wait and retry later."
+                )
+            elif si and is_luna_hub(url):
+                msg = "Signed in — opening My Collection…"
+            elif si and not on_collection_page(url):
+                msg = "Signed in — opening Prime Gaming My Collection…"
+            elif si:
+                msg = "Keep the window open until My Collection finishes loading."
+            else:
+                msg = (
+                    "Sign in on the Amazon page — we'll send you to My Collection after login."
+                )
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(poll_interval_ms)
+
+
 def sniff_claims(
     *,
     timeout_s: int = 60,
@@ -209,6 +522,8 @@ def sniff_claims(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Replay saved browser profile; return (raw_claims, codeless_records)."""
     from auth.cdp_browser import launch_persistent_profile
+
+    from auth.secrets import profile_dir
 
     profile = profile_dir(PROFILE_KEY)
     if not profile.is_dir():
@@ -221,34 +536,20 @@ def sniff_claims(
     captured: dict[str, bool] = {"done": False}
 
     def on_response(resp: Any) -> None:
-        if captured["done"]:
-            return
-        try:
-            status = getattr(resp, "status", 0)
-            if status != 200:
-                return
-            url = (getattr(resp, "url", None) or "").lower()
-            if "graphql" not in url:
-                return
-            body = resp.text()
-            items = try_parse_claims_from_text(body)
-            if items:
-                raw_claims.clear()
-                raw_claims.extend(items)
-                captured["done"] = True
-        except Exception:
-            pass
+        _capture_claims_from_response(resp, raw_claims, captured)
 
     with launch_persistent_profile(str(profile), headless=True) as ctx:
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.on("response", on_response)
-        try:
-            page.goto(LUNA_CLAIMS_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
-        except Exception:
-            pass
-        deadline = time.time() + timeout_s
-        while time.time() < deadline and not captured["done"]:
-            page.wait_for_timeout(500)
+        _poll_prime_collection(
+            page,
+            ctx,
+            deadline=time.time() + timeout_s,
+            raw_claims=raw_claims,
+            captured=captured,
+            allow_session_only=False,
+            start_at_signin=False,
+        )
 
     if dump_path is not None:
         path = Path(dump_path)
@@ -256,7 +557,7 @@ def sniff_claims(
         path.write_text(
             json.dumps(
                 {
-                    "url": LUNA_CLAIMS_URL,
+                    "urls": list(COLLECTION_URLS),
                     "raw_claim_count": len(raw_claims),
                     "raw_claims": raw_claims,
                     "codeless_count": len(filter_codeless_claims(raw_claims)),

@@ -101,6 +101,32 @@ function safeStringify(v) {
   try { return JSON.stringify(v); } catch (_) { return String(v); }
 }
 
+/** Benign browser noise — never toast, persist, or include in bug bundles. */
+function isIgnoredError(entry) {
+  const msg = String(entry?.message || '');
+  return /ResizeObserver loop completed with undelivered notifications/i.test(msg);
+}
+
+/**
+ * Historical entries to drop when rehydrating localStorage (fixed bugs / ignored noise).
+ * New captures for non-ignored messages are unaffected so regressions still surface.
+ */
+function isStalePersistedError(entry) {
+  if (isIgnoredError(entry)) return true;
+  const msg = String(entry?.message || '');
+  return msg === 'authStatus is not defined'
+    || msg === 'enableLocalProvider is not defined';
+}
+
+function prunePersistedRing() {
+  const before = _persistedRing.length;
+  _persistedRing = _persistedRing.filter(e => !isStalePersistedError(e));
+  if (_persistedRing.length === before || typeof window === 'undefined') return;
+  try {
+    window.localStorage?.setItem(PERSIST_STORAGE_KEY, JSON.stringify(_persistedRing));
+  } catch (_) { /* best-effort */ }
+}
+
 function shouldDedupe(entry) {
   const sig = makeSignature(entry);
   const now = entry.time;
@@ -137,6 +163,7 @@ function loadPersistedErrors() {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       _persistedRing = parsed.slice(-MAX_PERSISTED);
+      prunePersistedRing();
     }
   } catch (_) { /* corrupt or disabled storage — start fresh */ }
 }
@@ -455,6 +482,7 @@ function copyTextToClipboard(text, btn) {
 }
 
 function record(entry) {
+  if (isIgnoredError(entry)) return;
   const sig = makeSignature(entry);
   if (shouldDedupe(entry)) {
     bumpRepeatsForSignature(sig);
@@ -519,6 +547,7 @@ export function getCapturedErrors() { return _errors.slice(); }
 
 // Test helper — not part of the public contract.
 export function _resetForTests() {
+  _installed = false;
   _errors.length = 0;
   _signatures.clear();
   _persistedRing = [];

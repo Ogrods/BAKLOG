@@ -216,6 +216,60 @@ def print_id_diff(
 # enrichment back to None on every fetcher rerun.
 _IMAGE_KEYS = frozenset({"header_image", "library_image"})
 
+# Fields written by enrich scripts (reviews, HLTB, co-op tags), not store fetchers.
+ENRICHMENT_FIELDS = (
+    "steam_review_percent",
+    "steam_review_count",
+    "steam_review_desc",
+    "hltb_main_hours",
+    "hltb_main_extra_hours",
+    "hltb_completionist_hours",
+    "hltb_match_confidence",
+    "hltb_name",
+    "coop_online",
+    "coop_local",
+)
+
+# When a fetcher reruns with empty/zero fresh values, keep populated cache values.
+_PRESERVE_IF_FRESH_EMPTY = frozenset(
+    {
+        "playtime_minutes",
+        "last_played",
+        *ENRICHMENT_FIELDS,
+    }
+)
+
+
+def _is_empty(value: Any) -> bool:
+    if value is None:
+        return True
+    if value is False:
+        return True
+    if isinstance(value, (int, float)) and value == 0:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) == 0
+    return False
+
+
+def carry_enrichment(winner: dict, loser: dict | None) -> dict:
+    """Copy enricher-written fields from the displaced row when the winner lacks them."""
+    if not loser:
+        return winner
+    out = dict(winner)
+    for key in ENRICHMENT_FIELDS:
+        win_val = out.get(key)
+        lose_val = loser.get(key)
+        if (win_val is None or win_val == "" or win_val is False) and lose_val not in (
+            None,
+            "",
+            False,
+        ):
+            out[key] = lose_val
+    return out
+
 
 def merge_cached_row(
     fresh: dict[str, Any],
@@ -240,10 +294,19 @@ def merge_cached_row(
             continue
         if key in _IMAGE_KEYS and not fresh[key]:
             continue
+        if (
+            key in _PRESERVE_IF_FRESH_EMPTY
+            and _is_empty(fresh[key])
+            and not _is_empty(merged.get(key))
+        ):
+            continue
         merged[key] = fresh[key]
     if hltb_updated:
         for key in hltb_keys:
-            merged[key] = fresh.get(key)
+            fresh_val = fresh.get(key)
+            if _is_empty(fresh_val) and not _is_empty(merged.get(key)):
+                continue
+            merged[key] = fresh_val
     return merged
 
 

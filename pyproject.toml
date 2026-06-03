@@ -27,14 +27,19 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-timeout>=2.3",
     "ruff>=0.4",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+timeout = 60
+timeout_method = "thread"
+faulthandler_timeout = 70
 markers = [
     "integration: optional tests that launch a real Chrome/Edge browser",
+    "no_leak_check: skip autouse thread/child leak detector for self-check tests",
 ]
 
 [tool.ruff]

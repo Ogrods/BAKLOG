@@ -78,6 +78,26 @@ class TestMergeAmazonSources:
         assert out[0]["last_played"] == "2024-06-01"
         assert out[0]["source"] == "launcher"
 
+    def test_launcher_winner_keeps_web_enrichment(self) -> None:
+        web = _web_row("web-1", name="Prime Game", asin="B00ENR")
+        web.update(
+            {
+                "steam_review_percent": 75,
+                "steam_review_count": 500,
+                "coop_online": True,
+                "hltb_main_hours": 8.0,
+            }
+        )
+        launcher = _launcher_row("launcher-1", name="Prime Game", asin="B00ENR")
+        out = fa.merge_amazon_sources([launcher], [web], "launcher")
+        assert len(out) == 1
+        row = out[0]
+        assert row["source"] == "launcher"
+        assert row["steam_review_percent"] == 75
+        assert row["steam_review_count"] == 500
+        assert row["coop_online"] is True
+        assert row["hltb_main_hours"] == 8.0
+
     def test_name_collapse_when_asin_missing(self) -> None:
         current = [_web_row("web-2", name="  Mystery   Game ", asin=None)]
         carried = [_launcher_row("launcher-2", name="mystery game", asin=None)]
@@ -179,4 +199,12 @@ class TestResolveSourceLauncherDisabled:
     def test_auto_launcher_when_not_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(fa, "is_local_provider_disabled", lambda provider: False)
         monkeypatch.setattr(fa, "_launcher_db_ready", lambda sql_dir: True)
+        assert fa.resolve_source("auto", None) == "launcher"
+
+    def test_auto_launcher_when_both_launcher_and_web_ready(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(fa, "is_local_provider_disabled", lambda provider: False)
+        monkeypatch.setattr(fa, "_launcher_db_ready", lambda sql_dir: True)
+        monkeypatch.setattr(fa, "_web_profile_ready", lambda: True)
         assert fa.resolve_source("auto", None) == "launcher"

@@ -60,10 +60,17 @@ def runs_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "requires": [],
         },
     )
-    mgr = server.RunManager(runs_dir=runs_dir)
+    mgr = server.RunManager(runs_dir=runs_dir, enable_watchdog=False)
     yield mgr, runs_dir
-    mgr.cancel_all()
-    mgr.shutdown()
+    try:
+        mgr.cancel_all()
+    except Exception:
+        pass
+    try:
+        mgr.shutdown()
+    except Exception:
+        pass
+    mgr.join_threads(timeout=5.0)
 
 
 def test_submit_rejects_duplicate_key(runs_env):
@@ -102,6 +109,131 @@ def test_cancel_all_clears_active_and_queue(runs_env):
     assert queued.status == "cancelled"
     snap = mgr.snapshot()
     assert snap["queue"] == []
+
+
+def test_resync_stalled_queue_recovers_dead_worker(runs_env) -> None:
+    """Queued runs in _pending with an empty worker queue must execute after resync."""
+    mgr, runs_dir = runs_env
+    dead = threading.Thread(target=lambda: None)
+    dead.start()
+    dead.join()
+    mgr._worker_thread = dead
+    run = server.Run("demo", runs_dir=runs_dir)
+    with mgr._lock:
+        mgr._pending.append(run)
+        mgr._runs_by_id[run.id] = run
+    assert mgr._resync_stalled_queue() == 1
+    mgr._ensure_worker_thread()
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        snap = mgr.snapshot()
+        if not snap["active"] and not snap["queue"]:
+            if any(h.get("id") == run.id for h in snap["history"]):
+                break
+        time.sleep(0.05)
+    else:
+        pytest.fail(f"resynced run did not finish: {mgr.snapshot()}")
+
+
+def test_cancel_all_returns_before_async_kill(runs_env, monkeypatch: pytest.MonkeyPatch) -> None:
+    mgr, _ = runs_env
+
+    def slow_kill(pid: int) -> None:
+        time.sleep(2)
+
+    monkeypatch.setattr(server, "_terminate_pid", slow_kill)
+    mgr.submit("demo")
+    try:
+        mgr.submit("demo2")
+    except ValueError:
+        pass
+    t0 = time.time()
+    summaries = mgr.cancel_all()
+    elapsed = time.time() - t0
+    assert elapsed < 1.0
+    assert summaries
+
+
+def test_cancel_schedules_sync_completion_when_worker_dead(
+    runs_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When the worker thread is dead, cancel must not rely on it to finalize."""
+    completed: list[str] = []
+
+    def _record_complete(_mgr: server.RunManager, run: server.Run) -> None:
+        completed.append(run.id)
+        run.status = "cancelled"
+        run.exit_code = -1
+        run.ended_at = time.time()
+        if not run._finished.is_set():
+            run.mark_finished()
+        _mgr._finalize_run(run)
+
+    mgr, runs_dir = runs_env
+    monkeypatch.setattr(server, "_kill_pids_async", lambda _pids: None)
+    monkeypatch.setattr(
+        mgr,
+        "_complete_cancel_after_kill",
+        lambda run: _record_complete(mgr, run),
+    )
+    dead = threading.Thread(target=lambda: None)
+    dead.start()
+    dead.join()
+    mgr._worker_thread = dead
+
+    class _FakeProc:
+        pid = 424242
+
+        def poll(self) -> None:
+            return None
+
+        def wait(self, timeout: float | None = None) -> int:
+            return 0
+
+    run = server.Run("demo", runs_dir=runs_dir)
+    run.status = "running"
+    run.started_at = time.time()
+    run._proc = _FakeProc()
+    with mgr._lock:
+        mgr._active = run
+        mgr._runs_by_id[run.id] = run
+    cancelled, err = mgr.cancel(run.id)
+    assert err is None
+    assert cancelled is not None
+    assert completed == [run.id]
+    assert any(h.get("id") == run.id for h in mgr.snapshot()["history"])
+
+
+def test_force_reset_clears_queue(runs_env) -> None:
+    mgr, _ = runs_env
+    mgr.submit("demo")
+    try:
+        mgr.submit("demo2")
+    except ValueError:
+        pass
+    snap = mgr.snapshot()
+    assert snap["active"] or snap["queue"]
+    result = mgr.force_reset()
+    assert result.get("force") is True
+    snap = mgr.snapshot()
+    assert not snap["active"]
+    assert not snap["queue"]
+
+
+def test_force_finalize_stuck_cancelling(runs_env, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(server, "CANCEL_STUCK_GRACE_SEC", 0.01)
+    mgr, runs_dir = runs_env
+    run = server.Run("demo", runs_dir=runs_dir)
+    run.status = "cancelling"
+    run._cancelling_since = time.monotonic() - 10.0
+    run.started_at = time.time()
+    with mgr._lock:
+        mgr._active = run
+        mgr._runs_by_id[run.id] = run
+    mgr._force_finalize_stuck_cancelling()
+    snap = mgr.snapshot()
+    assert snap["active"] is None
+    assert any(h.get("id") == run.id for h in snap["history"])
 
 
 def test_cancel_queued_run(runs_env):
@@ -291,11 +423,18 @@ def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch: pyte
     mgr, _runs_dir = runs_env
     launch_started = threading.Event()
 
+    class _LateProc:
+        pid = 424242
+
+        def poll(self):
+            return None
+
     def blocking_popen(*args, **kwargs):
         launch_started.set()
         time.sleep(60)
+        return _LateProc()
 
-    monkeypatch.setattr(server.subprocess, "Popen", blocking_popen)
+    monkeypatch.setattr(server, "popen_fetcher", blocking_popen)
     run = mgr.submit("demo")
     assert launch_started.wait(timeout=5)
     deadline = time.time() + 8
@@ -320,7 +459,7 @@ def test_cancel_during_launch_does_not_leave_running_status(runs_env, monkeypatc
         gate.wait(timeout=5)
         return real_popen(*args, **kwargs)
 
-    monkeypatch.setattr(server.subprocess, "Popen", blocking_popen)
+    monkeypatch.setattr(server, "popen_fetcher", blocking_popen)
     run = mgr.submit("demo")
     deadline = time.time() + 5
     while time.time() < deadline:
@@ -334,6 +473,43 @@ def test_cancel_during_launch_does_not_leave_running_status(runs_env, monkeypatc
     assert run._finished.wait(timeout=10)
     assert run.status in ("cancelled", "failed")
     assert run.status != "running"
+
+
+def test_max_runtime_cap_kills_run(runs_env, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1.5)
+    monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
+    monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 9999)
+    mgr, _ = runs_env
+    monkeypatch.setitem(
+        server.FETCHERS,
+        "trickle",
+        {
+            "label": "Trickle",
+            "argv": [
+                server.sys.executable,
+                "-c",
+                "import time\nwhile True:\n print('tick')\n time.sleep(0.2)",
+            ],
+            "refreshArgs": [],
+            "metaKey": "trickle",
+            "group": "library",
+            "color": "#fff",
+            "requires": [],
+        },
+    )
+    run = mgr.submit("trickle")
+    saw_cap = False
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        replay = run.replay_lines()
+        if any("maximum runtime" in m.get("text", "") for m in replay):
+            saw_cap = True
+            break
+        time.sleep(0.05)
+    assert saw_cap, "expected max-runtime cap message in run log"
+    assert run._finished.wait(timeout=15)
+    assert run.status == "failed"
+    assert run.exit_code == -1
 
 
 def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.MonkeyPatch):
@@ -410,7 +586,7 @@ def test_durable_queue_skips_when_key_already_done(tmp_path: Path, monkeypatch: 
             "requires": [],
         },
     )
-    mgr = server.RunManager(runs_dir=runs_dir)
+    mgr = server.RunManager(runs_dir=runs_dir, enable_watchdog=False)
     snap = mgr.snapshot()
     assert not snap["active"]
     assert not snap["queue"]
@@ -442,7 +618,7 @@ def test_durable_queue_restored_on_startup(tmp_path: Path, monkeypatch: pytest.M
             "requires": [],
         },
     )
-    mgr = server.RunManager(runs_dir=runs_dir)
+    mgr = server.RunManager(runs_dir=runs_dir, enable_watchdog=False)
     snap = mgr.snapshot()
     assert snap["active"] or snap["queue"]
     mgr.shutdown()

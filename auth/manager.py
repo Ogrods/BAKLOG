@@ -191,6 +191,55 @@ def subprocess_env_for_profile(profile_id: str) -> dict[str, str]:
     return env
 
 
+def _local_data_present(provider: str, blob: dict[str, Any]) -> bool:
+    """True when the on-disk launcher/app database for a local provider exists."""
+    if provider == "amazon":
+        env_dir = ""
+        if _env_fallback_allowed():
+            env_dir = os.getenv("AMAZON_GAMES_SQL_DIR", "").strip()
+        env_dir = env_dir or (blob.get("AMAZON_GAMES_SQL_DIR") or "")
+        if isinstance(env_dir, str):
+            env_dir = env_dir.strip()
+        if env_dir:
+            sql_dir = Path(env_dir)
+        elif sys.platform != "win32":
+            return False
+        else:
+            from amazon_client import default_sql_dir
+
+            sql_dir = default_sql_dir()
+        entitlements = sql_dir / "Entitlements.sqlite"
+        return entitlements.is_file()
+
+    if provider == "gog_galaxy":
+        env_db = ""
+        if _env_fallback_allowed():
+            env_db = os.getenv("GOG_GALAXY_DB", "").strip()
+        env_db = env_db or (blob.get("GOG_GALAXY_DB") or "")
+        if isinstance(env_db, str) and env_db.strip() and Path(env_db.strip()).is_file():
+            db_path = Path(env_db.strip())
+        else:
+            from gog_galaxy_client import default_galaxy_db
+
+            db_path = default_galaxy_db()
+        return db_path.is_file()
+
+    if provider == "itch_local":
+        env_db = ""
+        if _env_fallback_allowed():
+            env_db = os.getenv("ITCH_BUTLER_DB", "").strip()
+        env_db = env_db or (blob.get("ITCH_BUTLER_DB") or "")
+        if isinstance(env_db, str) and env_db.strip() and Path(env_db.strip()).is_file():
+            db_path = Path(env_db.strip())
+        else:
+            from itch_local_client import default_butler_db
+
+            db_path = default_butler_db()
+        return db_path.is_file()
+
+    return False
+
+
 def _provider_state(provider: str) -> str:
     """Return one of: connected | unverified | expired | disconnected.
 
@@ -214,22 +263,7 @@ def _provider_state(provider: str) -> str:
     if spec.kind == "local":
         if blob.get("disabled"):
             return "disconnected"
-
-        env_dir = ""
-        if _env_fallback_allowed():
-            env_dir = os.getenv("AMAZON_GAMES_SQL_DIR", "").strip()
-        env_dir = env_dir or (blob.get("AMAZON_GAMES_SQL_DIR") or "")
-        if isinstance(env_dir, str):
-            env_dir = env_dir.strip()
-        if env_dir:
-            sql_dir = env_dir
-        elif sys.platform != "win32":
-            return "disconnected"
-        else:
-            from amazon_client import default_sql_dir
-
-            sql_dir = str(default_sql_dir())
-        return "connected" if Path(sql_dir).is_dir() else "disconnected"
+        return "connected" if _local_data_present(provider, blob) else "disconnected"
 
     if explicit == "expired":
         return "expired"

@@ -14,6 +14,7 @@ export const TIPS = [
   "Ctrl+Z undoes your last status change.",
   "Turn on Hide duplicates to collapse the same game across stores.",
   "Click any dashboard chart to drill into those exact games.",
+  "Just bought a game? Steam's API can take up to 24 hours to show it.",
 ];
 
 export const RARE_TIP = "My backlog is bigger than yours.";

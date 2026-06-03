@@ -7,6 +7,41 @@ from pathlib import Path
 import requests
 
 STORE_DELAY_SEC = 1.5
+_STORE_RETRY_BACKOFF = (2, 5, 10)
+_RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
+
+
+def _get_with_retry(
+    url: str,
+    params: dict,
+    *,
+    timeout: int = 30,
+    retries: int = 3,
+    backoff: tuple[int, ...] = _STORE_RETRY_BACKOFF,
+) -> requests.Response:
+    """GET with retries on transient network and Steam store errors."""
+    last_exc: BaseException | None = None
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, params=params, timeout=timeout)
+            if resp.status_code in _RETRYABLE_HTTP:
+                last_exc = requests.HTTPError(
+                    f"{resp.status_code} from {url}", response=resp
+                )
+                if attempt < retries - 1:
+                    time.sleep(backoff[min(attempt, len(backoff) - 1)])
+                    continue
+            resp.raise_for_status()
+            return resp
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(backoff[min(attempt, len(backoff) - 1)])
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("retry loop exited without response")
 
 
 def _default_steam_cache_dir() -> Path:
@@ -75,8 +110,7 @@ class SteamClient:
         self._throttle_store()
         url = "https://store.steampowered.com/api/appdetails"
         params = {"appids": appid, "l": "english"}
-        resp = requests.get(url, params=params, timeout=30)
-        resp.raise_for_status()
+        resp = _get_with_retry(url, params)
         raw = resp.json()
         entry = raw.get(str(appid), {})
         if not entry.get("success"):
@@ -102,8 +136,7 @@ class SteamClient:
             "purchase_type": "all",
             "num_per_page": 0,
         }
-        resp = requests.get(url, params=params, timeout=30)
-        resp.raise_for_status()
+        resp = _get_with_retry(url, params)
         raw = resp.json()
         summary = raw.get("query_summary", {})
         result = {

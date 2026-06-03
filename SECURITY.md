@@ -29,7 +29,7 @@ flowchart LR
   subgraph machine [Your machine - trusted]
     browser["Browser tab (localhost UI)"]
     server["127.0.0.1 Python server"]
-    fetchers["Fetchers + Playwright"]
+    fetchers["Fetchers + CDP browser"]
     secrets["cache/auth/secrets.bin (AES-256-GCM)"]
     keychain["OS keychain (master key)"]
     data["games_*.json / personal.json / localStorage"]
@@ -55,7 +55,7 @@ fourth box for a "BAKLOG cloud" because none exists.
 | Asset | Where it lives | Sensitivity |
 |-------|----------------|-------------|
 | API keys (Steam, OpenXBL, ITAD, HLTB) | `.env`, encrypted secrets doc | High |
-| Session cookies / NPSSO (GOG, PSN, Xbox, Ubisoft, itch, Epic storefront) | `.env`, Playwright profiles, encrypted secrets doc | High |
+| Session cookies / NPSSO (GOG, PSN, Xbox, Ubisoft, itch, Epic storefront) | `.env`, CDP browser profiles (`cache/auth/profiles/`), encrypted secrets doc | High |
 | OAuth refresh tokens (Epic, Battle.net, Nintendo) | `cache/<store>/session.json`, OS keychain, encrypted secrets doc | High |
 | Library / wishlist data | `games_*.json`, `itad_prices.json` | Low |
 | Personal annotations (status, notes, priority) | `data/personal.json`, `localStorage` | Low–medium |
@@ -143,7 +143,7 @@ does:
   user privileges can read the OS keychain and decrypt the secrets doc, exactly
   like any other app you have logged into. Full-disk encryption and a secure OS
   account are your responsibility.
-- **Plaintext `.env` and Playwright cookie jars.** Some credentials live in
+- **Plaintext `.env` and browser profile cookie jars.** Some credentials live in
   `.env` and `cache/auth/profiles/<store>/` as the storefronts' own cookie
   files. These are protected by OS file permissions, not by BAKLOG encryption.
 - **The `.master_key` fallback** when no keychain exists — a key file on disk.

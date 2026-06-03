@@ -4,16 +4,23 @@
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
-import os
 
-from hltb_client import HltbClient
-from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
+from auth import resolve_env
+from fetchers._base import (
+    STEAM_CREDENTIALS_HINT,
+    add_allow_empty_arg,
+    catalog_file,
+    refuse_drift_result,
+    refuse_empty_result,
+    write_catalog_text,
+)
 from fetchers._progress import RunStats, started
+from hltb_client import HltbClient
 from steam_client import SteamClient
 from steam_metadata import coop_flags_from_categories
 
@@ -140,6 +147,59 @@ def load_existing() -> dict[int, dict]:
     return {g["appid"]: g for g in data.get("games", [])}
 
 
+def _row_from_cached_catalog(owned: dict, cached_row: dict) -> dict:
+    """Reuse a prior catalog row; refresh playtime from GetOwnedGames only."""
+    return _finalize_steam_row(
+        {
+            **cached_row,
+            "playtime_minutes": owned.get("playtime_forever", cached_row.get("playtime_minutes", 0)),
+            "last_played": owned.get("rtime_last_played", 0) or cached_row.get("last_played"),
+        }
+    )
+
+
+def _fetch_store_data(
+    steam: SteamClient,
+    appid: int,
+    *,
+    refresh: bool,
+    cached_row: dict | None,
+) -> tuple[dict | None, dict | None]:
+    """Return (details_data, reviews) from store APIs with cache fallback."""
+    details_data: dict | None = None
+    reviews: dict | None = None
+    try:
+        app_result = steam.get_app_details(appid, refresh=refresh)
+        if app_result and app_result.get("success"):
+            details_data = app_result["data"]
+        reviews = steam.get_review_summary(appid, refresh=refresh)
+    except requests.RequestException as exc:
+        print(f"  Store API warning for {appid}: {exc}", flush=True)
+        if cached_row:
+            print(f"  Using cached catalog row for {appid}.", flush=True)
+            reviews = {
+                "percent_positive": cached_row.get("steam_review_percent"),
+                "total_reviews": cached_row.get("steam_review_count"),
+                "review_score_desc": cached_row.get("steam_review_desc"),
+            }
+            if cached_row.get("type") == "game" or cached_row.get("genres"):
+                details_data = {
+                    "type": cached_row.get("type", "game"),
+                    "name": cached_row.get("name"),
+                    "genres": [{"description": g} for g in cached_row.get("genres", [])],
+                    "categories": [{"description": t} for t in cached_row.get("tags", [])],
+                    "header_image": cached_row.get("header_image"),
+                    "release_date": (
+                        {"date": cached_row.get("release_date")}
+                        if cached_row.get("release_date")
+                        else {}
+                    ),
+                }
+        else:
+            reviews = None
+    return details_data, reviews
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Steam library into games_steam.json")
     parser.add_argument("--refresh", action="store_true", help="Ignore API cache")
@@ -156,7 +216,7 @@ def main() -> int:
     api_key = resolve_env("STEAM_API_KEY", provider="steam")
     steam_id = resolve_env("STEAM_ID", provider="steam")
     if not api_key or not steam_id:
-        stats.error("Set STEAM_API_KEY and STEAM_ID in .env (see .env.example)")
+        stats.error(STEAM_CREDENTIALS_HINT)
         return stats.finish("fetch_games", t0, exit_code=1)
 
     steam = SteamClient(api_key, steam_id)
@@ -199,20 +259,23 @@ def main() -> int:
         cached_row = existing.get(appid)
         need_store = args.refresh or cached_row is None or args.appid
 
-        details_data = None
-        if need_store:
-            app_result = steam.get_app_details(appid, refresh=args.refresh)
-            if app_result and app_result.get("success"):
-                details_data = app_result["data"]
-            reviews = steam.get_review_summary(appid, refresh=args.refresh)
-        else:
+        use_cached_only = not need_store and cached_row is not None
+        details_data: dict | None = None
+        reviews: dict | None = None
+
+        if use_cached_only:
             reviews = {
                 "percent_positive": cached_row.get("steam_review_percent"),
                 "total_reviews": cached_row.get("steam_review_count"),
                 "review_score_desc": cached_row.get("steam_review_desc"),
             }
-            app_result = steam.get_app_details(appid, refresh=False)
-            details_data = app_result["data"] if app_result and app_result.get("success") else None
+        else:
+            details_data, reviews = _fetch_store_data(
+                steam,
+                appid,
+                refresh=args.refresh,
+                cached_row=cached_row,
+            )
 
         hltb = None
         if not args.skip_hltb and (args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None):
@@ -231,6 +294,21 @@ def main() -> int:
                 "hltb_match_confidence": cached_row.get("hltb_match_confidence"),
                 "hltb_name": cached_row.get("hltb_name"),
             }
+
+        if use_cached_only:
+            row = _row_from_cached_catalog(owned, cached_row)
+            if hltb:
+                row.update(
+                    {
+                        "hltb_main_hours": hltb.get("hltb_main_hours"),
+                        "hltb_main_extra_hours": hltb.get("hltb_main_extra_hours"),
+                        "hltb_completionist_hours": hltb.get("hltb_completionist_hours"),
+                        "hltb_match_confidence": hltb.get("hltb_match_confidence"),
+                        "hltb_name": hltb.get("hltb_name"),
+                    }
+                )
+            games_out.append(row)
+            continue
 
         row = _build_game_row(owned, details_data, reviews, hltb)
         if row is None:
@@ -258,7 +336,7 @@ def main() -> int:
     # Inline write (not write_games_json) because the payload includes steam_id at root.
     # Per-row enrichment is preserved via cached_row in the loop above.
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "steam_id": steam_id,
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),

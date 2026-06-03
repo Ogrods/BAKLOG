@@ -192,13 +192,13 @@ export function pickSpotlightGames(games) {
     for (let i = 0; i < need; i++) top.push(extras[i]);
   }
 
-  // Cap "Replay" entries at ~6% so finished games appear noticeably less often
+  // Cap "Replay" entries at ~3.5% so finished games appear noticeably less often
   // than the other rotating categories. If the natural sort overshoots, drop
   // the lowest-scoring replays; if it undershoots, pull in additional replay
   // candidates that fell outside the score cutoff so the category still
   // surfaces (minimum of 1) in libraries with lots of high-rated finished
   // games.
-  const REPLAY_RATIO = 0.06;
+  const REPLAY_RATIO = 0.035;
   const replayQuota = Math.max(1, Math.round(top.length * REPLAY_RATIO));
   const replaysInTop = top.filter(t => t.reason.isReplay).length;
   if (replaysInTop > replayQuota) {

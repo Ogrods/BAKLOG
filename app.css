@@ -1004,6 +1004,11 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   gap: 0.75rem; flex-wrap: wrap;
 }
 .migration-banner-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.library-watch-banner.library-watch-found .migration-banner-body {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(22, 101, 52, 0.2);
+}
+.library-watch-banner .library-watch-waiting strong { color: #e2e8f0; }
 /* Undo toast — anchored bottom-right, dismissible. */
 #undoToast {
   position: fixed;
@@ -1500,7 +1505,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   top: 0;
   right: 0;
   bottom: 0;
-  width: 80%;
+  width: 72%;
   background: transparent;
   border: 0;
   padding: 0;

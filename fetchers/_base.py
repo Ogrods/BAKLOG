@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+STEAM_CREDENTIALS_HINT = (
+    "Steam is not connected for this profile. "
+    "Open Connections → Steam → Connect (sign in to capture your API key and SteamID)."
+)
+
 import argparse
 import json
 import sys

@@ -348,6 +348,9 @@ export async function reloadAfterFetcher(key) {
     return;
   }
   await applyMergedLibrary();
+  if (key === 'steam') {
+    void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
+  }
 }
 
 export async function reloadGames() {
@@ -400,6 +403,7 @@ export async function reloadGames() {
   await loadSteamCoversMeta();
   await loadSteamTagsMeta();
   await applyMergedLibrary();
+  void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
 }
 
 export function refreshAfterManualChange() {

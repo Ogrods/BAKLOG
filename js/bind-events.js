@@ -153,7 +153,13 @@ export function bindEvents() {
       return;
     }
     const chip = e.target.closest(".fh-chip[data-fetcher-key]");
-    if (!chip || chip.disabled) return;
+    if (!chip) return;
+    if (chip.dataset.fetcherConnect) {
+      e.preventDefault();
+      reconnectProvider(chip.dataset.fetcherConnect);
+      return;
+    }
+    if (chip.disabled) return;
     e.preventDefault();
     fetcherRunner.run(chip.dataset.fetcherKey, { refresh: e.shiftKey });
   });

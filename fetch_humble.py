@@ -316,6 +316,11 @@ def _load_existing_by_machine() -> dict[str, dict]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Humble library into games_humble.json")
+    parser.add_argument(
+        "--skip-hltb",
+        action="store_true",
+        help="Accepted for manifest/dashboard parity; HLTB is off by default (use --hltb to enable)",
+    )
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
     parser.add_argument(
         "--include-nongames",

@@ -24,6 +24,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Added
 
+- **`python -m auth expire <provider>`** — dev/test helper that marks a Connections provider Session expired (`mark_invalid`) so the dashboard Reconnect chip is reproducible without waiting for a real auth failure. `python -m auth expire --list` prints valid provider keys.
 - **Library watch** — after a Steam purchase, BAKLOG can watch for a title to appear in `games_steam.json` (Steam’s API often lags the client). `js/library-watch.js` arms watches in profile-scoped `localStorage`, shows a waiting banner with “Run Steam fetch”, polls every 5 minutes while the tab is open, and alerts when the game lands (in-app banner + optional desktop notification). Pico Park is armed by default on boot.
 - **Steam Store API retry** — `steam_client.py` retries transient connection errors and HTTP 429/5xx on app-details and review calls with backoff.
 - **Epic wishlist via saved browser profile** — dropped `EPIC_STORE_COOKIE` Python replay (Cloudflare-bound). `fetch_epic_wishlist.py` reuses `cache/auth/profiles/epic_wishlist` headlessly, captures storefront GraphQL, writes `games_wishlist_epic.json`. Auth connect returns a profile marker; `--dump` saves `cache/epic/wishlist_dump.*`.
@@ -49,6 +50,9 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- **EA fetch argparse crash** — `fetch_ea.py` no longer registers `--allow-drift` twice (duplicate of `add_allow_empty_arg`), which prevented the EA dashboard chip and CLI from starting.
+- **Humble fetch rejected `--skip-hltb`** — `fetch_humble.py` accepts the flag (no-op; HLTB stays off unless `--hltb`) so the manifest, `refresh.ps1`, and connection-matrix test commands match the script.
+- **Fetcher cancel no longer leaves a ghost queue slot** — cancel waits for the server to finish before clearing chip state; suppressed runs are not hidden until terminal; duplicate submits while a run is still dying on `_active` are rejected; 409 responses re-sync the queue UI.
 - **Profile menu vs BAKLOG_PROFILE in server shell** — `server.py` drops `BAKLOG_PROFILE` from the dev-server process at import so `profiles/index.json` and the header menu always own the active profile; startup prints a NOTE if the var was set. Per-run fetchers still pin profile via `subprocess_env_for_profile()`. CLI one-off fetchers in a separate shell are unchanged.
 - **Multi-tab personal.json cross-write** — saves stamp the tab's bound profile id; server rejects mismatches (409) so a background tab cannot overwrite another profile's `personal.json`. Unload `sendBeacon` now reaches `POST /api/personal` (previously 404).
 - **Delete profile no longer races in-flight runs** — DELETE is refused (409) while a fetch is running or queued for that profile. Switching profiles cancels runs and waits up to `SWITCH_CANCEL_WAIT_SEC` before rebinding paths.
@@ -62,6 +66,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - **Fetcher log layout** — run log opens beside the fetcher health card (2/3 + 1/3 columns) instead of below, keeping the dashboard hero and combat-text count visible; console font 1px smaller; narrow viewports stack log under health.
 - **Fetcher health hints** — missing-env warnings in the run log and Steam fetch scripts use plain “open Connections” guidance (`STEAM_CREDENTIALS_HINT` in `fetchers/_base.py`).
+- **Connection matrix verification steps** — tracker text matches real behavior: Disconnect → Connect chip + blocked run; Reconnect → `python -m auth expire <provider>`; ITAD scope and HLTB flag wording corrected; EA session TTL aligned to registry (~30 days).
 - **Connection matrix copy** — `tracker.html` testing steps rewritten in plain language (glossary for Reconnect, login vs setup errors, empty-result safety) and corrected to match the actual Connections controls: most cards expose only Connect/Disconnect/Reconnect (no editable cookie field), so the Reconnect test now uses the Disconnect button; only itch.io, ITAD, and Xbox have a key field to enter a wrong value.
 - **Connections browser driver** — replaced Playwright with a lightweight Chrome DevTools Protocol (CDP) layer that launches the user's installed **Google Chrome** or **Microsoft Edge** (`auth/cdp_browser.py`). No `playwright install chromium` step; install is `pip install -r requirements.txt` only. Set `BAKLOG_CHROME_PATH` to override the browser executable.
 - **Dashboard spotlight categories** — six new rotating hero eyebrows: On sale now (ITAD/Steam deal via `getDealInfo`), New release (last 12 months), Co-op campaign (`coop_online`, excludes `live`/`skip`), Couch co-op (`coop_local`), Long haul (HLTB ≥40h), Weekend-sized (8–15h). First-match priority places time-sensitive and co-op picks above the rating ladder.

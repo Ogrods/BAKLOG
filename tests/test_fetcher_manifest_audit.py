@@ -32,6 +32,10 @@ def _script_flags(script: str) -> set[str]:
     flags: set[str] = set()
     for m in re.finditer(r'add_argument\(\s*["\'](--[\w-]+)', text):
         flags.add(m.group(1))
+    if "add_hltb_args" in text:
+        base = (ROOT / "fetchers/_base.py").read_text(encoding="utf-8")
+        for m in re.finditer(r'add_argument\(\s*["\'](--[\w-]+)', base):
+            flags.add(m.group(1))
     return flags
 
 
@@ -39,6 +43,16 @@ def _script_flags(script: str) -> set[str]:
 def test_manifest_script_exists(entry: dict) -> None:
     script = ROOT / entry["script"]
     assert script.is_file(), f"missing script {entry['script']}"
+
+
+@pytest.mark.parametrize("entry", ENTRIES, ids=[e["key"] for e in ENTRIES])
+def test_manifest_args_supported_by_script(entry: dict) -> None:
+    args = entry.get("args") or []
+    if not args:
+        return
+    flags = _script_flags(entry["script"])
+    for arg in args:
+        assert arg in flags, f"{entry['key']}: {arg} not in {entry['script']}"
 
 
 @pytest.mark.parametrize("entry", ENTRIES, ids=[e["key"] for e in ENTRIES])

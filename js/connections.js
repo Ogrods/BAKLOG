@@ -1294,12 +1294,29 @@ async function fetchAuthStatus() {
 
   const data = await res.json();
 
-  authStatus = data.providers || [];
-
-  _authStatusLoaded = true;
+  ingestAuthStatusProviders(data.providers || []);
 
   return authStatus;
 
+}
+
+/** Cache provider rows from GET /api/auth/status (dashboard poll + refresh). */
+export function ingestAuthStatusProviders(providers) {
+  authStatus = providers || [];
+  _authStatusLoaded = true;
+  // Notify the dashboard fetcher chips so they re-render the moment a
+  // connection is made/changed, instead of waiting for the 30s poll.
+  try {
+    document.dispatchEvent(
+      new CustomEvent('baklog:auth-status', { detail: { providers: authStatus } }),
+    );
+  } catch (_) { /* no DOM (tests) */ }
+}
+
+/** Cached Connections status for a provider key, or null if unknown. */
+export function providerStatus(provider) {
+  const row = authStatus.find(p => p.key === provider);
+  return row?.status ?? null;
 }
 
 /** True once /api/auth/status has resolved at least once this session. */

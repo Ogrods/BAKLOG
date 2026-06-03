@@ -3,7 +3,7 @@
 // module installs them on import (side effect) and also exports
 // `syncCoverFits` for callers that need to re-prime cached images.
 
-import { sanitizeCoverUrl } from "./game-core.js";
+import { sanitizeCoverUrl, spotlightCropForAspect } from "./game-core.js";
 
 const DASH_FAILED_COVERS_KEY = "baklog-dash-failed-covers";
 window.__dashFailedCovers = window.__dashFailedCovers || (() => {
@@ -72,6 +72,41 @@ function persistLandscapeCache() {
 }
 window.coverLandscapeAttr = function (url) {
   return url && window.__landscapeCovers.has(url) ? " landscape" : "";
+};
+window.applySpotlightArtFit = function (img) {
+  if (!img?.naturalWidth) return;
+  const ratio = img.naturalWidth / img.naturalHeight;
+  const crop = spotlightCropForAspect(ratio);
+  img.style.objectFit = crop.fit;
+  img.style.objectPosition = crop.pos;
+  const spot = img.closest(".dash-spotlight");
+  if (!spot) return;
+  const bg = spot.querySelector(".dash-spotlight-art-bg");
+  if (crop.portrait && bg) {
+    const src = img.currentSrc || img.src;
+    if (src && bg.src !== src) bg.src = src;
+    spot.classList.add("has-portrait-art");
+    bg.classList.add("is-loaded");
+  } else {
+    spot.classList.remove("has-portrait-art");
+    bg?.classList.remove("is-loaded");
+  }
+};
+window.spotlightArtFallback = function (img) {
+  const list = (img.dataset.spotlightCandidates || "").split("|").filter(Boolean);
+  let idx = parseInt(img.dataset.spotlightIdx || "0", 10) + 1;
+  const spot = img.closest(".dash-spotlight");
+  spot?.classList.remove("has-portrait-art");
+  while (idx < list.length) {
+    if (img.src !== list[idx]) {
+      img.dataset.spotlightIdx = String(idx);
+      img.src = list[idx];
+      return;
+    }
+    idx++;
+  }
+  img.classList.add("is-loaded");
+  window.coverFallback(img);
 };
 window.markLandscape = function (img) {
   if (!img?.classList) return;

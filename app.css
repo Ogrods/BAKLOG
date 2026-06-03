@@ -1210,7 +1210,8 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .fh-chip:hover:not(:disabled) { background: rgba(30, 41, 59, 0.85); }
 .fh-chip:active:not(:disabled) { transform: translateY(1px); }
 .fh-chip:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
-.fh-chip:disabled { cursor: progress; }
+.fh-chip:disabled { cursor: not-allowed; }
+.fh-chip-running:disabled, .fh-chip-queued:disabled { cursor: progress; }
 .fh-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.6); }
 .fh-chip-label { color: #e2e8f0; font-weight: 600; }
 .fh-chip-count { color: #94a3b8; font-variant-numeric: tabular-nums; }
@@ -1257,8 +1258,15 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   background: rgba(248, 113, 113, 0.12);
   cursor: not-allowed;
 }
-.fh-chip-reconnect-required .fh-chip-dot { background: #f87171; }
-.fh-chip-reconnect-required .fh-chip-age { color: #fca5a5; }
+.fh-chip-disconnected {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: rgba(248, 113, 113, 0.12);
+  cursor: pointer;
+}
+.fh-chip-reconnect-required .fh-chip-dot,
+.fh-chip-disconnected .fh-chip-dot { background: #f87171; }
+.fh-chip-reconnect-required .fh-chip-age,
+.fh-chip-disconnected .fh-chip-age { color: #fca5a5; }
 .fh-chip-reconnect .fh-chip-dot { background: #f87171; }
 .fh-chip-reconnect-btn {
   flex: 0 0 auto;
@@ -1536,7 +1544,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   top: 0;
   right: 0;
   bottom: 0;
-  width: 72%;
+  width: 66%;
   background: transparent;
   border: 0;
   padding: 0;
@@ -1552,6 +1560,25 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   transform: translateZ(0);
 }
 .dash-spotlight.is-fading { opacity: 0; }
+.dash-spotlight-art-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  display: none;
+  pointer-events: none;
+  filter: blur(18px) brightness(0.5);
+  transform: scale(1.15) translateZ(0);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
+  mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
+}
+.dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
+  display: block;
+}
+.dash-spotlight-art-bg.is-loaded { opacity: 1; }
 .dash-spotlight-art {
   position: absolute;
   inset: 0;
@@ -1563,12 +1590,14 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   transition: transform 0.6s ease, opacity 0.45s ease;
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
   mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
+  z-index: 1;
   /* Promote so the mask doesn't get re-rasterized when sibling charts animate. */
   will-change: opacity, transform;
   backface-visibility: hidden;
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
 .dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04) translateZ(0); }
+.dash-spotlight.has-portrait-art:hover .dash-spotlight-art { transform: none; }
 .dash-spotlight-gradient {
   position: absolute;
   inset: 0;

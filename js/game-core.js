@@ -287,6 +287,65 @@ export function libraryCoverFor(g) {
   return sanitizeCoverUrl(g?.library_image) || coverFallbackFor(g);
 }
 
+const STEAM_CDN = "https://cdn.akamai.steamstatic.com/steam/apps";
+
+/** Steam app id from store/id or from a steamstatic image URL on the row. */
+export function steamAppIdFromGame(g) {
+  const ng = normalizeGame(g);
+  if (ng.store === "steam" && ng.id != null && ng.id !== "") return String(ng.id);
+  for (const url of [ng.header_image, ng.library_image]) {
+    const u = sanitizeCoverUrl(url);
+    if (!u) continue;
+    const m = u.match(/steamstatic\.com\/steam\/apps\/(\d+)\//);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+export function steamLibraryHeroUrl(appId) {
+  if (appId == null || appId === "") return "";
+  return `${STEAM_CDN}/${appId}/library_hero.jpg`;
+}
+
+/** Spotlight art URLs, best-first: Steam library_hero → header → portrait fallbacks. */
+export function spotlightArtCandidates(g) {
+  const ng = normalizeGame(g);
+  const seen = new Set();
+  const out = [];
+  const push = (url) => {
+    const u = sanitizeCoverUrl(url);
+    if (!u || seen.has(u)) return;
+    seen.add(u);
+    out.push(u);
+  };
+  const appId = steamAppIdFromGame(ng);
+  if (appId) push(steamLibraryHeroUrl(appId));
+  push(ng.header_image);
+  if (appId) {
+    push(`${STEAM_CDN}/${appId}/library_600x900_2x.jpg`);
+    push(`${STEAM_CDN}/${appId}/library_600x900.jpg`);
+  }
+  push(ng.library_image);
+  const lib = libraryCoverFor(ng);
+  if (lib) push(lib);
+  return out;
+}
+
+export function spotlightArtUrl(g) {
+  const c = spotlightArtCandidates(g);
+  return c[0] || "";
+}
+
+/** object-fit / object-position for dashboard spotlight from loaded aspect ratio. */
+export function spotlightCropForAspect(ratio) {
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return { fit: "cover", pos: "35% center", portrait: false };
+  }
+  if (ratio >= 2) return { fit: "cover", pos: "50% 40%", portrait: false };
+  if (ratio >= 1.4) return { fit: "cover", pos: "35% center", portrait: false };
+  return { fit: "contain", pos: "center", portrait: true };
+}
+
 const EPIC_PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]*$/;
 const GENERIC_STORE_URLS = new Set([
   "https://gaming.amazon.com/home",

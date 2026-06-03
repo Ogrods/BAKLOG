@@ -721,11 +721,22 @@ class RunManager:
         if key not in FETCHERS:
             raise KeyError(key)
         with self._lock:
+            active = self._active
+            if active and active.key == key and active.status in _IN_FLIGHT_STATUSES:
+                raise ValueError(f"{key} already queued or running")
             if any(r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending):
                 raise ValueError(f"{key} already queued or running")
             in_flight = sum(
                 1 for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             )
+            # cancel() drops a run from _pending while the worker is still
+            # finishing it on _active — count that slot so the queue can't wedge.
+            if (
+                active
+                and active.status in _IN_FLIGHT_STATUSES
+                and active not in self._pending
+            ):
+                in_flight += 1
             if in_flight >= 2:
                 raise ValueError(
                     "queue full — one run is in progress and one is queued; "

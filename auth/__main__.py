@@ -17,6 +17,8 @@ from auth.bundle import (
     export_bundle,
     import_bundle,
 )
+from auth.manager import mark_invalid
+from auth.registry import PROVIDERS, provider_order
 
 
 def _prompt_passphrase(*, confirm: bool = False) -> str:
@@ -62,6 +64,25 @@ def cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_expire(args: argparse.Namespace) -> int:
+    if args.list:
+        for key in provider_order():
+            spec = PROVIDERS[key]
+            print(f"  {key:20}  {spec.label}")
+        return 0
+    provider = (args.provider or "").strip()
+    if provider not in PROVIDERS:
+        print(
+            f"Unknown provider: {provider!r}. Run: python -m auth expire --list",
+            file=sys.stderr,
+        )
+        return 1
+    mark_invalid(provider, error=args.error or "Forced expire (dev test)")
+    print(f"Marked {provider} as expired (Session expired in Connections).")
+    print("Refresh the dashboard or Connections tab to see the Reconnect chip.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m auth", description="BAKLOG auth utilities")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -79,6 +100,27 @@ def main(argv: list[str] | None = None) -> int:
     import_p.add_argument("path", help="Path to .bundle file")
     import_p.add_argument("--dry-run", action="store_true", help="Validate bundle without writing")
     import_p.set_defaults(func=cmd_import)
+
+    expire_p = sub.add_parser(
+        "expire",
+        help="Mark a provider Session expired (dev/test Reconnect chip)",
+    )
+    expire_p.add_argument(
+        "provider",
+        nargs="?",
+        help="Provider key (e.g. gog, epic_wishlist). Omit with --list to print keys.",
+    )
+    expire_p.add_argument(
+        "--list",
+        action="store_true",
+        help="List valid provider keys",
+    )
+    expire_p.add_argument(
+        "--error",
+        default="",
+        help="Optional last_error message stored on the provider blob",
+    )
+    expire_p.set_defaults(func=cmd_expire)
 
     args = parser.parse_args(argv)
     try:

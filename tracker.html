@@ -223,6 +223,7 @@
     { id: "phases", label: "Phases" },
     { id: "notes", label: "Notes" },
     { id: "arch", label: "Architecture" },
+    { id: "engineering", label: "Engineering" },
     { id: "pipeline", label: "Pipeline" },
     { id: "wishlist", label: "Wishlist matrix" },
     { id: "connmatrix", label: "Connection matrix" },
@@ -299,6 +300,14 @@
         { id: "p3_fetcher_backoff", label: "[DONE] Fetcher backoff: per-provider reconnect-required chips with inline Reconnect (exit code 4 + /api/auth/status expired + max-strike escalation); dismiss persists in localStorage" },
         { id: "p3_readme_install", label: "README install section verified by a fresh clone on a new Windows machine" },
         { id: "p3_changelog_discipline", label: "[DONE] SemVer source-of-truth (pyproject.toml + package.json) + Release discipline block in CHANGELOG documenting the bump → rename Unreleased → tag workflow. First tag push is a user action." },
+        { id: "p3_single_instance_guard", label: "[DONE] Dev server single-instance guard — second python server.py exits loudly (no silent duplicate bind on Windows). See Engineering tab." },
+        { id: "p3_csrf_guard", label: "[DONE] Localhost CSRF guard on POST/PUT/DELETE + client X-BAKLOG-Local header. See Engineering tab." },
+        { id: "p3_secrets_atomic", label: "[DONE] Atomic secrets.bin writes + SecretsCorruptError (no silent empty overwrite on decrypt failure). See Engineering tab." },
+        { id: "p3_personal_backup_restore", label: "[DONE] Corrupt personal.json restores from personal_backups/ or returns 503 (never silent empty). See Engineering tab." },
+        { id: "p3_queue_crash_safety", label: "[DONE] Fetcher durable queue: dequeue clears stale entry; restore skips keys already done. See Engineering tab." },
+        { id: "p3_secret_leak_hardening", label: "[DONE] Import passphrase in POST body; Epic OAuth state + HTML-escape; run-log token redaction. See Engineering tab." },
+        { id: "p3_windows_ci_test_all", label: "[DONE] Windows CI job + scripts/test-all.ps1 + npm run test:all. See Engineering tab." },
+        { id: "p3_console_height_lock", label: "[DONE] Fetcher run-log panel height locked to fetcher-health card (syncLogHeightToCard). See Engineering tab." },
       ],
     },
     {
@@ -337,7 +346,7 @@
         { id: "p5_pick_channel", label: "Pick one launch channel (HN Show / r/patientgamers / r/Steam / Twitter / YouTube long-form) — not multiple" },
         { id: "p5_pricing", label: "Pricing decided (if paid): one number, no tiers at launch" },
         { id: "p5_soft_launch", label: "Soft launch: invite-only beta with 10–20 friends before going public" },
-        { id: "p5_beta_error_reporting", label: "Beta error reporting: give testers a frictionless way to send the local bug bundle back (the Copy-bug-bundle payload already exists — decide the channel: prefilled GitHub issue, mailto, or a paste-this-here form — local-first, opt-in, no silent telemetry)" },
+        { id: "p5_beta_error_reporting", label: "Beta error reporting: give testers a frictionless way to send the local bug bundle back (Copy bug bundle in kebab — whitelist payload, scrubbed errors, activeView now included; Engineering tab lists hardening). Decide channel: prefilled GitHub issue, mailto, or paste form — local-first, opt-in, no silent telemetry" },
         { id: "p5_metrics", label: "Decide what success looks like: stars, signups, retention, MRR? Pick one north-star" },
       ],
     },
@@ -348,6 +357,87 @@
     { id: "find_profile_baklog_env_server",
       title: "BAKLOG_PROFILE in the server shell is auto-ignored",
       body: "The dev server drops BAKLOG_PROFILE from its own environment at boot (server.py _release_server_profile_env) so the header profile menu / profiles/index.json always owns the active profile. Per-run fetchers still pin their own profile via subprocess_env_for_profile(), and one-off CLI fetchers ($env:BAKLOG_PROFILE='work'; python fetch_games.py) intentionally still honor the var since they are separate processes. server.py prints a NOTE at startup if the var was set." },
+  ];
+
+  // ---------- Engineering: beta hardening log + specs ----------
+  const HARDENING_LOG = [
+    {
+      area: "Single-instance dev server",
+      risk: "On Windows, SO_REUSEADDR lets a second python server.py bind port 8765 silently. Two servers serve different code ages, race on personal.json / queue.json / secrets.bin, and look 'fine' until behavior diverges.",
+      fix: "Before bind: TCP probe to 127.0.0.1:8765 — exit 1 with a clear message if busy. BaklogDevServer sets allow_reuse_address=False so the OS rejects a second bind anyway.",
+      where: "server.py (_dev_server_port_busy, BaklogDevServer, main)",
+      tests: "tests/test_server_single_instance.py",
+    },
+    {
+      area: "Localhost CSRF guard",
+      risk: "While BAKLOG runs, any website the user visits can POST to http://127.0.0.1:8765 — disconnect providers, overwrite personal.json, switch profiles, start fetchers. CORS blocks reading the response but not the write.",
+      fix: "All POST/PUT/DELETE handlers check _csrf_allowed: localhost Origin/Referer or X-BAKLOG-Local: 1 header. App mutating fetches go through baklogFetch in js/api-client.js; sendBeacon still works via Origin.",
+      where: "server.py, js/api-client.js",
+      tests: "tests/test_server_csrf.py",
+    },
+    {
+      area: "Atomic secrets store",
+      risk: "secrets.bin was written in-place (crash mid-write corrupts the file). On decrypt failure, load returned an empty in-memory doc; the next save overwrote good ciphertext with empty credentials.",
+      fix: "save_doc uses temp file + os.replace with .bak backup. load_doc raises SecretsCorruptError instead of silently emptying.",
+      where: "auth/secrets.py",
+      tests: "tests/test_auth_secrets_atomic.py",
+    },
+    {
+      area: "personal.json corruption recovery",
+      risk: "A corrupt personal.json was served as an empty document; a later PUT from the browser persisted that wipe. Backups existed but were not used automatically.",
+      fix: "On JSON decode error, try newest personal_backups/personal-*.json. If none parse, return HTTP 503 (PersonalCorruptError) — never default to empty.",
+      where: "server.py (_load_personal_doc, _restore_personal_from_backup)",
+      tests: "tests/test_server_personal.py",
+    },
+    {
+      area: "Fetcher queue crash-safety",
+      risk: "queue.json still listed a job while it was running; crash after a successful fetch but before history was written caused a duplicate run on restart.",
+      fix: "Worker sets launching and persists queue (removes entry from durable file). Restore skips queue keys whose latest history entry is already done.",
+      where: "server.py RunManager",
+      tests: "tests/test_run_manager.py",
+    },
+    {
+      area: "Frontend resilience",
+      risk: "Connections click handlers called async functions without .catch → unhandled rejections. Bug bundle always logged view:null. Notes import JSON.parse could throw uncaught.",
+      fix: "runConnAction + try/catch on disconnect/start/master-password; registerBugBundleContext getActiveView; scrubErrorText in error bundle; importNotes try/catch.",
+      where: "js/connections.js, js/error-boundary.js, js/app.js, js/bind-events.js",
+      tests: "Vitest suite (fetcher-health, error-boundary, etc.)",
+    },
+    {
+      area: "Secret-leak hardening",
+      risk: "Secrets import passphrase in URL (history, Referer). Epic OAuth callback reflected raw exception HTML. Fetcher stdout could land tokens in runs/*.jsonl and SSE.",
+      fix: "Import passphrase in JSON POST body. Epic state param validated; errors HTML-escaped. Run.add_line redacts Bearer/Cookie/api_key patterns.",
+      where: "server.py, js/connections.js",
+      tests: "tests/test_server_log_redact.py, tests/test_auth_bundle_server.py",
+    },
+    {
+      area: "Console height lock",
+      risk: "Open fetcher log used max-height:none on the body; log content (up to 25k lines buffered) drove grid row height and stretched the dashboard page.",
+      fix: "syncLogHeightToCard() measures #dashboardFetcherHealth and caps #fetcherRunLog to that height; body scrolls inside. CSS ceiling calc(100vh - 160px) as fallback.",
+      where: "js/fetcher-health.js, app.css",
+      tests: "tests/fetcher-health.test.js (syncLogHeightToCard)",
+    },
+  ];
+
+  const SECURITY_MODEL = [
+    { topic: "Network exposure", detail: "server.py binds 127.0.0.1 only — not LAN-visible. Do not port-forward or bind 0.0.0.0." },
+    { topic: "Fetcher execution", detail: "Browser cannot choose arbitrary commands. Fetchers are a server-side whitelist from fetchers/manifest.json; argv built at startup; subprocess without shell=True." },
+    { topic: "Credentials at rest", detail: "Per-profile secrets.bin: AES-256-GCM, 12-byte nonce per write. Master key from OS keyring (steam-backlog / secrets-master) or optional scrypt passphrase. CDP browser profiles under cache/auth/profiles/ (session cookies — not in git)." },
+    { topic: "CSRF while running", detail: "Mutating API routes require localhost Origin or X-BAKLOG-Local: 1. Stops drive-by websites from changing state while the dev server is up." },
+    { topic: "Bug reports", detail: "Copy bug bundle is a strict whitelist — no personal data, library contents, or credentials. Error message/stack scrubbed for Bearer/Cookie/api_key-like text before paste." },
+    { topic: "Repo hygiene", detail: "cache/, profiles/, data/, .env, games_*.json are gitignored. Verified: no secrets tracked in git history for those paths." },
+    { topic: "Run logs", detail: "Fetcher stdout/stderr stored in cache/runs/<id>.jsonl and streamed via SSE. Redaction layer strips obvious token patterns; fetchers should still avoid printing secrets." },
+  ];
+
+  const PROJECT_SPECS = [
+    { label: "Language", value: "Python 3.11+ (pyproject.toml, CI, .python-version). README aligned to 3.11+." },
+    { label: "Dev server", value: "stdlib ThreadingHTTPServer on http://127.0.0.1:8765 — single worker thread for fetchers, threaded request handlers." },
+    { label: "Frontend", value: "Vanilla ES modules (no bundler). index.html → js/app.js orchestrator. Cache-Control: no-store on .js/.css/.html in dev." },
+    { label: "Data files", value: "Per-store games_*.json + itad_prices.json; data/personal.json; profiles/<id>/ for multi-user layout. Atomic writes via shared/safe_write.py (temp + os.replace, rotated backups)." },
+    { label: "Auth providers", value: "15 providers in auth/registry.py — browser CDP sign-in, manual API keys, local-only (Amazon launcher), OAuth (Epic)." },
+    { label: "Tests", value: "~397 pytest + ~300 vitest (npm test). npm run test:all and scripts/test-all.ps1 run both." },
+    { label: "CI", value: "GitHub Actions: Ubuntu + Windows + macOS pytest; Node 20 vitest. Ruff lint advisory on Ubuntu." },
+    { label: "Versioning", value: "SemVer in pyproject.toml + package.json; CHANGELOG.md [Unreleased] discipline." },
   ];
 
   // ---------- Findings (audit) ----------
@@ -1490,6 +1580,52 @@
 
       el("h2", {}, "Personal state (data/personal.json)"),
       el("div", { class: "card" }, tableEl(["Field", "Values", "Scope"], PERSONAL_FIELDS.map((p) => [codeText(p.field), p.values, p.scope]))),
+    );
+  }
+
+  // ---------- Render: Engineering ----------
+  function panelEngineering() {
+    return el("section", { id: "panel-engineering", class: "panel" + (state.activeTab === "engineering" ? " active" : "") },
+      el("h1", {}, "Engineering & Hardening"),
+      el("p", {}, "What shipped for ", el("strong", {}, "beta-readiness"), ": concrete fixes to data integrity, localhost security, and dev-server footguns — written for engineers, explained in plain terms. The ", el("strong", {}, "Architecture"), " tab covers data flow and schemas; this tab is the ", el("strong", {}, "accomplishment log"), " and threat model."),
+
+      el("div", { class: "grid-5" },
+        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, "~697"), el("div", { class: "stat-label" }, "Tests (pytest + vitest)")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, "15"), el("div", { class: "stat-label" }, "Auth providers")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, "12"), el("div", { class: "stat-label" }, "Library sources")),
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, "3"), el("div", { class: "stat-label" }, "CI OSes")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(HARDENING_LOG.length)), el("div", { class: "stat-label" }, "Hardening fixes shipped")),
+      ),
+
+      el("h2", {}, "Beta-readiness hardening (shipped)"),
+      el("div", { class: "callout success" },
+        el("div", { class: "callout-title" }, "2026-06 beta pass"),
+        el("div", { class: "callout-body" }, "Eight targeted fixes before wider beta: no duplicate dev servers, no drive-by localhost writes, durable secrets/personal/queue paths, quieter frontend failures, less secret leakage in logs and URLs, and a bounded fetcher console."),
+      ),
+      el("div", { class: "card" }, tableEl(
+        ["Area", "Risk addressed", "What we did", "Where it lives", "Tests"],
+        HARDENING_LOG.map((r) => [
+          r.area,
+          r.risk,
+          r.fix,
+          codeText(r.where),
+          codeText(r.tests),
+        ]),
+      )),
+
+      el("h2", {}, "Security & reliability model"),
+      el("p", { class: "muted" }, "Threat model for a ", el("strong", {}, "local-first"), " app: assume the user runs the dev server on their machine while browsing the web. Assume fetchers and run logs can accidentally print secrets. Assume multi-tab and crash mid-write are normal."),
+      el("div", { class: "card" }, tableEl(
+        ["Topic", "Detail"],
+        SECURITY_MODEL.map((r) => [r.topic, r.detail]),
+      )),
+
+      el("h2", {}, "Project specs"),
+      el("p", { class: "muted" }, "Stack and operational facts — useful when onboarding or comparing to a typical SPA + cloud backend."),
+      el("div", { class: "card" }, tableEl(
+        ["Spec", "Detail"],
+        PROJECT_SPECS.map((r) => [r.label, r.value]),
+      )),
     );
   }
 
@@ -2940,6 +3076,7 @@
     host.appendChild(panelPhases());
     host.appendChild(panelNotes());
     host.appendChild(panelArch());
+    host.appendChild(panelEngineering());
     host.appendChild(panelPipeline());
     host.appendChild(panelWishlist());
     host.appendChild(panelConnMatrix());

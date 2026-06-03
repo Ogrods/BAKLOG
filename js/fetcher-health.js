@@ -1054,7 +1054,9 @@ export const fetcherRunner = (() => {
   let _lastAppliedDoneRunId = null;
 
   function logPanel() {
-    if (!logEl) logEl = document.getElementById('fetcherRunLog');
+    if (!logEl || !document.body.contains(logEl)) {
+      logEl = document.getElementById('fetcherRunLog');
+    }
     return logEl;
   }
 
@@ -1063,6 +1065,56 @@ export const fetcherRunner = (() => {
       logBodyEl = logPanel()?.querySelector('.fh-log-body') || null;
     }
     return logBodyEl;
+  }
+
+  const LOG_DESKTOP_MQ = '(min-width: 768px)';
+  let logHeightCardObs = null;
+  let logHeightResizeWired = false;
+
+  function clearLogHeightCap(panel = logPanel()) {
+    if (!panel) return;
+    panel.style.maxHeight = '';
+    panel.style.height = '';
+  }
+
+  /** Lock open log panel height to the fetcher-health card (desktop side-by-side). */
+  function syncLogHeightToCard() {
+    const panel = logPanel();
+    const card = document.getElementById('dashboardFetcherHealth');
+    if (!panel || !panel.classList.contains('open')) return;
+    if (!window.matchMedia(LOG_DESKTOP_MQ).matches) {
+      clearLogHeightCap(panel);
+      return;
+    }
+    if (!card) return;
+    panel.style.maxHeight = '0px';
+    panel.style.height = '0px';
+    void panel.offsetHeight;
+    const cardHeight = card.offsetHeight;
+    if (cardHeight > 0) {
+      panel.style.maxHeight = `${cardHeight}px`;
+      panel.style.height = `${cardHeight}px`;
+    } else {
+      clearLogHeightCap(panel);
+    }
+    updateJumpButton();
+  }
+
+  function ensureLogHeightObserver() {
+    const card = document.getElementById('dashboardFetcherHealth');
+    if (!card || typeof ResizeObserver === 'undefined') return;
+    if (!logHeightCardObs) {
+      logHeightCardObs = new ResizeObserver(() => {
+        if (logPanel()?.classList.contains('open')) syncLogHeightToCard();
+      });
+      logHeightCardObs.observe(card);
+    }
+    if (!logHeightResizeWired) {
+      logHeightResizeWired = true;
+      window.addEventListener('resize', () => {
+        if (logPanel()?.classList.contains('open')) syncLogHeightToCard();
+      });
+    }
   }
 
   function invalidateApiProbe() {
@@ -1171,6 +1223,8 @@ export const fetcherRunner = (() => {
     setStatus('queued');
     updateCancelButton();
     logBodyEl = panel.querySelector('[data-role="body"]');
+    ensureLogHeightObserver();
+    requestAnimationFrame(() => syncLogHeightToCard());
   }
 
   /**
@@ -1196,6 +1250,8 @@ export const fetcherRunner = (() => {
       body.appendChild(empty);
     }
     logBodyEl = body || null;
+    ensureLogHeightObserver();
+    requestAnimationFrame(() => syncLogHeightToCard());
     return true;
   }
 
@@ -1294,7 +1350,11 @@ export const fetcherRunner = (() => {
   }
 
   function closePanel() {
-    logPanel()?.classList.remove('open');
+    const panel = logPanel();
+    if (panel) {
+      clearLogHeightCap(panel);
+      panel.classList.remove('open');
+    }
   }
 
   function clearLog() {
@@ -1783,6 +1843,7 @@ export const fetcherRunner = (() => {
     stopDashboardPolling,
     closeAllStreams,
     reopenLogPanel,
+    syncLogHeightToCard,
     fetchWithTimeout: fetchWithTimeoutAndProbe,
   };
 })();
@@ -1990,4 +2051,5 @@ export function renderDashboardFetcherHealth() {
     <div class="fh-chips">${chipsHtml}</div>
   `;
   ensureAgeTicker();
+  requestAnimationFrame(() => fetcherRunner.syncLogHeightToCard());
 }

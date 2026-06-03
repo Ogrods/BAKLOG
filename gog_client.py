@@ -72,7 +72,7 @@ class GogClient:
             return None
         if max_age_seconds is not None:
             age = time.time() - path.stat().st_mtime
-            if age > max_age_seconds:
+            if age >= max_age_seconds:
                 return None
         try:
             return json.loads(path.read_text(encoding="utf-8"))

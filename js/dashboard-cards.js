@@ -3,7 +3,7 @@
 
 import { state, STATUS_CHIP_DEFS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey, combinedPlaytime } from './game-core.js';
+import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey, combinedPlaytime, storeBadgeHtml } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
@@ -15,7 +15,37 @@ import { dashDrillItchGenre } from './dashboard-drilldown.js';
 import { dashboardCharts } from './dashboard-charts.js';
 import { computeRecentAdditions } from './dashboard-spotlight.js';
 
-let itchHeroIndex = Math.floor(Math.random() * 10);
+const ITCH_HERO_MIN_RATING = 80;
+const ITCH_HERO_MAX = 30;
+
+let itchHeroIndex = 0;
+let itchHeroOrderSig = "";
+let itchHeroOrdered = [];
+
+/** Fisher–Yates shuffle (copy) for featured itch pick cycling order. */
+function shuffleCopy(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function itchHeroOrderSignature(candidates) {
+  return candidates.map((g) => gameKey(g)).sort().join("\0");
+}
+
+/** Randomize cycle order once per candidate set; stable across dashboard re-renders. */
+function resolveItchHeroOrder(freshCandidates) {
+  const sig = itchHeroOrderSignature(freshCandidates);
+  if (sig !== itchHeroOrderSig) {
+    itchHeroOrderSig = sig;
+    itchHeroOrdered = shuffleCopy(freshCandidates);
+    itchHeroIndex = 0;
+  }
+  return itchHeroOrdered;
+}
 
 /** Relative "added" label from first-seen timestamp (mirrors fetcher humanizeAge thresholds). */
 function formatAddedAgo(ts) {
@@ -73,7 +103,7 @@ export function renderDashboardCoopSpotlight(games) {
           const key = gameKey(g);
           return `<button type="button" class="coop-pick-row" data-action="coop-pick-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library">
             <img class="coop-pick-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
-            <span class="coop-pick-name">${escapeHtml(g.name)}</span>
+            <span class="coop-pick-name-wrap"><span class="coop-pick-name">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span>
             <span class="coop-pick-rating">${ratingValue(g)}%</span>
           </button>`;
         }).join("")
@@ -170,8 +200,10 @@ export function renderDashboardPicksVersus(games) {
       return ratingValue(b) - ratingValue(a);
     });
 
-  const balanced = Math.min(ratedAll.length, fastAll.length, 10);
-  const sliceCount = balanced > 0 ? balanced : Math.min(Math.max(ratedAll.length, fastAll.length), 10);
+  const hasItch = (state.itchGames || []).length > 0;
+  const maxPicks = hasItch ? 5 : 10;
+  const balanced = Math.min(ratedAll.length, fastAll.length, maxPicks);
+  const sliceCount = balanced > 0 ? balanced : Math.min(Math.max(ratedAll.length, fastAll.length), maxPicks);
   const rated = ratedAll.slice(0, sliceCount);
   const fast = fastAll.slice(0, sliceCount);
 
@@ -184,7 +216,7 @@ export function renderDashboardPicksVersus(games) {
     const key = gameKey(g);
     const isCross = crossKeys.has(key);
     const star = isCross ? ' <span class="dash-versus-star" title="Also in the other list">*</span>' : "";
-    return `<button type="button" class="dash-list-row dash-versus-row ${accentCls}${isCross ? " is-cross" : ""}" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}${star}</span><span class="text-slate-400">${escapeHtml(scoreFn(g))}</span></button>`;
+    return `<button type="button" class="dash-list-row dash-versus-row ${accentCls}${isCross ? " is-cross" : ""}" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}${star}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400">${escapeHtml(scoreFn(g))}</span></button>`;
   };
 
   const empty = '<p class="text-xs text-slate-400 italic">No matches yet.</p>';
@@ -237,7 +269,7 @@ export function renderDashboardRecentAdditions(games) {
     const cover = libraryCoverFor(g);
     const key = gameKey(g);
     const addedLabel = formatAddedAgo(g._addedAt);
-    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
+    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
   }).join('');
 }
 
@@ -446,12 +478,12 @@ export function renderDashboardItchRecap() {
     : "";
 
   const failedItch = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
-  const heroCandidates = gamesOnly
+  const heroPool = gamesOnly
     .filter(g => getPersonal(g).status !== "finished" && combinedPlaytime(g) === 0)
-    .filter(g => ratingValue(g) >= 90 && hasEnoughReviews(g))
+    .filter(g => ratingValue(g) >= ITCH_HERO_MIN_RATING && hasEnoughReviews(g))
     .filter(g => !!(g.library_image || g.header_image) && !failedItch.has(gameKey(g)))
-    .sort((a, b) => ratingValue(b) - ratingValue(a))
-    .slice(0, 10);
+    .slice(0, ITCH_HERO_MAX);
+  const heroCandidates = resolveItchHeroOrder(heroPool);
   if (heroCandidates.length) itchHeroIndex %= heroCandidates.length;
   else itchHeroIndex = 0;
   const heroHtml = videogames ? renderItchHeroHtml(heroCandidates) : "";

@@ -498,3 +498,49 @@ describe('reconnect-required state', () => {
     expect(isProviderReconnectRequired('gog')).toBe(true);
   });
 });
+
+describe('syncLogHeightToCard', () => {
+  let matchMediaDesktop = true;
+
+  beforeEach(() => {
+    matchMediaDesktop = true;
+    document.body.innerHTML = `
+      <div id="fetcherRow" class="fh-row">
+        <div id="dashboardFetcherHealth" class="dash-card dash-fetcher-health">
+          <div class="fh-chips"></div>
+        </div>
+        <div id="fetcherRunLog" class="fh-log open">
+          <div class="fh-log-head"></div>
+          <div class="fh-log-body" data-role="body"></div>
+        </div>
+      </div>`;
+    const card = document.getElementById('dashboardFetcherHealth');
+    Object.defineProperty(card, 'offsetHeight', { configurable: true, value: 120 });
+    vi.stubGlobal('matchMedia', (query) => ({
+      matches: query.includes('768px') ? matchMediaDesktop : false,
+      media: query,
+    }));
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.unstubAllGlobals();
+  });
+
+  it('sets log max-height to match the health card on desktop', () => {
+    const log = document.getElementById('fetcherRunLog');
+    fetcherRunner.syncLogHeightToCard();
+    expect(log.style.maxHeight).toBe('120px');
+    expect(log.style.height).toBe('120px');
+  });
+
+  it('clears inline height when matchMedia is mobile', () => {
+    matchMediaDesktop = false;
+    const log = document.getElementById('fetcherRunLog');
+    log.style.maxHeight = '200px';
+    log.style.height = '200px';
+    fetcherRunner.syncLogHeightToCard();
+    expect(log.style.maxHeight).toBe('');
+    expect(log.style.height).toBe('');
+  });
+});

@@ -115,7 +115,9 @@ terms-of-service standpoint:
 | Xbox | OpenXBL API key (yours) | **Sanctioned** — third-party API you authorize |
 | ITAD / HLTB | Official/public API | **Sanctioned** |
 | Epic | Official OAuth (community launcher client) + your auth code | **Tolerated** — official OAuth, well-known client id |
-| GOG, PSN, Ubisoft, itch, Amazon | Replay **your own** web session cookie/token | **Gray** — same calls your browser makes; automated locally |
+| GOG (web), PSN, Ubisoft, Amazon (web) | Replay **your own** web session cookie/token | **Gray** — same calls your browser makes; automated locally |
+| itch (API key) | Official itch.io API with **your** key | **Gray** — sanctioned API, your credentials |
+| Amazon Games, GOG Galaxy, itch butler | Read **your own** launcher SQLite on disk (read-only, no network) | **Local read** — Amazon DB is DPAPI-encrypted (Windows only); Galaxy and butler are plain SQLite from your install |
 | Nintendo, Humble, Epic wishlist, Xbox wishlist | Headless replay of **your own** saved browser profile | **Gray** — your session, your data, your IP |
 | Battle.net | Unofficial endpoint with **your own** session | **Gray** |
 | EA App | Replays **your own** ea.com web-session Bearer token (sniffed from your saved profile) and calls the same GraphQL endpoint ea.com itself uses | **Gray** — your session, your data; **no** desktop-client impersonation and **no** baked-in EA secret |

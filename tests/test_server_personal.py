@@ -104,3 +104,10 @@ def test_fetchers_from_manifest(personal_server: str):
     assert "steam" in keys
     assert "hltb" in keys
     assert len(keys) == len(server.FETCHERS)
+
+
+def test_missing_library_json_returns_empty_catalog(personal_server: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(server, "ROOT", tmp_path)
+    status, data = _request(personal_server, "GET", "/games_ea.json")
+    assert status == 200
+    assert data == {"game_count": 0, "games": []}

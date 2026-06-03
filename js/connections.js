@@ -224,13 +224,49 @@ function renderHero() {
 
   }
 
-  const connected = authStatus.filter(p => p.status === 'connected').length;
+  const connected = connectedProviderCount();
 
   const total = authStatus.length;
 
   countEl.textContent = `${connected} of ${total} connections made`;
 
   fillEl.style.width = total ? `${(connected / total) * 100}%` : '0%';
+
+}
+
+
+
+function renderOnboard() {
+
+  const el = document.getElementById('connOnboard');
+
+  if (!el) return;
+
+  if (!authStatus.length || connectedProviderCount() > 0) {
+
+    el.innerHTML = '';
+
+    el.hidden = true;
+
+    return;
+
+  }
+
+  el.hidden = false;
+
+  el.innerHTML = `
+
+    <div class="conn-onboard" role="region" aria-label="Get started">
+
+      <p class="conn-onboard-title">You have 0 stores connected</p>
+
+      <p class="conn-onboard-lead">Start with Steam — it imports your whole library in one sign-in. You can add the rest after.</p>
+
+      <button type="button" class="conn-onboard-btn" data-conn-start-steam>Start with Steam</button>
+
+      <p class="conn-onboard-muted">or pick any store from the list below</p>
+
+    </div>`;
 
 }
 
@@ -490,6 +526,8 @@ function renderConnections() {
 
   renderHero();
 
+  renderOnboard();
+
   if (!authStatus.length) {
 
     rail.innerHTML = '';
@@ -530,6 +568,22 @@ function renderConnections() {
 function handleLayoutClick(ev) {
 
   const target = ev.target;
+
+
+
+  const startSteam = target.closest('[data-conn-start-steam]');
+
+  if (startSteam) {
+
+    ev.preventDefault();
+
+    reconnectProvider('steam');
+
+    return;
+
+  }
+
+
 
   const card = target.closest('.conn-card');
 
@@ -685,11 +739,13 @@ function wireGridEvents() {
 
   if (gridWired) return;
 
+  const container = document.getElementById('connectionsContainer');
+
   const layout = document.getElementById('connLayout');
 
-  if (!layout) return;
+  if (!container || !layout) return;
 
-  layout.addEventListener('click', handleLayoutClick);
+  container.addEventListener('click', handleLayoutClick);
 
   layout.addEventListener('keydown', handleLayoutKeydown);
 
@@ -1427,6 +1483,16 @@ export function noteFetcherAuthFailure(fetcherKey, logText) {
 export function isProviderConnected(provider) {
 
   return authStatus.some(p => p.key === provider && p.status === 'connected');
+
+}
+
+
+
+/** Number of auth providers with status === 'connected' (onboarding / empty-state gate). */
+
+export function connectedProviderCount() {
+
+  return authStatus.filter(p => p.status === 'connected').length;
 
 }
 

@@ -188,6 +188,8 @@ describe("spotlight expanded categories", () => {
     state.itadByKey = {};
     state.prefs = { librarySeenSeeded: true };
     state.libraryFirstSeenByKey = {};
+    state.wishlistGames = [];
+    state.wishlistCrossStoreHiddenKeys = new Set();
     win._dataVersion = (win._dataVersion || 0) + 1;
     ({ pickSpotlightGames } = await import("../js/dashboard-spotlight.js"));
   });
@@ -228,11 +230,27 @@ describe("spotlight expanded categories", () => {
     expect(eyebrowFor(games, 2)).toBe("Couch co-op");
   });
 
-  it("tags ITAD-backed deals as On sale now", () => {
+  it("does NOT tag on-sale LIBRARY games as On sale now", () => {
     state.personal = { "steam:3": { status: "backlog" } };
     state.itadByKey = { "steam:3": { cut: 40, price: 9.99 } };
     const games = [libraryGame(3)];
-    expect(eyebrowFor(games, 3)).toBe("On sale now");
+    expect(eyebrowFor(games, 3)).not.toBe("On sale now");
+  });
+
+  it("tags on-sale WISHLIST games as On sale now", () => {
+    state.itadByKey = { "wishlist:3": { cut: 40, price: 9.99 } };
+    state.wishlistGames = [{
+      store: "wishlist",
+      id: 3,
+      name: "Wishlist 3",
+      steam_review_percent: 85,
+      steam_review_count: 1000,
+      library_image: "x.jpg",
+      header_image: "x.jpg",
+    }];
+    const pool = pickSpotlightGames([]);
+    const sale = pool.find(g => g.store === "wishlist" && g.id === 3);
+    expect(sale?._spotlightReason?.eyebrow).toBe("On sale now");
   });
 
   it("tags recent releases as New release", () => {

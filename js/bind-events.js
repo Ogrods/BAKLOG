@@ -477,6 +477,12 @@ export function bindEvents() {
     const chip = e.target.closest("[data-jump-view]");
     if (chip?.dataset.jumpView) switchView(chip.dataset.jumpView);
   });
+  document.getElementById("dashboardContainer")?.addEventListener("click", e => {
+    if (e.target.closest("[data-dash-goto-connections]")) {
+      e.preventDefault();
+      switchView("connections");
+    }
+  });
   const dedupEl = document.getElementById("crossStoreDedup");
   if (dedupEl) {
     dedupEl.addEventListener("change", () => {
@@ -503,6 +509,11 @@ export function bindEvents() {
     if (e.target.closest("[data-table-show-itch-nongames]")) {
       e.preventDefault();
       showItchNonGamesFromEmptyState();
+      return;
+    }
+    if (e.target.closest("[data-table-goto-connections]")) {
+      e.preventDefault();
+      switchView("connections");
     }
   });
   document.getElementById("tbody").addEventListener("change", e => {

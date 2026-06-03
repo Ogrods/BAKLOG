@@ -58,6 +58,8 @@ import {
   exportTopBacklogMarkdown,
   download,
   applyPrefsChange,
+  clearAllFilters,
+  showItchNonGamesFromEmptyState,
 } from './filters-ui.js';
 import {
   getDealInfo,
@@ -491,6 +493,17 @@ export function bindEvents() {
     const cur = state.prefs.genreFilters || [];
     const next = cur.includes(genre) ? cur.filter(x => x !== genre) : [...cur, genre];
     applyPrefsChange({ prefs: { genreFilters: next } }, { renderers: [renderGenreChips] });
+  });
+  document.getElementById("tbody")?.addEventListener("click", (e) => {
+    if (e.target.closest("[data-table-clear-filters]")) {
+      e.preventDefault();
+      clearAllFilters();
+      return;
+    }
+    if (e.target.closest("[data-table-show-itch-nongames]")) {
+      e.preventDefault();
+      showItchNonGamesFromEmptyState();
+    }
   });
   document.getElementById("tbody").addEventListener("change", e => {
     const t = e.target;

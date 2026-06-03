@@ -92,6 +92,28 @@
         <span id="bootLoadingTip" class="boot-loading-tip" aria-live="polite"></span>
       </div>
     </div>
+    <script>
+      // Seed a random boot tip at body-parse time so the hint paints on the
+      // first frame (before the module bundle loads). Keep in sync with TIPS
+      // in js/tips.js — same pattern as the valid-views map in <head>.
+      (function () {
+        var tips = [
+          "Watch your spotlight for anything you want to recategorize.",
+          "Own a physical copy? Add it manually — add whatever you want.",
+          "See a Humble icon but no other store? You probably still need to redeem the key in your Humble account.",
+          "Sort by time played to see what you actually play, then recategorize from there.",
+          "Press / to jump straight to the search box.",
+          "Press B, N, P, or F to set a status on the highlighted row.",
+          "Ctrl+Z undoes your last status change.",
+          "Turn on Hide duplicates to collapse the same game across stores.",
+          "Click any dashboard chart to drill into those exact games.",
+        ];
+        var el = document.getElementById("bootLoadingTip");
+        if (el && tips.length) {
+          el.textContent = tips[Math.floor(Math.random() * tips.length)];
+        }
+      })();
+    </script>
 
     <section id="connectionsContainer" class="hidden mb-4">
       <div class="conn-hero">

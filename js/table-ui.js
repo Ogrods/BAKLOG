@@ -63,6 +63,8 @@ import {
 import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
 import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
+import { buildTableEmptyStateHtml } from './table-empty-state.js';
+import { formatMoney, currencyMismatchTag, displayCurrency } from './currency.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 // dashboard-drilldown imports from table-ui already; the cycle is safe because
@@ -462,13 +464,17 @@ function hltbLabel(g) {
 
 export function formatPrice(g) {
   const itad = getItadForGame(g);
-  if (itad?.price_str) {
+  if (itad?.price != null || itad?.price_str) {
     const onSale = (itad.cut || 0) > 0;
     const cutTxt = onSale ? ` (-${itad.cut}%)` : "";
     const bucket = onSale ? cutBucketClass(itad.cut) : "";
-    const priceInner = onSale
-      ? `<span class="price-cut font-semibold ${bucket}">${escapeHtml(itad.price_str)}${escapeHtml(cutTxt)}</span>`
+    const itadCur = itad.currency || displayCurrency();
+    const priceLabel = itad.price != null
+      ? formatMoney(itad.price, itadCur)
       : escapeHtml(itad.price_str);
+    const priceInner = onSale
+      ? `<span class="price-cut font-semibold ${bucket}">${priceLabel}${escapeHtml(cutTxt)}</span>`
+      : priceLabel;
     const d = getDealInfo(g);
     const lowStar = d ? priceLowStarHtml(d) : "";
     const dropBadge = dealDroppedBadgeHtml(g).replace(/^/, "&nbsp;");
@@ -488,11 +494,12 @@ export function formatPrice(g) {
   if (!g.price && g.discount_percent == null) return "—";
   const base = g.price || "N/A";
   const cut = g.discount_percent || 0;
+  const curTag = currencyMismatchTag(g.currency);
   if (cut > 0) {
     const bucket = cutBucketClass(cut);
-    return `<span class="price-cut font-semibold ${bucket}">${escapeHtml(base)} (-${cut}%)</span>`;
+    return `<span class="price-cut font-semibold ${bucket}">${escapeHtml(base)} (-${cut}%)${curTag}</span>`;
   }
-  return escapeHtml(base);
+  return `${escapeHtml(base)}${curTag}`;
 }
 
 // === Focus helpers ===
@@ -819,7 +826,7 @@ let _paintGen = 0;
 const FIRST_CHUNK = 50;
 /** Must match .games-table tbody tr { height } in app.css */
 const ROW_HEIGHT = 76;
-const TABLE_COLSPAN = 13;
+export const TABLE_COLSPAN = 13;
 const VIRTUAL_OVERSCAN = 10;
 let _virtualList = null;
 let _virtualCtx = null;
@@ -1089,7 +1096,7 @@ function paintTableBody(list, opts = {}) {
     _virtualCtx = null;
     _virtualWindow = { start: 0, end: 0 };
     _virtualWindowList = null;
-    tbody.innerHTML = "";
+    tbody.innerHTML = buildTableEmptyStateHtml(state.activeView, TABLE_COLSPAN);
     if (run) {
       run.meta.paintPath = 'empty';
       perfMeasure(run, 'paint:total', 'paint:start', { rows: 0 });

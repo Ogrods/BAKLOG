@@ -7,6 +7,8 @@ from urllib.parse import quote
 
 import requests
 
+from shared.money import country_to_currency, format_price, normalize_currency_code
+
 BASE = "https://api.isthereanydeal.com"
 REQUEST_DELAY_SEC = 0.35
 
@@ -113,10 +115,15 @@ class ItadClient:
                     and price_amt <= year_low + 0.01
                     and not is_all_time
                 )
+                currency = normalize_currency_code(
+                    price.get("currency"),
+                    country=self.country,
+                )
                 out[gid] = {
                     "shop": (best.get("shop") or {}).get("name"),
                     "price": price_amt,
-                    "price_str": f"${price_amt:.2f}" if price_amt is not None else None,
+                    "currency": currency,
+                    "price_str": format_price(price_amt, currency),
                     "regular": regular.get("amount"),
                     "cut": best.get("cut", 0),
                     "url": best.get("url"),

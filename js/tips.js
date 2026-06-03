@@ -3,6 +3,7 @@
  * rare easter-egg, cross-fading while the curtain stays up (game-style).
  */
 
+// Keep in sync with the inline boot-tip seed list in index.html (body script).
 export const TIPS = [
   "Watch your spotlight for anything you want to recategorize.",
   "Own a physical copy? Add it manually — add whatever you want.",
@@ -88,8 +89,12 @@ export function startBootTipRotation(el) {
   stopBootTipRotation();
   if (!el) return;
 
-  const initial = pickTip();
-  showTip(el, initial);
+  const seeded = el.textContent && el.textContent.trim();
+  if (seeded) {
+    _currentTip = seeded;
+  } else {
+    showTip(el, pickTip());
+  }
 
   if (prefersReducedMotion()) return;
 

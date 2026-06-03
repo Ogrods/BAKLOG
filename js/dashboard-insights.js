@@ -8,6 +8,7 @@ import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo, dealScore, isStealDeal, wishlistGamesWithDeals } from './deals.js';
 import { DASH_STORE_LABELS } from './dashboard-shared.js';
+import { formatMoney, displayCurrency } from './currency.js';
 
 let _insightTimer = null;
 let _insightFadeTimer = null;
@@ -88,7 +89,7 @@ export function buildInsightPool(games) {
 
 function formatDollarMarquee(n) {
   if (n == null || Number.isNaN(n)) return '—';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+  return formatMoney(n, displayCurrency(), { maximumFractionDigits: 0, minimumFractionDigits: 0 });
 }
 
 export function buildMarqueeItems(games) {

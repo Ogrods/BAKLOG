@@ -42,6 +42,7 @@ from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
+from shared.money import format_price, normalize_currency_code
 
 GAMES_XBOX_WISHLIST_JSON = Path("games_wishlist_xbox.json")
 WISHLIST_URL = "https://www.xbox.com/en-us/wishlist"
@@ -289,20 +290,20 @@ def _pick_price(product: dict) -> tuple[str | None, str | None, int | None, str 
 
     _scan(price)
 
+    cur_norm = normalize_currency_code(currency)
+
     def _fmt(v: float | None) -> str | None:
         if v is None:
             return None
         if v == 0:
             return "Free"
-        if currency == "USD":
-            return f"${v:.2f}"
-        return f"{currency} {v:.2f}" if currency else f"{v:.2f}"
+        return format_price(v, cur_norm)
 
     discount = None
     if list_price is not None and msrp is not None and msrp > 0 and list_price < msrp:
         discount = round(100 * (1 - list_price / msrp))
 
-    return _fmt(list_price), _fmt(msrp), discount, currency
+    return _fmt(list_price), _fmt(msrp), discount, cur_norm
 
 
 def _to_item(product_id: str, added_at: str | None, product: dict | None) -> WishlistItem:

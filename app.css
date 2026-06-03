@@ -3035,13 +3035,19 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid #334155;
   position: relative;
 }
+.conn-primary,
+.conn-open-url {
+  flex: 0 0 auto;
+  min-width: 140px;
+  max-width: 240px;
+}
 .conn-primary {
-  flex: 1;
   background: #0284c7;
   color: #fff;
   border-radius: 6px;
@@ -3052,7 +3058,6 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-primary:hover { background: #0369a1; }
 .conn-local-label { flex: 1; font-size: 12px; color: #64748b; text-align: center; padding: 7px 0; }
 .conn-open-url {
-  flex: 1;
   background: #334155;
   color: #e2e8f0;
   border-radius: 6px;
@@ -3063,6 +3068,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-open-url:hover { background: #475569; }
 .conn-disconnect {
   flex: 0 0 auto;
+  margin-left: auto;
   background: transparent;
   color: #94a3b8;
   border: 1px solid #475569;
@@ -3138,7 +3144,9 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   color: #f1f5f9;
 }
 .conn-save-btn {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 140px;
+  max-width: 240px;
   background: #059669;
   color: #fff;
   border-radius: 6px;

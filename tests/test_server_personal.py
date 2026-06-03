@@ -12,16 +12,17 @@ from pathlib import Path
 import pytest
 
 import server
+from shared import profile_paths
 
 
 @pytest.fixture()
 def personal_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Run server.Handler on an ephemeral port with isolated personal-data files."""
-    personal_file = tmp_path / "personal.json"
-    backup_dir = tmp_path / "personal_backups"
-    monkeypatch.setattr(server, "PERSONAL_DIR", tmp_path)
-    monkeypatch.setattr(server, "PERSONAL_FILE", personal_file)
-    monkeypatch.setattr(server, "PERSONAL_BACKUP_DIR", backup_dir)
+    prof = tmp_path / "profiles"
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
+    monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
+    server._refresh_personal_paths()
 
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(server.ROOT)))
     port = httpd.server_address[1]
@@ -107,7 +108,51 @@ def test_fetchers_from_manifest(personal_server: str):
 
 
 def test_missing_library_json_returns_empty_catalog(personal_server: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(server, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     status, data = _request(personal_server, "GET", "/games_ea.json")
     assert status == 200
     assert data == {"game_count": 0, "games": []}
+
+
+def test_profiles_create_and_switch(personal_server: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "PROFILES_DIR", tmp_path / "profiles")
+    monkeypatch.setattr(profile_paths, "INDEX_FILE", tmp_path / "profiles" / "index.json")
+    status, data = _request(personal_server, "GET", "/api/profiles")
+    assert status == 200
+    assert data["active"] == "default"
+    assert data["legacy"] is True
+
+    status, created = _request(personal_server, "POST", "/api/profiles", {"label": "Work"})
+    assert status == 201
+    assert created["id"] == "work"
+    assert (tmp_path / "profiles" / "default" / "games_steam.json").exists() is False  # no root games to copy
+
+    status, switched = _request(personal_server, "POST", "/api/profiles/active", {"id": "work"})
+    assert status == 200
+    assert switched["active"] == "work"
+
+
+def test_scoped_catalog_served_from_profile_dir(
+    personal_server: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    work = tmp_path / "profiles" / "work"
+    work.mkdir(parents=True)
+    payload = {"game_count": 1, "games": [{"id": "1", "name": "Scoped"}]}
+    (work / "games_steam.json").write_text(json.dumps(payload), encoding="utf-8")
+    index = {
+        "active": "work",
+        "profiles": [
+            {"id": "default", "label": "Default", "created_at": "t"},
+            {"id": "work", "label": "Work", "created_at": "t"},
+        ],
+    }
+    (tmp_path / "profiles" / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "PROFILES_DIR", tmp_path / "profiles")
+    monkeypatch.setattr(profile_paths, "INDEX_FILE", tmp_path / "profiles" / "index.json")
+
+    status, data = _request(personal_server, "GET", "/games_steam.json")
+    assert status == 200
+    assert data["game_count"] == 1
+    assert data["games"][0]["name"] == "Scoped"

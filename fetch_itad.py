@@ -19,6 +19,7 @@ from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from itad_client import ItadClient, ItadError
 from shared.money import country_to_currency
+from shared.profile_paths import catalog_path, itad_path
 from shared.safe_write import safe_write_text
 
 ITAD_JSON = Path("itad_prices.json")
@@ -51,7 +52,7 @@ def _collect_titles(include_library: bool) -> list[tuple[str, str]]:
         seen.add(key)
         out.append((key, title.strip()))
 
-    wp = Path(WISHLIST_FILE)
+    wp = catalog_path(WISHLIST_FILE)
     if wp.exists():
         data = json.loads(wp.read_text(encoding="utf-8"))
         for g in data.get("games", []):
@@ -152,7 +153,8 @@ def main() -> int:
         "count": len(by_key),
         "by_key": by_key,
     }
-    safe_write_text(ITAD_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
+    out = itad_path()
+    safe_write_text(out, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"Wrote {len(by_key)} price rows to {ITAD_JSON}.", flush=True)
     stats.ok = len(by_key)
     exit_code = 0 if by_key or args.allow_empty else 2

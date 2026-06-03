@@ -14,10 +14,36 @@ from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from shared.profile_paths import auth_dir
+
 ROOT = Path(__file__).resolve().parents[1]
-AUTH_DIR = ROOT / "cache" / "auth"
-SECRETS_FILE = AUTH_DIR / "secrets.bin"
-MASTER_KEY_FILE = AUTH_DIR / ".master_key"
+
+
+def _auth_dir() -> Path:
+    patched = globals().get("AUTH_DIR")
+    if isinstance(patched, Path):
+        return patched
+    return auth_dir()
+
+
+def _secrets_file() -> Path:
+    patched = globals().get("SECRETS_FILE")
+    if isinstance(patched, Path):
+        return patched
+    return _auth_dir() / "secrets.bin"
+
+
+def _master_key_file() -> Path:
+    patched = globals().get("MASTER_KEY_FILE")
+    if isinstance(patched, Path):
+        return patched
+    return _auth_dir() / ".master_key"
+
+
+# Back-compat names for auth.bundle and tests (monkeypatch these Path hooks).
+AUTH_DIR: Path | None = None
+SECRETS_FILE: Path | None = None
+MASTER_KEY_FILE: Path | None = None
 SERVICE_NAME = "steam-backlog"
 KEYRING_ACCOUNT = "secrets-master"
 
@@ -31,7 +57,7 @@ def _now_iso() -> str:
 
 
 def _ensure_dir() -> None:
-    AUTH_DIR.mkdir(parents=True, exist_ok=True)
+    _auth_dir().mkdir(parents=True, exist_ok=True)
 
 
 def set_master_password_override(password: str | None) -> None:
@@ -71,12 +97,12 @@ def _save_keyring_key(key: bytes) -> None:
 
         keyring.set_password(SERVICE_NAME, KEYRING_ACCOUNT, b64encode(key).decode("ascii"))
     except Exception:
-        MASTER_KEY_FILE.write_bytes(key)
+        _master_key_file().write_bytes(key)
 
 
 def _get_master_key() -> bytes:
     if _master_password:
-        salt_path = AUTH_DIR / ".mpw.salt"
+        salt_path = _auth_dir() / ".mpw.salt"
         _ensure_dir()
         if salt_path.exists():
             salt = salt_path.read_bytes()
@@ -90,14 +116,15 @@ def _get_master_key() -> bytes:
         return key
 
     _ensure_dir()
-    if MASTER_KEY_FILE.exists():
-        return MASTER_KEY_FILE.read_bytes()
+    mk = _master_key_file()
+    if mk.exists():
+        return mk.read_bytes()
 
     key = secrets.token_bytes(32)
     try:
         _save_keyring_key(key)
     except Exception:
-        MASTER_KEY_FILE.write_bytes(key)
+        _master_key_file().write_bytes(key)
     return key
 
 
@@ -132,11 +159,12 @@ def load_doc() -> dict[str, Any]:
     with _lock:
         if _cache is not None:
             return json.loads(json.dumps(_cache))
-        if not SECRETS_FILE.exists():
+        secrets = _secrets_file()
+        if not secrets.exists():
             _cache = _empty_doc()
             return json.loads(json.dumps(_cache))
         try:
-            _cache = _decrypt_blob(SECRETS_FILE.read_bytes())
+            _cache = _decrypt_blob(secrets.read_bytes())
         except Exception:
             _cache = _empty_doc()
         return json.loads(json.dumps(_cache))
@@ -146,7 +174,7 @@ def save_doc(doc: dict[str, Any]) -> None:
     global _cache
     with _lock:
         _ensure_dir()
-        SECRETS_FILE.write_bytes(_encrypt_doc(doc))
+        _secrets_file().write_bytes(_encrypt_doc(doc))
         _cache = json.loads(json.dumps(doc))
 
 
@@ -169,6 +197,6 @@ def delete_provider_blob(provider: str) -> None:
 
 
 def profile_dir(provider: str) -> Path:
-    path = AUTH_DIR / "profiles" / provider
+    path = _auth_dir() / "profiles" / provider
     path.mkdir(parents=True, exist_ok=True)
     return path

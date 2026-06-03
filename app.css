@@ -2763,6 +2763,137 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
     min-width: 180px;
   }
 }
+/* Header profile switcher */
+.profile-menu-wrap {
+  position: relative;
+}
+.profile-menu-trigger {
+  cursor: pointer;
+  max-width: 8rem;
+}
+.profile-menu-label {
+  display: inline-block;
+  max-width: 6.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.profile-menu-chevron {
+  opacity: 0.75;
+}
+.profile-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  min-width: 10rem;
+  max-width: 14rem;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  z-index: 60;
+  padding: 4px 0;
+}
+.profile-menu-panel[hidden] {
+  display: none;
+}
+.profile-menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: #334155;
+}
+.profile-menu-option-active {
+  color: #7dd3fc;
+}
+.profile-menu-footer {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+}
+
+/* Manage profiles modal */
+.profile-modal-card {
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+.profile-modal-note code {
+  font-size: 0.85em;
+}
+.profile-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.profile-modal-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+.profile-modal-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.profile-modal-field {
+  flex: 1;
+  min-width: 0;
+  border-radius: 0.25rem;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #f1f5f9;
+  font-size: 0.875rem;
+  padding: 0.375rem 0.5rem;
+}
+.profile-modal-field:focus {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+.profile-modal-btn {
+  flex-shrink: 0;
+  min-width: 4.5rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  border: 0;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  color: #f1f5f9;
+}
+.profile-modal-btn-neutral {
+  background: #334155;
+}
+.profile-modal-btn-neutral:hover {
+  background: #475569;
+}
+.profile-modal-btn-primary {
+  background: #075985;
+}
+.profile-modal-btn-primary:hover {
+  background: #0369a1;
+}
+.profile-modal-btn-danger {
+  background: #9f1239;
+}
+.profile-modal-btn-danger:hover {
+  background: #be123c;
+}
+.profile-modal-status {
+  font-size: 0.75rem;
+  color: #4ade80;
+}
+.profile-modal-status.hidden,
+.profile-modal-error.hidden {
+  display: none;
+}
+.profile-modal-error {
+  font-size: 0.75rem;
+  color: #f87171;
+}
+
 .conn-popover-backdrop {
   position: fixed;
   inset: 0;

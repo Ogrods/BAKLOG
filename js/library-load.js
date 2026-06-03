@@ -40,8 +40,7 @@ import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 import { consumeItadAutoRunFlag, diffItadDeals } from './fetcher-health.js';
 import { fireLibraryCountFlash } from './library-count-animation.js';
-
-export const ITAD_SNAPSHOT_KEY = "baklog-itad-snapshot";
+import { itadSnapshotStorageKey } from './profiles.js';
 
 // Module-scoped previous counts so we only animate real fetch-driven jumps.
 // Null sentinels mean "first paint" — no popups on cold start, just the
@@ -52,7 +51,7 @@ let _prevWishlistCount = null;
 export async function loadItadPrices() {
   let prevByKey = {};
   try {
-    const raw = localStorage.getItem(ITAD_SNAPSHOT_KEY);
+    const raw = localStorage.getItem(itadSnapshotStorageKey());
     if (raw) prevByKey = JSON.parse(raw)?.by_key || {};
   } catch (_) {}
   try {
@@ -62,7 +61,7 @@ export async function loadItadPrices() {
     applyItadPriceSnapshot(prevByKey, nextByKey);
     state.itadByKey = nextByKey;
     try {
-      localStorage.setItem(ITAD_SNAPSHOT_KEY, JSON.stringify({
+      localStorage.setItem(itadSnapshotStorageKey(), JSON.stringify({
         saved_at: Date.now(),
         by_key: slimItadSnapshot(nextByKey),
       }));

@@ -14,6 +14,11 @@ Endpoints:
     GET  /api/stream/<run_id>      -> SSE: line / done / error events
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
+    GET  /api/profiles        -> {active, active_label, legacy, profiles[]}
+    POST /api/profiles        -> create profile {label}
+    POST /api/profiles/active -> switch active profile {id}
+    PUT  /api/profiles/<id>   -> rename profile {label}
+    DELETE /api/profiles/<id> -> delete non-active profile
     GET  /api/auth/status     -> per-provider connection state
     POST /api/auth/<p>/start  -> begin Playwright sign-in (returns session_id)
     GET  /api/auth/<id>/stream -> SSE auth flow events
@@ -83,15 +88,28 @@ _IN_FLIGHT_STATUSES = frozenset({"queued", "launching", "running", "cancelling"}
 _sse_connections = 0
 _sse_lock = threading.Lock()
 
+# Personal-data persistence (scoped to active profile via shared.profile_paths).
 from shared.platform_support import platform_supported  # noqa: E402
+from shared.profile_paths import (  # noqa: E402
+    catalog_path,
+    get_active_profile_id,
+    personal_backup_dir,
+    personal_dir,
+    personal_path,
+)
 
-# Personal-data persistence.
-# This file is the source of truth for the user's edits. localStorage in the
-# browser is treated as a hydration cache that is overwritten from this file
-# on every boot.
-PERSONAL_DIR = ROOT / "data"
-PERSONAL_FILE = PERSONAL_DIR / "personal.json"
-PERSONAL_BACKUP_DIR = PERSONAL_DIR / "personal_backups"
+# Kept for tests that monkeypatch these names.
+PERSONAL_DIR = personal_dir()
+PERSONAL_FILE = personal_path()
+PERSONAL_BACKUP_DIR = personal_backup_dir()
+
+
+def _refresh_personal_paths() -> None:
+    """Rebind module-level personal paths after profile switch (tests may patch)."""
+    global PERSONAL_DIR, PERSONAL_FILE, PERSONAL_BACKUP_DIR
+    PERSONAL_DIR = personal_dir()
+    PERSONAL_FILE = personal_path()
+    PERSONAL_BACKUP_DIR = personal_backup_dir()
 PERSONAL_BACKUP_KEEP = 10
 PERSONAL_MAX_BYTES = 32 * 1024 * 1024  # 32 MB hard cap on the PUT body
 _personal_lock = threading.RLock()
@@ -111,10 +129,11 @@ def _empty_personal_doc() -> dict[str, Any]:
 
 def _load_personal_doc() -> dict[str, Any]:
     with _personal_lock:
-        if not PERSONAL_FILE.exists():
+        path = personal_path()
+        if not path.exists():
             return _empty_personal_doc()
         try:
-            with PERSONAL_FILE.open("r", encoding="utf-8") as f:
+            with path.open("r", encoding="utf-8") as f:
                 doc = json.load(f)
         except (OSError, json.JSONDecodeError) as exc:
             print(f"[personal] corrupted: {exc!r} -- returning empty doc", file=sys.stderr)
@@ -160,19 +179,21 @@ def _rotate_personal_backup() -> None:
     now = time.time()
     if now - _personal_last_backup_at < 300:
         return
-    if not PERSONAL_FILE.exists():
+    path = personal_path()
+    if not path.exists():
         return
-    PERSONAL_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backup_dir = personal_backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(now))
-    backup = PERSONAL_BACKUP_DIR / f"personal-{stamp}.json"
+    backup = backup_dir / f"personal-{stamp}.json"
     try:
-        backup.write_bytes(PERSONAL_FILE.read_bytes())
+        backup.write_bytes(path.read_bytes())
     except OSError as exc:
         print(f"[personal] backup failed: {exc!r}", file=sys.stderr)
         return
     _personal_last_backup_at = now
     # Prune oldest backups beyond the keep-count.
-    backups = sorted(PERSONAL_BACKUP_DIR.glob("personal-*.json"))
+    backups = sorted(backup_dir.glob("personal-*.json"))
     for old in backups[:-PERSONAL_BACKUP_KEEP]:
         try:
             old.unlink()
@@ -187,12 +208,15 @@ def _save_personal_doc(payload: dict[str, Any]) -> dict[str, Any]:
         doc = _empty_personal_doc()
         doc.update(validated)
         doc["updated_at"] = time.time()
-        PERSONAL_DIR.mkdir(parents=True, exist_ok=True)
+        pdir = personal_dir()
+        pdir.mkdir(parents=True, exist_ok=True)
+        path = personal_path()
         _rotate_personal_backup()
-        tmp = PERSONAL_FILE.with_suffix(".json.tmp")
+        tmp = path.with_suffix(".json.tmp")
         with tmp.open("w", encoding="utf-8") as f:
             json.dump(doc, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, PERSONAL_FILE)
+        os.replace(tmp, path)
+        _refresh_personal_paths()
         return doc
 
 
@@ -753,6 +777,7 @@ class RunManager:
         # Force unbuffered Python output so we see progress in real time.
         env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
+        env["BAKLOG_PROFILE"] = get_active_profile_id()
 
         # Run Popen on a launcher thread so a wedged CreateProcess can't wedge
         # the queue worker. If the launch doesn't return within
@@ -973,10 +998,29 @@ def _maybe_serve_empty_library_json(handler: SimpleHTTPRequestHandler, path: str
     if not _LIBRARY_JSON_RE.match(path):
         return False
     filename = path.lstrip("/")
-    if (ROOT / filename).is_file():
+    if catalog_path(filename).is_file():
         return False
     _send_json(handler, HTTPStatus.OK, {"game_count": 0, "games": []})
     return True
+
+
+def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        length = int(handler.headers.get("Content-Length") or 0)
+    except ValueError:
+        return None, "invalid Content-Length"
+    if length <= 0:
+        return None, "empty body"
+    if length > PERSONAL_MAX_BYTES:
+        return None, f"body too large ({length} > {PERSONAL_MAX_BYTES})"
+    try:
+        raw = handler.rfile.read(length).decode("utf-8")
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, f"invalid JSON: {exc!r}"
+    if not isinstance(payload, dict):
+        return None, "payload must be a JSON object"
+    return payload, None
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -997,6 +1041,15 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
+    def translate_path(self, path: str) -> str:
+        """Serve catalog JSON from the active profile root (legacy or profiles/<id>/)."""
+        clean = path.split("?", 1)[0].lstrip("/")
+        if _LIBRARY_JSON_RE.match("/" + clean) or clean == "itad_prices.json":
+            disk = catalog_path(clean) if clean != "itad_prices.json" else catalog_path("itad_prices.json")
+            if disk.is_file():
+                return str(disk)
+        return super().translate_path(path)
+
     # ---- routing -----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802 - http.server API
         if self.path == "/api/runs":
@@ -1007,6 +1060,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/personal":
             self._handle_personal_get()
+            return
+        if self.path == "/api/profiles":
+            self._handle_profiles_get()
             return
         if self.path == "/api/auth/status":
             self._handle_auth_status()
@@ -1059,12 +1115,33 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/auth/secrets/import"):
             self._handle_auth_secrets_import()
             return
+        if self.path == "/api/profiles":
+            self._handle_profiles_create()
+            return
+        if self.path == "/api/profiles/active":
+            self._handle_profiles_set_active()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
+
+    def do_DELETE(self) -> None:  # noqa: N802 - http.server API
+        path_only = self.path.split("?", 1)[0]
+        if path_only.startswith("/api/profiles/"):
+            profile_id = path_only[len("/api/profiles/") :].strip("/")
+            if profile_id and profile_id not in ("active",):
+                self._handle_profiles_delete(profile_id)
+                return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_PUT(self) -> None:  # noqa: N802 - http.server API
         if self.path == "/api/personal":
             self._handle_personal_put()
             return
+        path_only = self.path.split("?", 1)[0]
+        if path_only.startswith("/api/profiles/"):
+            profile_id = path_only[len("/api/profiles/") :].strip("/")
+            if profile_id and profile_id not in ("active",):
+                self._handle_profiles_rename(profile_id)
+                return
         if self.path.startswith("/api/auth/") and self.path.endswith("/credentials"):
             provider = self.path[len("/api/auth/") : -len("/credentials")].strip("/")
             self._handle_auth_credentials(provider)
@@ -1110,6 +1187,72 @@ class Handler(SimpleHTTPRequestHandler):
         refresh_val = (params.get("refresh") or ["0"])[0].lower()
         refresh = refresh_val in ("1", "true", "yes")
         return key, refresh
+
+    def _handle_profiles_get(self) -> None:
+        try:
+            from shared.profiles import profiles_status
+
+            _send_json(self, HTTPStatus.OK, profiles_status())
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_profiles_create(self) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        try:
+            from shared.profiles import create_profile
+
+            created = create_profile(str(payload.get("label") or ""))
+            _refresh_personal_paths()
+            _send_json(self, HTTPStatus.CREATED, created)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _handle_profiles_set_active(self) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        profile_id = str(payload.get("id") or "").strip()
+        if not profile_id:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "id is required"})
+            return
+        try:
+            from shared.profiles import set_active_profile
+
+            result = set_active_profile(profile_id)
+            _refresh_personal_paths()
+            _send_json(self, HTTPStatus.OK, result)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _handle_profiles_rename(self, profile_id: str) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        try:
+            from shared.profiles import rename_profile
+
+            updated = rename_profile(profile_id, str(payload.get("label") or ""))
+            _send_json(self, HTTPStatus.OK, updated)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _handle_profiles_delete(self, profile_id: str) -> None:
+        try:
+            from shared.profiles import delete_profile
+
+            delete_profile(profile_id)
+            _refresh_personal_paths()
+            _send_json(self, HTTPStatus.OK, {"ok": True})
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     def _handle_personal_get(self) -> None:
         try:

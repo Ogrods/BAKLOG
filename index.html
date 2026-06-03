@@ -64,7 +64,7 @@
     <div id="authReconnectBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="mb-4">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div id="brandMark" class="flex items-center gap-2 shrink-0" style="margin: 0 1rem 0 0;">
+        <div id="brandMark" class="flex items-center gap-2 shrink-0" style="margin: 0 1rem 0 0; cursor: default;">
           <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap m-0">BAKLOG</h1>
           <img src="assets/baklog-logo.svg" alt="" aria-hidden="true" class="shrink-0" style="height: 30px; width: auto;" />
         </div>
@@ -76,7 +76,19 @@
           <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
         </nav>
         <span class="text-[11px] text-slate-400 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
-        <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle ml-auto self-center" title="Show fetcher log"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText">Fetcher log</span></button>
+        <div class="header-actions ml-auto flex items-center gap-2 shrink-0 self-center">
+          <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle" title="Show fetcher log"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText">Fetcher log</span></button>
+          <div id="profileMenuWrap" class="profile-menu-wrap relative shrink-0">
+            <button type="button" id="profileMenuTrigger" class="profile-menu-trigger px-2 py-1 rounded border border-slate-600 text-xs text-slate-200 hover:border-slate-500 flex items-center gap-1" aria-haspopup="menu" aria-expanded="false" aria-controls="profileMenu" aria-label="Profile">
+              <span id="profileMenuLabel" class="profile-menu-label">Default</span>
+              <svg class="profile-menu-chevron shrink-0" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M2 4l4 4 4-4z"/></svg>
+            </button>
+            <div id="profileMenu" class="profile-menu-panel" role="menu" aria-label="Profiles" hidden>
+              <div id="profileMenuList" class="profile-menu-list"></div>
+              <button type="button" role="menuitem" class="profile-menu-footer w-full text-left px-3 py-2 text-xs text-sky-300 hover:bg-slate-700/60 border-t border-slate-600/80" data-profile-manage>Manage profiles…</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="bootErrorBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
       <div id="summary" class="flex flex-wrap gap-2 mt-3"></div>
@@ -146,6 +158,11 @@
       </div>
       <template id="tplConnHowToPopover">
         <h3 class="conn-popover-title">How connections work</h3>
+        <p class="conn-howto-note">
+          Credentials you save via <em>Connect</em> are encrypted under <code>cache/auth/</code> on this machine.
+          A <code>.env</code> file still works as a fallback for terminal fetchers, but it is optional &mdash;
+          <em>Connect</em> is what verifies a store. Keys found only in <code>.env</code> show as <em>Unverified</em> until you click <em>Verify</em> on the card.
+        </p>
         <div class="conn-howto-row">
           <div class="conn-howto-glyph" aria-hidden="true">A</div>
           <div>
@@ -592,6 +609,45 @@
       </div>
     </div>
   </aside>
+
+  <!-- Profile manage modal -->
+  <div id="profileManageModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+    <div class="profile-modal-card bg-slate-800 rounded-lg shadow-xl border border-slate-700 max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="profileManageTitle">
+      <div class="flex items-center justify-between border-b border-slate-700 p-3">
+        <h3 id="profileManageTitle" class="text-lg font-semibold text-slate-100">Manage profiles</h3>
+        <button type="button" id="profileManageClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
+      </div>
+      <div class="p-3 space-y-3 overflow-y-auto flex-1 text-sm text-slate-300">
+        <p class="profile-modal-note text-xs text-slate-400">Each profile has its own library files, connections, and personal data under <code class="text-slate-300">profiles/&lt;name&gt;/</code>. Your first extra profile copies today&apos;s data into <code class="text-slate-300">profiles/default/</code>; root files stay as backup.</p>
+        <div class="profile-modal-section">
+          <label for="profileRenameInput" class="profile-modal-label">Rename active profile</label>
+          <div class="profile-modal-row">
+            <input type="text" id="profileRenameInput" class="profile-modal-field" maxlength="64" />
+            <button type="button" id="profileRenameSave" class="profile-modal-btn profile-modal-btn-neutral">Save</button>
+          </div>
+        </div>
+        <div class="profile-modal-section">
+          <label for="profileNewName" class="profile-modal-label">Add profile</label>
+          <div class="profile-modal-row">
+            <input type="text" id="profileNewName" class="profile-modal-field" placeholder="e.g. Work" maxlength="64" />
+            <button type="button" id="profileCreateBtn" class="profile-modal-btn profile-modal-btn-primary">Create</button>
+          </div>
+        </div>
+        <div class="profile-modal-section">
+          <label for="profileDeleteSelect" class="profile-modal-label">Delete another profile</label>
+          <div class="profile-modal-row">
+            <select id="profileDeleteSelect" class="profile-modal-field"></select>
+            <button type="button" id="profileDeleteBtn" class="profile-modal-btn profile-modal-btn-danger">Delete</button>
+          </div>
+        </div>
+        <p id="profileManageStatus" class="profile-modal-status hidden" role="status" aria-live="polite"></p>
+        <p id="profileManageError" class="profile-modal-error hidden" role="alert"></p>
+      </div>
+      <div class="border-t border-slate-700 p-3 flex justify-end">
+        <button type="button" id="profileManageCancel" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-100">Close</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Orphan personal-data cleanup modal -->
   <div id="orphanPruneModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">

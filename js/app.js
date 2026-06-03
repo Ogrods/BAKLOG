@@ -60,6 +60,7 @@ import {
 import { reloadGames, reloadAfterFetcher } from './library-load.js';
 import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
+import { initProfiles } from './profiles.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
 import { prewarmTableQueryForView, tableFingerprint } from './table-ui.js';
@@ -121,6 +122,7 @@ async function bootstrap() {
   syncViewTabAria(state.activeView);
   savePrefs();
   bindEvents();
+  initProfiles();
   document.getElementById("showScoreColumn").checked = !!state.prefs.showScoreColumn;
   const tableWrap = document.getElementById("tableWrap");
   tableWrap?.classList.toggle("table-hide-score", !state.prefs.showScoreColumn);
@@ -179,7 +181,11 @@ async function bootstrap() {
    *  first scheduleDashboardRender (from applyMergedLibrary) paints real chips. */
   async function bootstrapFetcherChrome() {
     await loadFetcherSources();
-    initConnections();
+    // Await the first /api/auth/status so the post-boot scheduleDashboardRender
+    // below evaluates the onboarding wizard with real connection state (avoids
+    // a "Welcome" flash before status resolves). refreshConnections swallows
+    // its own errors, so this never rejects the boot chain.
+    await initConnections();
     const available = await fetcherRunner.probeApi();
     if (!available) return;
     await fetcherRunner.syncFromServer();
@@ -237,7 +243,6 @@ async function bootstrap() {
   } catch (_) {}
 }
 
-hydrateState();
 bootstrap().catch(err => {
   console.error("[bootstrap] unhandled failure — lifting boot curtain", err);
   // Belt-and-suspenders alongside the inline 8s safety net + the try/finally

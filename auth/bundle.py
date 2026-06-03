@@ -16,10 +16,13 @@ from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from auth.secrets import AUTH_DIR, SECRETS_FILE, load_doc, profile_dir, save_doc
+from auth.secrets import _auth_dir, _secrets_file, load_doc, profile_dir, save_doc
 
 ROOT = Path(__file__).resolve().parents[1]
-PROFILES_ROOT = AUTH_DIR / "profiles"
+
+
+def _profiles_root() -> Path:
+    return _auth_dir() / "profiles"
 
 MAGIC = b"BAKLOGSB"
 BUNDLE_VERSION = 1
@@ -125,9 +128,10 @@ def _should_skip_profile_file(path: Path) -> bool:
 
 def _collect_profiles() -> dict[str, dict[str, str]]:
     out: dict[str, dict[str, str]] = {}
-    if not PROFILES_ROOT.is_dir():
+    root = _profiles_root()
+    if not root.is_dir():
         return out
-    for provider_dir in sorted(PROFILES_ROOT.iterdir()):
+    for provider_dir in sorted(root.iterdir()):
         if not provider_dir.is_dir():
             continue
         files: dict[str, str] = {}
@@ -225,11 +229,12 @@ def _atomic_write_bytes(path: Path, data: bytes) -> None:
 
 
 def _snapshot_profiles_dir() -> Path | None:
-    if not PROFILES_ROOT.exists() or not any(PROFILES_ROOT.iterdir()):
+    root = _profiles_root()
+    if not root.exists() or not any(root.iterdir()):
         return None
     stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-    dest = AUTH_DIR / f"profiles_pre_import_{stamp}"
-    shutil.move(str(PROFILES_ROOT), str(dest))
+    dest = _auth_dir() / f"profiles_pre_import_{stamp}"
+    shutil.move(str(root), str(dest))
     return dest
 
 
@@ -289,7 +294,8 @@ def import_bundle(blob: bytes, passphrase: str, *, dry_run: bool = False) -> Imp
 
     _snapshot_profiles_dir()
     save_doc(secrets_doc)
-    summary.bytes_written += SECRETS_FILE.stat().st_size if SECRETS_FILE.exists() else 0
+    sf = _secrets_file()
+    summary.bytes_written += sf.stat().st_size if sf.exists() else 0
 
     profiles = inner.get("profiles") or {}
     profile_names, profile_bytes = _restore_profiles(profiles, dry_run=False)

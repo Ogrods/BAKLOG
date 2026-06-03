@@ -29,6 +29,7 @@ enrich_hltb_run.log
 .vscode/
 *.code-workspace
 data/
+profiles/
 .server.err
 .server.log
 steam_backlog.egg-info/
@@ -38,3 +39,6 @@ check_images.py
 find_dupes.py
 migrate_gog_images.py
 remove_steam_dupes.py
+
+# Generated Lighthouse reports (npm run / npx lighthouse)
+lighthouse/

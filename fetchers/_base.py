@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from shared.json_util import dumps_games_json
+from shared.profile_paths import resolve_catalog_path
 from shared.safe_write import safe_write_text
 
 
@@ -80,6 +81,8 @@ def refuse_empty_result(
 def _previous_game_count(output_path: Path | None) -> int | None:
     """Read game_count from the previous on-disk file, if any. Resilient to
     malformed JSON or schema drift — callers should treat None as 'no baseline'."""
+    if output_path is not None:
+        output_path = resolve_catalog_path(output_path)
     if output_path is None or not output_path.exists():
         return None
     try:
@@ -139,6 +142,7 @@ def refuse_drift_result(
 
 
 def load_existing_games(path: Path, *, id_key: str = "id") -> dict[str, dict[str, Any]]:
+    path = resolve_catalog_path(path)
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -160,6 +164,7 @@ def write_games_json(
     successful runs), then the new content is written via temp file +
     os.replace so a kill-mid-write cannot leave a truncated file.
     """
+    path = resolve_catalog_path(path)
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "store": store,

@@ -1,0 +1,33 @@
+name: CDP smoke (manual)
+
+# On-demand canary for the Connections CDP layer. Not run on push/PR.
+on:
+  workflow_dispatch:
+
+jobs:
+  cdp-integration:
+    name: CDP integration smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run CDP integration smoke test
+        env:
+          BAKLOG_CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: pytest tests/test_cdp_browser.py -m integration -v

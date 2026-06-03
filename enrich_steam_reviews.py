@@ -5,7 +5,7 @@ search Steam's store for a matching title, then pull the review summary. Saves
 a small mapping file so repeat runs are fast. Pass --retry-misses to re-attempt
 rows previously cached as having no Steam app match (appid 0).
 
-Covered stores: gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, itch.
+Covered stores: gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, humble, itch.
 
 itch.io: only rows with classification == "game" (skips TTRPG PDFs, assets, tools).
 """
@@ -45,6 +45,7 @@ STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
     ("games_ubisoft.json", "ubisoft", None),
     ("games_nintendo.json", "nintendo", None),
     ("games_itch.json", "itch", _itch_is_videogame),
+    ("games_ea.json", "ea", None),
 ]
 
 
@@ -160,7 +161,7 @@ def main() -> int:
     parser.add_argument(
         "--stores",
         nargs="+",
-        choices=["gog", "epic", "psn", "amazon", "xbox", "battlenet", "ubisoft", "nintendo", "itch"],
+        choices=["gog", "epic", "psn", "amazon", "xbox", "battlenet", "ubisoft", "nintendo", "humble", "itch"],
         metavar="STORE",
         help="Only process these stores (default: all). Example: --stores nintendo",
     )
@@ -225,9 +226,15 @@ def main() -> int:
             if appid is None:
                 if args.refresh_empty:
                     continue
-                appid = steam_search(g["name"])
-                searched += 1
-                mapping[key] = appid if appid else 0
+                if store == "humble":
+                    direct = _humble_steam_appid(g)
+                    if direct:
+                        appid = direct
+                        mapping[key] = direct
+                if appid is None:
+                    appid = steam_search(g["name"])
+                    searched += 1
+                    mapping[key] = appid if appid else 0
                 if searched % 10 == 0:
                     save_mapping(mapping)
                     print(

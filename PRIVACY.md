@@ -18,6 +18,26 @@ Last updated: 2026-06-02.
 - Backups of your personal data and fetched libraries are written locally and
   not transmitted anywhere.
 
+## Acting on your behalf, with your own data
+
+BAKLOG is not a scraping service and does not crawl storefronts on its own. It
+is a local automation tool that does, on your machine, what you could do by
+hand in your own logged-in browser:
+
+- **You** sign in to each store, with **your** account, in a browser window on
+  **your** computer.
+- BAKLOG then reads back **only your own account's** library/wishlist —
+  the same data those pages already show you when you're logged in.
+- Each request goes **directly from your machine to the store**, authenticated
+  as you, from your own IP. There is no shared server, no pooled credentials,
+  and no central copy of anyone's catalog.
+
+In other words, the only data BAKLOG ever touches is your own, and the only
+party acting is you — BAKLOG is just the automation. For the per-store access
+method (official API key, official OAuth, or replaying your own web session)
+and the terms-of-service caveats, see
+[SECURITY.md → How BAKLOG reaches each store](SECURITY.md#how-baklog-reaches-each-store).
+
 ## What is stored, where, and why
 
 ### Credentials
@@ -149,7 +169,10 @@ your machine to the storefront — there is no project-owned middleman.
 | `www.epicgames.com`, `graphql.epicgames.com`, `account.epicgames.com` | Epic library + wishlist |
 | `account.battle.net` | Battle.net library |
 | `account.ubisoft.com`, `store.ubisoft.com` | Ubisoft library + wishlist |
-| `accounts.nintendo.com`, `ec.nintendo.com` | Nintendo library |
+| `accounts.nintendo.com`, `ec.nintendo.com` | Nintendo eShop library (transactions cookie) |
+| `www.nintendo.com` | Nintendo Store wishlist (`nintendo_wishlist` browser profile) |
+| `www.humblebundle.com` | Humble library API + store wishlist (`humble` browser profile) |
+| `www.ea.com`, `service-aggregation-layer.juno.ea.com` | EA App library — replays your own ea.com web session via the `ea` browser profile |
 | `api.openxbl.com` | Xbox library + wishlist |
 | `itch.io` | itch.io library |
 | `gaming.amazon.com` | Amazon Prime Gaming (local SQLite — no remote call) |

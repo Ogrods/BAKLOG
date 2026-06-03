@@ -134,6 +134,7 @@ def get_status() -> list[dict[str, Any]]:
                 "label": spec.label,
                 "kind": spec.kind,
                 "description": spec.description,
+                "tips": list(spec.tips),
                 "status": state,
                 "connected_at": blob.get("connected_at"),
                 "last_verified": blob.get("last_verified"),

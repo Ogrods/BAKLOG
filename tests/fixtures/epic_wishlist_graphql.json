@@ -1,0 +1,64 @@
+{
+  "data": {
+    "Wishlist": {
+      "wishlistItems": {
+        "elements": [
+          {
+            "id": "wish-1",
+            "created": "2024-01-15T12:00:00.000Z",
+            "offerId": "offer-aaa",
+            "namespace": "fn",
+            "offer": {
+              "title": "Test Epic Game",
+              "id": "offer-aaa",
+              "namespace": "fn",
+              "productSlug": "test-epic-game",
+              "releaseDate": "2024-06-01T00:00:00.000Z",
+              "keyImages": [
+                { "type": "OfferImageWide", "url": "https://cdn.epicgames.com/wide.jpg" },
+                { "type": "DieselGameBoxTall", "url": "https://cdn.epicgames.com/tall.jpg" }
+              ],
+              "tags": [{ "id": "action", "name": "Action" }],
+              "price": {
+                "totalPrice": {
+                  "discountPrice": 1999,
+                  "originalPrice": 3999,
+                  "currencyCode": "USD",
+                  "fmtPrice": {
+                    "originalPrice": "$39.99",
+                    "discountPrice": "$19.99"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "wish-2",
+            "created": "2024-02-01T12:00:00.000Z",
+            "offerId": "offer-bbb",
+            "namespace": "fn",
+            "offer": {
+              "title": "Free Epic Title",
+              "id": "offer-bbb",
+              "namespace": "fn",
+              "productSlug": "free-epic-title",
+              "keyImages": [],
+              "tags": [],
+              "price": {
+                "totalPrice": {
+                  "discountPrice": 0,
+                  "originalPrice": 0,
+                  "currencyCode": "USD",
+                  "fmtPrice": {
+                    "originalPrice": "Free",
+                    "discountPrice": "Free"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

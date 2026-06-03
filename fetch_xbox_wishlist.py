@@ -11,7 +11,7 @@ straight from the SSR HTML response, which is also what makes this fast and
 JS-free for the fetcher (no full browser render required after the request
 lands).
 
-Like ``fetch_ubisoft_wishlist.py`` we piggyback on the persistent Playwright
+Like ``fetch_ubisoft_wishlist.py`` we piggyback on the persistent Chrome/Edge
 profile the Connections page already established (``cache/auth/profiles/
 xbox_wishlist``). One headless ``context.request.get()`` call to the wishlist
 URL with that profile yields the SSR HTML; we carve out
@@ -101,13 +101,8 @@ def _store_url(product_id: str, title: str | None) -> str:
 
 
 def _fetch_wishlist_state(timeout_s: int = 45) -> dict:
-    """Headless ``context.request.get()`` with the saved xbox_wishlist profile.
-
-    Using ``context.request`` (rather than a real ``page.goto()``) reuses the
-    persistent cookie jar without booting React, which is both faster and
-    avoids the SSR hydration race the Connect window has to work around.
-    """
-    from playwright.sync_api import sync_playwright
+    """Headless cookie-authenticated GET with the saved xbox_wishlist profile."""
+    from auth.cdp_browser import launch_persistent_profile
 
     profile = profile_dir("xbox_wishlist")
     if not profile.exists():
@@ -116,33 +111,17 @@ def _fetch_wishlist_state(timeout_s: int = 45) -> dict:
             "Open the Connections page and connect 'Xbox Store wishlist' first."
         )
 
-    common: dict[str, Any] = {
-        "headless": True,
-        "viewport": {"width": 1400, "height": 1200},
-        "locale": "en-US",
-        "user_agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-        ),
-    }
-    with sync_playwright() as p:
-        try:
-            ctx = p.chromium.launch_persistent_context(str(profile), channel="chrome", **common)
-        except Exception:  # noqa: BLE001
-            ctx = p.chromium.launch_persistent_context(str(profile), **common)
-        try:
-            resp = ctx.request.get(WISHLIST_URL, timeout=timeout_s * 1000)
-            if resp.status >= 400:
-                raise RuntimeError(f"xbox.com/wishlist returned HTTP {resp.status}")
-            html = resp.text()
-            state = _parse_xbox_preloaded_state(html)
-            if not state:
-                raise RuntimeError(
-                    "Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response."
-                )
-            return state
-        finally:
-            ctx.close()
+    with launch_persistent_profile(str(profile), headless=True) as ctx:
+        resp = ctx.request.get(WISHLIST_URL, timeout=timeout_s * 1000)
+        if resp.status >= 400:
+            raise RuntimeError(f"xbox.com/wishlist returned HTTP {resp.status}")
+        html = resp.text()
+        state = _parse_xbox_preloaded_state(html)
+        if not state:
+            raise RuntimeError(
+                "Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response."
+            )
+        return state
 
 
 def _walk(node: Any, depth: int = 0, max_depth: int = 12) -> Iterable[Any]:

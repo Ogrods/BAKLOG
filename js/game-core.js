@@ -6,7 +6,7 @@ import { getPersonal, hasPersonalEntry } from './personal-storage.js';
 import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
 
 // === Constants & config ===
-export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "other", "manual"];
+export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "humble", "ea", "other", "manual"];
 export const JUNK_NAMES = new Set([
   "live",
   "hbo max",
@@ -243,7 +243,7 @@ export function recomputeWishlistCrossStore() {
 export function normalizeGame(g) {
   if (g.store && g.id != null) return g;
   const store = g.store || "steam";
-  const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id;
+  const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id ?? g.humble_id ?? g.ea_id;
   return { ...g, store, id };
 }
 
@@ -252,7 +252,7 @@ export function gameStore(g) {
 }
 
 export function gameId(g) {
-  return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id;
+  return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id ?? g.humble_id;
 }
 
 export function gameKey(g) {
@@ -357,6 +357,18 @@ export function storeUrlForGame(g) {
     if (url && url.startsWith("http")) return url;
     return `https://store.ubisoft.com/us/search?q=${encodeURIComponent(ng.name || "")}`;
   }
+  if (ng.store === "humble") {
+    if (url && url.startsWith("http")) return url;
+    const slug = ng.humble_id || (typeof ng.id === "string" && ng.id.startsWith("humble-") ? ng.id.slice(7) : null);
+    if (slug) return `https://www.humblebundle.com/store/${encodeURIComponent(slug)}`;
+    return `https://www.humblebundle.com/store/search?search=${encodeURIComponent(ng.name || "")}`;
+  }
+  if (ng.store === "ea") {
+    if (url && url.startsWith("http")) return url;
+    const slug = ng.ea_game_slug;
+    if (slug) return `https://www.ea.com/games/${encodeURIComponent(slug)}`;
+    return `https://www.ea.com/search?q=${encodeURIComponent(ng.name || "")}`;
+  }
   return url && url.startsWith("http") && !isGenericStoreUrl(url) ? url : null;
 }
 
@@ -423,7 +435,8 @@ export function trophyProgressPillHtml(g) {
 }
 
 export function storeLetter(s) {
-  return s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "itch" ? "I" : s === "xbox" ? "X" : s === "battlenet" ? "B" : s === "ubisoft" ? "U" : s === "other" ? "?" : s === "manual" ? "M" : "S";
+  if (s === "ea") return "EA";
+  return s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "itch" ? "I" : s === "xbox" ? "X" : s === "battlenet" ? "B" : s === "ubisoft" ? "U" : s === "humble" ? "H" : s === "other" ? "?" : s === "manual" ? "M" : "S";
 }
 
 export function singleStoreBadgeHtml(s, title) {
@@ -510,6 +523,7 @@ export function formatReleaseDate(d) {
   if (!d) return "—";
   const s = String(d).trim();
   if (!s) return "—";
+  if (/^to\s+be\s+announced$/i.test(s) || /^to\s+be\s+determined$/i.test(s)) return "TBA";
   const iso = s.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/);
   if (iso) {
     const y = iso[1];

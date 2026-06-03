@@ -8,7 +8,7 @@ auth context with its own ``dwsid`` session cookie. The wishlist page is
 *server-rendered*: there is no JSON API call to scrape, the items are baked
 into the HTML response.
 
-We piggyback on the same Playwright profile the Connections page already uses
+We piggyback on the same Chrome/Edge profile the Connections page already uses
 to sign in to Ubisoft (``cache/auth/profiles/ubisoft``). One headless page
 load with that profile yields a fully populated wishlist HTML; we parse the
 ``product-tile  wishlist-product-tile`` tiles plus the companion
@@ -103,7 +103,7 @@ def _configure_stdout() -> None:
 
 def _fetch_wishlist_html(timeout_s: int = 45) -> tuple[str, str]:
     """Load the wishlist page with the saved Ubisoft profile, headless."""
-    from playwright.sync_api import sync_playwright
+    from auth.cdp_browser import launch_persistent_profile
 
     profile = profile_dir("ubisoft")
     if not profile.exists():
@@ -112,30 +112,11 @@ def _fetch_wishlist_html(timeout_s: int = 45) -> tuple[str, str]:
             "Open the Connections page and connect Ubisoft first."
         )
 
-    common = {
-        "headless": True,
-        "viewport": {"width": 1400, "height": 1200},
-        "locale": "en-US",
-        "user_agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-        ),
-    }
-    with sync_playwright() as p:
-        try:
-            ctx = p.chromium.launch_persistent_context(str(profile), channel="chrome", **common)
-        except Exception:
-            ctx = p.chromium.launch_persistent_context(str(profile), **common)
-        try:
-            page = ctx.pages[0] if ctx.pages else ctx.new_page()
-            page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
-            try:
-                page.wait_for_load_state("networkidle", timeout=12_000)
-            except Exception:
-                pass
-            return page.title(), page.content()
-        finally:
-            ctx.close()
+    with launch_persistent_profile(str(profile), headless=True) as ctx:
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
+        page.wait_for_timeout(3000)
+        return page.title(), page.content()
 
 
 def _classify_kind(name: str, edition: str | None) -> str:

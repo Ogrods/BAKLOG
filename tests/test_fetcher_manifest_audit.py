@@ -88,6 +88,9 @@ REFUSE_EMPTY_SCRIPTS = {
     "fetch_psn_wishlist.py",
     "fetch_ubisoft_wishlist.py",
     "fetch_xbox_wishlist.py",
+    "fetch_nintendo_wishlist.py",
+    "fetch_humble.py",
+    "fetch_humble_wishlist.py",
     "fetch_wishlist.py",
     "fetch_itad.py",
 }
@@ -97,6 +100,7 @@ MANUAL_EMPTY_EXIT_SCRIPTS = {
     "fetch_nintendo.py",
     "fetch_itch.py",
     "fetch_ubisoft.py",
+    "fetch_ea.py",
 }
 NO_EMPTY_GUARD_SCRIPTS = {
     "enrich_hltb.py",

@@ -1,35 +1,43 @@
 #!/usr/bin/env python3
 """Fetch Epic Games Store wishlist into games_wishlist_epic.json.
 
-Uses the storefront session cookie (``EPIC_STORE_COOKIE`` in ``.env``) — the
-launcher OAuth that ``fetch_epic.py`` uses can't reach the wishlist endpoint
-because it sits behind a separate storefront auth context. See README for how
-to grab the cookie from DevTools.
+Uses the saved Epic Store browser profile (Connections -> Epic wishlist) and
+loads store.epicgames.com/wishlist headlessly, capturing storefront GraphQL
+responses. No cookie replay from Python (Cloudflare binds cf_clearance to the
+browser TLS fingerprint).
 
 Output rows match the shared dashboard wishlist schema (``store: "wishlist"``,
-``wishlist_store: "epic"``) so the merged Wishlist tab + deal radar pick them
-up alongside Steam and GOG entries.
+``wishlist_store: "epic"``).
 """
+
+from __future__ import annotations
 
 import argparse
 import json
-import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from dotenv import load_dotenv
 
-from epic_client import EpicAuthError, EpicStoreClient
-from auth import mark_invalid, resolve_env
+from auth import mark_invalid
+from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_WISHLIST_EPIC_JSON = Path("games_wishlist_epic.json")
+WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
+DUMP_DIR = Path("cache/epic")
+DUMP_HTML = DUMP_DIR / "wishlist_dump.html"
+DUMP_JSON = DUMP_DIR / "wishlist_dump.json"
 HLTB_DELAY_SEC = 1.0
+
+_SIGN_IN_RE = re.compile(r"sign\s*in|log\s*in", re.I)
 
 LIBRARY_IMAGE_TYPES = (
     "DieselGameBoxTall",
@@ -44,17 +52,6 @@ HEADER_IMAGE_TYPES = (
     "DieselGameBox",
     "Featured",
 )
-
-
-def _epic_auth_hint(exc: EpicAuthError) -> str:
-    msg = str(exc)
-    if "notLoggedIn" in msg:
-        return (
-            "Epic storefront session expired or never captured. On Connections, "
-            "use Epic (wishlist) → Connect, sign in at store.epicgames.com/wishlist, "
-            "and wait until your wishlist finishes loading."
-        )
-    return msg
 
 
 def _configure_stdout() -> None:
@@ -93,7 +90,6 @@ def _store_url(offer: dict | None, fallback_name: str) -> str:
 
 
 def _genres(offer: dict | None) -> list[str]:
-    """Pull human-readable category names from Epic tags."""
     if not offer:
         return []
     out: list[str] = []
@@ -107,7 +103,6 @@ def _genres(offer: dict | None) -> list[str]:
 
 
 def _price_fields(offer: dict | None) -> dict:
-    """Return price/price_initial/discount_percent/currency from an Epic offer."""
     blank = {
         "price": None,
         "price_initial": None,
@@ -190,6 +185,117 @@ def _build_row(element: dict, hltb: dict | None) -> dict | None:
     return row
 
 
+def _elements_from_payload(payload: Any) -> list[dict]:
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data") or payload
+    if not isinstance(data, dict):
+        return []
+    wishlist = data.get("Wishlist")
+    if not isinstance(wishlist, dict):
+        return []
+    items = wishlist.get("wishlistItems")
+    if not isinstance(items, dict):
+        return []
+    elements = items.get("elements")
+    if not isinstance(elements, list):
+        return []
+    return [el for el in elements if isinstance(el, dict)]
+
+
+def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[dict]:
+    """Merge wishlist GraphQL elements from captured JSON responses."""
+    found: dict[str, dict] = {}
+    for payload in api_payloads:
+        for el in _elements_from_payload(payload):
+            offer = el.get("offer") or {}
+            namespace = el.get("namespace") or offer.get("namespace")
+            offer_id = el.get("offerId") or offer.get("id")
+            eid = el.get("id") or (f"{namespace}:{offer_id}" if namespace and offer_id else None)
+            if not eid:
+                continue
+            found.setdefault(str(eid), el)
+    return list(found.values())
+
+
+def _signed_out(html: str, url: str) -> bool:
+    u = (url or "").lower()
+    if "id.epicgames.com/login" in u or "/login" in u and "store" not in u:
+        return True
+    if "challenge" in u or "cloudflare" in u:
+        return True
+    if _SIGN_IN_RE.search(html or "") and "wishlist" not in (html or "").lower():
+        return True
+    return False
+
+
+def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
+    from auth.cdp_browser import launch_persistent_profile
+
+    profile = profile_dir("epic_wishlist")
+    if not profile.exists():
+        raise RuntimeError(
+            "No saved Epic wishlist profile at cache/auth/profiles/epic_wishlist. "
+            "Open the Connections page and connect 'Epic (wishlist)' first."
+        )
+
+    api_payloads: list[Any] = []
+    # Network handlers run on the CDP reader thread; calling response.json()
+    # there deadlocks (getResponseBody waits on the same thread). Stash
+    # candidate responses and read their bodies from the main thread below.
+    candidates: list[Any] = []
+
+    def _capture(response) -> None:
+        try:
+            url = (response.url or "").lower()
+            if "store.epicgames.com/graphql" not in url:
+                return
+            if response.status == 200:
+                candidates.append(response)
+        except Exception:  # noqa: BLE001
+            pass
+
+    with launch_persistent_profile(str(profile), headless=True) as ctx:
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.on("response", _capture)
+        page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
+        page.wait_for_timeout(4000)
+        for resp in list(candidates):
+            try:
+                payload = resp.json()
+            except Exception:  # noqa: BLE001
+                continue
+            if _elements_from_payload(payload) or (
+                isinstance(payload, dict)
+                and isinstance(payload.get("data"), dict)
+                and "Wishlist" in payload["data"]
+            ):
+                api_payloads.append(payload)
+        html = page.content()
+        url = page.url or WISHLIST_URL
+
+        if dump:
+            DUMP_DIR.mkdir(parents=True, exist_ok=True)
+            DUMP_HTML.write_text(html, encoding="utf-8")
+            DUMP_JSON.write_text(
+                json.dumps(
+                    {
+                        "url": url,
+                        "api_payload_count": len(api_payloads),
+                        "api_payloads": api_payloads[:20],
+                        "element_count": len(parse_wishlist_sources(html, api_payloads)),
+                    },
+                    indent=2,
+                    default=str,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            print(f"  wrote {DUMP_HTML} and {DUMP_JSON}", flush=True)
+
+        return html, url, api_payloads
+
+
 def _load_existing() -> dict[str, dict]:
     if not GAMES_WISHLIST_EPIC_JSON.exists():
         return {}
@@ -202,45 +308,55 @@ def _load_existing() -> dict[str, dict]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Epic wishlist into games_wishlist_epic.json")
-    parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slower)")
+    parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
     parser.add_argument("--country", default="US", help="Storefront country code (default US)")
     parser.add_argument("--locale", default="en-US", help="Storefront locale (default en-US)")
+    parser.add_argument(
+        "--dump",
+        action="store_true",
+        help=f"Save raw HTML + captured GraphQL to {DUMP_DIR}/",
+    )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_epic_wishlist")
     stats = RunStats()
-
     load_dotenv()
-    cookie = resolve_env("EPIC_STORE_COOKIE", provider="epic_wishlist")
-    if not cookie:
-        print(
-            "EPIC_STORE_COOKIE is not set.\n\n"
-            "On Connections, use Epic (wishlist) → Connect, sign in at "
-            "store.epicgames.com/wishlist, clear any Cloudflare check, and "
-            "wait until your wishlist finishes loading.\n",
-            file=sys.stderr,
+
+    print("Fetching Epic wishlist via headless storefront page...", flush=True)
+    try:
+        html, url, api_payloads = _fetch_with_profile(dump=args.dump)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(exc)
+        is_transport = any(
+            tok in msg.lower()
+            for tok in ("cdp command timed out", "websocket", "browser", "debugging endpoint")
         )
-        return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
-
-    try:
-        client = EpicStoreClient(cookie=cookie)
-    except EpicAuthError as e:
-        hint = _epic_auth_hint(e)
-        mark_invalid("epic_wishlist", error=hint)
-        stats.error(hint)
+        if is_transport:
+            stats.error(f"wishlist fetch transport error: {msg}")
+            return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
+        mark_invalid("epic_wishlist", error=f"wishlist fetch failed: {msg}")
+        stats.error(msg)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
-    print("Fetching Epic wishlist via storefront GraphQL...", flush=True)
-    try:
-        elements = client.get_wishlist(country=args.country, locale=args.locale)
-    except EpicAuthError as e:
-        hint = _epic_auth_hint(e)
-        mark_invalid("epic_wishlist", error=hint)
-        stats.error(hint)
+    if _signed_out(html, url):
+        msg = (
+            "Epic storefront session is missing or expired. Open Connections, click "
+            "Epic (wishlist) \u2192 Connect, sign in at store.epicgames.com/wishlist "
+            "(clear Cloudflare if shown), and wait for the wishlist to load."
+        )
+        mark_invalid("epic_wishlist", error=msg)
+        stats.error(msg)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
-    print(f"  {len(elements)} wishlist items", flush=True)
+    elements = parse_wishlist_sources(html, api_payloads)
+    print(
+        f"  parsed {len(elements)} wishlist items ({len(api_payloads)} captured GraphQL responses)",
+        flush=True,
+    )
+
+    if args.dump:
+        return stats.finish("fetch_epic_wishlist", t0, exit_code=0, extra="dump only")
 
     empty_exit = refuse_empty_result(
         elements,
@@ -266,7 +382,7 @@ def main() -> int:
     for i, el in enumerate(elements, 1):
         offer = el.get("offer") or {}
         name = offer.get("title") or el.get("offerId") or "?"
-        print(f"[{i}/{len(elements)}] {name}")
+        print(f"[{i}/{len(elements)}] {name}", flush=True)
 
         hltb = None
         row_id = f"epic-{el.get('namespace') or offer.get('namespace')}:{el.get('offerId') or offer.get('id')}"
@@ -284,8 +400,8 @@ def main() -> int:
                 try:
                     time.sleep(HLTB_DELAY_SEC)
                     hltb = hltb_client.lookup(name)
-                except Exception as e:
-                    print(f"  HLTB warning: {e}")
+                except Exception as exc:  # noqa: BLE001
+                    print(f"  HLTB warning: {exc}", flush=True)
 
         row = _build_row(el, hltb)
         if row is None:
@@ -299,7 +415,8 @@ def main() -> int:
         "games": sorted(rows, key=lambda g: (g.get("name") or "").lower()),
     }
     GAMES_WISHLIST_EPIC_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+        json.dumps(payload, indent=2, ensure_ascii=False),
+        encoding="utf-8",
     )
     print(f"\nWrote {len(rows)} games to {GAMES_WISHLIST_EPIC_JSON}.", flush=True)
     print("Reload the dashboard to see Epic items in the Wishlist tab.", flush=True)

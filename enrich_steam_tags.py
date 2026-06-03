@@ -59,6 +59,7 @@ STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
     ("games_xbox.json", "xbox", None),
     ("games_battlenet.json", "battlenet", None),
     ("games_ubisoft.json", "ubisoft", None),
+    ("games_ea.json", "ea", None),
     ("games_nintendo.json", "nintendo", None),
     ("games_itch.json", "itch", _itch_is_videogame),
 ]

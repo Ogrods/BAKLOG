@@ -20,7 +20,7 @@ import {
   loadFetcherSources,
   configureFetcherHealth,
 } from './fetcher-health.js';
-import { initConnections } from './connections.js';
+import { initConnections, isItchTabAvailable } from './connections.js';
 import {
   initDashboard,
   scheduleDashboardRender,
@@ -57,7 +57,7 @@ import {
   liftBootCurtain,
   hideViewOverlay,
 } from './loading-curtain.js';
-import { reloadGames, reloadAfterFetcher } from './library-load.js';
+import { reloadGames, reloadAfterFetcher, finishEmptyLibraryLoad } from './library-load.js';
 import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
 import { initProfiles } from './profiles.js';
@@ -117,6 +117,10 @@ async function bootstrap() {
   const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch", "connections"]);
   if (VALID_VIEWS.has(state.prefs.activeView)) {
     state.activeView = state.prefs.activeView;
+  }
+  if (state.activeView === "itch" && !isItchTabAvailable()) {
+    state.activeView = "dashboard";
+    state.prefs.activeView = "dashboard";
   }
   applySavedSortForView(state.activeView);
   syncViewTabAria(state.activeView);
@@ -191,12 +195,13 @@ async function bootstrap() {
     await fetcherRunner.syncFromServer();
     if (state.activeView === "dashboard") fetcherRunner.startDashboardPolling();
   }
-  const reloadPromise = reloadGames().catch(() => {
+  const reloadPromise = reloadGames().catch(async () => {
     const banner = document.getElementById("bootErrorBanner");
     if (banner) {
       banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">No library data found. Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span></div>';
       banner.classList.remove("hidden");
     }
+    await finishEmptyLibraryLoad();
   });
   // Belt-and-suspenders: if either bootstrap chain rejects (fetcher API
   // unreachable, manifest 404, etc.) we still need to lift the curtain.

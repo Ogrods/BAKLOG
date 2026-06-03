@@ -14,6 +14,18 @@ from shared.profile_paths import resolve_catalog_path
 from shared.safe_write import safe_write_text
 
 
+def catalog_file(path: Path) -> Path:
+    """Resolved on-disk path for a catalog JSON under the active profile."""
+    return resolve_catalog_path(path)
+
+
+def write_catalog_text(path: Path, text: str) -> Path:
+    """Atomic write + rotated backup for a games_*.json / itad catalog file."""
+    disk = resolve_catalog_path(path)
+    safe_write_text(disk, text)
+    return disk
+
+
 def configure_stdout() -> None:
     """Avoid UnicodeEncodeError on Windows consoles (cp1252)."""
     for stream in (sys.stdout, sys.stderr):

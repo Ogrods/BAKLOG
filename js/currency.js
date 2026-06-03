@@ -117,3 +117,15 @@ export function currencyMismatchTag(code) {
   if (!code || rowCur === disp) return '';
   return `<span class="price-currency-tag" title="Store price in ${rowCur}">${rowCur}</span>`;
 }
+
+/** Tag for FX-converted rows (native currency/price preserved at fetch). */
+export function currencyMismatchTagForGame(g) {
+  if (g?.currency_native) {
+    const native = normalizeCurrencyCode(g.currency_native);
+    const title = g.price_native
+      ? `Store price: ${g.price_native} (${native})`
+      : `Store price in ${native}`;
+    return `<span class="price-currency-tag" title="${title}">${native}</span>`;
+  }
+  return currencyMismatchTag(g?.currency);
+}

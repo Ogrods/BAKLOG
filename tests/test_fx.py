@@ -1,0 +1,116 @@
+"""Tests for shared/fx.py and wishlist FX application."""
+
+from shared.fx import convert, parse_price_amount, round_amount
+from shared.wishlist_fx import apply_fx_to_game
+
+
+def _eur_base_rates() -> dict:
+    return {
+        "base": "EUR",
+        "fetched_at": "2026-06-01T12:00:00+00:00",
+        "rates": {
+            "EUR": 1.0,
+            "USD": 1.10,
+            "GBP": 0.85,
+            "JPY": 160.0,
+        },
+    }
+
+
+def test_parse_price_amount():
+    assert parse_price_amount("£45.99") == 45.99
+    assert parse_price_amount("$9.99") == 9.99
+    assert parse_price_amount(12.5) == 12.5
+    assert parse_price_amount(None) is None
+
+
+def test_convert_gbp_to_usd():
+    rates = _eur_base_rates()
+    # 10 GBP -> EUR -> USD
+    out = convert(10, "GBP", "USD", rates)
+    assert out is not None
+    assert abs(out - (10 / 0.85 * 1.10)) < 0.02
+
+
+def test_convert_same_currency():
+    assert convert(9.99, "USD", "USD", _eur_base_rates()) == 9.99
+
+
+def test_convert_missing_pair():
+    assert convert(10, "GBP", "XYZ", _eur_base_rates()) is None
+
+
+def test_round_amount_jpy():
+    assert round_amount(1234.6, "JPY") == 1235.0
+    assert round_amount(9.999, "USD") == 10.0
+
+
+def test_apply_fx_to_game_preserves_native():
+    rates = _eur_base_rates()
+    game = {
+        "name": "Test",
+        "currency": "GBP",
+        "price": "£45.00",
+        "price_initial": "£60.00",
+    }
+    assert apply_fx_to_game(game, "USD", rates) is True
+    assert game["currency_native"] == "GBP"
+    assert game["price_native"] == "£45.00"
+    assert game["currency"] == "USD"
+    assert game["price_amount"] is not None
+    assert game["fx_converted"] is True
+
+
+def test_apply_fx_is_idempotent():
+    """Re-running with the same target must not change a converted row again."""
+    rates = _eur_base_rates()
+    game = {"currency": "GBP", "price": "£45.00", "price_initial": "£60.00"}
+    assert apply_fx_to_game(game, "USD", rates) is True
+    first = dict(game)
+    assert apply_fx_to_game(game, "USD", rates) is False
+    assert game == first
+
+
+def test_apply_fx_no_double_conversion_on_target_change():
+    """Switching display currency must convert from the native price, not the prior result."""
+    rates = _eur_base_rates()
+    native = {"currency": "GBP", "price": "£45.00", "price_initial": "£60.00"}
+    apply_fx_to_game(native, "USD", rates)
+
+    direct = {"currency": "GBP", "price": "£45.00", "price_initial": "£60.00"}
+    apply_fx_to_game(direct, "EUR", rates)
+
+    # Converting the USD-converted row to EUR must equal converting GBP straight to EUR.
+    changed = apply_fx_to_game(native, "EUR", rates)
+    assert changed is True
+    assert native["currency_native"] == "GBP"
+    assert native["price_native"] == "£45.00"
+    assert abs(native["price_amount"] - direct["price_amount"]) < 0.001
+
+
+def test_apply_fx_restores_native_when_target_matches():
+    rates = _eur_base_rates()
+    game = {"currency": "GBP", "price": "£45.00", "price_initial": "£60.00"}
+    apply_fx_to_game(game, "USD", rates)
+    # Now display currency switches to the row's own native currency.
+    assert apply_fx_to_game(game, "GBP", rates) is True
+    assert game["currency"] == "GBP"
+    assert game["price"] == "£45.00"
+    assert "currency_native" not in game
+    assert "price_amount" not in game
+    assert "fx_converted" not in game
+
+
+def test_apply_fx_same_currency_is_noop():
+    rates = _eur_base_rates()
+    game = {"currency": "USD", "price": "$9.99"}
+    assert apply_fx_to_game(game, "USD", rates) is False
+    assert game == {"currency": "USD", "price": "$9.99"}
+
+
+def test_apply_fx_missing_pair_leaves_native():
+    rates = _eur_base_rates()  # no XYZ rate
+    game = {"currency": "XYZ", "price": "10.00"}
+    assert apply_fx_to_game(game, "USD", rates) is False
+    assert game["currency"] == "XYZ"
+    assert "price_amount" not in game

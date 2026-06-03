@@ -81,11 +81,13 @@ npm run build:css
 
 3. Find your [SteamID64](https://steamid.io) (17-digit number starting with `7656119`).
 
-4. Copy `.env.example` to `.env` and fill in credentials:
+4. (Optional, legacy) Copy `.env.example` to `.env` and fill in credentials:
 
    ```bash
    copy .env.example .env
    ```
+
+   Prefer the **Connections** page instead — it stores credentials in encrypted per-profile storage. On first `python server.py` start, any `.env` credentials are imported once into the **default** profile's encrypted store and the file is archived as `.env.imported`.
 
 5. Set **Game details** to **Public** in Steam → Profile → Edit Profile → Privacy Settings.
 
@@ -135,10 +137,18 @@ python fetch_epic.py
 python fetch_epic_wishlist.py
 ```
 
-**Amazon Games (Windows):** No browser sign-in — reads the Prime Gaming launcher SQLite DB on this PC. Optional override: `AMAZON_GAMES_SQL_DIR=`.
+**Amazon Games** — two sources, one `games_amazon.json`:
+
+| Source | Connections card | When to use |
+|--------|------------------|-------------|
+| **Launcher (Windows)** | Amazon Games (launcher) | Richest data (art, last played) from local SQLite. Optional: `AMAZON_GAMES_SQL_DIR=`. |
+| **Prime Gaming (web)** | Amazon (Prime Gaming, web) | Any OS; imports Amazon-fulfilled claims only (skips Epic/Steam key drops). |
+
+`fetch_amazon.py` picks **auto**: launcher DB on Windows when present, else the saved web session. Override with `--source launcher|web` or `AMAZON_SOURCE=`.
 
 ```bash
 python fetch_amazon.py
+python fetch_amazon.py --source web --dump-raw   # debug: writes cache/amazon_web_raw.json
 ```
 
 **Xbox (play history):** Connections → Xbox → Connect at [xbl.io](https://xbl.io/login), or paste an OpenXBL API key into the card.
@@ -216,6 +226,8 @@ python fetch_nintendo_wishlist.py   # Connections → Nintendo Store wishlist (s
 python fetch_itad.py
 ```
 
+**Display currency / FX:** set `ITAD_COUNTRY` (e.g. `GB`) before `fetch_itad.py`; ITAD and wishlist rows use that region’s currency. The script caches daily exchange rates from [Frankfurter](https://www.frankfurter.app/) and writes comparable `price_amount` fields on wishlist JSON while keeping `price_native` / `currency_native` for the store’s real price. Re-run ITAD after wishlist fetches to refresh conversions (rates can be up to 7 days old before a warning).
+
 Wishlist JSON files (`games_wishlist.json`, `games_wishlist_gog.json`, `games_wishlist_epic.json`, `games_wishlist_nintendo.json`, etc.) are optional per store. The dashboard **Fetcher health** row marks any file that has not been fetched yet as *missing*; that is normal until you run the matching script.
 
 **Epic wishlist:** separate from launcher OAuth (`fetch_epic.py`). Connections → **Epic (wishlist)** → Connect at [store.epicgames.com/wishlist](https://store.epicgames.com/en-US/wishlist) (clear Cloudflare if shown). `fetch_epic_wishlist.py` reuses the saved browser profile headlessly — no `EPIC_STORE_COOKIE` paste.
@@ -242,7 +254,8 @@ First Steam run may take several minutes for a large library (Store API is rate-
 | `enrich_steam_reviews.py` | Backfill Steam review % on non-Steam rows via Steam store search (gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, itch). Use `--stores nintendo` etc. to limit; Shift+click adds `--retry-misses`. |
 | `enrich_cross_store_images.py` | Backfill `header_image` / `library_image` from the Steam CDN for non-Steam rows (gog, psn, epic, amazon, xbox, battlenet, ubisoft, nintendo). |
 | `enrich_hltb.py` | Backfill HLTB hours on any `games_*.json` row missing them |
-| `fetch_itad.py` | Cross-store deal prices → `itad_prices.json` (wishlist by default) |
+| `fetch_itad.py` | Cross-store deal prices → `itad_prices.json` (wishlist by default); refreshes `cache/fx_rates.json` and converts wishlist store prices to display currency |
+| `fetch_fx.py` | Refresh FX rates only (`cache/fx_rates.json`, Frankfurter; 24h cache) |
 
 ## Open the dashboard
 
@@ -340,7 +353,7 @@ crontab -e
 0 9 * * 0 cd /path/to/steam-backlog && ./refresh.sh
 ```
 
-> `refresh.sh` skips `fetch_amazon.py` automatically — that store is Windows-only.
+> `refresh.sh` skips `fetch_amazon.py` on non-Windows hosts (launcher DB is Windows-only). Use the Prime Gaming web Connections card + `fetch_amazon.py --source web` on macOS/Linux.
 
 ## Files
 
@@ -350,7 +363,7 @@ crontab -e
 | `fetch_gog.py` | GOG library → `games_gog.json` |
 | `fetch_psn.py` | PSN library → `games_psn.json` |
 | `fetch_epic.py` | Epic library → `games_epic.json` |
-| `fetch_amazon.py` | Amazon Prime Gaming → `games_amazon.json` |
+| `fetch_amazon.py` | Amazon library (launcher DB or Prime Gaming web) → `games_amazon.json` |
 | `fetch_xbox.py` | Xbox / Game Pass / MS Store → `games_xbox.json` |
 | `fetch_battlenet.py` | Battle.net → `games_battlenet.json` |
 | `fetch_ubisoft.py` | Ubisoft Connect → `games_ubisoft.json` |
@@ -372,7 +385,8 @@ crontab -e
 | `gog_client.py` | GOG embed API client |
 | `psn_client.py` | PlayStation Network client (via psnawp) |
 | `epic_client.py` | Epic OAuth client |
-| `amazon_client.py` | Amazon Games SQLite reader (Windows-only) |
+| `amazon_client.py` | Amazon Games SQLite reader (Windows launcher source) |
+| `amazon_web_client.py` | Prime Gaming claims via Luna GraphQL (web source) |
 | `xbox_client.py` | OpenXBL title history client |
 | `battlenet_client.py` | Battle.net session (Edge cookie jar + optional .env fallback) |
 | `ubisoft_client.py` | Ubisoft Connect API client |

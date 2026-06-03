@@ -12,7 +12,7 @@ import os
 
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
 from fetchers._progress import RunStats, started
 from steam_client import SteamClient
 from steam_metadata import coop_flags_from_categories
@@ -134,9 +134,9 @@ def _build_game_row(
 
 
 def load_existing() -> dict[int, dict]:
-    if not GAMES_STEAM_JSON.exists():
+    if not catalog_file(GAMES_STEAM_JSON).exists():
         return {}
-    data = json.loads(GAMES_STEAM_JSON.read_text(encoding="utf-8"))
+    data = json.loads(catalog_file(GAMES_STEAM_JSON).read_text(encoding="utf-8"))
     return {g["appid"]: g for g in data.get("games", [])}
 
 
@@ -265,8 +265,8 @@ def main() -> int:
     }
 
     text = json.dumps(payload, indent=2, ensure_ascii=False)
-    GAMES_STEAM_JSON.write_text(text, encoding="utf-8")
-    print(f"\nWrote {len(games_out)} games to {GAMES_STEAM_JSON} (skipped {skipped} non-game items).", flush=True)
+    disk = write_catalog_text(GAMES_STEAM_JSON, text)
+    print(f"\nWrote {len(games_out)} games to {disk} (skipped {skipped} non-game items).", flush=True)
     print("Open index.html in your browser to view the dashboard.", flush=True)
     stats.ok = len(games_out)
     return stats.finish("fetch_games", t0, exit_code=0, extra=f"{len(games_out)} games")

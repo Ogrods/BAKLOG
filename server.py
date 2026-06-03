@@ -76,10 +76,6 @@ LAUNCH_TIMEOUT_SEC = 30  # max wait for subprocess.Popen() to return before decl
 # when spawned from another AppX Python process — the worker thread blocks
 # indefinitely with no zombie child to kill. The launch watchdog aborts the
 # wait so subsequent queued runs can still execute.
-RUNS_DIR = ROOT / "cache" / "runs"
-ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
-RUN_HISTORY_FILE = RUNS_DIR / "history.json"
-QUEUE_FILE = RUNS_DIR / "queue.json"
 _runs_file_lock = threading.Lock()
 
 # Statuses that occupy a queue slot (cap = 2: one active + one queued).
@@ -96,7 +92,14 @@ from shared.profile_paths import (  # noqa: E402
     personal_backup_dir,
     personal_dir,
     personal_path,
+    profile_root,
+    runs_dir,
 )
+
+RUNS_DIR = runs_dir()
+ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
+RUN_HISTORY_FILE = RUNS_DIR / "history.json"
+QUEUE_FILE = RUNS_DIR / "queue.json"
 
 # Kept for tests that monkeypatch these names.
 PERSONAL_DIR = personal_dir()
@@ -105,11 +108,16 @@ PERSONAL_BACKUP_DIR = personal_backup_dir()
 
 
 def _refresh_personal_paths() -> None:
-    """Rebind module-level personal paths after profile switch (tests may patch)."""
+    """Rebind module-level personal + run paths after profile switch (tests may patch)."""
     global PERSONAL_DIR, PERSONAL_FILE, PERSONAL_BACKUP_DIR
+    global RUNS_DIR, ACTIVE_RUNS_FILE, RUN_HISTORY_FILE, QUEUE_FILE
     PERSONAL_DIR = personal_dir()
     PERSONAL_FILE = personal_path()
     PERSONAL_BACKUP_DIR = personal_backup_dir()
+    RUNS_DIR = runs_dir()
+    ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
+    RUN_HISTORY_FILE = RUNS_DIR / "history.json"
+    QUEUE_FILE = RUNS_DIR / "queue.json"
 PERSONAL_BACKUP_KEEP = 10
 PERSONAL_MAX_BYTES = 32 * 1024 * 1024  # 32 MB hard cap on the PUT body
 _personal_lock = threading.RLock()
@@ -790,7 +798,7 @@ class RunManager:
             try:
                 p = subprocess.Popen(  # noqa: S603 - argv is fixed in FETCHERS, not user input
                     argv,
-                    cwd=str(ROOT),
+                    cwd=str(profile_root()),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     bufsize=1,
@@ -1665,8 +1673,31 @@ def _shutdown_server() -> None:
     MANAGER.shutdown()
 
 
+def _maybe_import_legacy_env() -> None:
+    """One-time: migrate root .env credentials into the default profile's encrypted
+    blob, then archive .env as .env.imported. Never blocks server start on failure."""
+    env_path = ROOT / ".env"
+    imported_path = ROOT / ".env.imported"
+    if not env_path.is_file() or imported_path.exists():
+        return
+    try:
+        from auth.manager import import_env_credentials
+        from shared.profile_paths import DEFAULT_PROFILE_ID
+
+        keys = import_env_credentials(profile_id=DEFAULT_PROFILE_ID)
+        os.replace(env_path, imported_path)
+        print(
+            f"[auth] Imported {len(keys)} provider(s) from .env into profile "
+            f"'{DEFAULT_PROFILE_ID}' -> .env.imported",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - migration must never block boot
+        print(f"[auth] .env import skipped: {exc}", file=sys.stderr, flush=True)
+
+
 def main() -> None:
     atexit.register(_shutdown_server)
+    _maybe_import_legacy_env()
 
     def _handle_exit(signum: int, _frame: Any) -> None:
         print(f"\nShutting down (signal {signum}).")

@@ -1,6 +1,7 @@
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 import { noteFetcherAuthFailure, isProviderConnected, FETCHER_AUTH_PROVIDER, showReconnectBanner } from './connections.js';
+import { profileScopedStorageKey } from './profiles.js';
 
 // ---------------------------------------------------------------------------
 // Chip-level auth-failure backoff
@@ -102,7 +103,7 @@ function authCooldownLabel(ms) {
 // ---------------------------------------------------------------------------
 // Per-provider reconnect-required (definitive auth / max-strike / server expired)
 // ---------------------------------------------------------------------------
-const RECONNECT_DISMISSED_LS_KEY = 'baklog-reconnect-dismissed';
+const RECONNECT_DISMISSED_LS_KEY = profileScopedStorageKey('baklog-reconnect-dismissed');
 /** @type {Set<string>} */
 let reconnectDismissed = loadReconnectDismissedSet();
 /** @type {Map<string, { at: number }>} */
@@ -196,7 +197,7 @@ const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
 const STALE_OVERRIDES = {
   itad: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
 };
-export const ITAD_LAST_AUTO_RUN_KEY = 'itad-last-auto-run';
+export const ITAD_LAST_AUTO_RUN_KEY = profileScopedStorageKey('baklog-itad-last-auto-run');
 export const ITAD_AUTO_REFRESH_INTERVAL_MS = 60 * 60_000;
 export const ITAD_AUTO_QUIET_HOUR_END = 7;
 

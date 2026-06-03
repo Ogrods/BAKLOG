@@ -1000,6 +1000,58 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
     )
 
 
+LUNA_CLAIMS_URL = "https://luna.amazon.com/claims/my-collection"
+
+
+def _extract_amazon_web(page, context, session: AuthSession | None = None) -> dict[str, str]:
+    """Confirm Prime Gaming claims load; durable credential is the saved browser profile."""
+    from amazon_web_client import try_parse_claims_from_text
+
+    saw_claims = {"ok": False}
+
+    def on_response(resp: Any) -> None:
+        if saw_claims["ok"]:
+            return
+        try:
+            if getattr(resp, "status", 0) != 200:
+                return
+            if "graphql" not in (getattr(resp, "url", None) or "").lower():
+                return
+            if try_parse_claims_from_text(resp.text()) is not None:
+                saw_claims["ok"] = True
+        except Exception:
+            pass
+
+    page.on("response", on_response)
+    try:
+        page.goto(LUNA_CLAIMS_URL, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_hint = 0.0
+    while time.time() < deadline:
+        if saw_claims["ok"]:
+            return {"AMAZON_WEB_PROFILE": "ready"}
+
+        now = time.time()
+        if session and now - last_hint > 10:
+            last_hint = now
+            url = (page.url or "").lower()
+            if "signin" in url or "/ap/" in url:
+                msg = "Sign in to your Amazon account in the browser window."
+            else:
+                msg = "Keep the window open until My Collection finishes loading."
+            session.emit("waiting_for_user", {"message": msg})
+
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "Prime Gaming claims not detected — sign in at luna.amazon.com, open My Collection, "
+        "and wait for your games list before the window closes."
+    )
+
+
 EXTRACTORS = {
     "battlenet": lambda page, ctx: _extract_battlenet(ctx),
     "nintendo": lambda page, ctx: _extract_nintendo_inline(page, ctx, None),
@@ -1016,13 +1068,14 @@ EXTRACTORS = {
     "ea": lambda page, ctx: _extract_ea(page, ctx, None),
     "epic": lambda page, ctx: _extract_epic_inline(page, ctx, None),
     "epic_wishlist": lambda page, ctx: _extract_epic_wishlist_inline(page, ctx, None),
+    "amazon_web": lambda page, ctx: _extract_amazon_web(page, ctx, None),
 }
 
 # Custom wait/extract loops — not the URL-pattern path in run_browser_auth.
 INLINE_PROVIDERS = {
     "psn", "steam", "itch", "itad", "xbox", "xbox_wishlist",
     "ubisoft", "ea", "epic_wishlist", "nintendo", "nintendo_wishlist", "epic",
-    "humble",
+    "humble", "amazon_web",
 }
 
 
@@ -1071,6 +1124,10 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             "Sign in to your EA account. We'll open the EA deals page to capture your "
             "library token automatically."
         ),
+        "amazon_web": (
+            "Sign in to Amazon and open Prime Gaming My Collection. We'll capture your "
+            "claims list automatically."
+        ),
     }
     session.emit(
         "waiting_for_user",
@@ -1116,6 +1173,8 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
                 creds = _extract_epic_inline(page, context, session)
             elif provider == "humble":
                 creds = _extract_humble_inline(page, context, session)
+            elif provider == "amazon_web":
+                creds = _extract_amazon_web(page, context, session)
             else:
                 page.goto(spec.login_url, wait_until="domcontentloaded")
                 session.emit("signed_in", {"url": page.url})

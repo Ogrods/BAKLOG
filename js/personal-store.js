@@ -1,4 +1,5 @@
 import { state, STORAGE_KEY, PREFS_KEY, MANUAL_KEY } from './state.js';
+import { prefsStorageKey } from './profiles.js';
 
 let getManualGamesFn = () => [];
 let setManualGamesFn = () => {};
@@ -186,7 +187,26 @@ export const personalStore = (() => {
     }
   }
 
-  return { init, notify, flush, flushSync, uploadLocalToServer, dismissMigration };
+  /** Flush current profile to disk, then block further saves until reload (profile switch). */
+  async function prepareForProfileSwitch() {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    if (apiAvailable === true) {
+      await flush();
+    }
+    dirty = false;
+    initComplete = false;
+  }
+
+  return {
+    init,
+    notify,
+    flush,
+    flushSync,
+    prepareForProfileSwitch,
+    uploadLocalToServer,
+    dismissMigration,
+  };
 })();
 
 window.addEventListener('beforeunload', () => personalStore.flushSync());

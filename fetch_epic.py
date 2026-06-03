@@ -22,6 +22,8 @@ from fetchers._base import (
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    catalog_file,
+    write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
@@ -240,9 +242,9 @@ def _build_game_row_from_record(
 
 
 def load_existing() -> dict[str, dict]:
-    if not GAMES_EPIC_JSON.exists():
+    if not catalog_file(GAMES_EPIC_JSON).exists():
         return {}
-    data = json.loads(GAMES_EPIC_JSON.read_text(encoding="utf-8"))
+    data = json.loads(catalog_file(GAMES_EPIC_JSON).read_text(encoding="utf-8"))
     return {g["id"]: g for g in data.get("games", [])}
 
 
@@ -407,7 +409,7 @@ def main() -> int:
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-    GAMES_EPIC_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_catalog_text(GAMES_EPIC_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_EPIC_JSON} (skipped {skipped}).", flush=True)
     print("Reload the dashboard (or click Reload library) to refresh Picks.", flush=True)
     stats.ok = len(games_out)

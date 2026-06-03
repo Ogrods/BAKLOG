@@ -19,8 +19,17 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKUP_ROOT = ROOT / "data" / "games_backups"
 DEFAULT_KEEP = 10
+
+
+def backup_root_for(path: Path) -> Path:
+    """Profile-scoped backup dir for catalog JSON (falls back to repo data/)."""
+    try:
+        from shared.profile_paths import games_backup_root
+
+        return games_backup_root()
+    except Exception:
+        return ROOT / "data" / "games_backups"
 
 
 def _stamp() -> str:
@@ -45,7 +54,7 @@ def rotate_backup(
     if not path.exists():
         return None
     prefix = prefix or path.stem
-    backup_dir = backup_dir or (BACKUP_ROOT / prefix)
+    backup_dir = backup_dir or (backup_root_for(path) / prefix)
     try:
         backup_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:

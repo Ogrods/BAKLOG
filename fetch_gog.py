@@ -18,6 +18,8 @@ from fetchers._base import (
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    catalog_file,
+    write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from gog_client import GogAuthError, GogClient
@@ -188,9 +190,9 @@ def _build_game_row(
 
 
 def load_existing() -> dict[int, dict]:
-    if not GAMES_GOG_JSON.exists():
+    if not catalog_file(GAMES_GOG_JSON).exists():
         return {}
-    data = json.loads(GAMES_GOG_JSON.read_text(encoding="utf-8"))
+    data = json.loads(catalog_file(GAMES_GOG_JSON).read_text(encoding="utf-8"))
     return {g["id"]: g for g in data.get("games", [])}
 
 
@@ -318,7 +320,7 @@ def main() -> int:
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
 
-    GAMES_GOG_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_catalog_text(GAMES_GOG_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_GOG_JSON} (skipped {skipped} non-game items).", flush=True)
     print("Open index.html in your browser to view the dashboard.", flush=True)
     stats.ok = len(games_out)

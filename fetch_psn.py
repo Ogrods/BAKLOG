@@ -19,6 +19,8 @@ from fetchers._base import (
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    catalog_file,
+    write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from psn_client import PsnAuthError, PsnClient, PsnGameEntry
@@ -92,9 +94,9 @@ def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
 
 
 def load_existing() -> dict[str, dict]:
-    if not GAMES_PSN_JSON.exists():
+    if not catalog_file(GAMES_PSN_JSON).exists():
         return {}
-    data = json.loads(GAMES_PSN_JSON.read_text(encoding="utf-8"))
+    data = json.loads(catalog_file(GAMES_PSN_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
@@ -226,7 +228,7 @@ def main() -> int:
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
 
-    GAMES_PSN_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_catalog_text(GAMES_PSN_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_PSN_JSON}.", flush=True)
     print("Open index.html in your browser to view the dashboard.", flush=True)
     stats.ok = len(games_out)

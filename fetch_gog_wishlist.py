@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from shared.money import format_price, normalize_currency_code
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
@@ -284,10 +284,7 @@ def main() -> int:
         "game_count": len(rows),
         "games": sorted(rows, key=lambda g: (g.get("name") or "").lower()),
     }
-    GAMES_WISHLIST_GOG_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    write_catalog_text(GAMES_WISHLIST_GOG_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(rows)} games to {GAMES_WISHLIST_GOG_JSON}.", flush=True)
     return stats.finish("fetch_gog_wishlist", t0, exit_code=0, extra=f"{len(rows)} games")
 

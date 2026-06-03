@@ -18,9 +18,11 @@ from auth import resolve_env
 from fetchers._base import add_allow_empty_arg, refuse_empty_result
 from fetchers._progress import RunStats, started
 from itad_client import ItadClient, ItadError
+from shared.fx import ensure_fx_rates
 from shared.money import country_to_currency
 from shared.profile_paths import catalog_path, itad_path
 from shared.safe_write import safe_write_text
+from shared.wishlist_fx import refresh_wishlist_fx_after_itad
 
 ITAD_JSON = Path("itad_prices.json")
 LIBRARY_FILES = [
@@ -61,7 +63,7 @@ def _collect_titles(include_library: bool) -> list[tuple[str, str]]:
 
     if include_library:
         for path in LIBRARY_FILES:
-            p = Path(path)
+            p = catalog_path(path)
             if not p.exists():
                 continue
             data = json.loads(p.read_text(encoding="utf-8"))
@@ -95,6 +97,10 @@ def main() -> int:
     t0 = started("fetch_itad")
     stats = RunStats()
     load_dotenv()
+    try:
+        ensure_fx_rates(warn_stale=True)
+    except RuntimeError as e:
+        stats.warn(f"FX rates unavailable: {e} (wishlist FX conversion skipped)")
     api_key = resolve_env("ITAD_API_KEY", provider="itad")
     if not api_key:
         stats.error("Set ITAD_API_KEY in .env (free key from https://isthereanydeal.com/dev/api/)")
@@ -156,6 +162,13 @@ def main() -> int:
     out = itad_path()
     safe_write_text(out, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"Wrote {len(by_key)} price rows to {ITAD_JSON}.", flush=True)
+    fx_files, fx_rows = refresh_wishlist_fx_after_itad(args.country)
+    if fx_rows:
+        print(
+            f"FX: converted {fx_rows} wishlist row(s) across {fx_files} catalog(s) "
+            f"to {country_to_currency(args.country)}.",
+            flush=True,
+        )
     stats.ok = len(by_key)
     exit_code = 0 if by_key or args.allow_empty else 2
     return stats.finish(

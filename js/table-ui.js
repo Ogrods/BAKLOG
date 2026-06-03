@@ -64,7 +64,7 @@ import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
 import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
 import { buildTableEmptyStateHtml } from './table-empty-state.js';
-import { formatMoney, currencyMismatchTag, displayCurrency } from './currency.js';
+import { formatMoney, currencyMismatchTagForGame, displayCurrency } from './currency.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 // dashboard-drilldown imports from table-ui already; the cycle is safe because
@@ -494,7 +494,7 @@ export function formatPrice(g) {
   if (!g.price && g.discount_percent == null) return "—";
   const base = g.price || "N/A";
   const cut = g.discount_percent || 0;
-  const curTag = currencyMismatchTag(g.currency);
+  const curTag = currencyMismatchTagForGame(g);
   if (cut > 0) {
     const bucket = cutBucketClass(cut);
     return `<span class="price-cut font-semibold ${bucket}">${escapeHtml(base)} (-${cut}%)${curTag}</span>`;

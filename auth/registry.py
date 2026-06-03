@@ -131,9 +131,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
     ),
     "amazon": ProviderSpec(
         key="amazon",
-        label="Amazon Games",
+        label="Amazon Games (launcher)",
         kind="local",
-        description="Your Prime Gaming library, read from the Amazon Games launcher on this PC.",
+        description="Your Prime Gaming library from the Amazon Games launcher on this PC (richest data: art, last played).",
         env_keys=("AMAZON_GAMES_SQL_DIR",),
         fetcher_keys=("amazon",),
         platforms=("win32",),
@@ -141,7 +141,28 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "No sign-in window \u2014 we read the Amazon Games launcher's local database on this PC.",
             "Just install the Amazon Games launcher and sign in there once; keep it installed.",
             "Nothing leaves your machine for this source; it's a local file read only.",
-            "Windows only \u2014 the launcher database uses Windows DPAPI, so this source is unavailable on macOS/Linux.",
+            "Windows only \u2014 the launcher database uses Windows DPAPI. On macOS/Linux use "
+            "“Amazon (Prime Gaming, web)” below.",
+        ),
+    ),
+    "amazon_web": ProviderSpec(
+        key="amazon_web",
+        label="Amazon (Prime Gaming, web)",
+        kind="browser",
+        description=(
+            "Prime Gaming claims delivered to Amazon Games (no external redemption keys). "
+            "Works on any OS; complements the Windows launcher source above."
+        ),
+        env_keys=("AMAZON_WEB_PROFILE",),
+        login_url="https://luna.amazon.com/claims/my-collection",
+        success_url_pattern=r"luna\.amazon\.com|amazon\.com",
+        expiry_days=30,
+        fetcher_keys=("amazon",),
+        tips=(
+            "Sign in with your Amazon account and open My Collection so we can capture your claims.",
+            "Imports Amazon-fulfilled Prime games only \u2014 external key drops (Epic, Steam, etc.) are skipped.",
+            "Use this on macOS/Linux, or on Windows when you don't use the Amazon Games launcher.",
+            "Sessions last about 30 days; reconnect if the Amazon fetcher reports auth failure.",
         ),
     ),
     "xbox": ProviderSpec(

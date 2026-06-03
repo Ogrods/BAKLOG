@@ -10,6 +10,7 @@ import {
   displayCurrency,
   formatMoney,
   currencyMismatchTag,
+  currencyMismatchTagForGame,
 } from '../js/currency.js';
 
 beforeEach(() => {
@@ -61,5 +62,18 @@ describe('currencyMismatchTag', () => {
     state.libraryMeta.itad = { currency: 'USD', country: 'US' };
     expect(currencyMismatchTag('EUR')).toContain('EUR');
     expect(currencyMismatchTag('USD')).toBe('');
+  });
+});
+
+describe('currencyMismatchTagForGame', () => {
+  it('shows native currency after FX conversion', () => {
+    state.libraryMeta.itad = { currency: 'USD', country: 'US' };
+    const tag = currencyMismatchTagForGame({
+      currency: 'USD',
+      currency_native: 'GBP',
+      price_native: '£45.00',
+    });
+    expect(tag).toContain('GBP');
+    expect(tag).toContain('£45.00');
   });
 });

@@ -1,4 +1,5 @@
 .env
+.env.imported
 games_steam.json
 games_gog.json
 games_psn.json

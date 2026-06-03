@@ -86,16 +86,19 @@ def test_auth_status_endpoint_ok_and_reports_platform(auth_server: str):
         assert amazon["available"] is False
 
 
-def test_amazon_fetcher_blocked_off_windows(auth_server: str):
-    """POST /api/run/amazon must be refused on non-Windows with a 400."""
+def test_amazon_fetcher_allowed_off_windows(auth_server: str):
+    """POST /api/run/amazon is allowed on non-Windows (Prime Gaming web source)."""
     if sys.platform == "win32":
-        pytest.skip("Amazon fetcher is allowed on Windows")
+        pytest.skip("covered by launcher path on Windows")
     req = urllib.request.Request(f"{auth_server}/api/run/amazon", data=b"", method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            status = resp.status
-    except urllib.error.HTTPError as exc:
-        status = exc.code
-        body = json.loads(exc.read().decode("utf-8"))
-        assert "win32" in body.get("error", "")
-    assert status == 400
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        status = resp.status
+    assert status in (200, 202, 204)
+
+
+def test_amazon_web_provider_available_everywhere():
+    rows = {r["key"]: r for r in manager.get_status()}
+    web = rows["amazon_web"]
+    assert web["platforms"] == []
+    assert web["available"] is True
+    assert web["kind"] == "browser"

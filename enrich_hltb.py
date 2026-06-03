@@ -16,12 +16,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, heartbeat, started
 from hltb_client import HltbClient
+from shared.profile_paths import profile_root
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-MAPPING_FILE = Path("cache/hltb_map.json")
+MAPPING_FILE = profile_root() / "cache" / "hltb_map.json"
 QUERY_DELAY_SEC = 0.4  # be polite to HLTB; howlongtobeatpy doesn't throttle itself
 SAVE_EVERY_N_LOOKUPS = 25
 HEARTBEAT_EVERY = 25
@@ -98,7 +100,8 @@ def main() -> int:
     for filename, store, row_filter in STORE_FILES:
         if args.store and args.store != store:
             continue
-        path = Path(filename)
+        rel = Path(filename)
+        path = catalog_file(rel)
         if not path.exists():
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -175,9 +178,7 @@ def main() -> int:
                 )
 
         data["game_count"] = len(games)
-        path.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
         print(
             f"  saved {updated} HLTB updates to {filename} "
             f"({store_lookups} lookups: {store_hits} hits, {store_misses} no-match, "

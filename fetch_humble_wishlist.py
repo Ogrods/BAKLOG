@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid
 from fetch_humble import _launch_humble_ctx
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
@@ -320,10 +320,10 @@ def _build_row(item: WishlistItem, hltb: dict | None) -> dict:
 
 
 def _load_existing() -> dict[str, dict]:
-    if not GAMES_HUMBLE_WISHLIST_JSON.exists():
+    if not catalog_file(GAMES_HUMBLE_WISHLIST_JSON).exists():
         return {}
     try:
-        data = json.loads(GAMES_HUMBLE_WISHLIST_JSON.read_text(encoding="utf-8"))
+        data = json.loads(catalog_file(GAMES_HUMBLE_WISHLIST_JSON).read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
     return {g["id"]: g for g in data.get("games", []) if isinstance(g, dict) and g.get("id")}
@@ -420,10 +420,7 @@ def main() -> int:
         "game_count": len(rows),
         "games": sorted(rows, key=lambda g: (g.get("name") or "").lower()),
     }
-    GAMES_HUMBLE_WISHLIST_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    write_catalog_text(GAMES_HUMBLE_WISHLIST_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(rows)} games to {GAMES_HUMBLE_WISHLIST_JSON}.", flush=True)
     stats.ok = len(rows)
     return stats.finish("fetch_humble_wishlist", t0, exit_code=0, extra=f"{len(rows)} games")

@@ -194,7 +194,6 @@
 
   // ---------- Tabs ----------
   const TABS = [
-    { id: "now", label: "Now" },
     { id: "phases", label: "Phases" },
     { id: "arch", label: "Architecture" },
     { id: "pipeline", label: "Pipeline" },
@@ -209,7 +208,7 @@
   // The two original tabs ("findings" + "blindspots") were consolidated into
   // a single "Triage" tab. Old localStorage state pointed activeTab at the
   // gone tabs and would otherwise leave the user staring at a blank panel.
-  const LEGACY_TAB_MAP = { findings: "triage", blindspots: "triage" };
+  const LEGACY_TAB_MAP = { findings: "triage", blindspots: "triage", now: "phases" };
 
   // ---------- Phases (checklists) ----------
   const PHASES = [
@@ -242,7 +241,7 @@
         { id: "p2_triage_debug", label: "Triage debug refactor findings: pick what's worth doing now vs. parking" },
         { id: "p2_followup_plans", label: "Each Accepted finding gets its own focused plan (small, reviewable, single concern)" },
         { id: "p2_no_bandaids", label: "Rule: no fixes during Phase 2 that aren't part of an accepted-finding follow-up plan" },
-        { id: "p2_deferred_ux_surfaces", label: "Surface deferred UX audits during triage: smart-lists (find_ux_tag_smart_lists), responsiveness (find_ux_responsiveness), add-row (find_ux_add_row), remove-row (find_ux_remove_row). Tags + notes audits resolved." },
+        { id: "p2_deferred_ux_surfaces", label: "Surface deferred UX audits during triage: smart-lists (find_ux_tag_smart_lists), add-row (find_ux_add_row), remove-row (find_ux_remove_row). Tags + notes audits resolved. Responsiveness moved to Phase 4.5." },
       ],
     },
     {
@@ -281,8 +280,18 @@
         { id: "p4_privacy_doc", label: "[DONE] Privacy doc — PRIVACY.md at repo root: credentials table, data files inventory, network hosts, explicit 'what does NOT happen', deletion checklist" },
         { id: "p4_cross_platform_decision", label: "Decide: stay Windows-only, or invest in macOS / Linux (Amazon SQLite paths, DPAPI alternatives)" },
         { id: "p4_packaging", label: "Decide: pip-installable? PyInstaller exe? Tauri shell? Stay 'clone and run'?" },
-        { id: "p4_lighthouse_perf", label: "Lighthouse performance pass — Accessibility + SEO + Best Practices are all at 100 (2026-06-02); only Performance remains. Run Lighthouse Performance on each view against a real large library, set a perf budget (cold-load ms, TTI, bundle size, memory ceiling with N games), and fix the worst offenders. Resolves bs_perf_budget. Reports land in lighthouse/." },
+        { id: "p4_lighthouse_perf", label: "Lighthouse performance pass — Accessibility + SEO + Best Practices are all at 100 (2026-06-02); only Performance remains. Run Lighthouse Performance on each view against a real large library, set a perf budget (cold-load ms, TTI, bundle size, memory ceiling with N games), and fix the worst offenders. This is the home for the performance-budget work (formerly the 'No performance budget' blindspot). Reports land in lighthouse/." },
         { id: "p4_local_profiles", label: "[DONE] Local switchable profiles — header profile menu, profiles/<id>/ data isolation, legacy root unchanged until second profile added (bs_multiuser_profiles)" },
+      ],
+    },
+    {
+      id: "p45",
+      title: "Phase 4.5 — Responsive / mobile",
+      tagline: "Make the UI survive narrow viewports. The whole app currently assumes a wide desktop screen; restyle once, after the major UX decisions land.",
+      items: [
+        { id: "p45_viewport_audit", label: "Audit every view (Dashboard / Library / Wishlist / Itch / Connections) at <1024px / <768px / <480px: dashboard chart cards, picks grid, table layout, filter drawer, kebab menu, deal cards. (Was find_ux_responsiveness.)" },
+        { id: "p45_mobile_story", label: "Decide a deliberate mobile story — what stacks, what collapses, what's hidden on small screens — then restyle once so we don't redo it twice." },
+        { id: "p45_print_stylesheet", label: "Add a print stylesheet (no deliberate print output today)." },
       ],
     },
     {
@@ -352,8 +361,6 @@
       body: "Resolved 2026-06-01. Personal records whose game no longer appears in any loaded catalog (uninstalled, store disconnected, fetcher didn't run yet) were invisible — they rode along in export and never paint a row. Shipped: findOrphanPersonalKeys() + countOrphanPersonalKeys() detector + prunePersonalKeys() in personal-storage.js, ?debug=1 overlay 'orphans' row (waits until dashboardDataReady so a partial library load doesn't lie), and a kebab → 'Clean up unknown games…' modal (js/orphan-prune.js + #orphanPruneModal). Modal lists each orphan with status / tag count / notes preview, defaults to selecting empty-only entries, has Select all/none + 'only empty entries' filter, and confirms before delete. Recoverability story: the server already writes rotating backups to data/personal_backups/ on every PUT, so a wrong delete can be restored. Auto-prune is intentionally NOT implemented — a temporarily missing games_*.json would silently flag valid data as orphan. Tests: findOrphanPersonalKeys + countOrphanPersonalKeys + prunePersonalKeys in personal-storage.test.js." },
     { id: "find_ux_notes_cross_store", area: "UX", severity: "grey", title: "[RESOLVED] Notes mirror across same-title store copies",
       body: "Resolved 2026-06-01. setPersonal(g, 'notes', …) mirrors to every getSameTitleKeys(g) copy (last-write-wins). One-shot canonicalizeNotesAcrossTitles() on library load (__notes_canonicalized_v1) runs reconcileNotesAcrossTitles(): longest non-empty note per title group wins and is written to all store keys. mergeImportedPersonal calls reconcileNotesAcrossTitles() after per-key merge so imports with split notes collapse correctly. Tests in personal-storage.test.js." },
-    { id: "find_ux_responsiveness", area: "UX", severity: "amber", title: "[DEFERRED] Responsiveness / mobile + narrow-viewport pass not done",
-      body: "Parked. The whole UI assumes a wide desktop viewport. Dashboard chart cards, picks grid, table layout, filter drawer, kebab menu, and the deal cards have not been audited at <1024px / <768px / <480px. No deliberate mobile story, no print stylesheet. Pick up after the major UX phase decisions land so we don't restyle twice." },
     { id: "find_ux_add_row", area: "UX", severity: "grey", title: "[RESOLVED] Add/remove unified model — custom add + duplicate warning",
       body: "Resolved 2026-06-01. Custom rows (manual[]) and Pulled (fetcher) rows now have distinct semantics. Add-game modal dedupes by normalized title against the target view (library / wishlist / itch — itch sourcing added during audit) with Go to existing / Add anyway / Cancel actions. Duplicate match excludes hidden by default (`findDuplicateMatch(title, view, { includeHidden? })`); Go to existing re-runs the lookup with includeHidden and auto-unhides the match before flashGameRow() so the user lands on the row even if they previously hid it. _bypassFor is scoped to a single proceed fn (not a sticky boolean) and resets on every titleEl input — fixes a bypass-leak where Add anyway → quickly retry with a new title skipped the warning. Custom badge (dashed outline via .store-badge.manual) shows on library + wishlist + itch rows. Add-modal footer reflects server sync; modal title/hint react to addGameTarget = 'wishlist' | 'itch' | 'library'. Tests in tests/game-duplicate.test.js (default-excludes-hidden, includeHidden opt-in, itch view sources state.itchGames)." },
     { id: "find_ux_remove_row", area: "UX", severity: "grey", title: "[RESOLVED] Add/remove unified model — bulk Remove branches by source",
@@ -396,10 +403,9 @@
     { id: "bs_multiuser", title: "[SUPERSEDED] Multi-account / multi-user — split into local profiles vs app login", body: "Superseded 2026-06-02. See bs_multiuser_profiles (Shape 2: switchable local profiles, shipped) and bs_multiuser_app_login (Shape B: app users + logins, blocked on p4_hosted_demo / Phase 5 hosting decision). Merging two accounts on the same store into one view remains out of scope (touches dedup core)." },
     { id: "bs_multiuser_profiles", title: "[RESOLVED] Local switchable profiles (work vs play)", body: "Resolved 2026-06-02. Shape 2: named profiles isolate games_*.json, itad_prices.json, data/personal.json, cache/auth/ per profiles/<id>/ without changing merge/dedup. Legacy installs keep repo root until the user adds a second profile (one-time copy to profiles/default/). Header menu + Manage modal; switch triggers full reload. shared/profile_paths.py + shared/profiles.py; /api/profiles; BAKLOG_PROFILE env for CLI fetchers; prefs + ITAD snapshot localStorage keyed by profile id." },
     { id: "bs_multiuser_app_login", title: "App users + logins (hosted multi-tenant)", body: "Deferred until hosting decision (p4_hosted_demo). Requires backend auth, per-user data isolation, and counsel on the bs_tos guardrails before any shared infra. The local profile primitive (bs_multiuser_profiles) is the intended seam if this ships later." },
-    { id: "bs_i18n", title: "[RESOLVED] Internationalization / currency — display currency from ITAD country", body: "Resolved 2026-06-02. Single display currency derived from ITAD fetch: ITAD_COUNTRY env + --country on fetch_itad.py write country + currency into itad_prices.json; JS displayCurrency() / formatMoney() (js/currency.js) replace hardcoded USD in formatDollar, dashboard marquee, deal filters, and wishlist price column. ITAD rows format via itad.currency; store-only rows show a price-currency-tag when g.currency differs. No FX conversion — see bs_fx_conversion." },
+    { id: "bs_i18n", title: "[RESOLVED] Internationalization / currency — display currency from ITAD country", body: "Resolved 2026-06-02. Single display currency derived from ITAD fetch: ITAD_COUNTRY env + --country on fetch_itad.py write country + currency into itad_prices.json; JS displayCurrency() / formatMoney() (js/currency.js) replace hardcoded USD in formatDollar, dashboard marquee, deal filters, and wishlist price column. ITAD rows format via itad.currency; store-only rows show a price-currency-tag when g.currency differs. Cross-store store-only comparability: bs_fx_conversion (Frankfurter at fetch)." },
     { id: "bs_a11y", title: "[RESOLVED] Accessibility audit — axe-core CI gate + Lighthouse sweep",
       body: "Resolved 2026-06-02. Policy: dashboard (index.html) targets WCAG 2.1 AA; SEO + Best Practices deferred to separate plans.\n\n• tests/a11y/index-axe.test.js — hydrates index.html into happy-dom, runs axe-core, fails CI on serious/critical violations outside tests/a11y/known-violations.json.\n\n• Landmarks: skip-to-main link, <main id=\"main\">, labeled regions for bulk bar + alpha nav.\n\n• Keyboard: js/focus-trap.js — focus trap + Escape on filter drawer, Connections popover, add-game / hidden-games / orphan-prune modals.\n\n• ARIA: aria-current on view tabs; co-op filter role=\"radiogroup\" + role=\"radio\" + aria-checked; connPopover named dialog; kebab aria-expanded toggles.\n\n• Contrast: text-slate-500 → text-slate-400 on bg-slate-800 surfaces.\n\n• docs/a11y.md documents CI gate + manual Lighthouse workflow (100 target per view).\n\nUpdate 2026-06-02: manual Lighthouse sweep complete — Accessibility, SEO, and Best Practices all score 100 across the views. Only the Performance category remains, tracked as the Phase 4 Lighthouse performance pass (p4_lighthouse_perf).\n\nDeferred: tracker.html a11y; cover-image descriptive alt; Chart.js canvas contrast if Lighthouse flags it." },
-    { id: "bs_perf_budget", title: "No performance budget", body: "App is fast enough on your machine. A productized version needs measurements: cold load ms, time-to-interactive, bundle size, memory ceiling with N games. Scheduled as the Phase 4 Lighthouse performance pass (p4_lighthouse_perf) — run Lighthouse per view against a large library, set the budget, and fix the worst offenders. The other Lighthouse categories (Accessibility, SEO, Best Practices) already score 100 as of 2026-06-02; Performance is the only one left." },
     { id: "bs_fetcher_backoff", title: "[RESOLVED] Fetcher resilience pass — queue FSM + client timeouts + reconnect-required chips",
       body: "Resolved 2026-06-02. Shipped (see find_dbg_fetcher_resilience + senior overhaul + reconnect chips pass):\n\n• Server-side queue cap (max 1 running + 1 queued) — RunManager.submit returns 409 when in_flight >= 2, mirrored client-side via fetcherRunner.isQueueFull() so the UI never lets a third run land.\n\n• Cancel-all endpoint (POST /api/runs/cancel) — old per-run cancel button only knew about liveRunId, so a queued sibling would keep emitting 'stream dropped — reconnecting…' after the active run died. New endpoint walks both active + queue and cancels them in one call; client adds suppressedRunIds so scheduleReconnect/subscribe/syncFromServer can't resurrect a cancelled run id.\n\n• Cancel no longer wedges the HTTP thread — Run.cancel() used to call proc.terminate() then proc.wait(5s), blocking SimpleHTTPRequestHandler (single-threaded) from accepting another request. Now uses immediate _terminate_pid() (taskkill /T /F on Windows), so /cancel returns instantly.\n\n• EventSource reconnect already has bounded exponential backoff (2s → 30s, 8 attempts) + post-cap user-facing 'refresh the page or use Cancel' message.\n\n• Senior overhaul checklist (2026-06-02): atomic submit(); launching/cancelling FSM; launch-timeout late-Popen kill; stall kill without line-count gate; durable queue.json; active.json file lock; fetchWithTimeout (15s); server-first chip state; sessionStorage suppressedRunIds; fetchers/registry.py + manifest audit tests.\n\n• Reconnect-required chips (2026-06-02): fetchers exit 4 on *AuthError (+ mark_invalid); server Run.to_summary adds failure_kind:'auth'; fetcher-health tracks per-provider reconnect state from SSE exit 4 / failure_kind + GET /api/auth/status expired; inline Reconnect button calls connections.reconnectProvider() (Playwright for browser providers); dismiss persists in localStorage; ambiguous regex-only failures still use 5m/15m/60m cooldown and flip to reconnect at max strike.\n\nFollow-up logged as bs_managed_login — generalize managed Playwright login across all cookie fetchers." },
     { id: "bs_managed_login", title: "[RESOLVED] Managed Playwright login generalized across cookie-based fetchers",
@@ -411,8 +417,8 @@
     { id: "bs_secret_recovery", title: "[RESOLVED] Portable secrets bundle — export/import credentials + profiles",
       body: "Resolved 2026-06-02. Policy: single passphrase-encrypted file the user controls.\n\n• auth/bundle.py — export_bundle() / import_bundle() with BundleError subclasses (BadPassphrase, BadMagic, UnsupportedVersion, BundleTooLarge). Inner payload: gzip JSON with secrets_doc + base64-encoded Playwright profiles. Always encrypted with its own scrypt+AES-GCM key (min 8-char passphrase); local OS keychain key never leaves the machine.\n\n• POST /api/auth/secrets/export (octet-stream download) + POST /api/auth/secrets/import (?passphrase= + raw body). CLI: python -m auth export-bundle / import-bundle (--dry-run).\n\n• Connections ⋮ menu gains a top-level Portable bundle… item that opens a dedicated popover with Export bundle… / Import bundle… buttons and an inline dialog passphrase prompt.\n\n• Import moves existing cache/auth/profiles/ to profiles_pre_import_<timestamp>/ before overwrite.\n\n• PRIVACY.md + README (Moving to a new machine) document the workflow.\n\nDeferred:\n• Cloud-storage auto-sync (Dropbox / iCloud / OneDrive) — user can drop the bundle in their own cloud folder.\n• Bundle key-rotation flow — equivalent to export-then-import.\n• Argon2id KDF — scrypt matches auth/secrets.py; future bundle_format = 2.\n• .env migration into bundle — stale env values could overwrite working blob values on import." },
     { id: "bs_data_drift", title: "[RESOLVED] Fetcher row-count floor guard added", body: "Resolved 2026-06-01. fetchers/_base.py::refuse_drift_result() — reads the previous on-disk file's game_count, refuses to overwrite when the new run is <50% of that count (configurable threshold), exit code 3. Pairs with the existing refuse_empty_result (exit 2). New --allow-drift flag opts out for legitimate large drops (delisted accounts, region swaps). Wired into every fetcher: fetch_games, fetch_wishlist, fetch_psn, fetch_epic, fetch_epic_wishlist, fetch_psn_wishlist, fetch_ubisoft_wishlist, fetch_xbox_wishlist, fetch_gog_wishlist, fetch_xbox, fetch_gog (11 sites). First-run safe (no baseline → no check). 7 new tests in tests/test_fetcher_progress.py cover the no-baseline / within-threshold / under-threshold / allow-drift / custom-threshold / malformed-baseline / int-count paths." },
-    { id: "bs_pricing_currency", title: "[RESOLVED] Wishlist prices — honest per-store currency labels", body: "Resolved 2026-06-02 (paired with bs_i18n). shared/money.py formats fetcher price strings with the real currency (Steam currency code, GOG/Epic/etc. fields); no more f\"${amt}\" on non-USD rows. Cross-store comparability stays on ITAD (one country per fetch). Per-store wishlist rows keep their native formatted price + currency code; UI tags mismatches vs display currency. Synthetic convert-at-fetch is deferred to bs_fx_conversion." },
-    { id: "bs_fx_conversion", title: "Cross-currency FX conversion at fetch time", body: "Deferred follow-up from bs_pricing_currency. Would need an exchange-rate source + cache + staleness policy, then convert every store price into display currency at fetch so sort/filter/compare raw numbers across GBP/EUR/USD rows. Not built — presentational honest labels + ITAD single-currency deals are the current model." },
+    { id: "bs_pricing_currency", title: "[RESOLVED] Wishlist prices — honest per-store currency labels", body: "Resolved 2026-06-02 (paired with bs_i18n). shared/money.py formats fetcher price strings with the real currency (Steam currency code, GOG/Epic/etc. fields); no more f\"${amt}\" on non-USD rows. Per-store wishlist rows keep native labels; FX conversion at fetch (bs_fx_conversion) adds display-currency price_amount for sort/filter while preserving currency_native / price_native." },
+    { id: "bs_fx_conversion", title: "[RESOLVED] Cross-currency FX conversion at fetch time", body: "Resolved 2026-06-03. Frankfurter daily rates cached at cache/fx_rates.json (24h refresh, warn if >7d). fetch_itad.py refreshes rates at run start, then post-processes all games_wishlist*.json into ITAD display currency (ITAD_COUNTRY / itad_prices.json currency). Native honesty preserved: currency_native, price_native, price_initial_native; comparable fields price_amount (+ price_amount_initial) and formatted price in display currency. JS effectiveSortPrice / deal max-price filter / table-query sort use price_amount; currencyMismatchTagForGame shows native tag when converted. Standalone fetch_fx.py for manual refresh. Missing FX pairs skip conversion (row stays native). Rates as of fx_rates_at on catalog payload." },
   ];
 
   // ---------- Architecture content (from canvas, kept current) ----------
@@ -443,7 +449,7 @@
     { fetcher: "fetch_gog.py", client: "gog_client.py", writes: "games_gog.json", notes: "Galaxy session · reviews via enrich_steam_reviews" },
     { fetcher: "fetch_psn.py", client: "psn_client.py", writes: "games_psn.json", notes: "Trophies + playtime · reviews via enrich" },
     { fetcher: "fetch_epic.py", client: "epic_client.py", writes: "games_epic.json", notes: "Entitlements + catalog · reviews via enrich" },
-    { fetcher: "fetch_amazon.py", client: "amazon_client.py", writes: "games_amazon.json", notes: "Prime Gaming local SQLite · reviews via enrich" },
+    { fetcher: "fetch_amazon.py", client: "amazon_client.py + amazon_web_client.py", writes: "games_amazon.json", notes: "Launcher SQLite (Win) or Prime Gaming web claims (all OS, codeless only) · --source auto|launcher|web" },
     { fetcher: "fetch_xbox.py", client: "xbox_client.py", writes: "games_xbox.json", notes: "OpenXBL title history · reviews via enrich" },
     { fetcher: "fetch_battlenet.py", client: "battlenet_client.py", writes: "games_battlenet.json", notes: "account.battle.net cookie + XSRF · franchise → store URL" },
     { fetcher: "fetch_ubisoft.py", client: "ubisoft_client.py", writes: "games_ubisoft.json", notes: "public-ubiservices ticket + session id · probes 4 endpoints" },
@@ -626,7 +632,7 @@
     return { area: "all", show: "active" };
   }
   function defaultState() {
-    return { v: 2, items: {}, decisions: {}, pageNotes: {}, activeTab: "now", triage: defaultTriageFilters(), monetizeSection: "vision" };
+    return { v: 2, items: {}, decisions: {}, pageNotes: {}, activeTab: "phases", triage: defaultTriageFilters(), monetizeSection: "vision" };
   }
   let state = loadState();
   function saveState() {
@@ -780,8 +786,15 @@
     return el("details", attrs, summary, body);
   }
 
-  // ---------- Render: Now ----------
-  function panelNow() {
+  // ---------- Render: Now (RETIRED) ----------
+  // The "Now" tab was removed; "Phases" is now the default landing tab.
+  // The future-stores stretch-goal note that used to live in this panel
+  // ("Further stores (Riot, Rockstar, Game Pass catalog, cloud services) are
+  // stretch goals — only if a clean own-session path exists and the bs_tos
+  // guardrails hold.") is preserved in the find_store_integration_complete
+  // finding on the Triage tab. The old shipped/up-next history was dropped.
+  // BEGIN dead code — intentionally unreferenced, kept only until the next sweep.
+  function _retiredPanelNow_unused() {
     const p1 = PHASES[0];
     const done = p1.items.filter((i) => getItem(i.id)).length;
     const total = p1.items.length;
@@ -797,7 +810,8 @@
       "First-run onboarding flow (2026-06-02) — when 0 providers connected: Connections .conn-onboard CTA (Start with Steam → reconnectProvider); dashboard #dashOnboard welcome; empty library/wishlist/itch tables get Open Connections button. connectedProviderCount() in js/connections.js. p4_onboarding_flow + find_ux_conn_density resolved.",
       "Ubisoft Connect 2FA blank tab (2026-06-02) — post-verify about:blank popups auto-closed via is_blank_browser_url + _merge_popup_worker (cdp_browser) and orphan-tab sweep in _extract_ubisoft; not a Connections card render bug. find_ux_conn_ubi_blank_tab resolved.",
       "Boot curtain loading tips (2026-06-02) — #bootLoadingTip was empty until the module graph finished, so hints only flashed for ~150ms before liftBootCurtain. Inline body script in index.html seeds a random tip at parse time (TIPS list kept in sync with js/tips.js); startBootTipRotation adopts seeded text so the 4s cross-fade rotation continues without a swap flash.",
-      "Display currency + honest wishlist prices (2026-06-02) — shared/money.py + ITAD_COUNTRY; itad_prices.json carries currency; js/currency.js (formatMoney, displayCurrency); six wishlist fetchers stop mislabeling local prices as '$'; price-currency-tag on mixed-currency store rows. bs_i18n + bs_pricing_currency resolved; bs_fx_conversion logged as follow-up. tests/currency.test.js + tests/test_money.py.",
+      "Display currency + honest wishlist prices (2026-06-02) — shared/money.py + ITAD_COUNTRY; itad_prices.json carries currency; js/currency.js (formatMoney, displayCurrency); wishlist fetchers use real currency codes. bs_i18n + bs_pricing_currency resolved.",
+      "FX at fetch (2026-06-03) — shared/fx.py (Frankfurter → cache/fx_rates.json); fetch_itad.py converts games_wishlist*.json to display currency with native fields preserved; price_amount drives sort/filter; fetch_fx.py; tests/test_fx.py + tests/deals-fx.test.js. bs_fx_conversion resolved.",
       "JS test coverage complete (2026-06-02) — six Vitest files cover the Phase-3 test plan: deals, prefs, table-fingerprint, table-perf, dashboard-fingerprint (exported dashboardFingerprint), plus game-core hidden-key assertions for recomputeCrossStoreHidden. find_no_js_tests + find_js_test_remaining_gaps resolved; all p3_js_tests_* phase checkboxes [DONE]. Suite: 233 passing.",
       "Managed Playwright login generalized (2026-06-02) — every cookie-based store uses Connections → Connect (headed persistent profile); fetchers read the saved blob via resolve_env. Humble added to INLINE_PROVIDERS; README Connect-first; reconnect chips launch managed re-auth. bs_managed_login resolved. itch/ITAD stay manual API-key; Amazon stays local-only.",
       "Store-integration phase COMPLETE (2026-06-02) — 12 library fetchers (Steam, GOG, PSN, Epic, Amazon, Xbox, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA App) + 8 wishlist fetchers wired. EA App was the last add: ea_client.py + fetch_ea.py replay the user's own ea.com web-session Bearer token (sniffed from the saved 'ea' Playwright profile) against the same Juno GraphQL endpoint the website uses — no desktop-client impersonation, keeping the bs_tos 'automating your own access' framing literally true. Further stores are now stretch goals only. Next focus: troubleshoot every existing connection one by one. See find_store_integration_complete.",
@@ -1049,7 +1063,7 @@
       { store: "GOG", fetcher: "fetch_gog.py", auth: "GOG_AL cookie", output: "games_gog.json" },
       { store: "PSN", fetcher: "fetch_psn.py", auth: "NPSSO token", output: "games_psn.json" },
       { store: "Epic", fetcher: "fetch_epic.py", auth: "OAuth refresh token", output: "games_epic.json" },
-      { store: "Amazon", fetcher: "fetch_amazon.py", auth: "Local SQLite (DPAPI)", output: "games_amazon.json" },
+      { store: "Amazon", fetcher: "fetch_amazon.py", auth: "Launcher SQLite (Win) or Prime web session", output: "games_amazon.json" },
       { store: "Xbox", fetcher: "fetch_xbox.py", auth: "OpenXBL API key", output: "games_xbox.json" },
       { store: "Battle.net", fetcher: "fetch_battlenet.py", auth: "Session cookie + XSRF", output: "games_battlenet.json" },
       { store: "Ubisoft", fetcher: "fetch_ubisoft.py", auth: "Ubi-SessionId + auth", output: "games_ubisoft.json" },
@@ -1180,27 +1194,153 @@
     { id: "spot", label: "Spot-check" },
   ];
   const CONNECTION_PULLS = [
-    { key: "steam", name: "Steam", type: "Library", output: "games_steam.json" },
-    { key: "gog", name: "GOG", type: "Library", output: "games_gog.json" },
-    { key: "psn", name: "PSN", type: "Library", output: "games_psn.json" },
-    { key: "epic", name: "Epic", type: "Library", output: "games_epic.json" },
-    { key: "amazon", name: "Amazon", type: "Library", output: "games_amazon.json", na: ["reconnect"] },
-    { key: "xbox", name: "Xbox", type: "Library", output: "games_xbox.json" },
-    { key: "battlenet", name: "Battle.net", type: "Library", output: "games_battlenet.json" },
-    { key: "ubisoft", name: "Ubisoft", type: "Library", output: "games_ubisoft.json" },
-    { key: "nintendo", name: "Nintendo", type: "Library", output: "games_nintendo.json" },
-    { key: "itch", name: "itch.io", type: "Library", output: "games_itch.json" },
-    { key: "humble", name: "Humble", type: "Library", output: "games_humble.json" },
-    { key: "ea", name: "EA App", type: "Library", output: "games_ea.json" },
-    { key: "wl_steam", name: "Steam", type: "Wishlist", output: "games_wishlist.json" },
-    { key: "wl_gog", name: "GOG", type: "Wishlist", output: "games_wishlist_gog.json" },
-    { key: "wl_epic", name: "Epic", type: "Wishlist", output: "games_wishlist_epic.json" },
-    { key: "wl_psn", name: "PSN", type: "Wishlist", output: "games_wishlist_psn.json" },
-    { key: "wl_ubisoft", name: "Ubisoft", type: "Wishlist", output: "games_wishlist_ubisoft.json" },
-    { key: "wl_xbox", name: "Xbox", type: "Wishlist", output: "games_wishlist_xbox.json" },
-    { key: "wl_nintendo", name: "Nintendo", type: "Wishlist", output: "games_wishlist_nintendo.json" },
-    { key: "wl_humble", name: "Humble", type: "Wishlist", output: "games_wishlist_humble.json" },
-    { key: "itad", name: "ITAD", type: "Prices", output: "itad_prices.json", na: ["reconnect"] },
+    {
+      key: "steam", name: "Steam", type: "Library", output: "games_steam.json", na: ["reconnect"],
+      connect: "Headed Playwright: Connections → Connect → steamcommunity.com/dev/apikey (saves STEAM_API_KEY + STEAM_ID). Or paste both in .env.",
+      cmd: "python fetch_games.py --skip-hltb",
+      expire: "N/A — fetcher never calls mark_invalid; bad keys → exit 1, not exit 4. Corrupt STEAM_API_KEY to test failure, not reconnect chip.",
+      gotcha: "Profile + wishlist must be Public. API keys do not expire like cookies.",
+    },
+    {
+      key: "gog", name: "GOG", type: "Library", output: "games_gog.json",
+      connect: "Headed Playwright → gog.com; saves GOG_AL (~14d). Or paste GOG_AL in .env.",
+      cmd: "python fetch_gog.py --skip-hltb",
+      expire: "Corrupt GOG_AL in auth blob, run fetcher → exit 4 → Session expired + reconnect chip.",
+      gotcha: "One sign-in covers library + wishlist.",
+    },
+    {
+      key: "psn", name: "PSN", type: "Library", output: "games_psn.json",
+      connect: "Headed Playwright → PlayStation Store; captures PSN_NPSSO (~30d). Or paste in .env.",
+      cmd: "python fetch_psn.py --skip-hltb",
+      expire: "Corrupt PSN_NPSSO in blob → exit 4 → mark_invalid(psn).",
+      gotcha: "Trophy/game privacy must be Anyone; may need a click on store after sign-in.",
+    },
+    {
+      key: "epic", name: "Epic", type: "Library", output: "games_epic.json",
+      connect: "Headed Playwright → Epic login → authorizationCode → refresh token in cache/epic/session.json (~30d). Or EPIC_AUTH_CODE in .env.",
+      cmd: "python fetch_epic.py --skip-hltb",
+      expire: "Delete cache/epic/session.json or use invalid auth code → exit 4.",
+      gotcha: "Library OAuth session is separate from Epic Store wishlist (epic_wishlist profile).",
+    },
+    {
+      key: "amazon", name: "Amazon", type: "Library", output: "games_amazon.json", na: ["reconnect"],
+      connect: "Local SQLite read — no Connect sign-in; auto Connected if Amazon Games Sql dir exists (Windows only). Prime web: headed login → cache/auth/profiles/amazon_web.",
+      cmd: "python fetch_amazon.py --skip-hltb  (launcher)  ·  python fetch_amazon.py --source web --skip-hltb  (Prime Gaming)",
+      expire: "N/A for launcher (no mark_invalid). Rename/move %LOCALAPPDATA%\\Amazon Games\\Data\\Games\\Sql to go disconnected. Web: delete amazon_web profile → exit 4 on amazon_web.",
+      gotcha: "Fetcher key amazon maps to provider amazon, but web auth failures set amazon_web expired — reconnect chip on Amazon fetcher may not light. Log as bs_* if seen.",
+    },
+    {
+      key: "xbox", name: "Xbox", type: "Library", output: "games_xbox.json",
+      connect: "Headed Playwright → xbl.io/login → XBL_API_KEY; or paste key in Connections.",
+      cmd: "python fetch_xbox.py --skip-hltb",
+      expire: "Save invalid XBL_API_KEY → exit 4 → mark_invalid(xbox).",
+      gotcha: "Play history only, not full Game Pass catalog.",
+    },
+    {
+      key: "battlenet", name: "Battle.net", type: "Library", output: "games_battlenet.json",
+      connect: "Headed Playwright → account.battle.net → BATTLENET_COOKIE (~7d). Or paste cookie in .env.",
+      cmd: "python fetch_battlenet.py --skip-hltb",
+      expire: "Corrupt BATTLENET_COOKIE in blob → exit 4.",
+      gotcha: "Edge v127+ app-bound encryption breaks live --browser edge jar read; stored cookie from Connections avoids this.",
+    },
+    {
+      key: "ubisoft", name: "Ubisoft", type: "Library", output: "games_ubisoft.json",
+      connect: "Headed Playwright → sniff UBISOFT_AUTH, UBISOFT_SESSION_ID, UBISOFT_APP_ID (~7d). Or DevTools headers in .env.",
+      cmd: "python fetch_ubisoft.py --skip-hltb",
+      expire: "Corrupt auth headers in blob → exit 4.",
+      gotcha: "One Connect covers library + wishlist; wishlist also replays ubisoft profile headlessly.",
+    },
+    {
+      key: "nintendo", name: "Nintendo", type: "Library", output: "games_nintendo.json",
+      connect: "Headed Playwright → ec.nintendo.com/my/transactions/ → NINTENDO_COOKIE (~14d).",
+      cmd: "python fetch_nintendo.py --skip-hltb",
+      expire: "Corrupt NINTENDO_COOKIE → exit 4.",
+      gotcha: "~2 years digital eShop only; sign-in can be flaky.",
+    },
+    {
+      key: "itch", name: "itch.io", type: "Library", output: "games_itch.json",
+      connect: "Manual — Open sign-in page, paste ITCH_API_KEY, Save (no Playwright Connect).",
+      cmd: "python fetch_itch.py --skip-hltb",
+      expire: "Save invalid ITCH_API_KEY → exit 4.",
+      gotcha: "Unclaimed bundle items are invisible to the API.",
+    },
+    {
+      key: "humble", name: "Humble", type: "Library", output: "games_humble.json",
+      connect: "Headed Playwright → humblebundle.com/home/library; profile cache/auth/profiles/humble (~30d).",
+      cmd: "python fetch_humble.py --skip-hltb",
+      expire: "Delete humble profile dir → exit 4.",
+      gotcha: "One profile for library + wishlist. CAPTCHA possible in browser.",
+    },
+    {
+      key: "ea", name: "EA App", type: "Library", output: "games_ea.json",
+      connect: "Headed Playwright → ea.com/login; profile cache/auth/profiles/ea (~30d). Fetch replays headless GraphQL.",
+      cmd: "python fetch_ea.py --skip-hltb",
+      expire: "Delete ea profile dir → exit 4.",
+      gotcha: "Short-lived tokens (~1 day). PC EA-store titles only.",
+    },
+    {
+      key: "wl_steam", name: "Steam", type: "Wishlist", output: "games_wishlist.json", na: ["reconnect"],
+      connect: "Same Steam Connect as library (STEAM_API_KEY + STEAM_ID).",
+      cmd: "python fetch_wishlist.py --skip-hltb",
+      expire: "N/A — no mark_invalid in fetch_wishlist.py. HTTP errors → exit 1 (check profile is public).",
+      gotcha: "Privacy/public-profile issues mimic auth failure but will not set expired.",
+    },
+    {
+      key: "wl_gog", name: "GOG", type: "Wishlist", output: "games_wishlist_gog.json",
+      connect: "Same GOG Connect / GOG_AL as library.",
+      cmd: "python fetch_gog_wishlist.py",
+      expire: "Corrupt GOG_AL → exit 4 → mark_invalid(gog).",
+      gotcha: "Shares gog provider with library.",
+    },
+    {
+      key: "wl_epic", name: "Epic", type: "Wishlist", output: "games_wishlist_epic.json",
+      connect: "Separate headed Playwright → store.epicgames.com/wishlist; profile epic_wishlist (~7d, Cloudflare).",
+      cmd: "python fetch_epic_wishlist.py",
+      expire: "Delete cache/auth/profiles/epic_wishlist/ → exit 4 → mark_invalid(epic_wishlist).",
+      gotcha: "Separate from Epic library OAuth. Provider epic_wishlist in fetcher registry.",
+    },
+    {
+      key: "wl_psn", name: "PSN", type: "Wishlist", output: "games_wishlist_psn.json",
+      connect: "Same PSN Connect / PSN_NPSSO as library.",
+      cmd: "python fetch_psn_wishlist.py",
+      expire: "Corrupt PSN_NPSSO → exit 4.",
+      gotcha: "Skips non-game SKUs.",
+    },
+    {
+      key: "wl_ubisoft", name: "Ubisoft", type: "Wishlist", output: "games_wishlist_ubisoft.json",
+      connect: "Same Ubisoft Connect as library (shared ubisoft profile).",
+      cmd: "python fetch_ubisoft_wishlist.py",
+      expire: "Corrupt ubisoft session / delete profile → exit 4 → mark_invalid(ubisoft).",
+      gotcha: "Headless storefront replay, not API headers alone.",
+    },
+    {
+      key: "wl_xbox", name: "Xbox", type: "Wishlist", output: "games_wishlist_xbox.json",
+      connect: "Separate headed Playwright → xbox.com wishlist; profile xbox_wishlist (~30d).",
+      cmd: "python fetch_xbox_wishlist.py",
+      expire: "Delete xbox_wishlist profile → exit 4.",
+      gotcha: "Separate from OpenXBL library key.",
+    },
+    {
+      key: "wl_nintendo", name: "Nintendo", type: "Wishlist", output: "games_wishlist_nintendo.json",
+      connect: "Separate headed Playwright → nintendo.com/us/wish-list/; profile nintendo_wishlist (~30d).",
+      cmd: "python fetch_nintendo_wishlist.py",
+      expire: "Delete nintendo_wishlist profile → signed-out → exit 4.",
+      gotcha: "Separate Connect from eShop library.",
+    },
+    {
+      key: "wl_humble", name: "Humble", type: "Wishlist", output: "games_wishlist_humble.json",
+      connect: "Same Humble Connect / humble profile as library.",
+      cmd: "python fetch_humble_wishlist.py",
+      expire: "Delete humble profile → exit 4.",
+      gotcha: "Reuses fetch_humble browser launch helper.",
+    },
+    {
+      key: "itad", name: "ITAD", type: "Prices", output: "itad_prices.json", na: ["reconnect"],
+      connect: "Manual — paste ITAD_API_KEY (UUID) from isthereanydeal.com/apps/my/.",
+      cmd: "python fetch_itad.py",
+      expire: "N/A — no mark_invalid / exit 4. Invalid key → API 401, status stays connected. Paste bad UUID to test.",
+      gotcha: "Needs wishlist JSON files first. Set ITAD_COUNTRY for FX. Optional: --country GB, --include-library.",
+    },
   ];
 
   function connStageApplies(pull, stageId) {
@@ -1225,6 +1365,24 @@
       preserveDetailsOpen(renderActive);
     });
     return cb;
+  }
+
+  function connHowToTestBlock(pull) {
+    const label = pull.type === "Wishlist" ? pull.name + " wishlist" : pull.name + " " + pull.type.toLowerCase();
+    const summary = el("summary", {},
+      el("span", { class: "phase-title", style: "font-weight:500; font-size:0.9rem;" }, "How to test — " + label),
+    );
+    const body = el("div", { class: "conn-howto-body", style: "font-size:0.88rem; line-height:1.5; padding-bottom:0.5rem;" },
+      el("p", { style: "margin:0.35rem 0;" }, el("strong", {}, "Connect: "), pull.connect || "—"),
+      el("p", { style: "margin:0.35rem 0;" }, el("strong", {}, "Fetch: "), codeText(pull.cmd || "—")),
+      el("p", { style: "margin:0.35rem 0;" }, el("strong", {}, "Force-expire: "), pull.expire || "—"),
+      el("p", { style: "margin:0.35rem 0;" }, el("strong", {}, "Gotcha: "), pull.gotcha || "—"),
+    );
+    return el("details", {
+      class: "phase",
+      "data-key": "conn-howto-" + pull.key,
+      style: "margin-top:0.5rem; background:var(--bg-panel); border-color:var(--border);",
+    }, summary, body);
   }
 
   // ---------- Render: Connection matrix ----------
@@ -1271,6 +1429,10 @@
       el("h2", {}, "Per-pull verification"),
       el("div", { class: "card" }, tableEl(headers, rows)),
 
+      el("h2", {}, "How to test each pull"),
+      el("p", { class: "faint", style: "margin-top:-0.25rem; font-size:0.88rem;" }, "Expand a row for connect method, fetch command, force-expire steps, and gotchas. Open state is preserved when you tick checkboxes above."),
+      ...CONNECTION_PULLS.map(connHowToTestBlock),
+
       el("div", { class: "callout" },
         el("div", { class: "callout-title" }, "What each stage means"),
         el("div", { class: "callout-body" },
@@ -1280,9 +1442,26 @@
           el("strong", {}, "Spot-check"), " — eyeball the rows in the app: names, store URLs, scores, and cross-store dedupe look right.",
         ),
       ),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Force-expire recipe"),
+        el("div", { class: "callout-body" },
+          "For browser/cookie/key providers: keep the provider ", el("strong", {}, "Connected"), ", then ",
+          el("strong", {}, "corrupt"), " the stored credential (or delete ", codeText("cache/auth/profiles/<provider>/"), ") and run the fetcher. Corrupting yields exit ",
+          codeText("4"), " → ", codeText("mark_invalid"), " → ", el("span", { class: "pill pill-danger" }, "Session expired"), " + reconnect chip. Deleting entirely often yields exit ",
+          codeText("1"), " / disconnected instead — use corruption when testing Reconnect.",
+        ),
+      ),
+      el("div", { class: "callout warning" },
+        el("div", { class: "callout-title" }, "No reconnect for these pulls"),
+        el("div", { class: "callout-body" },
+          "Steam library, Steam wishlist, ITAD, and Amazon launcher have no ", codeText("mark_invalid"), " / exit-4 path today — Reconnect shows ",
+          el("span", { class: "faint" }, "—"), " in the table. A missing reconnect chip during testing is expected, not a bug. Amazon Prime web (",
+          codeText("--source web"), ") does expire via ", codeText("amazon_web"), " but the fetcher chip may still not match — see Amazon gotcha.",
+        ),
+      ),
       el("div", { class: "callout success" },
         el("div", { class: "callout-title" }, "Reading the table"),
-        el("div", { class: "callout-body" }, "A muted ", el("span", { class: "faint" }, "—"), " in a stage cell means that stage doesn't apply to the pull (e.g. Amazon is a local SQLite read with no session to reconnect; ITAD is a manual API key). A pull flips to ", el("span", { class: "pill pill-success" }, "Yes"), " under Verified once every applicable stage is ticked."),
+        el("div", { class: "callout-body" }, "A muted ", el("span", { class: "faint" }, "—"), " in a stage cell means that stage doesn't apply to the pull (e.g. Amazon launcher is a local SQLite read; ITAD is a manual API key; Steam has no session expiry). A pull flips to ", el("span", { class: "pill pill-success" }, "Yes"), " under Verified once every applicable stage is ticked. Log new issues as ", codeText("bs_*"), " blind spots."),
       ),
     );
   }
@@ -1689,6 +1868,20 @@
         ),
         el("p", { class: "muted" }, "Counter-positioning: Storefronts profit when you cannot see across stores. BAKLOG is on your side because it runs on your machine and refuses to be one."),
       ));
+      cards.push(el("div", { class: "card agency-lane" },
+        el("h2", {}, "The deal tracker is a product, not just an ad surface"),
+        el("p", { class: "muted" }, "Elsewhere in this suite the deal cards get framed as the affiliate/ad slot. True \u2014 but that undersells them. The price layer is a real reason people open BAKLOG daily, and it does something no standalone deal site can: it knows what you already own."),
+        el("h3", {}, "Why the deal layer earns its keep with users"),
+        el("ul", {},
+          el("li", {}, el("strong", {}, "Ownership-aware deals (the one nobody else has): "), "ITAD / GG.deals / CheapShark can tell you a game is 80% off. They cannot tell you that you already own it on Epic, claimed it free from Prime, or have it buried in an itch bundle. BAKLOG fuses live pricing with your real cross-store library, so a deal only surfaces when it is ", el("em", {}, "actually actionable"), " \u2014 on sale, unowned everywhere, and worth your time."),
+          el("li", {}, el("strong", {}, "It kills the duplicate buy: "), "the single most expensive backlog mistake is re-buying a game you forgot you own on another store. Every other deal alert is ownership-blind and will happily sell you a dupe. BAKLOG flags owned titles so the radar never points at something already in your library."),
+          el("li", {}, el("strong", {}, "Wishlist radar that retires itself: "), "the wishlist deal hero + sale scoreboard turn a 200-item 'someday' list into a short, ranked 'these are cheap right now and you'll actually play them' shortlist \u2014 backed by rating and quick-win signals, not just raw discount percentage."),
+          el("li", {}, el("strong", {}, "Replaces a browser-tab habit: "), "the deal-hunter persona already keeps a price-tracker tab open. BAKLOG folds that habit into the same place they manage their backlog \u2014 one surface instead of a deal site plus five launchers."),
+          el("li", {}, el("strong", {}, "Honest, authorized pricing: "), "ITAD-sourced, authorized-store focus (not grey-market keys), shown in the user's own display currency. The deal you see is one you can trust and act on."),
+        ),
+        el("p", {}, el("strong", {}, "Value line: "), "\u201CEvery other deal alert is guessing. BAKLOG knows what you already own \u2014 so it only tells you about sales that are actually worth it.\u201D"),
+        el("p", { class: "muted" }, "Monetization tie-in (not the lead): because the deals are genuinely useful and ownership-filtered, the affiliate/house-ad surface rides on something users already want open \u2014 which is exactly why ads here read as helpful rather than intrusive. The user value comes first; the revenue is a byproduct of getting it right."),
+      ));
       cards.push(ownerPref("hooks", "Capture your preferred product pitch voice.", "My one-sentence pitch...\nMy 30-second demo script..."));
     } else if (section === "howitworks") {
       const runSvg = `
@@ -2087,7 +2280,6 @@
   function renderActive() {
     const host = document.getElementById("panels");
     host.innerHTML = "";
-    host.appendChild(panelNow());
     host.appendChild(panelPhases());
     host.appendChild(panelArch());
     host.appendChild(panelPipeline());

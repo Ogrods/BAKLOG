@@ -104,6 +104,12 @@ describe('isJunkEntry', () => {
     expect(isJunkEntry({ name: 'Hollow Knight' })).toBe(false);
     expect(isJunkEntry({ name: 'Fortnite' })).toBe(false);
   });
+
+  it('flags cosmetic wallpaper SKUs but not Wallpaper Engine', () => {
+    expect(isJunkEntry({ name: 'HD Wallpaper' })).toBe(true);
+    expect(isJunkEntry({ name: 'Death Stranding — HD Wallpaper' })).toBe(true);
+    expect(isJunkEntry({ name: 'Wallpaper Engine' })).toBe(false);
+  });
 });
 
 describe('dedupeWithinStore', () => {

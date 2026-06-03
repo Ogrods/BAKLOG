@@ -666,6 +666,17 @@
         "Accessibility: axe-core CI gate, skip link, focus traps on drawers/modals (WCAG 2.1 AA target).",
       ],
     },
+    {
+      category: "It's just your data, reshuffled",
+      pitch: "Simple, but powerful — no cloud vault, no AI, no secret sauce. BAKLOG logs in as you, retrieves the lists you already own, and reshuffles them into one honest backlog.",
+      bullets: [
+        "Logs in as you and pulls libraries, wishlists, and prices you already have access to — no proprietary catalog, no scraped secrets.",
+        "Normalizes 12 library sources into one schema; dedupes cross-store duplicates; rolls up combined playtime.",
+        "Reshuffles into dashboard, deal radar, weekly picks, and status workflow — the power is recombination, not magic.",
+        "That's why it's local-first: nothing to host because it's just your data on disk (games_*.json, personal.json, cache/).",
+        "Connect → Refresh → decide. The whole mental model fits in one sentence; the demo is retrieval + shuffle in real time.",
+      ],
+    },
   ];
 
   const MARKETING_PILLARS = [
@@ -674,6 +685,7 @@
     { id: "local_first_trust", headline: "Local-first trust", proof: "No server; per-profile secrets; portable bundle", productHooks: ["MARKETING_FEATURES[2]", "Nothing to breach"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_privacy", "bs_secret_recovery", "bs_telemetry"] },
     { id: "profiles_one_pc", headline: "Profiles on one PC", proof: "Work vs play; cancel-on-switch; isolated cache", productHooks: ["MARKETING_FEATURES[3]"], relatedCampaigns: ["carousel_profiles"], relatedFindings: ["bs_multiuser_profiles", "find_profile_switch_cancel_runs", "find_profile_cache_http"] },
     { id: "built_to_last", headline: "Built to last", proof: "Drift guard; atomic writes; honest fetcher signals", productHooks: ["MARKETING_FEATURES[4]", "MARKETING_FEATURES[5]"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_data_drift", "bs_fetcher_health_honest", "bs_phase2_reliability"] },
+    { id: "simple_powerful", headline: "Simple, but powerful", proof: "It's just your data — retrieved, normalized, and reshuffled. No cloud, no AI, no magic.", productHooks: ["MARKETING_FEATURES[6]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "Nothing to breach"], relatedFindings: ["bs_privacy", "bs_telemetry", "find_store_integration_complete"] },
   ];
 
   const MARKETING_ASSETS = [
@@ -705,6 +717,9 @@
       "Local-first. No telemetry. Your machine.",
       "The demo is the product.",
       "Stop alt-tabbing your launchers.",
+      "Simple, but powerful.",
+      "It's just your data — retrieved and reshuffled.",
+      "No magic. Your libraries, finally in one place.",
     ],
     elevator30: "BAKLOG is a local dashboard that imports your real libraries from Steam, Epic, GOG, PSN, Xbox, Amazon, and more — then layers deal radar, status workflow, and cross-store dedupe on top. No cloud account. Connect once, hit Refresh, and watch your library appear on your own machine.",
     elevator60: "If you've claimed free games for years across Epic, Prime, GOG, and Steam, you already have an accidental library — and no storefront will help you see it all. BAKLOG runs on your PC: you connect your stores, fetchers pull your real owned games into one table, and ITAD pricing shows deals only when you don't already own the title somewhere else. Credentials stay encrypted locally; there's no BAKLOG server to breach. The onboarding is a 60-second screen recording of chips lighting up as your count climbs — that's the product.",
@@ -764,6 +779,7 @@
     "The first time I hit Refresh and watched fetcher chips light up across Steam, Epic, PSN, GOG, Xbox, Amazon, itch in under a minute — the library count climbing live as each store landed — I knew this thing was real. That moment alone is the demo: I have shown it to people, it works, it sells itself.",
     "Every Thursday Epic gives me a game I will never play. Every month Prime drops more. I keep claiming because it costs nothing and someday I will look at them. BAKLOG is the 'someday'.",
     "I connect five or six storefront accounts that are tied to my payment methods. I am not handing those logins to someone else's cloud. The reason BAKLOG is a local install is the reason I trust it: there is no server holding my credentials, so there is nothing to breach — and the storefronts see a normal login from my own IP, not a bot farm.",
+    "It is not magic — BAKLOG just goes and gets the data I already own from each store, lays it out in one place, and shuffles it into something I can actually use. That honesty is the product: simple to explain, powerful because it is my real library.",
   ];
 
   const MONETIZE_PERSONAS = [
@@ -2329,6 +2345,7 @@
         el("p", { class: "muted" }, "12-month: activation and retention. 24-month: house ads / affiliate live in deal cards. 36-month: optional cloud convenience + No-ads tier complement the ad-supported free tier."),
         el("p", { style: "margin-top:0.4rem" }, el("strong", {}, "Lead model: "), "Free + ads. The audience is built almost entirely from people who claimed games they didn't pay for — pricing the core product anywhere above $0 fights the user's actual revealed preference. Ads (with a low-friction $2-$4/mo upgrade to remove them) align with how this audience already spends."),
         el("p", { style: "margin-top:0.5rem" }, el("strong", {}, "2026 Q2 product truth: "), "Profiles + honest fetcher health + FX hardening ship before monetization scales — trust and data honesty are the pitch (", codeText("bs_phase2_reliability"), ", ", codeText("bs_fetcher_health_honest"), ", ", codeText("bs_fx_conversion"), ")."),
+        el("p", { style: "margin-top:0.5rem" }, el("strong", {}, "Simplicity as moat: "), "Anyone can list games. BAKLOG wins by retrieving your cross-store data as you, normalizing it once, and reshuffling it into decisions — simply. No cloud brain, no AI wrapper: just data, retrieved and reshuffled on your machine."),
       ));
       cards.push(el("div", { class: "card agency-lane" },
         el("h2", {}, "Founder truths (the real reason this exists)"),
@@ -2342,6 +2359,7 @@
         el("h2", {}, "Why users choose this"),
         el("p", { class: "muted" }, "Court users with simple truths: free to start, Steam works first, cross-store clarity, and privacy-first defaults."),
         el("p", {}, "Core line: 'One honest backlog across all your stores, private by default.'"),
+        el("p", {}, el("strong", {}, "Simple but powerful: "), "It's just your data — retrieved from the stores you already use, normalized into one table, reshuffled into dashboard, deals, and picks. The magic-moment demo looks impressive because the retrieval is real; the product is honest about that."),
         el("h3", {}, "The magic-moment demo (lead with this)"),
         el("p", {}, "Connect once, click Refresh, and the dashboard fills in front of you: fetcher chips light up store-by-store (Steam, GOG, PSN, Epic, Xbox, Amazon, itch), the ", el("strong", {}, "library counter climbs live"), " — usually 0 to 1,000+ inside a minute — and the genre / co-op / deal panels paint as each store's data lands. Tested on a real audience: it sells itself. The demo IS the onboarding."),
         el("p", { class: "muted" }, "Why this matters in marketing: every other library tool shows you a populated mock screenshot. BAKLOG can show you the moment a real account turns into a real library on the user's own machine. That's a 30-second screen recording you can drop into any subreddit, any tweet, any landing page."),

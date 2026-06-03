@@ -25,12 +25,18 @@ def isolated_default_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     set_master_password_override("test-passphrase-auth-expire")
     secrets._cache = None
     target = profile_paths.auth_dir(profile_id="default")
+    saved = (
+        secrets.AUTH_DIR,
+        secrets.SECRETS_FILE,
+        secrets.MASTER_KEY_FILE,
+        secrets._cache,
+    )
     secrets.AUTH_DIR = target
     secrets.SECRETS_FILE = target / "secrets.bin"
     secrets.MASTER_KEY_FILE = target / ".master_key"
     yield
     set_master_password_override(None)
-    secrets._cache = None
+    secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache = saved
 
 
 def test_expire_unknown_provider_returns_1() -> None:

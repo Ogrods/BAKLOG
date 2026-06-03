@@ -18,7 +18,7 @@ import { ensureChartJs } from './chart-loader.js';
 import { animateCount, dashboardLibraryGames } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
 import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts } from './dashboard-charts.js';
-import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
+import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation } from './dashboard-insights.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
@@ -347,6 +347,11 @@ export async function renderDashboard(opts = {}) {
         renderDashboardPicksVersus(games);
       } catch (err) {
         console.error("Dashboard picks versus error:", err);
+      }
+      try {
+        renderDashboardRecentAdditions(games);
+      } catch (err) {
+        console.error("Dashboard recent additions error:", err);
       }
     });
     _dashRenderedFingerprint = fp;

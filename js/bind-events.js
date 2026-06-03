@@ -197,6 +197,7 @@ export function bindEvents() {
     focusGame(row.dataset.key);
   };
   document.getElementById("dashPicksVersusCard")?.addEventListener("click", onDashListClick);
+  document.getElementById("dashRecentAdditions")?.addEventListener("click", onDashListClick);
   document.getElementById("dashItchRecap")?.addEventListener("click", onDashListClick);
   document.getElementById("dashboardMega")?.addEventListener("click", onDashListClick);
 

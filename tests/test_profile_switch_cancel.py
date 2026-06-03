@@ -17,15 +17,18 @@ from shared.profiles import create_profile
 
 
 class _FakeManager:
-    """Records the ordering of cancel_all vs rebind so we can assert switch safety
+    """Records the ordering of cancel_all_and_wait vs rebind so we can assert switch safety
     without launching a real (slow, flaky-on-Windows) fetcher subprocess."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def cancel_all(self) -> list[dict]:
-        self.calls.append("cancel_all")
-        return [{"id": "stub", "key": "demo", "status": "cancelled"}]
+    def cancel_all_and_wait(self, timeout: float = 10.0) -> dict:
+        self.calls.append("cancel_all_and_wait")
+        return {
+            "cancelled": [{"id": "stub", "key": "demo", "status": "cancelled"}],
+            "stragglers": [],
+        }
 
     def rebind_profile_paths(self) -> None:
         self.calls.append("rebind")
@@ -74,6 +77,6 @@ def test_profile_switch_cancels_runs_before_rebind(switch_server) -> None:
 
     assert status == 200
     assert body.get("active") == "work"
-    # cancel_all must run before paths rebind so a still-running fetcher can't
+    # cancel_all_and_wait must run before paths rebind so a still-running fetcher can't
     # write into the newly-activated profile's run files.
-    assert fake.calls == ["cancel_all", "rebind"]
+    assert fake.calls == ["cancel_all_and_wait", "rebind"]

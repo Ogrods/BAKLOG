@@ -92,6 +92,65 @@ def test_personal_put_invalid_payload(personal_server: str):
     assert "personal must be an object" in err["error"]
 
 
+def test_personal_put_matching_profile_stamped(personal_server: str):
+    payload = {
+        "profile": "default",
+        "personal": {"steam:1": {"status": "backlog"}},
+        "prefs": {},
+        "manual": [],
+    }
+    status, saved = _request(personal_server, "PUT", "/api/personal", payload)
+    assert status == 200
+    assert saved["personal"]["steam:1"]["status"] == "backlog"
+    assert "profile" not in saved
+
+
+def test_personal_put_profile_mismatch_rejected(
+    personal_server: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    prof = tmp_path / "profiles"
+    prof.mkdir(parents=True)
+    (prof / "index.json").write_text(
+        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default", "created_at": "t"}]}),
+        encoding="utf-8",
+    )
+    server._refresh_personal_paths()
+    seed = {"personal": {"keep": {"status": "done"}}, "prefs": {}, "manual": []}
+    _request(personal_server, "PUT", "/api/personal", seed)
+
+    status, err = _request(
+        personal_server,
+        "PUT",
+        "/api/personal",
+        {"profile": "work", "personal": {"bad": {"status": "x"}}, "prefs": {}, "manual": []},
+    )
+    assert status == 409
+    assert err.get("error") == "profile mismatch"
+
+    _, loaded = _request(personal_server, "GET", "/api/personal")
+    assert loaded["personal"] == seed["personal"]
+
+
+def test_personal_post_beacon_writes(personal_server: str):
+    payload = {
+        "profile": "default",
+        "personal": {"steam:99": {"status": "queued"}},
+        "prefs": {},
+        "manual": [],
+    }
+    status, saved = _request(personal_server, "POST", "/api/personal", payload)
+    assert status == 200
+    assert saved["personal"]["steam:99"]["status"] == "queued"
+
+
+def test_personal_put_without_profile_back_compat(personal_server: str):
+    payload = {"personal": {"steam:2": {"status": "live"}}, "prefs": {}, "manual": []}
+    status, saved = _request(personal_server, "PUT", "/api/personal", payload)
+    assert status == 200
+    assert saved["personal"]["steam:2"]["status"] == "live"
+
+
 def test_run_unknown_fetcher(personal_server: str):
     status, err = _request(personal_server, "POST", "/api/run/unknown-fetcher-key")
     assert status == 404

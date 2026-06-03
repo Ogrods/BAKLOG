@@ -699,6 +699,104 @@ const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
 /** Chip stays in failed styling until the next successful run (not just ~10s runState). */
 const lastRunFailedByKey = new Map();
 
+// ---------------------------------------------------------------------------
+// Cosmetic chip-age ticker (in-place text only — never re-renders dashboard)
+// ---------------------------------------------------------------------------
+const AGE_TICK_MS = 60_000;
+const FAST_AGE_TICK_MS = 1_000;
+const FAST_AGE_WINDOW_MS = 60_000;
+
+let ageTickTimer = null;
+let fastTickTimer = null;
+let fastTickRemaining = 0;
+
+/** Cosmetic age label from logged fetched_at (clamped, no local counter). */
+function cosmeticAgeLabel(src) {
+  const { ageMs, ageLabel } = fetcherFreshness(src);
+  if (!Number.isFinite(ageMs)) return ageLabel;
+  return humanizeAge(Math.max(0, ageMs));
+}
+
+/** True when the chip is showing a plain relative age (not run/reconnect/cooldown/etc.). */
+function chipShowsPlainAge(src, deps = {}) {
+  const stateFor = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
+  if (stateFor(src.key)) return false;
+  if (isFetcherReconnectRequired(src.key)) return false;
+  if (authCooldownRemainingMs(src.key) > 0) return false;
+  if (lastRunFailedByKey.has(src.key)) return false;
+  const { status } = fetcherFreshness(src);
+  if (status === 'missing') return false;
+  return true;
+}
+
+/**
+ * Patch .fh-chip-age text from logged fetched_at. No innerHTML, no chart/dashboard render.
+ * @returns {boolean} false when the panel is gone (caller should stop its timer).
+ */
+export function refreshChipAgesInPlace(deps = {}) {
+  return tickRefreshChipAges(deps);
+}
+
+function tickRefreshChipAges(deps = {}) {
+  if (typeof document !== 'undefined' && document.hidden) return true;
+  const slot = document.getElementById('dashboardFetcherHealth');
+  if (!slot) return false;
+  const sources = deps.sources ?? fetcherSources;
+  for (const src of sources) {
+    if (!chipShowsPlainAge(src, deps)) continue;
+    const chip = slot.querySelector(`.fh-chip[data-fetcher-key="${src.key}"]`);
+    const ageSpan = chip?.querySelector('.fh-chip-age');
+    if (!ageSpan) continue;
+    const label = cosmeticAgeLabel(src);
+    if (ageSpan.textContent !== label) ageSpan.textContent = label;
+  }
+  return true;
+}
+
+export function stopAgeTicker() {
+  if (ageTickTimer) clearInterval(ageTickTimer);
+  ageTickTimer = null;
+}
+
+export function ensureAgeTicker() {
+  if (ageTickTimer) return;
+  ageTickTimer = setInterval(() => {
+    if (!tickRefreshChipAges()) stopAgeTicker();
+  }, AGE_TICK_MS);
+}
+
+export function stopFastAgeTick() {
+  if (fastTickTimer) clearInterval(fastTickTimer);
+  fastTickTimer = null;
+  fastTickRemaining = 0;
+}
+
+/** Whether the post-fetch 1s age ticker is active (for tests / diagnostics). */
+export function isFastAgeTickActive() {
+  return fastTickTimer != null;
+}
+
+/** 1s cosmetic updates for the first minute after a fetch lands (seconds band). */
+export function startFastAgeTick() {
+  const ticks = Math.ceil(FAST_AGE_WINDOW_MS / FAST_AGE_TICK_MS);
+  fastTickRemaining = Math.max(fastTickRemaining, ticks);
+  if (fastTickTimer) return;
+  fastTickTimer = setInterval(() => {
+    const cont = tickRefreshChipAges();
+    fastTickRemaining -= 1;
+    if (!cont || fastTickRemaining <= 0) stopFastAgeTick();
+  }, FAST_AGE_TICK_MS);
+}
+
+if (typeof document !== 'undefined' && !document.__baklogFetcherAgeVisListener) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      try { tickRefreshChipAges(); } catch (_) { /* panel not mounted */ }
+    }
+  });
+  document.__baklogFetcherAgeVisListener = true;
+}
+
 export function maybeAutoRefreshItad(deps = {}) {
   if (state.prefs.itadAutoRefreshDisabled) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
@@ -1120,12 +1218,16 @@ export const fetcherRunner = (() => {
   function appendLine(text, kind = 'stdout') {
     const body = logBody();
     if (!body) return;
+    // Only auto-scroll if the user is already pinned near the bottom; otherwise
+    // leave their scroll position alone so they can read back through the log
+    // while new lines keep streaming in.
+    const stick = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
     const div = document.createElement('div');
     div.className = `fh-log-line ${kind}`;
     div.textContent = text;
     body.appendChild(div);
     while (body.children.length > 4000) body.removeChild(body.firstChild);
-    body.scrollTop = body.scrollHeight;
+    if (stick) body.scrollTop = body.scrollHeight;
   }
 
   function markChipState(key, runState, runId = null) {
@@ -1418,6 +1520,7 @@ export const fetcherRunner = (() => {
       appendLine(`[client] reload failed: ${err}`, 'stderr');
     }
     renderDashboardFetcherHealth();
+    startFastAgeTick();
   }
 
   /** Re-attach SSE streams after a page load (or tab return). */
@@ -1519,6 +1622,8 @@ export const fetcherRunner = (() => {
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = null;
     stopInFlightPolling();
+    stopAgeTicker();
+    stopFastAgeTick();
   }
 
   return {
@@ -1723,4 +1828,5 @@ export function renderDashboardFetcherHealth() {
     </details>
     <div class="fh-chips">${chipsHtml}</div>
   `;
+  ensureAgeTicker();
 }

@@ -1,5 +1,5 @@
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
-import { prefsStorageKey, profileScopedStorageKey } from './profiles.js';
+import { activeProfileId, prefsStorageKey, profileScopedStorageKey } from './profiles.js';
 
 function personalStorageKey() {
   return profileScopedStorageKey(STORAGE_KEY);
@@ -29,6 +29,7 @@ export const personalStore = (() => {
 
   function snapshotLocal() {
     return {
+      profile: activeProfileId(),
       personal: JSON.parse(JSON.stringify(state.personal || {})),
       prefs: JSON.parse(JSON.stringify(state.prefs || {})),
       manual: JSON.parse(JSON.stringify(getManualGamesFn())),
@@ -152,7 +153,11 @@ export const personalStore = (() => {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          console.warn('[personalStore] PUT failed', res.status, await res.text().catch(() => ''));
+          if (res.status === 409) {
+            console.warn('[personalStore] save rejected: server active profile changed');
+          } else {
+            console.warn('[personalStore] PUT failed', res.status, await res.text().catch(() => ''));
+          }
           return false;
         }
         serverDoc = await res.json();

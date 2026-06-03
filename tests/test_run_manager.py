@@ -388,3 +388,42 @@ def test_durable_queue_restored_on_startup(tmp_path: Path, monkeypatch: pytest.M
     snap = mgr.snapshot()
     assert snap["active"] or snap["queue"]
     mgr.shutdown()
+
+
+def test_has_runs_for_profile(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    work_run = server.Run("demo", runs_dir=runs_dir, profile_id="work")
+    work_run.status = "queued"
+    play_run = server.Run("demo2", runs_dir=runs_dir, profile_id="play")
+    play_run.status = "done"
+    with mgr._lock:
+        mgr._pending.append(work_run)
+        mgr._pending.append(play_run)
+    assert mgr.has_runs_for_profile("work") is True
+    assert mgr.has_runs_for_profile("play") is False
+    assert mgr.has_runs_for_profile("missing") is False
+
+
+def test_cancel_all_and_wait_finishes_queued(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    run = server.Run("demo", runs_dir=runs_dir)
+    with mgr._lock:
+        mgr._pending.append(run)
+        mgr._runs_by_id[run.id] = run
+    result = mgr.cancel_all_and_wait(timeout=5.0)
+    assert result["stragglers"] == []
+    assert len(result["cancelled"]) == 1
+    assert run._finished.is_set()
+
+
+def test_cancel_all_and_wait_reports_stragglers(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    run = server.Run("demo", runs_dir=runs_dir)
+    run.status = "cancelling"
+    with mgr._lock:
+        mgr._pending.append(run)
+        mgr._runs_by_id[run.id] = run
+    result = mgr.cancel_all_and_wait(timeout=0.05)
+    assert result["stragglers"]
+    assert result["stragglers"][0]["id"] == run.id
+    assert not run._finished.is_set()

@@ -15,6 +15,12 @@ import {
   syncReconnectFromAuthStatus,
   noteAuthCooldownStrike,
   authCooldownDurationMs,
+  refreshChipAgesInPlace,
+  ensureAgeTicker,
+  stopAgeTicker,
+  startFastAgeTick,
+  stopFastAgeTick,
+  isFastAgeTickActive,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -194,6 +200,118 @@ describe('fetchWithTimeout', () => {
       });
     }));
     await expect(fetchWithTimeout('/api/runs', {}, 30)).rejects.toThrow('server not responding');
+  });
+});
+
+function mountFetcherHealthSlot(steamAgeText = '5m') {
+  document.body.innerHTML = `
+    <div id="dashboardFetcherHealth">
+      <button type="button" class="fh-chip" data-fetcher-key="steam">
+        <span class="fh-chip-age">${steamAgeText}</span>
+      </button>
+      <button type="button" class="fh-chip" data-fetcher-key="gog">
+        <span class="fh-chip-age">running</span>
+      </button>
+    </div>
+  `;
+}
+
+describe('refreshChipAgesInPlace', () => {
+  beforeEach(() => {
+    stopAgeTicker();
+    stopFastAgeTick();
+    document.body.innerHTML = '';
+    state.libraryMeta = {};
+  });
+
+  afterEach(() => {
+    stopAgeTicker();
+    stopFastAgeTick();
+    document.body.innerHTML = '';
+  });
+
+  it('updates plain-age chip from logged fetched_at', () => {
+    const fetchedAt = new Date(Date.now() - 3 * 60_000).toISOString();
+    state.libraryMeta = { steam: { game_count: 10, fetched_at: fetchedAt } };
+    mountFetcherHealthSlot('stale');
+    const sources = [{ key: 'steam', metaKey: 'steam', countFn: null }];
+    expect(refreshChipAgesInPlace({ sources, stateFor: () => null })).toBe(true);
+    const age = document.querySelector('[data-fetcher-key="steam"] .fh-chip-age');
+    expect(age.textContent).toBe('3m');
+  });
+
+  it('leaves running chip untouched', () => {
+    const fetchedAt = new Date(Date.now() - 3 * 60_000).toISOString();
+    state.libraryMeta = {
+      steam: { game_count: 10, fetched_at: fetchedAt },
+      gog: { game_count: 5, fetched_at: fetchedAt },
+    };
+    mountFetcherHealthSlot('3m');
+    const sources = [
+      { key: 'steam', metaKey: 'steam', countFn: null },
+      { key: 'gog', metaKey: 'gog', countFn: null },
+    ];
+    refreshChipAgesInPlace({ sources, stateFor: (k) => (k === 'gog' ? 'running' : null) });
+    expect(document.querySelector('[data-fetcher-key="gog"] .fh-chip-age').textContent).toBe('running');
+  });
+
+  it('clamps future fetched_at to 0s', () => {
+    const future = new Date(Date.now() + 5_000).toISOString();
+    state.libraryMeta = { steam: { game_count: 1, fetched_at: future } };
+    mountFetcherHealthSlot('—');
+    const sources = [{ key: 'steam', metaKey: 'steam', countFn: null }];
+    refreshChipAgesInPlace({ sources, stateFor: () => null });
+    expect(document.querySelector('[data-fetcher-key="steam"] .fh-chip-age').textContent).toBe('0s');
+  });
+
+  it('skips DOM writes when document is hidden', () => {
+    const fetchedAt = new Date(Date.now() - 90_000).toISOString();
+    state.libraryMeta = { steam: { game_count: 10, fetched_at: fetchedAt } };
+    mountFetcherHealthSlot('old');
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    const sources = [{ key: 'steam', metaKey: 'steam', countFn: null }];
+    expect(refreshChipAgesInPlace({ sources, stateFor: () => null })).toBe(true);
+    expect(document.querySelector('[data-fetcher-key="steam"] .fh-chip-age').textContent).toBe('old');
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+  });
+
+  it('returns false when panel is missing', () => {
+    document.body.innerHTML = '';
+    expect(refreshChipAgesInPlace({ sources: [], stateFor: () => null })).toBe(false);
+  });
+});
+
+describe('age tickers', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    stopAgeTicker();
+    stopFastAgeTick();
+    document.body.innerHTML = '';
+    state.libraryMeta = {};
+  });
+
+  afterEach(() => {
+    stopAgeTicker();
+    stopFastAgeTick();
+    vi.useRealTimers();
+    document.body.innerHTML = '';
+  });
+
+  it('ensureAgeTicker is idempotent', () => {
+    const spy = vi.spyOn(globalThis, 'setInterval');
+    ensureAgeTicker();
+    expect(spy).toHaveBeenCalledTimes(1);
+    ensureAgeTicker();
+    expect(spy).toHaveBeenCalledTimes(1);
+    stopAgeTicker();
+    spy.mockRestore();
+  });
+
+  it('fast tick self-stops after 60 interval fires', () => {
+    startFastAgeTick();
+    expect(isFastAgeTickActive()).toBe(true);
+    vi.advanceTimersByTime(60_000);
+    expect(isFastAgeTickActive()).toBe(false);
   });
 });
 

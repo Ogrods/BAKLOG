@@ -102,6 +102,9 @@ MANUAL_EMPTY_EXIT_SCRIPTS = {
     "fetch_ubisoft.py",
     "fetch_ea.py",
 }
+DRIFT_GUARD_BY_SCRIPT: dict[str, str] = {
+    "fetch_amazon.py": "refuse_amazon_source_drift",
+}
 NO_EMPTY_GUARD_SCRIPTS = {
     "enrich_hltb.py",
     "enrich_steam_reviews.py",
@@ -127,7 +130,7 @@ def test_refuse_empty_helper(script: str) -> None:
 def test_manual_empty_guard(script: str) -> None:
     text = (ROOT / script).read_text(encoding="utf-8")
     assert "exit_code=2" in text
-    assert "refuse_drift_result" in text
+    assert DRIFT_GUARD_BY_SCRIPT.get(script, "refuse_drift_result") in text
 
 
 @pytest.mark.parametrize(

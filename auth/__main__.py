@@ -17,7 +17,6 @@ from auth.bundle import (
     export_bundle,
     import_bundle,
 )
-from auth.manager import mark_invalid
 from auth.registry import PROVIDERS, provider_order
 
 
@@ -65,6 +64,8 @@ def cmd_import(args: argparse.Namespace) -> int:
 
 
 def cmd_expire(args: argparse.Namespace) -> int:
+    from auth.manager import mark_invalid
+
     if args.list:
         for key in provider_order():
             spec = PROVIDERS[key]

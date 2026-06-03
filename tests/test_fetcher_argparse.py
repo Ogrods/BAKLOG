@@ -6,32 +6,30 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_fetch_ea_help_exits_zero() -> None:
-    """Duplicate --allow-drift registration crashes argparse before --help."""
-    proc = subprocess.run(
-        [sys.executable, "fetch_ea.py", "--help"],
+def _run_help(script: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, script, "--help"],
         cwd=ROOT,
         capture_output=True,
         text=True,
         timeout=30,
     )
-    assert proc.returncode == 0, proc.stderr or proc.stdout
+
+
+def test_fetch_ea_help_exits_zero() -> None:
+    """Duplicate --allow-drift registration crashes argparse before --help."""
+    proc = _run_help("fetch_ea.py")
+    combined = (proc.stdout or "") + (proc.stderr or "")
+    assert proc.returncode == 0, combined
+    assert "conflicting option" not in combined.lower()
+    assert "--allow-drift" in combined
 
 
 def test_fetch_humble_accepts_skip_hltb_flag() -> None:
-    """Manifest passes --skip-hltb; script must not reject it at parse time."""
-    proc = subprocess.run(
-        [sys.executable, "fetch_humble.py", "--skip-hltb", "--allow-empty"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    combined = (proc.stderr or "") + (proc.stdout or "")
-    assert "unrecognized arguments" not in combined
-    assert proc.returncode != 2
+    """Manifest passes --skip-hltb; script must advertise it in --help."""
+    proc = _run_help("fetch_humble.py")
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "--skip-hltb" in (proc.stdout or "")

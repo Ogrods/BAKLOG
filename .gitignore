@@ -46,6 +46,10 @@ check_images.py
 find_dupes.py
 migrate_gog_images.py
 remove_steam_dupes.py
+capture_nintendo_endpoint.py
+scripts/probe_nintendo_graphql.py
+scripts/probe_nintendo_graphql2.py
+scripts/probe_nintendo_graphql3.py
 
 # Generated Lighthouse reports (npm run / npx lighthouse)
 lighthouse/

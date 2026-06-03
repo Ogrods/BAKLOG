@@ -784,6 +784,9 @@
       ? (done >= total ? 100 : Math.floor((done / total) * 100))
       : 0;
     const shipped = [
+      "Spotlight 'On sale now' is wishlist-only (2026-06-02) — a discount on a game you already own isn't actionable, so the spotlight category no longer tags library games. gameSpotlightReason dropped its isOnSale branch; pickSpotlightGames injects visible wishlist on-sale items (rating >= 70, cross-store/user-hidden excluded) tagged 'On sale now', rendered as 'on your wishlist' with a wishlist jump. js/dashboard-spotlight.js; tests/spotlight-replay.test.js updated.",
+      "Missing-catalog 404s silenced (2026-06-02) — server.py returns an empty {game_count:0, games:[]} stub for any games_*.json that doesn't exist yet (unfetched store), so the boot probe no longer floods the console with 404s during the connection pass. Real data replaces the stub once the fetcher runs. tests/test_server_personal.py covers the stub.",
+      "Library/wishlist merge gaps fixed (2026-06-02) — games_ea.json was loaded but never merged into the library (ea missing from rebuildAllGamesFromMetas); Nintendo + Humble wishlist files were loaded but never merged into state.wishlistGames (missing from rebuildWishlistFromMetas). All three now surface their rows. js/library-load.js.",
       "First-run onboarding flow (2026-06-02) — when 0 providers connected: Connections .conn-onboard CTA (Start with Steam → reconnectProvider); dashboard #dashOnboard welcome; empty library/wishlist/itch tables get Open Connections button. connectedProviderCount() in js/connections.js. p4_onboarding_flow + find_ux_conn_density resolved.",
       "Ubisoft Connect 2FA blank tab (2026-06-02) — post-verify about:blank popups auto-closed via is_blank_browser_url + _merge_popup_worker (cdp_browser) and orphan-tab sweep in _extract_ubisoft; not a Connections card render bug. find_ux_conn_ubi_blank_tab resolved.",
       "Boot curtain loading tips (2026-06-02) — #bootLoadingTip was empty until the module graph finished, so hints only flashed for ~150ms before liftBootCurtain. Inline body script in index.html seeds a random tip at parse time (TIPS list kept in sync with js/tips.js); startBootTipRotation adopts seeded text so the 4s cross-fade rotation continues without a swap flash.",
@@ -846,7 +849,7 @@
     ];
     const blockers = [];
     const next = [
-      "CONNECTION TROUBLESHOOTING PASS (current focus) — store-adding is done; managed login is generalized (bs_managed_login resolved). Walk every connection one by one: Connect, verify capture, run fetch, confirm drift guard + reconnect-chip behavior.",
+      "CONNECTION TROUBLESHOOTING PASS (current focus) — store-adding is done; managed login is generalized (bs_managed_login resolved). Walk every connection one by one: Connect, verify capture, run fetch, confirm drift guard + reconnect-chip behavior. Track progress on the new Connection matrix tab (Connect / Fetch / Reconnect / Spot-check per pull).",
       "Provider checklist to walk: Steam · GOG · PSN · Epic (+ wishlist) · Amazon · Xbox (+ wishlist) · Battle.net · Ubisoft (+ wishlist) · Nintendo (+ wishlist) · itch.io · Humble (+ wishlist) · EA App.",
       "Run the first EA App sync to populate games_ea.json + confirm the count, now that EA Connect is verified.",
       "Further stores (Riot, Rockstar, Game Pass catalog, cloud services) are stretch goals — only if a clean own-session path exists and the bs_tos guardrails hold.",

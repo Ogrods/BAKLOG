@@ -1197,6 +1197,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .fh-chip-failed .fh-chip-dot { background: #f43f5e; }
 .fh-chip-needs-config { border-style: dashed; }
 .fh-chip-readonly { opacity: 0.55; cursor: not-allowed; }
+.fh-chip-unavailable { opacity: 0.45; cursor: not-allowed; border-style: dotted; }
 .fh-chip-auth-cooldown {
   border-color: rgba(245, 158, 11, 0.6);
   background: rgba(245, 158, 11, 0.1);
@@ -2723,6 +2724,10 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   border-color: #475569;
   border-left-color: #38bdf8;
 }
+/* Platform-restricted provider (e.g. Amazon off Windows): dim but still
+   selectable so the card can explain why it is unavailable. */
+.conn-rail-item.is-unavailable { opacity: 0.55; }
+.conn-rail-item.is-unavailable .conn-row-label { font-style: italic; }
 .conn-rail-steam-wrap .conn-rail-item.is-selected {
   border-left-color: #38bdf8;
   box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);

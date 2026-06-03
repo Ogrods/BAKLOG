@@ -14,6 +14,8 @@ from typing import Any, Callable
 from auth.registry import PROVIDERS, spec_for
 from auth.runner import AuthSession, run_browser_auth
 from auth.secrets import delete_provider_blob, get_provider_blob, profile_dir, set_provider_blob
+from shared.platform_support import platform_supported
+from shared.profile_paths import epic_cache_dir
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -99,6 +101,12 @@ def _provider_state(provider: str) -> str:
     explicit = blob.get("status")
     spec = spec_for(provider)
 
+    # Platform-restricted providers (e.g. Amazon Games on Windows) must never
+    # import their OS-specific client on an unsupported OS — that import raises
+    # and would take down GET /api/auth/status for the whole Connections page.
+    if not platform_supported(spec.platforms):
+        return "unavailable"
+
     if spec.kind == "local":
         from amazon_client import default_sql_dir
 
@@ -112,7 +120,7 @@ def _provider_state(provider: str) -> str:
         return "connected"
 
     if spec.kind == "oauth" and provider == "epic":
-        session_file = ROOT / "cache" / "epic" / "session.json"
+        session_file = epic_cache_dir() / "session.json"
         if session_file.exists() or os.getenv("EPIC_AUTH_CODE", "").strip():
             return "unverified" if not session_file.exists() else "connected"
         return "disconnected"
@@ -140,6 +148,8 @@ def get_status() -> list[dict[str, Any]]:
                 "last_verified": blob.get("last_verified"),
                 "last_error": blob.get("last_error"),
                 "expiry_days": spec.expiry_days,
+                "platforms": list(spec.platforms),
+                "available": platform_supported(spec.platforms),
                 "form_fields": [
                     {"key": f.key, "label": f.label, "secret": f.secret, "placeholder": f.placeholder}
                     for f in spec.form_fields
@@ -234,7 +244,7 @@ def disconnect(provider: str) -> None:
     if prof.exists():
         shutil.rmtree(prof, ignore_errors=True)
     if provider == "epic":
-        session = ROOT / "cache" / "epic" / "session.json"
+        session = epic_cache_dir() / "session.json"
         if session.exists():
             session.unlink(missing_ok=True)
 

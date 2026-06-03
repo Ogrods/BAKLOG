@@ -563,6 +563,8 @@ export async function loadFetcherSources(force = false) {
         requires: entry.requires || [],
         missingRequirements: entry.missing_requirements || [],
         supportsRefresh: !!(entry.supports_refresh || refreshByKey[entry.key]),
+        available: entry.available !== false,
+        platforms: entry.platforms || [],
       }));
       return fetcherSources;
     }
@@ -1588,17 +1590,23 @@ export function renderDashboardFetcherHealth() {
     if (inAuthCooldown) {
       titleLines.push(`Auth failed — cooling down ${authCooldownLabel(authCooldownMs)}. Reconnect in Connections to clear, or wait it out.`);
     }
+    const platformUnavailable = src.available === false;
+    if (platformUnavailable) {
+      const plats = (src.platforms || []).join(', ') || 'Windows';
+      titleLines.push(`Unavailable on this OS — ${src.label} runs on ${plats} only.`);
+    }
     const title = titleLines.join('\n');
-    const disabled = !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere || inAuthCooldown || needsReconnect;
+    const disabled = platformUnavailable || !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere || inAuthCooldown || needsReconnect;
     const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
     const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
     const cooldownClass = inAuthCooldown ? ' fh-chip-auth-cooldown' : '';
     const reconnectClass = needsReconnect ? ' fh-chip-reconnect-required' : '';
+    const unavailableClass = platformUnavailable ? ' fh-chip-unavailable' : '';
     const warnBadge = needsConfig ? '<span class="fh-chip-warn" title="Missing credentials">!</span>' : '';
     const ageText = runState
       ? runState
       : (needsReconnect ? 'reconnect' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel));
-    const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
+    const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}" style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
       ${warnBadge}
       <span class="fh-chip-label">${escapeHtml(src.label)}</span>

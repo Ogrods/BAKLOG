@@ -10,6 +10,27 @@ BAKLOG helps you browse, sort, and prioritize games across Steam, GOG, PlayStati
 
 See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves your machine) and [SECURITY.md](SECURITY.md) for the threat model (TL;DR: there is no server to breach). Released under the [MIT license](LICENSE).
 
+## Supported platforms
+
+| OS | Status |
+|----|--------|
+| **Windows 10/11** | Fully supported (primary development target) |
+| **macOS** | Supported with limits — every store except **Amazon Games** |
+| **Linux** | Supported with limits — every store except **Amazon Games** |
+
+The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. The one Windows-only source is **Amazon Games**: it reads the desktop launcher's local SQLite database, which is encrypted with Windows DPAPI and has no portable equivalent. On macOS/Linux, Amazon is shown as **Unavailable** in Connections and its fetcher chip is disabled — everything else works the same.
+
+Credentials are stored via your OS **keyring** (Windows Credential Manager, macOS Keychain, Linux Secret Service) with an AES-GCM file fallback — not DPAPI. See [`auth/secrets.py`](auth/secrets.py).
+
+**Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium for the Connect sign-in flow (override with `BAKLOG_CHROME_PATH`), then `pip install -e ".[dev]"` and `python server.py`.
+
+### Store availability by platform
+
+| Store | Windows | macOS / Linux |
+|-------|:-------:|:-------------:|
+| Steam, GOG, PSN, Epic, Xbox, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA, ITAD | Yes | Yes |
+| Amazon Games | Yes | No (Windows-only launcher DB) |
+
 ## Stack
 
 | Layer | Tech |
@@ -283,9 +304,11 @@ The browser's `localStorage` still exists as a hot cache that the page hydrates 
 
 If you instead serve the dashboard read-only via `python -m http.server`, the dashboard falls back to localStorage as in earlier versions and the **Export notes** / **Import notes** buttons (in the toolbar ⋯ menu) become the only way to back up. The first time you open the dashboard via `server.py` after using read-only mode, a banner offers to upload your existing localStorage data into `data/personal.json`.
 
-## Auto-refresh on a schedule (Windows)
+## Auto-refresh on a schedule
 
-Use the included `refresh.ps1` helper:
+The cross-platform way to run fetchers is from the UI — click any chip in the **Fetcher health** row. For unattended refreshes, use the helper script for your OS. Both run the same fetch sequence and log to `refresh.log`.
+
+**Windows** (`refresh.ps1`):
 
 ```powershell
 Set-Location "c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog"
@@ -297,6 +320,23 @@ Create a weekly scheduled task (example: Sundays at 9:00):
 ```powershell
 schtasks /create /SC WEEKLY /D SUN /TN "BAKLOG Refresh" /TR "powershell -ExecutionPolicy Bypass -File \"c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog\refresh.ps1\"" /ST 09:00
 ```
+
+**macOS / Linux** (`refresh.sh`):
+
+```bash
+chmod +x refresh.sh   # first time only
+./refresh.sh
+```
+
+Schedule it weekly with `cron` (example: Sundays at 9:00):
+
+```bash
+crontab -e
+# then add:
+0 9 * * 0 cd /path/to/steam-backlog && ./refresh.sh
+```
+
+> `refresh.sh` skips `fetch_amazon.py` automatically — that store is Windows-only.
 
 ## Files
 
@@ -328,7 +368,7 @@ schtasks /create /SC WEEKLY /D SUN /TN "BAKLOG Refresh" /TR "powershell -Executi
 | `gog_client.py` | GOG embed API client |
 | `psn_client.py` | PlayStation Network client (via psnawp) |
 | `epic_client.py` | Epic OAuth client |
-| `amazon_client.py` | Amazon Games SQLite reader |
+| `amazon_client.py` | Amazon Games SQLite reader (Windows-only) |
 | `xbox_client.py` | OpenXBL title history client |
 | `battlenet_client.py` | Battle.net session (Edge cookie jar + optional .env fallback) |
 | `ubisoft_client.py` | Ubisoft Connect API client |
@@ -352,7 +392,7 @@ The repo keeps most scripts in the project root on purpose — each fetcher is a
 | `games_*.json`, `itad_prices.json` | Generated library data (gitignored where applicable) |
 | `index.html`, `js/`, `tailwind.css` | Static dashboard (serve over HTTP for ES modules) |
 | `cache/` | Cached API responses between fetch runs |
-| `refresh.ps1` | Runs the fetch sequence in order |
+| `refresh.ps1` / `refresh.sh` | Runs the fetch sequence in order (Windows / POSIX) |
 
 No nested `src/` folder — run fetchers from the repo root so paths stay simple.
 

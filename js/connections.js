@@ -8,6 +8,8 @@ let _connPopoverRelease = null;
 
 let authStatus = [];
 
+let _authStatusLoaded = false;
+
 let reconnectProviders = new Set();
 
 let pollTimer = null;
@@ -30,6 +32,8 @@ const STATUS_LABEL = {
 
   expired: 'Session expired',
 
+  unavailable: 'Unavailable',
+
 };
 
 
@@ -44,6 +48,8 @@ const STATUS_CLASS = {
 
   expired: 'conn-pill conn-pill--warn',
 
+  unavailable: 'conn-pill conn-pill--off',
+
 };
 
 
@@ -53,6 +59,8 @@ const STATUS_NOTE = {
   unverified: 'Found in .env but never verified. Click Verify to sign in.',
 
   expired: 'Last fetcher run reported an auth failure. Reconnect to refresh.',
+
+  unavailable: 'Not available on this operating system.',
 
 };
 
@@ -317,6 +325,20 @@ function disconnectBtnHtml(p, st) {
 
 function buildCardFooter(p, st) {
 
+  if (p.available === false) {
+
+    const plats = (p.platforms || []).join(', ') || 'Windows';
+
+    return `
+
+      <div class="conn-card-footer">
+
+        <span class="conn-local-label">${escapeHtml(`Available on ${plats} only`)}</span>
+
+      </div>`;
+
+  }
+
   if (p.kind === 'local') {
 
     return `
@@ -478,9 +500,17 @@ function buildRailItemHtml(p, selected) {
 
   const sel = selected ? ' is-selected' : '';
 
+  const unavailable = p.available === false;
+
+  const unav = unavailable ? ' is-unavailable' : '';
+
+  const title = unavailable
+    ? ` title="${escapeAttr(`${p.label} is available on ${(p.platforms || []).join(', ') || 'Windows'} only`)}"`
+    : '';
+
   return `
 
-    <div class="conn-rail-item${sel}" data-provider="${escapeAttr(p.key)}" role="option" tabindex="${selected ? '0' : '-1'}" aria-selected="${selected ? 'true' : 'false'}">
+    <div class="conn-rail-item${sel}${unav}" data-provider="${escapeAttr(p.key)}" role="option" tabindex="${selected ? '0' : '-1'}" aria-selected="${selected ? 'true' : 'false'}"${title}>
 
       <span class="conn-row-dot conn-row-dot--${escapeAttr(st)}" aria-hidden="true"></span>
 
@@ -1190,7 +1220,16 @@ async function fetchAuthStatus() {
 
   authStatus = data.providers || [];
 
+  _authStatusLoaded = true;
+
   return authStatus;
+
+}
+
+/** True once /api/auth/status has resolved at least once this session. */
+export function authStatusLoaded() {
+
+  return _authStatusLoaded;
 
 }
 
@@ -1444,7 +1483,7 @@ export function initConnections() {
 
   wireConnectionsUi();
 
-  refreshConnections();
+  return refreshConnections();
 
 }
 

@@ -28,6 +28,11 @@ const JUNK_NAME_PATTERNS = [
   // (e.g. "Chivalry 2 - Public Testing"). Drop them so they don't shadow
   // the real release.
   /\bpublic testing\b/i,
+  // Cosmetic wallpaper SKUs (e.g. Epic "HD Wallpaper", "Death Stranding — HD
+  // Wallpaper") get listed as standalone library entries and can pick up a
+  // mismatched Steam score. Match a trailing "wallpaper" only, so legit titles
+  // like "Wallpaper Engine" are unaffected. Mirrors psn_client.py.
+  /\bwallpaper$/i,
 ];
 
 const MIN_REVIEW_COUNT = 50;

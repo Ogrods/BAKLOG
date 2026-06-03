@@ -45,9 +45,13 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - **Connections tab** — unified sign-in for all stores: form fields for API keys (Steam, Xbox, itch, ITAD), headed Chrome/Edge sign-in via CDP for cookie/OAuth providers (GOG, PSN, Epic, Battle.net, Nintendo, Ubisoft), encrypted at rest via OS keychain + AES-GCM (`auth/` package).
 - **Reconnect banner** when a fetcher fails auth (401/403) — links to Connections tab.
 - **`scripts/build_installer.ps1`** — bundles app into `dist/baklog/` (target machine needs Chrome or Edge for Connections).
+- **Tracker Notes tab** — `tracker.html` gains a Notes panel for ops/guardrail reference (e.g. BAKLOG_PROFILE auto-ignore); moved out of Triage.
 
 ### Fixed
 
+- **Profile menu vs BAKLOG_PROFILE in server shell** — `server.py` drops `BAKLOG_PROFILE` from the dev-server process at import so `profiles/index.json` and the header menu always own the active profile; startup prints a NOTE if the var was set. Per-run fetchers still pin profile via `subprocess_env_for_profile()`. CLI one-off fetchers in a separate shell are unchanged.
+- **Multi-tab personal.json cross-write** — saves stamp the tab's bound profile id; server rejects mismatches (409) so a background tab cannot overwrite another profile's `personal.json`. Unload `sendBeacon` now reaches `POST /api/personal` (previously 404).
+- **Delete profile no longer races in-flight runs** — DELETE is refused (409) while a fetch is running or queued for that profile. Switching profiles cancels runs and waits up to `SWITCH_CANCEL_WAIT_SEC` before rebinding paths.
 - **Amazon launcher + web union-merge** — `fetch_amazon.py` no longer drops launcher-only titles when run with `--source web` (or vice versa). Each run refreshes only its source slice, keeps the other slice, and collapses cross-source duplicates by ASIN then name (launcher preferred). Drift guard is per-source slice, not whole-file count.
 - **Steam fetch survives Store blips** — `fetch_games.py` reuses cached catalog rows when the Store API fails mid-run (playtime still refreshed from GetOwnedGames); missing-credentials message points to Connections instead of `.env`.
 - **Library watch “found” banner** — no longer hidden immediately after a watched game appears in the Steam catalog.
@@ -56,6 +60,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **Fetcher log layout** — run log opens beside the fetcher health card (2/3 + 1/3 columns) instead of below, keeping the dashboard hero and combat-text count visible; console font 1px smaller; narrow viewports stack log under health.
 - **Fetcher health hints** — missing-env warnings in the run log and Steam fetch scripts use plain “open Connections” guidance (`STEAM_CREDENTIALS_HINT` in `fetchers/_base.py`).
 - **Connection matrix copy** — `tracker.html` testing steps rewritten in plain language (glossary for Reconnect, login vs setup errors, empty-result safety) and corrected to match the actual Connections controls: most cards expose only Connect/Disconnect/Reconnect (no editable cookie field), so the Reconnect test now uses the Disconnect button; only itch.io, ITAD, and Xbox have a key field to enter a wrong value.
 - **Connections browser driver** — replaced Playwright with a lightweight Chrome DevTools Protocol (CDP) layer that launches the user's installed **Google Chrome** or **Microsoft Edge** (`auth/cdp_browser.py`). No `playwright install chromium` step; install is `pip install -r requirements.txt` only. Set `BAKLOG_CHROME_PATH` to override the browser executable.

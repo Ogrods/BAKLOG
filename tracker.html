@@ -130,6 +130,8 @@
     .phase-status { display: inline-flex; gap: 0.4rem; align-items: center; color: var(--text-mute); font-size: 0.75rem; }
     .progress-bar { width: 80px; height: 4px; background: var(--bg-elev); border-radius: 2px; overflow: hidden; }
     .progress-fill { height: 100%; background: var(--accent); transition: width 0.25s ease; }
+    details.phase.is-complete .progress-fill { background: var(--green); }
+    .phase-complete-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: rgba(52, 211, 153, 0.12); color: var(--green); border: 1px solid var(--green); }
 
     .callout { background: rgba(56, 189, 248, 0.08); border: 1px solid var(--accent); border-radius: 0.5rem; padding: 0.85rem 1rem; margin-bottom: 1rem; }
     .callout.success { background: rgba(52, 211, 153, 0.08); border-color: var(--green); }
@@ -219,6 +221,7 @@
   // ---------- Tabs ----------
   const TABS = [
     { id: "phases", label: "Phases" },
+    { id: "notes", label: "Notes" },
     { id: "arch", label: "Architecture" },
     { id: "pipeline", label: "Pipeline" },
     { id: "wishlist", label: "Wishlist matrix" },
@@ -334,9 +337,17 @@
         { id: "p5_pick_channel", label: "Pick one launch channel (HN Show / r/patientgamers / r/Steam / Twitter / YouTube long-form) — not multiple" },
         { id: "p5_pricing", label: "Pricing decided (if paid): one number, no tiers at launch" },
         { id: "p5_soft_launch", label: "Soft launch: invite-only beta with 10–20 friends before going public" },
+        { id: "p5_beta_error_reporting", label: "Beta error reporting: give testers a frictionless way to send the local bug bundle back (the Copy-bug-bundle payload already exists — decide the channel: prefilled GitHub issue, mailto, or a paste-this-here form — local-first, opt-in, no silent telemetry)" },
         { id: "p5_metrics", label: "Decide what success looks like: stars, signups, retention, MRR? Pick one north-star" },
       ],
     },
+  ];
+
+  // ---------- Important notes (ops / guardrails — not triage) ----------
+  const OPS_NOTES = [
+    { id: "find_profile_baklog_env_server",
+      title: "BAKLOG_PROFILE in the server shell is auto-ignored",
+      body: "The dev server drops BAKLOG_PROFILE from its own environment at boot (server.py _release_server_profile_env) so the header profile menu / profiles/index.json always owns the active profile. Per-run fetchers still pin their own profile via subprocess_env_for_profile(), and one-off CLI fetchers ($env:BAKLOG_PROFILE='work'; python fetch_games.py) intentionally still honor the var since they are separate processes. server.py prints a NOTE at startup if the var was set." },
   ];
 
   // ---------- Findings (audit) ----------
@@ -384,8 +395,6 @@
       body: "Resolved 2026-06-03. fetch_amazon.py now union-merges per source: each run refreshes only its slice (launcher or web) and carries forward the other source's rows. Cross-source duplicates collapse by ASIN then normalized name (launcher row wins). Per-source drift guard compares the current slice count only. Legacy rows without a source tag are treated as launcher. Tests: tests/test_fetch_amazon_merge.py." },
     { id: "find_profile_env_global", area: "Arch", severity: "green", title: "[RESOLVED] Per-profile credentials isolated from process .env",
       body: "2026-06-03. Process .env / exported env applies only to the default profile (_env_fallback_allowed). Named profiles: get_credentials/resolve_env/status ignore process env; fetcher subprocesses use subprocess_env_for_profile (blob keys only). Shared OS keyring master key is intentional — each profile has its own secrets.bin." },
-    { id: "find_profile_baklog_env_server", area: "Arch", severity: "grey", title: "Ops: do not set BAKLOG_PROFILE in the server shell when using the profile menu",
-      body: "get_active_profile_id() prefers the BAKLOG_PROFILE env var over profiles/index.json active. If you export BAKLOG_PROFILE=work then run python server.py, the header profile menu looks like it switches but every path/credential still resolves to work. OK for one-off CLI fetchers ($env:BAKLOG_PROFILE='work'; python fetch_games.py). For the dev server: run python server.py with no BAKLOG_PROFILE; let the menu own active. Clear: Remove-Item Env:\\BAKLOG_PROFILE (PowerShell). server.py logs WARN on POST /api/profiles/active when env disagrees with the requested id. README Local profiles section documents this." },
     { id: "find_profile_cache_http", area: "Arch", severity: "red", title: "[RESOLVED] Enrichment cache GET /cache/*.json not profile-scoped",
       body: "Resolved 2026-06-03. server.Handler.translate_path always resolves cache JSON via cache_json_path() under profile_root()/cache — missing profile cache 404s (no root fallback). Serves hltb_map, steam_review_map, cross_store_images_meta, steam_tags_meta, fx_rates from profiles/<id>/cache. tests/test_profile_cache_http.py includes no-leak test. Fixes misleading fetcher-health ages on non-default profiles (e.g. Test profile showing Dan's enrichment ages)." },
     { id: "find_fetcher_health_signals", area: "UX", severity: "grey", title: "[RESOLVED] Fetcher health chip semantics — honest status vs Connections",
@@ -394,10 +403,10 @@
       body: "Resolved 2026-06-03. POST /api/profiles/active calls MANAGER.cancel_all() before set_active_profile and path rebind. Manage profiles modal notes auto-cancel + reload." },
     { id: "find_profile_cache_cwd", area: "Arch", severity: "green", title: "[RESOLVED] Cache paths use profile_cache_dir() not cwd",
       body: "2026-06-03. API clients (steam/gog/itch/itad/epic), enrich scripts (lazy cache_json_path), and fetcher debug dumps route through profile_cache_dir() / epic_cache_dir(). Epic session + secrets thread patch in same pass." },
-    { id: "find_profile_multitab_put", area: "Arch", severity: "grey", title: "[DEFERRED] Multi-tab personal.json PUT race",
-      body: "Deferred. prepareForProfileSwitch covers single-tab switch; sendBeacon + second tab can still PUT to server's active profile. Follow-up: profile id in PUT body + reject mismatch." },
-    { id: "find_profile_delete_runs", area: "Arch", severity: "grey", title: "[DEFERRED] Delete profile does not wait for in-flight runs",
-      body: "Deferred. delete_profile can rmtree while a subprocess still writes profiles/<id>/. Block delete when MANAGER has runs for that profile." },
+    { id: "find_profile_multitab_put", area: "Arch", severity: "green", title: "[RESOLVED] Multi-tab personal.json PUT race",
+      body: "Resolved 2026-06-03. PUT/POST /api/personal bodies include profile id; server returns 409 on mismatch with active profile so a background tab cannot cross-write. sendBeacon unload flush now routes POST /api/personal to the same handler (was 404)." },
+    { id: "find_profile_delete_runs", area: "Arch", severity: "green", title: "[RESOLVED] Delete profile does not wait for in-flight runs",
+      body: "Resolved 2026-06-03. DELETE /api/profiles/<id> returns 409 when MANAGER.has_runs_for_profile(id). Profile switch uses cancel_all_and_wait (bounded) before rebinding paths so subprocesses finish or are logged as stragglers." },
 
     // UX
     { id: "find_ux_dash_rotation", area: "UX", severity: "grey", title: "Dashboard spotlight rotation may be calmer-off",
@@ -1289,11 +1298,13 @@
       const pct = total
         ? (done >= total ? 100 : Math.floor((done / total) * 100))
         : 0;
+      const isComplete = total > 0 && done >= total;
       const summary = el("summary", {},
         el("span", { class: "phase-title" }, phase.title),
         el("span", { class: "phase-status" },
           el("span", {}, `${done}/${total}`),
           el("span", { class: "progress-bar" }, el("span", { class: "progress-fill", style: `width:${pct}%` })),
+          ...(isComplete ? [el("span", { class: "phase-complete-badge" }, "✓ Complete")] : []),
         ),
       );
       const activeChildren = activeItems.length
@@ -1305,7 +1316,7 @@
         ...activeChildren,
         drawer,
       );
-      return el("details", { class: "phase", "data-key": `phase-${phase.id}`, ...(idx === 0 ? { open: "open" } : {}) }, summary, body);
+      return el("details", { class: "phase" + (isComplete ? " is-complete" : ""), "data-key": `phase-${phase.id}`, ...(idx === 0 ? { open: "open" } : {}) }, summary, body);
     });
     const jun3Closeout = PHASES.find((p) => p.id === "p2")?.items.filter((i) => i.id.startsWith("p2_closeout_")) || [];
     const jun3Shipped = [
@@ -1337,6 +1348,24 @@
         )
         : null,
       ...items,
+    );
+  }
+
+  // ---------- Render: Notes ----------
+  function panelNotes() {
+    const cards = OPS_NOTES.map((n) =>
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" },
+          n.title,
+          n.id ? el("code", { class: "finding-id", style: "margin-left:0.5rem" }, n.id) : null,
+        ),
+        el("div", { class: "callout-body" }, n.body),
+      ),
+    );
+    return el("section", { id: "panel-notes", class: "panel" + (state.activeTab === "notes" ? " active" : "") },
+      el("h1", {}, "Notes"),
+      el("p", { class: "muted" }, "Important ops and guardrails — reference only, not triage. These describe how the app protects you from footguns; no Accept/Defer workflow."),
+      ...cards,
     );
   }
 
@@ -2883,6 +2912,7 @@
     const host = document.getElementById("panels");
     host.innerHTML = "";
     host.appendChild(panelPhases());
+    host.appendChild(panelNotes());
     host.appendChild(panelArch());
     host.appendChild(panelPipeline());
     host.appendChild(panelWishlist());

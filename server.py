@@ -71,6 +71,8 @@ STALL_REPEAT_SEC = 60
 STALL_POLL_SEC = 1.0
 SILENT_STALL_KILL_SEC = 180  # if a fetcher emits zero lines AND proc still alive after this, force-kill
 TERMINATE_GRACE_SEC = 5  # how long to wait after proc.terminate() before falling back to taskkill /F
+# Profile switch: wait for cancelled runs to finish (kill + re-kill window).
+SWITCH_CANCEL_WAIT_SEC = 2 * TERMINATE_GRACE_SEC
 LAUNCH_TIMEOUT_SEC = 30  # max wait for subprocess.Popen() to return before declaring the run failed.
 # On Windows the AppX/WindowsApps Python stub can deadlock inside CreateProcess
 # when spawned from another AppX Python process — the worker thread blocks
@@ -97,6 +99,17 @@ from shared.profile_paths import (  # noqa: E402
     profile_root,
     runs_dir,
 )
+
+
+def _release_server_profile_env() -> str | None:
+    """Drop BAKLOG_PROFILE from the server's own env so the profile menu /
+    profiles/index.json always owns the active profile. Per-run fetchers set
+    their own BAKLOG_PROFILE via subprocess_env_for_profile(), so this does not
+    affect fetch subprocesses; one-off CLI fetchers are separate processes."""
+    return os.environ.pop("BAKLOG_PROFILE", "").strip() or None
+
+
+_SERVER_ENV_PROFILE_OVERRIDE = _release_server_profile_env()
 
 RUNS_DIR = runs_dir()
 ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
@@ -759,6 +772,46 @@ class RunManager:
                 summaries.append(cancelled.to_summary())
         return summaries
 
+    def has_runs_for_profile(self, profile_id: str) -> bool:
+        """True if any queued or running fetcher is bound to this profile."""
+        with self._lock:
+            return any(
+                r.profile_id == profile_id and r.status in _IN_FLIGHT_STATUSES
+                for r in self._pending
+            )
+
+    def cancel_all_and_wait(
+        self,
+        timeout: float = SWITCH_CANCEL_WAIT_SEC,
+    ) -> dict[str, Any]:
+        """Cancel every in-flight fetcher and wait for each to finish (bounded)."""
+        with self._lock:
+            targets = [
+                r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
+            ]
+        cancelled: list[dict[str, Any]] = []
+        for run in targets:
+            run_obj, err = self.cancel(run.id)
+            if run_obj is not None and err is None:
+                cancelled.append(run_obj.to_summary())
+        deadline = time.monotonic() + timeout
+        stragglers: list[dict[str, Any]] = []
+        for run in targets:
+            remaining = deadline - time.monotonic()
+            if remaining > 0:
+                run._finished.wait(remaining)
+            if not run._finished.is_set():
+                stragglers.append(run.to_summary())
+        if stragglers:
+            ids = ", ".join(s.get("id", "?") for s in stragglers)
+            print(
+                f"WARN: {len(stragglers)} run(s) still not finished after "
+                f"{timeout}s cancel wait: {ids}",
+                file=sys.stderr,
+                flush=True,
+            )
+        return {"cancelled": cancelled, "stragglers": stragglers}
+
     def get(self, run_id: str) -> Run | None:
         with self._lock:
             return self._runs_by_id.get(run_id)
@@ -1189,6 +1242,9 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/api/profiles/active":
             self._handle_profiles_set_active()
             return
+        if self.path == "/api/personal":
+            self._handle_personal_put()
+            return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_DELETE(self) -> None:  # noqa: N802 - http.server API
@@ -1292,18 +1348,10 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             from shared.profiles import set_active_profile
 
-            MANAGER.cancel_all()
+            MANAGER.cancel_all_and_wait()
             result = set_active_profile(profile_id)
             _refresh_personal_paths()
-            env_override = os.environ.get("BAKLOG_PROFILE", "").strip()
-            if env_override and env_override != profile_id:
-                print(
-                    f"WARN: BAKLOG_PROFILE={env_override!r} is set in the server process; "
-                    f"paths and credentials still resolve to that profile, not {profile_id!r}. "
-                    "Unset BAKLOG_PROFILE when using the profile menu.",
-                    file=sys.stderr,
-                    flush=True,
-                )
+            # BAKLOG_PROFILE in the server process is dropped at import (_release_server_profile_env).
             _send_json(self, HTTPStatus.OK, result)
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -1323,6 +1371,18 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     def _handle_profiles_delete(self, profile_id: str) -> None:
+        if MANAGER.has_runs_for_profile(profile_id):
+            _send_json(
+                self,
+                HTTPStatus.CONFLICT,
+                {
+                    "error": (
+                        "This profile has a fetch running or queued. "
+                        "Cancel its runs or let them finish before deleting."
+                    ),
+                },
+            )
+            return
         try:
             from shared.profiles import delete_profile
 
@@ -1358,6 +1418,22 @@ class Handler(SimpleHTTPRequestHandler):
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"invalid JSON: {exc!r}"})
             return
+        claimed = payload.get("profile")
+        if claimed is not None:
+            from shared.profile_paths import get_active_profile_id
+
+            active = get_active_profile_id()
+            if str(claimed) != active:
+                _send_json(
+                    self,
+                    HTTPStatus.CONFLICT,
+                    {
+                        "error": "profile mismatch",
+                        "active": active,
+                        "claimed": str(claimed),
+                    },
+                )
+                return
         try:
             doc = _save_personal_doc(payload)
         except ValueError as exc:
@@ -1784,6 +1860,13 @@ def main() -> None:
         print(f"Python for fetchers: {_python_executable()}")
         print(f"Registered fetchers: {len(FETCHERS)}")
         print(f"Run history: {RUN_HISTORY_FILE} (max {MAX_HISTORY})")
+        if _SERVER_ENV_PROFILE_OVERRIDE:
+            print(
+                f"NOTE: BAKLOG_PROFILE={_SERVER_ENV_PROFILE_OVERRIDE!r} was set in the server "
+                f"shell; ignoring it so the profile menu owns the active profile "
+                f"(now {get_active_profile_id()!r}). Per-run fetchers still pin their own profile.",
+                flush=True,
+            )
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

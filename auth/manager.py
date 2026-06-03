@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import sys
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -213,7 +214,6 @@ def _provider_state(provider: str) -> str:
     if spec.kind == "local":
         if blob.get("disabled"):
             return "disconnected"
-        from amazon_client import default_sql_dir
 
         env_dir = ""
         if _env_fallback_allowed():
@@ -221,7 +221,14 @@ def _provider_state(provider: str) -> str:
         env_dir = env_dir or (blob.get("AMAZON_GAMES_SQL_DIR") or "")
         if isinstance(env_dir, str):
             env_dir = env_dir.strip()
-        sql_dir = env_dir or str(default_sql_dir())
+        if env_dir:
+            sql_dir = env_dir
+        elif sys.platform != "win32":
+            return "disconnected"
+        else:
+            from amazon_client import default_sql_dir
+
+            sql_dir = str(default_sql_dir())
         return "connected" if Path(sql_dir).is_dir() else "disconnected"
 
     if explicit == "expired":

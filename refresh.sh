@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # POSIX (macOS / Linux) counterpart to refresh.ps1 — runs the fetch sequence in
-# order and tees output to refresh.log. Amazon Games is Windows-only (DPAPI
-# launcher DB), so fetch_amazon.py is intentionally omitted here.
+# order and tees output to refresh.log. The Windows launcher DB path is omitted
+# here; run fetch_amazon.py --source web manually after connecting Prime Gaming
+# (web) on Connections if you use Amazon on macOS/Linux.
 set -uo pipefail
 
 cd "$(dirname "$0")"

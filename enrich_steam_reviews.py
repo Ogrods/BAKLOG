@@ -21,12 +21,14 @@ from pathlib import Path
 import requests
 
 from auth import resolve_env
+from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, started
+from shared.profile_paths import profile_root
 from steam_client import SteamClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-MAPPING_FILE = Path("cache/steam_review_map.json")
+MAPPING_FILE = profile_root() / "cache" / "steam_review_map.json"
 SEARCH_DELAY_SEC = 1.0
 SEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
@@ -146,7 +148,7 @@ def steam_search(name: str) -> int | None:
 
 def steam_appids_by_id() -> set[int]:
     try:
-        data = json.loads(Path("games_steam.json").read_text(encoding="utf-8"))
+        data = json.loads(catalog_file(Path("games_steam.json")).read_text(encoding="utf-8"))
     except FileNotFoundError:
         return set()
     return {g["id"] for g in data.get("games", [])}
@@ -199,7 +201,8 @@ def main() -> int:
     owned_ids = steam_appids_by_id()
 
     for filename, store, row_filter in store_files:
-        path = Path(filename)
+        rel = Path(filename)
+        path = catalog_file(rel)
         if not path.exists():
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -267,7 +270,7 @@ def main() -> int:
                 )
 
         data["game_count"] = len(games)
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
         print(f"  updated {updated} rows in {filename}", flush=True)
         save_mapping(mapping)
 

@@ -1,6 +1,7 @@
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
+import { state } from './state.js';
 
 export { FETCHER_AUTH_PROVIDER };
 
@@ -79,6 +80,7 @@ const PROVIDER_BRAND = {
   epic_wishlist: { color: '#888888', initial: 'E' },
 
   amazon: { color: '#ff9900', initial: 'A' },
+  amazon_web: { color: '#ff9900', initial: 'A' },
 
   xbox: { color: '#107c10', initial: 'X' },
 
@@ -138,7 +140,9 @@ const CONN_BADGE_LETTER = {
 };
 
 function connBadge(p) {
-  const cls = (p.key || '').replace(/_wishlist$/, '');
+  // Collapse store variants onto the base brand badge so they share the same
+  // background/letter (e.g. amazon_web -> amazon, xbox_wishlist -> xbox).
+  const cls = (p.key || '').replace(/_(wishlist|web)$/, '');
   return {
     cls,
     letter: CONN_BADGE_LETTER[cls] || (p.label || '?').charAt(0).toUpperCase(),
@@ -173,6 +177,7 @@ const RAIL_ORDER = [
   'epic',
   'epic_wishlist',
   'amazon',
+  'amazon_web',
   'itch',
   'itad',
   'battlenet',
@@ -181,6 +186,26 @@ const RAIL_ORDER = [
   'nintendo_wishlist',
   'ea',
 ];
+
+/** Collapsed rail entries: one button, multiple detail cards (web on top). */
+const PROVIDER_GROUPS = {
+  amazon: { label: 'Amazon', members: ['amazon_web', 'amazon'] },
+};
+const GROUP_OF = Object.fromEntries(
+  Object.entries(PROVIDER_GROUPS).flatMap(([g, d]) => d.members.map(k => [k, g])),
+);
+const STATUS_RANK = { connected: 4, expired: 3, unverified: 2, disconnected: 1, unavailable: 0 };
+
+export function groupRepFor(key) {
+  return GROUP_OF[key] || key;
+}
+
+export function combinedGroupStatus(members) {
+  return members.reduce((best, p) => {
+    const st = p.status || 'disconnected';
+    return (STATUS_RANK[st] ?? 0) > (STATUS_RANK[best] ?? 0) ? st : best;
+  }, 'disconnected');
+}
 
 function railSortIndex(key) {
   const idx = RAIL_ORDER.indexOf(key);
@@ -200,16 +225,43 @@ function orderedProviders() {
   return [...(steam ? [steam] : []), ...rest];
 }
 
-
+function railEntries() {
+  const out = [];
+  const seen = new Set();
+  for (const p of orderedProviders()) {
+    const g = GROUP_OF[p.key];
+    if (!g) {
+      out.push(p);
+      continue;
+    }
+    if (seen.has(g)) continue;
+    seen.add(g);
+    const members = PROVIDER_GROUPS[g].members
+      .map(k => authStatus.find(x => x.key === k))
+      .filter(Boolean);
+    out.push({
+      key: g,
+      label: PROVIDER_GROUPS[g].label,
+      status: combinedGroupStatus(members),
+      available: members.some(m => m.available !== false),
+      _group: true,
+    });
+  }
+  return out;
+}
 
 function ensureSelectedKey() {
-
   if (authStatus.some(p => p.key === _selectedKey)) return;
-
+  const rep = groupRepFor(_selectedKey);
+  if (
+    PROVIDER_GROUPS[rep]
+    && PROVIDER_GROUPS[rep].members.some(k => authStatus.some(p => p.key === k))
+  ) {
+    _selectedKey = rep;
+    return;
+  }
   const steam = authStatus.find(p => p.key === 'steam');
-
   _selectedKey = steam?.key || authStatus[0]?.key || 'steam';
-
 }
 
 
@@ -312,6 +364,25 @@ function buildFormPanel(p) {
 
     </div>`;
 
+}
+
+
+/**
+ * Browser providers connect via the primary button; their form field is only a
+ * manual fallback. Fold it into a collapsed drawer so it doesn't look like a
+ * required step.
+ */
+function buildFallbackPanel(p) {
+  return `
+    <details class="conn-fallback">
+      <summary class="conn-fallback-summary">
+        <span class="conn-fallback-chevron" aria-hidden="true">&rsaquo;</span>
+        <span>Trouble connecting? Enter a code manually</span>
+      </summary>
+      <div class="conn-fallback-body">
+        ${buildFormPanel(p)}
+      </div>
+    </details>`;
 }
 
 
@@ -482,7 +553,7 @@ function buildCardHtml(p) {
 
       </div>
 
-      ${showFormPanel ? buildFormPanel(p) : ''}
+      ${showFormPanel ? (p.kind === 'browser' ? buildFallbackPanel(p) : buildFormPanel(p)) : ''}
 
       ${buildCardFooter(p, st)}
 
@@ -570,26 +641,31 @@ function renderConnections() {
 
   ensureSelectedKey();
 
-  const ordered = orderedProviders();
+  const selKey = groupRepFor(_selectedKey);
+  const entries = railEntries();
   const railParts = [];
-  const steam = ordered.find(p => p.key === 'steam');
+  const steam = entries.find(e => e.key === 'steam');
   if (steam) {
-    railParts.push(buildSteamRailBlock(steam, _selectedKey === steam.key));
+    railParts.push(buildSteamRailBlock(steam, selKey === steam.key));
   }
-  for (const p of ordered) {
-    if (p.key === 'steam') continue;
-    railParts.push(buildRailItemHtml(p, _selectedKey === p.key));
+  for (const entry of entries) {
+    if (entry.key === 'steam') continue;
+    railParts.push(buildRailItemHtml(entry, selKey === entry.key));
   }
 
   rail.innerHTML = railParts.join('');
 
-  const selected = authStatus.find(p => p.key === _selectedKey);
-
-  pane.innerHTML = selected
-
-    ? buildCardHtml(selected)
-
-    : '<p class="text-sm text-slate-400">Select a provider on the left to get started.</p>';
+  if (PROVIDER_GROUPS[selKey]) {
+    const members = PROVIDER_GROUPS[selKey].members
+      .map(k => authStatus.find(x => x.key === k))
+      .filter(Boolean);
+    pane.innerHTML = `<div class="conn-card-stack">${members.map(buildCardHtml).join('')}</div>`;
+  } else {
+    const selected = authStatus.find(p => p.key === selKey);
+    pane.innerHTML = selected
+      ? buildCardHtml(selected)
+      : '<p class="text-sm text-slate-400">Select a provider on the left to get started.</p>';
+  }
 
 }
 
@@ -703,9 +779,9 @@ function handleLayoutKeydown(ev) {
 
 
 
-  const order = orderedProviders().map(p => p.key);
+  const order = railEntries().map(e => e.key);
 
-  let idx = order.indexOf(_selectedKey);
+  let idx = order.indexOf(groupRepFor(_selectedKey));
 
   if (idx < 0) idx = 0;
 
@@ -1421,6 +1497,8 @@ export async function refreshConnections() {
 
     renderReconnectBanner();
 
+    void import('./filters-ui.js').then(({ applyItchTabVisibility }) => applyItchTabVisibility());
+
   } catch {
 
     const rail = document.getElementById('connRail');
@@ -1532,6 +1610,22 @@ export function isProviderConnected(provider) {
 export function connectedProviderCount() {
 
   return authStatus.filter(p => p.status === 'connected').length;
+
+}
+
+
+
+/** itch.io tab: show once API key is saved (connected/unverified) or library already loaded. */
+
+export function isItchTabAvailable() {
+
+  const row = authStatus.find(p => p.key === 'itch');
+
+  const status = row?.status;
+
+  const hasSetup = status === 'connected' || status === 'unverified';
+
+  return hasSetup || (state.itchGames || []).length > 0;
 
 }
 

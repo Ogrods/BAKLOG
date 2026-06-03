@@ -16,6 +16,7 @@ DEFAULT_PROFILE_ID = "default"
 _ENV_OVERRIDE = "BAKLOG_PROFILE"
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+_PROFILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 def _now_iso() -> str:
@@ -48,21 +49,63 @@ def load_index() -> dict[str, Any]:
 
 
 def save_index(doc: dict[str, Any]) -> None:
+    active = doc.get("active")
+    if active is not None and not is_valid_profile_id(str(active)):
+        raise ValueError(f"invalid active profile in index: {active!r}")
+    profiles = doc.get("profiles")
+    if isinstance(profiles, list):
+        for p in profiles:
+            if isinstance(p, dict) and p.get("id") is not None:
+                normalize_profile_id(str(p["id"]))
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     tmp = INDEX_FILE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, INDEX_FILE)
 
 
+def is_valid_profile_id(profile_id: str) -> bool:
+    pid = (profile_id or "").strip()
+    if not pid or pid in (".", ".."):
+        return False
+    if not _PROFILE_ID_RE.match(pid):
+        return False
+    try:
+        resolved = (PROFILES_DIR / pid).resolve()
+        base = PROFILES_DIR.resolve()
+        return resolved == base or str(resolved).startswith(str(base) + os.sep)
+    except (OSError, RuntimeError):
+        return False
+
+
+def normalize_profile_id(profile_id: str) -> str:
+    """Validate profile id; raise ValueError when unsafe or malformed."""
+    pid = (profile_id or "").strip()
+    if not is_valid_profile_id(pid):
+        raise ValueError(f"invalid profile id: {profile_id!r}")
+    return pid
+
+
 def get_active_profile_id() -> str:
     override = os.environ.get(_ENV_OVERRIDE, "").strip()
     if override:
-        return override
-    return str(load_index().get("active") or DEFAULT_PROFILE_ID)
+        if is_valid_profile_id(override):
+            return override
+        import sys
+
+        print(
+            f"WARN: ignoring invalid {_ENV_OVERRIDE}={override!r}; using index active",
+            file=sys.stderr,
+            flush=True,
+        )
+    active = str(load_index().get("active") or DEFAULT_PROFILE_ID)
+    if is_valid_profile_id(active):
+        return active
+    return DEFAULT_PROFILE_ID
 
 
 def profile_data_dir(profile_id: str) -> Path:
-    return PROFILES_DIR / profile_id
+    pid = normalize_profile_id(profile_id)
+    return PROFILES_DIR / pid
 
 
 def is_legacy_layout(profile_id: str | None = None) -> bool:
@@ -110,6 +153,14 @@ def epic_cache_dir(*, profile_id: str | None = None) -> Path:
 
 def runs_dir(*, profile_id: str | None = None) -> Path:
     return profile_root(profile_id) / "cache" / "runs"
+
+
+def fx_rates_path(*, profile_id: str | None = None) -> Path:
+    return profile_root(profile_id) / "cache" / "fx_rates.json"
+
+
+def games_backup_root(*, profile_id: str | None = None) -> Path:
+    return personal_dir(profile_id=profile_id) / "games_backups"
 
 
 def resolve_catalog_path(path: Path, *, profile_id: str | None = None) -> Path:

@@ -20,6 +20,8 @@ from fetchers._base import (
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    catalog_file,
+    write_catalog_text,
 )
 from auth import mark_invalid, resolve_env
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
@@ -58,9 +60,9 @@ def _store_url(title: dict) -> str:
 
 
 def load_existing() -> dict[str, dict]:
-    if not GAMES_XBOX_JSON.exists():
+    if not catalog_file(GAMES_XBOX_JSON).exists():
         return {}
-    data = json.loads(GAMES_XBOX_JSON.read_text(encoding="utf-8"))
+    data = json.loads(catalog_file(GAMES_XBOX_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
@@ -199,9 +201,7 @@ def main() -> int:
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-    GAMES_XBOX_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    write_catalog_text(GAMES_XBOX_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_XBOX_JSON}.", flush=True)
     print("Reload the dashboard to see your Xbox library.", flush=True)
     return stats.finish("fetch_xbox", t0, exit_code=0, extra=f"{len(games_out)} games")

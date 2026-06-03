@@ -32,7 +32,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from auth import resolve_env
+from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, started
+from shared.profile_paths import profile_root
 from steam_client import SteamClient
 from steam_metadata import (
     ALWAYS_WRITE_FIELDS,
@@ -43,8 +45,8 @@ from steam_metadata import (
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-MAPPING_FILE = Path("cache/steam_review_map.json")
-META_FILE = Path("cache/steam_tags_meta.json")
+MAPPING_FILE = profile_root() / "cache" / "steam_review_map.json"
+META_FILE = profile_root() / "cache" / "steam_tags_meta.json"
 
 
 def _itch_is_videogame(row: dict) -> bool:
@@ -136,7 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     total_coop = 0
 
     for filename, store, row_filter in store_files:
-        path = Path(filename)
+        rel = Path(filename)
+        path = catalog_file(rel)
         if not path.exists():
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -193,9 +196,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if not args.dry_run and rows_updated:
             data["game_count"] = len(games)
-            path.write_text(
-                json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
+            write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
         print(
             f"  appid-mapped: {rows_with_appid}  "
             f"updated: {rows_updated}  "

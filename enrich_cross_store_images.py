@@ -14,7 +14,9 @@ from threading import Lock
 import requests
 from dotenv import load_dotenv
 
+from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, heartbeat, started
+from shared.profile_paths import profile_root
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 load_dotenv()
@@ -24,7 +26,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
 SEARCH_DELAY = 0.4
 WORKERS = 4
 HEARTBEAT_EVERY = 25
-META_FILE = Path("cache/cross_store_images_meta.json")
+META_FILE = profile_root() / "cache" / "cross_store_images_meta.json"
 
 STORE_FILES = [
     (Path("games_gog.json"), "gog"),
@@ -149,7 +151,8 @@ def main() -> int:
         g["image_source"] = "steam_search"
         return g
 
-    for path, store in STORE_FILES:
+    for rel, store in STORE_FILES:
+        path = catalog_file(rel)
         if not path.exists():
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -196,7 +199,7 @@ def main() -> int:
                         f"{updated} updated — still working"
                     )
         data["games"] = list(by_id.values())
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
 
     META_FILE.parent.mkdir(parents=True, exist_ok=True)
     META_FILE.write_text(

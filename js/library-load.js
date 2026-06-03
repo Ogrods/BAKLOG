@@ -35,6 +35,7 @@ import {
   renderWishlistStoreChips,
   switchView,
   updateWishlistDrawerVisibility,
+  applyItchTabVisibility,
 } from './filters-ui.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
@@ -180,6 +181,28 @@ function countWishlistVisible() {
   return state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g))).length;
 }
 
+/** When reloadGames fails (no JSON files), still mark data ready and paint empty UI. */
+export async function finishEmptyLibraryLoad() {
+  if (state.dashboardDataReady) return;
+  window._dataVersion = (window._dataVersion || 0) + 1;
+  invalidateTableCache();
+  recomputeCrossStoreHidden();
+  state.dashboardDataReady = true;
+  buildOwnedNormNames();
+  _prevLibraryCount = countLibraryVisible();
+  _prevWishlistCount = countWishlistVisible();
+  renderStoreChips();
+  renderWishlistStoreChips();
+  renderGenreChips();
+  renderSummary();
+  if (state.activeView === "dashboard") scheduleDashboardRender();
+  else {
+    renderPicks();
+    await refreshFilterUI({ force: true });
+    if (state.activeView === "wishlist") updateWishlistDrawerVisibility();
+  }
+}
+
 export async function applyMergedLibrary() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   bumpPersonalMemo();
@@ -229,6 +252,8 @@ export async function applyMergedLibrary() {
   } catch (err) {
     console.warn('[library-count-anim]', err);
   }
+
+  applyItchTabVisibility();
 }
 
 export async function fetchLibraryJson(path) {

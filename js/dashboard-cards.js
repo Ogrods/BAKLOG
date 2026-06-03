@@ -30,7 +30,7 @@ export function renderDashboardCoopSpotlight(games) {
         <div class="coop-spotlight-title">Co-op spotlight</div>
       </div>
       <div class="coop-empty">
-        No co-op games detected yet. Co-op flags come from Steam store categories — run <code>fetch_games.py</code> to refresh, or wait until you own a Steam title tagged <em>Online Co-op</em> or <em>Shared/Split Screen Co-op</em>.
+        No co-op games detected yet. Connect Steam and run the games fetcher (Fetcher health) — co-op flags come from Steam store categories, or wait until you own a title tagged <em>Online Co-op</em> or <em>Shared/Split Screen Co-op</em>.
       </div>`;
     return;
   }
@@ -203,10 +203,22 @@ export function renderDashboardPicksVersus(games) {
   applyItchVisibility();
 }
 
-function buildWishlistStatsHtml() {
+export function buildWishlistStatsHtml() {
   const wl = state.wishlistGames;
   if (!wl.length) {
-    return `<div class="dash-card sm:col-span-3"><div class="text-sm text-slate-400">No wishlist data — run <code class="text-slate-200">fetch_wishlist.py</code>, then reload.</div></div>`;
+    return [
+      dealHeroEmptyHtml({ noWishlist: true }),
+      dealSaleScoreboardCardHtml({
+        onSaleCount: 0,
+        totalCount: 0,
+        avgCut: 0,
+        bestCut: 0,
+        bestCutGame: "",
+        hasPricing: false,
+        cuts: [],
+      }),
+      dealStealsCardHtml([]),
+    ].join("");
   }
 
   const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
@@ -283,7 +295,7 @@ function renderItchHeroHtml(candidates) {
   if (!candidates.length) {
     return `<div class="itch-hero">
       <div class="itch-hero-label"><span>Featured unplayed pick</span></div>
-      <div class="itch-hero-empty">No rated picks yet — run <code class="text-slate-200">enrich_steam_reviews.py --stores itch</code> to backfill ratings.</div>
+      <div class="itch-hero-empty">No rated picks yet — run the itch ratings fetcher to backfill scores.</div>
     </div>`;
   }
   const idx = ((itchHeroIndex % candidates.length) + candidates.length) % candidates.length;
@@ -359,7 +371,7 @@ export function renderDashboardItchRecap() {
   const total = state.itchGames.length;
   applyItchVisibility();
   if (!total) {
-    el.innerHTML = `<p class="text-sm text-slate-400">No itch.io data loaded. Run <code class="text-slate-200">fetch_itch.py</code>, then reload.</p>`;
+    el.innerHTML = `<p class="text-sm text-slate-400">No itch.io data yet — add your itch.io key on Connections and run the itch fetcher.</p>`;
     return;
   }
 

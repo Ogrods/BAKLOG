@@ -15,7 +15,11 @@
     // module bundle loads and calls updateViewChrome().
     (function () {
       try {
-        var raw = localStorage.getItem('steam-backlog-ui-prefs');
+        var pid = localStorage.getItem('baklog-active-profile') || 'default';
+        var prefsKey = pid && pid !== 'default'
+          ? 'steam-backlog-ui-prefs:' + pid
+          : 'steam-backlog-ui-prefs';
+        var raw = localStorage.getItem(prefsKey);
         var view = 'dashboard';
         if (raw) {
           var p = JSON.parse(raw);
@@ -591,7 +595,7 @@
         <label class="block text-xs text-slate-300">Max price $ <span id="dealMaxPriceVal" class="text-slate-100">any</span>
           <input id="dealMaxPrice" type="range" min="0" max="100" step="5" value="100" class="w-full mt-1" />
         </label>
-        <p class="text-[11px] text-slate-400 mt-1 leading-snug">Best results when <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code> has been run recently. Steam discount % is used as a fallback.</p>
+        <p class="text-[11px] text-slate-400 mt-1 leading-snug">Best results when deal prices are refreshed recently (ITAD chip in Fetcher health). Steam discount % is used as a fallback.</p>
       </div>
     </div>
     <div class="drawer-footer" aria-label="Keyboard shortcuts">

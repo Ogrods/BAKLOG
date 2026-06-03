@@ -65,7 +65,12 @@ import {
   setDashReplayAllowed,
 } from './dashboard.js';
 import { fetcherRunner } from './fetcher-health.js';
-import { refreshConnections, startConnectionsPolling, stopConnectionsPolling } from './connections.js';
+import {
+  refreshConnections,
+  startConnectionsPolling,
+  stopConnectionsPolling,
+  isItchTabAvailable,
+} from './connections.js';
 import { collectActiveFilters } from './active-filters.js';
 
 export { collectActiveFilters } from './active-filters.js';
@@ -420,6 +425,7 @@ export function updateViewChrome(options) {
   // Keep the FOUC guard in sync so its !important rules don't outlive the
   // initial view. Once the user switches views, the attribute matches reality.
   document.documentElement.setAttribute("data-init-view", state.activeView);
+  applyItchTabVisibility();
   updateWishlistDrawerVisibility();
   updatePickTabsVisibility();
   // Quick-Wins slider visibility lives in picks-ui via updatePicksChrome;
@@ -475,6 +481,19 @@ export function syncViewTabAria(view) {
     if (active) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
+}
+
+/** Quarantine itch.io nav until the user has set up itch (API key) or already has itch data. */
+export function applyItchTabVisibility() {
+  const tab = document.querySelector('.view-tab[data-view="itch"]');
+  if (!tab) return;
+  const available = isItchTabAvailable();
+  tab.classList.toggle("hidden", !available);
+  if (!available && state.activeView === "itch") {
+    switchView("dashboard");
+    state.prefs.activeView = "dashboard";
+    savePrefs();
+  }
 }
 
 export function switchView(view) {

@@ -130,10 +130,13 @@ export function dealHeroCardHtml(g) {
   </button>`;
 }
 
-export function dealHeroEmptyHtml() {
+export function dealHeroEmptyHtml(opts = {}) {
+  const hint = opts.noWishlist
+    ? "Connect a store and run its wishlist fetcher to start tracking deals."
+    : "No active deals right now — check back after the next price refresh.";
   return `<div class="dash-card deal-hero-empty">
     <div class="dash-kpi-label">Today&apos;s top deal</div>
-    <div class="text-sm text-slate-400 mt-3">No active deals — check back after the next ITAD refresh.</div>
+    <div class="text-sm text-slate-400 mt-3">${hint}</div>
   </div>`;
 }
 
@@ -159,7 +162,7 @@ export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, be
   if (!hasPricing) {
     return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
       <div class="dash-kpi-label">Sale scoreboard</div>
-      <div class="text-xs text-slate-400 mt-2">Run <code class="text-slate-300">fetch_itad.py</code> for cross-store sale stats.</div>
+      <div class="text-xs text-slate-400 mt-2">Run the deal price fetcher (Fetcher health) to see cross-store sale stats.</div>
     </button>`;
   }
   const noSale = onSaleCount === 0;
@@ -377,6 +380,23 @@ export function parsePriceLike(v) {
   return m ? parseFloat(m[0]) : null;
 }
 
+/** Numeric store price for sort/filter — prefers FX-converted price_amount from fetch. */
+export function gameComparablePrice(g) {
+  if (g?.price_amount != null) {
+    const n = Number(g.price_amount);
+    if (Number.isFinite(n)) return n;
+  }
+  return parsePriceLike(g.price);
+}
+
+function gameComparableRegularPrice(g) {
+  if (g?.price_amount_initial != null) {
+    const n = Number(g.price_amount_initial);
+    if (Number.isFinite(n)) return n;
+  }
+  return parsePriceLike(g.price_initial);
+}
+
 // Returns unified deal info for a game. ITAD is preferred (cross-store best price);
 // Steam discount is the fallback. Manual wishlist entries can supply price/discount.
 export function getDealInfo(g) {
@@ -396,8 +416,8 @@ export function getDealInfo(g) {
       url: itad.url,
     };
   }
-  const steamPrice = parsePriceLike(g.price);
-  const steamRegular = parsePriceLike(g.price_initial);
+  const steamPrice = gameComparablePrice(g);
+  const steamRegular = gameComparableRegularPrice(g);
   const cut = g.discount_percent || 0;
   if (steamPrice != null || cut) {
     return {
@@ -460,7 +480,7 @@ export function effectiveDiscountPercent(g) {
 export function effectiveSortPrice(g) {
   const d = getDealInfo(g);
   if (d && d.price != null) return d.price;
-  return parsePriceLike(g.price);
+  return gameComparablePrice(g);
 }
 
 export function dealScore(g) {

@@ -393,6 +393,7 @@ export function bindEvents() {
     savePrefs();
     document.getElementById("picksContainer").classList.toggle("hidden", state.prefs.picksCollapsed);
     document.getElementById("togglePicks").textContent = state.prefs.picksCollapsed ? "Show" : "Hide";
+    if (!state.prefs.picksCollapsed) renderPicks();
   });
   document.querySelectorAll(".pick-tab").forEach(btn => {
     btn.addEventListener("click", () => {

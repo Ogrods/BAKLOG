@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from shared import profile_paths, profiles
+from shared.profile_paths import normalize_profile_id
 
 
 @pytest.fixture
@@ -77,6 +78,37 @@ def test_create_profile_migrates_default_copy(isolated_profiles: Path) -> None:
     work_dir = isolated_profiles / "profiles" / "work"
     assert work_dir.is_dir()
     assert not (work_dir / "games_steam.json").exists()
+
+
+def test_normalize_profile_id_rejects_unsafe() -> None:
+    with pytest.raises(ValueError):
+        normalize_profile_id("..")
+    with pytest.raises(ValueError):
+        normalize_profile_id("bad id")
+
+
+def test_migration_resumes_missing_files(isolated_profiles: Path) -> None:
+    (isolated_profiles / "games_steam.json").write_text(
+        '{"game_count":1,"games":[]}', encoding="utf-8"
+    )
+    default_dir = isolated_profiles / "profiles" / "default"
+    default_dir.mkdir(parents=True)
+    profiles.ensure_default_profile_dir()
+    assert (default_dir / "games_steam.json").is_file()
+    (default_dir / "games_steam.json").unlink()
+    (isolated_profiles / "games_gog.json").write_text(
+        '{"game_count":0,"games":[]}', encoding="utf-8"
+    )
+    profiles.ensure_default_profile_dir()
+    assert (default_dir / "games_steam.json").is_file()
+    assert (default_dir / "games_gog.json").is_file()
+
+
+def test_delete_default_blocked_after_migration(isolated_profiles: Path) -> None:
+    (isolated_profiles / "games_steam.json").write_text("{}", encoding="utf-8")
+    profiles.create_profile("Work")
+    with pytest.raises(ValueError, match="default"):
+        profiles.delete_profile("default")
 
 
 def test_delete_profile_refuses_active(isolated_profiles: Path) -> None:

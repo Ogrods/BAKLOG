@@ -34,6 +34,23 @@ export function itadSnapshotStorageKey() {
   return `${ITAD_SNAPSHOT_PREFIX}${profileKeySuffix()}`;
 }
 
+/** Prefix a localStorage base key with the active profile suffix. */
+export function profileScopedStorageKey(base) {
+  return `${base}${profileKeySuffix()}`;
+}
+
+export function clearProfileLocalStorage(profileId) {
+  try {
+    const suffix = profileId && profileId !== 'default' ? `:${profileId}` : '';
+    if (!suffix) return;
+    localStorage.removeItem(`${PREFS_KEY}${suffix}`);
+    localStorage.removeItem(`${ITAD_SNAPSHOT_PREFIX}${suffix}`);
+    localStorage.removeItem(`baklog-fetcher-auth-cooldown${suffix}`);
+    localStorage.removeItem(`baklog-reconnect-dismissed${suffix}`);
+    localStorage.removeItem(`baklog-itad-last-auto-run${suffix}`);
+  } catch (_) { /* ignore */ }
+}
+
 function syncActiveToStorage() {
   if (_status?.active) {
     localStorage.setItem(ACTIVE_PROFILE_LS, _status.active);
@@ -111,6 +128,8 @@ function escapeHtml(s) {
 
 async function switchProfile(id) {
   closeMenu();
+  const { personalStore } = await import('./personal-store.js');
+  await personalStore.prepareForProfileSwitch();
   await api('POST', '/api/profiles/active', { id });
   localStorage.setItem(ACTIVE_PROFILE_LS, id);
   location.reload();
@@ -227,6 +246,7 @@ async function deleteSelectedProfile() {
   }
   try {
     await api('DELETE', `/api/profiles/${encodeURIComponent(id)}`);
+    clearProfileLocalStorage(id);
     await fetchProfilesStatus();
     populateDeleteSelect();
     if (sel) sel.value = '';

@@ -3,6 +3,8 @@ import {
   ACTIVE_PROFILE_LS,
   prefsStorageKey,
   itadSnapshotStorageKey,
+  profileScopedStorageKey,
+  clearProfileLocalStorage,
   activeProfileId,
 } from '../js/profiles.js';
 import { PREFS_KEY } from '../js/state.js';
@@ -22,5 +24,16 @@ describe('profiles storage keys', () => {
     localStorage.setItem(ACTIVE_PROFILE_LS, 'work');
     expect(prefsStorageKey()).toBe(`${PREFS_KEY}:work`);
     expect(itadSnapshotStorageKey()).toBe('baklog-itad-snapshot:work');
+    expect(profileScopedStorageKey('baklog-fetcher-auth-cooldown')).toBe(
+      'baklog-fetcher-auth-cooldown:work',
+    );
+  });
+
+  it('clearProfileLocalStorage removes suffixed keys for deleted profile', () => {
+    localStorage.setItem(`${PREFS_KEY}:work`, '{}');
+    localStorage.setItem('baklog-itad-snapshot:work', '{}');
+    clearProfileLocalStorage('work');
+    expect(localStorage.getItem(`${PREFS_KEY}:work`)).toBeNull();
+    expect(localStorage.getItem('baklog-itad-snapshot:work')).toBeNull();
   });
 });

@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
 from fetchers._authoritative import NINTENDO
-from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result
+from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from nintendo_client import NintendoAuthError, NintendoClient
 
@@ -107,9 +107,9 @@ def _merge_transactions(transactions: list[dict]) -> list[dict]:
 
 
 def load_existing() -> dict[str, dict]:
-    if not GAMES_NINTENDO_JSON.exists():
+    if not catalog_file(GAMES_NINTENDO_JSON).exists():
         return {}
-    data = json.loads(GAMES_NINTENDO_JSON.read_text(encoding="utf-8"))
+    data = json.loads(catalog_file(GAMES_NINTENDO_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
@@ -247,9 +247,7 @@ def main() -> int:
         "note": "eShop digital purchases only; ~2 year history limit; no cartridge games",
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-    GAMES_NINTENDO_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    write_catalog_text(GAMES_NINTENDO_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_NINTENDO_JSON}.", flush=True)
     print("Reload the dashboard to see your Nintendo library.", flush=True)
     stats.ok = len(games_out)

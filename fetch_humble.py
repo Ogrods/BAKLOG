@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid
 from auth.secrets import profile_dir
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
@@ -298,10 +298,10 @@ def _build_row(item: LibraryItem, hltb: dict | None) -> dict:
 
 
 def _load_existing_by_machine() -> dict[str, dict]:
-    if not GAMES_HUMBLE_JSON.exists():
+    if not catalog_file(GAMES_HUMBLE_JSON).exists():
         return {}
     try:
-        data = json.loads(GAMES_HUMBLE_JSON.read_text(encoding="utf-8"))
+        data = json.loads(catalog_file(GAMES_HUMBLE_JSON).read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
     out: dict[str, dict] = {}
@@ -396,10 +396,7 @@ def main() -> int:
         "game_count": len(rows),
         "games": rows,
     }
-    GAMES_HUMBLE_JSON.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    write_catalog_text(GAMES_HUMBLE_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(rows)} games to {GAMES_HUMBLE_JSON}.", flush=True)
     stats.ok = len(rows)
     return stats.finish("fetch_humble", t0, exit_code=0, extra=f"{len(rows)} games")

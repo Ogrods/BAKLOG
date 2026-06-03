@@ -23,7 +23,7 @@ from ea_client import (
     EaClient,
 )
 from fetchers._authoritative import EA
-from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result
+from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
@@ -155,9 +155,9 @@ def _row_id(item: dict) -> str:
 
 
 def load_existing() -> dict[str, dict]:
-    if not GAMES_EA_JSON.exists():
+    if not catalog_file(GAMES_EA_JSON).exists():
         return {}
-    data = json.loads(GAMES_EA_JSON.read_text(encoding="utf-8"))
+    data = json.loads(catalog_file(GAMES_EA_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
@@ -335,7 +335,7 @@ def main() -> int:
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-    GAMES_EA_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_catalog_text(GAMES_EA_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_EA_JSON}.", flush=True)
     stats.ok = len(games_out)
     return stats.finish("fetch_ea", t0, exit_code=0, extra=f"{len(games_out)} games")

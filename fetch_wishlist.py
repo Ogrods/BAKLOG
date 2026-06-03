@@ -13,7 +13,7 @@ import requests
 from dotenv import load_dotenv
 
 from hltb_client import HltbClient
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
 from auth import resolve_env
 from fetchers._progress import RunStats, started
 from shared.money import format_price, normalize_currency_code
@@ -181,7 +181,7 @@ def main() -> int:
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-    GAMES_WISHLIST_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_catalog_text(GAMES_WISHLIST_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_WISHLIST_JSON}.", flush=True)
     stats.ok = len(games_out)
     return stats.finish("fetch_wishlist", t0, exit_code=0, extra=f"{len(games_out)} games")

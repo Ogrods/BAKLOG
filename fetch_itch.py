@@ -35,6 +35,8 @@ from fetchers._base import (
     print_id_diff,
     refuse_drift_result,
     write_games_json,
+    catalog_file,
+    write_catalog_text,
 )
 from auth import mark_invalid, resolve_env
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started

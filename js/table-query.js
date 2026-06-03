@@ -210,7 +210,10 @@ function getDealInfo(itadByKey, g) {
       isHistoricalLow: !!itad.is_historical_low,
     };
   }
-  const steamPrice = parsePriceLike(g.price);
+  const steamPrice =
+    g?.price_amount != null && Number.isFinite(Number(g.price_amount))
+      ? Number(g.price_amount)
+      : parsePriceLike(g.price);
   const cut = g.discount_percent || 0;
   if (steamPrice != null || cut) {
     return { price: steamPrice, cut, isHistoricalLow: false };
@@ -289,6 +292,9 @@ function effectiveDiscountPercent(ctx, g) {
 function effectiveSortPrice(ctx, g) {
   const d = getDealInfo(ctx.itadByKey, g);
   if (d && d.price != null) return d.price;
+  if (g?.price_amount != null && Number.isFinite(Number(g.price_amount))) {
+    return Number(g.price_amount);
+  }
   return parsePriceLike(g.price);
 }
 

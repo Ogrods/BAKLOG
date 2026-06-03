@@ -178,7 +178,9 @@ export function renderPicks() {
   document.getElementById("pickMeta").textContent = countLabel;
   const renderCard = tab === "wishlistDeals" ? dealCardHtml : pickCardHtml;
   const emptyMsg = tab === "wishlistDeals"
-    ? 'No deals on your wishlist right now. Run <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code> for cross-store prices.'
+    ? (state.wishlistGames.length === 0
+      ? "No deals on your wishlist yet. Connect a store and run the wishlist and deal price fetchers from Fetcher health."
+      : "No wishlist deals on sale right now. Refresh prices from Fetcher health, or check back after the next sale.")
     : pickView === "itch"
       ? "No rated itch.io backlog games yet. Most indie titles won't have Steam review scores."
       : "No games match this tab yet.";

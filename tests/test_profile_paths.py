@@ -87,6 +87,17 @@ def test_normalize_profile_id_rejects_unsafe() -> None:
         normalize_profile_id("bad id")
 
 
+def test_migration_marker_gates_legacy_layout(isolated_profiles: Path) -> None:
+    """profiles/default/ may exist mid-copy; layout flips only after .migration_complete."""
+    (isolated_profiles / "games_steam.json").write_text("{}", encoding="utf-8")
+    default_dir = isolated_profiles / "profiles" / "default"
+    default_dir.mkdir(parents=True)
+    assert profile_paths.is_legacy_layout() is True
+    profiles.ensure_default_profile_dir()
+    assert profile_paths.migration_complete_path().is_file()
+    assert profile_paths.is_legacy_layout() is False
+
+
 def test_migration_resumes_missing_files(isolated_profiles: Path) -> None:
     (isolated_profiles / "games_steam.json").write_text(
         '{"game_count":1,"games":[]}', encoding="utf-8"

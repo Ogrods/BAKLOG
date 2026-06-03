@@ -13,7 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from auth import mark_invalid
+from auth import mark_connected, mark_invalid
 from auth.secrets import profile_dir
 from amazon_web_client import AmazonWebAuthError
 from fetchers._authoritative import AMAZON
@@ -28,7 +28,12 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_AMAZON_JSON = Path("games_amazon.json")
-RAW_DUMP_JSON = Path("cache/amazon_web_raw.json")
+
+
+def raw_dump_json() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "amazon_web_raw.json"
 HLTB_DELAY_SEC = 1.0
 AMAZON_WEB_PROFILE = "amazon_web"
 
@@ -149,7 +154,7 @@ def _load_launcher_records(sql_dir: Path | None) -> list[dict]:
 def _load_web_records(*, dump_raw: bool) -> list[dict]:
     from amazon_web_client import AmazonWebAuthError, AmazonWebClient, sniff_claims
 
-    dump = RAW_DUMP_JSON if dump_raw else None
+    dump = raw_dump_json() if dump_raw else None
     try:
         if dump_raw:
             _raw, records = sniff_claims(dump_path=dump)
@@ -293,6 +298,8 @@ def main() -> int:
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
     write_catalog_text(GAMES_AMAZON_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
+    if source == "web":
+        mark_connected(AMAZON_WEB_PROFILE, {"AMAZON_WEB_PROFILE": "ready"})
     print(f"\nWrote {len(games_out)} games to {GAMES_AMAZON_JSON}.", flush=True)
     print("Reload the dashboard to see your Amazon library.", flush=True)
     stats.ok = len(games_out)

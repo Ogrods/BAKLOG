@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, heartbeat, started
-from shared.profile_paths import profile_root
+from shared.profile_paths import cache_json_path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 load_dotenv()
@@ -26,7 +26,10 @@ HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
 SEARCH_DELAY = 0.4
 WORKERS = 4
 HEARTBEAT_EVERY = 25
-META_FILE = profile_root() / "cache" / "cross_store_images_meta.json"
+
+
+def meta_file() -> Path:
+    return cache_json_path("cross_store_images_meta.json")
 
 STORE_FILES = [
     (Path("games_gog.json"), "gog"),
@@ -97,9 +100,10 @@ def needs_images(g: dict) -> bool:
 
 
 def load_meta() -> dict:
-    if META_FILE.exists():
+    path = meta_file()
+    if path.exists():
         try:
-            data = json.loads(META_FILE.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
                 return data
         except json.JSONDecodeError:
@@ -201,8 +205,9 @@ def main() -> int:
         data["games"] = list(by_id.values())
         write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
 
-    META_FILE.parent.mkdir(parents=True, exist_ok=True)
-    META_FILE.write_text(
+    meta = meta_file()
+    meta.parent.mkdir(parents=True, exist_ok=True)
+    meta.write_text(
         json.dumps(
             {
                 "fetched_at": datetime.now(timezone.utc).isoformat(),

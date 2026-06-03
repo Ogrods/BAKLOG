@@ -15,7 +15,7 @@ from auth.registry import PROVIDERS, spec_for
 from auth.runner import AuthSession, run_browser_auth
 from auth.secrets import delete_provider_blob, get_provider_blob, profile_dir, set_provider_blob
 from shared.platform_support import platform_supported
-from shared.profile_paths import DEFAULT_PROFILE_ID, auth_dir, epic_cache_dir
+from shared.profile_paths import DEFAULT_PROFILE_ID, auth_dir, epic_cache_dir, get_active_profile_id
 
 # Legacy single-key cookie aliases that _merge_creds also honors.
 _LEGACY_ENV_ALIASES: dict[str, tuple[str, ...]] = {
@@ -51,7 +51,14 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _env_fallback_allowed() -> bool:
+    """Process .env / exported env vars apply only to the default profile."""
+    return get_active_profile_id() == DEFAULT_PROFILE_ID
+
+
 def _env_fallback(spec_env_keys: tuple[str, ...]) -> dict[str, str]:
+    if not _env_fallback_allowed():
+        return {}
     out: dict[str, str] = {}
     for key in spec_env_keys:
         val = os.getenv(key, "").strip()
@@ -80,17 +87,107 @@ def get_credentials(provider: str) -> dict[str, str]:
     return _merge_creds(provider)
 
 
-def resolve_env(key: str, *, provider: str | None = None) -> str:
+def resolve_env(key: str, *, provider: str | None = None, allow_process_env: bool = True) -> str:
+    """Resolve a credential env var from the active profile's encrypted store.
+
+    When ``allow_process_env`` is False (chip missing-requirements checks), only
+    values stored for the active profile count — not process-wide ``.env``.
+    """
     if provider:
-        creds = get_credentials(provider)
+        creds = _credentials_from_profile_store(provider)
         if creds.get(key):
             return creds[key]
     for pkey, spec in PROVIDERS.items():
         if key in spec.env_keys:
-            creds = get_credentials(pkey)
+            creds = _credentials_from_profile_store(pkey)
             if creds.get(key):
                 return creds[key]
-    return os.getenv(key, "").strip()
+    if allow_process_env and _env_fallback_allowed():
+        return os.getenv(key, "").strip()
+    return ""
+
+
+def _credentials_from_profile_store(provider: str) -> dict[str, str]:
+    """Credentials from the encrypted blob only (no process .env fallback)."""
+    spec = spec_for(provider)
+    blob = get_provider_blob(provider)
+    out: dict[str, str] = {}
+    for key in spec.env_keys:
+        val = blob.get(key)
+        if isinstance(val, str) and val.strip():
+            out[key] = val.strip()
+    if provider == "battlenet" and blob.get("BATTLENET_COOKIE"):
+        out["BATTLENET_COOKIE"] = str(blob["BATTLENET_COOKIE"]).strip()
+    if provider == "nintendo" and blob.get("NINTENDO_COOKIE"):
+        out["NINTENDO_COOKIE"] = str(blob["NINTENDO_COOKIE"]).strip()
+    return out
+
+
+def _with_profile_secrets(profile_id: str):
+    """Point auth.secrets at one profile's auth dir (thread-safe; no BAKLOG_PROFILE mutation)."""
+    from contextlib import contextmanager
+
+    import auth.secrets as _secrets
+
+    target_dir = auth_dir(profile_id=profile_id)
+
+    @contextmanager
+    def _cm():
+        with _secrets._lock:
+            saved = (
+                _secrets.AUTH_DIR,
+                _secrets.SECRETS_FILE,
+                _secrets.MASTER_KEY_FILE,
+                _secrets._cache,
+            )
+            _secrets.AUTH_DIR = target_dir
+            _secrets.SECRETS_FILE = target_dir / "secrets.bin"
+            _secrets.MASTER_KEY_FILE = target_dir / ".master_key"
+            _secrets._cache = None
+            try:
+                yield
+            finally:
+                _secrets.AUTH_DIR, _secrets.SECRETS_FILE, _secrets.MASTER_KEY_FILE, _secrets._cache = (
+                    saved
+                )
+
+    return _cm()
+
+
+def profile_credentials_env(profile_id: str) -> dict[str, str]:
+    """All env keys from encrypted stores for one profile (no process .env)."""
+    out: dict[str, str] = {}
+    with _with_profile_secrets(profile_id):
+        for provider in PROVIDERS:
+            out.update(_credentials_from_profile_store(provider))
+    return out
+
+
+def subprocess_env_for_profile(profile_id: str) -> dict[str, str]:
+    """Minimal subprocess environment: system paths + profile-scoped credentials only."""
+    env: dict[str, str] = {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONIOENCODING": "utf-8",
+        "BAKLOG_PROFILE": profile_id,
+    }
+    for k in (
+        "PATH",
+        "HOME",
+        "USERPROFILE",
+        "SYSTEMROOT",
+        "TEMP",
+        "TMP",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "COMSPEC",
+        "LANG",
+        "LC_ALL",
+    ):
+        v = os.environ.get(k)
+        if v:
+            env[k] = v
+    env.update(profile_credentials_env(profile_id))
+    return env
 
 
 def _provider_state(provider: str) -> str:
@@ -116,7 +213,12 @@ def _provider_state(provider: str) -> str:
     if spec.kind == "local":
         from amazon_client import default_sql_dir
 
-        env_dir = os.getenv("AMAZON_GAMES_SQL_DIR", "").strip() or blob.get("AMAZON_GAMES_SQL_DIR")
+        env_dir = ""
+        if _env_fallback_allowed():
+            env_dir = os.getenv("AMAZON_GAMES_SQL_DIR", "").strip()
+        env_dir = env_dir or (blob.get("AMAZON_GAMES_SQL_DIR") or "")
+        if isinstance(env_dir, str):
+            env_dir = env_dir.strip()
         sql_dir = env_dir or str(default_sql_dir())
         return "connected" if Path(sql_dir).is_dir() else "disconnected"
 
@@ -127,12 +229,12 @@ def _provider_state(provider: str) -> str:
 
     if spec.kind == "oauth" and provider == "epic":
         session_file = epic_cache_dir() / "session.json"
-        if session_file.exists() or os.getenv("EPIC_AUTH_CODE", "").strip():
+        env_code = os.getenv("EPIC_AUTH_CODE", "").strip() if _env_fallback_allowed() else ""
+        if session_file.exists() or env_code:
             return "unverified" if not session_file.exists() else "connected"
         return "disconnected"
 
-    env_has_values = any(os.getenv(k, "").strip() for k in spec.env_keys)
-    if env_has_values:
+    if _env_fallback_allowed() and any(os.getenv(k, "").strip() for k in spec.env_keys):
         return "unverified"
     return "disconnected"
 
@@ -250,7 +352,7 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
                 "ITAD rejected this API key — copy the API key UUID from isthereanydeal.com/apps/my/"
             )
     if provider == "epic":
-        from epic_client import EpicAuthError, EpicClient
+        from epic_client import EpicAuthError, EpicClient, default_epic_cache_dir
 
         code = cleaned["EPIC_AUTH_CODE"].strip()
         if len(code) < 16 or not re.fullmatch(r"[A-Za-z0-9_\-]+", code):
@@ -259,7 +361,7 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
                 "value between the quotes (no quotes, no commas, no spaces)."
             )
         try:
-            client = EpicClient(auth_code=code)
+            client = EpicClient(auth_code=code, cache_dir=default_epic_cache_dir())
             client.login()
         except EpicAuthError as e:
             msg = str(e)

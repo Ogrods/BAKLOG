@@ -1,6 +1,14 @@
 """Tests for shared/fx.py and wishlist FX application."""
 
-from shared.fx import convert, parse_price_amount, round_amount
+from datetime import datetime, timedelta, timezone
+
+from shared.fx import (
+    CACHE_HARD_MAX_AGE_SECONDS,
+    convert,
+    ensure_fx_rates,
+    parse_price_amount,
+    round_amount,
+)
 from shared.wishlist_fx import apply_fx_to_game
 
 
@@ -114,3 +122,41 @@ def test_apply_fx_missing_pair_leaves_native():
     assert apply_fx_to_game(game, "USD", rates) is False
     assert game["currency"] == "XYZ"
     assert "price_amount" not in game
+
+
+def test_apply_fx_refuses_corrupted_fx_converted_row():
+    rates = _eur_base_rates()
+    game = {"fx_converted": True, "currency": "USD", "price": "$58.00"}
+    assert apply_fx_to_game(game, "EUR", rates) is False
+
+
+def test_ensure_fx_rates_warns_on_stale_cache_fallback(monkeypatch, tmp_path):
+    import shared.fx as fx_mod
+
+    old = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+    doc = {**_eur_base_rates(), "fetched_at": old}
+    path = tmp_path / "fx_rates.json"
+    path.write_text(__import__("json").dumps(doc), encoding="utf-8")
+    monkeypatch.setattr(fx_mod, "fx_rates_path", lambda **_: path)
+    monkeypatch.setattr(fx_mod, "_fetch_from_api", lambda: (_ for _ in ()).throw(OSError("offline")))
+
+    out = ensure_fx_rates(warn_stale=True)
+    assert out["base"] == "EUR"
+
+
+def test_ensure_fx_rates_refuses_ancient_cache(monkeypatch, tmp_path):
+    import shared.fx as fx_mod
+
+    days = CACHE_HARD_MAX_AGE_SECONDS // 86400 + 1
+    old = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    doc = {**_eur_base_rates(), "fetched_at": old}
+    path = tmp_path / "fx_rates.json"
+    path.write_text(__import__("json").dumps(doc), encoding="utf-8")
+    monkeypatch.setattr(fx_mod, "fx_rates_path", lambda **_: path)
+    monkeypatch.setattr(fx_mod, "_fetch_from_api", lambda: (_ for _ in ()).throw(OSError("offline")))
+
+    try:
+        ensure_fx_rates(warn_stale=True)
+        assert False, "expected RuntimeError"
+    except RuntimeError as e:
+        assert "too old" in str(e).lower()

@@ -1,4 +1,5 @@
 import { state, CLEANUP_MAX_RATING, CLEANUP_MIN_AGE_MS } from './state.js';
+import { displayCurrency, normalizeCurrencyCode } from './currency.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
 import {
   gameKey,
@@ -381,11 +382,14 @@ export function parsePriceLike(v) {
 }
 
 /** Numeric store price for sort/filter — prefers FX-converted price_amount from fetch. */
-export function gameComparablePrice(g) {
+export function gameComparablePrice(g, displayCcy) {
+  const disp = normalizeCurrencyCode(displayCcy || displayCurrency());
   if (g?.price_amount != null) {
     const n = Number(g.price_amount);
     if (Number.isFinite(n)) return n;
   }
+  const rowCur = normalizeCurrencyCode(g?.currency);
+  if (rowCur && rowCur !== disp) return null;
   return parsePriceLike(g.price);
 }
 

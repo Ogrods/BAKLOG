@@ -45,9 +45,12 @@ export function clearProfileLocalStorage(profileId) {
     if (!suffix) return;
     localStorage.removeItem(`${PREFS_KEY}${suffix}`);
     localStorage.removeItem(`${ITAD_SNAPSHOT_PREFIX}${suffix}`);
+    localStorage.removeItem(`steam-backlog-personal${suffix}`);
+    localStorage.removeItem(`steam-backlog-manual-games${suffix}`);
     localStorage.removeItem(`baklog-fetcher-auth-cooldown${suffix}`);
     localStorage.removeItem(`baklog-reconnect-dismissed${suffix}`);
     localStorage.removeItem(`baklog-itad-last-auto-run${suffix}`);
+    localStorage.removeItem(`fetcher-suppressed-run-ids${suffix}`);
   } catch (_) { /* ignore */ }
 }
 

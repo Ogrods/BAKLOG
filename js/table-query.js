@@ -201,7 +201,22 @@ function getItadForGame(itadByKey, g) {
   return null;
 }
 
-function getDealInfo(itadByKey, g) {
+function normalizeRowCurrency(code) {
+  const raw = String(code || '').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(raw) ? raw : '';
+}
+
+function comparableStorePrice(g, displayCcy) {
+  const disp = normalizeRowCurrency(displayCcy);
+  if (g?.price_amount != null && Number.isFinite(Number(g.price_amount))) {
+    return Number(g.price_amount);
+  }
+  const rowCur = normalizeRowCurrency(g?.currency);
+  if (rowCur && disp && rowCur !== disp) return null;
+  return parsePriceLike(g.price);
+}
+
+function getDealInfo(itadByKey, g, displayCcy) {
   const itad = getItadForGame(itadByKey, g);
   if (itad && itad.price != null) {
     return {
@@ -210,10 +225,7 @@ function getDealInfo(itadByKey, g) {
       isHistoricalLow: !!itad.is_historical_low,
     };
   }
-  const steamPrice =
-    g?.price_amount != null && Number.isFinite(Number(g.price_amount))
-      ? Number(g.price_amount)
-      : parsePriceLike(g.price);
+  const steamPrice = comparableStorePrice(g, displayCcy);
   const cut = g.discount_percent || 0;
   if (steamPrice != null || cut) {
     return { price: steamPrice, cut, isHistoricalLow: false };
@@ -227,9 +239,9 @@ function isOwnedByTitle(ownedNormNames, name) {
 }
 
 function passesDealFilters(ctx, g) {
-  const { prefs, ownedNormNames, itadByKey } = ctx;
+  const { prefs, ownedNormNames, itadByKey, displayCurrency: displayCcy } = ctx;
   if (prefs.dealHideOwned && isOwnedByTitle(ownedNormNames, g.name)) return false;
-  const d = getDealInfo(itadByKey, g);
+  const d = getDealInfo(itadByKey, g, displayCcy);
   const onSale = prefs.dealOnSaleOnly;
   const lowOnly = prefs.dealHistoricalLowOnly;
   const minCut = +(prefs.dealMinDiscount || 0);
@@ -284,18 +296,15 @@ function priorityScore(ctx, g) {
 }
 
 function effectiveDiscountPercent(ctx, g) {
-  const d = getDealInfo(ctx.itadByKey, g);
+  const d = getDealInfo(ctx.itadByKey, g, ctx.displayCurrency);
   if (d) return d.cut || 0;
   return g.discount_percent || 0;
 }
 
 function effectiveSortPrice(ctx, g) {
-  const d = getDealInfo(ctx.itadByKey, g);
+  const d = getDealInfo(ctx.itadByKey, g, ctx.displayCurrency);
   if (d && d.price != null) return d.price;
-  if (g?.price_amount != null && Number.isFinite(Number(g.price_amount))) {
-    return Number(g.price_amount);
-  }
-  return parsePriceLike(g.price);
+  return comparableStorePrice(g, ctx.displayCurrency);
 }
 
 function passesSearchQuery(g, p, q) {
@@ -386,8 +395,19 @@ function sortCompare(ctx, a, b) {
 }
 
 export function buildQueryContext(state, params) {
+  const itadMeta = state.libraryMeta?.itad;
+  let displayCurrency = 'USD';
+  if (itadMeta?.currency) {
+    const c = String(itadMeta.currency).trim().toUpperCase();
+    if (/^[A-Z]{3}$/.test(c)) displayCurrency = c;
+  } else if (itadMeta?.country) {
+    const cc = String(itadMeta.country).trim().toUpperCase();
+    const map = { US: 'USD', GB: 'GBP', UK: 'GBP', CA: 'CAD', AU: 'AUD', DE: 'EUR', FR: 'EUR' };
+    displayCurrency = map[cc] || 'USD';
+  }
   return {
     view: state.activeView,
+    displayCurrency,
     prefs: state.prefs,
     // Session-scoped prefs (itchHideNonGames, crossStoreDedup) — serialize across
     // to the worker so passesFilter() can read them on the off-main-thread path too.

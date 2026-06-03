@@ -6,12 +6,19 @@ from pathlib import Path
 
 import requests
 
-CACHE_DIR = Path("cache")
 STORE_DELAY_SEC = 1.5
 
 
+def _default_steam_cache_dir() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "steam"
+
+
 class SteamClient:
-    def __init__(self, api_key: str, steam_id: str, cache_dir: Path = CACHE_DIR):
+    def __init__(self, api_key: str, steam_id: str, cache_dir: Path | None = None):
+        if cache_dir is None:
+            cache_dir = _default_steam_cache_dir()
         self.api_key = api_key
         self.steam_id = steam_id
         self.cache_dir = cache_dir

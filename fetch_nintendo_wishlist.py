@@ -36,9 +36,18 @@ from shared.money import format_price, normalize_currency_code
 
 GAMES_NINTENDO_WISHLIST_JSON = Path("games_wishlist_nintendo.json")
 WISHLIST_URL = "https://www.nintendo.com/us/wish-list/"
-DUMP_DIR = Path("cache/nintendo")
-DUMP_HTML = DUMP_DIR / "wishlist_dump.html"
-DUMP_JSON = DUMP_DIR / "wishlist_dump.json"
+def dump_dir() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "nintendo"
+
+
+def dump_html() -> Path:
+    return dump_dir() / "wishlist_dump.html"
+
+
+def dump_json() -> Path:
+    return dump_dir() / "wishlist_dump.json"
 HLTB_DELAY_SEC = 1.0
 
 _NSUID_RE = re.compile(r"^7\d{12,14}$")
@@ -497,8 +506,8 @@ def _fetch_with_profile(
         html = page_html if len(page_html) > len(req_html) else req_html
 
         if dump:
-            DUMP_DIR.mkdir(parents=True, exist_ok=True)
-            DUMP_HTML.write_text(html, encoding="utf-8")
+            dump_dir().mkdir(parents=True, exist_ok=True)
+            dump_html().write_text(html, encoding="utf-8")
             dump_doc = {
                 "url": url,
                 "request_html_len": len(req_html),
@@ -507,11 +516,11 @@ def _fetch_with_profile(
                 "api_payloads": api_payloads[:20],
                 "next_data_keys": list((_extract_next_data(html) or {}).keys())[:30],
             }
-            DUMP_JSON.write_text(
+            dump_json().write_text(
                 json.dumps(dump_doc, indent=2, default=str, ensure_ascii=False),
                 encoding="utf-8",
             )
-            print(f"  wrote {DUMP_HTML} and {DUMP_JSON}", flush=True)
+            print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
 
         return html, url, api_payloads
 
@@ -565,7 +574,7 @@ def main() -> int:
     parser.add_argument(
         "--dump",
         action="store_true",
-        help=f"Save raw HTML + captured JSON to {DUMP_DIR}/ for debugging",
+        help=f"Save raw HTML + captured JSON to {dump_dir()}/ for debugging",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()

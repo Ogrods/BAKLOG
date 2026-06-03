@@ -27,6 +27,9 @@ venv/
 node_modules/
 refresh.log
 enrich_hltb_run.log
+.enrich_refresh.log
+_itad.json
+_runs.json
 .vscode/
 *.code-workspace
 data/

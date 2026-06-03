@@ -19,11 +19,13 @@ from pathlib import Path
 from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, heartbeat, started
 from hltb_client import HltbClient
-from shared.profile_paths import profile_root
+from shared.profile_paths import cache_json_path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-MAPPING_FILE = profile_root() / "cache" / "hltb_map.json"
+
+def mapping_file() -> Path:
+    return cache_json_path("hltb_map.json")
 QUERY_DELAY_SEC = 0.4  # be polite to HLTB; howlongtobeatpy doesn't throttle itself
 SAVE_EVERY_N_LOOKUPS = 25
 HEARTBEAT_EVERY = 25
@@ -60,9 +62,10 @@ HLTB_FIELDS = (
 
 
 def load_mapping() -> dict:
-    if MAPPING_FILE.exists():
+    path = mapping_file()
+    if path.exists():
         try:
-            return json.loads(MAPPING_FILE.read_text(encoding="utf-8"))
+            return json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return {}
     return {}
@@ -70,8 +73,9 @@ def load_mapping() -> dict:
 
 def save_mapping(mapping: dict) -> None:
     mapping["fetched_at"] = datetime.now(timezone.utc).isoformat()
-    MAPPING_FILE.parent.mkdir(parents=True, exist_ok=True)
-    MAPPING_FILE.write_text(
+    path = mapping_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(mapping, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 

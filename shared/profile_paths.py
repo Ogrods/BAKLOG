@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILES_DIR = ROOT / "profiles"
 INDEX_FILE = PROFILES_DIR / "index.json"
 DEFAULT_PROFILE_ID = "default"
+MIGRATION_COMPLETE_MARKER = ".migration_complete"
 _ENV_OVERRIDE = "BAKLOG_PROFILE"
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -108,12 +109,19 @@ def profile_data_dir(profile_id: str) -> Path:
     return PROFILES_DIR / pid
 
 
+def migration_complete_path(profile_id: str = DEFAULT_PROFILE_ID) -> Path:
+    return profile_data_dir(profile_id) / MIGRATION_COMPLETE_MARKER
+
+
 def is_legacy_layout(profile_id: str | None = None) -> bool:
-    """True when this profile's data lives at repo root (pre-migration installs)."""
+    """True when default profile data still lives at repo root (not fully migrated)."""
     pid = profile_id if profile_id is not None else get_active_profile_id()
     if pid != DEFAULT_PROFILE_ID:
         return False
-    return not profile_data_dir(DEFAULT_PROFILE_ID).is_dir()
+    dest = profile_data_dir(DEFAULT_PROFILE_ID)
+    if not dest.is_dir():
+        return True
+    return not migration_complete_path(DEFAULT_PROFILE_ID).is_file()
 
 
 def profile_root(profile_id: str | None = None) -> Path:
@@ -147,8 +155,12 @@ def auth_dir(*, profile_id: str | None = None) -> Path:
     return profile_root(profile_id) / "cache" / "auth"
 
 
+def profile_cache_dir(*, profile_id: str | None = None) -> Path:
+    return profile_root(profile_id) / "cache"
+
+
 def epic_cache_dir(*, profile_id: str | None = None) -> Path:
-    return profile_root(profile_id) / "cache" / "epic"
+    return profile_cache_dir(profile_id=profile_id) / "epic"
 
 
 def runs_dir(*, profile_id: str | None = None) -> Path:
@@ -157,6 +169,23 @@ def runs_dir(*, profile_id: str | None = None) -> Path:
 
 def fx_rates_path(*, profile_id: str | None = None) -> Path:
     return profile_root(profile_id) / "cache" / "fx_rates.json"
+
+
+# Enrichment / FX cache files the dashboard loads via GET /cache/<name>.
+PROFILE_CACHE_JSON_FILES = frozenset({
+    "hltb_map.json",
+    "steam_review_map.json",
+    "cross_store_images_meta.json",
+    "steam_tags_meta.json",
+    "fx_rates.json",
+})
+
+
+def cache_json_path(filename: str, *, profile_id: str | None = None) -> Path:
+    """Path to a profile-scoped cache JSON file (enrichment meta, FX rates)."""
+    if filename not in PROFILE_CACHE_JSON_FILES:
+        raise ValueError(f"unknown profile cache file: {filename!r}")
+    return profile_root(profile_id) / "cache" / filename
 
 
 def games_backup_root(*, profile_id: str | None = None) -> Path:

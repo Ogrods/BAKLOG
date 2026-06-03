@@ -93,7 +93,7 @@ npm run build:css
 
 ### Local profiles (optional)
 
-Use the **profile menu** in the header (next to the logo) for separate datasets — e.g. work vs play. Until you add a second profile, everything stays in the repo root as today. The first **Create** copies your current `games_*.json`, `data/`, and `cache/auth/` into `profiles/default/` (root files remain as backup) and starts the new profile empty. Switching profiles reloads the app. CLI fetchers respect `BAKLOG_PROFILE=<id>` or the active entry in `profiles/index.json`. Rollback: delete the `profiles/` folder to return to legacy single-root layout.
+Use the **profile menu** in the header (next to the logo) for separate datasets — e.g. work vs play. Until you add a second profile, everything stays in the repo root as today. The first **Create** copies your current `games_*.json`, `data/`, and `cache/auth/` into `profiles/default/` (root files remain as backup) and starts the new profile empty. Switching profiles reloads the app. CLI fetchers respect `BAKLOG_PROFILE=<id>` or the active entry in `profiles/index.json`. **Do not** export `BAKLOG_PROFILE` in the same shell where you run `python server.py` if you use the profile menu — that env var pins every path and credential lookup to one profile and ignores UI switches. Rollback: delete the `profiles/` folder to return to legacy single-root layout.
 
 ## Fetch your libraries
 

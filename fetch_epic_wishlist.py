@@ -32,9 +32,18 @@ from hltb_client import HltbClient
 
 GAMES_WISHLIST_EPIC_JSON = Path("games_wishlist_epic.json")
 WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
-DUMP_DIR = Path("cache/epic")
-DUMP_HTML = DUMP_DIR / "wishlist_dump.html"
-DUMP_JSON = DUMP_DIR / "wishlist_dump.json"
+def dump_dir() -> Path:
+    from shared.profile_paths import epic_cache_dir
+
+    return epic_cache_dir()
+
+
+def dump_html() -> Path:
+    return dump_dir() / "wishlist_dump.html"
+
+
+def dump_json() -> Path:
+    return dump_dir() / "wishlist_dump.json"
 HLTB_DELAY_SEC = 1.0
 
 _SIGN_IN_RE = re.compile(r"sign\s*in|log\s*in", re.I)
@@ -275,9 +284,9 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
         url = page.url or WISHLIST_URL
 
         if dump:
-            DUMP_DIR.mkdir(parents=True, exist_ok=True)
-            DUMP_HTML.write_text(html, encoding="utf-8")
-            DUMP_JSON.write_text(
+            dump_dir().mkdir(parents=True, exist_ok=True)
+            dump_html().write_text(html, encoding="utf-8")
+            dump_json().write_text(
                 json.dumps(
                     {
                         "url": url,
@@ -291,7 +300,7 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
                 ),
                 encoding="utf-8",
             )
-            print(f"  wrote {DUMP_HTML} and {DUMP_JSON}", flush=True)
+            print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
 
         return html, url, api_payloads
 
@@ -314,7 +323,7 @@ def main() -> int:
     parser.add_argument(
         "--dump",
         action="store_true",
-        help=f"Save raw HTML + captured GraphQL to {DUMP_DIR}/",
+        help=f"Save raw HTML + captured GraphQL to {dump_dir()}/",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()

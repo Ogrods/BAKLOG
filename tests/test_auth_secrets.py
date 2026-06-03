@@ -48,6 +48,9 @@ def test_api_providers_auth_kind() -> None:
 
 
 def test_env_fallback_when_store_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    from shared.profile_paths import DEFAULT_PROFILE_ID
+
+    monkeypatch.setenv("BAKLOG_PROFILE", DEFAULT_PROFILE_ID)
     monkeypatch.setenv("ITAD_API_KEY", "from-env")
     assert resolve_env("ITAD_API_KEY", provider="itad") == "from-env"
 

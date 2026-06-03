@@ -32,8 +32,14 @@ describe('profiles storage keys', () => {
   it('clearProfileLocalStorage removes suffixed keys for deleted profile', () => {
     localStorage.setItem(`${PREFS_KEY}:work`, '{}');
     localStorage.setItem('baklog-itad-snapshot:work', '{}');
+    localStorage.setItem('steam-backlog-personal:work', '{}');
+    localStorage.setItem('steam-backlog-manual-games:work', '[]');
+    localStorage.setItem('baklog-fetcher-auth-cooldown:work', '{}');
     clearProfileLocalStorage('work');
     expect(localStorage.getItem(`${PREFS_KEY}:work`)).toBeNull();
     expect(localStorage.getItem('baklog-itad-snapshot:work')).toBeNull();
+    expect(localStorage.getItem('steam-backlog-personal:work')).toBeNull();
+    expect(localStorage.getItem('steam-backlog-manual-games:work')).toBeNull();
+    expect(localStorage.getItem('baklog-fetcher-auth-cooldown:work')).toBeNull();
   });
 });

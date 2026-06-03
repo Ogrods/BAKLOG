@@ -1106,6 +1106,32 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 .fh-log-open:hover { background: rgb(51 65 85); }
 .fh-title { font-size: 0.75rem; font-weight: 600; color: #cbd5e1; letter-spacing: 0.04em; text-transform: uppercase; }
 .fh-summary { font-size: 0.7rem; color: #94a3b8; }
+.fh-legend {
+  font-size: 0.62rem;
+  color: #475569;
+  margin: 0.15rem 0 0.3rem;
+}
+.fh-legend > summary {
+  cursor: pointer;
+  width: max-content;
+  color: #475569;
+  opacity: 0.7;
+  list-style: none;
+  user-select: none;
+}
+.fh-legend > summary::-webkit-details-marker { display: none; }
+.fh-legend > summary::before { content: "ⓘ "; }
+.fh-legend > summary:hover { opacity: 1; color: #64748b; }
+.fh-legend[open] > summary { margin-bottom: 0.25rem; }
+.fh-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  color: #64748b;
+  padding: 0 0.1rem;
+}
+.fh-legend-item { white-space: nowrap; }
+.fh-legend .fh-chip-warn { margin-right: 0.15rem; vertical-align: middle; }
 .fh-toggle { font-size: 0.7rem; color: #94a3b8; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; user-select: none; }
 .fh-itad-auto { margin-left: 0.15rem; }
 .fh-group-chips { align-items: center; }

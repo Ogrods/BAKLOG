@@ -28,7 +28,11 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_EA_JSON = Path("games_ea.json")
-RAW_DUMP_JSON = Path("cache/ea_raw.json")
+def raw_dump_json() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "ea_raw.json"
+
 HLTB_DELAY_SEC = 1.0
 EA_GRAPHQL_HOST = "service-aggregation-layer.juno.ea.com"
 # A logged-in ea.com page that reliably fires an authenticated SAL GraphQL call,
@@ -271,12 +275,12 @@ def main() -> int:
     print(f"Found {len(deduped)} EA titles (from {len(raw_items)} API rows).", flush=True)
 
     if args.dump_raw:
-        RAW_DUMP_JSON.parent.mkdir(parents=True, exist_ok=True)
-        RAW_DUMP_JSON.write_text(
+        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
+        raw_dump_json().write_text(
             json.dumps({"items": raw_items, "filtered": deduped}, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-        print(f"Wrote raw dump to {RAW_DUMP_JSON}.", flush=True)
+        print(f"Wrote raw dump to {raw_dump_json()}.", flush=True)
 
     if not deduped:
         stats.error(

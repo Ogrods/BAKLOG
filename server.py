@@ -87,6 +87,8 @@ _sse_lock = threading.Lock()
 # Personal-data persistence (scoped to active profile via shared.profile_paths).
 from shared.platform_support import platform_supported  # noqa: E402
 from shared.profile_paths import (  # noqa: E402
+    PROFILE_CACHE_JSON_FILES,
+    cache_json_path,
     catalog_path,
     get_active_profile_id,
     personal_backup_dir,
@@ -118,6 +120,7 @@ def _refresh_personal_paths() -> None:
     ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
     RUN_HISTORY_FILE = RUNS_DIR / "history.json"
     QUEUE_FILE = RUNS_DIR / "queue.json"
+    MANAGER.rebind_profile_paths()
 PERSONAL_BACKUP_KEEP = 10
 PERSONAL_MAX_BYTES = 32 * 1024 * 1024  # 32 MB hard cap on the PUT body
 _personal_lock = threading.RLock()
@@ -309,7 +312,10 @@ def _missing_requirements(requires: list[dict[str, Any]]) -> list[str]:
         env_name = (req.get("env") or "").strip()
         if not env_name:
             continue
-        val = resolve(env_name) if resolve else os.getenv(env_name, "").strip()
+        if resolve:
+            val = resolve(env_name, allow_process_env=False)
+        else:
+            val = ""
         if not val:
             missing.append(env_name)
     return missing
@@ -385,13 +391,22 @@ def _save_durable_queue(entries: list[dict[str, Any]]) -> None:
         _write_json_atomic(QUEUE_FILE, {"runs": entries})
 
 
-def _load_run_history() -> list[dict[str, Any]]:
-    data = _read_json_file(RUN_HISTORY_FILE, [])
+def _load_run_history_from(path: Path | None = None) -> list[dict[str, Any]]:
+    hist_path = path or RUN_HISTORY_FILE
+    data = _read_json_file(hist_path, [])
     return data if isinstance(data, list) else []
 
 
+def _load_run_history() -> list[dict[str, Any]]:
+    return _load_run_history_from(RUN_HISTORY_FILE)
+
+
+def _save_run_history_to(path: Path, entries: list[dict[str, Any]]) -> None:
+    _write_json_atomic(path, entries[:MAX_HISTORY])
+
+
 def _save_run_history(entries: list[dict[str, Any]]) -> None:
-    _write_json_atomic(RUN_HISTORY_FILE, entries[:MAX_HISTORY])
+    _save_run_history_to(RUN_HISTORY_FILE, entries)
 
 
 class Run:
@@ -400,13 +415,21 @@ class Run:
     __slots__ = (
         "id", "key", "label", "status", "started_at", "ended_at", "exit_code",
         "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
-        "_log_path", "_runs_dir",
+        "_log_path", "_runs_dir", "profile_id",
     )
 
-    def __init__(self, key: str, refresh: bool = False, *, runs_dir: Path = RUNS_DIR) -> None:
+    def __init__(
+        self,
+        key: str,
+        refresh: bool = False,
+        *,
+        runs_dir: Path = RUNS_DIR,
+        profile_id: str | None = None,
+    ) -> None:
         spec = FETCHERS[key]
         self.id: str = uuid.uuid4().hex[:12]
         self.key: str = key
+        self.profile_id: str = profile_id or get_active_profile_id()
         self.label: str = spec["label"]
         self.refresh: bool = refresh
         self.status: str = "queued"  # queued | launching | running | cancelling | done | failed | cancelled
@@ -575,6 +598,16 @@ class RunManager:
         threading.Thread(target=self._worker_loop, name="run-worker", daemon=True).start()
         self._restore_durable_queue()
 
+    def rebind_profile_paths(self) -> None:
+        """Point run storage at the active profile after POST /api/profiles/active."""
+        self._runs_dir = runs_dir()
+        self._runs_dir.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            self._history = deque(
+                _load_run_history_from(self._runs_dir / "history.json")[-MAX_HISTORY:],
+                maxlen=MAX_HISTORY,
+            )
+
     def _persist_queue(self) -> None:
         with self._lock:
             entries = [
@@ -611,10 +644,16 @@ class RunManager:
                 if rid not in keep_ids:
                     del self._runs_by_id[rid]
 
-    def _append_history(self, summary: dict[str, Any]) -> None:
+    def _append_history(self, summary: dict[str, Any], *, profile_id: str) -> None:
+        hist_file = runs_dir(profile_id=profile_id) / "history.json"
+        entries = _load_run_history_from(hist_file)
+        entries.insert(0, summary)
+        _save_run_history_to(hist_file, entries)
         with self._lock:
-            self._history.appendleft(summary)
-            _save_run_history(list(self._history))
+            if profile_id == get_active_profile_id():
+                self._history.appendleft(summary)
+                while len(self._history) > MAX_HISTORY:
+                    self._history.pop()
 
     def _register_active_process(self, run: Run, pid: int) -> None:
         entry = {
@@ -648,7 +687,7 @@ class RunManager:
                 "line_count": 0,
                 "note": "orphaned — previous server stopped while this fetcher was running",
             }
-            self._append_history(summary)
+            self._append_history(summary, profile_id=get_active_profile_id())
         _write_active_runs([])
 
     def shutdown(self) -> None:
@@ -679,7 +718,13 @@ class RunManager:
                     "queue full — one run is in progress and one is queued; "
                     "wait for a slot before submitting another"
                 )
-            run = Run(key, refresh=refresh, runs_dir=self._runs_dir)
+            profile_id = get_active_profile_id()
+            run = Run(
+                key,
+                refresh=refresh,
+                runs_dir=runs_dir(profile_id=profile_id),
+                profile_id=profile_id,
+            )
             self._pending.append(run)
             self._runs_by_id[run.id] = run
             self._queue.put(run)
@@ -749,7 +794,7 @@ class RunManager:
             if run in self._pending:
                 self._pending.remove(run)
         self._unregister_active_process(run.id)
-        self._append_history(run.to_summary())
+        self._append_history(run.to_summary(), profile_id=run.profile_id)
         self._persist_queue()
         self._prune_runs_by_id()
 
@@ -781,11 +826,15 @@ class RunManager:
         run.broadcast("status", {"status": run.status, "started_at": run.started_at})
         run.add_line("stdout", f"$ {' '.join(argv)}")
 
-        env = os.environ.copy()
-        # Force unbuffered Python output so we see progress in real time.
-        env["PYTHONUNBUFFERED"] = "1"
-        env["PYTHONIOENCODING"] = "utf-8"
-        env["BAKLOG_PROFILE"] = get_active_profile_id()
+        try:
+            from auth.manager import subprocess_env_for_profile
+
+            env = subprocess_env_for_profile(run.profile_id)
+        except Exception as exc:
+            run.status = "failed"
+            run.exit_code = -1
+            run.add_line("stderr", f"[server] failed to build subprocess env: {exc!r}")
+            return
 
         # Run Popen on a launcher thread so a wedged CreateProcess can't wedge
         # the queue worker. If the launch doesn't return within
@@ -798,7 +847,7 @@ class RunManager:
             try:
                 p = subprocess.Popen(  # noqa: S603 - argv is fixed in FETCHERS, not user input
                     argv,
-                    cwd=str(profile_root()),
+                    cwd=str(profile_root(profile_id=run.profile_id)),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     bufsize=1,
@@ -1050,12 +1099,23 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def translate_path(self, path: str) -> str:
-        """Serve catalog JSON from the active profile root (legacy or profiles/<id>/)."""
+        """Serve catalog and cache JSON from the active profile root (legacy or profiles/<id>/)."""
         clean = path.split("?", 1)[0].lstrip("/")
+        if clean.startswith("profiles/"):
+            # Block direct static access to another profile's tree (use top-level paths).
+            return str(profile_root() / ".profile_static_blocked" / clean)
         if _LIBRARY_JSON_RE.match("/" + clean) or clean == "itad_prices.json":
             disk = catalog_path(clean) if clean != "itad_prices.json" else catalog_path("itad_prices.json")
             if disk.is_file():
                 return str(disk)
+        if clean.startswith("cache/"):
+            name = clean.split("/", 1)[1]
+            if name in PROFILE_CACHE_JSON_FILES:
+                # Always resolve to the active profile's cache path. For a legacy
+                # (default) layout this is repo-root cache; for profiles/<id>/ it
+                # is the profile cache. A missing file 404s instead of leaking the
+                # default profile's enrichment data into another profile's chips.
+                return str(cache_json_path(name))
         return super().translate_path(path)
 
     # ---- routing -----------------------------------------------------------
@@ -1232,8 +1292,18 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             from shared.profiles import set_active_profile
 
+            MANAGER.cancel_all()
             result = set_active_profile(profile_id)
             _refresh_personal_paths()
+            env_override = os.environ.get("BAKLOG_PROFILE", "").strip()
+            if env_override and env_override != profile_id:
+                print(
+                    f"WARN: BAKLOG_PROFILE={env_override!r} is set in the server process; "
+                    f"paths and credentials still resolve to that profile, not {profile_id!r}. "
+                    "Unset BAKLOG_PROFILE when using the profile menu.",
+                    file=sys.stderr,
+                    flush=True,
+                )
             _send_json(self, HTTPStatus.OK, result)
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -1513,9 +1583,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         try:
             from auth.manager import mark_connected
-            from epic_client import EpicClient
+            from epic_client import EpicClient, default_epic_cache_dir
 
-            client = EpicClient(auth_code=code)
+            client = EpicClient(auth_code=code, cache_dir=default_epic_cache_dir())
             client.login()
             mark_connected("epic", {"EPIC_AUTH_CODE": code})
             body = (

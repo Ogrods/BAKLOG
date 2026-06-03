@@ -34,7 +34,7 @@ from pathlib import Path
 from auth import resolve_env
 from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import RunStats, started
-from shared.profile_paths import profile_root
+from shared.profile_paths import cache_json_path
 from steam_client import SteamClient
 from steam_metadata import (
     ALWAYS_WRITE_FIELDS,
@@ -45,8 +45,12 @@ from steam_metadata import (
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-MAPPING_FILE = profile_root() / "cache" / "steam_review_map.json"
-META_FILE = profile_root() / "cache" / "steam_tags_meta.json"
+def mapping_file() -> Path:
+    return cache_json_path("steam_review_map.json")
+
+
+def meta_file() -> Path:
+    return cache_json_path("steam_tags_meta.json")
 
 
 def _itch_is_videogame(row: dict) -> bool:
@@ -68,10 +72,11 @@ STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
 
 
 def load_mapping() -> dict:
-    if not MAPPING_FILE.exists():
+    path = mapping_file()
+    if not path.exists():
         return {}
     try:
-        return json.loads(MAPPING_FILE.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
 
@@ -211,8 +216,9 @@ def main(argv: list[str] | None = None) -> int:
         total_coop += coop_set
 
     if not args.dry_run:
-        META_FILE.parent.mkdir(parents=True, exist_ok=True)
-        META_FILE.write_text(
+        meta = meta_file()
+        meta.parent.mkdir(parents=True, exist_ok=True)
+        meta.write_text(
             json.dumps(
                 {
                     "fetched_at": datetime.now(timezone.utc).isoformat(),

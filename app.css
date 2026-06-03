@@ -1347,6 +1347,7 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
   min-height: 7.5rem;
   width: 100%;
   min-width: 0;
+  max-height: calc(100vh - 160px);
 }
 .fh-log-head {
   display: flex; align-items: center; gap: 0.5rem;
@@ -2574,21 +2575,61 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .dash-list-cover { width: 28px; height: 42px; object-fit: cover; border-radius: 3px; background: #1e293b; flex-shrink: 0; }
 .dash-picks-row {
   display: grid;
-  /* 3 equal columns mirror the wishlist-stats row above so the gutter
-     between "What to play next" and "itch.io library" lines up vertically
-     with the gutter between "Sale scoreboard" and "Steals waiting". */
+  /* 3 equal columns mirror the wishlist-stats row above so gutters line up. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  align-items: stretch;
 }
-.dash-picks-row .dash-picks-versus { grid-column: span 2; }
-.dash-picks-row .dash-card-itch { grid-column: span 1; }
-.dash-picks-row.no-itch { grid-template-columns: 1fr; }
-.dash-picks-row.no-itch .dash-picks-versus { grid-column: auto; }
+.dash-picks-row .dash-picks-versus,
+.dash-picks-row .dash-card-itch,
+.dash-picks-row .dash-recent-card { grid-column: span 1; }
+.dash-picks-row.no-itch .dash-picks-versus { grid-column: span 2; }
+.dash-picks-row.no-itch .dash-recent-card { grid-column: span 1; }
+/* itch present: stack Best rated over Fastest in the versus card */
+.dash-picks-row:not(.no-itch) .dash-versus-grid {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.dash-picks-row:not(.no-itch) .dash-versus-divider {
+  width: 100%;
+  height: 1px;
+  min-height: 1px;
+}
+/* itch absent: side-by-side rated | fastest inside the 2/3 versus card */
+.dash-picks-row.no-itch .dash-versus-grid {
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 16px;
+}
+.dash-picks-row.no-itch .dash-versus-divider {
+  width: auto;
+  height: auto;
+  min-height: 0;
+}
+#dashRecentCard {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px;
+}
+.dash-recent-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+}
+.dash-recent-age { flex-shrink: 0; font-size: 12px; }
 @media (max-width: 900px) {
   .dash-picks-row,
   .dash-picks-row.no-itch { grid-template-columns: 1fr; }
   .dash-picks-row .dash-picks-versus,
-  .dash-picks-row .dash-card-itch { grid-column: auto; }
+  .dash-picks-row .dash-card-itch,
+  .dash-picks-row .dash-recent-card { grid-column: auto; }
+  .dash-picks-row .dash-versus-grid { grid-template-columns: 1fr; }
+  .dash-picks-row .dash-versus-divider {
+    width: 100%;
+    height: 1px;
+    min-height: 1px;
+  }
 }
 .dash-picks-versus { padding: 16px 18px; }
 .dash-versus-head {
@@ -2642,7 +2683,8 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
   flex-shrink: 0;
 }
-.dash-versus-row {
+.dash-versus-row,
+.dash-recent-row {
   position: relative;
   border-left: 2px solid transparent;
   padding-left: 8px !important;
@@ -2651,7 +2693,14 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   box-sizing: border-box;
   overflow: hidden;
 }
-.dash-versus-row .dash-list-cover {
+.dash-recent-row {
+  flex: 1 1 0;
+  min-height: 44px;
+  max-height: 52px;
+  border-left-color: rgba(251, 191, 36, 0.45);
+}
+.dash-versus-row .dash-list-cover,
+.dash-recent-row .dash-list-cover {
   width: 28px;
   height: 42px;
   min-width: 28px;

@@ -63,6 +63,18 @@ export function computeRecentSpotlightKeys(games) {
   return new Set(keys);
 }
 
+/** Top N library games by first-seen timestamp (for dashboard recents card). */
+export function computeRecentAdditions(games, cap = 10) {
+  if (!state.prefs.librarySeenSeeded) return [];
+  const seen = state.libraryFirstSeenByKey || {};
+  return games
+    .map(g => ({ g, at: seen[gameKey(g)] ?? 0 }))
+    .filter(e => e.at > 0)
+    .sort((a, b) => b.at - a.at)
+    .slice(0, cap)
+    .map(e => ({ ...e.g, _addedAt: e.at }));
+}
+
 function gameSpotlightReason(g, recentKeys) {
   const rating = ratingValue(g);
   const hltb = hltbMain(g);

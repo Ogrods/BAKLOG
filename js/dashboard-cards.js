@@ -13,8 +13,26 @@ import { DASH_STORE_LABELS, DASH_STORE_COLORS, ITCH_CLASS_LABELS } from './dashb
 // dashboard-drilldown does NOT import this module; the cycle stays one-way.
 import { dashDrillItchGenre } from './dashboard-drilldown.js';
 import { dashboardCharts } from './dashboard-charts.js';
+import { computeRecentAdditions } from './dashboard-spotlight.js';
 
 let itchHeroIndex = Math.floor(Math.random() * 10);
+
+/** Relative "added" label from first-seen timestamp (mirrors fetcher humanizeAge thresholds). */
+function formatAddedAgo(ts) {
+  const ms = Date.now() - ts;
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 14) return `${d}d ago`;
+  const w = Math.floor(d / 7);
+  if (w < 8) return `${w}w ago`;
+  return `${Math.floor(d / 30)}mo ago`;
+}
 
 export function renderDashboardCoopSpotlight(games) {
   const el = document.getElementById("dashboardCoopSpotlight");
@@ -201,6 +219,26 @@ export function renderDashboardPicksVersus(games) {
   }
 
   applyItchVisibility();
+}
+
+export function renderDashboardRecentAdditions(games) {
+  const el = document.getElementById('dashRecentAdditions');
+  if (!el) return;
+  const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
+  const hasCover = g => !!(g.library_image || g.header_image) && !failed.has(gameKey(g));
+  const recents = computeRecentAdditions(games, 10).filter(hasCover);
+  const empty = '<p class="text-xs text-slate-400 italic">No additions tracked yet.</p>';
+  if (!recents.length) {
+    el.innerHTML = empty;
+    return;
+  }
+  const ageTitle = 'Time since first tracked in your library';
+  el.innerHTML = recents.map(g => {
+    const cover = libraryCoverFor(g);
+    const key = gameKey(g);
+    const addedLabel = formatAddedAgo(g._addedAt);
+    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="truncate flex-1">${escapeHtml(g.name)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
+  }).join('');
 }
 
 export function buildWishlistStatsHtml() {

@@ -1,4 +1,5 @@
 import { state, PREFS_KEY } from './state.js';
+import { prefsStorageKey } from './profiles.js';
 import { personalStore } from './personal-store.js';
 import { resolveCoopFilterMode } from './table-query.js';
 
@@ -33,7 +34,7 @@ export function syncCoopFilterSegmented() {
 export function loadPrefs() {
   const fallback = { picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false, showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15, storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16, dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false, dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {}, fetcherHealthStaleOnly: false, coopFilterMode: "off" };
   let merged;
-  try { merged = { ...fallback, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || "{}")) }; } catch { return fallback; }
+  try { merged = { ...fallback, ...(JSON.parse(localStorage.getItem(prefsStorageKey()) || "{}")) }; } catch { return fallback; }
   if (!["off", "any", "online", "local", "both"].includes(merged.coopFilterMode)) {
     merged.coopFilterMode = merged.coopAny ? "any" : "off";
   }
@@ -97,7 +98,7 @@ export function syncFilterDomFromState() {
 }
 
 export function savePrefs() {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
+  localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
   personalStore.notify();
 }
 

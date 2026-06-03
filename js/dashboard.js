@@ -21,7 +21,7 @@ import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboard
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation } from './dashboard-insights.js';
-import { connectedProviderCount } from './connections.js';
+import { connectedProviderCount, authStatusLoaded } from './connections.js';
 
 // Re-exports — dashboard.js stays the single public entry point for the
 // dashboard surface. External callers (app.js / bind-events.js / etc.)
@@ -252,6 +252,15 @@ function runWhenIdle(fn, timeoutMs = 1200) {
 function renderDashboardOnboard() {
   const el = document.getElementById("dashOnboard");
   if (!el) return;
+  // Don't paint the welcome wizard during cold boot: until the library load
+  // finishes (dashboardDataReady) and the connections status has been fetched
+  // at least once, allGames is transiently empty and connectedProviderCount()
+  // is 0, which would flash the onboarding before real data lands.
+  if (!state.dashboardDataReady || !authStatusLoaded()) {
+    el.innerHTML = "";
+    el.hidden = true;
+    return;
+  }
   if (state.allGames.length === 0 && connectedProviderCount() === 0) {
     el.hidden = false;
     el.innerHTML = `

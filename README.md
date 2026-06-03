@@ -89,6 +89,10 @@ npm run build:css
 
 5. Set **Game details** to **Public** in Steam → Profile → Edit Profile → Privacy Settings.
 
+### Local profiles (optional)
+
+Use the **profile menu** in the header (next to the logo) for separate datasets — e.g. work vs play. Until you add a second profile, everything stays in the repo root as today. The first **Create** copies your current `games_*.json`, `data/`, and `cache/auth/` into `profiles/default/` (root files remain as backup) and starts the new profile empty. Switching profiles reloads the app. CLI fetchers respect `BAKLOG_PROFILE=<id>` or the active entry in `profiles/index.json`. Rollback: delete the `profiles/` folder to return to legacy single-root layout.
+
 ## Fetch your libraries
 
 **Recommended:** run `python server.py`, open **Connections**, and click **Connect** for each store. A headed Chrome/Edge window opens for cookie/OAuth sign-in; credentials stay local in `cache/auth/`. Then run fetchers from the dashboard **Fetcher health** row or from the terminal below.

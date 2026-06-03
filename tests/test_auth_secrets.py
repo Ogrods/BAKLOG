@@ -9,7 +9,7 @@ import pytest
 
 from auth.manager import disconnect, get_credentials, mark_connected, resolve_env
 from auth.registry import spec_for
-from auth.secrets import AUTH_DIR, SECRETS_FILE, load_doc, set_master_password_override
+from auth.secrets import _secrets_file, load_doc, set_master_password_override
 
 
 @pytest.fixture(autouse=True)
@@ -23,8 +23,9 @@ def _isolated_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     set_master_password_override("test-passphrase-for-unit-tests")
     yield
     set_master_password_override(None)
-    if SECRETS_FILE.exists():
-        SECRETS_FILE.unlink()
+    sf = _secrets_file()
+    if sf.exists():
+        sf.unlink()
 
 
 def test_stored_credentials_roundtrip() -> None:

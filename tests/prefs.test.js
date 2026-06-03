@@ -4,6 +4,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 import { state, PREFS_KEY } from '../js/state.js';
+import { prefsStorageKey } from '../js/profiles.js';
 import {
   loadPrefs,
   loadSessionPrefs,
@@ -22,14 +23,14 @@ beforeEach(() => {
 
 describe('loadPrefs', () => {
   it('returns defaults on malformed JSON', () => {
-    localStorage.setItem(PREFS_KEY, '{not json');
+    localStorage.setItem(prefsStorageKey(), '{not json');
     const p = loadPrefs();
     expect(p.picksTab).toBe('topRated');
     expect(p.coopFilterMode).toBe('off');
   });
 
   it('merges stored values with defaults', () => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ dealMinDiscount: 25, picksLimit: 8 }));
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ dealMinDiscount: 25, picksLimit: 8 }));
     const p = loadPrefs();
     expect(p.dealMinDiscount).toBe(25);
     expect(p.picksLimit).toBe(8);
@@ -38,7 +39,7 @@ describe('loadPrefs', () => {
 
   it('strips legacy persisted keys', () => {
     localStorage.setItem(
-      PREFS_KEY,
+      prefsStorageKey(),
       JSON.stringify({
         crossStoreDedup: false,
         itchHideNonGames: false,
@@ -55,14 +56,14 @@ describe('loadPrefs', () => {
   });
 
   it('coerces legacy coopAny when stored coopFilterMode is invalid', () => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ coopFilterMode: 'legacy', coopAny: true }));
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ coopFilterMode: 'legacy', coopAny: true }));
     const p = loadPrefs();
     expect(p.coopFilterMode).toBe('any');
     expect(p.coopAny).toBeUndefined();
   });
 
   it('invalid coopFilterMode falls back via coopAny or off', () => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ coopFilterMode: 'bogus' }));
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ coopFilterMode: 'bogus' }));
     expect(loadPrefs().coopFilterMode).toBe('off');
   });
 });
@@ -91,7 +92,7 @@ describe('persistCurrentSort', () => {
     state.sortDir = -1;
     persistCurrentSort();
     expect(state.prefs.viewSorts.wishlist).toEqual({ key: 'deal_price', dir: -1 });
-    const stored = JSON.parse(localStorage.getItem(PREFS_KEY));
+    const stored = JSON.parse(localStorage.getItem(prefsStorageKey()));
     expect(stored.viewSorts.wishlist.key).toBe('deal_price');
   });
 

@@ -211,6 +211,8 @@ def _provider_state(provider: str) -> str:
         return "unavailable"
 
     if spec.kind == "local":
+        if blob.get("disabled"):
+            return "disconnected"
         from amazon_client import default_sql_dir
 
         env_dir = ""
@@ -389,7 +391,34 @@ def open_manual_signin(provider: str) -> dict[str, str]:
     return {"ok": True, "url": url}
 
 
+def is_local_provider_disabled(provider: str) -> bool:
+    """True when the user hid a local-only source (e.g. Amazon Games launcher)."""
+    try:
+        spec = spec_for(provider)
+    except KeyError:
+        return False
+    if spec.kind != "local":
+        return False
+    return bool(get_provider_blob(provider).get("disabled"))
+
+
+def enable_local(provider: str) -> None:
+    """Re-enable auto-detection for a local provider after Disconnect."""
+    spec = spec_for(provider)
+    if spec.kind != "local":
+        raise ValueError(f"{provider} is not a local provider")
+    blob = get_provider_blob(provider)
+    blob.pop("disabled", None)
+    set_provider_blob(provider, blob)
+
+
 def disconnect(provider: str) -> None:
+    spec = spec_for(provider)
+    if spec.kind == "local":
+        blob = get_provider_blob(provider)
+        blob["disabled"] = True
+        set_provider_blob(provider, blob)
+        return
     delete_provider_blob(provider)
     prof = profile_dir(provider)
     if prof.exists():

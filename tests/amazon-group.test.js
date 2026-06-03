@@ -14,6 +14,15 @@ describe('groupRepFor', () => {
 });
 
 describe('combinedGroupStatus', () => {
+  it('amazon group can stay connected when only the launcher member is disconnected', () => {
+    expect(
+      combinedGroupStatus([
+        { key: 'amazon', status: 'disconnected' },
+        { key: 'amazon_web', status: 'connected' },
+      ]),
+    ).toBe('connected');
+  });
+
   it('picks the highest-priority status across members', () => {
     expect(
       combinedGroupStatus([

@@ -411,15 +411,16 @@ function buildCardFooter(p, st) {
   }
 
   if (p.kind === 'local') {
-
+    const connected = st === 'connected';
     return `
-
       <div class="conn-card-footer">
-
-        <span class="conn-local-label">Auto-detected from Amazon Games launcher</span>
-
+        ${connected
+          ? `<span class="conn-local-label">Auto-detected from Amazon Games launcher</span>
+             <button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}">Disconnect</button>`
+          : `<span class="conn-local-label">Launcher library hidden — Connect to use it again, or use Prime web</span>
+             <button type="button" class="conn-primary" data-enable-local data-provider="${escapeAttr(p.key)}">Connect</button>`
+        }
       </div>`;
-
   }
 
 
@@ -728,6 +729,18 @@ function handleLayoutClick(ev) {
   if (openUrlBtn && provider) {
 
     openManualUrl(provider);
+
+    return;
+
+  }
+
+
+
+  const enableLocalBtn = target.closest('[data-enable-local]');
+
+  if (enableLocalBtn?.dataset.provider) {
+
+    enableLocalProvider(enableLocalBtn.dataset.provider);
 
     return;
 
@@ -1424,6 +1437,57 @@ async function disconnectProvider(provider) {
 
 
 
+/** Enable a local-only provider (e.g. Amazon launcher) by verifying its
+ *  on-disk source exists server-side. No browser sign-in — POST /enable
+ *  validates the local data and marks the provider connected. */
+async function enableLocalProvider(provider) {
+
+  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
+
+  const log = card?.querySelector('.conn-log');
+
+  if (log) {
+
+    log.classList.remove('hidden');
+
+    log.textContent = 'Checking for local data on this PC…';
+
+  }
+
+  let res;
+
+  try {
+
+    res = await fetch(`/api/auth/${provider}/enable`, { method: 'POST' });
+
+  } catch (_) {
+
+    if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
+
+    return;
+
+  }
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+
+    if (log) log.textContent = data.error || `Could not enable (${res.status})`;
+
+    return;
+
+  }
+
+  reconnectProviders.delete(provider);
+
+  renderReconnectBanner();
+
+  await refreshConnections();
+
+}
+
+
+
 async function startBrowserConnect(provider) {
 
   const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
@@ -1671,7 +1735,11 @@ export async function reconnectProvider(provider) {
 
   const kind = p?.kind || 'browser';
 
-  if (kind === 'browser') {
+  if (kind === 'local') {
+
+    await enableLocalProvider(provider);
+
+  } else if (kind === 'browser') {
 
     await startBrowserConnect(provider);
 

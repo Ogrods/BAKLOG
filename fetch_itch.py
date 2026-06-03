@@ -37,7 +37,7 @@ from fetchers._base import (
     write_games_json,
 )
 from auth import mark_invalid, resolve_env
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 from itch_client import ItchApiError, ItchAuthError, ItchClient
 
@@ -185,8 +185,9 @@ def main() -> int:
         print("Walking owned-keys pages (this can take a minute for big libraries)...")
         keys = client.all_owned_keys()
     except ItchAuthError as e:
+        mark_invalid("itch", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_itch", t0, exit_code=1)
+        return stats.finish("fetch_itch", t0, exit_code=EXIT_CODE_AUTH)
     except ItchApiError as e:
         stats.error(f"itch.io API error: {e}")
         return stats.finish("fetch_itch", t0, exit_code=1)

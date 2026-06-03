@@ -23,7 +23,7 @@ from fetchers._base import (
     refuse_drift_result,
     refuse_empty_result,
 )
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_EPIC_JSON = Path("games_epic.json")
@@ -297,7 +297,7 @@ def main() -> int:
         mark_invalid("epic", error=str(e))
         stats.error(str(e))
         print_auth_help()
-        return stats.finish("fetch_epic", t0, exit_code=1)
+        return stats.finish("fetch_epic", t0, exit_code=EXIT_CODE_AUTH)
 
     print("Fetching library...")
     records = client.get_library_records()

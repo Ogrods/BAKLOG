@@ -1374,3 +1374,40 @@ export function isProviderConnected(provider) {
 
 }
 
+
+
+/** Jump to Connections and start reconnect for a provider (browser auto-start). */
+export async function reconnectProvider(provider) {
+
+  if (!provider) return;
+
+  _selectedKey = provider;
+
+  document.querySelector('.view-tab[data-view="connections"]')?.click();
+
+  try {
+
+    await refreshConnections();
+
+  } catch {
+
+    renderConnections();
+
+  }
+
+  const p = authStatus.find(x => x.key === provider);
+
+  const kind = p?.kind || 'browser';
+
+  if (kind === 'browser') {
+
+    await startBrowserConnect(provider);
+
+  } else if (kind === 'manual') {
+
+    await openManualUrl(provider);
+
+  }
+
+}
+

@@ -22,7 +22,7 @@ from fetchers._base import (
     refuse_empty_result,
 )
 from auth import mark_invalid, resolve_env
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 from xbox_client import XboxAuthError, XboxClient
 
@@ -140,8 +140,9 @@ def main() -> int:
         print(f"OpenXBL account: {gt or '(unknown gamertag)'}", flush=True)
         titles = client.get_title_history()
     except XboxAuthError as e:
+        mark_invalid("xbox", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_xbox", t0, exit_code=1)
+        return stats.finish("fetch_xbox", t0, exit_code=EXIT_CODE_AUTH)
 
     games = [t for t in titles if (t.get("type") or "Game").lower() in ("game", "dlc")]
     print(f"Found {len(games)} Xbox titles in title history.", flush=True)

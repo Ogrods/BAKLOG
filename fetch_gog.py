@@ -19,7 +19,7 @@ from fetchers._base import (
     refuse_drift_result,
     refuse_empty_result,
 )
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
 
@@ -218,7 +218,7 @@ def main() -> int:
     except GogAuthError as e:
         mark_invalid("gog", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_gog", t0, exit_code=1)
+        return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
 
     hltb_client = HltbClient()
     existing = load_existing()
@@ -229,7 +229,7 @@ def main() -> int:
     except GogAuthError as e:
         mark_invalid("gog", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_gog", t0, exit_code=1)
+        return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
 
     if not products:
         owned_ids = gog.get_owned_game_ids()

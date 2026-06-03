@@ -18,7 +18,7 @@ from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
 from fetchers._authoritative import UBISOFT
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from ubisoft_client import UbisoftAuthError, UbisoftClient
 
 GAMES_UBISOFT_JSON = Path("games_ubisoft.json")
@@ -299,7 +299,7 @@ def main() -> int:
     except UbisoftAuthError as e:
         mark_invalid("ubisoft", error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_ubisoft", t0, exit_code=1)
+        return stats.finish("fetch_ubisoft", t0, exit_code=EXIT_CODE_AUTH)
 
     print(f"Hit Ubisoft endpoint: {endpoint}")
 

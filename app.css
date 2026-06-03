@@ -1142,6 +1142,54 @@ html[data-boot-loading] .view-tab { opacity: 0.5; cursor: progress; }
 }
 .fh-chip-auth-cooldown .fh-chip-dot { background: #f59e0b; }
 .fh-chip-auth-cooldown .fh-chip-age { color: #fbbf24; }
+.fh-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+}
+.fh-chip-wrap--reconnect .fh-chip {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fh-chip-reconnect-required {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: rgba(248, 113, 113, 0.12);
+  cursor: not-allowed;
+}
+.fh-chip-reconnect-required .fh-chip-dot { background: #f87171; }
+.fh-chip-reconnect-required .fh-chip-age { color: #fca5a5; }
+.fh-chip-reconnect .fh-chip-dot { background: #f87171; }
+.fh-chip-reconnect-btn {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  background: rgba(248, 113, 113, 0.18);
+  color: #fecaca;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fh-chip-reconnect-btn:hover {
+  background: rgba(248, 113, 113, 0.28);
+  border-color: rgba(248, 113, 113, 0.75);
+}
+.fh-chip-reconnect-dismiss {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.fh-chip-reconnect-dismiss:hover { color: #e2e8f0; background: rgba(148, 163, 184, 0.15); }
 .fh-readonly-banner {
   font-size: 0.72rem; line-height: 1.35;
   padding: 0.45rem 0.55rem; margin-bottom: 0.35rem;

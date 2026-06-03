@@ -1,0 +1,48 @@
+﻿# Mirrors .gitignore: keep Cursor from indexing local data, caches, and deps.
+# Agents can still read these via explicit @-mentions.
+
+# Local secrets and env
+.env
+.env.imported
+
+# Game catalogs and enrichment blobs (large, local-only)
+games_*.json
+itad_prices.json
+broken_images.json
+still_missing_images.json
+_itad.json
+_runs.json
+
+# Runtime / local state
+cache/
+data/
+profiles/
+%SystemDrive%/
+
+# Tooling and deps
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+steam_backlog.egg-info/
+
+# Logs and server noise
+refresh.log
+enrich_hltb_run.log
+.enrich_refresh.log
+.server.err
+.server.log
+
+# IDE / generated reports
+.vscode/
+*.code-workspace
+lighthouse/
+
+# One-off local maintenance scripts
+check_images.py
+find_dupes.py
+migrate_gog_images.py
+remove_steam_dupes.py

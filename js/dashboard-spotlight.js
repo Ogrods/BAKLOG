@@ -445,6 +445,7 @@ export function spotlightInnerHtml(g) {
   return `
     <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
     <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
+    <div class="dash-spotlight-sheen" aria-hidden="true"></div>
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>

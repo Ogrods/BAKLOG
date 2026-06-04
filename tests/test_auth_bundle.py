@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import auth.secrets as secrets_mod
 from auth.bundle import (
     MAGIC,
     BadMagic,
@@ -19,7 +20,6 @@ from auth.bundle import (
 )
 from auth.manager import get_credentials, mark_connected
 from auth.secrets import load_doc, set_master_password_override
-import auth.secrets as secrets_mod
 
 
 @pytest.fixture(autouse=True)

@@ -39,11 +39,12 @@ import atexit
 import html
 import json
 import os
-import re
 import queue
+import re
+import secrets
 import signal
-import subprocess
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -99,11 +100,18 @@ _sse_lock = threading.Lock()
 _BAKLOG_LOCAL_HEADER = "X-BAKLOG-Local"
 _BAKLOG_IMPORT_PASSPHRASE_HEADER = "X-BAKLOG-Import-Passphrase"
 _LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "[::1]"})
-_epic_oauth_states: dict[str, float] = {}
+# Epic OAuth state -> (expiry_monotonic, profile_id).
+# Production Epic Connect uses Playwright + authorizationCode paste (auth/runner.py);
+# this map is only populated if something calls _register_epic_oauth_state (legacy redirect flow).
+_epic_oauth_states: dict[str, tuple[float, str]] = {}
+_stream_tickets: dict[str, tuple[str, float]] = {}
+_stream_tickets_lock = threading.Lock()
+_STREAM_TICKET_TTL_SEC = 30.0
 _LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Cookie:\s*)([^\s]+)", re.I), r"\1[redacted]"),
     (re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*)[\"']?[\w\-]+", re.I), r"\1[redacted]"),
+    (re.compile(r"([?&]ticket=)[^&\s]+", re.I), r"\1[redacted]"),
 ]
 
 
@@ -114,15 +122,83 @@ def _redact_log_line(text: str) -> str:
     return out
 
 
-def _register_epic_oauth_state(state: str, *, ttl_sec: float = 600.0) -> None:
-    _epic_oauth_states[state] = time.time() + ttl_sec
+def _register_epic_oauth_state(
+    state: str,
+    profile_id: str | None = None,
+    *,
+    ttl_sec: float = 600.0,
+) -> None:
+    from shared.profile_paths import get_active_profile_id
+
+    pid = profile_id or get_active_profile_id()
+    _epic_oauth_states[state] = (time.monotonic() + ttl_sec, pid)
 
 
-def _consume_epic_oauth_state(state: str | None) -> bool:
+def _consume_epic_oauth_state(state: str | None, *, require_state: bool = False) -> str | None:
+    """Return bound profile_id when state is valid; None when rejected."""
     if not state:
+        if require_state:
+            return None
+        from shared.profile_paths import get_active_profile_id
+
+        return get_active_profile_id()
+    entry = _epic_oauth_states.pop(state, None)
+    if not entry:
+        return None
+    expires, profile_id = entry
+    if expires < time.monotonic():
+        return None
+    return profile_id
+
+
+def _prune_expired_stream_tickets() -> None:
+    now = time.time()
+    expired = [k for k, (_, exp) in _stream_tickets.items() if exp < now]
+    for k in expired:
+        _stream_tickets.pop(k, None)
+
+
+def _mint_stream_ticket(profile_id: str) -> str:
+    ticket = secrets.token_urlsafe(32)
+    with _stream_tickets_lock:
+        _prune_expired_stream_tickets()
+        _stream_tickets[ticket] = (profile_id, time.time() + _STREAM_TICKET_TTL_SEC)
+    return ticket
+
+
+def _consume_stream_ticket(ticket: str | None) -> str | None:
+    if not ticket:
+        return None
+    with _stream_tickets_lock:
+        entry = _stream_tickets.pop(ticket, None)
+    if not entry:
+        return None
+    profile_id, expiry = entry
+    if expiry < time.time():
+        return None
+    return profile_id
+
+
+def _stream_ticket_from_handler(handler: SimpleHTTPRequestHandler) -> str | None:
+    parsed = urlparse(handler.path)
+    raw = (parse_qs(parsed.query).get("ticket") or [None])[0]
+    if raw is None:
+        return None
+    return str(raw).strip() or None
+
+
+def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:
+    """EventSource cannot send Authorization — validate single-use ?ticket= instead."""
+    from shared.supabase_auth import auth_enabled
+
+    if not auth_enabled():
         return True
-    expires = _epic_oauth_states.pop(state, None)
-    return expires is not None and expires >= time.time()
+    profile_id = _consume_stream_ticket(_stream_ticket_from_handler(handler))
+    if not profile_id:
+        _send_auth_required(handler)
+        return False
+    set_request_profile_id(profile_id)
+    return True
 
 # Personal-data persistence (scoped to active profile via shared.profile_paths).
 from shared.platform_support import platform_supported  # noqa: E402
@@ -130,12 +206,14 @@ from shared.profile_paths import (  # noqa: E402
     PROFILE_CACHE_JSON_FILES,
     cache_json_path,
     catalog_path,
+    clear_request_profile_id,
     get_active_profile_id,
     personal_backup_dir,
     personal_dir,
     personal_path,
     profile_root,
     runs_dir,
+    set_request_profile_id,
 )
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
 
@@ -618,6 +696,7 @@ class Run:
         }
         if self.exit_code == 4:
             summary["failure_kind"] = "auth"
+        summary["profile_id"] = self.profile_id
         return summary
 
     def add_line(self, stream: str, text: str) -> None:
@@ -1148,7 +1227,7 @@ class RunManager:
         else:
             self._complete_cancel_after_kill(run)
 
-    def cancel_all(self) -> list[dict[str, Any]]:
+    def cancel_all(self, *, profile_id: str | None = None) -> list[dict[str, Any]]:
         """Cancel every queued or running fetcher (active + next in queue). Returns immediately."""
         with self._lock:
             targets = [
@@ -1161,6 +1240,8 @@ class RunManager:
                 and active not in targets
             ):
                 targets.append(active)
+        if profile_id is not None:
+            targets = [r for r in targets if r.profile_id == profile_id]
         all_pids: list[int] = []
         summaries: list[dict[str, Any]] = []
         to_finalize_now: list[Run] = []
@@ -1187,7 +1268,7 @@ class RunManager:
             self._schedule_cancel_completion(run)
         return summaries
 
-    def force_reset(self) -> dict[str, Any]:
+    def force_reset(self, *, profile_id: str | None = None) -> dict[str, Any]:
         """Kill all tracked PIDs, clear queue state, finalize every in-flight run."""
         with self._lock:
             targets = [
@@ -1200,6 +1281,8 @@ class RunManager:
                 and active not in targets
             ):
                 targets.append(active)
+        if profile_id is not None:
+            targets = [r for r in targets if r.profile_id == profile_id]
         all_pids: list[int] = []
         for entry in _read_active_runs():
             pid = int(entry.get("pid") or 0)
@@ -1586,6 +1669,10 @@ def _origin_is_local(handler: SimpleHTTPRequestHandler) -> bool:
 
 def _csrf_allowed(handler: SimpleHTTPRequestHandler) -> bool:
     """Block cross-site POST/PUT/DELETE to localhost while the dev server runs."""
+    from shared.supabase_auth import auth_enabled, verify_bearer_user
+
+    if auth_enabled() and verify_bearer_user(handler.headers.get("Authorization")):
+        return True
     if not _request_host_is_local(handler):
         return False
     if handler.headers.get(_BAKLOG_LOCAL_HEADER) == "1":
@@ -1657,6 +1744,79 @@ def _stream_resume_since(handler: SimpleHTTPRequestHandler) -> int:
 _LIBRARY_JSON_RE = re.compile(r"^/games_[a-z0-9_]+\.json$", re.I)
 
 
+def _path_only(handler: SimpleHTTPRequestHandler) -> str:
+    return handler.path.split("?", 1)[0]
+
+
+def _normalize_static_path(path_only: str) -> str:
+    clean = path_only.split("?", 1)[0]
+    if not clean.startswith("/"):
+        clean = "/" + clean.lstrip("/")
+    return clean
+
+
+def _static_class(path_only: str) -> str:
+    """Classify a non-API path: public | data | deny."""
+    clean = _normalize_static_path(path_only)
+    parts = [p for p in clean.split("/") if p]
+    if any(p.startswith(".") for p in parts):
+        return "deny"
+    if parts and parts[0] == "profiles":
+        return "deny"
+    if parts and parts[0] == "data":
+        return "deny"
+    if len(parts) >= 2 and parts[0] == "cache":
+        if parts[1] == "auth":
+            return "deny"
+        if parts[1] in PROFILE_CACHE_JSON_FILES:
+            return "data"
+        return "deny"
+    if _LIBRARY_JSON_RE.match(clean) or clean.lower() == "/itad_prices.json":
+        return "data"
+    return "public"
+
+
+def _send_auth_required(handler: SimpleHTTPRequestHandler) -> None:
+    if handler.command.upper() == "HEAD":
+        handler.send_response(HTTPStatus.UNAUTHORIZED)
+        handler.end_headers()
+    else:
+        _send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": "sign in required"})
+
+
+def _bind_request_user(handler: SimpleHTTPRequestHandler) -> str | None:
+    """Verify bearer, ensure profile dir, pin request context. None after 401."""
+    from shared.account_profiles import ensure_profile_for_user
+    from shared.supabase_auth import verify_bearer_user
+
+    user = verify_bearer_user(handler.headers.get("Authorization"))
+    if not user:
+        _send_auth_required(handler)
+        return None
+    pid = ensure_profile_for_user(user["id"], user.get("email") or None)
+    set_request_profile_id(pid)
+    return pid
+
+
+def _bind_bearer_profile(handler: SimpleHTTPRequestHandler) -> bool:
+    """Verify bearer and pin request profile. Return False after sending 401."""
+    return _bind_request_user(handler) is not None
+
+
+def _gate_static(handler: SimpleHTTPRequestHandler) -> bool:
+    """Gate static catalog/cache paths when Supabase auth is on. Return False if handled."""
+    from shared.supabase_auth import auth_enabled
+
+    path_only = _path_only(handler)
+    kind = _static_class(path_only)
+    if kind == "deny":
+        handler.send_error(HTTPStatus.NOT_FOUND, "Not found")
+        return False
+    if kind == "data" and auth_enabled():
+        return _bind_bearer_profile(handler)
+    return True
+
+
 def _maybe_serve_empty_library_json(handler: SimpleHTTPRequestHandler, path: str) -> bool:
     if not _LIBRARY_JSON_RE.match(path):
         return False
@@ -1686,7 +1846,50 @@ def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] |
     return payload, None
 
 
+def _api_path(handler: SimpleHTTPRequestHandler) -> str:
+    return handler.path.split("?", 1)[0]
+
+
+def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
+    """Authenticate /api/* when Supabase auth is enabled. Return False if rejected."""
+    from shared.supabase_auth import auth_enabled
+
+    path = _api_path(handler)
+    if not path.startswith("/api/"):
+        return True
+    if path == "/api/config":
+        return True
+    if not auth_enabled():
+        return True
+    return _bind_request_user(handler) is not None
+
+
+def _profile_admin_blocked() -> bool:
+    from shared.supabase_auth import auth_enabled
+
+    return auth_enabled()
+
+
+def _run_accessible(run: Run | None) -> Run | None:
+    """When account auth is on, only the bound profile may access a run."""
+    from shared.supabase_auth import auth_enabled
+
+    if run is None:
+        return None
+    if not auth_enabled():
+        return run
+    if run.profile_id == get_active_profile_id():
+        return run
+    return None
+
+
 class Handler(SimpleHTTPRequestHandler):
+    def handle(self) -> None:
+        try:
+            super().handle()
+        finally:
+            clear_request_profile_id()
+
     def _reject_if_csrf(self) -> bool:
         """Return True when the request was rejected (caller should return)."""
         if _csrf_allowed(self):
@@ -1718,6 +1921,8 @@ class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path: str) -> str:
         """Serve catalog and cache JSON from the active profile root (legacy or profiles/<id>/)."""
         clean = path.split("?", 1)[0].lstrip("/")
+        if _static_class("/" + clean) == "deny":
+            return str(profile_root() / ".profile_static_blocked" / clean)
         if clean.startswith("profiles/"):
             # Block direct static access to another profile's tree (use top-level paths).
             return str(profile_root() / ".profile_static_blocked" / clean)
@@ -1735,40 +1940,76 @@ class Handler(SimpleHTTPRequestHandler):
                 return str(cache_json_path(name))
         return super().translate_path(path)
 
+    def _begin_request(self) -> None:
+        clear_request_profile_id()
+
     # ---- routing -----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802 - http.server API
-        if self.path == "/api/runs":
-            self._handle_runs()
+        self._begin_request()
+        path = _api_path(self)
+        if path == "/api/config":
+            self._handle_config_get()
             return
-        if self.path == "/api/fetchers":
-            self._handle_fetchers()
-            return
-        if self.path == "/api/personal":
-            self._handle_personal_get()
-            return
-        if self.path == "/api/profiles":
-            self._handle_profiles_get()
-            return
-        if self.path == "/api/auth/status":
-            self._handle_auth_status()
-            return
-        if self.path.startswith("/api/auth/") and self.path.endswith("/stream"):
-            rest = self.path[len("/api/auth/") : -len("/stream")].strip("/")
-            self._handle_auth_stream(rest)
-            return
-        if self.path.startswith("/oauth/epic/callback"):
+        if path.startswith("/oauth/epic/callback"):
             self._handle_epic_oauth_callback()
             return
-        if self.path.startswith("/api/stream/"):
-            self._handle_stream(self.path[len("/api/stream/"):])
+        if path.startswith("/api/stream/"):
+            if not _authorize_stream(self):
+                return
+            self._handle_stream(path[len("/api/stream/"):])
             return
-        path_only = self.path.split("?", 1)[0]
+        if path.startswith("/api/auth/") and path.endswith("/stream"):
+            if not _authorize_stream(self):
+                return
+            rest = path[len("/api/auth/") : -len("/stream")].strip("/")
+            self._handle_auth_stream(rest)
+            return
+        if not _require_api_auth(self):
+            return
+        if path == "/api/runs":
+            self._handle_runs()
+            return
+        if path == "/api/fetchers":
+            self._handle_fetchers()
+            return
+        if path == "/api/personal":
+            self._handle_personal_get()
+            return
+        if path == "/api/profiles":
+            self._handle_profiles_get()
+            return
+        if path == "/api/auth/session":
+            self._handle_auth_session_get()
+            return
+        if path == "/api/auth/status":
+            self._handle_auth_status()
+            return
+        path_only = _path_only(self)
+        if not _gate_static(self):
+            return
         if _maybe_serve_empty_library_json(self, path_only):
             return
         super().do_GET()
 
+    def do_HEAD(self) -> None:  # noqa: N802 - http.server API
+        self._begin_request()
+        if self.path == "/api/config":
+            self._handle_config_get()
+            return
+        if not _require_api_auth(self):
+            return
+        if not _gate_static(self):
+            return
+        super().do_HEAD()
+
     def do_POST(self) -> None:  # noqa: N802 - http.server API
+        self._begin_request()
         if self._reject_if_csrf():
+            return
+        if not _require_api_auth(self):
+            return
+        if _api_path(self) == "/api/auth/stream-ticket":
+            self._handle_stream_ticket_mint()
             return
         if self.path.rstrip("/") == "/api/runs/cancel":
             self._handle_cancel_all()
@@ -1784,6 +2025,13 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/auth/") and self.path.endswith("/start"):
             provider = self.path[len("/api/auth/") : -len("/start")].strip("/")
             self._handle_auth_start(provider)
+            return
+        if self.path.startswith("/api/auth/") and self.path.endswith("/oauth-url"):
+            provider = self.path[len("/api/auth/") : -len("/oauth-url")].strip("/")
+            if provider == "epic":
+                self._handle_epic_oauth_url()
+            else:
+                _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"no oauth-url for {provider}"})
             return
         if self.path.startswith("/api/auth/") and self.path.endswith("/open-url"):
             provider = self.path[len("/api/auth/") : -len("/open-url")].strip("/")
@@ -1818,7 +2066,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_DELETE(self) -> None:  # noqa: N802 - http.server API
+        self._begin_request()
         if self._reject_if_csrf():
+            return
+        if not _require_api_auth(self):
             return
         path_only = self.path.split("?", 1)[0]
         if path_only.startswith("/api/profiles/"):
@@ -1829,7 +2080,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_PUT(self) -> None:  # noqa: N802 - http.server API
+        self._begin_request()
         if self._reject_if_csrf():
+            return
+        if not _require_api_auth(self):
             return
         if self.path == "/api/personal":
             self._handle_personal_put()
@@ -1847,33 +2101,41 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     # ---- handlers ----------------------------------------------------------
+    def _handle_config_get(self) -> None:
+        from shared.supabase_auth import public_auth_config
+
+        _send_json(self, HTTPStatus.OK, public_auth_config())
+
     def _handle_fetchers(self) -> None:
         try:
-            from dotenv import load_dotenv
+            try:
+                from dotenv import load_dotenv
 
-            load_dotenv(ROOT / ".env", override=True)
-        except ImportError:
-            pass
-        data = {
-            "server_platform": sys.platform,
-            "fetchers": [
-                {
-                    "key": k,
-                    "label": v["label"],
-                    "cmd": " ".join(v["argv"][1:]),
-                    "metaKey": v.get("metaKey", k),
-                    "group": v.get("group", "library"),
-                    "color": v.get("color"),
-                    "requires": v.get("requires") or [],
-                    "missing_requirements": _missing_requirements(v.get("requires") or []),
-                    "supports_refresh": bool(v.get("refreshArgs")),
-                    "platforms": v.get("platforms") or [],
-                    "available": platform_supported(v.get("platforms")),
-                }
-                for k, v in FETCHERS.items()
-            ]
-        }
-        _send_json(self, HTTPStatus.OK, data)
+                load_dotenv(ROOT / ".env", override=True)
+            except ImportError:
+                pass
+            data = {
+                "server_platform": sys.platform,
+                "fetchers": [
+                    {
+                        "key": k,
+                        "label": v["label"],
+                        "cmd": " ".join(v["argv"][1:]),
+                        "metaKey": v.get("metaKey", k),
+                        "group": v.get("group", "library"),
+                        "color": v.get("color"),
+                        "requires": v.get("requires") or [],
+                        "missing_requirements": _missing_requirements(v.get("requires") or []),
+                        "supports_refresh": bool(v.get("refreshArgs")),
+                        "platforms": v.get("platforms") or [],
+                        "available": platform_supported(v.get("platforms")),
+                    }
+                    for k, v in FETCHERS.items()
+                ],
+            }
+            _send_json(self, HTTPStatus.OK, data)
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     @staticmethod
     def _parse_run_submit_path(rest: str) -> tuple[str, bool]:
@@ -1890,11 +2152,27 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             from shared.profiles import profiles_status
 
-            _send_json(self, HTTPStatus.OK, profiles_status())
+            data = profiles_status()
+            if _profile_admin_blocked():
+                active = get_active_profile_id()
+                profiles = data.get("profiles") if isinstance(data.get("profiles"), list) else []
+                data["profiles"] = [
+                    p for p in profiles if isinstance(p, dict) and p.get("id") == active
+                ]
+                data["active"] = active
+                data["accountAuth"] = True
+            _send_json(self, HTTPStatus.OK, data)
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     def _handle_profiles_create(self) -> None:
+        if _profile_admin_blocked():
+            _send_json(
+                self,
+                HTTPStatus.FORBIDDEN,
+                {"error": "profile management is disabled while account sign-in is enabled"},
+            )
+            return
         payload, err = _read_json_body(self)
         if err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
@@ -1910,6 +2188,13 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     def _handle_profiles_set_active(self) -> None:
+        if _profile_admin_blocked():
+            _send_json(
+                self,
+                HTTPStatus.FORBIDDEN,
+                {"error": "profile switching is disabled while account sign-in is enabled"},
+            )
+            return
         payload, err = _read_json_body(self)
         if err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
@@ -1931,6 +2216,13 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     def _handle_profiles_rename(self, profile_id: str) -> None:
+        if _profile_admin_blocked():
+            _send_json(
+                self,
+                HTTPStatus.FORBIDDEN,
+                {"error": "profile management is disabled while account sign-in is enabled"},
+            )
+            return
         payload, err = _read_json_body(self)
         if err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
@@ -1945,6 +2237,13 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     def _handle_profiles_delete(self, profile_id: str) -> None:
+        if _profile_admin_blocked():
+            _send_json(
+                self,
+                HTTPStatus.FORBIDDEN,
+                {"error": "profile management is disabled while account sign-in is enabled"},
+            )
+            return
         if MANAGER.has_runs_for_profile(profile_id):
             _send_json(
                 self,
@@ -1987,7 +2286,11 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "empty body"})
             return
         if length > PERSONAL_MAX_BYTES:
-            _send_json(self, HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": f"body too large ({length} > {PERSONAL_MAX_BYTES})"})
+            _send_json(
+                self,
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                {"error": f"body too large ({length} > {PERSONAL_MAX_BYTES})"},
+            )
             return
         try:
             raw = self.rfile.read(length).decode("utf-8")
@@ -2025,7 +2328,21 @@ class Handler(SimpleHTTPRequestHandler):
         _send_json(self, HTTPStatus.OK, doc)
 
     def _handle_runs(self) -> None:
-        _send_json(self, HTTPStatus.OK, MANAGER.snapshot())
+        snap = MANAGER.snapshot()
+        from shared.supabase_auth import auth_enabled
+
+        if auth_enabled():
+            pid = get_active_profile_id()
+            active = snap.get("active")
+            if active and active.get("profile_id") != pid:
+                snap["active"] = None
+            snap["queue"] = [
+                r for r in (snap.get("queue") or []) if r.get("profile_id") == pid
+            ]
+            snap["history"] = [
+                r for r in (snap.get("history") or []) if r.get("profile_id") == pid
+            ]
+        _send_json(self, HTTPStatus.OK, snap)
 
     def _handle_submit(self, rest: str) -> None:
         key, refresh = self._parse_run_submit_path(rest)
@@ -2057,6 +2374,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_cancel(self, run_id: str) -> None:
         run_id = run_id.strip("/").split("/", 1)[0]
+        if _run_accessible(MANAGER.get(run_id)) is None:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown run: {run_id}"})
+            return
         run, err = MANAGER.cancel(run_id)
         if err == "not_found":
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown run: {run_id}"})
@@ -2068,24 +2388,56 @@ class Handler(SimpleHTTPRequestHandler):
         _send_json(self, HTTPStatus.OK, run.to_summary())
 
     def _handle_cancel_all(self) -> None:
+        from shared.supabase_auth import auth_enabled
+
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query)
         force_vals = qs.get("force", ["0"])
         force = force_vals[0].lower() in ("1", "true", "yes")
+        scope_pid = get_active_profile_id() if auth_enabled() else None
         if force:
-            payload = MANAGER.force_reset()
+            payload = MANAGER.force_reset(profile_id=scope_pid)
         else:
-            payload = {"cancelled": MANAGER.cancel_all()}
+            payload = {"cancelled": MANAGER.cancel_all(profile_id=scope_pid)}
         _send_json(self, HTTPStatus.OK, payload)
+
+    def _handle_auth_session_get(self) -> None:
+        """Lightweight account session probe (JWT + bound profile)."""
+        from shared.profile_paths import get_active_profile_id
+        from shared.supabase_auth import verify_bearer_user
+
+        user = verify_bearer_user(self.headers.get("Authorization"))
+        if not user:
+            _send_auth_required(self)
+            return
+        _send_json(
+            self,
+            HTTPStatus.OK,
+            {
+                "ok": True,
+                "email": user.get("email") or "",
+                "profile": get_active_profile_id(),
+            },
+        )
+
+    def _handle_stream_ticket_mint(self) -> None:
+        """Single-use ticket for EventSource streams (cannot send Authorization)."""
+        ticket = _mint_stream_ticket(get_active_profile_id())
+        _send_json(self, HTTPStatus.OK, {"ticket": ticket})
 
     def _handle_auth_status(self) -> None:
         try:
             from auth.manager import get_status
+            from auth.secrets import secrets_store_corrupt
 
             _send_json(
                 self,
                 HTTPStatus.OK,
-                {"server_platform": sys.platform, "providers": get_status()},
+                {
+                    "server_platform": sys.platform,
+                    "providers": get_status(),
+                    "secrets_corrupt": secrets_store_corrupt(),
+                },
             )
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
@@ -2113,6 +2465,27 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _public_callback_url(self, path: str) -> str:
+        """Build an absolute URL to ``path`` from the request Host (tunnel-aware)."""
+        host = self.headers.get("Host") or f"{HOST}:{PORT}"
+        proto = (self.headers.get("X-Forwarded-Proto") or "http").strip().lower()
+        if proto not in ("http", "https"):
+            proto = "http"
+        return f"{proto}://{host}{path}"
+
+    def _handle_epic_oauth_url(self) -> None:
+        """Mint a profile-bound OAuth state and return the Epic browser sign-in URL."""
+        try:
+            from epic_client import build_epic_oauth_login_url
+
+            state = secrets.token_urlsafe(24)
+            _register_epic_oauth_state(state, profile_id=get_active_profile_id())
+            redirect_uri = self._public_callback_url("/oauth/epic/callback")
+            url = build_epic_oauth_login_url(redirect_uri, state)
+            _send_json(self, HTTPStatus.OK, {"url": url, "state": state})
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
@@ -2187,8 +2560,7 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             raw = self.rfile.read(length).decode("utf-8") if length else "{}"
             payload = json.loads(raw)
-            from auth.bundle import BundleError, BundleTooLarge
-            from auth.bundle import bundle_filename, export_bundle
+            from auth.bundle import BundleError, BundleTooLarge, bundle_filename, export_bundle
 
             passphrase = (payload.get("passphrase") or "").strip()
             include_profiles = payload.get("include_profiles", True)
@@ -2209,6 +2581,15 @@ class Handler(SimpleHTTPRequestHandler):
         except BundleError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "bundle_error"})
         except Exception as exc:  # noqa: BLE001
+            from auth.secrets import SecretsCorruptError
+
+            if isinstance(exc, SecretsCorruptError):
+                _send_json(
+                    self,
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": str(exc), "code": "secrets_corrupt"},
+                )
+                return
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     def _handle_auth_secrets_import(self) -> None:
@@ -2263,11 +2644,23 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_epic_oauth_callback(self) -> None:
         from urllib.parse import parse_qs, urlparse
 
+        from shared.supabase_auth import auth_enabled
+
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
         code = (params.get("code") or [None])[0]
         state = (params.get("state") or [None])[0]
-        if state is not None and not _consume_epic_oauth_state(state):
+        require_state = auth_enabled()
+        if require_state and not state:
+            self.send_response(HTTPStatus.BAD_REQUEST)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            body = b"<html><body><p>Missing OAuth state.</p></body></html>"
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        profile_id = _consume_epic_oauth_state(state, require_state=require_state)
+        if profile_id is None:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             body = b"<html><body><p>Invalid or expired OAuth state.</p></body></html>"
@@ -2275,6 +2668,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        set_request_profile_id(profile_id)
         if not code:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -2292,7 +2686,9 @@ class Handler(SimpleHTTPRequestHandler):
             mark_connected("epic", {"EPIC_AUTH_CODE": code})
             body = (
                 b"<html><body><p>Epic connected. You can close this tab and return to the dashboard.</p>"
-                b"<script>setTimeout(()=>window.close(),1500)</script></body></html>"
+                b"<script>try{const c=new BroadcastChannel('baklog-auth');"
+                b"c.postMessage({provider:'epic'});c.close();}catch(e){}"
+                b"setTimeout(()=>window.close(),1500)</script></body></html>"
             )
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -2301,7 +2697,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
         except Exception as exc:  # noqa: BLE001
             safe = html.escape(str(exc), quote=True)
-            body = f"<html><body><p>Epic sign-in failed: {safe}</p></body></html>".encode("utf-8")
+            body = f"<html><body><p>Epic sign-in failed: {safe}</p></body></html>".encode()
             self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -2357,9 +2753,13 @@ class Handler(SimpleHTTPRequestHandler):
         global _sse_connections
         run_id = run_id.strip("/").split("/", 1)[0].split("?", 1)[0]
         since = _stream_resume_since(self)
-        run = MANAGER.get(run_id)
+        run = _run_accessible(MANAGER.get(run_id))
         if run is None:
             terminal = MANAGER.stream_terminal_summary(run_id)
+            if terminal is not None:
+                from shared.supabase_auth import auth_enabled
+                if auth_enabled() and terminal.get("profile_id") != get_active_profile_id():
+                    terminal = None
             if terminal is None:
                 self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")
                 return

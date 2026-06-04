@@ -7,8 +7,8 @@ import queue
 import re
 import threading
 import time
-from typing import Any, Callable
-from urllib.parse import urlparse
+from collections.abc import Callable
+from typing import Any
 
 from auth.api_keys import (
     extract_itad,
@@ -212,7 +212,7 @@ def _nintendo_has_session(context) -> bool:
 def _nintendo_session_has_id_token(context) -> bool:
     """Verify /api/auth/session returns an idToken (GraphQL prerequisite)."""
     try:
-        from nintendo_client import SESSION_URL, probe_session_id_token
+        from nintendo_client import probe_session_id_token
 
         return bool(probe_session_id_token(context.request.get).get("ok"))
     except Exception:
@@ -1218,7 +1218,10 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
         "steam": "Sign in to Steam. We'll save your API key automatically.",
         "itch": "Sign in to itch.io. We'll save your API key automatically.",
         "itad": "Sign in to IsThereAnyDeal. We'll register an app and save your API key.",
-        "xbox": "Click \u201cSign in with Xbox Live\u201d on the xbl.io page, then sign in with your Microsoft account. We'll save your API key automatically once you have it.",
+        "xbox": (
+            "Click \u201cSign in with Xbox Live\u201d on the xbl.io page, then sign in with your "
+            "Microsoft account. We'll save your API key automatically once you have it."
+        ),
         "xbox_wishlist": (
             "Sign in to xbox.com with your Microsoft account. We'll detect your "
             "wishlist session automatically \u2014 no need to refresh the page."

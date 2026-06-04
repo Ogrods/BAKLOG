@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import socket
 from unittest.mock import MagicMock
 
 import pytest

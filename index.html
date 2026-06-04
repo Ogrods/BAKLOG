@@ -43,15 +43,18 @@
       // unconditionally. The normal dismiss path runs in <500ms on a warm
       // cache, so this only fires in true failure scenarios.
       setTimeout(function () {
-        if (document.documentElement.hasAttribute('data-boot-loading')) {
-          document.documentElement.removeAttribute('data-boot-loading');
-          var ov = document.getElementById('bootLoadingOverlay');
-          if (ov) ov.setAttribute('aria-busy', 'false');
-          document.querySelectorAll('.view-tab').forEach(function (b) {
-            b.disabled = false;
-            b.removeAttribute('aria-disabled');
-          });
+        if (!document.documentElement.hasAttribute('data-boot-loading')) return;
+        if (typeof window.__baklogLiftBootCurtain === 'function') {
+          window.__baklogLiftBootCurtain({ force: true });
+          return;
         }
+        document.documentElement.removeAttribute('data-boot-loading');
+        var ov = document.getElementById('bootLoadingOverlay');
+        if (ov) ov.setAttribute('aria-busy', 'false');
+        document.querySelectorAll('.view-tab').forEach(function (b) {
+          b.disabled = false;
+          b.removeAttribute('aria-disabled');
+        });
       }, 8000);
     })();
   </script>
@@ -60,7 +63,31 @@
   <link rel="stylesheet" href="app.css" />
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
+  <div id="authGateOverlay" class="auth-gate-overlay" hidden aria-hidden="true">
+    <div class="auth-gate-card">
+      <h2 class="auth-gate-title">Sign in to BAKLOG</h2>
+      <p class="auth-gate-hint">Invite-only. Use the email and password from your Supabase invite.</p>
+      <form id="authGateForm" class="auth-gate-form">
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">Email</span>
+          <input type="email" id="authGateEmail" name="email" autocomplete="username" required class="auth-gate-input" />
+        </label>
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">Password</span>
+          <input type="password" id="authGatePassword" name="password" autocomplete="current-password" required class="auth-gate-input" />
+        </label>
+        <p id="authGateError" class="auth-gate-error hidden" role="alert"></p>
+        <button type="submit" id="authGateSubmit" class="auth-gate-submit">Sign in</button>
+      </form>
+    </div>
+  </div>
   <a href="#main" class="skip-link">Skip to main content</a>
+  <div id="viewLoadingOverlay" class="app-view-overlay" aria-hidden="true">
+    <div class="app-view-overlay-card">
+      <div class="app-spinner" aria-hidden="true"></div>
+      <span id="viewLoadingLabel" class="app-view-overlay-label">Loading…</span>
+    </div>
+  </div>
   <div class="max-w-[1600px] mx-auto p-4 md:p-6">
     <div id="migrationBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
     <div id="undoToast" class="hidden" role="status" aria-live="polite"></div>
@@ -103,7 +130,7 @@
     <div id="bootLoadingOverlay" role="status" aria-live="polite" aria-busy="true">
       <div class="boot-loading-card">
         <div class="boot-loading-head">
-          <div class="view-spinner" aria-hidden="true"></div>
+          <div class="app-spinner" aria-hidden="true"></div>
           <span id="bootLoadingLabel" class="boot-loading-label">Loading…</span>
         </div>
         <span id="bootLoadingTip" class="boot-loading-tip" aria-live="polite"></span>
@@ -387,14 +414,8 @@
     </section>
 
     <div id="tableShell" class="relative">
-      <div id="viewLoadingOverlay" aria-hidden="true">
-        <div class="flex flex-col items-center gap-2 text-slate-200">
-          <div class="view-spinner"></div>
-          <span id="viewLoadingLabel" class="text-xs uppercase tracking-wide text-slate-300">Loading…</span>
-        </div>
-      </div>
       <div id="rowLoadingOverlay" class="row-loading-overlay" aria-hidden="true" role="status">
-        <div class="row-loading-spinner" aria-hidden="true"></div>
+        <div class="app-spinner app-spinner--sm" aria-hidden="true"></div>
         <span class="sr-only">Updating results…</span>
       </div>
     <div id="tableWrap" class="rounded-lg border border-slate-700">

@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
 import { beginRowLoader, endRowLoader, forceHideRowLoader } from './loading-curtain.js';
+import { deferTableRender } from './render-gate.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
 import {
   collectTableParams,
@@ -827,7 +828,7 @@ const FIRST_CHUNK = 50;
 /** Must match .games-table tbody tr { height } in app.css */
 const ROW_HEIGHT = 76;
 export const TABLE_COLSPAN = 13;
-const VIRTUAL_OVERSCAN = 10;
+const VIRTUAL_OVERSCAN = 20;
 let _virtualList = null;
 let _virtualCtx = null;
 let _virtualWindow = { start: 0, end: 0 };
@@ -1249,6 +1250,11 @@ export function syncRowCountLabel() {
 
 export async function renderTable(opts) {
   const force = !!opts?.force;
+  const drillIn = !!opts?.drillIn || !!state._drillHideOverlay || !!state._pendingFocusKey;
+  if (!force && state.activeView === 'connections') {
+    deferTableRender();
+    return;
+  }
   renderSortIndicators();
   const fp = tableFingerprint();
   if (!force && fp === _tableFingerprint && _lastRenderedView === state.activeView && state._visibleList && isTablePainted(state._visibleList)) {
@@ -1260,8 +1266,9 @@ export async function renderTable(opts) {
     }
     return;
   }
-  const loaderToken = beginRowLoader();
+  const loaderToken = drillIn ? 0 : beginRowLoader();
   try {
+  // drillIn uses the view overlay; in-tab filter/sort uses the row pill only
   const perfRun = perfBeginRun({
     view: state.activeView,
     force,
@@ -1398,6 +1405,6 @@ export async function renderTable(opts) {
   });
   perfEndRun(perfRun);
   } finally {
-    endRowLoader(loaderToken);
+    if (loaderToken) endRowLoader(loaderToken);
   }
 }

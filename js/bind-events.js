@@ -131,7 +131,7 @@ export function bindEvents() {
     const logBtn = e.target.closest(".fh-log-open");
     if (logBtn) {
       e.preventDefault();
-      fetcherRunner.reopenLogPanel();
+      fetcherRunner.expandPanel({ manual: true });
       return;
     }
     const reconnectBtn = e.target.closest("[data-fetcher-reconnect]");
@@ -678,10 +678,27 @@ export function bindEvents() {
     if (document.documentElement.hasAttribute("data-boot-loading")) return;
     const wasOnDash = state.activeView === "dashboard";
     if (!wasOnDash) switchView("dashboard");
-    const open = () => fetcherRunner.reopenLogPanel();
+    const open = () => fetcherRunner.expandPanel({ manual: true });
     if (wasOnDash) open();
     else requestAnimationFrame(() => requestAnimationFrame(open));
   };
+  document.getElementById("fetcherRow")?.addEventListener("click", e => {
+    if (e.target.closest(".fh-chip, .fh-run-stale, .fh-toggle, .fh-log-open, .fh-log, .fh-head-actions label")) {
+      return;
+    }
+    const toggleBtn = e.target.closest("[data-role='bar-toggle']");
+    if (toggleBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      fetcherRunner.toggleFetcherPanel({ manual: true });
+      return;
+    }
+    const bar = e.target.closest("[data-role='fetcher-bar']");
+    if (bar && document.getElementById("fetcherRow")?.classList.contains("is-collapsed")) {
+      e.preventDefault();
+      fetcherRunner.expandPanel({ manual: true });
+    }
+  });
   document.getElementById("showFetcherLog")?.addEventListener("click", () => {
     kebabMenu.classList.remove("open");
     reopenFetcherConsole();

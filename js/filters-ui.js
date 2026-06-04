@@ -1,4 +1,11 @@
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
+import {
+  consumeDeferredRenders,
+  deferPicksRender,
+  deferSummaryRender,
+  deferTableRender,
+  isTableDataView,
+} from './render-gate.js';
 import { cancelAllLibraryCountAnimations } from './library-count-animation.js';
 import {
   state,
@@ -359,6 +366,16 @@ export function updateGenreChipsCollapse() {
   el.classList.toggle("expanded", state.genreChipsExpanded);
 }
 
+export async function flushDeferredRenders() {
+  const flags = consumeDeferredRenders();
+  if (!isTableDataView(state.activeView)) return;
+  const tasks = [];
+  if (flags.table) tasks.push(renderTable({ force: true }));
+  if (flags.summary) renderSummary();
+  if (flags.picks) renderPicks();
+  if (tasks.length) await Promise.all(tasks);
+}
+
 export async function refreshFilterUI(options) {
   syncCoopFilterSegmented();
   renderFiltersButtonBadge();
@@ -367,10 +384,16 @@ export async function refreshFilterUI(options) {
     if (!options?.skipDashboardSchedule) scheduleDashboardRender();
     return;
   }
+  if (state.activeView === "connections") {
+    if (!options?.skipTable) deferTableRender();
+    if (!options?.skipPicks) deferPicksRender();
+    deferSummaryRender();
+    return;
+  }
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
   if (!options?.skipTable) {
-    if (options?.force || drillIn) await renderTable({ force: true });
-    else renderTable();
+    if (options?.force || drillIn) await renderTable({ force: true, drillIn });
+    else renderTable({ drillIn });
   }
   if (drillIn) {
     const deferChrome = () => {
@@ -560,6 +583,7 @@ export function switchView(view) {
     updateBulkBar();
     const skipDashboardSchedule = view === "dashboard";
     updateViewChrome({ drillIn, skipDashboardSchedule });
+    void flushDeferredRenders();
     const refreshDone = refreshFilterUI({ force: true, drillIn, skipDashboardSchedule });
     if (view === "dashboard") {
       // Explicit tab click — load Chart.js then render so the overlay doesn't linger.

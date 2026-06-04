@@ -9,8 +9,10 @@ import { getPersonal } from './personal-storage.js';
 import { getDealInfo, dealScore, isStealDeal, wishlistGamesWithDeals } from './deals.js';
 import { DASH_STORE_LABELS } from './dashboard-shared.js';
 import { formatMoney, displayCurrency } from './currency.js';
+import { registerPausable } from './visibility.js';
 
 let _insightTimer = null;
+let _lastInsights = null;
 let _insightFadeTimer = null;
 let _insightIndex = 0;
 
@@ -396,4 +398,13 @@ export function startInsightRotation(insights) {
     _insightIndex += 1;
     show(_insightIndex);
   }, 6000);
+}
+
+if (typeof document !== 'undefined') {
+  registerPausable({
+    pause: stopInsightRotation,
+    resume() {
+      if (_lastInsights?.length) startInsightRotation(_lastInsights);
+    },
+  });
 }

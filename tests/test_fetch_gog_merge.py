@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import json
 import pytest
 
 import fetch_gog as fg

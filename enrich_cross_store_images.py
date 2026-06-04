@@ -7,7 +7,7 @@ import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 
@@ -182,11 +182,14 @@ def main() -> int:
             flush=True,
         )
         by_id = {g["id"]: g for g in games}
+        completed = 0
         with ThreadPoolExecutor(max_workers=WORKERS) as ex:
             futures = {ex.submit(process, g, store): g["id"] for g in todo}
             for fut in as_completed(futures):
                 gid = futures[fut]
                 completed += 1
+                if completed % 25 == 0:
+                    hb.tick(f"{path.name}: {completed}/{len(todo)} covers — still working")
                 try:
                     new_g = fut.result()
                 except Exception as e:
@@ -205,7 +208,7 @@ def main() -> int:
     meta.write_text(
         json.dumps(
             {
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "fetched_at": datetime.now(UTC).isoformat(),
                 "last_updated": updated,
                 "no_steam_match": sorted(no_steam_match),
             },

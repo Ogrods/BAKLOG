@@ -9,7 +9,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -135,12 +135,15 @@ def main() -> int:
             stats.warn(f"no ITAD match for {title!r}")
 
     print(f"Resolved {len(plain_by_key)}/{len(titles)} ITAD ids. Fetching prices...", flush=True)
-    if titles and not plain_by_key and not args.allow_empty:
-        stats.error(
-            f"Resolved 0/{len(titles)} ITAD ids — refusing to overwrite {ITAD_JSON}."
+    if titles:
+        empty_exit = refuse_empty_result(
+            plain_by_key,
+            label="ITAD price resolution",
+            allow_empty=args.allow_empty,
+            output_path=ITAD_JSON,
         )
-        stats.error("If this is expected, re-run with --allow-empty.")
-        return stats.finish("fetch_itad", t0, exit_code=2)
+        if empty_exit is not None:
+            return stats.finish("fetch_itad", t0, exit_code=empty_exit)
 
     plains = list(set(plain_by_key.values()))
     prices_by_plain = client.prices_for_plains(plains)
@@ -153,7 +156,7 @@ def main() -> int:
             stats.warn(f"no price data for {key}")
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "country": args.country,
         "currency": country_to_currency(args.country),
         "count": len(by_key),

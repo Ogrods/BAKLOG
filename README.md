@@ -24,6 +24,8 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 
 **Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium for the Connect sign-in flow (override with `BAKLOG_CHROME_PATH`), then `pip install -e ".[dev]"` and `python server.py`.
 
+**Optional invite-only accounts:** Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. See [docs/SUPABASE_AUTH.md](docs/SUPABASE_AUTH.md). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing.
+
 ### Store availability by platform
 
 | Store | Windows | macOS / Linux |

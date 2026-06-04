@@ -595,7 +595,11 @@ describe('SSE stream resume cursor', () => {
 
 describe('log line caps and rAF batching', () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="fetcherRunLog" class="fh-log"></div>';
+    document.body.innerHTML = `
+      <div id="fetcherRow" class="fh-row is-expanded">
+        <div id="dashboardFetcherHealth"></div>
+        <div id="fetcherRunLog" class="fh-log"></div>
+      </div>`;
     fetcherRunner.reopenLogPanel();
   });
 
@@ -655,7 +659,7 @@ describe('syncLogHeightToCard', () => {
   beforeEach(() => {
     matchMediaDesktop = true;
     document.body.innerHTML = `
-      <div id="fetcherRow" class="fh-row">
+      <div id="fetcherRow" class="fh-row is-expanded">
         <div id="dashboardFetcherHealth" class="dash-card dash-fetcher-health">
           <div class="fh-chips"></div>
         </div>
@@ -693,11 +697,91 @@ describe('syncLogHeightToCard', () => {
     expect(log.style.maxHeight).toBe('');
     expect(log.style.height).toBe('');
   });
+
+  it('does not set height when fetcher row is collapsed', () => {
+    const row = document.getElementById('fetcherRow');
+    row.classList.remove('is-expanded');
+    row.classList.add('is-collapsed');
+    const log = document.getElementById('fetcherRunLog');
+    fetcherRunner.syncLogHeightToCard();
+    expect(log.style.maxHeight).toBe('');
+    expect(log.style.height).toBe('');
+  });
+});
+
+describe('fetcher bar collapse', () => {
+  beforeEach(() => {
+    state.prefs.fetcherCollapsed = true;
+    document.body.innerHTML = `
+      <div id="fetcherRow" class="fh-row">
+        <div id="dashboardFetcherHealth">
+          <div class="fh-bar" data-role="fetcher-bar">
+            <span data-role="bar-status"></span>
+            <span data-role="bar-tail"></span>
+            <button type="button" data-role="bar-toggle"></button>
+          </div>
+        </div>
+        <div id="fetcherRunLog" class="fh-log"></div>
+      </div>`;
+    fetcherRunner.applyFetcherRowLayout();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    state.prefs.fetcherCollapsed = true;
+  });
+
+  it('defaults to collapsed when fetcherCollapsed pref is true', () => {
+    const row = document.getElementById('fetcherRow');
+    expect(row.classList.contains('is-collapsed')).toBe(true);
+    expect(row.classList.contains('is-expanded')).toBe(false);
+    expect(document.getElementById('fetcherRunLog').classList.contains('open')).toBe(false);
+  });
+
+  it('expandPanel manual clears fetcherCollapsed pref', () => {
+    fetcherRunner.expandPanel({ manual: true });
+    expect(state.prefs.fetcherCollapsed).toBe(false);
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+  });
+
+  it('collapsePanel manual sets fetcherCollapsed pref', () => {
+    fetcherRunner.expandPanel({ manual: true });
+    fetcherRunner.collapsePanel({ manual: true });
+    expect(state.prefs.fetcherCollapsed).toBe(true);
+    expect(document.getElementById('fetcherRow').classList.contains('is-collapsed')).toBe(true);
+  });
+
+  it('appendLine updates bar tail while collapsed', () => {
+    fetcherRunner.appendLineForTest('hello from fetcher');
+    fetcherRunner.flushLinesNow();
+    const tail = document.querySelector('[data-role="bar-tail"]');
+    expect(tail?.textContent).toBe('hello from fetcher');
+  });
+
+  it('force expand without manual keeps pref collapsed for revert', () => {
+    fetcherRunner.expandPanel({ manual: false });
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+    expect(state.prefs.fetcherCollapsed).toBe(true);
+    fetcherRunner.revertFetcherLayoutIfIdle();
+    expect(document.getElementById('fetcherRow').classList.contains('is-collapsed')).toBe(true);
+  });
+
+  it('bar toggle is the sole focusable control with aria-expanded', () => {
+    const bar = document.querySelector('[data-role="fetcher-bar"]');
+    const toggle = document.querySelector('[data-role="bar-toggle"]');
+    expect(bar?.getAttribute('role')).toBeNull();
+    expect(bar?.getAttribute('tabindex')).toBeNull();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+  });
 });
 
 describe('log tail follow', () => {
   beforeEach(() => {
-    document.body.innerHTML = '<div id="fetcherRunLog" class="fh-log"></div>';
+    document.body.innerHTML = `
+      <div id="fetcherRow" class="fh-row is-expanded">
+        <div id="dashboardFetcherHealth"></div>
+        <div id="fetcherRunLog" class="fh-log"></div>
+      </div>`;
     fetcherRunner.reopenLogPanel();
   });
 

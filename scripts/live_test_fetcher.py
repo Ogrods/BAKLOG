@@ -206,18 +206,20 @@ def section_d(r: Results) -> None:
     hltb_id = b2.get("run_id") if isinstance(b2, dict) else None
     steam_id = b1.get("run_id") if isinstance(b1, dict) else None
 
-    snap = poll_until(
+    poll_until(
         lambda s: (s.get("active") or {}).get("key") == "steamCovers"
         and any(q.get("key") == "hltb" for q in (s.get("queue") or [])),
         timeout=20,
     )
     queue_before = read_json(RUNS_DIR / "queue.json")
-    r.record("D1 pre-kill queue has hltb", any(x.get("key") == "hltb" for x in queue_before.get("runs", [])), str(queue_before))
+    has_hltb = any(x.get("key") == "hltb" for x in queue_before.get("runs", []))
+    r.record("D1 pre-kill queue has hltb", has_hltb, str(queue_before))
 
     subprocess.run(["taskkill", "/F", "/PID", str(pid), "/T"], capture_output=True)
     time.sleep(1.0)
     queue_after_kill = read_json(RUNS_DIR / "queue.json")
-    r.record("D1 queue.json survived kill", any(x.get("key") == "hltb" for x in queue_after_kill.get("runs", [])), str(queue_after_kill))
+    survived = any(x.get("key") == "hltb" for x in queue_after_kill.get("runs", []))
+    r.record("D1 queue.json survived kill", survived, str(queue_after_kill))
 
     # Restart server
     proc = subprocess.Popen(
@@ -239,23 +241,36 @@ def section_d(r: Results) -> None:
         return
     r.record("D1 server restart", True, f"new pid={get_server_pid()}")
 
-    snap_after = poll_until(
-        lambda s: (s.get("active") or {}).get("key") == "hltb"
-        or any(h.get("id") == hltb_id and h.get("status") in ("running", "done") for h in (s.get("history") or [])),
-        timeout=30,
-    )
+    def _hltb_resumed(snap: dict) -> bool:
+        active = snap.get("active") or {}
+        if active.get("key") == "hltb":
+            return True
+        hist = snap.get("history") or []
+        return any(
+            h.get("id") == hltb_id and h.get("status") in ("running", "done")
+            for h in hist
+        )
+
+    snap_after = poll_until(_hltb_resumed, timeout=30)
     active_after = snap_after.get("active") or {}
     hist = snap_after.get("history") or []
     steam_hist = next((h for h in hist if h.get("id") == steam_id), None)
-    r.record("D1 hltb re-queued/running", active_after.get("key") == "hltb" or any(h.get("id") == hltb_id for h in hist), str(active_after))
+    hltb_running = active_after.get("key") == "hltb" or any(h.get("id") == hltb_id for h in hist)
+    r.record("D1 hltb re-queued/running", hltb_running, str(active_after))
     if steam_hist:
-        r.record("D1 steam not resurrected as active", active_after.get("id") != steam_id, str(steam_hist.get("status")))
+        not_steam = active_after.get("id") != steam_id
+        r.record("D1 steam not resurrected as active", not_steam, str(steam_hist.get("status")))
     else:
         r.record("D1 steam history entry", True, "no steam in history (killed mid-run)")
 
     # Cleanup: cancel if still running
     api("POST", "/api/runs/cancel")
     wait_idle(60)
+    try:
+        proc.terminate()
+        proc.wait(timeout=10)
+    except Exception:
+        pass
 
     print("\n=== D2/D3: launch FSM via pytest ===")
     pytest = subprocess.run(

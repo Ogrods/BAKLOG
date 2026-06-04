@@ -8,18 +8,24 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
 from dotenv import load_dotenv
 
-from battlenet_client import BattleNetAuthError, BattleNetClient
-from hltb_client import HltbClient
 from auth import mark_connected, mark_invalid, resolve_env
+from battlenet_client import BattleNetAuthError, BattleNetClient
 from fetchers._authoritative import BATTLENET
-from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
+from fetchers._base import (
+    add_allow_empty_arg,
+    catalog_file,
+    merge_cached_row,
+    refuse_drift_result,
+    write_catalog_text,
+)
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from hltb_client import HltbClient
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
 
@@ -102,7 +108,7 @@ def _last_played_iso(item: dict) -> str | None:
     ms = item.get("lastPlayedDateMillis")
     if not isinstance(ms, (int, float)) or ms <= 0:
         return None
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(ms / 1000, tz=UTC).isoformat()
 
 
 def load_existing() -> dict[str, dict]:
@@ -312,7 +318,7 @@ def main() -> int:
         return stats.finish("fetch_battlenet", t0, exit_code=drift_exit)
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "battlenet",
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),

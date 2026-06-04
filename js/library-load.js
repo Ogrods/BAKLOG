@@ -42,6 +42,31 @@ import { scheduleDashboardRender } from './dashboard.js';
 import { consumeItadAutoRunFlag, diffItadDeals, maybeAutoEnrichNewAdditions } from './fetcher-health.js';
 import { fireLibraryCountFlash } from './library-count-animation.js';
 import { itadSnapshotStorageKey } from './profiles.js';
+import { dataFetch } from './api-client.js';
+import {
+  deferPicksRender,
+  deferSummaryRender,
+  deferTableRender,
+} from './render-gate.js';
+
+async function refreshLibraryChromeAfterMerge() {
+  if (state.activeView === 'dashboard') {
+    scheduleDashboardRender();
+    return;
+  }
+  if (state.activeView === 'connections') {
+    deferPicksRender();
+    deferSummaryRender();
+    deferTableRender();
+    return;
+  }
+  renderSummary();
+  renderPicks();
+  await refreshFilterUI({ force: true });
+  if (state.activeView === 'wishlist') {
+    updateWishlistDrawerVisibility();
+  }
+}
 
 // Module-scoped previous counts so we only animate real fetch-driven jumps.
 // Null sentinels mean "first paint" — no popups on cold start, just the
@@ -117,7 +142,7 @@ export function showItadAlertBanner({ newSales, newHistoricalLows }) {
 
 export async function loadCacheMeta(url, metaKey) {
   try {
-    const res = await fetch(`${url}?t=${Date.now()}`);
+    const res = await dataFetch(`${url}?t=${Date.now()}`);
     if (!res.ok) {
       state.libraryMeta[metaKey] = null;
       return;
@@ -198,13 +223,7 @@ export async function finishEmptyLibraryLoad() {
   renderStoreChips();
   renderWishlistStoreChips();
   renderGenreChips();
-  renderSummary();
-  if (state.activeView === "dashboard") scheduleDashboardRender();
-  else {
-    renderPicks();
-    await refreshFilterUI({ force: true });
-    if (state.activeView === "wishlist") updateWishlistDrawerVisibility();
-  }
+  await refreshLibraryChromeAfterMerge();
 }
 
 export async function applyMergedLibrary() {
@@ -233,16 +252,7 @@ export async function applyMergedLibrary() {
   renderStoreChips();
   renderWishlistStoreChips();
   renderGenreChips();
-  renderSummary();
-  if (state.activeView === "dashboard") scheduleDashboardRender();
-  else {
-    renderPicks();
-    await refreshFilterUI({ force: true });
-    if (state.activeView === "wishlist") {
-      // dashboardDataReady just flipped true — re-evaluate the radar gate.
-      updateWishlistDrawerVisibility();
-    }
-  }
+  await refreshLibraryChromeAfterMerge();
 
   // Fire after the render so popup hosts exist in the DOM. Wrapped in
   // try/catch — this is pure polish; never let it break a real merge.
@@ -261,7 +271,7 @@ export async function applyMergedLibrary() {
 }
 
 export async function fetchLibraryJson(path) {
-  const res = await fetch(`${path}?t=${Date.now()}`);
+  const res = await dataFetch(`${path}?t=${Date.now()}`);
   if (!res.ok) return null;
   return res.json();
 }

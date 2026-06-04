@@ -1,17 +1,22 @@
 # Security model
 
-BAKLOG is a **local-first** desktop tool. It has no project-owned server,
-account system, or telemetry. This document is the threat model: what BAKLOG
+BAKLOG is a **local-first** desktop tool. By default it has no project-owned
+hosted backend and no telemetry. This document is the threat model: what BAKLOG
 defends, what it explicitly does **not**, and the cryptography behind the
 claims. For the plain-language data inventory and network-host list, see
 [PRIVACY.md](PRIVACY.md).
 
-Last updated: 2026-06-02.
+**Optional invite-only accounts:** When `BAKLOG_SUPABASE_*` is set, Supabase
+hosts login only (email + JWT). Your library and Connections secrets still live
+under `profiles/<user-id>/` on the machine running `server.py`. See
+[docs/SUPABASE_AUTH.md](docs/SUPABASE_AUTH.md).
+
+Last updated: 2026-06-03.
 
 ## TL;DR
 
 - Your store credentials are generated, used, and stored **only on your
-  machine**. There is no BAKLOG server, so there is no central store of
+  machine**. There is no central BAKLOG datastore of game libraries or store
   secrets to breach.
 - Storefront logins run from **your own browser session and IP**, not from a
   shared cloud — so they look like you, not like a bot farm hitting thousands
@@ -47,8 +52,9 @@ flowchart LR
 
 Everything inside the machine boundary is assumed to run as **your** OS user.
 BAKLOG's security goal is that nothing crosses the boundary except the
-storefront calls you ask for and the files you explicitly export. There is no
-fourth box for a "BAKLOG cloud" because none exists.
+storefront calls you ask for and the files you explicitly export. Optional
+Supabase auth adds a small hosted login box (credentials and catalog JSON still
+on your machine unless you later opt into Phase 6 cloud mirror work).
 
 ## Assets we protect
 

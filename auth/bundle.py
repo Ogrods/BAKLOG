@@ -9,7 +9,7 @@ import os
 import shutil
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import scrypt
 from pathlib import Path
 from typing import Any
@@ -88,7 +88,7 @@ class ImportSummary:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _app_version() -> str:
@@ -305,7 +305,7 @@ def import_bundle(blob: bytes, passphrase: str, *, dry_run: bool = False) -> Imp
 
 
 def bundle_filename() -> str:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     return f"baklog-secrets-{stamp}.bundle"
 
 

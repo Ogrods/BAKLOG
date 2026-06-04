@@ -8,10 +8,10 @@ import pytest
 
 import auth.secrets as secrets
 from auth.manager import (
+    _provider_state,
     disconnect,
     enable_local,
     is_local_provider_disabled,
-    _provider_state,
 )
 from auth.secrets import get_provider_blob, set_master_password_override, set_provider_blob
 from shared import profile_paths

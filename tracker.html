@@ -149,7 +149,19 @@
     .owner-pref { width: 100%; min-height: 130px; background: var(--bg); color: var(--text); border: 1px solid var(--border-soft); border-radius: 0.375rem; padding: 0.65rem; font-family: inherit; font-size: 0.85rem; line-height: 1.45; resize: vertical; }
     .owner-pref:focus { outline: 2px solid var(--amber); outline-offset: 1px; border-color: transparent; }
     .owner-lane { border-left: 4px solid var(--amber); }
-    .agency-lane h2::after { content: "Agency draft"; margin-left: 0.45rem; font-size: 0.65rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; }
+    .agency-lane h2::after, .thesis-lane h2::after { content: "Thesis"; margin-left: 0.45rem; font-size: 0.65rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; }
+    .thesis-statement { font-size: 1.15rem; line-height: 1.55; color: var(--text); border-left: 3px solid var(--accent); padding: 0.75rem 1rem; margin: 0 0 1rem; background: rgba(56, 189, 248, 0.06); border-radius: 0 0.5rem 0.5rem 0; }
+    .thesis-bet { margin: 0.5rem 0 0; padding-left: 1.1rem; color: var(--text-dim); }
+    .thesis-bet li { margin-bottom: 0.35rem; }
+    .ledger-table { font-size: 0.85rem; }
+    .ledger-table td:first-child { font-weight: 600; color: var(--text); }
+    .pill-locked { background: rgba(52, 211, 153, 0.12); color: var(--green); border-color: var(--green); }
+    .pill-open { background: rgba(251, 191, 36, 0.12); color: var(--amber); border-color: var(--amber); }
+    .pill-believe { background: rgba(56, 189, 248, 0.12); color: var(--accent); border-color: var(--accent); }
+    .pill-validate { background: rgba(168, 85, 247, 0.12); color: #c4b5fd; border-color: #a78bfa; }
+    .execution-appendix summary { cursor: pointer; font-weight: 600; color: var(--text-mute); }
+    .execution-appendix .execution-body { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+    .xref { font-size: 0.85rem; color: var(--text-mute); font-style: italic; }
     .monetize-subnav { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 1rem; }
     .monetize-subnav .tab { padding: 0.3rem 0.65rem; font-size: 0.78rem; }
 
@@ -292,8 +304,8 @@
         { id: "p3_js_tests_fingerprint", label: "[DONE] Vitest: table-ui.js tableFingerprint — differs on every input it should, identical for same input (regression magnet). tests/table-fingerprint.test.js" },
         { id: "p3_js_tests_dashboard_fp", label: "[DONE] Vitest: dashboard.js dashboardFingerprint — qw / itch presence / itchHideNonGames / dv changes flip fingerprint; stable when unchanged. tests/dashboard-fingerprint.test.js (export dashboardFingerprint from dashboard.js)." },
         { id: "p3_js_tests_dedup_state", label: "[DONE] Vitest: game-core.recomputeCrossStoreHidden — hidden keys match store-priority + scoreEntry tie-break; dedup off leaves siblings visible. tests/game-core.test.js describe recomputeCrossStoreHidden — hidden keys." },
-        { id: "p3_ci", label: "[DONE] GitHub Actions: ruff (advisory) + Python pytest + JS vitest on push/PR to main/master — see .github/workflows/ci.yml" },
-        { id: "p3_ci_ruff_required", label: "Make ruff lint a required CI gate — clean the ~150 inherited warnings (81 E501 long-line, 26 F401 unused-import, 24 UP017 datetime-timezone-utc, 14 I001 unsorted-imports, 5 UP035/UP012 modernization), flip continue-on-error→false in ci.yml" },
+        { id: "p3_ci", label: "[DONE] GitHub Actions: ruff (required) + Python pytest + JS vitest on push/PR to main/master — see .github/workflows/ci.yml" },
+        { id: "p3_ci_ruff_required", label: "[DONE] Ruff required CI gate — cleared 341 findings (119 auto-fix, line-length 100→120 + hand-wrap, E402/F821/F841/E731 fixes); continue-on-error removed in ci.yml" },
         { id: "p3_drill_anchor_audit", label: "[DONE] Drill-in scroll unification — pendingScrollTarget in table-ui.js. Follow-up: find_drill_post_scroll_jump (~20–30px table shift) deferred to Phase 4.5 (p45_drill_scroll_jump)." },
         { id: "p3_error_boundary", label: "[DONE] Global window.onerror + unhandledrejection handler that surfaces a toast — js/error-boundary.js, installs on app boot, top-right red sticky toast with Copy/Details/Dismiss; debug overlay shows running error count; window.__baklogErrors holds the session log" },
         { id: "p3_debug_overlay", label: "[DONE] ?debug=1 overlay — js/debug-overlay.js polls state every 500ms in a corner panel: view · _dataVersion · visible row count · active filter count · tableFingerprint · last renderTable totalMs · captured-error count. Enables via ?debug=1 or sticky localStorage 'baklog-debug=1'." },
@@ -327,7 +339,7 @@
         { id: "p4_onboarding_flow", label: "[DONE] Onboarding: empty-state UX — 0-connected Connections CTA (Start with Steam), dashboard welcome banner, Open Connections on empty library/wishlist/itch tables" },
         { id: "p4_readme_rewrite", label: "README rewrite: hero shot, 30-second pitch, three-step install, screenshot gallery — copy source: Monetization → Creative (readme_above_fold) + Campaign: Watch your library appear" },
         { id: "p4_landing_page", label: "Landing page (GitHub Pages or similar): name, screenshots, ITAD-style deal radar value prop — hero/copy from Creative → hero_accidental_library + Campaign: Watch your library appear" },
-        { id: "p4_hosted_demo", label: "Decide: hosted demo with stub data? Or local-only forever?" },
+        { id: "p4_hosted_demo", label: "[DECIDED 2026-06-04] Local-only for launch; remote access + cloud sync shelved to Phase 6. Supabase auth gateway stays dormant at launch (no BAKLOG_SUPABASE_* env). See p6_remote_access_tunnel + p6_cloud_sync_mirror." },
         { id: "p4_privacy_doc", label: "[DONE] Privacy doc — PRIVACY.md at repo root: credentials table, data files inventory, network hosts, explicit 'what does NOT happen', deletion checklist" },
         { id: "p4_cross_platform_decision", label: "Decide: stay Windows-only, or invest in macOS / Linux (Amazon SQLite paths, DPAPI alternatives)" },
         { id: "p4_packaging", label: "Decide: pip-installable? PyInstaller exe? Tauri shell? Stay 'clone and run'?" },
@@ -357,15 +369,33 @@
         { id: "p5_soft_launch", label: "Soft launch: invite-only beta with 10–20 friends before going public" },
         { id: "p5_beta_error_reporting", label: "Beta error reporting: give testers a frictionless way to send the local bug bundle back (Copy bug bundle in kebab — whitelist payload, scrubbed errors, activeView now included; Engineering tab lists hardening). Decide channel: prefilled GitHub issue, mailto, or paste form — local-first, opt-in, no silent telemetry" },
         { id: "p5_metrics", label: "Decide what success looks like: stars, signups, retention, MRR? Pick one north-star" },
+        { id: "audit_fetchers_repair", label: "Per-store fetcher repair (known broken): fix storefront integrations one at a time after API/auth drift — inventory in docs/AUDIT_FINDINGS.md §6; not a bulk audit fix" },
+      ],
+    },
+    {
+      id: "p6",
+      title: "Phase 6 — Post-launch",
+      tagline: "Optional remote access and cloud sync — shelved until after launch. Credentials never leave the machine in either path.",
+      items: [
+        { id: "p6_remote_access_tunnel", label: "Auth-gated remote access (tunnel): expose local server.py via Cloudflare Tunnel or Tailscale behind existing Supabase login (js/auth-gate.js + shared/supabase_auth.py). PC must be awake; keeps all three privacy promises (nothing leaves machine, no honeypot, localhost containment). ~80% scaffolded — see docs/SUPABASE_AUTH.md." },
+        { id: "p6_cloud_sync_mirror", label: "Always-on cloud read-only mirror: push games_*.json + personal.json to Supabase (hook fetchers/_base.py write path + /api/personal PUT); Vercel dashboard reads via Supabase Auth + RLS. PC-independent 24/7; catalog-only (credentials never sync per SECURITY.md asset split). Breaks 'nothing leaves your machine' / 'no server' / 'localhost-only' for opted-in users." },
+        { id: "p6_multiuser_run_queue", label: "Shared-server multi-tenant: per-user active.json / queue.json, auth-SSE session ownership beyond profile scoping, and CSRF tightening when one process serves multiple Supabase users (deferred from single-user self-host ship — see docs/SUPABASE_AUTH.md §6)." },
+        { id: "p6_fetcher_log_per_profile", label: "Per-account-profile fetcher logs: persist + scope the run console (currently in-memory in js/fetcher-health.js, reset on reload/profile switch) to the active account/profile so each profile keeps its own fetch history. Tie to per-user run queue (p6_multiuser_run_queue) and profile-scoped runs_dir; surface a reloadable per-profile log instead of the ephemeral session buffer. See docs/FETCHER_CONNECTIONS.md (inbound/outbound matrix)." },
       ],
     },
   ];
 
   // ---------- Important notes (ops / guardrails — not triage) ----------
   const OPS_NOTES = [
+    { id: "audit_2026_06_full",
+      title: "Full-project audit (2026-06-03)",
+      body: "Section-by-section audit completed; findings and backlog in docs/AUDIT_FINDINGS.md. Fixes: _bind_request_user, cancel_all profile scoping when auth on, SECURITY.md Supabase wording, npm run vendor:supabase. Store fetchers treated as known-broken — repair per-store under tracker id audit-fetchers-repair, not bulk-fixed in this pass." },
     { id: "find_profile_baklog_env_server",
       title: "BAKLOG_PROFILE in the server shell is auto-ignored",
       body: "The dev server drops BAKLOG_PROFILE from its own environment at boot (server.py _release_server_profile_env) so the header profile menu / profiles/index.json always owns the active profile. Per-run fetchers still pin their own profile via subprocess_env_for_profile(), and one-off CLI fetchers ($env:BAKLOG_PROFILE='work'; python fetch_games.py) intentionally still honor the var since they are separate processes. server.py prints a NOTE at startup if the var was set." },
+    { id: "find_fetcher_connections_doc",
+      title: "Fetcher connection matrix documented",
+      body: "Inbound/outbound map for js/fetcher-health.js + server RunManager lives in docs/FETCHER_CONNECTIONS.md (HTTP/SSE, UI events, storage, post-run reload). AUDIT_FINDINGS Section 5b links it. Use when debugging run → POST → stream → reloadAfterFetcher or wiring new fetcher affordances." },
   ];
 
   // ---------- Engineering: beta hardening log + specs ----------
@@ -447,6 +477,13 @@
       where: "nintendo_client.py, fetch_nintendo.py, auth/registry.py, fetchers/manifest.json",
       tests: "tests/test_nintendo_client.py (404/HTML classification, _map_graphql_item, browser GraphQL parse, cookie-only error)",
     },
+    {
+      area: "Dashboard fetcher collapsible bar",
+      risk: "Full fetcher-health + console row sat above the spotlight and pushed the magic-moment hero down on every dashboard load.",
+      fix: "Default collapsed: one-line .fh-bar (status + live log tail) in #fetcherRow; auto-expands on run start; reverts to pref fetcherCollapsed when idle. Console no longer independently dismissable — bound to expand/collapse. setBarSummary() for bar text (renderDashboardFetcherHealth is outside the fetcherRunner IIFE).",
+      where: "js/fetcher-health.js, js/bind-events.js, app.css, js/prefs.js",
+      tests: "tests/fetcher-health.test.js (fetcher bar collapse describe)",
+    },
   ];
 
   const SECURITY_MODEL = [
@@ -488,7 +525,7 @@
     { id: "find_js_test_remaining_gaps", area: "Arch", severity: "grey", title: "[RESOLVED] JS test coverage — dashboard fingerprint + dedup hidden-keys",
       body: "Done 2026-06-02. Closed the two follow-ups from find_no_js_tests: tests/dashboard-fingerprint.test.js (exported dashboardFingerprint from dashboard.js; stable + changes on qw/itch/ihn/dv), and tests/game-core.test.js describe 'recomputeCrossStoreHidden — hidden keys' (steam wins over psn/gog, scoreEntry tie-break within store, dedup off clears hidden set). Phase-3 p3_js_tests_dashboard_fp + p3_js_tests_dedup_state marked [DONE]. Suite: 229 Vitest tests." },
     { id: "find_no_ci", area: "Arch", severity: "grey", title: "[RESOLVED] CI wired up via GitHub Actions",
-      body: "Done. .github/workflows/ci.yml runs on every push + PR to main/master with two parallel jobs: (1) Python 3.11 — `pip install -e .[dev]`, ruff lint (currently advisory via continue-on-error so the ~150 inherited warnings don't block the first green run), then `pytest -q` (112 tests); (2) Node 20 — `npm ci` + `npm test` (59 vitest tests). Concurrency group cancels stale runs on the same branch/PR. Follow-up p3_ci_ruff_required tracks tightening lint once the existing warnings are cleaned up." },
+      body: "Done. .github/workflows/ci.yml runs on every push + PR to main/master with two parallel jobs: (1) Python 3.11 — `pip install -e .[dev]`, `ruff check .` (required gate; 341 inherited findings cleared 2026-06), then `pytest -q`; (2) Node 20 — `npm ci` + `npm test` (Vitest). Concurrency group cancels stale runs on the same branch/PR. p3_ci_ruff_required closed." },
     { id: "find_games_no_backup", area: "Arch", severity: "grey", title: "[RESOLVED] games_*.json + itad_prices.json now atomic-write + rotated backup",
       body: "Done. New shared/safe_write.py generalizes the data/personal.json pattern (atomic temp + os.replace, plus a rolling N-deep backup directory). Plumbed through fetchers/_base.py::write_games_json (covers every fetch_*.py + every refresh) and fetch_itad.py. Backups land in data/games_backups/<stem>/<stem>-YYYYMMDD-HHMMSS-mmm.json, keep=10 by default (configurable). data/ is already in .gitignore so backups stay local. Millisecond-resolution stamps avoid same-second collisions. 9 new tests in tests/test_safe_write.py cover atomic create/replace, tmp cleanup on failure, no-op when source missing, rotation, prune-to-keep, and default prefix=stem behavior." },
     { id: "find_state_dom_split", area: "Arch", severity: "grey", title: "[RESOLVED] Filter state is now state.sessionPrefs; DOM mirrors state",
@@ -605,7 +642,7 @@
     { id: "bs_tos", title: "[RESOLVED] Storefront ToS exposure — reframed as user-automates-own-access + guardrails logged", body: "Resolved 2026-06-02. The defensible posture is 'the user is automating access to their own data on their own machine,' which is already what BAKLOG does (local-only, user's own credentials/session/IP, no project server, no pooled requests, no redistributed catalog). That framing only holds as long as the code keeps behaving that way, so the four guardrails are now logged in Monetization -> Risk + ethics: (1) never centralize credentials or proxy fetches through our infra; (2) don't ship/host the scraped catalog as a dataset; (3) user-initiated + reasonable rate, their account only (fetchers already throttle); (4) precise copy — 'BAKLOG automates requests you could make in your own browser, using your credentials, on your machine,' never 'we aggregate store data.'\n\nSECURITY.md gains a 'How BAKLOG reaches each store' table grading per-store posture (sanctioned API -> official OAuth -> own-session replay -> unofficial endpoint with your session) and an explicit ToS caveat; PRIVACY.md gains an 'Acting on your behalf, with your own data' section. EA App was deliberately built on web-session replay (sniffs the user's own ea.com Bearer token from their saved profile, calls the same GraphQL endpoint the website uses) instead of desktop-client impersonation — an earlier draft hardcoded EA's client_secret + pc_sign and was replaced so the framing stays literally true. Remaining 'gray' stores (GOG, PSN, Ubisoft, Nintendo, Humble, Battle.net, EA) all replay only the user's own session for their own data; this is a mitigation, not immunity — several stores' terms restrict any automation regardless of whose data it is. Productized/hosted variant would still need counsel before any of the four guardrails are crossed." },
     { id: "bs_multiuser", title: "[SUPERSEDED] Multi-account / multi-user — split into local profiles vs app login", body: "Superseded 2026-06-02. See bs_multiuser_profiles (Shape 2: switchable local profiles, shipped) and bs_multiuser_app_login (Shape B: app users + logins, blocked on p4_hosted_demo / Phase 5 hosting decision). Merging two accounts on the same store into one view remains out of scope (touches dedup core)." },
     { id: "bs_multiuser_profiles", title: "[RESOLVED] Local switchable profiles (work vs play)", body: "Resolved 2026-06-02; hardened 2026-06-03. Shape 2: named profiles isolate games_*.json, itad_prices.json, data/personal.json, cache/auth/ per profiles/<id>/ without changing merge/dedup. Legacy installs keep repo root until the user adds a second profile (one-time copy to profiles/default/). Header menu + Manage modal; switch cancels in-flight fetchers then full reload. Profile-scoped cache HTTP (no root leak), per-profile credentials on chips, enrichment cache per profile. Ops: do not export BAKLOG_PROFILE in the shell that runs server.py — menu writes index active; env overrides index (find_profile_baklog_env_server).\n\nMarketing angle: 'Work library vs personal library on the same PC — zero bleed, one click to switch.' Pairs with privacy ('credentials never leave the machine') for streamers, couples, and shared-family PCs." },
-    { id: "bs_multiuser_app_login", title: "App users + logins (hosted multi-tenant)", body: "Deferred until hosting decision (p4_hosted_demo). Requires backend auth, per-user data isolation, and counsel on the bs_tos guardrails before any shared infra. The local profile primitive (bs_multiuser_profiles) is the intended seam if this ships later." },
+    { id: "bs_multiuser_app_login", title: "App users + logins (hosted multi-tenant)", body: "Deferred until hosting decision (p4_hosted_demo). Requires backend auth, per-user data isolation, and counsel on the bs_tos guardrails before any shared infra. The local profile primitive (bs_multiuser_profiles) is the intended seam if this ships later.\n\nUpdate 2026-06-04: p4_hosted_demo decided local-only for launch. Post-launch remote paths shelved to Phase 6: p6_remote_access_tunnel (auth-gated tunnel, data stays local) and p6_cloud_sync_mirror (always-on Supabase catalog mirror). Existing Supabase auth gateway remains dormant at launch unless BAKLOG_SUPABASE_* env is set." },
     { id: "bs_i18n", title: "[RESOLVED] Internationalization / currency — display currency from ITAD country", body: "Resolved 2026-06-02. Single display currency derived from ITAD fetch: ITAD_COUNTRY env + --country on fetch_itad.py write country + currency into itad_prices.json; JS displayCurrency() / formatMoney() (js/currency.js) replace hardcoded USD in formatDollar, dashboard marquee, deal filters, and wishlist price column. ITAD rows format via itad.currency; store-only rows show a price-currency-tag when g.currency differs. Cross-store store-only comparability: bs_fx_conversion (Frankfurter at fetch)." },
     { id: "bs_a11y", title: "[RESOLVED] Accessibility audit — axe-core CI gate + Lighthouse sweep",
       body: "Resolved 2026-06-02. Policy: dashboard (index.html) targets WCAG 2.1 AA; SEO + Best Practices deferred to separate plans.\n\n• tests/a11y/index-axe.test.js — hydrates index.html into happy-dom, runs axe-core, fails CI on serious/critical violations outside tests/a11y/known-violations.json.\n\n• Landmarks: skip-to-main link, <main id=\"main\">, labeled regions for bulk bar + alpha nav.\n\n• Keyboard: js/focus-trap.js — focus trap + Escape on filter drawer, Connections popover, add-game / hidden-games / orphan-prune modals.\n\n• ARIA: aria-current on view tabs; co-op filter role=\"radiogroup\" + role=\"radio\" + aria-checked; connPopover named dialog; kebab aria-expanded toggles.\n\n• Contrast: text-slate-500 → text-slate-400 on bg-slate-800 surfaces.\n\n• docs/a11y.md documents CI gate + manual Lighthouse workflow (100 target per view).\n\nUpdate 2026-06-02: manual Lighthouse sweep complete — Accessibility, SEO, and Best Practices all score 100 across the views. Only the Performance category remains, tracked as the Phase 4 Lighthouse performance pass (p4_lighthouse_perf).\n\nDeferred: tracker.html a11y; cover-image descriptive alt; Chart.js canvas contrast if Lighthouse flags it." },
@@ -677,6 +714,38 @@
     { fetcher: "enrich_cross_store_images.py", client: "(scraper)", writes: "(patches games_*.json)", notes: "Steam CDN covers for matched non-Steam titles" },
   ];
 
+  /** Pipeline tab store/auth labels; output file always from FETCHERS.writes. */
+  const PIPELINE_DISPLAY = {
+    "fetch_games.py": { store: "Steam", auth: "API key + SteamID64" },
+    "fetch_gog.py": { store: "GOG", auth: "GOG_AL cookie" },
+    "fetch_psn.py": { store: "PSN", auth: "NPSSO token" },
+    "fetch_epic.py": { store: "Epic", auth: "OAuth refresh token" },
+    "fetch_amazon.py": { store: "Amazon", auth: "Launcher SQLite (Win) or Prime web session" },
+    "fetch_xbox.py": { store: "Xbox", auth: "OpenXBL API key" },
+    "fetch_battlenet.py": { store: "Battle.net", auth: "Session cookie + XSRF" },
+    "fetch_ubisoft.py": { store: "Ubisoft", auth: "Ubi-SessionId + auth" },
+    "fetch_nintendo.py": { store: "Nintendo", auth: "CDP browser profile (nintendo)" },
+    "fetch_itch.py": { store: "itch.io", auth: "API key" },
+    "fetch_humble.py": { store: "Humble", auth: "Browser profile (humble)" },
+    "fetch_ea.py": { store: "EA App", auth: "Browser profile (ea) → web-session Bearer" },
+    "fetch_wishlist.py": { store: "Steam (wishlist)", auth: "API key + SteamID64" },
+    "fetch_gog_wishlist.py": { store: "GOG (wishlist)", auth: "GOG_AL cookie" },
+    "fetch_epic_wishlist.py": { store: "Epic (wishlist)", auth: "Browser profile (epic_wishlist)" },
+    "fetch_psn_wishlist.py": { store: "PSN (wishlist)", auth: "NPSSO token (shared)" },
+    "fetch_ubisoft_wishlist.py": { store: "Ubisoft (wishlist)", auth: "CDP browser profile" },
+    "fetch_xbox_wishlist.py": { store: "Xbox (wishlist)", auth: "CDP browser profile" },
+    "fetch_nintendo_wishlist.py": { store: "Nintendo (wishlist)", auth: "CDP browser profile (nintendo_wishlist)" },
+    "fetch_humble_wishlist.py": { store: "Humble (wishlist)", auth: "Browser profile (humble)" },
+  };
+
+  function pipelineRowsFromFetchers() {
+    return FETCHERS.filter((f) => PIPELINE_DISPLAY[f.fetcher]).map((f) => ({
+      ...PIPELINE_DISPLAY[f.fetcher],
+      fetcher: f.fetcher,
+      output: f.writes.startsWith("(") ? "—" : f.writes,
+    }));
+  }
+
   const GAME_FIELDS = [
     { group: "Identity", fields: "store · id · appid · gog_id · psn_id · epic_catalog_id · amazon_id · itch_id", source: "Store fetcher" },
     { group: "Display", fields: "name · header_image · library_image · release_date · type", source: "Store fetcher" },
@@ -684,7 +753,7 @@
     { group: "Scoring", fields: "steam_review_percent · steam_review_count · steam_review_desc", source: "Steam / wishlist fetch, or enrich_steam_reviews.py" },
     { group: "Length", fields: "hltb_main_hours · hltb_main_extra_hours · hltb_completionist_hours · hltb_match_confidence", source: "enrich_hltb.py" },
     { group: "Pricing", fields: "price · price_initial · discount_percent · currency", source: "Store API; ITAD overlays best deal on wishlist" },
-    { group: "Taxonomy", fields: "genres · tags (store) · personal tags (data/personal.json)", source: "Store metadata + you" },
+    { group: "Taxonomy", fields: "genres · tags (store)", source: "Store metadata" },
     { group: "Co-op", fields: "coop_online · coop_local", source: "Steam categories — fetch_games.py for Steam rows + enrich_steam_tags.py for non-Steam rows with a Steam match; js/coop-overrides.js for manually-flagged Steam-less titles" },
     { group: "Linking", fields: "store_url (with storeUrlForGame fallbacks)", source: "Fetcher + dashboard" },
   ];
@@ -692,11 +761,10 @@
   const PERSONAL_FIELDS = [
     { field: "status", values: "backlog · next · playing · unfinished · live · finished · skip", scope: "per game" },
     { field: "priority", values: "0 – 5", scope: "per game" },
-    { field: "tags", values: "free-form personal tags (chip filterable)", scope: "per game" },
     { field: "notes", values: "free text", scope: "per game" },
     { field: "hltb_override", values: "manual hours when HLTB is wrong", scope: "per game" },
     { field: "manual", values: "user-added games not present in any fetcher (Add Game flow)", scope: "global array" },
-    { field: "prefs", values: "active view · status/store/genre/tag filters · picks tab · sort orders · score column · deal filters · coop segmented mode · early-access toggle · cross-store dedup (session-only)", scope: "global" },
+    { field: "prefs", values: "active view · status/store/genre filters · picks tab · sort orders · score column · deal filters · coop segmented mode · early-access toggle · cross-store dedup (session-only) · fetcherCollapsed (bar vs expanded)", scope: "global" },
   ];
 
   const DATA_FLOW = [
@@ -815,7 +883,7 @@
     { id: "accidental_library", headline: "The accidental library", proof: "12 library + 8 wishlist fetchers; magic-moment demo; free-claimer persona", productHooks: ["MARKETING_FEATURES[0]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "The library you forgot you owned", "Free game Thursday, finally counted"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"] },
     { id: "ownership_aware_deals", headline: "Ownership-aware deals", proof: "ITAD + FX + duplicate-buy prevention", productHooks: ["MARKETING_FEATURES[1]", "bs_fx_conversion"], relatedCampaigns: ["Deal radar, not spreadsheet"], relatedFindings: ["bs_fx_conversion", "bs_pricing_currency"] },
     { id: "local_first_trust", headline: "Local-first trust", proof: "No server; per-profile secrets; portable bundle", productHooks: ["MARKETING_FEATURES[2]", "Nothing to breach"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_privacy", "bs_secret_recovery", "bs_telemetry"] },
-    { id: "profiles_one_pc", headline: "Profiles on one PC", proof: "Work vs play; cancel-on-switch; isolated cache", productHooks: ["MARKETING_FEATURES[3]"], relatedCampaigns: ["carousel_profiles"], relatedFindings: ["bs_multiuser_profiles", "find_profile_switch_cancel_runs", "find_profile_cache_http"] },
+    { id: "profiles_one_pc", headline: "Profiles on one PC", proof: "Work vs play; cancel-on-switch; isolated cache", productHooks: ["MARKETING_FEATURES[3]"], relatedCampaigns: ["Watch your library appear"], relatedFindings: ["bs_multiuser_profiles", "find_profile_switch_cancel_runs", "find_profile_cache_http"] },
     { id: "built_to_last", headline: "Built to last", proof: "Drift guard; atomic writes; honest fetcher signals", productHooks: ["MARKETING_FEATURES[4]", "MARKETING_FEATURES[5]"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_data_drift", "bs_fetcher_health_honest", "bs_phase2_reliability"] },
     { id: "simple_powerful", headline: "Simple, but powerful", proof: "It's just your data — retrieved, normalized, and reshuffled. No cloud, no AI, no magic.", productHooks: ["MARKETING_FEATURES[6]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "Nothing to breach"], relatedFindings: ["bs_privacy", "bs_telemetry", "find_store_integration_complete"] },
   ];
@@ -869,22 +937,75 @@
     ],
   };
 
+  const MONETIZE_SECTION_MIGRATE = {
+    vision: "thesis", hooks: "problem", features: "product", audience: "market",
+    landscape: "competition", compete: "competition", models: "model", pricing: "model",
+    howitworks: "architecture", playbook: "gtm", creative: "execution", messaging: "execution", campaign: "execution",
+  };
+
+  function migrateMonetizeSection(id) {
+    if (!id) return "thesis";
+    return MONETIZE_SECTION_MIGRATE[id] || id;
+  }
+
+  const MONETIZE_THESIS = {
+    statement: "BAKLOG is the private command center for accidental cross-store libraries: retrieve what you already own on your machine, normalize once, decide what to play and what to buy — with local-first trust as the moat, not the upsell.",
+    bet: [
+      "The category gap is real: no incumbent fuses automatic cross-store owned-library ingestion + ownership-aware deal intelligence + backlog decisioning in one no-account local package.",
+      "The wedge is the magic-moment demo — a real account turning into a real library in ~60s on the user's PC. That is onboarding, proof, and marketing in one clip.",
+      "Monetization follows revealed preference: the core audience acquired games for $0. Lead with free + contextual ads on deal intent; optional $2–$4/mo removes ads and adds convenience sync later.",
+    ],
+    horizon: "12 mo: activation + retention · 24 mo: house/affiliate on deal cards · 36 mo: optional No-ads + cloud sync tier",
+    productTruth: "2026 Q2 ship order: profiles + honest fetcher health + FX hardening before scaling monetization (bs_phase2_reliability, bs_fetcher_health_honest, bs_fx_conversion).",
+  };
+
+  const MONETIZE_ASSUMPTIONS = [
+    { claim: "Accidental-library persona is large enough on Steam + Epic + Prime claim paths", status: "believe", evidence: "Epic weekly free program, Prime monthly drops, Fanatical/Wario64 key firehose; founder library is the proof case" },
+    { claim: "Users will run a local Python stack (or frozen installer) for privacy + control", status: "validate", evidence: "Install friction vs Backloggd signup; mitigated by installer (p4_packaging) + privacy positioning" },
+    { claim: "Ownership-aware deals drive weekly return without feeling like ads", status: "believe", evidence: "Deal-hunter persona already keeps ITAD open; BAKLOG folds habit into backlog surface" },
+    { claim: "50k MAU × ($0.50 RPM + 1.5% × $3 upgrade) ≈ $25k–$50k ARR floor", status: "validate", evidence: "MONETIZE_MODELS math; affiliate uplift not modeled" },
+    { claim: "Magic-moment screen recording converts on Reddit/GitHub without long copy", status: "believe", evidence: "Tested in front of people — demo sells itself" },
+    { claim: "Day-7 return holds after first successful multi-store fetch", status: "validate", evidence: "North-star for GTM kill criteria — measure on soft launch cohort" },
+  ];
+
+  const MONETIZE_DECISIONS = [
+    { decision: "Lead monetization model: freemium free + ads", status: "locked", rationale: "Audience revealed preference is $0 on games; ads + low-friction upgrade align. See Model tab." },
+    { decision: "Distribution endpoint: B (local-first core)", status: "locked", rationale: "Optional cloud sync of derived catalog only + hosted read-only demo. Full hosted fetch (C) rejected. See Architecture tab." },
+    { decision: "Metadata authority: Steam (+ Wikidata gap-fill), not IGDB", status: "locked", rationale: "IGDB commercial terms + attribution unacceptable for monetized product" },
+    { decision: "Third-party ad networks", status: "open", rationale: "House/affiliate first; networks only after MAU ≥ 5k with context-only targeting" },
+    { decision: "Frozen installer / no-Python path", status: "open", rationale: "p4_packaging — bridge to mainstream without abandoning local-first" },
+    { decision: "Hosted multi-tenant app login", status: "open", rationale: "Deferred (bs_multiuser_app_login, p4_hosted_demo) until hosting + counsel" },
+  ];
+
+  const MONETIZE_METRICS = {
+    northStar: [
+      { metric: "Time-to-first-successful-fetch", note: "Connect → Refresh → non-empty library for ≥1 store" },
+      { metric: "Day-7 return", note: "User reopens dashboard within 7 days of first fetch" },
+      { metric: "Status / picks edits per WAU", note: "Proves decision layer, not just inventory browser" },
+    ],
+    guardrails: [
+      { metric: "Fetcher drift / empty overwrite incidents", note: "Must stay zero post atomic writes + drift guard" },
+      { metric: "Privacy incident / credential leak narrative", note: "Any cloud default-on sync kills thesis" },
+    ],
+    kill: [
+      "No day-7 return after 3+ channel tests with working demo",
+      "Upgrade conversion <0.5% with ads live and MAU >2k (model mismatch)",
+      "Support burden from connection matrix exceeds solo bandwidth without installer",
+    ],
+  };
+
   const MONETIZE_SECTIONS = [
-    { id: "vision", label: "Grand scheme" },
-    { id: "hooks", label: "Why users choose this" },
-    { id: "features", label: "Product features" },
-    { id: "creative", label: "Creative assets" },
-    { id: "messaging", label: "Messaging matrix" },
-    { id: "howitworks", label: "How it runs" },
-    { id: "audience", label: "Audience" },
-    { id: "market", label: "Market + numbers" },
-    { id: "landscape", label: "Competitive landscape" },
-    { id: "models", label: "Model iterations" },
-    { id: "campaign", label: "Campaign suite" },
-    { id: "playbook", label: "Launch playbook" },
-    { id: "pricing", label: "Pricing" },
+    { id: "thesis", label: "Thesis & bet" },
+    { id: "problem", label: "Problem & why now" },
+    { id: "product", label: "Product & moat" },
+    { id: "market", label: "Market & audience" },
+    { id: "competition", label: "Competition" },
+    { id: "model", label: "Model & unit econ" },
+    { id: "architecture", label: "Architecture & distribution" },
     { id: "gtm", label: "Go-to-market" },
-    { id: "risk", label: "Risk + ethics" },
+    { id: "risk", label: "Risk & ethics" },
+    { id: "decisions", label: "Decisions & metrics" },
+    { id: "execution", label: "Execution library" },
   ];
 
   const MONETIZE_MARKET = [
@@ -1031,8 +1152,8 @@
         parsed.activeTab = LEGACY_TAB_MAP[parsed.activeTab];
       }
       if (!parsed.triage) parsed.triage = defaultTriageFilters();
-      if (!parsed.monetizeSection) parsed.monetizeSection = "vision";
-      if (parsed.monetizeSection === "compete") parsed.monetizeSection = "landscape";
+      if (!parsed.monetizeSection) parsed.monetizeSection = "thesis";
+      parsed.monetizeSection = migrateMonetizeSection(parsed.monetizeSection);
       parsed.v = 2;
       return parsed;
     } catch {
@@ -1043,7 +1164,7 @@
     return { area: "all", show: "active" };
   }
   function defaultState() {
-    return { v: 2, items: {}, decisions: {}, pageNotes: {}, activeTab: "phases", triage: defaultTriageFilters(), monetizeSection: "vision" };
+    return { v: 2, items: {}, decisions: {}, pageNotes: {}, activeTab: "phases", triage: defaultTriageFilters(), monetizeSection: "thesis" };
   }
   let state = loadState();
   function saveState() {
@@ -1326,115 +1447,7 @@
 
   // ---------- Render: Now (RETIRED) ----------
   // The "Now" tab was removed; "Phases" is now the default landing tab.
-  // The future-stores stretch-goal note that used to live in this panel
-  // ("Further stores (Riot, Rockstar, Game Pass catalog, cloud services) are
-  // stretch goals — only if a clean own-session path exists and the bs_tos
-  // guardrails hold.") is preserved in the find_store_integration_complete
-  // finding on the Triage tab. The old shipped/up-next history was dropped.
-  // BEGIN dead code — intentionally unreferenced, kept only until the next sweep.
-  function _retiredPanelNow_unused() {
-    const p1 = PHASES[0];
-    const done = p1.items.filter((i) => getItem(i.id)).length;
-    const total = p1.items.length;
-    const pct = total
-      ? (done >= total ? 100 : Math.floor((done / total) * 100))
-      : 0;
-    const shipped = [
-      "Local switchable profiles (2026-06-02) — Shape 2: header profile menu + Manage modal; profiles/<id>/ isolates games_*, personal.json, auth; legacy root until second profile; full reload on switch. shared/profile_paths.py, shared/profiles.py, /api/profiles, BAKLOG_PROFILE for fetchers. bs_multiuser_profiles resolved.",
-      "Spotlight 'On sale now' is wishlist-only (2026-06-02) — a discount on a game you already own isn't actionable, so the spotlight category no longer tags library games. gameSpotlightReason dropped its isOnSale branch; pickSpotlightGames injects visible wishlist on-sale items (rating >= 70, cross-store/user-hidden excluded) tagged 'On sale now', rendered as 'on your wishlist' with a wishlist jump. js/dashboard-spotlight.js; tests/spotlight-replay.test.js updated.",
-      "Missing-catalog 404s silenced (2026-06-02) — server.py returns an empty {game_count:0, games:[]} stub for any games_*.json that doesn't exist yet (unfetched store), so the boot probe no longer floods the console with 404s during the connection pass. Real data replaces the stub once the fetcher runs. tests/test_server_personal.py covers the stub.",
-      "Library/wishlist merge gaps fixed (2026-06-02) — games_ea.json was loaded but never merged into the library (ea missing from rebuildAllGamesFromMetas); Nintendo + Humble wishlist files were loaded but never merged into state.wishlistGames (missing from rebuildWishlistFromMetas). All three now surface their rows. js/library-load.js.",
-      "Cross-platform graceful degradation (2026-06-02) — macOS/Linux run every store except Amazon Games (Windows-only DPAPI launcher DB). shared/platform_support.py + ProviderSpec.platforms + manifest platforms gate; auth/manager guards the amazon_client import so GET /api/auth/status never 500s off-Windows; /api/auth/status + /api/fetchers expose platforms/available/server_platform; UI dims Amazon rail + disables its chip; server 400s POST /api/run/amazon off win32; refresh.sh + cron docs; README platform matrix; macos-latest CI; tests/test_auth_status_platform.py. bs_xplatform resolved.",
-      "First-run onboarding flow (2026-06-02) — when 0 providers connected: Connections .conn-onboard CTA (Start with Steam → reconnectProvider); dashboard #dashOnboard welcome; empty library/wishlist/itch tables get Open Connections button. connectedProviderCount() in js/connections.js. p4_onboarding_flow + find_ux_conn_density resolved.",
-      "Ubisoft Connect 2FA blank tab (2026-06-02) — post-verify about:blank popups auto-closed via is_blank_browser_url + _merge_popup_worker (cdp_browser) and orphan-tab sweep in _extract_ubisoft; not a Connections card render bug. find_ux_conn_ubi_blank_tab resolved.",
-      "Boot curtain loading tips (2026-06-02) — #bootLoadingTip was empty until the module graph finished, so hints only flashed for ~150ms before liftBootCurtain. Inline body script in index.html seeds a random tip at parse time (TIPS list kept in sync with js/tips.js); startBootTipRotation adopts seeded text so the 4s cross-fade rotation continues without a swap flash.",
-      "Display currency + honest wishlist prices (2026-06-02) — shared/money.py + ITAD_COUNTRY; itad_prices.json carries currency; js/currency.js (formatMoney, displayCurrency); wishlist fetchers use real currency codes. bs_i18n + bs_pricing_currency resolved.",
-      "FX at fetch (2026-06-03) — shared/fx.py (Frankfurter → cache/fx_rates.json); fetch_itad.py converts games_wishlist*.json to display currency with native fields preserved; price_amount drives sort/filter; fetch_fx.py; tests/test_fx.py + tests/deals-fx.test.js. bs_fx_conversion resolved.",
-      "JS test coverage complete (2026-06-02) — six Vitest files cover the Phase-3 test plan: deals, prefs, table-fingerprint, table-perf, dashboard-fingerprint (exported dashboardFingerprint), plus game-core hidden-key assertions for recomputeCrossStoreHidden. find_no_js_tests + find_js_test_remaining_gaps resolved; all p3_js_tests_* phase checkboxes [DONE]. Suite: 233 passing.",
-      "Managed CDP browser login generalized (2026-06-02) — every cookie-based store uses Connections → Connect (headed persistent profile); fetchers read the saved blob via resolve_env. Humble added to INLINE_PROVIDERS; README Connect-first; reconnect chips launch managed re-auth. bs_managed_login resolved. itch/ITAD stay manual API-key; Amazon stays local-only.",
-      "Store-integration phase COMPLETE (2026-06-02) — 12 library fetchers (Steam, GOG, PSN, Epic, Amazon, Xbox, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA App) + 8 wishlist fetchers wired. EA App was the last add: ea_client.py + fetch_ea.py replay the user's own ea.com web-session Bearer token (sniffed from the saved 'ea' CDP browser profile) against the same Juno GraphQL endpoint the website uses — no desktop-client impersonation, keeping the bs_tos 'automating your own access' framing literally true. Further stores are now stretch goals only. Next focus: troubleshoot every existing connection one by one. See find_store_integration_complete.",
-      "Accessibility audit (2026-06-02) — axe-core CI gate (tests/a11y/index-axe.test.js) fails on serious/critical violations; skip-to-main + main landmark; focus trap/Escape on drawer, popovers, modals (js/focus-trap.js); aria-current view tabs; co-op radiogroup; contrast fixes; global :focus-visible. docs/a11y.md. bs_a11y resolved.",
-      "Portable secrets bundle (2026-06-02) — auth/bundle.py exports a passphrase-encrypted baklog-secrets-*.bundle with credentials + CDP browser profiles; import restores cache/auth/ atomically (profiles_pre_import_* snapshot on overwrite). Dashboard: Connections ⋮ → Portable bundle… → Export/Import. API: POST /api/auth/secrets/export + /import. CLI: python -m auth export-bundle / import-bundle. PRIVACY.md + README updated. bs_secret_recovery resolved.",
-      "Bug-bundle audit follow-up (2026-06-02) — persisted stack traces capped at 4KB (full stack kept in session); deduped errors track repeats counter (bundle_version 2); kebab → Report a bug… copies the same whitelist bundle; aria-label on bundle buttons; CHANGELOG Unreleased + version-mirror doc updated.",
-      "Telemetry / error reporting decision frozen (2026-06-02) — Hybrid local-only. error-boundary.js mirrors every captured error into a rolling 200-entry localStorage ring (baklog-error-log) that survives reloads. Toast gains a 'Copy bug bundle' button (alongside 'Errors only' / 'Details' / 'Dismiss') that puts a whitelist-built JSON payload on the clipboard — app version, view, data version, filter count, table fingerprint, last render ms, dash stats, plus session + persisted error arrays. State.personal / manualGames / library JSON / credentials / host paths are excluded by construction (no whitelist key references them). registerBugBundleContext() wires the fingerprint + filter-count lookups from app.js so error-boundary.js stays dependency-free and installs before any other module runs. Debug overlay gains the same 'Copy bug bundle' button. PRIVACY.md + README updated. bs_telemetry resolved.",
-      "Fetcher resilience pass (2026-06-02) — cancel-all endpoint (POST /api/runs/cancel) takes down active + queued runs in one click; server-side queue cap (max 1 running + 1 queued, enforced in RunManager.submit + mirrored client-side via inFlightCount/isQueueFull); cancel uses immediate taskkill so the single-threaded HTTP server no longer wedges; client suppressedRunIds set prevents scheduleReconnect/subscribe/syncFromServer from resurrecting a cancelled run id, killing the 'stream dropped — reconnecting in 2s/4s/8s' loop. New test_cancel_all_clears_active_and_queue locks the path. See find_dbg_fetcher_resilience.",
-      "Percent display: no rounding-up to 100% — fetcher coverage chips, tracker phase progress, and dashboard counts all use Math.floor((covered/total)*100) for partial coverage; only exact covered>=total reports 100%. Was reporting 100% at 99.86% before.",
-      "Tracker accordion preserves open state on check — preserveDetailsOpen() now matches on stable data-key (phase/drawer ids) before falling back to summary text. Old text-based match broke whenever a checkbox tick changed the embedded 'done/total' count, collapsing the phase you were working in.",
-      "Brand mark is no longer a link — BAKLOG header is a <div id=\"brandMark\"> instead of an <a>, fixing the unwanted hover/underline on app-shell click targets.",
-      "Picks drawer collapsed-state corner fix — #picksSection:has(> #picksContainer.hidden) > div:first-of-type clears its border-bottom so the divider doesn't draw against the rounded card corner when the drawer is collapsed.",
-      "Sticky table header 1px gap closed — #tableWrap drops top border and gets square top corners; thead th uses top:-1px + inset bottom-shadow so scrolled rows don't show through the seam.",
-      "Drill-to-row scroll for virtual lists — added scrollToVirtualRowIndex() + virtual branch in consumePendingScrollTarget; paintVirtualSlice now calls it when anchorIdx>=0 instead of leaving the user staring at a blank window mid-table. focusGame uses afterChrome only when crossing views (picksOpen && !crossingView), fixing the 'spotlight → blank table until mousewheel' regression. Tests at tests/drill-anchor.test.js include a 120+ row virtual list assertion.",
-      "Steam appid remap for orphaned PSN review map entries — two PSN rows in cache/steam_review_map.json pointed at Steam package IDs (132479, 124923) instead of app IDs, so /api/appdetails returned success: false and the co-op tag enricher reported them as 'unchecked'. Remapped to canonical app IDs (287700 = MGSV: TPP, 292030 = Witcher 3) so enrich_steam_tags.py --stores psn closes them. Co-op tags chip now reports 100% coverage with 0 unchecked-with-appid-match rows.",
-      "Co-op filter rebuilt as a 5-state segmented control (Off · Any · Online · Couch · Both).",
-      "Hide-duplicates control now visible on Library AND Wishlist tabs (was Library-only).",
-      "Connections page got a How-to disclosure + manual cards collapsed into one row.",
-      "Dashboard spotlight no longer flickers on revisit (compositor layer fix).",
-      "Library/itch table now uses true viewport windowing (Phase C) — ~60 DOM rows for a 1700+ row library, drill-in/A–Z jump by scroll position, deferred cover hydration, back-to-top docked to alpha rail.",
-      "BAKLOG logo + brand mark in the header.",
-      "Three new wishlist fetchers: PSN, Ubisoft, Xbox.",
-      "Full out-of-repo project backup taken; main pushed to origin.",
-      "GitHub Actions CI: ruff (advisory) + pytest (112) + vitest (59) on every push/PR.",
-      "Atomic write + rotated backups for every games_*.json and itad_prices.json — a killed fetcher or bad run can no longer corrupt or wipe fetched data.",
-      "Filter state moved to state.sessionPrefs as the single source of truth — DOM mirrors state, ~12 hand-rolled DOM reads collapsed into one helper.",
-      "?debug=1 overlay: corner panel with view, data version, visible rows, active filter count, table fingerprint, last render ms.",
-      "Global error toast — uncaught throws and unhandled promise rejections now surface as a sticky red toast (Copy / Details / Dismiss) instead of dying in the console.",
-      "Price column polish: discount text follows the deal-cut palette (emerald → emerald/amber → amber/red/pink) so 50%+ and 75%+ cuts read at a glance; the all-time / 1yr / generic-low badge collapsed into a small amber star to the LEFT of the price (outside the deal <a>, default cursor, no underline, tooltip preserved) — mirrors the dashboard steals row so users learn one shape.",
-      "Column header sort regression fixed — paintVirtualSlice was short-circuiting whenever the visible window indices matched, even after a resort handed it the same indices over a freshly-sorted list. Added _virtualWindowList identity check so the early-return only fires when the LIST is also the same; small lists / one-shot paints were unaffected. Filed find_virtual_window_cache_stale so the audit learns the pattern.",
-      "Library junk-name filter expanded to drop HBO Max + HBO GO (PSN reports them as type=game). Filter runs on load in dedupeWithinStore → isJunkEntry, so a re-fetch of games_psn.json can't reintroduce them.",
-      "applyPrefsChange(patch, options) helper consolidates the savePrefs + syncFilterDom + recomputeDedup + renderSummary + refreshFilterUI dance into one call — removeActiveFilter's 25-case switch and clearAllFilters now read as one-liners; bind-events.js deal/chip/dedup handlers migrated. Imports of recomputeCrossStoreHidden + syncFilterDomFromState dropped from bind-events.js (now dead).",
-      "Dashboard one-shot animation lock. Boot runs loadFetcherSources + probeApi in parallel with reloadGames so the first renderDashboard paints fetcher chips (no layout shift). Removed trailing bootstrap scheduleDashboardRender (applyMergedLibrary alone schedules once). Replay gated by setDashReplayAllowed + renderDashboard({ replay: true }) — only switchView('dashboard') may replay; boot/personalStore schedules hit skippedAutoReplay instead of chart.reset(). .dash-fetcher-health min-height 7.5rem belt. Debug overlay: dash F/R/S (S = reentrant + skippedAutoReplay).",
-      "Price column now sorts by current price (after sales). The header's data-sort was 'discount_percent' so clicking Price was secretly sorting by % off, not by price — flipped to data-sort='deal_price' and added a tooltip. Shift-click on Price now routes to discount_percent (was wishlist-only and inverted before). Default direction logic simplified: discount_percent → descending, everything else (incl. deal_price) → ascending so cheapest-first feels right on first click. Added sort indicator arrows on every sortable th (.sort-arrow + .th-sorted + aria-sort) so the active column is always visible; Price column shows '%↓' when shift-click routes the sort through discount_percent.",
-      "Loading curtain unified (js/loading-curtain.js) — LOADING_LABELS + setBootCurtainLabel / liftBootCurtain (boot #bootLoadingOverlay, 150ms min visible, 3 safety nets: try/finally, bootstrap.catch force-lift, inline FOUC 8s timeout) + showViewOverlay / hideViewOverlay (tab-switch #viewLoadingOverlay on tableShell). Boot tips: js/tips.js rotation + first-paint inline seed (see shipped 2026-06-02 boot-tip entry). Removed #dashboardLoading (textContent was destroying spinner markup). ?debug=1 curtain row shows boot reason/elapsed + view overlay state.",
-      "Notes UX end-to-end — search matches notes + tags; '✎ note' pill in row meta line; Esc reverts; export personal data + export notes only; import deep-merge; cross-store notes mirror (last-write-wins + longest-note canonicalize). Deferred: multiline, card surfacing, undo, bulk edit.",
-      "Orphan personal data cleanup — debug overlay surfaces an 'orphans' count (waits for full library load); kebab → Clean up unknown games… opens a modal with per-key checkboxes (status / tag count / notes preview), 'only empty entries' filter, Select all/none, and a destructive Remove that relies on the server's existing rotating backup in data/personal_backups/ for recovery. Auto-prune left intentionally out.",
-      "Tags UX end-to-end — canonical cross-store mirroring; shared tag filter; datalist autocomplete; filter-drawer rename/merge/delete; 'N tag(s)' meta pill; pick-card tag chips; export tags only; vitest coverage. Deferred: named smart-lists (find_ux_tag_smart_lists).",
-      "Connections page rebuilt as master-detail (sticky left rail + static right pane). Steam pinned to the top of the rail; custom RAIL_ORDER groups the other providers by friction/pairing. Replaced the previous accordion/grid that caused layout bounces and overlapping eyebrow/collapse controls. Keyboard navigation on the rail, responsive single-column at narrow widths.",
-      "Add/Remove unified model — Custom rows (manual[]) and Pulled (fetcher) rows now have distinct semantics. Add-game modal does dedupe by normalized title against the target view (library / wishlist / itch) with Go to existing / Add anyway / Cancel; Go to existing auto-unhides hidden matches before flashing the row. Custom badge (dashed outline) shows on library + wishlist + itch. Add-modal footer reflects server sync.",
-      "Bulk Remove + hidden games — bulkRemove branches: custom rows delete from manual[] AND clear their personal entry (no more orphan status/notes); pulled rows set personal.hidden=true and survive re-fetch. 12s undo restores both (manual array, personal records, including hidden flips). Hidden games kebab panel lists every hidden key with per-row Restore + Restore all; orphan keys (game dropped from catalog) still render with fallback name + 'awaiting next fetch'.",
-      "Pre-hide registry replaces Python fetcher denylists. New js/hidden-defaults.js seeds 13 known junk entries (Epic Q.U.B.E. 2 cosmetics + Death Stranding DLC; PSN streaming apps + NieR demo) into personal.hidden=true on first run (gated by __pre_hidden_v1_seeded). fetch_epic.py DENYLIST and fetch_psn.py DENYLIST_IDS removed — users can now unhide any of them from the Hidden games panel instead of editing Python.",
-      "Hidden-aware stats — filterOutHidden() applied at picks-ui, summary chips (filters-ui), dashboard totals (dashboard-shared); row-count denominators subtract countUserHiddenLibrary()/countUserHiddenWishlist(); orphan-prune treats hidden=true as hasData so a hidden delisted game isn't silently bulk-pruned. getPersonal() returns a derived object (no more mutate-on-read).",
-      "Boot UX hardening — navigation tabs are disabled during the data-boot-loading window (re-enabled by liftBootCurtain or the 8s safety net). Row-count label (#rowCount) syncs synchronously on tab switch via syncRowCountLabel() so 'Wishlist: 53 of 53' no longer lingers after switching to Library. Row meta pills (.store-badge, .coop-pill, .has-notes-dot) now share height=16px / line-height=1 so the badge / co-op / note pills sit on the same horizontal midline.",
-      "Blind-spot quick wins (4) — LICENSE (MIT) at repo root + mirrored in pyproject.toml + package.json + README header link; PRIVACY.md documents credentials, data files, every network host, deletion checklist; CHANGELOG.md gained a Release discipline block (SemVer + bump/rename-Unreleased/tag workflow); fetchers/_base.py gained refuse_drift_result + --allow-drift flag, wired into all 11 fetcher entry points so a fetcher returning 3 rows where it used to return 600 fails loudly (exit 3) instead of silently overwriting the on-disk file. 7 new pytest cases cover the drift guard.",
-      "Drill-in scroll unification — pendingScrollTarget in table-ui.js replaces four overlapping scroll paths; row drills defer scroll until picks/summary layout settles; category drills use kind=toolbar consumed after refreshFilterUI. 4 Vitest cases in tests/drill-anchor.test.js.",
-      "Tab loading flash fix — navigation tabs (.view-tab) now start dim via CSS rule on html[data-boot-loading], removing the bright→dim→bright flash on boot. Sticky-header 1px gap closed by stripping border-top from #tableWrap and applying border-top-radius to the first/last sticky <th>.",
-      "Cross-store playtime aggregation — state.crossStorePlaytimeByKey populated in recomputeCrossStoreHidden() sums playtime_minutes across every duplicate row when dedup is on. combinedPlaytime(g) + combinedPlaytimeTooltip(g) drive the library 'Played' cell (with a per-store breakdown tooltip), dashboard totals, 'unplayed' filter, and the playtime sort — main thread + worker (table-query.worker.js rebuilds the Map from a structured-clone-safe entries array). 6 Vitest cases cover the dedup-on / dedup-off / zero-minutes / per-store-tooltip paths.",
-      "Co-op overrides registry — js/coop-overrides.js holds a normalized-name registry for non-Steam co-op titles that Steam doesn't categorize for us (Fortnite, Rocket League, Ghost of Tsushima both editions, Ghost of Yotei). applyCoopOverrides() runs at load, never clears an existing true (Steam stays authoritative when it knows), and matches via normalizeNameForDedup so a single entry covers every store copy of the game.",
-      "Steam co-op tag enricher landed — new enrich_steam_tags.py + shared steam_metadata.py module backfill coop_online/coop_local on every non-Steam library row that has a Steam appid match in cache/steam_review_map.json. Also fills missing genres / release_date when the store didn't provide them; ALWAYS_WRITE vs FILL_IF_MISSING partition is tested (15 unit + 3 offline integration tests, all monkey-patched so they run in <1s without network). Wired into the dashboard chip strip with coverage % + pending count + click/refresh hints. fetch_games.py now imports the same coop classifier so Steam fetch + non-Steam enrich agree on Online Co-op vs Shared/Split Screen Co-op vs LAN Co-op semantics.",
-      "PSN title links go to the PlayStation Store again — two reinforcing bugs: (1) psn_client.py dedupe inherited concept_id from a sibling but kept the keeper's psnprofiles trophy URL (the existing 'if not keeper.store_url' guard refused to upgrade it); (2) storeUrlForGame in game-core.js returned the cached store_url before checking concept_id, so even after the Python fix the on-disk psnprofiles URLs would still leak. Python now rebuilds store_url from the merged concept_id at the end of dedupe; JS gained a PSN-specific branch that prefers the concept URL and falls back to PSN store search (not psnprofiles) when there's no concept_id. 348/596 PSN rows route correctly without re-fetch; 2 new game-core Vitest cases lock the behavior.",
-      "Fetcher review-wipe fix — every non-Steam fetcher (GOG, Epic, PSN, Amazon, Xbox, Battle.net, Ubisoft, Nintendo) now uses fetchers/_base.py::merge_cached_row() with a per-store authoritative-field set (fetchers/_authoritative.py). Refetching a store no longer overwrites enriched fields the store can't provide (Steam reviews, HLTB hours) with nulls. New tests/test_merge_cached_row.py covers the Steam-reviews-preserved / HLTB-updated-when-flagged paths.",
-      "Steam review enricher tightened — enrich_steam_reviews.py's substring fallback was matching base games to sequels and DLC (Death Stranding → Death Stranding 2 / Director's Cut / Digital Artbook). New _close_enough_title gates on _number_tokens diff + _SPINOFF_MARKERS regex so 'death stranding' no longer matches 'death stranding 2 on beach' or '… director s cut'. New --refresh-empty flag retries rows that have a mapped appid but a null review percent (no second store search). 7 new pytest cases cover the sequel guard.",
-      "Table empty-state affordance (2026-06-02) — zero filter matches show 'No games match your filters' + Clear all filters (and Show non-games on itch when hide-non-games is on) instead of a blank table; neutral hints when the catalog is genuinely empty. find_ux_itch_empty resolved. tests/empty-state.test.js.",
-      "HD Wallpaper permanent fix (2026-06-02) — Epic cosmetic 'HD Wallpaper' kept reappearing with a bogus 94.9% Steam score (stale enrich_steam_reviews match). PRE_HIDDEN_KEYS could not re-apply for users who already ran __pre_hidden_v1_seeded. Fix: JUNK_NAME_PATTERNS /\\bwallpaper$/i in game-core.js drops trailing-wallpaper SKUs at load in dedupeWithinStore (all users, every reload, survives Epic re-fetch). Tests lock HD Wallpaper + Death Stranding — HD Wallpaper true, Wallpaper Engine false. Stale steam_review_* stripped from games_epic.json row. PRE_HIDDEN_KEYS entry kept as belt-and-suspenders.",
-    ];
-    const blockers = [];
-    const next = [
-      "CONNECTION TROUBLESHOOTING PASS (current focus) — store-adding is done; managed login is generalized (bs_managed_login resolved). Walk every connection one by one: Connect, verify capture, run fetch, confirm drift guard + reconnect-chip behavior. Track progress on the new Connection matrix tab (Connect / Fetch / Reconnect / Spot-check per pull).",
-      "Provider checklist to walk: Steam · GOG · PSN · Epic (+ wishlist) · Amazon · Xbox (+ wishlist) · Battle.net · Ubisoft (+ wishlist) · Nintendo (+ wishlist) · itch.io · Humble (+ wishlist) · EA App.",
-      "Run the first EA App sync to populate games_ea.json + confirm the count, now that EA Connect is verified.",
-      "Further stores (Riot, Rockstar, Game Pass catalog, cloud services) are stretch goals — only if a clean own-session path exists and the bs_tos guardrails hold.",
-      "Open the Triage tab (consolidated Audit findings + Blind spots). Walk every Active item; mark Accept / Defer / Reject / Done.",
-    ];
-    return el("section", { id: "panel-now", class: "panel" + (state.activeTab === "now" ? " active" : "") },
-      el("div", { class: "card-row" },
-        el("h1", {}, "Phase 1 — Stabilize"),
-        el("div", {}, el("span", { class: "pill pill-info" }, `${done} / ${total} · ${pct}%`)),
-      ),
-      el("p", {}, p1.tagline),
-      el("div", { class: "grid-3" },
-        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, String(shipped.length)), el("div", { class: "stat-label" }, "Just shipped")),
-        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(next.length)), el("div", { class: "stat-label" }, "Up next")),
-        el("div", { class: "stat" + (blockers.length ? " stat-warning" : "") }, el("div", { class: "stat-value" }, String(blockers.length)), el("div", { class: "stat-label" }, "Blockers")),
-      ),
-      el("h3", {}, "Up next"),
-      el("div", { class: "card" }, ...next.map((s, i) => checkboxRow("now_next_" + i, escapeHtml(s)))),
-      el("h3", {}, "Blockers"),
-      blockers.length
-        ? el("div", { class: "card" }, ...blockers.map((s, i) => checkboxRow("now_block_" + i, escapeHtml(s))))
-        : el("div", { class: "card" }, el("p", { class: "muted" }, "No blockers.")),
-      el("h3", {}, "Just shipped"),
-      el("div", { class: "card" }, ...shipped.map((s) => el("div", { class: "check-row" }, el("input", { type: "checkbox", checked: "checked", disabled: "disabled" }), el("label", {}, s)))),
-    );
-  }
+  // Stretch-goal store note lives in find_store_integration_complete on Triage.
 
   // ---------- Render: Phases ----------
   function panelPhases() {
@@ -1478,7 +1491,7 @@
 
     return el("section", { id: "panel-phases", class: "panel" + (state.activeTab === "phases" ? " active" : "") },
       el("h1", {}, "Phases"),
-      el("p", { class: "muted" }, "Five phases from where you are today to launch. Phase 1 is current; the others are seeded with concrete items — fill in / re-order as you go. Finished items collapse into a per-phase ", el("strong", {}, "Completed"), " drawer."),
+      el("p", { class: "muted" }, `${PHASES.length} phases from where you are today to launch. Phase 1 is current; the others are seeded with concrete items — fill in / re-order as you go. Finished items collapse into a per-phase `, el("strong", {}, "Completed"), " drawer."),
       el("div", { class: "recent-shipped" },
         el("strong", {}, "Last shipped — Jun 3, 2026"),
         el("ul", {}, ...jun3Shipped.map((s) => el("li", {}, s))),
@@ -1551,11 +1564,12 @@
         `).join("")}
 
         <!-- Wishlist group -->
-        <rect x="40" y="220" width="600" height="100" rx="10" fill="#1e293b" stroke="#475569" />
-        <text x="56" y="240" fill="#94a3b8" font-size="10" font-weight="700" letter-spacing="0.05em">WISHLIST · 6 SOURCES</text>
-        ${["Steam", "GOG", "Epic", "PSN", "Ubisoft", "Xbox"].map((label, i) => {
-          const x = 56 + i * 98; const y = 254;
-          return `<g><rect x="${x}" y="${y}" width="86" height="50" rx="6" fill="#334155" stroke="#475569" /><text x="${x + 8}" y="${y + 20}" fill="#e2e8f0" font-size="11" font-weight="600">${label}</text><text x="${x + 8}" y="${y + 36}" fill="#94a3b8" font-size="9">wishlist</text></g>`;
+        <rect x="40" y="220" width="600" height="120" rx="10" fill="#1e293b" stroke="#475569" />
+        <text x="56" y="240" fill="#94a3b8" font-size="10" font-weight="700" letter-spacing="0.05em">WISHLIST · 8 SOURCES</text>
+        ${["Steam", "GOG", "Epic", "PSN", "Ubisoft", "Xbox", "Nintendo", "Humble"].map((label, i) => {
+          const col = i % 4; const row = Math.floor(i / 4);
+          const x = 56 + col * 145; const y = 254 + row * 58;
+          return `<g><rect x="${x}" y="${y}" width="130" height="50" rx="6" fill="#334155" stroke="#475569" /><text x="${x + 8}" y="${y + 20}" fill="#e2e8f0" font-size="11" font-weight="600">${label}</text><text x="${x + 8}" y="${y + 36}" fill="#94a3b8" font-size="9">wishlist</text></g>`;
         }).join("")}
 
         <!-- Itch already quarantined inside library group; this slot for ITAD -->
@@ -1693,28 +1707,7 @@
 
   // ---------- Render: Pipeline ----------
   function panelPipeline() {
-    const STORE_ROWS = [
-      { store: "Steam", fetcher: "fetch_games.py", auth: "API key + SteamID64", output: "games_steam.json" },
-      { store: "GOG", fetcher: "fetch_gog.py", auth: "GOG_AL cookie", output: "games_gog.json" },
-      { store: "PSN", fetcher: "fetch_psn.py", auth: "NPSSO token", output: "games_psn.json" },
-      { store: "Epic", fetcher: "fetch_epic.py", auth: "OAuth refresh token", output: "games_epic.json" },
-      { store: "Amazon", fetcher: "fetch_amazon.py", auth: "Launcher SQLite (Win) or Prime web session", output: "games_amazon.json" },
-      { store: "Xbox", fetcher: "fetch_xbox.py", auth: "OpenXBL API key", output: "games_xbox.json" },
-      { store: "Battle.net", fetcher: "fetch_battlenet.py", auth: "Session cookie + XSRF", output: "games_battlenet.json" },
-      { store: "Ubisoft", fetcher: "fetch_ubisoft.py", auth: "Ubi-SessionId + auth", output: "games_ubisoft.json" },
-      { store: "Nintendo", fetcher: "fetch_nintendo.py", auth: "CDP browser profile (nintendo)", output: "games_nintendo.json" },
-      { store: "itch.io", fetcher: "fetch_itch.py", auth: "API key", output: "games_itch.json" },
-      { store: "Humble", fetcher: "fetch_humble.py", auth: "Browser profile (humble)", output: "games_humble.json" },
-      { store: "EA App", fetcher: "fetch_ea.py", auth: "Browser profile (ea) → web-session Bearer", output: "games_ea.json" },
-      { store: "Steam (wishlist)", fetcher: "fetch_wishlist.py", auth: "API key + SteamID64", output: "games_wishlist.json" },
-      { store: "GOG (wishlist)", fetcher: "fetch_gog_wishlist.py", auth: "GOG_AL cookie", output: "games_wishlist_gog.json" },
-      { store: "Epic (wishlist)", fetcher: "fetch_epic_wishlist.py", auth: "Browser profile (epic_wishlist)", output: "games_wishlist_epic.json" },
-      { store: "PSN (wishlist)", fetcher: "fetch_psn_wishlist.py", auth: "NPSSO token (shared)", output: "games_wishlist_psn.json" },
-      { store: "Ubisoft (wishlist)", fetcher: "fetch_ubisoft_wishlist.py", auth: "CDP browser profile", output: "games_wishlist_ubisoft.json" },
-      { store: "Xbox (wishlist)", fetcher: "fetch_xbox_wishlist.py", auth: "CDP browser profile", output: "games_wishlist_xbox.json" },
-      { store: "Nintendo (wishlist)", fetcher: "fetch_nintendo_wishlist.py", auth: "CDP browser profile (nintendo_wishlist)", output: "games_wishlist_nintendo.json" },
-      { store: "Humble (wishlist)", fetcher: "fetch_humble_wishlist.py", auth: "Browser profile (humble)", output: "games_wishlist_humble.json" },
-    ];
+    const STORE_ROWS = pipelineRowsFromFetchers();
 
     return el("section", { id: "panel-pipeline", class: "panel" + (state.activeTab === "pipeline" ? " active" : "") },
       el("h1", {}, "Data pipeline"),
@@ -1741,7 +1734,7 @@
 
       el("div", { class: "callout success" },
         el("div", { class: "callout-title" }, "In-app refresh"),
-        el("div", { class: "callout-body" }, "Each fetcher in ", codeText("fetchers/manifest.json"), " shows up as a chip on the dashboard's fetcher-health strip. Clicking a chip posts ", codeText("/api/run/<key>"), " to ", codeText("server.py"), ", which spawns the script as a subprocess and tracks state via ", codeText("/api/runs"), ". A server-side watchdog kills runs that go silent; cancel falls back to ", codeText("taskkill /F"), " on Windows. The corresponding ", codeText("games_*.json"), " hot-reloads on success."),
+        el("div", { class: "callout-body" }, "Each fetcher in ", codeText("fetchers/manifest.json"), " shows up as a chip on the dashboard fetcher-health strip (collapsed ", codeText(".fh-bar"), " by default; expands on run). Clicking a chip posts ", codeText("/api/run/<key>"), " to ", codeText("server.py"), ", which spawns the script as a subprocess and tracks state via ", codeText("/api/runs"), ". A server-side watchdog kills runs that go silent; cancel falls back to ", codeText("taskkill /F"), " on Windows. The corresponding ", codeText("games_*.json"), " hot-reloads on success. Inbound/outbound wiring: ", codeText("docs/FETCHER_CONNECTIONS.md"), "."),
       ),
 
       el("div", { class: "callout" },
@@ -1810,9 +1803,9 @@
         el("div", { class: "callout-body" }, el("strong", {}, "Getting the key: "), "ITAD is the only ", el("strong", {}, "manual API-key"), " provider (no browser login). Make a free account at ", codeText("isthereanydeal.com"), ", open the developer / Apps page (", codeText("isthereanydeal.com/apps/"), "), register/assign a new app (give it a name; redirect URL can be a placeholder), then copy the generated API key. Paste it on the Connections page (ITAD card) or set ", codeText("ITAD_API_KEY"), " in ", codeText(".env"), " directly."),
       ),
 
-      el("div", { class: "callout warning" },
-        el("div", { class: "callout-title" }, "Epic wishlist — BLOCKED on Cloudflare"),
-        el("div", { class: "callout-body" }, codeText("graphql.epicgames.com"), " was discontinued; the wishlist now lives behind ", codeText("www.epicgames.com/graphql"), " on the storefront, which sits behind aggressive Cloudflare Turnstile. The Connections capture (", codeText("auth/runner.py::_extract_epic_wishlist_inline"), ") tries to sniff the storefront cookie from a 200 GraphQL response, but Turnstile loops despite the bypass flags (", codeText("disable-blink-features=AutomationControlled"), ", prefer real Chrome). ", codeText("cf_clearance"), " is UA/TLS-bound so a captured cookie can't be replayed from Python anyway. Fix direction: skip the cookie entirely and fetch headlessly through the saved CDP browser profile, the way Ubisoft and Xbox wishlist already do."),
+      el("div", { class: "callout success" },
+        el("div", { class: "callout-title" }, "Epic wishlist — resolved (headless CDP)"),
+        el("div", { class: "callout-body" }, codeText("fetch_epic_wishlist.py"), " loads ", codeText("store.epicgames.com/wishlist"), " through the saved ", codeText("cache/auth/profiles/epic_wishlist"), " CDP profile (same pattern as Ubisoft/Xbox wishlist). Cookie replay from Python was abandoned — ", codeText("cf_clearance"), " is UA/TLS-bound and Turnstile blocked inline capture. Connect once on Connections (clear Cloudflare if prompted), then run the WL Epic chip; use ", codeText("--dump"), " for ", codeText("cache/epic/wishlist_dump.*"), " if parsing needs tuning."),
       ),
     );
   }
@@ -2504,6 +2497,12 @@
             el("p", { style: "margin:0" }, "Watch the overlay's ", el("code", {}, "errors"), " field. If non-zero, the red toast already told you. If you dismissed it, paste ", el("code", {}, "copy(JSON.stringify(window.__baklogErrors, null, 2))"), " in DevTools."),
           ),
         ),
+        el("div", { class: "field-card" },
+          el("div", { class: "field-head" }, el("div", { class: "field-name" }, "\"Fetcher run didn't reload / stream odd\"")),
+          el("div", { class: "field-body" },
+            el("p", { style: "margin:0" }, "Read ", el("code", {}, "docs/FETCHER_CONNECTIONS.md"), " — POST ", el("code", {}, "/api/run/<key>"), ", SSE ", el("code", {}, "/api/runs/<id>/stream"), ", ", el("code", {}, "reloadAfterFetcher"), ", profile-scoped ", el("code", {}, "games_*.json"), ". Tracker OPS note ", el("code", {}, "find_fetcher_connections_doc"), "."),
+          ),
+        ),
       ),
 
       el("h2", { style: "margin-top:1.5rem" }, "Privacy"),
@@ -2534,90 +2533,102 @@
     );
   }
 
+  function monetizeStatusPill(status) {
+    const tones = { locked: "pill-locked", open: "pill-open", believe: "pill-believe", validate: "pill-validate" };
+    return el("span", { class: "pill " + (tones[status] || "pill-neutral") }, status);
+  }
+
+  function renderMarketingFeatureCards() {
+    const out = [];
+    for (const block of MARKETING_FEATURES) {
+      out.push(el("div", { class: "card" },
+        el("h3", {}, block.category),
+        el("p", {}, el("strong", {}, "Pitch: "), block.pitch),
+        el("ul", {}, ...block.bullets.map((b) => {
+          const li = el("li", {});
+          const codeMatch = b.match(/(find_[a-z0-9_]+|bs_[a-z0-9_]+)/g);
+          if (!codeMatch) { li.textContent = b; return li; }
+          const parts = b.split(/(find_[a-z0-9_]+|bs_[a-z0-9_]+)/);
+          for (const part of parts) {
+            if (/^(find_|bs_)/.test(part)) li.appendChild(el("code", {}, part));
+            else if (part) li.appendChild(document.createTextNode(part));
+          }
+          return li;
+        })),
+      ));
+    }
+    return out;
+  }
+
   function panelMonetize() {
-    const ta = el("textarea", { class: "freenotes", placeholder: "Free notes - pricing thoughts, brand names, channel ideas, who you'd email for feedback-" });
+    const ta = el("textarea", { class: "freenotes", placeholder: "Free notes — pricing thoughts, channel ideas, counsel questions…" });
     ta.value = getPageNote("monetize");
     ta.addEventListener("input", () => setPageNote("monetize", ta.value));
-    const section = state.monetizeSection || "vision";
+    const section = state.monetizeSection || "thesis";
     const cards = [];
-    if (section === "vision") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Grand scheme"),
-        el("p", {}, "BAKLOG becomes the private command center for backlog decisions: fast activation, cross-store clarity, and ", el("strong", {}, "freemium (free + ads) monetization layered on top"), " with an optional 'No ads + cloud sync' upgrade for a couple of bucks a month."),
-        el("p", { class: "muted" }, "12-month: activation and retention. 24-month: house ads / affiliate live in deal cards. 36-month: optional cloud convenience + No-ads tier complement the ad-supported free tier."),
-        el("p", { style: "margin-top:0.4rem" }, el("strong", {}, "Lead model: "), "Free + ads. The audience is built almost entirely from people who claimed games they didn't pay for — pricing the core product anywhere above $0 fights the user's actual revealed preference. Ads (with a low-friction $2-$4/mo upgrade to remove them) align with how this audience already spends."),
-        el("p", { style: "margin-top:0.5rem" }, el("strong", {}, "2026 Q2 product truth: "), "Profiles + honest fetcher health + FX hardening ship before monetization scales — trust and data honesty are the pitch (", codeText("bs_phase2_reliability"), ", ", codeText("bs_fetcher_health_honest"), ", ", codeText("bs_fx_conversion"), ")."),
-        el("p", { style: "margin-top:0.5rem" }, el("strong", {}, "Simplicity as moat: "), "Anyone can list games. BAKLOG wins by retrieving your cross-store data as you, normalizing it once, and reshuffling it into decisions — simply. No cloud brain, no AI wrapper: just data, retrieved and reshuffled on your machine."),
+
+    if (section === "thesis") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Thesis statement"),
+        el("p", { class: "thesis-statement" }, MONETIZE_THESIS.statement),
+        el("h3", {}, "The bet"),
+        el("ul", { class: "thesis-bet" }, ...MONETIZE_THESIS.bet.map((b) => el("li", {}, b))),
+        el("p", { class: "muted" }, MONETIZE_THESIS.horizon),
+        el("p", { style: "margin-top:0.5rem" }, MONETIZE_THESIS.productTruth),
+        el("p", { class: "xref" }, "Lead monetization model (canonical): Model & unit econ tab."),
       ));
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Founder truths (the real reason this exists)"),
-        el("p", { class: "muted" }, "These are not hypothetical user research. They are the actual library the founder is living in."),
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Founder truths (evidence, not personas)"),
+        el("p", { class: "muted" }, "The actual library the founder lives in — grounds the accidental-library thesis."),
         el("ul", {}, ...MONETIZE_TRUTHS.map((t) => el("li", {}, t))),
-        el("p", {}, el("strong", {}, "Reframed pitch: "), "Modern game libraries are accidental — yours, mine, everyone's. BAKLOG is the first tool built for people who own more games than they remember claiming."),
+        el("p", {}, el("strong", {}, "Reframed pitch: "), "Modern game libraries are accidental. BAKLOG is built for people who own more games than they remember claiming."),
       ));
       cards.push(ownerPref("vision", "Define your personal north-star and hard limits.", "Success looks like...\nI will not do..."));
-    } else if (section === "hooks") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Why users choose this"),
-        el("p", { class: "muted" }, "Court users with simple truths: free to start, Steam works first, cross-store clarity, and privacy-first defaults."),
-        el("p", {}, "Core line: 'One honest backlog across all your stores, private by default.'"),
-        el("p", {}, el("strong", {}, "Simple but powerful: "), "It's just your data — retrieved from the stores you already use, normalized into one table, reshuffled into dashboard, deals, and picks. The magic-moment demo looks impressive because the retrieval is real; the product is honest about that."),
-        el("h3", {}, "The magic-moment demo (lead with this)"),
-        el("p", {}, "Connect once, click Refresh, and the dashboard fills in front of you: fetcher chips light up store-by-store (Steam, GOG, PSN, Epic, Xbox, Amazon, itch), the ", el("strong", {}, "library counter climbs live"), " — usually 0 to 1,000+ inside a minute — and the genre / co-op / deal panels paint as each store's data lands. Tested on a real audience: it sells itself. The demo IS the onboarding."),
-        el("p", { class: "muted" }, "Why this matters in marketing: every other library tool shows you a populated mock screenshot. BAKLOG can show you the moment a real account turns into a real library on the user's own machine. That's a 30-second screen recording you can drop into any subreddit, any tweet, any landing page."),
-        el("h3", {}, "Pain stories we lead with"),
+    } else if (section === "problem") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Pain stories"),
+        el("p", { class: "muted" }, "Court users with simple truths: free to start, Steam works first, cross-store clarity, privacy-first defaults."),
         el("ul", {},
-          el("li", {}, el("strong", {}, "Free Thursday has consequences: "), "Epic gives away a game every week. Prime Gaming drops a stack every month. GOG runs giveaways. Steam free weekends. You have been claiming for years. You cannot name half of what is in your account — and there is no native tool, on any storefront, that helps you audit it."),
-          el("li", {}, el("strong", {}, "The accidental library: "), "Years of Epic free Thursdays, Prime Gaming drops, GOG giveaways, and Steam free weekends. You did not buy a 600-game library — it accumulated while you were not looking."),
-          el("li", {}, el("strong", {}, "The itch.io blackout: "), "You bought a 1,400-item bundle. You cannot tell which entries are playable games, which are assets, which are zines. No storefront helps you sort it out."),
-          el("li", {}, el("strong", {}, "The five-launcher tax: "), "Steam, Epic, GOG, PSN, Xbox. Every launcher is a silo, and 'what should I play tonight?' requires checking five places."),
-          el("li", {}, el("strong", {}, "The duplicate buy: "), "You bought a deal on Epic for a game already in your Steam library. Wishlist alerts have no idea what you already own elsewhere."),
-          el("li", {}, el("strong", {}, "The 'where did all these come from?' moment: "), "First-run, the library count climbs in real time as each store's fetcher returns. People who watch it happen on their own account get it immediately — no copy required. That is the conversion event."),
+          el("li", {}, el("strong", {}, "Free Thursday has consequences: "), "Epic weekly, Prime monthly, GOG giveaways, Steam free weekends — years of claims with no native audit tool on any storefront."),
+          el("li", {}, el("strong", {}, "The accidental library: "), "You did not buy a 600-game library — it accumulated while you were not looking."),
+          el("li", {}, el("strong", {}, "The itch.io blackout: "), "1,400-item bundles mix games, assets, and zines — no storefront sorts playable vs junk."),
+          el("li", {}, el("strong", {}, "The five-launcher tax: "), "Steam, Epic, GOG, PSN, Xbox — 'what should I play tonight?' requires five places."),
+          el("li", {}, el("strong", {}, "The duplicate buy: "), "Wishlist alerts are ownership-blind; you rebuy on Epic what you already own on Steam."),
         ),
-        el("p", { class: "muted" }, "Counter-positioning: Storefronts profit when you cannot see across stores. BAKLOG is on your side because it runs on your machine and refuses to be one."),
+        el("p", { class: "muted" }, "Counter-positioning: storefronts profit when you cannot see across stores. BAKLOG runs on your machine."),
       ));
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "The deal tracker is a product, not just an ad surface"),
-        el("p", { class: "muted" }, "Elsewhere in this suite the deal cards get framed as the affiliate/ad slot. True \u2014 but that undersells them. The price layer is a real reason people open BAKLOG daily, and it does something no standalone deal site can: it knows what you already own."),
-        el("h3", {}, "Why the deal layer earns its keep with users"),
-        el("ul", {},
-          el("li", {}, el("strong", {}, "Ownership-aware deals (the one nobody else has): "), "ITAD / GG.deals / CheapShark can tell you a game is 80% off. They cannot tell you that you already own it on Epic, claimed it free from Prime, or have it buried in an itch bundle. BAKLOG fuses live pricing with your real cross-store library, so a deal only surfaces when it is ", el("em", {}, "actually actionable"), " \u2014 on sale, unowned everywhere, and worth your time."),
-          el("li", {}, el("strong", {}, "It kills the duplicate buy: "), "the single most expensive backlog mistake is re-buying a game you forgot you own on another store. Every other deal alert is ownership-blind and will happily sell you a dupe. BAKLOG flags owned titles so the radar never points at something already in your library."),
-          el("li", {}, el("strong", {}, "Wishlist radar that retires itself: "), "the wishlist deal hero + sale scoreboard turn a 200-item 'someday' list into a short, ranked 'these are cheap right now and you'll actually play them' shortlist \u2014 backed by rating and quick-win signals, not just raw discount percentage."),
-          el("li", {}, el("strong", {}, "Replaces a browser-tab habit: "), "the deal-hunter persona already keeps a price-tracker tab open. BAKLOG folds that habit into the same place they manage their backlog \u2014 one surface instead of a deal site plus five launchers."),
-          el("li", {}, el("strong", {}, "Honest, authorized pricing: "), "ITAD-sourced, authorized-store focus (not grey-market keys), shown in the user's own display currency. The deal you see is one you can trust and act on."),
-          el("li", {}, el("strong", {}, "Multi-currency wishlists: "), "Frankfurter FX at fetch time converts wishlist rows into your display currency while keeping native price labels — sort and filter deals without comparing yen magnitudes to dollar amounts."),
-          el("li", {}, el("strong", {}, "Work vs play profiles: "), "switchable local profiles isolate libraries, credentials, and notes on one machine — no cross-contamination when you share a PC (", codeText("bs_multiuser_profiles"), ")."),
-          el("li", {}, el("strong", {}, "Honest fetcher UI: "), "chips show data age + per-profile keys — they do not fake connection state (", codeText("find_fetcher_health_signals"), " · ", codeText("bs_fetcher_health_honest"), ")."),
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Non-obvious insight"),
+        el("p", {}, el("strong", {}, "Revealed preference = $0 payers. "), "The core audience acquired games through free claim flows (Epic, Prime, keys, bundles). Pricing the core above $0 fights how they actually spend."),
+        el("p", {}, el("strong", {}, "Accidental libraries are the category. "), "No incumbent treats cross-store owned-library truth + ownership-aware deals + backlog decisioning as one local-first package."),
+        el("p", { class: "xref" }, "Magic-moment demo + 12 library / 8 wishlist stack: Product & moat tab."),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Why now"),
+        el("table", { class: "data-table ledger-table" },
+          el("thead", {}, el("tr", {}, el("th", {}, "Signal"), el("th", {}, "Value"), el("th", {}, "Implication"))),
+          el("tbody", {},
+            ...MONETIZE_MARKET.filter((m) => /Epic|Prime|claim|free|accidental|ITAD|Backloggd/i.test(m.metric + m.implication)).slice(0, 6).map((m) =>
+              el("tr", {}, el("td", {}, m.metric), el("td", {}, m.value), el("td", {}, m.implication)),
+            ),
+          ),
         ),
-        el("p", {}, el("strong", {}, "Value line: "), "\u201CEvery other deal alert is guessing. BAKLOG knows what you already own \u2014 so it only tells you about sales that are actually worth it.\u201D"),
-        el("p", { class: "muted" }, "Full bullet list: Monetization \u2192 Product features tab."),
-        el("p", { class: "muted" }, "Monetization tie-in (not the lead): because the deals are genuinely useful and ownership-filtered, the affiliate/house-ad surface rides on something users already want open \u2014 which is exactly why ads here read as helpful rather than intrusive. The user value comes first; the revenue is a byproduct of getting it right."),
+        el("p", { class: "xref" }, "Full TAM table: Market & audience tab."),
       ));
       cards.push(ownerPref("hooks", "Capture your preferred product pitch voice.", "My one-sentence pitch...\nMy 30-second demo script..."));
-    } else if (section === "features") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Product features (copy bank)"),
-        el("p", { class: "muted" }, "Paste-ready bullets for README hero, landing page, GitHub description, and social posts. Each block has a one-line pitch plus detail bullets. Updated as shipped features land — see also resolved items in Triage (bs_*)."),
+    } else if (section === "product") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Canonical product facts"),
+        el("p", {}, el("strong", {}, "12 library + 8 wishlist fetchers "), "— largest accidental-hoarder ingestion stack in category; cross-store dedupe + combined playtime."),
+        el("h3", {}, "Magic-moment demo (canonical)"),
+        el("p", {}, "Connect once, Refresh — fetcher chips light store-by-store, library counter climbs (often 0→1,000+ in ~60s) on the user's PC. Real account → real library; 30s screen recording is onboarding + marketing."),
+        el("p", { class: "muted" }, "Every competitor shows populated mocks. BAKLOG can show retrieval happening locally."),
+        el("h3", {}, "Ownership-aware deals (canonical)"),
+        el("p", {}, "ITAD pricing fused with real libraries — deals surface only when actionable (on sale, unowned everywhere). Kills duplicate buys; wishlist radar retires itself when owned."),
+        el("p", { class: "xref" }, "Privacy + fetcher-health bullets below; lead model in Model tab."),
       ));
-      for (const block of MARKETING_FEATURES) {
-        cards.push(el("div", { class: "card" },
-          el("h3", {}, block.category),
-          el("p", {}, el("strong", {}, "Pitch: "), block.pitch),
-          el("ul", {}, ...block.bullets.map((b) => {
-            const li = el("li", {});
-            const codeMatch = b.match(/(find_[a-z0-9_]+|bs_[a-z0-9_]+)/g);
-            if (!codeMatch) { li.textContent = b; return li; }
-            const parts = b.split(/(find_[a-z0-9_]+|bs_[a-z0-9_]+)/);
-            for (const part of parts) {
-              if (/^(find_|bs_)/.test(part)) li.appendChild(el("code", {}, part));
-              else if (part) li.appendChild(document.createTextNode(part));
-            }
-            return li;
-          })),
-        ));
-      }
-      cards.push(el("div", { class: "card agency-lane" },
+      cards.push(...renderMarketingFeatureCards());
+      cards.push(el("div", { class: "card thesis-lane" },
         el("h3", {}, "Marketing pillars"),
         ...MARKETING_PILLARS.map((p) => el("div", { class: "pillar-card" },
           el("p", {}, el("strong", {}, p.headline)),
@@ -2627,8 +2638,8 @@
           ),
         )),
       ));
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h3", {}, "Quick comparison sound bites"),
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h3", {}, "Quick comparison"),
         el("table", { class: "data-table", style: "margin-top:0.5rem" },
           el("thead", {}, el("tr", {}, el("th", {}, "They"), el("th", {}, "BAKLOG"))),
           el("tbody", {},
@@ -2640,88 +2651,83 @@
         ),
       ));
       cards.push(ownerPref("features", "Note which bullets to lead with per channel.", "Reddit lead with...\nLanding hero should emphasize...\nScreenshots to capture next..."));
-    } else if (section === "creative") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Creative assets"),
-        el("p", { class: "muted" }, "Design-ready briefs — hand to Figma, Canva, or landing build. Status + copy blocks with one-click copy."),
+    } else if (section === "market") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Personas (condensed)"),
+        el("p", { class: "muted" }, "Primary: backlog hoarders, deal hunters, cross-store collectors. Secondary: privacy-first power users, creators."),
+        ...MONETIZE_PERSONAS.map((p) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, p.name),
+          el("p", { class: "finding-body" }, p.description),
+          el("p", { style: "margin:0" }, el("strong", {}, "Pain: "), p.pain),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Wins with: "), p.winsWith),
+        )),
       ));
-      for (const asset of MARKETING_ASSETS) {
-        const statusTone = asset.status === "ready" ? "success" : asset.status === "shipped" ? "info" : "neutral";
-        const usedIn = MONETIZE_CAMPAIGNS.filter((c) => c.assetChecklist?.includes(asset.id)).map((c) => c.name);
-        const card = el("div", { class: "asset-card" },
-          el("div", { class: "asset-card-head" },
-            el("span", { class: "asset-card-title" }, asset.title),
-            el("span", { class: "pill pill-" + statusTone }, asset.status),
-            el("span", { class: "pill pill-neutral" }, asset.format),
-          ),
-          el("p", { class: "muted", style: "margin:0 0 0.35rem" }, asset.goal),
-          el("p", { class: "faint", style: "margin:0 0 0.5rem" }, "Pillars: ", (asset.relatedPillars || []).join(", ")),
-        );
-        if (usedIn.length) card.appendChild(el("p", { class: "faint", style: "margin:0 0 0.5rem" }, "Used in campaigns: ", usedIn.join(" · ")));
-        for (const [key, lines] of Object.entries(asset.copyBlocks || {})) {
-          const text = Array.isArray(lines) ? lines.join("\n") : String(lines);
-          card.appendChild(el("div", { style: "margin-top:0.35rem" },
-            el("strong", {}, key.charAt(0).toUpperCase() + key.slice(1) + ": "),
-            copyBtn(key, text),
-            el("pre", { class: "copy-snippet" }, text),
-          ));
-        }
-        if (asset.visualNotes) card.appendChild(el("p", { style: "margin:0.5rem 0 0" }, el("strong", {}, "Visual: "), asset.visualNotes));
-        cards.push(card);
-      }
-      cards.push(ownerPref("creative", "Asset production notes.", "Ship first...\nBlocked on...\nDesigner contact..."));
-    } else if (section === "messaging") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Persona × channel matrix"),
-        el("p", { class: "muted" }, "Recommended campaign + pillar + hook per cell."),
-        el("div", { class: "messaging-grid" },
-          tableEl(
-            ["Persona", "Reddit", "GitHub README", "Landing", "Short video", "Email waitlist"],
-            MARKETING_CHANNEL_MATRIX.map((row) => [
-              row.persona,
-              ...["reddit", "github_readme", "landing", "short_video", "email_waitlist"].map((ch) => {
-                const cell = row.channels[ch];
-                if (!cell) return "—";
-                return el("div", {},
-                  el("div", {}, el("strong", {}, cell.campaign)),
-                  el("div", { class: "faint" }, cell.hook),
-                  el("code", { style: "font-size:0.7rem" }, cell.pillar),
-                );
-              }),
-            ]),
-          ),
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Market + TAM logic"),
+        el("table", { class: "data-table ledger-table" },
+          el("thead", {}, el("tr", {}, el("th", {}, "Metric"), el("th", {}, "Value"), el("th", {}, "Source"), el("th", {}, "Implication"))),
+          el("tbody", {}, ...MONETIZE_MARKET.map((m) => el("tr", {}, el("td", {}, m.metric), el("td", {}, m.value), el("td", {}, m.source), el("td", {}, m.implication)))),
         ),
       ));
-      cards.push(el("div", { class: "card" },
-        el("h3", {}, "Copy snippet library"),
-        el("div", { class: "snippet-block" },
-          el("h4", {}, "Taglines"),
-          el("pre", { class: "copy-snippet" }, MONETIZE_COPY_SNIPPETS.taglines.join("\n")),
-          copyBtn("taglines", MONETIZE_COPY_SNIPPETS.taglines.join("\n")),
-        ),
-        el("div", { class: "snippet-block" },
-          el("h4", {}, "Elevator — 30s"),
-          el("pre", { class: "copy-snippet" }, MONETIZE_COPY_SNIPPETS.elevator30),
-          copyBtn("30s pitch", MONETIZE_COPY_SNIPPETS.elevator30),
-        ),
-        el("div", { class: "snippet-block" },
-          el("h4", {}, "Elevator — 60s"),
-          el("pre", { class: "copy-snippet" }, MONETIZE_COPY_SNIPPETS.elevator60),
-          copyBtn("60s pitch", MONETIZE_COPY_SNIPPETS.elevator60),
-        ),
-        el("div", { class: "snippet-block" },
-          el("h4", {}, "FAQ"),
-          ...MONETIZE_COPY_SNIPPETS.faq.map((f) => el("p", { style: "margin:0.35rem 0" }, el("strong", {}, f.q + " "), f.a)),
-        ),
-        el("div", { class: "snippet-block" },
-          el("h4", {}, "Objection handlers"),
-          ...MONETIZE_COPY_SNIPPETS.objections.map((o) => el("p", { style: "margin:0.35rem 0" }, el("strong", {}, o.objection + " — "), o.response)),
+      cards.push(ownerPref("market", "Write down assumptions you trust versus assumptions to validate.", "Assumptions I trust...\nAssumptions to validate..."));
+    } else if (section === "competition") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Category position"),
+        el("p", {}, "Only local-first tool fusing ", el("strong", {}, "automatic cross-store owned-library ingestion"), " + ", el("strong", {}, "deal intelligence"), " + ", el("strong", {}, "backlog decisioning"), " in one no-account package."),
+        el("h3", {}, "Market segments"),
+        ...MONETIZE_LANDSCAPE.map((s) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, s.segment),
+          el("p", { class: "muted", style: "margin:0 0 0.25rem" }, s.players),
+          el("p", { class: "finding-body" }, s.whatTheyDo),
+          el("p", { style: "margin:0" }, el("strong", {}, "Gap: "), s.gap),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Room for BAKLOG: "), s.roomFor),
+        )),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Competitor deep dives"),
+        ...MONETIZE_COMPETITORS.map((c) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, c.name),
+          el("p", { class: "muted", style: "margin:0 0 0.25rem" }, `${c.segment} · ${c.platform} · ${c.model}`),
+          el("p", { class: "finding-body" }, c.strength),
+          el("p", { style: "margin:0" }, el("strong", {}, "Gap: "), c.gap),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "BAKLOG edge: "), c.edge),
+        )),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Honest weaknesses"),
+        el("ul", {},
+          el("li", {}, el("strong", {}, "No native mobile app: "), "GG wins mobile; BAKLOG desktop-local for now."),
+          el("li", {}, el("strong", {}, "Install friction: "), "Python + local server today — privacy moat, real friction."),
+          el("li", {}, el("strong", {}, "No social layer: "), "Backloggd/GG feeds — solo workflow by design."),
+          el("li", {}, el("strong", {}, "Pre-launch scale: "), "Founder library as proof; smaller than Backloggd's 650k."),
+          el("li", {}, el("strong", {}, "Per-store Connect: "), "No one-click cloud OAuth like hosted competitors."),
         ),
       ));
-      cards.push(ownerPref("messaging", "Channel I'm testing first…", "Primary channel...\nHook to A/B...\nPersona focus..."));
-    } else if (section === "howitworks") {
-      const runSvg = `
-      <svg class="flow" viewBox="0 0 1000 580" width="100%" preserveAspectRatio="xMidYMid meet">
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Metadata: Steam + Wikidata, not IGDB"),
+        el("p", {}, el("strong", {}, "IGDB rejected. "), "Commercial terms + attribution for monetized product. Authority stays Steam (+ Wikidata gap-fill for console-only rows)."),
+      ));
+      cards.push(ownerPref("compete", "Draft positioning against launchers, trackers, and deal sites.", "We win because..."));
+    } else if (section === "model") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Lead model (canonical): free + ads"),
+        el("p", {}, el("strong", {}, "$0 free with contextual ads "), "on deal intent · optional ", el("strong", {}, "$2–$4/mo No ads"), " removes ad code paths (not DOM hide) + optional cloud sync later."),
+        el("p", { class: "muted" }, "Audience revealed preference is $0 on games. House/affiliate on deal cards first; third-party networks only after MAU ≥ 5k, context-only targeting."),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Model iterations (ranked)"),
+        ...MONETIZE_MODELS.map((m) => el("div", { class: "finding" },
+          el("div", { class: "finding-title" }, m.name),
+          el("p", { class: "finding-body" }, m.pitch),
+          el("p", { style: "margin:0" }, el("strong", {}, "Price: "), m.priceBand, " — ", el("strong", {}, "Math: "), m.math),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Agency says: "), m.agencySays),
+          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "You'd ship: "), m.actuallyShip),
+        )),
+      ));
+      cards.push(ownerPref("model_pick", "Pick your current model and deal-breakers.", "Model I'm leaning toward...\nDeal-breakers..."));
+      cards.push(ownerPref("pricing", "Lock your first pricing hypothesis.", "Free tier ad slots...\nUpgrade price...\nFloor...\nCeiling...\nWhat triggers ad-network onboarding..."));
+    } else if (section === "architecture") {
+      const runSvg = `<svg class="flow" viewBox="0 0 1000 580" width="100%" preserveAspectRatio="xMidYMid meet">
         <defs>
           <marker id="hw-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8" /></marker>
           <marker id="hw-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#38bdf8" /></marker>
@@ -2803,9 +2809,7 @@
         <polyline points="888,458 940,458 940,118 906,118" fill="none" stroke="#f59e0b" marker-end="url(#hw-amber)" />
         <text x="950" y="300" fill="#f59e0b" font-size="10" text-anchor="middle" transform="rotate(90 950 300)">you log in at the real store</text>
       </svg>`;
-
-      const endpointSvg = `
-      <svg class="flow" viewBox="0 0 1000 700" width="100%" preserveAspectRatio="xMidYMid meet">
+      const endpointSvg = `<svg class="flow" viewBox="0 0 1000 700" width="100%" preserveAspectRatio="xMidYMid meet">
         <defs>
           <marker id="ep-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8" /></marker>
           <marker id="ep-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#38bdf8" /></marker>
@@ -2894,228 +2898,227 @@
         <line x1="500" y1="120" x2="660" y2="520" stroke="#f87171" stroke-dasharray="4 4" opacity="0.35" />
         <text x="580" y="320" fill="#f87171" font-size="9" transform="rotate(-25 580 320)">not pursuing</text>
       </svg>`;
-
       const PACKAGING_TIERS = [
         ["Clone and run (today)", "Yes", "User installs Python 3.11+, pip install -e \".[dev]\", Chrome for Connect. Runs python server.py."],
         ["pipx / pip install", "Yes (Python must exist)", "Console entry point (baklog) — cleaner, still needs Python on the machine."],
         ["PyInstaller / Briefcase frozen binary", "No", "Bundles interpreter + deps into BAKLOG.exe / .app. Build per OS. Gotcha: ROOT path must use sys._MEIPASS when frozen. Chrome still required (BAKLOG_CHROME_PATH)."],
         ["Docker", "No (needs Docker)", "Wrong fit for non-technical users; self-hosters only."],
       ];
-
       cards.push(el("div", { class: "card" },
-        el("h2", {}, "How you actually use BAKLOG (today)"),
-        el("p", { class: "muted" }, "Current shipping model: clone the repo, install Python + deps, run server.py. Everything still runs on your PC; two browser windows is all you see."),
+        el("h2", {}, "How it runs (today)"),
+        el("p", { class: "muted" }, "Local engine on your PC; two browser windows. Privacy moat = architecture, not marketing copy."),
         el("div", { class: "card", html: runSvg }),
-        el("p", { class: "muted", style: "margin-top:0.5rem" }, "Three layers: stores on the internet; engine + data on your PC; two browser windows. No BAKLOG cloud in the middle."),
-        el("h3", {}, "The first run, in three steps"),
+        el("p", { class: "muted", style: "margin-top:0.5rem" }, "Stores → fetchers → local JSON → dashboard. No BAKLOG cloud in the middle."),
+        el("h3", {}, "First run"),
         el("ol", {},
-          el("li", {}, "Run ", el("code", {}, "python server.py"), " and open ", el("code", {}, "http://127.0.0.1:8765"), "."),
-          el("li", {}, "On ", el("strong", {}, "Connections"), ", ", el("strong", {}, "Connect"), " each store (sign-in popup opens and closes)."),
-          el("li", {}, el("strong", {}, "Refresh"), " — fetchers fill ", el("code", {}, "games_*.json"), " and the dashboard live."),
+          el("li", {}, "Run ", el("code", {}, "python server.py"), " → ", el("code", {}, "http://127.0.0.1:8765"), "."),
+          el("li", {}, "Connections → Connect each store (sign-in popup)."),
+          el("li", {}, "Refresh — ", el("code", {}, "games_*.json"), " fills; dashboard paints live."),
         ),
       ));
-
       cards.push(el("div", { class: "card" },
-        el("h2", {}, "Where we're headed (proposed endpoint)"),
-        el("p", { class: "muted" }, "Target state = ", el("strong", {}, "B: local-first core"), " + ", el("strong", {}, "optional"), " cloud sync of ", el("em", {}, "derived"), " catalog only + a ", el("strong", {}, "hosted read-only demo"), " for marketing. Fetching and credentials ", el("strong", {}, "always"), " stay on the user's PC. Full hosted fetch (C) is explicitly rejected."),
+        el("h2", {}, "Distribution endpoint: B (locked)"),
+        el("p", { class: "muted" }, "Local-first core + optional derived-catalog sync + hosted read-only demo. Full hosted fetch (C) rejected."),
         el("div", { class: "card", html: endpointSvg }),
-        el("p", { class: "muted", style: "margin-top:0.5rem" }, "Phase 4 items: ", el("code", {}, "p4_packaging"), " (installer / no-Python path), ", el("code", {}, "p4_cross_platform_decision"), " (done for graceful degradation). Optional cloud ties to ", el("code", {}, "p4_hosted_demo"), " and ", el("code", {}, "bs_multiuser_app_login"), " when hosting is decided."),
+        el("p", { class: "muted", style: "margin-top:0.5rem" }, codeText("p4_packaging"), " · ", codeText("p4_hosted_demo"), " · ", codeText("bs_multiuser_app_login"), " when hosting decided."),
       ));
-
       cards.push(el("div", { class: "card" },
-        el("h2", {}, "What lives where (engine vs frontend)"),
+        el("h2", {}, "Engine vs frontend · Python requirement"),
         el("ul", {},
-          el("li", {}, el("strong", {}, "Frontend (what users see): "), el("code", {}, "index.html"), " + ", el("code", {}, "js/"), " + CSS — the dashboard UI. Not inside ", el("code", {}, "server.py"), "."),
-          el("li", {}, el("strong", {}, "Engine (what users run): "), el("code", {}, "server.py"), " — serves those static files from the repo root and exposes ", el("code", {}, "/api/*"), " (personal data, auth, fetcher queue, profiles)."),
-          el("li", {}, el("strong", {}, "Workers: "), "fetch_*.py / enrich_*.py — launched by the engine, write ", el("code", {}, "games_*.json"), "."),
-          el("li", {}, el("strong", {}, "Secrets: "), el("code", {}, "auth/secrets.bin"), " (AES-GCM blob of per-store sessions) unlocked by one key in the ", el("strong", {}, "OS keyring (built-in)"), " — Credential Manager / Keychain / Secret Service. Not a BAKLOG tray app; the OS facility is queried only when server.py reads or writes secrets."),
+          el("li", {}, el("strong", {}, "UI: "), el("code", {}, "index.html"), " + ", el("code", {}, "js/"), " — static files served by ", el("code", {}, "server.py"), "."),
+          el("li", {}, el("strong", {}, "Workers: "), "fetch_*.py write ", el("code", {}, "games_*.json"), "; secrets in OS keyring + ", el("code", {}, "auth/secrets.bin"), "."),
+          el("li", {}, el("strong", {}, "Today: Python required. "), "Frozen binary removes Python; Chrome still required for Connect."),
         ),
+        tableEl(["Approach", "Python required?", "Notes"], PACKAGING_TIERS.map((r) => r)),
       ));
-
       cards.push(el("div", { class: "card" },
-        el("h2", {}, "Does the user need Python?"),
-        el("p", {}, el("strong", {}, "Today: yes."), " ", el("code", {}, "server.py"), " is a Python program. Users need Python 3.11+, ", el("code", {}, "pip install -e \".[dev]\""), ", and Chrome/Chromium for Connect."),
+        el("h2", {}, "B vs full-hosted C"),
+        el("p", {}, el("strong", {}, "Endpoint locked: B. "), "Optional sync = derived catalog only; never credentials; never server-side fetch."),
         el("ul", {},
-          el("li", {}, "Python goes away only at the ", el("strong", {}, "frozen-binary"), " tier (PyInstaller / Briefcase) — user double-clicks an installer, interpreter is bundled."),
-          el("li", {}, "Chrome/Chromium is ", el("strong", {}, "still"), " required even with a frozen binary (sign-in windows); detect or document ", el("code", {}, "BAKLOG_CHROME_PATH"), "."),
-          el("li", {}, "Audience today skews semi-technical (privacy-first, will run a script); installer is the bridge to mainstream."),
-        ),
-        el("div", { class: "card" }, tableEl(["Approach", "Python required?", "Notes"], PACKAGING_TIERS.map((r) => r))),
-      ));
-
-      cards.push(el("div", { class: "card" },
-        el("h2", {}, "Testing cross-platform (no Mac tester required for logic)"),
-        el("ul", {},
-          el("li", {}, el("strong", {}, "CI (automatic): "), "ubuntu-latest + ", el("strong", {}, "macos-latest"), " pytest jobs; ", el("code", {}, "tests/test_auth_status_platform.py"), " asserts Amazon unavailable off Windows and ", el("code", {}, "GET /api/auth/status"), " never 500s from ", el("code", {}, "amazon_client"), " import."),
-          el("li", {}, el("strong", {}, "Local Linux E2E: "), "WSL — clone inside WSL, ", el("code", {}, "python server.py"), ", browse from Windows to ", el("code", {}, "127.0.0.1:8765"), "."),
-          el("li", {}, el("strong", {}, "Genuinely manual: "), "Mac browser visual smoke + headed Chrome launcher path — borrow a Mac for ~20 min before marketing to Mac users, or use a cloud Mac."),
+          el("li", {}, el("strong", {}, "C temptation: "), "zero-install URL, mobile-anywhere, native sync."),
+          el("li", {}, el("strong", {}, "C rejected: "), "breaks privacy thesis, ", codeText("bs_tos"), " guardrails, breach target + infra cost."),
+          el("li", {}, el("strong", {}, "Sanctioned slivers: "), "read-only demo, opt-in catalog sync, later hosted login after counsel."),
         ),
       ));
-
-      cards.push(el("div", { class: "card" },
-        el("h2", {}, "Distribution decision: B vs full-hosted C"),
-        el("p", {}, el("strong", {}, "Endpoint locked: B"), " — local-first + optional cloud sync of derived data + hosted read-only demo. Local app works fully offline without cloud."),
-        el("h3", {}, "Why full-hosted C is tempting"),
-        el("ul", {},
-          el("li", {}, el("strong", {}, "Zero-install funnel: "), "URL works instantly — best for virality and landing pages."),
-          el("li", {}, el("strong", {}, "Mobile / any device: "), "check backlog on phone; local-only cannot do this without sync."),
-          el("li", {}, el("strong", {}, "Native sync + one-click updates: "), "data already server-side; deploy once."),
-        ),
-        el("h3", {}, "Why full-hosted C is deferred (rejected as the core model)"),
-        el("ul", {},
-          el("li", {}, "Breaks the privacy thesis: ", el("em", {}, "your store logins never leave your PC"), " — hosting means ", el("strong", {}, "you"), " hold users' storefront sessions."),
-          el("li", {}, "Detonates ", el("code", {}, "bs_tos"), " guardrails: never centralize credentials; never proxy fetches through our infra; server-side fetch = datacenter IPs = bot-farm optics + account-ban risk."),
-          el("li", {}, "You become a breach target with real infra cost and security liability."),
-        ),
-        el("h3", {}, "Sanctioned slivers of C (compatible with B)"),
-        el("ul", {},
-          el("li", {}, el("strong", {}, "Optional cloud sync: "), "only finished catalog (", el("code", {}, "games_*.json"), ", ", el("code", {}, "personal.json"), ") — never credentials, never server-side fetch."),
-          el("li", {}, el("strong", {}, "Hosted read-only demo: "), "sample data, no real accounts — try-from-a-link marketing without holding logins."),
-          el("li", {}, el("strong", {}, "Later: "), el("code", {}, "bs_multiuser_app_login"), " / ", el("code", {}, "p4_hosted_demo"), " if a hosted tier ships — only after hosting decision + counsel on guardrails."),
-        ),
-      ));
-
       cards.push(ownerPref("howitworks", "Notes on how you explain the model to a new user.", "The one-liner I use...\nWhat confuses people...\nThe analogy that clicks..."));
-    } else if (section === "audience") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Audience"),
-        el("p", { class: "muted" }, "Primary personas: backlog hoarders, deal hunters, and cross-store collectors. Secondary: privacy-first power users and creators."),
-        ...MONETIZE_PERSONAS.map((p) => el("div", { class: "finding" },
-          el("div", { class: "finding-title" }, p.name),
-          el("p", { class: "finding-body" }, p.description),
-          el("p", { style: "margin:0" }, el("strong", {}, "Pain: "), p.pain),
-          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Wins with: "), p.winsWith),
-        )),
-      ));
-      cards.push(ownerPref("audience", "Pick who you are actively building for this quarter.", "Primary persona...\nSecondary persona...\nIgnore for now..."));
-    } else if (section === "market") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Market + numbers"),
-        el("table", {},
-          el("thead", {}, el("tr", {}, el("th", {}, "Metric"), el("th", {}, "Value"), el("th", {}, "Source"), el("th", {}, "Implication"))),
-          el("tbody", {}, ...MONETIZE_MARKET.map((m) => el("tr", {}, el("td", {}, m.metric), el("td", {}, m.value), el("td", {}, m.source), el("td", {}, m.implication))))
-        ),
-      ));
-      cards.push(ownerPref("market", "Write down assumptions you trust versus assumptions to validate.", "Assumptions I trust...\nAssumptions to validate..."));
-    } else if (section === "landscape") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Competitive landscape"),
-        el("p", {}, "BAKLOG is the only local-first tool that fuses ", el("strong", {}, "automatic cross-store owned-library ingestion"), " + ", el("strong", {}, "deal/price intelligence"), " + ", el("strong", {}, "backlog decisioning"), " in one no-account package."),
-        el("p", { class: "muted" }, "The market splits into four segments. Each solves one slice; none combines all three layers BAKLOG targets."),
-        el("h3", {}, "Market segments"),
-        ...MONETIZE_LANDSCAPE.map((s) => el("div", { class: "finding" },
-          el("div", { class: "finding-title" }, s.segment),
-          el("p", { class: "muted", style: "margin:0 0 0.25rem" }, s.players),
-          el("p", { class: "finding-body" }, s.whatTheyDo),
-          el("p", { style: "margin:0" }, el("strong", {}, "Gap: "), s.gap),
-          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Room for BAKLOG: "), s.roomFor),
-        )),
-      ));
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Competitor deep dives"),
-        ...MONETIZE_COMPETITORS.map((c) => el("div", { class: "finding" },
-          el("div", { class: "finding-title" }, c.name),
-          el("p", { class: "muted", style: "margin:0 0 0.25rem" }, `${c.segment} · ${c.platform} · ${c.model}`),
-          el("p", { class: "finding-body" }, c.strength),
-          el("p", { style: "margin:0" }, el("strong", {}, "Gap: "), c.gap),
-          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "BAKLOG edge: "), c.edge),
-        )),
-      ));
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Where BAKLOG is weak (honest read)"),
-        el("p", { class: "muted" }, "Credibility requires naming what incumbents do better today."),
-        el("ul", {},
-          el("li", {}, el("strong", {}, "No native mobile app: "), "GG wins on iOS/Android. BAKLOG is desktop-local only for now."),
-          el("li", {}, el("strong", {}, "Install friction: "), "Backloggd/GG offer instant web signup. BAKLOG requires Python + local server — reframed as the privacy moat, but it is real friction."),
-          el("li", {}, el("strong", {}, "No social/community layer: "), "Backloggd and GG have active feeds, follows, and reviews. BAKLOG is solo workflow — by design, but it limits viral growth."),
-          el("li", {}, el("strong", {}, "Smaller / younger: "), "Backloggd has 650k users and IGDB backing. BAKLOG is pre-launch with a founder library as proof."),
-          el("li", {}, el("strong", {}, "Manual credential setup: "), "Each store needs cookies/OAuth/API keys configured locally. No one-click cloud OAuth like hosted competitors."),
-        ),
-      ));
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Metadata sourcing decision (why not IGDB)"),
-        el("p", {}, el("strong", {}, "IGDB: rejected for BAKLOG. "), "Backloggd, GOG Galaxy, and GG all lean on IGDB, but it is only free-and-frictionless for ", el("em", {}, "non-commercial"), " use. A monetized product requires a commercial partnership agreement (email partner@igdb.com) plus mandatory user-facing \u201CPowered by IGDB.com\u201D attribution. We will not take on that string."),
-        el("p", {}, el("strong", {}, "Authority stays Steam. "), "steam_metadata.py + enrich_steam_tags.py already backfill genres and co-op tags for non-Steam rows via Steam appdetails \u2014 no extra credential, no attribution, no commercial terms."),
-        el("p", {}, el("strong", {}, "No-strings gap-filler: Wikidata. "), "If we ever need metadata for console-only titles with no Steam equivalent (Nintendo / PSN / Xbox), Wikidata is CC0 / public domain \u2014 no auth, no rate-limit gate, no commercial restriction. Spottier coverage and name-based matching, but zero legal strings. It is the only metadata source we would add on top of Steam."),
-      ));
-      cards.push(ownerPref("compete", "Draft your positioning against launchers, trackers, and deal sites.", "We win because..."));
-    } else if (section === "models") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Model iterations"),
-        ...MONETIZE_MODELS.map((m) => el("div", { class: "finding" },
-          el("div", { class: "finding-title" }, m.name),
-          el("p", { class: "finding-body" }, m.pitch),
-          el("p", { style: "margin:0" }, el("strong", {}, "Price: "), m.priceBand, " - ", el("strong", {}, "Math: "), m.math),
-          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "Agency says: "), m.agencySays),
-          el("p", { style: "margin:0.2rem 0 0" }, el("strong", {}, "You'd ship: "), m.actuallyShip),
-        )),
-      ));
-      cards.push(ownerPref("model_pick", "Pick your current model and deal-breakers.", "Model I'm leaning toward...\nDeal-breakers..."));
-    } else if (section === "campaign") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Campaign suite"),
-        el("p", { class: "muted" }, "Expand each card for storyboard, channels, long-form, design notes, and asset checklist. Priority campaigns fully fleshed out first."),
-        ...MONETIZE_CAMPAIGNS.map((c) => renderCampaignCard(c)),
-      ));
-      cards.push(ownerPref("campaign", "Capture preferred tone and forbidden angles.", "Tone I like...\nNever do..."));
-    } else if (section === "playbook") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Launch playbook (week-by-week)"),
-        el("p", { class: "muted" }, "Optional GTM checklist — one channel at a time (p5_pick_channel)."),
+    } else if (section === "gtm") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Launch sequencing (one channel at a time)"),
+        el("p", { class: "muted" }, "Optional checklist — expand only if retention signal holds (", codeText("p5_pick_channel"), ")."),
         el("ol", {},
-          el("li", {}, el("strong", {}, "Week 0: "), "Ship magic-moment screen recording (", codeText("video_magic_moment"), ") + README above-fold (", codeText("readme_above_fold"), ")."),
-          el("li", {}, el("strong", {}, "Week 1: "), "Soft launch to 10–20 friends — measure time-to-first-fetch + day-1 status edits."),
-          el("li", {}, el("strong", {}, "Week 2: "), "Single Reddit post — ", codeText("Watch your library appear"), " GIF on r/patientgamers or r/GameDeals."),
-          el("li", {}, el("strong", {}, "Week 3: "), "Privacy variant on r/selfhosted — ", codeText("Nothing to breach"), " + trust diagram."),
-          el("li", {}, el("strong", {}, "Week 4: "), "Thursday claim-day post — ", codeText("Free game Thursday, finally counted"), "."),
-          el("li", {}, el("strong", {}, "Week 5+: "), "Only expand channel if retention signal holds — pick north-star in p5_metrics."),
+          el("li", {}, el("strong", {}, "Week 0: "), "Magic-moment recording (", codeText("video_magic_moment"), ") + README above-fold (", codeText("readme_above_fold"), ")."),
+          el("li", {}, el("strong", {}, "Week 1: "), "10–20 friends — time-to-first-fetch + day-1 status edits."),
+          el("li", {}, el("strong", {}, "Week 2: "), "Single Reddit — ", codeText("Watch your library appear"), " GIF."),
+          el("li", {}, el("strong", {}, "Week 3: "), "r/selfhosted privacy variant."),
+          el("li", {}, el("strong", {}, "Week 4: "), "Thursday claim-day post."),
+          el("li", {}, el("strong", {}, "Week 5+: "), "Next channel only if day-7 return holds."),
+        ),
+        el("p", { class: "xref" }, "Full campaign storyboards: Execution library tab."),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Persona × channel (condensed)"),
+        el("div", { class: "messaging-grid" },
+          tableEl(
+            ["Persona", "Reddit", "GitHub", "Landing", "Video", "Email"],
+            MARKETING_CHANNEL_MATRIX.map((row) => [
+              row.persona,
+              ...["reddit", "github_readme", "landing", "short_video", "email_waitlist"].map((ch) => {
+                const cell = row.channels[ch];
+                if (!cell) return "—";
+                return el("div", {},
+                  el("div", {}, el("strong", {}, cell.campaign)),
+                  el("div", { class: "faint" }, cell.hook),
+                );
+              }),
+            ]),
+          ),
         ),
       ));
       cards.push(ownerPref("playbook", "Your launch sequencing.", "Week 1 channel...\nSuccess metric...\nKill criteria..."));
-    } else if (section === "pricing") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Pricing"),
-        el("p", {}, el("strong", {}, "Headline: "), "$0 free with ads · $2-$4/mo 'No ads' upgrade. One number on the upgrade button, one promise (zero ads, full local + optional cloud sync)."),
-        el("p", { class: "muted" }, "Why low: the audience overwhelmingly came in through free-game claim flows. A $4.99/mo price point fights the user's revealed preference; $2-$3/mo reads as a tip jar with benefits."),
-        el("p", { class: "muted" }, "Ad slot strategy: house ads / affiliate first (deal cards already exist — they ARE the ad surface). Third-party ad networks only after MAU ≥ 5k. No behavioral tracking — keyword / context only — so the privacy posture survives."),
-        el("p", { class: "muted" }, "Upgrade tier should remove ad rendering code paths entirely (not just hide DOM nodes), so 'No ads' is technically true, not cosmetic."),
-      ));
-      cards.push(ownerPref("pricing", "Lock your first pricing hypothesis.", "Free tier ad slots...\nUpgrade price...\nFloor...\nCeiling...\nWhat triggers ad-network onboarding..."));
-    } else if (section === "gtm") {
-      cards.push(el("div", { class: "card agency-lane" },
-        el("h2", {}, "Go-to-market"),
-        el("p", { class: "muted" }, "Run one launch channel at a time. Start where backlog pain is explicit (Reddit/GitHub), then expand only after retention signal."),
-      ));
       cards.push(ownerPref("gtm", "Pick first channel and success metric.", "First channel...\nSuccess metric..."));
-    } else {
-      cards.push(el("div", { class: "card agency-lane" },
+    } else if (section === "risk") {
+      cards.push(el("div", { class: "card thesis-lane" },
         el("h2", {}, "Risk + ethics"),
-        el("p", { class: "muted" }, "Big risks: hidden affiliate incentives, breaking privacy trust with cloud defaults, and overextending solo bandwidth."),
-        el("h3", {}, "Ads in a privacy-first tool — the real tension"),
-        el("p", {}, "Free + ads is the lead monetization model (see Vision + Models), but ads in an app that brands itself local-first / privacy-first is the single biggest brand risk. Resolve it now, not after launch."),
+        el("p", { class: "muted" }, "Big risks: affiliate incentives, cloud defaults breaking trust, solo bandwidth, ads in a privacy-first brand."),
+        el("p", { class: "xref" }, "Lead monetization model (canonical): Model & unit econ tab."),
+        el("h3", {}, "Ads in a privacy-first tool"),
         el("ul", {},
-          el("li", {}, el("strong", {}, "House ads + affiliate first: "), "Every store BAKLOG already talks to has an affiliate program. Deal cards become ad surfaces without onboarding a third-party network."),
-          el("li", {}, el("strong", {}, "Context, not behavior: "), "Target ads against the current view (wishlist, store badge, genre filter) — never against scraped library content sent to a server. Library content never leaves the device."),
-          el("li", {}, el("strong", {}, "Disclosure on every slot: "), "Every ad slot labelled 'Sponsored' or 'Affiliate link'. Footer disclosure block. No native-style ads pretending to be deal recommendations."),
-          el("li", {}, el("strong", {}, "Upgrade kills code paths: "), "'No ads' tier removes the ad-rendering modules at runtime, not just hides DOM. Verifiable in DevTools — that's the proof users will reverse-engineer."),
-          el("li", {}, el("strong", {}, "Never sell data: "), "Even an anonymized aggregate 'what games people own' dataset is off limits. Privacy posture is the product moat."),
+          el("li", {}, el("strong", {}, "House/affiliate first "), "on deal cards — no third-party network until MAU ≥ 5k."),
+          el("li", {}, el("strong", {}, "Context, not behavior: "), "target view (wishlist, store badge) — library never leaves device."),
+          el("li", {}, el("strong", {}, "Disclosure "), "on every slot; upgrade removes ad modules at runtime."),
+          el("li", {}, el("strong", {}, "Never sell data "), "— even aggregate ownership datasets off limits."),
         ),
-        el("h3", {}, "Storefront ToS guardrails (the framing only holds if the code stays honest)"),
-        el("p", {}, "Storefront scraping has real ToS exposure once money or a hosted variant enters the picture. The defensible position is \u201Cthe user is automating access to their own data\u201D \u2014 but that's only true as long as the software keeps behaving that way. These are mostly things BAKLOG already does; the risk is silently violating one later:"),
+        el("h3", {}, "Storefront ToS guardrails"),
         el("ul", {},
-          el("li", {}, el("strong", {}, "Never centralize credentials or proxy fetches through our infra: "), "the moment a server holds user sessions or makes the calls, BAKLOG becomes the actor at scale \u2014 that's the high-exposure pattern."),
-          el("li", {}, el("strong", {}, "Don't ship or host the scraped catalog as a dataset: "), "fetched library/catalog data stays on the user's machine; no project-owned copy, aggregate, or redistributable dump."),
-          el("li", {}, el("strong", {}, "User-initiated + reasonable rate, their account only: "), "every fetch is something the user triggers, reads only their own account, and throttles (the fetchers already do this). No pooling across users, no CAPTCHA-solving."),
-          el("li", {}, el("strong", {}, "Be precise in copy: "), "\u201CBAKLOG automates requests you could make in your own browser, using your credentials, on your machine\u201D \u2014 never \u201Cwe aggregate store data.\u201D The wording is part of the legal posture, not just marketing."),
+          el("li", {}, el("strong", {}, "Never centralize credentials or proxy fetches."), ""),
+          el("li", {}, el("strong", {}, "Don't host/redistribute scraped catalog."), ""),
+          el("li", {}, el("strong", {}, "User-initiated, reasonable rate, own account only."), ""),
+          el("li", {}, el("strong", {}, "Copy precision: "), "automates what you could do in your browser on your machine — not 'we aggregate store data.'"),
         ),
-        el("p", { class: "muted" }, "Per-store posture (sanctioned API \u2192 official OAuth \u2192 own-session replay) lives in SECURITY.md \u2192 \u201CHow BAKLOG reaches each store.\u201D EA was deliberately moved off desktop-client impersonation to pure web-session replay so the framing stays literally true."),
+        el("p", { class: "muted" }, "Per-store posture: SECURITY.md. EA uses web-session replay only."),
       ));
       cards.push(ownerPref("risk", "Document legal/trust constraints before monetization buildout.", "Disclosure language...\nRed lines...\nAd-network gating rules...\nQuestions for counsel..."));
+    } else if (section === "decisions") {
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Assumptions ledger"),
+        el("table", { class: "data-table ledger-table" },
+          el("thead", {}, el("tr", {}, el("th", {}, "Claim"), el("th", {}, "Status"), el("th", {}, "Evidence"))),
+          el("tbody", {}, ...MONETIZE_ASSUMPTIONS.map((a) => el("tr", {},
+            el("td", {}, a.claim),
+            el("td", {}, monetizeStatusPill(a.status)),
+            el("td", {}, a.evidence),
+          ))),
+        ),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Decision log"),
+        el("table", { class: "data-table ledger-table" },
+          el("thead", {}, el("tr", {}, el("th", {}, "Decision"), el("th", {}, "Status"), el("th", {}, "Rationale"))),
+          el("tbody", {}, ...MONETIZE_DECISIONS.map((d) => el("tr", {},
+            el("td", {}, d.decision),
+            el("td", {}, monetizeStatusPill(d.status)),
+            el("td", {}, d.rationale),
+          ))),
+        ),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "North-star metrics"),
+        el("ul", {}, ...MONETIZE_METRICS.northStar.map((m) => el("li", {}, el("strong", {}, m.metric + ": "), m.note))),
+        el("h3", {}, "Guardrails"),
+        el("ul", {}, ...MONETIZE_METRICS.guardrails.map((m) => el("li", {}, el("strong", {}, m.metric + ": "), m.note))),
+        el("h3", {}, "Kill criteria"),
+        el("ul", {}, ...MONETIZE_METRICS.kill.map((k) => el("li", {}, k))),
+      ));
+      cards.push(el("div", { class: "card" },
+        el("h3", {}, "Owner lanes (strategic notes)"),
+        el("p", { class: "muted" }, "Saved notes persist under legacy ids — edit in place."),
+      ));
+      cards.push(ownerPref("market", "Assumptions I trust vs validate.", "Assumptions I trust...\nAssumptions to validate..."));
+      cards.push(ownerPref("model_pick", "Model pick + deal-breakers.", "Model I'm leaning toward...\nDeal-breakers..."));
+      cards.push(ownerPref("pricing", "Pricing hypothesis.", "Free tier ad slots...\nUpgrade price..."));
+      cards.push(ownerPref("gtm", "First channel + metric.", "First channel...\nSuccess metric..."));
+      cards.push(ownerPref("risk", "Legal/trust red lines.", "Disclosure language...\nRed lines..."));
+    } else if (section === "execution") {
+      const execBody = el("div", { class: "execution-body" },
+        el("p", { class: "muted" }, "Demoted reference — public deck is canonical for external audiences."),
+        el("p", {},
+          el("a", { href: "marketing/index.html", target: "_blank", rel: "noopener" }, "marketing/index.html"),
+          " · ",
+          el("a", { href: "marketing/one-pager.html", target: "_blank", rel: "noopener" }, "one-pager"),
+          " · ",
+          el("a", { href: "marketing/content-kit.md", target: "_blank", rel: "noopener" }, "content-kit.md"),
+        ),
+        el("h3", {}, "Creative asset briefs"),
+      );
+      for (const asset of MARKETING_ASSETS) {
+        const statusTone = asset.status === "ready" ? "success" : asset.status === "shipped" ? "info" : "neutral";
+        const card = el("div", { class: "asset-card" },
+          el("div", { class: "asset-card-head" },
+            el("span", { class: "asset-card-title" }, asset.title),
+            el("span", { class: "pill pill-" + statusTone }, asset.status),
+            el("span", { class: "pill pill-neutral" }, asset.format),
+          ),
+          el("p", { class: "muted", style: "margin:0 0 0.35rem" }, asset.goal),
+        );
+        for (const [key, lines] of Object.entries(asset.copyBlocks || {})) {
+          const txt = Array.isArray(lines) ? lines.join("\n") : String(lines);
+          card.appendChild(el("div", { style: "margin-top:0.35rem" },
+            el("strong", {}, key + ": "),
+            copyBtn(key, txt),
+            el("pre", { class: "copy-snippet" }, txt),
+          ));
+        }
+        execBody.appendChild(card);
+      }
+      execBody.appendChild(el("h3", { style: "margin-top:1rem" }, "Persona × channel matrix (full)"));
+      execBody.appendChild(el("div", { class: "messaging-grid" },
+        tableEl(
+          ["Persona", "Reddit", "GitHub README", "Landing", "Short video", "Email waitlist"],
+          MARKETING_CHANNEL_MATRIX.map((row) => [
+            row.persona,
+            ...["reddit", "github_readme", "landing", "short_video", "email_waitlist"].map((ch) => {
+              const cell = row.channels[ch];
+              if (!cell) return "—";
+              return el("div", {},
+                el("div", {}, el("strong", {}, cell.campaign)),
+                el("div", { class: "faint" }, cell.hook),
+                el("code", { style: "font-size:0.7rem" }, cell.pillar),
+              );
+            }),
+          ]),
+        ),
+      ));
+      execBody.appendChild(el("h3", { style: "margin-top:1rem" }, "Campaign suite"));
+      for (const c of MONETIZE_CAMPAIGNS) execBody.appendChild(renderCampaignCard(c));
+      execBody.appendChild(el("h3", { style: "margin-top:1rem" }, "Copy snippet bank"));
+      execBody.appendChild(el("pre", { class: "copy-snippet" }, MONETIZE_COPY_SNIPPETS.taglines.join("\n")));
+      execBody.appendChild(copyBtn("taglines", MONETIZE_COPY_SNIPPETS.taglines.join("\n")));
+      execBody.appendChild(el("pre", { class: "copy-snippet", style: "margin-top:0.5rem" }, MONETIZE_COPY_SNIPPETS.elevator30));
+      execBody.appendChild(copyBtn("30s", MONETIZE_COPY_SNIPPETS.elevator30));
+      cards.push(el("details", { class: "card execution-appendix", open: false },
+        el("summary", {}, "Execution library (collapsed) — briefs, campaigns, snippets"),
+        execBody,
+      ));
+      cards.push(ownerPref("creative", "Asset production notes.", "Ship first...\nBlocked on..."));
+      cards.push(ownerPref("messaging", "Channel testing notes.", "Primary channel...\nHook to A/B..."));
+      cards.push(ownerPref("campaign", "Tone and forbidden angles.", "Tone I like...\nNever do..."));
     }
 
     return el("section", { id: "panel-monetize", class: "panel" + (state.activeTab === "monetize" ? " active" : "") },
-      el("h1", {}, "Monetization & launch suite"),
-      el("p", {}, "Agency-style draft plus your editable preference lane. Use this to choose what to test first."),
+      el("h1", {}, "Launch thesis (internal)"),
+      el("div", { class: "callout success", style: "margin-bottom:1rem" },
+        el("div", { class: "callout-title" }, "Public-facing deck"),
+        el("div", { class: "callout-body" },
+          "Investor/audience showpiece: ",
+          el("a", { href: "marketing/index.html", target: "_blank", rel: "noopener" }, "marketing/index.html"),
+          " · ",
+          el("a", { href: "marketing/one-pager.html", target: "_blank", rel: "noopener" }, "one-pager"),
+          " · ",
+          el("a", { href: "marketing/content-kit.md", target: "_blank", rel: "noopener" }, "content-kit.md"),
+          ". This panel is the internal investment thesis — execution collateral lives in the appendix.",
+        ),
+      ),
+      el("p", { class: "muted" }, "Thesis sections first; assumptions and kill criteria in Decisions. Your preference lanes persist under legacy note ids."),
       monetizeSubnav(),
       ...cards,
       el("div", { class: "card-row", style: "margin-top:1rem" },
@@ -3165,7 +3168,7 @@
       const parsed = JSON.parse(text);
       if (!parsed || typeof parsed !== "object") throw new Error("not an object");
       if (parsed.v !== 1 && parsed.v !== 2) throw new Error("unknown version " + parsed.v);
-      state = { ...defaultState(), ...parsed, v: 2, monetizeSection: parsed.monetizeSection || "vision" };
+      state = { ...defaultState(), ...parsed, v: 2, monetizeSection: migrateMonetizeSection(parsed.monetizeSection || "thesis") };
       saveState();
       renderActive();
       toast("Imported.");

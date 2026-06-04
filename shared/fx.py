@@ -7,7 +7,7 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -59,9 +59,9 @@ def _cache_age_seconds(doc: dict[str, Any]) -> float | None:
     ts = _parse_fetched_at(doc)
     if ts is None:
         return None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+        ts = ts.replace(tzinfo=UTC)
     return (now - ts).total_seconds()
 
 
@@ -93,7 +93,7 @@ def _fetch_from_api() -> dict[str, Any]:
         if isinstance(val, (int, float)):
             rates[str(code).upper()] = float(val)
     return {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "source": "frankfurter",
         "date": data.get("date"),
         "base": base,

@@ -57,7 +57,15 @@ describe('personalStore.prepareForProfileSwitch', () => {
     expect(playingPut.profile).toBe('default');
   });
 
-  it('PUT body includes bound profile id', async () => {
+  it('PUT body omits profile claim in account auth mode', async () => {
+    vi.resetModules();
+    vi.doMock('../js/auth-gate.js', () => ({
+      isAccountAuthMode: () => true,
+      getAccessToken: () => 'tok',
+      whenAuthReady: () => Promise.resolve(),
+      refreshAccessToken: async () => null,
+      handleApiUnauthorized: () => {},
+    }));
     localStorage.setItem('baklog-active-profile', 'work');
     const puts = [];
     vi.stubGlobal(
@@ -80,12 +88,13 @@ describe('personalStore.prepareForProfileSwitch', () => {
       }),
     );
 
-    const { personalStore } = await loadStore();
+    const { personalStore, state } = await loadStore();
+    state.personal = { game1: { status: 'backlog' } };
     await personalStore.init();
     personalStore.notify();
     await personalStore.flush();
     expect(puts.length).toBeGreaterThanOrEqual(1);
-    expect(puts[puts.length - 1].profile).toBe('work');
+    expect(puts[puts.length - 1].profile).toBeUndefined();
   });
 
   it('409 profile mismatch keeps local edits for a later flush', async () => {

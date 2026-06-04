@@ -34,12 +34,7 @@ jobs:
           # mirrored for the cloning-and-running-locally path.
           pip install -e ".[dev]"
 
-      # Ruff is advisory for now: the codebase has accumulated lint debt that
-      # shouldn't block the first green CI run. The step still surfaces every
-      # finding in the job summary so it stays visible. Flip
-      # `continue-on-error` to false once the existing warnings are cleaned up.
-      - name: Lint with ruff (advisory)
-        continue-on-error: true
+      - name: Lint with ruff
         run: ruff check .
 
       - name: Run pytest

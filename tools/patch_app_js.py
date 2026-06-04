@@ -25,7 +25,9 @@ text = "\n".join(lines) + "\n"
 
 imports = """import { escapeHtml, escapeAttr, formatNum } from './dom-util.js';
 import { personalStore, configurePersonalStore, showMigrationBanner } from './personal-store.js';
-import { fetcherRunner, loadFetcherSources, renderDashboardFetcherHealth, configureFetcherHealth } from './fetcher-health.js';
+import {
+  fetcherRunner, loadFetcherSources, renderDashboardFetcherHealth, configureFetcherHealth,
+} from './fetcher-health.js';
 import {
   initDashboard,
   scheduleDashboardRender,

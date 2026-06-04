@@ -28,16 +28,14 @@ import argparse
 import json
 import sys
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from auth import resolve_env
 from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
-
-HEARTBEAT_EVERY = 25  # Steam API lookups between progress lines (avoids server stall-kill)
-from shared.profile_paths import cache_json_path
 from itch_game import itch_is_videogame as _itch_is_videogame
+from shared.profile_paths import cache_json_path
 from steam_client import SteamClient
 from steam_metadata import (
     ALWAYS_WRITE_FIELDS,
@@ -45,6 +43,8 @@ from steam_metadata import (
     apply_enrichment_to_row,
     enrichment_from_appdetails,
 )
+
+HEARTBEAT_EVERY = 25  # Steam API lookups between progress lines (avoids server stall-kill)
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -222,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         meta.write_text(
             json.dumps(
                 {
-                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "fetched_at": datetime.now(UTC).isoformat(),
                     "rows_updated": total_updated,
                     "rows_with_appid": total_appid_mapped,
                     "rows_coop": total_coop,

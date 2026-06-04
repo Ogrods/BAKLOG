@@ -22,6 +22,7 @@ import { collectActiveFilters } from './filters-ui.js';
 import { getErrorCount, buildBugBundle } from './error-boundary.js';
 import { getCurtainState } from './loading-curtain.js';
 import { countOrphanPersonalKeys } from './personal-storage.js';
+import { registerPausable } from './visibility.js';
 
 const STORAGE_KEY = 'baklog-debug';
 const POLL_INTERVAL_MS = 1000;
@@ -219,4 +220,20 @@ export function stopDebugOverlay() {
   _pollTimer = null;
   _overlayEl?.remove();
   _overlayEl = null;
+}
+
+if (typeof document !== 'undefined') {
+  registerPausable({
+    pause() {
+      if (_pollTimer) {
+        clearInterval(_pollTimer);
+        _pollTimer = null;
+      }
+    },
+    resume() {
+      if (_overlayEl && !_pollTimer) {
+        _pollTimer = setInterval(tick, POLL_INTERVAL_MS);
+      }
+    },
+  });
 }

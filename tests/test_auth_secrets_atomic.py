@@ -6,8 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from auth.secrets import SecretsCorruptError, load_doc, save_doc, set_master_password_override
-from auth.secrets import _secrets_file
+from auth.secrets import (
+    SecretsCorruptError,
+    _secrets_file,
+    load_doc,
+    save_doc,
+    set_master_password_override,
+)
 
 
 @pytest.fixture(autouse=True)

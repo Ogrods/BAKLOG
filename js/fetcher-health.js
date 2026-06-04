@@ -1,4 +1,6 @@
-import { withBaklogHeaders } from './api-client.js';
+import { baklogFetch, urlWithStreamTicket, withBaklogHeaders } from './api-client.js';
+import { isAccountAuthMode } from './auth-gate.js';
+import { isPageHidden, registerPausable } from './visibility.js';
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 import {
@@ -11,6 +13,7 @@ import {
   ingestAuthStatusProviders,
 } from './connections.js';
 import { activeProfileId, profileScopedStorageKey } from './profiles.js';
+import { savePrefs } from './prefs.js';
 
 // ---------------------------------------------------------------------------
 // Chip-level auth-failure backoff
@@ -350,13 +353,19 @@ export function serverChipState(status) {
 export const FETCH_TIMEOUT_MS = 15_000;
 
 /** Fetch with timeout; throws when the server does not respond in time. */
+function _isApiUrl(url) {
+  const s = String(url);
+  return s.startsWith('/api/') || s.includes('/api/');
+}
+
 export async function fetchWithTimeout(url, options = {}, ms = FETCH_TIMEOUT_MS) {
   const method = (options.method || 'GET').toUpperCase();
   const merged = method === 'GET' || method === 'HEAD' ? options : withBaklogHeaders(options);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
+  const doFetch = _isApiUrl(url) ? baklogFetch : fetch;
   try {
-    return await fetch(url, { ...merged, signal: ctrl.signal });
+    return await doFetch(url, { ...merged, signal: ctrl.signal });
   } catch (err) {
     if (err?.name === 'AbortError') {
       throw new Error('server not responding');
@@ -669,7 +678,7 @@ async function manifestRefreshKeys() {
 export async function loadFetcherSources(force = false) {
   const refreshByKey = await manifestRefreshKeys();
   try {
-    const res = await fetch('/api/fetchers');
+    const res = await baklogFetch('/api/fetchers');
     if (res.ok) {
       const data = await res.json();
       fetcherSources = (data.fetchers || []).map(entry => ({
@@ -885,6 +894,7 @@ if (typeof document !== 'undefined' && !document.__baklogFetcherAgeVisListener) 
 }
 
 export function maybeAutoRefreshItad(deps = {}) {
+  if (isPageHidden()) return false;
   if (state.prefs.itadAutoRefreshDisabled) return false;
   if (isFetcherDisconnected('itad')) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
@@ -1095,9 +1105,10 @@ export const fetcherRunner = (() => {
   }
 
   function ensureInFlightPolling() {
-    if (inFlightPollTimer || !isApiAvailable()) return;
+    if (inFlightPollTimer || !isApiAvailable() || isPageHidden()) return;
     if (runStateByKey.size === 0 && sourcesByRunId.size === 0) return;
     inFlightPollTimer = setInterval(() => {
+      if (isPageHidden()) return;
       syncFromServer().catch(() => {});
       if (runStateByKey.size === 0 && sourcesByRunId.size === 0 && !lastServerInFlight) {
         clearInterval(inFlightPollTimer);
@@ -1200,7 +1211,12 @@ export const fetcherRunner = (() => {
   let liveRunId = null;
   let logEl = null;
   let logBodyEl = null;
+  let forceExpanded = false;
+  let lastLineText = '';
+  let lastLineKind = 'stdout';
+  let lastBarSummary = 'Fetcher health';
   let pollTimer = null;
+  let _dashboardPollWanted = false;
   let syncedOnce = false;
   /** Avoid re-running refreshAfterFetch on every dashboard tab return when syncFromServer
    *  keeps seeing the same recent "done" run in the 5-minute window. */
@@ -1215,9 +1231,129 @@ export const fetcherRunner = (() => {
 
   function logBody() {
     if (!logBodyEl || !document.body.contains(logBodyEl)) {
-      logBodyEl = logPanel()?.querySelector('.fh-log-body') || null;
+      logBodyEl = logPanel()?.querySelector('.fh-log-body') || logPanel()?.querySelector('[data-role="body"]') || null;
     }
     return logBodyEl;
+  }
+
+  function fetcherRow() {
+    return document.getElementById('fetcherRow');
+  }
+
+  function isFetcherInFlight() {
+    return runStateByKey.size > 0 || lastServerInFlight || cancelInFlight;
+  }
+
+  function shouldShowExpanded() {
+    return forceExpanded || !state.prefs.fetcherCollapsed;
+  }
+
+  function isFetcherRowExpanded() {
+    return fetcherRow()?.classList.contains('is-expanded') ?? false;
+  }
+
+  function barStatusFromRuns() {
+    const running = [];
+    const queued = [];
+    for (const [key, st] of runStateByKey) {
+      const src = source(key);
+      const label = src?.label || key;
+      if (st === 'running') running.push(label);
+      else if (st === 'queued') queued.push(label);
+    }
+    if (running.length) {
+      return running.length === 1 ? `Running: ${running[0]}` : `Running: ${running.join(', ')}`;
+    }
+    if (queued.length) {
+      return queued.length === 1 ? `Queued: ${queued[0]}` : `Queued: ${queued.join(', ')}`;
+    }
+    return lastBarSummary;
+  }
+
+  function updateFetcherBar() {
+    const bar = document.querySelector('[data-role="fetcher-bar"]');
+    if (!bar) return;
+    const expanded = isFetcherRowExpanded();
+    const statusEl = bar.querySelector('[data-role="bar-status"]');
+    const tailEl = bar.querySelector('[data-role="bar-tail"]');
+    const dotEl = bar.querySelector('[data-role="bar-dot"]');
+    const toggleEl = bar.querySelector('[data-role="bar-toggle"]');
+    if (statusEl) statusEl.textContent = barStatusFromRuns();
+    if (tailEl) {
+      tailEl.textContent = lastLineText || 'No fetcher activity yet.';
+      tailEl.className = `fh-bar-tail${lastLineKind === 'stderr' ? ' stderr' : ''}`;
+    }
+    if (dotEl) dotEl.classList.toggle('is-live', isFetcherInFlight());
+    if (toggleEl) {
+      toggleEl.textContent = expanded ? '▾' : '▸';
+      toggleEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      toggleEl.setAttribute('aria-label', expanded ? 'Collapse fetcher' : 'Expand fetcher');
+    }
+  }
+
+  function applyFetcherRowLayout() {
+    const row = fetcherRow();
+    if (!row) return;
+    const expanded = shouldShowExpanded();
+    row.classList.toggle('is-expanded', expanded);
+    row.classList.toggle('is-collapsed', !expanded);
+    const panel = logPanel();
+    if (panel) {
+      if (expanded) {
+        buildLogPanelChrome();
+        panel.classList.add('open');
+        ensureLogHeightObserver();
+        requestAnimationFrame(() => syncLogHeightToCard());
+      } else {
+        clearLogHeightCap(panel);
+        panel.classList.remove('open');
+      }
+    }
+    updateFetcherBar();
+  }
+
+  function revertFetcherLayoutIfIdle() {
+    if (isFetcherInFlight()) return;
+    forceExpanded = false;
+    applyFetcherRowLayout();
+  }
+
+  function expandPanel({ manual = false, src, serverStatus, extra } = {}) {
+    if (manual) {
+      state.prefs.fetcherCollapsed = false;
+      savePrefs();
+      forceExpanded = false;
+    } else {
+      forceExpanded = true;
+    }
+    const panel = buildLogPanelChrome();
+    if (!panel) return false;
+    if (src && serverStatus) {
+      syncLogPanelChrome(src, serverStatus, extra);
+    } else if (src) {
+      panel.querySelector('[data-role="title"]').textContent = src.label;
+    } else {
+      const titleEl = panel.querySelector('[data-role="title"]');
+      if (titleEl) titleEl.textContent = 'Fetcher log';
+    }
+    updateCancelButton();
+    logBodyEl = panel.querySelector('[data-role="body"]');
+    applyFetcherRowLayout();
+    return true;
+  }
+
+  function collapsePanel({ manual = false } = {}) {
+    if (manual) {
+      state.prefs.fetcherCollapsed = true;
+      savePrefs();
+    }
+    forceExpanded = false;
+    applyFetcherRowLayout();
+  }
+
+  function toggleFetcherPanel({ manual = true } = {}) {
+    if (isFetcherRowExpanded()) collapsePanel({ manual });
+    else expandPanel({ manual });
   }
 
   const LOG_DESKTOP_MQ = '(min-width: 768px)';
@@ -1234,7 +1370,7 @@ export const fetcherRunner = (() => {
   function syncLogHeightToCard() {
     const panel = logPanel();
     const card = document.getElementById('dashboardFetcherHealth');
-    if (!panel || !panel.classList.contains('open')) return;
+    if (!isFetcherRowExpanded() || !panel || !panel.classList.contains('open')) return;
     if (!window.matchMedia(LOG_DESKTOP_MQ).matches) {
       clearLogHeightCap(panel);
       return;
@@ -1259,14 +1395,14 @@ export const fetcherRunner = (() => {
     if (!card || typeof ResizeObserver === 'undefined') return;
     if (!logHeightCardObs) {
       logHeightCardObs = new ResizeObserver(() => {
-        if (logPanel()?.classList.contains('open')) syncLogHeightToCard();
+        if (isFetcherRowExpanded() && logPanel()?.classList.contains('open')) syncLogHeightToCard();
       });
       logHeightCardObs.observe(card);
     }
     if (!logHeightResizeWired) {
       logHeightResizeWired = true;
       window.addEventListener('resize', () => {
-        if (logPanel()?.classList.contains('open')) syncLogHeightToCard();
+        if (isFetcherRowExpanded() && logPanel()?.classList.contains('open')) syncLogHeightToCard();
       });
     }
   }
@@ -1280,7 +1416,7 @@ export const fetcherRunner = (() => {
     if (apiAvailable !== null) return apiAvailable;
     try {
       await loadFetcherSources(force);
-      const res = await fetch('/api/fetchers', { method: 'GET' });
+      const res = await baklogFetch('/api/fetchers', { method: 'GET' });
       apiAvailable = res.ok;
     } catch {
       apiAvailable = false;
@@ -1350,7 +1486,7 @@ export const fetcherRunner = (() => {
         <span class="fh-log-spacer"></span>
         <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel" title="Stop all queued and running fetchers (Shift+click: force reset queue)">Cancel</button>
         <button type="button" class="fh-log-btn" data-role="clear">Clear</button>
-        <button type="button" class="fh-log-btn" data-role="close">Close</button>
+        <button type="button" class="fh-log-btn" data-role="close">Collapse</button>
       </div>
       <div class="fh-log-body" data-role="body"></div>
       <button type="button" class="fh-log-jump hidden" data-role="jump" aria-label="Jump to latest line" title="Jump to latest">&darr;</button>
@@ -1359,7 +1495,7 @@ export const fetcherRunner = (() => {
     panel.addEventListener('click', e => {
       const btn = e.target.closest('[data-role]');
       if (!btn) return;
-      if (btn.dataset.role === 'close') closePanel();
+      if (btn.dataset.role === 'close') collapsePanel({ manual: true });
       else if (btn.dataset.role === 'clear') clearLog();
       else if (btn.dataset.role === 'cancel') cancelInFlightRuns({ force: e.shiftKey });
       else if (btn.dataset.role === 'jump') scrollLogToBottom();
@@ -1370,37 +1506,20 @@ export const fetcherRunner = (() => {
   }
 
   function ensurePanel(src, serverStatus, extra) {
-    const panel = buildLogPanelChrome();
-    if (!panel) return;
-    panel.classList.add('open');
-    if (src && serverStatus) {
-      syncLogPanelChrome(src, serverStatus, extra);
-    } else if (src) {
-      panel.querySelector('[data-role="title"]').textContent = src.label;
-    } else {
-      panel.querySelector('[data-role="title"]').textContent = 'Fetcher log';
-    }
-    updateCancelButton();
-    logBodyEl = panel.querySelector('[data-role="body"]');
-    ensureLogHeightObserver();
-    requestAnimationFrame(() => syncLogHeightToCard());
+    expandPanel({ manual: false, src, serverStatus, extra });
   }
 
   /**
-   * Reopen the run-log panel (e.g. after the user clicked Close mid-run and
-   * wants it back). Builds the chrome shell if it hasn't been built yet so
-   * the kebab "Show fetcher log" entry works on a fresh page load with no
-   * activity. Doesn't change status or clear existing log lines — preserves
-   * whatever's already there so the user picks up where they left off.
+   * Expand fetcher health + console (e.g. kebab "Show fetcher log"). Builds
+   * chrome if needed; preserves existing log lines.
    *
-   * Note: the panel lives inside #dashboardContainer; callers from other
-   * views should switchView('dashboard') first so it's actually visible.
-   * @returns {boolean} true if the panel exists and was opened.
+   * Note: lives inside #dashboardContainer — switchView('dashboard') first
+   * when calling from other views.
+   * @returns {boolean}
    */
   function reopenLogPanel() {
     const panel = buildLogPanelChrome();
     if (!panel) return false;
-    panel.classList.add('open');
     const body = panel.querySelector('[data-role="body"]');
     if (body && !body.children.length) {
       const empty = document.createElement('div');
@@ -1411,9 +1530,7 @@ export const fetcherRunner = (() => {
       clearFollowTailIdleTimer();
     }
     logBodyEl = body || null;
-    ensureLogHeightObserver();
-    requestAnimationFrame(() => syncLogHeightToCard());
-    return true;
+    return expandPanel({ manual: true });
   }
 
   function updateCancelButton() {
@@ -1607,11 +1724,7 @@ export const fetcherRunner = (() => {
   }
 
   function closePanel() {
-    const panel = logPanel();
-    if (panel) {
-      clearLogHeightCap(panel);
-      panel.classList.remove('open');
-    }
+    collapsePanel({ manual: true });
   }
 
   const LOG_DOM_CAP = 4000;
@@ -1766,7 +1879,11 @@ export const fetcherRunner = (() => {
   }
 
   function appendLine(text, kind = 'stdout') {
+    if (!logBody()) buildLogPanelChrome();
     if (!logBody()) return;
+    lastLineText = text;
+    lastLineKind = kind;
+    if (!isFetcherRowExpanded()) updateFetcherBar();
     pendingLines.push({ text, kind });
     if (pendingLines.length > LOG_BUFFER_CAP) {
       pendingLines = pendingLines.slice(-LOG_BUFFER_CAP);
@@ -1787,7 +1904,11 @@ export const fetcherRunner = (() => {
     updateGlobalFetcherIndicator(runStateByKey, source);
     renderDashboardFetcherHealth();
     if (runState) ensureInFlightPolling();
-    else if (runStateByKey.size === 0) stopInFlightPolling();
+    else if (runStateByKey.size === 0) {
+      stopInFlightPolling();
+      revertFetcherLayoutIfIdle();
+    }
+    updateFetcherBar();
   }
 
   async function run(key, { refresh = false, auto = false } = {}) {
@@ -1930,7 +2051,7 @@ export const fetcherRunner = (() => {
     }
   }
 
-  function subscribe(runId, key, src, { reconnect = false, quiet = false, queuedOnly = false } = {}) {
+  async function subscribe(runId, key, src, { reconnect = false, quiet = false, queuedOnly = false } = {}) {
     if (suppressedRunIds.has(runId)) return;
     clearReconnect(runId);
     const prior = sourcesByRunId.get(runId);
@@ -1938,7 +2059,7 @@ export const fetcherRunner = (() => {
       try { prior.es.close(); } catch (_) {}
       sourcesByRunId.delete(runId);
     }
-    const es = new EventSource(streamUrl(runId));
+    const es = new EventSource(await urlWithStreamTicket(streamUrl(runId)));
     sourcesByRunId.set(runId, { es, key, src });
     const recentLog = [];
 
@@ -2031,6 +2152,7 @@ export const fetcherRunner = (() => {
           liveRunId = null;
           updateCancelButton();
         }
+        revertFetcherLayoutIfIdle();
       }
     });
 
@@ -2186,21 +2308,50 @@ export const fetcherRunner = (() => {
     }
   }
 
-  function startDashboardPolling() {
-    if (pollTimer || !isApiAvailable()) return;
+  function _runDashboardPollTick() {
+    if (isPageHidden()) return;
+    syncFromServer();
     maybeAutoRefreshItad();
-    pollTimer = setInterval(() => {
-      syncFromServer();
-      maybeAutoRefreshItad();
-    }, 30_000);
+  }
+
+  function startDashboardPolling() {
+    _dashboardPollWanted = true;
+    if (pollTimer || !isApiAvailable() || isPageHidden()) return;
+    maybeAutoRefreshItad();
+    pollTimer = setInterval(_runDashboardPollTick, 30_000);
+  }
+
+  function pauseDashboardPollForVisibility() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
   }
 
   function stopDashboardPolling() {
+    _dashboardPollWanted = false;
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = null;
     stopInFlightPolling();
     stopAgeTicker();
     stopFastAgeTick();
+  }
+
+  if (typeof document !== 'undefined') {
+    registerPausable({
+      pause() {
+        pauseDashboardPollForVisibility();
+        stopInFlightPolling();
+        closeAllStreams();
+      },
+      resume() {
+        syncFromServer().catch(() => {});
+        if (_dashboardPollWanted && !pollTimer && isApiAvailable() && !isPageHidden()) {
+          pollTimer = setInterval(_runDashboardPollTick, 30_000);
+        }
+        if (runStateByKey.size > 0 || sourcesByRunId.size > 0 || lastServerInFlight) {
+          ensureInFlightPolling();
+        }
+      },
+    });
   }
 
   return {
@@ -2219,6 +2370,16 @@ export const fetcherRunner = (() => {
     stopDashboardPolling,
     closeAllStreams,
     reopenLogPanel,
+    expandPanel,
+    collapsePanel,
+    toggleFetcherPanel,
+    isFetcherRowExpanded,
+    applyFetcherRowLayout,
+    updateFetcherBar,
+    revertFetcherLayoutIfIdle,
+    setBarSummary(text) {
+      lastBarSummary = text;
+    },
     syncLogHeightToCard,
     flushLinesNow,
     appendLineForTest(text, kind = 'stdout') {
@@ -2247,6 +2408,7 @@ export const fetcherRunner = (() => {
 export function renderDashboardFetcherHealth() {
   const slot = document.getElementById('dashboardFetcherHealth');
   if (!slot) return;
+  const restoreBarToggleFocus = document.activeElement?.matches?.('[data-role="bar-toggle"]');
   const showOnlyStale = !!state.prefs.fetcherHealthStaleOnly;
   const rows = fetcherSources.map(src => ({ src, ...fetcherFreshness(src) }));
   const staleRows = rows.filter(r => r.status === 'stale');
@@ -2271,6 +2433,7 @@ export function renderDashboardFetcherHealth() {
   if (missingRows.length) summaryParts.push(`${missingRows.length} missing`);
   const healthSummary = summaryParts.length ? summaryParts.join(' · ') : 'All fresh';
   const summaryText = `Profile: ${profileLabel} · ${healthSummary}`;
+  fetcherRunner.setBarSummary(summaryText);
   const apiReady = fetcherRunner.isApiAvailable();
   const probeDone = fetcherRunner.apiProbeFinished();
   const showReadonly = probeDone && !apiReady;
@@ -2283,11 +2446,16 @@ export function renderDashboardFetcherHealth() {
     ? `<span class="fh-summary" title="${escapeAttr(summaryTooltip)}">· click = sync · Shift+click = full refresh</span>`
     : '';
   const readonlyBanner = showReadonly
-    ? `<div class="fh-readonly-banner" role="status">
-        Fetcher health is read-only. Run <code>python server.py</code> and open
-        <a href="http://127.0.0.1:8765" class="fh-readonly-link">http://127.0.0.1:8765</a>
-        to click chips and stream logs.
-      </div>`
+    ? (isAccountAuthMode()
+      ? `<div class="fh-readonly-banner" role="status">
+          Fetcher health is read-only — the server API did not respond (sign in, restart
+          <code>python server.py</code>, or check the terminal for errors).
+        </div>`
+      : `<div class="fh-readonly-banner" role="status">
+          Fetcher health is read-only. Run <code>python server.py</code> and open
+          <a href="http://127.0.0.1:8765" class="fh-readonly-link">http://127.0.0.1:8765</a>
+          to click chips and stream logs.
+        </div>`)
     : '';
 
   function chipHtml({ src, status, count, ageLabel, iso }) {
@@ -2420,6 +2588,12 @@ export function renderDashboardFetcherHealth() {
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
 
   slot.innerHTML = `
+    <div class="fh-bar" data-role="fetcher-bar" title="Click status or tail to expand when collapsed">
+      <span class="fh-bar-dot" data-role="bar-dot" aria-hidden="true"></span>
+      <span class="fh-bar-status" data-role="bar-status">Fetcher health</span>
+      <span class="fh-bar-tail" data-role="bar-tail">No fetcher activity yet.</span>
+      <button type="button" class="fh-bar-toggle" data-role="bar-toggle" aria-expanded="false" aria-label="Expand fetcher">▸</button>
+    </div>
     ${readonlyBanner}
     <div class="fh-head${apiReady ? '' : ' fh-readonly'}">
       <div class="fh-head-left">
@@ -2428,7 +2602,7 @@ export function renderDashboardFetcherHealth() {
         ${apiNotice}
       </div>
       <div class="fh-head-actions">
-        <button type="button" class="fh-log-open" title="Open the fetcher console / run log">Log</button>
+        <button type="button" class="fh-log-open" title="Expand fetcher health and run log">Log</button>
         <button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>
         <label class="fh-toggle">
           <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />
@@ -2452,5 +2626,8 @@ export function renderDashboardFetcherHealth() {
     <div class="fh-chips">${chipsHtml}</div>
   `;
   ensureAgeTicker();
-  requestAnimationFrame(() => fetcherRunner.syncLogHeightToCard());
+  fetcherRunner.applyFetcherRowLayout();
+  if (restoreBarToggleFocus) {
+    document.querySelector('[data-role="bar-toggle"]')?.focus();
+  }
 }

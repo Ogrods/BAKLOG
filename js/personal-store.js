@@ -1,4 +1,5 @@
-import { baklogFetch } from './api-client.js';
+import { baklogFetch, BAKLOG_LOCAL_HEADER, BAKLOG_LOCAL_HEADER_VALUE } from './api-client.js';
+import { getAccessToken, isAccountAuthMode } from './auth-gate.js';
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
 import { activeProfileId, prefsStorageKey, profileScopedStorageKey } from './profiles.js';
 
@@ -29,13 +30,16 @@ export const personalStore = (() => {
   const PUSH_DEBOUNCE_MS = 600;
 
   function snapshotLocal() {
-    return {
-      profile: activeProfileId(),
+    const snap = {
       personal: JSON.parse(JSON.stringify(state.personal || {})),
       prefs: JSON.parse(JSON.stringify(state.prefs || {})),
       manual: JSON.parse(JSON.stringify(getManualGamesFn())),
       libraryFirstSeen: JSON.parse(JSON.stringify(state.libraryFirstSeenByKey || {})),
     };
+    if (!isAccountAuthMode()) {
+      snap.profile = activeProfileId();
+    }
+    return snap;
   }
 
   function isMeaningful(snap) {
@@ -48,7 +52,7 @@ export const personalStore = (() => {
   async function probe() {
     if (apiAvailable !== null) return apiAvailable;
     try {
-      const res = await fetch('/api/personal', { method: 'GET' });
+      const res = await baklogFetch('/api/personal', { method: 'GET' });
       if (!res.ok) { apiAvailable = false; return false; }
       serverDoc = await res.json();
       apiAvailable = true;
@@ -193,11 +197,24 @@ export const personalStore = (() => {
     pushTimer = null;
     dirty = false;
     const snap = snapshotLocal();
+    const body = JSON.stringify(snap);
     try {
-      const blob = new Blob([JSON.stringify(snap)], { type: 'application/json' });
-      navigator.sendBeacon('/api/personal', blob);
+      if (isAccountAuthMode()) {
+        const headers = {
+          'Content-Type': 'application/json',
+          [BAKLOG_LOCAL_HEADER]: BAKLOG_LOCAL_HEADER_VALUE,
+        };
+        const token = getAccessToken();
+        if (token) headers.Authorization = `Bearer ${token}`;
+        fetch('/api/personal', { method: 'PUT', headers, body, keepalive: true }).catch((err) => {
+          console.warn('[personalStore] keepalive flush failed', err);
+        });
+      } else {
+        const blob = new Blob([body], { type: 'application/json' });
+        navigator.sendBeacon('/api/personal', blob);
+      }
     } catch (err) {
-      console.warn('[personalStore] sendBeacon failed', err);
+      console.warn('[personalStore] unload flush failed', err);
     }
   }
 

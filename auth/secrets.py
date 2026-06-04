@@ -7,7 +7,7 @@ import os
 import secrets
 import threading
 from base64 import b64decode, b64encode
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import scrypt
 from pathlib import Path
 from typing import Any
@@ -53,7 +53,7 @@ _master_password: str | None = None
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _ensure_dir() -> None:
@@ -206,9 +206,24 @@ def save_doc(doc: dict[str, Any]) -> None:
 
 
 def get_provider_blob(provider: str) -> dict[str, Any]:
-    doc = load_doc()
+    try:
+        doc = load_doc()
+    except SecretsCorruptError:
+        return {}
     blob = doc["providers"].get(provider)
     return dict(blob) if isinstance(blob, dict) else {}
+
+
+def secrets_store_corrupt() -> bool:
+    """True when secrets.bin exists but cannot be decrypted."""
+    secrets = _secrets_file()
+    if not secrets.is_file():
+        return False
+    try:
+        _decrypt_blob(secrets.read_bytes())
+        return False
+    except Exception:
+        return True
 
 
 def set_provider_blob(provider: str, blob: dict[str, Any]) -> None:

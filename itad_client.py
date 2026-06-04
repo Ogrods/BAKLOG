@@ -8,7 +8,7 @@ from urllib.parse import quote
 import requests
 
 from fetchers._progress import HeartbeatTimer
-from shared.money import country_to_currency, format_price, normalize_currency_code
+from shared.money import format_price, normalize_currency_code
 
 BASE = "https://api.isthereanydeal.com"
 REQUEST_DELAY_SEC = 0.35

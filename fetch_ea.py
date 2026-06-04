@@ -7,7 +7,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -26,7 +26,13 @@ from ea_client import (
 )
 from ea_session import DEFAULT_TRIGGER_URLS, probe_ea_token, sniff_ea_bearer
 from fetchers._authoritative import EA
-from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
+from fetchers._base import (
+    add_allow_empty_arg,
+    catalog_file,
+    merge_cached_row,
+    refuse_drift_result,
+    write_catalog_text,
+)
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 
@@ -360,7 +366,10 @@ def main() -> int:
     hltb_client = HltbClient()
     existing = load_existing()
     games_out: list[dict] = []
-    for i, item in enumerate(sorted(deduped, key=lambda x: _clean_name(str((x.get("product") or {}).get("name") or ""))), 1):
+    def _sort_key(row: dict) -> str:
+        return _clean_name(str((row.get("product") or {}).get("name") or ""))
+
+    for i, item in enumerate(sorted(deduped, key=_sort_key), 1):
         name = _clean_name(str((item.get("product") or {}).get("name") or ""))
         print(f"[{i}/{len(deduped)}] {name}", flush=True)
         cached = existing.get(_row_id(item))
@@ -388,7 +397,7 @@ def main() -> int:
         return stats.finish("fetch_ea", t0, exit_code=drift_exit)
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "ea",
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),

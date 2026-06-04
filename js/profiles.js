@@ -4,6 +4,12 @@
  */
 
 import { baklogFetch } from './api-client.js';
+import {
+  isAccountAuthMode,
+  getAccountEmail,
+  getAccountProfileId,
+  signOutAccount,
+} from './auth-gate.js';
 import { PREFS_KEY } from './state.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
@@ -19,6 +25,10 @@ function el(id) {
 }
 
 export function activeProfileId() {
+  if (isAccountAuthMode()) {
+    const bound = getAccountProfileId();
+    if (bound) return bound;
+  }
   return localStorage.getItem(ACTIVE_PROFILE_LS) || _status?.active || 'default';
 }
 
@@ -325,7 +335,84 @@ export function bindProfilesUI() {
   bindEscapeClose(el('profileManageModal'), closeManageModal);
 }
 
+/**
+ * Account-mode header menu: shows the signed-in email + Sign out.
+ * Profile switching stays disabled (the profile is bound to the Supabase user).
+ */
+function renderAccountMenu(email) {
+  const label = el('profileMenuLabel');
+  const trigger = el('profileMenuTrigger');
+  const shown = email || 'Account';
+  if (label) {
+    label.textContent = shown;
+    label.title = shown;
+  }
+  if (trigger) trigger.setAttribute('aria-label', email ? `Account: ${email}` : 'Account');
+  const list = el('profileMenuList');
+  if (list) {
+    list.innerHTML =
+      `<div class="profile-menu-account-email px-3 py-2 text-xs text-slate-400 border-b border-slate-600/80">${escapeHtml(email || 'Signed in')}</div>` +
+      `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60" data-account-signout>Sign out</button>`;
+  }
+  const footer = document.querySelector('#profileMenu [data-profile-manage]');
+  if (footer) footer.classList.add('hidden');
+}
+
+function bindAccountMenu() {
+  const trigger = el('profileMenuTrigger');
+  const menu = el('profileMenu');
+  if (!trigger || !menu) return;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.documentElement.hasAttribute('data-boot-loading')) return;
+    if (_menuOpen) {
+      closeMenu();
+    } else {
+      menu.hidden = false;
+      _menuOpen = true;
+      trigger.setAttribute('aria-expanded', 'true');
+    }
+  });
+
+  menu.addEventListener('click', async (e) => {
+    if (!e.target.closest('[data-account-signout]')) return;
+    closeMenu();
+    try {
+      await signOutAccount({ intentional: true });
+    } finally {
+      location.reload();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!_menuOpen) return;
+    if (e.target.closest('#profileMenuWrap')) return;
+    closeMenu();
+  });
+}
+
+async function syncAccountProfileId() {
+  try {
+    const res = await baklogFetch('/api/auth/session');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.profile) {
+      localStorage.setItem(ACTIVE_PROFILE_LS, data.profile);
+    }
+  } catch (_) { /* ignore */ }
+}
+
 export async function initProfiles() {
+  const wrap = el('profileMenuWrap');
+  if (isAccountAuthMode()) {
+    if (wrap) wrap.classList.remove('hidden');
+    await syncAccountProfileId();
+    renderAccountMenu(getAccountEmail());
+    bindAccountMenu();
+    return;
+  }
+  if (wrap) wrap.classList.remove('hidden');
   const seeded = localStorage.getItem(ACTIVE_PROFILE_LS);
   if (seeded) renderProfileTrigger();
   try {

@@ -17,8 +17,6 @@ from urllib.parse import quote
 
 import requests
 
-from fetchers._progress import HeartbeatTimer
-
 GRAPHQL_URL = "https://service-aggregation-layer.juno.ea.com/graphql"
 # Persisted-query identifiers used by the ea.com web app (see Playnite EaLibrary
 # 3.x). These are the website's own operation hashes, not desktop-only queries.
@@ -147,6 +145,7 @@ class EaClient:
     def get_owned_games(self) -> list[dict]:
         out: list[dict] = []
         offset = "0"
+        page = 0
         while True:
             root = self._graphql_get(
                 "getPreloadedOwnedGames",

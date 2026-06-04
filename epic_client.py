@@ -24,6 +24,7 @@ from pathlib import Path
 
 import requests
 
+
 def _legacy_epic_cache_dir() -> Path:
     from shared.profile_paths import ROOT
 
@@ -45,6 +46,31 @@ LOGIN_URL = (
 
 CLIENT_ID = "34a02cf8f4414e29b15921876da36f9a"
 CLIENT_SECRET = "daafbccc737745039dffe53d94fc76cf"
+
+
+def build_epic_oauth_login_url(redirect_uri: str, state: str = "") -> str:
+    """Epic login URL that hands the authorizationCode back to ``redirect_uri``.
+
+    ``LOGIN_URL`` omits a ``redirectUrl`` so Epic's ``id/api/redirect`` endpoint
+    renders the code as JSON (scraped by the Playwright flow). Supplying a
+    ``redirectUrl`` instead makes Epic redirect the browser to our local
+    ``/oauth/epic/callback`` with ``?code=`` appended, so the GET callback can
+    exchange it. ``state`` is round-tripped for CSRF + profile binding.
+    """
+    from urllib.parse import quote, urlencode
+
+    target = redirect_uri
+    if state:
+        sep = "&" if "?" in target else "?"
+        target = f"{target}{sep}{urlencode({'state': state})}"
+    inner = (
+        "https://www.epicgames.com/id/api/redirect"
+        f"?clientId={CLIENT_ID}&responseType=code&redirectUrl={quote(target, safe='')}"
+    )
+    return f"https://www.epicgames.com/id/login?lang=en&redirectUrl={quote(inner, safe='')}"
+
+
+
 BASIC_AUTH = "basic " + base64.b64encode(
     f"{CLIENT_ID}:{CLIENT_SECRET}".encode()
 ).decode()

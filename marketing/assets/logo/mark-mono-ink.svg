@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="2 24 96 52" role="img" aria-label="BAKLOG mark ink">
+  <defs>
+    <mask id="knobs-ink" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+      <rect width="100" height="100" fill="#fff"/>
+      <circle cx="14" cy="64" r="8" fill="#000"/>
+      <circle cx="64" cy="64" r="8" fill="#000"/>
+      <circle cx="39" cy="36" r="8" fill="#000"/>
+    </mask>
+  </defs>
+  <g fill="#0b1220" mask="url(#knobs-ink)">
+    <rect x="2" y="52" width="46" height="24" rx="12" ry="12"/>
+    <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
+    <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
+  </g>
+</svg>

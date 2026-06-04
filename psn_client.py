@@ -8,9 +8,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 
-from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
 from psnawp_api import PSNAWP
 from psnawp_api.core import PSNAWPAuthenticationError, PSNAWPForbiddenError
+
+from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
 
 
 class PsnAuthError(Exception):

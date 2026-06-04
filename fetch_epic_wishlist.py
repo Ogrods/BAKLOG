@@ -17,7 +17,7 @@ import json
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -26,7 +26,13 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid
 from auth.secrets import profile_dir
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
+from fetchers._base import (
+    add_allow_empty_arg,
+    catalog_file,
+    refuse_drift_result,
+    refuse_empty_result,
+    write_catalog_text,
+)
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 
@@ -421,7 +427,7 @@ def main() -> int:
         rows.append(row)
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist_epic",
         "game_count": len(rows),
         "games": sorted(rows, key=lambda g: (g.get("name") or "").lower()),

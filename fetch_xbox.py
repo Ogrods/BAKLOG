@@ -5,25 +5,24 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
 from dotenv import load_dotenv
 
+from auth import mark_invalid, resolve_env
 from fetchers._authoritative import XBOX
 from fetchers._base import (
     add_allow_empty_arg,
+    catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
-    catalog_file,
     write_catalog_text,
 )
-from auth import mark_invalid, resolve_env
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 from xbox_client import XboxAuthError, XboxClient
@@ -195,7 +194,7 @@ def main() -> int:
         stats.ok += 1
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "xbox",
         "gamertag": gt,
         "game_count": len(games_out),

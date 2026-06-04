@@ -522,7 +522,6 @@ def sniff_claims(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Replay saved browser profile; return (raw_claims, codeless_records)."""
     from auth.cdp_browser import launch_persistent_profile
-
     from auth.secrets import profile_dir
 
     profile = profile_dir(PROFILE_KEY)

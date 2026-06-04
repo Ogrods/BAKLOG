@@ -1,4 +1,6 @@
-import { baklogFetch } from './api-client.js';
+import { baklogFetch, urlWithStreamTicket } from './api-client.js';
+import { isAccountAuthMode } from './auth-gate.js';
+import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
@@ -15,6 +17,11 @@ let _authStatusLoaded = false;
 let reconnectProviders = new Set();
 
 let pollTimer = null;
+
+const POST_CONNECT_FAST_POLL_MS = 3000;
+const POST_CONNECT_FAST_POLL_MAX_MS = 30_000;
+let postConnectFastPollTimer = null;
+let postConnectFastPollStopAt = 0;
 
 let gridWired = false;
 
@@ -53,6 +60,15 @@ const STATUS_CLASS = {
   unavailable: 'conn-pill conn-pill--off',
 
 };
+
+
+
+/** Collapse server-only states for pill/dot display (3 visible states). */
+export function displayStatus(serverStatus) {
+  const st = serverStatus || 'disconnected';
+  if (st === 'expired') return 'disconnected';
+  return st;
+}
 
 
 
@@ -402,6 +418,9 @@ function buildFormPanel(p) {
  * required step.
  */
 function buildFallbackPanel(p) {
+  const epicBrowser = p.key === 'epic'
+    ? `<button type="button" class="conn-open-url" data-epic-oauth data-provider="epic">Sign in with your browser instead</button>`
+    : '';
   return `
     <details class="conn-fallback">
       <summary class="conn-fallback-summary">
@@ -409,6 +428,7 @@ function buildFallbackPanel(p) {
         <span>Trouble connecting? Enter a code manually</span>
       </summary>
       <div class="conn-fallback-body">
+        ${epicBrowser}
         ${buildFormPanel(p)}
       </div>
     </details>`;
@@ -528,6 +548,8 @@ function buildCardHtml(p) {
 
   const st = p.status || 'disconnected';
 
+  const pillSt = displayStatus(st);
+
   const brand = providerBrand(p);
   const badge = connBadge(p);
 
@@ -559,7 +581,7 @@ function buildCardHtml(p) {
 
         <div class="conn-head-actions">
 
-          <span class="${STATUS_CLASS[st] || STATUS_CLASS.disconnected}">${STATUS_LABEL[st] || st}</span>
+          <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected}">${STATUS_LABEL[pillSt] || pillSt}</span>
 
         </div>
 
@@ -597,6 +619,8 @@ function buildRailItemHtml(p, selected) {
 
   const st = p.status || 'disconnected';
 
+  const pillSt = displayStatus(st);
+
   const badge = connBadge(p);
 
   const sel = selected ? ' is-selected' : '';
@@ -613,13 +637,13 @@ function buildRailItemHtml(p, selected) {
 
     <div class="conn-rail-item${sel}${unav}" data-provider="${escapeAttr(p.key)}" role="option" tabindex="${selected ? '0' : '-1'}" aria-selected="${selected ? 'true' : 'false'}"${title}>
 
-      <span class="conn-row-dot conn-row-dot--${escapeAttr(st)}" aria-hidden="true"></span>
+      <span class="conn-row-dot conn-row-dot--${escapeAttr(pillSt)}" aria-hidden="true"></span>
 
       <span class="store-badge conn-rail-badge ${escapeAttr(badge.cls)}">${escapeHtml(badge.letter)}</span>
 
       <span class="conn-row-label">${escapeHtml(p.label)}</span>
 
-      <span class="${STATUS_CLASS[st] || STATUS_CLASS.disconnected} conn-row-pill">${STATUS_LABEL[st] || st}</span>
+      <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected} conn-row-pill">${STATUS_LABEL[pillSt] || pillSt}</span>
 
     </div>`;
 
@@ -747,6 +771,18 @@ function handleLayoutClick(ev) {
   if (pasteBtn && card) {
 
     pasteFromClipboard(card);
+
+    return;
+
+  }
+
+
+
+  const epicOauthBtn = target.closest('[data-epic-oauth]');
+
+  if (epicOauthBtn) {
+
+    startEpicBrowserOAuth();
 
     return;
 
@@ -1356,18 +1392,76 @@ function renderReconnectBanner() {
 
 
 
+function connectionStatusErrorMessage(err) {
+  const status = err?.status;
+  if (status === 401) {
+    return isAccountAuthMode()
+      ? 'Session expired or not signed in. Sign in again to refresh connection status.'
+      : 'Not authorized to load connection status.';
+  }
+  if (status === 503) return 'Server secrets store is unavailable. Check server logs.';
+  if (status >= 500) {
+    return err?.detail
+      ? `Server error loading connection status: ${err.detail}`
+      : 'Server error loading connection status. Check server.py logs.';
+  }
+  if (err?.code === 'network') {
+    return 'Could not reach the local server (is server.py running?).';
+  }
+  return 'Could not load connection status.';
+}
+
+
+function ensureConnRefreshBanner() {
+  const layout = document.getElementById('connLayout');
+  if (!layout) return null;
+  let el = document.getElementById('connRefreshBanner');
+  if (!el) {
+    el = document.createElement('p');
+    el.id = 'connRefreshBanner';
+    el.className = 'conn-refresh-error text-sm text-amber-400 hidden';
+    el.setAttribute('role', 'status');
+    layout.parentNode?.insertBefore(el, layout);
+  }
+  return el;
+}
+
+
+function showConnRefreshError(msg) {
+  const el = ensureConnRefreshBanner();
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+
+function clearConnRefreshError() {
+  const el = document.getElementById('connRefreshBanner');
+  if (el) el.classList.add('hidden');
+}
+
+
 async function fetchAuthStatus() {
-
-  const res = await fetch('/api/auth/status');
-
-  if (!res.ok) throw new Error(`auth status ${res.status}`);
-
+  let res;
+  try {
+    res = await baklogFetch('/api/auth/status');
+  } catch (_) {
+    const err = new Error('network');
+    err.code = 'network';
+    throw err;
+  }
+  if (!res.ok) {
+    const err = new Error(`auth status ${res.status}`);
+    err.status = res.status;
+    try {
+      const body = await res.json();
+      if (body?.error) err.detail = body.error;
+    } catch { /* ignore */ }
+    throw err;
+  }
   const data = await res.json();
-
   ingestAuthStatusProviders(data.providers || []);
-
   return authStatus;
-
 }
 
 /** Cache provider rows from GET /api/auth/status (dashboard poll + refresh). */
@@ -1412,7 +1506,7 @@ async function openManualUrl(provider) {
 
   }
 
-  const res = await fetch(`/api/auth/${provider}/open-url`, { method: 'POST' });
+  const res = await baklogFetch(`/api/auth/${provider}/open-url`, { method: 'POST' });
 
   const data = await res.json().catch(() => ({}));
 
@@ -1425,6 +1519,54 @@ async function openManualUrl(provider) {
   }
 
   if (log) log.textContent = 'Copy your API key from the browser tab, paste above, then Save key.';
+
+}
+
+
+
+async function startEpicBrowserOAuth() {
+
+  const card = document.querySelector('.conn-card[data-provider="epic"]');
+
+  const log = card?.querySelector('.conn-log');
+
+  if (log) {
+
+    log.classList.remove('hidden');
+
+    log.textContent = 'Opening Epic sign-in…';
+
+  }
+
+  let res;
+
+  try {
+
+    res = await baklogFetch('/api/auth/epic/oauth-url', { method: 'POST' });
+
+  } catch (_) {
+
+    if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
+
+    return;
+
+  }
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || !data.url) {
+
+    if (log) log.textContent = data.error || `Could not start Epic sign-in (${res.status})`;
+
+    return;
+
+  }
+
+  window.open(data.url, '_blank', 'noopener');
+
+  startPostConnectFastPoll();
+
+  if (log) log.textContent = 'Finish signing in in the new tab — this page updates once Epic connects.';
 
 }
 
@@ -1651,7 +1793,10 @@ async function startBrowserConnect(provider) {
 
   }
 
-  const es = new EventSource(`/api/auth/${data.session_id}/stream`);
+  startPostConnectFastPoll();
+
+  const streamUrl = await urlWithStreamTicket(`/api/auth/${data.session_id}/stream`);
+  const es = new EventSource(streamUrl);
 
   es.addEventListener('waiting_for_user', ev => {
 
@@ -1711,6 +1856,8 @@ export async function refreshConnections() {
 
     await fetchAuthStatus();
 
+    clearConnRefreshError();
+
     renderConnections();
 
     renderReconnectBanner();
@@ -1718,17 +1865,31 @@ export async function refreshConnections() {
     const { applyItchTabVisibility } = await import('./filters-ui.js');
     applyItchTabVisibility();
 
-  } catch {
+  } catch (err) {
 
-    const rail = document.getElementById('connRail');
+    const msg = connectionStatusErrorMessage(err);
 
-    const pane = document.getElementById('connPane');
+    if (authStatus.length > 0) {
 
-    if (rail) rail.innerHTML = '';
+      renderConnections();
 
-    if (pane) {
+      showConnRefreshError(msg);
 
-      pane.innerHTML = '<p class="text-sm text-amber-400">Could not load connection status (is server.py running?).</p>';
+    } else {
+
+      clearConnRefreshError();
+
+      const rail = document.getElementById('connRail');
+
+      const pane = document.getElementById('connPane');
+
+      if (rail) rail.innerHTML = '';
+
+      if (pane) {
+
+        pane.innerHTML = `<p class="text-sm text-amber-400">${escapeHtml(msg)}</p>`;
+
+      }
 
     }
 
@@ -1740,18 +1901,72 @@ export async function refreshConnections() {
 
 
 
-export function startConnectionsPolling() {
-
-  stopConnectionsPolling();
-
-  pollTimer = setInterval(() => {
-
-    if (document.getElementById('connectionsContainer')?.classList.contains('hidden')) return;
-
+function startPostConnectFastPoll() {
+  stopPostConnectFastPoll();
+  postConnectFastPollStopAt = Date.now() + POST_CONNECT_FAST_POLL_MAX_MS;
+  refreshConnections();
+  postConnectFastPollTimer = setInterval(() => {
+    if (isPageHidden()) return;
+    if (Date.now() >= postConnectFastPollStopAt) {
+      stopPostConnectFastPoll();
+      return;
+    }
     refreshConnections();
+  }, POST_CONNECT_FAST_POLL_MS);
+}
 
+function stopPostConnectFastPoll() {
+  if (postConnectFastPollTimer) clearInterval(postConnectFastPollTimer);
+  postConnectFastPollTimer = null;
+  postConnectFastPollStopAt = 0;
+}
+
+function resumePostConnectFastPollIfActive() {
+  if (postConnectFastPollStopAt <= Date.now()) return;
+  if (postConnectFastPollTimer) return;
+  postConnectFastPollTimer = setInterval(() => {
+    if (isPageHidden()) return;
+    if (Date.now() >= postConnectFastPollStopAt) {
+      stopPostConnectFastPoll();
+      return;
+    }
+    refreshConnections();
+  }, POST_CONNECT_FAST_POLL_MS);
+}
+
+
+export function startConnectionsPolling() {
+  stopConnectionsPolling();
+  if (state.activeView !== 'connections' || isPageHidden()) return;
+  pollTimer = setInterval(() => {
+    if (state.activeView !== 'connections' || isPageHidden()) return;
+    refreshConnections();
   }, 15000);
+}
 
+if (typeof document !== 'undefined') {
+  registerPausable({
+    pause() {
+      stopConnectionsPolling();
+      if (postConnectFastPollTimer) {
+        clearInterval(postConnectFastPollTimer);
+        postConnectFastPollTimer = null;
+      }
+    },
+    resume() {
+      if (state.activeView === 'connections') startConnectionsPolling();
+      resumePostConnectFastPollIfActive();
+    },
+  });
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const authChannel = new BroadcastChannel('baklog-auth');
+      authChannel.onmessage = (ev) => {
+        if (ev.data?.provider) refreshConnections();
+      };
+    } catch (_) { /* ignore */ }
+  }
 }
 
 

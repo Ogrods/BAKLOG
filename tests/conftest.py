@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 import server
+from shared import supabase_auth
 from shared.subprocess_guard import child_pids_of, terminate_pid_tree
 
 _RUN_MANAGER_THREAD_PREFIXES = ("run-worker", "run-watchdog", "run-kill", "run-launch-")
@@ -60,6 +61,16 @@ def _cleanup_leaks(
 
 
 @pytest.fixture(autouse=True)
+def _default_supabase_auth_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """server.py loads .env at import; keep auth disabled unless a test opts in."""
+    monkeypatch.delenv("BAKLOG_SUPABASE_URL", raising=False)
+    monkeypatch.delenv("BAKLOG_SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("BAKLOG_SUPABASE_JWT_SECRET", raising=False)
+    monkeypatch.delenv("BAKLOG_AUTH_DISABLED", raising=False)
+    supabase_auth.reset_jwks_client_for_tests()
+
+
+@pytest.fixture(autouse=True)
 def _detect_thread_and_child_leaks(request: pytest.FixtureRequest):
     if request.node.get_closest_marker("no_leak_check"):
         yield
@@ -87,7 +98,9 @@ def _detect_thread_and_child_leaks(request: pytest.FixtureRequest):
 def run_manager(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Isolated RunManager with guaranteed teardown."""
     runs_dir = tmp_path / "runs"
-    _runs_dir_fn = lambda *, profile_id=None: runs_dir
+    def _runs_dir_fn(*, profile_id=None):
+        return runs_dir
+
     monkeypatch.setattr("shared.profile_paths.runs_dir", _runs_dir_fn)
     monkeypatch.setattr(server, "runs_dir", _runs_dir_fn)
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)

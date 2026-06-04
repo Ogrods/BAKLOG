@@ -3,9 +3,10 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, formatDollar } from './game-core.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
-import { getDealInfo } from './deals.js';
+import { getDealInfo, cutBucketClass } from './deals.js';
+import { registerPausable } from './visibility.js';
 
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
@@ -49,6 +50,7 @@ function pickStinkerGame(eligible) {
 }
 
 let _spotlightTimer = null;
+let _rotationWanted = false;
 let _spotlightFadeTimer = null;
 let _spotlightIndex = 0;
 let _spotlightPool = [];
@@ -322,6 +324,23 @@ export function spotlightInnerHtml(g) {
     ? 'on your wishlist'
     : (SPOTLIGHT_STATUS_LABEL[status] || 'in your library');
   const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
+  const metaParts = [
+    `<strong>${rating}%</strong> review`,
+    `<strong>${escapeHtml(hltbStr)}</strong> main`,
+  ];
+  // "On sale now" spotlights surface the discount + price using the same
+  // cut-depth color scale as the deal stats (emerald → amber → pink).
+  if (g._spotlightReason?.isWishlistSale) {
+    const deal = getDealInfo(g);
+    const cut = deal?.cut || 0;
+    if (cut > 0) {
+      metaParts.push(`<strong class="dash-spotlight-cut ${cutBucketClass(cut)}">-${cut}%</strong> off`);
+    }
+    if (deal?.price != null) {
+      metaParts.push(`<strong class="dash-spotlight-price ${cutBucketClass(cut)}">${escapeHtml(formatDollar(deal.price))}</strong>`);
+    }
+  }
+  metaParts.push(escapeHtml(statusLabel));
   return `
     <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
     <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
@@ -329,7 +348,7 @@ export function spotlightInnerHtml(g) {
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow">${escapeHtml(eyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
-      <span class="dash-spotlight-meta"><strong>${rating}%</strong> review · <strong>${escapeHtml(hltbStr)}</strong> main · ${escapeHtml(statusLabel)}</span>
+      <span class="dash-spotlight-meta">${metaParts.join(' · ')}</span>
     </div>`;
 }
 
@@ -363,8 +382,10 @@ export function startSpotlightRotation(pool) {
   if (!pool || pool.length <= 1) {
     stopSpotlightRotation();
     _spotlightPool = pool || [];
+    _rotationWanted = false;
     return;
   }
+  _rotationWanted = true;
   const el = document.getElementById('dashboardSpotlight');
   if (!el) return;
   const domMatches = !!pool[0] && el.dataset.key === gameKey(pool[0]);
@@ -444,4 +465,15 @@ export function syncSpotlightInMega(el, spotlight) {
     return;
   }
   existing?.remove();
+}
+
+if (typeof document !== 'undefined') {
+  registerPausable({
+    pause: stopSpotlightRotation,
+    resume() {
+      if (_rotationWanted && _spotlightPool.length > 1) {
+        startSpotlightRotation(_spotlightPool);
+      }
+    },
+  });
 }

@@ -6,3 +6,4 @@ psnawp>=3.0.0
 websocket-client>=1.6.0
 keyring>=25.0.0
 cryptography>=42.0.0
+PyJWT>=2.8.0

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from dataclasses import dataclass
+from typing import Literal
 
 from amazon_web_client import amazon_signin_url
 
@@ -108,7 +108,12 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="epic",
         label="Epic (library)",
         kind="browser",
-        description="Your Epic Games library. Click Connect to sign in to Epic in a managed window — we capture and exchange the authorizationCode for a 30-day refresh token automatically. If auto-capture is ever blocked, you can still paste the code Epic shows on the page below.",
+        description=(
+            "Your Epic Games library. Click Connect to sign in to Epic in a managed "
+            "window — we capture and exchange the authorizationCode for a 30-day "
+            "refresh token automatically. If auto-capture is ever blocked, you can "
+            "still paste the code Epic shows on the page below."
+        ),
         env_keys=("EPIC_AUTH_CODE",),
         form_fields=(
             FormField(
@@ -128,7 +133,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         fetcher_keys=("epic",),
         tips=(
             "Click Connect and sign in — we grab the authorizationCode for you, no copy/paste.",
-            "Auto-capture blocked? Paste the authorizationCode shown on Epic's page into the fallback field.",
+            (
+                "Auto-capture blocked? Paste the authorizationCode shown on Epic's page "
+                "into the fallback field."
+            ),
             "We trade the code for a ~30-day refresh token, so you only do this about monthly.",
         ),
     ),
@@ -136,7 +144,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="epic_wishlist",
         label="Epic (wishlist)",
         kind="browser",
-        description="Your Epic Games Store wishlist. Separate sign-in on the storefront — Cloudflare may challenge once.",
+        description=(
+            "Your Epic Games Store wishlist. Separate sign-in on the storefront — "
+            "Cloudflare may challenge once."
+        ),
         env_keys=("EPIC_STORE_COOKIE",),
         login_url="https://store.epicgames.com/en-US/wishlist",
         success_url_pattern=r"store\.epicgames\.com",
@@ -152,7 +163,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="amazon",
         label="Amazon Games (launcher)",
         kind="local",
-        description="Your Prime Gaming library from the Amazon Games launcher on this PC (richest data: art, last played).",
+        description=(
+            "Your Prime Gaming library from the Amazon Games launcher on this PC "
+            "(richest data: art, last played)."
+        ),
         env_keys=("AMAZON_GAMES_SQL_DIR",),
         fetcher_keys=("amazon",),
         platforms=("win32",),
@@ -188,7 +202,11 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="xbox",
         label="Xbox",
         kind="browser",
-        description="Your Xbox play history (every title you've launched on Xbox network). Game Pass titles you've played are tagged \u2014 we don't pull the broader Game Pass catalog.",
+        description=(
+            "Your Xbox play history (every title you've launched on Xbox network). "
+            "Game Pass titles you've played are tagged \u2014 we don't pull the broader "
+            "Game Pass catalog."
+        ),
         env_keys=("XBL_API_KEY",),
         form_fields=(
             FormField(
@@ -212,7 +230,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="xbox_wishlist",
         label="Xbox Store wishlist",
         kind="browser",
-        description="Your Xbox Store wishlist. Separate sign-in on xbox.com from the Xbox play history above \u2014 wishlists aren't exposed by OpenXBL.",
+        description=(
+            "Your Xbox Store wishlist. Separate sign-in on xbox.com from the Xbox play "
+            "history above \u2014 wishlists aren't exposed by OpenXBL."
+        ),
         env_keys=("XBOX_WISHLIST_PROFILE",),
         login_url="https://www.xbox.com/en-us/wishlist",
         success_url_pattern=r"xbox\.com/(en-us/)?wishlist",
@@ -229,7 +250,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="itch",
         label="itch.io (API key)",
         kind="manual",
-        description="Your itch.io library via API key. Paste a key from your itch settings — automated sign-in is blocked.",
+        description=(
+            "Your itch.io library via API key. Paste a key from your itch settings — "
+            "automated sign-in is blocked."
+        ),
         env_keys=("ITCH_API_KEY",),
         form_fields=(FormField("ITCH_API_KEY", "API key", secret=True),),
         login_url="https://itch.io/user/settings/api-keys",
@@ -258,7 +282,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="itad",
         label="IsThereAnyDeal",
         kind="manual",
-        description="Cross-store deal prices for your wishlist. Paste an API key from your ITAD apps page — automated sign-in is blocked.",
+        description=(
+            "Cross-store deal prices for your wishlist. Paste an API key from your ITAD "
+            "apps page — automated sign-in is blocked."
+        ),
         env_keys=("ITAD_API_KEY",),
         form_fields=(FormField("ITAD_API_KEY", "API key (UUID)", secret=True),),
         login_url="https://isthereanydeal.com/apps/my/",
@@ -306,7 +333,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="nintendo_wishlist",
         label="Nintendo Store wishlist",
         kind="browser",
-        description="Your Nintendo.com wish list. Separate sign-in on nintendo.com from the eShop transactions path above.",
+        description=(
+            "Your Nintendo.com wish list. Separate sign-in on nintendo.com from the "
+            "eShop transactions path above."
+        ),
         env_keys=("NINTENDO_WISHLIST_PROFILE",),
         login_url="https://www.nintendo.com/us/wish-list/",
         success_url_pattern=r"nintendo\.com/(us/)?wish-list",
@@ -332,7 +362,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "One sign-in covers both your Humble library and the Humble Store wishlist.",
             "Sign in at humblebundle.com (email or Google). Complete any CAPTCHA in the browser window.",
             "After sign-in we'll open your library page to capture the session.",
-            "Most Humble purchases are Steam keys \u2014 they appear as Humble-owned titles and dedupe against Steam by name.",
+            (
+                "Most Humble purchases are Steam keys \u2014 they appear as Humble-owned "
+                "titles and dedupe against Steam by name."
+            ),
         ),
     ),
     "ubisoft": ProviderSpec(

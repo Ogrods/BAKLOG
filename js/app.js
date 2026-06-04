@@ -65,6 +65,7 @@ import { initProfiles } from './profiles.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
 import { prewarmTableQueryForView, tableFingerprint } from './table-ui.js';
+import { initAuthGate } from './auth-gate.js';
 
 // Personal-storage's setPersonal triggers a downstream render of
 // summary/picks/dashboard. Those callbacks live in filters-ui/picks-ui/
@@ -100,6 +101,7 @@ function hydrateState() {
 }
 
 async function bootstrap() {
+  await initAuthGate();
   const tBoot = typeof performance !== "undefined" ? performance.now() : Date.now();
   // Dashboard now uses direct ES imports for its dependencies (game-core,
   // deals, genres, personal-storage, prefs, filters-ui, table-ui). The
@@ -124,7 +126,7 @@ async function bootstrap() {
   syncViewTabAria(state.activeView);
   savePrefs();
   bindEvents();
-  initProfiles();
+  await initProfiles();
   document.getElementById("showScoreColumn").checked = !!state.prefs.showScoreColumn;
   const tableWrap = document.getElementById("tableWrap");
   tableWrap?.classList.toggle("table-hide-score", !state.prefs.showScoreColumn);
@@ -256,7 +258,10 @@ async function bootstrap() {
 }
 
 bootstrap().catch(err => {
-  console.error("[bootstrap] unhandled failure - lifting boot curtain", err);
+  console.error("[bootstrap] unhandled failure", err);
+  if (document.documentElement.hasAttribute('data-auth-required')) {
+    return;
+  }
   // Belt-and-suspenders alongside the inline 8s safety net + the try/finally
   // around Promise.all inside bootstrap().
   liftBootCurtain(0, { force: true });

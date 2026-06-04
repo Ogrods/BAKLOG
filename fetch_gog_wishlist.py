@@ -12,21 +12,25 @@ wishlist, so you can deal-radar across stores in one place.
 
 import argparse
 import json
-import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from shared.money import format_price, normalize_currency_code
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
+from fetchers._base import (
+    add_allow_empty_arg,
+    refuse_drift_result,
+    refuse_empty_result,
+    write_catalog_text,
+)
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
+from shared.money import format_price
 
 GAMES_WISHLIST_GOG_JSON = Path("games_wishlist_gog.json")
 GOG_API_BASE = "https://api.gog.com"
@@ -168,8 +172,14 @@ def _build_row(gog_id: int, product: dict | None, price_doc: dict | None, hltb_d
         prices_list = embedded.get("prices") or []
         if prices_list:
             best = prices_list[0]
-            final = _money_to_float(best.get("finalPrice", "").split(" ")[0] if isinstance(best.get("finalPrice"), str) else best.get("finalPrice"))
-            base = _money_to_float(best.get("basePrice", "").split(" ")[0] if isinstance(best.get("basePrice"), str) else best.get("basePrice"))
+            fp_raw = best.get("finalPrice")
+            bp_raw = best.get("basePrice")
+            final = _money_to_float(
+                fp_raw.split(" ")[0] if isinstance(fp_raw, str) else fp_raw
+            )
+            base = _money_to_float(
+                bp_raw.split(" ")[0] if isinstance(bp_raw, str) else bp_raw
+            )
             currency = (best.get("currency") or {}).get("code") if isinstance(best.get("currency"), dict) else None
             if isinstance(best.get("finalPrice"), str) and " " in best["finalPrice"]:
                 currency = currency or best["finalPrice"].split(" ")[-1]
@@ -177,6 +187,8 @@ def _build_row(gog_id: int, product: dict | None, price_doc: dict | None, hltb_d
                 price_str = f"${final:.2f}"
             if final is not None and base and base > 0:
                 discount = round(100 * (1 - final / base))
+
+    cur_norm = currency or "USD"
 
     return {
         "store": "wishlist",
@@ -282,7 +294,7 @@ def main() -> int:
         stats.ok += 1
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist_gog",
         "game_count": len(rows),
         "games": sorted(rows, key=lambda g: (g.get("name") or "").lower()),

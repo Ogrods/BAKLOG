@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+_request_profile_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "_request_profile_id",
+    default=None,
+)
+
+
+def set_request_profile_id(profile_id: str | None) -> None:
+    """Pin active profile for the current HTTP request (Supabase auth)."""
+    _request_profile_id.set(profile_id)
+
+
+def clear_request_profile_id() -> None:
+    _request_profile_id.set(None)
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES_DIR = ROOT / "profiles"
@@ -21,7 +36,7 @@ _PROFILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _empty_index() -> dict[str, Any]:
@@ -87,6 +102,9 @@ def normalize_profile_id(profile_id: str) -> str:
 
 
 def get_active_profile_id() -> str:
+    ctx = _request_profile_id.get()
+    if ctx is not None:
+        return ctx
     override = os.environ.get(_ENV_OVERRIDE, "").strip()
     if override:
         if is_valid_profile_id(override):

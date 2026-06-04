@@ -28,10 +28,11 @@ import json
 import re
 import sys
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import quote
 
 from dotenv import load_dotenv
@@ -39,7 +40,13 @@ from dotenv import load_dotenv
 from auth import mark_invalid
 from auth.runner import _parse_xbox_preloaded_state
 from auth.secrets import profile_dir
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
+from fetchers._base import (
+    add_allow_empty_arg,
+    catalog_file,
+    refuse_drift_result,
+    refuse_empty_result,
+    write_catalog_text,
+)
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
@@ -466,7 +473,8 @@ def main() -> int:
 
     catalog = _index_products(state)
     items = [_to_item(pid, added_at, catalog.get(pid)) for pid, added_at in ids]
-    print(f"  parsed {len(items)} wishlist items ({sum(1 for it in items if catalog.get(it.product_id))} with catalog metadata)", flush=True)
+    with_meta = sum(1 for it in items if catalog.get(it.product_id))
+    print(f"  parsed {len(items)} wishlist items ({with_meta} with catalog metadata)", flush=True)
 
     empty_exit = refuse_empty_result(
         items,
@@ -512,7 +520,7 @@ def main() -> int:
         rows.append(_build_row(item, hltb))
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist_xbox",
         "game_count": len(rows),
         "games": sorted(rows, key=lambda g: (g.get("name") or "").lower()),

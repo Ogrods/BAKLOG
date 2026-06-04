@@ -13,7 +13,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fetchers._base import catalog_file, write_catalog_text
@@ -67,7 +67,7 @@ def load_mapping() -> dict:
 
 
 def save_mapping(mapping: dict) -> None:
-    mapping["fetched_at"] = datetime.now(timezone.utc).isoformat()
+    mapping["fetched_at"] = datetime.now(UTC).isoformat()
     path = mapping_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -139,7 +139,7 @@ def main() -> int:
             if cached is False and not args.retry_misses:
                 store_skipped += 1
                 if processed % HEARTBEAT_EVERY == 0:
-                    heartbeat(
+                    hb.tick(
                         f"[{i}/{len(missing)}] skipped {store_skipped} cached misses, "
                         f"{store_lookups} lookups (+{store_hits} hits) — still working"
                     )

@@ -9,16 +9,15 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from auth import mark_invalid
-from auth.manager import mark_connected
-from auth.manager import is_local_provider_disabled
-from auth.secrets import profile_dir
 from amazon_web_client import AmazonWebAuthError
+from auth import mark_invalid
+from auth.manager import is_local_provider_disabled, mark_connected
+from auth.secrets import profile_dir
 from fetchers._authoritative import AMAZON
 
 try:
@@ -424,7 +423,7 @@ def main() -> int:
     games_out = merge_amazon_sources(current_rows, carried_rows, source)
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "amazon",
         "source": source,
         "game_count": len(games_out),

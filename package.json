@@ -8,10 +8,13 @@
     "test": "vitest run",
     "test:js": "vitest run",
     "test:js:watch": "vitest",
-    "test:all": "python -m pytest -q && npm test"
+    "test:all": "python -m pytest -q && npm test",
+    "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/module/index.js --bundle --format=esm --outfile=js/vendor/supabase-js.mjs"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.49.1",
     "axe-core": "^4.12.0",
+    "esbuild": "^0.28.0",
     "happy-dom": "^20.9.0",
     "vitest": "^3.0.0"
   }

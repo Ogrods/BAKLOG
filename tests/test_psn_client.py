@@ -1,7 +1,7 @@
 """Tests for PSN library playtime aggregation (PS4 + PS5 cross-gen sum)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from psn_client import PsnClient, _accumulate_stat_into_agg, _apply_stat_to_entry, _new_stat_agg
@@ -88,16 +88,16 @@ def test_cross_gen_last_first_play_count_merged() -> None:
             name="Fortnite",
             hours=100,
             play_count=50,
-            last=datetime(2024, 6, 1, tzinfo=timezone.utc),
-            first=datetime(2018, 1, 1, tzinfo=timezone.utc),
+            last=datetime(2024, 6, 1, tzinfo=UTC),
+            first=datetime(2018, 1, 1, tzinfo=UTC),
         ),
         _stat(
             title_id="PPSA01922_00",
             name="Fortnite",
             hours=10,
             play_count=5,
-            last=datetime(2025, 1, 1, tzinfo=timezone.utc),
-            first=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            last=datetime(2025, 1, 1, tzinfo=UTC),
+            first=datetime(2020, 1, 1, tzinfo=UTC),
         ),
     ]
     client = object.__new__(PsnClient)

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BAKLOG — One-pager</title>
+  <link rel="stylesheet" href="brand.css" />
+  <style>
+    .sheet {
+      max-width: 8.5in;
+      margin: 0 auto;
+      padding: 0.6in 0.55in;
+    }
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.35in;
+      padding-bottom: 0.2in;
+      border-bottom: 2px solid rgba(56, 189, 248, 0.4);
+    }
+    .sheet-header h1 {
+      font-size: 1.75rem;
+      margin: 0;
+      letter-spacing: 0.1em;
+    }
+    .tagline {
+      font-size: 0.95rem;
+      color: var(--slate-300);
+      margin: 0;
+      max-width: none;
+    }
+    .cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35in 0.45in;
+      font-size: 0.82rem;
+    }
+    .cols h2 {
+      font-size: 0.7rem;
+      margin: 0 0 0.15in;
+      color: var(--sky);
+    }
+    .cols p, .cols li {
+      margin: 0 0 0.12in;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      max-width: none;
+    }
+    .cols ul {
+      margin: 0;
+      padding-left: 1.1em;
+      color: var(--text-dim);
+    }
+    .stat-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35in;
+      margin: 0.25in 0;
+      padding: 0.2in 0;
+      border-top: 1px solid var(--slate-700);
+      border-bottom: 1px solid var(--slate-700);
+    }
+    .stat-strip span {
+      font-family: var(--font-display);
+      font-weight: 800;
+      color: var(--sky);
+      font-size: 1.1rem;
+    }
+    .stat-strip small {
+      display: block;
+      font-size: 0.65rem;
+      color: var(--slate-500);
+      font-weight: 400;
+    }
+    .footer-line {
+      margin-top: 0.3in;
+      font-size: 0.72rem;
+      color: var(--slate-500);
+      text-align: center;
+    }
+    .no-print { margin-bottom: 1rem; }
+    @media print {
+      body { background: #fff; color: #0b1220; background-image: none; }
+      .sheet { padding: 0.45in; }
+      .no-print { display: none !important; }
+      h1, h2, .stat-strip span { color: #0369a1 !important; }
+      p, li { color: #334155 !important; }
+      .card, .sheet-header { border-color: #cbd5e1 !important; }
+    }
+    @page { size: letter; margin: 0.4in; }
+  </style>
+</head>
+<body>
+  <p class="no-print wrap" style="padding:1rem 0">
+    <a href="index.html">← Deck</a> ·
+    <button type="button" class="btn btn-primary" onclick="window.print()" style="margin-left:0.5rem">Print / Save PDF</button>
+  </p>
+
+  <article class="sheet">
+    <header class="sheet-header">
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <img src="assets/logo/lockup-horizontal.svg" alt="BAKLOG" width="200" height="40" />
+      </div>
+      <p class="tagline" style="text-align:right;max-width:3.2in">
+        <strong style="color:var(--text)">One honest backlog across every store.</strong><br />
+        Local-first · private by default
+      </p>
+    </header>
+
+    <div class="stat-strip">
+      <div><span>12+8</span><small>library + wishlist sources</small></div>
+      <div><span>~130M</span><small>Steam MAU top of funnel</small></div>
+      <div><span>$0</span><small>core free forever</small></div>
+      <div><span>$2–4</span><small>No-ads + sync tier</small></div>
+    </div>
+
+    <div class="cols">
+      <section>
+        <h2>Problem</h2>
+        <p>PC gamers accumulate libraries they never intentionally bought — Epic weekly frees, Prime drops, bundle keys, itch megabundles. No storefront offers cross-store ownership truth or ownership-aware deal alerts.</p>
+        <h2>Solution</h2>
+        <p>BAKLOG runs on the user's PC (127.0.0.1). Python fetchers pull real libraries into one table; ITAD pricing layers deals only when actionable. The 60-second "watch your library appear" demo is onboarding.</p>
+        <h2>Product (shipped)</h2>
+        <ul>
+          <li>12 library + 8 wishlist fetchers, cross-store dedupe</li>
+          <li>Ownership-aware deal radar + FX display currency</li>
+          <li>Switchable local profiles (work vs play)</li>
+          <li>Drift guard, atomic writes, honest fetcher health UI</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Business model</h2>
+        <p><strong>Lead:</strong> Freemium free + ads in deal surfaces. Optional $2–$4/mo removes ads + adds cloud sync. Affiliate on deal intent. ARR floor ~$25k–$50k at 50k MAU (conservative).</p>
+        <h2>Market</h2>
+        <p>Accidental-hoarder persona: near-zero upfront WTP, high deal intent. Epic/Prime/GOG free economies create structural demand for inventory + decision tools.</p>
+        <h2>Competitive edge</h2>
+        <ul>
+          <li>vs launchers: decision + deals, not launch</li>
+          <li>vs ITAD/GG.deals: ownership context</li>
+          <li>vs Backloggd: auto-import, local-first</li>
+        </ul>
+        <h2>Traction / trust</h2>
+        <ul>
+          <li>Store-integration phase complete (Jun 2026)</li>
+          <li>axe-core CI, pytest + vitest gates</li>
+          <li>No BAKLOG server — credentials on device</li>
+        </ul>
+      </section>
+    </div>
+
+    <p class="footer-line">
+      <strong>CTA:</strong> Clone repo · Connect Steam · Refresh · baklog.local<br />
+      Deck: marketing/index.html · Content: marketing/content-kit.md · MIT
+    </p>
+  </article>
+</body>
+</html>

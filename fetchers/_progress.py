@@ -10,22 +10,22 @@ Exit code contract (used across fetchers and enrichers):
 
 from __future__ import annotations
 
-EXIT_CODE_AUTH = 4
-
 import sys
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TypeVar
 
 T = TypeVar("T")
 
+EXIT_CODE_AUTH = 4
+
 
 def started(label: str) -> float:
     """Print a run header and return monotonic start time."""
-    iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"=== {label} started at {iso} ===", flush=True)
     return time.monotonic()
 

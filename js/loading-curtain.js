@@ -3,7 +3,7 @@
  *
  * Boot curtain: #bootLoadingOverlay + html[data-boot-loading] (set in index.html
  * FOUC script, lifted by liftBootCurtain after bootstrap).
- * View overlay: #viewLoadingOverlay scrim on #tableShell (tab switches only).
+ * View overlay: #viewLoadingOverlay full-viewport scrim (tab switches, all views).
  */
 
 import { startBootTipRotation, stopBootTipRotation } from './tips.js';
@@ -151,6 +151,7 @@ if (typeof document !== "undefined") {
   if (document.documentElement?.hasAttribute("data-boot-loading")) {
     setTabsDisabled(true);
   }
+  window.__baklogLiftBootCurtain = (opts) => liftBootCurtain(0, opts || { force: true });
 }
 
 export {

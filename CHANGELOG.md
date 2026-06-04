@@ -22,8 +22,21 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Changed
+
+- **Connections status pills (3 states)** — scrapped the client-side "Connecting…" animation. Pills now show only **Connected**, **Unverified**, or **Not connected** from server truth (`displayStatus()`); `expired` still drives Reconnect chip/banner but displays as "Not connected" on the card. Post-connect speed uses Epic callback `BroadcastChannel` + a 30s time-boxed fast poll (no fake in-flight state).
+
+### Fixed
+
+- **Virtual table scroll white flashes** — dark `html` / `#tableShell` / `.games-table` backgrounds so `contain: paint` repaints never expose the white canvas; virtual overscan raised from 10 to 20 rows to reduce blank gaps on fast flicks.
+- **Connections rail crash** — fixed leftover `eff` reference in `buildRailItemHtml` after the three-state status refactor (`ReferenceError: eff is not defined` broke the Connections tab).
+- **Connections status refresh errors** — failed `/api/auth/status` no longer wipes the provider list when cached data exists; messages distinguish sign-in required (401), server errors, and offline instead of always blaming `server.py`.
+- **Audit hardening** — deduplicated Supabase bearer→profile binding (`_bind_request_user`); `cancel_all` / `force_reset` scoped to the signed-in profile when auth is on; [SECURITY.md](SECURITY.md) documents optional invite-only login; full audit notes in [docs/AUDIT_FINDINGS.md](docs/AUDIT_FINDINGS.md).
+
 ### Added
 
+- **Epic browser sign-in (redirect OAuth)** — `POST /api/auth/epic/oauth-url` returns an Epic login URL whose `redirectUrl` points back to the local `/oauth/epic/callback` with a single-use, profile-bound `state`; the callback exchanges the `authorizationCode` and connects Epic to the signed-in profile. Available as "Sign in with your browser instead" in the Epic Connections fallback drawer; the Playwright auto-capture flow remains the default.
+- **Supabase invite-only sign-in** — optional account gate: full-screen login overlay, `GET /api/config`, JWT verification on `/api/*`, and one isolated `profiles/<user-id>/` data tree per invited user. Setup: [docs/SUPABASE_AUTH.md](docs/SUPABASE_AUTH.md). Local dev without Supabase: `BAKLOG_AUTH_DISABLED=1` in `.env`.
 - **GOG Galaxy + itch butler local scan** — dual-source library fetchers mirror the Amazon launcher/web pattern. `gog_galaxy_client.py` reads `galaxy-2.0.db`; `itch_local_client.py` reads `butler.db`. `fetch_gog.py` / `fetch_itch.py` use `--source auto` (local first), union-merge per-source slices with drift guards, and shared filtering via `gog_filters.py` / `itch_game.py`. Fetcher-health treats a connected local sibling (`gog_galaxy`, `itch_local`) as satisfying GOG/itch credentials so reconnect chips and missing-key warnings do not fire when only the launcher DB is present.
 - **Runaway-process / test-hang guard** — the dev server caps every fetcher run at `MAX_RUN_SECONDS` (override via `BAKLOG_MAX_RUN_SECONDS`) and kills past the cap with a clear log line; `popen_fetcher` launches under a Windows job object so the whole child tree dies with the parent; `RunManager.join_threads()` drains workers on shutdown (`shared/subprocess_guard.py`). Test side: `pytest-timeout` (60s, faulthandler 70s) plus a `tests/conftest.py` thread/subprocess leak detector that dumps stacks instead of letting CI hang.
 - **`python -m auth expire <provider>`** — dev/test helper that marks a Connections provider Session expired (`mark_invalid`) so the dashboard Reconnect chip is reproducible without waiting for a real auth failure. `python -m auth expire --list` prints valid provider keys.

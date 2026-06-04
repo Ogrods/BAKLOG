@@ -61,7 +61,10 @@ export const state = {
   sortKey: 'name',
   sortDir: 1,
   pickedKey: null,
-  libraryMeta: { steam: null, gog: null, psn: null, epic: null, amazon: null, nintendo: null, itch: null, wishlist: null },
+  libraryMeta: {
+    steam: null, gog: null, psn: null, epic: null, amazon: null, nintendo: null, itch: null,
+    wishlist: null,
+  },
   crossStoreHiddenKeys: new Set(),
   crossStoreOwnedStores: new Map(),
   wishlistGames: [],
@@ -80,7 +83,9 @@ export const CLEANUP_MAX_RATING = 60;
 export const CLEANUP_MIN_AGE_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
 export const GENRE_CHIP_COLLAPSE_AT = 12;
 export const GENRE_ALIASES = { Simulator: 'Simulation', Sport: 'Sports' };
-export const ITCH_NON_GAME_CLASSIFICATIONS = new Set(['tool', 'assets', 'comic', 'book', 'soundtrack', 'physical_game', 'other']);
+export const ITCH_NON_GAME_CLASSIFICATIONS = new Set([
+  'tool', 'assets', 'comic', 'book', 'soundtrack', 'physical_game', 'other',
+]);
 export const STATUS_CHIP_DEFS = [
   { key: 'backlog', label: 'Backlog' },
   { key: 'next', label: 'Next' },

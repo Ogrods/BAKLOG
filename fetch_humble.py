@@ -17,7 +17,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -248,7 +248,6 @@ def fetch_library_items(
             print(f"  wrote {dump_path()}", flush=True)
             return []
 
-        existing_by_key = _load_existing_by_machine()
         found: dict[str, LibraryItem] = {}
         for i, entry in enumerate(orders_raw, 1):
             if not isinstance(entry, dict):
@@ -385,7 +384,6 @@ def main() -> int:
     existing = _load_existing_by_machine()
     rows: list[dict] = []
     for i, item in enumerate(items, 1):
-        row_id = f"humble-{item.machine_name}"
         print(f"[{i}/{len(items)}] {item.name}", flush=True)
         hltb = None
         hltb_updated = False
@@ -416,7 +414,7 @@ def main() -> int:
         )
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "humble",
         "game_count": len(rows),
         "games": rows,

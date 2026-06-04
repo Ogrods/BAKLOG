@@ -245,16 +245,102 @@ html[data-init-view="connections"] .view-tab[data-view="connections"] {
   color: #e2e8f0;
   background: rgba(14, 165, 233, 0.15);
 }
+/* === Overlay stack (z-index tokens) ===
+   auth gate 200 > boot curtain 150 > view overlay 140 > alpha nav 35 > row pill 1 */
+:root {
+  --overlay-z-auth: 200;
+  --overlay-z-boot: 150;
+  --overlay-z-view: 140;
+  --overlay-scrim: rgb(2 6 23);
+  --overlay-scrim-soft: rgba(15, 23, 42, 0.72);
+}
+
 /* === Bootstrap curtain (all five views) ===
    html[data-boot-loading="<view>"] is set synchronously in <head>. The curtain
    covers the active view's primary container plus chrome that paints into the
    header strip so the cold-load swap is one fade, not five.
 
-   Tab switches use #viewLoadingOverlay (tableShell scrim) via loading-curtain.js. */
+   Tab switches use #viewLoadingOverlay (full-viewport scrim) via loading-curtain.js. */
+/* === Supabase account gate (invite-only sign-in) === */
+#authGateOverlay { display: none; }
+#authGateOverlay:not([hidden]) {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: var(--overlay-z-auth);
+  align-items: center;
+  justify-content: center;
+  background: rgb(2 6 23);
+  padding: 1.5rem;
+}
+/* While the sign-in gate is up, suppress the boot curtain entirely so its
+   spinner/tips don't bleed or flicker behind the (now opaque) auth card. */
+html[data-auth-required] #bootLoadingOverlay { display: none !important; }
+.auth-gate-card {
+  width: 100%;
+  max-width: 22rem;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(71 85 105);
+  background: rgb(30 41 59);
+}
+.auth-gate-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: rgb(241 245 249);
+}
+.auth-gate-hint {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: rgb(148 163 184);
+  line-height: 1.4;
+}
+.auth-gate-form { display: flex; flex-direction: column; gap: 0.75rem; }
+.auth-gate-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.auth-gate-label { font-size: 0.75rem; color: rgb(148 163 184); }
+.auth-gate-input {
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgb(71 85 105);
+  background: rgb(15 23 42);
+  color: rgb(241 245 249);
+  font-size: 0.875rem;
+}
+.auth-gate-input:focus {
+  outline: 2px solid rgb(56 189 248);
+  outline-offset: 1px;
+}
+.auth-gate-error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: rgb(251 191 36);
+}
+.auth-gate-error.hidden { display: none; }
+.auth-gate-submit {
+  margin-top: 0.25rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  border: none;
+  background: rgb(14 165 233);
+  color: rgb(15 23 42);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.auth-gate-submit:hover { background: rgb(56 189 248); }
+.auth-gate-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 #bootLoadingOverlay { display: none; }
 html[data-boot-loading] #bootLoadingOverlay {
-  display: block;
-  margin-bottom: 1rem;
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: var(--overlay-z-boot);
+  align-items: center;
+  justify-content: center;
+  background: rgb(2 6 23);
+  padding: 1.5rem;
+  margin: 0;
 }
 .boot-loading-card {
   display: flex;
@@ -302,16 +388,16 @@ html[data-boot-loading] #bootLoadingOverlay {
 @media (prefers-reduced-motion: reduce) {
   .boot-loading-tip { transition: none; }
 }
-/* Hide chrome that belongs to a loaded view; visibility (not display)
-   preserves layout so the reveal is a fade-style swap for below-curtain
-   sections. */
+/* Boot-hidden policy:
+   - display:none for large view subtrees (no layout/paint cost behind curtain)
+   - visibility:hidden only where header height must be reserved (.view-tab) */
 html[data-boot-loading] #picksSection,
 html[data-boot-loading] #toolbarSection,
 html[data-boot-loading] #wishlistDealRadar,
 html[data-boot-loading] #tableShell,
 html[data-boot-loading] #rowCount,
 html[data-boot-loading] #dashboardContainer,
-html[data-boot-loading] #connectionsContainer { visibility: hidden; }
+html[data-boot-loading] #connectionsContainer { display: none; }
 /* #summary lives INSIDE the <header>, above the curtain. If chips get
    appended during boot via renderSummary(), header grows and shoves the
    curtain down. display:none keeps its footprint at zero until the boot
@@ -327,7 +413,7 @@ html[data-boot-loading] #profileMenuWrap { pointer-events: none; }
 /* Reserve the vertical scrollbar's gutter so the page never shifts
    horizontally the moment content overflows the viewport (especially
    noticeable on Windows where the scrollbar is opaque and ~17px wide). */
-html { scrollbar-gutter: stable; }
+html { scrollbar-gutter: stable; background: #0f172a; }
 body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
 th { cursor: pointer; user-select: none; }
 th:hover { background: rgb(51 65 85); }
@@ -752,7 +838,7 @@ body.bulk-bar-open { padding-bottom: 56px; }
 #kebabMenu { display: none; }
 #kebabMenu.open { display: block; }
 /* === View-switch loading overlay === */
-#tableShell { contain: layout paint; }
+#tableShell { contain: layout paint; background: #0f172a; }
 #dashboardContainer { contain: layout paint; }
 
 .row-loading-overlay {
@@ -785,19 +871,25 @@ body.bulk-bar-open { padding-bottom: 56px; }
 .row-loading-overlay::after {
   content: "Updating…";
 }
-.row-loading-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(148, 163, 184, 0.35);
+.app-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(148, 163, 184, 0.35);
   border-top-color: #38bdf8;
   border-radius: 50%;
   animation: view-spin 0.75s linear infinite;
   flex: 0 0 auto;
 }
+.app-spinner--sm {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+.view-spinner { /* legacy alias */ width: 28px; height: 28px; border: 3px solid rgba(148, 163, 184, 0.35); border-top-color: #38bdf8; border-radius: 50%; animation: view-spin 0.75s linear infinite; }
 @media (prefers-reduced-motion: reduce) {
   .row-loading-overlay { transition: none; }
-  .row-loading-spinner { animation: none; border-top-color: #38bdf8; opacity: 0.85; }
-  #viewLoadingOverlay .view-spinner { animation: none; border-top-color: #38bdf8; opacity: 0.85; }
+  .app-spinner { animation: none; border-top-color: #38bdf8; opacity: 0.85; }
+  .view-spinner { animation: none; border-top-color: #38bdf8; opacity: 0.85; }
   .dash-spotlight,
   .dash-spotlight-art { transition: none !important; }
   .dash-spotlight:hover .dash-spotlight-art { transform: none; }
@@ -817,24 +909,41 @@ body.bulk-bar-open { padding-bottom: 56px; }
   #viewLoadingOverlay { transition: none; }
 }
 
-#viewLoadingOverlay {
-  position: absolute; inset: 0; z-index: 30;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(15, 23, 42, 0.55);
+#viewLoadingOverlay.app-view-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--overlay-z-view);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay-scrim-soft);
   backdrop-filter: blur(2px);
-  border-radius: 0.5rem;
-  opacity: 0; pointer-events: none;
+  opacity: 0;
+  pointer-events: none;
   transition: opacity 0.18s ease;
 }
-#viewLoadingOverlay.show { opacity: 1; pointer-events: auto; }
-.view-spinner {
-  width: 28px; height: 28px;
-  border: 3px solid rgba(148, 163, 184, 0.35);
-  border-top-color: #38bdf8;
-  border-radius: 50%;
-  animation: view-spin 0.75s linear infinite;
+#viewLoadingOverlay.app-view-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.app-view-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(51 65 85);
+  background: rgb(30 41 59);
+}
+.app-view-overlay-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(203 213 225);
 }
 @keyframes view-spin { to { transform: rotate(360deg); } }
+html[data-page-hidden] .dash-marquee-track { animation-play-state: paused !important; }
 .view-tab[disabled] { opacity: 0.5; cursor: progress; }
 /* Tabs stay hidden while the boot curtain is up, then the whole bar reveals
    as one unit when liftBootCurtain() removes data-boot-loading — no per-tab
@@ -1096,21 +1205,96 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 }
 .dash-legend-swatch-solid { background: #94a3b8; }
 .dash-legend-swatch-faded { background: rgba(148, 163, 184, 0.33); }
-/* Fetcher health + run log: side-by-side when log is open (2fr / 1fr). */
+/* Fetcher: collapsed = one-line status bar; expanded = health + console (2fr / 1fr). */
 .fh-row {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.4rem;
   align-items: stretch;
 }
-.fh-row:has(.fh-log.open) {
+.fh-row.is-expanded {
   grid-template-columns: 2fr 1fr;
   min-height: 7.5rem;
 }
+.fh-row.is-collapsed {
+  min-height: 0;
+}
 .dash-fetcher-health {
   display: flex; flex-direction: column; gap: 0.4rem; height: auto;
+  min-height: 0;
+}
+.fh-row.is-expanded .dash-fetcher-health {
   min-height: 7.5rem;
 }
+/* Collapsed: thin live status bar only */
+.fh-bar {
+  display: none;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(51 65 85);
+  background: rgba(15, 23, 42, 0.85);
+  cursor: pointer;
+  user-select: none;
+}
+.fh-row.is-collapsed .fh-bar {
+  display: flex;
+  grid-column: 1 / -1;
+}
+.fh-row.is-collapsed .dash-fetcher-health .fh-head,
+.fh-row.is-collapsed .dash-fetcher-health .fh-legend,
+.fh-row.is-collapsed .dash-fetcher-health .fh-chips,
+.fh-row.is-collapsed .dash-fetcher-health .fh-readonly-banner {
+  display: none !important;
+}
+.fh-row.is-collapsed .fh-log {
+  display: none !important;
+}
+.fh-bar-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #64748b;
+}
+.fh-bar-dot.is-live {
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+  animation: fh-pulse 1.2s ease-in-out infinite;
+}
+.fh-bar-status {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+.fh-bar-tail {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.65rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fh-bar-tail.stderr { color: #fda4af; }
+.fh-bar-toggle {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.fh-bar-toggle:hover { color: #e2e8f0; background: rgba(148, 163, 184, 0.12); }
+.fh-bar-toggle:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
 .fh-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 .fh-head-left { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
 .fh-head-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
@@ -1350,7 +1534,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   overflow: hidden;
   display: none;
 }
-.fh-log.open {
+.fh-row.is-expanded .fh-log.open {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1358,7 +1542,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 /* Fill the full row height (matches the health card via the grid stretch).
    The body is min-height:0 so its content scrolls instead of growing the
    row — keeps the panel pinned to the health card height with no dead space. */
-.fh-row:has(.fh-log.open) .fh-log.open {
+.fh-row.is-expanded .fh-log.open {
   min-height: 7.5rem;
   width: 100%;
   min-width: 0;
@@ -1458,7 +1642,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .fh-log-body::-webkit-scrollbar-thumb:hover {
   background: rgb(71 85 105);
 }
-.fh-row:has(.fh-log.open) .fh-log-body {
+.fh-row.is-expanded .fh-log-body {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
@@ -1491,13 +1675,13 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .fh-log-line.cmd { color: #38bdf8; }
 .fh-log-empty { color: #64748b; font-style: italic; }
 @media (max-width: 767px) {
-  .fh-row:has(.fh-log.open) {
+  .fh-row.is-expanded {
     grid-template-columns: 1fr;
   }
-  .fh-row:has(.fh-log.open) .fh-log.open {
+  .fh-row.is-expanded .fh-log.open {
     max-height: 14.5rem;
   }
-  .fh-row:has(.fh-log.open) .fh-log-body {
+  .fh-row.is-expanded .fh-log-body {
     flex: none;
     max-height: 12rem;
   }
@@ -1719,9 +1903,29 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 }
 .dash-spotlight-meta { font-size: 11px; color: #cbd5e1; text-align: right; }
 .dash-spotlight-meta strong { color: #f1f5f9; font-weight: 600; }
+/* "On sale now" spotlight: discount + price reuse the deal cut-depth scale
+   (emerald < 50%, emerald→amber 50–74%, amber→red→pink 75%+). */
+.dash-spotlight-meta .dash-spotlight-cut,
+.dash-spotlight-meta .dash-spotlight-price { color: #6ee7b7; font-weight: 700; }
+.dash-spotlight-meta .dash-spotlight-cut.deal-cut-big,
+.dash-spotlight-meta .dash-spotlight-price.deal-cut-big {
+  background: linear-gradient(90deg, #34d399 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dash-spotlight-meta .dash-spotlight-cut.deal-cut-huge,
+.dash-spotlight-meta .dash-spotlight-price.deal-cut-huge {
+  background: linear-gradient(90deg, #fbbf24 0%, #f87171 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 .dash-marquee {
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+  padding-top: 8px;
+  padding-bottom: 0;
   border-top: 1px solid #1e293b;
   position: relative;
   overflow: hidden;
@@ -1769,7 +1973,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .dash-marquee-icon.is-violet { background: rgba(168, 85, 247, 0.15); color: #c4b5fd; }
 .dash-marquee-icon.is-rose { background: rgba(244, 114, 182, 0.15); color: #fda4af; }
 .dash-mega-divider {
-  margin: 22px -4px 18px;
+  margin: 0 -4px 18px;
   border-top: 1px solid #1e293b;
 }
 .dash-ribbon {
@@ -2381,6 +2585,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   width: 100%;
   table-layout: fixed;
   min-width: 1280px;
+  background: #0f172a;
   /* Collapse table borders so the default border-spacing 2px band INSIDE
      <thead> (above each <th>) disappears. Without this, the band is painted
      by <thead>'s bg-slate-800 only while the thead is in normal flow; once
@@ -2647,7 +2852,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 4px;
   min-height: 0;
 }
@@ -2755,8 +2960,10 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   max-height: 52px;
 }
 .dash-recent-row {
-  flex: 0 0 auto;
-  height: 52px;
+  flex: 1 1 0;
+  height: auto;
+  min-height: 44px;
+  max-height: 52px;
   border-left-color: rgba(251, 191, 36, 0.45);
 }
 .dash-versus-row .dash-list-cover,
@@ -2843,6 +3050,13 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   cursor: pointer;
 }
 .conn-kebab-item:hover, .conn-kebab-item:focus-visible { background: #233146; color: #f1f5f9; outline: none; }
+.conn-refresh-error {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
 .conn-hint {
   display: flex;
   align-items: center;

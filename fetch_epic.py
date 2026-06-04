@@ -4,25 +4,24 @@
 import argparse
 import concurrent.futures
 import json
-import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from epic_client import EpicAuthError, EpicClient, LOGIN_URL, default_epic_cache_dir
+from epic_client import LOGIN_URL, EpicAuthError, EpicClient, default_epic_cache_dir
 from fetchers._authoritative import EPIC
 from fetchers._base import (
     add_allow_empty_arg,
+    catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
-    catalog_file,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
@@ -404,7 +403,7 @@ def main() -> int:
         )
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "epic",
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),

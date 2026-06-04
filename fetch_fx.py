@@ -2,7 +2,6 @@
 """Refresh cached FX rates (Frankfurter) for wishlist price conversion."""
 
 import argparse
-import sys
 
 from fetchers._base import configure_stdout
 from fetchers._progress import RunStats, started

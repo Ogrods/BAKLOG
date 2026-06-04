@@ -5,8 +5,8 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from http.server import ThreadingHTTPServer
 from functools import partial
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -201,7 +201,9 @@ def test_fetchers_from_manifest(personal_server: str):
     assert len(keys) == len(server.FETCHERS)
 
 
-def test_missing_library_json_returns_empty_catalog(personal_server: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_missing_library_json_returns_empty_catalog(
+    personal_server: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     status, data = _request(personal_server, "GET", "/games_ea.json")
     assert status == 200

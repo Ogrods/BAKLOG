@@ -7,7 +7,6 @@ from fetchers._base import refuse_drift_result, refuse_empty_result
 from fetchers._progress import (
     HeartbeatTimer,
     RunStats,
-    done,
     pct,
     progress_line,
     started,

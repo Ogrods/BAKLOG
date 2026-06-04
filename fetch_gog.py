@@ -7,7 +7,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,10 +18,9 @@ from fetchers._authoritative import GOG
 from fetchers._base import (
     add_allow_empty_arg,
     carry_enrichment,
-    merge_cached_row,
-    refuse_drift_result,
-    refuse_empty_result,
     catalog_file,
+    merge_cached_row,
+    refuse_empty_result,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
@@ -647,7 +646,7 @@ def main() -> int:
         )
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "gog",
         "source": source,
         "game_count": len(games_out),

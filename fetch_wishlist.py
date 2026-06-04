@@ -3,26 +3,24 @@
 
 import argparse
 import json
-import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
 
-from hltb_client import HltbClient
+from auth import resolve_env
 from fetchers._base import (
     STEAM_CREDENTIALS_HINT,
     add_allow_empty_arg,
     refuse_drift_result,
     refuse_empty_result,
-    catalog_file,
     write_catalog_text,
 )
-from auth import resolve_env
 from fetchers._progress import RunStats, started
+from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
 from steam_client import SteamClient
 
@@ -183,7 +181,7 @@ def main() -> int:
         return stats.finish("fetch_wishlist", t0, exit_code=drift_exit)
 
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist",
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),

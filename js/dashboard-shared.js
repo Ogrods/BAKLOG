@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { gameKey } from './game-core.js';
 import { filterOutHidden } from './personal-storage.js';
 import { prefersReducedMotion } from './motion.js';
+import { isPageHidden } from './visibility.js';
 
 export const ITCH_CLASS_LABELS = {
   game: "Games",
@@ -55,6 +56,10 @@ export const HLTB_BUCKETS = [
 
 export function animateCount(el, from, to, format, durationMs = 900) {
   if (!el) return;
+  if (isPageHidden()) {
+    el.textContent = format(to);
+    return;
+  }
   if (prefersReducedMotion() || durationMs <= 0 || from === to) {
     el.textContent = format(to);
     return;
@@ -62,6 +67,10 @@ export function animateCount(el, from, to, format, durationMs = 900) {
   const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const ease = t => 1 - Math.pow(1 - t, 3);
   function tick(now) {
+    if (isPageHidden()) {
+      el.textContent = format(to);
+      return;
+    }
     const elapsed = (now || performance.now()) - start;
     const t = Math.min(1, elapsed / durationMs);
     const v = from + (to - from) * ease(t);

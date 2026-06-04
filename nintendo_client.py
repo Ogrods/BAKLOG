@@ -250,7 +250,7 @@ class NintendoClient:
                 }
             )
             url = f"{GRAPHQL_URL}?{query}"
-            resp = context.request.get(url, timeout=30)
+            resp = context.request.get(url, headers=headers, timeout=30)
             if resp.status != 200:
                 break
             try:

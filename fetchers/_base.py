@@ -2,21 +2,22 @@
 
 from __future__ import annotations
 
-STEAM_CREDENTIALS_HINT = (
-    "Steam is not connected for this profile. "
-    "Open Connections → Steam → Connect (sign in to capture your API key and SteamID)."
-)
-
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from shared.json_util import dumps_games_json
 from shared.profile_paths import resolve_catalog_path
 from shared.safe_write import safe_write_text
+
+STEAM_CREDENTIALS_HINT = (
+    "Steam is not connected for this profile. "
+    "Open Connections → Steam → Connect (sign in to capture your API key and SteamID)."
+)
 
 
 def catalog_file(path: Path) -> Path:
@@ -183,7 +184,7 @@ def write_games_json(
     """
     path = resolve_catalog_path(path)
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "store": store,
         "game_count": len(games),
         "games": games,

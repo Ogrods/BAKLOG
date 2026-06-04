@@ -2,19 +2,27 @@
 
 from __future__ import annotations
 
+import contextvars
 import os
 import re
 import shutil
 import sys
 import threading
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from auth.registry import PROVIDERS, spec_for
 from auth.runner import AuthSession, run_browser_auth
-from auth.secrets import delete_provider_blob, get_provider_blob, profile_dir, set_provider_blob
+from auth.secrets import (
+    SecretsCorruptError,
+    delete_provider_blob,
+    get_provider_blob,
+    profile_dir,
+    set_provider_blob,
+)
 from shared.platform_support import platform_supported
 from shared.profile_paths import DEFAULT_PROFILE_ID, auth_dir, epic_cache_dir, get_active_profile_id
 
@@ -32,7 +40,10 @@ _sessions_lock = threading.Lock()
 
 def _migrate_unified_epic() -> None:
     """Split a previously-unified epic blob back into epic + epic_wishlist."""
-    epic = get_provider_blob("epic")
+    try:
+        epic = get_provider_blob("epic")
+    except SecretsCorruptError:
+        return
     if not epic.get("EPIC_STORE_COOKIE"):
         return
     wl = get_provider_blob("epic_wishlist")
@@ -49,7 +60,7 @@ _migrate_unified_epic()
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _env_fallback_allowed() -> bool:
@@ -494,7 +505,12 @@ def start_browser_auth(provider: str) -> str:
         finally:
             session.finish()
 
-    threading.Thread(target=_worker, daemon=True, name=f"auth-{provider}").start()
+    ctx = contextvars.copy_context()
+    threading.Thread(
+        target=lambda: ctx.run(_worker),
+        daemon=True,
+        name=f"auth-{provider}",
+    ).start()
     return session_id
 
 

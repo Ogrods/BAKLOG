@@ -1,6 +1,6 @@
 """Tests for shared/fx.py and wishlist FX application."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from shared.fx import (
     CACHE_HARD_MAX_AGE_SECONDS,
@@ -133,7 +133,7 @@ def test_apply_fx_refuses_corrupted_fx_converted_row():
 def test_ensure_fx_rates_warns_on_stale_cache_fallback(monkeypatch, tmp_path):
     import shared.fx as fx_mod
 
-    old = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+    old = (datetime.now(UTC) - timedelta(days=10)).isoformat()
     doc = {**_eur_base_rates(), "fetched_at": old}
     path = tmp_path / "fx_rates.json"
     path.write_text(__import__("json").dumps(doc), encoding="utf-8")
@@ -148,7 +148,7 @@ def test_ensure_fx_rates_refuses_ancient_cache(monkeypatch, tmp_path):
     import shared.fx as fx_mod
 
     days = CACHE_HARD_MAX_AGE_SECONDS // 86400 + 1
-    old = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    old = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     doc = {**_eur_base_rates(), "fetched_at": old}
     path = tmp_path / "fx_rates.json"
     path.write_text(__import__("json").dumps(doc), encoding="utf-8")

@@ -15,7 +15,7 @@ import re
 import sys
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -23,8 +23,8 @@ import requests
 from auth import resolve_env
 from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
-from shared.profile_paths import cache_json_path
 from itch_game import itch_is_videogame as _itch_is_videogame
+from shared.profile_paths import cache_json_path
 from steam_client import SteamClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -45,9 +45,21 @@ STORE_FILES: list[tuple[str, str, Callable[[dict], bool] | None]] = [
     ("games_battlenet.json", "battlenet", None),
     ("games_ubisoft.json", "ubisoft", None),
     ("games_nintendo.json", "nintendo", None),
+    ("games_humble.json", "humble", None),
     ("games_itch.json", "itch", _itch_is_videogame),
     ("games_ea.json", "ea", None),
 ]
+
+
+def _humble_steam_appid(g: dict) -> int | None:
+    """Steam app id embedded by fetch_humble (skips store search when present)."""
+    raw = g.get("humble_steam_app_id") or g.get("steam_app_id")
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def _number_tokens(s: str) -> set[str]:
@@ -106,7 +118,7 @@ def load_mapping() -> dict:
 
 
 def save_mapping(mapping: dict) -> None:
-    mapping["fetched_at"] = datetime.now(timezone.utc).isoformat()
+    mapping["fetched_at"] = datetime.now(UTC).isoformat()
     path = mapping_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(mapping, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -157,8 +169,8 @@ def steam_appids_by_id() -> set[int]:
 
 def main() -> int:
     import argparse
+
     from dotenv import load_dotenv
-    import os
 
     parser = argparse.ArgumentParser(description="Backfill Steam review fields on non-Steam library JSON.")
     parser.add_argument(

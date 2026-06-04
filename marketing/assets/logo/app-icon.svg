@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="BAKLOG app icon">
+  <defs>
+    <linearGradient id="iconBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="iconMark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <mask id="knobs-icon" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+      <rect width="100" height="100" fill="#fff"/>
+      <circle cx="14" cy="64" r="8" fill="#000"/>
+      <circle cx="64" cy="64" r="8" fill="#000"/>
+      <circle cx="39" cy="36" r="8" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#iconBg)"/>
+  <rect width="128" height="128" rx="28" fill="none" stroke="rgba(56,189,248,0.35)" stroke-width="2"/>
+  <g transform="translate(16, 36) scale(1.05)">
+    <g fill="url(#iconMark)" mask="url(#knobs-icon)">
+      <rect x="2" y="52" width="46" height="24" rx="12" ry="12"/>
+      <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
+      <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
+    </g>
+  </g>
+</svg>

@@ -51,7 +51,7 @@ describe("spotlight art (A+B)", () => {
     );
   });
 
-  it("spotlightArtCandidates prefers library_hero then header for Steam", () => {
+  it("spotlightArtCandidates prefers hero then 600x900 then header for Steam", () => {
     const g = {
       store: "steam",
       id: 367520,
@@ -60,8 +60,14 @@ describe("spotlight art (A+B)", () => {
     };
     const c = spotlightArtCandidates(g);
     expect(c[0]).toBe(steamLibraryHeroUrl(367520));
-    expect(c[1]).toBe(g.header_image);
-    expect(c).toContain(g.library_image);
+    expect(c[1]).toBe(
+      "https://cdn.akamai.steamstatic.com/steam/apps/367520/library_600x900_2x.jpg",
+    );
+    expect(c[2]).toBe(g.library_image);
+    expect(c).toContain(g.header_image);
+    const headerIdx = c.indexOf(g.header_image);
+    const portraitIdx = c.indexOf(g.library_image);
+    expect(headerIdx).toBeGreaterThan(portraitIdx);
   });
 
   it("steamAppIdFromGame parses app id from steamstatic URLs", () => {

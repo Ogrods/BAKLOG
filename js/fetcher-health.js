@@ -11,8 +11,9 @@ import {
   authStatusLoaded,
   providerStatus,
   ingestAuthStatusProviders,
+  groupRepFor,
 } from './connections.js';
-import { activeProfileId, profileScopedStorageKey } from './profiles.js';
+import { profileScopedStorageKey } from './profiles.js';
 import { savePrefs } from './prefs.js';
 
 // ---------------------------------------------------------------------------
@@ -186,6 +187,22 @@ export function clearReconnectRequired(provider) {
   if (reconnectDismissed.delete(provider)) persistReconnectDismissed();
 }
 
+/** Fetcher chip keys whose mapped auth provider is `provider`. */
+function fetcherKeysForProvider(provider) {
+  return Object.keys(FETCHER_AUTH_PROVIDER).filter(
+    k => FETCHER_AUTH_PROVIDER[k] === provider,
+  );
+}
+
+/** A provider just reconnected (was reconnect-required -> connected): clear
+ *  sticky failed/cooldown chip state so chips recover without a fresh run. */
+function clearFailedStateForReconnectedProvider(provider) {
+  for (const key of fetcherKeysForProvider(provider)) {
+    lastRunFailedByKey.delete(key);
+    clearAuthCooldown(key);
+  }
+}
+
 /** User dismissed the inline reconnect chip affordance for this provider. */
 export function dismissReconnectRequired(provider) {
   if (!provider) return;
@@ -200,10 +217,7 @@ export function isReconnectDismissed(provider) {
 /** True when provider needs reconnect and user has not dismissed the chip hint. */
 export function isProviderReconnectRequired(provider) {
   if (!provider || reconnectDismissed.has(provider)) return false;
-  if (isProviderConnected(provider)) {
-    clearReconnectRequired(provider);
-    return false;
-  }
+  if (providerStatus(provider) === 'expired') return true;
   return reconnectRequiredByProvider.has(provider);
 }
 
@@ -222,7 +236,11 @@ export async function syncReconnectFromAuthStatus() {
     ingestAuthStatusProviders(data.providers || []);
     for (const p of data.providers || []) {
       if (p.status === 'expired') markReconnectRequired(p.key);
-      else if (p.status === 'connected') clearReconnectRequired(p.key);
+      else if (p.status === 'connected') {
+        const wasReconnect = reconnectRequiredByProvider.has(p.key);
+        clearReconnectRequired(p.key);
+        if (wasReconnect) clearFailedStateForReconnectedProvider(p.key);
+      }
     }
   } catch (_) { /* server offline or timed out */ }
 }
@@ -235,7 +253,11 @@ if (typeof document !== 'undefined') {
     const providers = ev?.detail?.providers || [];
     for (const p of providers) {
       if (p.status === 'expired') markReconnectRequired(p.key);
-      else if (p.status === 'connected') clearReconnectRequired(p.key);
+      else if (p.status === 'connected') {
+        const wasReconnect = reconnectRequiredByProvider.has(p.key);
+        clearReconnectRequired(p.key);
+        if (wasReconnect) clearFailedStateForReconnectedProvider(p.key);
+      }
     }
     try { renderDashboardFetcherHealth(); } catch (_) { /* not mounted */ }
   });
@@ -254,8 +276,33 @@ export function reconnectProviderForFetcher(key) {
 }
 
 export function isFetcherReconnectRequired(key) {
-  if (fetcherCredentialsSatisfied(key)) return false;
-  return fetcherProviders(key).some(p => isProviderReconnectRequired(p));
+  const providers = fetcherProviders(key);
+  if (!providers.some(p => isProviderReconnectRequired(p))) return false;
+  // Dual-source fetchers: suppress when a non-reconnect sibling is connected.
+  if (FETCHER_PROVIDER_GROUP[key]) {
+    const hasHealthySibling = providers.some(
+      p => !isProviderReconnectRequired(p) && providerStatus(p) === 'connected',
+    );
+    if (hasHealthySibling) return false;
+  }
+  return true;
+}
+
+/** Provider/rail key to open in Connections when the chip should not run a fetch. */
+export function connectionsNavigateProvider(key) {
+  const providers = fetcherProviders(key);
+  for (const p of providers) {
+    if (isProviderReconnectRequired(p)) return groupRepFor(p);
+  }
+  if (isFetcherDisconnected(key)) {
+    const cp = connectProviderForFetcher(key);
+    return cp ? groupRepFor(cp) : null;
+  }
+  if (authCooldownRemainingMs(key) > 0 || lastRunFailedByKey.has(key)) {
+    const cp = connectProviderForFetcher(key) || FETCHER_AUTH_PROVIDER[key];
+    return cp ? groupRepFor(cp) : null;
+  }
+  return null;
 }
 
 /** Provider key to use for the chip Connect button when disconnected. */
@@ -296,15 +343,23 @@ export function isFetcherDisconnected(key) {
   return single ? providerStatus(single) === 'disconnected' : false;
 }
 
-function handleFetcherAuthOutcome(key, data, logText) {
+async function handleFetcherAuthOutcome(key, data, logText) {
   const authExit = data?.exit_code === 4 || data?.failure_kind === 'auth';
   if (authExit) {
-    if (!fetcherCredentialsSatisfied(key)) {
-      const provider = reconnectProviderForFetcher(key) || FETCHER_AUTH_PROVIDER[key];
-      if (provider) markReconnectRequired(provider);
-      if (provider) showReconnectBanner([provider]);
+    const provider = reconnectProviderForFetcher(key)
+      || connectProviderForFetcher(key)
+      || FETCHER_AUTH_PROVIDER[key];
+    if (provider) {
+      markReconnectRequired(provider);
+      showReconnectBanner([provider]);
     }
     clearAuthCooldown(key);
+    // Pull mark_invalid from the fetcher subprocess into the shared auth cache
+    // so Connections shows "Session expired" without waiting for the 30s poll.
+    try {
+      await syncReconnectFromAuthStatus();
+      renderDashboardFetcherHealth();
+    } catch (_) {}
     return;
   }
   const authish = noteFetcherAuthFailure(key, logText);
@@ -940,7 +995,8 @@ export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
   const sources = deps.sources ?? fetcherSources;
   const stateForFn = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
-  const waitSlotFn = deps.waitForQueueSlot ?? (() => fetcherRunner.waitForQueueSlot());
+  const waitSlotFn =
+    deps.waitForQueueSlot ?? (() => fetcherRunner.waitForQueueSlot({ batchEpoch }));
   const credsOkFn = deps.fetcherCredentialsSatisfied ?? fetcherCredentialsSatisfied;
   const cooldownFn = deps.authCooldownRemainingMs ?? authCooldownRemainingMs;
   const disconnectedFn = deps.isFetcherDisconnected ?? isFetcherDisconnected;
@@ -962,12 +1018,27 @@ export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
     appendLineFn(`[auto-enrich: ${newCount} new game(s) - queuing ${keysToRun.length} enricher(s)]`, 'meta');
   }
 
+  const cancelEpochFn = deps.getCancelEpoch ?? (() => fetcherRunner.getCancelEpoch());
+  const batchEpoch = cancelEpochFn();
+
   for (const key of keysToRun) {
+    if (cancelEpochFn() !== batchEpoch) {
+      if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
+      break;
+    }
     try {
       await waitSlotFn();
+      if (cancelEpochFn() !== batchEpoch) {
+        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
+        break;
+      }
       await runFn(key, { auto: true });
     } catch (err) {
-      if (appendLineFn) appendLineFn(`[auto-enrich aborted: ${err}]`, 'stderr');
+      if (err?.message === 'cancelled') {
+        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
+      } else if (appendLineFn) {
+        appendLineFn(`[auto-enrich aborted: ${err}]`, 'stderr');
+      }
       break;
     }
   }
@@ -1004,6 +1075,16 @@ export const fetcherRunner = (() => {
   /** True when the last /api/runs snapshot had active or queued rows (server truth). */
   let lastServerInFlight = false;
   let cancelInFlight = false;
+  /** Bumped on each user cancel — client batch loops capture epoch and stop if it changes. */
+  let cancelEpoch = 0;
+
+  function getCancelEpoch() {
+    return cancelEpoch;
+  }
+
+  function bumpCancelEpoch() {
+    cancelEpoch += 1;
+  }
 
   function loadLastSeqByRunId() {
     try {
@@ -1182,9 +1263,9 @@ export const fetcherRunner = (() => {
     const maxAttempts = queuedOnly ? RECONNECT_MAX_QUEUED : RECONNECT_MAX_ATTEMPTS;
     if (attempt > maxAttempts) {
       reconnectAttempts.delete(runId);
-      appendLine(
+      logEvent(
+        'error',
         `[${src.label}: stream dropped too many times - refresh the page or use Cancel]`,
-        'stderr',
       );
       markChipState(key, null);
       if (liveRunId === runId) {
@@ -1199,7 +1280,7 @@ export const fetcherRunner = (() => {
       RECONNECT_BASE_MS * 2 ** (attempt - 1) * (queuedOnly ? 1.5 : 1),
       RECONNECT_MAX_MS,
     );
-    appendLine(`[${src.label}: stream dropped - reconnecting in ${Math.round(delay / 1000)}s]`, 'meta');
+    logEvent('info', `[${src.label}: stream dropped - reconnecting in ${Math.round(delay / 1000)}s]`);
     const timer = setTimeout(() => {
       reconnectTimers.delete(runId);
       if (suppressedRunIds.has(runId)) return;
@@ -1215,6 +1296,11 @@ export const fetcherRunner = (() => {
   let logEl = null;
   let logBodyEl = null;
   let forceExpanded = false;
+  // Set when the user manually collapses the console mid-run so the polling
+  // loop's auto-expand (ensurePanel) doesn't keep reopening it. Cleared when
+  // the fetcher goes idle or the user manually reopens, so a fresh run can
+  // still auto-open the console.
+  let suppressAutoExpand = false;
   let lastLineText = '';
   let lastLineKind = 'stdout';
   let lastBarSummary = 'Fetcher health';
@@ -1289,6 +1375,7 @@ export const fetcherRunner = (() => {
     if (dotEl) dotEl.classList.toggle('is-live', isFetcherInFlight());
     if (toggleEl) {
       toggleEl.textContent = expanded ? '▾' : '▸';
+      toggleEl.classList.toggle('is-open', expanded);
       toggleEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       toggleEl.setAttribute('aria-label', expanded ? 'Collapse fetcher' : 'Expand fetcher');
     }
@@ -1318,6 +1405,7 @@ export const fetcherRunner = (() => {
   function revertFetcherLayoutIfIdle() {
     if (isFetcherInFlight()) return;
     forceExpanded = false;
+    suppressAutoExpand = false;
     applyFetcherRowLayout();
   }
 
@@ -1326,7 +1414,8 @@ export const fetcherRunner = (() => {
       state.prefs.fetcherCollapsed = false;
       savePrefs();
       forceExpanded = false;
-    } else {
+      suppressAutoExpand = false;
+    } else if (!suppressAutoExpand) {
       forceExpanded = true;
     }
     const panel = buildLogPanelChrome();
@@ -1349,6 +1438,9 @@ export const fetcherRunner = (() => {
     if (manual) {
       state.prefs.fetcherCollapsed = true;
       savePrefs();
+      // Stop the polling loop from auto-reopening this collapsed console
+      // for the remainder of the in-flight run.
+      if (isFetcherInFlight()) suppressAutoExpand = true;
     }
     forceExpanded = false;
     applyFetcherRowLayout();
@@ -1449,11 +1541,23 @@ export const fetcherRunner = (() => {
   function isQueueFull() {
     return inFlightCount() >= MAX_IN_FLIGHT;
   }
-  function waitForQueueSlot() {
+  function waitForQueueSlot({ batchEpoch } = {}) {
+    if (batchEpoch !== undefined && getCancelEpoch() !== batchEpoch) {
+      return Promise.reject(new Error('cancelled'));
+    }
+    if (cancelInFlight) return Promise.reject(new Error('cancelled'));
     if (!isQueueFull()) return Promise.resolve();
     const start = Date.now();
     return new Promise((resolve, reject) => {
       const tick = () => {
+        if (cancelInFlight) {
+          reject(new Error('cancelled'));
+          return;
+        }
+        if (batchEpoch !== undefined && getCancelEpoch() !== batchEpoch) {
+          reject(new Error('cancelled'));
+          return;
+        }
         if (!isQueueFull()) {
           resolve();
           return;
@@ -1600,93 +1704,101 @@ export const fetcherRunner = (() => {
     if (!isApiAvailable()) return;
     if (cancelInFlight) return;
     cancelInFlight = true;
+    bumpCancelEpoch();
     updateCancelButton();
-    let snap = null;
+    // True only when the soft cancel left runs alive and we must escalate to a
+    // force reset. Done after the finally clears cancelInFlight so the
+    // re-entrant call passes its own guard.
+    let needForceReset = false;
     try {
-      snap = await fetchRunsSnapshot({ force: true });
-    } catch (_) {}
-    applyServerSnapshotInFlight(snap);
-    const ids = [];
-    if (snap?.active) ids.push(snap.active.id);
-    for (const q of snap?.queue || []) ids.push(q.id);
-    if (!ids.length && !force && inFlightCount() === 0 && !lastServerInFlight) {
+      let snap = null;
+      try {
+        snap = await fetchRunsSnapshot({ force: true });
+      } catch (_) {}
+      applyServerSnapshotInFlight(snap);
+      const ids = [];
+      if (snap?.active) ids.push(snap.active.id);
+      for (const q of snap?.queue || []) ids.push(q.id);
+      if (!ids.length && !force && inFlightCount() === 0 && !lastServerInFlight) {
+        return;
+      }
+      closeAllStreams();
+      for (const id of ids) suppressedRunIds.add(id);
+      persistSuppressedRunIds();
+      for (const key of [...runStateByKey.keys()]) {
+        markChipState(key, 'running');
+      }
+      if (snap?.active) {
+        const src = source(snap.active.key);
+        if (src) {
+          ensurePanel(src, 'cancelling', force ? 'cancelling (force)' : undefined);
+          markChipState(
+            snap.active.key,
+            serverChipState(snap.active.status) || 'running',
+            snap.active.id,
+          );
+        }
+      } else {
+        setStatus('running', force ? 'cancelling (force)' : 'cancelling');
+      }
+      updateCancelButton();
+      renderDashboardFetcherHealth();
+      const cancelUrl = force ? '/api/runs/cancel?force=1' : '/api/runs/cancel';
+      let bulkOk = false;
+      try {
+        const res = await fetchWithTimeoutAndProbe(cancelUrl, { method: 'POST' }, CANCEL_HTTP_MS);
+        if (res.ok) {
+          bulkOk = true;
+          const data = await res.json();
+          const n = data.cancelled?.length ?? 0;
+          logEvent(
+            'info',
+            force ? `[force reset: ${n} run(s)]` : (n ? `[cancelled ${n} run(s)]` : '[cancelled]'),
+          );
+        } else {
+          const txt = await res.text().catch(() => '');
+          logEvent('error', `[cancel failed ${res.status}] ${txt}`);
+        }
+      } catch (err) {
+        logEvent('error', `[cancel failed] ${err}`);
+      }
+      if (!bulkOk && ids.length) {
+        logEvent('info', '[per-run cancel fallback…]');
+        for (const id of ids) {
+          await cancelOneRun(id);
+        }
+      }
+      let stillRunning = await waitForRunsToClear(ids);
+      if (stillRunning.size && !force) {
+        logEvent('info', '[queue still busy - force reset…]');
+        needForceReset = true;
+        return;
+      }
+      for (const id of ids) {
+        if (!stillRunning.has(id)) suppressedRunIds.add(id);
+      }
+      persistSuppressedRunIds();
+      try {
+        snap = await fetchRunsSnapshot({ force: true });
+        applyServerSnapshotInFlight(snap);
+        pruneSuppressedRuns(snap);
+      } catch (_) {}
+      await syncFromServer();
+      const idle = !snap?.active && !(snap?.queue || []).length;
+      if (idle) {
+        for (const key of [...runStateByKey.keys()]) markChipState(key, null);
+        setStatus('failed');
+        liveRunId = null;
+        lastServerInFlight = false;
+      }
+      renderDashboardFetcherHealth();
+    } finally {
       cancelInFlight = false;
       updateCancelButton();
-      return;
     }
-    closeAllStreams();
-    for (const id of ids) suppressedRunIds.add(id);
-    persistSuppressedRunIds();
-    for (const key of [...runStateByKey.keys()]) {
-      markChipState(key, 'running');
-    }
-    if (snap?.active) {
-      const src = source(snap.active.key);
-      if (src) {
-        ensurePanel(src, 'cancelling', force ? 'cancelling (force)' : undefined);
-        markChipState(
-          snap.active.key,
-          serverChipState(snap.active.status) || 'running',
-          snap.active.id,
-        );
-      }
-    } else {
-      setStatus('running', force ? 'cancelling (force)' : 'cancelling');
-    }
-    updateCancelButton();
-    renderDashboardFetcherHealth();
-    const cancelUrl = force ? '/api/runs/cancel?force=1' : '/api/runs/cancel';
-    let bulkOk = false;
-    try {
-      const res = await fetchWithTimeoutAndProbe(cancelUrl, { method: 'POST' }, CANCEL_HTTP_MS);
-      if (res.ok) {
-        bulkOk = true;
-        const data = await res.json();
-        const n = data.cancelled?.length ?? 0;
-        appendLine(
-          force ? `[force reset: ${n} run(s)]` : (n ? `[cancelled ${n} run(s)]` : '[cancelled]'),
-          'meta',
-        );
-      } else {
-        const txt = await res.text().catch(() => '');
-        appendLine(`[cancel failed ${res.status}] ${txt}`, 'stderr');
-      }
-    } catch (err) {
-      appendLine(`[cancel failed] ${err}`, 'stderr');
-    }
-    if (!bulkOk && ids.length) {
-      appendLine('[per-run cancel fallback…]', 'meta');
-      for (const id of ids) {
-        await cancelOneRun(id);
-      }
-    }
-    let stillRunning = await waitForRunsToClear(ids);
-    if (stillRunning.size && !force) {
-      appendLine('[queue still busy - force reset…]', 'stderr');
-      cancelInFlight = false;
+    if (needForceReset) {
       return cancelInFlightRuns({ force: true });
     }
-    for (const id of ids) {
-      if (!stillRunning.has(id)) suppressedRunIds.add(id);
-    }
-    persistSuppressedRunIds();
-    try {
-      snap = await fetchRunsSnapshot({ force: true });
-      applyServerSnapshotInFlight(snap);
-      pruneSuppressedRuns(snap);
-    } catch (_) {}
-    await syncFromServer();
-    const idle = !snap?.active && !(snap?.queue || []).length;
-    if (idle) {
-      for (const key of [...runStateByKey.keys()]) markChipState(key, null);
-      setStatus('failed');
-      liveRunId = null;
-      lastServerInFlight = false;
-    }
-    updateCancelButton();
-    renderDashboardFetcherHealth();
-    cancelInFlight = false;
-    updateCancelButton();
   }
 
   function reconcileRunStateFromSnapshot(snap) {
@@ -1881,6 +1993,14 @@ export const fetcherRunner = (() => {
     flushLines();
   }
 
+  const LOG_LEVEL_KIND = {
+    cmd: 'cmd',
+    output: 'stdout',
+    info: 'meta',
+    warn: 'warn',
+    error: 'stderr',
+  };
+
   function appendLine(text, kind = 'stdout') {
     if (!logBody()) buildLogPanelChrome();
     if (!logBody()) return;
@@ -1894,6 +2014,10 @@ export const fetcherRunner = (() => {
     if (!flushHandle) {
       flushHandle = requestAnimationFrame(flushLines);
     }
+  }
+
+  function logEvent(level, text) {
+    appendLine(text, LOG_LEVEL_KIND[level] ?? 'stdout');
   }
 
   function markChipState(key, runState, runId = null) {
@@ -1916,6 +2040,7 @@ export const fetcherRunner = (() => {
 
   async function run(key, { refresh = false, auto = false } = {}) {
     if (!isApiAvailable()) return;
+    if (cancelInFlight) return;
     await loadFetcherSources(true);
     const src = source(key);
     if (!src || runStateByKey.has(key)) return;
@@ -1926,9 +2051,9 @@ export const fetcherRunner = (() => {
     if (cooldownMs > 0) {
       if (!auto) {
         ensurePanel(src);
-        appendLine(
+        logEvent(
+          'info',
           `[${src.label}: auth cooldown - ${authCooldownLabel(cooldownMs)} left. Reconnect in Connections to clear.]`,
-          'meta',
         );
       }
       return;
@@ -1937,9 +2062,9 @@ export const fetcherRunner = (() => {
       if (!auto) {
         ensurePanel(src);
         const provider = connectProviderForFetcher(key);
-        appendLine(
+        logEvent(
+          'info',
           `[${src.label}: not connected - connect in Connections before running. No request sent.]`,
-          'meta',
         );
         if (provider) showReconnectBanner([provider]);
       }
@@ -1950,16 +2075,16 @@ export const fetcherRunner = (() => {
     // server's lock saw the first one as pending.
     if (isQueueFull()) {
       ensurePanel(src);
-      appendLine(
+      logEvent(
+        'info',
         `[${src.label}: queue full - one run is in progress and one is queued]`,
-        'meta',
       );
       return;
     }
     if (refresh && !src.supportsRefresh) {
-      appendLine(
+      logEvent(
+        'info',
         `[${src.label}: this fetcher has no force-refresh mode - a normal click already pulls the latest data]`,
-        'stderr',
       );
       return;
     }
@@ -1970,35 +2095,45 @@ export const fetcherRunner = (() => {
       ensurePanel(src);
       if (src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) {
         const hint = humanizeMissingRequirements(src.missingRequirements);
-        appendLine(
+        logEvent(
+          'warn',
           `[warning: ${hint} - open Connections before running]`,
-          'meta',
         );
       }
       const cmdSuffix = refresh ? ' --refresh' : '';
-      appendLine(`$ ${src.cmd}${cmdSuffix}`, 'cmd');
+      logEvent('cmd', `$ ${src.cmd}${cmdSuffix}`);
     }
 
     const url = `/api/run/${encodeURIComponent(key)}${refresh ? '?refresh=1' : ''}`;
     let res;
-    try {
-      res = await fetchWithTimeoutAndProbe(url, { method: 'POST' });
-    } catch (err) {
-      appendLine(`[client] cannot reach server: ${err}`, 'stderr');
-      setStatus('failed');
-      return;
-    }
-    if (res.status === 409) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (cancelInFlight) return;
+      try {
+        res = await fetchWithTimeoutAndProbe(url, { method: 'POST' });
+      } catch (err) {
+        logEvent('error', `[client] cannot reach server: ${err}`);
+        setStatus('failed');
+        return;
+      }
+      if (res.status !== 409) break;
+      // Benign: key already in flight, or a just-cancelled run still holds the
+      // server's active slot. Re-sync; retry once after a short settle window.
       const txt = await res.text().catch(() => '');
-      appendLine(`[server 409] ${txt || 'already queued or running'}`, 'stderr');
-      appendLine('[syncing queue state…]', 'meta');
+      logEvent('info', `[${src.label}: ${txt || 'already in flight'} — re-syncing queue]`);
       await syncFromServer();
-      return;
+      const canRetry =
+        attempt === 0
+        && !cancelInFlight
+        && !runStateByKey.has(key)
+        && !isQueueFull();
+      if (!canRetry) return;
+      await new Promise(r => setTimeout(r, 600));
     }
+    if (res.status === 409) return;
     if (!res.ok) {
       invalidateApiProbe();
       const txt = await res.text().catch(() => '');
-      appendLine(`[server ${res.status}] ${txt || 'submit failed'}`, 'stderr');
+      logEvent('error', `[server ${res.status}] ${txt || 'submit failed'}`);
       setStatus('failed');
       markChipState(key, null);
       return;
@@ -2012,13 +2147,13 @@ export const fetcherRunner = (() => {
     } catch (_) {}
     const queueExtra = queueStatusExtra(snapAfterSubmit, runId);
     if (queueExtra) {
-      appendLine(`(queue ${queueExtra})`, 'meta');
+      logEvent('info', `(queue ${queueExtra})`);
       syncLogPanelChrome(src, 'queued', queueExtra);
     } else if (snapAfterSubmit?.active?.id === runId) {
       syncLogPanelChrome(src, snapAfterSubmit.active.status);
     } else if (liveRunId && liveRunId !== runId) {
       const liveSrc = sourcesByRunId.get(liveRunId)?.src;
-      appendLine(`(queued after ${liveSrc?.label || 'current run'})`, 'meta');
+      logEvent('info', `(queued after ${liveSrc?.label || 'current run'})`);
     }
     subscribe(runId, key, src);
   }
@@ -2040,15 +2175,28 @@ export const fetcherRunner = (() => {
       })
       .map(src => src.key);
     if (!staleKeys.length) return;
+    const batchEpoch = getCancelEpoch();
     // Respect the global cap. Wait for an open slot between submits so we
     // never stack the queue beyond 1 active + 1 queued, matching the rule
     // the server enforces and the chip-disable logic in chipHtml.
     for (const key of staleKeys) {
+      if (getCancelEpoch() !== batchEpoch) {
+        logEvent('info', '[run stale aborted: cancelled]');
+        break;
+      }
       try {
-        await waitForQueueSlot();
+        await waitForQueueSlot({ batchEpoch });
+        if (getCancelEpoch() !== batchEpoch) {
+          logEvent('info', '[run stale aborted: cancelled]');
+          break;
+        }
         await run(key);
       } catch (err) {
-        appendLine(`[run stale aborted: ${err}]`, 'stderr');
+        if (err?.message === 'cancelled') {
+          logEvent('info', '[run stale aborted: cancelled]');
+        } else {
+          logEvent('error', `[run stale aborted: ${err}]`);
+        }
         break;
       }
     }
@@ -2076,10 +2224,10 @@ export const fetcherRunner = (() => {
           if (reconnect) {
             if (!quiet) {
               const stateWord = data.status === 'launching' ? 'launching' : 'running';
-              appendLine(`[reconnected · ${src.label} ${stateWord}]`, 'meta');
+              logEvent('info', `[reconnected · ${src.label} ${stateWord}]`);
             }
           } else {
-            appendLine(`--- ${src.label} starting ---`, 'meta');
+            logEvent('info', `--- ${src.label} starting ---`);
           }
           updateCancelButton();
         } else if (data.status === 'queued') {
@@ -2111,9 +2259,9 @@ export const fetcherRunner = (() => {
           ? `${(data.ended_at - data.started_at).toFixed(1)}s`
           : '';
         const outcome = cancelled ? 'cancelled' : ok ? 'done' : 'failed';
-        appendLine(
+        logEvent(
+          'info',
           `[${src.label}: exit ${data.exit_code}] ${outcome}${duration ? ` in ${duration}` : ''}`,
-          'meta',
         );
         flushLinesNow();
         if (liveRunId === runId) {
@@ -2144,7 +2292,7 @@ export const fetcherRunner = (() => {
           }, 10000);
         }
       } catch (err) {
-        appendLine(`[client] parse error on done: ${err}`, 'stderr');
+        logEvent('error', `[client] parse error on done: ${err}`);
       } finally {
         clearReconnect(runId);
         reconnectAttempts.delete(runId);
@@ -2178,7 +2326,7 @@ export const fetcherRunner = (() => {
         }
         if (finished) {
           const ok = finished.status === 'done' && finished.exit_code === 0;
-          appendLine(`[${src.label}: stream dropped after exit ${finished.exit_code}]`, 'meta');
+          logEvent('info', `[${src.label}: stream dropped after exit ${finished.exit_code}]`);
           if (liveRunId === runId) setStatus(ok ? 'done' : 'failed');
           if (ok && finished.id !== _lastAppliedDoneRunId) {
             _lastAppliedDoneRunId = finished.id;
@@ -2192,9 +2340,9 @@ export const fetcherRunner = (() => {
           return;
         }
       } catch (_) {}
-      appendLine(
+      logEvent(
+        'error',
         `[${src.label}: stream error - server stopped, too many tabs, or connection limit (${MAX_SSE_HINT})]`,
-        'stderr',
       );
       if (liveRunId === runId) {
         setStatus('failed');
@@ -2209,7 +2357,7 @@ export const fetcherRunner = (() => {
       if (reloadAfterFetcherFn) await reloadAfterFetcherFn(key);
       else await reloadGamesFn();
     } catch (err) {
-      appendLine(`[client] reload failed: ${err}`, 'stderr');
+      logEvent('error', `[client] reload failed: ${err}`);
     }
     renderDashboardFetcherHealth();
     startFastAgeTick();
@@ -2262,7 +2410,7 @@ export const fetcherRunner = (() => {
           parts.push(`${qLabel} queued`);
         }
         if (parts.length) {
-          appendLine(`[reconnected · ${parts.join(', ')}]`, 'meta');
+          logEvent('info', `[reconnected · ${parts.join(', ')}]`);
         }
       }
       for (const run of visiblePending) {
@@ -2388,6 +2536,12 @@ export const fetcherRunner = (() => {
     appendLineForTest(text, kind = 'stdout') {
       appendLine(text, kind);
     },
+    logEventForTest(level, text) {
+      logEvent(level, text);
+    },
+    logLevelKindForTest() {
+      return { ...LOG_LEVEL_KIND };
+    },
     setFollowTailForTest(val) {
       followTail = !!val;
       clearFollowTailIdleTimer();
@@ -2402,8 +2556,19 @@ export const fetcherRunner = (() => {
     getLastSeqForTest: getLastSeq,
     reconcileRunStateFromSnapshot,
     isCancelInFlightForTest: () => cancelInFlight,
+    getCancelEpoch,
+    bumpCancelEpochForTest: bumpCancelEpoch,
+    setCancelInFlightForTest(val) {
+      cancelInFlight = !!val;
+    },
     markChipStateForTest(key, state, runId = null) {
       markChipState(key, state, runId);
+    },
+    markRunFailedForTest(key) {
+      lastRunFailedByKey.set(key, Date.now());
+    },
+    isRunFailedForTest(key) {
+      return lastRunFailedByKey.has(key);
     },
   };
 })();
@@ -2429,14 +2594,14 @@ export function renderDashboardFetcherHealth() {
   const rank = { missing: 0, stale: 1, recent: 2, fresh: 3 };
   visible.sort((a, b) => rank[a.status] - rank[b.status] || a.src.label.localeCompare(b.src.label));
 
-  const profileLabel = document.getElementById('profileMenuLabel')?.textContent?.trim()
-    || activeProfileId();
   const summaryParts = [];
   if (staleRows.length) summaryParts.push(`${staleRows.length} stale`);
   if (missingRows.length) summaryParts.push(`${missingRows.length} missing`);
   const healthSummary = summaryParts.length ? summaryParts.join(' · ') : 'All fresh';
-  const summaryText = `Profile: ${profileLabel} · ${healthSummary}`;
-  fetcherRunner.setBarSummary(summaryText);
+  fetcherRunner.setBarSummary(healthSummary);
+  const countsHtml = summaryParts.length
+    ? `${staleRows.length ? `<span class="fh-count fh-count--stale">${staleRows.length} stale</span>` : ''}${missingRows.length ? `<span class="fh-count fh-count--missing">${missingRows.length} missing</span>` : ''}`
+    : '<span class="fh-count fh-count--fresh">All fresh</span>';
   const apiReady = fetcherRunner.isApiAvailable();
   const probeDone = fetcherRunner.apiProbeFinished();
   const showReadonly = probeDone && !apiReady;
@@ -2445,8 +2610,8 @@ export function renderDashboardFetcherHealth() {
     'Shift+click → force a full refresh that ignores local cache (slower; only on chips that support it).',
     'Hover any chip to see exactly what click vs. Shift+click will do for that source.',
   ].join('\n');
-  const apiNotice = apiReady
-    ? `<span class="fh-summary" title="${escapeAttr(summaryTooltip)}">· click = sync · Shift+click = full refresh</span>`
+  const clickHint = apiReady
+    ? `<span class="fh-legend-item" title="${escapeAttr(summaryTooltip)}"><span class="fh-chip-warn" aria-hidden="true">!</span> click a chip = sync &middot; Shift+click = full refresh</span>`
     : '';
   const readonlyBanner = showReadonly
     ? (isAccountAuthMode()
@@ -2468,10 +2633,19 @@ export function renderDashboardFetcherHealth() {
       : (count != null && count > 0 ? formatNum(count) : ' - ');
     const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
     const runState = fetcherRunner.stateFor(src.key);
-    const provider = reconnectProviderForFetcher(src.key);
-    const needsReconnect = !runState && isFetcherReconnectRequired(src.key);
-    const disconnected = !runState && !needsReconnect && isFetcherDisconnected(src.key);
-    const connectProvider = connectProviderForFetcher(src.key);
+    // A terminal 'failed' runState (the ~10s post-failure flash) is not an
+    // active run: clicks should route to Connections (reconnect / fix creds)
+    // exactly like the persisted failed/reconnect state that follows it, so
+    // every chip behaves the same the instant it fails — never silently
+    // re-running an auth-broken fetcher. Only launching/queued/running/
+    // cancelling count as "active" and suppress the Connections route.
+    const runActive = !!runState && runState !== 'failed';
+    const needsReconnect = !runActive && isFetcherReconnectRequired(src.key);
+    const disconnected = !runActive && !needsReconnect && isFetcherDisconnected(src.key);
+    const navProvider = !runActive ? connectionsNavigateProvider(src.key) : null;
+    const reconnectBtnProvider = reconnectProviderForFetcher(src.key)
+      || fetcherProviders(src.key).find(p => isProviderReconnectRequired(p))
+      || null;
     const authCooldownMs = (runState || needsReconnect || disconnected) ? 0 : authCooldownRemainingMs(src.key);
     const inAuthCooldown = authCooldownMs > 0;
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
@@ -2524,9 +2698,9 @@ export function renderDashboardFetcherHealth() {
       titleLines.push(`Unavailable on this OS - ${src.label} runs on ${plats} only.`);
     }
     const title = titleLines.join('\n');
-    // Disconnected chips stay clickable — the click routes to Connections to
-    // connect (handled in bind-events via data-fetcher-connect), not to a run.
-    const disabled = platformUnavailable || !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere || inAuthCooldown || needsReconnect;
+    // When navProvider is set, the chip routes to Connections (bind-events) instead of running.
+    const disabled = platformUnavailable || !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere
+      || ((inAuthCooldown || needsReconnect) && !navProvider);
     const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
     const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
     const cooldownClass = inAuthCooldown ? ' fh-chip-auth-cooldown' : '';
@@ -2541,8 +2715,8 @@ export function renderDashboardFetcherHealth() {
       : (needsReconnect ? 'reconnect' : (disconnected ? 'connect' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel)));
     if (persistFailed && !runState) ageText = 'failed';
     else if (status === 'missing' && ageLabel === '?' && (count === 0 || count == null)) ageText = 'empty';
-    const connectAttr = disconnected && connectProvider
-      ? ` data-fetcher-connect="${escapeAttr(connectProvider)}"`
+    const connectAttr = navProvider
+      ? ` data-fetcher-connect="${escapeAttr(navProvider)}"`
       : '';
     const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
@@ -2551,19 +2725,13 @@ export function renderDashboardFetcherHealth() {
       <span class="fh-chip-count">${escapeHtml(countStr)}</span>
       <span class="fh-chip-age">${escapeHtml(ageText)}</span>
     </button>`;
-    const reconnectControls = needsReconnect
-      ? `<button type="button" class="fh-chip-reconnect-btn" data-fetcher-reconnect data-provider="${escapeAttr(provider)}" title="Reconnect ${escapeAttr(src.label)}">Reconnect</button>
-         <button type="button" class="fh-chip-reconnect-dismiss" data-fetcher-reconnect-dismiss data-provider="${escapeAttr(provider)}" aria-label="Dismiss reconnect hint">&times;</button>`
+    const reconnectControls = needsReconnect && reconnectBtnProvider
+      ? `<button type="button" class="fh-chip-reconnect-btn" data-fetcher-reconnect data-provider="${escapeAttr(reconnectBtnProvider)}" title="Reconnect ${escapeAttr(src.label)}">Reconnect</button>
+         <button type="button" class="fh-chip-reconnect-dismiss" data-fetcher-reconnect-dismiss data-provider="${escapeAttr(reconnectBtnProvider)}" aria-label="Dismiss reconnect hint">&times;</button>`
       : '';
     const chip = needsReconnect
       ? `<div class="fh-chip-wrap fh-chip-wrap--reconnect">${chipBtn}${reconnectControls}</div>`
       : chipBtn;
-    if (src.key === 'itad') {
-      return chip + `<label class="fh-toggle fh-itad-auto" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
-        <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${state.prefs.itadAutoRefreshDisabled ? '' : 'checked'} />
-        Auto-refresh
-      </label>`;
-    }
     return chip;
   }
 
@@ -2580,8 +2748,23 @@ export function renderDashboardFetcherHealth() {
             };
             groupRows = [...groupRows].sort((a, b) => ord(a.src.key) - ord(b.src.key));
           }
+          let groupToggle = '';
+          if (group === 'prices') {
+            groupToggle = `<label class="fh-toggle fh-itad-auto" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
+              <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${state.prefs.itadAutoRefreshDisabled ? '' : 'checked'} />
+              Auto-refresh
+            </label>`;
+          } else if (group === 'enrich') {
+            groupToggle = `<label class="fh-toggle" title="After a library fetch adds new games, queue HLTB, Reviews, Covers, and Co-op tags">
+              <input id="autoEnrichOnAddToggle" type="checkbox" class="rounded" ${state.prefs.autoEnrichOnAdd !== false ? 'checked' : ''} />
+              Auto-enrich new games
+            </label>`;
+          }
           return `<div class="fh-group">
-            <div class="fh-group-label">${escapeHtml(GROUP_LABELS[group] || group)}</div>
+            <div class="fh-group-head">
+              <div class="fh-group-label">${escapeHtml(GROUP_LABELS[group] || group)}</div>
+              ${groupToggle}
+            </div>
             <div class="fh-group-chips">${groupRows.map(chipHtml).join('')}</div>
           </div>`;
         }).join(''))
@@ -2591,7 +2774,7 @@ export function renderDashboardFetcherHealth() {
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
 
   slot.innerHTML = `
-    <div class="fh-bar" data-role="fetcher-bar" title="Click status or tail to expand when collapsed">
+    <div class="fh-bar" data-role="fetcher-bar" title="Click to expand the fetcher console">
       <span class="fh-bar-dot" data-role="bar-dot" aria-hidden="true"></span>
       <span class="fh-bar-status" data-role="bar-status">Fetcher health</span>
       <span class="fh-bar-tail" data-role="bar-tail">No fetcher activity yet.</span>
@@ -2600,26 +2783,22 @@ export function renderDashboardFetcherHealth() {
     ${readonlyBanner}
     <div class="fh-head${apiReady ? '' : ' fh-readonly'}">
       <div class="fh-head-left">
+        <button type="button" class="fh-head-collapse" data-role="head-collapse" aria-expanded="true" aria-label="Collapse fetcher">▾</button>
         <span class="fh-title">Fetcher health</span>
-        <span class="fh-summary">${escapeHtml(summaryText)}</span>
-        ${apiNotice}
+        <span class="fh-counts">${countsHtml}</span>
       </div>
       <div class="fh-head-actions">
-        <button type="button" class="fh-log-open" title="Expand fetcher health and run log">Log</button>
         <button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>
         <label class="fh-toggle">
           <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />
           Only stale / missing
         </label>
-        <label class="fh-toggle" title="After a library fetch adds new games, queue HLTB, Reviews, Covers, and Co-op tags">
-          <input id="autoEnrichOnAddToggle" type="checkbox" class="rounded" ${state.prefs.autoEnrichOnAdd !== false ? 'checked' : ''} />
-          Auto-enrich new games
-        </label>
       </div>
     </div>
     <details class="fh-legend">
-      <summary>Legend</summary>
+      <summary>Legend &amp; tips</summary>
       <div class="fh-legend-items">
+        ${clickHint}
         <span class="fh-legend-item"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
         <span class="fh-legend-item">dim dashed = never fetched</span>
         <span class="fh-legend-item">dot color = cache age</span>

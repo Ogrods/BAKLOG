@@ -24,7 +24,6 @@ import {
   backlogPace,
   hoardRate,
   qualityStartRate,
-  topWarGame,
   formatRate,
   formatPct100,
   cleanupCandidateCount,
@@ -234,10 +233,6 @@ export function buildInsightPool(games, snapIn) {
   if (avg != null) {
     add(`Finish rate: <strong>${formatRate(avg)}</strong>`, METRIC_WEIGHT.moderate);
   }
-  const warTop = topWarGame(snap);
-  if (warTop) {
-    add(`Top WAR pick: <strong>${escapeHtml(warTop.g.name)}</strong> · ${warTop.war}`, METRIC_WEIGHT.cryptic);
-  }
   const pyth = pythagoreanCompletion(snap);
   if (pyth != null && Math.abs(pyth.delta) >= 0.02) {
     const label = pyth.delta >= 0 ? 'overperforming' : 'underperforming';
@@ -390,6 +385,15 @@ export function buildMarqueeItems(games, snapIn) {
     if (closest && closest.trophy_progress < 100) {
       push('^', 'is-rose', `${closest.name} · ${Math.round(closest.trophy_progress)}%`, 'closest to 100%');
     }
+    const platReady = tracked.filter(g => {
+      const h = hltbMain(g);
+      return g.trophy_progress >= 80 && g.trophy_progress < 100 && h != null && h <= 12;
+    });
+    if (platReady.length) {
+      push('*', 'is-violet', formatNum(platReady.length), 'platinum potential', null, { weight: W.friendly });
+      const best = [...platReady].sort((a, b) => b.trophy_progress - a.trophy_progress)[0];
+      push('^', 'is-rose', `${best.name} · ${Math.round(best.trophy_progress)}%`, 'closest platinum', null, { weight: W.friendly });
+    }
   }
 
   const xboxScored = games.filter(g => (g.xbox_gamerscore_current || 0) > 0);
@@ -438,8 +442,6 @@ export function buildMarqueeItems(games, snapIn) {
   if (hoard != null) push('^', 'is-rose', formatPct100(hoard), 'hoard rate (never touched)', null, { weight: W.moderate });
   const qs = qualityStartRate(snap);
   if (qs != null) push('+', 'is-emerald', formatPct100(qs), 'quality start rate', null, { weight: W.moderate });
-  const warTop = topWarGame(snap);
-  if (warTop) push('*', 'is-violet', `${warTop.g.name} · ${warTop.war}`, 'top WAR', null, { weight: W.cryptic });
   const cleanup = cleanupCandidateCount(snap);
   if (cleanup) push('^', 'is-rose', formatNum(cleanup), 'cleanup candidates', null, { weight: W.friendly });
   const clutchCount = backlog.filter(g => isLeveragePick(g)).length;

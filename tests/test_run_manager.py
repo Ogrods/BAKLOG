@@ -238,6 +238,78 @@ def test_force_finalize_stuck_cancelling(runs_env, monkeypatch: pytest.MonkeyPat
     assert any(h.get("id") == run.id for h in snap["history"])
 
 
+def test_force_finalize_orphaned_active_run(
+    runs_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(server, "STUCK_NO_PROC_GRACE_SEC", 0.01)
+    mgr, runs_dir = runs_env
+    run = server.Run("demo", runs_dir=runs_dir)
+    run.status = "running"
+    run._proc = None
+    run._no_proc_since = time.monotonic() - 100.0
+    run.started_at = time.time()
+    with mgr._lock:
+        mgr._active = run
+        mgr._runs_by_id[run.id] = run
+    mgr._force_finalize_orphaned_runs()
+    snap = mgr.snapshot()
+    assert snap["active"] is None
+    hist = next(h for h in snap["history"] if h.get("id") == run.id)
+    assert hist["status"] == "failed"
+    assert hist["exit_code"] == -1
+    assert "no live subprocess" in (hist.get("note") or "")
+
+
+def test_orphaned_reaper_spares_live_process(
+    runs_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(server, "STUCK_NO_PROC_GRACE_SEC", 0.01)
+
+    class _LiveProc:
+        pid = 4242
+
+        @staticmethod
+        def poll():
+            return None
+
+    mgr, runs_dir = runs_env
+    run = server.Run("demo", runs_dir=runs_dir)
+    run.status = "running"
+    run._proc = _LiveProc()
+    run.started_at = time.time()
+    with mgr._lock:
+        mgr._active = run
+        mgr._runs_by_id[run.id] = run
+    mgr._force_finalize_orphaned_runs()
+    snap = mgr.snapshot()
+    assert snap["active"] is not None
+    assert snap["active"]["id"] == run.id
+    assert not any(h.get("id") == run.id for h in snap["history"])
+
+
+def test_orphaned_reaper_one_cycle_grace(
+    runs_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(server, "STUCK_NO_PROC_GRACE_SEC", 0.01)
+    mgr, runs_dir = runs_env
+    run = server.Run("demo", runs_dir=runs_dir)
+    run.status = "running"
+    run._proc = None
+    run.started_at = time.time()
+    with mgr._lock:
+        mgr._active = run
+        mgr._runs_by_id[run.id] = run
+    mgr._force_finalize_orphaned_runs()
+    assert run._no_proc_since is not None
+    snap = mgr.snapshot()
+    assert snap["active"] is not None
+    time.sleep(0.02)
+    mgr._force_finalize_orphaned_runs()
+    snap = mgr.snapshot()
+    assert snap["active"] is None
+    assert any(h.get("id") == run.id for h in snap["history"])
+
+
 def test_cancel_queued_run(runs_env):
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)

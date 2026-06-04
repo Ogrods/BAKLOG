@@ -41,6 +41,7 @@ import {
   renderPicksLimitButtons,
 } from './picks-ui.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
+import { initTrophyPopover } from './trophy-popover.js';
 import {
   openFiltersDrawer,
   closeFiltersDrawer,
@@ -106,6 +107,8 @@ const SUMMARY_FILTER_CHIP_SELECTOR =
   ".status-chip, .summary-store-chip, .summary-deal-chip[data-wishlist-deal-filter], .summary-wishlist-reset";
 
 export function bindEvents() {
+  initTrophyPopover();
+
   document.getElementById("undoToast")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-undo-action]");
     if (!btn) return;
@@ -128,17 +131,11 @@ export function bindEvents() {
   });
 
   document.getElementById("dashboardFetcherHealth")?.addEventListener("click", e => {
-    const logBtn = e.target.closest(".fh-log-open");
-    if (logBtn) {
-      e.preventDefault();
-      fetcherRunner.expandPanel({ manual: true });
-      return;
-    }
     const reconnectBtn = e.target.closest("[data-fetcher-reconnect]");
     if (reconnectBtn) {
       e.preventDefault();
       e.stopPropagation();
-      reconnectProvider(reconnectBtn.dataset.provider);
+      reconnectProvider(reconnectBtn.dataset.provider, { autoStart: false });
       return;
     }
     const dismissBtn = e.target.closest("[data-fetcher-reconnect-dismiss]");
@@ -159,7 +156,7 @@ export function bindEvents() {
     if (!chip) return;
     if (chip.dataset.fetcherConnect) {
       e.preventDefault();
-      reconnectProvider(chip.dataset.fetcherConnect);
+      reconnectProvider(chip.dataset.fetcherConnect, { autoStart: false });
       return;
     }
     if (chip.disabled) return;
@@ -683,7 +680,14 @@ export function bindEvents() {
     else requestAnimationFrame(() => requestAnimationFrame(open));
   };
   document.getElementById("fetcherRow")?.addEventListener("click", e => {
-    if (e.target.closest(".fh-chip, .fh-run-stale, .fh-toggle, .fh-log-open, .fh-log, .fh-head-actions label")) {
+    if (e.target.closest(".fh-chip, .fh-run-stale, .fh-toggle, .fh-log, .fh-head-actions label")) {
+      return;
+    }
+    const headCollapse = e.target.closest("[data-role='head-collapse']");
+    if (headCollapse) {
+      e.preventDefault();
+      e.stopPropagation();
+      fetcherRunner.toggleFetcherPanel({ manual: true });
       return;
     }
     const toggleBtn = e.target.closest("[data-role='bar-toggle']");

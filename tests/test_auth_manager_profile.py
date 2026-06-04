@@ -44,3 +44,59 @@ def test_browser_auth_worker_inherits_profile_context(
         profile_paths.clear_request_profile_id()
 
     assert captured == ["pinned-profile-99"]
+
+
+def _stub_browser_worker(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
+    """Mock the browser-auth worker internals so start_browser_auth is inert."""
+    done = threading.Event()
+
+    monkeypatch.setattr(
+        auth_manager, "run_browser_auth", lambda _p, _s: {"token": "x"}
+    )
+    monkeypatch.setattr(
+        "auth.session_probe.probe_browser_session", lambda _p, _c: None
+    )
+    monkeypatch.setattr(
+        auth_manager, "mark_connected", lambda _p, _c: done.set()
+    )
+    return done
+
+
+def test_fresh_reconnect_clears_browser_session(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cleared: list[str] = []
+    monkeypatch.setattr(
+        auth_manager, "clear_browser_session", lambda p: cleared.append(p)
+    )
+    done = _stub_browser_worker(monkeypatch)
+
+    auth_manager.start_browser_auth("xbox_wishlist", fresh=True)
+    assert done.wait(timeout=3.0)
+    assert cleared == ["xbox_wishlist"]
+
+
+def test_plain_connect_does_not_clear_browser_session(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cleared: list[str] = []
+    monkeypatch.setattr(
+        auth_manager, "clear_browser_session", lambda p: cleared.append(p)
+    )
+    done = _stub_browser_worker(monkeypatch)
+
+    auth_manager.start_browser_auth("xbox_wishlist")
+    assert done.wait(timeout=3.0)
+    assert cleared == []
+
+
+def test_clear_browser_session_removes_profile_dir(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = profile_env / "xbox_wishlist_profile"
+    prof.mkdir(parents=True)
+    (prof / "Cookies").write_text("stale", encoding="utf-8")
+    monkeypatch.setattr(auth_manager, "profile_dir", lambda _p: prof)
+
+    auth_manager.clear_browser_session("xbox_wishlist")
+    assert not prof.exists()

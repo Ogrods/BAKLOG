@@ -85,6 +85,8 @@ WATCHDOG_INTERVAL_SEC = 3.0
 # Profile switch: wait for cancelled runs to finish (kill + re-kill window).
 SWITCH_CANCEL_WAIT_SEC = 2 * TERMINATE_GRACE_SEC
 LAUNCH_TIMEOUT_SEC = 30  # max wait for subprocess.Popen() to return before declaring the run failed.
+# Grace before force-finalizing launching/running runs with no live subprocess (worker wedged).
+STUCK_NO_PROC_GRACE_SEC = LAUNCH_TIMEOUT_SEC + 15
 # On Windows the AppX/WindowsApps Python stub can deadlock inside CreateProcess
 # when spawned from another AppX Python process — the worker thread blocks
 # indefinitely with no zombie child to kill. The launch watchdog aborts the
@@ -621,8 +623,8 @@ class Run:
     __slots__ = (
         "id", "key", "label", "status", "started_at", "ended_at", "exit_code",
         "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
-        "_log_path", "_runs_dir", "profile_id", "_cancelling_since",
-        "_next_seq", "_total_lines",
+        "_log_path", "_runs_dir", "profile_id", "_cancelling_since", "_no_proc_since",
+        "_history_note", "_next_seq", "_total_lines",
     )
 
     def __init__(
@@ -656,6 +658,8 @@ class Run:
         self._listeners: set[queue.Queue] = set()
         self._finished = threading.Event()
         self._cancelling_since: float | None = None
+        self._no_proc_since: float | None = None
+        self._history_note: str | None = None
         self._restore_seq_from_disk()
 
     def _restore_seq_from_disk(self) -> None:
@@ -697,6 +701,8 @@ class Run:
         }
         if self.exit_code == 4:
             summary["failure_kind"] = "auth"
+        if self._history_note:
+            summary["note"] = self._history_note
         summary["profile_id"] = self.profile_id
         return summary
 
@@ -893,6 +899,8 @@ class RunManager:
         """
         to_put: list[Run] = []
         with self._lock:
+            if self._active is not None and self._active._finished.is_set():
+                self._active = None
             if self._active is not None:
                 return 0
             if self._queue.qsize() > 0:
@@ -923,6 +931,7 @@ class RunManager:
             try:
                 self._kick_queue_if_stalled()
                 self._force_finalize_stuck_cancelling()
+                self._force_finalize_orphaned_runs()
             except Exception as exc:  # noqa: BLE001
                 print(f"[runs] watchdog error: {exc!r}", file=sys.stderr, flush=True)
 
@@ -957,6 +966,76 @@ class RunManager:
                     if run.ended_at is None:
                         run.ended_at = time.time()
             if not run._finished.is_set():
+                run.mark_finished()
+                run.broadcast(
+                    "done",
+                    {
+                        "status": run.status,
+                        "exit_code": run.exit_code,
+                        "started_at": run.started_at,
+                        "ended_at": run.ended_at,
+                    },
+                )
+            self._finalize_run(run)
+
+    def _run_has_live_process(self, run: Run) -> bool:
+        if run._proc is not None and run._proc.poll() is None:
+            return True
+        for entry in _read_active_runs():
+            if entry.get("id") == run.id:
+                pid = int(entry.get("pid") or 0)
+                if _pid_alive(pid):
+                    return True
+        return False
+
+    def _force_finalize_orphaned_runs(self) -> None:
+        """Force-finalize launching/running runs with no live subprocess."""
+        now = time.monotonic()
+        stuck: list[Run] = []
+        with self._lock:
+            candidates: list[Run] = []
+            active = self._active
+            if (
+                active
+                and active.status in ("launching", "running")
+                and not active._finished.is_set()
+            ):
+                candidates.append(active)
+            for r in self._pending:
+                if (
+                    r.status in ("launching", "running")
+                    and not r._finished.is_set()
+                    and r not in candidates
+                ):
+                    candidates.append(r)
+            for run in candidates:
+                if self._run_has_live_process(run):
+                    run._no_proc_since = None
+                    continue
+                if run._no_proc_since is None:
+                    run._no_proc_since = now
+                    continue
+                if now - run._no_proc_since > STUCK_NO_PROC_GRACE_SEC:
+                    stuck.append(run)
+        for run in stuck:
+            pids = self._collect_pids_for_run(run, [])
+            if pids:
+                _kill_pids_async(pids)
+            with run._lock:
+                if not run._finished.is_set():
+                    run.status = "failed"
+                    run.exit_code = -1
+                    if run.ended_at is None:
+                        run.ended_at = time.time()
+                    run._history_note = (
+                        "force-finalized: no live subprocess (worker stalled)"
+                    )
+            if not run._finished.is_set():
+                run.add_line(
+                    "stderr",
+                    "[server] no live subprocess — force-finalizing stalled run "
+                    "so the queue can advance",
+                )
                 run.mark_finished()
                 run.broadcast(
                     "done",
@@ -2026,8 +2105,8 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 self._handle_submit(rest)
             return
-        if self.path.startswith("/api/auth/") and self.path.endswith("/start"):
-            provider = self.path[len("/api/auth/") : -len("/start")].strip("/")
+        if self.path.startswith("/api/auth/") and _api_path(self).endswith("/start"):
+            provider = _api_path(self)[len("/api/auth/") : -len("/start")].strip("/")
             self._handle_auth_start(provider)
             return
         if self.path.startswith("/api/auth/") and self.path.endswith("/oauth-url"):
@@ -2464,7 +2543,9 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             from auth.manager import start_browser_auth
 
-            session_id = start_browser_auth(provider)
+            params = parse_qs(urlparse(self.path).query)
+            fresh = (params.get("fresh") or ["0"])[0].lower() in ("1", "true", "yes")
+            session_id = start_browser_auth(provider, fresh=fresh)
             _send_json(self, HTTPStatus.ACCEPTED, {"session_id": session_id, "provider": provider})
         except KeyError:
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})

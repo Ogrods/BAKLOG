@@ -67,7 +67,6 @@ import { getCoopFilterMode } from './prefs.js';
 import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
 import { buildTableEmptyStateHtml } from './table-empty-state.js';
 import { formatMoney, currencyMismatchTagForGame, displayCurrency } from './currency.js';
-import { backlogWar, backlogValuePlus, getLibrarySnapshot, luckAdjustedRating } from './sabermetrics.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 // dashboard-drilldown imports from table-ui already; the cycle is safe because
@@ -1027,16 +1026,7 @@ function timeSyncCoverFits(tbody) {
   return performance.now() - t0;
 }
 
-function warBadgeHtml(g, snap) {
-  const war = backlogWar(g, snap);
-  if (war == null || war < 0.5) return '';
-  const bv = backlogValuePlus(g, snap);
-  const adj = luckAdjustedRating(g, snap.rBar);
-  const tip = `Backlog WAR: ${war}${bv != null ? ` · BV+ ${bv}` : ''}${adj !== ratingValue(g) ? ` · adj rating ${adj}%` : ''}`;
-  return `<span class="sabermetrics-war-pill" title="${escapeAttr(tip)}">${war} WAR</span>`;
-}
-
-function tableRowHtml(g, idx, { isWish, showScore, sabermetricsSnap: snap }) {
+function tableRowHtml(g, idx, { isWish, showScore }) {
   const p = getPersonal(g);
   const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
   const hiddenGem = isHiddenGem(g);
@@ -1061,7 +1051,6 @@ function tableRowHtml(g, idx, { isWish, showScore, sabermetricsSnap: snap }) {
             <div class="row-meta mt-1 flex items-center gap-1.5 flex-wrap">
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
               ${coopPillsHtml(g)}
-              ${snap && !isWish ? warBadgeHtml(g, snap) : ""}
               ${state.activeView === "wishlist" ? "" : trophyProgressPillHtml(g)}
               ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))}" aria-label="Has notes">&#9998; note</span>` : ""}
             </div>
@@ -1102,8 +1091,7 @@ function paintTableBody(list, opts = {}) {
   }
   const isWish = state.activeView === "wishlist";
   const showScore = !!state.prefs.showScoreColumn;
-  const sabermetricsSnap = getLibrarySnapshot(state.allGames || []);
-  const ctx = { isWish, showScore, sabermetricsSnap };
+  const ctx = { isWish, showScore };
 
   if (!list.length) {
     _virtualList = null;

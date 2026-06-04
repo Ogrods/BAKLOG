@@ -38,8 +38,10 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid
-from auth.runner import _parse_xbox_preloaded_state
-from auth.secrets import profile_dir
+from auth.xbox_wishlist_session import (
+    capture_xbox_wishlist_preloaded_state,
+    validate_xbox_wishlist_state,
+)
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
@@ -52,7 +54,8 @@ from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
 
 GAMES_XBOX_WISHLIST_JSON = Path("games_wishlist_xbox.json")
-WISHLIST_URL = "https://www.xbox.com/en-us/wishlist"
+
+
 def wishlist_state_dump() -> Path:
     from shared.profile_paths import profile_cache_dir
 
@@ -109,30 +112,6 @@ def _store_url(product_id: str, title: str | None) -> str:
     if title:
         return f"https://www.xbox.com/en-us/search/results?q={quote(title)}"
     return "https://www.xbox.com/en-us/games"
-
-
-def _fetch_wishlist_state(timeout_s: int = 45) -> dict:
-    """Headless cookie-authenticated GET with the saved xbox_wishlist profile."""
-    from auth.cdp_browser import launch_persistent_profile
-
-    profile = profile_dir("xbox_wishlist")
-    if not profile.exists():
-        raise RuntimeError(
-            "No saved Xbox wishlist profile at cache/auth/profiles/xbox_wishlist. "
-            "Open the Connections page and connect 'Xbox Store wishlist' first."
-        )
-
-    with launch_persistent_profile(str(profile), headless=True) as ctx:
-        resp = ctx.request.get(WISHLIST_URL, timeout=timeout_s * 1000)
-        if resp.status >= 400:
-            raise RuntimeError(f"xbox.com/wishlist returned HTTP {resp.status}")
-        html = resp.text()
-        state = _parse_xbox_preloaded_state(html)
-        if not state:
-            raise RuntimeError(
-                "Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response."
-            )
-        return state
 
 
 def _walk(node: Any, depth: int = 0, max_depth: int = 12) -> Iterable[Any]:
@@ -419,32 +398,65 @@ def main() -> int:
         action="store_true",
         help=f"Save the raw __PRELOADED_STATE__ wishlist branch to {wishlist_state_dump()}",
     )
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Use visible Chrome instead of headless (diagnostic; compare with fetch failure)",
+    )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_xbox_wishlist")
     stats = RunStats()
-
     load_dotenv()
-    print("Fetching Xbox wishlist via headless xbox.com SSR...", flush=True)
+    mode_label = "headed" if args.headed else "headless"
+    print(f"Fetching Xbox wishlist via {mode_label} xbox.com SSR...", flush=True)
+
+    def _capture() -> dict:
+        return capture_xbox_wishlist_preloaded_state(
+            headless=False if args.headed else "legacy",
+            timeout_s=30,
+        )
 
     try:
-        state = run_with_heartbeat(_fetch_wishlist_state, "Xbox wishlist capture")
+        state = run_with_heartbeat(_capture, "Xbox wishlist capture")
     except Exception as exc:  # noqa: BLE001
-        msg = f"wishlist page fetch failed: {exc}"
+        err = str(exc)
+        if "No saved Xbox wishlist profile" in err:
+            hint = "profile missing — connect Xbox Store wishlist in Connections first"
+        elif "__PRELOADED_STATE__" in err:
+            hint = "no __PRELOADED_STATE__ in SSR HTML"
+        elif "HTTP" in err:
+            hint = err
+        else:
+            hint = f"wishlist page fetch failed: {err}"
+        msg = f"Xbox wishlist capture failed ({hint})"
         mark_invalid("xbox_wishlist", error=msg)
-        stats.error(str(exc))
+        stats.error(msg)
         return stats.finish("fetch_xbox_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     user = state.get("user") or {}
-    if not user.get("isSignedIn"):
-        msg = (
-            "Xbox storefront session is missing or expired. Open the Connections "
-            "page, click 'Xbox Store wishlist' \u2192 Reconnect, and sign in to "
-            "xbox.com inside the launched browser window."
+    session_err = validate_xbox_wishlist_state(state, headless=not args.headed)
+    if args.dump_state:
+        wishlist_state_dump().parent.mkdir(parents=True, exist_ok=True)
+        wishlist_state_dump().write_text(
+            json.dumps(
+                {
+                    "user": user,
+                    "pageMeta": (state.get("pageRequestMetadata") or {}).get("/wishlist"),
+                    "wishlists": ((state.get("core2") or {}).get("wishlist") or {}).get("wishlists"),
+                    "core2Keys": list((state.get("core2") or {}).keys()),
+                },
+                indent=2,
+                default=str,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
         )
-        mark_invalid("xbox_wishlist", error=msg)
-        stats.error(msg)
+        print(f"  wrote SSR snapshot to {wishlist_state_dump()} (--dump-state)", flush=True)
+    if session_err:
+        mark_invalid("xbox_wishlist", error=session_err)
+        stats.error(session_err)
         return stats.finish("fetch_xbox_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     ids, wishlists_branch = _extract_wishlist_ids(state)

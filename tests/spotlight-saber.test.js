@@ -18,7 +18,6 @@ describe('spotlight saber categories', () => {
   let pickSpotlightGames;
   let computeSpotlightSuperlatives;
   let buildLibrarySnapshot;
-  let topWarGame;
   let state;
 
   beforeEach(async () => {
@@ -39,7 +38,7 @@ describe('spotlight saber categories', () => {
     let setStinkerChanceForTest;
     ({ pickSpotlightGames, setStinkerChanceForTest } = await import('../js/dashboard-spotlight.js'));
     ({ computeSpotlightSuperlatives } = await import('../js/creative-metrics.js'));
-    ({ buildLibrarySnapshot, topWarGame } = await import('../js/sabermetrics.js'));
+    ({ buildLibrarySnapshot } = await import('../js/sabermetrics.js'));
     setStinkerChanceForTest(0);
   });
 
@@ -74,22 +73,19 @@ describe('spotlight saber categories', () => {
     expect(whale._spotlightReason.isSaber).toBe(true);
   });
 
-  it('surfaces MVP pick for highest-WAR unfinished game', () => {
+  it('surfaces Completionist for a 100% trophy game', () => {
     const games = [
-      artGame({ id: '1', name: 'MVP', steam_review_percent: 98, hltb_main_hours: 25 }),
+      artGame({ id: '1', name: 'Platinum Hero', steam_review_percent: 92, trophy_progress: 100 }),
       ...Array.from({ length: 5 }, (_, i) =>
-        artGame({ id: String(10 + i), steam_review_percent: 72 }),
+        artGame({ id: String(10 + i), steam_review_percent: 72, trophy_progress: 40 }),
       ),
     ];
     const snap = buildLibrarySnapshot(games);
-    const top = topWarGame(snap);
-    expect(top?.g.name).toBe('MVP');
-    expect(top.war).toBeGreaterThan(0);
-    const pool = pickSpotlightGames(games);
-    const mvp = pool.find((g) => g._spotlightReason?.eyebrow === 'MVP pick');
-    expect(mvp).toBeTruthy();
-    expect(mvp.name).toBe('MVP');
-    expect(mvp._spotlightReason.metaParts.join(' ')).toMatch(/WAR/);
+    const picks = computeSpotlightSuperlatives(games, snap);
+    const completionist = picks.find((p) => p.eyebrow === 'Completionist');
+    expect(completionist).toBeTruthy();
+    expect(completionist.key).toBe('steam:1');
+    expect(completionist.metaParts.join(' ')).toMatch(/100%/);
   });
 
   it('surfaces Guilty pleasure for lowest-rated finished game', () => {

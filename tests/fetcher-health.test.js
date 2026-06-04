@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { ingestAuthStatusProviders } from '../js/connections.js';
 import {
   fetcherFreshness,
   humanizeAge,
@@ -26,7 +27,9 @@ import {
   reconnectProviderForFetcher,
   fetcherCredentialsSatisfied,
   connectProviderForFetcher,
+  connectionsNavigateProvider,
   fetcherRunner,
+  renderDashboardFetcherHealth,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -42,6 +45,7 @@ vi.mock('../js/connections.js', () => ({
     itad: 'itad',
     steam: 'steam',
     amazon: 'amazon',
+    wishlistXbox: 'xbox_wishlist',
   },
   isProviderConnected: vi.fn(() => false),
   noteFetcherAuthFailure: vi.fn(() => false),
@@ -49,6 +53,7 @@ vi.mock('../js/connections.js', () => ({
   authStatusLoaded: () => connMock.loaded,
   providerStatus: (p) => connMock.statuses[p] ?? null,
   ingestAuthStatusProviders: vi.fn(),
+  groupRepFor: (key) => (key === 'gog_galaxy' ? 'gog' : key === 'amazon' ? 'amazon_web' : key === 'itch_local' ? 'itch' : key),
 }));
 
 import { isProviderConnected, showReconnectBanner } from '../js/connections.js';
@@ -108,6 +113,14 @@ describe('isFetcherDisconnected', () => {
     markReconnectRequired('gog');
     expect(isFetcherReconnectRequired('gog')).toBe(false);
     expect(reconnectProviderForFetcher('gog')).toBe(null);
+  });
+
+  it('gog reconnect required when web session bad and no healthy sibling', () => {
+    connMock.statuses.gog = 'connected';
+    connMock.statuses.gog_galaxy = 'disconnected';
+    markReconnectRequired('gog');
+    expect(isFetcherReconnectRequired('gog')).toBe(true);
+    expect(connectionsNavigateProvider('gog')).toBe('gog');
   });
 
   it('itch not disconnected when itch_local is connected', () => {
@@ -487,9 +500,15 @@ describe('reconnect-required state', () => {
     expect(localStorage.getItem('baklog-reconnect-dismissed')).toContain('psn');
   });
 
-  it('clear on connected provider', () => {
+  it('stays reconnect-required while server status is still connected', () => {
     markReconnectRequired('gog');
-    isProviderConnected.mockReturnValue(true);
+    ingestAuthStatusProviders([{ key: 'gog', status: 'connected' }]);
+    expect(isProviderReconnectRequired('gog')).toBe(true);
+  });
+
+  it('clearReconnectRequired drops reconnect flag after user reconnects', () => {
+    markReconnectRequired('gog');
+    clearReconnectRequired('gog');
     expect(isProviderReconnectRequired('gog')).toBe(false);
   });
 
@@ -523,6 +542,25 @@ describe('reconnect-required state', () => {
     clearReconnectRequired('gog');
     markReconnectRequired('gog');
     expect(isProviderReconnectRequired('gog')).toBe(true);
+  });
+
+  it('clears sticky failed chip state when provider reconnects', () => {
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    markReconnectRequired('xbox_wishlist');
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(true);
+    document.dispatchEvent(new CustomEvent('baklog:auth-status', {
+      detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
+    }));
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(false);
+    expect(isProviderReconnectRequired('xbox_wishlist')).toBe(false);
+  });
+
+  it('connected event does not clear failed chip without prior reconnect-required', () => {
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    document.dispatchEvent(new CustomEvent('baklog:auth-status', {
+      detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
+    }));
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(true);
   });
 });
 
@@ -629,6 +667,29 @@ describe('log line caps and rAF batching', () => {
     const body = document.querySelector('[data-role="body"]');
     expect(body?.children.length).toBeLessThanOrEqual(4000);
     expect(body?.firstChild?.textContent).toContain('line 10');
+  });
+
+  it('logLevelKindForTest maps semantic levels to log line classes', () => {
+    expect(fetcherRunner.logLevelKindForTest()).toEqual({
+      cmd: 'cmd',
+      output: 'stdout',
+      info: 'meta',
+      warn: 'warn',
+      error: 'stderr',
+    });
+  });
+
+  it.each([
+    ['info', 'meta'],
+    ['warn', 'warn'],
+    ['error', 'stderr'],
+    ['cmd', 'cmd'],
+    ['output', 'stdout'],
+  ])('logEventForTest(%s) renders fh-log-line %s', (level, kind) => {
+    fetcherRunner.logEventForTest(level, `level-${level}`);
+    fetcherRunner.flushLinesNow();
+    const line = document.querySelector(`[data-role="body"] .fh-log-line.${kind}`);
+    expect(line?.textContent).toBe(`level-${level}`);
   });
 });
 
@@ -766,12 +827,59 @@ describe('fetcher bar collapse', () => {
     expect(document.getElementById('fetcherRow').classList.contains('is-collapsed')).toBe(true);
   });
 
+  it('manual collapse mid-run suppresses auto-reopen from polling', () => {
+    fetcherRunner.applyServerSnapshotInFlight({ active: { key: 'steam' } });
+    fetcherRunner.expandPanel({ manual: false });
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+
+    fetcherRunner.collapsePanel({ manual: true });
+    expect(document.getElementById('fetcherRow').classList.contains('is-collapsed')).toBe(true);
+
+    fetcherRunner.expandPanel({ manual: false });
+    expect(document.getElementById('fetcherRow').classList.contains('is-collapsed')).toBe(true);
+
+    fetcherRunner.applyServerSnapshotInFlight({});
+  });
+
+  it('clears auto-expand suppression once the fetcher goes idle', () => {
+    fetcherRunner.applyServerSnapshotInFlight({ active: { key: 'steam' } });
+    fetcherRunner.collapsePanel({ manual: true });
+    fetcherRunner.expandPanel({ manual: false });
+    expect(document.getElementById('fetcherRow').classList.contains('is-collapsed')).toBe(true);
+
+    fetcherRunner.applyServerSnapshotInFlight({});
+    fetcherRunner.revertFetcherLayoutIfIdle();
+    fetcherRunner.expandPanel({ manual: false });
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+
+    fetcherRunner.revertFetcherLayoutIfIdle();
+  });
+
   it('bar toggle is the sole focusable control with aria-expanded', () => {
     const bar = document.querySelector('[data-role="fetcher-bar"]');
     const toggle = document.querySelector('[data-role="bar-toggle"]');
     expect(bar?.getAttribute('role')).toBeNull();
     expect(bar?.getAttribute('tabindex')).toBeNull();
     expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('bar toggle gains is-open class when expanded', () => {
+    const toggle = document.querySelector('[data-role="bar-toggle"]');
+    expect(toggle?.classList.contains('is-open')).toBe(false);
+    fetcherRunner.expandPanel({ manual: true });
+    fetcherRunner.updateFetcherBar();
+    expect(toggle?.classList.contains('is-open')).toBe(true);
+    fetcherRunner.collapsePanel({ manual: true });
+    fetcherRunner.updateFetcherBar();
+    expect(toggle?.classList.contains('is-open')).toBe(false);
+  });
+
+  it('toggleFetcherPanel from expanded collapses the row', () => {
+    fetcherRunner.expandPanel({ manual: true });
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+    fetcherRunner.toggleFetcherPanel({ manual: true });
+    expect(document.getElementById('fetcherRow').classList.contains('is-collapsed')).toBe(true);
+    expect(state.prefs.fetcherCollapsed).toBe(true);
   });
 });
 
@@ -826,5 +934,73 @@ describe('log tail follow', () => {
     fetcherRunner.flushLinesNow();
     expect(body.scrollTop).toBe(500);
     vi.useRealTimers();
+  });
+});
+
+describe('failed chip routes to Connections', () => {
+  const stubFetchers = (fetchers) => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return { ok: true, json: async () => ({ fetchers }) };
+      }
+      if (u.includes('manifest.json')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = {};
+    document.body.innerHTML =
+      '<div id="fetcherRunLog"></div><div id="dashboardFetcherHealth"></div>';
+  });
+
+  afterEach(() => {
+    // Drain the sticky failed/reconnect state set during the test so later
+    // suites start clean (reconnect event clears lastRunFailedByKey + flag).
+    fetcherRunner.markChipStateForTest('wishlistXbox', null);
+    markReconnectRequired('xbox_wishlist');
+    document.dispatchEvent(new CustomEvent('baklog:auth-status', {
+      detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
+    }));
+    clearReconnectRequired('xbox_wishlist');
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  it('a freshly-failed auth chip routes clicks to Connections, not a re-run', async () => {
+    stubFetchers([{
+      key: 'wishlistXbox',
+      label: 'WL Xbox',
+      metaKey: 'wishlist_xbox',
+      group: 'library',
+      color: '#107c10',
+      cmd: 'fetch_xbox_wishlist.py',
+      available: true,
+    }]);
+    await fetcherRunner.probeApi(true);
+
+    // Simulate the ~10s post-failure window: terminal 'failed' runState plus
+    // the auth-failure bookkeeping (sticky failed + provider reconnect-required).
+    connMock.statuses.xbox_wishlist = 'expired';
+    markReconnectRequired('xbox_wishlist');
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    fetcherRunner.markChipStateForTest('wishlistXbox', 'failed');
+
+    renderDashboardFetcherHealth();
+
+    const chip = document.querySelector('.fh-chip[data-fetcher-key="wishlistXbox"]');
+    expect(chip).not.toBeNull();
+    // Routes to Connections (data-fetcher-connect) instead of re-running.
+    expect(chip.getAttribute('data-fetcher-connect')).toBe('xbox_wishlist');
+    expect(chip.disabled).toBe(false);
+    // Still visibly failed while the run-state flash lingers.
+    expect(chip.classList.contains('fh-chip-failed')).toBe(true);
   });
 });

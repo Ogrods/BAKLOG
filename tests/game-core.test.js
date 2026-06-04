@@ -457,11 +457,15 @@ describe('trophyProgressPillHtml', () => {
     expect(trophyProgressPillHtml({ store: 'psn', id: 'abc', trophy_progress: null })).toBe('');
   });
 
-  it('renders a slim pill with rounded percent when trophy_progress is set', () => {
+  it('renders an interactive button pill with rounded percent when trophy_progress is set', () => {
     const html = trophyProgressPillHtml({ store: 'psn', id: 'abc', trophy_progress: 73.4 });
     expect(html).toContain('trophy-pill');
+    expect(html).toContain('data-trophy-pop');
+    expect(html).toMatch(/<button[^>]*class="trophy-pill"/);
     expect(html).toContain('73%');
     expect(html).toContain('PSN trophy completion: 73%');
+    expect(html).toContain('aria-haspopup="true"');
+    expect(html).toContain('aria-expanded="false"');
   });
 
   it('labels the tooltip per store', () => {
@@ -469,5 +473,17 @@ describe('trophyProgressPillHtml', () => {
       .toContain('Xbox achievement completion: 50%');
     expect(trophyProgressPillHtml({ store: 'gog', id: '1', trophy_progress: 20 }))
       .toContain('Completion: 20%');
+  });
+
+  it('emits Xbox gamerscore data attributes when present', () => {
+    const html = trophyProgressPillHtml({
+      store: 'xbox',
+      id: '1',
+      trophy_progress: 42,
+      xbox_gamerscore_current: 500,
+      xbox_gamerscore_total: 1000,
+    });
+    expect(html).toContain('data-gs-cur="500"');
+    expect(html).toContain('data-gs-total="1000"');
   });
 });

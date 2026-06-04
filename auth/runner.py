@@ -16,7 +16,11 @@ from auth.api_keys import (
     extract_steam,
     extract_xbox,
 )
-from auth.cdp_browser import is_blank_browser_url, launch_persistent_profile
+from auth.cdp_browser import (
+    auth_banner_init_script,
+    is_blank_browser_url,
+    launch_persistent_profile,
+)
 from auth.registry import spec_for
 from auth.secrets import profile_dir
 
@@ -380,8 +384,6 @@ def pick_gog_al_from_cookies(cookies: list[dict]) -> str:
     header = _cookie_header(cookies, ("gog.com",))
     if header and "gog-al=" in header:
         return header.split("gog-al=")[-1].split(";")[0].strip()
-    if header:
-        return header.strip()
     return ""
 
 
@@ -752,9 +754,28 @@ def _parse_xbox_preloaded_state(html: str) -> dict | None:
     return None
 
 
-def _xbox_signed_in_state(context) -> dict | None:
-    """Fetch xbox.com/wishlist with the persistent cookies and return the
-    parsed state when ``user.isSignedIn`` is true (else ``None``)."""
+def _xbox_signed_in_state(context, page=None) -> dict | None:
+    """Return parsed wishlist SSR when signed in (else ``None``).
+
+    Prefer the live page document after ``page.goto`` — cookie-only HTTP GET
+    often returns a signed-out ``__PRELOADED_STATE__`` on xbox.com.
+    """
+    if page is not None:
+        try:
+            url = (page.url or "").lower()
+            if "xbox.com" in url:
+                state = _parse_xbox_preloaded_state(page.content())
+                if state:
+                    user = state.get("user") or {}
+                    if not user.get("isSignedIn"):
+                        return None
+                    page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
+                    err = page_meta.get("error") or {}
+                    if err.get("httpStatusCode") == 403:
+                        return None
+                    return state
+        except Exception:  # noqa: BLE001
+            pass
     try:
         resp = context.request.get(XBOX_WISHLIST_URL, timeout=20000)
     except Exception:  # noqa: BLE001
@@ -774,16 +795,32 @@ def _xbox_signed_in_state(context) -> dict | None:
     page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
     err = page_meta.get("error") or {}
     if err.get("httpStatusCode") == 403:
-        # MSA cookie present but xbox.com hasn't issued the wishlist auth
-        # token yet — wait for the next poll cycle.
         return None
     return state
 
 
+def _xbox_capture_wishlist_api(page, sniffer, *, timeout_s: float = 12.0) -> None:
+    """After sign-in, linger on the wishlist so the Emerald XHR fires and is sniffed."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if sniffer.token:
+            return
+        page.wait_for_timeout(500)
+
+
 def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
     """Open xbox.com/wishlist, wait for MSA sign-in (detected via SSR HTML),
-    then return a marker cred. The real credential is the persistent profile.
+    then capture the Emerald wishlist API token for headless replay. The
+    persistent profile remains the fallback credential.
     """
+    from auth.xbox_wishlist_capture import WishlistApiSniffer
+
+    sniffer = WishlistApiSniffer()
+    try:
+        page.on("response", sniffer.on_response)
+    except Exception:  # noqa: BLE001
+        pass
+
     try:
         page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
     except Exception:  # noqa: BLE001
@@ -791,35 +828,50 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
-    last_signin_check = False
     while time.time() < deadline:
-        state = _xbox_signed_in_state(context)
-        if state is not None:
-            # Reload the visible page so the user sees their signed-in
-            # wishlist before the window closes (xbox.com's React doesn't
-            # always pick up MSA cookies on the same render cycle).
+        url = (page.url or "").lower()
+        on_login = (
+            "login.live.com" in url
+            or "login.microsoftonline" in url
+            or "signin" in url
+            or "account.microsoft" in url
+        )
+        # xbox.com bakes __PRELOADED_STATE__ into the HTML at load time and
+        # never refreshes it client-side, and a cookie-only HTTP GET returns a
+        # signed-out payload. So once the user is back on xbox.com we must
+        # re-navigate to pull a fresh SSR that reflects the new MSA cookies.
+        # Never navigate while they're mid-login on a Microsoft page.
+        if not on_login and "xbox.com" in url:
             try:
                 page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=15000)
-                page.wait_for_timeout(800)
+                page.wait_for_timeout(1200)
             except Exception:  # noqa: BLE001
                 pass
-            return {"XBOX_WISHLIST_PROFILE": "ready"}
+
+        state = _xbox_signed_in_state(context, page)
+        if state is not None:
+            if session:
+                session.emit(
+                    "waiting_for_user",
+                    {"message": "Signed in \u2014 capturing your wishlist session..."},
+                )
+            _xbox_capture_wishlist_api(page, sniffer)
+            sniffer.dump()
+            creds = {"XBOX_WISHLIST_PROFILE": "ready"}
+            creds.update(sniffer.creds())
+            return creds
 
         now = time.time()
         if session and now - last_msg > 8:
             last_msg = now
-            url = (page.url or "").lower()
-            if "login.live.com" in url or "login.microsoftonline" in url or "signin" in url:
+            if on_login:
                 msg = "Sign in to your Microsoft account in the browser window."
             elif "xbox.com" not in url:
                 msg = "Open xbox.com/wishlist after signing in."
-            elif last_signin_check:
-                msg = "Signed in \u2014 waiting for xbox.com to issue your wishlist session."
             else:
-                msg = "On the wishlist page? Sign in via the Sign in link if you haven't already."
+                msg = "Signed in \u2014 waiting for xbox.com to issue your wishlist session."
             session.emit("waiting_for_user", {"message": msg})
 
-        last_signin_check = bool(state)
         page.wait_for_timeout(int(XBOX_WISHLIST_POLL_SEC * 1000))
 
     raise RuntimeError(
@@ -1267,13 +1319,28 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             "automatically once you're logged in."
         ),
     }
-    session.emit(
-        "waiting_for_user",
-        {"message": _CONNECT_HINTS.get(provider, f"Sign in to {spec.label} in the browser window")},
+    connect_hint = _CONNECT_HINTS.get(
+        provider,
+        f"Sign in to {spec.label} in the browser window, then keep it open until it closes automatically.",
     )
+    session.emit("waiting_for_user", {"message": connect_hint})
 
     with launch_persistent_profile(user_data, headless=False) as context:
         context.add_init_script(_STEALTH_INIT)
+        # Paint a persistent, click-through banner inside the popup so users see
+        # the same guidance there (not just on the dashboard). Keep it in sync
+        # with the live waiting_for_user / signed_in messages.
+        context.add_init_script(auth_banner_init_script(connect_hint))
+
+        def _sync_auth_banner(event: str, data: dict) -> None:
+            if event == "waiting_for_user":
+                context.set_auth_banner((data or {}).get("message") or connect_hint)
+            elif event == "signed_in":
+                context.set_auth_banner(
+                    "Signed in \u2014 keep this window open until it closes automatically."
+                )
+
+        session.add_listener(_sync_auth_banner)
         page = context.pages[0] if context.pages else context.new_page()
 
         if provider in INLINE_PROVIDERS:

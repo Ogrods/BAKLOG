@@ -28,6 +28,7 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from auth.session_probe import probe_gog_session
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
 from shared.money import format_price
@@ -236,13 +237,13 @@ def main() -> int:
         stats.error("Set GOG_AL in .env (see README for cookie instructions).")
         return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
 
-    try:
-        gog = GogClient(gog_al)
-        gog.validate_session()
-    except GogAuthError as e:
-        mark_invalid("gog", error=str(e))
-        stats.error(str(e))
+    probe_err = probe_gog_session(gog_al)
+    if probe_err:
+        mark_invalid("gog", error=probe_err)
+        stats.error(probe_err)
         return stats.finish("fetch_gog_wishlist", t0, exit_code=EXIT_CODE_AUTH)
+
+    gog = GogClient(gog_al)
 
     print("Fetching GOG wishlist IDs...", flush=True)
     try:

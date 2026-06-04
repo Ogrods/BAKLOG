@@ -33,12 +33,7 @@ describe('marqueeTip', () => {
 });
 
 describe('insightTip', () => {
-  it('resolves sabermetric insight from HTML', () => {
-    const tip = insightTip('Top WAR pick: <strong>Game</strong> · 2.1');
-    expect(tip).toMatch(/WAR|Mendoza/i);
-  });
-
-  it('resolves Mendoza line insight', () => {
+  it('resolves Mendoza line insight from HTML', () => {
     const tip = insightTip('Mendoza line: <strong>72%</strong>');
     expect(tip).toMatch(/median backlog/i);
   });
@@ -62,7 +57,8 @@ describe('insightTip', () => {
 describe('eyebrowTip', () => {
   it('explains cryptic baseball eyebrows', () => {
     expect(eyebrowTip('Barrel')).toMatch(/85%|≤12h|short/i);
-    expect(eyebrowTip('MVP pick')).toMatch(/WAR/);
+    expect(eyebrowTip('Completionist')).toMatch(/100%|complete/i);
+    expect(marqueeTip('platinum potential')).toMatch(/80|99|12h/i);
   });
 
   it('explains creative superlative eyebrows', () => {

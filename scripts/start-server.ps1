@@ -2,7 +2,7 @@
 $Root = Split-Path -Parent $PSScriptRoot
 $Py = Join-Path $Root ".venv\Scripts\python.exe"
 if (-not (Test-Path $Py)) {
-    Write-Error "Missing $Py — run: py -3.13 -m venv .venv; .\.venv\Scripts\pip install -e `".[dev]`""
+    Write-Error "Missing $Py - run: py -3.13 -m venv .venv; .\.venv\Scripts\pip install -e '.[dev]'"
     exit 1
 }
 Set-Location $Root

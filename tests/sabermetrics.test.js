@@ -12,7 +12,6 @@ import {
   agingCurveBuckets,
   completionAverage,
   backlogOps,
-  backlogWar,
   backlogValuePlus,
   isBarrel,
   isLeveragePick,
@@ -68,16 +67,6 @@ describe('sabermetrics', () => {
   it('isBarrel requires 85%+ and <=12h', () => {
     expect(isBarrel(game({ steam_review_percent: 90, hltb_main_hours: 8 }))).toBe(true);
     expect(isBarrel(game({ steam_review_percent: 90, hltb_main_hours: 20 }))).toBe(false);
-  });
-
-  it('backlogWar is higher for well-rated backlog titles', () => {
-    const snap = buildLibrarySnapshot([
-      game({ steam_review_percent: 95, id: 'a' }),
-      game({ steam_review_percent: 60, id: 'b' }),
-    ]);
-    const hi = backlogWar(game({ steam_review_percent: 95, id: 'a' }), snap);
-    const lo = backlogWar(game({ steam_review_percent: 60, id: 'b' }), snap);
-    expect(hi).toBeGreaterThan(lo);
   });
 
   it('luckAdjustedRating regresses low review counts toward rBar', () => {
@@ -137,11 +126,6 @@ describe('sabermetrics', () => {
     expect(p).not.toBeNull();
     expect(p.expected).toBeGreaterThan(0);
     expect(p.actual).toBe(snap.completionRate);
-  });
-
-  it('backlogWar returns null for finished games', () => {
-    const snap = buildLibrarySnapshot([game({ status: 'finished', id: '1' })]);
-    expect(backlogWar(game({ status: 'finished', id: '1' }), snap)).toBeNull();
   });
 
   it('hotColdStreak returns cold with no finishes', () => {

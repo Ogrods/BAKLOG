@@ -499,7 +499,12 @@ export function trophyProgressPillHtml(g) {
     : store === "xbox"
       ? "Xbox achievement completion"
       : "Completion";
-  return `<span class="trophy-pill" title="${label}: ${pct}%">&#127942; ${pct}%</span>`;
+  const gsCur = g.xbox_gamerscore_current;
+  const gsTotal = g.xbox_gamerscore_total;
+  const gsCurAttr = gsCur != null ? ` data-gs-cur="${gsCur}"` : "";
+  const gsTotalAttr = gsTotal != null ? ` data-gs-total="${gsTotal}"` : "";
+  const tip = `${label}: ${pct}%`;
+  return `<button type="button" class="trophy-pill" data-trophy-pop data-store="${escapeAttr(store)}" data-pct="${pct}" data-label="${escapeAttr(label)}"${gsCurAttr}${gsTotalAttr} aria-label="${escapeAttr(tip)}" aria-haspopup="true" aria-expanded="false" title="${escapeAttr(tip)}">&#127942; ${pct}%</button>`;
 }
 
 export function storeLetter(s) {

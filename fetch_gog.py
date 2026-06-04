@@ -10,9 +10,11 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from auth.session_probe import probe_gog_session
 from auth.manager import is_local_provider_disabled, mark_connected
 from fetchers._authoritative import GOG
 from fetchers._base import (
@@ -24,7 +26,7 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
-from gog_client import GogAuthError, GogClient
+from gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 from gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
 from hltb_client import HltbClient
 
@@ -307,6 +309,38 @@ def _web_creds_ready() -> bool:
     return bool(resolve_env("GOG_AL", provider="gog"))
 
 
+def _gog_galaxy_hint(db_path: Path | None) -> str:
+    if _galaxy_db_ready(db_path):
+        return " GOG Galaxy database detected — retry with: python fetch_gog.py --source local"
+    return ""
+
+
+def _web_fetch_products(gog: GogClient, refresh: bool) -> list[dict] | None:
+    """Return owned products from the web API, or None if auth fails entirely."""
+    try:
+        return gog.get_all_filtered_products(refresh=refresh)
+    except GogAuthError:
+        print(
+            "GOG library API rejected the session; trying owned-game ID list...",
+            flush=True,
+        )
+        try:
+            owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")
+        except GogAuthError:
+            return None
+        if not owned_ids:
+            return None
+        print(
+            f"Warning: degraded fetch via per-game details ({len(owned_ids)} IDs).",
+            flush=True,
+        )
+        return [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code in (401, 403):
+            return None
+        raise
+
+
 def resolve_source(requested: str, db_path: Path | None) -> str:
     src = (requested or "auto").strip().lower()
     if src not in ("auto", "web", "local"):
@@ -516,20 +550,20 @@ def main() -> int:
             stats.error("Set GOG_AL in .env or connect GOG on the Connections page.")
             return stats.finish("fetch_gog", t0, exit_code=1)
 
-        try:
-            gog = GogClient(gog_al)
-            gog.validate_session()
-        except GogAuthError as e:
-            mark_invalid("gog", error=str(e))
-            stats.error(str(e))
+        probe_err = probe_gog_session(gog_al)
+        if probe_err:
+            msg = probe_err + _gog_galaxy_hint(db_path)
+            mark_invalid("gog", error=msg)
+            stats.error(msg)
             return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
 
+        gog = GogClient(gog_al)
         print("Fetching owned games from GOG (web)...", flush=True)
-        try:
-            products = gog.get_all_filtered_products(refresh=args.refresh)
-        except GogAuthError as e:
-            mark_invalid("gog", error=str(e))
-            stats.error(str(e))
+        products = _web_fetch_products(gog, args.refresh)
+        if products is None:
+            msg = GOG_AUTH_MESSAGE + _gog_galaxy_hint(db_path)
+            mark_invalid("gog", error=msg)
+            stats.error(msg)
             return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
 
         if not products:

@@ -47,6 +47,52 @@ _BROWSER_LAUNCH_HINT = (
 )
 
 
+def auth_banner_init_script(message: str) -> str:
+    """Init script that paints a fixed, click-through BAKLOG guidance banner.
+
+    Runs on every new document (including after cross-origin navigations during
+    sign-in) so the instructions stay visible in the popup window. The banner is
+    ``pointer-events:none`` so it never blocks the site's own login controls, and
+    sits at the bottom-center to avoid covering top-right "Sign in" buttons.
+    The live text can be refreshed via ``window.__baklogSetBanner(msg)``.
+    """
+    default = json.dumps(message)
+    style = (
+        "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);"
+        "z-index:2147483647;max-width:min(680px,92vw);box-sizing:border-box;"
+        "padding:11px 18px;border-radius:10px;"
+        "background:linear-gradient(90deg,#0f172a,#1e3a8a);color:#f8fafc;"
+        "font:600 14px/1.45 system-ui,Segoe UI,Arial,sans-serif;text-align:center;"
+        "box-shadow:0 6px 22px rgba(0,0,0,.45);border:1px solid rgba(148,163,184,.4);"
+        "pointer-events:none;white-space:normal;"
+    )
+    style_js = json.dumps(style)
+    return (
+        "(() => {"
+        "  try {"
+        "    if (window.top !== window) return;"
+        f"    const DEFAULT = {default};"
+        "    const ID = '__baklog_auth_banner';"
+        "    function ensure() {"
+        "      const root = document.documentElement; if (!root) return;"
+        "      let bar = document.getElementById(ID);"
+        "      if (!bar) {"
+        "        bar = document.createElement('div'); bar.id = ID;"
+        f"        bar.style.cssText = {style_js};"
+        "        (document.body || root).appendChild(bar);"
+        "      }"
+        "      bar.textContent = '\\uD83C\\uDFAE BAKLOG \\u2014 ' + (window.__baklogBannerMsg || DEFAULT);"
+        "    }"
+        "    if (!window.__baklogBannerMsg) window.__baklogBannerMsg = DEFAULT;"
+        "    window.__baklogSetBanner = function (m) { if (m) window.__baklogBannerMsg = String(m); ensure(); };"
+        "    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensure);"
+        "    else ensure();"
+        "    setInterval(ensure, 1000);"
+        "  } catch (e) {}"
+        "})();"
+    )
+
+
 def _browser_launch_error(message: str) -> RuntimeError:
     return RuntimeError(f"{message} {_BROWSER_LAUNCH_HINT}")
 
@@ -573,6 +619,26 @@ class CdpContext:
         for page in self.pages:
             self._apply_init_script(page, source)
 
+    def set_auth_banner(self, message: str) -> None:
+        """Update the in-window guidance banner text on every live page.
+
+        Safe no-op if the banner init script (``auth_banner_init_script``) was
+        never installed or the page is between navigations.
+        """
+        if not message:
+            return
+        fn = (
+            "() => { try { if (window.__baklogSetBanner) "
+            f"window.__baklogSetBanner({json.dumps(message)}); }} catch (e) {{}} }}"
+        )
+        for page in list(self.pages):
+            if getattr(page, "is_closed", False):
+                continue
+            try:
+                page.evaluate(fn, timeout=5)
+            except Exception:
+                pass
+
     def _apply_init_script(self, page: CdpPage, source: str) -> None:
         try:
             self._send(
@@ -822,9 +888,14 @@ def _reader_loop(
 def launch_persistent_profile(
     user_data_dir: str | Path,
     *,
-    headless: bool = False,
+    headless: bool | str = False,
 ) -> CdpContext:
-    """Launch Chrome/Edge with a persistent profile and return a CDP context."""
+    """Launch Chrome/Edge with a persistent profile and return a CDP context.
+
+    ``headless`` may be ``False`` (visible), ``True`` or ``"new"`` (``--headless=new``),
+    or ``"legacy"`` / ``"old"`` (classic ``--headless``). Some sites serve different
+    SSR to ``--headless=new`` than to a visible window.
+    """
     exe = find_chromium_executable()
     port = _free_port()
     profile = Path(user_data_dir)
@@ -844,8 +915,12 @@ def launch_persistent_profile(
         "--disable-features=IsolateOrigins,site-per-process",
     ]
     if headless:
-        # Prefer Chromium's newer headless mode; older --headless can behave differently.
-        args.append("--headless=new")
+        mode = "new" if headless is True else str(headless).lower()
+        if mode in ("legacy", "old"):
+            args.append("--headless")
+        else:
+            args.append("--headless=new")
+        args.append("--window-size=1920,1080")
     else:
         args.append("--start-maximized")
 

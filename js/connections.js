@@ -205,11 +205,55 @@ const RAIL_ORDER = [
   'ea',
 ];
 
-/** Collapsed rail entries: one button, multiple detail cards (web on top). */
+/** What data this credential pulls (Content axis). */
+const PROVIDER_CONTENT = {
+  steam: 'both',
+  gog: 'both',
+  gog_galaxy: 'library',
+  psn: 'both',
+  xbox: 'library',
+  xbox_wishlist: 'wishlist',
+  epic: 'library',
+  epic_wishlist: 'wishlist',
+  amazon: 'library',
+  amazon_web: 'library',
+  nintendo: 'library',
+  nintendo_wishlist: 'wishlist',
+  itch: 'library',
+  itch_local: 'library',
+  battlenet: 'library',
+  ubisoft: 'both',
+  humble: 'both',
+  ea: 'library',
+  itad: 'deals',
+};
+
+const CONTENT_LABEL = {
+  library: 'Library',
+  wishlist: 'Wishlist',
+  both: 'Library + Wishlist',
+  deals: 'Deal prices',
+};
+
+function contentFacetLabel(key) {
+  return CONTENT_LABEL[PROVIDER_CONTENT[key] || 'library'] || 'Library';
+}
+
+/** How credentials are obtained (Source axis). */
+function sourceFacet(p) {
+  if (p.kind === 'local') return 'File scan';
+  if (p.kind === 'manual' || p.kind === 'form') return 'API key';
+  return 'Web sign-in';
+}
+
+/** Collapsed rail entries: one button, multiple detail cards (library on top). */
 const PROVIDER_GROUPS = {
-  amazon: { label: 'Amazon', members: ['amazon_web', 'amazon'] },
-  gog: { label: 'GOG', members: ['gog', 'gog_galaxy'] },
-  itch: { label: 'itch.io', members: ['itch', 'itch_local'] },
+  amazon: { label: 'Amazon', type: 'source', members: ['amazon_web', 'amazon'] },
+  gog: { label: 'GOG', type: 'source', members: ['gog', 'gog_galaxy'] },
+  itch: { label: 'itch.io', type: 'source', members: ['itch', 'itch_local'] },
+  epic: { label: 'Epic', type: 'content', members: ['epic', 'epic_wishlist'] },
+  xbox: { label: 'Xbox', type: 'content', members: ['xbox', 'xbox_wishlist'] },
+  nintendo: { label: 'Nintendo', type: 'content', members: ['nintendo', 'nintendo_wishlist'] },
 };
 const GROUP_OF = Object.fromEntries(
   Object.entries(PROVIDER_GROUPS).flatMap(([g, d]) => d.members.map(k => [k, g])),
@@ -227,9 +271,17 @@ export function combinedGroupStatus(members) {
   }, 'disconnected');
 }
 
-/** Explanatory note above grouped provider cards (dual local + remote sources). */
+/** Explanatory note above grouped provider cards (source vs content grouping). */
 function groupConnectNote(groupKey, members) {
+  const def = PROVIDER_GROUPS[groupKey];
+  if (!def) return '';
   const anyConnected = (members || []).some(m => m.status === 'connected');
+  if (def.type === 'content') {
+    const lead = anyConnected
+      ? `Ready to pull - at least one ${def.label} sign-in is connected.`
+      : `Connect the library and/or wishlist cards below when you need them.`;
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>Library and wishlist are separate sign-ins for ${escapeHtml(def.label)}. They use different credentials - connect each one you want. The library card is on top.</p></div>`;
+  }
   if (groupKey === 'amazon') {
     const lead = anyConnected
       ? 'Ready to pull - at least one source is connected.'
@@ -240,7 +292,7 @@ function groupConnectNote(groupKey, members) {
     const lead = anyConnected
       ? 'Ready to pull - Galaxy and/or web session detected.'
       : 'Install GOG Galaxy on this PC, or connect GOG (web) below.';
-    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one GOG source. Run the GOG fetcher and BAKLOG reads the Galaxy database first when present, then falls back to your gog.com cookie session.</p></div>`;
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one GOG source. Run the GOG fetcher and BAKLOG reads the Galaxy database first when present (file scan, library only), then falls back to your gog.com cookie session (web sign-in - library and wishlist).</p></div>`;
   }
   if (groupKey === 'itch') {
     const lead = anyConnected
@@ -566,7 +618,11 @@ function buildCardHtml(p) {
 
   const showFormPanel = hasFormFields && (p.kind === 'form' || p.kind === 'manual' || p.kind === 'browser');
 
-
+  const facets = `
+    <div class="conn-facets" aria-label="Pull type and credential source">
+      <span class="conn-facet conn-facet--content">${escapeHtml(contentFacetLabel(p.key))}</span>
+      <span class="conn-facet conn-facet--source">${escapeHtml(sourceFacet(p))}</span>
+    </div>`;
 
   return `
 
@@ -589,6 +645,8 @@ function buildCardHtml(p) {
       <div class="conn-card-body">
 
         <h3>${escapeHtml(p.label)}</h3>
+
+        ${facets}
 
         <p class="conn-desc">${escapeHtml(p.description || '')}</p>
 
@@ -1788,11 +1846,17 @@ async function startBrowserConnect(provider) {
 
   const log = card?.querySelector('.conn-log');
 
+  // A "Reconnect" (status connected/expired) should start a clean sign-in:
+  // wipe the old profile cookies server-side so a stale/expired session never
+  // carries over. A first-time Connect has nothing to clear.
+  const current = authStatus.find(x => x.key === provider)?.status;
+  const fresh = current === 'connected' || current === 'expired';
+
   if (log) {
 
     log.classList.remove('hidden');
 
-    log.textContent = 'Opening sign-in window…';
+    log.textContent = fresh ? 'Clearing old session, opening sign-in window…' : 'Opening sign-in window…';
 
   }
 
@@ -1800,7 +1864,7 @@ async function startBrowserConnect(provider) {
 
   try {
 
-    res = await baklogFetch(`/api/auth/${provider}/start`, { method: 'POST' });
+    res = await baklogFetch(`/api/auth/${provider}/start${fresh ? '?fresh=1' : ''}`, { method: 'POST' });
 
   } catch (_) {
 
@@ -2093,11 +2157,11 @@ export function isItchTabAvailable() {
 
 
 /** Jump to Connections and start reconnect for a provider (browser auto-start). */
-export async function reconnectProvider(provider) {
+export async function reconnectProvider(provider, { autoStart = true } = {}) {
 
   if (!provider) return;
 
-  _selectedKey = provider;
+  _selectedKey = groupRepFor(provider);
 
   document.querySelector('.view-tab[data-view="connections"]')?.click();
 
@@ -2110,6 +2174,12 @@ export async function reconnectProvider(provider) {
     renderConnections();
 
   }
+
+  // When navigating in from a dashboard chip/affordance we only want to tab
+  // over to the right card so the user can choose - never auto-open a sign-in
+  // window or trigger a local scan. autoStart stays on for explicit in-page
+  // connect actions (e.g. Steam onboarding button).
+  if (!autoStart) return;
 
   const p = authStatus.find(x => x.key === provider);
 

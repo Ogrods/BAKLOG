@@ -97,10 +97,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         expiry_days=30,
         fetcher_keys=("psn", "wishlistPsn"),
         tips=(
-            "Easiest sign-in: if you have a passkey, choose \u201cSign in with a passkey\u201d "
-            "and approve it on your phone \u2014 no password or 2FA codes to type.",
             "Use the Sign In button at the top-right of the store page, then keep the window "
             "open until it closes on its own.",
+            "Easiest sign-in: if you have a passkey, choose \u201cSign in with a passkey\u201d "
+            "and approve it on your phone \u2014 no password or 2FA codes to type.",
             "One sign-in covers your PSN library and PlayStation Store wishlist; sessions last ~30 days.",
         ),
     ),
@@ -234,7 +234,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Your Xbox Store wishlist. Separate sign-in on xbox.com from the Xbox play "
             "history above \u2014 wishlists aren't exposed by OpenXBL."
         ),
-        env_keys=("XBOX_WISHLIST_PROFILE",),
+        env_keys=("XBOX_WISHLIST_PROFILE", "XBOX_WISHLIST_TOKEN", "XBOX_WISHLIST_MARKET"),
         login_url="https://www.xbox.com/en-us/wishlist",
         success_url_pattern=r"xbox\.com/(en-us/)?wishlist",
         expiry_days=30,

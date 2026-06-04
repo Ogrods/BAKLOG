@@ -25,6 +25,7 @@ from auth.cdp_browser import (
     CdpPage,
     _cdp_websocket_error,
     _should_preserve_popup,
+    auth_banner_init_script,
     find_chromium_executable,
     is_blank_browser_url,
     launch_persistent_profile,
@@ -169,6 +170,39 @@ class TestRunnerCdpCompat:
         root = Path(__file__).resolve().parents[1]
         runner_src = (root / "auth" / "runner.py").read_text(encoding="utf-8")
         assert ".is_closed()" not in runner_src
+
+
+class TestAuthBanner:
+    def test_init_script_embeds_message_and_setter(self) -> None:
+        src = auth_banner_init_script('keep "this" window open')
+        # Message is JSON-encoded so quotes can't break the script.
+        assert '"keep \\"this\\" window open"' in src
+        assert "window.__baklogSetBanner" in src
+        assert "__baklog_auth_banner" in src
+        assert "pointer-events:none" in src
+
+    def test_set_auth_banner_pushes_to_live_pages_only(self) -> None:
+        ctx = _bare_context()
+        open_page = _FakePage("S-OPEN")
+        closed_page = _FakePage("S-CLOSED")
+        closed_page.is_closed = True
+        evaluated: list[str] = []
+        open_page.evaluate = lambda fn, timeout=5: evaluated.append(fn)  # type: ignore[attr-defined]
+        closed_page.evaluate = lambda fn, timeout=5: evaluated.append("CLOSED")  # type: ignore[attr-defined]
+        ctx.pages = [open_page, closed_page]
+
+        ctx.set_auth_banner("Sign in and keep this window open")
+
+        assert len(evaluated) == 1
+        assert "__baklogSetBanner" in evaluated[0]
+        assert "Sign in and keep this window open" in evaluated[0]
+
+    def test_set_auth_banner_ignores_blank_message(self) -> None:
+        ctx = _bare_context()
+        page = _FakePage("S-1")
+        page.evaluate = lambda fn, timeout=5: (_ for _ in ()).throw(AssertionError("called"))  # type: ignore[attr-defined]
+        ctx.pages = [page]
+        ctx.set_auth_banner("")  # no live update for empty text
 
 
 class TestFindBrowser:

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BAKLOG</title>
-  <meta name="description" content="BAKLOG — cross-store game backlog and wishlist deal radar. Local-only; your libraries stay on your machine." />
+  <meta name="description" content="BAKLOG - cross-store game backlog and wishlist deal radar. Local-only; your libraries stay on your machine." />
   <!-- Must match pyproject.toml + package.json (see CHANGELOG release discipline). Read at runtime by js/error-boundary.js for bug-bundle metadata. -->
   <meta name="baklog-version" content="0.6.0" />
   <meta name="theme-color" content="#0f172a" />
@@ -116,7 +116,7 @@
       (function () {
         var tips = [
           "Watch your spotlight for anything you want to recategorize.",
-          "Own a physical copy? Add it manually — add whatever you want.",
+          "Own a physical copy? Add it manually - add whatever you want.",
           "See a Humble icon but no other store? You probably still need to redeem the key in your Humble account.",
           "Sort by time played to see what you actually play, then recategorize from there.",
           "Press / to jump straight to the search box.",
@@ -125,6 +125,8 @@
           "Turn on Hide duplicates to collapse the same game across stores.",
           "Click any dashboard chart to drill into those exact games.",
           "Just bought a game? Steam's API can take up to 24 hours to show it.",
+          "Co-op data (online, couch, campaign) is hard to pin down. Spot something off? Let us know.",
+          "There's more than one back-to-top button.",
         ];
         var el = document.getElementById("bootLoadingTip");
         if (el && tips.length) {
@@ -415,7 +417,14 @@
         <thead class="bg-slate-800 text-slate-300">
           <tr>
             <th class="p-2"><label class="sr-only" for="selectAllVisible">Select all visible rows</label><input type="checkbox" id="selectAllVisible" /></th>
-            <th class="p-2" scope="col"><span class="sr-only">Cover art</span></th>
+            <th class="p-2" scope="col">
+              <span class="sr-only">Cover art</span>
+              <button id="backToTopCover" type="button" title="Back to top" aria-label="Back to top">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M10 13 L10 7 M6 10 L10 6 L14 10" />
+                </svg>
+              </button>
+            </th>
             <th data-sort="name" class="p-2 text-left">Game</th>
             <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
             <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>
@@ -448,18 +457,32 @@
   <script>
     (function () {
       var btn = document.getElementById('backToTop');
-      if (!btn) return;
-      var sync = function () {
-        var y = window.scrollY || document.documentElement.scrollTop;
-        btn.classList.toggle('show', y > 400);
-      };
-      window.addEventListener('scroll', sync, { passive: true });
-      window.addEventListener('resize', sync, { passive: true });
-      btn.addEventListener('click', function () {
+      var coverBtn = document.getElementById('backToTopCover');
+      var tableWrap = document.getElementById('tableWrap');
+      if (!btn && !coverBtn) return;
+      var jumpTop = function () {
         // Instant jump — smooth-scrolling a 1700-row table forces a paint per
         // animation frame and stalls for seconds. Snap to top instead.
         window.scrollTo(0, 0);
-      });
+      };
+      var sync = function () {
+        if (btn) {
+          var y = window.scrollY || document.documentElement.scrollTop;
+          btn.classList.toggle('show', y > 400);
+        }
+        if (coverBtn && tableWrap) {
+          // The cover-art button rides the sticky table header: it only shows
+          // while the header is actually pinned to the viewport top — i.e. the
+          // table has scrolled up past the top edge but is still in view.
+          var r = tableWrap.getBoundingClientRect();
+          var stuck = r.top <= 0 && r.bottom > 80;
+          coverBtn.classList.toggle('show', stuck);
+        }
+      };
+      window.addEventListener('scroll', sync, { passive: true });
+      window.addEventListener('resize', sync, { passive: true });
+      if (btn) btn.addEventListener('click', jumpTop);
+      if (coverBtn) coverBtn.addEventListener('click', jumpTop);
       sync();
     })();
   </script>

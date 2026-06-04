@@ -673,6 +673,9 @@ export function bindEvents() {
   // Sequenced in two rAFs because switchView defers the dashboard chrome
   // toggle to the next frame on the overlay path.
   const reopenFetcherConsole = () => {
+    // Boot curtain blocks pointer events via CSS; this guards keyboard activation
+    // so a focused-Enter can't switchView mid-boot before bootstrap finishes.
+    if (document.documentElement.hasAttribute("data-boot-loading")) return;
     const wasOnDash = state.activeView === "dashboard";
     if (!wasOnDash) switchView("dashboard");
     const open = () => fetcherRunner.reopenLogPanel();
@@ -711,7 +714,7 @@ export function bindEvents() {
     banner.className = "migration-banner";
     banner.textContent = ok
       ? "Bug bundle copied. Paste it into a new GitHub issue."
-      : "Could not copy — use ?debug=1 overlay or trigger an error and click Copy bug bundle.";
+      : "Could not copy - use ?debug=1 overlay or trigger an error and click Copy bug bundle.";
     banner.classList.remove("hidden");
     window.setTimeout(() => {
       banner.classList.add("hidden");
@@ -730,7 +733,7 @@ export function bindEvents() {
       console.warn('[importNotes] invalid JSON', err);
       const banner = document.getElementById('bootErrorBanner');
       if (banner) {
-        banner.textContent = 'Notes import failed — file is not valid JSON.';
+        banner.textContent = 'Notes import failed - file is not valid JSON.';
         banner.classList.remove('hidden');
       }
     }

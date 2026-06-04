@@ -164,7 +164,7 @@ function logRunSummary(run) {
   }
   if (syncRows >= 200) {
     console.warn(
-      `[baklog-perf] Large synchronous paint (${syncRows} rows) — unexpected after Phase B; `
+      `[baklog-perf] Large synchronous paint (${syncRows} rows) - unexpected after Phase B; `
       + 'drill-in should use progressive+anchor with syncRows≈50 only.',
     );
   }

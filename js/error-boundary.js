@@ -233,7 +233,7 @@ function buildToast() {
       <pre class="baklog-error-toast-stack" data-field="stack"></pre>
     </div>
     <div class="baklog-error-toast-foot">
-      <button type="button" class="baklog-error-toast-btn" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a JSON bug bundle (errors + app context) to your clipboard so you can paste it into a GitHub issue. Nothing is sent anywhere — what you do with the clipboard is up to you.">Copy bug bundle</button>
+      <button type="button" class="baklog-error-toast-btn" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a JSON bug bundle (errors + app context) to your clipboard so you can paste it into a GitHub issue. Nothing is sent anywhere - what you do with the clipboard is up to you.">Copy bug bundle</button>
       <button type="button" class="baklog-error-toast-btn" data-action="copy" title="Copy just the error list as JSON">Errors only</button>
       <button type="button" class="baklog-error-toast-btn" data-action="toggle-details" aria-label="Toggle error details">Details</button>
     </div>

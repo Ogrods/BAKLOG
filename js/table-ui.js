@@ -491,7 +491,7 @@ export function formatPrice(g) {
       ${shopHtml ? `<span class="text-[10px] text-slate-400 truncate w-full text-right" title="${escapeAttr(itad.shop)}">${shopHtml}</span>` : ""}
     ${linkClose}</div>`;
   }
-  if (!g.price && g.discount_percent == null) return "—";
+  if (!g.price && g.discount_percent == null) return " - ";
   const base = g.price || "N/A";
   const cut = g.discount_percent || 0;
   const curTag = currencyMismatchTagForGame(g);
@@ -673,7 +673,7 @@ function consumePendingFocus(list) {
   const run = perfActiveRun();
   if (run) run.meta.pendingKeyFound = idx >= 0;
   if (idx < 0) {
-    console.warn('[consumePendingFocus] pending key not in painted list — anchor lost', {
+    console.warn('[consumePendingFocus] pending key not in painted list - anchor lost', {
       key,
       view: state.activeView,
       listLen: list.length,
@@ -1066,11 +1066,11 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="p-2 text-right">
         <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
-      <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—"}</td>
+      <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - "}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
       <td class="p-2 text-slate-300">${formatReleaseDate(g.release_date)}</td>
       <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
-      <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || "—"}</td>
+      <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
       <td class="p-2 notes-cell">
         <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1">${escapeHtml(p.notes || "")}</textarea>
       </td>

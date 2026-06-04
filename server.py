@@ -11,7 +11,7 @@ Endpoints:
     POST /api/run/<key>            -> {run_id, status}    (queues a fetcher)
     POST /api/run/<run_id>/cancel  -> cancel one queued or running fetcher
     POST /api/runs/cancel          -> cancel all in-flight fetchers (active + queue)
-    GET  /api/stream/<run_id>      -> SSE: line / done / error events
+    GET  /api/stream/<run_id>      -> SSE: line / done / error events (?since=N or Last-Event-ID for resume)
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
     GET  /api/profiles        -> {active, active_label, legacy, profiles[]}
@@ -74,7 +74,7 @@ _DEV_SERVER_BUSY_MSG = (
 MAX_HISTORY = 200
 MAX_LINES_PER_RUN = 25_000
 MAX_SSE_CONNECTIONS = 8
-STALL_FIRST_NOTICE_SEC = 30
+STALL_FIRST_NOTICE_SEC = 60
 STALL_REPEAT_SEC = 60
 STALL_POLL_SEC = 1.0
 SILENT_STALL_KILL_SEC = 180  # if a fetcher emits zero lines AND proc still alive after this, force-kill
@@ -327,6 +327,9 @@ def _argv(*parts: str) -> list[str]:
 
 def _python_executable() -> str:
     """Prefer the project's venv interpreter when present."""
+    override = os.environ.get("BAKLOG_PYTHON", "").strip()
+    if override:
+        return override
     candidates = [
         ROOT / ".venv" / "Scripts" / "python.exe",  # Windows
         ROOT / ".venv" / "bin" / "python",          # POSIX
@@ -335,7 +338,30 @@ def _python_executable() -> str:
     for c in candidates:
         if c.exists():
             return str(c)
-    return sys.executable
+    exe = sys.executable
+    if sys.platform != "win32":
+        return exe
+    # The Microsoft Store "python.exe" shim under WindowsApps can deadlock when
+    # this server (also launched via the shim) spawns fetcher subprocesses.
+    # Resolve the real interpreter via the py launcher when we detect that stub.
+    exe_norm = exe.replace("\\", "/")
+    if "WindowsApps/python.exe" in exe_norm or exe_norm.endswith("/WindowsApps/python"):
+        try:
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            proc = subprocess.run(
+                ["py", "-3.13", "-c", "import sys; print(sys.executable)"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+                creationflags=flags,
+            )
+            resolved = (proc.stdout or "").strip()
+            if proc.returncode == 0 and resolved and Path(resolved).is_file():
+                return resolved
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return exe
 
 
 MANIFEST_FILE = ROOT / "fetchers" / "manifest.json"
@@ -517,6 +543,7 @@ class Run:
         "id", "key", "label", "status", "started_at", "ended_at", "exit_code",
         "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
         "_log_path", "_runs_dir", "profile_id", "_cancelling_since",
+        "_next_seq", "_total_lines",
     )
 
     def __init__(
@@ -544,10 +571,39 @@ class Run:
         self._log_path = self._runs_dir / f"{self.id}.jsonl"
         # Ring buffer for live listeners; full log is on disk for replay.
         self.lines: deque[dict[str, Any]] = deque(maxlen=MAX_LINES_PER_RUN)
+        self._next_seq = 0
+        self._total_lines = 0
         self._lock = threading.Lock()
         self._listeners: set[queue.Queue] = set()
         self._finished = threading.Event()
         self._cancelling_since: float | None = None
+        self._restore_seq_from_disk()
+
+    def _restore_seq_from_disk(self) -> None:
+        """Resume monotonic seq / line totals from an existing jsonl log."""
+        if not self._log_path.exists():
+            return
+        max_seq = 0
+        count = 0
+        fallback = 0
+        try:
+            with self._log_path.open(encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    count += 1
+                    msg = json.loads(line)
+                    seq = msg.get("seq")
+                    if seq is None:
+                        fallback += 1
+                        seq = fallback
+                    max_seq = max(max_seq, int(seq))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[runs] log scan failed {self.id}: {exc!r}", file=sys.stderr)
+            return
+        self._next_seq = max_seq
+        self._total_lines = count
 
     def to_summary(self) -> dict[str, Any]:
         summary: dict[str, Any] = {
@@ -558,15 +614,23 @@ class Run:
             "started_at": self.started_at,
             "ended_at": self.ended_at,
             "exit_code": self.exit_code,
-            "line_count": len(self.lines),
+            "line_count": self._total_lines,
         }
         if self.exit_code == 4:
             summary["failure_kind"] = "auth"
         return summary
 
     def add_line(self, stream: str, text: str) -> None:
-        msg = {"t": time.time(), "stream": stream, "text": _redact_log_line(text)}
         with self._lock:
+            self._next_seq += 1
+            self._total_lines += 1
+            seq = self._next_seq
+            msg = {
+                "seq": seq,
+                "t": time.time(),
+                "stream": stream,
+                "text": _redact_log_line(text),
+            }
             self.lines.append(msg)
             try:
                 with self._log_path.open("a", encoding="utf-8") as f:
@@ -588,7 +652,21 @@ class Run:
                 except queue.Full:
                     self._listeners.discard(q)
 
-    def replay_lines(self) -> list[dict[str, Any]]:
+    def replay_lines(self, since: int = 0) -> list[dict[str, Any]]:
+        """Return log lines with seq > since (full log on disk; ring buffer fallback)."""
+        since = max(0, int(since))
+
+        def _with_seq(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            out: list[dict[str, Any]] = []
+            fallback = 0
+            for msg in messages:
+                seq = msg.get("seq")
+                if seq is None:
+                    fallback += 1
+                    msg = {**msg, "seq": fallback}
+                out.append(msg)
+            return [m for m in out if int(m.get("seq", 0)) > since]
+
         if self._log_path.exists():
             replay: list[dict[str, Any]] = []
             try:
@@ -598,17 +676,17 @@ class Run:
                         if not line:
                             continue
                         replay.append(json.loads(line))
-                return replay
+                return _with_seq(replay)
             except (OSError, json.JSONDecodeError) as exc:
                 print(f"[runs] log read failed {self.id}: {exc!r}", file=sys.stderr)
         with self._lock:
-            return list(self.lines)
+            return _with_seq(list(self.lines))
 
-    def attach_listener(self) -> tuple[queue.Queue, list[dict[str, Any]], bool]:
+    def attach_listener(self, since: int = 0) -> tuple[queue.Queue, list[dict[str, Any]], bool]:
         """Return (queue, replay-buffer, already-finished)."""
         q: queue.Queue = queue.Queue(maxsize=1024)
         with self._lock:
-            replay = self.replay_lines()
+            replay = self.replay_lines(since)
             done = self._finished.is_set()
             if not done:
                 self._listeners.add(q)
@@ -1543,10 +1621,34 @@ def _send_bytes(
     handler.wfile.write(body)
 
 
-def _sse_format(event: str, data: Any) -> bytes:
+def _sse_format(event: str, data: Any, *, event_id: int | str | None = None) -> bytes:
     payload = data if isinstance(data, str) else json.dumps(data)
-    out = f"event: {event}\ndata: {payload}\n\n"
-    return out.encode("utf-8")
+    parts: list[str] = []
+    if event_id is not None:
+        parts.append(f"id: {event_id}")
+    parts.append(f"event: {event}")
+    parts.append(f"data: {payload}")
+    parts.append("")
+    return ("\n".join(parts) + "\n").encode("utf-8")
+
+
+def _stream_resume_since(handler: SimpleHTTPRequestHandler) -> int:
+    """Parse SSE resume cursor from ?since= and Last-Event-ID (max of both)."""
+    since = 0
+    parsed = urlparse(handler.path)
+    raw = parse_qs(parsed.query).get("since", [None])[0]
+    if raw is not None:
+        try:
+            since = max(0, int(raw))
+        except (TypeError, ValueError):
+            pass
+    last_event = handler.headers.get("Last-Event-ID") or handler.headers.get("Last-Event-Id")
+    if last_event:
+        try:
+            since = max(since, int(last_event.strip()))
+        except ValueError:
+            pass
+    return since
 
 
 # Known catalog files the dashboard probes on boot. When a store hasn't been
@@ -2253,7 +2355,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_stream(self, run_id: str) -> None:
         global _sse_connections
-        run_id = run_id.strip("/").split("/", 1)[0]
+        run_id = run_id.strip("/").split("/", 1)[0].split("?", 1)[0]
+        since = _stream_resume_since(self)
         run = MANAGER.get(run_id)
         if run is None:
             terminal = MANAGER.stream_terminal_summary(run_id)
@@ -2318,7 +2421,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
 
-        q, replay, already_done = run.attach_listener()
+        q, replay, already_done = run.attach_listener(since)
         try:
             self._sse_write("status", {
                 "status": run.status,
@@ -2327,7 +2430,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "exit_code": run.exit_code,
             })
             for msg in replay:
-                self._sse_write("line", msg)
+                self._sse_write("line", msg, event_id=msg.get("seq"))
 
             if already_done:
                 self._sse_write("done", {
@@ -2346,7 +2449,8 @@ class Handler(SimpleHTTPRequestHandler):
                     self._sse_write_raw(b": keepalive\n\n")
                     last_ping = time.time()
                     continue
-                self._sse_write(event, data)
+                event_id = data.get("seq") if event == "line" and isinstance(data, dict) else None
+                self._sse_write(event, data, event_id=event_id)
                 if event == "done":
                     return
                 if time.time() - last_ping > 30:
@@ -2361,8 +2465,8 @@ class Handler(SimpleHTTPRequestHandler):
                 _sse_connections = max(0, _sse_connections - 1)
 
     # ---- SSE helpers -------------------------------------------------------
-    def _sse_write(self, event: str, data: Any) -> None:
-        self._sse_write_raw(_sse_format(event, data))
+    def _sse_write(self, event: str, data: Any, *, event_id: int | str | None = None) -> None:
+        self._sse_write_raw(_sse_format(event, data, event_id=event_id))
 
     def _sse_write_raw(self, chunk: bytes) -> None:
         try:

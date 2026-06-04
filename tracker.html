@@ -312,6 +312,9 @@
         { id: "p3_console_log_batching", label: "[DONE] Fetcher console no longer freezes during large refreshes (e.g. itch) — log lines buffer and flush on requestAnimationFrame (appendLine/flushLines/flushLinesNow in js/fetcher-health.js); clearLog resets the buffer." },
         { id: "p3_log_panel_chrome_sync", label: "[DONE] Run-log panel title + badge always track real server state (syncLogPanelChrome): no more 'Running: Covers' with a 'queued · launching' badge; queue position reads '2 of 2' (activeCount + idx + 1) instead of a confusing '1 of 2'." },
         { id: "p3_enricher_heartbeats", label: "[DONE] enrich_steam_tags.py prints a heartbeat every HEARTBEAT_EVERY (25) Steam lookups so long silent stretches (e.g. co-op tags on Epic) aren't force-killed by the 180s server stall watchdog." },
+        { id: "p3_console_sse_resume", label: "[DONE] Fetcher console SSE resume cursor: per-line seq, ?since= / Last-Event-ID replay filter, client lastSeqByRunId — no duplicate lines on reload/reconnect." },
+        { id: "p3_console_state_reconcile", label: "[DONE] syncFromServer reconciles stale in-flight chips; Cancel button shows Cancelling… and blocks double-submit." },
+        { id: "p3_nintendo_cdp_capture", label: "[DONE] Nintendo fetch: queue GraphQL responses off CDP reader thread, idToken connect probe, NintendoCaptureError vs auth exit 4, --headed/--dump-debug." },
       ],
     },
     {
@@ -2009,10 +2012,10 @@
       gotcha: "Same sign-in as the library fetch.",
     },
     {
-      key: "itad", name: "ITAD", type: "Prices", output: "itad_prices.json",
+      key: "itad", name: "ITAD", type: "Prices", output: "itad_prices.json", na: ["reconnect"],
       connect: "On the IsThereAnyDeal card click Open sign-in page, copy your API key (a UUID) from isthereanydeal.com/apps/my/, paste it into the API key field, and click Save key.",
       cmd: "python fetch_itad.py",
-      testReconnect: "No Reconnect button on the card (manual API key — Open sign-in page + Save key only). Disconnect test: Disconnect on ITAD — chip shows Connect; run blocked. Reconnect test: python -m auth expire itad — Session expired; ITAD chip offers Reconnect. Paste your real key, Save key, re-fetch. Bad-key test: wrong UUID + Save key — run fails (exit 1).",
+      testReconnect: "Reconnect column is N/A. ITAD uses a manual API key, not an expiring session, so there is no Reconnect button (Open sign-in page + Save key only). Disconnect test: Disconnect on ITAD, the chip shows Connect and the run is blocked. Bad-key test: paste a wrong UUID and Save key, the run fails (exit 1). To replace the key: Open sign-in page, copy a fresh UUID, Save key, then re-fetch.",
       spotCheck: "After ITAD runs: Steam wishlist deal badges and prices look right; region matches your ITAD country. Other-store wishlist rows use native store prices unless ITAD matched them via Steam app IDs.",
       gotcha: "Run Steam wishlist (and other wishlist fetchers) before ITAD. fetch_itad.py prices games_wishlist.json directly; --include-library adds owned games. Optional: --country GB.",
     },
@@ -2087,7 +2090,7 @@
 
     const headers = ["Pull", "Type", ...CONN_STAGES.map((s) => s.label), "Output", "Verified"];
     const rows = CONNECTION_PULLS.map((pull) => [
-      el("strong", {}, pull.name),
+      el("strong", {}, pull.type === "Wishlist" ? pull.name + " wishlist" : pull.name),
       typePill(pull.type),
       ...CONN_STAGES.map((st) => connCheckCell(pull, st.id)),
       codeText(pull.output),

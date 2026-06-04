@@ -93,9 +93,9 @@ export function displayCurrency() {
  * @param {{ maximumFractionDigits?: number, minimumFractionDigits?: number }} [opts]
  */
 export function formatMoney(amount, code, opts = {}) {
-  if (amount == null || amount === '') return '—';
+  if (amount == null || amount === '') return ' - ';
   const num = Number(amount);
-  if (!Number.isFinite(num)) return '—';
+  if (!Number.isFinite(num)) return ' - ';
   const cur = normalizeCurrencyCode(code || displayCurrency());
   const fracDigits = opts.maximumFractionDigits ?? (cur === 'JPY' || cur === 'KRW' ? 0 : 2);
   try {

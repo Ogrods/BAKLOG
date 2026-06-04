@@ -118,7 +118,7 @@ function confirmPrune() {
     alert('Nothing selected.');
     return;
   }
-  const ok = confirm(`Remove personal data for ${keys.length} unknown ${keys.length === 1 ? 'entry' : 'entries'}?\n\nThe server keeps a rotating backup in data/personal_backups/ — you can restore from there if needed.`);
+  const ok = confirm(`Remove personal data for ${keys.length} unknown ${keys.length === 1 ? 'entry' : 'entries'}?\n\nThe server keeps a rotating backup in data/personal_backups/ - you can restore from there if needed.`);
   if (!ok) return;
   const removed = prunePersonalKeys(keys);
   flushSavePersonal();

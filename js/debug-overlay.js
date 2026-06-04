@@ -53,16 +53,16 @@ function buildOverlay() {
       <button type="button" class="baklog-debug-overlay-close" title="Hide overlay (refresh to show again)" aria-label="Hide debug overlay">×</button>
     </div>
     <dl class="baklog-debug-overlay-rows">
-      <dt>view</dt><dd data-field="view">—</dd>
-      <dt>dataVer</dt><dd data-field="dataVer">—</dd>
-      <dt>visible</dt><dd data-field="visible">—</dd>
-      <dt>filters</dt><dd data-field="filters">—</dd>
-      <dt>fp</dt><dd data-field="fp" title="">—</dd>
-      <dt>render</dt><dd data-field="render">—</dd>
-      <dt>dash</dt><dd data-field="dash" title="full / replay / skipped (reentrant+cooldown)">—</dd>
-      <dt>curtain</dt><dd data-field="curtain" title="boot data-boot-loading + view overlay">—</dd>
-      <dt>errors</dt><dd data-field="errors">—</dd>
-      <dt>orphans</dt><dd data-field="orphans" title="state.personal keys with no matching game in any catalog. Surfaced read-only; clean up via kebab → Clean up unknown games.">—</dd>
+      <dt>view</dt><dd data-field="view"> - </dd>
+      <dt>dataVer</dt><dd data-field="dataVer"> - </dd>
+      <dt>visible</dt><dd data-field="visible"> - </dd>
+      <dt>filters</dt><dd data-field="filters"> - </dd>
+      <dt>fp</dt><dd data-field="fp" title=""> - </dd>
+      <dt>render</dt><dd data-field="render"> - </dd>
+      <dt>dash</dt><dd data-field="dash" title="full / replay / skipped (reentrant+cooldown)"> - </dd>
+      <dt>curtain</dt><dd data-field="curtain" title="boot data-boot-loading + view overlay"> - </dd>
+      <dt>errors</dt><dd data-field="errors"> - </dd>
+      <dt>orphans</dt><dd data-field="orphans" title="state.personal keys with no matching game in any catalog. Surfaced read-only; clean up via kebab → Clean up unknown games."> - </dd>
     </dl>
     <div class="baklog-debug-overlay-foot">
       <button type="button" class="baklog-debug-overlay-bundle" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a sanitized JSON bug bundle to clipboard. Nothing is sent anywhere.">Copy bug bundle</button>
@@ -114,7 +114,7 @@ function setField(name, value, opts) {
   if (!_overlayEl) return;
   const node = _overlayEl.querySelector(`[data-field="${name}"]`);
   if (!node) return;
-  const next = value == null ? '—' : String(value);
+  const next = value == null ? ' - ' : String(value);
   if (node.textContent !== next) node.textContent = next;
   if (opts?.title != null && node.title !== opts.title) node.title = opts.title;
 }
@@ -130,20 +130,20 @@ function readActiveFilterCount() {
 function readLastRenderMs() {
   try {
     const t = window.__baklogPerf?.last?.totalMs;
-    return typeof t === 'number' ? `${t.toFixed(1)}ms` : '—';
-  } catch (_) { return '—'; }
+    return typeof t === 'number' ? `${t.toFixed(1)}ms` : ' - ';
+  } catch (_) { return ' - '; }
 }
 
 function tick() {
   if (!_overlayEl) return;
-  setField('view', state.activeView || '—');
-  setField('dataVer', window._dataVersion ?? '—');
-  setField('visible', state._visibleList?.length ?? '—');
+  setField('view', state.activeView || ' - ');
+  setField('dataVer', window._dataVersion ?? ' - ');
+  setField('visible', state._visibleList?.length ?? ' - ');
   setField('filters', readActiveFilterCount());
   const fp = readFingerprint();
   const shortFp = fp.length > FINGERPRINT_DISPLAY_LEN
     ? `${fp.slice(0, FINGERPRINT_DISPLAY_LEN)}…`
-    : (fp || '—');
+    : (fp || ' - ');
   setField('fp', shortFp, { title: fp });
   setField('render', readLastRenderMs());
   setField('dash', readDashStats());
@@ -153,7 +153,7 @@ function tick() {
   if (!_overlayEl.classList.contains('baklog-debug-overlay--hidden')) {
     setField('orphans', readOrphanCount());
   } else {
-    setField('orphans', '—');
+    setField('orphans', ' - ');
   }
 }
 
@@ -162,7 +162,7 @@ function readOrphanCount() {
     if (!state.dashboardDataReady) return 'waiting…';
     return String(countOrphanPersonalKeys());
   } catch (_) {
-    return '—';
+    return ' - ';
   }
 }
 
@@ -174,7 +174,7 @@ function readOrphanCount() {
  */
 function readDashStats() {
   const s = (typeof window !== "undefined" && window.__baklogDash?.stats) || null;
-  if (!s) return "—";
+  if (!s) return " - ";
   const skipped = (s.skippedReentrant || 0) + (s.skippedAutoReplay || 0);
   return `F:${s.full} R:${s.replay} S:${skipped}`;
 }
@@ -185,13 +185,13 @@ function readCurtainState() {
     const boot =
       c.bootReason != null
         ? `${c.bootReason}${c.bootElapsedMs != null ? ` ${c.bootElapsedMs}ms` : ""}`
-        : "—";
+        : " - ";
     const view = c.viewOverlayShown
       ? (c.viewOverlayLabel || "on")
-      : "—";
+      : " - ";
     return `boot:${boot} · view:${view}`;
   } catch (_) {
-    return "—";
+    return " - ";
   }
 }
 

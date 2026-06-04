@@ -164,6 +164,83 @@ def test_barren_solo_kept() -> None:
     assert out[0]["gog_id"] == 1098723469
 
 
+def test_edition_variant_barren_dropped_when_populated_sibling_exists() -> None:
+    rows = [
+        {
+            "name": "Stray Gods: The Roleplaying Musical",
+            "gog_id": 1624007757,
+            "header_image": "https://images.gog.com/stray.jpg",
+            "genres": ["Adventure"],
+        },
+        {
+            "name": "Stray Gods: Orpheus Edition",
+            "gog_id": 1098723469,
+            "header_image": None,
+            "genres": [],
+        },
+    ]
+    out = apply_gog_name_filters(rows)
+    assert len(out) == 1
+    assert out[0]["gog_id"] == 1624007757
+
+
+def test_brigador_deluxe_barren_dropped_when_edition_populated() -> None:
+    rows = [
+        {
+            "name": "Brigador: Up-Armored Edition",
+            "gog_id": 1356485086,
+            "header_image": "https://images.gog.com/brig.jpg",
+            "genres": ["Action"],
+        },
+        {
+            "name": "Brigador: Up-Armored Deluxe",
+            "gog_id": 1744995009,
+            "header_image": None,
+            "genres": [],
+        },
+    ]
+    out = apply_gog_name_filters(rows)
+    assert len(out) == 1
+    assert out[0]["gog_id"] == 1356485086
+
+
+def test_alone_in_the_dark_trilogy_dropped_when_components_owned() -> None:
+    rows = [
+        {"name": "Alone in the Dark: The Trilogy 1+2+3", "gog_id": 1207658923},
+        {"name": "Alone in the Dark 1", "gog_id": 1207660923},
+        {"name": "Alone in the Dark 2", "gog_id": 1207660963},
+        {"name": "Alone in the Dark 3", "gog_id": 1207660973},
+    ]
+    out = apply_gog_name_filters(rows)
+    names = {r["name"] for r in out}
+    assert "Alone in the Dark: The Trilogy 1+2+3" not in names
+    assert names == {
+        "Alone in the Dark 1",
+        "Alone in the Dark 2",
+        "Alone in the Dark 3",
+    }
+
+
+def test_sequel_subtitles_not_grouped_by_franchise_prefix() -> None:
+    """Tomb Raider sequels must not collapse via edition-variant family key."""
+    rows = [
+        {
+            "name": "Tomb Raider: Anniversary",
+            "gog_id": 1,
+            "header_image": "https://images.gog.com/a.jpg",
+            "genres": ["Action"],
+        },
+        {
+            "name": "Tomb Raider: Legend",
+            "gog_id": 2,
+            "header_image": None,
+            "genres": [],
+        },
+    ]
+    out = collapse_metadata_barren_dupes(rows)
+    assert len(out) == 2
+
+
 def test_all_populated_same_name_both_kept() -> None:
     rows = [
         {

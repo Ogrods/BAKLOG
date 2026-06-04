@@ -98,7 +98,7 @@ function computeMegaHeroStats(games) {
   const finished = games.filter(g => getPersonal(g).status === "finished").length;
   const completion = nonSkip.length ? Math.round((finished / nonSkip.length) * 100) : 0;
   const rated = games.filter(g => ratingValue(g) > 0);
-  const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length) : "—";
+  const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length) : " - ";
   const wlDeals = state.wishlistGames.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
   const stores = new Set(games.map(g => normalizeGame(g).store)).size;
   const years = backlogHrs > 0 ? (backlogHrs / (2 * 365)).toFixed(1) : "0";
@@ -123,7 +123,7 @@ function applyMegaHeroCounters(stats) {
     { id: "dashHeroPlayed", to: Math.round(stats.playedHrs), format: fmtH },
     { id: "dashHeroBacklog", to: Math.round(stats.backlogHrs), format: fmtH },
   ];
-  if (stats.avgRating !== "—") {
+  if (stats.avgRating !== " - ") {
     counters.push({ id: "dashHeroAvg", to: stats.avgRating, format: fmtPct });
   }
   for (const item of counters) {
@@ -222,7 +222,7 @@ function renderDashboardMega(games) {
           <div class="dash-hero-pillar-label">Backlog</div>
         </div>
         <div class="dash-hero-pillar">
-          <div class="dash-hero-pillar-value" id="dashHeroAvg">${stats.avgRating === "—" ? "—" : escapeHtml(String(stats.avgRating)) + "%"}</div>
+          <div class="dash-hero-pillar-value" id="dashHeroAvg">${stats.avgRating === " - " ? " - " : escapeHtml(String(stats.avgRating)) + "%"}</div>
           <div class="dash-hero-pillar-label">Avg review</div>
         </div>
       </div>

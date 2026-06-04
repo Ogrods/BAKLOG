@@ -198,12 +198,25 @@ _NINTENDO_SESSION_COOKIES = ("MIST", "JViDD", "_gh_sess", "NASID", "ecsid")
 
 
 def _nintendo_has_session(context) -> bool:
-    """True once ec.nintendo.com session cookies exist (not just any nintendo.com cookie)."""
+    """True when known eShop session cookies exist on ec.nintendo.com."""
     for c in context.cookies():
         domain = (c.get("domain") or "").lstrip(".")
-        if domain.startswith("ec.nintendo.com") and c.get("name") and c.get("value"):
+        if not domain.startswith("ec.nintendo.com"):
+            continue
+        name = c.get("name") or ""
+        if name in _NINTENDO_SESSION_COOKIES and c.get("value"):
             return True
     return False
+
+
+def _nintendo_session_has_id_token(context) -> bool:
+    """Verify /api/auth/session returns an idToken (GraphQL prerequisite)."""
+    try:
+        from nintendo_client import SESSION_URL, probe_session_id_token
+
+        return bool(probe_session_id_token(context.request.get).get("ok"))
+    except Exception:
+        return False
 
 
 def _extract_nintendo_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
@@ -230,7 +243,7 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
 
         # Once signed in (we've returned to ec.nintendo.com), the eShop session
         # cookies should be present — capture and finish.
-        if signed_in and _nintendo_has_session(context):
+        if signed_in and _nintendo_has_session(context) and _nintendo_session_has_id_token(context):
             header = _cookie_header(context.cookies(), ("nintendo.com",))
             if header:
                 return {"NINTENDO_COOKIE": header}
@@ -268,11 +281,11 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
 
-    # Last resort: capture whatever nintendo.com cookies exist (older accounts
-    # sometimes work without the ec session cookie set yet).
-    header = _cookie_header(context.cookies(), ("nintendo.com",))
-    if header:
-        return {"NINTENDO_COOKIE": header}
+    # Last resort: session cookies + idToken probe (not merely any nintendo.com cookie).
+    if _nintendo_has_session(context) and _nintendo_session_has_id_token(context):
+        header = _cookie_header(context.cookies(), ("nintendo.com",))
+        if header:
+            return {"NINTENDO_COOKIE": header}
     raise RuntimeError(
         "No Nintendo session captured — sign in, then make sure the eShop transactions page "
         "at ec.nintendo.com finished loading. Close any blank tab and click Connect again if needed."

@@ -317,6 +317,12 @@ html[data-boot-loading] #connectionsContainer { visibility: hidden; }
    curtain down. display:none keeps its footprint at zero until the boot
    finishes. */
 html[data-boot-loading] #summary { display: none; }
+/* The fetcher pill and profile menu live in the header (above the curtain), so
+   they stay visible during boot. Block interaction so a mid-boot click can't
+   kick off switchView/profile-switch before bootstrap finishes. Keyboard
+   activation is guarded in JS (reopenFetcherConsole / profile trigger). */
+html[data-boot-loading] #fetcherGlobalStatus,
+html[data-boot-loading] #profileMenuWrap { pointer-events: none; }
 /* === Base === */
 /* Reserve the vertical scrollbar's gutter so the page never shifts
    horizontally the moment content overflows the viewport (especially
@@ -876,12 +882,11 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   cursor: pointer;
 }
 .alpha-nav-btn.enabled:hover { color: #38bdf8; }
-/* === Back to top (sits above the A–Z rail) === */
-#backToTop {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  right: 0;
+/* === Back to top ===
+   Two variants share one look: #backToTop sits above the A–Z rail (shows past
+   400px scroll); #backToTopCover lives in the cover-art column of the sticky
+   table header and only shows while that header is pinned. */
+#backToTop, #backToTopCover {
   display: flex; align-items: center; justify-content: center;
   padding: 3px 2px;
   background: rgba(15, 23, 42, 0.88);
@@ -892,10 +897,17 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   opacity: 0; pointer-events: none;
   transition: opacity 0.2s ease, color 0.15s ease, transform 0.15s ease;
 }
-#backToTop.show { opacity: 0.85; pointer-events: auto; }
-#backToTop:hover { opacity: 1; color: #38bdf8; transform: translateY(-1px); }
-#backToTop:focus-visible { opacity: 1; outline: 2px solid #38bdf8; outline-offset: 2px; }
-#backToTop svg { width: 14px; height: 14px; }
+#backToTop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+}
+#backToTopCover { width: 100%; }
+#backToTop.show, #backToTopCover.show { opacity: 0.85; pointer-events: auto; }
+#backToTop:hover, #backToTopCover:hover { opacity: 1; color: #38bdf8; transform: translateY(-1px); }
+#backToTop:focus-visible, #backToTopCover:focus-visible { opacity: 1; outline: 2px solid #38bdf8; outline-offset: 2px; }
+#backToTop svg, #backToTopCover svg { width: 14px; height: 14px; }
 /* === Status breakdown chips === */
 .status-chip {
   display: inline-flex;
@@ -1627,8 +1639,8 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   pointer-events: none;
   filter: blur(18px) brightness(0.5);
   transform: scale(1.15) translateZ(0);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
-  mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0, 0, 0, 0.25) 32%, rgba(0, 0, 0, 0.6) 56%, rgba(0, 0, 0, 0.9) 80%, #000 95%);
+  mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0, 0, 0, 0.25) 32%, rgba(0, 0, 0, 0.6) 56%, rgba(0, 0, 0, 0.9) 80%, #000 95%);
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
   display: block;
@@ -1642,16 +1654,18 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   object-fit: cover;
   object-position: 35% center;
   opacity: 0;
+  transform: scale(0.9);
+  transform-origin: center right;
   transition: transform 0.6s ease, opacity 0.45s ease;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
-  mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.35) 24%, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.95) 70%, #000 85%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0, 0, 0, 0.25) 32%, rgba(0, 0, 0, 0.6) 56%, rgba(0, 0, 0, 0.9) 80%, #000 95%);
+  mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0, 0, 0, 0.25) 32%, rgba(0, 0, 0, 0.6) 56%, rgba(0, 0, 0, 0.9) 80%, #000 95%);
   z-index: 1;
   /* Promote so the mask doesn't get re-rasterized when sibling charts animate. */
   will-change: opacity, transform;
   backface-visibility: hidden;
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
-.dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04) translateZ(0); }
+.dash-spotlight:hover .dash-spotlight-art { transform: scale(0.94) translateZ(0); }
 .dash-spotlight.has-portrait-art:hover .dash-spotlight-art { transform: none; }
 .dash-spotlight-gradient {
   position: absolute;

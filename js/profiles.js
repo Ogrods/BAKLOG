@@ -285,6 +285,9 @@ export function bindProfilesUI() {
 
   trigger.addEventListener('click', (e) => {
     e.stopPropagation();
+    // Boot curtain blocks pointer events via CSS; guard keyboard activation too
+    // so the profile menu can't open (and switch/reload) mid-boot.
+    if (document.documentElement.hasAttribute('data-boot-loading')) return;
     if (_menuOpen) closeMenu();
     else openMenu();
   });

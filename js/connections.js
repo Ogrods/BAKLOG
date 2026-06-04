@@ -217,19 +217,19 @@ function groupConnectNote(groupKey, members) {
   const anyConnected = (members || []).some(m => m.status === 'connected');
   if (groupKey === 'amazon') {
     const lead = anyConnected
-      ? 'Ready to pull — at least one source is connected.'
+      ? 'Ready to pull - at least one source is connected.'
       : 'Connect the launcher or Prime web below to start pulling.';
-    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one Amazon source. Run the Amazon fetcher and BAKLOG auto-detects what's available — it scans the Amazon Games launcher database first (file scan) and falls back to Prime Gaming (web).</p></div>`;
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one Amazon source. Run the Amazon fetcher and BAKLOG auto-detects what's available - it scans the Amazon Games launcher database first (file scan) and falls back to Prime Gaming (web).</p></div>`;
   }
   if (groupKey === 'gog') {
     const lead = anyConnected
-      ? 'Ready to pull — Galaxy and/or web session detected.'
+      ? 'Ready to pull - Galaxy and/or web session detected.'
       : 'Install GOG Galaxy on this PC, or connect GOG (web) below.';
     return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one GOG source. Run the GOG fetcher and BAKLOG reads the Galaxy database first when present, then falls back to your gog.com cookie session.</p></div>`;
   }
   if (groupKey === 'itch') {
     const lead = anyConnected
-      ? 'Ready to pull — itch app and/or API key detected.'
+      ? 'Ready to pull - itch app and/or API key detected.'
       : 'Install the itch desktop app, or paste an API key below.';
     return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one itch.io source. Run the itch fetcher and BAKLOG reads butler.db from the itch app first when present, then falls back to your API key.</p></div>`;
   }
@@ -349,7 +349,7 @@ function renderOnboard() {
 
       <p class="conn-onboard-title">You have 0 stores connected</p>
 
-      <p class="conn-onboard-lead">Start with Steam — it imports your whole library in one sign-in. You can add the rest after.</p>
+      <p class="conn-onboard-lead">Start with Steam - it imports your whole library in one sign-in. You can add the rest after.</p>
 
       <button type="button" class="conn-onboard-btn" data-conn-start-steam>Start with Steam</button>
 
@@ -446,7 +446,7 @@ function buildCardFooter(p, st) {
         ${connected
           ? `<span class="conn-local-label">Auto-detected from Amazon Games launcher</span>
              <button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}">Disconnect</button>`
-          : `<span class="conn-local-label">Launcher library hidden — Connect to use it again, or use Prime web</span>
+          : `<span class="conn-local-label">Launcher library hidden - Connect to use it again, or use Prime web</span>
              <button type="button" class="conn-primary" data-enable-local data-provider="${escapeAttr(p.key)}">Connect</button>`
         }
       </div>`;
@@ -514,7 +514,7 @@ async function pasteFromClipboard(card) {
 
       log.classList.remove('hidden');
 
-      log.textContent = 'Could not read clipboard — paste into the field manually (Ctrl+V).';
+      log.textContent = 'Could not read clipboard - paste into the field manually (Ctrl+V).';
 
     }
 
@@ -1158,7 +1158,7 @@ async function exportSecretsBundle() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    setSecretsBundleHint('Bundle downloaded. Store it somewhere safe — we cannot recover the passphrase.');
+    setSecretsBundleHint('Bundle downloaded. Store it somewhere safe - we cannot recover the passphrase.');
   } catch (err) {
     setSecretsBundleHint(err?.message || 'Export failed.', true);
   }
@@ -1663,7 +1663,7 @@ async function startBrowserConnect(provider) {
 
   es.addEventListener('signed_in', () => {
 
-    if (log) log.textContent = 'Signed in — extracting credentials…';
+    if (log) log.textContent = 'Signed in - extracting credentials…';
 
   });
 

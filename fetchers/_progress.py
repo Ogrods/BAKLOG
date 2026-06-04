@@ -30,6 +30,32 @@ def heartbeat(msg: str) -> None:
     print(f"  · {msg}", flush=True)
 
 
+class HeartbeatTimer:
+    """Emit a heartbeat only after `interval` seconds of wall-clock silence.
+
+    The dev server force-kills a fetcher after 180s with no stdout (stall
+    watchdog). Count-based heartbeats (every N items) are unsafe when each item
+    is a slow network call — N slow lookups can exceed 180s before the count
+    threshold prints anything. Call `tick(msg)` every loop iteration (ideally
+    *before* each slow call); it prints at most once per `interval`, guaranteeing
+    silence never approaches the watchdog as long as the loop keeps turning.
+    """
+
+    def __init__(self, interval: float = 45.0) -> None:
+        self.interval = interval
+        self._last = time.monotonic()
+
+    def reset(self) -> None:
+        """Mark 'now' as the last output (call after printing elsewhere)."""
+        self._last = time.monotonic()
+
+    def tick(self, msg: str) -> None:
+        now = time.monotonic()
+        if now - self._last >= self.interval:
+            heartbeat(msg)
+            self._last = now
+
+
 def done(
     label: str,
     t0: float,

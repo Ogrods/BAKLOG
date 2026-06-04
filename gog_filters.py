@@ -19,7 +19,13 @@ _PROMO_SUFFIX_RES: tuple[re.Pattern[str], ...] = (
 
 _DLC_NAME_RE = re.compile(r"\bDLC\b", re.IGNORECASE)
 _YEAR_QUALIFIER_RE = re.compile(r"\s*\(\d{4}\)\s*$")
-
+# Subtitle after ":" that signals a parallel SKU (edition / deluxe / musical …), not a
+# distinct sequel subtitle like "The Legend of Darkmoon".
+_EDITION_VARIANT_SUBTITLE_RE = re.compile(
+    r"\b(edition|deluxe|upgrade|complete|musical|trilogy|collection|pack|bundle|"
+    r"goty|definitive|remastered|remaster|ultimate)\b",
+    re.IGNORECASE,
+)
 _NON_GAME_TITLES = frozenset({"freedom to buy games"})
 
 _PACK_REGISTRY: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
@@ -65,6 +71,14 @@ _PACK_REGISTRY: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
             "Menzoberranzan",
         ),
     ),
+    (
+        re.compile(r"^Alone in the Dark: The Trilogy 1\+2\+3$", re.IGNORECASE),
+        (
+            "Alone in the Dark 1",
+            "Alone in the Dark 2",
+            "Alone in the Dark 3",
+        ),
+    ),
 )
 
 
@@ -100,6 +114,31 @@ def dedupe_key(name: str) -> str:
     """Canonical grouping key: promo suffix stripped, trailing (YYYY) removed."""
     base = _YEAR_QUALIFIER_RE.sub("", canonical_gog_title(name))
     return norm_gog_title(base)
+
+
+def _subtitle_after_colon(name: str) -> str:
+    if ":" not in name:
+        return ""
+    return name.split(":", 1)[1].strip()
+
+
+def subtitle_looks_like_edition_variant(name: str) -> bool:
+    """True when the post-colon segment is an edition/SKU label, not a sequel title."""
+    sub = _subtitle_after_colon(name)
+    return bool(sub and _EDITION_VARIANT_SUBTITLE_RE.search(sub))
+
+
+def barren_group_key(name: str) -> str:
+    """Group key for metadata-barren collapse.
+
+    Exact/promo/year dupes use ``dedupe_key``. Edition-variant SKUs that share a
+    franchise prefix (``Stray Gods: …``, ``Brigador: …``) group on the part before
+    the first colon so a cover-less edition row can be dropped when any populated
+    sibling exists.
+    """
+    if ":" in name and subtitle_looks_like_edition_variant(name):
+        return norm_gog_title(name.split(":", 1)[0])
+    return dedupe_key(name)
 
 
 def _row_name(row: dict[str, Any]) -> str:
@@ -176,11 +215,11 @@ def collapse_metadata_barren_dupes(rows: list[dict[str, Any]]) -> list[dict[str,
     """Drop metadata-barren SKUs when a populated same-canonical twin exists."""
     groups: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        groups.setdefault(dedupe_key(_row_name(row)), []).append(row)
+        groups.setdefault(barren_group_key(_row_name(row)), []).append(row)
 
     out: list[dict[str, Any]] = []
     for row in rows:
-        grp = groups[dedupe_key(_row_name(row))]
+        grp = groups[barren_group_key(_row_name(row))]
         if (
             len(grp) > 1
             and row_is_metadata_barren(row)

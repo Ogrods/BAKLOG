@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fetchers._base import catalog_file, write_catalog_text
-from fetchers._progress import RunStats, heartbeat, started
+from fetchers._progress import HeartbeatTimer, RunStats, heartbeat, started
 from hltb_client import HltbClient
 from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
@@ -95,6 +95,11 @@ def main() -> int:
     mapping = load_mapping()
     grand_lookups = 0
     grand_updated = 0
+    # Wall-clock heartbeat: HLTB network lookups are slow and often miss, so a
+    # batch of new lookups (e.g. a fresh GOG library) can stay silent well past
+    # the dev server's 180s stall watchdog and get force-killed. Ticked before
+    # each lookup so silence never approaches that ceiling.
+    hb = HeartbeatTimer(45.0)
 
     for filename, store, row_filter in STORE_FILES:
         if args.store and args.store != store:
@@ -115,6 +120,7 @@ def main() -> int:
             f"\n=== {filename}: {len(missing)}/{len(games)} need HLTB{filter_note} ===",
             flush=True,
         )
+        hb.reset()
         updated = 0
         store_lookups = 0
         store_hits = 0
@@ -125,6 +131,10 @@ def main() -> int:
             key = f"{store}:{g.get('id')}"
             cached = mapping.get(key)
             processed += 1
+            hb.tick(
+                f"{filename}: [{i}/{len(missing)}] {store_lookups} lookups "
+                f"(+{store_hits} hits) — still working"
+            )
 
             if cached is False and not args.retry_misses:
                 store_skipped += 1
@@ -133,6 +143,7 @@ def main() -> int:
                         f"[{i}/{len(missing)}] skipped {store_skipped} cached misses, "
                         f"{store_lookups} lookups (+{store_hits} hits) — still working"
                     )
+                    hb.reset()
                 continue
 
             if isinstance(cached, dict):
@@ -158,6 +169,7 @@ def main() -> int:
                         f"[{i}/{len(missing)}] checked {store_lookups} "
                         f"(+{store_hits} hits, {store_misses} no-match) — still working"
                     )
+                    hb.reset()
 
             if not hit:
                 continue
@@ -175,6 +187,7 @@ def main() -> int:
                     f"match {hit.get('hltb_match_confidence')})",
                     flush=True,
                 )
+                hb.reset()
 
         data["game_count"] = len(games)
         write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))

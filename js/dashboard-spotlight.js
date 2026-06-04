@@ -22,6 +22,32 @@ const SPOTLIGHT_FADE_MS = 300;
 const RECENT_SPOTLIGHT_CAP = 5;
 const RECENT_QUOTA = 5;
 
+// Rare "stinker" easter egg: occasionally the spotlight surfaces the
+// lowest-rated game in your catalog with a tongue-in-cheek eyebrow. Same rarity
+// as the rare boot-loading tip (RARE_CHANCE in js/tips.js).
+const STINKER_EYEBROW = 'Rare stinker';
+let _stinkerChance = 0.02;
+
+/** Test seam: override the stinker easter-egg probability (0 disables it). */
+export function setStinkerChanceForTest(chance) {
+  _stinkerChance = chance;
+}
+
+/** Lowest-rated catalog game with a real rating and art (for the stinker egg). */
+function pickStinkerGame(eligible) {
+  let worst = null;
+  let worstRating = Infinity;
+  for (const g of eligible) {
+    const r = ratingValue(g);
+    if (r <= 0) continue;
+    if (r < worstRating) {
+      worstRating = r;
+      worst = g;
+    }
+  }
+  return worst;
+}
+
 let _spotlightTimer = null;
 let _spotlightFadeTimer = null;
 let _spotlightIndex = 0;
@@ -253,6 +279,20 @@ export function pickSpotlightGames(games) {
     if (idx > 0) {
       const [head] = pool.splice(idx, 1);
       pool.unshift(head);
+    }
+  }
+
+  // Rare stinker easter egg: roll once per pool build and, when it hits, drop the
+  // lowest-rated catalog game at the front so it actually shows this render.
+  if (Math.random() < _stinkerChance) {
+    const stinker = pickStinkerGame(eligible);
+    if (stinker) {
+      const key = gameKey(stinker);
+      const at = pool.findIndex(g => gameKey(g) === key);
+      if (at >= 0) pool.splice(at, 1);
+      pool.unshift(Object.assign({}, stinker, {
+        _spotlightReason: { eyebrow: STINKER_EYEBROW, score: 999, isStinker: true },
+      }));
     }
   }
   return pool;

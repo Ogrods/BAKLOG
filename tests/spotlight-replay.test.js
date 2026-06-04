@@ -17,7 +17,9 @@ describe("spotlight replay category", () => {
     ({ state } = await import("../js/state.js"));
     state.personal = {};
     win._dataVersion = (win._dataVersion || 0) + 1;
-    ({ pickSpotlightGames } = await import("../js/dashboard-spotlight.js"));
+    let setStinkerChanceForTest;
+    ({ pickSpotlightGames, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+    setStinkerChanceForTest(0);
   });
 
   const finishedGame = (id, rating, count = 1000) => ({
@@ -107,7 +109,9 @@ describe("spotlight recently added category", () => {
     state.libraryFirstSeenByKey = {};
     state.prefs = {};
     win._dataVersion = (win._dataVersion || 0) + 1;
-    ({ pickSpotlightGames, computeRecentSpotlightKeys } = await import("../js/dashboard-spotlight.js"));
+    let setStinkerChanceForTest;
+    ({ pickSpotlightGames, computeRecentSpotlightKeys, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+    setStinkerChanceForTest(0);
   });
 
   const libraryGame = (id, rating, count = 500) => ({
@@ -191,7 +195,9 @@ describe("spotlight expanded categories", () => {
     state.wishlistGames = [];
     state.wishlistCrossStoreHiddenKeys = new Set();
     win._dataVersion = (win._dataVersion || 0) + 1;
-    ({ pickSpotlightGames } = await import("../js/dashboard-spotlight.js"));
+    let setStinkerChanceForTest;
+    ({ pickSpotlightGames, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+    setStinkerChanceForTest(0);
   });
 
   const libraryGame = (id, overrides = {}) => ({
@@ -287,6 +293,66 @@ describe("spotlight expanded categories", () => {
     state.personal = { "steam:8": { status: "unfinished" } };
     const games = [libraryGame(8, { trophy_progress: 50 })];
     expect(eyebrowFor(games, 8)).toBe("Pick back up");
+  });
+});
+
+describe("spotlight rare stinker easter egg", () => {
+  let pickSpotlightGames;
+  let setStinkerChanceForTest;
+  let state;
+
+  beforeEach(async () => {
+    const win = new Window({ url: "http://127.0.0.1:8765/" });
+    global.window = win;
+    global.document = win.document;
+    global.localStorage = win.localStorage;
+    win.__dashFailedCovers = new Set();
+
+    vi.resetModules();
+    ({ state } = await import("../js/state.js"));
+    state.personal = {};
+    state.prefs = {};
+    state.libraryFirstSeenByKey = {};
+    state.wishlistGames = [];
+    state.wishlistCrossStoreHiddenKeys = new Set();
+    win._dataVersion = (win._dataVersion || 0) + 1;
+    ({ pickSpotlightGames, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+  });
+
+  const game = (id, rating) => ({
+    store: "steam",
+    id,
+    name: `Game ${id}`,
+    steam_review_percent: rating,
+    steam_review_count: 1000,
+    library_image: "x.jpg",
+    header_image: "x.jpg",
+  });
+
+  it("fronts the lowest-rated game with the Rare stinker eyebrow when the roll hits", () => {
+    setStinkerChanceForTest(1);
+    state.personal = {
+      "steam:1": { status: "backlog" },
+      "steam:2": { status: "backlog" },
+      "steam:3": { status: "backlog" },
+    };
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    const games = [game(1, 92), game(2, 41), game(3, 85)];
+    const pool = pickSpotlightGames(games);
+    expect(pool[0].id).toBe(2);
+    expect(pool[0]._spotlightReason.eyebrow).toBe("Rare stinker");
+    expect(pool[0]._spotlightReason.isStinker).toBe(true);
+    // The stinker is not duplicated in the pool.
+    expect(pool.filter(g => g.id === 2).length).toBe(1);
+  });
+
+  it("never surfaces the stinker when the chance is zero", () => {
+    setStinkerChanceForTest(0);
+    state.personal = { "steam:2": { status: "backlog" } };
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    const games = [game(1, 92), game(2, 41)];
+    const pool = pickSpotlightGames(games);
+    expect(pool.find(g => g._spotlightReason?.isStinker)).toBeFalsy();
   });
 });
 

@@ -103,6 +103,49 @@ describe('maybeAutoEnrichNewAdditions', () => {
     });
     expect(runFn.mock.calls.map(c => c[0])).toEqual(['steamTags', 'steamCovers', 'steamReviews']);
   });
+
+  it('stops queuing remaining enrichers after cancel epoch bumps mid-batch', async () => {
+    let epoch = 0;
+    const getCancelEpoch = () => epoch;
+    const runFn = vi.fn().mockImplementation(async key => {
+      if (key === 'steamCovers') epoch = 1;
+    });
+    const appendLine = vi.fn();
+    await maybeAutoEnrichNewAdditions(3, {
+      isApiAvailable: () => true,
+      now: Date.now() + 40_000,
+      runFn,
+      getCancelEpoch,
+      waitForQueueSlot: async () => {},
+      loadFetcherSources: async () => {},
+      sources: enrichSources,
+      stateFor: () => null,
+      fetcherCredentialsSatisfied: () => true,
+      authCooldownRemainingMs: () => 0,
+      isFetcherDisconnected: () => false,
+      appendLine,
+    });
+    expect(runFn.mock.calls.map(c => c[0])).toEqual(['steamTags', 'steamCovers']);
+    expect(appendLine).toHaveBeenCalledWith('[auto-enrich aborted: cancelled]', 'meta');
+  });
+
+  it('stops when waitForQueueSlot rejects cancelled', async () => {
+    const runFn = vi.fn();
+    await maybeAutoEnrichNewAdditions(1, {
+      isApiAvailable: () => true,
+      now: Date.now() + 50_000,
+      runFn,
+      waitForQueueSlot: () => Promise.reject(new Error('cancelled')),
+      getCancelEpoch: () => 0,
+      loadFetcherSources: async () => {},
+      sources: enrichSources,
+      stateFor: () => null,
+      fetcherCredentialsSatisfied: () => true,
+      authCooldownRemainingMs: () => 0,
+      isFetcherDisconnected: () => false,
+    });
+    expect(runFn).not.toHaveBeenCalled();
+  });
 });
 
 describe('recordLibraryFirstSeen', () => {

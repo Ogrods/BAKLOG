@@ -81,4 +81,164 @@ describe('cancelInFlightRuns server truth', () => {
     expect(urls.some(u => u.includes('/api/runs/cancel'))).toBe(true);
     expect(urls.some(u => u.includes('/api/run/q1/cancel'))).toBe(true);
   });
+
+  it('bumps cancel epoch when user cancels', async () => {
+    let runsPoll = 0;
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'demo',
+              label: 'Demo',
+              metaKey: 'demo',
+              group: 'library',
+              color: '#fff',
+              cmd: 'fetch_demo.py',
+              available: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/runs') && method === 'GET') {
+        runsPoll += 1;
+        if (runsPoll > 2) {
+          return {
+            ok: true,
+            json: async () => ({
+              active: null,
+              queue: [],
+              history: [{ id: 'r1', key: 'demo', status: 'cancelled' }],
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            active: { id: 'r1', key: 'demo', status: 'running' },
+            queue: [],
+            history: [],
+          }),
+        };
+      }
+      if (u.includes('/api/runs/cancel') && method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({
+            cancelled: [{ id: 'r1', key: 'demo', status: 'cancelled' }],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    const before = fetcherRunner.getCancelEpoch();
+    await fetcherRunner.cancelInFlightRuns();
+    expect(fetcherRunner.getCancelEpoch()).toBe(before + 1);
+  });
+
+  it('run() does not POST while cancelInFlight', async () => {
+    const fetchMock = vi.fn(async url => {
+      const u = String(url);
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'steamCovers',
+              label: 'Covers',
+              metaKey: 'steamCovers',
+              group: 'enrich',
+              color: '#ea580c',
+              cmd: 'enrich_cross_store_images.py',
+              available: true,
+              supportsRefresh: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/run/')) {
+        return { ok: true, status: 202, json: async () => ({ id: 'new-run' }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner, loadFetcherSources } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    await loadFetcherSources(true);
+    fetcherRunner.setCancelInFlightForTest(true);
+    await fetcherRunner.run('steamCovers');
+    const runPosts = fetchMock.mock.calls.filter(
+      c => String(c[0]).includes('/api/run/') && (c[1]?.method || 'GET').toUpperCase() === 'POST',
+    );
+    expect(runPosts).toHaveLength(0);
+  });
+
+  it('409 on submit re-syncs and retries once when queue is idle', async () => {
+    vi.useFakeTimers();
+    class MockEventSource {
+      constructor() {
+        this.close = vi.fn();
+      }
+      addEventListener() {}
+    }
+    global.EventSource = MockEventSource;
+    let runPosts = 0;
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'steamCovers',
+              label: 'Covers',
+              metaKey: 'steamCovers',
+              group: 'enrich',
+              color: '#ea580c',
+              cmd: 'enrich_cross_store_images.py',
+              available: true,
+              supportsRefresh: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/runs') && method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({ active: null, queue: [], history: [] }),
+        };
+      }
+      if (u.includes('/api/run/steamCovers') && method === 'POST') {
+        runPosts += 1;
+        if (runPosts === 1) {
+          return { ok: false, status: 409, text: async () => 'queue settling' };
+        }
+        return { ok: true, status: 202, json: async () => ({ run_id: 'retry-run' }) };
+      }
+      if (u.includes('/api/auth/status')) {
+        return { ok: true, json: async () => ({ providers: {} }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner, loadFetcherSources } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    await loadFetcherSources(true);
+    const runPromise = fetcherRunner.run('steamCovers');
+    await vi.advanceTimersByTimeAsync(700);
+    await runPromise;
+    const posts = fetchMock.mock.calls.filter(
+      c => String(c[0]).includes('/api/run/steamCovers') && (c[1]?.method || 'GET').toUpperCase() === 'POST',
+    );
+    expect(posts).toHaveLength(2);
+    vi.useRealTimers();
+    delete global.EventSource;
+  });
 });

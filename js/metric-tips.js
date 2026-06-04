@@ -52,6 +52,8 @@ export const METRIC_TIPS = {
   'of available gamerscore': 'Earned gamerscore ÷ total available gamerscore.',
   'trophy efficiency': 'Average trophy completion % across games with trophy data.',
   'gamerscore efficiency': 'Total earned Xbox gamerscore ÷ total available.',
+  'platinum potential': 'Tracked games 80–99% complete that are short (≤12h) — an easy run to 100%.',
+  'closest platinum': 'Among platinum-potential titles, the one nearest full completion.',
 
   // Sabermetrics - slash line & rates
   'completion AVG': 'Batting-style completion average: finished ÷ (finished + unfinished).',
@@ -65,7 +67,6 @@ export const METRIC_TIPS = {
   'backlog pace (median HLTB)': 'Median HLTB main hours across backlog - typical commitment per pick.',
   'hoard rate (never touched)': 'Share of library with zero playtime (never launched).',
   'quality start rate': 'Share of played games where playtime ≥ 40% of HLTB main (a real session).',
-  'top WAR': 'Highest WAR among backlog/next/playing: (rating − Mendoza)/10 + length/deal bonuses.',
   'cleanup candidates': 'Games flagged as cleanup candidates (low rating, no playtime, etc.).',
   'clutch picks': 'Backlog games that are leverage picks: ≥80% rated, on sale, ≤15h.',
   'finish streak': 'Hot/warm/cold from recent finishes: hot = 3+ recent, cold = none or stale.',
@@ -140,10 +141,9 @@ export const METRIC_TIPS = {
   'Quick wins ready': 'Backlog games ≥75% rated with HLTB ≤ quick-win max hours.',
   'Hidden gems': '90%+ rated, enough reviews, zero playtime.',
   'Clutch pick': 'Best leverage pick: strong rating, on sale, short HLTB.',
-  'Mendoza line': 'Replacement level = median backlog rating; WAR is measured against this baseline.',
+  'Mendoza line': 'Replacement level = median backlog rating (baseline for value metrics).',
   'Closest to 100%': 'Tracked game nearest full trophy completion.',
   'Finish rate': 'Completion average: finished ÷ (finished + unfinished), shown as .XXX.',
-  'Top WAR pick': 'Highest-WAR active pick: (rating − Mendoza)/10 + length/deal bonuses.',
   Pythagorean: 'Hours-based expected completion vs actual finish rate; over/underperforming label.',
   'Backlog diagnosis': 'Creative snapshot of backlog health (collector, finisher, hoarder, etc.).',
   'Shelf warmer': 'Owned game sitting longest without meaningful progress.',
@@ -158,7 +158,7 @@ export const METRIC_TIPS = {
 /**
  * Tooltip copy for the rotating hero spotlight eyebrows. Keyed by the exact
  * eyebrow string set in js/dashboard-spotlight.js so cryptic / baseball terms
- * (Barrel, MVP pick, Whale, etc.) explain themselves on hover.
+ * (Barrel, Completionist, Whale, etc.) explain themselves on hover.
  * @type {Record<string, string>}
  */
 export const EYEBROW_TIPS = {
@@ -185,7 +185,7 @@ export const EYEBROW_TIPS = {
   'Fast finish': '≤4h to beat - knock it out fast.',
   'Worth a look': 'Rated 70%+ - a reasonable option from the backlog.',
   // Saber / creative superlatives
-  'MVP pick': 'Highest WAR among active picks: (rating − Mendoza)/10 plus length & deal bonuses.',
+  Completionist: 'Earned every trophy/achievement — 100% complete.',
   Whale: 'The priciest game (by MSRP) you own but have never launched.',
   'Gathering dust': 'The game that has sat unplayed on your shelf the longest.',
   'Time capsule': 'The oldest untouched backlog game by when it first appeared in your library.',
@@ -222,7 +222,7 @@ export const EYEBROW_VARIANTS = {
   'Weekend-sized': ['Weekend-sized', 'Weekender', 'Two-day', 'Weekend fit'],
   'Fast finish': ['Fast finish', 'One sitting', 'Knock-out', 'Speedy'],
   'Worth a look': ['Worth a look', 'Maybe this', 'Why not', 'A look'],
-  'MVP pick': ['MVP pick', 'Top WAR', 'MVP', 'All-star'],
+  Completionist: ['Completionist', 'Maxed out', '100% club', 'Platinum'],
   Whale: ['Whale', 'Big spender', 'Priciest', 'Money sink'],
   'Gathering dust': ['Gathering dust', 'Collecting dust', 'Shelf warmer', 'Untouched'],
   'Time capsule': ['Time capsule', 'Ancient add', 'Old timer', 'Still sealed'],

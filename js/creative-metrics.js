@@ -423,6 +423,17 @@ export function computeSpotlightSuperlatives(games, snap) {
     }
   }
 
+  const platinum = list
+    .filter(g => g.trophy_progress != null && g.trophy_progress >= 100)
+    .sort((a, b) => ratingValue(b) - ratingValue(a))[0];
+  if (platinum) {
+    const r = ratingValue(platinum);
+    push(platinum, 'Completionist', r > 0 ? r + 8 : SABER_SPOTLIGHT_SCORE, [
+      '<strong>100%</strong> complete',
+      ...(r > 0 ? [`<strong>${r}%</strong> review`] : []),
+    ]);
+  }
+
   return picks;
 }
 

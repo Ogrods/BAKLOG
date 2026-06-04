@@ -901,11 +901,22 @@ export function renderDashboardCharts(games) {
 
   const yearCounts = {};
   games.forEach(g => {
-    const y = (g.release_date || "").slice(0, 4);
-    if (y && /^\d{4}$/.test(y) && +y >= 1990) yearCounts[y] = (yearCounts[y] || 0) + 1;
+    // Use the shared robust parser (handles "Feb 11, 2026", "1998", ISO, etc.)
+    // — the old release_date.slice(0,4) only kept ISO-prefixed dates, dropping
+    // the vast majority of Steam titles and truncating the axis to ~2001.
+    const y = parseReleaseYear(g.release_date);
+    if (y != null && y >= 1990) yearCounts[y] = (yearCounts[y] || 0) + 1;
   });
-  const years = Object.keys(yearCounts).sort();
-  const trendData = years.map(y => yearCounts[y]);
+  // Continuous year axis (fill gaps with 0) so the timeline and era bands span
+  // every year from the oldest release through the newest — no compression.
+  const presentYears = Object.keys(yearCounts).map(Number).sort((a, b) => a - b);
+  const years = [];
+  if (presentYears.length) {
+    for (let y = presentYears[0]; y <= presentYears[presentYears.length - 1]; y++) {
+      years.push(String(y));
+    }
+  }
+  const trendData = years.map(y => yearCounts[y] || 0);
   const rolling = years.map((_, i) => {
     const lo = Math.max(0, i - 1);
     const hi = Math.min(years.length - 1, i + 1);

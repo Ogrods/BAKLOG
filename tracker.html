@@ -424,6 +424,9 @@
         { id: "p6_cloud_sync_mirror", label: "Always-on cloud read-only mirror: push games_*.json + personal.json to Supabase (hook fetchers/_base.py write path + /api/personal PUT); Vercel dashboard reads via Supabase Auth + RLS. PC-independent 24/7; catalog-only (credentials never sync per SECURITY.md asset split). Breaks 'nothing leaves your machine' / 'no server' / 'localhost-only' for opted-in users." },
         { id: "p6_multiuser_run_queue", label: "Shared-server multi-tenant: per-user active.json / queue.json, auth-SSE session ownership beyond profile scoping, and CSRF tightening when one process serves multiple Supabase users (deferred from single-user self-host ship — see docs/SUPABASE_AUTH.md §6)." },
         { id: "p6_fetcher_log_per_profile", label: "Per-account-profile fetcher logs: persist + scope the run console (currently in-memory in js/fetcher-health.js, reset on reload/profile switch) to the active account/profile so each profile keeps its own fetch history. Tie to per-user run queue (p6_multiuser_run_queue) and profile-scoped runs_dir; surface a reloadable per-profile log instead of the ephemeral session buffer. See docs/FETCHER_CONNECTIONS.md (inbound/outbound matrix)." },
+        { id: "p6_deep_trophy_metadata", label: "Deep trophy/achievement enrichment: pull full per-title metadata beyond the summary % we store today. PSN — PSNAWP title_trophies / trophy_summary (earned vs defined per tier, individual trophies, earned datetimes). Xbox — achievements endpoint (per-achievement name, description, gamerscore, rarity, unlock time). Both are one extra API call per title, so this needs batching + caching as a separate enrichment pass (not the main library fetch) to avoid hammering the APIs on large libraries. Unlocks granular achievement views (rarity, unlock timeline, per-tier breakdown) and richer trophy insights/metrics." },
+        { id: "p6_bundle_chromium_fallback", label: "Bundle/auto-download Chromium (recommended): if no Chrome/Edge is found by auth/cdp_browser.py find_chromium_executable(), fetch Playwright's Chromium or a portable build and point BAKLOG_CHROME_PATH at it. Keeps the entire existing CDP codebase unchanged and makes sign-in work on a Safari-only Mac (or any machine lacking Chrome/Edge) without supporting Safari at all. ~1 day, low risk. Solves the only scenario that actually breaks today — no Chromium installed." },
+        { id: "p6_firefox_bidi_engine", label: "Add a Firefox engine via WebDriver BiDi: modern Firefox supports network interception + init scripts through BiDi, so write a second automation backend behind the CdpPage / auth/cdp_compat.py interface. Medium-large effort (the abstraction exists, but BiDi ≠ CDP, so it's a real port plus a second test matrix). Firefox's old CDP is being removed, so BiDi is the only future-proof path. Note: cookie-only providers (GOG/PSN/Battle.net/Nintendo) port cleanly; header-sniffing providers (Ubisoft/EA/Epic wishlist/Amazon) depend on request/response interception that must be re-implemented on BiDi." },
       ],
     },
   ];
@@ -925,7 +928,7 @@
   ];
 
   const MARKETING_PILLARS = [
-    { id: "accidental_library", headline: "The accidental library", proof: "12 library + 8 wishlist fetchers; magic-moment demo; free-claimer persona", productHooks: ["MARKETING_FEATURES[0]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "The library you forgot you owned", "Free game Thursday, finally counted"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"] },
+    { id: "accidental_library", headline: "The accidental library", proof: "12 library + 8 wishlist fetchers; magic-moment demo; free-claimer persona", productHooks: ["MARKETING_FEATURES[0]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "The library you forgot you owned", "Free game Thursday, finally counted", "The backlog concierge"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"] },
     { id: "ownership_aware_deals", headline: "Ownership-aware deals", proof: "ITAD + FX + duplicate-buy prevention", productHooks: ["MARKETING_FEATURES[1]", "bs_fx_conversion"], relatedCampaigns: ["Deal radar, not spreadsheet"], relatedFindings: ["bs_fx_conversion", "bs_pricing_currency"] },
     { id: "local_first_trust", headline: "Local-first trust", proof: "No server; per-profile secrets; portable bundle", productHooks: ["MARKETING_FEATURES[2]", "Nothing to breach"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_privacy", "bs_secret_recovery", "bs_telemetry"] },
     { id: "profiles_one_pc", headline: "Profiles on one PC", proof: "Work vs play; cancel-on-switch; isolated cache", productHooks: ["MARKETING_FEATURES[3]"], relatedCampaigns: ["Watch your library appear"], relatedFindings: ["bs_multiuser_profiles", "find_profile_switch_cancel_runs", "find_profile_cache_http"] },
@@ -941,6 +944,7 @@
     { id: "social_tile_deal_radar", title: "Deal radar social tile", format: "1200×630 OG image", goal: "Reddit/Twitter link preview for deal posts", status: "draft", relatedPillars: ["ownership_aware_deals"], copyBlocks: { headline: ["Deal alerts that know what you already own."], body: ["Wishlist price in your currency. Duplicate-buy prevention. ITAD-powered."], cta: ["Catch the right sale"] }, visualNotes: "Wishlist row mock with 'also on Epic' dedupe pill + historical low badge. Keep text large — thumbnail legibility." },
     { id: "readme_above_fold", title: "README above-the-fold", format: "Markdown copy block", goal: "p4_readme_rewrite", status: "draft", relatedPillars: ["accidental_library", "local_first_trust"], copyBlocks: { headline: ["BAKLOG — one honest backlog across every store you forgot you used."], body: ["pip install -e \".[dev]\" && python server.py → http://127.0.0.1:8765", "Local-first: your logins stay on your machine. 12 library + 8 wishlist fetchers."], cta: ["Connect Steam → Refresh → watch your library appear"] }, visualNotes: "Pair with 30s GIF of magic-moment demo under the pitch line." },
     { id: "explainer_fetcher_health", title: "What the chips mean (blog/support)", format: "Long-form copy · mirrors in-app legend", goal: "Support + trust SEO", status: "draft", relatedPillars: ["built_to_last"], copyBlocks: { headline: ["Fetcher chips ≠ Connected"], body: ["! Missing keys for this profile\n— — Never fetched or empty catalog\n2h / 3d Age of last good data (not connection status)\nfailed Last run failed until next success\n\nReconnect expired sessions on Connections — not on the chip strip."], cta: ["Open the ⓘ Legend on your dashboard"] }, visualNotes: "Screenshot of collapsed fh-legend + one annotated chip row. Link find_fetcher_health_signals." },
+    { id: "video_concierge_selection", title: "Concierge 'Tonight's selection' demo", format: "20–30s video · 9:16 + 16:9", goal: "Premium Concierge tier upsell", status: "draft", relatedPillars: ["accidental_library"], copyBlocks: { headline: ["Allow me to suggest tonight's game."], body: ["Five launcher windows, nothing launched → a single bell tap → one 'Tonight's selection' card slides in with reasoning chips (45 min · solo · owned, never started) → Play."], cta: ["Let the concierge pick tonight's game"] }, visualNotes: "Velvet/brass accent over the standard slate UI; a gloved hand presents one card while the rest of the library dims. Homage only — no John Wick / Charon names or likeness and no 'Continental' wordmark in shipped creative; keep an original BAKLOG concierge." },
   ];
 
   const MARKETING_CHANNEL_MATRIX = [
@@ -1094,6 +1098,7 @@
     { name: "Affiliate-only", pitch: "Free forever, monetize deal intent.", whoPays: "No direct payer", priceBand: "N/A", mvp: "Attribution links + disclosure", math: "Traffic-dependent, low-to-mid five figures", legal: "Disclosure + neutrality policy", agencySays: "Audience first, intent monetization.", actuallyShip: "Viable low-op path." },
     { name: "Hybrid (freemium + cloud + affiliate)", pitch: "Free + ads local · $2-$4/mo No-ads + cloud · affiliate everywhere.", whoPays: "Advertisers + subscribers + merchants", priceBand: "$0 free · $2-$4/mo paid · affiliate floor", mvp: "Freemium ad slots, paid no-ads tier with cloud sync, affiliate links on every deal card", math: "Three diversified revenue lines instead of one. Each layer reinforces the next: ads pay the bills, upgrades smooth the rough edges, affiliate kicks in on intent.", legal: "Most operationally complex — three disclosures, three abuse vectors", agencySays: "Catch every segment without compromising the free promise.", actuallyShip: "Likely end-state. Ship the freemium half first, layer cloud + affiliate when retention proves out." },
     { name: "Tips / Sponsors", pitch: "Community-funded OSS support.", whoPays: "Power users and fans", priceBand: "$3/$5/$10", mvp: "Sponsor CTA + roadmap", math: "Unpredictable upside", legal: "Low legal burden", agencySays: "Good signal, weak model.", actuallyShip: "Enable as bonus channel." },
+    { name: "Premium 'Concierge' tier (backlog butler)", pitch: "A Charon-from-John-Wick styled library concierge: discreet, unflappable, anticipatory. 'Allow me to suggest tonight's game.' Curates your night by mood / time available / co-op, remembers what you abandoned, queues the right deal, and never nags — a refined persona layer over the picks + status + deal-radar data you already have.", whoPays: "Choice-paralysis users who want the decision made for them — upsell from the free tier", priceBand: "$3-$5/mo add-on, or folded into the No-ads + cloud tier", mvp: "Persona-skinned picks panel in the concierge's voice over existing weekly-picks/status/co-op data; rule-based first (mood/time/co-op/owned-not-started filters). Optional on-device LLM phrasing later — no cloud required for v1.", math: "Attach-rate upsell + retention/ARPU lift on an existing paid tier, not a standalone line", legal: "Keep it rule-based/local to preserve the local-first promise; if an LLM is added, prefer on-device or opt-in cloud with clear disclosure — never ship library data to a server silently.", agencySays: "Personality is sticky and demo-able — 'the Continental for your backlog.' Strong brand hook that separates it from spreadsheet trackers.", actuallyShip: "Prototype as a free persona skin on weekly picks to test delight; gate the curated/advanced behavior behind the paid tier once it proves retention." },
     { name: "B2B / white-label", pitch: "Enterprise backlog intelligence.", whoPays: "Studios/tools partners", priceBand: "Custom", mvp: "Would need account/data rights architecture", math: "Potentially high but unrealistic now", legal: "Conflicts with local-first promise", agencySays: "Big checks.", actuallyShip: "Explicitly defer." },
   ];
 
@@ -1165,6 +1170,23 @@
       channels: [{ channel: "Reddit", format: "Timing post", notes: "Thursday AM US — pair with claim thread" }, { channel: "X", format: "Short video", notes: "Calendar animation" }, { channel: "Landing", format: "Store breakdown stats", notes: "Real founder numbers" }],
       assetChecklist: ["hero_accidental_library", "social_tile_deal_radar"],
       designNotes: "Calendar heatmap optional. Highlight dedupe pill in screenshot — primary proof point.",
+    },
+    {
+      name: "The backlog concierge", objective: "Launch the premium Concierge tier — turn decision paralysis into the paid hook and the brand's most quotable character",
+      audience: "Players sitting on huge accidental libraries who open five launchers, scroll, feel the guilt, and play nothing — the 'too much choice' segment, not the 'too few games' one",
+      visual: "Velvet-and-brass concierge motif over the usual slate UI: a gloved hand presents one 'Tonight's selection' card while the rest of the library politely dims away",
+      cta: "Let the concierge pick tonight's game",
+      headlines: ["Allow me to suggest tonight's game.", "600 games. One decision, handled.", "You don't have a backlog problem anymore. You have a concierge.", "Choosing is the hard part. Leave it to him.", "A discreet word on what to play next."],
+      shortPost: "You own 600 games and play none of them, because choosing is the exhausting part. The Concierge tier hands your library a quietly competent maître d': it reads the room — how long you've got, your mood, whether a friend's online, what you own but never started — and presents one impeccable pick. No lists to scroll. No nagging. 'Allow me to suggest tonight's game.' The free tier still does everything; the concierge simply makes the call, and tells you exactly why.",
+      landing: "Concierge persona reveal → single 'Tonight's selection' card → 'why this pick' reasoning chips (time/mood/co-op/owned-not-started) → free-vs-Concierge tier strip with a 'no library data leaves your device' line",
+      metrics: "Concierge trial starts; suggestion-accepted rate (did they launch it); free→Concierge upgrade conversion; 30-day retention delta vs non-concierge users; nights-played-per-week lift",
+      relatedPillars: ["accidental_library"], relatedFindings: [],
+      headlineVariants: { reddit: "I let my backlog hire a concierge.", twitter: "Allow me to suggest tonight's game.", landing: "600 games. One decision, handled.", email: "A discreet word on what to play next" },
+      longForm: { problem: "A massive owned library makes choosing harder, not easier.", agitation: "Five launchers open, endless scrolling, the guilt sets in — and you close everything without pressing play.", solution: "A concierge persona over BAKLOG's own picks/status/deal data presents one confident selection tuned to your time, mood, co-op availability, and owned-but-unstarted games.", proof: "Every suggestion shows its reasoning and pulls only from the local data you can already see — rule-based, no cloud, no black box.", cta: "Upgrade to Concierge → 'Allow me to suggest tonight's game.'" },
+      storyboard: [{ beat: "Paralysis", visual: "Five launcher windows, cursor drifting, nothing launched", duration: "4s", caption: "Too many games. No decision." }, { beat: "Summon", visual: "A single bell tap; UI settles into velvet/brass", duration: "3s", caption: "Allow me." }, { beat: "Selection", visual: "One 'Tonight's selection' card slides in; the rest dims", duration: "5s", caption: "One impeccable pick." }, { beat: "Why", visual: "Reasoning chips: 45 min · solo · owned, never started", duration: "4s", caption: "Tuned to your night." }, { beat: "Play", visual: "Cursor hits Play — straight in", duration: "3s", caption: "Decided." }],
+      channels: [{ channel: "Landing", format: "Persona reveal + tier strip", notes: "Concierge card hero; free-vs-Concierge comparison below; privacy line" }, { channel: "Short video", format: "20-30s vertical + 16:9", notes: "video_concierge_selection asset; paralysis→summon→selection beats" }, { channel: "Email", format: "Behavioral upsell", notes: "Trigger to free users after repeated app opens with zero games launched" }, { channel: "Reddit", format: "Delight-led post", notes: "r/patientgamers · r/gamingsuggestions — 'I let my backlog hire a concierge' tone; link in comment" }],
+      assetChecklist: ["video_concierge_selection", "hero_accidental_library"],
+      designNotes: "Velvet/brass accent against the standard slate dashboard; gloved hand presents one card. Homage only — do NOT use John Wick / Charon names or likeness or the 'Continental' wordmark in shipped creative; keep the character an original BAKLOG concierge. Reinforce 'reasoning shown + nothing leaves your device' so the persona never reads as a cloud-AI gimmick. Ties to MONETIZE_MODELS → 'Premium Concierge tier (backlog butler)'.",
     },
   ];
 
@@ -2671,7 +2693,7 @@
         el("h3", {}, "Ownership-aware deals (canonical)"),
         el("p", {}, "ITAD pricing fused with real libraries — deals surface only when actionable (on sale, unowned everywhere). Kills duplicate buys; wishlist radar retires itself when owned."),
         el("h3", {}, "Rediscovery engine — selling your games back to you"),
-        el("p", {}, "The dashboard spotlight rotates full-bleed ", el("strong", {}, "cover art"), " from games you ", el("strong", {}, "already own"), ", framed like a storefront hero — but every pick is sourced from your library, scored by sabermetrics (Barrel, MVP/WAR, Clutch deal, Time capsule). It is merchandising turned inward: the same dopamine a store uses to sell you something new, pointed at the 600 games you forgot you bought."),
+        el("p", {}, "The dashboard spotlight rotates full-bleed ", el("strong", {}, "cover art"), " from games you ", el("strong", {}, "already own"), ", framed like a storefront hero — but every pick is sourced from your library, scored by sabermetrics (Barrel, Completionist, Clutch deal, Time capsule). It is merchandising turned inward: the same dopamine a store uses to sell you something new, pointed at the 600 games you forgot you bought."),
         el("p", { class: "muted" }, "Why it matters for the model: rediscovery drives the re-engagement loop. Every spotlight that makes you open a game you already own is a session that didn't cost a purchase — more sessions = more deal-card impressions = more ad/affiliate revenue, with zero new acquisition spend. The art and the burns are screenshot bait, so the loop also recruits."),
         el("p", { class: "xref" }, "Privacy + fetcher-health bullets below; lead model in Model tab; spotlight mechanics in Sabermetrics tab."),
       ));
@@ -3181,7 +3203,7 @@
   // ---------- Render: Sabermetrics ----------
   // Baseball-inspired backlog stats. Source of truth is js/sabermetrics.js —
   // a single LibrarySnapshot is built per dashboard render and reused by the
-  // hero row, insight ticker, marquee, the WAR pill on library rows, the
+  // hero row, insight ticker, marquee, trophy pill + popover on library rows, the
   // spotlight eyebrows. Genre+/Store+/Aging now surface as marquee items.
   const SABER_SLASH = [
     { stat: "AVG", fn: "completionAverage", what: "Completion average — your batting average for finishing what you start.", formula: "finished / (finished + unfinished)" },
@@ -3196,7 +3218,6 @@
     { stat: "Pythag", fn: "pythagoreanCompletion", what: "Pythagorean expectation — hours-based expected completion vs actual completionRate (excl. skip); delta compares same 0–1 scale.", formula: "expected = played²/(played²+remaining²); actual = completionRate" },
   ];
   const SABER_VALUE = [
-    { stat: "WAR", fn: "backlogWar", what: "Wins above replacement — a game's value over a replacement-level backlog title, with bonuses for length, quick high-rated wins, and live deals. Finished/unfinished games are discounted.", formula: "(rating − Mendoza) / 10 + tier/deal bonuses" },
     { stat: "BV+", fn: "backlogValuePlus", what: "Backlog value plus — rating per unit of time invested, indexed so 100 = league average.", formula: "(adjRating / log₂(hrs+2)) vs league, ×100" },
     { stat: "Adj rating", fn: "luckAdjustedRating", what: "Luck-adjusted rating — regresses thin-review-count games toward the library mean (small sample = less trust).", formula: "raw·w + rBar·(1−w), w = min(1, n/50)" },
     { stat: "wOBA", fn: "wishlistWoba", what: "Weighted on-base average — deal quality for wishlist titles (mirrors deals.computeWishlistWoba).", formula: "weighted blend of cut, rating, low-price" },
@@ -3205,7 +3226,7 @@
   const SABER_INDEX = [
     { stat: "Genre+", fn: "genrePlusMap", what: "Park factor by genre — average rating of a genre vs the whole library. 100 = league average.", formula: "(genre avg rating / rBar) × 100" },
     { stat: "Store+", fn: "storePlusMap", what: "Park factor by store — average rating per store vs library. Surfaces which storefronts you rate higher.", formula: "(store avg rating / rBar) × 100" },
-    { stat: "Mendoza line", fn: "replacementRating", what: "Replacement level — the median backlog rating. WAR is measured against this baseline.", formula: "median(backlog ratings)" },
+    { stat: "Mendoza line", fn: "replacementRating", what: "Replacement level — the median backlog rating (baseline for value metrics).", formula: "median(backlog ratings)" },
     { stat: "rBar", fn: "libraryMeanRating", what: "League average rating — the mean rating across all rated games. Denominator for every '+' index.", formula: "mean(rated game ratings)" },
   ];
   const SABER_STANDINGS = [
@@ -3219,7 +3240,6 @@
     { stat: "Gamerscore eff.", fn: "gamerscoreEfficiency", what: "Gamerscore efficiency — earned vs available Xbox gamerscore.", formula: "current / total gamerscore" },
     { stat: "Win shares", fn: "winSharesByGenre", what: "Win shares — finished games attributed across their genres (top 8).", formula: "count(finished) per genre" },
     { stat: "Aging curve", fn: "agingCurveBuckets", what: "Aging curve — finish rate bucketed by how long a game has sat in the library (<30d, 30–90d, 90d–1y, 1y+).", formula: "finish % per first-seen age bucket" },
-    { stat: "Top WAR", fn: "topWarGame", what: "MVP pick — highest-WAR game still in backlog/next/playing.", formula: "max WAR over unfinished" },
   ];
   const SABER_FLAGS = [
     { stat: "Barrel", fn: "isBarrel", what: "A barreled ball — 85%+ rated and ≤12h. Drives the spotlight 'Barrel' eyebrow.", formula: "rating ≥ 85 && HLTB ≤ 12h" },
@@ -3228,8 +3248,8 @@
   const SABER_SURFACES = [
     { surface: "Insight ticker (pill)", where: "js/dashboard-insights.js", shows: "Curated one-liners (regular + saber), weight-filtered then clamped to one line — anything too wide is discarded, not truncated" },
     { surface: "Marquee", where: "js/dashboard-insights.js", shows: "Regular metrics + all sabermetrics, mixed and weight-filtered per visit (cryptic stats appear rarely)" },
-    { surface: "Library row pill", where: "js/table-ui.js", shows: "{WAR} pill with BV+ and adjusted-rating tooltip (≥ 0.5 WAR)" },
-    { surface: "Spotlight eyebrows", where: "js/dashboard-spotlight.js", shows: "'Barrel' and leverage-pick priority boosts" },
+    { surface: "Trophy pill", where: "js/table-ui.js + js/trophy-popover.js", shows: "Achievement % pill with hover/click popover (completion %, Xbox gamerscore)" },
+    { surface: "Spotlight eyebrows", where: "js/dashboard-spotlight.js + js/creative-metrics.js", shows: "'Barrel', 'Completionist', creative superlatives, leverage-pick priority" },
   ];
   // Mouseover tooltip system — js/metric-tips.js is the single source of copy.
   // Resolved at the final render stage so ~100 push()/add() call sites stay untouched.
@@ -3238,7 +3258,7 @@
     { surface: "Insight pill", how: "insightTip(html)", note: "Strips HTML, takes the concept before ':', then keyword rules (work-weeks, pace, 'still untouched' time capsule, finish-by-age) before falling back to marqueeTip." },
     { surface: "Spotlight eyebrow", how: "eyebrowTip(canonical)", note: "Chip renders a randomized eyebrowVariant() display label, but the title resolves from the canonical eyebrow so cryptic variants (No-doubter, Squared up, Sleeper) self-explain." },
     { surface: "Hero pillars + tagline", how: "static title attrs", note: "Played / Backlog / Avg review pillars and the 'yrs to clear at 2h/day' + 'deals live' tagline spans (js/dashboard.js)." },
-    { surface: "WAR / wOBA pills", how: "static title attrs", note: "Library-row WAR pill (BV+ / adjusted rating) and wishlist wOBA pill (js/deals.js)." },
+    { surface: "wOBA pill", how: "static title attrs", note: "Wishlist wOBA pill (js/deals.js)." },
   ];
   const TOOLTIP_AUDIT = [
     { item: "Time capsule insight", status: "Fixed", note: "'Added 2019, still untouched: …' resolved no tip (concept slice missed the 'Added' key). Added a 'still untouched' keyword rule + reworded the 'Added' copy." },
@@ -3254,7 +3274,7 @@
     { tier: "friendly", weight: "1.0", behavior: "Always shown. Plain-language, no baseball knowledge needed." },
     { tier: "normal", weight: "1.0", behavior: "Always shown. Default tier for regular (non-saber) metrics." },
     { tier: "moderate", weight: "0.5", behavior: "Shown on roughly half of page loads. Intuitive once seen." },
-    { tier: "cryptic", weight: "0.15", behavior: "Rare. Baseball-jargon stats (OPS, OBP, K%, ISO, SLG, BV+, WAR, Pythagorean)." },
+    { tier: "cryptic", weight: "0.15", behavior: "Rare. Baseball-jargon stats (OPS, OBP, K%, ISO, SLG, BV+, Pythagorean)." },
     { tier: "kojima", weight: "0.03", behavior: "Super-rare easter egg." },
   ];
   const tierTag = (tier) => el("span", { class: "tier tier-" + tier }, tier);
@@ -3296,6 +3316,8 @@
     { group: "Achievements", metric: "fully completed (100%)", when: "trophy 100% count", tier: "normal" },
     { group: "Achievements", metric: "one push from 100%", when: "trophy 90–99% count", tier: "normal" },
     { group: "Achievements", metric: "closest to 100%", when: "tracked < 100% exists", tier: "normal" },
+    { group: "Achievements", metric: "platinum potential", when: "80–99% complete & HLTB ≤12h", tier: "friendly" },
+    { group: "Achievements", metric: "closest platinum", when: "platinum-potential set non-empty", tier: "friendly" },
     { group: "Achievements", metric: "gamerscore earned", when: "xbox gamerscore > 0", tier: "normal" },
     { group: "Achievements", metric: "of available gamerscore", when: "gamerscore total > 0", tier: "normal" },
     { group: "Picks", metric: "90%+ unplayed", when: "rated ≥ 90 backlog", tier: "normal" },
@@ -3349,7 +3371,6 @@
     { insight: "Mendoza line", shows: "Replacement-level rating %", tier: "moderate" },
     { insight: "Closest to 100%", shows: "Highest sub-100% trophy game", tier: "friendly" },
     { insight: "Finish rate", shows: "Completion AVG (formatRate)", tier: "moderate" },
-    { insight: "Top WAR pick", shows: "Highest-WAR unfinished game", tier: "cryptic" },
     { insight: "Pythagorean", shows: "Over/underperforming vs expected finish", tier: "cryptic" },
   ];
   const insightRows = (arr) => arr.map((r) => [el("strong", {}, r.insight), r.shows, tierTag(r.tier)]);
@@ -3377,6 +3398,7 @@
     { surface: "chip", metric: "at historical low now", module: "creative-metrics.js", when: "wishlist isHistoricalLow count", tier: "friendly" },
     { surface: "pill", metric: "one that got away", module: "creative-metrics.js", when: "top wishlist deal by dealScore", tier: "moderate" },
     { surface: "chip", metric: "oldest wishlist", module: "creative-metrics.js", when: "max days since wishlist added_at", tier: "normal" },
+    { surface: "spotlight", metric: "Completionist", module: "creative-metrics.js", when: "100% trophy_progress; highest-rated", tier: "friendly" },
   ];
   const creativeRows = (arr) => arr.map((r) => [
     r.surface,
@@ -3390,7 +3412,7 @@
     { html: "Backlog diagnosis: <strong>Chronic acquirer</strong>", tier: "moderate" },
     { html: "Whale: <strong>Elden Ring</strong> · $59 untouched", tier: "moderate" },
     { html: "<strong>Hollow Knight</strong> · 1,240 days on shelf", tier: "moderate" },
-    { html: "Top WAR pick: <strong>Hades</strong>", tier: "cryptic" },
+    { html: "Platinum potential: <strong>3</strong> short near-100% games", tier: "friendly" },
     { html: "Mendoza line <strong>.412</strong>", tier: "moderate" },
     { html: "~4.2 yrs to clear at your pace", tier: "friendly" },
     { html: "Guilty pleasure: <strong>Fall Guys</strong> · 58%", tier: "moderate" },
@@ -3403,7 +3425,7 @@
   const SAMPLE_CHIPS = [
     { glyph: "★", iconCls: "is-emerald", value: ".333", label: "finish AVG", tier: "cryptic" },
     { glyph: "★", iconCls: "is-emerald", value: ".512", label: "backlog OPS", tier: "cryptic" },
-    { glyph: "★", iconCls: "is-violet", value: "2.4 WAR", label: "top pick", tier: "cryptic" },
+    { glyph: "★", iconCls: "is-violet", value: "3", label: "platinum potential", tier: "friendly" },
     { glyph: "#", iconCls: "is-amber", value: "RPG · 12", label: "comfort genre", tier: "friendly" },
     { glyph: "#", iconCls: "is-rose", value: "Strategy · 48", label: "blind spot genre", tier: "friendly" },
     { glyph: "$", iconCls: "is-emerald", value: "$2,400", label: "MSRP sitting unplayed", tier: "friendly" },
@@ -3453,8 +3475,8 @@
         el("div", { class: "callout-title" }, "How it shows up"),
         el("div", { class: "callout-body" },
           "Marquee chips scroll under the hero; one insight pill rotates at a time (too-wide lines are discarded, not truncated). ",
-          codeText("METRIC_WEIGHT"), " tiers control rarity — friendly/normal always appear; cryptic baseball jargon (~15%); Kojima easter egg (~3%). WAR vs the ",
-          el("strong", {}, "Mendoza line"), " (median backlog rating); Genre+/Store+/BV+ use ", el("strong", {}, "100 = library average"), "."),
+          codeText("METRIC_WEIGHT"), " tiers control rarity — friendly/normal always appear; cryptic baseball jargon (~15%); Kojima easter egg (~3%). The ",
+          el("strong", {}, "Mendoza line"), " is median backlog rating; Genre+/Store+/BV+ use ", el("strong", {}, "100 = library average"), "."),
       ),
       el("div", { class: "card" }, tableEl(["Tier", "Weight", "Behavior"], METRIC_TIERS.map((r) => [tierTag(r.tier), codeText(r.weight), r.behavior]))),
 
@@ -3471,8 +3493,8 @@
       el("p", { class: "muted" }, "AVG · OBP · SLG · OPS — library-wide productivity in batting notation."),
       el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_SLASH))),
 
-      el("h2", {}, "Player value (WAR / BV+)"),
-      el("p", { class: "muted" }, "Per-game value; drives library-row WAR pill and top-pick insights."),
+      el("h2", {}, "Player value (BV+)"),
+      el("p", { class: "muted" }, "Per-game value index and luck-adjusted rating for insights."),
       el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_VALUE))),
 
       el("h2", {}, "Park factors & indices"),

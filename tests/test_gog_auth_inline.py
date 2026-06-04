@@ -17,6 +17,13 @@ class TestPickGogAlFromCookies:
         assert pick_gog_al_from_cookies([]) == ""
         assert pick_gog_al_from_cookies([{"name": "other", "value": "y"}]) == ""
 
+    def test_parses_gog_al_from_header_without_other_cookies(self) -> None:
+        cookies = [
+            {"name": "prefs", "value": "x", "domain": ".gog.com"},
+            {"name": "other", "value": "y=1", "domain": ".gog.com"},
+        ]
+        assert pick_gog_al_from_cookies(cookies) == ""
+
 
 class TestGogInlineProvider:
     def test_gog_in_inline_providers(self) -> None:

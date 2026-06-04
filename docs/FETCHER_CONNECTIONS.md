@@ -70,7 +70,6 @@ flowchart LR
 |--------|--------|-------|
 | `.fh-chip[data-fetcher-key]` | `run(key, { refresh: shiftKey })` | |
 | `.fh-run-stale` | `runAllStale()` | |
-| `.fh-log-open` | `expandPanel({ manual: true })` | Persists `fetcherCollapsed` |
 | `#fetcherRow` bar (not toggle) when collapsed | `expandPanel({ manual: true })` | Click status/tail |
 | `[data-role=bar-toggle]` | `toggleFetcherPanel({ manual: true })` | Sole focusable bar control |
 | `#showFetcherLog`, `#fetcherGlobalStatus` | `switchView('dashboard')` + `expandPanel` | |

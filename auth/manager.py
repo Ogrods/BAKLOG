@@ -464,14 +464,16 @@ def enable_local(provider: str) -> None:
     set_provider_blob(provider, blob)
 
 
-def disconnect(provider: str) -> None:
-    spec = spec_for(provider)
-    if spec.kind == "local":
-        blob = get_provider_blob(provider)
-        blob["disabled"] = True
-        set_provider_blob(provider, blob)
-        return
-    delete_provider_blob(provider)
+def clear_browser_session(provider: str) -> None:
+    """Wipe the persistent browser profile (cookies) and any cached session
+    artifacts for a provider, leaving its stored credential blob untouched.
+
+    Used by ``disconnect`` (after the blob is deleted) and by a fresh
+    ``Reconnect`` so a stale or expired sign-in never carries over into the
+    new sign-in window. For browser-session providers (gog, xbox_wishlist,
+    etc.) the profile cookies *are* the credential, so reusing them on
+    reconnect is exactly what made "Reconnect" feel like a no-op.
+    """
     prof = profile_dir(provider)
     if prof.exists():
         shutil.rmtree(prof, ignore_errors=True)
@@ -481,12 +483,27 @@ def disconnect(provider: str) -> None:
             session.unlink(missing_ok=True)
 
 
-def start_browser_auth(provider: str) -> str:
+def disconnect(provider: str) -> None:
+    spec = spec_for(provider)
+    if spec.kind == "local":
+        blob = get_provider_blob(provider)
+        blob["disabled"] = True
+        set_provider_blob(provider, blob)
+        return
+    delete_provider_blob(provider)
+    clear_browser_session(provider)
+
+
+def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
     spec = spec_for(provider)
     if spec.kind == "manual":
         raise ValueError(f"{provider} uses manual sign-in — click Open in browser and paste your API key")
     if spec.kind not in ("browser", "oauth"):
         raise ValueError(f"{provider} does not support browser sign-in")
+    if fresh:
+        # Reconnect: drop the old profile cookies so the sign-in window starts
+        # logged out instead of resurrecting the stale/expired session.
+        clear_browser_session(provider)
     session_id = uuid.uuid4().hex[:12]
     session = AuthSession(session_id, provider)
     with _sessions_lock:
@@ -495,12 +512,42 @@ def start_browser_auth(provider: str) -> str:
     def _worker() -> None:
         try:
             creds = run_browser_auth(provider, session)
-            if creds:
+            if not creds:
+                # Window closed without a completed sign-in. Reset to a clean,
+                # current state so the chip never keeps a stale error from a
+                # prior run.
+                msg = "Sign-in cancelled or timed out before completing."
+                mark_invalid(provider, error=msg)
+                session.emit("error", {"message": msg})
+                return
+
+            from auth.session_probe import (
+                ADVISORY_BROWSER_PROBE,
+                probe_browser_session,
+            )
+
+            if provider in ADVISORY_BROWSER_PROBE:
+                # Headed sign-in already confirmed the session via the live page
+                # (the connect window won't close until xbox.com reports
+                # isSignedIn). The headless re-check is both unreliable AND
+                # harmful here: it holds the profile's --user-data-dir lock for
+                # up to ~50s, so an immediate WL Xbox run collides and Chrome
+                # exits with "profile in use" (code 21). Trust the headed
+                # sign-in and do NOT launch a competing background browser.
                 mark_connected(provider, creds)
                 session.emit("extracted", {"status": "connected"})
+                return
+
+            probe_err = probe_browser_session(provider, creds)
+            if probe_err:
+                mark_invalid(provider, error=probe_err)
+                session.emit("error", {"message": probe_err})
             else:
-                session.emit("error", {"message": "Sign-in cancelled or timed out"})
+                mark_connected(provider, creds)
+                session.emit("extracted", {"status": "connected"})
         except Exception as exc:  # noqa: BLE001
+            # Unexpected failure: clear stale state with a current message.
+            mark_invalid(provider, error=f"Sign-in did not complete: {exc}")
             session.emit("error", {"message": str(exc)})
         finally:
             session.finish()

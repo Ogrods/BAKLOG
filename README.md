@@ -121,6 +121,8 @@ python fetch_gog.py
 
 *Fallback:* copy the `gog-al` cookie from DevTools → Application → Cookies into `GOG_AL=` in `.env`.
 
+If the web fetch fails with **403 Forbidden**, reconnect GOG on the Connections page (refreshes the `gog-al` cookie). On Windows/macOS with GOG Galaxy installed, prefer `python fetch_gog.py --source local` so the fetcher reads `galaxy-2.0.db` instead of the embed API.
+
 **PlayStation (PSN):** Connections → PlayStation → Connect and sign in at the PlayStation Store. Set trophy/game privacy to **Anyone** so the library and wishlist can load.
 
 ```bash

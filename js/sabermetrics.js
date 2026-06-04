@@ -1,4 +1,4 @@
-// Backlog sabermetrics — baseball-inspired library stats (WAR, OPS, BV+, park factors).
+// Backlog sabermetrics — baseball-inspired library stats (OPS, BV+, park factors).
 // Pure functions; snapshot built once per dashboard render and reused.
 
 import { state } from './state.js';
@@ -275,24 +275,6 @@ export function qualityStartRate(snap) {
   return qs / played.length;
 }
 
-export function backlogWar(g, snap) {
-  const r = ratingValue(g);
-  const st = getPersonal(g).status || 'backlog';
-  if (st === 'skip' || st === 'live' || st === 'finished') return null;
-  let war = (r - snap.rRep) / 10;
-  const tier = lengthTier(g);
-  if (tier === 'long' || tier === 'epic') war += 0.3;
-  if (tier === 'quick' && r >= 80) war += 0.15;
-  const d = getDealInfo(g);
-  if (d) {
-    if ((d.cut || 0) >= 50) war += 0.25;
-    if (d.isHistoricalLow) war += 0.2;
-  }
-  if (st === 'finished') war *= 0.35;
-  if (st === 'unfinished') war *= 0.5;
-  return Math.round(war * 10) / 10;
-}
-
 export function backlogValuePlus(g, snap) {
   const r = luckAdjustedRating(g, snap.rBar);
   if (r <= 0) return null;
@@ -439,20 +421,6 @@ export function winSharesByGenre(snap) {
     }
   }
   return Object.entries(shares).sort((a, b) => b[1] - a[1]).slice(0, 8);
-}
-
-export function topWarGame(snap) {
-  let best = null;
-  let bestWar = -Infinity;
-  for (const g of snap.games) {
-    const w = backlogWar(g, snap);
-    if (w == null || w <= bestWar) continue;
-    const st = getPersonal(g).status || 'backlog';
-    if (!['backlog', 'next', 'playing'].includes(st)) continue;
-    bestWar = w;
-    best = g;
-  }
-  return best ? { g: best, war: bestWar } : null;
 }
 
 export function formatRate(pct, digits = 3) {

@@ -29,6 +29,17 @@ USER_STATE_TTL = 0
 LIBRARY_TTL = 24 * 60 * 60
 DETAILS_TTL = None
 
+GOG_AUTH_MESSAGE = (
+    "GOG session rejected (expired or blocked). Reconnect GOG on the Connections page, "
+    "or run with --source local if GOG Galaxy is installed."
+)
+
+# embed.gog.com often 403s scripted clients without browser context.
+_GOG_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+
 
 class GogAuthError(Exception):
     """Session cookie invalid or expired."""
@@ -42,8 +53,10 @@ class GogClient:
         self.session.cookies.set("gog-al", gog_al, domain=".gog.com")
         self.session.headers.update(
             {
-                "User-Agent": "steam-backlog/1.0",
+                "User-Agent": _GOG_BROWSER_UA,
                 "Accept": "application/json",
+                "Referer": "https://www.gog.com/",
+                "Origin": "https://www.gog.com",
             }
         )
         self.cache_dir = cache_dir
@@ -86,6 +99,11 @@ class GogClient:
             json.dumps(data, ensure_ascii=False), encoding="utf-8"
         )
 
+    @staticmethod
+    def _raise_if_auth_error(resp: requests.Response) -> None:
+        if resp.status_code in (401, 403):
+            raise GogAuthError(GOG_AUTH_MESSAGE)
+
     def _get(
         self,
         path: str,
@@ -102,24 +120,33 @@ class GogClient:
         self._throttle()
         url = f"{EMBED_BASE}{path}"
         resp = self.session.get(url, timeout=30)
-        if resp.status_code == 401:
-            raise GogAuthError(
-                "GOG session expired. Sign in at gog.com and update GOG_AL in .env."
-            )
+        self._raise_if_auth_error(resp)
         resp.raise_for_status()
         data = resp.json()
         self._write_cache(ck, data)
         return data
 
     def validate_session(self) -> bool:
+        """Verify the session can reach GOG embed APIs.
+
+        ``userData.json`` must accept the cookie. The paginated library endpoint
+        often 403s scripted clients even right after a browser sign-in; when that
+        happens we still accept the session if the owned-game ID list works (same
+        degraded path as :func:`fetch_gog._web_fetch_products`).
+        """
         self._throttle()
         resp = self.session.get(f"{EMBED_BASE}/userData.json", timeout=30)
-        if resp.status_code == 401:
-            raise GogAuthError(
-                "GOG session expired. Sign in at gog.com and update GOG_AL in .env."
-            )
+        self._raise_if_auth_error(resp)
         resp.raise_for_status()
-        return True
+        try:
+            self.get_filtered_products(page=1, refresh=True)
+            return True
+        except GogAuthError:
+            try:
+                self.get_owned_game_ids()
+                return True
+            except GogAuthError:
+                raise GogAuthError(GOG_AUTH_MESSAGE) from None
 
     def get_owned_game_ids(self) -> list[int]:
         data = self._get(

@@ -77,9 +77,11 @@ describe('cancelInFlightRuns server truth', () => {
     await fetcherRunner.probeApi(true);
 
     await fetcherRunner.cancelInFlightRuns();
-    const urls = fetchMock.mock.calls.map(c => String(c[0]));
-    expect(urls.some(u => u.includes('/api/runs/cancel'))).toBe(true);
-    expect(urls.some(u => u.includes('/api/run/q1/cancel'))).toBe(true);
+    await vi.waitFor(() => {
+      const urls = fetchMock.mock.calls.map(c => String(c[0]));
+      expect(urls.some(u => u.includes('/api/runs/cancel'))).toBe(true);
+      expect(urls.some(u => u.includes('/api/run/q1/cancel'))).toBe(true);
+    });
   });
 
   it('bumps cancel epoch when user cancels', async () => {
@@ -177,6 +179,56 @@ describe('cancelInFlightRuns server truth', () => {
       c => String(c[0]).includes('/api/run/') && (c[1]?.method || 'GET').toUpperCase() === 'POST',
     );
     expect(runPosts).toHaveLength(0);
+  });
+
+  it('clears chips and cancelInFlight immediately when server is unreachable', async () => {
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'steamTags',
+              label: 'Co-op tags',
+              metaKey: 'steamTags',
+              group: 'enrich',
+              color: '#ea580c',
+              cmd: 'enrich_steam_tags.py',
+              available: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/runs/cancel') && method === 'POST') {
+        throw new Error('server not responding');
+      }
+      if (u.includes('/api/runs') && method === 'GET') {
+        throw new Error('server not responding');
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    fetcherRunner.markChipStateForTest('steamTags', 'running');
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'r1', key: 'steamTags', status: 'running' },
+      queue: [],
+    });
+    fetcherRunner.expandPanel();
+    const t0 = Date.now();
+    await fetcherRunner.cancelInFlightRuns();
+    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(fetcherRunner.isCancelInFlightForTest()).toBe(false);
+    expect(fetcherRunner.getInFlightCountForTest()).toBe(0);
+    expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+    const panel = document.getElementById('fetcherRunLog');
+    const body = panel?.querySelector('[data-role="body"]');
+    expect(body?.textContent || '').toMatch(/\[cancelled\]/);
+    const btn = panel?.querySelector('[data-role="cancel"]');
+    expect(btn?.classList.contains('hidden')).toBe(true);
   });
 
   it('409 on submit re-syncs and retries once when queue is idle', async () => {

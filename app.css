@@ -1,3 +1,16 @@
+/* ==========================================================================
+   Responsive system (BAKLOG audit — Phase 0+)
+   Desktop-first. All new responsive rules use these tiers only.
+   Do not add ad-hoc breakpoints (legacy 720/767/900 migrate opportunistically).
+
+   --bp-tablet-max: 1023.98px  (tablet and below)
+   --bp-phone-max:  639.98px   (phone and below)
+   --bp-compact-max: 400px     (smallest phones)
+
+   Touch: interactive controls on phone should be >= 44px min height
+   (--touch-min in phone block below).
+   ========================================================================== */
+
 /* === Global error toast ===
    Surfaces uncaught errors + unhandled promise rejections. Top-right so it
    never collides with the bottom-right undoToast / debug overlay. Sticky
@@ -958,6 +971,7 @@ body.bulk-bar-open { padding-bottom: 56px; }
   tr.row-flash { animation: none; }
   .deal-flag-cut.deal-flag-cut--huge { animation: none; opacity: 1; }
   .fh-global-status::before,
+  .fh-global-status-tail { transition: none; }
   .fh-chip-running .fh-chip-dot { animation: none; transform: none; }
   .fh-log-status.running::after,
   .fh-log-status.queued::after,
@@ -1433,12 +1447,41 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .fh-group-chips { align-items: center; }
 .fh-global-status {
   display: inline-flex; align-items: center; gap: 0.35rem;
+  max-width: min(100%, 22rem);
   padding: 0.1rem 0.45rem; border-radius: 9999px;
   font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em;
   color: #7dd3fc; background: rgba(56, 189, 248, 0.12);
   border: 1px solid rgba(56, 189, 248, 0.35);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, max-width 320ms ease;
+}
+.fh-global-status-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.fh-global-status-tail {
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0;
+  font-weight: 400;
+  color: #94a3b8;
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 1px solid transparent;
+  transition: max-width 320ms ease, opacity 200ms ease, margin-left 320ms ease, padding-left 320ms ease, border-color 320ms ease;
+}
+.fh-global-status.is-streaming .fh-global-status-tail {
+  max-width: clamp(7rem, 20vw, 15rem);
+  opacity: 0.8;
+  margin-left: 0.4rem;
+  padding-left: 0.4rem;
+  border-left-color: rgba(56, 189, 248, 0.3);
+}
+.fh-global-status-tail.fh-global-status-tail--err {
+  color: #fda4af;
 }
 .fh-global-status:hover {
   background: rgba(56, 189, 248, 0.2);
@@ -4079,5 +4122,393 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   }
   .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded {
     animation: none !important;
+  }
+}
+
+/* === Phase 0: global chrome (tablet / phone) === */
+.app-shell {
+  min-width: 0;
+  overflow-x: clip;
+}
+#main,
+#tableShell,
+#dashboardContainer,
+#connectionsContainer {
+  min-width: 0;
+  max-width: 100%;
+}
+#tableWrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* --- Tablet (<= 1023.98px) --- */
+@media (max-width: 1023.98px) {
+  .app-header-row {
+    row-gap: 0.5rem;
+  }
+  .app-header-nav {
+    flex-basis: 100%;
+    order: 3;
+    max-width: 100%;
+  }
+  .app-header-tagline {
+    display: none;
+  }
+  .app-header-actions {
+    margin-left: auto;
+    order: 2;
+  }
+  .app-header-brand {
+    order: 1;
+  }
+}
+
+/* --- Phone (<= 639.98px) --- */
+@media (max-width: 639.98px) {
+  :root {
+    --touch-min: 44px;
+  }
+  .app-shell {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .app-header-row {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .app-header-brand {
+    order: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 0 !important;
+  }
+  .app-header-brand h1 {
+    font-size: 1.25rem;
+  }
+  .app-header-brand img {
+    height: 24px !important;
+  }
+  .app-header-actions {
+    order: 2;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .app-header-nav-wrap {
+    order: 3;
+    flex: 1 1 100%;
+    min-width: 0;
+    position: relative;
+    max-width: 100%;
+  }
+  .app-header-nav-wrap::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 28px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, #0f172a 85%);
+  }
+  .app-header-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 0.35rem;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+  .app-header-nav .view-tab {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    min-height: var(--touch-min);
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .fh-global-status {
+    position: relative;
+    min-height: var(--touch-min);
+    min-width: var(--touch-min);
+    padding: 0 0.55rem;
+    justify-content: center;
+  }
+  .fh-global-status .fh-global-status-tail {
+    display: none;
+  }
+  .fh-global-status #fetcherGlobalStatusText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .profile-menu-trigger {
+    min-height: var(--touch-min);
+  }
+  #summary {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 0.5rem;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    align-items: stretch;
+  }
+  #summary > .summary-scroll-row,
+  #summary > div {
+    display: flex;
+    flex-wrap: nowrap;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+    width: max-content;
+    max-width: none;
+  }
+  #summary .summary-store-chip,
+  #summary .summary-deal-chip,
+  #summary .summary-wishlist-reset,
+  #summary .summary-jump-chip,
+  #summary > div > div,
+  #summary button {
+    flex-shrink: 0;
+    min-height: var(--touch-min);
+    display: inline-flex;
+    align-items: center;
+  }
+  #toolbarSection .toolbar-row {
+    gap: 0.5rem;
+  }
+  #toolbarSection #search {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+    order: 1;
+    min-height: var(--touch-min);
+  }
+  #toolbarSection #openFiltersBtn,
+  #toolbarSection #addGameBtn,
+  #toolbarSection #kebabBtn {
+    order: 2;
+    min-height: var(--touch-min);
+  }
+  #toolbarSection #pickForMe {
+    display: none;
+  }
+  #toolbarSection .toolbar-kebab-pick--phone {
+    display: block;
+  }
+  #activeFilterPills {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+  #activeFilterPills > * {
+    flex-shrink: 0;
+  }
+}
+
+#toolbarSection .toolbar-kebab-pick--phone {
+  display: none;
+}
+
+/* Compact (<= 400px) */
+@media (max-width: 400px) {
+  .app-shell {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  .app-header-nav .view-tab {
+    font-size: 0.75rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+/* Prevent page-level horizontal scroll from chrome (table overflow handled in R1) */
+body {
+  overflow-x: clip;
+}
+
+/* === Fetcher health popover (header pill) === */
+.fetcher-popover-anchor {
+  position: relative;
+}
+.fetcher-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.5);
+  z-index: 90;
+}
+.fetcher-popover-backdrop[hidden] {
+  display: none;
+}
+.fetcher-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: min(560px, 94vw);
+  max-height: min(85vh, 720px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 12px 12px 10px;
+  z-index: 91;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+  color: #cbd5e1;
+}
+.fetcher-popover[hidden] {
+  display: none;
+}
+.fetcher-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid #334155;
+}
+.fetcher-popover-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e2e8f0;
+}
+.fetcher-popover-close {
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  color: #94a3b8;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.fetcher-popover-close:hover {
+  color: #f1f5f9;
+  background: #233146;
+}
+.fetcher-popover-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+.fetcher-popover .fh-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #1e293b;
+  padding: 0.35rem 0 0.5rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.65);
+}
+.fetcher-popover .fh-group-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.35rem;
+  align-items: stretch;
+}
+.fetcher-popover .fh-chip {
+  width: 100%;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.fetcher-popover .fh-chip-wrap {
+  width: 100%;
+}
+.fetcher-popover .fh-chip-wrap .fh-chip {
+  width: 100%;
+}
+.fh-log--collapsed .fh-log-body,
+.fh-log--collapsed .fh-log-jump {
+  display: none !important;
+}
+.fetcher-popover .fh-row--popover {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: 1fr !important;
+  gap: 0.5rem;
+  min-height: 0;
+  margin-top: 0;
+}
+.fetcher-popover .fh-row--popover .fh-bar {
+  display: none !important;
+}
+.fetcher-popover .fh-row--popover.is-expanded .dash-fetcher-health {
+  min-height: 0;
+  max-height: none;
+  overflow-y: visible;
+}
+.fetcher-popover .fh-row--popover .fh-log {
+  display: flex !important;
+  flex-direction: column;
+  min-height: 0;
+  flex-shrink: 0;
+}
+.fetcher-popover .fh-row--popover .fh-log.open {
+  max-height: min(32vh, 280px);
+  min-height: auto;
+}
+.fetcher-popover .fh-row--popover .fh-log.open.fh-log--collapsed {
+  max-height: none;
+  min-height: 0;
+}
+.fetcher-popover .fh-row--popover .fh-log.open .fh-log-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(28vh, 240px);
+  overflow-y: auto;
+}
+@media (min-width: 1024px) {
+  .fetcher-popover {
+    max-height: min(88vh, 860px);
+  }
+  .fetcher-popover .fh-row--popover .fh-log.open .fh-log-body {
+    max-height: 360px;
+  }
+}
+@media (max-width: 639.98px) {
+  .fetcher-popover {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    bottom: 10px;
+    width: auto;
+    max-height: none;
+  }
+  .fetcher-popover-close {
+    min-height: var(--touch-min, 44px);
+    min-width: var(--touch-min, 44px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fetcher-popover .fh-group-chips {
+    grid-template-columns: 1fr;
+  }
+  .fetcher-popover .fh-row--popover .fh-log.open {
+    max-height: min(40vh, 320px);
   }
 }

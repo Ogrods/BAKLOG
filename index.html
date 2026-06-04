@@ -88,29 +88,47 @@
       <span id="viewLoadingLabel" class="app-view-overlay-label">Loading…</span>
     </div>
   </div>
-  <div class="max-w-[1600px] mx-auto p-4 md:p-6">
+  <div class="app-shell max-w-[1600px] mx-auto p-4 md:p-6">
     <div id="migrationBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
     <div id="undoToast" class="hidden" role="status" aria-live="polite"></div>
     <div id="itadAlertBanner" class="migration-banner itad-alert-banner hidden" role="status" aria-live="polite"></div>
     <div id="libraryWatchBanner" class="migration-banner library-watch-banner hidden" role="status" aria-live="polite"></div>
     <div id="authReconnectBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <div id="authSecretsBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
-    <header class="mb-4">
-      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div id="brandMark" class="flex items-center gap-2 shrink-0" style="margin: 0 1rem 0 0; cursor: default;">
+    <header class="app-header mb-4">
+      <div class="app-header-row flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0" style="margin: 0 1rem 0 0; cursor: default;">
           <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap m-0">BAKLOG</h1>
           <img src="assets/baklog-logo.svg" alt="" aria-hidden="true" class="shrink-0" style="height: 30px; width: auto;" />
         </div>
-        <nav class="flex flex-wrap items-center gap-1.5" aria-label="Main views">
-          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="dashboard">Dashboard</button>
-          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="library">Library</button>
-          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
-          <button type="button" class="view-tab hidden px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
-          <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
-        </nav>
-        <span class="text-[11px] text-slate-400 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
-        <div class="header-actions ml-auto flex items-center gap-2 shrink-0 self-center">
-          <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle" title="Show fetcher log"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText">Fetcher log</span></button>
+        <div class="app-header-nav-wrap min-w-0">
+          <nav class="app-header-nav flex flex-wrap items-center gap-1.5" aria-label="Main views">
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="dashboard">Dashboard</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="library">Library</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
+            <button type="button" class="view-tab hidden px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
+          </nav>
+        </div>
+        <span class="app-header-tagline text-[11px] text-slate-400 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
+        <div class="header-actions app-header-actions ml-auto flex items-center gap-2 shrink-0 self-center">
+          <div id="fetcherPopoverAnchor" class="fetcher-popover-anchor relative shrink-0">
+            <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle" title="Show fetcher log" aria-haspopup="dialog" aria-expanded="false" aria-controls="fetcherPopover"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText" class="fh-global-status-label">Fetcher log</span><span id="fetcherGlobalStatusTail" class="fh-global-status-tail" aria-hidden="true"></span></button>
+            <div id="fetcherPopoverBackdrop" class="fetcher-popover-backdrop" hidden></div>
+            <div id="fetcherPopover" class="fetcher-popover" role="dialog" aria-modal="true" aria-labelledby="fetcherPopoverTitle" hidden>
+              <h2 id="fetcherPopoverTitle" class="sr-only">Fetcher health and log</h2>
+              <div class="fetcher-popover-head">
+                <span class="fetcher-popover-title" id="fetcherPopoverVisibleTitle">Fetchers</span>
+                <button type="button" class="fetcher-popover-close" data-fetcher-popover-close aria-label="Close fetcher">&times;</button>
+              </div>
+              <div class="fetcher-popover-scroll">
+                <div id="fetcherRow" class="fh-row fh-row--popover is-expanded">
+                  <div id="dashboardFetcherHealth" class="dash-card dash-fetcher-health"></div>
+                  <div id="fetcherRunLog" class="fh-log open fh-log--collapsed"></div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div id="profileMenuWrap" class="profile-menu-wrap relative shrink-0">
             <button type="button" id="profileMenuTrigger" class="profile-menu-trigger px-2 py-1 rounded border border-slate-600 text-xs text-slate-200 hover:border-slate-500 flex items-center gap-1" aria-haspopup="menu" aria-expanded="false" aria-controls="profileMenu" aria-label="Profile">
               <span id="profileMenuLabel" class="profile-menu-label">Default</span>
@@ -327,7 +345,7 @@
     <div id="wishlistDealRadar" class="dash-wishlist-stats-target hidden grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4"></div>
 
     <section id="toolbarSection" class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
-      <div class="flex flex-wrap gap-2 items-center">
+      <div class="toolbar-row flex flex-wrap gap-2 items-center">
         <input id="search" type="search" placeholder="Search games or notes..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
         <button type="button" id="openFiltersBtn" class="relative bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm whitespace-nowrap">
           Filters <span id="filtersBtnBadge" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-sky-600 text-[10px] font-bold">0</span>
@@ -337,6 +355,7 @@
         <div class="relative">
           <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions" aria-haspopup="menu" aria-expanded="false">⋯</button>
           <div id="kebabMenu" class="absolute right-0 top-full mt-1 z-30 min-w-[180px] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 text-sm">
+            <button type="button" id="pickForMeKebab" class="toolbar-kebab-pick--phone w-full text-left px-3 py-2 hover:bg-slate-700">Pick for me</button>
             <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
             <button type="button" id="showFetcherLog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reopen the fetcher console (helpful if you closed it during a run)">Show fetcher log</button>
             <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
@@ -356,10 +375,6 @@
     <section id="dashboardContainer" class="hidden space-y-4 mb-4">
       <div id="dashOnboard" hidden></div>
       <div id="dashboardContent" class="hidden space-y-4">
-        <div id="fetcherRow" class="fh-row">
-          <div id="dashboardFetcherHealth" class="dash-card dash-fetcher-health"></div>
-          <div id="fetcherRunLog" class="fh-log"></div>
-        </div>
         <div id="dashboardMega" class="dash-mega"></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="dash-card">

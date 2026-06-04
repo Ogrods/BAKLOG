@@ -1004,3 +1004,136 @@ describe('failed chip routes to Connections', () => {
     expect(chip.classList.contains('fh-chip-failed')).toBe(true);
   });
 });
+
+describe('fetcher header popover', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <div id="fetcherPopoverBackdrop" class="fetcher-popover-backdrop" hidden></div>
+      <div id="fetcherPopover" class="fetcher-popover" role="dialog" hidden>
+        <div class="fetcher-popover-head">
+          <span class="fetcher-popover-title">Fetchers</span>
+          <button type="button" data-fetcher-popover-close aria-label="Close">&times;</button>
+        </div>
+        <div class="fetcher-popover-scroll">
+          <div id="fetcherRow" class="fh-row fh-row--popover is-expanded">
+            <div id="dashboardFetcherHealth"></div>
+            <div id="fetcherRunLog" class="fh-log"></div>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="fetcherGlobalStatus" aria-expanded="false" aria-controls="fetcherPopover"></button>`;
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    fetcherRunner.hideFetcherPopover?.();
+  });
+
+  it('showFetcherPopover opens dialog without dashboard switch', () => {
+    const ok = fetcherRunner.showFetcherPopover();
+    expect(ok).toBe(true);
+    expect(document.getElementById('fetcherPopover').hidden).toBe(false);
+    expect(document.getElementById('fetcherPopoverBackdrop').hidden).toBe(false);
+    expect(document.getElementById('fetcherGlobalStatus').getAttribute('aria-expanded')).toBe('true');
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+  });
+
+  it('collapsePanel closes popover instead of collapsing row', () => {
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    fetcherRunner.collapsePanel({ manual: true });
+    expect(document.getElementById('fetcherPopover').hidden).toBe(true);
+    expect(document.getElementById('fetcherGlobalStatus').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('syncLogHeightToCard skips height sync when popover is mounted', () => {
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    const log = document.getElementById('fetcherRunLog');
+    log.classList.add('open');
+    const card = document.getElementById('dashboardFetcherHealth');
+    Object.defineProperty(card, 'offsetHeight', { configurable: true, value: 200 });
+    log.style.maxHeight = '99px';
+    log.style.height = '99px';
+    fetcherRunner.syncLogHeightToCard();
+    expect(log.style.maxHeight).toBe('');
+    expect(log.style.height).toBe('');
+  });
+
+  it('toggleFetcherPopover opens then closes', () => {
+    fetcherRunner.toggleFetcherPopover();
+    expect(fetcherRunner.isFetcherPopoverOpen()).toBe(true);
+    fetcherRunner.toggleFetcherPopover();
+    expect(fetcherRunner.isFetcherPopoverOpen()).toBe(false);
+  });
+
+  it('console Collapse toggles only the log body, not the popover', () => {
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    fetcherRunner.reopenLogPanel();
+    const pop = document.getElementById('fetcherPopover');
+    const log = document.getElementById('fetcherRunLog');
+    const closeBtn = log.querySelector('[data-role="close"]');
+    expect(pop.hidden).toBe(false);
+    expect(log.classList.contains('fh-log--collapsed')).toBe(false);
+
+    closeBtn.click();
+    expect(log.classList.contains('fh-log--collapsed')).toBe(true);
+    expect(closeBtn.textContent).toBe('Expand');
+    expect(pop.hidden).toBe(false);
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+
+    closeBtn.click();
+    expect(log.classList.contains('fh-log--collapsed')).toBe(false);
+    expect(closeBtn.textContent).toBe('Collapse');
+  });
+});
+
+describe('header pill ticker', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle">
+        <span id="fetcherGlobalStatusLive" class="sr-only" aria-live="polite"></span>
+        <span id="fetcherGlobalStatusText" class="fh-global-status-label">Fetcher log</span>
+        <span id="fetcherGlobalStatusTail" class="fh-global-status-tail" aria-hidden="true"></span>
+      </button>
+      <div id="fetcherRow" class="fh-row is-expanded">
+        <div id="dashboardFetcherHealth"></div>
+        <div id="fetcherRunLog" class="fh-log"></div>
+      </div>`;
+    fetcherRunner.reopenLogPanel();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    fetcherRunner.markChipStateForTest('steam', null);
+  });
+
+  it('streams the latest log line into the tail while active', () => {
+    const pill = document.getElementById('fetcherGlobalStatus');
+    const tail = document.getElementById('fetcherGlobalStatusTail');
+    fetcherRunner.markChipStateForTest('steam', 'running');
+    expect(pill.classList.contains('fh-global-status-idle')).toBe(false);
+
+    fetcherRunner.appendLineForTest('Fetched 10 games');
+    expect(tail.textContent).toBe('Fetched 10 games');
+    expect(pill.classList.contains('is-streaming')).toBe(true);
+  });
+
+  it('replaces the tail text in place when a new line arrives', () => {
+    fetcherRunner.markChipStateForTest('steam', 'running');
+    fetcherRunner.appendLineForTest('First line');
+    fetcherRunner.appendLineForTest('Second line');
+    expect(document.getElementById('fetcherGlobalStatusTail').textContent).toBe('Second line');
+  });
+
+  it('clears streaming state when the queue goes idle', () => {
+    const pill = document.getElementById('fetcherGlobalStatus');
+    const tail = document.getElementById('fetcherGlobalStatusTail');
+    fetcherRunner.markChipStateForTest('steam', 'running');
+    fetcherRunner.appendLineForTest('Working…');
+    expect(pill.classList.contains('is-streaming')).toBe(true);
+
+    fetcherRunner.markChipStateForTest('steam', null);
+    expect(pill.classList.contains('is-streaming')).toBe(false);
+    expect(tail.textContent).toBe('');
+    expect(pill.classList.contains('fh-global-status-idle')).toBe(true);
+  });
+});

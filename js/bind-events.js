@@ -649,7 +649,7 @@ export function bindEvents() {
     gameKey,
     toggleSelection,
   }));
-  document.getElementById("pickForMe").addEventListener("click", e => {
+  const runPickForMe = (e) => {
     let list = filteredGames();
     if (state.activeView === "library") {
       if (!e.shiftKey) list = list.filter(g => getPersonal(g).status === "backlog");
@@ -660,34 +660,27 @@ export function bindEvents() {
     if (!list.length) return;
     const pick = list[Math.floor(Math.random() * list.length)];
     focusGame(gameKey(pick));
+  };
+  document.getElementById("pickForMe").addEventListener("click", runPickForMe);
+  document.getElementById("pickForMeKebab")?.addEventListener("click", (e) => {
+    document.getElementById("kebabMenu")?.classList.remove("open");
+    runPickForMe(e);
   });
   document.getElementById("reloadData").addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
     try { await reloadGames(); } catch { alert("Could not reload library files. Run the fetch scripts (fetch_games.py, fetch_gog.py, etc.) and reload."); }
   });
-  // The run-log panel lives inside #dashboardContainer; opening it from
-  // another view requires switching first so it's actually visible.
-  // Sequenced in two rAFs because switchView defers the dashboard chrome
-  // toggle to the next frame on the overlay path.
-  const reopenFetcherConsole = () => {
-    // Boot curtain blocks pointer events via CSS; this guards keyboard activation
-    // so a focused-Enter can't switchView mid-boot before bootstrap finishes.
-    if (document.documentElement.hasAttribute("data-boot-loading")) return;
-    const wasOnDash = state.activeView === "dashboard";
-    if (!wasOnDash) switchView("dashboard");
-    const open = () => fetcherRunner.expandPanel({ manual: true });
-    if (wasOnDash) open();
-    else requestAnimationFrame(() => requestAnimationFrame(open));
+  const toggleFetcherPopover = () => {
+    fetcherRunner.toggleFetcherPopover();
   };
+  document.getElementById("fetcherPopoverBackdrop")?.addEventListener("click", () => {
+    fetcherRunner.hideFetcherPopover();
+  });
+  document.querySelectorAll("[data-fetcher-popover-close]").forEach(btn => {
+    btn.addEventListener("click", () => fetcherRunner.hideFetcherPopover());
+  });
   document.getElementById("fetcherRow")?.addEventListener("click", e => {
     if (e.target.closest(".fh-chip, .fh-run-stale, .fh-toggle, .fh-log, .fh-head-actions label")) {
-      return;
-    }
-    const headCollapse = e.target.closest("[data-role='head-collapse']");
-    if (headCollapse) {
-      e.preventDefault();
-      e.stopPropagation();
-      fetcherRunner.toggleFetcherPanel({ manual: true });
       return;
     }
     const toggleBtn = e.target.closest("[data-role='bar-toggle']");
@@ -700,14 +693,14 @@ export function bindEvents() {
     const bar = e.target.closest("[data-role='fetcher-bar']");
     if (bar && document.getElementById("fetcherRow")?.classList.contains("is-collapsed")) {
       e.preventDefault();
-      fetcherRunner.expandPanel({ manual: true });
+      fetcherRunner.showFetcherPopover();
     }
   });
   document.getElementById("showFetcherLog")?.addEventListener("click", () => {
     kebabMenu.classList.remove("open");
-    reopenFetcherConsole();
+    fetcherRunner.showFetcherPopover();
   });
-  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", reopenFetcherConsole);
+  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", toggleFetcherPopover);
   kebabMenu.querySelectorAll("button, label").forEach(el => {
     el.addEventListener("click", () => kebabMenu.classList.remove("open"));
   });

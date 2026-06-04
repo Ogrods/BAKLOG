@@ -4,7 +4,14 @@ from __future__ import annotations
 import json
 
 from fetchers._base import refuse_drift_result, refuse_empty_result
-from fetchers._progress import HeartbeatTimer, RunStats, done, started
+from fetchers._progress import (
+    HeartbeatTimer,
+    RunStats,
+    done,
+    pct,
+    progress_line,
+    started,
+)
 
 
 def test_refuse_empty_result_blocks_by_default():
@@ -73,6 +80,40 @@ def test_refuse_drift_accepts_int_count(tmp_path):
     _write_games_file(out, 200)
     assert refuse_drift_result(10, label="x", allow_drift=False, output_path=out) == 3
     assert refuse_drift_result(120, label="x", allow_drift=False, output_path=out) is None
+
+
+def test_pct_partial_and_total():
+    assert pct(0, 10) == "0%"
+    assert pct(5, 10) == "50%"
+    assert pct(10, 10) == "100%"
+    assert pct(11, 10) == "100%"
+    assert pct(1, 0) == ""
+    assert pct(1, -1) == ""
+
+
+def test_progress_line_with_and_without_total():
+    assert progress_line(3, 10, "phase") == "[3/10] (30%) phase"
+    assert progress_line(3, 10, "phase", "detail") == "[3/10] (30%) phase: detail"
+    assert progress_line(3, 0, "phase", "detail") == "[3] phase: detail"
+
+
+def test_heartbeat_timer_tick_progress_emits_after_interval(capsys, monkeypatch):
+    times = [0.0, 0.0, 30.0, 30.0]
+
+    def fake_monotonic():
+        return times.pop(0) if times else 60.0
+
+    monkeypatch.setattr("fetchers._progress.time.monotonic", fake_monotonic)
+    timer = HeartbeatTimer(interval=25.0)
+    timer.tick_progress(2, 8, "catalog", "1 hits")
+    assert capsys.readouterr().out == ""
+    timer.tick_progress(3, 8, "catalog", "2 hits")
+    out = capsys.readouterr().out
+    assert "[3/8]" in out
+    assert "(38%)" in out
+    assert "catalog: 2 hits" in out
+    timer.tick_progress(4, 8, "catalog", "3 hits")
+    assert capsys.readouterr().out == ""
 
 
 def test_heartbeat_timer_emits_after_interval(capsys):

@@ -17,6 +17,8 @@ from urllib.parse import quote
 
 import requests
 
+from fetchers._progress import HeartbeatTimer
+
 GRAPHQL_URL = "https://service-aggregation-layer.juno.ea.com/graphql"
 # Persisted-query identifiers used by the ea.com web app (see Playnite EaLibrary
 # 3.x). These are the website's own operation hashes, not desktop-only queries.
@@ -49,6 +51,10 @@ REQUEST_DELAY_SEC = 0.15
 
 class EaAuthError(Exception):
     pass
+
+
+class EaCaptureError(Exception):
+    """Logged-in session present but Bearer token could not be captured."""
 
 
 def _persisted_url(operation: str, variables: dict, sha256_hash: str) -> str:
@@ -119,6 +125,25 @@ class EaClient:
             raise EaAuthError(f"EA GraphQL errors: {data['errors'][:1]}")
         return data
 
+    def probe_owned_games(self) -> None:
+        """Single-page owned-games query to verify the Bearer token."""
+        self._graphql_get(
+            "getPreloadedOwnedGames",
+            {
+                "isMac": False,
+                "addFieldsToPreloadGames": False,
+                "locale": "en",
+                "limit": 1,
+                "next": "0",
+                "type": ["DIGITAL_FULL_GAME", "PACKAGED_FULL_GAME"],
+                "entitlementEnabled": True,
+                "storefronts": ["EA"],
+                "ownershipMethods": sorted(REAL_OWNERSHIP | EA_PLAY_OWNERSHIP | XGP_ONLY),
+                "platforms": ["PC"],
+            },
+            OWNED_GAMES_HASH,
+        )
+
     def get_owned_games(self) -> list[dict]:
         out: list[dict] = []
         offset = "0"
@@ -146,6 +171,7 @@ class EaClient:
             offset = owned.get("next")
             if not offset:
                 break
+            page += 1
         return out
 
     def get_play_times(self, slugs: list[str]) -> list[dict]:

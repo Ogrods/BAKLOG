@@ -25,7 +25,7 @@ from fetchers._base import (
     catalog_file,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
 from hltb_client import HltbClient
 
 GAMES_EPIC_JSON = Path("games_epic.json")
@@ -330,11 +330,11 @@ def main() -> int:
         ns, cid = str(rec["namespace"]), str(rec["catalogItemId"])
         return (ns, cid), client.get_catalog_item(ns, cid)
 
+    catalog_hb = HeartbeatTimer(interval=25.0)
     with concurrent.futures.ThreadPoolExecutor(max_workers=CATALOG_WORKERS) as ex:
         futures = [ex.submit(fetch_one, rec) for rec in apps]
         for i, fut in enumerate(concurrent.futures.as_completed(futures), 1):
-            if i % 25 == 0 or i == len(futures):
-                print(f"  catalog {i}/{len(futures)}", flush=True)
+            catalog_hb.tick_progress(i, len(futures), "Epic catalog", f"{len(catalog)} hits")
             try:
                 key, item = fut.result()
                 if item:

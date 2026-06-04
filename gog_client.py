@@ -6,6 +6,8 @@ from pathlib import Path
 
 import requests
 
+from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
+
 REQUEST_DELAY_SEC = 1.0
 
 
@@ -146,18 +148,22 @@ class GogClient:
         )
 
     def get_all_filtered_products(self, refresh: bool = False) -> list[dict]:
+        hb = HeartbeatTimer(interval=25.0)
         products: list[dict] = []
         page = 1
+        total_pages = 1
         while True:
+            hb.tick_progress(page, total_pages, "GOG library pages", f"{len(products)} products")
             data = self.get_filtered_products(page, refresh=refresh)
             batch = data.get("products", [])
             if not batch:
                 break
             products.extend(batch)
-            total_pages = data.get("totalPages") or data.get("total_pages") or 1
+            total_pages = data.get("totalPages") or data.get("total_pages") or page
             if page >= total_pages:
                 break
             page += 1
+        heartbeat(progress_line(page, total_pages, "GOG library", f"{len(products)} products"))
         return products
 
     def get_product_details(self, product_id: int, refresh: bool = False) -> dict:

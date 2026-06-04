@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid, resolve_env
 from shared.money import format_price, normalize_currency_code
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
 
@@ -234,7 +234,10 @@ def main() -> int:
 
     print("Fetching GOG wishlist IDs...", flush=True)
     try:
-        ids = _fetch_wishlist_ids(gog, refresh=args.refresh)
+        ids = run_with_heartbeat(
+            lambda: _fetch_wishlist_ids(gog, refresh=args.refresh),
+            "GOG wishlist capture",
+        )
     except GogAuthError as e:
         mark_invalid("gog", error=str(e))
         stats.error(str(e))

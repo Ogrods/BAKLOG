@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fetchers._authoritative import AMAZON, GOG
+from fetchers._authoritative import AMAZON, GOG, HUMBLE, PSN
 from fetchers._base import merge_cached_row
 
 
@@ -169,6 +169,130 @@ def test_merge_preserves_coop_when_fresh_is_false() -> None:
     merged = merge_cached_row(fresh, cached, authoritative=auth, hltb_updated=False)
     assert merged["coop_online"] is True
     assert merged["coop_local"] is True
+
+
+def test_merge_preserves_psn_first_played_and_trophy_when_fresh_empty() -> None:
+    cached = {
+        "store": "psn",
+        "id": "CUSA12345_00",
+        "psn_id": "CUSA12345_00",
+        "first_played": "2020-01-15T10:00:00Z",
+        "trophy_progress": 42,
+        "playtime_minutes": 300,
+    }
+    fresh = {
+        "store": "psn",
+        "id": "CUSA12345_00",
+        "psn_id": "CUSA12345_00",
+        "first_played": None,
+        "trophy_progress": None,
+        "playtime_minutes": 0,
+        "last_played": None,
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=PSN, hltb_updated=False)
+    assert merged["first_played"] == "2020-01-15T10:00:00Z"
+    assert merged["trophy_progress"] == 42
+    assert merged["playtime_minutes"] == 300
+
+
+def test_merge_price_overwrites_to_zero_when_fresh_is_zero() -> None:
+    cached = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "price": 19.99,
+        "price_initial": 29.99,
+        "discount_percent": 33,
+        "currency": "USD",
+    }
+    fresh = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "price": 0,
+        "price_initial": 0,
+        "discount_percent": 0,
+        "currency": "",
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=GOG, hltb_updated=False)
+    assert merged["price"] == 0
+    assert merged["price_initial"] == 0
+    assert merged["discount_percent"] == 0
+    assert merged["currency"] == ""
+
+
+def test_merge_last_played_keeps_newer_date() -> None:
+    cached = {
+        "store": "psn",
+        "id": "x",
+        "psn_id": "x",
+        "last_played": "2024-06-01T12:00:00Z",
+    }
+    fresh = {
+        "store": "psn",
+        "id": "x",
+        "psn_id": "x",
+        "last_played": "2023-01-01T00:00:00Z",
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=PSN, hltb_updated=False)
+    assert merged["last_played"] == "2024-06-01T12:00:00Z"
+
+
+def test_merge_first_played_keeps_earlier_date() -> None:
+    cached = {
+        "store": "psn",
+        "id": "x",
+        "psn_id": "x",
+        "first_played": "2020-01-01T00:00:00Z",
+    }
+    fresh = {
+        "store": "psn",
+        "id": "x",
+        "psn_id": "x",
+        "first_played": "2022-06-15T00:00:00Z",
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=PSN, hltb_updated=False)
+    assert merged["first_played"] == "2020-01-01T00:00:00Z"
+
+
+def test_merge_humble_preserves_enrichment_on_refetch() -> None:
+    """Humble fetch rows default playtime/reviews to empty; merge must keep cache."""
+    cached = {
+        "store": "humble",
+        "id": "humble-game-one",
+        "humble_id": "game-one",
+        "playtime_minutes": 90,
+        "steam_review_percent": 88.0,
+        "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1/header.jpg",
+        "hltb_main_hours": 12.0,
+    }
+    fresh = {
+        "store": "humble",
+        "id": "humble-game-one",
+        "humble_id": "game-one",
+        "humble_gamekey": "gk1",
+        "name": "Game One",
+        "playtime_minutes": 0,
+        "last_played": None,
+        "header_image": None,
+        "library_image": None,
+        "steam_review_percent": None,
+        "steam_review_count": None,
+        "steam_review_desc": None,
+        "hltb_main_hours": None,
+        "hltb_main_extra_hours": None,
+        "hltb_completionist_hours": None,
+        "hltb_match_confidence": None,
+        "hltb_name": None,
+        "store_url": "https://www.humblebundle.com/store/game-one",
+        "type": "game",
+    }
+    merged = merge_cached_row(fresh, cached, authoritative=HUMBLE, hltb_updated=False)
+    assert merged["playtime_minutes"] == 90
+    assert merged["steam_review_percent"] == 88.0
+    assert merged["header_image"].startswith("https://cdn.akamai")
+    assert merged["hltb_main_hours"] == 12.0
+    assert merged["name"] == "Game One"
 
 
 def test_merge_sets_coop_when_fresh_is_true() -> None:

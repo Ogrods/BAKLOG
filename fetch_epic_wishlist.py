@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid
 from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 
 GAMES_WISHLIST_EPIC_JSON = Path("games_wishlist_epic.json")
@@ -334,7 +334,10 @@ def main() -> int:
 
     print("Fetching Epic wishlist via headless storefront page...", flush=True)
     try:
-        html, url, api_payloads = _fetch_with_profile(dump=args.dump)
+        html, url, api_payloads = run_with_heartbeat(
+            lambda: _fetch_with_profile(dump=args.dump),
+            "Epic wishlist capture",
+        )
     except Exception as exc:  # noqa: BLE001
         msg = str(exc)
         is_transport = any(

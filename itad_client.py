@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 import requests
 
+from fetchers._progress import HeartbeatTimer
 from shared.money import country_to_currency, format_price, normalize_currency_code
 
 BASE = "https://api.isthereanydeal.com"
@@ -95,7 +96,10 @@ class ItadClient:
             return {}
         out: dict[str, dict] = {}
         chunk_size = 200
-        for i in range(0, len(game_ids), chunk_size):
+        total_chunks = max(1, (len(game_ids) + chunk_size - 1) // chunk_size)
+        hb = HeartbeatTimer(interval=25.0)
+        for chunk_idx, i in enumerate(range(0, len(game_ids), chunk_size), 1):
+            hb.tick_progress(chunk_idx, total_chunks, "ITAD prices", f"{len(out)} resolved")
             chunk = game_ids[i : i + chunk_size]
             entries = self._post("games/prices/v3", chunk, {"country": self.country})
             if not isinstance(entries, list):

@@ -24,7 +24,7 @@ from fetchers._base import (
     catalog_file,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from gog_client import GogAuthError, GogClient
 from gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
 from hltb_client import HltbClient
@@ -534,7 +534,7 @@ def main() -> int:
             return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
 
         if not products:
-            owned_ids = gog.get_owned_game_ids()
+            owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")
             print(f"Found {len(owned_ids)} owned IDs (building from details)...", flush=True)
             products = [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
         else:

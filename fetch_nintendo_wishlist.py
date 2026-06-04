@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid
 from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
 
@@ -586,7 +586,10 @@ def main() -> int:
     print("Fetching Nintendo wishlist via headless nintendo.com page...", flush=True)
 
     try:
-        html, url, api_payloads = _fetch_with_profile(dump=args.dump)
+        html, url, api_payloads = run_with_heartbeat(
+            lambda: _fetch_with_profile(dump=args.dump),
+            "Nintendo wishlist capture",
+        )
     except Exception as exc:  # noqa: BLE001
         # CDP/transport failures (browser launch, websocket, command timeout) are
         # not auth problems — don't flip the Connections chip to "expired" for them.

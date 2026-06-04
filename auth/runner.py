@@ -1069,27 +1069,26 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
     )
 
 
-EA_GRAPHQL_HOST = "service-aggregation-layer.juno.ea.com"
-EA_LOGIN_URL = "https://www.ea.com/login"
-EA_DEALS_URL = "https://www.ea.com/sales/deals"
-
-
 def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, str]:
-    """Confirm an ea.com web login and persist the profile.
+    """Confirm ea.com login, persist profile + web-session Bearer token."""
+    from ea_session import (
+        EA_DEALS_URL,
+        EA_GRAPHQL_HOST,
+        EA_LOGIN_URL,
+        normalize_bearer,
+        probe_ea_token,
+    )
 
-    We only verify the session works (by seeing the user's own browser fire an
-    authenticated GraphQL request); the durable credential is the saved browser
-    profile, which fetch_ea.py replays headlessly. We never store EA's secrets
-    or impersonate the desktop client.
-    """
-    saw_token = {"ok": False}
+    saw_token: dict[str, Any] = {"ok": False, "value": ""}
 
     def on_request(request) -> None:
-        if EA_GRAPHQL_HOST not in request.url:
+        if EA_GRAPHQL_HOST not in (request.url or ""):
             return
         auth = request.headers.get("authorization") or request.headers.get("Authorization")
-        if auth and auth.strip():
+        token = normalize_bearer(auth)
+        if token:
             saw_token["ok"] = True
+            saw_token["value"] = token
 
     context.on("request", on_request)
     try:
@@ -1101,8 +1100,15 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
     last_hint = 0.0
     nudged = False
     while time.time() < deadline:
-        if saw_token["ok"]:
-            return {"EA_PROFILE": "ready"}
+        if saw_token["ok"] and saw_token["value"]:
+            cookies = context.cookies()
+            if probe_ea_token(saw_token["value"], cookies).get("ok"):
+                return {
+                    "EA_PROFILE": "ready",
+                    "EA_BEARER_TOKEN": saw_token["value"],
+                }
+            saw_token["ok"] = False
+            saw_token["value"] = ""
 
         url = (page.url or "").lower()
         signed_in = "ea.com" in url and "login" not in url and "signin.ea.com" not in url
@@ -1125,7 +1131,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
             if "signin.ea.com" in url or "/login" in url:
                 msg = "Sign in to your EA account in the browser window."
             elif signed_in and not saw_token["ok"]:
-                msg = "Signed in — loading EA deals to confirm your session."
+                msg = "Signed in — wait for the deals page to finish loading so we can save your session."
             else:
                 msg = "Keep the window open while we confirm your EA App session."
             session.emit("waiting_for_user", {"message": msg})

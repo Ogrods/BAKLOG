@@ -3269,6 +3269,20 @@
   ];
   const saberRows = (arr) => arr.map((r) => [el("strong", {}, r.stat), codeText(r.fn), r.what, r.formula]);
 
+  // Stat de-clustering — js/stat-families.js. spreadByFamily() spaces similar
+  // stats across the marquee, spotlight rotation, and insight ticker.
+  const STAT_FAMILIES = [
+    { family: "completion", covers: "trophy/achievement %, gamerscore, 100%, platinum potential, Completionist, Almost mastered" },
+    { family: "time", covers: "HLTB hours, time-to-clear, marathons/epics, work-weeks, shelf days, pace, time capsule" },
+    { family: "rating", covers: "review %, Mendoza, rated %, hidden gems, top-rated, guilty pleasure" },
+    { family: "deals", covers: "sale/cut, steal, MSRP, wishlist value, savings, historical low, whale, cheap thrill" },
+    { family: "counts", covers: "games owned, stores, backlog/completed/in-progress, touched, co-op ready" },
+    { family: "saber", covers: "OPS/OBP/SLG/ISO, barrel, magic #, BV+, Genre+/Store+, win shares, Pythagorean" },
+    { family: "identity", covers: "top dev/publisher/genre/decade/era, A–Z gaps, one-hit dev, monogamy" },
+    { family: "activity", covers: "newest add, added this year, net adds, add velocity, finish streak, most-played" },
+  ];
+  const familyRows = (arr) => arr.map((r) => [el("strong", {}, r.family), r.covers]);
+
   // ---------- Metric appearance weighting (METRIC_WEIGHT in js/dashboard-insights.js) ----------
   const METRIC_TIERS = [
     { tier: "friendly", weight: "1.0", behavior: "Always shown. Plain-language, no baseball knowledge needed." },
@@ -3475,7 +3489,8 @@
         el("div", { class: "callout-title" }, "How it shows up"),
         el("div", { class: "callout-body" },
           "Marquee chips scroll under the hero; one insight pill rotates at a time (too-wide lines are discarded, not truncated). ",
-          codeText("METRIC_WEIGHT"), " tiers control rarity — friendly/normal always appear; cryptic baseball jargon (~15%); Kojima easter egg (~3%). The ",
+          codeText("METRIC_WEIGHT"), " tiers control rarity — friendly/normal always appear; cryptic baseball jargon (~15%); Kojima easter egg (~3%). After weighting, a ",
+          el("strong", {}, "family de-clustering pass"), " (", codeText("spreadByFamily"), ") spaces similar stats so the marquee, spotlight rotation, and insight ticker never show two same-family items back-to-back. The ",
           el("strong", {}, "Mendoza line"), " is median backlog rating; Genre+/Store+/BV+ use ", el("strong", {}, "100 = library average"), "."),
       ),
       el("div", { class: "card" }, tableEl(["Tier", "Weight", "Behavior"], METRIC_TIERS.map((r) => [tierTag(r.tier), codeText(r.weight), r.behavior]))),
@@ -3530,6 +3545,18 @@
       el("h2", {}, "Where it surfaces"),
       el("p", { class: "muted" }, "Hero completion %, magic #, and marquee all pull from the same snapshot."),
       el("div", { class: "card" }, tableEl(["Surface", "Lives in", "Shows"], SABER_SURFACES.map((r) => [r.surface, codeText(r.where), r.shows]))),
+
+      el("h2", {}, "Family de-clustering"),
+      el("p", { class: "muted" }, "Spacing similar stats so the eye gets variety — ", codeText("js/stat-families.js"), "."),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Why spread by family"),
+        el("div", { class: "callout-body" },
+          "The marquee pushes ~100 chips in a fixed order, so siblings clustered (e.g. ", el("strong", {}, "one push from 100%"), " landed next to ", el("strong", {}, "platinum potential"), "). ",
+          codeText("spreadByFamily"), " tags each chip/eyebrow/insight with a family via ", codeText("familyForLabel"), " / ", codeText("familyForEyebrow"), " / ", codeText("familyForInsight"),
+          ", then greedily reorders so no two adjacent items share a family. ", codeText("wrap: true"), " also fixes the loop seam (marquee track is duplicated; spotlight + insight tickers rotate). Unknown labels become their own family, so they never block placement, and a single dominant family degrades gracefully (spacing is best-effort, never drops items)."),
+      ),
+      el("div", { class: "card" }, tableEl(["Family", "Covers"], familyRows(STAT_FAMILIES))),
+      el("p", { class: "muted" }, "Wired into ", codeText("buildMarqueeItems"), ", ", codeText("pickSpotlightGames"), ", and ", codeText("startInsightRotation"), " · tested in ", codeText("tests/stat-families.test.js"), "."),
 
       el("h2", {}, "Mouseover tooltips"),
       el("p", { class: "muted" }, "Every metric, insight, and sabermetric explains its calculation on hover. Copy lives in one place — ", codeText("js/metric-tips.js"), " — and is resolved at render time so the ~100 metric builders stay untouched."),

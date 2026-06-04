@@ -116,12 +116,12 @@ def test_heartbeat_timer_tick_progress_emits_after_interval(capsys, monkeypatch)
 
 
 def test_heartbeat_timer_emits_after_interval(capsys):
-    import time as time_mod
-
     timer = HeartbeatTimer(interval=0.02)
     timer.tick("silent")
     assert capsys.readouterr().out == ""
-    time_mod.sleep(0.03)
+    # Simulate elapsed silence deterministically; real sleep margins are flaky
+    # on loaded CI runners where monotonic()/sleep() resolution varies.
+    timer._last -= timer.interval + 0.01
     timer.tick("still working")
     assert "still working" in capsys.readouterr().out
     timer.tick("no repeat")

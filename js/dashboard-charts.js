@@ -828,10 +828,20 @@ export function renderDashboardCharts(games) {
     else bucketCounts[5]++;
   });
   const hltbBucketColors = ["#22c55e", "#84cc16", "#eab308", "#f59e0b", "#ef4444", "#b91c1c"];
+  const hltbBarDuration = 600;
+  // Slight left-to-right stagger: each bar starts a touch after the one to its left.
+  const hltbBarDelay = (ctx) =>
+    ctx.type === "data" && ctx.mode === "default" ? ctx.dataIndex * 60 : 0;
   setDashboardChart("chartHltbHist", {
     type: "bar",
     data: { labels: buckets, datasets: [{ label: "Backlog games", data: bucketCounts, backgroundColor: hltbBucketColors, borderColor: hltbBucketColors, borderWidth: 1 }] },
     options: dashChartOptions({
+      // easeOutBack overshoots the final height a hair then settles — a slight
+      // bounce as each bar hits the top. Delay creates the left-to-right cascade.
+      animation: { duration: hltbBarDuration, easing: "easeOutBack", delay: hltbBarDelay },
+      animations: {
+        y: { type: "number", duration: hltbBarDuration, easing: "easeOutBack", delay: hltbBarDelay },
+      },
       plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } },
       onClick(_evt, elements) {
@@ -1042,7 +1052,7 @@ export function renderDashboardCharts(games) {
     },
   };
   const scatterAnimReduced = prefersReducedMotion();
-  const scatterAnimDuration = 600;
+  const scatterAnimDuration = 1000;
   const ratingGradient = (rating, alpha) => {
     const t = Math.max(0, Math.min(1, rating / 100));
     const r = Math.round(245 + (16 - 245) * t);

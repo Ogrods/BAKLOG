@@ -14,8 +14,8 @@ import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from auth.session_probe import probe_gog_session
 from auth.manager import is_local_provider_disabled, mark_connected
+from auth.session_probe import probe_gog_session
 from fetchers._authoritative import GOG
 from fetchers._base import (
     add_allow_empty_arg,
@@ -25,10 +25,6 @@ from fetchers._base import (
     refuse_empty_result,
     write_catalog_text,
 )
-
-# Stable metadata that the other GOG source may have populated (web has release_date;
-# local Galaxy DB often does not). Carried on source flip after merge_cached_row.
-_GOG_CROSS_SOURCE_CARRY = ("release_date", "genres", "header_image", "library_image", "tags")
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 from gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
@@ -37,6 +33,10 @@ from hltb_client import HltbClient
 GAMES_GOG_JSON = Path("games_gog.json")
 HLTB_DELAY_SEC = 1.0
 LEGACY_ROW_SOURCE = "web"
+
+# Stable metadata that the other GOG source may have populated (web has release_date;
+# local Galaxy DB often does not). Carried on source flip after merge_cached_row.
+_GOG_CROSS_SOURCE_CARRY = ("release_date", "genres", "header_image", "library_image", "tags")
 
 
 def _configure_stdout() -> None:
@@ -354,32 +354,6 @@ def _gog_galaxy_hint(db_path: Path | None) -> str:
     return ""
 
 
-def _web_fetch_products(gog: GogClient, refresh: bool) -> list[dict] | None:
-    """Return owned products from the web API, or None if auth fails entirely."""
-    try:
-        return gog.get_all_filtered_products(refresh=refresh)
-    except GogAuthError:
-        print(
-            "GOG library API rejected the session; trying owned-game ID list...",
-            flush=True,
-        )
-        try:
-            owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")
-        except GogAuthError:
-            return None
-        if not owned_ids:
-            return None
-        print(
-            f"Warning: degraded fetch via per-game details ({len(owned_ids)} IDs).",
-            flush=True,
-        )
-        return [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
-    except requests.HTTPError as e:
-        if e.response is not None and e.response.status_code in (401, 403):
-            return None
-        raise
-
-
 def resolve_source(requested: str, db_path: Path | None) -> str:
     src = (requested or "auto").strip().lower()
     if src not in ("auto", "web", "local"):
@@ -574,10 +548,10 @@ def main() -> int:
                 }
 
             current_rows.append(
-                merge_cached_row(
+                merge_gog_cached_row(
                     _build_game_row_from_local(rec, hltb, source),
                     cached,
-                    authoritative=GOG,
+                    source=source,
                     hltb_updated=hltb_updated,
                 )
             )
@@ -596,12 +570,36 @@ def main() -> int:
 
         gog = GogClient(gog_al)
         print("Fetching owned games from GOG (web)...", flush=True)
-        products = _web_fetch_products(gog, args.refresh)
-        if products is None:
-            msg = GOG_AUTH_MESSAGE + _gog_galaxy_hint(db_path)
-            mark_invalid("gog", error=msg)
-            stats.error(msg)
-            return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+        try:
+            products = gog.get_all_filtered_products(refresh=args.refresh)
+        except GogAuthError:
+            print(
+                "GOG library API rejected the session; trying owned-game ID list...",
+                flush=True,
+            )
+            products = None
+            try:
+                owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")
+            except GogAuthError:
+                owned_ids = []
+            if owned_ids:
+                print(
+                    f"Warning: degraded fetch via per-game details ({len(owned_ids)} IDs).",
+                    flush=True,
+                )
+                products = [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
+            if products is None:
+                msg = GOG_AUTH_MESSAGE + _gog_galaxy_hint(db_path)
+                mark_invalid("gog", error=msg)
+                stats.error(msg)
+                return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code in (401, 403):
+                msg = GOG_AUTH_MESSAGE + _gog_galaxy_hint(db_path)
+                mark_invalid("gog", error=msg)
+                stats.error(msg)
+                return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+            raise
 
         if not products:
             owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")

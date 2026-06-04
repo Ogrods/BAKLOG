@@ -214,13 +214,13 @@ describe('maybeAutoRefreshItad', () => {
     expect(runFn).not.toHaveBeenCalled();
   });
 
-  it('returns early if last auto-run was less than 60min ago', () => {
+  it('returns early if last auto-run was less than the refresh interval ago', () => {
     const runFn = vi.fn();
     const now = Date.now();
     const ok = maybeAutoRefreshItad({
       getHour: () => 10,
       now,
-      getLastRun: () => now - 30 * 60_000,
+      getLastRun: () => now - ITAD_AUTO_REFRESH_INTERVAL_MS / 2,
       isApiAvailable: () => true,
       stateFor: () => null,
       runFn,

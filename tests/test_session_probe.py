@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from auth.session_probe import (
     probe_browser_session,
     probe_gog_session,
     probe_xbox_wishlist_session,
 )
-from gog_client import GogAuthError, GOG_AUTH_MESSAGE
+from gog_client import GOG_AUTH_MESSAGE, GogAuthError
 
 
 class TestProbeGogSession:

@@ -21,6 +21,7 @@ import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from auth.session_probe import probe_gog_session
 from fetchers._base import (
     add_allow_empty_arg,
     refuse_drift_result,
@@ -28,7 +29,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
-from auth.session_probe import probe_gog_session
 from gog_client import GogAuthError, GogClient
 from hltb_client import HltbClient
 from shared.money import format_price

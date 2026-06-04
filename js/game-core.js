@@ -343,7 +343,7 @@ export function spotlightCropForAspect(ratio) {
   }
   if (ratio >= 2) return { fit: "cover", pos: "50% 40%", portrait: false };
   if (ratio >= 1.4) return { fit: "cover", pos: "35% center", portrait: false };
-  return { fit: "cover", pos: "center top", portrait: false };
+  return { fit: "contain", pos: "center", portrait: true };
 }
 
 const EPIC_PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]*$/;

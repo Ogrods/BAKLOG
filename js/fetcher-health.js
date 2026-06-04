@@ -239,6 +239,9 @@ if (typeof document !== 'undefined') {
     }
     try { renderDashboardFetcherHealth(); } catch (_) { /* not mounted */ }
   });
+  document.addEventListener('baklog:reconnect-dismiss', ev => {
+    for (const p of ev?.detail?.providers || []) dismissReconnectRequired(p);
+  });
 }
 
 /** Provider to reconnect for a fetcher chip (skipped when a sibling is already connected). */

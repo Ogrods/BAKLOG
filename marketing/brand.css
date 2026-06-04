@@ -288,6 +288,55 @@ section + section {
 .pill-emerald { background: rgba(34, 197, 94, 0.15); color: var(--emerald); border-color: rgba(34, 197, 94, 0.35); }
 .pill-amber { background: rgba(245, 158, 11, 0.15); color: var(--amber); border-color: rgba(245, 158, 11, 0.35); }
 
+/* Sabermetrics deck samples */
+.saber-pill-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.saber-pill {
+  display: inline-block;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--slate-300);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  white-space: nowrap;
+}
+.saber-pill strong { color: var(--text); font-weight: 600; }
+.saber-pill-cryptic { border-color: rgba(56, 189, 248, 0.35); }
+.saber-chip-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(51, 65, 85, 0.6);
+}
+.saber-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--slate-500);
+}
+.saber-chip em {
+  font-style: normal;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--sky);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.saber-chip strong { color: var(--text); font-weight: 700; }
+
 /* CTA */
 .btn {
   display: inline-flex;

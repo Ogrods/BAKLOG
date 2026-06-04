@@ -480,7 +480,8 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
             platforms = []
         fetchers[key] = {
             "label": label,
-            "argv": _argv(script, *map(str, extra_args)),
+            # Absolute script path so the launch never depends on subprocess cwd.
+            "argv": _argv(str(ROOT / script), *map(str, extra_args)),
             "refreshArgs": [str(a) for a in refresh_args],
             "metaKey": entry.get("metaKey", key),
             "group": entry.get("group", "library"),
@@ -1462,7 +1463,10 @@ class RunManager:
             try:
                 p = popen_fetcher(  # noqa: S603 - argv is fixed in FETCHERS, not user input
                     argv,
-                    cwd=str(profile_root(profile_id=run.profile_id)),
+                    # Run from repo root so the relative script path in argv resolves;
+                    # profile scoping is via BAKLOG_PROFILE in env + resolve_catalog_path,
+                    # not cwd (profiles/<id>/ holds data/cache, not the fetch_*.py scripts).
+                    cwd=str(ROOT),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     bufsize=1,
@@ -2120,7 +2124,8 @@ class Handler(SimpleHTTPRequestHandler):
                     {
                         "key": k,
                         "label": v["label"],
-                        "cmd": " ".join(v["argv"][1:]),
+                        # argv[1] is now an absolute script path; show just the basename.
+                        "cmd": " ".join([Path(v["argv"][1]).name, *v["argv"][2:]]) if len(v["argv"]) > 1 else "",
                         "metaKey": v.get("metaKey", k),
                         "group": v.get("group", "library"),
                         "color": v.get("color"),

@@ -79,6 +79,10 @@ def child_pids_of(parent_pid: int | None = None) -> set[int]:
             return _win_child_pids_snapshot(ppid)
         except OSError:
             return set()
+        except AttributeError:
+            # sys.platform was monkeypatched to "win32" on a non-Windows host
+            # (ctypes.windll only exists on real Windows). Fall back to ps below.
+            pass
     try:
         out = subprocess.check_output(
             ["ps", "-o", "pid=", "--ppid", str(ppid)],

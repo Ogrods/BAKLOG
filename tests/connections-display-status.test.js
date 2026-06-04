@@ -5,25 +5,25 @@ const STATUS_LABEL = {
   connected: 'Connected',
   unverified: 'Unverified',
   disconnected: 'Not connected',
+  expired: 'Session expired',
 };
 
 describe('displayStatus', () => {
-  it('maps expired to disconnected for pill display', () => {
-    expect(displayStatus('expired')).toBe('disconnected');
+  it('keeps expired as its own pill state', () => {
+    expect(displayStatus('expired')).toBe('expired');
   });
 
-  it('passes through the three primary states', () => {
+  it('passes through the primary states', () => {
     expect(displayStatus('connected')).toBe('connected');
     expect(displayStatus('unverified')).toBe('unverified');
     expect(displayStatus('disconnected')).toBe('disconnected');
   });
 
-  it('produces only the three visible pill labels for primary states', () => {
-    for (const key of ['connected', 'unverified', 'disconnected']) {
+  it('maps pill labels for connected, unverified, disconnected, and expired', () => {
+    for (const key of ['connected', 'unverified', 'disconnected', 'expired']) {
       const pill = displayStatus(key);
       expect(STATUS_LABEL[pill]).toBeDefined();
-      expect(['Connected', 'Unverified', 'Not connected']).toContain(STATUS_LABEL[pill]);
     }
-    expect(STATUS_LABEL[displayStatus('expired')]).toBe('Not connected');
+    expect(STATUS_LABEL[displayStatus('expired')]).toBe('Session expired');
   });
 });

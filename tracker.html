@@ -78,6 +78,48 @@
     .stat-success .stat-value { color: var(--green); }
     .stat-warning .stat-value { color: var(--amber); }
 
+    .tier { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .tier-friendly { color: var(--green); }
+    .tier-normal { color: var(--text-mute); }
+    .tier-moderate { color: var(--amber); }
+    .tier-cryptic { color: var(--accent); }
+    .tier-kojima { color: #c4b5fd; }
+
+    /* Sabermetrics panel — dashboard pill + marquee samples (mirrors app.css) */
+    .saber-showcase { margin: 1.25rem 0 1.5rem; }
+    .saber-showcase-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-mute); margin-bottom: 0.5rem; font-weight: 600; }
+    .saber-pill-stack { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .saber-chip-strip { display: flex; flex-wrap: wrap; gap: 12px 22px; padding: 10px 0 4px; border-top: 1px solid var(--border); }
+    .dash-marquee-item { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; }
+    .dash-marquee-item strong { color: #f1f5f9; font-weight: 700; }
+    .dash-marquee-item .dash-marquee-label { color: #94a3b8; }
+    .dash-marquee-icon {
+      width: 22px; height: 22px; border-radius: 999px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(56, 189, 248, 0.12); color: #38bdf8;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .dash-marquee-icon.is-amber { background: rgba(251, 191, 36, 0.15); color: #fcd34d; }
+    .dash-marquee-icon.is-emerald { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+    .dash-marquee-icon.is-violet { background: rgba(168, 85, 247, 0.15); color: #c4b5fd; }
+    .dash-marquee-icon.is-rose { background: rgba(244, 114, 182, 0.15); color: #fda4af; }
+    .dash-insight {
+      display: inline-block; font-size: 12px; line-height: 1.5; color: #cbd5e1;
+      background: rgba(15, 23, 42, 0.65); border: 1px solid #334155;
+      border-radius: 999px; padding: 6px 12px; white-space: nowrap;
+    }
+    .dash-insight.is-visible { opacity: 1; }
+    .dash-insight strong { color: #f1f5f9; font-weight: 600; }
+    details.saber-ref-table { margin: 0.75rem 0 1.25rem; }
+    details.saber-ref-table > summary {
+      cursor: pointer; font-weight: 600; color: var(--text); padding: 0.45rem 0;
+      list-style: none; display: flex; align-items: center; gap: 0.5rem;
+    }
+    details.saber-ref-table > summary::-webkit-details-marker { display: none; }
+    details.saber-ref-table > summary::before { content: "▸"; color: var(--accent); font-size: 0.85rem; }
+    details.saber-ref-table[open] > summary::before { content: "▾"; }
+    details.saber-ref-table .card { margin-top: 0.5rem; }
+
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     th, td { text-align: left; padding: 0.55rem 0.65rem; border-bottom: 1px solid var(--border); vertical-align: top; }
     th { color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.7rem; font-weight: 600; }
@@ -242,6 +284,7 @@
     { id: "triage", label: "Triage" },
     { id: "debug", label: "Debug tools" },
     { id: "monetize", label: "Monetization" },
+    { id: "sabermetrics", label: "Sabermetrics" },
   ];
 
   // ---------- Persisted state: legacy tab migration ----------
@@ -3130,6 +3173,357 @@
     );
   }
 
+  // ---------- Render: Sabermetrics ----------
+  // Baseball-inspired backlog stats. Source of truth is js/sabermetrics.js —
+  // a single LibrarySnapshot is built per dashboard render and reused by the
+  // hero row, insight ticker, marquee, the WAR pill on library rows, the
+  // spotlight eyebrows. Genre+/Store+/Aging now surface as marquee items.
+  const SABER_SLASH = [
+    { stat: "AVG", fn: "completionAverage", what: "Completion average — your batting average for finishing what you start.", formula: "finished / (finished + unfinished)" },
+    { stat: "OBP", fn: "startRate / backlogObp", what: "On-base percentage — how often a game gets off the bench and into rotation.", formula: "touched / total" },
+    { stat: "SLG", fn: "sluggingPct / backlogSlg", what: "Slugging — finishes weighted by game length (quick=1 … epic=4 bases).", formula: "length bases of finished / (finished + unfinished)" },
+    { stat: "OPS", fn: "backlogOps", what: "On-base plus slugging — the headline summary of backlog productivity.", formula: "OBP + SLG" },
+    { stat: "ISO", fn: "closerPower", what: "Isolated power — extra-base ability, i.e. tackling long games vs just clearing shorts.", formula: "SLG − AVG" },
+    { stat: "K%", fn: "abandonRate", what: "Strikeout rate — share of started games left unfinished.", formula: "unfinished / touched" },
+    { stat: "Barrel%", fn: "barrelRate", what: "Barrel rate — share of library that is elite-rated and short enough to crush.", formula: "count(85%+ & ≤12h) / total" },
+    { stat: "QS%", fn: "qualityStartRate", what: "Quality start rate — played games where you put in a real shift.", formula: "count(playtime ≥ 40% of HLTB) / played" },
+    { stat: "Hoard%", fn: "hoardRate", what: "Hoard rate — owned but never even launched.", formula: "count(0 playtime) / total" },
+    { stat: "Pythag", fn: "pythagoreanCompletion", what: "Pythagorean expectation — hours-based expected completion vs actual completionRate (excl. skip); delta compares same 0–1 scale.", formula: "expected = played²/(played²+remaining²); actual = completionRate" },
+  ];
+  const SABER_VALUE = [
+    { stat: "WAR", fn: "backlogWar", what: "Wins above replacement — a game's value over a replacement-level backlog title, with bonuses for length, quick high-rated wins, and live deals. Finished/unfinished games are discounted.", formula: "(rating − Mendoza) / 10 + tier/deal bonuses" },
+    { stat: "BV+", fn: "backlogValuePlus", what: "Backlog value plus — rating per unit of time invested, indexed so 100 = league average.", formula: "(adjRating / log₂(hrs+2)) vs league, ×100" },
+    { stat: "Adj rating", fn: "luckAdjustedRating", what: "Luck-adjusted rating — regresses thin-review-count games toward the library mean (small sample = less trust).", formula: "raw·w + rBar·(1−w), w = min(1, n/50)" },
+    { stat: "wOBA", fn: "wishlistWoba", what: "Weighted on-base average — deal quality for wishlist titles (mirrors deals.computeWishlistWoba).", formula: "weighted blend of cut, rating, low-price" },
+    { stat: "Length tier", fn: "lengthTier / lengthBases", what: "Hit classification by HLTB main: quick (≤5h), short (≤15h), long (≤40h), epic (40h+).", formula: "HLTB main → tier → 1–4 bases" },
+  ];
+  const SABER_INDEX = [
+    { stat: "Genre+", fn: "genrePlusMap", what: "Park factor by genre — average rating of a genre vs the whole library. 100 = league average.", formula: "(genre avg rating / rBar) × 100" },
+    { stat: "Store+", fn: "storePlusMap", what: "Park factor by store — average rating per store vs library. Surfaces which storefronts you rate higher.", formula: "(store avg rating / rBar) × 100" },
+    { stat: "Mendoza line", fn: "replacementRating", what: "Replacement level — the median backlog rating. WAR is measured against this baseline.", formula: "median(backlog ratings)" },
+    { stat: "rBar", fn: "libraryMeanRating", what: "League average rating — the mean rating across all rated games. Denominator for every '+' index.", formula: "mean(rated game ratings)" },
+  ];
+  const SABER_STANDINGS = [
+    { stat: "Magic #", fn: "magicNumber", what: "Magic number — finishes still needed to clinch a target library completion.", formula: "ceil(nonSkip × goal%) − finished" },
+    { stat: "Backlog pace", fn: "backlogPace", what: "Pace — median HLTB main hours across the backlog, a sense of typical commitment per pick.", formula: "median(backlog HLTB main)" },
+    { stat: "QW speed index", fn: "quickWinSpeedIndex", what: "Quick-win speed index — count of well-rated short backlog games ready to clear fast.", formula: "count(backlog & 75%+ & ≤ maxHrs)" },
+    { stat: "Power-speed #", fn: "powerSpeedNumber", what: "Power-speed number — harmonic balance of finishing long games (power) vs short ones (speed).", formula: "2·power·speed / (power + speed)" },
+    { stat: "Streak", fn: "hotColdStreak", what: "Hot/cold streak — recent finishing momentum based on last-played finishes.", formula: "recency of finished games" },
+    { stat: "Cleanup #", fn: "cleanupCandidateCount", what: "Cleanup candidates — games flagged for pruning from the library.", formula: "count(isCleanupCandidate)" },
+    { stat: "Trophy eff.", fn: "trophyEfficiency", what: "Trophy efficiency — average achievement/trophy completion across tracked games.", formula: "mean(trophy_progress)" },
+    { stat: "Gamerscore eff.", fn: "gamerscoreEfficiency", what: "Gamerscore efficiency — earned vs available Xbox gamerscore.", formula: "current / total gamerscore" },
+    { stat: "Win shares", fn: "winSharesByGenre", what: "Win shares — finished games attributed across their genres (top 8).", formula: "count(finished) per genre" },
+    { stat: "Aging curve", fn: "agingCurveBuckets", what: "Aging curve — finish rate bucketed by how long a game has sat in the library (<30d, 30–90d, 90d–1y, 1y+).", formula: "finish % per first-seen age bucket" },
+    { stat: "Top WAR", fn: "topWarGame", what: "MVP pick — highest-WAR game still in backlog/next/playing.", formula: "max WAR over unfinished" },
+  ];
+  const SABER_FLAGS = [
+    { stat: "Barrel", fn: "isBarrel", what: "A barreled ball — 85%+ rated and ≤12h. Drives the spotlight 'Barrel' eyebrow.", formula: "rating ≥ 85 && HLTB ≤ 12h" },
+    { stat: "Leverage pick", fn: "isLeveragePick", what: "High-leverage at-bat — strong game (80%+) on sale and ≤15h. Boosts spotlight priority.", formula: "rating ≥ 80 && on sale && HLTB ≤ 15h" },
+  ];
+  const SABER_SURFACES = [
+    { surface: "Insight ticker (pill)", where: "js/dashboard-insights.js", shows: "Curated one-liners (regular + saber), weight-filtered then clamped to one line — anything too wide is discarded, not truncated" },
+    { surface: "Marquee", where: "js/dashboard-insights.js", shows: "Regular metrics + all sabermetrics, mixed and weight-filtered per visit (cryptic stats appear rarely)" },
+    { surface: "Library row pill", where: "js/table-ui.js", shows: "{WAR} pill with BV+ and adjusted-rating tooltip (≥ 0.5 WAR)" },
+    { surface: "Spotlight eyebrows", where: "js/dashboard-spotlight.js", shows: "'Barrel' and leverage-pick priority boosts" },
+  ];
+  // Mouseover tooltip system — js/metric-tips.js is the single source of copy.
+  // Resolved at the final render stage so ~100 push()/add() call sites stay untouched.
+  const TOOLTIP_SURFACES = [
+    { surface: "Marquee chips", how: "marqueeTip(label)", note: "Exact key → normalizeLabel (strips trailing (…) and year) → PREFIX_TIPS (below Mendoza, added in, net adds in, playtime in) → hot/warm/cold streak fallback." },
+    { surface: "Insight pill", how: "insightTip(html)", note: "Strips HTML, takes the concept before ':', then keyword rules (work-weeks, pace, 'still untouched' time capsule, finish-by-age) before falling back to marqueeTip." },
+    { surface: "Spotlight eyebrow", how: "eyebrowTip(canonical)", note: "Chip renders a randomized eyebrowVariant() display label, but the title resolves from the canonical eyebrow so cryptic variants (No-doubter, Squared up, Sleeper) self-explain." },
+    { surface: "Hero pillars + tagline", how: "static title attrs", note: "Played / Backlog / Avg review pillars and the 'yrs to clear at 2h/day' + 'deals live' tagline spans (js/dashboard.js)." },
+    { surface: "WAR / wOBA pills", how: "static title attrs", note: "Library-row WAR pill (BV+ / adjusted rating) and wishlist wOBA pill (js/deals.js)." },
+  ];
+  const TOOLTIP_AUDIT = [
+    { item: "Time capsule insight", status: "Fixed", note: "'Added 2019, still untouched: …' resolved no tip (concept slice missed the 'Added' key). Added a 'still untouched' keyword rule + reworded the 'Added' copy." },
+    { item: "Hero pillars", status: "Fixed", note: "Played / Backlog / Avg review now carry title attributes." },
+    { item: "Hero tagline", status: "Fixed", note: "'yrs to clear at 2h/day' and 'deals live' spans now tipped (completion span already was)." },
+    { item: "Variant/tip drift", status: "Guarded", note: "Vitest asserts every EYEBROW_VARIANTS canonical has an EYEBROW_TIPS entry and variants[0] === canonical, so a new cryptic variant can't ship without an explanation." },
+    { item: "Marquee / insight / eyebrow coverage", status: "Verified", note: "All marquee labels, 16 insight concepts, and 29 spotlight eyebrows resolve to copy. Kojima easter egg intentionally untipped." },
+  ];
+  const saberRows = (arr) => arr.map((r) => [el("strong", {}, r.stat), codeText(r.fn), r.what, r.formula]);
+
+  // ---------- Metric appearance weighting (METRIC_WEIGHT in js/dashboard-insights.js) ----------
+  const METRIC_TIERS = [
+    { tier: "friendly", weight: "1.0", behavior: "Always shown. Plain-language, no baseball knowledge needed." },
+    { tier: "normal", weight: "1.0", behavior: "Always shown. Default tier for regular (non-saber) metrics." },
+    { tier: "moderate", weight: "0.5", behavior: "Shown on roughly half of page loads. Intuitive once seen." },
+    { tier: "cryptic", weight: "0.15", behavior: "Rare. Baseball-jargon stats (OPS, OBP, K%, ISO, SLG, BV+, WAR, Pythagorean)." },
+    { tier: "kojima", weight: "0.03", behavior: "Super-rare easter egg." },
+  ];
+  const tierTag = (tier) => el("span", { class: "tier tier-" + tier }, tier);
+
+  // Regular (non-saber) marquee chips — js/dashboard-insights.js buildMarqueeItems.
+  // Sabermetric chips in the same marquee are documented in the stat tables above.
+  const REGULAR_METRICS = [
+    { group: "Counts", metric: "games owned", when: "total > 0", tier: "normal" },
+    { group: "Counts", metric: "stores", when: "distinct stores > 0", tier: "normal" },
+    { group: "Counts", metric: "wishlists tracked", when: "wishlist sources > 0", tier: "normal" },
+    { group: "Counts", metric: "itch games", when: "itch game count > 0", tier: "normal" },
+    { group: "Counts", metric: "in backlog", when: "backlog > 0", tier: "normal" },
+    { group: "Counts", metric: "completed", when: "finished > 0", tier: "normal" },
+    { group: "Counts", metric: "games touched", when: "playtime > 0 count", tier: "normal" },
+    { group: "Counts", metric: "in progress", when: "status playing", tier: "normal" },
+    { group: "Counts", metric: "queued next", when: "status next", tier: "normal" },
+    { group: "Counts", metric: "left unfinished", when: "status unfinished", tier: "normal" },
+    { group: "Rates", metric: "completion (excl. skip)", when: "nonSkip > 0", tier: "normal" },
+    { group: "Rates", metric: "ever touched", when: "total > 0", tier: "normal" },
+    { group: "Rates", metric: "of library rated", when: "rated games > 0", tier: "normal" },
+    { group: "Hours", metric: "all-time played", when: "playedHrs > 0", tier: "normal" },
+    { group: "Hours", metric: "avg time per played game", when: "touched > 0", tier: "normal" },
+    { group: "Hours", metric: "most-played", when: "max playtime > 0", tier: "normal" },
+    { group: "Hours", metric: "avg backlog main", when: "backlog HLTB present", tier: "normal" },
+    { group: "Hours", metric: "median backlog main", when: "backlog HLTB present", tier: "normal" },
+    { group: "Hours", metric: "to clear at 2h/day", when: "backlogHrs > 0", tier: "normal" },
+    { group: "Hours", metric: "to clear at 4h/day", when: "backlogHrs > 0", tier: "normal" },
+    { group: "Hours", metric: "non-stop at 8h/day", when: "backlogHrs > 0", tier: "normal" },
+    { group: "HLTB buckets", metric: "longest backlog", when: "backlog HLTB present", tier: "normal" },
+    { group: "HLTB buckets", metric: "shortest backlog", when: "backlog HLTB > 0", tier: "normal" },
+    { group: "HLTB buckets", metric: "under 2h to beat", when: "backlog ≤ 2h count", tier: "normal" },
+    { group: "HLTB buckets", metric: "under 5h to beat", when: "backlog ≤ 5h count", tier: "normal" },
+    { group: "HLTB buckets", metric: "50h+ marathons", when: "backlog ≥ 50h count", tier: "normal" },
+    { group: "HLTB buckets", metric: "100h+ epics", when: "backlog ≥ 100h count", tier: "normal" },
+    { group: "Reviews", metric: "avg review score", when: "rated games > 0", tier: "normal" },
+    { group: "Reviews", metric: "avg backlog review", when: "rated backlog > 0", tier: "normal" },
+    { group: "Reviews", metric: "median review score", when: "rated games > 0", tier: "normal" },
+    { group: "Achievements", metric: "avg achievement completion", when: "trophy_progress present", tier: "normal" },
+    { group: "Achievements", metric: "fully completed (100%)", when: "trophy 100% count", tier: "normal" },
+    { group: "Achievements", metric: "one push from 100%", when: "trophy 90–99% count", tier: "normal" },
+    { group: "Achievements", metric: "closest to 100%", when: "tracked < 100% exists", tier: "normal" },
+    { group: "Achievements", metric: "gamerscore earned", when: "xbox gamerscore > 0", tier: "normal" },
+    { group: "Achievements", metric: "of available gamerscore", when: "gamerscore total > 0", tier: "normal" },
+    { group: "Picks", metric: "90%+ unplayed", when: "rated ≥ 90 backlog", tier: "normal" },
+    { group: "Picks", metric: "80%+ unplayed", when: "rated ≥ 80 backlog", tier: "normal" },
+    { group: "Picks", metric: "hidden gems", when: "90%+ & never played", tier: "friendly" },
+    { group: "Picks", metric: "top-rated unplayed", when: "rated backlog exists", tier: "normal" },
+    { group: "Deals", metric: "steal-tier deals", when: "isStealDeal count", tier: "normal" },
+    { group: "Deals", metric: "on sale now", when: "wishlist on sale > 0", tier: "normal" },
+    { group: "Deals", metric: "top deal", when: "wishlist on sale > 0", tier: "normal" },
+    { group: "Deals", metric: "avg discount", when: "cuts present", tier: "normal" },
+    { group: "Deals", metric: "steepest cut", when: "cuts present", tier: "normal" },
+    { group: "Deals", metric: "wishlist value", when: "wishlist regular price sum > 0", tier: "normal" },
+    { group: "Deals", metric: "savings if bought now", when: "sale total < regular", tier: "normal" },
+    { group: "Catalog", metric: "oldest in library", when: "release years present", tier: "normal" },
+    { group: "Catalog", metric: "newest release owned", when: "release years present", tier: "normal" },
+    { group: "Catalog", metric: "top decade", when: "release years present", tier: "normal" },
+    { group: "Catalog", metric: "oldest unplayed", when: "dated backlog exists", tier: "normal" },
+    { group: "Catalog", metric: "newest add", when: "added_at present", tier: "normal" },
+    { group: "Catalog", metric: "added in {year}", when: "added this year > 0", tier: "normal" },
+    { group: "Catalog", metric: "top developer", when: "dev count > 1", tier: "normal" },
+    { group: "Catalog", metric: "top publisher", when: "pub count > 1", tier: "normal" },
+    { group: "Catalog", metric: "unique developers", when: "unique devs > 1", tier: "normal" },
+    { group: "Catalog", metric: "top genre", when: "genres present", tier: "normal" },
+    { group: "Catalog", metric: "unique genres", when: "unique genres > 1", tier: "normal" },
+    { group: "Catalog", metric: "biggest store", when: "stores present", tier: "normal" },
+    { group: "Catalog", metric: "games per store avg", when: "stores & total > 0", tier: "normal" },
+    { group: "Completion", metric: "longest game beaten", when: "finished w/ HLTB", tier: "normal" },
+    { group: "Completion", metric: "total hours finished", when: "finished HLTB sum > 0", tier: "friendly" },
+    { group: "Completion", metric: "completionist hours total", when: "completionist HLTB present", tier: "normal" },
+    { group: "Completion", metric: "avg completionist run", when: "completionist HLTB present", tier: "normal" },
+    { group: "Completion", metric: "co-op ready", when: "coop_online/coop_local count", tier: "friendly" },
+    { group: "Completion", metric: "net adds in {year}", when: "added or finished this year", tier: "normal" },
+    { group: "Completion", metric: "priority flagged", when: "personal priority > 0", tier: "normal" },
+    { group: "Easter egg", metric: "(1) gay character: you, the player.", when: "always pushed; ~3% appearance", tier: "kojima" },
+  ];
+  const regularRows = (arr) => arr.map((r) => [r.group, el("strong", {}, r.metric), codeText(r.when), tierTag(r.tier)]);
+
+  // Insight pill pool — js/dashboard-insights.js buildInsightPool.
+  const SABER_INSIGHTS = [
+    { insight: "Biggest backlog", shows: "Top backlog genre by HLTB hours", tier: "friendly" },
+    { insight: "Most played", shows: "Highest combined-playtime game", tier: "friendly" },
+    { insight: "Avg HLTB main", shows: "Mean backlog main-story hours", tier: "friendly" },
+    { insight: "Longest unplayed", shows: "Untouched backlog game with max HLTB", tier: "friendly" },
+    { insight: "Top deal", shows: "Best-scored wishlist deal + cut", tier: "friendly" },
+    { insight: "Average review", shows: "Mean rating across rated games", tier: "friendly" },
+    { insight: "Newest add", shows: "Most recently added game", tier: "friendly" },
+    { insight: "Hours per game", shows: "Played hours / library size", tier: "friendly" },
+    { insight: "Quick wins ready", shows: "75%+ & ≤ maxHrs backlog count", tier: "friendly" },
+    { insight: "Hidden gems", shows: "90%+ & never-played count", tier: "friendly" },
+    { insight: "Clutch pick", shows: "First leverage pick (isLeveragePick)", tier: "friendly" },
+    { insight: "Mendoza line", shows: "Replacement-level rating %", tier: "moderate" },
+    { insight: "Closest to 100%", shows: "Highest sub-100% trophy game", tier: "friendly" },
+    { insight: "Finish rate", shows: "Completion AVG (formatRate)", tier: "moderate" },
+    { insight: "Top WAR pick", shows: "Highest-WAR unfinished game", tier: "cryptic" },
+    { insight: "Pythagorean", shows: "Over/underperforming vs expected finish", tier: "cryptic" },
+  ];
+  const insightRows = (arr) => arr.map((r) => [el("strong", {}, r.insight), r.shows, tierTag(r.tier)]);
+
+  const CREATIVE_METRICS = [
+    { surface: "pill", metric: "Backlog diagnosis", module: "creative-metrics.js", when: "library ≥ 5; hoard + completion heuristics", tier: "moderate" },
+    { surface: "chip", metric: "comfort genre", module: "creative-metrics.js", when: "top genre by finished count", tier: "friendly" },
+    { surface: "chip", metric: "blind spot genre", module: "creative-metrics.js", when: "top genre in untouched backlog", tier: "friendly" },
+    { surface: "pill+chip", metric: "to clear at your pace", module: "creative-metrics.js", when: "backlogHrs / finishes last 12mo", tier: "friendly" },
+    { surface: "pill", metric: "finish backlog by age ?", module: "creative-metrics.js", when: "backlogHrs ≥ 10h; playful age copy", tier: "moderate" },
+    { surface: "pill", metric: "shelf warmer", module: "creative-metrics.js", when: "longest days on shelf (firstSeen, untouched)", tier: "moderate" },
+    { surface: "chip", metric: "avg shelf time", module: "creative-metrics.js", when: "mean days firstSeen → first play", tier: "friendly" },
+    { surface: "pill", metric: "time capsule", module: "creative-metrics.js", when: "oldest untouched + add year", tier: "moderate" },
+    { surface: "chip", metric: "MSRP sitting unplayed", module: "creative-metrics.js", when: "sum deal.regular on untouched backlog", tier: "friendly" },
+    { surface: "pill", metric: "whale", module: "creative-metrics.js", when: "priciest untouched by MSRP", tier: "moderate" },
+    { surface: "chip", metric: "cheapest thrill", module: "creative-metrics.js", when: "lowest MSRP among 75%+ untouched", tier: "friendly" },
+    { surface: "chip", metric: "free, never launched", module: "creative-metrics.js", when: "free/zero-price untouched count", tier: "friendly" },
+    { surface: "chip", metric: "add velocity", module: "creative-metrics.js", when: "adds per month from added_at span", tier: "friendly" },
+    { surface: "chip", metric: "playtime in one game", module: "creative-metrics.js", when: "monogamy % ≥ 25", tier: "friendly" },
+    { surface: "pill", metric: "guilty pleasure", module: "creative-metrics.js", when: "lowest-rated finished game", tier: "moderate" },
+    { surface: "chip", metric: "finished vs backlog era", module: "creative-metrics.js", when: "avg release year both sets", tier: "normal" },
+    { surface: "pill", metric: "one-hit dev", module: "creative-metrics.js", when: "dev ≥ 2 owned, 0 finished", tier: "moderate" },
+    { surface: "chip", metric: "missing A–Z letters", module: "creative-metrics.js", when: "gaps in library name initials", tier: "friendly" },
+    { surface: "pill+chip", metric: "backlog in work-weeks", module: "creative-metrics.js", when: "backlogHrs / 40", tier: "friendly" },
+    { surface: "chip", metric: "at historical low now", module: "creative-metrics.js", when: "wishlist isHistoricalLow count", tier: "friendly" },
+    { surface: "pill", metric: "one that got away", module: "creative-metrics.js", when: "top wishlist deal by dealScore", tier: "moderate" },
+    { surface: "chip", metric: "oldest wishlist", module: "creative-metrics.js", when: "max days since wishlist added_at", tier: "normal" },
+  ];
+  const creativeRows = (arr) => arr.map((r) => [
+    r.surface,
+    el("strong", {}, r.metric),
+    codeText(r.module),
+    r.when,
+    tierTag(r.tier),
+  ]);
+
+  const SAMPLE_PILLS = [
+    { html: "Backlog diagnosis: <strong>Chronic acquirer</strong>", tier: "moderate" },
+    { html: "Whale: <strong>Elden Ring</strong> · $59 untouched", tier: "moderate" },
+    { html: "<strong>Hollow Knight</strong> · 1,240 days on shelf", tier: "moderate" },
+    { html: "Top WAR pick: <strong>Hades</strong>", tier: "cryptic" },
+    { html: "Mendoza line <strong>.412</strong>", tier: "moderate" },
+    { html: "~4.2 yrs to clear at your pace", tier: "friendly" },
+    { html: "Guilty pleasure: <strong>Fall Guys</strong> · 58%", tier: "moderate" },
+    { html: "Added <strong>2019</strong>, still untouched: <strong>Stardew Valley</strong>", tier: "moderate" },
+    { html: "Finish backlog by age <strong>73</strong>?", tier: "moderate" },
+    { html: "<strong>FromSoftware</strong> · 6 owned, 0 finished", tier: "moderate" },
+    { html: "One that got away: <strong>Outer Wilds</strong> · <span style=\"color:#6ee7b7\">-85%</span> (wishlist)", tier: "moderate" },
+    { html: "Pythagorean: <strong>underperforming</strong> vs expected finish", tier: "cryptic" },
+  ];
+  const SAMPLE_CHIPS = [
+    { glyph: "★", iconCls: "is-emerald", value: ".333", label: "finish AVG", tier: "cryptic" },
+    { glyph: "★", iconCls: "is-emerald", value: ".512", label: "backlog OPS", tier: "cryptic" },
+    { glyph: "★", iconCls: "is-violet", value: "2.4 WAR", label: "top pick", tier: "cryptic" },
+    { glyph: "#", iconCls: "is-amber", value: "RPG · 12", label: "comfort genre", tier: "friendly" },
+    { glyph: "#", iconCls: "is-rose", value: "Strategy · 48", label: "blind spot genre", tier: "friendly" },
+    { glyph: "$", iconCls: "is-emerald", value: "$2,400", label: "MSRP sitting unplayed", tier: "friendly" },
+    { glyph: "~", iconCls: "is-amber", value: "312 wks", label: "backlog in work-weeks", tier: "friendly" },
+    { glyph: "?", iconCls: "is-violet", value: "Q X Z", label: "missing A–Z letters", tier: "friendly" },
+    { glyph: ">", iconCls: "", value: "127", label: "free, never launched", tier: "friendly" },
+    { glyph: "+", iconCls: "is-emerald", value: "3.2/mo", label: "add velocity", tier: "friendly" },
+    { glyph: "~", iconCls: "is-amber", value: "62%", label: "playtime in one game", tier: "friendly" },
+    { glyph: "~", iconCls: "is-amber", value: "2014 vs 2021", label: "finished vs backlog era", tier: "normal" },
+    { glyph: "★", iconCls: "is-emerald", value: "847", label: "games owned", tier: "normal" },
+    { glyph: "★", iconCls: "is-emerald", value: "412h", label: "to clear at 2h/day", tier: "normal" },
+    { glyph: "★", iconCls: "is-violet", value: "18d", label: "avg shelf time", tier: "friendly" },
+    { glyph: "★", iconCls: "is-emerald", value: "8", label: "at historical low now", tier: "friendly" },
+    { glyph: "★", iconCls: "is-rose", value: "Hades · 400d", label: "oldest wishlist", tier: "normal" },
+    { glyph: "★", iconCls: "is-emerald", value: "23", label: "hidden gems", tier: "friendly" },
+    { glyph: "★", iconCls: "is-amber", value: "67%", label: "Hoard%", tier: "cryptic" },
+    { glyph: "★", iconCls: "is-violet", value: "Genre+ 118", label: "RPG park factor", tier: "cryptic" },
+  ];
+
+  function sampleChip(c) {
+    return el("span", { class: "dash-marquee-item", title: c.tier ? "tier: " + c.tier : undefined },
+      el("span", { class: "dash-marquee-icon " + (c.iconCls || "") }, c.glyph),
+      el("strong", {}, c.value),
+      el("span", { class: "dash-marquee-label" }, c.label),
+    );
+  }
+  function samplePill(p) {
+    return el("span", { class: "dash-insight is-visible", html: p.html, title: p.tier ? "tier: " + p.tier : undefined });
+  }
+
+  function panelSabermetrics() {
+    const saberCount = SABER_SLASH.length + SABER_VALUE.length + SABER_INDEX.length + SABER_STANDINGS.length + SABER_FLAGS.length;
+    const totalAll = saberCount + REGULAR_METRICS.length + CREATIVE_METRICS.length + SABER_INSIGHTS.length;
+    return el("section", { id: "panel-sabermetrics", class: "panel" + (state.activeTab === "sabermetrics" ? " active" : "") },
+      el("h1", {}, "Sabermetrics"),
+      el("p", {}, "One box score for your whole library — baseball analytics, counting stats, and plain-English burns — all computed locally from ", codeText("getLibrarySnapshot"), " in ", el("strong", {}, "js/sabermetrics.js"), ", ", el("strong", {}, "js/dashboard-insights.js"), ", and ", el("strong", {}, "js/creative-metrics.js"), "."),
+
+      el("div", { class: "grid-5" },
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(totalAll)), el("div", { class: "stat-label" }, "Tracked stats")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(saberCount)), el("div", { class: "stat-label" }, "Baseball saber")),
+        el("div", { class: "stat stat-warning" }, el("div", { class: "stat-value" }, String(REGULAR_METRICS.length + CREATIVE_METRICS.length)), el("div", { class: "stat-label" }, "Marquee chips")),
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(SABER_INSIGHTS.length + CREATIVE_METRICS.filter((r) => r.surface.includes("pill")).length)), el("div", { class: "stat-label" }, "Pill lines")),
+        el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, String(SABER_SURFACES.length)), el("div", { class: "stat-label" }, "Surfaces")),
+      ),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "How it shows up"),
+        el("div", { class: "callout-body" },
+          "Marquee chips scroll under the hero; one insight pill rotates at a time (too-wide lines are discarded, not truncated). ",
+          codeText("METRIC_WEIGHT"), " tiers control rarity — friendly/normal always appear; cryptic baseball jargon (~15%); Kojima easter egg (~3%). WAR vs the ",
+          el("strong", {}, "Mendoza line"), " (median backlog rating); Genre+/Store+/BV+ use ", el("strong", {}, "100 = library average"), "."),
+      ),
+      el("div", { class: "card" }, tableEl(["Tier", "Weight", "Behavior"], METRIC_TIERS.map((r) => [tierTag(r.tier), codeText(r.weight), r.behavior]))),
+
+      el("h2", {}, "Live samples"),
+      el("p", { class: "muted" }, "Rendered like the dashboard — illustrative values, real copy patterns from production builders."),
+      el("div", { class: "card saber-showcase" },
+        el("div", { class: "saber-showcase-label" }, "Insight pill (one at a time on dashboard)"),
+        el("div", { class: "saber-pill-stack" }, ...SAMPLE_PILLS.map(samplePill)),
+        el("div", { class: "saber-showcase-label", style: "margin-top:1rem" }, "Marquee chips (mixed saber + regular + creative)"),
+        el("div", { class: "saber-chip-strip" }, ...SAMPLE_CHIPS.map(sampleChip)),
+      ),
+
+      el("h2", {}, "The slash line"),
+      el("p", { class: "muted" }, "AVG · OBP · SLG · OPS — library-wide productivity in batting notation."),
+      el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_SLASH))),
+
+      el("h2", {}, "Player value (WAR / BV+)"),
+      el("p", { class: "muted" }, "Per-game value; drives library-row WAR pill and top-pick insights."),
+      el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_VALUE))),
+
+      el("h2", {}, "Park factors & indices"),
+      el("p", { class: "muted" }, "Genre+, Store+, Mendoza line — normalized so 100 = league average."),
+      el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_INDEX))),
+
+      el("h2", {}, "Standings & pace"),
+      el("p", { class: "muted" }, "Magic #, backlog pace, streaks, win shares, aging curve."),
+      el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_STANDINGS))),
+
+      el("h2", {}, "Scouting flags"),
+      el("p", { class: "muted" }, "Barrel and leverage-pick classifications for spotlight priority."),
+      el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_FLAGS))),
+
+      el("h2", {}, "Identity, time & money stats"),
+      el("p", { class: "muted" }, "Creative / edgy lines — diagnosis, whale, shelf warmer, work-weeks, A–Z gaps."),
+      el("details", { class: "saber-ref-table" },
+        el("summary", {}, "Full creative metrics table (", String(CREATIVE_METRICS.length), " rows)"),
+        el("div", { class: "card" }, tableEl(["Surface", "Metric", "Module", "Shown when", "Tier"], creativeRows(CREATIVE_METRICS))),
+      ),
+
+      el("h2", {}, "Counting stats"),
+      el("p", { class: "muted" }, "Plain-language marquee chips — hours, deals, catalog, achievements."),
+      el("details", { class: "saber-ref-table" },
+        el("summary", {}, "Full regular metrics table (", String(REGULAR_METRICS.length), " rows)"),
+        el("div", { class: "card" }, tableEl(["Group", "Metric", "Shown when", "Tier"], regularRows(REGULAR_METRICS))),
+      ),
+
+      el("h2", {}, "Headline tickers"),
+      el("p", { class: "muted" }, "Core pill pool from ", codeText("buildInsightPool"), " — plus creative pills above."),
+      el("div", { class: "card" }, tableEl(["Insight", "Shows", "Tier"], insightRows(SABER_INSIGHTS))),
+
+      el("h2", {}, "Where it surfaces"),
+      el("p", { class: "muted" }, "Hero completion %, magic #, and marquee all pull from the same snapshot."),
+      el("div", { class: "card" }, tableEl(["Surface", "Lives in", "Shows"], SABER_SURFACES.map((r) => [r.surface, codeText(r.where), r.shows]))),
+
+      el("h2", {}, "Mouseover tooltips"),
+      el("p", { class: "muted" }, "Every metric, insight, and sabermetric explains its calculation on hover. Copy lives in one place — ", codeText("js/metric-tips.js"), " — and is resolved at render time so the ~100 metric builders stay untouched."),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Why centralized resolvers"),
+        el("div", { class: "callout-body" },
+          codeText("marqueeTip"), ", ", codeText("insightTip"), ", and ", codeText("eyebrowTip"),
+          " run on the final label/HTML at paint time, so dynamic chips (", el("strong", {}, "below Mendoza (78%)"), ", ", el("strong", {}, "added in 2026"), ", variant eyebrows) all map back to canonical copy without editing each ",
+          codeText("push()"), "/", codeText("add()"), " call. Cursor stays ", codeText("default"), " on metric elements."),
+      ),
+      el("div", { class: "card" }, tableEl(["Surface", "Resolver", "How it maps"], TOOLTIP_SURFACES.map((r) => [r.surface, codeText(r.how), r.note]))),
+      el("h3", {}, "Audit + hardening (2026-06-04)"),
+      el("p", { class: "muted" }, "Second-pass audit of metric/tooltip coverage, including the spotlight variant + Barrel update."),
+      el("div", { class: "card" }, tableEl(["Item", "Status", "Detail"], TOOLTIP_AUDIT.map((r) => [
+        el("strong", {}, r.item),
+        el("span", { class: "tier tier-" + (r.status === "Fixed" ? "friendly" : r.status === "Guarded" ? "moderate" : "normal") }, r.status),
+        r.note,
+      ]))),
+    );
+  }
+
   // ---------- Render: all panels ----------
   function renderActive() {
     const host = document.getElementById("panels");
@@ -3144,6 +3538,7 @@
     host.appendChild(panelTriage());
     host.appendChild(panelDebug());
     host.appendChild(panelMonetize());
+    host.appendChild(panelSabermetrics());
     activateTab(state.activeTab);
   }
 

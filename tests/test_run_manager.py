@@ -691,3 +691,57 @@ def test_shutdown_cancels_in_flight_run(runs_env, monkeypatch: pytest.MonkeyPatc
     assert run._finished.is_set() or run.status in ("cancelled", "failed", "cancelling")
     snap = mgr.snapshot()
     assert snap["active"] is None
+
+
+def test_manifest_fetcher_argv_uses_absolute_script_path() -> None:
+    """Manifest scripts launch via an absolute path so cwd never matters."""
+    spec = server.FETCHERS["steam"]
+    script = spec["argv"][1]
+    assert Path(script).is_absolute()
+    assert script == str(server.ROOT / "fetch_games.py")
+
+
+def test_execute_runs_from_repo_root_for_nondefault_profile(
+    runs_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fetchers must run with cwd=repo root even on a non-default profile.
+
+    Regression guard for the bug where cwd was the profile data dir
+    (profiles/<id>/), which has no fetch_*.py and broke every UI run on
+    Supabase/account profiles. Profile scoping is via BAKLOG_PROFILE, not cwd.
+    """
+    import auth.manager
+
+    mgr, _runs_dir = runs_env
+    monkeypatch.setattr(server, "get_active_profile_id", lambda: "work")
+    monkeypatch.setattr(
+        auth.manager,
+        "subprocess_env_for_profile",
+        lambda pid: {"BAKLOG_PROFILE": pid, "PYTHONUNBUFFERED": "1"},
+    )
+
+    captured: dict[str, object] = {}
+    real_popen = server.subprocess.Popen
+
+    def capturing_popen(argv, **kwargs):
+        captured["cwd"] = kwargs.get("cwd")
+        captured["argv"] = list(argv)
+        return real_popen(
+            [server.sys.executable, "-c", "print('ok')"],
+            stdout=kwargs.get("stdout"),
+            stderr=kwargs.get("stderr"),
+            text=kwargs.get("text", True),
+            encoding=kwargs.get("encoding"),
+            errors=kwargs.get("errors"),
+            bufsize=kwargs.get("bufsize", -1),
+            cwd=kwargs.get("cwd"),
+        )
+
+    monkeypatch.setattr(server, "popen_fetcher", capturing_popen)
+
+    run = mgr.submit("steam")
+    assert run.profile_id == "work"
+    assert run._finished.wait(timeout=10)
+
+    assert captured["cwd"] == str(server.ROOT)
+    assert captured["argv"][1] == str(server.ROOT / "fetch_games.py")

@@ -6,6 +6,9 @@ import { escapeAttr, escapeHtml } from './dom-util.js';
 import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, formatDollar } from './game-core.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo, cutBucketClass } from './deals.js';
+import { isBarrel, isLeveragePick, getLibrarySnapshot, topWarGame } from './sabermetrics.js';
+import { computeSpotlightSuperlatives } from './creative-metrics.js';
+import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
 import { registerPausable } from './visibility.js';
 
 function releasedWithinMonths(g, months) {
@@ -19,7 +22,7 @@ function isOnSale(g) {
 }
 
 const SPOTLIGHT_INTERVAL_MS = 7000;
-const SPOTLIGHT_FADE_MS = 300;
+export const SPOTLIGHT_FADE_MS = 300;
 const RECENT_SPOTLIGHT_CAP = 5;
 const RECENT_QUOTA = 5;
 
@@ -27,6 +30,28 @@ const RECENT_QUOTA = 5;
 // lowest-rated game in your catalog with a tongue-in-cheek eyebrow. Same rarity
 // as the rare boot-loading tip (RARE_CHANCE in js/tips.js).
 const STINKER_EYEBROW = 'Rare stinker';
+
+/** Saber superlatives never replace these curated spotlight categories. */
+const SABER_PROTECTED_EYEBROWS = new Set([
+  'Recently added',
+  'Replay',
+  'On sale now',
+  STINKER_EYEBROW,
+  'Co-op campaign',
+  'Couch co-op',
+  'Almost mastered',
+  'Pick back up',
+  'Return to',
+  'Up next',
+  'Clutch deal',
+  'Barrel',
+  'New release',
+  'Long haul',
+  'Weekend-sized',
+  'Quick win',
+  'Top-rated quick pick',
+]);
+
 let _stinkerChance = 0.02;
 
 /** Test seam: override the stinker easter-egg probability (0 disables it). */
@@ -152,6 +177,12 @@ function gameSpotlightReason(g, recentKeys) {
   if (status === 'next' && rating >= 70) {
     return { eyebrow: 'Up next', score: rating + 10 };
   }
+  if (isLeveragePick(g)) {
+    return { eyebrow: 'Clutch deal', score: rating + 12, isLeverage: true };
+  }
+  if (isBarrel(g)) {
+    return { eyebrow: 'Barrel', score: rating + 6, isBarrel: true };
+  }
   // "On sale now" is intentionally NOT tagged for library games — a discount on
   // something you already own isn't actionable. The category is sourced from the
   // wishlist instead (see wishlist on-sale injection in pickSpotlightGames).
@@ -223,8 +254,71 @@ export function pickSpotlightGames(games) {
   )
     .filter(hasArt)
     .filter(g => isOnSale(g) && ratingValue(g) >= 70)
-    .map(g => ({ g, reason: { eyebrow: 'On sale now', score: ratingValue(g) + 9, isWishlistSale: true } }));
+    .map(g => {
+      const deal = getDealInfo(g);
+      const cut = deal?.cut || 0;
+      const rating = ratingValue(g);
+      const metaParts = [`<strong>${rating}%</strong> review`];
+      if (cut > 0) {
+        metaParts.push(`<strong class="dash-spotlight-cut ${cutBucketClass(cut)}">-${cut}%</strong> off`);
+      }
+      if (deal?.price != null) {
+        metaParts.push(`<strong class="dash-spotlight-price ${cutBucketClass(cut)}">${escapeHtml(formatDollar(deal.price))}</strong>`);
+      }
+      return {
+        g,
+        reason: {
+          eyebrow: 'On sale now',
+          score: rating + 9,
+          isWishlistSale: true,
+          metaParts,
+        },
+      };
+    });
   tagged.push(...wishlistOnSale);
+
+  const snap = getLibrarySnapshot(games);
+  const saberPicks = computeSpotlightSuperlatives(eligible, snap);
+  const mvp = topWarGame(snap);
+  if (mvp?.g && hasArt(mvp.g)) {
+    const rating = ratingValue(mvp.g);
+    const hltb = hltbMain(mvp.g);
+    const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
+    saberPicks.push({
+      key: gameKey(mvp.g),
+      eyebrow: 'MVP pick',
+      score: rating + 11,
+      metaParts: [
+        `<strong>${mvp.war} WAR</strong>`,
+        `<strong>${rating}%</strong> review`,
+        `<strong>${escapeHtml(hltbStr)}</strong> main`,
+      ],
+    });
+  }
+
+  const saberByKey = new Map();
+  for (const pick of saberPicks) {
+    const prev = saberByKey.get(pick.key);
+    if (!prev || pick.score >= prev.score) saberByKey.set(pick.key, pick);
+  }
+  for (const pick of saberByKey.values()) {
+    const g = eligible.find(x => gameKey(x) === pick.key);
+    if (!g) continue;
+    const reason = {
+      eyebrow: pick.eyebrow,
+      score: pick.score,
+      metaParts: pick.metaParts,
+      isSaber: true,
+    };
+    const idx = tagged.findIndex(t => gameKey(t.g) === pick.key);
+    if (idx >= 0) {
+      const existing = tagged[idx].reason;
+      if (SABER_PROTECTED_EYEBROWS.has(existing.eyebrow)) continue;
+      if (pick.score >= existing.score) tagged[idx].reason = reason;
+    } else {
+      tagged.push({ g, reason });
+    }
+  }
 
   tagged.sort((a, b) => b.reason.score - a.reason.score);
   const top = tagged.slice(0, target);
@@ -266,6 +360,19 @@ export function pickSpotlightGames(games) {
     const extras = tagged.slice(target).filter(t => t.reason.isReplay);
     const need = Math.min(replayQuota - replaysInTop, extras.length);
     for (let i = 0; i < need; i++) top.push(extras[i]);
+  }
+
+  const BARREL_RATIO = 0.04;
+  const barrelQuota = Math.max(1, Math.round(top.length * BARREL_RATIO));
+  let barrelsInTop = top.filter(t => t.reason.isBarrel);
+  if (barrelsInTop.length > barrelQuota) {
+    barrelsInTop.sort((a, b) => a.reason.score - b.reason.score);
+    const dropKeys = new Set(
+      barrelsInTop.slice(0, barrelsInTop.length - barrelQuota).map(t => gameKey(t.g)),
+    );
+    for (let i = top.length - 1; i >= 0; i--) {
+      if (dropKeys.has(gameKey(top[i].g))) top.splice(i, 1);
+    }
   }
 
   for (let i = top.length - 1; i > 0; i--) {
@@ -324,32 +431,30 @@ export function spotlightInnerHtml(g) {
     ? 'on your wishlist'
     : (SPOTLIGHT_STATUS_LABEL[status] || 'in your library');
   const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
-  const metaParts = [
-    `<strong>${rating}%</strong> review`,
-    `<strong>${escapeHtml(hltbStr)}</strong> main`,
-  ];
-  // "On sale now" spotlights surface the discount + price using the same
-  // cut-depth color scale as the deal stats (emerald → amber → pink).
-  if (g._spotlightReason?.isWishlistSale) {
-    const deal = getDealInfo(g);
-    const cut = deal?.cut || 0;
-    if (cut > 0) {
-      metaParts.push(`<strong class="dash-spotlight-cut ${cutBucketClass(cut)}">-${cut}%</strong> off`);
-    }
-    if (deal?.price != null) {
-      metaParts.push(`<strong class="dash-spotlight-price ${cutBucketClass(cut)}">${escapeHtml(formatDollar(deal.price))}</strong>`);
-    }
-  }
-  metaParts.push(escapeHtml(statusLabel));
+  const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
+  const eyebrowTipText = eyebrowTip(eyebrow);
+  const eyebrowTitleAttr = eyebrowTipText ? ` title="${escapeAttr(eyebrowTipText)}"` : '';
+  const customMeta = g._spotlightReason?.metaParts;
+  const metaParts = customMeta?.length
+    ? customMeta
+    : [
+      `<strong>${rating}%</strong> review`,
+      `<strong>${escapeHtml(hltbStr)}</strong> main`,
+      escapeHtml(statusLabel),
+    ];
   return `
     <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
     <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
     <div class="dash-spotlight-body">
-      <span class="dash-spotlight-eyebrow">${escapeHtml(eyebrow)}</span>
+      <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
       <span class="dash-spotlight-meta">${metaParts.join(' · ')}</span>
-    </div>`;
+    </div>
+    <span class="dash-spotlight-nav" aria-hidden="false">
+      <span class="dash-spotlight-nav-btn" role="button" tabindex="0" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</span>
+      <span class="dash-spotlight-nav-btn" role="button" tabindex="0" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</span>
+    </span>`;
 }
 
 export function renderSpotlightHtml(g) {
@@ -369,6 +474,44 @@ export function primeSpotlightArt(btn) {
   }
 }
 
+function applySpotlightSlide(el, next) {
+  el.classList.remove('has-portrait-art');
+  el.innerHTML = spotlightInnerHtml(next);
+  el.dataset.key = gameKey(next);
+  el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
+  el.classList.remove('is-fading');
+  primeSpotlightArt(el);
+  _spotlightCurrentKey = gameKey(next);
+}
+
+function fadeToSpotlight(el, next) {
+  el.classList.add('is-fading');
+  if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+  _spotlightFadeTimer = setTimeout(() => {
+    applySpotlightSlide(el, next);
+    _spotlightFadeTimer = null;
+  }, SPOTLIGHT_FADE_MS);
+}
+
+function stopSpotlightTimer() {
+  if (_spotlightTimer) clearInterval(_spotlightTimer);
+  _spotlightTimer = null;
+}
+
+function startSpotlightTimer(el) {
+  stopSpotlightTimer();
+  _spotlightTimer = setInterval(() => {
+    const paused = el._spotlightPaused?.() ?? false;
+    if (paused) return;
+    if (!document.getElementById('dashboardSpotlight')) {
+      stopSpotlightRotation();
+      return;
+    }
+    _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
+    fadeToSpotlight(el, _spotlightPool[_spotlightIndex]);
+  }, SPOTLIGHT_INTERVAL_MS);
+}
+
 function wireSpotlightHover(el) {
   if (!el || el.dataset.hoverWired) return;
   el.dataset.hoverWired = '1';
@@ -376,9 +519,54 @@ function wireSpotlightHover(el) {
   el.addEventListener('mouseenter', () => { paused = true; });
   el.addEventListener('mouseleave', () => { paused = false; });
   el._spotlightPaused = () => paused;
+
+  el.addEventListener('click', (e) => {
+    const nav = e.target.closest('[data-spotlight-nav]');
+    if (!nav) return;
+    e.preventDefault();
+    e.stopPropagation();
+    stepSpotlight(nav.dataset.spotlightNav === 'prev' ? -1 : 1);
+  });
+
+  el.addEventListener('keydown', (e) => {
+    const nav = e.target.closest('[data-spotlight-nav]');
+    if (nav && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      e.stopPropagation();
+      stepSpotlight(nav.dataset.spotlightNav === 'prev' ? -1 : 1);
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopPropagation();
+      stepSpotlight(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      e.stopPropagation();
+      stepSpotlight(1);
+    }
+  });
+}
+
+export function stepSpotlight(delta) {
+  if (_spotlightPool.length <= 1) return;
+  const el = document.getElementById('dashboardSpotlight');
+  if (!el) return;
+  const len = _spotlightPool.length;
+  _spotlightIndex = (_spotlightIndex + delta + len) % len;
+  fadeToSpotlight(el, _spotlightPool[_spotlightIndex]);
+  if (_rotationWanted) {
+    stopSpotlightTimer();
+    startSpotlightTimer(el);
+  }
 }
 
 export function startSpotlightRotation(pool) {
+  const el = document.getElementById('dashboardSpotlight');
+  if (el) {
+    if (pool && pool.length > 1) el.classList.add('dash-spotlight--multi');
+    else el.classList.remove('dash-spotlight--multi');
+  }
   if (!pool || pool.length <= 1) {
     stopSpotlightRotation();
     _spotlightPool = pool || [];
@@ -386,35 +574,14 @@ export function startSpotlightRotation(pool) {
     return;
   }
   _rotationWanted = true;
-  const el = document.getElementById('dashboardSpotlight');
   if (!el) return;
   const domMatches = !!pool[0] && el.dataset.key === gameKey(pool[0]);
   _spotlightPool = pool;
+  wireSpotlightHover(el);
   // Same slide still mounted: resume rotation only (no innerHTML swap / fade-in).
   if (domMatches) {
     if (_spotlightTimer) return;
-    wireSpotlightHover(el);
-    _spotlightTimer = setInterval(() => {
-      const paused = el._spotlightPaused?.() ?? false;
-      if (paused) return;
-      if (!document.getElementById('dashboardSpotlight')) {
-        stopSpotlightRotation();
-        return;
-      }
-      _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
-      const next = _spotlightPool[_spotlightIndex];
-      el.classList.add('is-fading');
-      if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
-      _spotlightFadeTimer = setTimeout(() => {
-        el.classList.remove('has-portrait-art');
-        el.innerHTML = spotlightInnerHtml(next);
-        el.dataset.key = gameKey(next);
-        el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
-        el.classList.remove('is-fading');
-        primeSpotlightArt(el);
-        _spotlightCurrentKey = gameKey(next);
-      }, SPOTLIGHT_FADE_MS);
-    }, SPOTLIGHT_INTERVAL_MS);
+    startSpotlightTimer(el);
     return;
   }
   stopSpotlightRotation();
@@ -422,27 +589,7 @@ export function startSpotlightRotation(pool) {
   // arranged the pool so the previously-displayed game is at index 0; on first
   // load _spotlightIndex is already 0 from module init.
   _spotlightIndex = 0;
-  wireSpotlightHover(el);
-  _spotlightTimer = setInterval(() => {
-    if (el._spotlightPaused?.()) return;
-    if (!document.getElementById('dashboardSpotlight')) {
-      stopSpotlightRotation();
-      return;
-    }
-    _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
-    const next = _spotlightPool[_spotlightIndex];
-    el.classList.add('is-fading');
-    if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
-    _spotlightFadeTimer = setTimeout(() => {
-      el.classList.remove('has-portrait-art');
-      el.innerHTML = spotlightInnerHtml(next);
-      el.dataset.key = gameKey(next);
-      el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
-      el.classList.remove('is-fading');
-      primeSpotlightArt(el);
-      _spotlightCurrentKey = gameKey(next);
-    }, SPOTLIGHT_FADE_MS);
-  }, SPOTLIGHT_INTERVAL_MS);
+  startSpotlightTimer(el);
 }
 
 export function syncSpotlightInMega(el, spotlight) {

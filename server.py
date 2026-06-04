@@ -624,7 +624,7 @@ class Run:
         "id", "key", "label", "status", "started_at", "ended_at", "exit_code",
         "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
         "_log_path", "_runs_dir", "profile_id", "_cancelling_since", "_no_proc_since",
-        "_history_note", "_next_seq", "_total_lines",
+        "_history_note", "_next_seq", "_total_lines", "_finalized",
     )
 
     def __init__(
@@ -646,6 +646,7 @@ class Run:
         self.ended_at: float | None = None
         self.exit_code: int | None = None
         self.cancelled: bool = False
+        self._finalized: bool = False
         self._proc: subprocess.Popen[str] | None = None
         self._runs_dir = runs_dir
         self._runs_dir.mkdir(parents=True, exist_ok=True)
@@ -1463,6 +1464,10 @@ class RunManager:
         return {"active": active, "queue": queued, "history": history}
 
     def _finalize_run(self, run: Run) -> None:
+        with run._lock:
+            if run._finalized:
+                return
+            run._finalized = True
         if not run._finished.is_set():
             if run.ended_at is None:
                 run.ended_at = time.time()

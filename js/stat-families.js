@@ -10,6 +10,7 @@ export const FAMILY = {
   SABER: 'saber',
   IDENTITY: 'identity',
   ACTIVITY: 'activity',
+  WILDCARD: 'wildcard',
 };
 
 const _unknown = new Map();
@@ -161,6 +162,10 @@ export function familyForEyebrow(eyebrow) {
 
   if (matchesAny(e, ['barrel', 'new release', 'brand new', 'fresh release'])) {
     return FAMILY.SABER;
+  }
+
+  if (matchesAny(e, ['random pick', 'dealer', 'wild card', 'wildcard', 'lucky dip'])) {
+    return FAMILY.WILDCARD;
   }
 
   return familyForLabel(e);

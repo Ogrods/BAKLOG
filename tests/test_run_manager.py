@@ -330,6 +330,21 @@ def test_cancel_queued_run(runs_env):
         pytest.fail("cancelled run was not finalized into history")
 
 
+def test_finalize_run_is_idempotent(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    run = mgr.submit("demo")
+    run.status = "cancelled"
+    run.exit_code = -1
+    run.ended_at = time.time()
+    run.mark_finished()
+    mgr._finalize_run(run)
+    hist = server._load_run_history_from(runs_dir / "history.json")
+    assert sum(1 for h in hist if h.get("id") == run.id) == 1
+    mgr._finalize_run(run)
+    hist2 = server._load_run_history_from(runs_dir / "history.json")
+    assert sum(1 for h in hist2 if h.get("id") == run.id) == 1
+
+
 def test_history_persisted_on_finish(runs_env):
     mgr, runs_dir = runs_env
     run = mgr.submit("demo")

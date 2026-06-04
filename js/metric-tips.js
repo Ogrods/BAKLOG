@@ -192,6 +192,7 @@ export const EYEBROW_TIPS = {
   'Cheap thrill': 'The cheapest highly rated (75%+) game you have not played yet.',
   'Guilty pleasure': 'The lowest-rated game you finished anyway.',
   'Rare stinker': 'Rare easter egg: the single lowest-rated game in your whole catalog.',
+  'Random pick': 'Dealer\u2019s choice: one title pulled at random from your library.',
 };
 
 /**
@@ -229,6 +230,7 @@ export const EYEBROW_VARIANTS = {
   'Cheap thrill': ['Cheap thrill', 'Bargain pick', 'Budget gem', 'Budget buy'],
   'Guilty pleasure': ['Guilty pleasure', 'Guilty fave', 'No regrets', 'Trashy fun'],
   'Rare stinker': ['Rare stinker', 'Certified stinker', 'Bottom tier', 'The worst'],
+  'Random pick': ['Random pick', 'Dealer\u2019s choice', 'Wild card', 'Lucky dip'],
 };
 
 /** @param {string} s */

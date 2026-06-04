@@ -285,6 +285,7 @@
     { id: "debug", label: "Debug tools" },
     { id: "monetize", label: "Monetization" },
     { id: "sabermetrics", label: "Sabermetrics" },
+    { id: "responsive", label: "Responsive" },
   ];
 
   // ---------- Persisted state: legacy tab migration ----------
@@ -755,7 +756,7 @@
     { fetcher: "fetch_xbox_wishlist.py", client: "(direct)", writes: "games_wishlist_xbox.json", notes: "Reuses Xbox Store CDP browser profile · writes rows (done)" },
     { fetcher: "fetch_nintendo_wishlist.py", client: "(direct)", writes: "games_wishlist_nintendo.json", notes: "Reuses Nintendo Store CDP browser profile · nintendo.com/us/wish-list/ (done)" },
     { fetcher: "fetch_humble_wishlist.py", client: "(direct)", writes: "games_wishlist_humble.json", notes: "Reuses Humble browser profile · store wishlist page (done)" },
-    { fetcher: "fetch_itad.py", client: "itad_client.py", writes: "itad_prices.json", notes: "Cross-store best price · wishlist by default" },
+    { fetcher: "fetch_itad.py", client: "itad_client.py", writes: "itad_prices.json", notes: "Cross-store best price · wishlist by default · ITAD caps confirmed-email keys at 1k req/min; we self-throttle to ~171/min (REQUEST_DELAY_SEC 0.35s, single worker) so no explicit limiter needed" },
     { fetcher: "enrich_hltb.py", client: "(scraper)", writes: "(patches all games_*.json)", notes: "Opt-in HLTB enrichment on its own cadence" },
     { fetcher: "enrich_steam_reviews.py", client: "steam_client.py", writes: "(patches games_*.json)", notes: "Backfill steam_review_* on non-Steam stores" },
     { fetcher: "enrich_steam_tags.py", client: "steam_client.py", writes: "(patches games_*.json + cache/steam_tags_meta.json)", notes: "Backfill coop_online / coop_local on non-Steam rows · fills missing genres / release_date" },
@@ -3578,6 +3579,96 @@
     );
   }
 
+  // ---------- Responsive audit ----------
+  const RESPONSIVE_BREAKPOINTS = [
+    { tier: "Desktop", width: ">= 1024px", role: "Current layout baseline; no Phase 0 changes." },
+    { tier: "Tablet", width: "<= 1023.98px", role: "Header nav wraps to a second row; summary/toolbar still multi-line where needed." },
+    { tier: "Phone", width: "<= 639.98px", role: "Global chrome collapse: nav scroll strip, icon-only fetcher status, full-width search, kebab Pick for me." },
+    { tier: "Compact", width: "<= 400px", role: "Optional: tighter padding on app shell and summary scroll strips." },
+  ];
+  const RESPONSIVE_INVENTORY = [
+    { view: "Global chrome", issues: "Header tabs wrap raggedly; summary chips + filter pills stack tall; toolbar buttons overflow.", phase: "Phase 0" },
+    { view: "Library / Wishlist / itch", issues: "13-column games table overflows; #alphaNav + #bulkBar overlap risk.", phase: "R1 Table" },
+    { view: "Dashboard", issues: "Chart 2-col grid, mega/spotlight (partial 900px rules), KPI ribbon, fetcher health row.", phase: "R2 Dashboard" },
+    { view: "Connections", issues: "#connLayout master-detail (#connRail + #connPane) must stack on narrow viewports.", phase: "R3 Connections" },
+    { view: "Modals + drawer", issues: "Filter drawer already min(360px,92vw); modals need full-screen treatment on phone.", phase: "R4 Modals" },
+  ];
+  const RESPONSIVE_ROADMAP = [
+    { id: "R0", label: "Phase 0 — Foundation + global chrome (this pass)" },
+    { id: "R1", label: "Table views — progressive column hide; alpha nav + bulk bar placement" },
+    { id: "R2", label: "Dashboard — charts, mega/spotlight, picks row" },
+    { id: "R3", label: "Connections — rail + pane stack" },
+    { id: "R4", label: "Modals/drawers — full-screen modals on phone" },
+    { id: "R5", label: "Cross-cutting — type scale, images, reduced-motion, landscape QA" },
+  ];
+  const RESPONSIVE_TEST_MATRIX = [
+    { width: "1024px", device: "Tablet landscape / small laptop", checks: "No horizontal page scroll; header nav on row 2; toolbar usable." },
+    { width: "768px", device: "Tablet portrait", checks: "Same as 1024; verify summary chips scroll or wrap without overflow." },
+    { width: "390px", device: "Phone (iPhone 14 class)", checks: "Nav scroll strip; icon fetcher; search full width; Pick for me in kebab only." },
+    { width: "360px", device: "Compact Android", checks: "App shell padding; touch targets >= 44px; no clipped modals." },
+  ];
+
+  function panelResponsive() {
+    const bpRows = RESPONSIVE_BREAKPOINTS.map((r) => [el("strong", {}, r.tier), codeText(r.width), r.role]);
+    const invRows = RESPONSIVE_INVENTORY.map((r) => [r.view, r.issues, el("span", { class: "tier tier-normal" }, r.phase)]);
+    const roadmapRows = RESPONSIVE_ROADMAP.map((r) => [codeText(r.id), r.label]);
+    const testRows = RESPONSIVE_TEST_MATRIX.map((r) => [codeText(r.width), r.device, r.checks]);
+    return el("section", { id: "panel-responsive", class: "panel" + (state.activeTab === "responsive" ? " active" : "") },
+      el("h1", {}, "Responsive audit"),
+      el("p", {}, "Collapse BAKLOG to ", el("strong", {}, "tablet"), " then ", el("strong", {}, "phone"), " viewports. All responsive rules live in ", codeText("app.css"), " (hand-written media queries) — ", codeText("tailwind.css"), " is a static tree-shaken build; do not add new ", codeText("md:"), " / ", codeText("lg:"), " utilities in markup without rebuilding Tailwind."),
+
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Phase 0 scope"),
+        el("div", { class: "callout-body" },
+          "Breakpoint ladder, viewport overflow fixes for global chrome, and header / summary / toolbar collapse. ",
+          "Games table, dashboard charts, and connections master-detail are ", el("strong", {}, "out of scope"), " until R1–R3."),
+      ),
+
+      el("h2", {}, "Breakpoint ladder"),
+      el("div", { class: "card" }, tableEl(["Tier", "Width", "Role"], bpRows)),
+      el("p", { class: "muted" }, "Documented in ", codeText("app.css"), " ", el("em", {}, "Responsive system"), " region. Rule: no new ad-hoc breakpoints (retire 720/767/900 over time)."),
+
+      el("h2", {}, "Per-view break inventory"),
+      el("div", { class: "card" }, tableEl(["View", "Known issues", "Phase"], invRows)),
+
+      el("h2", {}, "Roadmap"),
+      el("div", { class: "card" }, tableEl(["Id", "Scope"], roadmapRows)),
+
+      el("h2", {}, "Table strategy (R1 — recorded decision)"),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Progressive column hiding (recommended)"),
+        el("div", { class: "callout-body" },
+          "Keep the virtualized table. Hide low-priority columns via media queries on tablet/phone. Phone keeps ",
+          el("strong", {}, "Cover + Game"), " (inline secondary: status · price) + notes affordance. ",
+          "Card/stacked rows deferred — variable row heights break windowing."),
+      ),
+      checkboxRow("r0_table_direction", "Table direction recorded: progressive column hide (not card stack)"),
+
+      el("h2", {}, "Phase 0 checklist"),
+      el("p", { class: "muted" }, "Ticks persist in tracker localStorage."),
+      checkboxRow("r0_breakpoint_ladder", "Breakpoint ladder documented in app.css Responsive system region"),
+      checkboxRow("r0_viewport_audit", "Viewport audit: no horizontal overflow at 1024 / 768 / 390 on all five views (chrome-level)"),
+      checkboxRow("r0_break_inventory", "Per-view break inventory seeded in this panel"),
+      checkboxRow("r0_chrome_header_nav", "Header + nav: tablet wrap; phone nav scroll strip + icon-only fetcher status"),
+      checkboxRow("r0_chrome_summary", "Summary / store chips: single-line horizontal scroll strip on phone"),
+      checkboxRow("r0_chrome_toolbar", "Toolbar: full-width search; Pick for me in kebab on phone; filter pills scroll strip"),
+      checkboxRow("r0_touch_targets", "Touch targets >= 44px for view tabs, summary chips, toolbar buttons at phone"),
+      checkboxRow("r0_test_matrix", "Manual device matrix (below) run and signed off"),
+
+      el("h2", {}, "Manual test matrix"),
+      el("div", { class: "card" }, tableEl(["Width", "Device", "Checks"], testRows)),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Implementation (2026-06-04)"),
+        el("div", { class: "callout-body" },
+          "Shipped in ", codeText("app.css"), " (Responsive system + Phase 0 chrome block), ",
+          codeText("index.html"), " (header/toolbar hooks), ", codeText("js/bind-events.js"), " (Pick for me kebab). ",
+          "Page-level ", codeText("overflow-x: clip"), "; table scroll contained in ", codeText("#tableWrap"), ". ",
+          "Check each row in DevTools, then tick ", codeText("r0_test_matrix"), "."),
+      ),
+      el("p", { class: "muted" }, "Chrome DevTools device toolbar. Sign off by checking ", codeText("r0_test_matrix"), " above after all rows pass."),
+    );
+  }
+
   // ---------- Render: all panels ----------
   function renderActive() {
     const host = document.getElementById("panels");
@@ -3593,6 +3684,7 @@
     host.appendChild(panelDebug());
     host.appendChild(panelMonetize());
     host.appendChild(panelSabermetrics());
+    host.appendChild(panelResponsive());
     activateTab(state.activeTab);
   }
 

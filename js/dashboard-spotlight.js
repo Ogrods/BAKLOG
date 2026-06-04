@@ -51,6 +51,7 @@ const SABER_PROTECTED_EYEBROWS = new Set([
   'Weekend-sized',
   'Quick win',
   'Top-rated quick pick',
+  'Random pick',
 ]);
 
 let _stinkerChance = 0.02;
@@ -58,6 +59,29 @@ let _stinkerChance = 0.02;
 /** Test seam: override the stinker easter-egg probability (0 disables it). */
 export function setStinkerChanceForTest(chance) {
   _stinkerChance = chance;
+}
+
+// "Random pick" / "Dealer's choice" — a wildcard library title pulled uniformly
+// at random. Rolls once per pool build and surfaces only occasionally (low
+// chance), so it stays a treat rather than a fixture. Only fires for
+// non-trivial libraries so single-game/tiny pools stay predictable.
+const MIN_LIBRARY_FOR_RANDOM_PICK = 8;
+let _randomPickChance = 0.08;
+
+/** Test seam: override the random-pick probability (0 disables, 1 forces it). */
+export function setRandomPickChanceForTest(chance) {
+  _randomPickChance = chance;
+}
+
+/** One uniformly-random library title, skipping skip/live and any excluded keys. */
+function pickRandomLibraryGame(eligible, excludeKeys) {
+  const candidates = eligible.filter(g => {
+    const status = (getPersonal(g).status) || 'backlog';
+    if (status === 'skip' || status === 'live') return false;
+    return !excludeKeys.has(gameKey(g));
+  });
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 /** Lowest-rated catalog game with a real rating and art (for the stinker egg). */
@@ -366,6 +390,29 @@ export function pickSpotlightGames(games) {
   }
   const spreadTop = spreadByFamily(top, t => familyForEyebrow(t.reason.eyebrow), { wrap: true });
   const pool = spreadTop.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
+
+  // "Random pick" wildcard: surface one library title at random (it may not have
+  // earned any other category). Kept clear of the quota'd categories
+  // (recents / replay / barrel) so it never eats their guaranteed slots, and
+  // de-clustered as its own family so it never reads as a duplicate of a neighbor.
+  if (eligible.length >= MIN_LIBRARY_FOR_RANDOM_PICK && Math.random() < _randomPickChance) {
+    const protectedKeys = new Set(
+      pool
+        .filter(g => g._spotlightReason?.isRecent || g._spotlightReason?.isReplay || g._spotlightReason?.isBarrel)
+        .map(gameKey),
+    );
+    const randomPick = pickRandomLibraryGame(eligible, protectedKeys);
+    if (randomPick) {
+      const key = gameKey(randomPick);
+      const at = pool.findIndex(g => gameKey(g) === key);
+      if (at >= 0) pool.splice(at, 1);
+      const entry = Object.assign({}, randomPick, {
+        _spotlightReason: { eyebrow: 'Random pick', score: 50, isRandom: true },
+      });
+      const insertAt = Math.floor(Math.random() * (pool.length + 1));
+      pool.splice(insertAt, 0, entry);
+    }
+  }
 
   // Preserve the previously-displayed game across dashboard revisits: if it's still
   // eligible, rotate it to index 0 so re-paint doesn't visibly switch games.

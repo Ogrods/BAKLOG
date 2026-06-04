@@ -57,9 +57,9 @@ function injectSyntheticRuntimeDom() {
       <div class="conn-rail-item" data-provider="gog" role="option" tabindex="-1" aria-selected="false">GOG</div>`;
   }
 
-  const fetcherRow = document.getElementById('fetcherHealthRow');
-  if (fetcherRow) {
-    fetcherRow.innerHTML =
+  const fetcherHealth = document.getElementById('dashboardFetcherHealth');
+  if (fetcherHealth) {
+    fetcherHealth.innerHTML =
       '<button type="button" class="fh-chip" aria-label="Refresh Steam library">Steam</button>';
   }
 

@@ -1867,7 +1867,208 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
 .dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04) translateZ(0); }
-.dash-spotlight.has-portrait-art:hover .dash-spotlight-art { transform: none; }
+.dash-spotlight.has-portrait-art:hover .dash-spotlight-art,
+.dash-spotlight.has-portrait-art:hover .dash-spotlight-art-bg {
+  animation-play-state: paused;
+}
+.dash-spotlight.has-portrait-art:hover .dash-spotlight-art {
+  --portrait-scale: 1.04;
+}
+.dash-spotlight.has-portrait-art .dash-spotlight-art {
+  transition: opacity 0.45s ease, --portrait-scale 0.25s ease;
+  box-sizing: border-box;
+  padding: 5px 0;
+}
+@property --portrait-scale {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+@keyframes spotlightSheen1 {
+  0%, 18% {
+    transform: translateX(-150%) skewX(-12deg);
+    opacity: 0;
+  }
+  26% { opacity: 0.08; }
+  46% { opacity: 0.08; }
+  56%, 100% {
+    transform: translateX(150%) skewX(-12deg);
+    opacity: 0;
+  }
+}
+@keyframes spotlightSheen2 {
+  0%, 18% {
+    transform: translateX(150%) skewX(12deg);
+    opacity: 0;
+  }
+  26% { opacity: 0.08; }
+  46% { opacity: 0.08; }
+  56%, 100% {
+    transform: translateX(-150%) skewX(12deg);
+    opacity: 0;
+  }
+}
+@keyframes spotlightSheen3 {
+  0%, 16% {
+    transform: translateX(-150%) skewX(-14deg);
+    opacity: 0;
+  }
+  24% { opacity: 0.08; }
+  44% { opacity: 0.08; }
+  54%, 100% {
+    transform: translateX(150%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+@keyframes spotlightSheen4 {
+  0%, 20% {
+    transform: translateX(150%) skewX(10deg);
+    opacity: 0;
+  }
+  28% { opacity: 0.08; }
+  48% { opacity: 0.08; }
+  58%, 100% {
+    transform: translateX(-150%) skewX(10deg);
+    opacity: 0;
+  }
+}
+@keyframes spotlightFloat1 {
+  0%, 100% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(-3deg) rotateX(1deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(3deg) rotateX(-1deg) translateY(-1.5px) translateZ(0);
+  }
+}
+@keyframes spotlightFloat2 {
+  0%, 100% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(3deg) rotateX(-1deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(-3deg) rotateX(1deg) translateY(-1.5px) translateZ(0);
+  }
+}
+@keyframes spotlightFloat3 {
+  0%, 100% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(-4deg) rotateX(1.2deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(4deg) rotateX(-1.2deg) translateY(-1.5px) translateZ(0);
+  }
+}
+@keyframes spotlightFloat4 {
+  0%, 100% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(2.5deg) rotateX(-0.8deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: perspective(900px) scale(var(--portrait-scale, 1)) rotateY(-2.5deg) rotateX(0.8deg) translateY(-1px) translateZ(0);
+  }
+}
+@keyframes spotlightFloatBg1 {
+  0%, 100% {
+    transform: scale(1.15) perspective(900px) rotateY(-1.5deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: scale(1.15) perspective(900px) rotateY(1.5deg) translateY(-1px) translateZ(0);
+  }
+}
+@keyframes spotlightFloatBg2 {
+  0%, 100% {
+    transform: scale(1.15) perspective(900px) rotateY(1.5deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: scale(1.15) perspective(900px) rotateY(-1.5deg) translateY(-1px) translateZ(0);
+  }
+}
+@keyframes spotlightFloatBg3 {
+  0%, 100% {
+    transform: scale(1.15) perspective(900px) rotateY(-2deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: scale(1.15) perspective(900px) rotateY(2deg) translateY(-1px) translateZ(0);
+  }
+}
+@keyframes spotlightFloatBg4 {
+  0%, 100% {
+    transform: scale(1.15) perspective(900px) rotateY(1deg) translateY(0) translateZ(0);
+  }
+  50% {
+    transform: scale(1.15) perspective(900px) rotateY(-1deg) translateY(-1px) translateZ(0);
+  }
+}
+.dash-spotlight-sheen {
+  display: none;
+}
+.dash-spotlight.has-portrait-art .dash-spotlight-sheen {
+  display: block;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
+  content: "";
+  position: absolute;
+  top: -12%;
+  bottom: -12%;
+  left: 0;
+  width: 48%;
+  background: linear-gradient(
+    var(--sheen-angle, 115deg),
+    transparent 0%,
+    rgba(255, 255, 255, 0.045) 42%,
+    rgba(255, 255, 255, 0.085) 50%,
+    rgba(255, 255, 255, 0.045) 58%,
+    transparent 100%
+  );
+  filter: blur(7px);
+  mix-blend-mode: screen;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-1 { --sheen-angle: 115deg; }
+.dash-spotlight.has-portrait-art.portrait-anim-1 .dash-spotlight-sheen::before {
+  animation: spotlightSheen1 5.5s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-1 .dash-spotlight-art.is-loaded {
+  animation: spotlightFloat1 9s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-1 .dash-spotlight-art-bg.is-loaded {
+  animation: spotlightFloatBg1 9s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-2 { --sheen-angle: 65deg; }
+.dash-spotlight.has-portrait-art.portrait-anim-2 .dash-spotlight-sheen::before {
+  animation: spotlightSheen2 6.5s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-2 .dash-spotlight-art.is-loaded {
+  animation: spotlightFloat2 10.5s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-2 .dash-spotlight-art-bg.is-loaded {
+  animation: spotlightFloatBg2 10.5s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-3 { --sheen-angle: 115deg; }
+.dash-spotlight.has-portrait-art.portrait-anim-3 .dash-spotlight-sheen::before {
+  animation: spotlightSheen3 5s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-3 .dash-spotlight-art.is-loaded {
+  animation: spotlightFloat3 8s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-3 .dash-spotlight-art-bg.is-loaded {
+  animation: spotlightFloatBg3 8s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-4 { --sheen-angle: 65deg; }
+.dash-spotlight.has-portrait-art.portrait-anim-4 .dash-spotlight-sheen::before {
+  animation: spotlightSheen4 7s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-4 .dash-spotlight-art.is-loaded {
+  animation: spotlightFloat4 11.5s ease-in-out infinite;
+}
+.dash-spotlight.has-portrait-art.portrait-anim-4 .dash-spotlight-art-bg.is-loaded {
+  animation: spotlightFloatBg4 11.5s ease-in-out infinite;
+}
 .dash-spotlight-gradient {
   position: absolute;
   inset: 0;
@@ -3813,4 +4014,16 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .library-count-popup { display: none; }
+  .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
+    animation: none !important;
+    transform: translateX(0) skewX(-12deg);
+    opacity: 0.35;
+  }
+  .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
+  .dash-spotlight.has-portrait-art .dash-spotlight-art-bg.is-loaded {
+    animation: none !important;
+  }
+  .dash-spotlight.has-portrait-art:hover .dash-spotlight-art {
+    transform: scale(1.04) translateZ(0);
+  }
 }

@@ -85,6 +85,15 @@ function persistLandscapeCache() {
 window.coverLandscapeAttr = function (url) {
   return url && window.__landscapeCovers.has(url) ? " landscape" : "";
 };
+const PORTRAIT_ANIM_CLASSES = ["portrait-anim-1", "portrait-anim-2", "portrait-anim-3", "portrait-anim-4"];
+const PORTRAIT_ANIM_COUNT = PORTRAIT_ANIM_CLASSES.length;
+function clearPortraitAnimClasses(spot) {
+  spot?.classList.remove(...PORTRAIT_ANIM_CLASSES);
+}
+function assignPortraitAnimClass(spot) {
+  clearPortraitAnimClasses(spot);
+  spot.classList.add(`portrait-anim-${1 + Math.floor(Math.random() * PORTRAIT_ANIM_COUNT)}`);
+}
 window.applySpotlightArtFit = function (img) {
   if (!img?.naturalWidth) return;
   const ratio = img.naturalWidth / img.naturalHeight;
@@ -94,14 +103,22 @@ window.applySpotlightArtFit = function (img) {
   const spot = img.closest(".dash-spotlight");
   if (!spot) return;
   const bg = spot.querySelector(".dash-spotlight-art-bg");
+  const sheen = spot.querySelector(".dash-spotlight-sheen");
   if (crop.portrait && bg) {
     const src = img.currentSrc || img.src;
     if (src && bg.src !== src) bg.src = src;
     spot.classList.add("has-portrait-art");
+    assignPortraitAnimClass(spot);
     bg.classList.add("is-loaded");
+    if (sheen) {
+      const w = Math.min(spot.clientWidth, spot.clientHeight * ratio);
+      sheen.style.width = `${w}px`;
+    }
   } else {
     spot.classList.remove("has-portrait-art");
+    clearPortraitAnimClasses(spot);
     bg?.classList.remove("is-loaded");
+    if (sheen) sheen.style.width = "";
   }
 };
 window.spotlightArtFallback = function (img) {
@@ -109,6 +126,7 @@ window.spotlightArtFallback = function (img) {
   let idx = parseInt(img.dataset.spotlightIdx || "0", 10) + 1;
   const spot = img.closest(".dash-spotlight");
   spot?.classList.remove("has-portrait-art");
+  clearPortraitAnimClasses(spot);
   while (idx < list.length) {
     if (img.src !== list[idx]) {
       img.dataset.spotlightIdx = String(idx);

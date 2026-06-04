@@ -6,7 +6,7 @@
 // Keep in sync with the inline boot-tip seed list in index.html (body script).
 export const TIPS = [
   "Watch your spotlight for anything you want to recategorize.",
-  "Own a physical copy? Add it manually — add whatever you want.",
+  "Own a physical copy? Add it manually - add whatever you want.",
   "See a Humble icon but no other store? You probably still need to redeem the key in your Humble account.",
   "Sort by time played to see what you actually play, then recategorize from there.",
   "Press / to jump straight to the search box.",
@@ -15,6 +15,8 @@ export const TIPS = [
   "Turn on Hide duplicates to collapse the same game across stores.",
   "Click any dashboard chart to drill into those exact games.",
   "Just bought a game? Steam's API can take up to 24 hours to show it.",
+  "Co-op data (online, couch, campaign) is hard to pin down. Spot something off? Let us know.",
+  "There's more than one back-to-top button.",
 ];
 
 export const RARE_TIP = "My backlog is bigger than yours.";

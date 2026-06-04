@@ -27,7 +27,7 @@ export function pickCardHtml(g) {
   const headerFallback = coverFallbackFor(g);
   const cover = libraryCoverFor(g);
   const ratingVal = ratingValue(g);
-  const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : "—";
+  const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - ";
   const h = hltbMain(g);
   const store = normalizeGame(g).store;
   const badge = store === "gog" ? "G" : store === "psn" ? "P" : store === "epic" ? "E" : store === "amazon" ? "A" : store === "nintendo" ? "N" : store === "xbox" ? "X" : store === "battlenet" ? "B" : store === "ubisoft" ? "U" : store === "other" ? "?" : "S";
@@ -48,7 +48,7 @@ export function dealCardHtml(g) {
   const headerFallback = coverFallbackFor(g);
   const cover = libraryCoverFor(g);
   const d = getDealInfo(g);
-  const priceLabel = d && d.price != null ? `$${d.price.toFixed(2)}` : "—";
+  const priceLabel = d && d.price != null ? `$${d.price.toFixed(2)}` : " - ";
   const cutLabel = d && d.cut ? `-${d.cut}%` : "";
   const cutValue = d && d.cut ? d.cut : 0;
   const cutClass = cutValue >= 75

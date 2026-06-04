@@ -284,6 +284,7 @@ def test_run_log_replay_from_disk(runs_env):
     run.add_line("stdout", "world")
     replay = run.replay_lines()
     assert [m["text"] for m in replay] == ["hello", "world"]
+    assert [m["seq"] for m in replay] == [1, 2]
     assert (runs_dir / f"{run.id}.jsonl").exists()
 
 
@@ -661,3 +662,30 @@ def test_cancel_all_and_wait_reports_stragglers(runs_env) -> None:
     assert result["stragglers"]
     assert result["stragglers"][0]["id"] == run.id
     assert not run._finished.is_set()
+
+
+def test_shutdown_cancels_in_flight_run(runs_env, monkeypatch: pytest.MonkeyPatch) -> None:
+    mgr, _runs_dir = runs_env
+    monkeypatch.setitem(
+        server.FETCHERS,
+        "slow",
+        {
+            "label": "Slow",
+            "argv": [server.sys.executable, "-c", "import time; time.sleep(60)"],
+            "refreshArgs": [],
+            "metaKey": "slow",
+            "group": "library",
+            "color": "#fff",
+            "requires": [],
+        },
+    )
+    run = mgr.submit("slow")
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if run.status in ("running", "launching"):
+            break
+        time.sleep(0.05)
+    mgr.shutdown()
+    assert run._finished.is_set() or run.status in ("cancelled", "failed", "cancelling")
+    snap = mgr.snapshot()
+    assert snap["active"] is None

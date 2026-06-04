@@ -21,13 +21,27 @@ from fetchers._authoritative import NINTENDO
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from auth.secrets import profile_dir
-from nintendo_client import NintendoAuthError, NintendoClient, NintendoEndpointError
+from nintendo_client import (
+    NintendoAuthError,
+    NintendoCaptureError,
+    NintendoClient,
+    NintendoEndpointError,
+)
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
+
+
 def raw_dump_json() -> Path:
     from shared.profile_paths import profile_cache_dir
 
     return profile_cache_dir() / "nintendo_raw.json"
+
+
+def fetch_debug_json() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "nintendo" / "fetch_debug.json"
+
 
 HLTB_DELAY_SEC = 1.0
 
@@ -161,6 +175,13 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
     return row
 
 
+def _nintendo_connected() -> bool:
+    prof = profile_dir("nintendo")
+    if prof.exists() and any(prof.iterdir()):
+        return True
+    return bool(resolve_env("NINTENDO_COOKIE", provider="nintendo"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Nintendo eShop purchase history")
     parser.add_argument("--skip-hltb", action="store_true")
@@ -170,27 +191,45 @@ def main() -> int:
         action="store_true",
         help=f"Write raw transactions to {raw_dump_json()}",
     )
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Open the saved browser profile visibly (debug capture issues)",
+    )
+    parser.add_argument(
+        "--dump-debug",
+        action="store_true",
+        help=f"Write capture diagnostics to {fetch_debug_json()}",
+    )
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_nintendo")
     stats = RunStats()
     load_dotenv()
-    cookie = resolve_env("NINTENDO_COOKIE", provider="nintendo")
-    if not cookie:
+
+    if not _nintendo_connected():
         stats.error(
-            "Set NINTENDO_COOKIE in .env:\n"
-            "  1. https://ec.nintendo.com/my/transactions/\n"
-            "  2. DevTools → Network → filter transactions\n"
-            "  3. Click transactions?limit=… → copy Cookie header"
+            "Nintendo is not connected. Open Connections → Nintendo → Connect and "
+            "sign in at ec.nintendo.com/my/transactions/ (saved browser profile required)."
         )
         return stats.finish("fetch_nintendo", t0, exit_code=1)
 
+    cookie = resolve_env("NINTENDO_COOKIE", provider="nintendo") or ""
+    prof = profile_dir("nintendo")
+    debug_path = fetch_debug_json() if args.dump_debug else None
+
     try:
-        client = NintendoClient(cookie, profile_path=profile_dir("nintendo"))
+        client = NintendoClient(
+            cookie,
+            profile_path=prof,
+            headless=not args.headed,
+            dump_debug_path=debug_path,
+        )
         raw_tx = client.fetch_all_transactions()
     except NintendoEndpointError as e:
-        # Endpoint moved/removed — not an auth problem, so don't mark the
-        # account invalid (that would nag the user to reconnect pointlessly).
+        stats.error(str(e))
+        return stats.finish("fetch_nintendo", t0, exit_code=1)
+    except NintendoCaptureError as e:
         stats.error(str(e))
         return stats.finish("fetch_nintendo", t0, exit_code=1)
     except NintendoAuthError as e:
@@ -212,7 +251,7 @@ def main() -> int:
 
     if not merged:
         stats.error(
-            "No games found. Check cache/nintendo_raw.json — cookie may be valid "
+            "No games found. Check cache/nintendo_raw.json — session may be valid "
             "but account has no eShop purchases in the last ~2 years."
         )
         return stats.finish("fetch_nintendo", t0, exit_code=2)

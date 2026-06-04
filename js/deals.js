@@ -134,7 +134,7 @@ export function dealHeroCardHtml(g) {
 export function dealHeroEmptyHtml(opts = {}) {
   const hint = opts.noWishlist
     ? "Connect a store and run its wishlist fetcher to start tracking deals."
-    : "No active deals right now — check back after the next price refresh.";
+    : "No active deals right now - check back after the next price refresh.";
   return `<div class="dash-card deal-hero-empty">
     <div class="dash-kpi-label">Today&apos;s top deal</div>
     <div class="text-sm text-slate-400 mt-3">${hint}</div>
@@ -197,11 +197,11 @@ export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, be
       </div>
       <div class="sale-stat">
         <div class="sale-stat-label">Avg cut</div>
-        <div class="sale-stat-value sale-stat-cut ${noSale ? "sale-stat-muted" : cutBucketClass(avgCut)}">${noSale ? "—" : `-${avgCut}%`}</div>
+        <div class="sale-stat-value sale-stat-cut ${noSale ? "sale-stat-muted" : cutBucketClass(avgCut)}">${noSale ? " - " : `-${avgCut}%`}</div>
       </div>
       <div class="sale-stat">
         <div class="sale-stat-label">Best cut</div>
-        <div class="sale-stat-value sale-stat-cut ${noSale ? "sale-stat-muted" : `sale-stat-best ${cutBucketClass(bestCut)}`}">${noSale ? "—" : `-${bestCut}%`}</div>
+        <div class="sale-stat-value sale-stat-cut ${noSale ? "sale-stat-muted" : `sale-stat-best ${cutBucketClass(bestCut)}`}">${noSale ? " - " : `-${bestCut}%`}</div>
         ${noSale ? "" : bestLabel}
       </div>
     </div>

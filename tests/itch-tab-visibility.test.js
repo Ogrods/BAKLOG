@@ -3,6 +3,11 @@
  */
 
 import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
+
+vi.mock('../js/chart-loader.js', () => ({
+  ensureChartJs: vi.fn(() => Promise.resolve()),
+}));
+
 import { state } from '../js/state.js';
 import { refreshConnections, isItchTabAvailable } from '../js/connections.js';
 import { applyItchTabVisibility } from '../js/filters-ui.js';
@@ -59,15 +64,21 @@ describe('isItchTabAvailable', () => {
 describe('applyItchTabVisibility', () => {
   beforeEach(() => {
     state.itchGames = [];
+    state.dashboardDataReady = false;
     state.activeView = 'library';
     state.prefs = state.prefs || {};
     state.prefs.activeView = 'library';
-    document.body.innerHTML =
-      '<button type="button" class="view-tab" data-view="itch">itch.io</button>';
+    document.body.innerHTML = `
+      <button type="button" class="view-tab" data-view="itch">itch.io</button>
+      <button type="button" class="view-tab" data-view="dashboard">Dashboard</button>
+      <div id="bulkBar" class="hidden"><span id="bulkCount"></span></div>
+      <div id="viewLoadingOverlay"></div>
+      <div id="viewLoadingLabel"></div>`;
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    state.dashboardDataReady = false;
   });
 
   it('hides the itch tab when itch is not set up', async () => {
@@ -83,5 +94,26 @@ describe('applyItchTabVisibility', () => {
     await refreshConnections();
     const tab = document.querySelector('.view-tab[data-view="itch"]');
     expect(tab.classList.contains('hidden')).toBe(false);
+  });
+
+  it('does not redirect away from itch during boot before data is known', async () => {
+    state.activeView = 'itch';
+    state.prefs.activeView = 'itch';
+    state.dashboardDataReady = false;
+    mockAuthStatus([{ key: 'itch', status: 'disconnected' }]);
+    await refreshConnections();
+    applyItchTabVisibility();
+    expect(state.activeView).toBe('itch');
+    expect(state.prefs.activeView).toBe('itch');
+  });
+
+  it('redirects from itch to dashboard once auth and library data are known', async () => {
+    state.activeView = 'itch';
+    state.prefs.activeView = 'itch';
+    state.dashboardDataReady = true;
+    mockAuthStatus([{ key: 'itch', status: 'disconnected' }]);
+    await refreshConnections();
+    applyItchTabVisibility();
+    expect(state.prefs.activeView).toBe('dashboard');
   });
 });

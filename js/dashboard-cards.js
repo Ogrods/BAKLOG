@@ -50,7 +50,7 @@ function resolveItchHeroOrder(freshCandidates) {
 /** Relative "added" label from first-seen timestamp (mirrors fetcher humanizeAge thresholds). */
 function formatAddedAgo(ts) {
   const ms = Date.now() - ts;
-  if (!Number.isFinite(ms) || ms < 0) return '—';
+  if (!Number.isFinite(ms) || ms < 0) return ' - ';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
@@ -78,7 +78,7 @@ export function renderDashboardCoopSpotlight(games) {
         <div class="coop-spotlight-title">Co-op spotlight</div>
       </div>
       <div class="coop-empty">
-        No co-op games detected yet. Connect Steam and run the games fetcher (Fetcher health) — co-op flags come from Steam store categories, or wait until you own a title tagged <em>Online Co-op</em> or <em>Shared/Split Screen Co-op</em>.
+        No co-op games detected yet. Connect Steam and run the games fetcher (Fetcher health) - co-op flags come from Steam store categories, or wait until you own a title tagged <em>Online Co-op</em> or <em>Shared/Split Screen Co-op</em>.
       </div>`;
     return;
   }
@@ -107,7 +107,7 @@ export function renderDashboardCoopSpotlight(games) {
             <span class="coop-pick-rating">${ratingValue(g)}%</span>
           </button>`;
         }).join("")
-      : '<div class="coop-picks-empty">All started or finished — nothing unplayed.</div>';
+      : '<div class="coop-picks-empty">All started or finished - nothing unplayed.</div>';
     const drillJson = escapeAttr(JSON.stringify(drillArgs));
     return `
       <div class="coop-side ${sideClass}" role="button" tabindex="0" data-action="coop-drill" data-drill="${drillJson}" title="Filter the library by ${escapeAttr(title)}">
@@ -128,7 +128,7 @@ export function renderDashboardCoopSpotlight(games) {
           </div>
           <div class="coop-side-stat">
             <div class="coop-side-stat-label">Avg HLTB</div>
-            <div class="coop-side-stat-value ${avgHltb != null ? "" : "coop-side-stat-muted"}">${avgHltb != null ? avgHltb + "h" : "—"}</div>
+            <div class="coop-side-stat-value ${avgHltb != null ? "" : "coop-side-stat-muted"}">${avgHltb != null ? avgHltb + "h" : " - "}</div>
           </div>
         </div>
         <div>
@@ -375,7 +375,7 @@ function renderItchHeroHtml(candidates) {
   if (!candidates.length) {
     return `<div class="itch-hero">
       <div class="itch-hero-label"><span>Featured unplayed pick</span></div>
-      <div class="itch-hero-empty">No rated picks yet — run the itch ratings fetcher to backfill scores.</div>
+      <div class="itch-hero-empty">No rated picks yet - run the itch ratings fetcher to backfill scores.</div>
     </div>`;
   }
   const idx = ((itchHeroIndex % candidates.length) + candidates.length) % candidates.length;
@@ -451,7 +451,7 @@ export function renderDashboardItchRecap() {
   const total = state.itchGames.length;
   applyItchVisibility();
   if (!total) {
-    el.innerHTML = `<p class="text-sm text-slate-400">No itch.io data yet — add your itch.io key on Connections and run the itch fetcher.</p>`;
+    el.innerHTML = `<p class="text-sm text-slate-400">No itch.io data yet - add your itch.io key on Connections and run the itch fetcher.</p>`;
     return;
   }
 
@@ -539,11 +539,11 @@ export function renderDashboardItchRecap() {
       </div>
       <div class="sale-stat">
         <div class="sale-stat-label">Backlog</div>
-        <div class="sale-stat-value ${backlogged ? "" : "sale-stat-muted"}">${backlogged ? formatNum(backlogged) : "—"}</div>
+        <div class="sale-stat-value ${backlogged ? "" : "sale-stat-muted"}">${backlogged ? formatNum(backlogged) : " - "}</div>
       </div>
       <div class="sale-stat">
         <div class="sale-stat-label">Rated</div>
-        <div class="sale-stat-value ${rated ? "" : "sale-stat-muted"}">${rated ? formatNum(rated) : "—"}</div>
+        <div class="sale-stat-value ${rated ? "" : "sale-stat-muted"}">${rated ? formatNum(rated) : " - "}</div>
       </div>
     </div>
     ${segHtml}

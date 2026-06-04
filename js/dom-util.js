@@ -8,6 +8,6 @@ export function escapeAttr(s) {
 
 export function formatNum(n) {
   const num = Number(n);
-  if (!Number.isFinite(num)) return String(n ?? "—");
+  if (!Number.isFinite(num)) return String(n ?? " - ");
   return Math.abs(num) >= 10000 ? num.toLocaleString("en-US") : String(num);
 }

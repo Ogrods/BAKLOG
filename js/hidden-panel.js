@@ -70,7 +70,7 @@ function render() {
   const summary = el(SUMMARY_ID);
   if (summary) {
     summary.textContent = entries.length
-      ? `${entries.length} hidden ${entries.length === 1 ? 'game' : 'games'} — restore to show in your library, wishlist, or itch tab again.`
+      ? `${entries.length} hidden ${entries.length === 1 ? 'game' : 'games'} - restore to show in your library, wishlist, or itch tab again.`
       : 'No hidden games.';
   }
   const wrap = el(LIST_ID);

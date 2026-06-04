@@ -88,7 +88,7 @@ export function buildInsightPool(games) {
 }
 
 function formatDollarMarquee(n) {
-  if (n == null || Number.isNaN(n)) return '—';
+  if (n == null || Number.isNaN(n)) return ' - ';
   return formatMoney(n, displayCurrency(), { maximumFractionDigits: 0, minimumFractionDigits: 0 });
 }
 

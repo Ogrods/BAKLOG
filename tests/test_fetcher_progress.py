@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 
 from fetchers._base import refuse_drift_result, refuse_empty_result
-from fetchers._progress import RunStats, done, started
+from fetchers._progress import HeartbeatTimer, RunStats, done, started
 
 
 def test_refuse_empty_result_blocks_by_default():
@@ -73,6 +73,19 @@ def test_refuse_drift_accepts_int_count(tmp_path):
     _write_games_file(out, 200)
     assert refuse_drift_result(10, label="x", allow_drift=False, output_path=out) == 3
     assert refuse_drift_result(120, label="x", allow_drift=False, output_path=out) is None
+
+
+def test_heartbeat_timer_emits_after_interval(capsys):
+    import time as time_mod
+
+    timer = HeartbeatTimer(interval=0.02)
+    timer.tick("silent")
+    assert capsys.readouterr().out == ""
+    time_mod.sleep(0.03)
+    timer.tick("still working")
+    assert "still working" in capsys.readouterr().out
+    timer.tick("no repeat")
+    assert capsys.readouterr().out == ""
 
 
 def test_run_stats_finish_returns_exit_code(capsys):

@@ -134,7 +134,7 @@ export function renderWaitingBanner() {
   el.innerHTML = `
     <div class="migration-banner-body library-watch-waiting">
       <span>Waiting for <strong>${labels}</strong> in your Steam library.
-        Steam's API can lag behind the client — we'll alert you when the next sync includes it.</span>
+        Steam's API can lag behind the client - we'll alert you when the next sync includes it.</span>
       <span class="migration-banner-actions">
         <button type="button" class="fh-log-btn" data-lw-run-steam>Run Steam fetch</button>
         <button type="button" class="fh-log-btn" data-lw-cancel-watch>Stop watching</button>
@@ -155,7 +155,7 @@ export function renderWaitingBanner() {
 
 function fireWatchAlert(watch, game) {
   const name = game?.name || watch.name;
-  postDesktopNotification('BAKLOG — game added', `${name} is now in your Steam library.`);
+  postDesktopNotification('BAKLOG - game added', `${name} is now in your Steam library.`);
   showFoundBanner(watch, game);
   console.info(`[library-watch] ${name} detected in Steam catalog`);
 }

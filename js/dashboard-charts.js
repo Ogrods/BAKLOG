@@ -638,7 +638,7 @@ function renderScatterList(hits) {
   }).join('');
 
   const overflowTile = remaining > 0
-    ? `<div class="dash-scatter-list-more" aria-hidden="true" title="${remaining} more game${remaining === 1 ? '' : 's'} in this cluster — narrows as the window widens">
+    ? `<div class="dash-scatter-list-more" aria-hidden="true" title="${remaining} more game${remaining === 1 ? '' : 's'} in this cluster - narrows as the window widens">
         <span class="dash-scatter-list-more-num">+${remaining}</span>
         <span class="dash-scatter-list-more-label">more</span>
       </div>`
@@ -877,7 +877,7 @@ export function renderDashboardCharts(games) {
   if (storeHeadlineEl) {
     storeHeadlineEl.innerHTML = topStore[0]
       ? `<strong>${escapeHtml(DASH_STORE_LABELS[topStore[0]] || topStore[0])}</strong> ${storePct}%`
-      : '<strong>—</strong>';
+      : '<strong> - </strong>';
   }
 
   const backlogCount = games.filter(g => getPersonal(g).status === 'backlog').length;

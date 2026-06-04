@@ -440,9 +440,9 @@ describe('getSameTitleKeys', () => {
 });
 
 describe('formatReleaseDate', () => {
-  it('returns — for empty', () => {
-    expect(formatReleaseDate('')).toBe('—');
-    expect(formatReleaseDate(null)).toBe('—');
+  it('returns placeholder for empty', () => {
+    expect(formatReleaseDate('')).toBe(' - ');
+    expect(formatReleaseDate(null)).toBe(' - ');
   });
 
   it('parses year-only strings as-is', () => {

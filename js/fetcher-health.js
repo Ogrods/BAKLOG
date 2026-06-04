@@ -391,8 +391,8 @@ const COUNT_FNS = {
 // Plain-English description of what a normal click does for each fetcher.
 // Falls back to a generic per-group hint if a key isn't listed here.
 const CLICK_HINTS = {
-  steam: 'Sync your Steam library — picks up new purchases & updated playtime',
-  gog: 'Sync your GOG library — picks up new purchases & metadata',
+  steam: 'Sync your Steam library - picks up new purchases & updated playtime',
+  gog: 'Sync your GOG library - picks up new purchases & metadata',
   psn: 'Sync your PSN library',
   epic: 'Sync your Epic library',
   amazon: 'Sync your Amazon Prime Gaming library',
@@ -425,11 +425,11 @@ const REFRESH_HINTS = {
   psn: 'Re-fetch every PSN entry, ignoring local cache',
   epic: 'Re-fetch every Epic entry, ignoring local cache',
   wishlistGog: 'Re-fetch every wishlist entry from GOG, ignoring cached details',
-  hltb: 'Also retry titles previously cached as "no HLTB match" — use after HLTB adds new entries',
+  hltb: 'Also retry titles previously cached as "no HLTB match" - use after HLTB adds new entries',
   steamReviews:
-    'Also retry titles previously cached as "no Steam app match" — use after Steam lists the game',
-  steamCovers: 'Also retry rows previously cached as "no Steam match" — use after Steam adds new entries',
-  steamTags: 'Re-fetch Steam appdetails ignoring the local cache — picks up newly-added Steam categories',
+    'Also retry titles previously cached as "no Steam app match" - use after Steam lists the game',
+  steamCovers: 'Also retry rows previously cached as "no Steam match" - use after Steam adds new entries',
+  steamTags: 'Re-fetch Steam appdetails ignoring the local cache - picks up newly-added Steam categories',
 };
 
 // Pending breakdown for the enrichment chips so the tooltip can say
@@ -518,15 +518,15 @@ function clickHintFor(src) {
     return `${base} (${formatNum(pending.unchecked)} pending)`;
   }
   if (pending.retry > 0) {
-    return `Re-tries ${formatNum(pending.retry)} previously-attempted rows that didn't return data. Usually won't change the score — safe to skip.`;
+    return `Re-tries ${formatNum(pending.retry)} previously-attempted rows that didn't return data. Usually won't change the score - safe to skip.`;
   }
   if (pending.noMatch > 0) {
     const note = src.supportsRefresh
       ? ' Use Shift+click to retry them.'
       : '';
-    return `Nothing new to look up — the remaining ${formatNum(pending.noMatch)} are cached as "no match".${note}`;
+    return `Nothing new to look up - the remaining ${formatNum(pending.noMatch)} are cached as "no match".${note}`;
   }
-  return 'Everything is enriched — nothing to do.';
+  return 'Everything is enriched - nothing to do.';
 }
 
 function refreshHintFor(src) {
@@ -602,7 +602,7 @@ function coverageLabel(key) {
   const fn = COVERAGE_FNS[key];
   if (!fn) return null;
   const { covered, total, pct } = fn();
-  if (!total) return '—';
+  if (!total) return ' - ';
   const base = `${pct != null ? pct : 0}% · ${formatNum(covered)}/${formatNum(total)}`;
   const pending = pendingForEnrich(key);
   if (!pending) return base;
@@ -631,10 +631,10 @@ function coverageTooltipLine(key) {
   if (pending.unchecked > 0) {
     line += ` ${formatNum(pending.unchecked)} still to try.`;
   } else if (pending.retry > 0 && key === 'steamReviews') {
-    line += ` ${formatNum(pending.retry)} were tried before with no review score — clicking will re-check but rarely changes the number.`;
+    line += ` ${formatNum(pending.retry)} were tried before with no review score - clicking will re-check but rarely changes the number.`;
   } else if (pending.noMatch > 0) {
     const src = key === 'hltb' ? 'HowLongToBeat' : 'Steam';
-    line += ` Remaining ${formatNum(pending.noMatch)} have no match on ${src} — clicking won't add more.`;
+    line += ` Remaining ${formatNum(pending.noMatch)} have no match on ${src} - clicking won't add more.`;
   } else {
     line += ' Nothing pending.';
   }
@@ -745,11 +745,11 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   }
   if (textEl) textEl.textContent = text;
   if (liveEl) liveEl.textContent = text;
-  el.title = `${text} — click to show log`;
+  el.title = `${text} - click to show log`;
 }
 
 export function humanizeAge(ms) {
-  if (!Number.isFinite(ms)) return '—';
+  if (!Number.isFinite(ms)) return ' - ';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
@@ -770,7 +770,7 @@ export function fetcherFreshness(source) {
     ? (source.countFn ? source.countFn(meta) : (meta.game_count ?? null))
     : null;
   if (!meta || !meta.fetched_at) {
-    return { status: 'missing', ageMs: Infinity, count, ageLabel: meta ? '?' : '—', iso: null };
+    return { status: 'missing', ageMs: Infinity, count, ageLabel: meta ? '?' : ' - ', iso: null };
   }
   const ts = Date.parse(meta.fetched_at);
   const ageMs = Number.isFinite(ts) ? Date.now() - ts : Infinity;
@@ -946,7 +946,7 @@ export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
 
   const appendLineFn = deps.appendLine;
   if (appendLineFn) {
-    appendLineFn(`[auto-enrich: ${newCount} new game(s) — queuing ${keysToRun.length} enricher(s)]`, 'meta');
+    appendLineFn(`[auto-enrich: ${newCount} new game(s) - queuing ${keysToRun.length} enricher(s)]`, 'meta');
   }
 
   for (const key of keysToRun) {
@@ -975,6 +975,8 @@ export const fetcherRunner = (() => {
   /** Run ids the user cancelled — do not reconnect or re-subscribe until gone from server. */
   const suppressedRunIds = new Set();
   const SUPPRESSED_RUNS_KEY = profileScopedStorageKey('fetcher-suppressed-run-ids');
+  const LAST_SEQ_KEY = profileScopedStorageKey('fetcher-last-seq-by-run');
+  const lastSeqByRunId = new Map();
   const IN_FLIGHT_POLL_MS = 10_000;
   const WAIT_QUEUE_SLOT_MS = 120_000;
   const RECONNECT_BASE_MS = 2000;
@@ -988,6 +990,51 @@ export const fetcherRunner = (() => {
   let inFlightPollTimer = null;
   /** True when the last /api/runs snapshot had active or queued rows (server truth). */
   let lastServerInFlight = false;
+  let cancelInFlight = false;
+
+  function loadLastSeqByRunId() {
+    try {
+      const raw = sessionStorage.getItem(LAST_SEQ_KEY);
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === 'object') {
+        for (const [id, seq] of Object.entries(obj)) {
+          const n = Number(seq);
+          if (id && Number.isFinite(n) && n > 0) lastSeqByRunId.set(id, n);
+        }
+      }
+    } catch (_) {}
+  }
+
+  function persistLastSeqMap() {
+    try {
+      const obj = Object.fromEntries(lastSeqByRunId);
+      sessionStorage.setItem(LAST_SEQ_KEY, JSON.stringify(obj));
+    } catch (_) {}
+  }
+
+  function getLastSeq(runId) {
+    return lastSeqByRunId.get(runId) || 0;
+  }
+
+  function recordLineSeq(runId, seq) {
+    const n = Number(seq);
+    if (!Number.isFinite(n) || n <= 0) return;
+    if (n <= getLastSeq(runId)) return;
+    lastSeqByRunId.set(runId, n);
+    persistLastSeqMap();
+  }
+
+  function clearLastSeq(runId) {
+    if (!lastSeqByRunId.delete(runId)) return;
+    persistLastSeqMap();
+  }
+
+  function streamUrl(runId) {
+    const base = `/api/stream/${encodeURIComponent(runId)}`;
+    const since = getLastSeq(runId);
+    return since > 0 ? `${base}?since=${since}` : base;
+  }
 
   function applyServerSnapshotInFlight(snap) {
     lastServerInFlight = !!(snap?.active || (snap?.queue?.length));
@@ -1010,6 +1057,7 @@ export const fetcherRunner = (() => {
   }
 
   loadSuppressedRunIds();
+  loadLastSeqByRunId();
 
   async function fetchWithTimeoutAndProbe(url, options = {}, ms = FETCH_TIMEOUT_MS) {
     try {
@@ -1039,10 +1087,10 @@ export const fetcherRunner = (() => {
     // the visible total rather than its queue-only index.
     const pos = activeCount + idx + 1;
     const waitFor = snap.active ? labelForKey(snap.active.key) : null;
-    if (waitFor) return `${pos} of ${slots} — waiting for ${waitFor}`;
+    if (waitFor) return `${pos} of ${slots} - waiting for ${waitFor}`;
     // active=null with queued runs means the server worker wedged; snapshot polls
     // re-queue them, so this is usually brief — not "nothing will ever run".
-    if (!snap.active) return `${pos} of ${slots} — starting soon`;
+    if (!snap.active) return `${pos} of ${slots} - starting soon`;
     return `${pos} of ${slots}`;
   }
 
@@ -1121,7 +1169,7 @@ export const fetcherRunner = (() => {
     if (attempt > maxAttempts) {
       reconnectAttempts.delete(runId);
       appendLine(
-        `[${src.label}: stream dropped too many times — refresh the page or use Cancel]`,
+        `[${src.label}: stream dropped too many times - refresh the page or use Cancel]`,
         'stderr',
       );
       markChipState(key, null);
@@ -1137,7 +1185,7 @@ export const fetcherRunner = (() => {
       RECONNECT_BASE_MS * 2 ** (attempt - 1) * (queuedOnly ? 1.5 : 1),
       RECONNECT_MAX_MS,
     );
-    appendLine(`[${src.label}: stream dropped — reconnecting in ${Math.round(delay / 1000)}s]`, 'meta');
+    appendLine(`[${src.label}: stream dropped - reconnecting in ${Math.round(delay / 1000)}s]`, 'meta');
     const timer = setTimeout(() => {
       reconnectTimers.delete(runId);
       if (suppressedRunIds.has(runId)) return;
@@ -1203,6 +1251,7 @@ export const fetcherRunner = (() => {
       clearLogHeightCap(panel);
     }
     updateJumpButton();
+    if (followTail) scrollLogToBottom();
   }
 
   function ensureLogHeightObserver() {
@@ -1316,7 +1365,7 @@ export const fetcherRunner = (() => {
       else if (btn.dataset.role === 'jump') scrollLogToBottom();
     });
     const body = panel.querySelector('[data-role="body"]');
-    if (body) body.addEventListener('scroll', updateJumpButton);
+    if (body) body.addEventListener('scroll', () => onLogBodyScroll(body));
     return panel;
   }
 
@@ -1358,6 +1407,8 @@ export const fetcherRunner = (() => {
       empty.className = 'fh-log-empty';
       empty.textContent = 'No fetcher activity yet. Run a fetcher from the dashboard chips to populate.';
       body.appendChild(empty);
+      followTail = true;
+      clearFollowTailIdleTimer();
     }
     logBodyEl = body || null;
     ensureLogHeightObserver();
@@ -1372,7 +1423,15 @@ export const fetcherRunner = (() => {
     if (!btn) return;
     const show = isApiAvailable() && (inFlightCount() > 0 || lastServerInFlight);
     btn.classList.toggle('hidden', !show);
-    btn.disabled = !show;
+    if (cancelInFlight) {
+      btn.disabled = true;
+      btn.textContent = 'Cancelling…';
+      btn.title = 'Stopping queued and running fetchers…';
+    } else {
+      btn.disabled = !show;
+      btn.textContent = 'Cancel';
+      btn.title = 'Stop all queued and running fetchers (Shift+click: force reset queue)';
+    }
   }
 
   async function cancelOneRun(runId) {
@@ -1419,6 +1478,9 @@ export const fetcherRunner = (() => {
 
   async function cancelInFlightRuns({ force = false } = {}) {
     if (!isApiAvailable()) return;
+    if (cancelInFlight) return;
+    cancelInFlight = true;
+    updateCancelButton();
     let snap = null;
     try {
       snap = await fetchRunsSnapshot({ force: true });
@@ -1428,6 +1490,8 @@ export const fetcherRunner = (() => {
     if (snap?.active) ids.push(snap.active.id);
     for (const q of snap?.queue || []) ids.push(q.id);
     if (!ids.length && !force && inFlightCount() === 0 && !lastServerInFlight) {
+      cancelInFlight = false;
+      updateCancelButton();
       return;
     }
     closeAllStreams();
@@ -1478,7 +1542,8 @@ export const fetcherRunner = (() => {
     }
     let stillRunning = await waitForRunsToClear(ids);
     if (stillRunning.size && !force) {
-      appendLine('[queue still busy — force reset…]', 'stderr');
+      appendLine('[queue still busy - force reset…]', 'stderr');
+      cancelInFlight = false;
       return cancelInFlightRuns({ force: true });
     }
     for (const id of ids) {
@@ -1500,6 +1565,45 @@ export const fetcherRunner = (() => {
     }
     updateCancelButton();
     renderDashboardFetcherHealth();
+    cancelInFlight = false;
+    updateCancelButton();
+  }
+
+  function reconcileRunStateFromSnapshot(snap) {
+    if (!snap) return;
+    const inFlightKeys = new Set();
+    if (snap.active?.key) inFlightKeys.add(snap.active.key);
+    for (const q of snap.queue || []) {
+      if (q.key) inFlightKeys.add(q.key);
+    }
+    const historyByKey = new Map();
+    for (const h of snap.history || []) {
+      if (!h.key) continue;
+      if (!historyByKey.has(h.key) || (h.ended_at || 0) > (historyByKey.get(h.key).ended_at || 0)) {
+        historyByKey.set(h.key, h);
+      }
+    }
+    for (const key of [...runStateByKey.keys()]) {
+      const state = runStateByKey.get(key);
+      if (!state || state === 'failed') continue;
+      if (inFlightKeys.has(key)) continue;
+      const runId = runIdByKey.get(key);
+      if (runId && sourcesByRunId.has(runId)) continue;
+      const hist = historyByKey.get(key);
+      if (hist) {
+        if (hist.status === 'done' && hist.exit_code === 0) {
+          markChipState(key, null);
+        } else if (hist.status === 'cancelled') {
+          markChipState(key, null);
+        } else {
+          markChipState(key, 'failed');
+        }
+        if (hist.id) clearLastSeq(hist.id);
+      } else {
+        markChipState(key, null);
+        if (runId) clearLastSeq(runId);
+      }
+    }
   }
 
   function closePanel() {
@@ -1512,8 +1616,38 @@ export const fetcherRunner = (() => {
 
   const LOG_DOM_CAP = 4000;
   const LOG_BUFFER_CAP = 4000;
+  const FOLLOW_TAIL_IDLE_MS = 12_000;
   let pendingLines = [];
   let flushHandle = 0;
+  let followTail = true;
+  let followTailIdleTimer = 0;
+
+  function clearFollowTailIdleTimer() {
+    if (followTailIdleTimer) {
+      clearTimeout(followTailIdleTimer);
+      followTailIdleTimer = 0;
+    }
+  }
+
+  function scheduleFollowTailIdle() {
+    clearFollowTailIdleTimer();
+    followTailIdleTimer = setTimeout(() => {
+      followTailIdleTimer = 0;
+      followTail = true;
+      updateJumpButton();
+    }, FOLLOW_TAIL_IDLE_MS);
+  }
+
+  function onLogBodyScroll(body) {
+    if (logNearBottom(body)) {
+      followTail = true;
+      clearFollowTailIdleTimer();
+    } else {
+      followTail = false;
+      scheduleFollowTailIdle();
+    }
+    updateJumpButton();
+  }
 
   function clearLog() {
     pendingLines = [];
@@ -1523,6 +1657,8 @@ export const fetcherRunner = (() => {
     }
     const body = logBody();
     if (body) body.innerHTML = '';
+    followTail = true;
+    clearFollowTailIdleTimer();
     updateJumpButton();
   }
 
@@ -1544,6 +1680,8 @@ export const fetcherRunner = (() => {
   function scrollLogToBottom() {
     const body = logBody();
     if (!body) return;
+    followTail = true;
+    clearFollowTailIdleTimer();
     body.scrollTop = body.scrollHeight;
     updateJumpButton();
   }
@@ -1604,7 +1742,8 @@ export const fetcherRunner = (() => {
     }
     const batch = pendingLines;
     pendingLines = [];
-    const stick = logNearBottom(body);
+    const placeholder = body.querySelector('.fh-log-empty');
+    if (placeholder) placeholder.remove();
     const fragment = document.createDocumentFragment();
     for (const { text, kind } of batch) {
       const div = document.createElement('div');
@@ -1614,7 +1753,7 @@ export const fetcherRunner = (() => {
     }
     body.appendChild(fragment);
     while (body.children.length > LOG_DOM_CAP) body.removeChild(body.firstChild);
-    if (stick) body.scrollTop = body.scrollHeight;
+    if (followTail) body.scrollTop = body.scrollHeight;
     updateJumpButton();
   }
 
@@ -1664,7 +1803,7 @@ export const fetcherRunner = (() => {
       if (!auto) {
         ensurePanel(src);
         appendLine(
-          `[${src.label}: auth cooldown — ${authCooldownLabel(cooldownMs)} left. Reconnect in Connections to clear.]`,
+          `[${src.label}: auth cooldown - ${authCooldownLabel(cooldownMs)} left. Reconnect in Connections to clear.]`,
           'meta',
         );
       }
@@ -1675,7 +1814,7 @@ export const fetcherRunner = (() => {
         ensurePanel(src);
         const provider = connectProviderForFetcher(key);
         appendLine(
-          `[${src.label}: not connected — connect in Connections before running. No request sent.]`,
+          `[${src.label}: not connected - connect in Connections before running. No request sent.]`,
           'meta',
         );
         if (provider) showReconnectBanner([provider]);
@@ -1688,14 +1827,14 @@ export const fetcherRunner = (() => {
     if (isQueueFull()) {
       ensurePanel(src);
       appendLine(
-        `[${src.label}: queue full — one run is in progress and one is queued]`,
+        `[${src.label}: queue full - one run is in progress and one is queued]`,
         'meta',
       );
       return;
     }
     if (refresh && !src.supportsRefresh) {
       appendLine(
-        `[${src.label}: this fetcher has no force-refresh mode — a normal click already pulls the latest data]`,
+        `[${src.label}: this fetcher has no force-refresh mode - a normal click already pulls the latest data]`,
         'stderr',
       );
       return;
@@ -1708,7 +1847,7 @@ export const fetcherRunner = (() => {
       if (src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) {
         const hint = humanizeMissingRequirements(src.missingRequirements);
         appendLine(
-          `[warning: ${hint} — open Connections before running]`,
+          `[warning: ${hint} - open Connections before running]`,
           'meta',
         );
       }
@@ -1799,7 +1938,7 @@ export const fetcherRunner = (() => {
       try { prior.es.close(); } catch (_) {}
       sourcesByRunId.delete(runId);
     }
-    const es = new EventSource(`/api/stream/${encodeURIComponent(runId)}`);
+    const es = new EventSource(streamUrl(runId));
     sourcesByRunId.set(runId, { es, key, src });
     const recentLog = [];
 
@@ -1885,6 +2024,7 @@ export const fetcherRunner = (() => {
       } finally {
         clearReconnect(runId);
         reconnectAttempts.delete(runId);
+        clearLastSeq(runId);
         try { es.close(); } catch (_) {}
         sourcesByRunId.delete(runId);
         if (liveRunId === runId) {
@@ -1928,7 +2068,7 @@ export const fetcherRunner = (() => {
         }
       } catch (_) {}
       appendLine(
-        `[${src.label}: stream error — server stopped, too many tabs, or connection limit (${MAX_SSE_HINT})]`,
+        `[${src.label}: stream error - server stopped, too many tabs, or connection limit (${MAX_SSE_HINT})]`,
         'stderr',
       );
       if (liveRunId === runId) {
@@ -1968,6 +2108,7 @@ export const fetcherRunner = (() => {
     }
     applyServerSnapshotInFlight(snap);
     pruneSuppressedRuns(snap);
+    reconcileRunStateFromSnapshot(snap);
 
     const pending = [];
     if (snap.active) pending.push(snap.active);
@@ -2032,6 +2173,7 @@ export const fetcherRunner = (() => {
       return;
     }
 
+    reconcileRunStateFromSnapshot(snap);
     updateCancelButton();
     updateGlobalFetcherIndicator(runStateByKey, source);
     const recentDone = (snap.history || []).find(r => {
@@ -2079,11 +2221,26 @@ export const fetcherRunner = (() => {
     reopenLogPanel,
     syncLogHeightToCard,
     flushLinesNow,
+    appendLineForTest(text, kind = 'stdout') {
+      appendLine(text, kind);
+    },
+    setFollowTailForTest(val) {
+      followTail = !!val;
+      clearFollowTailIdleTimer();
+    },
     syncLogPanelChrome,
     fetchWithTimeout: fetchWithTimeoutAndProbe,
     cancelInFlightRuns,
     applyServerSnapshotInFlight,
     getLastServerInFlight: () => lastServerInFlight,
+    streamUrlForTest: streamUrl,
+    recordLineSeqForTest: recordLineSeq,
+    getLastSeqForTest: getLastSeq,
+    reconcileRunStateFromSnapshot,
+    isCancelInFlightForTest: () => cancelInFlight,
+    markChipStateForTest(key, state, runId = null) {
+      markChipState(key, state, runId);
+    },
   };
 })();
 
@@ -2118,7 +2275,7 @@ export function renderDashboardFetcherHealth() {
   const probeDone = fetcherRunner.apiProbeFinished();
   const showReadonly = probeDone && !apiReady;
   const summaryTooltip = [
-    'Click a chip → run an incremental sync (fast — fills gaps, uses cache where safe).',
+    'Click a chip → run an incremental sync (fast - fills gaps, uses cache where safe).',
     'Shift+click → force a full refresh that ignores local cache (slower; only on chips that support it).',
     'Hover any chip to see exactly what click vs. Shift+click will do for that source.',
   ].join('\n');
@@ -2137,7 +2294,7 @@ export function renderDashboardFetcherHealth() {
     const covLabel = ENRICH_KEYS.has(src.key) ? coverageLabel(src.key) : null;
     const countStr = covLabel != null
       ? covLabel
-      : (count != null && count > 0 ? formatNum(count) : '—');
+      : (count != null && count > 0 ? formatNum(count) : ' - ');
     const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
     const runState = fetcherRunner.stateFor(src.key);
     const provider = reconnectProviderForFetcher(src.key);
@@ -2165,7 +2322,7 @@ export function renderDashboardFetcherHealth() {
           `Click: ${clickHint}`,
           refreshHint ? `Shift+click: ${refreshHint}` : 'Shift+click: not supported for this fetcher',
           `Command: ${src.cmd}${refreshHint ? ' [+ --refresh on Shift+click]' : ''}`,
-          needsConfig ? 'Not configured for this profile — open Connections to add keys.' : '',
+          needsConfig ? 'Not configured for this profile - open Connections to add keys.' : '',
           configHint ? `Note:${configHint}` : '',
         ].filter(Boolean)
       : [
@@ -2173,27 +2330,27 @@ export function renderDashboardFetcherHealth() {
           enrichLine,
           `Click: ${clickHint}`,
           `Command: ${src.cmd}`,
-          needsConfig ? 'Not configured for this profile — open Connections to add keys.' : '',
+          needsConfig ? 'Not configured for this profile - open Connections to add keys.' : '',
           configHint ? `Note:${configHint}` : '',
-          'Server is offline — start `python server.py` to run fetchers from the UI.',
+          'Server is offline - start `python server.py` to run fetchers from the UI.',
         ].filter(Boolean);
     const queueFullElsewhere = fetcherRunner.inFlightCount() >= 2 && !runState;
     if (queueFullElsewhere) {
-      titleLines.push('Queue full — one run is in progress and one is queued. Wait for a slot.');
+      titleLines.push('Queue full - one run is in progress and one is queued. Wait for a slot.');
     }
     if (needsReconnect) {
-      titleLines.push('Session expired — reconnect to refresh credentials, or dismiss to hide this hint.');
+      titleLines.push('Session expired - reconnect to refresh credentials, or dismiss to hide this hint.');
     }
     if (disconnected) {
-      titleLines.push('Not connected — click to connect in Connections.');
+      titleLines.push('Not connected - click to connect in Connections.');
     }
     if (inAuthCooldown) {
-      titleLines.push(`Auth failed — cooling down ${authCooldownLabel(authCooldownMs)}. Reconnect in Connections to clear, or wait it out.`);
+      titleLines.push(`Auth failed - cooling down ${authCooldownLabel(authCooldownMs)}. Reconnect in Connections to clear, or wait it out.`);
     }
     const platformUnavailable = src.available === false;
     if (platformUnavailable) {
       const plats = (src.platforms || []).join(', ') || 'Windows';
-      titleLines.push(`Unavailable on this OS — ${src.label} runs on ${plats} only.`);
+      titleLines.push(`Unavailable on this OS - ${src.label} runs on ${plats} only.`);
     }
     const title = titleLines.join('\n');
     // Disconnected chips stay clickable — the click routes to Connections to
@@ -2206,7 +2363,7 @@ export function renderDashboardFetcherHealth() {
     const disconnectedClass = disconnected ? ' fh-chip-disconnected' : '';
     const unavailableClass = platformUnavailable ? ' fh-chip-unavailable' : '';
     const warnBadge = needsConfig
-      ? '<span class="fh-chip-warn" title="Missing credentials for this profile — Connections">!</span>'
+      ? '<span class="fh-chip-warn" title="Missing credentials for this profile - Connections">!</span>'
       : '';
     let ageText = runState
       ? runState
@@ -2257,7 +2414,7 @@ export function renderDashboardFetcherHealth() {
             <div class="fh-group-chips">${groupRows.map(chipHtml).join('')}</div>
           </div>`;
         }).join(''))
-    : '<span class="fh-empty">No stale or missing fetchers — nice.</span>';
+    : '<span class="fh-empty">No stale or missing fetchers - nice.</span>';
 
   const staleBtnDisabled = !apiReady || !runnableStale.length || Date.now() < runStaleCooldownUntil;
   const staleBtnLabel = `Run stale (${runnableStale.length})`;

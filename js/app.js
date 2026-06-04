@@ -120,10 +120,6 @@ async function bootstrap() {
   if (VALID_VIEWS.has(state.prefs.activeView)) {
     state.activeView = state.prefs.activeView;
   }
-  if (state.activeView === "itch" && !isItchTabAvailable()) {
-    state.activeView = "dashboard";
-    state.prefs.activeView = "dashboard";
-  }
   applySavedSortForView(state.activeView);
   syncViewTabAria(state.activeView);
   savePrefs();
@@ -217,6 +213,14 @@ async function bootstrap() {
   } finally {
     liftBootCurtain(tBoot);
     hideViewOverlay();
+    if (state.activeView === "itch" && !isItchTabAvailable()) {
+      state.activeView = "dashboard";
+      state.prefs.activeView = "dashboard";
+      savePrefs();
+      updateViewChrome({ skipDashboardSchedule: true });
+    }
+    // Dashboard still renders after lift (Chart.js is heavy); the boot curtain
+    // covers the empty shell until ensureChartJs + scheduleDashboardRender run.
     if (state.activeView === "dashboard") {
       ensureChartJs()
         .then(() => { if (state.activeView === "dashboard") scheduleDashboardRender(); })
@@ -252,7 +256,7 @@ async function bootstrap() {
 }
 
 bootstrap().catch(err => {
-  console.error("[bootstrap] unhandled failure — lifting boot curtain", err);
+  console.error("[bootstrap] unhandled failure - lifting boot curtain", err);
   // Belt-and-suspenders alongside the inline 8s safety net + the try/finally
   // around Promise.all inside bootstrap().
   liftBootCurtain(0, { force: true });

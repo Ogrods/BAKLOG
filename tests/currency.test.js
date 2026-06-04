@@ -52,8 +52,8 @@ describe('formatMoney', () => {
     expect(eur).toMatch(/50|5/);
   });
 
-  it('returns em dash for non-finite amounts', () => {
-    expect(formatMoney(null, 'USD')).toBe('—');
+  it('returns placeholder for non-finite amounts', () => {
+    expect(formatMoney(null, 'USD')).toBe(' - ');
   });
 });
 

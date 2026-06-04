@@ -85,7 +85,7 @@ export function showItadAlertBanner({ newSales, newHistoricalLows }) {
   if (!parts.length) return;
   el.innerHTML = `
     <div class="migration-banner-body">
-      <span><strong>Prices refreshed</strong> — ${escapeHtml(parts.join(" · "))}.
+      <span><strong>Prices refreshed</strong> - ${escapeHtml(parts.join(" · "))}.
         <button type="button" class="text-sky-300 hover:text-sky-200 underline ml-1" data-itad-view-deals>View deals →</button>
       </span>
       <span class="migration-banner-actions">
@@ -379,18 +379,49 @@ export async function reloadAfterFetcher(key) {
 }
 
 export async function reloadGames() {
-  const steam = await fetchLibraryJson("games_steam.json");
-  const gog = await fetchLibraryJson("games_gog.json");
-  const psn = await fetchLibraryJson("games_psn.json");
-  const epic = await fetchLibraryJson("games_epic.json");
-  const amazon = await fetchLibraryJson("games_amazon.json");
-  const nintendo = await fetchLibraryJson("games_nintendo.json");
-  const itch = await fetchLibraryJson("games_itch.json");
-  const xbox = await fetchLibraryJson("games_xbox.json");
-  const battlenet = await fetchLibraryJson("games_battlenet.json");
-  const ubisoft = await fetchLibraryJson("games_ubisoft.json");
-  const humble = await fetchLibraryJson("games_humble.json");
-  const ea = await fetchLibraryJson("games_ea.json");
+  const [
+    steam,
+    gog,
+    psn,
+    epic,
+    amazon,
+    nintendo,
+    itch,
+    xbox,
+    battlenet,
+    ubisoft,
+    humble,
+    ea,
+    wishlist,
+    wishlistGog,
+    wishlistEpic,
+    wishlistPsn,
+    wishlistUbisoft,
+    wishlistXbox,
+    wishlistNintendo,
+    wishlistHumble,
+  ] = await Promise.all([
+    fetchLibraryJson("games_steam.json"),
+    fetchLibraryJson("games_gog.json"),
+    fetchLibraryJson("games_psn.json"),
+    fetchLibraryJson("games_epic.json"),
+    fetchLibraryJson("games_amazon.json"),
+    fetchLibraryJson("games_nintendo.json"),
+    fetchLibraryJson("games_itch.json"),
+    fetchLibraryJson("games_xbox.json"),
+    fetchLibraryJson("games_battlenet.json"),
+    fetchLibraryJson("games_ubisoft.json"),
+    fetchLibraryJson("games_humble.json"),
+    fetchLibraryJson("games_ea.json"),
+    fetchLibraryJson("games_wishlist.json"),
+    fetchLibraryJson("games_wishlist_gog.json"),
+    fetchLibraryJson("games_wishlist_epic.json"),
+    fetchLibraryJson("games_wishlist_psn.json"),
+    fetchLibraryJson("games_wishlist_ubisoft.json"),
+    fetchLibraryJson("games_wishlist_xbox.json"),
+    fetchLibraryJson("games_wishlist_nintendo.json"),
+    fetchLibraryJson("games_wishlist_humble.json"),
+  ]);
   if (!steam && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft && !humble && !ea) throw new Error("No library files found");
   state.libraryMeta.steam = steam;
   state.libraryMeta.gog = gog;
@@ -405,14 +436,6 @@ export async function reloadGames() {
   state.libraryMeta.humble = humble;
   state.libraryMeta.ea = ea;
   rebuildAllGamesFromMetas();
-  const wishlist = await fetchLibraryJson("games_wishlist.json");
-  const wishlistGog = await fetchLibraryJson("games_wishlist_gog.json");
-  const wishlistEpic = await fetchLibraryJson("games_wishlist_epic.json");
-  const wishlistPsn = await fetchLibraryJson("games_wishlist_psn.json");
-  const wishlistUbisoft = await fetchLibraryJson("games_wishlist_ubisoft.json");
-  const wishlistXbox = await fetchLibraryJson("games_wishlist_xbox.json");
-  const wishlistNintendo = await fetchLibraryJson("games_wishlist_nintendo.json");
-  const wishlistHumble = await fetchLibraryJson("games_wishlist_humble.json");
   state.libraryMeta.wishlist = wishlist;
   state.libraryMeta.wishlistGog = wishlistGog;
   state.libraryMeta.wishlistEpic = wishlistEpic;
@@ -422,11 +445,13 @@ export async function reloadGames() {
   state.libraryMeta.wishlistNintendo = wishlistNintendo;
   state.libraryMeta.wishlistHumble = wishlistHumble;
   rebuildWishlistFromMetas();
-  await loadItadPrices();
-  await loadHltbCache();
-  await loadSteamReviewCache();
-  await loadSteamCoversMeta();
-  await loadSteamTagsMeta();
+  await Promise.all([
+    loadItadPrices(),
+    loadHltbCache(),
+    loadSteamReviewCache(),
+    loadSteamCoversMeta(),
+    loadSteamTagsMeta(),
+  ]);
   await applyMergedLibrary();
   void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
 }

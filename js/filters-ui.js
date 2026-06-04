@@ -70,6 +70,7 @@ import {
   startConnectionsPolling,
   stopConnectionsPolling,
   isItchTabAvailable,
+  authStatusLoaded,
 } from './connections.js';
 import { collectActiveFilters } from './active-filters.js';
 
@@ -489,7 +490,11 @@ export function applyItchTabVisibility() {
   if (!tab) return;
   const available = isItchTabAvailable();
   tab.classList.toggle("hidden", !available);
-  if (!available && state.activeView === "itch") {
+  // Fail open during boot: until auth status is fetched and the library has
+  // loaded, authStatus/itchGames are empty, so a hard refresh on itch would
+  // always bounce to dashboard. Only redirect once we truly know.
+  const known = authStatusLoaded() && state.dashboardDataReady;
+  if (!available && known && state.activeView === "itch") {
     switchView("dashboard");
     state.prefs.activeView = "dashboard";
     savePrefs();
@@ -588,7 +593,9 @@ export function switchView(view) {
     }
     if (useOverlay && !drillIn) {
       if (view === "dashboard") {
-        ensureChartJs().finally(() => hideViewOverlay());
+        // catch() before finally(): a transient Chart.js load failure must not
+        // leak as an unhandledrejection (the render path above logs it).
+        ensureChartJs().catch(() => {}).finally(() => hideViewOverlay());
       } else {
         refreshDone.finally(() => hideViewOverlay());
       }
@@ -636,7 +643,7 @@ export function renderSummary() {
       ? `<button type="button" class="summary-deal-chip historical${lowOnlyActive ? " active" : ""}" data-wishlist-deal-filter="historicalLow" title="${lowOnlyActive ? "Clear: show only historical lows" : "Show only historical lows"}">Historical low <span class="text-amber-300 font-semibold ml-1">${lows.length}</span></button>`
       : "";
     const ownedChip = owned
-      ? `<button type="button" class="summary-deal-chip owned${hideOwnedActive ? " active" : ""}" data-wishlist-deal-filter="hideOwned" title="${hideOwnedActive ? "Currently hiding already-owned wishlist items — click to show" : "Hide wishlist items you already own elsewhere"}">Already owned <span class="text-amber-200 font-semibold ml-1">${owned}</span></button>`
+      ? `<button type="button" class="summary-deal-chip owned${hideOwnedActive ? " active" : ""}" data-wishlist-deal-filter="hideOwned" title="${hideOwnedActive ? "Currently hiding already-owned wishlist items - click to show" : "Hide wishlist items you already own elsewhere"}">Already owned <span class="text-amber-200 font-semibold ml-1">${owned}</span></button>`
       : "";
     const statusChips = renderStatusChipsHtml(wl, WISHLIST_STATUS_CHIP_DEFS);
     const sourcesChip = sourceSet.size
@@ -663,7 +670,7 @@ export function renderSummary() {
     const backlog = state.itchGames.filter(g => getPersonal(g).status === "backlog" && (!hideNonGames || itchIsGame(g)));
     const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
     const rated = state.itchGames.filter(g => ratingValue(g) > 0 && (!hideNonGames || itchIsGame(g)));
-    const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : "—";
+    const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : " - ";
     const fetched = state.libraryMeta.itch?.fetched_at ? new Date(state.libraryMeta.itch.fetched_at).toLocaleString() : "";
     const countLabel = hideNonGames && gamesOnly !== total
       ? `${gamesOnly} of ${total}`
@@ -675,7 +682,7 @@ export function renderSummary() {
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">itch.io <span class="text-slate-100 font-semibold ml-1">${countLabel}</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
         <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
-        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== "—" ? "%" : ""}</span></div>
+        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
         ${fetched ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs text-slate-400">Fetched ${escapeHtml(fetched)}</div>` : ""}
       </div>
       ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
@@ -698,7 +705,7 @@ export function renderSummary() {
     }))
     .sort((a, b) => b.count - a.count);
   const rated = visible.filter(g => ratingValue(g) > 0);
-  const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : "—";
+  const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : " - ";
   const hiddenCount = state.allGames.length - visible.length;
   const activeStore = state.prefs.storeFilter || "";
   const storeChips = storeCounts
@@ -723,7 +730,7 @@ export function renderSummary() {
       ${storeChips}
       <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
       <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(played))}h</span></div>
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== "—" ? "%" : ""}</span></div>
+      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
     </div>
     ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
 }
@@ -767,7 +774,7 @@ export function exportTopBacklogMarkdown() {
     return;
   }
   const lines = [
-    "# BAKLOG — Top 20 backlog",
+    "# BAKLOG - Top 20 backlog",
     "",
     "| # | Game | Store | Score | HLTB main | Rating |",
     "|---:|---|---|---:|---:|---:|",
@@ -777,7 +784,7 @@ export function exportTopBacklogMarkdown() {
     const h = hltbMain(g);
     const rating = ratingValue(g);
     lines.push(
-      `| ${i + 1} | ${g.name.replace(/\|/g, "\\|")} | ${store} | ${priorityScore(g).toFixed(1)} | ${h != null ? `${h}h` : "—"} | ${rating > 0 ? `${rating}%` : "—"} |`,
+      `| ${i + 1} | ${g.name.replace(/\|/g, "\\|")} | ${store} | ${priorityScore(g).toFixed(1)} | ${h != null ? `${h}h` : " - "} | ${rating > 0 ? `${rating}%` : " - "} |`,
     );
   });
   const md = lines.join("\n");

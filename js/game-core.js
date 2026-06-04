@@ -205,7 +205,7 @@ export function combinedPlaytimeTooltip(g) {
     .filter(p => p.minutes > 0)
     .map(p => `${p.store.toUpperCase()}: ${(p.minutes / 60).toFixed(1)}h`);
   if (parts.length < 2) return "";
-  return `Combined across stores — ${parts.join(" · ")}`;
+  return `Combined across stores - ${parts.join(" · ")}`;
 }
 
 export function wishlistEntryStore(g) {
@@ -343,7 +343,7 @@ export function spotlightCropForAspect(ratio) {
   }
   if (ratio >= 2) return { fit: "cover", pos: "50% 40%", portrait: false };
   if (ratio >= 1.4) return { fit: "cover", pos: "35% center", portrait: false };
-  return { fit: "contain", pos: "center", portrait: true };
+  return { fit: "cover", pos: "center top", portrait: false };
 }
 
 const EPIC_PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]*$/;
@@ -573,9 +573,9 @@ export function formatHours(minutes) {
 }
 
 export function formatDate(unixOrStr) {
-  if (!unixOrStr) return "—";
+  if (!unixOrStr) return " - ";
   if (typeof unixOrStr === "number") {
-    if (unixOrStr === 0) return "—";
+    if (unixOrStr === 0) return " - ";
     const dt = new Date(unixOrStr * 1000);
     return `${RELEASE_MONTHS[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
   }
@@ -588,9 +588,9 @@ export function parseReleaseForSort(d) {
 }
 
 export function formatReleaseDate(d) {
-  if (!d) return "—";
+  if (!d) return " - ";
   const s = String(d).trim();
-  if (!s) return "—";
+  if (!s) return " - ";
   if (/^to\s+be\s+announced$/i.test(s) || /^to\s+be\s+determined$/i.test(s)) return "TBA";
   const iso = s.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/);
   if (iso) {

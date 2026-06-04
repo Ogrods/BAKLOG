@@ -273,13 +273,16 @@ First Steam run may take several minutes for a large library (Store API is rate-
 **Option A (recommended):** run the bundled dev server, which serves the dashboard *and* lets you trigger fetchers from the dashboard "Fetcher health" row:
 
 ```bash
-pip install -r requirements.txt
-python server.py
+py -3.13 -m venv .venv
+.\.venv\Scripts\pip install -e ".[dev]"
+.\.venv\Scripts\python.exe server.py
 ```
+
+Windows shortcut: `.\scripts\start-server.ps1` (same venv launcher).
 
 Requires **Google Chrome** or **Microsoft Edge** installed (Edge ships with Windows). Connections opens a headed browser window for cookie/OAuth sign-in. Override the browser path with `BAKLOG_CHROME_PATH` if needed.
 
-On Windows, prefer the project venv interpreter (`.venv\Scripts\python.exe server.py`) rather than the Microsoft Store `python.exe` stub. Fetcher subprocesses launched from the stub can hang `subprocess.Popen` and wedge the run queue.
+On Windows, always use the project venv (not the Microsoft Store `python.exe` stub). Fetcher subprocesses launched from the stub can hang `subprocess.Popen` and wedge the run queue. `server.py` auto-picks `.venv` when present.
 
 **Connections tab:** sign in once per store from the dashboard — API keys via form fields, cookie/OAuth stores via a headed Chrome/Edge window. Credentials are encrypted in `cache/auth/` (OS keychain by default). `.env` still works as a fallback.
 

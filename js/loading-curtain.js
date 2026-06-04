@@ -20,6 +20,38 @@ const MIN_BOOT_VISIBLE_MS = 150;
 
 let _bootCurtainShownAt = null;
 
+function isBootDebugLog() {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (localStorage.getItem('baklog-debug') === '1') return true;
+    if (new URLSearchParams(window.location.search).has('debug')) return true;
+  } catch (_) { /* private mode / file:// */ }
+  return false;
+}
+
+/** Force layout/paint after the boot curtain reveals hidden table chrome. */
+function nudgeRevealPaint() {
+  const run = () => {
+    const tbody = document.getElementById('tbody');
+    const tbodyRows = tbody
+      ? tbody.querySelectorAll('tr:not(.virtual-spacer)').length
+      : 0;
+    if (isBootDebugLog()) {
+      console.log('[baklog-boot] curtain lifted · tbody rows at reveal:', tbodyRows);
+    }
+    // renderTable runs the same scroll nudge while tbody is visibility:hidden;
+    // repeat it once the shell is visible so cells paint on hard refresh.
+    if (tbodyRows > 0) {
+      void tbody.offsetHeight;
+      window.scrollTo(window.scrollX, window.scrollY);
+    }
+    const shell = document.getElementById('tableShell');
+    if (shell && !shell.classList.contains('hidden')) void shell.offsetHeight;
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+  else run();
+}
+
 function nowMs() {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
 }
@@ -54,6 +86,7 @@ export function liftBootCurtain(startedAt, opts = {}) {
     if (ov) ov.setAttribute("aria-busy", "false");
     setTabsDisabled(false);
     _bootCurtainShownAt = null;
+    nudgeRevealPaint();
   };
   if (opts.force) {
     doLift();

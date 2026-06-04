@@ -354,7 +354,7 @@ export function runLibraryCountDemo(opts = {}) {
   if (typeof document === 'undefined') return;
   const hero = document.getElementById('dashHeroCount');
   if (!hero) {
-    console.warn('[baklog-demo] dashHeroCount not on page — switch to Dashboard first.');
+    console.warn('[baklog-demo] dashHeroCount not on page - switch to Dashboard first.');
     return;
   }
   _demoRunning = true;
@@ -418,7 +418,7 @@ export function runLibraryCountSmallDemo(opts = {}) {
   if (typeof document === 'undefined') return;
   const hero = document.getElementById('dashHeroCount');
   if (!hero) {
-    console.warn('[baklog-demo] dashHeroCount not on page — switch to Dashboard first.');
+    console.warn('[baklog-demo] dashHeroCount not on page - switch to Dashboard first.');
     return;
   }
   _demoRunning = true;

@@ -16,8 +16,8 @@ describe('formatReleaseDate', () => {
     expect(out).not.toContain('T09');
   });
 
-  it('returns em dash for empty', () => {
-    expect(formatReleaseDate(null)).toBe('—');
-    expect(formatReleaseDate('')).toBe('—');
+  it('returns placeholder for empty', () => {
+    expect(formatReleaseDate(null)).toBe(' - ');
+    expect(formatReleaseDate('')).toBe(' - ');
   });
 });

@@ -563,6 +563,90 @@ describe('syncLogPanelChrome', () => {
       'queued · 2 of 2 — waiting for Covers',
     );
   });
+
+  it('maps running to Running title and running badge', () => {
+    fetcherRunner.syncLogPanelChrome({ label: 'HLTB', key: 'hltb' }, 'running', '12.3s');
+    expect(document.querySelector('[data-role="title"]')?.textContent).toBe('Running: HLTB');
+    expect(document.querySelector('[data-role="status"]')?.textContent).toBe('running · 12.3s');
+    expect(document.querySelector('[data-role="status"]')?.classList.contains('running')).toBe(true);
+  });
+
+  it('maps cancelling to Running title with cancelling extra', () => {
+    fetcherRunner.syncLogPanelChrome({ label: 'Nintendo', key: 'nintendo' }, 'cancelling');
+    expect(document.querySelector('[data-role="title"]')?.textContent).toBe('Running: Nintendo');
+    expect(document.querySelector('[data-role="status"]')?.textContent).toBe('running · cancelling');
+  });
+
+  it('maps done to done badge', () => {
+    fetcherRunner.syncLogPanelChrome({ label: 'Steam', key: 'steam' }, 'done', '4.2s');
+    expect(document.querySelector('[data-role="status"]')?.textContent).toBe('done · 4.2s');
+    expect(document.querySelector('[data-role="status"]')?.classList.contains('done')).toBe(true);
+  });
+});
+
+describe('SSE stream resume cursor', () => {
+  it('streamUrl includes ?since after lines are recorded', () => {
+    const runId = 'test-run-seq';
+    fetcherRunner.recordLineSeqForTest(runId, 12);
+    expect(fetcherRunner.streamUrlForTest(runId)).toBe('/api/stream/test-run-seq?since=12');
+    expect(fetcherRunner.streamUrlForTest('fresh-run')).toBe('/api/stream/fresh-run');
+  });
+});
+
+describe('log line caps and rAF batching', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="fetcherRunLog" class="fh-log"></div>';
+    fetcherRunner.reopenLogPanel();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.restoreAllMocks();
+  });
+
+  it('appendLine schedules a single rAF for a burst of lines', () => {
+    const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(() => 42);
+    fetcherRunner.appendLineForTest('a');
+    fetcherRunner.appendLineForTest('b');
+    fetcherRunner.appendLineForTest('c');
+    expect(rafSpy).toHaveBeenCalledTimes(1);
+    fetcherRunner.flushLinesNow();
+    const text = document.querySelector('[data-role="body"]')?.textContent || '';
+    expect(text).toContain('a');
+    expect(text).toContain('b');
+    expect(text).toContain('c');
+  });
+
+  it('evicts oldest DOM lines past LOG_DOM_CAP', () => {
+    for (let i = 0; i < 4010; i++) {
+      fetcherRunner.appendLineForTest(`line ${i}`);
+    }
+    fetcherRunner.flushLinesNow();
+    const body = document.querySelector('[data-role="body"]');
+    expect(body?.children.length).toBeLessThanOrEqual(4000);
+    expect(body?.firstChild?.textContent).toContain('line 10');
+  });
+});
+
+describe('reconcileRunStateFromSnapshot', () => {
+  it('clears stale running chip when run finished in history', () => {
+    fetcherRunner.markChipStateForTest('hltb', 'running', 'run-hltb-1');
+    expect(fetcherRunner.stateFor('hltb')).toBe('running');
+    fetcherRunner.reconcileRunStateFromSnapshot({
+      active: null,
+      queue: [],
+      history: [
+        {
+          id: 'done1',
+          key: 'hltb',
+          status: 'done',
+          exit_code: 0,
+          ended_at: Date.now() / 1000,
+        },
+      ],
+    });
+    expect(fetcherRunner.stateFor('hltb')).toBeNull();
+  });
 });
 
 describe('syncLogHeightToCard', () => {
@@ -608,5 +692,55 @@ describe('syncLogHeightToCard', () => {
     fetcherRunner.syncLogHeightToCard();
     expect(log.style.maxHeight).toBe('');
     expect(log.style.height).toBe('');
+  });
+});
+
+describe('log tail follow', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="fetcherRunLog" class="fh-log"></div>';
+    fetcherRunner.reopenLogPanel();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('flushLinesNow scrolls when followTail is true even if not near bottom', () => {
+    const body = document.querySelector('[data-role="body"]');
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 500 });
+    Object.defineProperty(body, 'clientHeight', { configurable: true, value: 100 });
+    body.scrollTop = 0;
+    fetcherRunner.setFollowTailForTest(true);
+    fetcherRunner.appendLineForTest('line one');
+    fetcherRunner.flushLinesNow();
+    expect(body.scrollTop).toBe(500);
+  });
+
+  it('flushLinesNow does not scroll when followTail is false', () => {
+    const body = document.querySelector('[data-role="body"]');
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 500 });
+    Object.defineProperty(body, 'clientHeight', { configurable: true, value: 100 });
+    body.scrollTop = 50;
+    fetcherRunner.setFollowTailForTest(false);
+    fetcherRunner.appendLineForTest('line one');
+    fetcherRunner.flushLinesNow();
+    expect(body.scrollTop).toBe(50);
+  });
+
+  it('re-enables followTail after scroll-up idle', () => {
+    vi.useFakeTimers();
+    const body = document.querySelector('[data-role="body"]');
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 500 });
+    Object.defineProperty(body, 'clientHeight', { configurable: true, value: 100 });
+    body.scrollTop = 0;
+    body.dispatchEvent(new Event('scroll'));
+    fetcherRunner.appendLineForTest('before idle');
+    fetcherRunner.flushLinesNow();
+    expect(body.scrollTop).toBe(0);
+    vi.advanceTimersByTime(12_000);
+    fetcherRunner.appendLineForTest('after idle');
+    fetcherRunner.flushLinesNow();
+    expect(body.scrollTop).toBe(500);
+    vi.useRealTimers();
   });
 });

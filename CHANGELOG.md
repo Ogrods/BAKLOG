@@ -52,6 +52,16 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- **Blank library/wishlist rows right after boot curtain** — `reloadGames()` fetches store JSON in parallel; `liftBootCurtain()` nudges layout after reveal so table cells paint on hard refresh (library, wishlist, itch).
+- **Hard refresh on itch tab jumped to dashboard** — itch→dashboard redirect is fail-open until `authStatusLoaded()` and `dashboardDataReady`; one authoritative check after bootstrap instead of clobbering the saved view mid-load.
+- **Fetcher log did not stick to bottom** — explicit tail-follow flag re-pins after panel resize; clears the empty-state placeholder on first line flush.
+- **Chart.js load failure surfaced as unhandled rejection** — dashboard view-overlay path catches `ensureChartJs()` rejections so a transient script error does not open the error toast.
+- **Header controls clickable during boot** — fetcher status pill and profile menu are non-interactive under `data-boot-loading` (pointer-events + keyboard guard).
+- **Nintendo fetch empty after reconnect** — GraphQL responses are queued in the CDP `response` handler and parsed on the main thread (avoids deadlocking `getResponseBody` on the reader thread). Connect now requires eShop session cookies plus a valid `/api/auth/session` idToken. Capture failures raise `NintendoCaptureError` (exit 1, no `mark_invalid`) with `--headed` / `--dump-debug` hints; true session expiry still uses exit 4.
+- **Fetcher console reconnect duplicated log lines** — each log line now has a monotonic `seq`; SSE emits it as `id:` and honors `?since=` / `Last-Event-ID` on replay. The client tracks `lastSeqByRunId` (sessionStorage) and resumes without re-appending the backlog after reload or stream drop.
+- **Stale fetcher chips after missed `done` events** — `syncFromServer` reconciles `runStateByKey` against the server snapshot so chips and panel chrome cannot stay `running`/`queued` when the run already finished.
+- **Cancel button double-submit** — disabled with a "Cancelling…" label while `cancelInFlightRuns` is in flight.
+- **Run `line_count` under-reported past 25k lines** — `to_summary()` uses a dedicated `_total_lines` counter (deque still caps in-memory replay).
 - **Nintendo eShop fetch rewired to browser GraphQL** — Nintendo retired the legacy REST endpoint (`/api/my/transactions` now returns 404 HTML), which the old client misread as a bad cookie and force-expired the Connections chip. `nintendo_client.py` now drives the saved CDP profile (`cache/auth/profiles/nintendo`) headlessly, intercepts the `TransactionsClientRootClient` Savanna GraphQL responses, paginates via the on-page numeric buttons, and maps rows to the legacy shape. `NintendoEndpointError` classifies 404/HTML as "endpoint moved" (exit 1, no `mark_invalid`); cookie-only with no saved profile raises a helpful reconnect error. `fetch_nintendo.py` passes `profile_dir("nintendo")`.
 - **Fetcher console froze during large refreshes** — run-log lines now buffer and flush on `requestAnimationFrame` (`appendLine`/`flushLines`/`flushLinesNow` in `js/fetcher-health.js`) instead of a synchronous DOM append per SSE line; `clearLog` resets the buffer.
 - **Run-log panel title/badge mismatch** — `syncLogPanelChrome` keeps the panel title and status badge aligned with real server state (no more "Running: Covers" under a "queued · launching" badge); queue position reads "2 of 2" (`activeCount + idx + 1`) instead of a confusing "1 of 2".
@@ -70,6 +80,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **User-facing copy** — em dashes in UI strings replaced with ` - ` (empty-state placeholders, tooltips, toasts); code comments unchanged.
+- **Dashboard spotlight portrait covers** — portrait art uses `object-fit: cover` again instead of letterboxed contain.
 - **Fetcher log layout** — run log opens beside the fetcher health card (2/3 + 1/3 columns) instead of below, keeping the dashboard hero and combat-text count visible; console font 1px smaller; narrow viewports stack log under health.
 - **Fetcher health hints** — missing-env warnings in the run log and Steam fetch scripts use plain “open Connections” guidance (`STEAM_CREDENTIALS_HINT` in `fetchers/_base.py`).
 - **Connection matrix verification steps** — tracker text matches real behavior: Disconnect → Connect chip + blocked run; Reconnect → `python -m auth expire <provider>`; ITAD scope and HLTB flag wording corrected; EA session TTL aligned to registry (~30 days).

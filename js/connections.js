@@ -29,7 +29,7 @@ let chromeWired = false;
 
 let _selectedKey = 'steam';
 
-
+let _secretsCorrupt = false;
 
 const STATUS_LABEL = {
 
@@ -63,10 +63,9 @@ const STATUS_CLASS = {
 
 
 
-/** Collapse server-only states for pill/dot display (3 visible states). */
+/** Map server status for pill/dot display (includes expired as its own state). */
 export function displayStatus(serverStatus) {
   const st = serverStatus || 'disconnected';
-  if (st === 'expired') return 'disconnected';
   return st;
 }
 
@@ -1381,11 +1380,14 @@ function renderReconnectBanner() {
   });
 
   el.querySelector('[data-dismiss-auth-banner]')?.addEventListener('click', () => {
-
+    const providers = [...reconnectProviders];
     reconnectProviders.clear();
-
     renderReconnectBanner();
-
+    try {
+      document.dispatchEvent(
+        new CustomEvent('baklog:reconnect-dismiss', { detail: { providers } }),
+      );
+    } catch (_) { /* no DOM (tests) */ }
   });
 
 }
@@ -1460,8 +1462,33 @@ async function fetchAuthStatus() {
     throw err;
   }
   const data = await res.json();
+  _secretsCorrupt = !!data.secrets_corrupt;
+  renderSecretsCorruptBanner();
   ingestAuthStatusProviders(data.providers || []);
   return authStatus;
+}
+
+/** True when the server secrets bundle is corrupt (see GET /api/auth/status). */
+export function secretsStoreCorrupt() {
+  return _secretsCorrupt;
+}
+
+function renderSecretsCorruptBanner() {
+  const el = document.getElementById('authSecretsBanner');
+  if (!el) return;
+  if (!_secretsCorrupt) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <span><strong>Secrets store corrupt.</strong> Re-export from a backup or re-enter credentials on the Connections page.</span>
+    <button type="button" class="underline ml-2" data-jump-connections-secrets>Open Connections</button>
+  `;
+  el.querySelector('[data-jump-connections-secrets]')?.addEventListener('click', () => {
+    document.querySelector('.view-tab[data-view="connections"]')?.click();
+  });
 }
 
 /** Cache provider rows from GET /api/auth/status (dashboard poll + refresh). */

@@ -19,6 +19,7 @@
       <li><a href="#problem" data-section="problem">Problem</a></li>
       <li><a href="#moment" data-section="moment">Demo</a></li>
       <li><a href="#product" data-section="product">Product</a></li>
+      <li><a href="#sabermetrics" data-section="sabermetrics">Sabermetrics</a></li>
       <li><a href="#market" data-section="market">Market</a></li>
       <li><a href="#model" data-section="model">Model</a></li>
       <li><a href="#trust" data-section="trust">Trust</a></li>
@@ -157,6 +158,85 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <section id="sabermetrics">
+      <div class="wrap">
+        <p class="section-label reveal">Sabermetrics</p>
+        <h2 class="reveal">We gave your pile of shame a <span class="gradient-text">box score</span>.</h2>
+        <p class="lead reveal">Baseball-grade analytics on your real library — AVG, OPS, WAR, Mendoza line — plus plain-English burns that are honest enough to screenshot. All computed locally. No cloud brain. No AI wrapper.</p>
+        <div class="stat-row reveal">
+          <div class="stat-block"><div class="num">150+</div><div class="lbl">tracked stats</div></div>
+          <div class="stat-block"><div class="num">WAR</div><div class="lbl">per game, vs replacement</div></div>
+          <div class="stat-block"><div class="num">1</div><div class="lbl">box score</div></div>
+        </div>
+        <div class="grid-3 reveal" style="margin-top:2rem">
+          <div class="card">
+            <span class="pill pill-emerald">Slash line</span>
+            <h3 style="margin-top:0.75rem">AVG · OBP · SLG · OPS</h3>
+            <p>Your finish rate as a batting average. Slugging weights epics vs quick clears. OPS is the headline number for backlog productivity — in classic <code>.333</code> notation.</p>
+          </div>
+          <div class="card reveal-delay-1">
+            <span class="pill">WAR &amp; BV+</span>
+            <h3 style="margin-top:0.75rem">Every game has a value</h3>
+            <p>Wins Above Replacement scores each title against the Mendoza line (median backlog rating). BV+ normalizes rating per hour invested. The library table shows a WAR pill on standouts.</p>
+          </div>
+          <div class="card reveal-delay-2">
+            <span class="pill pill-amber">The mirror</span>
+            <h3 style="margin-top:0.75rem">Stats that sting (on purpose)</h3>
+            <p>Backlog diagnosis. Shelf warmer. Whale. Guilty pleasure. Work-weeks of backlog left. Share-bait honesty — the kind of line you send to the group chat.</p>
+          </div>
+        </div>
+        <div class="grid-2 reveal" style="margin-top:1.25rem">
+          <div class="card card-accent">
+            <h3 style="margin-top:0">Rarity tiers</h3>
+            <p>Friendly stats always show. Cryptic baseball jargon (ISO, K%, Pythagorean) surfaces ~15% of visits. A Kojima easter egg hits ~3%. Session-stable RNG — same subset while you browse, reshuffles on reload.</p>
+            <table class="data-table" style="margin-top:1rem">
+              <thead><tr><th>Tier</th><th>Weight</th><th>Examples</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill pill-emerald">friendly</span></td><td>always</td><td>hidden gems, comfort genre, MSRP unplayed</td></tr>
+                <tr><td><span class="pill">moderate</span></td><td>~50%</td><td>diagnosis, whale, shelf warmer</td></tr>
+                <tr><td><span class="pill pill-amber">cryptic</span></td><td>~15%</td><td>OPS, WAR, Pythagorean, BV+</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0">Sample insights</h3>
+            <p class="muted" style="margin-top:0">Rotating one-liners from your real data — pill on the dashboard hero.</p>
+            <div class="saber-pill-strip reveal" style="margin-top:1rem">
+              <span class="saber-pill">Backlog diagnosis: <strong>Chronic acquirer</strong></span>
+              <span class="saber-pill">Whale: <strong>Elden Ring</strong> · $59 untouched</span>
+              <span class="saber-pill">~4.2 yrs to clear at your pace</span>
+              <span class="saber-pill saber-pill-cryptic">Top WAR pick: <strong>Hades</strong></span>
+              <span class="saber-pill">Finish backlog by age <strong>73</strong>?</span>
+            </div>
+            <p style="margin-top:1.25rem"><strong style="color:var(--text)">Growth loop:</strong> these lines are screenshot bait. Users share the diagnosis, the whale, the years-to-clear — organic recruitment without a referral program.</p>
+          </div>
+        </div>
+        <div class="card reveal" style="margin-top:1.25rem">
+          <h3 style="margin-top:0">Marquee — the scrolling stat wall</h3>
+          <p>Under the hero: a ticker of chips mixing sabermetrics, counting stats, and creative metrics — games owned, finish AVG, blind-spot genre, work-weeks, historical lows, and more. One surface, one engine.</p>
+          <div class="saber-chip-demo" aria-hidden="true">
+            <span class="saber-chip"><em>★</em> <strong>.333</strong> finish AVG</span>
+            <span class="saber-chip"><em>#</em> <strong>RPG · 12</strong> comfort genre</span>
+            <span class="saber-chip"><em>$</em> <strong>$2,400</strong> MSRP sitting unplayed</span>
+            <span class="saber-chip"><em>~</em> <strong>312 wks</strong> backlog in work-weeks</span>
+            <span class="saber-chip"><em>?</em> <strong>Q X Z</strong> missing A–Z letters</span>
+            <span class="saber-chip"><em>&gt;</em> <strong>127</strong> free, never launched</span>
+          </div>
+        </div>
+        <div class="card card-accent reveal" style="margin-top:1.25rem">
+          <span class="pill pill-emerald">Approachable</span>
+          <h3 style="margin-top:0.75rem">Nothing cryptic stays cryptic</h3>
+          <p>Baseball jargon is a fun flex, not a wall. Every chip, insight, and spotlight tag explains its own calculation on hover — so <code>OPS</code>, <code>WAR</code>, <code>Barrel</code>, and the Pythagorean expectation teach themselves the first time you see them. Even the rotating spotlight nicknames (<em>No-doubter</em>, <em>Squared up</em>, <em>Sleeper</em>) resolve back to one plain-English definition.</p>
+          <div class="saber-pill-strip" style="margin-top:1rem">
+            <span class="saber-pill saber-pill-cryptic" title="On-base plus slugging: start rate (OBP) + length-weighted finish rate (SLG).">backlog OPS <strong>.742</strong></span>
+            <span class="saber-pill" title="Highest WAR among active picks: (rating − Mendoza)/10 plus length &amp; deal bonuses.">Barrel <strong>Hades</strong></span>
+          </div>
+          <p class="muted" style="margin-top:1rem">One tooltip dictionary (<code>js/metric-tips.js</code>) resolved at render time — copy stays consistent across ~100 metric builders, and a test blocks any new cryptic label from shipping without an explanation.</p>
+        </div>
+        <p class="muted reveal" style="margin-top:1.5rem">Shipped in <code>js/sabermetrics.js</code>, <code>js/dashboard-insights.js</code>, <code>js/creative-metrics.js</code>, <code>js/metric-tips.js</code> · documented in <a href="../tracker.html">internal tracker</a></p>
       </div>
     </section>
 

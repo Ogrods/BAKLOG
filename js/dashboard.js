@@ -22,6 +22,7 @@ import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboa
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation } from './dashboard-insights.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
+import { getLibrarySnapshot } from './sabermetrics.js';
 
 // Re-exports — dashboard.js stays the single public entry point for the
 // dashboard surface. External callers (app.js / bind-events.js / etc.)
@@ -80,6 +81,11 @@ export function dashboardFingerprint() {
       if (at > recentMax) recentMax = at;
     }
   }
+  let dealSig = 0;
+  for (const g of state.wishlistGames || []) {
+    const d = getDealInfo(g);
+    if (d) dealSig += (d.cut || 0) + (d.isHistoricalLow ? 1000 : 0);
+  }
   return JSON.stringify({
     dv: window._dataVersion || 0,
     itch: (state.itchGames || []).length > 0,
@@ -87,16 +93,14 @@ export function dashboardFingerprint() {
     ihn: !!state.sessionPrefs.itchHideNonGames,
     rc: recentCount,
     rm: recentMax,
+    ds: dealSig,
   });
 }
 
-function computeMegaHeroStats(games) {
-  const backlog = games.filter(g => getPersonal(g).status === "backlog");
-  const backlogHrs = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
-  const playedHrs = games.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
-  const nonSkip = games.filter(g => getPersonal(g).status !== "skip");
-  const finished = games.filter(g => getPersonal(g).status === "finished").length;
-  const completion = nonSkip.length ? Math.round((finished / nonSkip.length) * 100) : 0;
+function computeMegaHeroStats(games, snap) {
+  const backlogHrs = snap.backlogHrs;
+  const playedHrs = snap.playedHrs;
+  const completion = snap.nonSkip ? Math.round(snap.completionRate * 100) : 0;
   const rated = games.filter(g => ratingValue(g) > 0);
   const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length) : " - ";
   const wlDeals = state.wishlistGames.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
@@ -149,7 +153,7 @@ function applyMegaHeroCounters(stats) {
   _dashCountersInitialized = true;
 }
 
-function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems) {
+function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap) {
   const el = document.getElementById("dashboardMega");
   if (!el) return;
   el.className = spotlight ? 'dash-mega dash-mega--has-spotlight' : 'dash-mega';
@@ -159,7 +163,7 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
   const tagline = el.querySelector('.dash-hero-tagline');
   if (tagline) {
     tagline.innerHTML = `
-        <span><strong>${stats.completion}%</strong> complete</span>
+        <span title="Finished share of library excluding skipped games"><strong>${stats.completion}%</strong> complete</span>
         <span class="sep">·</span>
         <span><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
@@ -176,12 +180,12 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
       divider?.insertAdjacentHTML('beforebegin', renderMarqueeHtml(marqueeItems));
     }
   }
-  startInsightRotation(buildInsightPool(games));
+  startInsightRotation(buildInsightPool(games, snap));
   startSpotlightRotation(spotlightPool);
 }
 
-function renderDashboardMega(games) {
-  const stats = computeMegaHeroStats(games);
+function renderDashboardMega(games, snap) {
+  const stats = computeMegaHeroStats(games, snap);
   const el = document.getElementById("dashboardMega");
   if (!el) return;
 
@@ -189,10 +193,10 @@ function renderDashboardMega(games) {
   const spotlight = spotlightPool[0] || null;
   if (spotlight) setSpotlightCurrentKey(gameKey(spotlight));
   else setSpotlightCurrentKey(null);
-  const marqueeItems = buildMarqueeItems(games);
+  const marqueeItems = buildMarqueeItems(games, snap);
 
   if (_dashMegaShellBuilt && document.getElementById('dashHeroCount')) {
-    updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems);
+    updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap);
     return;
   }
 
@@ -206,22 +210,22 @@ function renderDashboardMega(games) {
       <span class="library-count-host" data-libcount-host><span class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(stats.total))}</span></span>
       <div class="dash-hero-sub">games owned across ${escapeHtml(String(stats.stores))} stores</div>
       <div class="dash-hero-tagline">
-        <span><strong>${stats.completion}%</strong> complete</span>
+        <span title="Finished share of library excluding skipped games"><strong>${stats.completion}%</strong> complete</span>
         <span class="sep">·</span>
-        <span><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
+        <span title="Backlog HLTB main hours ÷ (2 hours × 365 days)"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
-        <span><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>
+        <span title="Wishlist items with an active discount right now"><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>
       </div>
       <div class="dash-hero-pillars">
-        <div class="dash-hero-pillar">
+        <div class="dash-hero-pillar" title="Sum of playtime across all games, in hours">
           <div class="dash-hero-pillar-value" id="dashHeroPlayed">${escapeHtml(formatNum(Math.round(stats.playedHrs)))}h</div>
           <div class="dash-hero-pillar-label">Played</div>
         </div>
-        <div class="dash-hero-pillar">
+        <div class="dash-hero-pillar" title="Sum of HowLongToBeat main-story hours across backlog games">
           <div class="dash-hero-pillar-value" id="dashHeroBacklog">${escapeHtml(formatNum(Math.round(stats.backlogHrs)))}h</div>
           <div class="dash-hero-pillar-label">Backlog</div>
         </div>
-        <div class="dash-hero-pillar">
+        <div class="dash-hero-pillar" title="Mean review % across rated games">
           <div class="dash-hero-pillar-value" id="dashHeroAvg">${stats.avgRating === " - " ? " - " : escapeHtml(String(stats.avgRating)) + "%"}</div>
           <div class="dash-hero-pillar-label">Avg review</div>
         </div>
@@ -251,7 +255,7 @@ function renderDashboardMega(games) {
 
   applyMegaHeroCounters(stats);
   primeSpotlightArt(document.getElementById('dashboardSpotlight'));
-  startInsightRotation(buildInsightPool(games));
+  startInsightRotation(buildInsightPool(games, snap));
   startSpotlightRotation(spotlightPool);
 }
 
@@ -319,7 +323,8 @@ export async function renderDashboard(opts = {}) {
         const games = dashboardLibraryGames();
         const spotlightPool = getSpotlightPool().length ? getSpotlightPool() : pickSpotlightGames(games);
         startSpotlightRotation(spotlightPool);
-        startInsightRotation(buildInsightPool(games));
+        const snapReplay = getLibrarySnapshot(games);
+        startInsightRotation(buildInsightPool(games, snapReplay));
         replayDashboardChartAnimations();
         _dashRenderStats.replay++;
       } finally {
@@ -337,9 +342,10 @@ export async function renderDashboard(opts = {}) {
     Chart.defaults.color = "#94a3b8";
     Chart.defaults.borderColor = "#334155";
     const games = dashboardLibraryGames();
+    const snap = getLibrarySnapshot(games);
     renderDashboardFetcherHealth();
     try {
-      renderDashboardMega(games);
+      renderDashboardMega(games, snap);
     } catch (err) {
       console.error("Dashboard mega error:", err);
     }

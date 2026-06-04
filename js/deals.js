@@ -22,6 +22,17 @@ import { refreshFilterUI, switchView } from './filters-ui.js';
 
 /** Cut-depth modifier class — emerald default, big-gradient for 50%+,
  *  amber→red→pink gradient for 75%+. Matches the pre-CSS-extract project. */
+/** Weighted on-base average for deal quality (mirrors sabermetrics.wishlistWoba). */
+export function computeWishlistWoba(g, d, cutOverride) {
+  const dinfo = d || getDealInfo(g);
+  if (!dinfo) return null;
+  const cut = cutOverride ?? (dinfo.cut || 0);
+  const r = ratingValue(g);
+  let woba = cut * 0.4 + (dinfo.isHistoricalLow ? 25 : 0) + (r >= 80 ? 10 : r >= 70 ? 5 : 0);
+  if (dinfo.price != null) woba -= Math.max(0, dinfo.price - 20) * 0.2;
+  return Math.round(woba * 10) / 10;
+}
+
 export function cutBucketClass(cut) {
   if (!Number.isFinite(cut) || cut <= 0) return "";
   if (cut >= 75) return "deal-cut-huge";
@@ -100,6 +111,10 @@ export function dealHeroCardHtml(g) {
     : "";
   const heroBadges = [];
   if (cut > 0) heroBadges.push(`<span class="deal-cut-badge ${cutBucketClass(cut)}">-${cut}%</span>`);
+  const woba = computeWishlistWoba(g, d, cut);
+  if (woba != null && woba > 0) {
+    heroBadges.push(`<span class="deal-woba-pill" title="Weighted on-base average (deal quality)">wOBA ${woba}</span>`);
+  }
   if (lowPin) heroBadges.push(lowPin);
   if (droppedPin) heroBadges.push(droppedPin);
   const wlBadge = wishlistBadgeHtml(g);

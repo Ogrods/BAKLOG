@@ -1160,5 +1160,4 @@ export function renderDashboardCharts(games) {
     plugins: [scatterClusterPlugin],
   });
   renderScatterList([]);
-
 }

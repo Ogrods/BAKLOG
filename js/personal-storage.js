@@ -130,8 +130,8 @@ configurePersonalStore({
   setManualGames: (list) => { manualGames = list; },
 });
 
-const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false };
-const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false });
+const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null };
+const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null });
 
 const META_KEYS = new Set(["__migrated_v3", "__notes_canonicalized_v1", "__tags_removed_v1", "__pre_hidden_v1_seeded"]);
 
@@ -146,6 +146,8 @@ function normalizePersonalRecord(found) {
     priority: found.priority ?? 0,
     hltb_override: found.hltb_override === undefined ? null : found.hltb_override,
     hidden: found.hidden === true,
+    started_at: found.started_at ?? null,
+    finished_at: found.finished_at ?? null,
   };
 }
 
@@ -277,6 +279,16 @@ export function canonicalizeNotesAcrossTitles() {
 export function setPersonalByKey(key, field, value, options) {
   if (isMetaPersonalKey(key)) return;
   if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT };
+  if (field === "status") {
+    const prev = state.personal[key].status || "backlog";
+    const now = new Date().toISOString();
+    if (value === "finished" && prev !== "finished") {
+      state.personal[key].finished_at = now;
+    }
+    if (value === "playing" && prev !== "playing" && !state.personal[key].started_at) {
+      state.personal[key].started_at = now;
+    }
+  }
   state.personal[key][field] = value;
   window._dataVersion = (window._dataVersion || 0) + 1;
   personalMemo.bump();

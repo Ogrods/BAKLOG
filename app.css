@@ -1765,6 +1765,25 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   backdrop-filter: blur(2px);
 }
 .dash-hero-pillar-value { font-size: 26px; font-weight: 700; color: #f1f5f9; line-height: 1; }
+.sabermetrics-war-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  cursor: default;
+}
+.deal-woba-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(168, 85, 247, 0.15);
+  color: #c4b5fd;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
 .dash-hero-pillar-label {
   font-size: 11px;
   color: #94a3b8;
@@ -1861,6 +1880,47 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   );
   pointer-events: none;
 }
+.dash-spotlight-nav {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: none;
+  gap: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(2px);
+}
+.dash-spotlight.dash-spotlight--multi .dash-spotlight-nav {
+  display: flex;
+}
+.dash-spotlight-nav-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: #cbd5e1;
+  background: transparent;
+  border: none;
+  user-select: none;
+}
+.dash-spotlight-nav-btn + .dash-spotlight-nav-btn {
+  border-left: 1px solid rgba(51, 65, 85, 0.6);
+}
+.dash-spotlight-nav-btn:hover {
+  color: #f1f5f9;
+  background: rgba(30, 41, 59, 0.9);
+}
+.dash-spotlight-nav-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -2px;
+}
 .dash-spotlight-body {
   position: absolute;
   bottom: 14px;
@@ -1889,6 +1949,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   text-transform: uppercase;
   color: #38bdf8;
   font-weight: 700;
+  cursor: pointer;
 }
 .dash-spotlight-title {
   font-size: 18px;
@@ -1916,6 +1977,24 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 }
 .dash-spotlight-meta .dash-spotlight-cut.deal-cut-huge,
 .dash-spotlight-meta .dash-spotlight-price.deal-cut-huge {
+  background: linear-gradient(90deg, #fbbf24 0%, #f87171 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Deal cut % in insight pill + marquee — cut-depth scale (emerald < 50%,
+   emerald→amber 50–74%, amber→red→pink 75%+). */
+.dash-insight-cut,
+.dash-marquee-item strong.dash-marquee-cut { color: #6ee7b7; font-weight: 700; }
+.dash-insight-cut.deal-cut-big,
+.dash-marquee-item strong.dash-marquee-cut.deal-cut-big {
+  background: linear-gradient(90deg, #34d399 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dash-insight-cut.deal-cut-huge,
+.dash-marquee-item strong.dash-marquee-cut.deal-cut-huge {
   background: linear-gradient(90deg, #fbbf24 0%, #f87171 50%, #f472b6 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -2012,12 +2091,15 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   font-size: 12px;
   line-height: 1.5;
   min-height: calc(1em * 1.5 + 12px + 2px); /* line-height + vertical padding + border */
+  cursor: default;
   color: #cbd5e1;
   background: rgba(15, 23, 42, 0.65);
   border: 1px solid #334155;
   border-radius: 999px;
   padding: 6px 12px;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
   opacity: 0;
   transition: opacity 0.5s ease;
   position: relative;

@@ -19,7 +19,7 @@ from hltb_client import HltbClient
 from auth import mark_invalid, resolve_env
 from fetchers._authoritative import NINTENDO
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from auth.secrets import profile_dir
 from nintendo_client import (
     NintendoAuthError,
@@ -225,7 +225,10 @@ def main() -> int:
             headless=not args.headed,
             dump_debug_path=debug_path,
         )
-        raw_tx = client.fetch_all_transactions()
+        raw_tx = run_with_heartbeat(
+            client.fetch_all_transactions,
+            "Nintendo transactions",
+        )
     except NintendoEndpointError as e:
         stats.error(str(e))
         return stats.finish("fetch_nintendo", t0, exit_code=1)

@@ -33,7 +33,7 @@ from pathlib import Path
 
 from auth import resolve_env
 from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
-from fetchers._progress import RunStats, heartbeat, started
+from fetchers._progress import HeartbeatTimer, RunStats, started
 
 HEARTBEAT_EVERY = 25  # Steam API lookups between progress lines (avoids server stall-kill)
 from shared.profile_paths import cache_json_path
@@ -137,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         return stats.finish("enrich_steam_tags", t0, exit_code=1)
 
     steam = SteamClient(api_key=api_key, steam_id=steam_id)
+    hb = HeartbeatTimer(45.0)
     total_updated = 0
     total_appid_mapped = 0
     total_coop = 0
@@ -161,6 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         release_filled = 0
 
         for i, g in enumerate(games, 1):
+            hb.tick_progress(i, len(games), f"tags {filename}", f"{rows_updated} updated")
             if row_filter is not None and not row_filter(g):
                 continue
             key = f"{store}:{g.get('id')}"
@@ -168,11 +170,6 @@ def main(argv: list[str] | None = None) -> int:
             if not appid:  # None or 0 → no Steam match recorded
                 continue
             rows_with_appid += 1
-            if rows_with_appid % HEARTBEAT_EVERY == 0:
-                heartbeat(
-                    f"{filename}: {rows_with_appid} Steam lookups, "
-                    f"{rows_updated} updated ({i}/{len(games)})"
-                )
 
             try:
                 result = steam.get_app_details(int(appid), refresh=args.refresh)

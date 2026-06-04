@@ -22,7 +22,7 @@ import requests
 
 from auth import resolve_env
 from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
-from fetchers._progress import RunStats, started
+from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.profile_paths import cache_json_path
 from itch_game import itch_is_videogame as _itch_is_videogame
 from steam_client import SteamClient
@@ -200,6 +200,7 @@ def main() -> int:
     steam = SteamClient(api_key=api_key, steam_id=steam_id)
     mapping = load_mapping()
     owned_ids = steam_appids_by_id()
+    hb = HeartbeatTimer(45.0)
 
     for filename, store, row_filter in store_files:
         rel = Path(filename)
@@ -210,9 +211,11 @@ def main() -> int:
         games = data.get("games", [])
         eligible = [g for g in games if row_filter is None or row_filter(g)]
         print(f"\n=== {filename} ({len(eligible)} eligible / {len(games)} rows) ===", flush=True)
+        hb.reset()
         updated = 0
         searched = 0
         for i, g in enumerate(games, 1):
+            hb.tick_progress(i, len(games), f"reviews {filename}", f"{updated} updated")
             if row_filter is not None and not row_filter(g):
                 continue
             if g.get("steam_review_percent") is not None:

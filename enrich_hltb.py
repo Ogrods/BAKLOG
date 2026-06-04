@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fetchers._base import catalog_file, write_catalog_text
-from fetchers._progress import HeartbeatTimer, RunStats, heartbeat, started
+from fetchers._progress import HeartbeatTimer, RunStats, started
 from hltb_client import HltbClient
 from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
@@ -164,12 +164,6 @@ def main() -> int:
                 mapping[key] = hit if hit else False
                 if grand_lookups % SAVE_EVERY_N_LOOKUPS == 0:
                     save_mapping(mapping)
-                if store_lookups % HEARTBEAT_EVERY == 0:
-                    heartbeat(
-                        f"[{i}/{len(missing)}] checked {store_lookups} "
-                        f"(+{store_hits} hits, {store_misses} no-match) — still working"
-                    )
-                    hb.reset()
 
             if not hit:
                 continue

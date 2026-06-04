@@ -23,6 +23,8 @@ from typing import Any
 
 import requests
 
+from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
+
 BASE_URL = "https://itch.io/api/1"
 DEFAULT_PAGE_SIZE_FALLBACK = 50  # itch may return up to 50 keys per page
 REQUEST_DELAY_SEC = 0.4
@@ -103,10 +105,12 @@ class ItchClient:
 
     def all_owned_keys(self) -> list[dict]:
         """Walk every page until itch returns an empty result."""
+        hb = HeartbeatTimer(interval=25.0)
         out: list[dict] = []
         seen_ids: set[int] = set()
         page = 1
         while True:
+            hb.tick_progress(page, 0, "itch owned-keys", f"{len(out)} games")
             chunk = self.owned_keys_page(page)
             if not chunk:
                 break
@@ -122,10 +126,7 @@ class ItchClient:
             # Stop if the API returns a page that's all duplicates (defensive).
             if new_in_page == 0:
                 break
-            print(
-                f"  · itch owned-keys page {page}: {len(out)} games so far",
-                flush=True,
-            )
+            heartbeat(progress_line(page, 0, "itch owned-keys", f"{len(out)} games"))
             page += 1
             if page > 200:  # hard safety cap (~10k games)
                 break

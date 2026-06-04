@@ -40,7 +40,7 @@ from auth import mark_invalid
 from auth.runner import _parse_xbox_preloaded_state
 from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
 
@@ -422,7 +422,7 @@ def main() -> int:
     print("Fetching Xbox wishlist via headless xbox.com SSR...", flush=True)
 
     try:
-        state = _fetch_wishlist_state()
+        state = run_with_heartbeat(_fetch_wishlist_state, "Xbox wishlist capture")
     except Exception as exc:  # noqa: BLE001
         msg = f"wishlist page fetch failed: {exc}"
         mark_invalid("xbox_wishlist", error=msg)

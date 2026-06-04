@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 
+from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
 from psnawp_api import PSNAWP
 from psnawp_api.core import PSNAWPAuthenticationError, PSNAWPForbiddenError
 
@@ -209,6 +211,64 @@ def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
 
 
+def _new_stat_agg() -> dict[str, dict]:
+    return defaultdict(
+        lambda: {"minutes": 0, "play_count": None, "last": None, "first": None}
+    )
+
+
+def _accumulate_stat_into_agg(stat_agg: dict[str, dict], stat: object) -> None:
+    """Sum play time across PS4/PS5 (etc.) title_stats rows for the same game name."""
+    key = _dedupe_key(getattr(stat, "name", None))
+    if not key:
+        return
+    agg = stat_agg[key]
+    play_duration = getattr(stat, "play_duration", None)
+    if play_duration:
+        agg["minutes"] += int(play_duration.total_seconds() // 60)
+    play_count = getattr(stat, "play_count", None)
+    if play_count is not None:
+        agg["play_count"] = (agg["play_count"] or 0) + play_count
+    last = _iso(getattr(stat, "last_played_date_time", None))
+    if last and (not agg["last"] or last > agg["last"]):
+        agg["last"] = last
+    first = _iso(getattr(stat, "first_played_date_time", None))
+    if first and (not agg["first"] or first < agg["first"]):
+        agg["first"] = first
+
+
+def _apply_stat_to_entry(
+    entry: PsnGameEntry,
+    stat: object | None,
+    stat_agg: dict[str, dict],
+) -> None:
+    """Apply per-title stat fields, preferring cross-gen summed play time when present."""
+    agg = stat_agg.get(_dedupe_key(entry.name))
+    if agg and agg["minutes"]:
+        entry.playtime_minutes = agg["minutes"]
+    elif stat is not None and getattr(stat, "play_duration", None):
+        entry.playtime_minutes = int(stat.play_duration.total_seconds() // 60)
+    last = (agg and agg["last"]) or (
+        _iso(getattr(stat, "last_played_date_time", None)) if stat is not None else None
+    )
+    if last:
+        entry.last_played = last
+    first = (agg and agg["first"]) or (
+        _iso(getattr(stat, "first_played_date_time", None)) if stat is not None else None
+    )
+    if first:
+        entry.first_played = first
+    count = agg["play_count"] if agg else None
+    if count is None and stat is not None:
+        count = getattr(stat, "play_count", None)
+    if count is not None:
+        entry.play_count = count
+    if stat is not None and getattr(stat, "title_id", None) and not entry.title_id:
+        entry.title_id = stat.title_id
+    if stat is not None and getattr(stat, "image_url", None) and not entry.image_url:
+        entry.image_url = stat.image_url
+
+
 def _platform_labels(raw: frozenset) -> list[str]:
     labels: list[str] = []
     for platform in raw:
@@ -375,17 +435,24 @@ class PsnClient:
         return entries
 
     def collect_library(self) -> list[PsnGameEntry]:
+        hb = HeartbeatTimer(interval=25.0)
+        heartbeat("PSN library: loading title stats")
         stats_by_title_id: dict[str, object] = {}
         stats_by_name: dict[str, object] = {}
-        for stat in self._client.title_stats(limit=None):
+        stat_agg = _new_stat_agg()
+        for i, stat in enumerate(self._client.title_stats(limit=None), 1):
+            hb.tick_progress(i, 0, "PSN title stats")
             if stat.title_id:
                 stats_by_title_id[stat.title_id] = stat
             if stat.name:
                 stats_by_name[_norm_name(stat.name)] = stat
+            _accumulate_stat_into_agg(stat_agg, stat)
 
         entries: dict[str, PsnGameEntry] = {}
+        heartbeat(progress_line(0, 0, "PSN title stats", f"{len(stats_by_title_id)} loaded"))
 
-        for trophy in self._client.trophy_titles(limit=None):
+        for i, trophy in enumerate(self._client.trophy_titles(limit=None), 1):
+            hb.tick_progress(i, 0, "PSN trophies")
             comm_id = trophy.np_communication_id
             if not comm_id:
                 continue
@@ -407,6 +474,8 @@ class PsnClient:
             )
             entries[comm_id] = entry
 
+        heartbeat(progress_line(0, len(entries), "PSN trophies", f"{len(entries)} titles"))
+
         for entry in entries.values():
             stat = None
             if entry.title_id:
@@ -415,22 +484,12 @@ class PsnClient:
                 stat = stats_by_name.get(_norm_name(entry.name))
             if stat is None:
                 continue
-            if stat.play_duration:
-                entry.playtime_minutes = int(stat.play_duration.total_seconds() // 60)
-            if stat.last_played_date_time:
-                entry.last_played = _iso(stat.last_played_date_time)
-            if stat.first_played_date_time:
-                entry.first_played = _iso(stat.first_played_date_time)
-            if stat.play_count is not None:
-                entry.play_count = stat.play_count
-            if stat.title_id and not entry.title_id:
-                entry.title_id = stat.title_id
-            if stat.image_url and not entry.image_url:
-                entry.image_url = stat.image_url
+            _apply_stat_to_entry(entry, stat, stat_agg)
 
         seen_title_ids = {e.title_id for e in entries.values() if e.title_id}
 
-        for entitlement in self._client.game_entitlements(limit=None):
+        for i, entitlement in enumerate(self._client.game_entitlements(limit=None), 1):
+            hb.tick_progress(i, 0, "PSN entitlements")
             title_meta = entitlement.get("titleMeta") or {}
             concept_meta = entitlement.get("conceptMeta") or {}
             title_id = title_meta.get("titleId")
@@ -466,16 +525,7 @@ class PsnClient:
             stat = stats_by_title_id.get(title_id) or stats_by_name.get(_norm_name(name))
             if stat is None:
                 continue
-            if stat.play_duration:
-                entries[entry_id].playtime_minutes = int(stat.play_duration.total_seconds() // 60)
-            if stat.last_played_date_time:
-                entries[entry_id].last_played = _iso(stat.last_played_date_time)
-            if stat.first_played_date_time:
-                entries[entry_id].first_played = _iso(stat.first_played_date_time)
-            if stat.play_count is not None:
-                entries[entry_id].play_count = stat.play_count
-            if stat.image_url and not entries[entry_id].image_url:
-                entries[entry_id].image_url = stat.image_url
+            _apply_stat_to_entry(entries[entry_id], stat, stat_agg)
 
         deduped = self._dedupe_by_name(list(entries.values()))
         self.last_dedupe_dropped = len(entries) - len(deduped)

@@ -9,35 +9,43 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from dotenv import load_dotenv
 
-from auth import mark_invalid
+from auth import mark_connected, mark_invalid, resolve_env
 from auth.secrets import profile_dir
 from ea_client import (
     EA_PLAY_OWNERSHIP,
     REAL_OWNERSHIP,
     XGP_ONLY,
     EaAuthError,
+    EaCaptureError,
     EaClient,
 )
+from ea_session import DEFAULT_TRIGGER_URLS, probe_ea_token, sniff_ea_bearer
 from fetchers._authoritative import EA
 from fetchers._base import add_allow_empty_arg, merge_cached_row, refuse_drift_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 
 GAMES_EA_JSON = Path("games_ea.json")
+
+
 def raw_dump_json() -> Path:
     from shared.profile_paths import profile_cache_dir
 
     return profile_cache_dir() / "ea_raw.json"
 
+
+def fetch_debug_json() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "ea" / "fetch_debug.json"
+
+
 HLTB_DELAY_SEC = 1.0
-EA_GRAPHQL_HOST = "service-aggregation-layer.juno.ea.com"
-# A logged-in ea.com page that reliably fires an authenticated SAL GraphQL call,
-# so we can sniff the user's own web-session Bearer token from the request.
-EA_TRIGGER_URL = "https://www.ea.com/sales/deals"
 
 _TM_CHARS = "".maketrans({"®": "", "™": "", "©": ""})
 
@@ -54,55 +62,74 @@ def _clean_name(raw: str) -> str:
     return " ".join((raw or "").translate(_TM_CHARS).split()).strip()
 
 
-def _sniff_session(*, timeout_s: int = 45) -> tuple[str, list[dict]]:
-    """Replay the user's saved ea.com login to capture their own Bearer token.
+def _ea_connected() -> bool:
+    prof = profile_dir("ea")
+    if prof.exists() and any(prof.iterdir()):
+        return True
+    return bool(resolve_env("EA_BEARER_TOKEN", provider="ea"))
 
-    Launches the persistent EA profile headlessly, opens a logged-in ea.com page
-    that fires an authenticated GraphQL request, and reads the Authorization
-    header off that request — the same token the website obtained for the user.
-    """
-    from auth.cdp_browser import launch_persistent_profile
+
+def _resolve_session(
+    *,
+    headless: bool,
+    timeout_s: int = 45,
+    dump_debug: bool = False,
+) -> tuple[str, list[dict], dict[str, Any]]:
+    """Return (bearer_token, cookies, debug_info)."""
+    debug: dict[str, Any] = {"headless": headless, "stored_token_probe": None}
+    stored = (resolve_env("EA_BEARER_TOKEN", provider="ea") or "").strip()
+
+    if stored:
+        probe = probe_ea_token(stored)
+        debug["stored_token_probe"] = probe
+        if probe.get("ok"):
+            debug["token_source"] = "stored"
+            return stored, [], debug
 
     profile = profile_dir("ea")
-    if not profile.exists():
+    if not profile.exists() or not any(profile.iterdir()):
         raise EaAuthError(
             "No saved EA profile at cache/auth/profiles/ea. "
             "Open the Connections page and connect EA App first."
         )
 
-    captured: dict[str, str] = {}
+    from auth.cdp_browser import launch_persistent_profile
 
-    def on_request(request) -> None:
-        if EA_GRAPHQL_HOST not in (request.url or "").lower():
-            return
-        auth = request.headers.get("authorization") or request.headers.get("Authorization")
-        if not auth:
-            return
-        token = auth.strip()
-        if token.lower().startswith("bearer "):
-            token = token[7:].strip()
-        if token:
-            captured["token"] = token
-
-    with launch_persistent_profile(str(profile), headless=True) as ctx:
+    with launch_persistent_profile(str(profile), headless=headless) as ctx:
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        page.on("request", on_request)
         try:
-            page.goto(EA_TRIGGER_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
+            result = sniff_ea_bearer(
+                ctx,
+                page,
+                trigger_urls=DEFAULT_TRIGGER_URLS,
+                timeout_s=timeout_s,
+                debug_out=debug,
+            )
+        except (EaAuthError, EaCaptureError):
+            if dump_debug:
+                _write_fetch_debug(debug, page=page)
+            raise
+        debug.update(result.debug)
+        debug["token_source"] = "sniff"
+        if dump_debug:
+            debug["final_url"] = result.debug.get("final_url")
+            _write_fetch_debug(debug, page=page)
+        mark_connected(
+            "ea",
+            {"EA_PROFILE": "ready", "EA_BEARER_TOKEN": result.token},
+        )
+        return result.token, result.cookies, debug
+
+
+def _write_fetch_debug(debug: dict[str, Any], *, page: Any = None) -> None:
+    path = fetch_debug_json()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if page is not None:
+        try:
+            debug.setdefault("final_url", getattr(page, "url", None) or "")
         except Exception:  # noqa: BLE001
             pass
-        deadline = time.time() + timeout_s
-        while time.time() < deadline and "token" not in captured:
-            page.wait_for_timeout(500)
-        cookies = ctx.cookies()
-
-    token = captured.get("token")
-    if not token:
-        raise EaAuthError(
-            "Could not capture an EA web-session token — your EA login may have expired. "
-            "Reconnect EA App on the Connections page."
-        )
-    return token, cookies
+    path.write_text(json.dumps(debug, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _ownership_methods(item: dict) -> set[str]:
@@ -119,7 +146,6 @@ def _should_include(item: dict) -> bool:
         return False
     game_type = (base.get("gameType") or "").upper()
     if game_type and game_type not in ("GAME", "BASE_GAME", "FULL_GAME", ""):
-        # Drop demos/tools when EA labels them explicitly.
         if game_type in ("DEMO", "TRIAL", "TOOL", "LAUNCHER"):
             return False
     methods = _ownership_methods(item)
@@ -232,13 +258,38 @@ def main() -> int:
     add_allow_empty_arg(parser)
     parser.add_argument("--skip-hltb", action="store_true")
     parser.add_argument("--dump-raw", action="store_true")
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Open the saved browser profile visibly (debug capture issues)",
+    )
+    parser.add_argument(
+        "--dump-debug",
+        action="store_true",
+        help=f"Write capture diagnostics to {fetch_debug_json()}",
+    )
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_ea")
     stats = RunStats()
 
+    if not _ea_connected():
+        stats.error(
+            "EA App is not connected. Open Connections → EA App → Connect and sign in at ea.com."
+        )
+        return stats.finish("fetch_ea", t0, exit_code=1)
+
     try:
-        token, cookies = _sniff_session()
+        token, cookies, _dbg = run_with_heartbeat(
+            lambda: _resolve_session(
+                headless=not args.headed,
+                dump_debug=args.dump_debug,
+            ),
+            "EA session capture",
+        )
+    except EaCaptureError as e:
+        stats.error(str(e))
+        return stats.finish("fetch_ea", t0, exit_code=1)
     except EaAuthError as e:
         mark_invalid("ea", error=str(e))
         stats.error(str(e))
@@ -295,7 +346,11 @@ def main() -> int:
             slugs.append(slug)
     play_by_slug: dict[str, dict] = {}
     try:
-        for pt in client.get_play_times(sorted(set(slugs))):
+        play_rows = run_with_heartbeat(
+            lambda: client.get_play_times(sorted(set(slugs))),
+            "EA play times",
+        )
+        for pt in play_rows:
             s = pt.get("gameSlug")
             if isinstance(s, str):
                 play_by_slug[s] = pt

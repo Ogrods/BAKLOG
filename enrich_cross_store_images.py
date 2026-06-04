@@ -15,7 +15,7 @@ import requests
 from dotenv import load_dotenv
 
 from fetchers._base import catalog_file, write_catalog_text
-from fetchers._progress import RunStats, heartbeat, started
+from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.profile_paths import cache_json_path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -123,7 +123,7 @@ def main() -> int:
     t0 = started("enrich_cross_store_images")
     stats = RunStats()
     updated = 0
-    completed = 0
+    hb = HeartbeatTimer(25.0)
     meta = load_meta()
     # Persistent "this row exists on (store, id) but has no Steam match" set
     # so a re-click doesn't waste a Steam search hit on Hearthstone again.
@@ -197,11 +197,6 @@ def main() -> int:
                     updated += 1
                     stats.ok += 1
                     print(f"  + {new_g.get('name', gid)}", flush=True)
-                if completed % HEARTBEAT_EVERY == 0:
-                    heartbeat(
-                        f"{path.name}: processed {completed}/{len(todo)}, "
-                        f"{updated} updated — still working"
-                    )
         data["games"] = list(by_id.values())
         write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
 

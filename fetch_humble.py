@@ -26,7 +26,15 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid
 from auth.secrets import profile_dir
-from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
+from fetchers._authoritative import HUMBLE
+from fetchers._base import (
+    add_allow_empty_arg,
+    catalog_file,
+    merge_cached_row,
+    refuse_drift_result,
+    refuse_empty_result,
+    write_catalog_text,
+)
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 
@@ -380,6 +388,7 @@ def main() -> int:
         row_id = f"humble-{item.machine_name}"
         print(f"[{i}/{len(items)}] {item.name}", flush=True)
         hltb = None
+        hltb_updated = False
         cached = existing.get(item.machine_name)
         if hltb_client and item.name:
             if cached and cached.get("hltb_main_hours") is not None:
@@ -394,9 +403,17 @@ def main() -> int:
                 try:
                     time.sleep(HLTB_DELAY_SEC)
                     hltb = hltb_client.lookup(item.name)
+                    hltb_updated = bool(hltb)
                 except Exception as exc:  # noqa: BLE001
                     print(f"  HLTB warning: {exc}", flush=True)
-        rows.append(_build_row(item, hltb))
+        rows.append(
+            merge_cached_row(
+                _build_row(item, hltb),
+                cached,
+                authoritative=HUMBLE,
+                hltb_updated=hltb_updated,
+            )
+        )
 
     payload = {
         "fetched_at": datetime.now(timezone.utc).isoformat(),

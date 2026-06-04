@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid
 from auth.secrets import profile_dir
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
 
@@ -305,7 +305,7 @@ def main() -> int:
     print("Fetching Ubisoft wishlist via headless storefront page...", flush=True)
 
     try:
-        title, html = _fetch_wishlist_html()
+        title, html = run_with_heartbeat(_fetch_wishlist_html, "Ubisoft wishlist capture")
     except Exception as exc:
         mark_invalid("ubisoft", error=f"wishlist page fetch failed: {exc}")
         stats.error(str(exc))

@@ -230,13 +230,9 @@ ENRICHMENT_FIELDS = (
     "coop_local",
 )
 
-# When a fetcher reruns with empty/zero fresh values, keep populated cache values.
-_PRESERVE_IF_FRESH_EMPTY = frozenset(
-    {
-        "playtime_minutes",
-        "last_played",
-        *ENRICHMENT_FIELDS,
-    }
+# Pricing legitimately drops to 0/empty (free game, sale ends) — allow overwrite.
+_ALLOW_EMPTY_OVERWRITE = frozenset(
+    {"price", "price_initial", "discount_percent", "currency"}
 )
 
 
@@ -295,7 +291,7 @@ def merge_cached_row(
         if key in _IMAGE_KEYS and not fresh[key]:
             continue
         if (
-            key in _PRESERVE_IF_FRESH_EMPTY
+            key not in _ALLOW_EMPTY_OVERWRITE
             and _is_empty(fresh[key])
             and not _is_empty(merged.get(key))
         ):
@@ -307,7 +303,42 @@ def merge_cached_row(
             if _is_empty(fresh_val) and not _is_empty(merged.get(key)):
                 continue
             merged[key] = fresh_val
+    _apply_monotonic_play_dates(merged, cached, fresh)
     return merged
+
+
+def _nonempty_iso(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _apply_monotonic_play_dates(
+    merged: dict[str, Any],
+    cached: dict[str, Any],
+    fresh: dict[str, Any],
+) -> None:
+    """Keep play dates from regressing when a flaky API returns an older snapshot."""
+    lasts = [
+        v
+        for v in (
+            _nonempty_iso(cached.get("last_played")),
+            _nonempty_iso(fresh.get("last_played")),
+        )
+        if v
+    ]
+    if lasts:
+        merged["last_played"] = max(lasts)
+    firsts = [
+        v
+        for v in (
+            _nonempty_iso(cached.get("first_played")),
+            _nonempty_iso(fresh.get("first_played")),
+        )
+        if v
+    ]
+    if firsts:
+        merged["first_played"] = min(firsts)
 
 
 RowBuilder = Callable[..., dict[str, Any]]

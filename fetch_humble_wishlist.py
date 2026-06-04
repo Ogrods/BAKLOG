@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid
 from fetch_humble import _launch_humble_ctx
 from fetchers._base import add_allow_empty_arg, refuse_drift_result, refuse_empty_result, catalog_file, write_catalog_text
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
 
@@ -358,7 +358,10 @@ def main() -> int:
 
     print("Fetching Humble wishlist via headless store page...", flush=True)
     try:
-        html, url, api_payloads = _fetch_wishlist(dump=args.dump)
+        html, url, api_payloads = run_with_heartbeat(
+            lambda: _fetch_wishlist(dump=args.dump),
+            "Humble wishlist capture",
+        )
     except Exception as exc:  # noqa: BLE001
         mark_invalid("humble", error=f"wishlist fetch failed: {exc}")
         stats.error(str(exc))

@@ -52,11 +52,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- **Fetchers overwriting saved play data with zeros on re-fetch** — `merge_cached_row` now keeps any populated authoritative field when the fresh API row is empty (except pricing, which may legitimately drop to free). Play dates are monotonic (`last_played` keeps the newer ISO timestamp, `first_played` the earlier). Fixes PSN `first_played` / `trophy_progress` loss when title-stats do not match. `fetch_humble.py` now merges rows like other library fetchers instead of full-replacing enrichment each run.
 - **Blank library/wishlist rows right after boot curtain** — `reloadGames()` fetches store JSON in parallel; `liftBootCurtain()` nudges layout after reveal so table cells paint on hard refresh (library, wishlist, itch).
 - **Hard refresh on itch tab jumped to dashboard** — itch→dashboard redirect is fail-open until `authStatusLoaded()` and `dashboardDataReady`; one authoritative check after bootstrap instead of clobbering the saved view mid-load.
 - **Fetcher log did not stick to bottom** — explicit tail-follow flag re-pins after panel resize; clears the empty-state placeholder on first line flush.
 - **Chart.js load failure surfaced as unhandled rejection** — dashboard view-overlay path catches `ensureChartJs()` rejections so a transient script error does not open the error toast.
 - **Header controls clickable during boot** — fetcher status pill and profile menu are non-interactive under `data-boot-loading` (pointer-events + keyboard guard).
+- **PSN cross-gen playtime** — `title_stats` for PS4 and PS5 (same game, different `title_id`) are now summed by dedupe name so titles like Fortnite keep both platforms' hours (~2304h + ~168h) instead of whichever `np_title_id` the trophy row matched that day.
+- **EA fetch exit 4 after reconnect** — Connect now persists the ea.com web-session `EA_BEARER_TOKEN` (probed via Juno GraphQL) alongside the browser profile, so fetch no longer depends on headless re-sniff alone. Shared `ea_session.py` handles capture (deals + home triggers, `context.on('request')`); `EaCaptureError` maps to exit 1 without `mark_invalid`; `--headed` / `--dump-debug` for diagnosis.
 - **Nintendo fetch empty after reconnect** — GraphQL responses are queued in the CDP `response` handler and parsed on the main thread (avoids deadlocking `getResponseBody` on the reader thread). Connect now requires eShop session cookies plus a valid `/api/auth/session` idToken. Capture failures raise `NintendoCaptureError` (exit 1, no `mark_invalid`) with `--headed` / `--dump-debug` hints; true session expiry still uses exit 4.
 - **Fetcher console reconnect duplicated log lines** — each log line now has a monotonic `seq`; SSE emits it as `id:` and honors `?since=` / `Last-Event-ID` on replay. The client tracks `lastSeqByRunId` (sessionStorage) and resumes without re-appending the backlog after reload or stream drop.
 - **Stale fetcher chips after missed `done` events** — `syncFromServer` reconciles `runStateByKey` against the server snapshot so chips and panel chrome cannot stay `running`/`queued` when the run already finished.
@@ -80,6 +83,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **Fetcher progress heartbeats** — long pulls now emit consistent `[i/total] (NN%) phase` lines during previously-silent capture/batch steps (PSN library collect, GOG web catalog, itch owned-keys, Epic catalog pool, ITAD price batches, EA session/playtimes, Nintendo transactions, headless wishlist captures) and from enrichers, so the run console shows real progress instead of going quiet.
 - **User-facing copy** — em dashes in UI strings replaced with ` - ` (empty-state placeholders, tooltips, toasts); code comments unchanged.
 - **Dashboard spotlight portrait covers** — portrait art uses `object-fit: cover` again instead of letterboxed contain.
 - **Fetcher log layout** — run log opens beside the fetcher health card (2/3 + 1/3 columns) instead of below, keeping the dashboard hero and combat-text count visible; console font 1px smaller; narrow viewports stack log under health.

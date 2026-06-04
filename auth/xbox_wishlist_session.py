@@ -13,9 +13,9 @@ from typing import Literal
 
 from auth.cdp_browser import launch_persistent_profile
 from auth.runner import (
+    _STEALTH_INIT,
     XBOX_WISHLIST_POLL_SEC,
     XBOX_WISHLIST_URL,
-    _STEALTH_INIT,
     _parse_xbox_preloaded_state,
 )
 from auth.secrets import profile_dir

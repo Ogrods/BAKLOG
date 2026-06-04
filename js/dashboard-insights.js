@@ -41,6 +41,7 @@ import {
 } from './sabermetrics.js';
 import { appendCreativeInsights, appendCreativeMarqueeChips } from './creative-metrics.js';
 import { marqueeTip, insightTip } from './metric-tips.js';
+import { familyForInsight, familyForLabel, spreadByFamily } from './stat-families.js';
 
 /** Sabermetric marquee/pill appearance weights (session-stable RNG). */
 export const METRIC_WEIGHT = {
@@ -291,6 +292,7 @@ export function buildMarqueeItems(games, snapIn) {
       iconCls,
       valueHtml: valueHtml ?? escapeHtml(String(value)),
       label,
+      family: familyForLabel(label),
       w: opts.weight ?? METRIC_WEIGHT.normal,
       iconTitle: opts.iconTitle,
     });
@@ -701,7 +703,7 @@ export function buildMarqueeItems(games, snapIn) {
     iconTitle: 'kojima',
   });
 
-  return applyMetricWeights(items);
+  return spreadByFamily(applyMetricWeights(items), it => it.family, { wrap: true });
 }
 
 export function renderMarqueeHtml(items) {
@@ -738,6 +740,7 @@ export function startInsightRotation(insights) {
   const weighted = filterInsightsByWeight(entries);
   let htmlList = weighted.map(e => e.html);
   htmlList = filterInsightsOneLine(el, htmlList);
+  htmlList = spreadByFamily(htmlList, familyForInsight, { wrap: true });
   _lastInsights = htmlList;
   if (!htmlList.length) {
     el.innerHTML = '';

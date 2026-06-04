@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from fetch_gog import merge_gog_cached_row
 from fetchers._authoritative import AMAZON, GOG, HUMBLE, PSN
 from fetchers._base import merge_cached_row
-from fetch_gog import merge_gog_cached_row
 
 
 def test_merge_preserves_steam_reviews() -> None:

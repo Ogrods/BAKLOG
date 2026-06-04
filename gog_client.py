@@ -132,7 +132,7 @@ class GogClient:
         ``userData.json`` must accept the cookie. The paginated library endpoint
         often 403s scripted clients even right after a browser sign-in; when that
         happens we still accept the session if the owned-game ID list works (same
-        degraded path as :func:`fetch_gog._web_fetch_products`).
+        degraded path as the web fetch loop in ``fetch_gog.main``).
         """
         self._throttle()
         resp = self.session.get(f"{EMBED_BASE}/userData.json", timeout=30)

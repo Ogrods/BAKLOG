@@ -372,7 +372,7 @@ const STALE_OVERRIDES = {
   itad: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
 };
 export const ITAD_LAST_AUTO_RUN_KEY = profileScopedStorageKey('baklog-itad-last-auto-run');
-export const ITAD_AUTO_REFRESH_INTERVAL_MS = 60 * 60_000;
+export const ITAD_AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 export const ITAD_AUTO_QUIET_HOUR_END = 7;
 
 export function thresholdsForMetaKey(metaKey) {

@@ -9,6 +9,7 @@ import { getDealInfo, cutBucketClass } from './deals.js';
 import { isBarrel, isLeveragePick, getLibrarySnapshot } from './sabermetrics.js';
 import { computeSpotlightSuperlatives } from './creative-metrics.js';
 import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
+import { familyForEyebrow, spreadByFamily } from './stat-families.js';
 import { registerPausable } from './visibility.js';
 
 function releasedWithinMonths(g, months) {
@@ -363,7 +364,8 @@ export function pickSpotlightGames(games) {
     const j = Math.floor(Math.random() * (i + 1));
     [top[i], top[j]] = [top[j], top[i]];
   }
-  const pool = top.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
+  const spreadTop = spreadByFamily(top, t => familyForEyebrow(t.reason.eyebrow), { wrap: true });
+  const pool = spreadTop.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
 
   // Preserve the previously-displayed game across dashboard revisits: if it's still
   // eligible, rotate it to index 0 so re-paint doesn't visibly switch games.

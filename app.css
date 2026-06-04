@@ -1847,6 +1847,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
   display: block;
+  transition: transform 0.45s ease, opacity 0.45s ease;
 }
 .dash-spotlight-art-bg.is-loaded { opacity: 1; }
 .dash-spotlight-art {
@@ -1867,9 +1868,11 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
 .dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04) translateZ(0); }
-.dash-spotlight.has-portrait-art:hover .dash-spotlight-art,
-.dash-spotlight.has-portrait-art:hover .dash-spotlight-art-bg {
+.dash-spotlight.has-portrait-art:hover .dash-spotlight-art {
   animation-play-state: paused;
+}
+.dash-spotlight.has-portrait-art:hover .dash-spotlight-art-bg {
+  transform: scale(1.27) translateZ(0);
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
   transition: opacity 0.45s ease;
@@ -1956,38 +1959,6 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
     transform: perspective(900px) rotateY(-2.5deg) rotateX(0.8deg) translateY(-1px) translateZ(0);
   }
 }
-@keyframes spotlightFloatBg1 {
-  0%, 100% {
-    transform: scale(1.15) perspective(900px) rotateY(-1.5deg) translateY(0) translateZ(0);
-  }
-  50% {
-    transform: scale(1.15) perspective(900px) rotateY(1.5deg) translateY(-1px) translateZ(0);
-  }
-}
-@keyframes spotlightFloatBg2 {
-  0%, 100% {
-    transform: scale(1.15) perspective(900px) rotateY(1.5deg) translateY(0) translateZ(0);
-  }
-  50% {
-    transform: scale(1.15) perspective(900px) rotateY(-1.5deg) translateY(-1px) translateZ(0);
-  }
-}
-@keyframes spotlightFloatBg3 {
-  0%, 100% {
-    transform: scale(1.15) perspective(900px) rotateY(-2deg) translateY(0) translateZ(0);
-  }
-  50% {
-    transform: scale(1.15) perspective(900px) rotateY(2deg) translateY(-1px) translateZ(0);
-  }
-}
-@keyframes spotlightFloatBg4 {
-  0%, 100% {
-    transform: scale(1.15) perspective(900px) rotateY(1deg) translateY(0) translateZ(0);
-  }
-  50% {
-    transform: scale(1.15) perspective(900px) rotateY(-1deg) translateY(-1px) translateZ(0);
-  }
-}
 .dash-spotlight-sheen {
   display: none;
 }
@@ -2018,7 +1989,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
     rgba(255, 255, 255, 0.045) 58%,
     transparent 100%
   );
-  filter: blur(7px);
+  filter: blur(10px);
   mix-blend-mode: screen;
 }
 .dash-spotlight.has-portrait-art.portrait-anim-1 { --sheen-angle: 115deg; }
@@ -2028,18 +1999,12 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .dash-spotlight.has-portrait-art.portrait-anim-1 .dash-spotlight-art.is-loaded {
   animation: spotlightFloat1 9s ease-in-out infinite;
 }
-.dash-spotlight.has-portrait-art.portrait-anim-1 .dash-spotlight-art-bg.is-loaded {
-  animation: spotlightFloatBg1 9s ease-in-out infinite;
-}
 .dash-spotlight.has-portrait-art.portrait-anim-2 { --sheen-angle: 65deg; }
 .dash-spotlight.has-portrait-art.portrait-anim-2 .dash-spotlight-sheen::before {
   animation: spotlightSheen2 6.5s ease-in-out infinite;
 }
 .dash-spotlight.has-portrait-art.portrait-anim-2 .dash-spotlight-art.is-loaded {
   animation: spotlightFloat2 10.5s ease-in-out infinite;
-}
-.dash-spotlight.has-portrait-art.portrait-anim-2 .dash-spotlight-art-bg.is-loaded {
-  animation: spotlightFloatBg2 10.5s ease-in-out infinite;
 }
 .dash-spotlight.has-portrait-art.portrait-anim-3 { --sheen-angle: 115deg; }
 .dash-spotlight.has-portrait-art.portrait-anim-3 .dash-spotlight-sheen::before {
@@ -2048,18 +2013,12 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .dash-spotlight.has-portrait-art.portrait-anim-3 .dash-spotlight-art.is-loaded {
   animation: spotlightFloat3 8s ease-in-out infinite;
 }
-.dash-spotlight.has-portrait-art.portrait-anim-3 .dash-spotlight-art-bg.is-loaded {
-  animation: spotlightFloatBg3 8s ease-in-out infinite;
-}
 .dash-spotlight.has-portrait-art.portrait-anim-4 { --sheen-angle: 65deg; }
 .dash-spotlight.has-portrait-art.portrait-anim-4 .dash-spotlight-sheen::before {
   animation: spotlightSheen4 7s ease-in-out infinite;
 }
 .dash-spotlight.has-portrait-art.portrait-anim-4 .dash-spotlight-art.is-loaded {
   animation: spotlightFloat4 11.5s ease-in-out infinite;
-}
-.dash-spotlight.has-portrait-art.portrait-anim-4 .dash-spotlight-art-bg.is-loaded {
-  animation: spotlightFloatBg4 11.5s ease-in-out infinite;
 }
 .dash-spotlight-gradient {
   position: absolute;
@@ -4011,8 +3970,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
     transform: translateX(0) skewX(-12deg);
     opacity: 0.35;
   }
-  .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
-  .dash-spotlight.has-portrait-art .dash-spotlight-art-bg.is-loaded {
+  .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded {
     animation: none !important;
   }
 }

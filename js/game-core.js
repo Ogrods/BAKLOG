@@ -307,7 +307,7 @@ export function steamLibraryHeroUrl(appId) {
   return `${STEAM_CDN}/${appId}/library_hero.jpg`;
 }
 
-/** Spotlight art URLs, best-first: Steam library_hero → header → portrait fallbacks. */
+/** Spotlight art URLs, best-first: hero → 600×900 portrait → header/square → other covers. */
 export function spotlightArtCandidates(g) {
   const ng = normalizeGame(g);
   const seen = new Set();
@@ -319,13 +319,13 @@ export function spotlightArtCandidates(g) {
     out.push(u);
   };
   const appId = steamAppIdFromGame(ng);
-  if (appId) push(steamLibraryHeroUrl(appId));
-  push(ng.header_image);
   if (appId) {
+    push(steamLibraryHeroUrl(appId));
     push(`${STEAM_CDN}/${appId}/library_600x900_2x.jpg`);
     push(`${STEAM_CDN}/${appId}/library_600x900.jpg`);
   }
   push(ng.library_image);
+  push(ng.header_image);
   const lib = libraryCoverFor(ng);
   if (lib) push(lib);
   return out;

@@ -25,6 +25,10 @@ from fetchers._base import (
     refuse_empty_result,
     write_catalog_text,
 )
+
+# Stable metadata that the other GOG source may have populated (web has release_date;
+# local Galaxy DB often does not). Carried on source flip after merge_cached_row.
+_GOG_CROSS_SOURCE_CARRY = ("release_date", "genres", "header_image", "library_image", "tags")
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 from gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
@@ -202,6 +206,41 @@ def _effective_row_source(row: dict) -> str:
     if s in ("local", "web"):
         return str(s)
     return LEGACY_ROW_SOURCE
+
+
+def _field_empty(value: object) -> bool:
+    if value is None or value is False:
+        return True
+    if isinstance(value, (int, float)) and value == 0:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) == 0
+    return False
+
+
+def merge_gog_cached_row(
+    fresh: dict,
+    cached: dict | None,
+    *,
+    source: str,
+    hltb_updated: bool = False,
+) -> dict:
+    """Merge a GOG fetch row onto cache, preserving metadata across source switches."""
+    merged = merge_cached_row(
+        fresh,
+        cached,
+        authoritative=GOG,
+        hltb_updated=hltb_updated,
+    )
+    if not cached or _effective_row_source(cached) == source:
+        return merged
+    merged = carry_enrichment(merged, cached)
+    for key in _GOG_CROSS_SOURCE_CARRY:
+        if _field_empty(merged.get(key)) and not _field_empty(cached.get(key)):
+            merged[key] = cached[key]
+    return merged
 
 
 def _normalize_name(name: str) -> str:
@@ -513,8 +552,6 @@ def main() -> int:
             print(f"[{i}/{len(records)}] {name} ({gog_id})", flush=True)
 
             cached = existing.get(gog_id)
-            if cached is not None and _effective_row_source(cached) != source:
-                cached = None
 
             hltb = None
             hltb_updated = False
@@ -605,8 +642,6 @@ def main() -> int:
             print(f"[{i}/{len(products)}] {name} ({gog_id})", flush=True)
 
             cached_row = existing.get(gog_id)
-            if cached_row is not None and _effective_row_source(cached_row) != source:
-                cached_row = None
 
             need_details = args.refresh or cached_row is None or args.gog_id
             details = None
@@ -641,10 +676,10 @@ def main() -> int:
                 skipped += 1
                 continue
             current_rows.append(
-                merge_cached_row(
+                merge_gog_cached_row(
                     _tag_web_row(row),
                     cached_row,
-                    authoritative=GOG,
+                    source=source,
                     hltb_updated=hltb_updated,
                 )
             )

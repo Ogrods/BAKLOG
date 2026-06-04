@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fetchers._authoritative import AMAZON, GOG, HUMBLE, PSN
 from fetchers._base import merge_cached_row
+from fetch_gog import merge_gog_cached_row
 
 
 def test_merge_preserves_steam_reviews() -> None:
@@ -293,6 +294,53 @@ def test_merge_humble_preserves_enrichment_on_refetch() -> None:
     assert merged["header_image"].startswith("https://cdn.akamai")
     assert merged["hltb_main_hours"] == 12.0
     assert merged["name"] == "Game One"
+
+
+def test_merge_gog_cross_source_preserves_metadata() -> None:
+    """Web → local source flip must not wipe release_date/genres/images."""
+    cached = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "source": "web",
+        "name": "Example Game",
+        "release_date": "Oct 7, 2025",
+        "genres": ["RPG", "Action"],
+        "header_image": "https://images.gog.com/header.jpg",
+        "library_image": "https://images.gog.com/library.jpg",
+        "tags": ["story rich"],
+        "steam_review_percent": 91.0,
+        "hltb_main_hours": 14.0,
+    }
+    fresh = {
+        "store": "gog",
+        "id": 1,
+        "gog_id": 1,
+        "source": "local",
+        "name": "Example Game",
+        "release_date": None,
+        "genres": [],
+        "header_image": None,
+        "library_image": None,
+        "tags": [],
+        "playtime_minutes": 120,
+        "steam_review_percent": None,
+        "hltb_main_hours": None,
+        "price": None,
+        "price_initial": None,
+        "discount_percent": None,
+        "currency": None,
+    }
+    merged = merge_gog_cached_row(fresh, cached, source="local", hltb_updated=False)
+    assert merged["source"] == "local"
+    assert merged["playtime_minutes"] == 120
+    assert merged["release_date"] == "Oct 7, 2025"
+    assert merged["genres"] == ["RPG", "Action"]
+    assert merged["header_image"] == "https://images.gog.com/header.jpg"
+    assert merged["library_image"] == "https://images.gog.com/library.jpg"
+    assert merged["tags"] == ["story rich"]
+    assert merged["steam_review_percent"] == 91.0
+    assert merged["hltb_main_hours"] == 14.0
 
 
 def test_merge_sets_coop_when_fresh_is_true() -> None:

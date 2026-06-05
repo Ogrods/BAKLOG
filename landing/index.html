@@ -157,6 +157,19 @@
       line-height: 1;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
     }
+    .wordmark .tm {
+      font-size: 0.28em;
+      vertical-align: top;
+      letter-spacing: 0;
+      margin-left: 0.06em;
+      font-weight: 600;
+    }
+    .foot-brand .name .tm {
+      font-size: 0.5em;
+      vertical-align: top;
+      letter-spacing: 0;
+      margin-left: 0.05em;
+    }
 
     .hero-badge {
       display: inline-flex;
@@ -470,8 +483,23 @@
     }
 
     @media (max-width: 560px) {
-      .waitlist-row { flex-direction: column; }
-      .btn { width: 100%; min-height: 44px; }
+      .waitlist-row {
+        flex-direction: column;
+        gap: 0.55rem;
+        background: transparent;
+        border: none;
+        padding: 0;
+        backdrop-filter: none;
+      }
+      .waitlist input[type="email"] {
+        background: rgba(30, 41, 59, 0.7);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.85rem 0.95rem;
+        backdrop-filter: blur(8px);
+        min-height: 48px;
+      }
+      .btn { width: 100%; min-height: 48px; border-radius: 12px; }
       .foot-grid { flex-direction: column; align-items: flex-start; }
       .foot-meta { text-align: left; }
       .foot-invite a {
@@ -504,7 +532,7 @@
       </g>
     </svg>
 
-    <h1 class="wordmark">BAKLOG</h1>
+    <h1 class="wordmark">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></h1>
     <p class="hero-badge">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
       Free forever &middot; Invite-only early access
@@ -795,13 +823,14 @@
             <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
           </g>
         </svg>
-        <span class="name">BAKLOG</span>
+        <span class="name">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></span>
       </div>
       <div class="foot-meta">
         <strong>baklog.app</strong>. One honest backlog across every store.<br />
         Free forever &middot; Invite-only early access. Invites go out in small waves.<br />
         <p class="foot-invite"><a href="#waitlist">Request an invite</a></p>
-        Local-first &middot; No telemetry &middot; MIT &middot; <span id="year"></span>
+        Local-first &middot; No telemetry &middot; MIT &middot; &copy; <span id="year"></span> Dan Ogrodnik<br />
+        BAKLOG&trade; is a trademark of Dan Ogrodnik
       </div>
     </div>
   </footer>

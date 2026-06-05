@@ -1,6 +1,6 @@
 # BAKLOG — Strategy Audit: Gaps to Scale
 
-**Author:** Dan Ogonoski  
+**Author:** Dan Ogrodnik  
 **Date:** 2026-06-04  
 **Status:** Working strategic assessment — not a commitment or forecast.
 

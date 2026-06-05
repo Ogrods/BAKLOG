@@ -1,6 +1,6 @@
 # BAKLOG — Founding / Full-Stack Engineer Portfolio Narrative
 
-**Author:** Dan Ogonoski  
+**Author:** Dan Ogrodnik  
 **Date:** 2026-06-04  
 **Purpose:** Reusable story for job applications, interviews, and portfolio sites.  
 **Repo:** https://github.com/Ogrods/steam-backlog

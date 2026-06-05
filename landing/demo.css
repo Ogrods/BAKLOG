@@ -558,6 +558,7 @@
 @media (max-width: 640px) {
   .dash-hero-pillars { grid-template-columns: 1fr; }
   .dash-mega { padding: 20px 18px 16px; }
+  .section-invite { text-align: center; }
 }
 @media (max-width: 400px) {
   .score-grid { gap: 0.6rem; }

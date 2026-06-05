@@ -28,6 +28,10 @@
         var valid = { dashboard: 1, library: 1, wishlist: 1, itch: 1, connections: 1 };
         if (!valid[view]) view = 'dashboard';
         document.documentElement.setAttribute('data-init-view', view);
+        var theme = localStorage.getItem('baklog-color-theme') || 'default';
+        var validThemes = { default: 1, dark: 1, timber: 1, ember: 1, synthwave: 1, terminal: 1 };
+        if (!validThemes[theme]) theme = 'default';
+        document.documentElement.setAttribute('data-theme', theme);
         // Boot curtain covers every view consistently so the swap from
         // empty HTML to populated chrome is one fade, not five different
         // half-loaded states. The bundle removes the attribute once the
@@ -36,6 +40,7 @@
       } catch (_) {
         document.documentElement.setAttribute('data-init-view', 'dashboard');
         document.documentElement.setAttribute('data-boot-loading', 'dashboard');
+        document.documentElement.setAttribute('data-theme', 'default');
       }
       // Safety net: if bootstrap() throws or hangs (network stall, module
       // import failure, infinite await, etc.), the boot curtain would trap
@@ -97,9 +102,9 @@
     <div id="authSecretsBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="app-header mb-4">
       <div class="app-header-row flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0" style="margin: 0 1rem 0 0; cursor: default;">
+        <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0">
+          <span class="brand-logo-mark shrink-0" aria-hidden="true"></span>
           <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap m-0">BAKLOG</h1>
-          <img src="assets/baklog-logo.svg" alt="" aria-hidden="true" class="shrink-0" style="height: 30px; width: auto;" />
         </div>
         <div class="app-header-nav-wrap min-w-0">
           <nav class="app-header-nav flex flex-wrap items-center gap-1.5" aria-label="Main views">
@@ -110,7 +115,7 @@
             <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
           </nav>
         </div>
-        <span class="app-header-tagline text-[11px] text-slate-400 hidden lg:inline self-center pl-2 border-l border-slate-700/60 ml-1">Cross-store backlog · local-only</span>
+        <span class="app-header-tagline text-[11px] hidden lg:inline self-center">Cross-store backlog · local-only</span>
         <div class="header-actions app-header-actions ml-auto flex items-center gap-2 shrink-0 self-center">
           <div id="fetcherPopoverAnchor" class="fetcher-popover-anchor relative shrink-0">
             <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle" title="Show fetcher log" aria-haspopup="dialog" aria-expanded="false" aria-controls="fetcherPopover"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText" class="fh-global-status-label">Fetcher log</span><span id="fetcherGlobalStatusTail" class="fh-global-status-tail" aria-hidden="true"></span></button>
@@ -119,6 +124,7 @@
               <h2 id="fetcherPopoverTitle" class="sr-only">Fetcher health and log</h2>
               <div class="fetcher-popover-head">
                 <span class="fetcher-popover-title" id="fetcherPopoverVisibleTitle">Fetchers</span>
+                <button type="button" class="fetcher-stat-layout-toggle" id="fetcherStatLayoutToggle" title="Switch overview layout (compact / landscape)">Layout</button>
                 <button type="button" class="fetcher-popover-close" data-fetcher-popover-close aria-label="Close fetcher">&times;</button>
               </div>
               <div class="fetcher-popover-scroll">
@@ -130,12 +136,15 @@
             </div>
           </div>
           <div id="profileMenuWrap" class="profile-menu-wrap relative shrink-0">
-            <button type="button" id="profileMenuTrigger" class="profile-menu-trigger px-2 py-1 rounded border border-slate-600 text-xs text-slate-200 hover:border-slate-500 flex items-center gap-1" aria-haspopup="menu" aria-expanded="false" aria-controls="profileMenu" aria-label="Profile">
+            <button type="button" id="profileMenuTrigger" class="profile-menu-trigger px-2 py-1 rounded border text-xs flex items-center gap-1" aria-haspopup="menu" aria-expanded="false" aria-controls="profileMenu" aria-label="Profile">
               <span id="profileMenuLabel" class="profile-menu-label">Default</span>
               <svg class="profile-menu-chevron shrink-0" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M2 4l4 4 4-4z"/></svg>
             </button>
             <div id="profileMenu" class="profile-menu-panel" role="menu" aria-label="Profiles" hidden>
               <div id="profileMenuList" class="profile-menu-list"></div>
+              <div class="profile-menu-divider" aria-hidden="true"></div>
+              <div class="profile-menu-theme-label">Theme · <span id="profileThemeName">Default</span></div>
+              <div id="profileThemeList" class="profile-menu-themes" role="group" aria-label="Color theme"></div>
               <button type="button" role="menuitem" class="profile-menu-footer w-full text-left px-3 py-2 text-xs text-sky-300 hover:bg-slate-700/60 border-t border-slate-600/80" data-profile-manage>Manage profiles…</button>
             </div>
           </div>
@@ -396,7 +405,7 @@
         </div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB length (backlog)</h3><div class="dash-chart-wrap"><canvas id="chartHltbHist"></canvas></div></div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Releases by year <span class="text-xs font-normal text-slate-400">area + 3-yr rolling average</span></h3><div class="dash-chart-wrap tall"><canvas id="chartReleases"></canvas><div id="chartReleasesEraTooltip" class="dash-era-tooltip" hidden></div></div></div>
-        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB vs Steam rating</h3><div class="dash-chart-wrap tall"><canvas id="chartScatter"></canvas><div id="chartScatterTooltip" class="dash-scatter-cursor-tip" hidden></div></div><div id="chartScatterList" class="dash-scatter-list"></div></div>
+        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB vs Steam rating</h3><div class="dash-chart-wrap tall"><canvas id="chartScatter"></canvas><div id="chartScatterTooltip" class="dash-scatter-cursor-tip" hidden></div></div><div id="chartScatterList" class="dash-scatter-list" role="region" aria-label="Scatter cluster inspector" aria-expanded="false"></div></div>
         <div id="dashboardCoopSpotlight" class="dash-card"></div>
         <div id="dashboardWishlistStats" class="dash-wishlist-stats-target grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
         <div id="dashboardPicksRow" class="dash-picks-row no-itch">

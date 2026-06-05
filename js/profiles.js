@@ -12,6 +12,15 @@ import {
 } from './auth-gate.js';
 import { PREFS_KEY } from './state.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
+import { escapeAttr } from './dom-util.js';
+import {
+  getColorTheme,
+  setColorTheme,
+  THEMES,
+  THEME_LABELS,
+  THEME_SWATCHES,
+  applyColorThemeFromStorage,
+} from './theme.js';
 
 export const ACTIVE_PROFILE_LS = 'baklog-active-profile';
 export const ITAD_SNAPSHOT_PREFIX = 'baklog-itad-snapshot';
@@ -117,8 +126,60 @@ function openMenu() {
   const trigger = el('profileMenuTrigger');
   if (!menu || !trigger) return;
   renderMenuList();
+  renderThemeList();
   menu.hidden = false;
   trigger.setAttribute('aria-expanded', 'true');
+}
+
+function setThemeNameLabel(text) {
+  const n = el('profileThemeName');
+  if (n) n.textContent = text;
+}
+
+let _themeSwatchHoverWired = false;
+
+function wireThemeSwatchHover(list) {
+  if (!list || _themeSwatchHoverWired) return;
+  _themeSwatchHoverWired = true;
+  list.addEventListener('pointerover', (e) => {
+    const b = e.target.closest('[data-theme-set]');
+    if (b) setThemeNameLabel(THEME_LABELS[b.dataset.themeSet] || b.dataset.themeSet);
+  });
+  list.addEventListener('pointerleave', () => {
+    const active = getColorTheme();
+    setThemeNameLabel(THEME_LABELS[active] || active);
+  });
+}
+
+function renderThemeList() {
+  const list = el('profileThemeList');
+  if (!list) return;
+  const active = getColorTheme();
+  list.innerHTML = THEMES.map((id) => {
+    const sw = THEME_SWATCHES[id] || {};
+    const name = THEME_LABELS[id] || id;
+    const grad = `linear-gradient(135deg, ${sw.bg} 0%, ${sw.bg} 55%, ${sw.accent} 90%, ${sw.accent2} 100%)`;
+    const selected = id === active;
+    return `<button type="button" role="menuitemradio" aria-checked="${selected}" class="theme-swatch${selected ? ' is-active' : ''}" data-theme-set="${escapeAttr(id)}" title="${escapeAttr(name)}" aria-label="${escapeAttr(name)}" style="--swatch-grad:${grad}; --swatch-accent:${sw.accent || '#fff'}"></button>`;
+  }).join('');
+  setThemeNameLabel(THEME_LABELS[active] || active);
+  wireThemeSwatchHover(list);
+}
+
+function handleMenuThemeClick(e) {
+  const btn = e.target.closest('[data-theme-set]');
+  if (!btn) return false;
+  // renderThemeList() below replaces the swatch element we just clicked, which
+  // detaches e.target. The document-level "click outside" handler would then
+  // fail its e.target.closest('#profileMenuWrap') check and close the menu.
+  // Stop propagation so theme previews keep the menu open.
+  e.stopPropagation();
+  const id = btn.getAttribute('data-theme-set');
+  if (id) {
+    setColorTheme(id);
+    renderThemeList();
+  }
+  return true;
 }
 
 function renderMenuList() {
@@ -303,6 +364,7 @@ export function bindProfilesUI() {
   });
 
   menu.addEventListener('click', (e) => {
+    if (handleMenuThemeClick(e)) return;
     const sw = e.target.closest('[data-profile-switch]');
     if (sw) {
       const id = sw.getAttribute('data-profile-switch');
@@ -369,6 +431,7 @@ function bindAccountMenu() {
     if (_menuOpen) {
       closeMenu();
     } else {
+      renderThemeList();
       menu.hidden = false;
       _menuOpen = true;
       trigger.setAttribute('aria-expanded', 'true');
@@ -376,6 +439,7 @@ function bindAccountMenu() {
   });
 
   menu.addEventListener('click', async (e) => {
+    if (handleMenuThemeClick(e)) return;
     if (!e.target.closest('[data-account-signout]')) return;
     closeMenu();
     try {
@@ -404,6 +468,8 @@ async function syncAccountProfileId() {
 }
 
 export async function initProfiles() {
+  applyColorThemeFromStorage();
+  renderThemeList();
   const wrap = el('profileMenuWrap');
   if (isAccountAuthMode()) {
     if (wrap) wrap.classList.remove('hidden');

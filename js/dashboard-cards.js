@@ -75,7 +75,7 @@ export function renderDashboardCoopSpotlight(games) {
   if (coopGames.length === 0) {
     el.innerHTML = `
       <div class="coop-spotlight-header">
-        <div class="coop-spotlight-title">Co-op spotlight</div>
+        <div class="coop-spotlight-title" title="Games tagged with Steam online or couch co-op">Co-op spotlight</div>
       </div>
       <div class="coop-empty">
         No co-op games detected yet. Connect Steam and run the games fetcher (Fetcher health) - co-op flags come from Steam store categories, or wait until you own a title tagged <em>Online Co-op</em> or <em>Shared/Split Screen Co-op</em>.
@@ -118,21 +118,21 @@ export function renderDashboardCoopSpotlight(games) {
           <span class="coop-side-count">${list.length}</span>
         </div>
         <div class="coop-side-stats">
-          <div class="coop-side-stat">
+          <div class="coop-side-stat" title="Co-op games in your backlog">
             <div class="coop-side-stat-label">Backlog</div>
             <div class="coop-side-stat-value ${backlog ? "" : "coop-side-stat-muted"}">${backlog}</div>
           </div>
-          <div class="coop-side-stat">
+          <div class="coop-side-stat" title="Co-op games you've finished">
             <div class="coop-side-stat-label">Finished</div>
             <div class="coop-side-stat-value ${finished ? "" : "coop-side-stat-muted"}">${finished}</div>
           </div>
-          <div class="coop-side-stat">
+          <div class="coop-side-stat" title="Average HLTB main hours in this co-op group">
             <div class="coop-side-stat-label">Avg HLTB</div>
             <div class="coop-side-stat-value ${avgHltb != null ? "" : "coop-side-stat-muted"}">${avgHltb != null ? avgHltb + "h" : " - "}</div>
           </div>
         </div>
         <div>
-          <div class="coop-side-picks-label">Top unplayed picks</div>
+          <div class="coop-side-picks-label" title="Highest-rated unplayed co-op games in this group">Top unplayed picks</div>
           <div class="coop-side-picks-list">${picksHtml}</div>
         </div>
       </div>`;
@@ -157,8 +157,8 @@ export function renderDashboardCoopSpotlight(games) {
 
   el.innerHTML = `
     <div class="coop-spotlight-header">
-      <div class="coop-spotlight-title">Co-op spotlight</div>
-      <div class="coop-spotlight-sub">Steam co-op signal · click a side to filter the library</div>
+      <div class="coop-spotlight-title" title="Games tagged with Steam online or couch co-op">Co-op spotlight</div>
+      <div class="coop-spotlight-sub" title="Steam co-op categories · click a column to filter the library">Steam co-op signal · click a side to filter the library</div>
     </div>
     <div class="coop-versus">
       ${sideHtml(onlineGames, { sideClass: "coop-side-online", title: "Online co-op", drillArgs: { online: true, local: false } })}
@@ -374,7 +374,7 @@ function itchBreakdownRows(entries, fillClass, action) {
 function renderItchHeroHtml(candidates) {
   if (!candidates.length) {
     return `<div class="itch-hero">
-      <div class="itch-hero-label"><span>Featured unplayed pick</span></div>
+      <div class="itch-hero-label" title="Top-rated unplayed itch.io game"><span>Featured unplayed pick</span></div>
       <div class="itch-hero-empty">No rated picks yet - run the itch ratings fetcher to backfill scores.</div>
     </div>`;
   }
@@ -398,7 +398,7 @@ function renderItchHeroHtml(candidates) {
     ? `<button type="button" class="itch-hero-shuffle" data-action="itch-hero-shuffle" title="Cycle picks">↻</button>`
     : "";
   return `<div class="itch-hero">
-    <div class="itch-hero-label">
+    <div class="itch-hero-label" title="Top-rated unplayed itch.io game">
       <span>Featured unplayed pick</span>
       ${shuffleBtn}
     </div>
@@ -407,7 +407,7 @@ function renderItchHeroHtml(candidates) {
       <div class="itch-hero-body">
         <div class="itch-hero-head">
           <span class="itch-hero-name">${escapeHtml(g.name)}</span>
-          <span class="itch-hero-rating">${rating}%</span>
+          <span class="itch-hero-rating" title="itch.io community review %">${rating}%</span>
         </div>
         ${metaHtml}
         ${desc}
@@ -470,7 +470,7 @@ export function renderDashboardItchRecap() {
   const segSum = segments.reduce((a, s) => a + s.count, 0);
   const segHtml = segSum
     ? `<div class="itch-distribution">
-        <div class="itch-distribution-label">Library composition</div>
+        <div class="itch-distribution-label" title="Rated vs unrated vs non-game itch.io items">Library composition</div>
         <div class="sale-distribution-bar" role="img" aria-label="itch.io library composition">
           ${segments.map(s => s.count
             ? `<span class="sale-distribution-seg itch-seg-${s.id}" style="flex: ${s.count};" title="${s.label}: ${formatNum(s.count)}"></span>`
@@ -509,7 +509,7 @@ export function renderDashboardItchRecap() {
     .map(([cls, count]) => [cls, count, ITCH_CLASS_LABELS[cls] || cls]);
   const classHtml = classEntries.length
     ? `<div class="itch-breakdown">
-        <div class="itch-distribution-label">What's in your library</div>
+        <div class="itch-distribution-label" title="itch.io item types (game, tool, soundtrack, etc.)">What's in your library</div>
         <div class="itch-breakdown-list">${itchBreakdownRows(classEntries, "itch-bar-class", null)}</div>
       </div>`
     : "";
@@ -526,22 +526,22 @@ export function renderDashboardItchRecap() {
     .map(([genre, count]) => [genre, count, genre]);
   const genreHtml = genreEntries.length
     ? `<div class="itch-breakdown">
-        <div class="itch-distribution-label">Top itch genres</div>
+        <div class="itch-distribution-label" title="Most common genres in your itch.io library">Top itch genres</div>
         <div class="itch-breakdown-list">${itchBreakdownRows(genreEntries, "itch-bar-genre", "itch-drill-genre")}</div>
       </div>`
     : "";
 
   el.innerHTML = `
     <div class="sale-scoreboard">
-      <div class="sale-stat">
+      <div class="sale-stat" title="itch.io items classified as videogames">
         <div class="sale-stat-label">Videogames</div>
         <div class="sale-stat-value">${formatNum(videogames)}<span class="sale-stat-suffix"> / ${formatNum(total)}</span></div>
       </div>
-      <div class="sale-stat">
+      <div class="sale-stat" title="itch.io videogames marked backlog">
         <div class="sale-stat-label">Backlog</div>
         <div class="sale-stat-value ${backlogged ? "" : "sale-stat-muted"}">${backlogged ? formatNum(backlogged) : " - "}</div>
       </div>
-      <div class="sale-stat">
+      <div class="sale-stat" title="itch.io videogames with a community rating">
         <div class="sale-stat-label">Rated</div>
         <div class="sale-stat-value ${rated ? "" : "sale-stat-muted"}">${rated ? formatNum(rated) : " - "}</div>
       </div>
@@ -551,6 +551,6 @@ export function renderDashboardItchRecap() {
     ${classHtml}
     ${genreHtml}
     <div class="itch-footer">
-      <button type="button" class="summary-jump-chip px-2 py-1 rounded text-xs cursor-pointer" data-jump-view="itch">Open itch.io tab →</button>
+      <button type="button" class="summary-jump-chip px-2 py-1 rounded text-xs cursor-pointer" data-jump-view="itch" title="Switch to the itch.io library tab">Open itch.io tab →</button>
     </div>`;
 }

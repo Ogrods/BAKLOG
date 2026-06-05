@@ -1,4 +1,4 @@
-import { state, CLEANUP_MAX_RATING, CLEANUP_MIN_AGE_MS } from './state.js';
+import { state } from './state.js';
 import { displayCurrency, normalizeCurrencyCode } from './currency.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
 import {
@@ -12,11 +12,9 @@ import {
   formatDollar,
   wishlistBadgeHtml,
   earlyAccessRibbonHtml,
-  parseReleaseForSort,
-  combinedPlaytime,
+  isCleanupCandidate,
 } from './game-core.js';
 import { isPlatformToken } from './genres.js';
-import { getPersonal } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { refreshFilterUI, switchView } from './filters-ui.js';
 
@@ -126,7 +124,7 @@ export function dealHeroCardHtml(g) {
   // same row. The bind-events click handler picks up data-deal-url on wishlist.
   const dealUrl = d?.url ? ` data-deal-url="${escapeAttr(d.url)}"` : "";
   return `<button type="button" class="deal-card-clickable deal-hero dash-card deal-rail-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}"${dealUrl} title="Jump to ${escapeAttr(g.name)} on Wishlist">
-    <div class="dash-kpi-label">Today&apos;s top deal</div>
+    <div class="dash-kpi-label" title="Best-scoring wishlist deal right now (discount, rating, historical low)">Today&apos;s top deal</div>
     <div class="deal-hero-body mt-2">
       <span class="cover-wrap deal-hero-cover-wrap${window.coverLandscapeAttr(cover)}">
         <img class="deal-hero-cover${window.coverLandscapeAttr(cover)}" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
@@ -151,7 +149,7 @@ export function dealHeroEmptyHtml(opts = {}) {
     ? "Connect a store and run its wishlist fetcher to start tracking deals."
     : "No active deals right now - check back after the next price refresh.";
   return `<div class="dash-card deal-rail-card deal-hero-empty">
-    <div class="dash-kpi-label">Today&apos;s top deal</div>
+    <div class="dash-kpi-label" title="Best-scoring wishlist deal right now (discount, rating, historical low)">Today&apos;s top deal</div>
     <div class="text-sm text-slate-400 mt-3">${hint}</div>
   </div>`;
 }
@@ -177,7 +175,7 @@ function bucketCuts(cuts) {
 export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, bestCut, bestCutGame, hasPricing, cuts }) {
   if (!hasPricing) {
     return `<button type="button" class="deal-card-clickable dash-card deal-rail-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
-      <div class="dash-kpi-label">Sale scoreboard</div>
+      <div class="dash-kpi-label" title="Wishlist sale stats from ITAD / Steam pricing">Sale scoreboard</div>
       <div class="text-xs text-slate-400 mt-2">Run the deal price fetcher (Fetcher health) to see cross-store sale stats.</div>
     </button>`;
   }
@@ -206,15 +204,15 @@ export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, be
   return `<button type="button" class="deal-card-clickable dash-card deal-rail-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
     <div class="dash-kpi-label">Sale scoreboard</div>
     <div class="sale-scoreboard mt-2">
-      <div class="sale-stat">
+      <div class="sale-stat" title="Wishlist items with an active discount">
         <div class="sale-stat-label">On sale</div>
         <div class="sale-stat-value">${onSaleCount}<span class="sale-stat-suffix"> / ${totalCount}</span></div>
       </div>
-      <div class="sale-stat">
+      <div class="sale-stat" title="Average discount % across on-sale wishlist items">
         <div class="sale-stat-label">Avg cut</div>
         <div class="sale-stat-value sale-stat-cut ${noSale ? "sale-stat-muted" : cutBucketClass(avgCut)}">${noSale ? " - " : `-${avgCut}%`}</div>
       </div>
-      <div class="sale-stat">
+      <div class="sale-stat" title="Deepest discount on the wishlist right now">
         <div class="sale-stat-label">Best cut</div>
         <div class="sale-stat-value sale-stat-cut ${noSale ? "sale-stat-muted" : `sale-stat-best ${cutBucketClass(bestCut)}`}">${noSale ? " - " : `-${bestCut}%`}</div>
         ${noSale ? "" : bestLabel}
@@ -227,7 +225,7 @@ export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, be
 export function dealStealsCardHtml(steals) {
   if (!steals.length) {
     return `<button type="button" class="deal-card-clickable dash-card deal-rail-card text-left w-full" data-action="deal-steals" title="Show wishlist steals (50%+ off, 80%+ rated)">
-      <div class="dash-kpi-label">Steals waiting</div>
+      <div class="dash-kpi-label" title="Wishlist games 50%+ off (or historical low) with 80%+ Steam rating">Steals waiting</div>
       <div class="text-xs text-slate-400 mt-1">50%+ off or historical low · 80%+ rated</div>
       <div class="text-xs text-slate-400 mt-3">No steals match right now.</div>
     </button>`;
@@ -271,7 +269,7 @@ export function dealStealsCardHtml(steals) {
   return `<div class="dash-card steal-card deal-rail-card" title="50%+ off or historical low · 80%+ rated">
     <div class="flex items-baseline justify-between gap-2">
       <div>
-        <div class="dash-kpi-label">Steals waiting</div>
+        <div class="dash-kpi-label" title="Wishlist games 50%+ off (or historical low) with 80%+ Steam rating">Steals waiting</div>
         <div class="text-[10px] text-slate-400 mt-0.5">50%+ off or historical low · 80%+ rated</div>
       </div>
       <div class="text-sm font-semibold text-slate-300">${steals.length}</div>
@@ -295,16 +293,7 @@ export function isOwnedByTitle(name) {
   return n && state.ownedNormNames.has(n);
 }
 
-export function isCleanupCandidate(g) {
-  const p = getPersonal(g);
-  if (p.status !== "backlog") return false;
-  if (combinedPlaytime(g) > 0) return false;
-  const rating = ratingValue(g);
-  if (rating > 0 && rating >= CLEANUP_MAX_RATING) return false;
-  const released = parseReleaseForSort(g.release_date);
-  if (!released) return true;
-  return Date.now() - released >= CLEANUP_MIN_AGE_MS;
-}
+export { isCleanupCandidate };
 
 export function getItadForGame(g) {
   const key = gameKey(g);

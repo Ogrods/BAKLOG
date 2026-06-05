@@ -7,6 +7,7 @@ self.onmessage = (ev) => {
   ctx.hiddenKeys = new Set(ctx.hiddenKeys || []);
   ctx.ownedNormNames = new Set(ctx.ownedNormNames || []);
   ctx.combinedPlaytime = new Map(ctx.combinedPlaytime || []);
+  ctx.playedTitleNorms = new Set(ctx.playedTitleNorms || []);
   const list = queryGames({ source, ctx });
   const indices = list.map(g => source.indexOf(g));
   self.postMessage({ id, indices });

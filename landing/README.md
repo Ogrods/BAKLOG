@@ -5,6 +5,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 ## Files
 
 - `index.html` — page markup, inline base CSS, waitlist form. No build step.
+- `main.js` — footer year, non-blocking font load, waitlist submit handler.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
 - `assets/sample/*.png` — fictional game covers for the spotlight carousel.
@@ -12,7 +13,9 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
 - `assets/store-logos/*.svg` — copy of repo-root `assets/store-logos/` for the hero trust strip (CSS mask). Re-sync when app logos change: `cp ../assets/store-logos/*.svg assets/store-logos/`.
 - `favicon.svg` — white BAKLOG mark.
-- `vercel.json` — security + cache headers, clean URLs.
+- `apple-touch-icon.png` — 180×180 home-screen icon (`../tools/make_apple_touch_icon.py`).
+- `404.html` — branded not-found page (Vercel serves automatically).
+- `vercel.json` — CSP, security + cache headers, clean URLs.
 
 ## Deploy to Vercel
 
@@ -57,8 +60,9 @@ npm i -g vercel
 vercel dev   # run from landing/  (uses .env / Vercel env)
 ```
 
-## Regenerate the OG image
+## Regenerate share / touch icons
 
 ```sh
-python tools/make_og_image.py   # run from the repo root; writes landing/assets/og.png
+python tools/make_og_image.py          # run from the repo root; writes landing/assets/og.png
+python tools/make_apple_touch_icon.py  # writes landing/apple-touch-icon.png
 ```

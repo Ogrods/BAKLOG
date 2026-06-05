@@ -6,7 +6,8 @@ import {
   setPersonalByKey,
   flushSavePersonal,
 } from './personal-storage.js';
-import { storeBadgeHtml, wishlistBadgeHtml, storeLetter } from './game-core.js';
+import { storeBadgeHtml, wishlistBadgeHtml } from './game-core.js';
+import { storeLogoHtml } from './store-logos.js';
 import { invalidateTableCache, renderTable, pushPersonalUndo } from './table-ui.js';
 import { renderSummary } from './filters-ui.js';
 import { renderPicks } from './picks-ui.js';
@@ -33,7 +34,7 @@ function badgeHtml(entry) {
     return storeBadgeHtml(g);
   }
   const store = entry.fallbackStore || 'unknown';
-  return `<span class="store-badge ${escapeAttr(store)}" title="${escapeAttr(store.toUpperCase())} (not in catalog yet)">${escapeHtml(storeLetter(store))}</span>`;
+  return storeLogoHtml(store, { size: 'sm', title: `${store.toUpperCase()} (not in catalog yet)` });
 }
 
 function rowHtml(entry) {

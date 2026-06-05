@@ -188,7 +188,7 @@ function renderMenuList() {
   const active = _status.active;
   const rows = (_status.profiles || []).map((p) => {
     const selected = p.id === active;
-    return `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 ${selected ? 'profile-menu-option-active' : ''}" data-profile-switch="${p.id}">${escapeHtml(p.label || p.id)}${selected ? ' ✓' : ''}</button>`;
+    return `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 ${selected ? 'profile-menu-option-active' : ''}" data-profile-switch="${p.id}" title="Switch to this profile">${escapeHtml(p.label || p.id)}${selected ? ' ✓' : ''}</button>`;
   });
   list.innerHTML = rows.join('');
 }
@@ -414,7 +414,7 @@ function renderAccountMenu(email) {
   if (list) {
     list.innerHTML =
       `<div class="profile-menu-account-email px-3 py-2 text-xs text-slate-400 border-b border-slate-600/80">${escapeHtml(email || 'Signed in')}</div>` +
-      `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60" data-account-signout>Sign out</button>`;
+      `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60" data-account-signout title="Sign out of this account">Sign out</button>`;
   }
   const footer = document.querySelector('#profileMenu [data-profile-manage]');
   if (footer) footer.classList.add('hidden');

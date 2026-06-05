@@ -22,6 +22,7 @@ from fetchers._base import (
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
+    refuse_empty_result,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
@@ -32,14 +33,12 @@ from nintendo_client import (
     NintendoClient,
     NintendoEndpointError,
 )
+from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
 
 
-def raw_dump_json() -> Path:
-    from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "nintendo_raw.json"
+NINTENDO_RAW_DUMP = profile_raw_dump_path("nintendo_raw.json")
 
 
 def fetch_debug_json() -> Path:
@@ -194,7 +193,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-raw",
         action="store_true",
-        help=f"Write raw transactions to {raw_dump_json()}",
+        help=f"Write raw transactions to {NINTENDO_RAW_DUMP}",
     )
     parser.add_argument(
         "--headed",
@@ -248,21 +247,27 @@ def main() -> int:
     print(f"Fetched {len(raw_tx)} raw transactions.")
 
     if args.dump_raw:
-        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
-        raw_dump_json().write_text(
+        NINTENDO_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
+        NINTENDO_RAW_DUMP.write_text(
             json.dumps(raw_tx, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"Wrote raw dump to {raw_dump_json()}.")
+        print(f"Wrote raw dump to {NINTENDO_RAW_DUMP}.")
 
     merged = _merge_transactions(raw_tx)
     print(f"Found {len(merged)} unique game/DLC titles (after filtering funds/NSO).")
 
-    if not merged:
+    empty_exit = refuse_empty_result(
+        merged,
+        label="Nintendo library",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_NINTENDO_JSON,
+    )
+    if empty_exit is not None:
         stats.error(
-            "No games found. Check cache/nintendo_raw.json — session may be valid "
+            f"No games found. Check {NINTENDO_RAW_DUMP} — session may be valid "
             "but account has no eShop purchases in the last ~2 years."
         )
-        return stats.finish("fetch_nintendo", t0, exit_code=2)
+        return stats.finish("fetch_nintendo", t0, exit_code=empty_exit)
 
     hltb_client = HltbClient()
     existing = load_existing()

@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse
 
+from shared.profile_paths import profile_cache_dir
+
 LUNA_CLAIMS_URL = "https://luna.amazon.com/claims/my-collection"
 GAMING_HOME_URL = "https://gaming.amazon.com/home"
 PROFILE_KEY = "amazon_web"
@@ -94,6 +96,34 @@ class AmazonWebAuthError(Exception):
 
 class AmazonWebError(Exception):
     """Prime Gaming claims could not be parsed."""
+
+
+_RAW_DUMP_BASENAME = "amazon_web_raw.json"
+_RAW_DUMP_MAX_AGE_S = 60 * 60 * 24 * 7  # used by fetcher fallback
+_RAW_FAILURE_DUMP_BASENAME = "amazon_web_raw_failure.json"
+
+
+def raw_dump_path() -> Path:
+    return profile_cache_dir() / _RAW_DUMP_BASENAME
+
+
+def raw_failure_dump_path() -> Path:
+    return profile_cache_dir() / _RAW_FAILURE_DUMP_BASENAME
+
+
+def raw_dump_max_age_s() -> int:
+    return int(_RAW_DUMP_MAX_AGE_S)
+
+
+def classify_sniff_capture(*, capture_ok: bool, signed_in: bool) -> str:
+    """Classify the sniff result without depending on browser runtime."""
+    if capture_ok:
+        return "claims_captured"
+    return "signed_out" if not signed_in else "signed_in_no_claims"
+
+
+def _now_s() -> float:
+    return time.time()
 
 
 def collection_urls() -> tuple[str, ...]:
@@ -383,9 +413,18 @@ def _response_may_contain_claims(url: str) -> bool:
 
 def _capture_claims_from_response(
     resp: Any,
+    candidates: list[Any],
     raw_claims: list[dict[str, Any]],
     captured: dict[str, bool],
 ) -> None:
+    """Response handler (CDP reader thread): NEVER read body here.
+
+    The CDP driver dispatches response handlers on the same single reader thread
+    that pumps command replies. Calling resp.text() (Network.getResponseBody)
+    here would deadlock by waiting on the reader thread to deliver its own
+    response. Instead, enqueue candidate responses and let the polling loop
+    parse bodies on a non-reader thread.
+    """
     if captured["done"]:
         return
     try:
@@ -394,13 +433,39 @@ def _capture_claims_from_response(
         url = (getattr(resp, "url", None) or "").lower()
         if not _response_may_contain_claims(url):
             return
-        items = try_parse_claims_from_text(resp.text())
+        candidates.append(resp)
+    except Exception:
+        pass
+
+
+def _drain_claim_candidates(
+    candidates: list[Any],
+    raw_claims: list[dict[str, Any]],
+    captured: dict[str, bool],
+    *,
+    max_per_tick: int = 6,
+) -> bool:
+    """Poll thread: parse queued candidate responses and capture claims.
+
+    Returns True when capture criteria are met.
+    """
+    if captured.get("done"):
+        return True
+    drained = 0
+    while candidates and drained < max_per_tick and not captured.get("done"):
+        drained += 1
+        resp = candidates.pop(0)
+        try:
+            items = try_parse_claims_from_text(resp.text())
+        except Exception:
+            items = None
         if items is not None:
             raw_claims.clear()
             raw_claims.extend(items)
             captured["done"] = True
-    except Exception:
-        pass
+            captured["claims_captured"] = True
+            return True
+    return bool(captured.get("done"))
 
 
 def _try_capture_from_page_html(
@@ -411,6 +476,7 @@ def _try_capture_from_page_html(
     captured: dict[str, bool],
     *,
     allow_session_only: bool,
+    session_only_grace_ok: bool,
 ) -> bool:
     """Return True when connect/fetch capture criteria are met."""
     items = try_parse_claims_from_html(html)
@@ -418,9 +484,16 @@ def _try_capture_from_page_html(
         raw_claims.clear()
         raw_claims.extend(items)
         captured["done"] = True
+        captured["claims_captured"] = True
         return True
-    if allow_session_only and collection_page_ready(html, url) and signed_in(url, context):
+    if (
+        allow_session_only
+        and session_only_grace_ok
+        and collection_page_ready(html, url)
+        and signed_in(url, context)
+    ):
         captured["done"] = True
+        captured["session_only_captured"] = True
         return True
     return False
 
@@ -444,12 +517,16 @@ def _poll_prime_collection(
     context: Any,
     *,
     deadline: float,
+    candidates: list[Any],
     raw_claims: list[dict[str, Any]],
     captured: dict[str, bool],
     allow_session_only: bool = False,
+    session_only_grace_s: float = 8.0,
     start_at_signin: bool = False,
     session: Any = None,
     poll_interval_ms: int = 500,
+    log_progress: bool = False,
+    log_prefix: str = "Amazon web",
 ) -> None:
     """Navigate sign-in / collection until claims or session criteria are met."""
     if start_at_signin and not signed_in(page.url or "", context):
@@ -460,19 +537,48 @@ def _poll_prime_collection(
     last_hint = 0.0
     nudged = False
     url_idx = 0
-    while time.time() < deadline and not captured["done"]:
+    poll_t0 = _now_s()
+    last_log = 0.0
+    while _now_s() < deadline and not captured["done"]:
+        _drain_claim_candidates(candidates, raw_claims, captured)
+        if captured["done"]:
+            break
         url = page.url or ""
-        now = time.time()
+        now = _now_s()
         try:
             html = page.content()
         except Exception:
             html = ""
+        session_only_grace_ok = (
+            (not allow_session_only) or (now - poll_t0 >= session_only_grace_s)
+        )
         if _try_capture_from_page_html(
-            html, url, context, raw_claims, captured, allow_session_only=allow_session_only,
+            html,
+            url,
+            context,
+            raw_claims,
+            captured,
+            allow_session_only=allow_session_only,
+            session_only_grace_ok=session_only_grace_ok,
         ):
             break
 
         si = signed_in(url, context)
+        if (
+            log_progress
+            and session is None
+            and now - last_log >= 10
+        ):
+            last_log = now
+            state = (
+                "signin"
+                if is_signin_url(url)
+                else ("luna_hub" if is_luna_hub(url) else "collection")
+            )
+            print(
+                f"{log_prefix}: poll state={state} signed_in={si} url={url}",
+                flush=True,
+            )
         if si and not nudged:
             nudged = True
             if session is not None:
@@ -519,8 +625,8 @@ def sniff_claims(
     *,
     timeout_s: int = 60,
     dump_path: Path | str | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Replay saved browser profile; return (raw_claims, codeless_records)."""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """Replay saved browser profile; return (raw_claims, records, outcome)."""
     from auth.cdp_browser import launch_persistent_profile
     from auth.secrets import profile_dir
 
@@ -532,26 +638,29 @@ def sniff_claims(
         )
 
     raw_claims: list[dict[str, Any]] = []
-    captured: dict[str, bool] = {"done": False}
+    candidates: list[Any] = []
 
-    def on_response(resp: Any) -> None:
-        _capture_claims_from_response(resp, raw_claims, captured)
+    def _outcome_template() -> dict[str, Any]:
+        return {
+            "capture_ok": False,
+            "claims_captured": False,
+            "session_only_captured": False,
+            "signed_in": False,
+            "final_url": None,
+            "headless": True,
+            "reason": None,
+        }
 
-    with launch_persistent_profile(str(profile), headless=True) as ctx:
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        page.on("response", on_response)
-        _poll_prime_collection(
-            page,
-            ctx,
-            deadline=time.time() + timeout_s,
-            raw_claims=raw_claims,
-            captured=captured,
-            allow_session_only=False,
-            start_at_signin=False,
-        )
+    def _dump_raw(reason: str, *, forced_path: Path | None = None) -> None:
+        from shared.raw_dumps import raw_dumps_enabled
 
-    if dump_path is not None:
-        path = Path(dump_path)
+        if forced_path is None and dump_path is None and not raw_dumps_enabled():
+            return
+        path = forced_path or (Path(dump_path) if dump_path is not None else None)
+        if path is None:
+            # Do not overwrite the connect-time fallback dump (amazon_web_raw.json).
+            # We still write a diagnostic dump for observability.
+            path = raw_failure_dump_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(
@@ -560,6 +669,7 @@ def sniff_claims(
                     "raw_claim_count": len(raw_claims),
                     "raw_claims": raw_claims,
                     "codeless_count": len(filter_codeless_claims(raw_claims)),
+                    "capture_reason": reason,
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -567,16 +677,101 @@ def sniff_claims(
             encoding="utf-8",
         )
 
-    if not raw_claims:
+    def _run_once(*, headless: bool, run_timeout_s: int) -> dict[str, Any]:
+        # Reset shared buffers between retries.
+        candidates.clear()
+        raw_claims.clear()
+
+        captured: dict[str, bool] = {
+            "done": False,
+            "claims_captured": False,
+            "session_only_captured": False,
+        }
+
+        def _on_response(resp: Any) -> None:
+            _capture_claims_from_response(resp, candidates, raw_claims, captured)
+
+        outcome = _outcome_template()
+        outcome["headless"] = headless
+        outcome["signed_in"] = False
+        outcome["final_url"] = None
+
+        deadline = _now_s() + run_timeout_s
+        with launch_persistent_profile(str(profile), headless=headless) as ctx:
+            # Parity with Connections-headed auth.
+            from auth.cdp_browser import STEALTH_INIT_SCRIPT
+
+            ctx.add_init_script(STEALTH_INIT_SCRIPT)
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            page.on("response", _on_response)
+            _poll_prime_collection(
+                page,
+                ctx,
+                deadline=deadline,
+                candidates=candidates,
+                raw_claims=raw_claims,
+                captured=captured,
+                allow_session_only=False,
+                start_at_signin=False,
+                log_progress=True,
+                log_prefix="Amazon web",
+            )
+
+            final_url = page.url or ""
+            outcome["final_url"] = final_url
+            outcome["signed_in"] = signed_in(final_url, ctx)
+            outcome["claims_captured"] = captured.get("claims_captured", False)
+            outcome["session_only_captured"] = captured.get(
+                "session_only_captured", False
+            )
+            outcome["capture_ok"] = captured.get("claims_captured", False)
+            outcome["reason"] = (
+                "claims_captured"
+                if outcome["capture_ok"]
+                else ("session_only" if captured.get("session_only_captured") else "no_claims")
+            )
+
+            print(
+                f"Amazon web: final headless={headless} capture_ok={outcome['capture_ok']} "
+                f"claims_captured={outcome['claims_captured']} signed_in={outcome['signed_in']} "
+                f"reason={outcome['reason']} url={final_url}",
+                flush=True,
+            )
+
+        return outcome
+
+    headless_timeout_s = min(timeout_s, 30)
+    headed_timeout_s = min(timeout_s, 25)
+
+    # 1) Headless first (faster, usually works for already-connected profiles).
+    headless_outcome = _run_once(headless=True, run_timeout_s=headless_timeout_s)
+    if headless_outcome["capture_ok"]:
+        return raw_claims, filter_codeless_claims(raw_claims), headless_outcome
+
+    # 2) If headless captured nothing, record diagnostics (raw dump) and fall
+    # back to headed once for parity (matches working headed Connect window).
+    _dump_raw("headless_no_claims")
+    headless_outcome["reason"] = headless_outcome.get("reason") or "no_claims"
+
+    # Signed-out vs signed-in-no-claims.
+    if not headless_outcome["signed_in"]:
         raise AmazonWebAuthError(
             "Could not capture Prime Gaming claims — session may have expired. "
             "Reconnect “Amazon (Prime Gaming, web)” on Connections."
         )
 
-    return raw_claims, filter_codeless_claims(raw_claims)
+    # 3) Visible retry (diagnostic parity). This may pop a window.
+    headed_outcome = _run_once(headless=False, run_timeout_s=headed_timeout_s)
+    if headed_outcome["capture_ok"]:
+        # Preserve headed capture; overwrite raw dump with real payload.
+        _dump_raw("headed_no_claims_or_captured", forced_path=raw_dump_path())
+        return raw_claims, filter_codeless_claims(raw_claims), headed_outcome
+
+    _dump_raw("headed_no_claims")
+    return raw_claims, filter_codeless_claims(raw_claims), headed_outcome
 
 
 class AmazonWebClient:
     def get_library_records(self) -> list[dict]:
-        _raw, records = sniff_claims()
+        _raw, records, _outcome = sniff_claims()
         return records

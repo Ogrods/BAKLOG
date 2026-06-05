@@ -30,6 +30,10 @@ describe('marqueeTip', () => {
   it('returns empty for unknown labels', () => {
     expect(marqueeTip('totally unknown metric xyz')).toBe('');
   });
+
+  it('resolves hidden gems regardless of case', () => {
+    expect(marqueeTip('hidden gems')).toMatch(/90%/);
+  });
 });
 
 describe('insightTip', () => {

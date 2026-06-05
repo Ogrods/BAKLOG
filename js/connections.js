@@ -5,6 +5,7 @@ import { escapeAttr, escapeHtml } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
 import { state } from './state.js';
+import { storeLogoHtml } from './store-logos.js';
 
 export { FETCHER_AUTH_PROVIDER };
 
@@ -141,30 +142,9 @@ function providerBrand(p) {
 }
 
 
-const CONN_BADGE_LETTER = {
-  steam: 'S',
-  gog: 'G',
-  psn: 'P',
-  epic: 'E',
-  amazon: 'A',
-  xbox: 'X',
-  battlenet: 'B',
-  nintendo: 'N',
-  ubisoft: 'U',
-  humble: 'H',
-  ea: 'EA',
-  itch: 'I',
-  itad: 'I',
-};
-
-function connBadge(p) {
-  // Collapse store variants onto the base brand badge so they share the same
-  // background/letter (e.g. amazon_web -> amazon, xbox_wishlist -> xbox).
-  const cls = (p.key || '').replace(/_(wishlist|web|galaxy|local)$/, '');
-  return {
-    cls,
-    letter: CONN_BADGE_LETTER[cls] || (p.label || '?').charAt(0).toUpperCase(),
-  };
+function connStoreKey(p) {
+  // Collapse store variants onto the base brand badge (e.g. amazon_web -> amazon).
+  return (p.key || '').replace(/_(wishlist|web|galaxy|local)$/, '');
 }
 
 
@@ -418,7 +398,7 @@ function renderOnboard() {
 
       <p class="conn-onboard-lead">Start with Steam - it imports your whole library in one sign-in. You can add the rest after.</p>
 
-      <button type="button" class="conn-onboard-btn" data-conn-start-steam>Start with Steam</button>
+      <button type="button" class="conn-onboard-btn" data-conn-start-steam title="Connect Steam — imports your library via browser sign-in">Start with Steam</button>
 
       <p class="conn-onboard-muted">or pick any store from the list below</p>
 
@@ -470,7 +450,7 @@ function buildFormPanel(p) {
  */
 function buildFallbackPanel(p) {
   const epicBrowser = p.key === 'epic'
-    ? `<button type="button" class="conn-open-url" data-epic-oauth data-provider="epic">Sign in with your browser instead</button>`
+    ? `<button type="button" class="conn-open-url" data-epic-oauth data-provider="epic" title="Epic library OAuth in browser">Sign in with your browser instead</button>`
     : '';
   return `
     <details class="conn-fallback">
@@ -489,7 +469,7 @@ function buildFallbackPanel(p) {
 function disconnectBtnHtml(p, st) {
   const show = st !== 'disconnected' && st !== 'unverified' && p.kind !== 'local';
   return show
-    ? `<button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}">Disconnect</button>`
+    ? `<button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}" title="Disconnect ${escapeAttr(p.label)} (credentials removed locally)">Disconnect</button>`
     : '';
 }
 
@@ -516,9 +496,9 @@ function buildCardFooter(p, st) {
       <div class="conn-card-footer">
         ${connected
           ? `<span class="conn-local-label">Auto-detected from Amazon Games launcher</span>
-             <button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}">Disconnect</button>`
+             <button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}" title="Disconnect ${escapeAttr(p.label)} (credentials removed locally)">Disconnect</button>`
           : `<span class="conn-local-label">Launcher library hidden - Connect to use it again, or use Prime web</span>
-             <button type="button" class="conn-primary" data-enable-local data-provider="${escapeAttr(p.key)}">Connect</button>`
+             <button type="button" class="conn-primary" data-enable-local data-provider="${escapeAttr(p.key)}" title="Enable ${escapeAttr(p.label)} from local launcher data">Connect</button>`
         }
       </div>`;
   }
@@ -531,7 +511,7 @@ function buildCardFooter(p, st) {
 
       <div class="conn-card-footer">
 
-        <button type="button" class="conn-open-url" data-open-url data-provider="${escapeAttr(p.key)}">Open sign-in page</button>
+        <button type="button" class="conn-open-url" data-open-url data-provider="${escapeAttr(p.key)}" title="Open ${escapeAttr(p.label)} sign-in page in browser">Open sign-in page</button>
 
         ${disconnectBtnHtml(p, st)}
 
@@ -601,7 +581,7 @@ function buildCardHtml(p) {
 
   const pillSt = displayStatus(st);
 
-  const badge = connBadge(p);
+  const storeKey = connStoreKey(p);
 
   const expiry = p.expiry_days ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>` : '';
 
@@ -619,8 +599,8 @@ function buildCardHtml(p) {
 
   const facets = `
     <div class="conn-facets" aria-label="Pull type and credential source">
-      <span class="conn-facet conn-facet--content">${escapeHtml(contentFacetLabel(p.key))}</span>
-      <span class="conn-facet conn-facet--source">${escapeHtml(sourceFacet(p))}</span>
+      <span class="conn-facet conn-facet--content" title="What this connection syncs (library, wishlist, prices)">${escapeHtml(contentFacetLabel(p.key))}</span>
+      <span class="conn-facet conn-facet--source" title="Where credentials are stored">${escapeHtml(sourceFacet(p))}</span>
     </div>`;
 
   return `
@@ -631,11 +611,11 @@ function buildCardHtml(p) {
 
       <div class="conn-card-head">
 
-        <span class="store-badge store-badge--lg ${escapeAttr(badge.cls)}">${escapeHtml(badge.letter)}</span>
+        ${storeLogoHtml(storeKey, { size: 'lg', title: p.label })}
 
         <div class="conn-head-actions">
 
-          <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected}">${STATUS_LABEL[pillSt] || pillSt}</span>
+          <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected}" title="Connection status">${STATUS_LABEL[pillSt] || pillSt}</span>
 
         </div>
 
@@ -677,7 +657,7 @@ function buildRailItemHtml(p, selected) {
 
   const pillSt = displayStatus(st);
 
-  const badge = connBadge(p);
+  const storeKey = connStoreKey(p);
 
   const sel = selected ? ' is-selected' : '';
 
@@ -686,20 +666,20 @@ function buildRailItemHtml(p, selected) {
   const unav = unavailable ? ' is-unavailable' : '';
 
   const title = unavailable
-    ? ` title="${escapeAttr(`${p.label} is available on ${(p.platforms || []).join(', ') || 'Windows'} only`)}"`
-    : '';
+    ? `${p.label} is available on ${(p.platforms || []).join(', ') || 'Windows'} only`
+    : `Select ${p.label} to connect or manage`;
 
   return `
 
-    <div class="conn-rail-item${sel}${unav}" data-provider="${escapeAttr(p.key)}" role="option" tabindex="${selected ? '0' : '-1'}" aria-selected="${selected ? 'true' : 'false'}"${title}>
+    <div class="conn-rail-item${sel}${unav}" data-provider="${escapeAttr(p.key)}" role="option" tabindex="${selected ? '0' : '-1'}" aria-selected="${selected ? 'true' : 'false'}" title="${escapeAttr(title)}">
 
-      <span class="conn-row-dot conn-row-dot--${escapeAttr(pillSt)}" aria-hidden="true"></span>
+      <span class="conn-row-dot conn-row-dot--${escapeAttr(pillSt)}" aria-hidden="true" title="Status: green=connected, amber=unverified, red=expired"></span>
 
-      <span class="store-badge conn-rail-badge ${escapeAttr(badge.cls)}">${escapeHtml(badge.letter)}</span>
+      ${storeLogoHtml(storeKey, { size: 'sm', title: p.label, className: 'conn-rail-badge' })}
 
       <span class="conn-row-label">${escapeHtml(p.label)}</span>
 
-      <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected} conn-row-pill">${STATUS_LABEL[pillSt] || pillSt}</span>
+      <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected} conn-row-pill" title="Connection status">${STATUS_LABEL[pillSt] || pillSt}</span>
 
     </div>`;
 
@@ -1429,9 +1409,9 @@ function renderReconnectBanner() {
 
     <span>Session expired for <strong>${escapeHtml(names)}</strong>.</span>
 
-    <button type="button" class="underline ml-2" data-jump-connections>Reconnect in Connections</button>
+    <button type="button" class="underline ml-2" data-jump-connections title="Open Connections to refresh expired sessions">Reconnect in Connections</button>
 
-    <button type="button" class="ml-2 opacity-70" data-dismiss-auth-banner aria-label="Dismiss">&times;</button>
+    <button type="button" class="ml-2 opacity-70" data-dismiss-auth-banner aria-label="Dismiss" title="Dismiss session expired banner">&times;</button>
 
   `;
 
@@ -1859,8 +1839,11 @@ async function startBrowserConnect(provider) {
   // A "Reconnect" (status connected/expired) should start a clean sign-in:
   // wipe the old profile cookies server-side so a stale/expired session never
   // carries over. A first-time Connect has nothing to clear.
+  // Epic wishlist keeps its browser profile on reconnect — cf_clearance and
+  // storefront cookies must survive or Cloudflare re-challenges every time.
   const current = authStatus.find(x => x.key === provider)?.status;
-  const fresh = current === 'connected' || current === 'expired';
+  const preserveProfile = provider === 'epic_wishlist';
+  const fresh = !preserveProfile && (current === 'connected' || current === 'expired');
 
   if (log) {
 

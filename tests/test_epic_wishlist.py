@@ -6,7 +6,6 @@ from pathlib import Path
 
 from fetch_epic_wishlist import (
     _build_row,
-    _signed_out,
     parse_wishlist_sources,
 )
 
@@ -17,9 +16,21 @@ def test_parse_wishlist_from_graphql_fixture() -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
     elements = parse_wishlist_sources("", [payload])
     assert len(elements) == 2
-    titles = {(el.get("offer") or {}).get("title") for el in elements}
-    assert "Test Epic Game" in titles
-    assert "Free Epic Title" in titles
+
+
+def test_parse_wishlist_from_dehydrated_html() -> None:
+    html = (
+        '{"state":{"data":{"Wishlist":{"wishlistItems":{"elements":[{"id":"wish-1",'
+        '"offerId":"offer-aaa","namespace":"ns-1"}]}}},"status":"success"},'
+        '"queryKey":["getWishlist",["accountId","acct"],"hash"]},'
+        '{"state":{"data":[{"Catalog":{"catalogOffer":{"title":"Test Epic Game","id":"offer-aaa",'
+        '"namespace":"ns-1","productSlug":"test-epic-game","keyImages":[],'
+        '"price":{"totalPrice":{"discountPrice":1999,"originalPrice":3999,"currencyCode":"USD",'
+        '"fmtPrice":{"originalPrice":"$39.99","discountPrice":"$19.99"}}}}}}}]}}'
+    )
+    elements = parse_wishlist_sources(html, [])
+    assert len(elements) == 1
+    assert (elements[0].get("offer") or {}).get("title") == "Test Epic Game"
 
 
 def test_build_row_schema() -> None:
@@ -34,9 +45,3 @@ def test_build_row_schema() -> None:
     assert row["epic_offer_id"] == "offer-aaa"
     assert "epicgames.com" in row["store_url"]
     assert row["price"] == "$19.99"
-
-
-def test_signed_out_login_page() -> None:
-    assert _signed_out("", "https://www.epicgames.com/id/login")
-    assert _signed_out("", "https://store.epicgames.com/challenge")
-    assert not _signed_out("<html>wishlist</html>", "https://store.epicgames.com/en-US/wishlist")

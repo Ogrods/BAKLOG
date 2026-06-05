@@ -14,6 +14,7 @@ Paste-ready copy for SEO, PPC, landing tests, social, and email. Sourced from `t
 
 **Sound bites**
 - No BAKLOG server to breach.
+- Your concierge across every store: it fetches, you decide.
 - Ownership-aware deals — skip sales for games you already own elsewhere.
 - The demo *is* onboarding: connect once, hit Refresh, watch your real library appear.
 - Cross-store dedupe + backlog decisions — not another launcher.
@@ -231,9 +232,9 @@ We don't upload your logins. There is no BAKLOG server to breach.
 
 ## Elevator pitches
 
-**30s:** BAKLOG is a local dashboard that imports your real libraries from Steam, Epic, GOG, PSN, Xbox, Amazon, and more — then layers deal radar, status workflow, and cross-store dedupe on top. No cloud account. Connect once, hit Refresh, and watch your library appear on your own machine.
+**30s:** BAKLOG is your concierge across every store: it fetches your real libraries on your behalf through your own session, opens a direct channel from each storefront to your machine, and layers deal radar, status workflow, and cross-store dedupe on top. No cloud account. Connect once, hit Refresh, and watch your library appear.
 
-**60s:** If you've claimed free games for years across Epic, Prime, GOG, and Steam, you already have an accidental library — and no storefront will help you see it all. BAKLOG runs on your PC: you connect your stores, fetchers pull your real owned games into one table, and ITAD pricing shows deals only when you don't already own the title somewhere else. Trophy hunters get summary completion for free; deep achievement sync through the store APIs is metered when you want fresh rarity and unlock timelines. Credentials stay encrypted locally; there's no BAKLOG server to breach. The onboarding is a 60-second screen recording of chips lighting up as your count climbs — that's the product.
+**60s:** If you've claimed free games for years across Epic, Prime, GOG, and Steam, you already have an accidental library — and no storefront will help you see it all. You should not have to visit five launchers to audit what is yours. BAKLOG runs on your PC: it goes to each store for you, opens a channel straight to your machine, and normalizes what arrives into one table. ITAD pricing shows deals only when you don't already own the title somewhere else. Trophy hunters get summary completion for free; deep achievement sync through the store APIs is metered when you want fresh rarity and unlock timelines. Credentials stay encrypted locally; there's no BAKLOG server to breach. The onboarding is a 60-second screen recording of chips lighting up as your count climbs — that's the product.
 
 ---
 
@@ -251,6 +252,7 @@ We don't upload your logins. There is no BAKLOG server to breach.
 
 ## Taglines (rotation)
 - One honest backlog across every store.
+- Your concierge across every store: it fetches, you decide.
 - Back up your backlog with BAKLOG.
 - Watch your library appear.
 - Deal alerts that know what you already own.
@@ -258,3 +260,6 @@ We don't upload your logins. There is no BAKLOG server to breach.
 - Built for accidental libraries.
 - The demo is the product.
 - Simple, but powerful — it's just your data, reshuffled.
+
+### Cheeky (optional, risqué — use where the tone fits)
+- When it comes to your backlog, it's not the size that counts — it's how you use it.

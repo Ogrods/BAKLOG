@@ -268,7 +268,7 @@
       padding: 0.22in 0.28in;
       box-sizing: border-box;
     }
-    .bizcard-front .bizcard-face { justify-content: space-between; }
+    .bizcard-front .bizcard-face { justify-content: space-between; padding-bottom: 0.4in; }
     .bizcard-back .bizcard-face {
       flex-direction: row; align-items: center; gap: 0.2in;
       padding: 0.2in 0.24in;
@@ -288,6 +288,7 @@
       color: var(--bc-text-faint, #64748b);
       border-top: 1px solid var(--bc-hairline, rgba(56, 189, 248, 0.35));
       padding-top: 0.1in; margin-top: auto;
+      max-width: 2.1in;
     }
     .bizcard-qr-wrap { flex-shrink: 0; }
     .bizcard-qr {
@@ -306,11 +307,37 @@
       font-size: 0.075in; color: var(--bc-text-faint, #64748b);
       margin-top: auto; letter-spacing: 0.04em;
     }
-    .bizcard-side-label {
-      position: absolute; top: 0.08in; right: 0.1in;
-      font-size: 0.055in; text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--bc-text-faint, rgba(148, 163, 184, 0.5));
+    /* Subtle storefront watermark — faint brand-logo discs reinforcing the
+       cross-store value prop. Right-aligned corner fan sized so all 12 fit
+       inside the card; sits behind the card content. */
+    .bizcard-face { position: relative; z-index: 1; }
+    .bizcard-storefronts {
+      position: absolute;
+      right: 0.1in; bottom: 0.1in; left: auto;
+      display: flex;
+      justify-content: flex-end;
+      opacity: 0.11;
       pointer-events: none;
+      z-index: 0;
+    }
+    /* Back face: top-right so the fan clears the QR (left) and bottom copy. */
+    .bizcard-back .bizcard-storefronts {
+      bottom: auto; top: 0.1in; right: 0.1in; left: auto;
+    }
+    .bizcard-store {
+      width: 0.26in; height: 0.26in;
+      margin-left: -0.072in;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bc-store, #64748b);
+      box-shadow: 0 0 0 0.016in var(--bc-bg, #0f172a);
+    }
+    .bizcard-store:first-child { margin-left: 0; }
+    .bizcard-store-glyph {
+      width: 58%; height: 58%;
+      background: #fff;
+      -webkit-mask: var(--bc-glyph) center / contain no-repeat;
+              mask: var(--bc-glyph) center / contain no-repeat;
     }
     /* Midnight slate — shipped app default */
     .bizcard--midnight {
@@ -545,6 +572,9 @@
     { id: "find_fetcher_connections_doc",
       title: "Fetcher connection matrix documented",
       body: "Inbound/outbound map for js/fetcher-health.js + server RunManager lives in docs/FETCHER_CONNECTIONS.md (HTTP/SSE, UI events, storage, post-run reload). AUDIT_FINDINGS Section 5b links it. Use when debugging run → POST → stream → reloadAfterFetcher or wiring new fetcher affordances." },
+    { id: "audit_2026_06_fetcher_static",
+      title: "Static fetcher audit (2026-06-05) — low-risk fixes landed",
+      body: "Python fetchers + dashboard fetcher-health UI reviewed without live connections. Deliverable: docs/FETCHER_AUDIT.md (linked from docs/AUDIT_FINDINGS.md §6). Applied this pass: Xbox wishlist dump gated; --allow-empty on Ubisoft/Nintendo/Battle.net/EA empty paths; Steam auth exit 4 + empty-library via refuse_empty_result; GOG non-401 HTTPError handling; profile-scoped raw_dump helpers; fetcher UI a11y (pill aria-label, chip aria-labels, layout toggle, log aria-live); dead reconnect-chip CSS/handlers removed. Deferred refactors tracked in Triage as find_fetcher_health_* + find_fetcher_heartbeat_loops + find_fetcher_main_tests_gap + find_configure_stdout_dedup." },
   ];
 
   // ---------- Engineering: beta hardening log + specs ----------
@@ -665,6 +695,20 @@
       body: "Done. The c('fnName') runtime DI lookup is gone — dashboard.js and its sub-modules now use direct ES imports from game-core, deals, genres, personal-storage, prefs, filters-ui, table-ui. Pairs with the dashboard split (find_dashboard_size)." },
     { id: "find_dashboard_size", area: "Arch", severity: "grey", title: "[RESOLVED] dashboard.js split into 6 focused modules",
       body: "Done. dashboard.js is now a ~350-line orchestrator + re-exports (line count as of 2026-06-02). The 2.3k-line monolith was split into dashboard-charts (Chart.js, scatter, era bands), dashboard-cards (coop, picks-versus, wishlist stats, itch), dashboard-insights (insight marquee), dashboard-spotlight (rotating hero), dashboard-drilldown (dash* drill helpers), dashboard-shared (constants + animateCount + dashboardLibraryGames)." },
+    { id: "find_fetcher_health_size", area: "Arch", severity: "amber", title: "js/fetcher-health.js (~3.1k lines) — recommended split into js/fetcher/ modules",
+      body: "Flagged by the 2026-06-05 static fetcher audit (docs/FETCHER_AUDIT.md). fetcher-health.js is the last big monolith after the app.js (find_appjs_size) and dashboard.js (find_dashboard_size) splits. Proposed seams: js/fetcher/auth-cooldown, freshness, sources, global-status, auto-run, runner/ (queue + SSE), ui/ (chips, popover, log panel), behind a re-export barrel so existing imports keep working. Do first or in parallel with find_fetcher_health_diff_render + find_fetcher_popover_scroll — all three touch the same render path. Keep the 88 fetcher-health + axe tests green." },
+    { id: "find_fetcher_health_diff_render", area: "UX", severity: "amber", title: "Fetcher health panel — diff/patch render instead of full innerHTML rebuild",
+      body: "docs/FETCHER_AUDIT.md (recommended, not done 2026-06-05). renderDashboardFetcherHealth (~line 3109) replaces the entire chip strip via slot.innerHTML on every tick — open <details> (legend), stale-only checkbox, and bar-toggle focus are lost or restored heuristically (restoreBarToggleFocus). Patch in place or keyed reconcile so UI state survives re-render without the current focus/expand hacks. Pairs with find_fetcher_health_size (module seam: ui/render.js) and find_fetcher_popover_scroll." },
+    { id: "find_fetcher_popover_scroll", area: "UX", severity: "amber", title: "Fetcher popover — single scroll owner (.fetcher-popover-scroll vs .fh-log-body)",
+      body: "docs/FETCHER_AUDIT.md (recommended, not done 2026-06-05). Nested scroll containers: outer .fetcher-popover-scroll and inner .fh-log-body both own vertical scroll — awkward on mobile/landscape and fights syncLogHeightToCard. Redesign so one element is the scroll owner; log panel grows within the popover rail without nested overflow. See app.css landscape popover rules + tests/fetcher-health.test.js (syncLogHeightToCard, popover describe)." },
+    { id: "find_fetcher_heartbeat_loops", area: "Arch", severity: "amber", title: "Long fetcher loops — HeartbeatTimer / run_with_heartbeat to avoid 180s stall-kill",
+      body: "docs/FETCHER_AUDIT.md (recommended, not done 2026-06-05). RunManager max-runtime (~180s) can kill healthy runs when HLTB or per-title store-detail loops run long: Steam owned-games enrichment, PSN, GOG details, Amazon web, itch. GOG/EA/Nintendo already use run_with_heartbeat in places; extend the same pattern to the remaining hot loops so stdout heartbeats reset the stall timer. Verify with test_max_runtime_cap or a focused integration stub." },
+    { id: "find_fetcher_main_tests_gap", area: "Arch", severity: "amber", title: "Fetcher-main test gap — PSN, Xbox library, Ubisoft library scripts",
+      body: "docs/FETCHER_AUDIT.md (recommended, not done 2026-06-05). Merge/drift/argparse tests exist for several stores; no dedicated test_fetch_psn.py / test_fetch_xbox.py / test_fetch_ubisoft.py (main library scripts, not wishlist variants). Add offline unit tests for auth-exit paths, refuse_empty/drift wiring, and response-shape parsers — mirror test_fetch_nintendo.py / test_fetch_ea.py patterns. Complements test_fetcher_auth_exit.py contract tests." },
+    { id: "find_configure_stdout_dedup", area: "Arch", severity: "grey", title: "fetchers — consolidate copy-pasted _configure_stdout() into fetchers._base",
+      body: "docs/FETCHER_AUDIT.md (nice-to-have). configure_stdout() already exists in fetchers/_base.py but most fetch_*.py still define a local _configure_stdout() duplicate. One-line import + call migration across scripts; no behavior change. Low risk; batch in a hygiene PR." },
+    { id: "find_store_brand_hex_audit", area: "UX", severity: "grey", title: "Audit STORE_LOGO_ASSETS brand hexes against official sources",
+      body: "js/store-logos.js STORE_LOGO_ASSETS colors back the dashboard hero glyph strip and were set ad hoc. Audit every store's background hex against official/legacy brand guidelines via web search and update: steam (#ea580c — non-brand orange, picked for glyph contrast), epic (#2a2a2a), gog (#86328a), humble (#cc2929), psn (#0070d1), xbox (#107c10), nintendo (#e60012), amazon (#ff9900), itch (#fa5c5c), battlenet (#148eff), ubisoft (#1472f1 — set to legacy Uplay 'Blue Ribbon'), ea (#ff4747). Note divergence from the .store-badge.X letter palette in app.css (e.g. steam orange vs navy, ubisoft #00adef). Decide per store: official brand color vs. legibility of the white-masked glyph on that background; keep one canonical value. Cosmetic, hero-only." },
     { id: "find_dedup_pref_force", area: "Arch", severity: "grey", title: "[RESOLVED] Session-prefs concept introduced — crossStoreDedup migrated",
       body: "Done. Added state.sessionPrefs (state.js) + loadSessionPrefs() (prefs.js) for toggles that should never persist across reloads. crossStoreDedup moved out of the localStorage prefs bag entirely — defaults to true via loadSessionPrefs() on every bootstrap, off-state lasts only the current tab/session. Removed the force-overwrite in app.js (was `state.prefs.crossStoreDedup = true`), the savePrefs() in the toggle handler (bind-events.js) and pill clear (filters-ui.js), and stripped crossStoreDedup from the prefs fallback. loadPrefs() also `delete merged.crossStoreDedup` so old persisted values are dropped on read. tableFingerprint reads state.sessionPrefs.crossStoreDedup so the table cache still invalidates when the toggle flips. Pattern is now reusable: any future session-scoped toggle goes into state.sessionPrefs / loadSessionPrefs() with no other ceremony." },
     { id: "find_crlf", area: "Arch", severity: "grey", title: "[RESOLVED] .gitattributes — LF in repo, CRLF for .bat/.ps1",
@@ -721,6 +765,8 @@
       body: "Resolved 2026-06-03. DELETE /api/profiles/<id> returns 409 when MANAGER.has_runs_for_profile(id). Profile switch uses cancel_all_and_wait (bounded) before rebinding paths so subprocesses finish or are logged as stragglers." },
 
     // UX
+    { id: "find_ux_store_display_order", area: "UX", severity: "green", title: "[RESOLVED] Canonical storefront display hierarchy",
+      body: "Resolved 2026-06-05. The business-card storefront watermark (BIZCARD_STORES in tracker.html) is the canonical storefront display hierarchy: Steam, Epic, GOG, Humble, itch.io, PlayStation, Xbox, Nintendo, Amazon, Battle.net, Ubisoft, EA. Codified as STORE_DISPLAY_ORDER + storeDisplayRank() + sortStoresByDisplayOrder() in js/dashboard-shared.js. Applied to the dashboard hero badge strip (dashboard.js computeMegaHeroStats + storeLogoStripHtml in store-logos.js) and the library summary store chips (filters-ui.js) — both now render in fixed hierarchy order instead of by game count. The landing page hero strip (landing/index.html) and BIZCARD_STORES are ordered to match (sync comments on both). NOT applied to the Connections rail (RAIL_ORDER in connections.js stays ease-of-use ordered) or cross-store dedup (STORE_PRIORITY in game-core.js, survivor selection only) — those are intentionally separate orderings. Tests: tests/store-display-order.test.js." },
     { id: "find_ux_dash_rotation", area: "UX", severity: "grey", title: "Dashboard spotlight rotation may be calmer-off",
       body: "7-second auto-rotate competes with the rest of the page. Consider letting it stay fixed unless the user hovers/clicks (already the hover-pause case)." },
     { id: "find_ux_library_focus", area: "UX", severity: "grey", title: "[REJECTED] Library has no clear primary affordance",
@@ -785,6 +831,7 @@
 
   // ---------- Blind spots ----------
   const BLINDSPOTS = [
+    { id: "bs_vercel_landing_env", title: "Confirm Vercel env vars for the landing waitlist (RESEND_API_KEY, NOTIFY_FROM, NOTIFY_TO)", body: "The BAKLOG landing page (landing/ folder) is deployed to Vercel on baklog.app via Git integration (root directory = landing). The waitlist form posts to the landing/api/subscribe.js serverless function, which emails each signup via Resend and needs three environment variables set in Vercel → Settings → Environment Variables (Production + Preview):\n\n• RESEND_API_KEY — the re_… key (Sending access) from Resend.\n• NOTIFY_FROM — verified sender; currently BAKLOG <waitlist@mail.danogrodnik.com> (must be on a Resend-verified domain).\n• NOTIFY_TO — where signups land (dan.ogrodnik@gmail.com).\n\nNames are CASE-SENSITIVE on Vercel (Linux) — all caps. If any is missing/misnamed, the function returns 500 'Server not configured' and the form shows a friendly error (build still succeeds). To verify: open https://baklog.app, submit a test email, confirm a notification arrives at NOTIFY_TO. Optional follow-up: verify baklog.app in Resend (adds DKIM/MX/TXT DNS records) if you later want the sender to be @baklog.app instead of @mail.danogrodnik.com." },
     { id: "bs_pico_park_debug_watch", title: "Pico Park library watch is DEBUG ONLY — remove before release", body: "The Pico Park library-watch is armed by default on boot (PICO_PARK_WATCH in js/library-watch.js, wired via initLibraryWatches() in js/app.js). It exists purely to exercise the library-watch feature (waiting banner, 5-min poll, desktop notification, found banner) against a real recent purchase while Steam's API lagged. It is NOT a shipping feature. Before release: drop the default-armed PICO_PARK_WATCH (and the ensureWatch() call in initLibraryWatches) so no watch is armed unless the user arms one, or replace it with a real user-facing 'watch for a game' affordance. Tests in tests/library-watch.test.js exercise the generic mechanism and do not depend on Pico Park staying armed by default." },
     { id: "bs_fetcher_testing", title: "Individual fetcher testing — walk every connection one by one", body: "Current focus now that store-adding is done and managed login is generalized. Test each fetcher end-to-end on its own, not as a batch refresh, so per-store breakage is isolated. For every provider: (1) Connect from a clean/expired profile and confirm token/cookie capture; (2) run the fetcher and confirm it writes real rows (not an empty/short file) and passes the drift guard; (3) confirm the dashboard reconnect-required chip fires on an expired session and clears on reconnect; (4) spot-check the rows (names, store URLs, scores, dedupe). Log per-store findings as their own items as they surface.\n\nJun 3 profile testing: after find_profile_cache_http fix, verify fetcher chips on a non-default profile (e.g. Test) — enrichment shows — — / empty when profile cache missing; ! only when that profile lacks keys (not borrowed from default .env). Switch profiles mid-fetch and confirm cancel + reload.\n\nDual-source local passes (find_local_scan_gaps resolved):\n\n• GOG: Galaxy connected (or web disconnected) with no GOG_AL → fetch_gog.py / chip uses --source auto → rows from Galaxy; no reconnect / missing-key chip. Re-run web slice later → merge keeps both source tags and web enrichment on local winner.\n\n• itch: butler.db present, no ITCH_API_KEY → fetch_itch.py --source auto succeeds; add API key later → API slice merges and carry-forward preserves enrichment.\n\nChecklist: Steam · GOG · PSN · Epic (library) · Epic (wishlist) · Amazon · Xbox · Xbox (wishlist) · Battle.net · Ubisoft · Ubisoft (wishlist) · Nintendo · Nintendo (wishlist) · itch.io · Humble · Humble (wishlist) · EA App · ITAD (prices). Ubisoft 2FA blank-tab UX resolved (find_ux_conn_ubi_blank_tab). First EA App sync still needs to populate games_ea.json." },
     { id: "bs_license", title: "[RESOLVED] LICENSE file added (MIT)", body: "Resolved 2026-06-01. Repo-root LICENSE file (MIT, © 2026 Dan Ogonoski). Mirrored in pyproject.toml ([project].license = { file = \"LICENSE\" }) and package.json (\"license\": \"MIT\"). README header links to it. Pairs with bs_semver — the version + license combo is the minimum contract a second installer needs." },
@@ -3860,50 +3907,83 @@
       </g>
     </svg>`;
   }
+  // Real, scannable QR encoding https://baklog.app (version 2, ECC level M).
+  // Regenerate with: python -c "import qrcode,json;qr=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M,box_size=1,border=0);qr.add_data('https://baklog.app');qr.make(fit=True);print(json.dumps(qr.get_matrix()))"
+  const BIZCARD_QR_MODULES = [
+    [1,1,1,1,1,1,1,0,0,0,0,1,0,1,0,0,0,0,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,1,0,1,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1],
+    [1,0,1,1,1,0,1,0,1,0,1,0,0,0,0,1,0,0,1,0,1,1,1,0,1],
+    [1,0,1,1,1,0,1,0,1,1,1,0,0,0,1,0,0,0,1,0,1,1,1,0,1],
+    [1,0,1,1,1,0,1,0,0,0,1,1,0,1,0,0,1,0,1,0,1,1,1,0,1],
+    [1,0,0,0,0,0,1,0,0,0,1,1,0,1,1,0,1,0,1,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1],
+    [0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0],
+    [1,0,0,0,0,0,1,0,1,0,0,1,1,0,1,1,0,1,1,0,0,1,1,1,0],
+    [1,0,1,1,1,1,0,1,0,1,0,1,0,0,1,1,0,0,0,1,1,1,1,1,0],
+    [0,1,0,1,0,1,1,1,0,0,1,1,0,0,0,1,0,0,1,0,1,1,0,1,1],
+    [1,0,0,1,0,0,0,0,0,0,1,1,1,0,1,1,1,1,1,0,0,1,0,0,1],
+    [0,1,0,1,1,0,1,0,1,0,1,1,0,1,1,0,1,0,1,1,0,0,0,0,1],
+    [1,1,1,1,0,1,0,0,0,0,0,0,1,1,1,1,0,0,0,1,0,0,0,1,0],
+    [1,0,1,0,1,0,1,0,0,1,1,0,0,1,1,1,1,0,0,1,1,1,0,1,1],
+    [1,0,1,1,0,0,0,1,0,0,1,0,1,1,1,1,0,1,0,1,0,1,1,0,1],
+    [1,0,0,0,0,0,1,0,1,0,0,0,1,0,1,1,1,1,1,1,1,0,1,0,0],
+    [0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0],
+    [1,1,1,1,1,1,1,0,0,0,1,0,1,1,1,0,1,0,1,0,1,0,0,0,1],
+    [1,0,0,0,0,0,1,0,0,0,0,1,0,0,1,1,1,0,0,0,1,0,0,0,0],
+    [1,0,1,1,1,0,1,0,0,1,1,1,0,0,0,1,1,1,1,1,1,0,1,0,1],
+    [1,0,1,1,1,0,1,0,0,1,0,0,1,1,0,1,0,1,1,0,0,0,0,1,1],
+    [1,0,1,1,1,0,1,0,0,1,0,0,0,1,1,0,1,0,0,0,0,1,1,0,1],
+    [1,0,0,0,0,0,1,0,0,1,0,0,1,1,0,0,1,1,0,1,1,0,0,0,1],
+    [1,1,1,1,1,1,1,0,1,0,1,1,1,1,0,0,1,1,1,0,0,1,0,0,1],
+  ];
   function bizcardQrHtml(variant) {
     const fg = variant === "ivory" ? "#1e293b" : "#e2e8f0";
     const bg = variant === "ivory" ? "#faf8f5" : variant === "mono" ? "#0a0a0a" : "#0f172a";
-    const modules = [
-      [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1],
-      [1,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,1],
-      [1,0,1,1,1,0,1,0,1,0,0,1,0,1,1,0,1],
-      [1,0,1,1,1,0,1,0,0,1,1,0,0,1,1,0,1],
-      [1,0,1,1,1,0,1,0,1,1,0,1,0,1,1,0,1],
-      [1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,1],
-      [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1],
-      [0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
-      [1,0,1,1,0,1,0,1,0,1,1,0,1,0,1,1,0],
-      [0,1,0,1,1,0,1,0,1,0,0,1,0,1,0,0,1],
-      [1,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0],
-      [0,0,1,1,0,0,1,0,0,1,1,1,0,0,1,0,1],
-      [1,0,1,0,1,1,0,1,0,0,1,0,1,1,0,1,0],
-      [0,1,0,0,0,1,1,0,1,1,0,1,0,0,1,0,1],
-      [1,1,1,0,1,0,0,1,0,1,1,0,1,1,1,0,0],
-      [0,0,1,1,0,1,1,0,1,0,0,1,0,1,0,1,1],
-      [1,1,1,1,1,1,1,0,0,1,1,0,1,0,1,0,1],
-    ];
-    const cell = 100 / 17;
+    const modules = BIZCARD_QR_MODULES;
+    const n = modules.length;
+    const quiet = 2; // quiet-zone modules on each edge so scanners lock on
+    const cell = 100 / (n + quiet * 2);
+    const off = quiet * cell;
     let rects = "";
-    for (let y = 0; y < modules.length; y++) {
-      for (let x = 0; x < modules[y].length; x++) {
-        if (modules[y][x]) rects += `<rect x="${(x * cell).toFixed(2)}" y="${(y * cell).toFixed(2)}" width="${(cell * 0.92).toFixed(2)}" height="${(cell * 0.92).toFixed(2)}" fill="${fg}"/>`;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        if (modules[y][x]) {
+          rects += `<rect x="${(off + x * cell).toFixed(3)}" y="${(off + y * cell).toFixed(3)}" width="${cell.toFixed(3)}" height="${cell.toFixed(3)}" fill="${fg}"/>`;
+        }
       }
     }
-    const f = (ox, oy) => `
-      <rect x="${ox}" y="${oy}" width="${cell * 7}" height="${cell * 7}" fill="${fg}"/>
-      <rect x="${ox + cell}" y="${oy + cell}" width="${cell * 5}" height="${cell * 5}" fill="${bg}"/>
-      <rect x="${ox + cell * 2}" y="${oy + cell * 2}" width="${cell * 3}" height="${cell * 3}" fill="${fg}"/>`;
-    return `<svg class="bizcard-qr" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    return `<svg class="bizcard-qr" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img" aria-label="QR code linking to baklog.app">
       <rect width="100" height="100" fill="${bg}"/>
-      ${f(0, 0)}${f(100 - cell * 7, 0)}${f(0, 100 - cell * 7)}
       ${rects}
     </svg>`;
   }
+  // Faint storefront discs (brand color + real white logo glyph, mirroring the
+  // app's store badges) used as a subtle cross-store watermark on the cards.
+  // Canonical storefront display hierarchy. Keep in sync with
+  // STORE_DISPLAY_ORDER in js/dashboard-shared.js (hero strip + library chips).
+  const BIZCARD_STORES = [
+    { c: "#1b2838", g: "assets/store-logos/steam.svg" },       // Steam
+    { c: "#2a2a2a", g: "assets/store-logos/epic.svg" },        // Epic Games
+    { c: "#86328a", g: "assets/store-logos/gog.svg" },         // GOG
+    { c: "#cc2929", g: "assets/store-logos/humble-h.svg" },    // Humble Bundle (H mark)
+    { c: "#fa5c5c", g: "assets/store-logos/itch.svg" },        // itch.io
+    { c: "#0070d1", g: "assets/store-logos/playstation.svg" }, // PlayStation
+    { c: "#107c10", g: "assets/store-logos/xbox.svg" },        // Xbox
+    { c: "#e60012", g: "assets/store-logos/nintendo.svg" },    // Nintendo
+    { c: "#ff9900", g: "assets/store-logos/amazon.svg" },      // Amazon
+    { c: "#148eff", g: "assets/store-logos/battlenet.svg" },   // Battle.net
+    { c: "#0072ff", g: "assets/store-logos/ubisoft.svg" },     // Ubisoft Connect
+    { c: "#ff4747", g: "assets/store-logos/ea.svg" },          // EA
+  ];
+  function bizcardStorefrontsHtml() {
+    return BIZCARD_STORES
+      .map(s => `<span class="bizcard-store" style="--bc-store:${s.c};--bc-glyph:url('${s.g}')"><span class="bizcard-store-glyph"></span></span>`)
+      .join("");
+  }
   function bizcardFace(variant, side) {
-    const sideLabel = side === "front" ? "Front" : "Back";
     if (side === "front") {
       return el("div", { class: "bizcard bizcard--" + variant + " bizcard-front" },
-        el("span", { class: "bizcard-side-label" }, sideLabel),
+        el("div", { class: "bizcard-storefronts", html: bizcardStorefrontsHtml(), "aria-hidden": "true" }),
         el("div", { class: "bizcard-face" },
           el("div", {},
             el("div", { class: "bizcard-brand", html: bizcardLogoHtml() + '<span class="bizcard-wordmark">BAKLOG</span>' }),
@@ -3914,9 +3994,9 @@
       );
     }
     return el("div", { class: "bizcard bizcard--" + variant + " bizcard-back" },
-      el("span", { class: "bizcard-side-label" }, sideLabel),
+      el("div", { class: "bizcard-storefronts", html: bizcardStorefrontsHtml(), "aria-hidden": "true" }),
       el("div", { class: "bizcard-face" },
-        el("div", { class: "bizcard-qr-wrap", html: bizcardQrHtml(variant), title: "Placeholder QR — swap for real encoder when URL is final" }),
+        el("div", { class: "bizcard-qr-wrap", html: bizcardQrHtml(variant), title: "Scannable QR \u2014 links to https://baklog.app" }),
         el("div", { class: "bizcard-back-copy" },
           el("div", { class: "bizcard-url" }, "baklog.app"),
           el("p", { class: "bizcard-value" }, "Download free. Connect your stores. See what you actually own."),

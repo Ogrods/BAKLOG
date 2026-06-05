@@ -284,16 +284,33 @@ function normalizeLabel(label) {
   return s;
 }
 
+/** Case-insensitive fallback for METRIC_TIPS keys (e.g. marquee chip "hidden gems" vs "Hidden gems"). */
+const METRIC_TIPS_LOWER = Object.fromEntries(
+  Object.entries(METRIC_TIPS).map(([k, v]) => [k.toLowerCase(), v]),
+);
+
+function tipFromMap(label) {
+  if (!label) return '';
+  const exact = METRIC_TIPS[label];
+  if (exact) return exact;
+  const norm = normalizeLabel(label);
+  if (METRIC_TIPS[norm]) return METRIC_TIPS[norm];
+  const lower = label.toLowerCase();
+  if (METRIC_TIPS_LOWER[lower]) return METRIC_TIPS_LOWER[lower];
+  const normLower = norm.toLowerCase();
+  if (METRIC_TIPS_LOWER[normLower]) return METRIC_TIPS_LOWER[normLower];
+  return '';
+}
+
 /**
  * @param {string} label - marquee chip label
  * @returns {string}
  */
 export function marqueeTip(label) {
   if (!label) return '';
-  const exact = METRIC_TIPS[label];
-  if (exact) return exact;
+  const fromMap = tipFromMap(label);
+  if (fromMap) return fromMap;
   const norm = normalizeLabel(label);
-  if (METRIC_TIPS[norm]) return METRIC_TIPS[norm];
   for (const { prefix, tip } of PREFIX_TIPS) {
     if (label.startsWith(prefix) || norm.startsWith(prefix)) return tip;
   }
@@ -319,7 +336,8 @@ export function insightTip(html) {
   if (!text) return '';
   const colon = text.indexOf(':');
   const concept = colon >= 0 ? text.slice(0, colon).trim() : text;
-  if (METRIC_TIPS[concept]) return METRIC_TIPS[concept];
+  const fromMap = tipFromMap(concept) || tipFromMap(text);
+  if (fromMap) return fromMap;
   for (const { prefix, tip } of PREFIX_TIPS) {
     if (concept.startsWith(prefix) || text.startsWith(prefix)) return tip;
   }

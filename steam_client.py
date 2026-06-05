@@ -93,12 +93,7 @@ class SteamClient:
         resp.raise_for_status()
         data = resp.json()
         games = data.get("response", {}).get("games", [])
-        if not games:
-            raise RuntimeError(
-                "No games returned. Check STEAM_ID, API key, and that Game details "
-                "is set to Public in Steam privacy settings."
-            )
-        return games
+        return games if games else []
 
     def get_app_details(self, appid: int, refresh: bool = False) -> dict | None:
         cache_key = str(appid)

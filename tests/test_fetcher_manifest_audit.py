@@ -108,13 +108,13 @@ REFUSE_EMPTY_SCRIPTS = {
     "fetch_wishlist.py",
     "fetch_itad.py",
     "fetch_itch.py",
-}
-MANUAL_EMPTY_EXIT_SCRIPTS = {
-    "fetch_amazon.py",
     "fetch_battlenet.py",
     "fetch_nintendo.py",
     "fetch_ubisoft.py",
     "fetch_ea.py",
+}
+MANUAL_EMPTY_EXIT_SCRIPTS = {
+    "fetch_amazon.py",
 }
 DRIFT_GUARD_BY_SCRIPT: dict[str, str] = {
     "fetch_amazon.py": "refuse_amazon_source_drift",

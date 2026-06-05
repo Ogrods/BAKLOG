@@ -17,9 +17,10 @@ from __future__ import annotations
 import math
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Literal
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -617,7 +618,6 @@ def build_animation(
 
 def run_timber_batch(arg: str) -> None:
     preset = timber_preset()
-    layout = compute_layout(preset)
     print(f"Canvas {preset.canvas_w}x{preset.canvas_h} -> {preset.out_w}x{preset.out_h} @ {FPS}fps")
     print(f"Output: {OUT_DIR}")
 

@@ -11,10 +11,13 @@ import {
   loadManualGames,
   findOrphanPersonalKeys,
   setPersonalByKey,
+  applyHiddenTitleNorms,
 } from '../js/personal-storage.js';
 import { gameKey } from '../js/game-core.js';
 
 const steamGame = { store: 'steam', id: 99, name: 'Hidden Test', playtime_minutes: 0 };
+const fortniteSteam = { store: 'steam', id: 1, name: 'Fortnite', playtime_minutes: 0 };
+const fortniteEpic = { store: 'epic', id: 'abc', name: 'Fortnite', playtime_minutes: 0 };
 
 function ctx(personal, view = 'library') {
   return {
@@ -85,6 +88,42 @@ describe('hidden personal field', () => {
     const list = listUserHiddenEntries();
     expect(list).toHaveLength(1);
     expect(list[0].key).toBe('steam:99');
+  });
+});
+
+describe('cross-store hidden mirroring', () => {
+  beforeEach(() => {
+    state.allGames = [fortniteSteam, fortniteEpic];
+  });
+
+  it('setGameHidden on one copy hides every store copy of the title', () => {
+    setGameHidden(fortniteSteam, true, { silent: true });
+    expect(state.personal[gameKey(fortniteSteam)].hidden).toBe(true);
+    expect(state.personal[gameKey(fortniteEpic)].hidden).toBe(true);
+    expect(getPersonal(fortniteEpic).hidden).toBe(true);
+    expect(Array.isArray(state.personal.__hidden_title_norms_v1)).toBe(true);
+    expect(state.personal.__hidden_title_norms_v1).toContain('fortnite');
+  });
+
+  it('restore on one copy clears hidden on all store copies', () => {
+    setGameHidden(fortniteSteam, true, { silent: true });
+    setGameHidden(fortniteEpic, false, { silent: true });
+    expect(state.personal[gameKey(fortniteSteam)].hidden).toBe(false);
+    expect(state.personal[gameKey(fortniteEpic)].hidden).toBe(false);
+    expect(state.personal.__hidden_title_norms_v1 || []).not.toContain('fortnite');
+  });
+
+  it('applyHiddenTitleNorms re-hides newly-added keys (key churn / new connection)', () => {
+    setGameHidden(fortniteEpic, true, { silent: true });
+    expect(state.personal.__hidden_title_norms_v1).toContain('fortnite');
+
+    // Catalog changes: a new store copy appears later.
+    const fortniteXbox = { store: 'xbox', id: 'x1', name: 'Fortnite', playtime_minutes: 0 };
+    state.allGames = [fortniteSteam, fortniteEpic, fortniteXbox];
+
+    // The norm-based hidden set should re-apply onto whatever keys exist now.
+    applyHiddenTitleNorms({ silent: true });
+    expect(state.personal[gameKey(fortniteXbox)].hidden).toBe(true);
   });
 });
 

@@ -270,8 +270,8 @@ function showUndoToast(label) {
   if (!el) return;
   el.innerHTML = `
     <span class="undo-toast-label">${escapeHtml(label)}<span class="undo-toast-shortcut">Ctrl+Z</span></span>
-    <button type="button" data-undo-action="undo">Undo</button>
-    <button type="button" class="undo-toast-dismiss" data-undo-action="dismiss" aria-label="Dismiss">×</button>
+    <button type="button" data-undo-action="undo" title="Undo last status change (Ctrl+Z)">Undo</button>
+    <button type="button" class="undo-toast-dismiss" data-undo-action="dismiss" aria-label="Dismiss" title="Dismiss undo toast">×</button>
   `;
   el.classList.remove("hidden");
   if (_undoToastTimer) clearTimeout(_undoToastTimer);
@@ -424,7 +424,7 @@ export function updateHasNotesIndicatorInPlace(tr, g) {
   const notes = String(getPersonal(g).notes || "").trim();
   const dot = meta.querySelector(".has-notes-dot");
   if (notes) {
-    const tooltip = notes.slice(0, 160);
+    const tooltip = `${notes.slice(0, 160)} — click to edit notes`;
     if (dot) {
       dot.title = tooltip;
     } else {
@@ -445,6 +445,8 @@ export function updateRowInPlace(tr, g) {
   const selected = state.selectedKeys.has(key);
   const focused = tr.classList.contains("row-focused");
   tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
+  if (cleanup) tr.title = 'Cleanup candidate: tagged backlog, 0h, rated under 60%, 2+ yrs old';
+  else tr.removeAttribute('title');
 }
 
 function rowClass(g, lowConf) {
@@ -824,6 +826,25 @@ export async function prewarmTableQueryForView(view) {
 }
 
 let _renderTableGen = 0;
+
+const TABLE_PHONE_MQ = '(max-width: 639.98px)';
+
+function syncTablePhoneLayout() {
+  const wrap = document.getElementById('tableWrap');
+  if (!wrap) return;
+  const phone = typeof matchMedia === 'function' && matchMedia(TABLE_PHONE_MQ).matches;
+  wrap.classList.toggle('table-phone', phone);
+}
+
+/** Toggle card-style library rows on narrow viewports. */
+export function initTablePhoneLayout() {
+  syncTablePhoneLayout();
+  if (typeof matchMedia !== 'function') return;
+  const mq = matchMedia(TABLE_PHONE_MQ);
+  const onChange = () => syncTablePhoneLayout();
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else mq.addListener(onChange);
+}
 let _paintGen = 0;
 const FIRST_CHUNK = 50;
 /** Must match .games-table tbody tr { height } in app.css */
@@ -1037,9 +1058,10 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const ownedWish = state.activeView === "wishlist" && isOwnedByTitle(g.name);
   const selected = state.selectedKeys.has(key);
   const focused = idx === state.focusedRowIndex;
+  const cleanupTitle = cleanup ? ' title="Cleanup candidate: tagged backlog, 0h, rated under 60%, 2+ yrs old"' : '';
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
-  return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}">
-      <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} /></td>
+  return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}"${cleanupTitle}>
+      <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} title="Select for bulk status or remove" /></td>
       <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2 game-name-cell">
         <div class="flex items-center gap-2">
@@ -1052,9 +1074,9 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
               ${coopPillsHtml(g)}
               ${state.activeView === "wishlist" ? "" : trophyProgressPillHtml(g)}
-              ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))}" aria-label="Has notes">&#9998; note</span>` : ""}
+              ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))} — click to edit notes" aria-label="Has notes">&#9998; note</span>` : ""}
             </div>
-            ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
+            ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400" title="Uncertain HowLongToBeat match — Shift+click HLTB to override">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             ${earlyAccessPillHtml(g)}
@@ -1063,18 +1085,18 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
         </div>
       </td>
       ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
-      <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
+      <td class="col-score p-2 text-right" title="Priority score: Steam rating ÷ log₂(HLTB main + 2)">${priorityScore(g).toFixed(1)}</td>
       <td class="col-played p-2 text-right text-slate-300"${combinedPlaytimeTooltip(g) ? ` title="${escapeAttr(combinedPlaytimeTooltip(g))}"` : ""}>${formatHours(combinedPlaytime(g))}</td>
       <td class="p-2 text-right">
         <button data-hltb-edit="${escapeAttr(key)}" class="px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
-      <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - "}</td>
+      <td class="p-2 text-right" title="${g.steam_review_percent != null ? `Steam review: ${g.steam_review_percent}%` : 'No Steam review data'}">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - "}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
       <td class="p-2 text-slate-300">${formatReleaseDate(g.release_date)}</td>
       <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
       <td class="p-2 notes-cell">
-        <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1">${escapeHtml(p.notes || "")}</textarea>
+        <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1" title="Personal notes — saved automatically">${escapeHtml(p.notes || "")}</textarea>
       </td>
     </tr>`;
 }
@@ -1324,6 +1346,7 @@ export async function renderTable(opts) {
   const showScore = !!state.prefs.showScoreColumn;
   const isWish = state.activeView === "wishlist";
   const wrap = document.getElementById("tableWrap");
+  syncTablePhoneLayout();
   wrap?.classList.toggle("table-hide-score", !showScore);
   wrap?.classList.toggle("table-hide-playtime", isWish);
   wrap?.classList.toggle("table-hide-lastplayed", isWish);

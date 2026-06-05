@@ -248,25 +248,24 @@ def load_existing() -> dict[str, dict]:
 
 
 def print_auth_help() -> None:
+    session_path = default_epic_cache_dir() / "session.json"
     print(
-        """
+        f"""
 Epic login is NOT a cookie from DevTools.
 
 1. Sign in at https://www.epicgames.com in your browser.
 2. Open this URL in the same browser (copy/paste the whole line):
 
-"""
-        + LOGIN_URL
-        + """
+{LOGIN_URL}
 
 3. You should see a JSON page like:
-   {"authorizationCode":"abc123...","redirectUrl":"..."}
+   {{"authorizationCode":"abc123...","redirectUrl":"..."}}
 4. Copy only the authorizationCode value into .env:
    EPIC_AUTH_CODE=abc123...
 5. Run: python fetch_epic.py
 
 The code expires in ~5 minutes. After the first successful run, a refresh
-token is saved in cache/epic/session.json and you won't need the code again.
+token is saved in {session_path} and you won't need the code again.
 """
     )
 

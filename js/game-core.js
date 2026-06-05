@@ -1,10 +1,18 @@
-import { state, STATUS_CHIP_DEFS, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
+import {
+  state,
+  STATUS_CHIP_DEFS,
+  ITCH_NON_GAME_CLASSIFICATIONS,
+  isCleanupCandidateFromParts,
+} from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
 import { isEarlyAccess } from './table-query.js';
 import { STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { getPersonal, hasPersonalEntry } from './personal-storage.js';
 import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
 import { formatMoney, displayCurrency } from './currency.js';
+import { storeLogoHtml, storeLetter } from './store-logos.js';
+
+export { storeLetter };
 
 // === Constants & config ===
 export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "humble", "ea", "other", "manual"];
@@ -139,6 +147,7 @@ export function recomputeCrossStoreHidden() {
   state.crossStoreHiddenKeys = new Set();
   state.crossStoreOwnedStores = new Map();
   state.crossStorePlaytimeByKey = new Map();
+  state.playedTitleNorms = new Set();
   const groups = new Map();
   for (const g of state.allGames) {
     const norm = normalizeNameForDedup(g.name);
@@ -161,6 +170,14 @@ export function recomputeCrossStoreHidden() {
     }
     if (orderedStores.length > 1) {
       state.crossStoreOwnedStores.set(gameKey(list[0]), orderedStores);
+    }
+    let groupTotal = 0;
+    for (const g of list) {
+      groupTotal += Math.max(0, Number(g.playtime_minutes) || 0);
+    }
+    if (groupTotal > 0) {
+      const playedNorm = normalizeNameForDedup(list[0].name);
+      if (playedNorm) state.playedTitleNorms.add(playedNorm);
     }
     if (state.sessionPrefs.crossStoreDedup) {
       const repKey = gameKey(list[0]);
@@ -206,6 +223,16 @@ export function combinedPlaytimeTooltip(g) {
     .map(p => `${p.store.toUpperCase()}: ${(p.minutes / 60).toFixed(1)}h`);
   if (parts.length < 2) return "";
   return `Combined across stores - ${parts.join(" · ")}`;
+}
+
+export function isCleanupCandidate(g) {
+  const p = getPersonal(g);
+  const explicitBacklog = hasPersonalEntry(g) && p.status === "backlog";
+  const norm = normalizeNameForDedup(g.name);
+  const played = combinedPlaytime(g) > 0 || !!(norm && state.playedTitleNorms?.has(norm));
+  const rating = ratingValue(g);
+  const releaseMs = parseReleaseForSort(g.release_date);
+  return isCleanupCandidateFromParts({ explicitBacklog, played, rating, releaseMs });
 }
 
 export function wishlistEntryStore(g) {
@@ -442,8 +469,10 @@ export function storeUrlForGame(g) {
 
 export function storeLinkHtml(g, className, labelHtml) {
   const url = storeUrlForGame(g);
-  if (!url) return `<span class="${className}">${labelHtml}</span>`;
-  return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" class="${className}">${labelHtml}</a>`;
+  const store = normalizeGame(g).store || 'store';
+  const tip = `Open on ${store}`;
+  if (!url) return `<span class="${className}" title="${escapeAttr(tip)}">${labelHtml}</span>`;
+  return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" class="${className}" title="${escapeAttr(tip)}">${labelHtml}</a>`;
 }
 
 export function hltbMain(g) {
@@ -507,13 +536,8 @@ export function trophyProgressPillHtml(g) {
   return `<button type="button" class="trophy-pill" data-trophy-pop data-store="${escapeAttr(store)}" data-pct="${pct}" data-label="${escapeAttr(label)}"${gsCurAttr}${gsTotalAttr} aria-label="${escapeAttr(tip)}" aria-haspopup="true" aria-expanded="false" title="${escapeAttr(tip)}">&#127942; ${pct}%</button>`;
 }
 
-export function storeLetter(s) {
-  if (s === "ea") return "EA";
-  return s === "gog" ? "G" : s === "psn" ? "P" : s === "epic" ? "E" : s === "amazon" ? "A" : s === "nintendo" ? "N" : s === "itch" ? "I" : s === "xbox" ? "X" : s === "battlenet" ? "B" : s === "ubisoft" ? "U" : s === "humble" ? "H" : s === "other" ? "?" : s === "manual" ? "M" : "S";
-}
-
 export function singleStoreBadgeHtml(s, title) {
-  return `<span class="store-badge ${s}" title="${title || s.toUpperCase()}">${storeLetter(s)}</span>`;
+  return storeLogoHtml(s, { size: 'sm', title: title || s.toUpperCase() });
 }
 
 export function storeBadgeHtml(g) {
@@ -525,7 +549,7 @@ export function storeBadgeHtml(g) {
   if (!owned || owned.length < 2) {
     if (g.manual) {
       const tip = `${primary.toUpperCase()} (custom)`;
-      return `<span class="store-badge ${primary} manual" title="${tip}">${storeLetter(primary)}</span>`;
+      return storeLogoHtml(primary, { size: 'sm', title: tip, manual: true });
     }
     return singleStoreBadgeHtml(primary);
   }
@@ -553,7 +577,7 @@ export function renderBulkStatusButtons() {
     return;
   }
   wrap.innerHTML = bulkStatusOptsForView(state.activeView).map(
-    ({ status, label }) => `<button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="${escapeAttr(status)}">${escapeHtml(label)}</button>`,
+    ({ status, label }) => `<button type="button" class="bulk-status px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-status="${escapeAttr(status)}" title="Set selected games to ${escapeAttr(label)}">${escapeHtml(label)}</button>`,
   ).join("");
 }
 
@@ -563,14 +587,13 @@ export function tableColSpan() {
 
 export function wishlistBadgeHtml(g) {
   const target = wishlistEntryStore(g);
-  const manualMark = g.manual ? " manual" : "";
   const owned = state.wishlistCrossStoreOwnedStores.get(gameKey(g));
   if (owned && owned.length > 1) {
     const tip = `Wishlisted on: ${owned.map(s => s.toUpperCase()).join(", ")}`;
     return `<span class="inline-flex items-center gap-0.5 align-middle" title="${tip}">${owned.map(s => singleStoreBadgeHtml(s, tip)).join("")}</span>`;
   }
   const tip = `Wishlist · ${target.toUpperCase()}${g.manual ? " (manual)" : ""}`;
-  return `<span class="store-badge ${target}${manualMark}" title="${tip}">${storeLetter(target)}</span>`;
+  return storeLogoHtml(target, { size: 'sm', title: tip, manual: !!g.manual });
 }
 
 export function formatHours(minutes) {

@@ -31,18 +31,17 @@ from fetchers._base import (
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
+    refuse_empty_result,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
+from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_EA_JSON = Path("games_ea.json")
 
 
-def raw_dump_json() -> Path:
-    from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "ea_raw.json"
+EA_RAW_DUMP = profile_raw_dump_path("ea_raw.json")
 
 
 def fetch_debug_json() -> Path:
@@ -331,18 +330,24 @@ def main() -> int:
     print(f"Found {len(deduped)} EA titles (from {len(raw_items)} API rows).", flush=True)
 
     if args.dump_raw:
-        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
-        raw_dump_json().write_text(
+        EA_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
+        EA_RAW_DUMP.write_text(
             json.dumps({"items": raw_items, "filtered": deduped}, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-        print(f"Wrote raw dump to {raw_dump_json()}.", flush=True)
+        print(f"Wrote raw dump to {EA_RAW_DUMP}.", flush=True)
 
-    if not deduped:
+    empty_exit = refuse_empty_result(
+        deduped,
+        label="EA library",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_EA_JSON,
+    )
+    if empty_exit is not None:
         stats.error(
             "No EA games returned. Confirm you own PC titles on EA App, then reconnect on Connections."
         )
-        return stats.finish("fetch_ea", t0, exit_code=2)
+        return stats.finish("fetch_ea", t0, exit_code=empty_exit)
 
     slugs = []
     for item in deduped:

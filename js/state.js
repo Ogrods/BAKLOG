@@ -27,6 +27,8 @@ export const state = {
    * don't double-count when dedup is off.
    */
   crossStorePlaytimeByKey: new Map(),
+  /** Normalized title names with >0 playtime across any cross-store sibling. */
+  playedTitleNorms: new Set(),
   wishlistCrossStoreHiddenKeys: new Set(),
   wishlistCrossStoreOwnedStores: new Map(),
   wishlistGames: [],
@@ -72,6 +74,21 @@ export const state = {
 
 export const CLEANUP_MAX_RATING = 60;
 export const CLEANUP_MIN_AGE_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
+
+/** Pure cleanup-candidate gate shared by table-query (worker) and UI paths. */
+export function isCleanupCandidateFromParts({
+  explicitBacklog,
+  played,
+  rating,
+  releaseMs,
+  now = Date.now(),
+}) {
+  if (!explicitBacklog) return false;
+  if (played) return false;
+  if (!(rating > 0 && rating < CLEANUP_MAX_RATING)) return false;
+  if (!releaseMs) return false;
+  return now - releaseMs >= CLEANUP_MIN_AGE_MS;
+}
 export const GENRE_CHIP_COLLAPSE_AT = 12;
 export const GENRE_ALIASES = { Simulator: 'Simulation', Sport: 'Sports' };
 export const ITCH_NON_GAME_CLASSIFICATIONS = new Set(['tool', 'assets', 'asset_pack', 'comic', 'book', 'soundtrack', 'physical_game', 'other']);

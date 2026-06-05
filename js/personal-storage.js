@@ -133,7 +133,15 @@ configurePersonalStore({
 const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null };
 const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null });
 
-const META_KEYS = new Set(["__migrated_v3", "__notes_canonicalized_v1", "__tags_removed_v1", "__pre_hidden_v1_seeded"]);
+const META_KEYS = new Set([
+  "__migrated_v3",
+  "__notes_canonicalized_v1",
+  "__tags_removed_v1",
+  "__pre_hidden_v1_seeded",
+  "__hidden_mirrored_v1",
+  "__hidden_title_norms_v1",
+  "__hidden_title_norms_migrated_v1",
+]);
 
 function isMetaPersonalKey(key) {
   return META_KEYS.has(key) || String(key).startsWith("__");
@@ -149,6 +157,28 @@ function normalizePersonalRecord(found) {
     started_at: found.started_at ?? null,
     finished_at: found.finished_at ?? null,
   };
+}
+
+function hiddenTitleNorms() {
+  if (!state.personal.__hidden_title_norms_v1) state.personal.__hidden_title_norms_v1 = [];
+  const raw = state.personal.__hidden_title_norms_v1;
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(raw.filter(Boolean));
+}
+
+function saveHiddenTitleNorms(norms, options) {
+  const list = [...norms].sort();
+  const prev = state.personal.__hidden_title_norms_v1;
+  const same = Array.isArray(prev)
+    && prev.length === list.length
+    && prev.every((v, i) => v === list[i]);
+  if (same) return false;
+  state.personal.__hidden_title_norms_v1 = list;
+  window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
+  savePersonal();
+  if (!options?.silent) scheduleDownstreamSync();
+  return true;
 }
 
 export function getPersonal(g) {
@@ -239,6 +269,27 @@ function mirrorNoteToKeys(keys, note, options) {
   return changed;
 }
 
+function mirrorHiddenToKeys(keys, hidden, options) {
+  const flag = !!hidden;
+  let changed = false;
+  for (const key of keys) {
+    if (isMetaPersonalKey(key)) continue;
+    if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT };
+    if (state.personal[key].hidden === flag) continue;
+    state.personal[key].hidden = flag;
+    if (flag && options?.titleNorm) state.personal[key].hidden_title_norm = options.titleNorm;
+    if (!flag && 'hidden_title_norm' in state.personal[key]) delete state.personal[key].hidden_title_norm;
+    changed = true;
+  }
+  if (changed) {
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    personalMemo.bump();
+    savePersonal();
+    if (!options?.silent) scheduleDownstreamSync();
+  }
+  return changed;
+}
+
 /** Pick the longest non-empty note per title group and mirror to every store copy. */
 export function reconcileNotesAcrossTitles() {
   const index = getTitleKeyIndex();
@@ -276,6 +327,99 @@ export function canonicalizeNotesAcrossTitles() {
   return changed;
 }
 
+/** One-shot: migrate key-based hidden flags into title-norm hidden set. */
+export function migrateHiddenTitleNorms() {
+  if (state.personal.__hidden_title_norms_migrated_v1) return false;
+  const norms = hiddenTitleNorms();
+  let changed = false;
+
+  // Any catalog-backed hidden entry implies the title norm is hidden.
+  for (const [key, rec] of Object.entries(state.personal)) {
+    if (isMetaPersonalKey(key)) continue;
+    if (!rec || rec.hidden !== true) continue;
+    const g = findGameByKey(key);
+    if (!g) continue;
+    const norm = normalizeNameForDedup(g.name);
+    if (!norm) continue;
+    if (!norms.has(norm)) {
+      norms.add(norm);
+      changed = true;
+    }
+    if (state.personal[key] && state.personal[key].hidden_title_norm !== norm) {
+      state.personal[key].hidden_title_norm = norm;
+      changed = true;
+    }
+  }
+
+  state.personal.__hidden_title_norms_migrated_v1 = true;
+  if (changed) {
+    state.personal.__hidden_title_norms_v1 = [...norms].sort();
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    personalMemo.bump();
+    savePersonal();
+    scheduleDownstreamSync();
+  } else {
+    savePersonal();
+  }
+  return changed;
+}
+
+/** Apply title-level hidden norms onto whatever keys exist in the current catalog. */
+export function applyHiddenTitleNorms({ silent = false } = {}) {
+  migrateHiddenTitleNorms();
+  const norms = hiddenTitleNorms();
+  if (norms.size === 0) return false;
+  const index = getTitleKeyIndex();
+  let changed = false;
+  for (const norm of norms) {
+    const keys = index.get(norm);
+    if (!keys || keys.length === 0) continue;
+    if (mirrorHiddenToKeys(keys, true, { silent: true, titleNorm: norm })) changed = true;
+  }
+  if (changed && !silent) scheduleDownstreamSync();
+  return changed;
+}
+
+/** Sync hidden flag across every store copy of the same title (fixes key churn). */
+export function reconcileHiddenAcrossTitles() {
+  const index = getTitleKeyIndex();
+  const processed = new Set();
+  let changed = false;
+
+  const applyToGroup = (keys) => {
+    const sig = keys.slice().sort().join("|");
+    if (processed.has(sig)) return;
+    processed.add(sig);
+    const catalogKeys = keys.filter(k => findGameByKey(k));
+    if (!catalogKeys.length) return;
+    const anyVisible = catalogKeys.some(k => state.personal[k]?.hidden !== true);
+    const target = !anyVisible;
+    if (mirrorHiddenToKeys(keys, target, { silent: true })) changed = true;
+  };
+
+  for (const keys of index.values()) applyToGroup(keys);
+
+  for (const [key] of Object.entries(state.personal)) {
+    if (isMetaPersonalKey(key)) continue;
+    const g = findGameByKey(key);
+    if (!g) continue;
+    const norm = normalizeNameForDedup(g.name);
+    if (!norm) continue;
+    applyToGroup(index.get(norm) || [key]);
+  }
+
+  if (changed) scheduleDownstreamSync();
+  return changed;
+}
+
+export function canonicalizeHiddenAcrossTitles() {
+  if (state.personal.__hidden_mirrored_v1) return false;
+  const changed = reconcileHiddenAcrossTitles();
+  state.personal.__hidden_mirrored_v1 = true;
+  savePersonal();
+  return changed;
+}
+
 export function setPersonalByKey(key, field, value, options) {
   if (isMetaPersonalKey(key)) return;
   if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT };
@@ -300,6 +444,23 @@ export function setPersonalByKey(key, field, value, options) {
 export function setPersonal(g, field, value, options) {
   if (field === "notes") {
     mirrorNoteToKeys(getSameTitleKeys(g), value, options);
+    return;
+  }
+  if (field === "hidden") {
+    const norm = normalizeNameForDedup(g?.name);
+    if (!norm) {
+      mirrorHiddenToKeys(getSameTitleKeys(g), !!value, options);
+      return;
+    }
+    const norms = hiddenTitleNorms();
+    const flag = !!value;
+    const didChange = flag ? !norms.has(norm) : norms.has(norm);
+    if (didChange) {
+      if (flag) norms.add(norm);
+      else norms.delete(norm);
+      saveHiddenTitleNorms(norms, options);
+    }
+    mirrorHiddenToKeys(getSameTitleKeys(g), flag, { ...options, titleNorm: norm });
     return;
   }
   setPersonalByKey(gameKey(g), field, value, options);
@@ -330,7 +491,7 @@ export function seedPreHiddenDefaults() {
 }
 
 export function setGameHidden(g, hidden, options) {
-  setPersonalByKey(gameKey(g), "hidden", !!hidden, options);
+  setPersonal(g, "hidden", !!hidden, options);
 }
 
 function entryDisplayName(entry) {

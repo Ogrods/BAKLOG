@@ -205,6 +205,114 @@ class TestAuthBanner:
         ctx.set_auth_banner("")  # no live update for empty text
 
 
+class TestLaunchArgs:
+    def test_off_screen_headed_uses_window_position(self, tmp_path: Path) -> None:
+        exe = tmp_path / "chrome.exe"
+        exe.write_bytes(b"")
+        profile = tmp_path / "profile"
+
+        class LaunchArgsCaptured(Exception):
+            def __init__(self, args: list[str]) -> None:
+                self.args = args
+
+        def fake_popen(args, **kwargs):
+            raise LaunchArgsCaptured(list(args))
+
+        import auth.cdp_browser as cdp
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
+        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
+        monkeypatch.setattr(cdp.subprocess, "Popen", fake_popen)
+        try:
+            with pytest.raises(LaunchArgsCaptured) as exc:
+                launch_persistent_profile(
+                    profile,
+                    headless=False,
+                    window_position=(-32000, -32000),
+                )
+        finally:
+            monkeypatch.undo()
+
+        args = exc.value.args
+        assert "--window-position=-32000,-32000" in args
+        assert "--window-size=1280,900" in args
+        assert "--start-maximized" not in args
+        assert not any(a.startswith("--headless") for a in args)
+
+    def test_headed_default_uses_start_maximized(self, tmp_path: Path) -> None:
+        exe = tmp_path / "chrome.exe"
+        exe.write_bytes(b"")
+        profile = tmp_path / "profile"
+
+        class LaunchArgsCaptured(Exception):
+            def __init__(self, args: list[str]) -> None:
+                self.args = args
+
+        def fake_popen(args, **kwargs):
+            raise LaunchArgsCaptured(list(args))
+
+        import auth.cdp_browser as cdp
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
+        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
+        monkeypatch.setattr(cdp.subprocess, "Popen", fake_popen)
+        try:
+            with pytest.raises(LaunchArgsCaptured) as exc:
+                launch_persistent_profile(profile, headless=False)
+        finally:
+            monkeypatch.undo()
+
+        assert "--start-maximized" in exc.value.args
+        assert not any(a.startswith("--window-position=") for a in exc.value.args)
+
+
+class TestGracefulClose:
+    def test_close_sends_browser_close_before_terminate(self) -> None:
+        ctx = _bare_context()
+        calls: list[str] = []
+
+        class _FakeProc:
+            def __init__(self) -> None:
+                self.exited = False
+                self.terminated = False
+
+            def poll(self) -> int | None:
+                return 0 if self.exited else None
+
+            def wait(self, timeout: float | None = None) -> int:
+                self.exited = True
+                return 0
+
+            def terminate(self) -> None:
+                self.terminated = True
+                self.exited = True
+
+            def kill(self) -> None:
+                self.exited = True
+
+        class _FakeWs:
+            def close(self) -> None:
+                return None
+
+        proc = _FakeProc()
+
+        def fake_send(method, params=None, *, session_id=None, timeout=60):
+            calls.append(method)
+            return {}
+
+        ctx._proc = proc  # type: ignore[attr-defined]
+        ctx._ws = _FakeWs()  # type: ignore[attr-defined]
+        ctx._send = fake_send  # type: ignore[method-assign]
+
+        ctx.close()
+
+        assert calls == ["Browser.close"]
+        assert proc.exited
+        assert not proc.terminated
+
+
 class TestFindBrowser:
     def test_override_env(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         exe = tmp_path / "chrome.exe"

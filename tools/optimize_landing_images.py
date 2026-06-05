@@ -62,7 +62,8 @@ def main() -> None:
         total_png += src.stat().st_size / 1024
         optimize_png(slug, PORTRAIT_SIZE)
         total_webp += (SAMPLE / f"{slug}.webp").stat().st_size / 1024
-    print(f"Total: {total_png:.0f} KB png -> {total_webp:.0f} KB webp ({100 * total_webp / total_png:.1f}% of original)")
+    pct = 100 * total_webp / total_png
+    print(f"Total: {total_png:.0f} KB png -> {total_webp:.0f} KB webp ({pct:.1f}% of original)")
 
 
 if __name__ == "__main__":

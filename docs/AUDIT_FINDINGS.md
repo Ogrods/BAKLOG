@@ -140,6 +140,8 @@ Full inbound/outbound map: **[FETCHER_CONNECTIONS.md](FETCHER_CONNECTIONS.md)** 
 
 **When repairing fetchers:** prefer classifying errors (transient vs `mark_invalid`) over blanket reconnect; keep profile-scoped cache paths.
 
+**Static fetcher audit (2026-06-05):** Python fetch scripts + dashboard fetcher-health UI reviewed without live connections. Findings, P0/P1/P2 fixes, and deferred refactors: **[FETCHER_AUDIT.md](FETCHER_AUDIT.md)**.
+
 ---
 
 ## Section 7 — Enrichment and catalog merge
@@ -191,6 +193,33 @@ No new findings.
 | FX / deals | pass | `deals-fx.test.js`, `test_fx` |
 
 No new findings.
+
+### Store display hierarchy
+
+The business-card storefront watermark is the canonical display hierarchy:
+
+1. Steam
+2. Epic
+3. GOG
+4. Humble
+5. itch.io
+6. PlayStation
+7. Xbox
+8. Nintendo
+9. Amazon
+10. Battle.net
+11. Ubisoft
+12. EA
+
+Three distinct, intentionally separate store orderings exist — do not collapse them:
+
+| Constant | Location | Scope |
+|----------|----------|-------|
+| `STORE_DISPLAY_ORDER` | [js/dashboard-shared.js](../js/dashboard-shared.js) | Display hierarchy: dashboard hero badge strip + library summary chips. Mirrored by `BIZCARD_STORES` ([tracker.html](../tracker.html)) and the landing hero strip ([landing/index.html](../landing/index.html)). |
+| `STORE_PRIORITY` | [js/game-core.js](../js/game-core.js) | Cross-store dedup survivor selection only — unchanged. |
+| `RAIL_ORDER` | [js/connections.js](../js/connections.js) | Connections rail ease-of-use ordering only — unchanged. |
+
+Tests: [tests/store-display-order.test.js](../tests/store-display-order.test.js).
 
 ---
 
@@ -258,3 +287,4 @@ No new findings.
 1. `npm run test:all` (or `pytest -q` + `npm test`).
 2. Walk sections 1–5 with auth on (`BAKLOG_SUPABASE_*`) and off (`BAKLOG_AUTH_DISABLED=1`).
 3. For Section 6, run only the stores you care about via Connections + one fetch; file results under `audit-fetchers-repair`.
+4. Pre-go-live: use [LIVE_FETCH_CHECKLIST.md](LIVE_FETCH_CHECKLIST.md) and `python scripts/store_fetch_checklist.py`.

@@ -10,4 +10,6 @@ create table if not exists public.waitlist (
 );
 
 alter table public.waitlist enable row level security;
+-- Required: service_role must have table grants (RLS alone is not enough).
+grant select, insert on public.waitlist to service_role;
 -- No policies: anon/public have no access; service_role bypasses RLS.

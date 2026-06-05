@@ -1,5 +1,7 @@
-// Vercel serverless function: emails each waitlist signup to the founder via Resend.
+// Vercel serverless function: emails each waitlist signup to the founder via Resend,
+// then sends the signer a confirmation auto-reply.
 // No database. Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
+// Optional: WELCOME_FROM (defaults to NOTIFY_FROM), WELCOME_REPLY_TO (defaults to NOTIFY_TO).
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -34,6 +36,56 @@ function isRateLimited(ip) {
   }
   return entry.count > RATE_MAX;
 }
+
+async function sendEmail(apiKey, payload) {
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const detail = await r.text().catch(() => "");
+    throw new Error(`Resend ${r.status}: ${detail}`);
+  }
+  return r;
+}
+
+const CONFIRM_SUBJECT = "You're on the BAKLOG invite list";
+
+const CONFIRM_TEXT = `Thanks for requesting a BAKLOG invite.
+
+You're on the list. BAKLOG is in invite-only beta and we're onboarding in small waves, so you'll get a follow-up here when your spot opens up.
+
+A quick refresher on what you signed up for:
+- One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Nintendo, Amazon, EA, itch, Humble, and more.
+- Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.
+- Free forever to import your library.
+
+No action needed right now - just keep an eye on your inbox.
+
+- The BAKLOG team
+https://baklog.app`;
+
+const CONFIRM_HTML = `<!doctype html>
+<html>
+  <body style="margin:0;background:#0f172a;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e2e8f0;">
+    <div style="max-width:520px;margin:0 auto;padding:32px 24px;">
+      <h1 style="font-size:20px;margin:0 0 16px;color:#f8fafc;">You're on the BAKLOG invite list</h1>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for requesting a BAKLOG invite. BAKLOG is in invite-only beta and we're onboarding in small waves, so you'll get a follow-up here when your spot opens up.</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">A quick refresher on what you signed up for:</p>
+      <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
+        <li>One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Nintendo, Amazon, EA, itch, Humble, and more.</li>
+        <li>Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.</li>
+        <li>Free forever to import your library.</li>
+      </ul>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">No action needed right now - just keep an eye on your inbox.</p>
+      <p style="font-size:14px;line-height:1.6;margin:0;color:#94a3b8;">- The BAKLOG team<br /><a href="https://baklog.app" style="color:#38bdf8;">baklog.app</a></p>
+    </div>
+  </body>
+</html>`;
 
 export default {
   async fetch(request) {
@@ -74,31 +126,33 @@ export default {
     }
 
     try {
-      const r = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from,
-          to,
-          reply_to: email,
-          subject: "New BAKLOG waitlist signup",
-          text: `New signup: ${email}\nTime: ${new Date().toISOString()}`,
-        }),
+      await sendEmail(apiKey, {
+        from,
+        to,
+        reply_to: email,
+        subject: "New BAKLOG waitlist signup",
+        text: `New signup: ${email}\nTime: ${new Date().toISOString()}`,
       });
-
-      if (!r.ok) {
-        const detail = await r.text().catch(() => "");
-        console.error("subscribe: Resend error", r.status, detail);
-        return Response.json({ error: "Send failed" }, { status: 502 });
-      }
-
-      return Response.json({ ok: true });
     } catch (err) {
-      console.error("subscribe: unexpected error", err);
+      console.error("subscribe: founder notification failed", err);
       return Response.json({ error: "Send failed" }, { status: 502 });
     }
+
+    // Confirmation auto-reply to the signer. Best-effort: a failure here must not
+    // fail the request, since the signup was already captured above.
+    try {
+      await sendEmail(apiKey, {
+        from: process.env.WELCOME_FROM || from,
+        to: email,
+        reply_to: process.env.WELCOME_REPLY_TO || to,
+        subject: CONFIRM_SUBJECT,
+        text: CONFIRM_TEXT,
+        html: CONFIRM_HTML,
+      });
+    } catch (err) {
+      console.error("subscribe: confirmation auto-reply failed", err);
+    }
+
+    return Response.json({ ok: true });
   },
 };

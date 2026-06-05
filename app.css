@@ -1668,16 +1668,15 @@ html[data-init-view="connections"] header.app-header {
   color: var(--text-mute);
 }
 .app-header-brand h1 { color: var(--accent); }
-/* BETA tag — absolutely positioned so deleting the .brand-beta span (or this
-   whole rule) reflows nothing. The wordmark itself is the positioning anchor. */
-.brand-wordmark { position: relative; }
+/* BETA tag — in-flow flex child; delete the .brand-beta span to snap header back. */
 .brand-beta {
-  position: absolute;
-  top: -0.55em;
-  left: calc(100% + 0.3rem);
-  padding: 0.12em 0.4em;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.18em 0.45em;
   border-radius: 999px;
-  font-size: 0.34em;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1686,13 +1685,6 @@ html[data-init-view="connections"] header.app-header {
   background: color-mix(in srgb, var(--accent, #38bdf8) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent, #38bdf8) 45%, transparent);
   white-space: nowrap;
-  pointer-events: none;
-}
-html[data-theme="default"] .brand-beta,
-html[data-theme="dark"] .brand-beta {
-  color: #7dd3fc;
-  background: rgba(125, 211, 252, 0.14);
-  border-color: rgba(125, 211, 252, 0.4);
 }
 html[data-theme="default"] .app-header-brand h1 { color: #fff; }
 html[data-theme="dark"] .app-header-brand h1 { color: #fff; }

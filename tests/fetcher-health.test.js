@@ -30,6 +30,7 @@ import {
   connectionsNavigateProvider,
   fetcherRunner,
   renderDashboardFetcherHealth,
+  buildFetcherHealthRows,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -1012,6 +1013,7 @@ describe('fetcher header popover', () => {
       <div id="fetcherPopover" class="fetcher-popover" role="dialog" hidden>
         <div class="fetcher-popover-head">
           <span class="fetcher-popover-title">Fetchers</span>
+          <button type="button" class="fetcher-stat-layout-toggle" id="fetcherStatLayoutToggle">Layout</button>
           <button type="button" data-fetcher-popover-close aria-label="Close">&times;</button>
         </div>
         <div class="fetcher-popover-scroll">
@@ -1135,5 +1137,257 @@ describe('header pill ticker', () => {
     expect(pill.classList.contains('is-streaming')).toBe(false);
     expect(tail.textContent).toBe('');
     expect(pill.classList.contains('fh-global-status-idle')).toBe(true);
+  });
+});
+
+describe('fetcher stat strip', () => {
+  const stubFetchers = (fetchers) => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return { ok: true, json: async () => ({ fetchers }) };
+      }
+      if (u.includes('manifest.json')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = {};
+    clearReconnectRequired('gog');
+    clearReconnectRequired('gog_galaxy');
+    document.body.innerHTML = '<div id="dashboardFetcherHealth"></div><div id="fetcherRunLog"></div>';
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    state.libraryMeta = {};
+  });
+
+  it('renders hero slash and per-group connected counts', async () => {
+    const now = new Date().toISOString();
+    state.libraryMeta = {
+      steam: { fetched_at: now, game_count: 100 },
+      nintendo: { fetched_at: now, game_count: 12 },
+      epic: {},
+      wishlistGog: { fetched_at: now },
+      hltb: { fetched_at: now },
+    };
+    stubFetchers([
+      { key: 'steam', label: 'Steam', metaKey: 'steam', group: 'library', color: '#1b2838', cmd: 'fetch_steam.py', available: true },
+      { key: 'nintendo', label: 'Nintendo', metaKey: 'nintendo', group: 'library', color: '#e60012', cmd: 'fetch_nintendo.py', available: true },
+      { key: 'epic', label: 'Epic', metaKey: 'epic', group: 'library', color: '#2f2d2e', cmd: 'fetch_epic.py', available: true },
+      { key: 'wishlistGog', label: 'WL GOG', metaKey: 'wishlistGog', group: 'wishlist', color: '#6d28d9', cmd: 'fetch_gog_wishlist.py', available: true },
+      { key: 'hltb', label: 'HLTB', metaKey: 'hltb', group: 'enrich', color: '#2d6a4f', cmd: 'fetch_hltb.py', available: true },
+    ]);
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    renderDashboardFetcherHealth();
+
+    expect(document.querySelector('.fh-stat--hero .fh-stat-value')?.textContent).toBe('4/5');
+
+    const byLabel = Object.fromEntries(
+      [...document.querySelectorAll('.fh-stats .fh-stat:not(.fh-stat--hero)')].map(tile => [
+        tile.querySelector('.fh-stat-label')?.textContent,
+        tile.querySelector('.fh-stat-value')?.textContent,
+      ]),
+    );
+    expect(byLabel.Libraries).toBe('2');
+    expect(byLabel.Wishlists).toBe('1');
+    expect(byLabel.Enrichment).toBe('1');
+    expect(byLabel['Last sync']).toMatch(/ago$/);
+  });
+});
+
+describe('stat layout toggle', () => {
+  const STAT_LAYOUT_KEY = 'baklog-fetcher-stat-layout';
+
+  const stubFetchers = (fetchers) => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return { ok: true, json: async () => ({ fetchers }) };
+      }
+      if (u.includes('manifest.json')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = {};
+    try { localStorage.removeItem(STAT_LAYOUT_KEY); } catch { /* ignore */ }
+    document.body.innerHTML = '<div id="dashboardFetcherHealth"></div><div id="fetcherRunLog"></div>';
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    try { localStorage.removeItem(STAT_LAYOUT_KEY); } catch { /* ignore */ }
+    document.body.innerHTML = '';
+    state.libraryMeta = {};
+  });
+
+  it('defaults to compact and cycles to landscape with hero value intact', async () => {
+    const now = new Date().toISOString();
+    state.libraryMeta = {
+      steam: { fetched_at: now, game_count: 100 },
+      epic: {},
+    };
+    stubFetchers([
+      { key: 'steam', label: 'Steam', metaKey: 'steam', group: 'library', color: '#1b2838', cmd: 'fetch_steam.py', available: true },
+      { key: 'epic', label: 'Epic', metaKey: 'epic', group: 'library', color: '#2f2d2e', cmd: 'fetch_epic.py', available: true },
+    ]);
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    renderDashboardFetcherHealth();
+
+    const slot = document.getElementById('dashboardFetcherHealth');
+    expect(slot?.dataset.statLayout).toBe('compact');
+    expect(document.querySelector('.fh-stats.fh-stats--compact')).toBeTruthy();
+    expect(document.querySelector('.fh-stat--hero .fh-stat-value')?.textContent).toBe('1/2');
+
+    fetcherRunner.cycleStatLayout();
+    expect(slot?.dataset.statLayout).toBe('landscape');
+    expect(document.querySelector('.fh-stats.fh-stats--rail')).toBeTruthy();
+    expect(document.querySelector('.fh-stat--hero .fh-stat-value')?.textContent).toBe('1/2');
+  });
+});
+
+describe('enrichment chip compact count', () => {
+  const stubFetchers = (fetchers) => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return { ok: true, json: async () => ({ fetchers }) };
+      }
+      if (u.includes('manifest.json')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = {};
+    document.body.innerHTML = '<div id="dashboardFetcherHealth"></div><div id="fetcherRunLog"></div>';
+    state.allGames = [
+      { store: 'gog', id: '1', name: 'Has HLTB', hltb_main_hours: 12 },
+      { store: 'gog', id: '2', name: 'Needs HLTB' },
+    ];
+    state.itchGames = [];
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    state.libraryMeta = {};
+    state.allGames = [];
+    state.itchGames = [];
+  });
+
+  it('shows percent and optional pending new on the chip, not covered/total', async () => {
+    const now = new Date().toISOString();
+    state.libraryMeta = { hltb: { fetched_at: now } };
+    stubFetchers([
+      { key: 'hltb', label: 'HLTB', metaKey: 'hltb', group: 'enrich', color: '#2d6a4f', cmd: 'fetch_hltb.py', available: true },
+    ]);
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    renderDashboardFetcherHealth();
+
+    const countEl = document.querySelector('.fh-chip[data-fetcher-key="hltb"] .fh-chip-count');
+    expect(countEl).not.toBeNull();
+    const text = countEl.textContent;
+    expect(text).toMatch(/^\d+%( · \d+ new)?$/);
+    expect(text).not.toContain('/');
+    expect(text).toContain('new');
+  });
+
+  it('shows only percent when nothing is pending', async () => {
+    state.allGames = [
+      { store: 'gog', id: '1', name: 'Done', hltb_main_hours: 5 },
+      { store: 'gog', id: '2', name: 'Also done', hltb_main_hours: 8 },
+    ];
+    state.libraryMeta = {
+      hltb: {
+        fetched_at: new Date().toISOString(),
+        'gog:2': false,
+      },
+    };
+    stubFetchers([
+      { key: 'hltb', label: 'HLTB', metaKey: 'hltb', group: 'enrich', color: '#2d6a4f', cmd: 'fetch_hltb.py', available: true },
+    ]);
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    renderDashboardFetcherHealth();
+
+    const text = document.querySelector('.fh-chip[data-fetcher-key="hltb"] .fh-chip-count')?.textContent;
+    expect(text).toBe('100%');
+    expect(text).not.toContain('new');
+    expect(text).not.toContain('/');
+  });
+
+  it('drops " tags" from the Co-op chip label when new tags are pending', async () => {
+    const now = new Date().toISOString();
+    state.allGames = [
+      { store: 'gog', id: '1', name: 'Tagged', coop_online: true },
+      { store: 'gog', id: '2', name: 'Untagged' },
+    ];
+    state.libraryMeta = {
+      steamTags: { fetched_at: now, rows_updated: 1 },
+      steamReviews: { 'gog:1': 80, 'gog:2': 75 },
+    };
+    stubFetchers([
+      { key: 'steamTags', label: 'Co-op tags', metaKey: 'steamTags', group: 'enrich', color: '#ea580c', cmd: 'enrich_steam_tags.py', available: true },
+    ]);
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    renderDashboardFetcherHealth();
+
+    const countText = document.querySelector('.fh-chip[data-fetcher-key="steamTags"] .fh-chip-count')?.textContent;
+    expect(countText).toContain('new');
+    const labelText = document.querySelector('.fh-chip[data-fetcher-key="steamTags"] .fh-chip-label')?.textContent;
+    expect(labelText).toBe('Co-op');
+  });
+
+  it('keeps the full Co-op tags label when nothing is pending', async () => {
+    const now = new Date().toISOString();
+    state.allGames = [
+      { store: 'gog', id: '1', name: 'Tagged', coop_online: true },
+    ];
+    state.libraryMeta = {
+      steamTags: { fetched_at: now, rows_updated: 1 },
+      steamReviews: { 'gog:1': 80 },
+    };
+    stubFetchers([
+      { key: 'steamTags', label: 'Co-op tags', metaKey: 'steamTags', group: 'enrich', color: '#ea580c', cmd: 'enrich_steam_tags.py', available: true },
+    ]);
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    renderDashboardFetcherHealth();
+
+    const countText = document.querySelector('.fh-chip[data-fetcher-key="steamTags"] .fh-chip-count')?.textContent;
+    expect(countText).not.toContain('new');
+    const labelText = document.querySelector('.fh-chip[data-fetcher-key="steamTags"] .fh-chip-label')?.textContent;
+    expect(labelText).toBe('Co-op tags');
   });
 });

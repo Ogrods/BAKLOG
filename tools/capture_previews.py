@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from auth.cdp_browser import find_chromium_executable
+from auth.cdp_browser import find_chromium_executable  # noqa: E402  (needs ROOT on sys.path first)
 
 DASHBOARD_OUT = ROOT / "dashboard.png"
 BOOTSTRAP = "/preview-bootstrap.html"

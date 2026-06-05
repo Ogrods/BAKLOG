@@ -1,7 +1,8 @@
-// Vercel serverless function: emails each waitlist signup to the founder via Resend,
-// then sends the signer a confirmation auto-reply.
-// No database. Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
-// Optional: WELCOME_FROM (defaults to NOTIFY_FROM), WELCOME_REPLY_TO (defaults to NOTIFY_TO).
+// Vercel serverless function: logs each waitlist signup (optional Supabase),
+// emails the founder via Resend, then sends the signer a confirmation auto-reply.
+// Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
+// Optional: WELCOME_FROM (defaults to NOTIFY_FROM), WELCOME_REPLY_TO (defaults to NOTIFY_TO),
+// SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (durable waitlist log).
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -35,6 +36,27 @@ function isRateLimited(ip) {
     }
   }
   return entry.count > RATE_MAX;
+}
+
+async function logToSupabase({ email, ip, time }) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+
+  const r = await fetch(`${url}/rest/v1/waitlist`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=ignore-duplicates,return=minimal",
+    },
+    body: JSON.stringify({ email, ip, source: "landing", created_at: time }),
+  });
+  if (!r.ok) {
+    const detail = await r.text().catch(() => "");
+    throw new Error(`Supabase ${r.status}: ${detail}`);
+  }
 }
 
 async function sendEmail(apiKey, payload) {
@@ -125,13 +147,23 @@ export default {
       return Response.json({ error: "Server not configured" }, { status: 500 });
     }
 
+    const signupTime = new Date().toISOString();
+    const ip = clientIp(request);
+    console.log(`waitlist_signup\t${signupTime}\t${email}`);
+
+    try {
+      await logToSupabase({ email, ip, time: signupTime });
+    } catch (err) {
+      console.error("subscribe: supabase log failed", err);
+    }
+
     try {
       await sendEmail(apiKey, {
         from,
         to,
         reply_to: email,
-        subject: "New BAKLOG waitlist signup",
-        text: `New signup: ${email}\nTime: ${new Date().toISOString()}`,
+        subject: `New BAKLOG invite request: ${email}`,
+        text: `New signup: ${email}\nTime: ${signupTime}`,
       });
     } catch (err) {
       console.error("subscribe: founder notification failed", err);

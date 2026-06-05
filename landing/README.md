@@ -10,6 +10,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `assets/sample/*.png` — fictional game covers for the spotlight carousel.
 - `api/subscribe.js` — Vercel serverless function; emails each waitlist signup to you via [Resend](https://resend.com). No database.
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
+- `assets/store-logos/*.svg` — copy of repo-root `assets/store-logos/` for the hero trust strip (CSS mask). Re-sync when app logos change: `cp ../assets/store-logos/*.svg assets/store-logos/`.
 - `favicon.svg` — white BAKLOG mark.
 - `vercel.json` — security + cache headers, clean URLs.
 

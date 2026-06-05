@@ -34,17 +34,18 @@
   };
 
   const SPOTLIGHT_GAMES = [
-    { title: "Emberfall", eyebrow: "Critically acclaimed", rating: 95, hltb: "42h", status: "in backlog", art: "assets/sample/hero-emberfall.png", portrait: false },
-    { title: "Neon Drift", eyebrow: "Recently added", rating: 86, hltb: "12h", status: "in backlog", art: "assets/sample/cover-neon-drift.png", portrait: true },
-    { title: "Hollow Crown", eyebrow: "On sale now", rating: 92, saleCut: 80, price: "$5.99", art: "assets/sample/hero-hollow-crown.png", portrait: false },
-    { title: "Tidewright", eyebrow: "New release", rating: 88, hltb: "26h", status: "next up", art: "assets/sample/hero-tidewright.png", portrait: false },
-    { title: "Bumper Buddies", eyebrow: "Couch co-op", rating: 83, hltb: "10h", status: "in backlog", art: "assets/sample/cover-bumper-buddies.png", portrait: true },
-    { title: "Ashen Vale", eyebrow: "Long haul", rating: 90, hltb: "60h", status: "in progress", art: "assets/sample/hero-ashen-vale.png", portrait: false },
-    { title: "Encore", eyebrow: "Replay", rating: 93, hltb: "8h", status: "completed", art: "assets/sample/cover-encore.png", portrait: true },
-    { title: "Stormhallow", eyebrow: "Up next", rating: 87, hltb: "33h", status: "next up", art: "assets/sample/hero-stormhallow.png", portrait: false },
-    { title: "Quick Byte", eyebrow: "Quick win", rating: 78, hltb: "3h", status: "in backlog", art: "assets/sample/cover-quick-byte.png", portrait: true },
-    { title: "Dawnbanner", eyebrow: "Trending now", rating: 94, hltb: "38h", status: "in backlog", art: "assets/sample/hero-dawnbanner.png", portrait: false },
-    { title: "Valor Reach", eyebrow: "Most played", rating: 91, hltb: "52h", status: "in progress", art: "assets/sample/hero-valor-reach.png", portrait: false },
+    { title: "Emberfall", eyebrow: "Critically acclaimed", rating: 95, hltb: "42h", status: "in backlog", art: "assets/sample/hero-emberfall.webp", portrait: false },
+    { title: "Ironveil", eyebrow: "Couch co-op", rating: 83, hltb: "10h", status: "in backlog", art: "assets/sample/cover-ironveil.webp", portrait: true },
+    { title: "Hollow Crown", eyebrow: "On sale now", rating: 92, saleCut: 80, price: "$5.99", art: "assets/sample/hero-hollow-crown.webp", portrait: false },
+    { title: "Ashlight Saga", eyebrow: "Highly rated", rating: 91, hltb: "55h", status: "in backlog", art: "assets/sample/cover-ashlight-saga.webp", portrait: true },
+    { title: "Tidewright", eyebrow: "New release", rating: 88, hltb: "26h", status: "next up", art: "assets/sample/hero-tidewright.webp", portrait: false },
+    { title: "Hollowmaw", eyebrow: "Hidden gem", rating: 84, hltb: "14h", status: "in backlog", art: "assets/sample/cover-hollowmaw.webp", portrait: true },
+    { title: "Ashen Vale", eyebrow: "Long haul", rating: 90, hltb: "60h", status: "in progress", art: "assets/sample/hero-ashen-vale.webp", portrait: false },
+    { title: "Encore", eyebrow: "Replay", rating: 93, hltb: "8h", status: "completed", art: "assets/sample/cover-encore.webp", portrait: true },
+    { title: "Stormhallow", eyebrow: "Up next", rating: 87, hltb: "33h", status: "next up", art: "assets/sample/hero-stormhallow.webp", portrait: false },
+    { title: "Apex Velocity", eyebrow: "Weekend-sized", rating: 89, hltb: "6h", status: "in backlog", art: "assets/sample/cover-apex-velocity.webp", portrait: true },
+    { title: "Dawnbanner", eyebrow: "Trending now", rating: 94, hltb: "38h", status: "in backlog", art: "assets/sample/hero-dawnbanner.webp", portrait: false },
+    { title: "Quick Byte", eyebrow: "Quick win", rating: 78, hltb: "3h", status: "in backlog", art: "assets/sample/cover-quick-byte.webp", portrait: true },
   ];
 
   const MARQUEE_ITEMS = [
@@ -95,13 +96,15 @@
     return `<strong>${g.rating}%</strong> review · <strong>${escapeHtml(g.hltb)}</strong> main · ${escapeHtml(g.status)}`;
   }
 
-  function spotlightInnerHtml(g, animClass) {
+  function spotlightInnerHtml(g, animClass, eager = false) {
+    const loadAttr = eager ? 'fetchpriority="high"' : 'loading="lazy"';
+    const decodeAttr = 'decoding="async"';
     const bg = g.portrait
-      ? `<img class="dash-spotlight-art-bg is-loaded" src="${escapeHtml(g.art)}" alt="" aria-hidden="true" />`
+      ? `<img class="dash-spotlight-art-bg is-loaded" src="${escapeHtml(g.art)}" alt="" aria-hidden="true" ${decodeAttr} ${loadAttr} />`
       : "";
     return `
       ${bg}
-      <img class="dash-spotlight-art is-loaded" src="${escapeHtml(g.art)}" alt="" loading="lazy" />
+      <img class="dash-spotlight-art is-loaded" src="${escapeHtml(g.art)}" alt="" ${decodeAttr} ${loadAttr} />
       <div class="dash-spotlight-sheen" aria-hidden="true"></div>
       <div class="dash-spotlight-gradient" aria-hidden="true"></div>
       <div class="dash-spotlight-body">
@@ -576,7 +579,7 @@
     applySpotlight(SPOTLIGHT_GAMES[0], 0);
     resetSpotlightTimer();
     startInsightRotation();
-    initCharts();
+    requestAnimationFrame(() => initCharts());
 
     const heroCount = document.getElementById("dashHeroCount");
     if (heroCount) {

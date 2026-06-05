@@ -15,12 +15,12 @@ import { gameKey, hltbMain, ratingValue, normalizeGame, combinedPlaytime, itchIs
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
-import { animateCount, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
+import { animateCount, countUpDurationForDelta, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
 import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView } from './dashboard-charts.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
-import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation } from './dashboard-insights.js';
+import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation, applyMarqueeSpeed } from './dashboard-insights.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
 import { THEME_CHANGE_EVENT } from './theme.js';
@@ -156,16 +156,24 @@ function applyMegaHeroCounters(stats) {
         continue;
       }
       if (item.id === 'dashHeroCount' && Number.isFinite(prev) && item.to > prev) {
-        animateCount(node, prev, item.to, item.format, 1000);
+        animateCount(node, prev, item.to, item.format, countUpDurationForDelta(item.to - prev), { easeInOut: true });
       } else {
         node.textContent = item.format(item.to);
       }
     } else {
-      animateCount(node, 0, item.to, item.format, 1000);
+      if (item.id === 'dashHeroCount') {
+        animateCount(node, 0, item.to, item.format, countUpDurationForDelta(item.to), { easeInOut: true });
+      } else {
+        animateCount(node, 0, item.to, item.format, 1000);
+      }
     }
     _dashLastCounters[item.id] = item.to;
   }
   _dashCountersInitialized = true;
+}
+
+function scheduleMarqueeSpeed(rootEl) {
+  requestAnimationFrame(() => applyMarqueeSpeed(rootEl || document.getElementById('dashboardMega')));
 }
 
 function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap) {
@@ -206,6 +214,7 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
       const divider = el.querySelector('.dash-mega-divider');
       divider?.insertAdjacentHTML('beforebegin', renderMarqueeHtml(marqueeItems));
     }
+    scheduleMarqueeSpeed(el);
   }
   startInsightRotation(buildInsightPool(games, snap));
   startSpotlightRotation(spotlightPool);
@@ -285,6 +294,7 @@ function renderDashboardMega(games, snap) {
   primeSpotlightArt(document.getElementById('dashboardSpotlight'));
   startInsightRotation(buildInsightPool(games, snap));
   startSpotlightRotation(spotlightPool);
+  scheduleMarqueeSpeed(el);
 }
 
 function runWhenIdle(fn, timeoutMs = 1200) {

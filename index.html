@@ -379,7 +379,10 @@
           </div>
         </div>
       </div>
-      <div id="activeFilterPills" class="hidden flex flex-wrap gap-1.5 items-center"></div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <div id="activeFilterPills" class="hidden flex flex-wrap gap-1.5 items-center min-w-0"></div>
+        <p id="rowCountTop" class="text-slate-400 text-sm ml-auto whitespace-nowrap"></p>
+      </div>
     </section>
 
     <section id="dashboardContainer" class="hidden space-y-4 mb-4">
@@ -489,7 +492,7 @@
       </table>
     </div>
     </div>
-    <p id="rowCount" class="text-slate-400 text-sm mt-2"></p>
+    <p id="rowCount" class="text-slate-400 text-sm mt-2 text-right"></p>
     </main>
   </div>
 

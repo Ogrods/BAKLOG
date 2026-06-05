@@ -1269,6 +1269,8 @@ export function syncRowCountLabel() {
     });
   }
   renderRowCountEl(el, view, list);
+  const topEl = document.getElementById("rowCountTop");
+  if (topEl) topEl.textContent = formatRowCountText(view, list);
 }
 
 export async function renderTable(opts) {
@@ -1405,6 +1407,8 @@ export async function renderTable(opts) {
   if (!rowAnim || !isSurfaceAnimating(rowAnim)) {
     renderRowCountEl(rowCountEl, state.activeView, list);
   }
+  const rowCountTopEl = document.getElementById("rowCountTop");
+  if (rowCountTopEl) rowCountTopEl.textContent = formatRowCountText(state.activeView, list);
   perfMark(perfRun, 'post:start');
   updateBulkBar();
   buildAlphaNav(list);

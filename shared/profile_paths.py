@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from shared.install_paths import data_root
+
 _request_profile_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "_request_profile_id",
     default=None,
@@ -24,7 +26,6 @@ def set_request_profile_id(profile_id: str | None) -> None:
 def clear_request_profile_id() -> None:
     _request_profile_id.set(None)
 
-from shared.install_paths import data_root
 
 ROOT = data_root()
 PROFILES_DIR = ROOT / "profiles"

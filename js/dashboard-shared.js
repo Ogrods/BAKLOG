@@ -79,7 +79,18 @@ export const HLTB_BUCKETS = [
   { minExclusive: 40, maxInclusive: null, label: "HLTB 40h+" },
 ];
 
-export function animateCount(el, from, to, format, durationMs = 900) {
+export function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// Gentle sqrt curve: +1 -> ~450ms, scaling up to a 1300ms cap for big imports.
+// (+25 ~650ms, +100 ~900ms, +~324 hits the cap.)
+export function countUpDurationForDelta(delta) {
+  const d = Math.abs(Math.round(delta)) || 0;
+  return Math.min(1300, Math.max(450, 400 + 50 * Math.sqrt(d)));
+}
+
+export function animateCount(el, from, to, format, durationMs = 900, opts = {}) {
   if (!el) return;
   if (isPageHidden()) {
     el.textContent = format(to);
@@ -90,7 +101,7 @@ export function animateCount(el, from, to, format, durationMs = 900) {
     return;
   }
   const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  const ease = t => 1 - Math.pow(1 - t, 3);
+  const ease = opts.easeInOut ? easeInOutCubic : (t => 1 - Math.pow(1 - t, 3));
   function tick(now) {
     if (isPageHidden()) {
       el.textContent = format(to);

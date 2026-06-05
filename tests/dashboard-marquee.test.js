@@ -14,7 +14,7 @@ vi.mock('../js/deals.js', () => ({
 }));
 
 import { state } from '../js/state.js';
-import { buildMarqueeItems, renderMarqueeHtml } from '../js/dashboard-insights.js';
+import { buildMarqueeItems, renderMarqueeHtml, applyMarqueeSpeed, MARQUEE_PX_PER_SEC } from '../js/dashboard-insights.js';
 import { marqueeTip } from '../js/metric-tips.js';
 import { getLibrarySnapshot, invalidateLibrarySnapshot } from '../js/sabermetrics.js';
 
@@ -77,5 +77,32 @@ describe('buildMarqueeItems', () => {
   it('uses the passed snapshot without throwing on an empty library', () => {
     const snap = getLibrarySnapshot([]);
     expect(() => buildMarqueeItems([], snap)).not.toThrow();
+  });
+});
+
+describe('applyMarqueeSpeed', () => {
+  it('sets animation-duration from measured track width', () => {
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="dash-marquee">
+        <div class="dash-marquee-track" style="width: 800px">a</div>
+      </div>`;
+    const track = root.querySelector('.dash-marquee-track');
+    Object.defineProperty(track, 'scrollWidth', { value: 800, configurable: true });
+
+    applyMarqueeSpeed(root);
+
+    expect(track.style.animationDuration).toBe(`${400 / MARQUEE_PX_PER_SEC}s`);
+  });
+
+  it('no-ops when track width is zero', () => {
+    const root = document.createElement('div');
+    root.innerHTML = `<div class="dash-marquee-track"></div>`;
+    const track = root.querySelector('.dash-marquee-track');
+    Object.defineProperty(track, 'scrollWidth', { value: 0, configurable: true });
+
+    applyMarqueeSpeed(root);
+
+    expect(track.style.animationDuration).toBe('');
   });
 });

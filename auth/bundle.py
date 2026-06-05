@@ -17,7 +17,6 @@ from typing import Any
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from auth.secrets import _auth_dir, _secrets_file, load_doc, profile_dir, save_doc
-
 from shared.install_paths import bundle_root
 
 

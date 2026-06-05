@@ -229,8 +229,40 @@ Release notes template: Chrome/Edge required, Windows 10/11, free forever to imp
 
 - Bundling Chromium (too large; use system Chrome/Edge).
 - Auto-update channel (manual re-download for beta waves).
-- macOS/Linux frozen binaries.
+- macOS/Linux **frozen** binaries (`.app`, `.AppImage`, etc.) — see below.
 - Removing Python from **dev** workflow (unchanged).
+
+---
+
+## Other platforms (macOS / Linux)
+
+**Decision (2026-06-05):** Invest in cross-platform **clone-and-run** for beta. Frozen installers remain Windows-only until packaging Phase 2+.
+
+Beta testers on macOS or Linux:
+
+```bash
+git clone https://github.com/<you>/steam-backlog.git
+cd steam-backlog
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+python server.py
+```
+
+**Requirements:** Python 3.11+, Google Chrome or Chromium (set `BAKLOG_CHROME_PATH` if installed off the default path). Connections sign-in opens a headed browser window — same as Windows.
+
+**Store caveats on non-Windows:**
+
+| Source | macOS / Linux |
+|--------|----------------|
+| Browser Connect providers (Steam, Epic, GOG web, etc.) | Supported |
+| itch app (local `butler.db`) | Supported |
+| GOG Galaxy (local) | macOS only (no Linux Galaxy client) |
+| Amazon Games launcher | Windows only — use **Amazon (Prime Gaming, web)** Connect instead |
+
+Unattended refresh: `scripts/refresh.sh` (skips the Windows-only Amazon launcher path; run `fetch_amazon.py --source web` after Prime Gaming web Connect).
+
+CI runs the full pytest suite on Ubuntu and Windows, plus a macOS smoke subset — see `.github/workflows/ci.yml`.
 
 ---
 

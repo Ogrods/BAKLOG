@@ -162,6 +162,17 @@
     return `<div class="dash-marquee-track">${track}${track}</div>`;
   }
 
+  /** Visual scroll speed (px/s). Keep in sync with js/dashboard-insights.js. */
+  const MARQUEE_PX_PER_SEC = 24;
+
+  function syncMarqueeSpeed() {
+    const track = document.querySelector(".dash-marquee-track");
+    if (!track) return;
+    const copyWidth = track.scrollWidth / 2;
+    if (!copyWidth) return;
+    track.style.animationDuration = `${copyWidth / MARQUEE_PX_PER_SEC}s`;
+  }
+
   function buildStoreStripHtml() {
     const items = DEMO_STORE_KEYS.map((key) => {
       const color = STORE_BRAND_COLORS[key];
@@ -720,7 +731,11 @@
     wireSpotlightNav();
     resetSpotlightTimer();
     startInsightRotation();
-    requestAnimationFrame(() => initCharts());
+    requestAnimationFrame(() => {
+      initCharts();
+      syncMarqueeSpeed();
+    });
+    if (document.fonts?.ready) document.fonts.ready.then(syncMarqueeSpeed);
 
     const heroCount = document.getElementById("dashHeroCount");
     if (heroCount) {

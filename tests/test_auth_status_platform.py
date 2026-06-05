@@ -107,3 +107,29 @@ def test_amazon_web_provider_available_everywhere():
     assert web["platforms"] == []
     assert web["available"] is True
     assert web["kind"] == "browser"
+
+
+def test_amazon_local_data_absent_off_windows(monkeypatch: pytest.MonkeyPatch):
+    """Without an explicit SQL dir, Amazon launcher DB is not probed off Windows."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.delenv("AMAZON_GAMES_SQL_DIR", raising=False)
+    sys.modules.pop("amazon_client", None)
+    assert manager._local_data_present("amazon", {}) is False
+    assert "amazon_client" not in sys.modules
+
+
+def test_amazon_fetcher_available_for_web_on_all_platforms(auth_server: str):
+    """Amazon fetcher stays enabled everywhere; launcher vs web is resolved in fetch_amazon.py."""
+    assert server.FETCHERS["amazon"].get("platforms") == []
+    req = urllib.request.Request(f"{auth_server}/api/fetchers", method="GET")
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    amazon = next(f for f in payload["fetchers"] if f["key"] == "amazon")
+    assert amazon["available"] is True
+    assert amazon["platforms"] == []
+
+
+def test_gog_galaxy_local_data_absent_on_linux(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.delenv("GOG_GALAXY_DB", raising=False)
+    assert manager._local_data_present("gog_galaxy", {}) is False

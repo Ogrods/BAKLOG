@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
 import urllib.error
@@ -146,6 +148,62 @@ def _cdp_websocket_error(exc: Exception) -> RuntimeError:
     return RuntimeError(f"{message} {_BROWSER_LAUNCH_HINT}")
 
 
+_CHROMIUM_WHICH_NAMES = (
+    "google-chrome",
+    "google-chrome-stable",
+    "chromium",
+    "chromium-browser",
+    "microsoft-edge",
+    "microsoft-edge-stable",
+    "brave-browser",
+    "brave",
+)
+
+
+def _chromium_executable_candidates() -> list[Path]:
+    """Ordered filesystem paths to probe for Chrome/Edge/Chromium."""
+    candidates: list[Path] = []
+    if sys.platform == "win32":
+        pf = os.environ.get("ProgramFiles", r"C:\Program Files")
+        pfx = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+        local = os.environ.get("LOCALAPPDATA", "")
+        candidates.extend([
+            Path(pf) / "Google/Chrome/Application/chrome.exe",
+            Path(pfx) / "Google/Chrome/Application/chrome.exe",
+            Path(local) / "Google/Chrome/Application/chrome.exe",
+            Path(pf) / "Microsoft/Edge/Application/msedge.exe",
+            Path(pfx) / "Microsoft/Edge/Application/msedge.exe",
+        ])
+        return candidates
+
+    candidates.extend([
+        Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        Path("/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta"),
+        Path("/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary"),
+        Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+        Path("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"),
+        Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
+        Path("/usr/bin/google-chrome"),
+        Path("/usr/bin/google-chrome-stable"),
+        Path("/usr/bin/chromium"),
+        Path("/usr/bin/chromium-browser"),
+        Path("/opt/google/chrome/chrome"),
+        Path("/usr/bin/microsoft-edge"),
+        Path("/usr/bin/microsoft-edge-stable"),
+        Path("/usr/bin/brave-browser"),
+        Path("/snap/bin/chromium"),
+        Path("/snap/bin/google-chrome"),
+        Path("/var/lib/flatpak/exports/bin/org.chromium.Chromium"),
+        Path("/var/lib/flatpak/exports/bin/com.google.Chrome"),
+    ])
+    home = Path(os.path.expanduser("~"))
+    candidates.extend([
+        Path(os.path.join(home, ".local/share/flatpak/exports/bin/org.chromium.Chromium")),
+        Path(os.path.join(home, ".local/share/flatpak/exports/bin/com.google.Chrome")),
+    ])
+    return candidates
+
+
 def find_chromium_executable() -> Path:
     """Return path to Chrome or Edge, or raise with install instructions."""
     override = os.getenv("BAKLOG_CHROME_PATH", "").strip()
@@ -155,29 +213,16 @@ def find_chromium_executable() -> Path:
             return p
         raise RuntimeError(f"BAKLOG_CHROME_PATH does not exist: {override}")
 
-    candidates: list[Path] = []
-    pf = os.environ.get("ProgramFiles", r"C:\Program Files")
-    pfx = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
-    local = os.environ.get("LOCALAPPDATA", "")
-
-    candidates.extend([
-        Path(pf) / "Google/Chrome/Application/chrome.exe",
-        Path(pfx) / "Google/Chrome/Application/chrome.exe",
-        Path(local) / "Google/Chrome/Application/chrome.exe",
-        Path(pf) / "Microsoft/Edge/Application/msedge.exe",
-        Path(pfx) / "Microsoft/Edge/Application/msedge.exe",
-    ])
-    if os.name != "nt":
-        candidates.extend([
-            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-            Path("/usr/bin/google-chrome"),
-            Path("/usr/bin/chromium"),
-            Path("/usr/bin/chromium-browser"),
-        ])
-
-    for path in candidates:
+    for path in _chromium_executable_candidates():
         if path.is_file():
             return path
+
+    for name in _CHROMIUM_WHICH_NAMES:
+        found = shutil.which(name)
+        if found:
+            p = Path(found)
+            if p.is_file():
+                return p
 
     raise RuntimeError(
         "No Chrome or Edge browser found. Install Google Chrome or Microsoft Edge, "

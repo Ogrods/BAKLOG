@@ -707,8 +707,8 @@
       body: "docs/FETCHER_AUDIT.md (recommended, not done 2026-06-05). Merge/drift/argparse tests exist for several stores; no dedicated test_fetch_psn.py / test_fetch_xbox.py / test_fetch_ubisoft.py (main library scripts, not wishlist variants). Add offline unit tests for auth-exit paths, refuse_empty/drift wiring, and response-shape parsers — mirror test_fetch_nintendo.py / test_fetch_ea.py patterns. Complements test_fetcher_auth_exit.py contract tests." },
     { id: "find_configure_stdout_dedup", area: "Arch", severity: "grey", title: "fetchers — consolidate copy-pasted _configure_stdout() into fetchers._base",
       body: "docs/FETCHER_AUDIT.md (nice-to-have). configure_stdout() already exists in fetchers/_base.py but most fetch_*.py still define a local _configure_stdout() duplicate. One-line import + call migration across scripts; no behavior change. Low risk; batch in a hygiene PR." },
-    { id: "find_store_brand_hex_audit", area: "UX", severity: "grey", title: "Audit STORE_LOGO_ASSETS brand hexes against official sources",
-      body: "js/store-logos.js STORE_LOGO_ASSETS colors back the dashboard hero glyph strip and were set ad hoc. Audit every store's background hex against official/legacy brand guidelines via web search and update: steam (#ea580c — non-brand orange, picked for glyph contrast), epic (#2a2a2a), gog (#86328a), humble (#cc2929), psn (#0070d1), xbox (#107c10), nintendo (#e60012), amazon (#ff9900), itch (#fa5c5c), battlenet (#148eff), ubisoft (#1472f1 — set to legacy Uplay 'Blue Ribbon'), ea (#ff4747). Note divergence from the .store-badge.X letter palette in app.css (e.g. steam orange vs navy, ubisoft #00adef). Decide per store: official brand color vs. legibility of the white-masked glyph on that background; keep one canonical value. Cosmetic, hero-only." },
+    { id: "find_store_brand_hex_audit", area: "UX", severity: "grey", title: "[RESOLVED] Store brand hexes aligned to official sources",
+      body: "2026-06-05: Audited via brand guidelines / brandcolorcode / press kits. Canonical STORE_BRAND_COLORS in js/store-brand-colors.js (re-exported by dashboard-shared; wired through DASH_STORE_COLORS, STORE_LOGO_ASSETS, app.css --brand-* / .store-badge.*, steal-row chips, connections PROVIDER_BRAND, landing hero strip, tracker bizcard). steam #1b2838, epic #2f2d2e, gog #5100dc (2025 GOG guidelines), humble #cb272c, psn #003791, xbox #107c10, nintendo #e60012, amazon #ff9900, itch #fa5c5c, battlenet #148eff, ubisoft #000000 (Connect black), ea #f05556. White-masked hero glyphs on dark brand backgrounds; Amazon keeps dark letter text on orange." },
     { id: "find_dedup_pref_force", area: "Arch", severity: "grey", title: "[RESOLVED] Session-prefs concept introduced — crossStoreDedup migrated",
       body: "Done. Added state.sessionPrefs (state.js) + loadSessionPrefs() (prefs.js) for toggles that should never persist across reloads. crossStoreDedup moved out of the localStorage prefs bag entirely — defaults to true via loadSessionPrefs() on every bootstrap, off-state lasts only the current tab/session. Removed the force-overwrite in app.js (was `state.prefs.crossStoreDedup = true`), the savePrefs() in the toggle handler (bind-events.js) and pill clear (filters-ui.js), and stripped crossStoreDedup from the prefs fallback. loadPrefs() also `delete merged.crossStoreDedup` so old persisted values are dropped on read. tableFingerprint reads state.sessionPrefs.crossStoreDedup so the table cache still invalidates when the toggle flips. Pattern is now reusable: any future session-scoped toggle goes into state.sessionPrefs / loadSessionPrefs() with no other ceremony." },
     { id: "find_crlf", area: "Arch", severity: "grey", title: "[RESOLVED] .gitattributes — LF in repo, CRLF for .bat/.ps1",
@@ -1789,7 +1789,7 @@
           { x: 792, y: 56, label: "Amazon", color: "#FF9900" },
           { x: 56, y: 130, label: "Xbox · Game Pass", color: "#107C10" },
           { x: 240, y: 130, label: "Battle.net", color: "#148EFF" },
-          { x: 424, y: 130, label: "Ubisoft Connect", color: "#FFD200" },
+          { x: 424, y: 130, label: "Ubisoft Connect", color: "#000000" },
           { x: 608, y: 130, label: "Nintendo Switch", color: "#E60012" },
           { x: 792, y: 130, label: "itch.io (quarantined)", color: "#FF2449" },
         ].map(c => `
@@ -3963,17 +3963,17 @@
   // STORE_DISPLAY_ORDER in js/dashboard-shared.js (hero strip + library chips).
   const BIZCARD_STORES = [
     { c: "#1b2838", g: "assets/store-logos/steam.svg" },       // Steam
-    { c: "#2a2a2a", g: "assets/store-logos/epic.svg" },        // Epic Games
-    { c: "#86328a", g: "assets/store-logos/gog.svg" },         // GOG
-    { c: "#cc2929", g: "assets/store-logos/humble-h.svg" },    // Humble Bundle (H mark)
+    { c: "#2f2d2e", g: "assets/store-logos/epic.svg" },        // Epic Games
+    { c: "#5100dc", g: "assets/store-logos/gog.svg" },         // GOG
+    { c: "#cb272c", g: "assets/store-logos/humble-h.svg" },    // Humble Bundle (H mark)
     { c: "#fa5c5c", g: "assets/store-logos/itch.svg" },        // itch.io
-    { c: "#0070d1", g: "assets/store-logos/playstation.svg" }, // PlayStation
+    { c: "#003791", g: "assets/store-logos/playstation.svg" }, // PlayStation
     { c: "#107c10", g: "assets/store-logos/xbox.svg" },        // Xbox
     { c: "#e60012", g: "assets/store-logos/nintendo.svg" },    // Nintendo
     { c: "#ff9900", g: "assets/store-logos/amazon.svg" },      // Amazon
     { c: "#148eff", g: "assets/store-logos/battlenet.svg" },   // Battle.net
-    { c: "#0072ff", g: "assets/store-logos/ubisoft.svg" },     // Ubisoft Connect
-    { c: "#ff4747", g: "assets/store-logos/ea.svg" },          // EA
+    { c: "#000000", g: "assets/store-logos/ubisoft.svg" },     // Ubisoft Connect
+    { c: "#f05556", g: "assets/store-logos/ea.svg" },          // EA
   ];
   function bizcardStorefrontsHtml() {
     return BIZCARD_STORES

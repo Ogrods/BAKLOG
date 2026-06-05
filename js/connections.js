@@ -6,6 +6,7 @@ import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
 import { state } from './state.js';
 import { storeLogoHtml } from './store-logos.js';
+import { STORE_BRAND_COLORS } from './store-brand-colors.js';
 
 export { FETCHER_AUTH_PROVIDER };
 
@@ -85,42 +86,25 @@ const STATUS_NOTE = {
 
 
 const PROVIDER_BRAND = {
-
-  steam: { color: '#1b9cd8', initial: 'S' },
-
-  gog: { color: '#a855f7', initial: 'G' },
-  gog_galaxy: { color: '#a855f7', initial: 'G' },
-
-  psn: { color: '#0070d1', initial: 'P' },
-
-  epic: { color: '#888888', initial: 'E' },
-
-  epic_wishlist: { color: '#888888', initial: 'E' },
-
-  amazon: { color: '#ff9900', initial: 'A' },
-  amazon_web: { color: '#ff9900', initial: 'A' },
-
-  xbox: { color: '#107c10', initial: 'X' },
-
-  xbox_wishlist: { color: '#107c10', initial: 'X' },
-
-  battlenet: { color: '#148eff', initial: 'B' },
-
-  nintendo: { color: '#e60012', initial: 'N' },
-
-  nintendo_wishlist: { color: '#e60012', initial: 'N' },
-
-  ubisoft: { color: '#0072ff', initial: 'U' },
-
-  humble: { color: '#cc2929', initial: 'H' },
-
-  ea: { color: '#ff4747', initial: 'EA' },
-
-  itch: { color: '#fa5c5c', initial: 'I' },
-  itch_local: { color: '#fa5c5c', initial: 'I' },
-
+  steam: { color: STORE_BRAND_COLORS.steam, initial: 'S' },
+  gog: { color: STORE_BRAND_COLORS.gog, initial: 'G' },
+  gog_galaxy: { color: STORE_BRAND_COLORS.gog, initial: 'G' },
+  psn: { color: STORE_BRAND_COLORS.psn, initial: 'P' },
+  epic: { color: STORE_BRAND_COLORS.epic, initial: 'E' },
+  epic_wishlist: { color: STORE_BRAND_COLORS.epic, initial: 'E' },
+  amazon: { color: STORE_BRAND_COLORS.amazon, initial: 'A' },
+  amazon_web: { color: STORE_BRAND_COLORS.amazon, initial: 'A' },
+  xbox: { color: STORE_BRAND_COLORS.xbox, initial: 'X' },
+  xbox_wishlist: { color: STORE_BRAND_COLORS.xbox, initial: 'X' },
+  battlenet: { color: STORE_BRAND_COLORS.battlenet, initial: 'B' },
+  nintendo: { color: STORE_BRAND_COLORS.nintendo, initial: 'N' },
+  nintendo_wishlist: { color: STORE_BRAND_COLORS.nintendo, initial: 'N' },
+  ubisoft: { color: STORE_BRAND_COLORS.ubisoft, initial: 'U' },
+  humble: { color: STORE_BRAND_COLORS.humble, initial: 'H' },
+  ea: { color: STORE_BRAND_COLORS.ea, initial: 'EA' },
+  itch: { color: STORE_BRAND_COLORS.itch, initial: 'I' },
+  itch_local: { color: STORE_BRAND_COLORS.itch, initial: 'I' },
   itad: { color: '#22d3ee', initial: 'I' },
-
 };
 
 

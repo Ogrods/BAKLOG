@@ -6,6 +6,9 @@ import { gameKey } from './game-core.js';
 import { filterOutHidden } from './personal-storage.js';
 import { prefersReducedMotion } from './motion.js';
 import { isPageHidden } from './visibility.js';
+import { STORE_BRAND_COLORS } from './store-brand-colors.js';
+
+export { STORE_BRAND_COLORS } from './store-brand-colors.js';
 
 export const ITCH_CLASS_LABELS = {
   game: "Games",
@@ -18,11 +21,7 @@ export const ITCH_CLASS_LABELS = {
   other: "Other",
 };
 
-export const DASH_STORE_COLORS = {
-  steam: "#ea580c", gog: "#6d28d9", psn: "#003791", epic: "#64748b",
-  amazon: "#c2410c", xbox: "#107C10", battlenet: "#148EFF", ubisoft: "#FFD200",
-  nintendo: "#E60012", itch: "#fa5c5c", humble: "#cc2929", ea: "#FF4747", other: "#94a3b8", manual: "#64748b",
-};
+export const DASH_STORE_COLORS = { ...STORE_BRAND_COLORS };
 
 export const DASH_STATUS_COLORS = {
   backlog: "#ef4444", next: "#38bdf8", playing: "#facc15", unfinished: "#f97316",

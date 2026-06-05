@@ -10,7 +10,8 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
 - `assets/sample/*.png` — fictional game covers for the spotlight carousel.
-- `api/subscribe.js` — Vercel serverless function; emails each waitlist signup to you via [Resend](https://resend.com). No database.
+- `api/subscribe.js` — Vercel serverless function; logs signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
+- `sql/waitlist.sql` — one-time Supabase table for durable signup logging.
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
 - `assets/store-logos/*.svg` — copy of repo-root `assets/store-logos/` for the hero trust strip (CSS mask). Re-sync when app logos change: `cp ../assets/store-logos/*.svg assets/store-logos/`.
 - `favicon.svg` — white BAKLOG mark.
@@ -36,7 +37,16 @@ The waitlist function needs three vars (all environments):
 | `NOTIFY_FROM` | `BAKLOG <waitlist@baklog.app>` | Sender must be on a **Resend-verified domain** (verify `baklog.app` in Resend → Domains). |
 | `NOTIFY_TO` | `you@baklog.app` | Where signup notifications land. `reply_to` is set to the signup's email. |
 
-Without these, `/api/subscribe` returns `500 Server not configured` and the form shows a friendly error.
+Optional durable logging (recommended):
+
+| Variable | Example | Notes |
+| --- | --- | --- |
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | Project URL (same project as BAKLOG auth is fine). |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | **service_role** key from Project Settings → API. Server-only; never expose in the browser. |
+
+Run `sql/waitlist.sql` once in the Supabase SQL editor before enabling these vars. Without Supabase env vars, signups still work; they are only emailed and logged to Vercel function logs.
+
+Without the Resend trio, `/api/subscribe` returns `500 Server not configured` and the form shows a friendly error.
 
 ## Local preview
 

@@ -226,15 +226,17 @@
       width: 22px;
       height: 22px;
       border-radius: 5px;
-      background: var(--store-bg, #334155);
+      /* Unified, muted chips so the row reads as one quiet "works with these"
+         signal instead of 12 competing brand colors next to the CTA. */
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       flex-shrink: 0;
-      opacity: 0.9;
     }
     .hero-store-glyph {
       display: block;
       width: 62%;
       height: 62%;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.6);
       -webkit-mask: var(--store-glyph) center / contain no-repeat;
               mask: var(--store-glyph) center / contain no-repeat;
     }
@@ -555,7 +557,6 @@
       <span class="hero-store" style="--store-bg:#000000;--store-glyph:url('assets/store-logos/ubisoft.svg')"><span class="hero-store-glyph"></span></span>
       <span class="hero-store" style="--store-bg:#f05556;--store-glyph:url('assets/store-logos/ea.svg')"><span class="hero-store-glyph"></span></span>
     </div>
-    <p class="hero-store-caption">Twelve library sources &middot; <a href="#stores">Steam, Epic, GOG, PlayStation, Xbox, and more</a></p>
 
     <form class="waitlist" id="waitlist" novalidate>
       <div class="waitlist-row">
@@ -566,14 +567,11 @@
       <div class="form-reassure">
         <p class="form-secure">
           <svg class="secure-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <strong>100% secure.</strong> No telemetry, ever. Your data stays on your machine.
+          <strong>100% secure.</strong> No telemetry, ever &middot; invite-only, your place is reserved on request.
         </p>
-        <p class="form-invite">Invite-only. Requesting now reserves your place in the next wave.</p>
       </div>
       <p class="form-msg" id="formMsg" role="status" aria-live="polite"></p>
     </form>
-
-    <a class="scroll-link" href="#demo">See what it does &darr;</a>
     </div>
   </header>
 

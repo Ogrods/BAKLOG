@@ -57,7 +57,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-ROOT = Path(__file__).resolve().parent
+from shared.install_paths import bundle_root, data_root, is_frozen, static_root
+
+ROOT = data_root()
 
 try:
     from dotenv import load_dotenv
@@ -410,15 +412,31 @@ def _argv(*parts: str) -> list[str]:
     return [_python_executable(), *parts]
 
 
+def _fetcher_argv(key: str, script: str, extra_args: list) -> list[str]:
+    if is_frozen():
+        return _argv("--run-fetcher", key, *map(str, extra_args))
+    return _argv(str(bundle_root() / script), *map(str, extra_args))
+
+
+def _fetcher_cmd_label(argv: list[str]) -> str:
+    if len(argv) > 2 and argv[1] == "--run-fetcher":
+        return " ".join([argv[2], *argv[3:]])
+    if len(argv) > 1:
+        return " ".join([Path(argv[1]).name, *argv[2:]])
+    return ""
+
+
 def _python_executable() -> str:
     """Prefer the project's venv interpreter when present."""
+    if is_frozen():
+        return sys.executable
     override = os.environ.get("BAKLOG_PYTHON", "").strip()
     if override:
         return override
     candidates = [
-        ROOT / ".venv" / "Scripts" / "python.exe",  # Windows
-        ROOT / ".venv" / "bin" / "python",          # POSIX
-        ROOT / ".venv" / "bin" / "python3",
+        data_root() / ".venv" / "Scripts" / "python.exe",  # Windows
+        data_root() / ".venv" / "bin" / "python",          # POSIX
+        data_root() / ".venv" / "bin" / "python3",
     ]
     for c in candidates:
         if c.exists():
@@ -449,7 +467,7 @@ def _python_executable() -> str:
     return exe
 
 
-MANIFEST_FILE = ROOT / "fetchers" / "manifest.json"
+MANIFEST_FILE = bundle_root() / "fetchers" / "manifest.json"
 
 
 def _load_fetchers() -> dict[str, dict[str, Any]]:
@@ -488,7 +506,7 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
         fetchers[key] = {
             "label": label,
             # Absolute script path so the launch never depends on subprocess cwd.
-            "argv": _argv(str(ROOT / script), *map(str, extra_args)),
+            "argv": _fetcher_argv(key, script, extra_args),
             "refreshArgs": [str(a) for a in refresh_args],
             "metaKey": entry.get("metaKey", key),
             "group": entry.get("group", "library"),
@@ -1555,7 +1573,7 @@ class RunManager:
                     # Run from repo root so the relative script path in argv resolves;
                     # profile scoping is via BAKLOG_PROFILE in env + resolve_catalog_path,
                     # not cwd (profiles/<id>/ holds data/cache, not the fetch_*.py scripts).
-                    cwd=str(ROOT),
+                    cwd=str(data_root()),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     bufsize=1,
@@ -2213,8 +2231,7 @@ class Handler(SimpleHTTPRequestHandler):
                     {
                         "key": k,
                         "label": v["label"],
-                        # argv[1] is now an absolute script path; show just the basename.
-                        "cmd": " ".join([Path(v["argv"][1]).name, *v["argv"][2:]]) if len(v["argv"]) > 1 else "",
+                        "cmd": _fetcher_cmd_label(v["argv"]),
                         "metaKey": v.get("metaKey", k),
                         "group": v.get("group", "library"),
                         "color": v.get("color"),
@@ -3041,7 +3058,7 @@ def main() -> None:
         signal.signal(signal.SIGTERM, _handle_exit)
 
     _exit_if_dev_server_busy()
-    handler = partial(Handler, directory=str(ROOT))
+    handler = partial(Handler, directory=str(static_root()))
     try:
         httpd = BaklogDevServer((HOST, PORT), handler)
     except OSError:
@@ -3066,4 +3083,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--run-fetcher":
+        from baklog_fetcher_dispatch import run_fetcher
+
+        raise SystemExit(run_fetcher(sys.argv[2], sys.argv[3:]))
     main()

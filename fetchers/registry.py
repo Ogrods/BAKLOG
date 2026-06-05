@@ -7,8 +7,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_PATH = ROOT / "fetchers" / "manifest.json"
+from shared.install_paths import bundle_root
+
+MANIFEST_PATH = bundle_root() / "fetchers" / "manifest.json"
 
 # Fetcher key -> connections provider id (for reconnect banners).
 AUTH_PROVIDER_BY_KEY: dict[str, str] = {
@@ -105,7 +106,7 @@ def validate_manifest(path: Path | None = None) -> list[str]:
         if not key or not script:
             errors.append(f"entry missing key or script: {entry!r}")
             continue
-        if not (ROOT / script).is_file():
+        if not (bundle_root() / script).is_file():
             errors.append(f"{key}: missing script {script}")
         group = entry.get("group", "library")
         meta = entry.get("metaKey", key)
@@ -137,7 +138,7 @@ def validate_manifest(path: Path | None = None) -> list[str]:
 
 
 def _script_flags(script: str) -> set[str]:
-    path = ROOT / script
+    path = bundle_root() / script
     text = path.read_text(encoding="utf-8")
     flags: set[str] = set()
     for m in re.finditer(r'add_argument\(\s*["\'](--[\w-]+)', text):
@@ -147,7 +148,7 @@ def _script_flags(script: str) -> set[str]:
 
 def export_js_registry(out_path: Path | None = None) -> None:
     """Write js/fetcher-registry.js for the browser bundle."""
-    out = out_path or ROOT / "js" / "fetcher-registry.js"
+    out = out_path or bundle_root() / "js" / "fetcher-registry.js"
     payload = {
         "libraryStoreJson": LIBRARY_JSON_BY_KEY,
         "wishlistFetcherJson": WISHLIST_JSON_BY_KEY,

@@ -24,7 +24,9 @@ def set_request_profile_id(profile_id: str | None) -> None:
 def clear_request_profile_id() -> None:
     _request_profile_id.set(None)
 
-ROOT = Path(__file__).resolve().parents[1]
+from shared.install_paths import data_root
+
+ROOT = data_root()
 PROFILES_DIR = ROOT / "profiles"
 INDEX_FILE = PROFILES_DIR / "index.json"
 DEFAULT_PROFILE_ID = "default"

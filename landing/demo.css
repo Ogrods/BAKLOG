@@ -437,12 +437,15 @@
 
 /* Funnel: score grid */
 .score-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 1rem;
   margin-top: 1.5rem;
 }
 .score-tile {
+  flex: 1 1 180px;
+  max-width: 260px;
   background: linear-gradient(160deg, var(--bg-panel), rgba(30,41,59,0.4));
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
@@ -509,8 +512,8 @@
   .dash-mega { padding: 20px 18px 16px; }
 }
 @media (max-width: 400px) {
-  .score-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .score-tile { padding: 1rem 0.75rem; }
+  .score-grid { gap: 0.6rem; }
+  .score-tile { flex-basis: 130px; padding: 1rem 0.75rem; }
   .score-tile .num { font-size: 1.5rem; }
   .demo-mount { padding: 0 1rem; }
   .dash-marquee { margin-left: -0.25rem; margin-right: -0.25rem; }

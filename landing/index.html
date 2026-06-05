@@ -6,26 +6,61 @@
   <title>BAKLOG: One honest backlog across every store</title>
   <meta name="description" content="BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, invite-only early access." />
   <meta name="theme-color" content="#0f172a" />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="BAKLOG" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="canonical" href="https://baklog.app/" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 
   <!-- Open Graph / social -->
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BAKLOG" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:url" content="https://baklog.app/" />
   <meta property="og:title" content="BAKLOG: One honest backlog across every store" />
   <meta property="og:description" content="BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, invite-only early access." />
-  <meta property="og:image" content="assets/og.png" />
+  <meta property="og:image" content="https://baklog.app/assets/og.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="BAKLOG: one honest backlog across every store" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="BAKLOG: One honest backlog across every store" />
   <meta name="twitter:description" content="BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, invite-only early access." />
-  <meta name="twitter:image" content="assets/og.png" />
+  <meta name="twitter:image" content="https://baklog.app/assets/og.png" />
+  <meta name="twitter:image:alt" content="BAKLOG: one honest backlog across every store" />
 
+  <!-- Fonts: preconnect + non-render-blocking stylesheet load -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
   <link rel="stylesheet" href="demo.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="demo.js" defer></script>
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "BAKLOG",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "url": "https://baklog.app/",
+    "description": "BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, invite-only early access.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "BAKLOG",
+      "url": "https://baklog.app/"
+    }
+  }
+  </script>
 
   <style>
     :root {
@@ -89,15 +124,25 @@
     /* ---------- Hero ---------- */
     .hero {
       position: relative;
-      min-height: 100vh;
-      min-height: 100svh;
+      height: 100vh;
+      height: 100svh;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      isolation: isolate;
+      -webkit-overflow-scrolling: touch;
+    }
+    .hero-inner {
+      margin: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       text-align: center;
-      padding: 5rem 1.5rem 4rem;
-      isolation: isolate;
+      width: 100%;
+      max-width: 100%;
+      padding: 3rem 1.5rem;
+      flex-shrink: 0;
     }
 
     /* blue mesh glow behind the hero */
@@ -171,9 +216,57 @@
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
     }
 
+    /* Compact store trust strip — same SVG mask system as the app (assets/store-logos) */
+    .hero-store-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 6px 7px;
+      margin: 1rem auto 0;
+      max-width: min(100%, 22rem);
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.21s both;
+    }
+    .hero-store {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      background: var(--store-bg, #334155);
+      flex-shrink: 0;
+      opacity: 0.9;
+    }
+    .hero-store-glyph {
+      display: block;
+      width: 62%;
+      height: 62%;
+      background: #fff;
+      -webkit-mask: var(--store-glyph) center / contain no-repeat;
+              mask: var(--store-glyph) center / contain no-repeat;
+    }
+    .hero-store-caption {
+      display: block;
+      margin: 0.5rem auto 0;
+      font-size: 0.72rem;
+      letter-spacing: 0.03em;
+      color: var(--text-mute);
+      opacity: 0.88;
+      max-width: 40ch;
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
+    }
+    .hero-store-caption a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: rgba(148, 163, 184, 0.45);
+      text-underline-offset: 2px;
+    }
+    .hero-store-caption a:hover { color: var(--accent-muted); }
+
     /* ---------- Waitlist form ---------- */
     .waitlist {
-      margin: 2.5rem auto 0;
+      margin: 2rem auto 0;
       width: 100%;
       max-width: 460px;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
@@ -254,8 +347,12 @@
     .form-msg.err { color: #fca5a5; }
 
     .scroll-link {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
       margin-top: 1.8rem;
+      padding: 0.25rem 0.5rem;
       font-size: 0.85rem;
       color: var(--text-mute);
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
@@ -342,17 +439,66 @@
 
     @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
+    /* Short viewports: compress hero before internal scroll kicks in */
+    @media (max-height: 720px) {
+      .hero-inner { padding: 2rem 1.25rem; }
+      .hero-badge { margin-top: 0.75rem; }
+      .hero-tagline { margin-top: 0.9rem; }
+      .hero-sub { margin-top: 0.5rem; }
+      .hero-store-strip { margin-top: 0.65rem; }
+      .hero-store-caption { margin-top: 0.35rem; }
+      .waitlist { margin-top: 1.25rem; }
+      .scroll-link { margin-top: 1rem; }
+      .form-reassure { margin-top: 0.65rem; gap: 0.35rem; }
+    }
+    @media (max-height: 560px) {
+      .hero-inner { padding: 1.25rem 1rem; }
+      .hero-mark { width: clamp(100px, 22vw, 160px); }
+      .wordmark {
+        font-size: clamp(2rem, 8vw, 3.5rem);
+        margin-top: clamp(-2rem, -3.5vw, -0.75rem);
+      }
+      .hero-tagline { font-size: clamp(1rem, 2.8vw, 1.35rem); margin-top: 0.6rem; }
+      .hero-sub { font-size: 0.9rem; margin-top: 0.4rem; }
+      .hero-store { width: 18px; height: 18px; }
+      .hero-store-caption { font-size: 0.68rem; }
+      .waitlist { margin-top: 0.9rem; }
+      .scroll-link { margin-top: 0.65rem; font-size: 0.78rem; }
+      .form-secure, .form-invite { font-size: 0.75rem; }
+    }
+
+    @media (max-width: 768px) {
+      section.band { padding: 4rem 0; }
+      .section-head { margin-bottom: 2rem; }
+      .wrap { padding: 0 1.25rem; }
+      .features-grid { grid-template-columns: 1fr; }
+      footer { padding: 3rem 0 3.5rem; }
+    }
+
+    @media (max-width: 400px) {
+      .hero-inner { padding-left: 1rem; padding-right: 1rem; }
+      .hero-store-strip { gap: 5px 6px; max-width: 100%; }
+      .wordmark { letter-spacing: 0.12em; }
+      .hero-sub { max-width: 36ch; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .hero-mark, .wordmark, .hero-badge, .hero-tagline, .hero-sub, .waitlist, .scroll-link { animation: none; }
+      .hero-mark, .wordmark, .hero-badge, .hero-tagline, .hero-sub, .hero-store-strip, .hero-store-caption, .waitlist, .scroll-link { animation: none; }
       .card, .btn { transition: none; }
     }
 
     @media (max-width: 560px) {
       .waitlist-row { flex-direction: column; }
-      .btn { width: 100%; }
+      .btn { width: 100%; min-height: 44px; }
       .foot-grid { flex-direction: column; align-items: flex-start; }
       .foot-meta { text-align: left; }
+      .foot-invite a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0.25rem 0;
+      }
     }
   </style>
 </head>
@@ -360,6 +506,7 @@
 
   <!-- ============ HERO ============ -->
   <header class="hero">
+    <div class="hero-inner">
     <svg class="hero-mark" viewBox="0 0 100 100" role="img" aria-label="BAKLOG logo">
       <defs>
         <mask id="knobs" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
@@ -384,6 +531,22 @@
     <p class="hero-tagline">One honest backlog across every store.</p>
     <p class="hero-sub">BAKLOG goes to every store for you, opens a channel from each one straight to your machine, and finally shows you what to play next.</p>
 
+    <div class="hero-store-strip" aria-hidden="true">
+      <span class="hero-store" style="--store-bg:#1b2838;--store-glyph:url('assets/store-logos/steam.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#2a2a2a;--store-glyph:url('assets/store-logos/epic.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#86328a;--store-glyph:url('assets/store-logos/gog.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#0070d1;--store-glyph:url('assets/store-logos/playstation.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#107c10;--store-glyph:url('assets/store-logos/xbox.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#ff9900;--store-glyph:url('assets/store-logos/amazon.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#148eff;--store-glyph:url('assets/store-logos/battlenet.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#0072ff;--store-glyph:url('assets/store-logos/ubisoft.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#e60012;--store-glyph:url('assets/store-logos/nintendo.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#fa5c5c;--store-glyph:url('assets/store-logos/itch.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#cc2929;--store-glyph:url('assets/store-logos/humble-h.svg')"><span class="hero-store-glyph"></span></span>
+      <span class="hero-store" style="--store-bg:#ff4747;--store-glyph:url('assets/store-logos/ea.svg')"><span class="hero-store-glyph"></span></span>
+    </div>
+    <p class="hero-store-caption">Twelve library sources — <a href="#stores">Steam, Epic, GOG, PlayStation, Xbox, and more</a></p>
+
     <form class="waitlist" id="waitlist" novalidate>
       <div class="waitlist-row">
         <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required aria-label="Email address" />
@@ -401,7 +564,10 @@
     </form>
 
     <a class="scroll-link" href="#demo">See what it does &darr;</a>
+    </div>
   </header>
+
+  <main id="main">
 
   <!-- ============ INTERACTIVE DEMO ============ -->
   <section class="band demo-section" id="demo">
@@ -427,7 +593,7 @@
   </section>
 
   <!-- ============ STORE WALL ============ -->
-  <section class="band logo-wall-section">
+  <section class="band logo-wall-section" id="stores">
     <div class="wrap">
       <span class="eyebrow">Works with what you already own</span>
       <h2>Twelve libraries and eight wishlists. One honest table.</h2>
@@ -620,6 +786,8 @@
       <a class="btn" href="#waitlist">Request an invite</a>
     </div>
   </section>
+
+  </main>
 
   <!-- ============ FOOTER ============ -->
   <footer>

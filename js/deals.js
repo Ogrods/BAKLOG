@@ -125,7 +125,7 @@ export function dealHeroCardHtml(g) {
   // card to jump to the actual sale page (deal URL) instead of re-focusing the
   // same row. The bind-events click handler picks up data-deal-url on wishlist.
   const dealUrl = d?.url ? ` data-deal-url="${escapeAttr(d.url)}"` : "";
-  return `<button type="button" class="deal-card-clickable deal-hero dash-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}"${dealUrl} title="Jump to ${escapeAttr(g.name)} on wishlist">
+  return `<button type="button" class="deal-card-clickable deal-hero dash-card deal-rail-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}"${dealUrl} title="Jump to ${escapeAttr(g.name)} on Wishlist">
     <div class="dash-kpi-label">Today&apos;s top deal</div>
     <div class="deal-hero-body mt-2">
       <span class="cover-wrap deal-hero-cover-wrap${window.coverLandscapeAttr(cover)}">
@@ -150,7 +150,7 @@ export function dealHeroEmptyHtml(opts = {}) {
   const hint = opts.noWishlist
     ? "Connect a store and run its wishlist fetcher to start tracking deals."
     : "No active deals right now - check back after the next price refresh.";
-  return `<div class="dash-card deal-hero-empty">
+  return `<div class="dash-card deal-rail-card deal-hero-empty">
     <div class="dash-kpi-label">Today&apos;s top deal</div>
     <div class="text-sm text-slate-400 mt-3">${hint}</div>
   </div>`;
@@ -176,7 +176,7 @@ function bucketCuts(cuts) {
 
 export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, bestCut, bestCutGame, hasPricing, cuts }) {
   if (!hasPricing) {
-    return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
+    return `<button type="button" class="deal-card-clickable dash-card deal-rail-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
       <div class="dash-kpi-label">Sale scoreboard</div>
       <div class="text-xs text-slate-400 mt-2">Run the deal price fetcher (Fetcher health) to see cross-store sale stats.</div>
     </button>`;
@@ -203,7 +203,7 @@ export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, be
         </div>
       </div>`
     : "";
-  return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
+  return `<button type="button" class="deal-card-clickable dash-card deal-rail-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
     <div class="dash-kpi-label">Sale scoreboard</div>
     <div class="sale-scoreboard mt-2">
       <div class="sale-stat">
@@ -226,7 +226,7 @@ export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, be
 
 export function dealStealsCardHtml(steals) {
   if (!steals.length) {
-    return `<button type="button" class="deal-card-clickable dash-card text-left w-full" data-action="deal-steals" title="Show wishlist steals (50%+ off, 80%+ rated)">
+    return `<button type="button" class="deal-card-clickable dash-card deal-rail-card text-left w-full" data-action="deal-steals" title="Show wishlist steals (50%+ off, 80%+ rated)">
       <div class="dash-kpi-label">Steals waiting</div>
       <div class="text-xs text-slate-400 mt-1">50%+ off or historical low · 80%+ rated</div>
       <div class="text-xs text-slate-400 mt-3">No steals match right now.</div>
@@ -251,7 +251,7 @@ export function dealStealsCardHtml(steals) {
     const shopCls = `steal-row-shop steal-row-shop-${shopSlug(shopFull)}`;
     const shop = shopShort ? `<span class="${shopCls}" title="Deal on ${escapeAttr(shopFull)}">${escapeHtml(shopShort)}</span>` : "";
     const key = gameKey(g);
-    return `<button type="button" class="steal-row" data-action="deal-steal-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on wishlist${shopFull ? ` (deal on ${escapeAttr(shopFull)})` : ""}">
+    return `<button type="button" class="steal-row" data-action="deal-steal-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} on Wishlist${shopFull ? ` (deal on ${escapeAttr(shopFull)})` : ""}">
       <img class="steal-row-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fb)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
       <span class="steal-row-name truncate">${escapeHtml(g.name)}</span>
       ${shop}
@@ -268,7 +268,7 @@ export function dealStealsCardHtml(steals) {
   const footer = remaining > 0
     ? `<div class="steal-list-footer" data-action="deal-steals" title="Show all steals">+${remaining} more · view all →</div>`
     : `<div class="steal-list-footer steal-list-footer-passive" data-action="deal-steals" title="Show all steals on wishlist">View on wishlist →</div>`;
-  return `<div class="dash-card steal-card" title="50%+ off or historical low · 80%+ rated">
+  return `<div class="dash-card steal-card deal-rail-card" title="50%+ off or historical low · 80%+ rated">
     <div class="flex items-baseline justify-between gap-2">
       <div>
         <div class="dash-kpi-label">Steals waiting</div>
@@ -408,11 +408,16 @@ export function gameComparablePrice(g, displayCcy) {
   return parsePriceLike(g.price);
 }
 
-function gameComparableRegularPrice(g) {
+function gameComparableRegularPrice(g, displayCcy) {
   if (g?.price_amount_initial != null) {
     const n = Number(g.price_amount_initial);
     if (Number.isFinite(n)) return n;
   }
+  // Mirror gameComparablePrice: never sum a native price_initial that is in a
+  // different currency than the display currency (that was the old inaccuracy).
+  const disp = normalizeCurrencyCode(displayCcy || displayCurrency());
+  const rowCur = normalizeCurrencyCode(g?.currency);
+  if (rowCur && rowCur !== disp) return null;
   return parsePriceLike(g.price_initial);
 }
 

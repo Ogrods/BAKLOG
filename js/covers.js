@@ -120,6 +120,7 @@ window.applySpotlightArtFit = function (img) {
     bg?.classList.remove("is-loaded");
     if (sheen) sheen.style.width = "";
   }
+  spot._spotlightSyncHover?.();
 };
 window.spotlightArtFallback = function (img) {
   const list = (img.dataset.spotlightCandidates || "").split("|").filter(Boolean);

@@ -15,6 +15,28 @@ import { dashDrillStore, dashDrillStatus, dashDrillStoreStatus, dashSetReleaseYe
 
 export const dashboardCharts = {};
 const pendingChartRenders = new Map();
+
+function cssAccentVar(name) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || null;
+}
+
+/** Live theme accent (falls back to default sky if the token is missing). */
+function accentColor() {
+  return cssAccentVar('--accent') || '#38bdf8';
+}
+
+function accentRgba(alpha, varName = '--accent') {
+  const c = cssAccentVar(varName) || '#38bdf8';
+  if (!c.startsWith('#')) return c;
+  const hex = c.slice(1);
+  const full = hex.length === 3 ? hex.split('').map((x) => x + x).join('') : hex;
+  const n = parseInt(full, 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 let chartLazyObserver = null;
 
 const CHART_STAGGER_MS = 120;
@@ -376,6 +398,7 @@ let _scatterHoverPending = null;
 let _scatterHoverLastKey = null;
 
 let _scatterListClickBound = false;
+let _scatterListEscBound = false;
 let _scatterListLastKey = null;
 let _scatterListLastFitCount = 0;
 let _scatterListLastHits = null;
@@ -513,8 +536,6 @@ function runScatterHover(evt, chart) {
   } else {
     hideScatterCursorTooltip();
   }
-  if (_scatterListFrozen) return;
-  if (hits.length >= 1) renderScatterList(hits);
 }
 
 function scheduleScatterHover(evt, chart) {
@@ -544,12 +565,41 @@ function sortClusterForPicker(hits) {
   });
 }
 
+function collapseScatterList() {
+  _scatterListFrozenKey = null;
+  setScatterListFrozen(false);
+  renderScatterList([]);
+}
+
+export function resetScatterListView() {
+  clearScatterList();
+}
+
+function ensureScatterListEscHandler() {
+  if (_scatterListEscBound || typeof document === 'undefined') return;
+  _scatterListEscBound = true;
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !_scatterListFrozen) return;
+    const el = document.getElementById('chartScatterList');
+    if (!el?.classList.contains('is-open')) return;
+    e.preventDefault();
+    collapseScatterList();
+  });
+}
+
 function ensureScatterListClickHandler() {
   if (_scatterListClickBound) return;
   const el = document.getElementById('chartScatterList');
   if (!el) return;
   _scatterListClickBound = true;
+  ensureScatterListEscHandler();
   el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-scatter-collapse]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      collapseScatterList();
+      return;
+    }
     const row = e.target.closest('.dash-scatter-list-row');
     if (!row?.dataset.key) return;
     e.preventDefault();
@@ -580,8 +630,9 @@ function setScatterListFrozen(frozen) {
   const el = document.getElementById('chartScatterList');
   if (!el) return;
   el.classList.toggle('is-frozen', frozen);
+  el.classList.toggle('is-open', frozen);
+  el.setAttribute('aria-expanded', frozen ? 'true' : 'false');
   if (frozen) pulseScatterList();
-  // Force the next render() to repaint so the pin badge appears/disappears.
   _scatterListLastKey = null;
 }
 
@@ -592,7 +643,9 @@ function renderScatterList(hits) {
   ensureScatterListResizeObserver();
 
   if (!hits.length) {
-    el.innerHTML = '<div class="dash-scatter-list-hint">Hover a point or cluster to inspect</div>';
+    el.classList.remove('is-open', 'is-frozen');
+    el.setAttribute('aria-expanded', 'false');
+    el.innerHTML = '<div class="dash-scatter-list-hint">Click a cluster of games to inspect</div>';
     _scatterListLastKey = null;
     _scatterListLastHits = null;
     _scatterListLastFitCount = 0;
@@ -617,20 +670,17 @@ function renderScatterList(hits) {
   _scatterListLastKey = key;
 
   const isCluster = hits.length >= 2;
-  const pinBadge = _scatterListFrozen
-    ? '<span class="dash-scatter-list-pin" title="Click the chart background or another cluster to unpin">Pinned</span>'
-    : '';
   const headLabel = isCluster
     ? `${hits.length} games here · click to jump`
     : `${sorted[0].pt.label} · click to jump`;
-  const headText = `${headLabel}${pinBadge}`;
+  const closeBtn = '<button type="button" class="dash-scatter-list-close" data-scatter-collapse aria-label="Collapse inspector" title="Collapse (Esc)">×</button>';
 
   const rowHtml = shown.map(({ pt }) => {
     const cover = pt.cover || '';
     const coverHtml = cover
       ? `<img class="dash-scatter-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />`
       : `<span class="dash-scatter-list-cover" aria-hidden="true"></span>`;
-    return `<button type="button" class="dash-scatter-list-row" data-key="${escapeAttr(pt.key)}" title="Jump to ${escapeAttr(pt.label)} in the library">
+    return `<button type="button" class="dash-scatter-list-row" data-key="${escapeAttr(pt.key)}" title="Jump to ${escapeAttr(pt.label)} in Library">
       ${coverHtml}
       <span class="dash-scatter-list-name">${escapeHtml(pt.label)}</span>
       <span class="dash-scatter-list-meta">${pt.y}% · ${pt.x}h</span>
@@ -645,7 +695,10 @@ function renderScatterList(hits) {
     : '';
 
   el.innerHTML = `
-    <div class="dash-scatter-list-head">${headText}</div>
+    <div class="dash-scatter-list-head">
+      <span class="dash-scatter-list-head-label">${headLabel}</span>
+      ${closeBtn}
+    </div>
     <div class="dash-scatter-list-strip">${rowHtml}${overflowTile}</div>
   `;
 }
@@ -749,7 +802,7 @@ export function renderDashboardCharts(games) {
       datasets: [{
         label: "Games",
         data: topGenres.map(([, n]) => n),
-        backgroundColor: "#38bdf8",
+        backgroundColor: accentColor(),
       }],
     },
     options: dashChartOptions({
@@ -943,8 +996,8 @@ export function renderDashboardCharts(games) {
         {
           label: "Games / year",
           data: trendData,
-          borderColor: "rgba(56, 189, 248, 0.95)",
-          backgroundColor: "rgba(56, 189, 248, 0.18)",
+          borderColor: accentRgba(0.95),
+          backgroundColor: accentRgba(0.18),
           borderWidth: 1.5,
           pointRadius: 0,
           pointHoverRadius: 4,
@@ -954,13 +1007,15 @@ export function renderDashboardCharts(games) {
         {
           label: "3-yr rolling avg",
           data: rolling,
-          borderColor: "rgba(52, 211, 153, 0.95)",
+          borderColor: accentRgba(0.95, '--accent-bright'),
           backgroundColor: "transparent",
-          borderWidth: 2,
+          borderWidth: 2.5,
           pointRadius: 0,
           pointHoverRadius: 4,
           tension: 0.4,
-          borderDash: [4, 3],
+          borderDash: [0, 7],
+          borderCapStyle: "round",
+          borderJoinStyle: "round",
           fill: false,
         },
       ],
@@ -973,11 +1028,26 @@ export function renderDashboardCharts(games) {
           position: "top",
           labels: {
             color: "#cbd5e1",
-            boxWidth: 14,
-            boxHeight: 8,
+            boxWidth: 16,
+            boxHeight: 10,
             font: { size: 11 },
             usePointStyle: true,
-            pointStyle: "rectRounded",
+            // Match each marker to its line: a rounded-rect swatch for the solid
+            // "Games / year" series and a round-dotted line for the rolling avg.
+            generateLabels(chart) {
+              const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              for (const item of items) {
+                if (item.datasetIndex === 0) {
+                  item.pointStyle = "rectRounded";
+                } else if (item.datasetIndex === 1) {
+                  item.pointStyle = "line";
+                  item.lineDash = [0, 5];
+                  item.lineCap = "round";
+                  item.lineWidth = 2.5;
+                }
+              }
+              return items;
+            },
           },
         },
         tooltip: {
@@ -1053,21 +1123,14 @@ export function renderDashboardCharts(games) {
   };
   const scatterAnimReduced = prefersReducedMotion();
   const scatterAnimDuration = 1000;
-  const ratingGradient = (rating, alpha) => {
-    const t = Math.max(0, Math.min(1, rating / 100));
-    const r = Math.round(245 + (16 - 245) * t);
-    const g = Math.round(158 + (185 - 158) * t);
-    const b = Math.round(11 + (129 - 11) * t);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
   setDashboardChart("chartScatter", {
     type: "scatter",
     data: {
       datasets: [{
         label: "Games",
         data: scatterPts.map(p => ({ x: p.x, y: p.y })),
-        backgroundColor: scatterPts.map(p => ratingGradient(p.y, 0.55)),
-        borderColor: scatterPts.map(p => ratingGradient(p.y, 0.95)),
+        backgroundColor: accentRgba(0.55),
+        borderColor: accentRgba(0.95),
         borderWidth: 0.6,
         pointRadius: 4,
         pointHoverRadius: 7,
@@ -1154,11 +1217,7 @@ export function renderDashboardCharts(games) {
         const cy = evt.y ?? (evt.native?.offsetY ?? 0);
         const hits = hitsAtScatterClick(chart, cx, cy);
         if (!hits.length) {
-          if (_scatterListFrozen) {
-            _scatterListFrozenKey = null;
-            setScatterListFrozen(false);
-            renderScatterList([]);
-          }
+          if (_scatterListFrozen) collapseScatterList();
           return;
         }
         if (hits.length === 1) {
@@ -1167,9 +1226,7 @@ export function renderDashboardCharts(games) {
         }
         const key = hits.map(h => h.pt.key).join('|');
         if (_scatterListFrozen && key === _scatterListFrozenKey) {
-          _scatterListFrozenKey = null;
-          setScatterListFrozen(false);
-          renderScatterList(hits);
+          collapseScatterList();
           return;
         }
         _scatterListFrozenKey = key;

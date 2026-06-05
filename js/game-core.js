@@ -535,7 +535,7 @@ export function storeBadgeHtml(g) {
 
 export function wishlistStatusSelectHtml(g, p) {
   const key = gameKey(g);
-  return `<select data-game-key="${escapeAttr(key)}" data-field="status" class="bg-slate-700 border border-slate-600 rounded text-xs py-1" title="Wishlist tracking">
+  return `<select data-game-key="${escapeAttr(key)}" data-field="status" class="row-ctl rounded text-xs py-1" title="Wishlist tracking">
     ${Object.entries(WISHLIST_STATUS_LABELS).map(([val, label]) => `<option value="${val}" ${p.status === val ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
   </select>`;
 }

@@ -17,12 +17,13 @@ import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, dashboardLibraryGames } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
-import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts } from './dashboard-charts.js';
+import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView } from './dashboard-charts.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation } from './dashboard-insights.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
+import { THEME_CHANGE_EVENT } from './theme.js';
 
 // Re-exports — dashboard.js stays the single public entry point for the
 // dashboard surface. External callers (app.js / bind-events.js / etc.)
@@ -42,6 +43,7 @@ export function initDashboard() {}
 export function stopDashboardRotations() {
   stopInsightRotation();
   stopSpotlightRotation();
+  resetScatterListView();
 }
 
 let _dashboardRenderTimer = null;
@@ -94,6 +96,9 @@ export function dashboardFingerprint() {
     rc: recentCount,
     rm: recentMax,
     ds: dealSig,
+    // Charts read CSS accent tokens at render time; fold the active theme in so
+    // switching back to the dashboard after a theme change repaints the charts.
+    th: (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme")) || "default",
   });
 }
 
@@ -397,4 +402,16 @@ export function scheduleDashboardRender() {
 /** Has the dashboard ever been rendered in this session? */
 export function dashboardWasRendered() {
   return _dashMegaShellBuilt;
+}
+
+// Charts bake CSS accent tokens into Chart.js datasets at render time, so a
+// live theme switch needs a forced re-render to repaint them. When the
+// dashboard isn't the active view, the theme is folded into the fingerprint so
+// the next switch-in repaints without a forced render here.
+if (typeof window !== "undefined") {
+  window.addEventListener(THEME_CHANGE_EVENT, () => {
+    if (state.activeView === "dashboard") {
+      renderDashboard({ force: true });
+    }
+  });
 }

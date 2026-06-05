@@ -1066,7 +1066,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="col-score p-2 text-right">${priorityScore(g).toFixed(1)}</td>
       <td class="col-played p-2 text-right text-slate-300"${combinedPlaytimeTooltip(g) ? ` title="${escapeAttr(combinedPlaytimeTooltip(g))}"` : ""}>${formatHours(combinedPlaytime(g))}</td>
       <td class="p-2 text-right">
-        <button data-hltb-edit="${escapeAttr(key)}" class="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
+        <button data-hltb-edit="${escapeAttr(key)}" class="px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
       <td class="p-2 text-right">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - "}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
@@ -1074,7 +1074,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
       <td class="p-2 notes-cell">
-        <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input bg-slate-700 border border-slate-600 rounded text-xs w-full px-2 py-1">${escapeHtml(p.notes || "")}</textarea>
+        <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1">${escapeHtml(p.notes || "")}</textarea>
       </td>
     </tr>`;
 }

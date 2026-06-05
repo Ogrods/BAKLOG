@@ -601,7 +601,6 @@ function buildCardHtml(p) {
 
   const pillSt = displayStatus(st);
 
-  const brand = providerBrand(p);
   const badge = connBadge(p);
 
   const expiry = p.expiry_days ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>` : '';
@@ -628,7 +627,7 @@ function buildCardHtml(p) {
 
     <article class="conn-card${p.kind === 'manual' ? ' conn-card--manual' : ''}" data-provider="${escapeAttr(p.key)}">
 
-      <div class="conn-card-stripe" style="background:${escapeAttr(brand.color)}"></div>
+      <div class="conn-card-stripe"></div>
 
       <div class="conn-card-head">
 
@@ -1357,11 +1356,22 @@ function wireChromeEvents() {
 
     }
 
-    if (!target.closest('#connKebabMenu')) {
+  });
 
-      toggleKebabMenu(false);
+  // Close the kebab menu on any click outside it (the section-scoped handler
+  // above only fires for clicks inside #connectionsContainer, so clicks on the
+  // header or elsewhere on the page would otherwise leave the menu open).
+  document.addEventListener('click', ev => {
 
-    }
+    const menu = document.getElementById('connKebabMenu');
+
+    if (!menu || menu.hidden) return;
+
+    const target = ev.target;
+
+    if (target.closest('#connKebabMenu') || target.closest('#connKebabBtn')) return;
+
+    toggleKebabMenu(false);
 
   });
 

@@ -4,6 +4,30 @@ Paste-ready copy for SEO, PPC, landing tests, social, and email. Sourced from `t
 
 ---
 
+## Positioning moat (lead with this)
+
+**One-liner (benefit):** See everything you own across every store in one place — and finally know what to play next.
+
+**Trust moat (differentiator):** Your library never lives on a BAKLOG server — there is nothing to breach, sell, or subpoena. Credentials stay on your machine; store fetches use your browser session and your IP.
+
+**Counter-positioning:** Storefronts profit when you cannot see across stores. BAKLOG runs on your machine and refuses to be one.
+
+**Sound bites**
+- No BAKLOG server to breach.
+- Ownership-aware deals — skip sales for games you already own elsewhere.
+- The demo *is* onboarding: connect once, hit Refresh, watch your real library appear.
+- Cross-store dedupe + backlog decisions — not another launcher.
+- Lives in your system tray: open BAKLOG from the tray, check out your backlog in a browser window.
+
+**Product experience (direction):** BAKLOG runs quietly in the system tray. Open it from the tray and your backlog opens in a browser window — local-first, always a click away, nothing phoning home.
+
+**Do not over-claim**
+- No “patent pending” unless counsel confirms a filing.
+- No “only available in the US” — sales are worldwide; patent geography is a separate question (see [IP.md](../IP.md)).
+- No “cloud sync” / “AI picks” until shipped.
+
+---
+
 ## SEO
 
 ### Primary keywords
@@ -119,6 +143,17 @@ Free, MIT-ish vibe, clone and run. Happy to hear what breaks on your setup.
 - **Subhead:** Local-first backlog dashboard. Your credentials never leave your machine. One honest table across every store.
 - **CTA:** Read the threat model · Try BAKLOG
 
+### Variant D — The gift you forgot you got
+- **Headline:** "Aw cool, someone got me a Steam key for my birthday."
+- **Subhead:** Gift keys pile up just like free claims. BAKLOG pulls your whole library into one local table so the games friends and family gave you actually get seen, sorted, and played.
+- **CTA:** Find the games people gave you → Connect Steam
+
+### Variant E — System tray (direction)
+- **Headline:** Your backlog, one click from the tray.
+- **Subhead:** BAKLOG lives in the system tray on your PC. Open it from the tray and your backlog opens in a browser window — local-first, always nearby, nothing phoning home.
+- **CTA:** See how it works · Try BAKLOG
+- **Note:** Product direction — do not imply shipped until tray build ships.
+
 ---
 
 ## Digital ad copy (pairs with `marketing/assets/ads/`)
@@ -159,6 +194,7 @@ BAKLOG pulls it all into one table on your machine:
 - 12 library sources, 8 wishlists
 - Deals only when you don't already own the title somewhere
 - $0 core — optional $2–4/mo to remove sponsored deal slots
+- Deep achievement/trophy pulls are metered (real store API calls) — included in the paid tier or small credit packs for one-off refreshes
 
 **Try it:** [link] · 60-second demo video attached
 
@@ -166,11 +202,38 @@ We don't upload your logins. There is no BAKLOG server to breach.
 
 ---
 
+## Monetization — metered achievement / trophy enrichment
+
+**Positioning:** Free tier keeps cached summary % and slow refresh. Paid tier (or credit packs) covers on-demand deep pulls through Steam, PSN, Xbox, and RetroAchievements APIs — rarity, unlock timestamps, per-tier breakdown — because every refresh is a real upstream request.
+
+### Headlines (PPC / landing)
+- Pay for the API calls, not the spreadsheet
+- Trophy data that stays fresh — metered, honest
+- Deep achievement sync when you need it
+- 100% hunters: refresh rarity without hammering the APIs
+
+### Short copy blocks
+**Landing subhead:** Cached trophy % is free. Deep per-title achievement sync — global rarity, unlock timeline, tier breakdown — is metered: bundled with No-ads + cloud, or buy a small credit pack when you want a one-off refresh.
+
+**Footer / How we make money:** Library import stays free forever. Sponsored deal cards and optional upgrades fund the app. Achievement and trophy enrichment that hits store APIs on your behalf is usage-metered so we only charge when a refresh actually costs us — never for data we already cached on your machine.
+
+**Reddit r/Trophies / r/SteamAchievements:** BAKLOG already shows trophy % across your library. Deep pulls (per-achievement rarity, unlock dates) go through the real store APIs, so refreshes are metered — free lane is cached/slow, paid tier or a $3 credit pack when you want everything fresh. Still local-first; your credentials never leave your PC.
+
+### FAQ snippets
+| Question | Answer |
+|----------|--------|
+| Why meter achievements? | Each deep refresh is a real API call to Steam/PSN/Xbox. Metering keeps the free core honest and covers marginal cost. |
+| What's free? | Summary completion %, cached state, slow background refresh. |
+| What's paid? | Priority deep sync, higher rate limits, bulk refresh — in No-ads + cloud or credit packs. |
+| Do you resell platform data? | No. We sell convenience and throughput for requests you could make yourself, on your machine. |
+
+---
+
 ## Elevator pitches
 
 **30s:** BAKLOG is a local dashboard that imports your real libraries from Steam, Epic, GOG, PSN, Xbox, Amazon, and more — then layers deal radar, status workflow, and cross-store dedupe on top. No cloud account. Connect once, hit Refresh, and watch your library appear on your own machine.
 
-**60s:** If you've claimed free games for years across Epic, Prime, GOG, and Steam, you already have an accidental library — and no storefront will help you see it all. BAKLOG runs on your PC: you connect your stores, fetchers pull your real owned games into one table, and ITAD pricing shows deals only when you don't already own the title somewhere else. Credentials stay encrypted locally; there's no BAKLOG server to breach. The onboarding is a 60-second screen recording of chips lighting up as your count climbs — that's the product.
+**60s:** If you've claimed free games for years across Epic, Prime, GOG, and Steam, you already have an accidental library — and no storefront will help you see it all. BAKLOG runs on your PC: you connect your stores, fetchers pull your real owned games into one table, and ITAD pricing shows deals only when you don't already own the title somewhere else. Trophy hunters get summary completion for free; deep achievement sync through the store APIs is metered when you want fresh rarity and unlock timelines. Credentials stay encrypted locally; there's no BAKLOG server to breach. The onboarding is a 60-second screen recording of chips lighting up as your count climbs — that's the product.
 
 ---
 
@@ -182,11 +245,13 @@ We don't upload your logins. There is no BAKLOG server to breach.
 | Backloggd is free | Backloggd is manual logging. BAKLOG auto-imports 12 library + 8 wishlist sources. |
 | I don't want to install Python | Clone-and-run today; frozen installer on roadmap. Install is the privacy model. |
 | Isn't scraping against ToS? | BAKLOG automates requests you could make in your own browser, with your credentials, on your machine. |
+| Why pay for achievement sync? | Deep trophy/achievement pulls hit store APIs per title. Free tier uses cache; paid covers the real request cost when you want fresh rarity and unlock timelines. |
 
 ---
 
 ## Taglines (rotation)
 - One honest backlog across every store.
+- Back up your backlog with BAKLOG.
 - Watch your library appear.
 - Deal alerts that know what you already own.
 - There is no BAKLOG server to breach.

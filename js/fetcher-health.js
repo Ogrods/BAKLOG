@@ -669,16 +669,12 @@ const COVERAGE_FNS = {
 function coverageLabel(key) {
   const fn = COVERAGE_FNS[key];
   if (!fn) return null;
-  const { covered, total, pct } = fn();
+  const { total, pct } = fn();
   if (!total) return ' - ';
-  const base = `${pct != null ? pct : 0}% · ${formatNum(covered)}/${formatNum(total)}`;
+  let label = `${pct != null ? pct : 0}%`;
   const pending = pendingForEnrich(key);
-  if (!pending) return base;
-  if (pending.unchecked > 0) return `${base} · ${formatNum(pending.unchecked)} new`;
-  // "retry" and "noMatch" are not actionable enough to deserve a banner —
-  // keep the chip quiet and let the tooltip explain. "max" means there's
-  // simply nothing left a click would do.
-  return `${base} · max`;
+  if (pending && pending.unchecked > 0) label += ` · ${formatNum(pending.unchecked)} new`;
+  return label;
 }
 
 function coverageTooltipLine(key) {
@@ -1075,6 +1071,25 @@ export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
   return true;
 }
 
+const STAT_LAYOUT_KEY = 'baklog-fetcher-stat-layout';
+const STAT_LAYOUTS = ['compact', 'landscape'];
+
+function statLayout() {
+  try {
+    const v = localStorage.getItem(STAT_LAYOUT_KEY);
+    return STAT_LAYOUTS.includes(v) ? v : 'compact';
+  } catch {
+    return 'compact';
+  }
+}
+
+export function cycleStatLayout() {
+  const next = statLayout() === 'compact' ? 'landscape' : 'compact';
+  try { localStorage.setItem(STAT_LAYOUT_KEY, next); } catch { /* ignore */ }
+  renderDashboardFetcherHealth();
+  return next;
+}
+
 export const fetcherRunner = (() => {
   let apiAvailable = null;
   const runStateByKey = new Map();
@@ -1411,6 +1426,8 @@ export const fetcherRunner = (() => {
     if (focusPanel) {
       pop.querySelector('[data-fetcher-popover-close]')?.focus({ preventScroll: true });
     }
+    pop.classList.add('fh-pop-opening');
+    setTimeout(() => pop.classList.remove('fh-pop-opening'), 600);
     return true;
   }
 
@@ -2688,8 +2705,94 @@ export const fetcherRunner = (() => {
     isRunFailedForTest(key) {
       return lastRunFailedByKey.has(key);
     },
+    cycleStatLayout,
   };
 })();
+
+function isSourceConnected(row) {
+  return row.status !== 'missing'
+    && !isFetcherDisconnected(row.src.key)
+    && !isFetcherReconnectRequired(row.src.key);
+}
+
+function groupConnectedCount(rows, group) {
+  const inGroup = rows.filter(r => r.src.group === group);
+  const total = inGroup.length;
+  const connected = inGroup.filter(isSourceConnected).length;
+  return { connected, total };
+}
+
+export function buildFetcherHealthRows() {
+  return fetcherSources.map(src => ({ src, ...fetcherFreshness(src) }));
+}
+
+function fetcherStatTotals(rows) {
+  const total = rows.length;
+  const connected = rows.filter(isSourceConnected).length;
+  const pct = total ? Math.round((connected / total) * 100) : 0;
+  const lib = groupConnectedCount(rows, 'library');
+  const wish = groupConnectedCount(rows, 'wishlist');
+  const enrich = groupConnectedCount(rows, 'enrich');
+
+  let lastSyncValue = 'never';
+  let minAge = Infinity;
+  for (const r of rows) {
+    if (Number.isFinite(r.ageMs) && r.ageMs < minAge) minAge = r.ageMs;
+  }
+  if (Number.isFinite(minAge) && minAge !== Infinity) {
+    lastSyncValue = `${humanizeAge(minAge)} ago`;
+  }
+  return { total, connected, pct, lib, wish, enrich, lastSyncValue };
+}
+
+function statTileHtml(value, label, title, extraClass = '') {
+  return `
+    <div class="fh-stat${extraClass ? ` ${extraClass}` : ''}" title="${escapeAttr(title)}">
+      <span class="fh-stat-value">${escapeHtml(String(value))}</span>
+      <span class="fh-stat-label">${escapeHtml(label)}</span>
+    </div>`;
+}
+
+export function buildStatTilesHtml(rows) {
+  const { lib, wish, enrich, lastSyncValue } = fetcherStatTotals(rows);
+  return `
+      ${statTileHtml(lib.connected, 'Libraries', `${lib.connected} of ${lib.total} library sources connected`)}
+      ${statTileHtml(wish.connected, 'Wishlists', `${wish.connected} of ${wish.total} wishlist sources connected`)}
+      ${statTileHtml(enrich.connected, 'Enrichment', `${enrich.connected} of ${enrich.total} enrichment sources connected`)}
+      ${statTileHtml(lastSyncValue, 'Last sync', 'Most recent fetch across all sources', 'fh-stat--lastsync')}`;
+}
+
+export function buildStatStripHtml(rows, mode = statLayout(), extrasHtml = '') {
+  const { total, connected, pct } = fetcherStatTotals(rows);
+  const heroTitle = `${connected} of ${total} sources have data and are not disconnected`;
+  const heroLabel = mode === 'compact' ? 'Sources' : 'Sources connected';
+  const barHtml = `<span class="fh-stat-bar" aria-hidden="true"><span class="fh-stat-bar-fill" style="--pct:${pct}%"></span></span>`;
+  const meterHtml = `<span class="fh-stat-meter" aria-hidden="true"><span class="fh-stat-meter-fill" style="--pct:${pct}%"></span></span>`;
+
+  if (mode === 'compact') {
+    return `
+    <div class="fh-stats fh-stats--compact" role="group" aria-label="Fetcher overview">
+      <div class="fh-stat fh-stat--hero" title="${escapeAttr(heroTitle)}">
+        <span class="fh-stat-value">${connected}/${total}</span>
+        <span class="fh-stat-label">${escapeHtml(heroLabel)}</span>
+      </div>
+      ${extrasHtml}
+      ${buildStatTilesHtml(rows)}
+      ${barHtml}
+    </div>`;
+  }
+
+  // Rail: the meter hero is the only thing in this block. The breakdown tiles
+  // and the head controls are placed in the middle rail column by the renderer.
+  return `
+    <div class="fh-stats fh-stats--rail" role="group" aria-label="Fetcher overview">
+      <div class="fh-stat fh-stat--hero fh-stat--meter" title="${escapeAttr(heroTitle)}">
+        <span class="fh-stat-value">${connected}/${total}</span>
+        <span class="fh-stat-label">${escapeHtml(heroLabel)}</span>
+        ${meterHtml}
+      </div>
+    </div>`;
+}
 
 export function renderDashboardFetcherHealth() {
   const slot = document.getElementById('dashboardFetcherHealth');
@@ -2757,12 +2860,27 @@ export function renderDashboardFetcherHealth() {
           to click chips and stream logs.
         </div>`)
     : '';
+  const layout = statLayout();
+  slot.dataset.statLayout = layout;
+  const countsBlockHtml = `<span class="fh-counts">${countsHtml}</span>`;
+  // Compact floats the counts pill (e.g. "4 missing") into the stat strip's
+  // top-right, above the blue bar; landscape keeps it in the head.
+  const statStripHtml = buildStatStripHtml(
+    rows,
+    layout,
+    layout === 'compact' ? `<span class="fh-counts fh-counts--float">${countsHtml}</span>` : '',
+  );
 
   function chipHtml({ src, status, count, ageLabel, iso }) {
     const covLabel = ENRICH_KEYS.has(src.key) ? coverageLabel(src.key) : null;
     const countStr = covLabel != null
       ? covLabel
       : (count != null && count > 0 ? formatNum(count) : ' - ');
+    // Co-op tags has the longest enrichment label; when it also shows "· N new"
+    // the chip gets tight, so drop the " tags" suffix to reclaim space.
+    const chipLabel = (src.key === 'steamTags' && covLabel && covLabel.includes('new'))
+      ? src.label.replace(/ tags$/i, '')
+      : src.label;
     const fetchedLine = iso ? new Date(iso).toLocaleString() : 'not loaded';
     const runState = fetcherRunner.stateFor(src.key);
     // A terminal 'failed' runState (the ~10s post-failure flash) is not an
@@ -2844,7 +2962,7 @@ export function renderDashboardFetcherHealth() {
       : '';
     let ageText = runState
       ? runState
-      : (needsReconnect ? 'reconnect' : (disconnected ? 'connect' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel)));
+      : (needsReconnect ? 'reconnect' : (disconnected ? '' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel)));
     if (persistFailed && !runState) ageText = 'failed';
     else if (status === 'missing' && ageLabel === '?' && (count === 0 || count == null)) ageText = 'empty';
     const connectAttr = navProvider
@@ -2853,7 +2971,7 @@ export function renderDashboardFetcherHealth() {
     const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
       ${warnBadge}
-      <span class="fh-chip-label">${escapeHtml(src.label)}</span>
+      <span class="fh-chip-label">${escapeHtml(chipLabel)}</span>
       <span class="fh-chip-count">${escapeHtml(countStr)}</span>
       <span class="fh-chip-age">${escapeHtml(ageText)}</span>
     </button>`;
@@ -2905,6 +3023,64 @@ export function renderDashboardFetcherHealth() {
   const staleBtnDisabled = !apiReady || !runnableStale.length || Date.now() < runStaleCooldownUntil;
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
 
+  const actionsHtml = `
+        <div class="fh-head-actions">
+          <button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>
+          <label class="fh-toggle">
+            <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />
+            Only stale / missing
+          </label>
+        </div>`;
+  // Counts pill ("4 missing") is placed per layout, never in the head: compact
+  // floats it into the stat strip; landscape pins it top-right across from the
+  // legend (see overviewHtml). Keeping it out of the head avoids duplication.
+  const headCountsHtml = '';
+  const headHtml = `
+      <div class="fh-head${apiReady ? '' : ' fh-readonly'}">
+        ${headCountsHtml}
+        ${actionsHtml}
+      </div>`;
+  const legendHtml = `
+      <details class="fh-legend">
+        <summary>Legend &amp; tips</summary>
+        <div class="fh-legend-items">
+          ${clickHint}
+          <span class="fh-legend-item"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
+          <span class="fh-legend-item">dim dashed = never fetched</span>
+          <span class="fh-legend-item">dot color = cache age</span>
+          <span class="fh-legend-item">reconnect = session expired (Connections, not these chips)</span>
+        </div>
+      </details>`;
+  const chipsBlockHtml = `<div class="fh-chips">${chipsHtml}</div>`;
+
+  // Rail splits the overview into three columns: a skinny meter, a middle
+  // column with the breakdown tiles + head controls, and the chips on the
+  // right. Compact puts the legend + stacked run controls in one row under the
+  // divider, then the chips below.
+  const overviewHtml = layout === 'landscape'
+    ? `<div class="fh-rail-grid">
+      ${statStripHtml}
+      <div class="fh-rail-mid">
+        ${buildStatTilesHtml(rows)}
+        ${headHtml}
+      </div>
+      <div class="fh-rail-main">
+        <div class="fh-legend-row">
+          ${legendHtml}
+          ${countsBlockHtml}
+        </div>
+        ${chipsBlockHtml}
+      </div>
+    </div>`
+    : `${statStripHtml}
+    <div class="fh-rail-main">
+      <div class="fh-legend-row">
+        ${legendHtml}
+        ${actionsHtml}
+      </div>
+      ${chipsBlockHtml}
+    </div>`;
+
   slot.innerHTML = `
     <div class="fh-bar" data-role="fetcher-bar" title="Click to expand the fetcher console">
       <span class="fh-bar-dot" data-role="bar-dot" aria-hidden="true"></span>
@@ -2913,29 +3089,7 @@ export function renderDashboardFetcherHealth() {
       <button type="button" class="fh-bar-toggle" data-role="bar-toggle" aria-expanded="false" aria-label="Expand fetcher">▸</button>
     </div>
     ${readonlyBanner}
-    <div class="fh-head${apiReady ? '' : ' fh-readonly'}">
-      <div class="fh-head-left">
-        <span class="fh-counts">${countsHtml}</span>
-      </div>
-      <div class="fh-head-actions">
-        <button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>
-        <label class="fh-toggle">
-          <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />
-          Only stale / missing
-        </label>
-      </div>
-    </div>
-    <details class="fh-legend">
-      <summary>Legend &amp; tips</summary>
-      <div class="fh-legend-items">
-        ${clickHint}
-        <span class="fh-legend-item"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
-        <span class="fh-legend-item">dim dashed = never fetched</span>
-        <span class="fh-legend-item">dot color = cache age</span>
-        <span class="fh-legend-item">reconnect = session expired (Connections, not these chips)</span>
-      </div>
-    </details>
-    <div class="fh-chips">${chipsHtml}</div>
+    ${overviewHtml}
   `;
   ensureAgeTicker();
   fetcherRunner.applyFetcherRowLayout();

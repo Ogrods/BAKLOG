@@ -239,6 +239,107 @@
     .pillar-card { border-left: 3px solid var(--accent); padding-left: 0.75rem; margin-bottom: 0.85rem; }
     .recent-shipped { background: rgba(52, 211, 153, 0.06); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; }
     .recent-shipped ul { margin: 0.35rem 0 0; padding-left: 1.2rem; color: var(--text-dim); }
+
+    /* Business cards — print-aspect mockups (3.5in × 2in) */
+    .bizcard-showcase { display: flex; flex-direction: column; gap: 2rem; margin-top: 1rem; }
+    .bizcard-variant-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text-mute); font-weight: 700; margin-bottom: 0.65rem;
+    }
+    .bizcard-pair {
+      display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start;
+      padding: 1.25rem 1.5rem;
+      background: linear-gradient(145deg, #e8ecf1 0%, #d4dae3 100%);
+      border-radius: 0.65rem;
+      border: 1px solid var(--border-soft);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .bizcard {
+      width: 3.5in; height: 2in; flex-shrink: 0;
+      border-radius: 0.12in;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 8px 24px rgba(0, 0, 0, 0.12);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      position: relative;
+    }
+    .bizcard-face {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      padding: 0.22in 0.28in;
+      box-sizing: border-box;
+    }
+    .bizcard-front .bizcard-face { justify-content: space-between; }
+    .bizcard-back .bizcard-face {
+      flex-direction: row; align-items: center; gap: 0.2in;
+      padding: 0.2in 0.24in;
+    }
+    .bizcard-brand { display: flex; align-items: center; gap: 0.14in; }
+    .bizcard-mark { width: 0.52in; height: auto; flex-shrink: 0; color: var(--bc-logo, #fff); }
+    .bizcard-wordmark {
+      font-size: 0.28in; font-weight: 700; letter-spacing: 0.14em;
+      color: var(--bc-text, #fff); line-height: 1;
+    }
+    .bizcard-tagline {
+      font-size: 0.105in; line-height: 1.35; color: var(--bc-text-dim, #94a3b8);
+      max-width: 2.6in; margin-top: 0.12in;
+    }
+    .bizcard-subline {
+      font-size: 0.075in; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--bc-text-faint, #64748b);
+      border-top: 1px solid var(--bc-hairline, rgba(56, 189, 248, 0.35));
+      padding-top: 0.1in; margin-top: auto;
+    }
+    .bizcard-qr-wrap { flex-shrink: 0; }
+    .bizcard-qr {
+      width: 0.72in; height: 0.72in; display: block;
+      border-radius: 2px;
+    }
+    .bizcard-back-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.06in; }
+    .bizcard-url {
+      font-size: 0.16in; font-weight: 700; letter-spacing: 0.02em;
+      color: var(--bc-accent, #38bdf8); line-height: 1.2;
+    }
+    .bizcard-value {
+      font-size: 0.085in; line-height: 1.4; color: var(--bc-text-dim, #94a3b8);
+    }
+    .bizcard-handle {
+      font-size: 0.075in; color: var(--bc-text-faint, #64748b);
+      margin-top: auto; letter-spacing: 0.04em;
+    }
+    .bizcard-side-label {
+      position: absolute; top: 0.08in; right: 0.1in;
+      font-size: 0.055in; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--bc-text-faint, rgba(148, 163, 184, 0.5));
+      pointer-events: none;
+    }
+    /* Midnight slate — shipped app default */
+    .bizcard--midnight {
+      --bc-bg: #0f172a; --bc-text: #f1f5f9; --bc-text-dim: #94a3b8;
+      --bc-text-faint: #64748b; --bc-accent: #38bdf8; --bc-logo: #ffffff;
+      --bc-hairline: rgba(56, 189, 248, 0.35);
+      background: var(--bc-bg);
+    }
+    /* Ivory — conservative print-on-white */
+    .bizcard--ivory {
+      --bc-bg: #faf8f5; --bc-text: #1e293b; --bc-text-dim: #475569;
+      --bc-text-faint: #64748b; --bc-accent: #0284c7; --bc-logo: #0f172a;
+      --bc-hairline: rgba(15, 23, 42, 0.12);
+      background: var(--bc-bg);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+    .bizcard--ivory .bizcard-qr { filter: none; }
+    /* Charcoal mono — near-monochrome dark theme */
+    .bizcard--mono {
+      --bc-bg: #0a0a0a; --bc-text: #e4e4e7; --bc-text-dim: #a1a1aa;
+      --bc-text-faint: #71717a; --bc-accent: #f97316; --bc-logo: #e4e4e7;
+      --bc-hairline: rgba(249, 115, 22, 0.4);
+      background: var(--bc-bg);
+      border: 1px solid #27272a;
+    }
+    @media (max-width: 700px) {
+      .bizcard-pair { justify-content: center; padding: 1rem; }
+      .bizcard { transform: scale(0.88); transform-origin: top center; }
+    }
   </style>
 </head>
 <body>
@@ -284,6 +385,7 @@
     { id: "triage", label: "Triage" },
     { id: "debug", label: "Debug tools" },
     { id: "monetize", label: "Monetization" },
+    { id: "cards", label: "Business cards" },
     { id: "sabermetrics", label: "Sabermetrics" },
     { id: "responsive", label: "Responsive" },
   ];
@@ -929,7 +1031,7 @@
   ];
 
   const MARKETING_PILLARS = [
-    { id: "accidental_library", headline: "The accidental library", proof: "12 library + 8 wishlist fetchers; magic-moment demo; free-claimer persona", productHooks: ["MARKETING_FEATURES[0]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "The library you forgot you owned", "Free game Thursday, finally counted", "The backlog concierge"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"] },
+    { id: "accidental_library", headline: "The accidental library", proof: "12 library + 8 wishlist fetchers; magic-moment demo; free-claimer persona; dormant-account rediscovery", productHooks: ["MARKETING_FEATURES[0]", "Watch your library appear"], relatedCampaigns: ["Watch your library appear", "The library you forgot you owned", "Found it on an account I forgot I had", "Free game Thursday, finally counted", "While you're here, these are free right now", "The backlog concierge"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"] },
     { id: "ownership_aware_deals", headline: "Ownership-aware deals", proof: "ITAD + FX + duplicate-buy prevention", productHooks: ["MARKETING_FEATURES[1]", "bs_fx_conversion"], relatedCampaigns: ["Deal radar, not spreadsheet"], relatedFindings: ["bs_fx_conversion", "bs_pricing_currency"] },
     { id: "local_first_trust", headline: "Local-first trust", proof: "No server; per-profile secrets; portable bundle", productHooks: ["MARKETING_FEATURES[2]", "Nothing to breach"], relatedCampaigns: ["Nothing to breach"], relatedFindings: ["bs_privacy", "bs_secret_recovery", "bs_telemetry"] },
     { id: "profiles_one_pc", headline: "Profiles on one PC", proof: "Work vs play; cancel-on-switch; isolated cache", productHooks: ["MARKETING_FEATURES[3]"], relatedCampaigns: ["Watch your library appear"], relatedFindings: ["bs_multiuser_profiles", "find_profile_switch_cancel_runs", "find_profile_cache_http"] },
@@ -958,11 +1060,14 @@
   const MONETIZE_COPY_SNIPPETS = {
     taglines: [
       "One honest backlog across every store.",
+      "Back up your backlog with BAKLOG.",
       "Your library is honest with you for once.",
       "Deal alerts that know what you already own.",
       "There is no BAKLOG server to breach.",
       "Watch your library appear.",
       "Free Thursday haul — finally counted.",
+      "While you're here, these are free right now.",
+      "Found it on an account I forgot I had.",
       "Built for accidental libraries.",
       "Local-first. No telemetry. Your machine.",
       "The demo is the product.",
@@ -1003,7 +1108,7 @@
     bet: [
       "The category gap is real: no incumbent fuses automatic cross-store owned-library ingestion + ownership-aware deal intelligence + backlog decisioning in one no-account local package.",
       "The wedge is the magic-moment demo — a real account turning into a real library in ~60s on the user's PC. That is onboarding, proof, and marketing in one clip.",
-      "Monetization follows revealed preference: the core audience acquired games for $0. Lead with free + contextual ads on deal intent; optional $2–$4/mo removes ads and adds convenience sync later.",
+      "Monetization follows revealed preference: the core audience acquired games for $0. Lead with free + contextual ads on deal intent; optional $2–$4/mo removes ads and adds convenience sync later. Meter deep achievement/trophy API enrichment by usage — completionists will pay for fresh rarity/unlock data when each refresh is a real store call.",
     ],
     horizon: "12 mo: activation + retention · 24 mo: house/affiliate on deal cards · 36 mo: optional No-ads + cloud sync tier",
     productTruth: "2026 Q2 ship order: profiles + honest fetcher health + FX hardening before scaling monetization (bs_phase2_reliability, bs_fetcher_health_honest, bs_fx_conversion).",
@@ -1100,6 +1205,7 @@
     { name: "Hybrid (freemium + cloud + affiliate)", pitch: "Free + ads local · $2-$4/mo No-ads + cloud · affiliate everywhere.", whoPays: "Advertisers + subscribers + merchants", priceBand: "$0 free · $2-$4/mo paid · affiliate floor", mvp: "Freemium ad slots, paid no-ads tier with cloud sync, affiliate links on every deal card", math: "Three diversified revenue lines instead of one. Each layer reinforces the next: ads pay the bills, upgrades smooth the rough edges, affiliate kicks in on intent.", legal: "Most operationally complex — three disclosures, three abuse vectors", agencySays: "Catch every segment without compromising the free promise.", actuallyShip: "Likely end-state. Ship the freemium half first, layer cloud + affiliate when retention proves out." },
     { name: "Tips / Sponsors", pitch: "Community-funded OSS support.", whoPays: "Power users and fans", priceBand: "$3/$5/$10", mvp: "Sponsor CTA + roadmap", math: "Unpredictable upside", legal: "Low legal burden", agencySays: "Good signal, weak model.", actuallyShip: "Enable as bonus channel." },
     { name: "Premium 'Concierge' tier (backlog butler)", pitch: "A Charon-from-John-Wick styled library concierge: discreet, unflappable, anticipatory. 'Allow me to suggest tonight's game.' Curates your night by mood / time available / co-op, remembers what you abandoned, queues the right deal, and never nags — a refined persona layer over the picks + status + deal-radar data you already have.", whoPays: "Choice-paralysis users who want the decision made for them — upsell from the free tier", priceBand: "$3-$5/mo add-on, or folded into the No-ads + cloud tier", mvp: "Persona-skinned picks panel in the concierge's voice over existing weekly-picks/status/co-op data; rule-based first (mood/time/co-op/owned-not-started filters). Optional on-device LLM phrasing later — no cloud required for v1.", math: "Attach-rate upsell + retention/ARPU lift on an existing paid tier, not a standalone line", legal: "Keep it rule-based/local to preserve the local-first promise; if an LLM is added, prefer on-device or opt-in cloud with clear disclosure — never ship library data to a server silently.", agencySays: "Personality is sticky and demo-able — 'the Continental for your backlog.' Strong brand hook that separates it from spreadsheet trackers.", actuallyShip: "Prototype as a free persona skin on weekly picks to test delight; gate the curated/advanced behavior behind the paid tier once it proves retention." },
+    { name: "Metered achievement / trophy enrichment", pitch: "Pull-on-demand achievement, trophy, and completion data through the store APIs (Steam achievements, PSN/Xbox trophies, RetroAchievements) as a paid enrichment lane. The free tier covers the cheap, cacheable basics; deep per-title achievement sync — global rarity, unlock timestamps, 100% effort estimates — is metered because every refresh is a real upstream API call.", whoPays: "Completionists and trophy-hunters who want fresh achievement state across stores, plus a slice of heavy users whose request volume actually costs money to serve", priceBand: "Bundled into the No-ads + cloud tier, or a small credit pack ($3 = N achievement refreshes) for free-tier users who want one-off deep pulls", mvp: "Achievement/trophy fetchers gated behind a request budget: free users get a slow cached lane, paid users get priority + higher rate limits. Surface 'X achievement refreshes left' in the enrichment UI; queue + dedupe requests so we never double-spend an API call.", math: "Costs scale with API usage, so price tracks cost: a credit pack covers the marginal request cost with margin; attach-rate uplift on the existing paid tier for the all-you-can-sync crowd", legal: "Stay inside each platform's API ToS and rate limits — automate only requests the user could make with their own credentials, on their machine. No reselling raw platform data; we sell the convenience/throughput, not the data itself. Disclose that refresh volume is metered to cover upstream costs.", agencySays: "Trophy-hunters are the most engaged, most willing-to-pay backlog segment — usage-based pricing on a genuinely costly feature is the cleanest 'pay for what you use' story and doesn't dent the free-forever core.", actuallyShip: "Ship the cached free lane first; add metering once achievement enrichment volume proves it's a real cost center." },
     { name: "B2B / white-label", pitch: "Enterprise backlog intelligence.", whoPays: "Studios/tools partners", priceBand: "Custom", mvp: "Would need account/data rights architecture", math: "Potentially high but unrealistic now", legal: "Conflicts with local-first promise", agencySays: "Big checks.", actuallyShip: "Explicitly defer." },
   ];
 
@@ -1107,6 +1213,7 @@
     { name: "Stop alt-tabbing your libraries", objective: "Convert multi-store owners", audience: "Steam-first users with 2+ stores", visual: "Launchers collapse into one table", cta: "Load Steam now", headlines: ["One backlog. All your stores.", "Your games should not live in five apps.", "Backlog clarity in 15 minutes."], shortPost: "BAKLOG gives you one local dashboard across your stores. Free, private, Steam-ready out of the box.", landing: "Hero, trust strip, screenshot, 3-step quickstart", metrics: "Activation and 7-day return" },
     { name: "The honest backlog", objective: "Position as decision system", audience: "Players with choice paralysis", visual: "Status chips + picks tabs", cta: "Turn backlog chaos into weekly picks", headlines: ["Finish more, buy smarter.", "From backlog guilt to backlog plan.", "Play what matters first."], shortPost: "Not just a list. BAKLOG gives statuses and picks so your backlog becomes actionable.", landing: "Problem framing + workflow + proof", metrics: "Weekly active users and status edits" },
     { name: "Deal radar, not spreadsheet", objective: "Own wishlist/deal narrative", audience: "Price-sensitive players", visual: "Wishlist radar with ownership context", cta: "Catch the right sale", headlines: ["Your wishlist deserves context.", "Buy fewer games you will not start.", "Deal alerts with ownership intelligence."], shortPost: "See sales with context from what you own and what you will actually play.", landing: "Wishlist value + disclosure + CTA", metrics: "Deal click-through" },
+    { name: "Pay for the API calls, not the spreadsheet", objective: "Monetize deep achievement/trophy enrichment without breaking the free core", audience: "Trophy hunters and completionists on Steam + PSN + Xbox who refresh rarity and unlock timelines across large libraries", visual: "Trophy pill on library row → popover with per-achievement rarity; meter counter '12 deep refreshes left' · free cached lane vs paid priority sync", cta: "Refresh trophy data · See credit packs", headlines: ["Trophy data that stays fresh — metered, honest.", "Deep achievement sync when you need it.", "100% hunters: pay for the API calls, not the library import.", "Cached % is free. Rarity + unlock timeline is metered."], shortPost: "BAKLOG shows trophy % across your whole library for free. Deep pulls — per-achievement rarity, unlock dates, tier breakdown — go through the real store APIs on your machine, so refreshes are metered: slow cached lane on free, priority + credit packs ($3) or bundled in No-ads + cloud when you want everything fresh. We charge for throughput, not platform data.", landing: "Explain free vs metered lane · credit pack pricing · 'How we make money' disclosure · trophy popover screenshot", metrics: "Deep-enrichment request volume, credit-pack conversion, attach rate on paid tier, trophy-popover engagement" },
     { name: "Free forever. Ads when you're hunting deals.", objective: "Position freemium / free + ads as the headline business model", audience: "The same accidental hoarders who never paid for the games — won't pay $4.99/mo, will absorb ads and tip $2-$3/mo to remove them", visual: "Hero with deal cards rendering both organic and 'Sponsored' badges, side-by-side with a clean No-ads variant after the upgrade click", cta: "Start free · Upgrade later", headlines: ["Free, because you didn't pay for the games either.", "Ads in deal cards. Cash in your pocket.", "Two dollars a month to make the ads go away.", "We don't sell your library. Ever."], shortPost: "BAKLOG is free with a couple of sponsored deal cards. If you want them gone, $2-$4/mo (and you get cloud sync). Library content never leaves your device — ads are context-only, never behavioral. That's the whole deal.", landing: "Side-by-side free vs No-ads screenshot · privacy posture block · 'How we make money' link in footer · disclosure of every affiliate partner", metrics: "Free-tier MAU, ad CTR + RPM on deal cards, upgrade conversion rate, churn after upgrade" },
     {
       name: "The library you forgot you owned", objective: "Recruit accidental hoarders", audience: "Epic / Prime / GOG / itch.io free-claim users + Wario64 / Fanatical / bundle-key redeemers",
@@ -1123,6 +1230,22 @@
       channels: [{ channel: "Reddit", format: "Text + screenshot", notes: "r/patientgamers · r/GameDeals — founder truth tone" }, { channel: "Landing", format: "Hero + gallery", notes: "hero_accidental_library asset" }],
       assetChecklist: ["hero_accidental_library", "readme_above_fold"],
       designNotes: "Dark split-screen; left desaturated launcher screenshots, right BAKLOG table with store badges. Founder quote pull-quote optional.",
+    },
+    {
+      name: "The gift you forgot you got", objective: "Recruit people whose libraries grew from gifted keys, not just self-claims", audience: "Gamers who receive Steam/GOG/Epic gift keys for birthdays + holidays from friends and family, then never activate or forget them",
+      visual: "A birthday card with a Steam key code → BAKLOG row lighting up months later with a 'gifted · never launched' vibe",
+      cta: "Find the games people gave you",
+      headlines: ["Aw, cool — someone got me a Steam key for my birthday.", "That birthday gift key? Still unredeemed.", "Your friends gave you games. Did you ever play them?", "Gift keys count too. BAKLOG finds them.", "The best present is the one you forgot you opened."],
+      shortPost: "Birthdays, holidays, 'hey I saw this on sale and thought of you' — gift keys pile up just like free claims. BAKLOG pulls your whole Steam/GOG/Epic library into one local table so the games people gave you actually get seen, sorted, and played instead of buried. Free, private, runs on your machine.",
+      landing: "Warm gifting hook + screenshot of a never-launched gifted title surfacing in weekly picks + 3-step start",
+      metrics: "Sign-ups around birthday/holiday seasonality; activation completion; status edits on never-launched titles",
+      relatedPillars: ["accidental_library"], relatedFindings: ["find_store_integration_complete", "bs_fetcher_testing"],
+      headlineVariants: { reddit: "Aw cool, someone got me a Steam key for my birthday — and I never played it.", twitter: "Gift keys count too. BAKLOG finds the games people gave you.", landing: "Find the games people gave you — and finally play them.", email: "The birthday gift you forgot to open" },
+      longForm: { problem: "Gifted keys get redeemed and immediately forgotten among hundreds of other titles.", agitation: "It feels rude to forget a gift, but launchers give you no way to resurface it.", solution: "BAKLOG flattens your whole library so gifted, never-launched games show up in picks and status views.", proof: "Recently-added + never-played surfacing on the dashboard.", cta: "Connect → Refresh → see what you were given" },
+      storyboard: [{ beat: "Hook", visual: "Birthday card with a key code", duration: "3s", caption: "Aw, cool — a Steam key." }, { beat: "Forget", visual: "Library buries it", duration: "4s", caption: "Redeemed. Then forgotten." }, { beat: "Resurface", visual: "BAKLOG picks surfaces it", duration: "6s", caption: "Months later: there it is." }],
+      channels: [{ channel: "Reddit", format: "Text + screenshot", notes: "r/Steam · r/patientgamers — wholesome gifting tone" }, { channel: "Landing", format: "Hero + gallery", notes: "Seasonal birthday/holiday variant" }],
+      assetChecklist: ["hero_accidental_library"],
+      designNotes: "Warm accent (gift ribbon) against the dark dashboard; gifted title gets a subtle 'never launched' tag in the mock. Keep wholesome, not guilt-trippy.",
     },
     {
       name: "Watch your library appear", objective: "Lead with the magic-moment demo", audience: "Epic/Prime/GOG/Steam free-claim hoarders who never audited their accounts",
@@ -2694,8 +2817,8 @@
         el("h3", {}, "Ownership-aware deals (canonical)"),
         el("p", {}, "ITAD pricing fused with real libraries — deals surface only when actionable (on sale, unowned everywhere). Kills duplicate buys; wishlist radar retires itself when owned."),
         el("h3", {}, "Rediscovery engine — selling your games back to you"),
-        el("p", {}, "The dashboard spotlight rotates full-bleed ", el("strong", {}, "cover art"), " from games you ", el("strong", {}, "already own"), ", framed like a storefront hero — but every pick is sourced from your library, scored by sabermetrics (Barrel, Completionist, Clutch deal, Time capsule). It is merchandising turned inward: the same dopamine a store uses to sell you something new, pointed at the 600 games you forgot you bought."),
-        el("p", { class: "muted" }, "Why it matters for the model: rediscovery drives the re-engagement loop. Every spotlight that makes you open a game you already own is a session that didn't cost a purchase — more sessions = more deal-card impressions = more ad/affiliate revenue, with zero new acquisition spend. The art and the burns are screenshot bait, so the loop also recruits."),
+        el("p", {}, "The dashboard spotlight rotates full-bleed ", el("strong", {}, "cover art"), " from games you ", el("strong", {}, "already own"), ", framed like a storefront hero — but every pick is sourced from your library, scored by sabermetrics (Barrel, Completionist, Clutch deal, Time capsule). It is merchandising turned inward: the same dopamine a store uses to sell you something new, pointed at the 600 games you forgot you bought — and whole ", el("strong", {}, "accounts"), " you forgot you had (dormant Epic, old GOG, PSN from a console you sold). Reconnect a fetcher and titles from years ago surface in the same table."),
+        el("p", { class: "muted" }, "Why it matters for the model: rediscovery drives the re-engagement loop. Every spotlight that makes you open a game you already own is a session that didn't cost a purchase — more sessions = more deal-card impressions = more ad/affiliate revenue, with zero new acquisition spend. The audit-to-claim flywheel extends that: surfacing the backlog pulls users back to active giveaways (Epic Thursday, Prime, etc.) — claims grow libraries and feed deal/affiliate intent. Campaign line: ", el("em", {}, "While you're here, these are free right now"), ". The art and the burns are screenshot bait, so the loop also recruits."),
         el("p", { class: "xref" }, "Privacy + fetcher-health bullets below; lead model in Model tab; spotlight mechanics in Sabermetrics tab."),
       ));
       cards.push(...renderMarketingFeatureCards());
@@ -3027,6 +3150,22 @@
         el("p", { class: "xref" }, "Full campaign storyboards: Execution library tab."),
       ));
       cards.push(el("div", { class: "card thesis-lane" },
+        el("h2", {}, "Warm outreach play (do NOT pitch)"),
+        el("p", { class: "muted" }, "Get the one-pager in front of decision-makers — no pitch, just the artifact."),
+        el("ul", {},
+          el("li", {}, el("strong", {}, "Targets: "), "marketing manager, product manager, and CEO."),
+          el("li", {}, el("strong", {}, "Channels: "), "email, LinkedIn, and phone — whatever reaches them."),
+          el("li", {}, el("strong", {}, "The ask: "), "send them the ", codeText("marketing/one-pager.html"), " only."),
+          el("li", {}, el("strong", {}, "Do NOT pitch "), "— let the one-pager do the talking; no deck, no hard sell."),
+          el("li", {}, el("strong", {}, "Goal: "), "advance to the license-agreement negotiation phase — the one-pager is the door-opener, not the close."),
+          el("li", {}, el("strong", {}, "Expect back-and-forth: "), "license-agreement talks go through several rounds of revisions — that is normal and expected until terms land in a signed contract."),
+          el("li", {}, el("strong", {}, "Runs in parallel: "), "any licensing path proceeds alongside our own strategies (freemium launch, GTM, roadmap) — never gate or pause our independent execution on a deal that may not close."),
+          el("li", {}, el("strong", {}, "Attorney timing: "), "bring in a licensing attorney at contract time only — not during back-and-forth negotiations. Handle the talks ourselves; pay for legal review when terms are ready to paper."),
+          el("li", {}, el("strong", {}, "Right specialist: "), "use a licensing / commercial-contracts attorney for the agreement — NOT a patent attorney. Patents are a separate track and irrelevant to papering this license."),
+          el("li", {}, el("strong", {}, "Confidant: "), "find someone experienced with licensing deals to talk through strategy as a sounding board — informal advisor/mentor, not a hired attorney — to sanity-check terms and tactics during negotiations."),
+        ),
+      ));
+      cards.push(el("div", { class: "card thesis-lane" },
         el("h2", {}, "Persona × channel (condensed)"),
         el("div", { class: "messaging-grid" },
           tableEl(
@@ -3246,6 +3385,20 @@
     { stat: "Barrel", fn: "isBarrel", what: "A barreled ball — 85%+ rated and ≤12h. Drives the spotlight 'Barrel' eyebrow.", formula: "rating ≥ 85 && HLTB ≤ 12h" },
     { stat: "Leverage pick", fn: "isLeveragePick", what: "High-leverage at-bat — strong game (80%+) on sale and ≤15h. Boosts spotlight priority.", formula: "rating ≥ 80 && on sale && HLTB ≤ 15h" },
   ];
+  // Computed in js/sabermetrics.js but not given their own marquee/insight/spotlight chip.
+  const UNUSED_METRICS = [
+    { metric: "wishlistWoba", fn: "wishlistWoba", why: "Exported from sabermetrics; live wishlist UI uses deals.computeWishlistWoba instead." },
+    { metric: "rRep", fn: "replacementRating → snap.rRep", why: "Duplicate of Mendoza line (snap.mendozaLine); only the median surfaces." },
+    { metric: "Pythagorean expected", fn: "pythagoreanCompletion.expected", why: "Hours-based expected completion; only delta (vs pythagorean) is marquee-facing." },
+    { metric: "Pythagorean actual", fn: "pythagoreanCompletion.actual", why: "Same scale as completion (excl. skip); redundant with the snapshot field." },
+    { metric: "Aging 30–90d finish %", fn: "agingCurveBuckets['30–90d'].finishRate", why: "Middle bucket computed; marquee shows rookie (<30d) and veteran (1y+) only." },
+    { metric: "Aging 90d–1y finish %", fn: "agingCurveBuckets['90d–1y'].finishRate", why: "Middle bucket computed; not surfaced as its own chip." },
+    { metric: "Aging bucket totals", fn: "agingCurveBuckets[*].total", why: "Population denominators per bucket — used internally, not displayed." },
+    { metric: "backlogObp alias", fn: "backlogObp", why: "Alias of startRate; OBP chip uses startRate directly." },
+    { metric: "sluggingPct alias", fn: "sluggingPct", why: "Alias of backlogSlg; SLG chip uses backlogSlg directly." },
+  ];
+  // Pool-assignable spotlight eyebrows — js/dashboard-spotlight.js + creative superlatives (not in the 138 tracked-stats catalog).
+  const SPOTLIGHT_CATEGORY_COUNT = 30;
   const SABER_SURFACES = [
     { surface: "Insight ticker (pill)", where: "js/dashboard-insights.js", shows: "Curated one-liners (regular + saber), weight-filtered then clamped to one line — anything too wide is discarded, not truncated" },
     { surface: "Marquee", where: "js/dashboard-insights.js", shows: "Regular metrics + all sabermetrics, mixed and weight-filtered per visit (cryptic stats appear rarely)" },
@@ -3474,16 +3627,27 @@
   function panelSabermetrics() {
     const saberCount = SABER_SLASH.length + SABER_VALUE.length + SABER_INDEX.length + SABER_STANDINGS.length + SABER_FLAGS.length;
     const totalAll = saberCount + REGULAR_METRICS.length + CREATIVE_METRICS.length + SABER_INSIGHTS.length;
+    const grandTotal = totalAll + UNUSED_METRICS.length + SPOTLIGHT_CATEGORY_COUNT;
+    const unusedRows = (arr) => arr.map((r) => [el("strong", {}, r.metric), codeText(r.fn), r.why]);
     return el("section", { id: "panel-sabermetrics", class: "panel" + (state.activeTab === "sabermetrics" ? " active" : "") },
       el("h1", {}, "Sabermetrics"),
-      el("p", {}, "One box score for your whole library — baseball analytics, counting stats, and plain-English burns — all computed locally from ", codeText("getLibrarySnapshot"), " in ", el("strong", {}, "js/sabermetrics.js"), ", ", el("strong", {}, "js/dashboard-insights.js"), ", and ", el("strong", {}, "js/creative-metrics.js"), "."),
+      el("p", {}, "One box score for your whole library — baseball analytics, counting stats, and plain-English burns — all computed locally from ", codeText("getLibrarySnapshot"), " in ", el("strong", {}, "js/sabermetrics.js"), ", ", el("strong", {}, "js/dashboard-insights.js"), ", and ", el("strong", {}, "js/creative-metrics.js"), ". ",
+        String(totalAll), " stats surface live on the dashboard (marquee, insight pill, spotlight, hero); ",
+        String(UNUSED_METRICS.length), " more are computed under the hood; ",
+        String(SPOTLIGHT_CATEGORY_COUNT), " spotlight selection categories sit beside that catalog — ",
+        String(grandTotal), "+ defined all together."),
 
       el("div", { class: "grid-5" },
-        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(totalAll)), el("div", { class: "stat-label" }, "Tracked stats")),
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(totalAll)), el("div", { class: "stat-label" }, "Stats live")),
         el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(saberCount)), el("div", { class: "stat-label" }, "Baseball saber")),
         el("div", { class: "stat stat-warning" }, el("div", { class: "stat-value" }, String(REGULAR_METRICS.length + CREATIVE_METRICS.length)), el("div", { class: "stat-label" }, "Marquee chips")),
         el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(SABER_INSIGHTS.length + CREATIVE_METRICS.filter((r) => r.surface.includes("pill")).length)), el("div", { class: "stat-label" }, "Pill lines")),
         el("div", { class: "stat stat-success" }, el("div", { class: "stat-value" }, String(SABER_SURFACES.length)), el("div", { class: "stat-label" }, "Surfaces")),
+      ),
+      el("div", { class: "grid-5", style: "margin-top:0.75rem" },
+        el("div", { class: "stat" }, el("div", { class: "stat-value" }, String(UNUSED_METRICS.length)), el("div", { class: "stat-label" }, "Under the hood")),
+        el("div", { class: "stat stat-warning" }, el("div", { class: "stat-value" }, String(SPOTLIGHT_CATEGORY_COUNT)), el("div", { class: "stat-label" }, "Spotlight categories")),
+        el("div", { class: "stat stat-info" }, el("div", { class: "stat-value" }, String(grandTotal) + "+"), el("div", { class: "stat-label" }, "All defined")),
       ),
 
       el("div", { class: "callout" },
@@ -3492,7 +3656,9 @@
           "Marquee chips scroll under the hero; one insight pill rotates at a time (too-wide lines are discarded, not truncated). ",
           codeText("METRIC_WEIGHT"), " tiers control rarity — friendly/normal always appear; cryptic baseball jargon (~15%); Kojima easter egg (~3%). After weighting, a ",
           el("strong", {}, "family de-clustering pass"), " (", codeText("spreadByFamily"), ") spaces similar stats so the marquee, spotlight rotation, and insight ticker never show two same-family items back-to-back. The ",
-          el("strong", {}, "Mendoza line"), " is median backlog rating; Genre+/Store+/BV+ use ", el("strong", {}, "100 = library average"), "."),
+          el("strong", {}, "Mendoza line"), " is median backlog rating; Genre+/Store+/BV+ use ", el("strong", {}, "100 = library average"), ". Counting: ",
+          String(totalAll), " surfaced + ", String(UNUSED_METRICS.length), " computed-but-unused + ", String(SPOTLIGHT_CATEGORY_COUNT), " spotlight categories = ",
+          String(grandTotal), "+ stats/metrics/sabermetrics all together."),
       ),
       el("div", { class: "card" }, tableEl(["Tier", "Weight", "Behavior"], METRIC_TIERS.map((r) => [tierTag(r.tier), codeText(r.weight), r.behavior]))),
 
@@ -3524,6 +3690,13 @@
       el("h2", {}, "Scouting flags"),
       el("p", { class: "muted" }, "Barrel and leverage-pick classifications for spotlight priority."),
       el("div", { class: "card" }, tableEl(["Stat", "Function", "What it measures", "Formula"], saberRows(SABER_FLAGS))),
+
+      el("h2", {}, "Computed but unused"),
+      el("p", { class: "muted" }, "Still built in ", codeText("js/sabermetrics.js"), " — not given their own marquee, insight, or spotlight chip."),
+      el("details", { class: "saber-ref-table" },
+        el("summary", {}, "Under-the-hood metrics (", String(UNUSED_METRICS.length), " rows)"),
+        el("div", { class: "card" }, tableEl(["Metric", "Function", "Why not surfaced"], unusedRows(UNUSED_METRICS))),
+      ),
 
       el("h2", {}, "Identity, time & money stats"),
       el("p", { class: "muted" }, "Creative / edgy lines — diagnosis, whale, shelf warmer, work-weeks, A–Z gaps."),
@@ -3669,6 +3842,127 @@
     );
   }
 
+  // ---------- Business card mockups ----------
+  let _bizcardMaskSeq = 0;
+  function bizcardLogoHtml() {
+    const id = "bc-knobs-" + (++_bizcardMaskSeq);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="2 24 96 52" class="bizcard-mark" role="img" aria-hidden="true">
+      <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+        <rect width="100" height="100" fill="#fff"/>
+        <circle cx="14" cy="64" r="8" fill="#000"/>
+        <circle cx="64" cy="64" r="8" fill="#000"/>
+        <circle cx="39" cy="36" r="8" fill="#000"/>
+      </mask></defs>
+      <g fill="currentColor" mask="url(#${id})">
+        <rect x="2" y="52" width="46" height="24" rx="12" ry="12"/>
+        <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
+        <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
+      </g>
+    </svg>`;
+  }
+  function bizcardQrHtml(variant) {
+    const fg = variant === "ivory" ? "#1e293b" : "#e2e8f0";
+    const bg = variant === "ivory" ? "#faf8f5" : variant === "mono" ? "#0a0a0a" : "#0f172a";
+    const modules = [
+      [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,1],
+      [1,0,1,1,1,0,1,0,1,0,0,1,0,1,1,0,1],
+      [1,0,1,1,1,0,1,0,0,1,1,0,0,1,1,0,1],
+      [1,0,1,1,1,0,1,0,1,1,0,1,0,1,1,0,1],
+      [1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,1],
+      [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0],
+      [1,0,1,1,0,1,0,1,0,1,1,0,1,0,1,1,0],
+      [0,1,0,1,1,0,1,0,1,0,0,1,0,1,0,0,1],
+      [1,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0],
+      [0,0,1,1,0,0,1,0,0,1,1,1,0,0,1,0,1],
+      [1,0,1,0,1,1,0,1,0,0,1,0,1,1,0,1,0],
+      [0,1,0,0,0,1,1,0,1,1,0,1,0,0,1,0,1],
+      [1,1,1,0,1,0,0,1,0,1,1,0,1,1,1,0,0],
+      [0,0,1,1,0,1,1,0,1,0,0,1,0,1,0,1,1],
+      [1,1,1,1,1,1,1,0,0,1,1,0,1,0,1,0,1],
+    ];
+    const cell = 100 / 17;
+    let rects = "";
+    for (let y = 0; y < modules.length; y++) {
+      for (let x = 0; x < modules[y].length; x++) {
+        if (modules[y][x]) rects += `<rect x="${(x * cell).toFixed(2)}" y="${(y * cell).toFixed(2)}" width="${(cell * 0.92).toFixed(2)}" height="${(cell * 0.92).toFixed(2)}" fill="${fg}"/>`;
+      }
+    }
+    const f = (ox, oy) => `
+      <rect x="${ox}" y="${oy}" width="${cell * 7}" height="${cell * 7}" fill="${fg}"/>
+      <rect x="${ox + cell}" y="${oy + cell}" width="${cell * 5}" height="${cell * 5}" fill="${bg}"/>
+      <rect x="${ox + cell * 2}" y="${oy + cell * 2}" width="${cell * 3}" height="${cell * 3}" fill="${fg}"/>`;
+    return `<svg class="bizcard-qr" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="100" height="100" fill="${bg}"/>
+      ${f(0, 0)}${f(100 - cell * 7, 0)}${f(0, 100 - cell * 7)}
+      ${rects}
+    </svg>`;
+  }
+  function bizcardFace(variant, side) {
+    const sideLabel = side === "front" ? "Front" : "Back";
+    if (side === "front") {
+      return el("div", { class: "bizcard bizcard--" + variant + " bizcard-front" },
+        el("span", { class: "bizcard-side-label" }, sideLabel),
+        el("div", { class: "bizcard-face" },
+          el("div", {},
+            el("div", { class: "bizcard-brand", html: bizcardLogoHtml() + '<span class="bizcard-wordmark">BAKLOG</span>' }),
+            el("p", { class: "bizcard-tagline" }, "One honest backlog across every store"),
+          ),
+          el("p", { class: "bizcard-subline" }, "Cross-store backlog · local-first"),
+        ),
+      );
+    }
+    return el("div", { class: "bizcard bizcard--" + variant + " bizcard-back" },
+      el("span", { class: "bizcard-side-label" }, sideLabel),
+      el("div", { class: "bizcard-face" },
+        el("div", { class: "bizcard-qr-wrap", html: bizcardQrHtml(variant), title: "Placeholder QR — swap for real encoder when URL is final" }),
+        el("div", { class: "bizcard-back-copy" },
+          el("div", { class: "bizcard-url" }, "baklog.app"),
+          el("p", { class: "bizcard-value" }, "Download free. Connect your stores. See what you actually own."),
+          el("p", { class: "bizcard-handle" }, "Your Name · @handle"),
+        ),
+      ),
+    );
+  }
+  function bizcardVariant(label, variant) {
+    return el("div", { class: "bizcard-variant" },
+      el("div", { class: "bizcard-variant-label" }, label),
+      el("div", { class: "bizcard-pair" },
+        bizcardFace(variant, "front"),
+        bizcardFace(variant, "back"),
+      ),
+    );
+  }
+  function panelCards() {
+    _bizcardMaskSeq = 0;
+    return el("section", { id: "panel-cards", class: "panel" + (state.activeTab === "cards" ? " active" : "") },
+      el("h1", {}, "Business card mockups"),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Internal mockups — color scheme not locked"),
+        el("div", { class: "callout-body" },
+          "Three conservative front/back pairs at true print aspect (3.5″ × 2″). Goal: get someone to ",
+          el("strong", {}, "download"),
+          " — QR + ",
+          el("strong", {}, "baklog.app"),
+          " anchor the back face. QR blocks are ",
+          el("em", {}, "placeholders"),
+          " (inline SVG); swap for a real encoder once the landing URL is final. Palette iteration lives here in the tracker; promote the winner to ",
+          el("a", { href: "marketing/index.html", target: "_blank", rel: "noopener" }, "marketing/"),
+          " when ready (e.g. ",
+          codeText("marketing/business-card.html"),
+          ").",
+        ),
+      ),
+      el("p", { class: "muted" }, "Rendered on a light desk surface so each card reads as physical stock. Side labels are for review only — omit on print."),
+      el("div", { class: "bizcard-showcase" },
+        bizcardVariant("Midnight slate — shipped app default", "midnight"),
+        bizcardVariant("Ivory — conservative print on white stock", "ivory"),
+        bizcardVariant("Charcoal mono — near-monochrome dark theme", "mono"),
+      ),
+    );
+  }
+
   // ---------- Render: all panels ----------
   function renderActive() {
     const host = document.getElementById("panels");
@@ -3683,6 +3977,7 @@
     host.appendChild(panelTriage());
     host.appendChild(panelDebug());
     host.appendChild(panelMonetize());
+    host.appendChild(panelCards());
     host.appendChild(panelSabermetrics());
     host.appendChild(panelResponsive());
     activateTab(state.activeTab);

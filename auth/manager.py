@@ -230,9 +230,12 @@ def _local_data_present(provider: str, blob: dict[str, Any]) -> bool:
         if isinstance(env_db, str) and env_db.strip() and Path(env_db.strip()).is_file():
             db_path = Path(env_db.strip())
         else:
-            from gog_galaxy_client import default_galaxy_db
+            from gog_galaxy_client import GogGalaxyError, default_galaxy_db
 
-            db_path = default_galaxy_db()
+            try:
+                db_path = default_galaxy_db()
+            except GogGalaxyError:
+                return False
         return db_path.is_file()
 
     if provider == "itch_local":

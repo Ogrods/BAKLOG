@@ -14,6 +14,7 @@ GitHub Actions: run the manual "CDP smoke" workflow after a suspected browser re
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from auth.cdp_browser import (
     CdpContext,
     CdpPage,
     _cdp_websocket_error,
+    _chromium_executable_candidates,
     _should_preserve_popup,
     auth_banner_init_script,
     find_chromium_executable,
@@ -324,6 +326,44 @@ class TestFindBrowser:
         monkeypatch.setenv("BAKLOG_CHROME_PATH", "/no/such/browser.exe")
         with pytest.raises(RuntimeError, match="BAKLOG_CHROME_PATH"):
             find_chromium_executable()
+
+    def test_macos_chrome_candidate(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.delenv("BAKLOG_CHROME_PATH", raising=False)
+        monkeypatch.setattr(sys, "platform", "darwin")
+        chrome = tmp_path / "Google Chrome.app/Contents/MacOS/Google Chrome"
+        chrome.parent.mkdir(parents=True)
+        chrome.write_bytes(b"")
+
+        def fake_candidates() -> list[Path]:
+            return [chrome]
+
+        import auth.cdp_browser as cdp
+
+        monkeypatch.setattr(cdp, "_chromium_executable_candidates", fake_candidates)
+        assert str(find_chromium_executable()) == str(chrome)
+
+    def test_linux_which_fallback(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.delenv("BAKLOG_CHROME_PATH", raising=False)
+        monkeypatch.setattr(sys, "platform", "linux")
+        chrome = tmp_path / "google-chrome-stable"
+        chrome.write_bytes(b"")
+
+        import auth.cdp_browser as cdp
+
+        monkeypatch.setattr(cdp, "_chromium_executable_candidates", lambda: [])
+        monkeypatch.setattr(
+            cdp.shutil,
+            "which",
+            lambda name: str(chrome) if name == "google-chrome-stable" else None,
+        )
+        assert str(find_chromium_executable()) == str(chrome)
+
+    def test_posix_candidates_include_edge_and_brave(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sys, "platform", "linux")
+        paths = {p.as_posix() for p in _chromium_executable_candidates()}
+        assert "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" in paths
+        assert "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" in paths
+        assert "/opt/google/chrome/chrome" in paths
 
 
 @pytest.mark.integration

@@ -434,9 +434,9 @@ def _python_executable() -> str:
     if override:
         return override
     candidates = [
-        data_root() / ".venv" / "Scripts" / "python.exe",  # Windows
-        data_root() / ".venv" / "bin" / "python",          # POSIX
-        data_root() / ".venv" / "bin" / "python3",
+        ROOT / ".venv" / "Scripts" / "python.exe",  # Windows
+        ROOT / ".venv" / "bin" / "python",          # POSIX
+        ROOT / ".venv" / "bin" / "python3",
     ]
     for c in candidates:
         if c.exists():

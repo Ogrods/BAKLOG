@@ -50,7 +50,9 @@ def default_galaxy_db() -> Path:
         return _WIN_DB
     if sys.platform == "darwin":
         return _DARWIN_DB
-    return _WIN_DB
+    raise GogGalaxyError(
+        "GOG Galaxy is Windows/macOS only — use the GOG (web) source on Linux"
+    )
 
 
 def _gog_id_from_release_key(release_key: str) -> int | None:

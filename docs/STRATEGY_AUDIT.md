@@ -59,7 +59,7 @@ Ranked by severity. Each gap includes **why it matters** and **so what** if igno
 
 ### 2. Install friction (structural ceiling)
 
-**What:** Today: clone repo, Python, `pip install`, run `server.py`, Windows-centric paths (Amazon launcher, DPAPI). Phase 4 items still open: `p4_packaging` (PyInstaller? Tauri? stay clone-and-run?) and `p4_cross_platform_decision`.
+**What:** Today: clone repo, Python, `pip install`, run `server.py`. Cross-platform support is in place (Windows, macOS, Linux); Amazon Games launcher remains Windows-only with Prime Gaming web fallback. Phase 4 packaging item still open: `p4_packaging` (PyInstaller Windows `.exe`; macOS/Linux ship clone-and-run for beta).
 
 **Why:** Every step between "saw the GIF" and "saw my own library" loses roughly half the funnel. "Huge" consumer products need **one-click install** or a **web entry point** — BAKLOG has neither.
 

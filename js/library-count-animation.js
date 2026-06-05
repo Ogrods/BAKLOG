@@ -13,8 +13,8 @@
 
 import { state } from './state.js';
 import { prefersReducedMotion } from './motion.js';
+import { countUpDurationForDelta, easeInOutCubic } from './dashboard-shared.js';
 
-const COUNT_ROLL_MS = 1000;
 const POPUP_SPAWN_INTERVAL_MS = 70;
 const POPUP_LIFETIME_MS = 700;
 const POPUP_CAP = 10;
@@ -25,8 +25,6 @@ const JITTER_PX = 4;
 const SURFACE_KEY = '__baklogLibCountAnim';
 /** Every surface with an in-flight episode (survives DOM detachment on tab switch). */
 const _activeSurfaces = new Set();
-
-function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
 function fmtPlain(n) { return String(Math.round(n)); }
 function fmtCommas(n) {
@@ -158,7 +156,8 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
     return;
   }
 
-  const durationMs = Math.max(120, opts.durationMs || COUNT_ROLL_MS);
+  const delta = Math.abs(safeTo - safeFrom);
+  const durationMs = opts.durationMs ? Math.max(120, opts.durationMs) : countUpDurationForDelta(delta);
   const wantPopups = opts.popups !== false && safeTo > safeFrom;
   const host = wantPopups ? ensureHost(node) : null;
 
@@ -200,7 +199,7 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
     }
     const elapsed = (now || performance.now()) - start;
     const t = Math.min(1, elapsed / durationMs);
-    const v = safeFrom + (safeTo - safeFrom) * easeOutCubic(t);
+    const v = safeFrom + (safeTo - safeFrom) * easeInOutCubic(t);
     node.textContent = format(v);
     if (t < 1) {
       episode.rafId = requestAnimationFrame(tick);

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
 
 import pytest
 
-from gog_galaxy_client import GogGalaxyClient, GogGalaxyError
+from gog_galaxy_client import GogGalaxyClient, GogGalaxyError, default_galaxy_db
 
 
 def _seed_galaxy_db(path: Path) -> None:
@@ -373,3 +374,22 @@ def test_skips_dlcs_listed_and_non_game_titles(tmp_path: Path) -> None:
     # gog_5004 dropped (non-game voucher). Only the base game remains.
     assert names == {"Base Game"}
     assert {r["gog_id"] for r in records} == {5001}
+
+
+def test_default_galaxy_db_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+    path = default_galaxy_db()
+    assert path.name == "galaxy-2.0.db"
+    assert "GOG.com" in str(path)
+
+
+def test_default_galaxy_db_darwin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+    path = default_galaxy_db()
+    assert path == Path("/Users/Shared/GOG.com/Galaxy/Storage/galaxy-2.0.db")
+
+
+def test_default_galaxy_db_linux_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    with pytest.raises(GogGalaxyError, match="Windows/macOS only"):
+        default_galaxy_db()

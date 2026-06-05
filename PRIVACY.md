@@ -53,7 +53,7 @@ and the terms-of-service caveats, see
 | OAuth refresh tokens (Epic, Battle.net, Nintendo) | `cache/<store>/session.json` and/or the OS keychain via Python `keyring` | Re-auth without re-prompting |
 | Session cookies (GOG, PSN NPSSO, Xbox, Ubisoft, itch, Epic storefront) | `.env` and/or `cache/auth/profiles/<store>/` (Chrome/Edge user-data from CDP sign-in) | Same as above |
 | API keys (Steam Web API, OpenXBL, ITAD, HowLongToBeat) | `.env` | Required by those APIs |
-| Encrypted secret bundle | DPAPI-protected blob (Windows) or the `cryptography` AES-GCM keyring fallback | Encrypted-at-rest variant used by the Connections page |
+| Encrypted secret bundle | OS keychain via Python `keyring` (Windows Credential Manager, macOS Keychain, Linux Secret Service), with AES-256-GCM file fallback when no keyring is available | Encrypted-at-rest storage for Connections credentials |
 
 Credentials are never written to fetched `games_*.json` files, never logged in
 plain text to stdout, and never sent to the project authors.

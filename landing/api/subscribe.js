@@ -6,32 +6,22 @@
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-async function readJsonBody(req) {
-  if (req.body && typeof req.body === "object") return req.body;
-  if (typeof req.body === "string" && req.body.length) {
-    try { return JSON.parse(req.body); } catch { return {}; }
-  }
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  if (!chunks.length) return {};
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { return {}; }
-}
-
-module.exports = async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Method not allowed" });
+export async function POST(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
   }
 
-  const body = await readJsonBody(req);
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const website = typeof body.website === "string" ? body.website.trim() : "";
 
   // Honeypot: bots fill the hidden field. Pretend success, do nothing.
-  if (website) return res.status(200).json({ ok: true });
+  if (website) return Response.json({ ok: true });
 
   if (!EMAIL_RE.test(email) || email.length > 320) {
-    return res.status(400).json({ error: "Invalid email" });
+    return Response.json({ error: "Invalid email" }, { status: 400 });
   }
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -39,7 +29,7 @@ module.exports = async function handler(req, res) {
   const to = process.env.NOTIFY_TO;
   if (!apiKey || !from || !to) {
     console.error("subscribe: missing RESEND_API_KEY / NOTIFY_FROM / NOTIFY_TO");
-    return res.status(500).json({ error: "Server not configured" });
+    return Response.json({ error: "Server not configured" }, { status: 500 });
   }
 
   try {
@@ -61,12 +51,12 @@ module.exports = async function handler(req, res) {
     if (!r.ok) {
       const detail = await r.text().catch(() => "");
       console.error("subscribe: Resend error", r.status, detail);
-      return res.status(502).json({ error: "Send failed" });
+      return Response.json({ error: "Send failed" }, { status: 502 });
     }
 
-    return res.status(200).json({ ok: true });
+    return Response.json({ ok: true });
   } catch (err) {
     console.error("subscribe: unexpected error", err);
-    return res.status(502).json({ error: "Send failed" });
+    return Response.json({ error: "Send failed" }, { status: 502 });
   }
 }

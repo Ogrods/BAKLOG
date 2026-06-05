@@ -604,10 +604,55 @@
     colors: ["#22c55e", "#34d399", "#86efac", "#fbbf24"],
   };
 
+  // Right legend needs room for the donut + the longest label
+  // ("Overwhelmingly Positive"); below this the key reads better stacked under.
+  const LEGEND_SIDE_MIN_PX = 340;
+  const legendPositionFor = (px) => (px >= LEGEND_SIDE_MIN_PX ? "right" : "bottom");
+  const donutCharts = [];
+  let donutLegendResizeHooked = false;
+  let donutLegendResizeRaf = 0;
+
+  function donutLegendLabels(position) {
+    return {
+      color: "#ffffff",
+      boxWidth: 12,
+      padding: position === "bottom" ? 6 : 8,
+      font: { size: 11 },
+    };
+  }
+
+  function syncDonutLegendPositions() {
+    for (const chart of donutCharts) {
+      const canvas = chart.canvas;
+      const host = canvas?.parentElement;
+      if (!host) continue;
+      const next = legendPositionFor(host.clientWidth);
+      const legend = chart.options.plugins.legend;
+      if (legend.position === next) continue;
+      legend.position = next;
+      legend.labels = donutLegendLabels(next);
+      chart.update("none");
+    }
+  }
+
+  function hookDonutLegendResize() {
+    if (donutLegendResizeHooked) return;
+    donutLegendResizeHooked = true;
+    window.addEventListener("resize", () => {
+      if (donutLegendResizeRaf) cancelAnimationFrame(donutLegendResizeRaf);
+      donutLegendResizeRaf = requestAnimationFrame(() => {
+        donutLegendResizeRaf = 0;
+        syncDonutLegendPositions();
+      });
+    });
+  }
+
   function makeDonut(canvasId, spec) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === "undefined") return null;
-    return new Chart(canvas, {
+    const host = canvas.parentElement;
+    const legendPos = legendPositionFor(host ? host.clientWidth : 0);
+    const chart = new Chart(canvas, {
       type: "doughnut",
       data: {
         labels: spec.labels,
@@ -623,13 +668,15 @@
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: "right",
-            labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
+            position: legendPos,
+            labels: donutLegendLabels(legendPos),
           },
         },
         animation: reducedMotion() ? false : { duration: 800 },
       },
     });
+    donutCharts.push(chart);
+    return chart;
   }
 
   function initCharts() {
@@ -637,9 +684,15 @@
       Chart.defaults.color = "#94a3b8";
       Chart.defaults.borderColor = "#334155";
     }
+    for (const chart of donutCharts) {
+      try { chart.destroy(); } catch (_) { /* already disposed */ }
+    }
+    donutCharts.length = 0;
     makeDonut("chartStoreDonut", STORE_DONUT);
     makeDonut("chartStatusDonut", STATUS_DONUT);
     makeDonut("chartReviewDonut", REVIEW_DONUT);
+    hookDonutLegendResize();
+    syncDonutLegendPositions();
   }
 
   // --- Init ---

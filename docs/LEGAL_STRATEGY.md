@@ -1,6 +1,6 @@
 # BAKLOG — Legal & IP Strategy
 
-**Owner:** Dan Ogonoski  
+**Owner:** Dan Ogrodnik  
 **Last updated:** 2026-06-04  
 **Status:** Working strategy memo — consolidates IP posture, licensing goals, and self-protection guardrails.
 

@@ -4,7 +4,7 @@ Plain-language notes for contributors, investors, and anyone forking the repo. *
 
 ## Copyright (code)
 
-- **Owner:** Dan Ogonoski
+- **Owner:** Dan Ogrodnik
 - **License:** [MIT](LICENSE) — you may use, modify, and distribute the **source code** if you keep the copyright notice and license text in copies.
 - **What MIT does *not* grant:** rights to the **BAKLOG** name, logo, or marketing assets as your own product brand (see Trademark below).
 

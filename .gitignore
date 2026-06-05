@@ -41,4 +41,9 @@ scripts/probe_nintendo_graphql3.py
 # Generated Lighthouse reports (npm run / npx lighthouse)
 lighthouse/
 
+# PyInstaller
+build/
+dist/BAKLOG/
+dist/BAKLOG.exe
+
 .vercel

@@ -516,7 +516,7 @@
         { id: "p4_hosted_demo", label: "[DECIDED 2026-06-04] Local-only for launch; remote access + cloud sync shelved to Phase 6. Supabase auth gateway stays dormant at launch (no BAKLOG_SUPABASE_* env). See p6_remote_access_tunnel + p6_cloud_sync_mirror." },
         { id: "p4_privacy_doc", label: "[DONE] Privacy doc — PRIVACY.md at repo root: credentials table, data files inventory, network hosts, explicit 'what does NOT happen', deletion checklist" },
         { id: "p4_cross_platform_decision", label: "Decide: stay Windows-only, or invest in macOS / Linux (Amazon SQLite paths, DPAPI alternatives)" },
-        { id: "p4_packaging", label: "Decide: pip-installable? PyInstaller exe? Tauri shell? Stay 'clone and run'?" },
+        { id: "p4_packaging", label: "PyInstaller Windows .exe (in progress — docs/PACKAGING_PLAN.md, packaging/baklog.spec)" },
         { id: "p4_lighthouse_perf", label: "Lighthouse performance pass — Accessibility + SEO + Best Practices are all at 100 (2026-06-02); only Performance remains. Run Lighthouse Performance on each view against a real large library, set a perf budget (cold-load ms, TTI, bundle size, memory ceiling with N games), and fix the worst offenders. This is the home for the performance-budget work (formerly the 'No performance budget' blindspot). Reports land in lighthouse/." },
         { id: "p4_local_profiles", label: "[DONE] Local switchable profiles — header profile menu, profiles/<id>/ data isolation, legacy root unchanged until second profile added (bs_multiuser_profiles)" },
       ],
@@ -4038,6 +4038,7 @@
   }
   // ---------- Render: Beta invites ----------
   function panelBeta() {
+    const SETUP_LINK = "https://github.com/Ogrods/BAKLOG/releases";
     const EMAILS = [
       {
         name: 'Wave invite — "You\'re in"',
@@ -4048,7 +4049,7 @@
 "Thanks for requesting an invite. A spot just opened in the current beta wave, so you're in.\n\n" +
 "Quick context: BAKLOG is a local-first app that pulls your game libraries from every store - Steam, Epic, GOG, PlayStation, Xbox, Nintendo, Amazon, EA, itch, Humble, and more - into one honest backlog that lives on your machine. No cloud account, nothing uploaded, free forever to import your library.\n\n" +
 "Getting started takes about 5 minutes:\n" +
-"1. Download and set up: [setup link]\n" +
+"1. Download and set up: " + SETUP_LINK + "\n" +
 "2. Connect a store or two (start with Steam - it's the fastest).\n" +
 "3. Hit Refresh and watch your real library appear.\n\n" +
 "A few honest notes:\n" +
@@ -4069,7 +4070,7 @@
 "I've been heads-down building BAKLOG and I'd love your eyes on it before it goes public.\n\n" +
 "It's an app that pulls all your games - Steam, Epic, GOG, PlayStation, Xbox, itch, whatever - into one list so you can finally see what you own and decide what to actually play. It also flags wishlist deals but skips stuff you already own somewhere else. Everything runs on your own computer; nothing gets uploaded.\n\n" +
 "It's invite-only right now and I'm bringing people on in small batches. If you're up for it:\n" +
-"1. Setup (about 5 minutes): [setup link]\n" +
+"1. Setup (about 5 minutes): " + SETUP_LINK + "\n" +
 "2. Connect a store, hit Refresh, watch it fill in.\n\n" +
 "Fair warning: it's beta, so expect a few rough edges. If something breaks or feels weird, just text me or reply here - that feedback is the whole reason I'm sending this.\n\n" +
 "No pressure at all. But if you try it, I'd really value your honest take.\n\n" +
@@ -4118,11 +4119,18 @@
     return el("section", { id: "panel-beta", class: "panel" + (state.activeTab === "beta" ? " active" : "") },
       el("h1", {}, "Beta invites"),
       el("p", {}, "Paste-ready email drafts for the ", el("strong", {}, "invite-only beta"), " (Phases → ", el("code", {}, "p5_soft_launch"), "). Signups are logged in the ", el("code", {}, "waitlist"), " Supabase table; each gets the confirmation auto-reply from ", el("code", {}, "landing/api/subscribe.js"), ". These are the manual follow-ups you send as you open waves."),
+      el("div", { class: "callout warning" },
+        el("div", { class: "callout-title" }, "Packaging (p4_packaging)"),
+        el("div", { class: "callout-body" },
+          "Target: Windows ", el("code", {}, "BAKLOG.exe"), " (no Python). Plan: ", el("code", {}, "docs/PACKAGING_PLAN.md"), ". Tester instructions: ", el("code", {}, "docs/BETA_SETUP.md"), ". Interim: ", el("code", {}, "scripts/build_installer.ps1"), " → zip on GitHub Releases. Setup link in emails below points at ",
+          el("code", {}, SETUP_LINK), " until a dedicated download page ships.",
+        ),
+      ),
       el("div", { class: "callout" },
         el("div", { class: "callout-title" }, "Voice + guardrails"),
         el("div", { class: "callout-body" },
           "Hyphens only (no em dashes). Lead with what they get and that it's free forever to import. Set the beta expectation honestly (rough edges, small waves). No store-affiliation or traction claims. Swap ",
-          el("code", {}, "[first name]"), " and ", el("code", {}, "[setup link]"), " before sending.",
+          el("code", {}, "[first name]"), " before sending. Chrome or Edge required for Connect.",
         ),
       ),
       ...cards,

@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from auth.secrets import _auth_dir, _secrets_file, load_doc, profile_dir, save_doc
 
-ROOT = Path(__file__).resolve().parents[1]
+from shared.install_paths import bundle_root
 
 
 def _profiles_root() -> Path:
@@ -95,7 +95,7 @@ def _app_version() -> str:
     try:
         import tomllib
 
-        with (ROOT / "pyproject.toml").open("rb") as fh:
+        with (bundle_root() / "pyproject.toml").open("rb") as fh:
             return str(tomllib.load(fh)["project"]["version"])
     except Exception:
         return "unknown"

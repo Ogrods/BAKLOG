@@ -1,6 +1,7 @@
 // Shared storefront badges: letter badges everywhere, full SVG glyphs in the dashboard hero strip.
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { DASH_STORE_LABELS, sortStoresByDisplayOrder } from './dashboard-shared.js';
+import { STORE_BRAND_COLORS } from './store-brand-colors.js';
 
 /** Canonical single-letter (or short) labels per store key. */
 export const STORE_BADGE_LETTERS = {
@@ -33,20 +34,28 @@ const SIZE_CLASS = {
  * (storeLogoStripHtml). Everywhere else uses letter badges (storeLogoHtml).
  * @type {Readonly<Record<string, { glyph: string, color: string }>>}
  */
-export const STORE_LOGO_ASSETS = {
-  steam: { glyph: 'assets/store-logos/steam.svg', color: '#ea580c' },
-  epic: { glyph: 'assets/store-logos/epic.svg', color: '#2a2a2a' },
-  gog: { glyph: 'assets/store-logos/gog.svg', color: '#86328a' },
-  humble: { glyph: 'assets/store-logos/humble-h.svg', color: '#cc2929' },
-  psn: { glyph: 'assets/store-logos/playstation.svg', color: '#0070d1' },
-  xbox: { glyph: 'assets/store-logos/xbox.svg', color: '#107c10' },
-  nintendo: { glyph: 'assets/store-logos/nintendo.svg', color: '#e60012' },
-  amazon: { glyph: 'assets/store-logos/amazon.svg', color: '#ff9900' },
-  itch: { glyph: 'assets/store-logos/itch.svg', color: '#fa5c5c' },
-  battlenet: { glyph: 'assets/store-logos/battlenet.svg', color: '#148eff' },
-  ubisoft: { glyph: 'assets/store-logos/ubisoft.svg', color: '#1472f1' },
-  ea: { glyph: 'assets/store-logos/ea.svg', color: '#ff4747' },
+const STORE_GLYPH_PATHS = {
+  steam: 'assets/store-logos/steam.svg',
+  epic: 'assets/store-logos/epic.svg',
+  gog: 'assets/store-logos/gog.svg',
+  humble: 'assets/store-logos/humble-h.svg',
+  psn: 'assets/store-logos/playstation.svg',
+  xbox: 'assets/store-logos/xbox.svg',
+  nintendo: 'assets/store-logos/nintendo.svg',
+  amazon: 'assets/store-logos/amazon.svg',
+  itch: 'assets/store-logos/itch.svg',
+  battlenet: 'assets/store-logos/battlenet.svg',
+  ubisoft: 'assets/store-logos/ubisoft.svg',
+  ea: 'assets/store-logos/ea.svg',
 };
+
+/** @type {Readonly<Record<string, { glyph: string, color: string }>>} */
+export const STORE_LOGO_ASSETS = Object.fromEntries(
+  Object.entries(STORE_GLYPH_PATHS).map(([key, glyph]) => [
+    key,
+    { glyph, color: STORE_BRAND_COLORS[key] },
+  ]),
+);
 
 export function storeLetter(store) {
   const key = (store || '').toLowerCase();

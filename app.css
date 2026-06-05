@@ -286,19 +286,18 @@ html[data-init-view="connections"] .view-tab[data-view="connections"] {
   --accent-muted: #7dd3fc;
   --header-control-h: 34px;
 
-  /* Store / platform brand accent colors (theme-independent). Used for the
-     store-chip inset bars so each source reads in its own brand hue. */
-  --brand-steam: #66c0f4;
-  --brand-gog: #a3329f;
-  --brand-psn: #0070d1;
-  --brand-epic: #d1d5db;
+  /* Store brand primaries — keep in sync with js/store-brand-colors.js */
+  --brand-steam: #1b2838;
+  --brand-gog: #5100dc;
+  --brand-psn: #003791;
+  --brand-epic: #2f2d2e;
   --brand-amazon: #ff9900;
   --brand-nintendo: #e60012;
   --brand-xbox: #107c10;
-  --brand-battlenet: #00aeff;
-  --brand-ubisoft: #0098db;
-  --brand-humble: #cc2929;
-  --brand-ea: #ff4747;
+  --brand-battlenet: #148eff;
+  --brand-ubisoft: #000000;
+  --brand-humble: #cb272c;
+  --brand-ea: #f05556;
   --brand-itch: #fa5c5c;
 }
 
@@ -955,19 +954,19 @@ input[type="range"] {
   line-height: 1;
   flex-shrink: 0;
 }
-.store-badge.steam { background: #ea580c; color: #fff7ed; }
-.store-badge.gog { background: #6d28d9; color: #ede9fe; }
-.store-badge.psn { background: #003791; color: #dbeafe; }
-.store-badge.epic { background: #1e293b; color: #e2e8f0; box-shadow: inset 0 0 0 1px #64748b; }
-.store-badge.amazon { background: #ff9900; color: #1a1200; }
-.store-badge.nintendo { background: #e60012; color: #fff5f5; }
-.store-badge.xbox { background: #107c10; color: #f0fff4; }
-.store-badge.battlenet { background: #148eff; color: #f0f7ff; }
-.store-badge.ubisoft { background: #00adef; color: #001930; }
+.store-badge.steam { background: var(--brand-steam); color: #fff; }
+.store-badge.gog { background: var(--brand-gog); color: #fff; }
+.store-badge.psn { background: var(--brand-psn); color: #fff; }
+.store-badge.epic { background: var(--brand-epic); color: #fff; box-shadow: inset 0 0 0 1px #64748b; }
+.store-badge.amazon { background: var(--brand-amazon); color: #1a1200; }
+.store-badge.nintendo { background: var(--brand-nintendo); color: #fff; }
+.store-badge.xbox { background: var(--brand-xbox); color: #fff; }
+.store-badge.battlenet { background: var(--brand-battlenet); color: #fff; }
+.store-badge.ubisoft { background: var(--brand-ubisoft); color: #fff; }
 .store-badge.other { background: #475569; color: #f1f5f9; }
-.store-badge.itch { background: #fa5c5c; color: #2a0606; }
-.store-badge.humble { background: #cc2929; color: #fff; }
-.store-badge.ea { background: #ff4747; color: #fff; font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
+.store-badge.itch { background: var(--brand-itch); color: #fff; }
+.store-badge.humble { background: var(--brand-humble); color: #fff; }
+.store-badge.ea { background: var(--brand-ea); color: #fff; font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
 .store-badge.itad { background: #22d3ee; color: #06303a; }
 .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
 .store-badge--md { height: 22px; min-width: 22px; font-size: 12px; border-radius: 5px; padding: 0 6px; }
@@ -3236,16 +3235,16 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   line-height: 1.25;
 }
-.steal-row-shop-steam { background: rgba(234, 88, 12, 0.18); color: #fdba74; border-color: rgba(249, 115, 22, 0.4); }
-.steal-row-shop-gog { background: rgba(109, 40, 217, 0.22); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.45); }
-.steal-row-shop-humble { background: rgba(202, 28, 28, 0.18); color: #fca5a5; border-color: rgba(220, 38, 38, 0.45); }
+.steal-row-shop-steam { background: rgba(27, 40, 56, 0.45); color: #cbd5e1; border-color: rgba(102, 192, 244, 0.35); }
+.steal-row-shop-gog { background: rgba(81, 0, 220, 0.22); color: #c4b5fd; border-color: rgba(129, 140, 248, 0.45); }
+.steal-row-shop-humble { background: rgba(203, 39, 44, 0.22); color: #fca5a5; border-color: rgba(220, 38, 38, 0.45); }
 .steal-row-shop-fanatical { background: rgba(220, 38, 38, 0.18); color: #fecaca; border-color: rgba(248, 113, 113, 0.45); }
 .steal-row-shop-gmg { background: rgba(132, 204, 22, 0.18); color: #d9f99d; border-color: rgba(163, 230, 53, 0.45); }
 .steal-row-shop-indiegala { background: rgba(244, 114, 182, 0.18); color: #fbcfe8; border-color: rgba(236, 72, 153, 0.45); }
 .steal-row-shop-microsoft { background: rgba(16, 124, 16, 0.22); color: #bbf7d0; border-color: rgba(34, 197, 94, 0.45); }
-.steal-row-shop-epic { background: rgba(15, 23, 42, 0.55); color: #e2e8f0; border-color: rgba(148, 163, 184, 0.45); }
-.steal-row-shop-ubisoft { background: rgba(20, 142, 255, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.45); }
-.steal-row-shop-ea { background: rgba(245, 158, 11, 0.18); color: #fde68a; border-color: rgba(217, 119, 6, 0.45); }
+.steal-row-shop-epic { background: rgba(47, 45, 46, 0.55); color: #e2e8f0; border-color: rgba(148, 163, 184, 0.45); }
+.steal-row-shop-ubisoft { background: rgba(0, 0, 0, 0.45); color: #e2e8f0; border-color: rgba(148, 163, 184, 0.45); }
+.steal-row-shop-ea { background: rgba(240, 85, 86, 0.22); color: #fecaca; border-color: rgba(248, 113, 113, 0.45); }
 .steal-row-shop-battlenet { background: rgba(20, 142, 255, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.45); }
 .steal-row-shop-nintendo { background: rgba(230, 0, 18, 0.22); color: #fecaca; border-color: rgba(239, 68, 68, 0.5); }
 .steal-row-shop-psn { background: rgba(0, 55, 145, 0.32); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.5); }

@@ -24,7 +24,12 @@ import {
   hasNoAdjacentSameFamily,
 } from '../js/stat-families.js';
 import { buildMarqueeItems } from '../js/dashboard-insights.js';
-import { pickSpotlightGames } from '../js/dashboard-spotlight.js';
+import {
+  pickSpotlightGames,
+  setRandomPickChanceForTest,
+  setSpotlightCurrentKey,
+  setStinkerChanceForTest,
+} from '../js/dashboard-spotlight.js';
 import { invalidateLibrarySnapshot, getLibrarySnapshot } from '../js/sabermetrics.js';
 
 function game(overrides = {}) {
@@ -50,6 +55,11 @@ beforeEach(() => {
   state.libraryFirstSeenByKey = {};
   window._dataVersion = 0;
   invalidateLibrarySnapshot();
+  // pickSpotlightGames rolls stinker / random-pick dice and may rotate the pool
+  // for _spotlightCurrentKey — disable those so spacing tests are deterministic.
+  setStinkerChanceForTest(0);
+  setRandomPickChanceForTest(0);
+  setSpotlightCurrentKey(null);
 });
 
 describe('family classifiers', () => {
@@ -138,17 +148,11 @@ describe('pickSpotlightGames spacing', () => {
       game({ id: '6', name: 'F', steam_review_percent: 90, hltb_main_hours: 50, status: 'backlog' }),
     ];
     const pool = pickSpotlightGames(games);
-    if (pool.length >= 3) {
-      const families = pool.map(g => familyForEyebrow(g._spotlightReason?.eyebrow));
-      for (let i = 1; i < families.length; i++) {
-        if (families[i] === families[i - 1] && typeof families[i] === 'string') {
-          // Allow duplicate only if pool is small / dominated by one family
-          const unique = new Set(families.filter(f => typeof f === 'string'));
-          if (unique.size >= 2) {
-            expect(families[i]).not.toBe(families[i - 1]);
-          }
-        }
-      }
-    }
+    expect(pool.length).toBeGreaterThanOrEqual(3);
+    const families = pool.map(g => familyForEyebrow(g._spotlightReason?.eyebrow));
+    const uniqueFamilies = new Set(families);
+    // Diverse eyebrows → spreadByFamily should separate same-family neighbors.
+    expect(uniqueFamilies.size).toBeGreaterThanOrEqual(2);
+    expect(hasNoAdjacentSameFamily(pool, g => familyForEyebrow(g._spotlightReason?.eyebrow))).toBe(true);
   });
 });

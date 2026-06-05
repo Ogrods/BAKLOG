@@ -143,9 +143,15 @@ window.markLandscape = function (img) {
   if (!img?.classList) return;
   const isLandscape = !!(img.naturalWidth && img.naturalHeight && img.naturalWidth > img.naturalHeight * 1.1);
   img.classList.toggle("landscape", isLandscape);
-  const wrap = img.closest(".cover-wrap");
-  if (wrap) wrap.classList.toggle("landscape", isLandscape);
   const src = img.currentSrc || img.src;
+  const wrap = img.closest(".cover-wrap");
+  if (wrap) {
+    wrap.classList.toggle("landscape", isLandscape);
+    // Letterboxed (contained) covers paint a blurred copy of the art behind
+    // them instead of a flat fill. Cleared when the cover fills the frame.
+    if (isLandscape && src) wrap.style.setProperty("--cover-blur-img", `url("${src}")`);
+    else wrap.style.removeProperty("--cover-blur-img");
+  }
   if (src) {
     const had = window.__landscapeCovers.has(src);
     if (isLandscape && !had) { window.__landscapeCovers.add(src); persistLandscapeCache(); }

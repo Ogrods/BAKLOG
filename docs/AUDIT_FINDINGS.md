@@ -270,11 +270,60 @@ No new findings.
 
 ---
 
+## Section 15 — Untracked gaps audit (fresh eyes, 2026-06-05)
+
+Second-pass audit hunting gaps **not** covered by Sections 1–14, `FETCHER_AUDIT.md`, `STRATEGY_AUDIT.md`, or `snappiness-2026-06-01.md`. Method: three parallel code explorers + direct `git check-ignore` / version verification.
+
+### Fixes applied in this pass
+
+1. **`.gitignore` store JSON globs** — replaced per-file enumeration with `games_*.json` + `games_wishlist_*.json` so Humble/EA/Nintendo-wishlist (and future stores) cannot be committed accidentally.
+2. **`gameId()` `ea_id` fallback** — aligned [js/game-core.js](../js/game-core.js) with `normalizeGame()` and [js/table-query.js](../js/table-query.js); regression test in `tests/game-core.test.js`.
+3. **`fetcher-registry.js` parity test** — `test_committed_fetcher_registry_js_matches_python` in [tests/test_fetcher_manifest_audit.py](../tests/test_fetcher_manifest_audit.py).
+4. **`force_reset` profile scoping test** — `test_force_reset_scoped_to_active_profile` in [tests/test_server_supabase_auth.py](../tests/test_server_supabase_auth.py); also fixed [server.py](../server.py) route match (`_api_path`) so `?force=1` reaches `_handle_cancel_all`.
+5. **Landing CSP** — waitlist handler wired via [landing/main.js](../landing/main.js); JSON-LD moved to [landing/structured-data.json](../landing/structured-data.json); font load via `id="google-fonts"` (no inline `onload`).
+6. **Landing demo a11y** — spotlight nav moved out of carousel innerHTML to sibling `<button>` elements; cover `alt` uses game title; hero replay is keyboard-accessible.
+7. **Subscribe email sanitization** — strip control chars before Resend `reply_to` in [landing/api/subscribe.js](../landing/api/subscribe.js).
+8. **Hygiene** — removed ungated `console.log`/`console.info` from [js/orphan-prune.js](../js/orphan-prune.js) and [js/library-watch.js](../js/library-watch.js); deleted orphaned scratch scripts (`tools/extract_dashboard.py`, `tools/patch_app_js.py`, `scripts/audit_gog_barren.py`, `scripts/restore_gog_metadata.py`).
+
+### Remaining gaps (tracker-ready)
+
+| Finding | Severity | Tracker ID | Notes |
+|---------|----------|------------|-------|
+| Subscribe rate limit is in-memory per Vercel isolate | med | `find_landing_subscribe_kv` | Needs KV/Upstash or Turnstile for prod abuse resistance |
+| `[Unreleased]` feature test gaps (deal badges HTML, export top 20, auth-cooldown integration, connections refresh errors) | med | `find_unreleased_feature_tests` | See Section 15b |
+| `table-query.js` mirrors ~400 lines of game-core/deals/genres with no parity test | med | `find_table_query_worker_parity` | Worker must stay DOM-free; add cross-path tests |
+| macOS CI smoke omits Galaxy/butler client + merge tests | low | `find_macos_ci_galaxy_itch` | Add to `.github/workflows/ci.yml` macOS subset |
+| README `ruff check` scope narrower than CI | low | `find_readme_ruff_scope` | Align README with `ruff check .` |
+| Version frozen at 0.6.0 while `[Unreleased]` is large | low | `find_version_cut` | Cut release or bump pre-release when ready |
+| Marketing one-pager domain drift | fixed | — | `baklog.local` → `baklog.app` |
+
+### Section 15b — `[Unreleased]` features with thin tests (not in prior audits)
+
+| Feature | Test gap |
+|---------|----------|
+| Export top 20 backlog | `exportTopBacklogMarkdown` untested |
+| Deal badges on dashboard cards | `dealDroppedBadgeHtml` / `ownedElsewhereBadgeHtml` untested |
+| Library cross-store pill | `storeBadgeHtml` multi-store path untested |
+| Steam Store API 429/5xx retry | only connection-error retry tested |
+| Chip auth-failure backoff integration | duration math only; stale-sweep skip + reconnect clear untested |
+| Connections `/api/auth/status` error UX | keep-cache-on-error path untested |
+| Library watch desktop notification | `Notification` stubbed away in tests |
+
+---
+
 ## Prioritized backlog (tracker-ready)
 
 | ID | Title | Severity | Phase |
 |----|-------|----------|-------|
 | audit-epic-callback | Wire legacy `/oauth/epic/callback` state registration | done | redirect-OAuth path wired + tested |
+| audit-gitignore-glob | `.gitignore` glob for `games_*.json` / `games_wishlist_*.json` | done | privacy |
+| audit-eaid-gameid | `gameId()` includes `ea_id` fallback | done | correctness |
+| audit-fetcher-registry-parity | CI test: `fetcher-registry.js` ↔ Python registry | done | correctness |
+| audit-force-reset-scope | `force_reset` profile scoping test | done | auth |
+| audit-landing-csp | Landing waitlist + JSON-LD CSP compliance | done | deploy |
+| find_landing_subscribe_kv | Landing subscribe KV rate limit + optional Turnstile | med | Phase 4 |
+| find_unreleased_feature_tests | Tests for shipped `[Unreleased]` UI paths | med | Phase 3 |
+| find_table_query_worker_parity | Worker ↔ main-thread filter parity tests | med | refactor |
 | p6_multiuser_run_queue | Per-user queue/active files + auth-SSE ownership | deferred | Phase 6 |
 | audit-split-server | Extract RunManager + static gates from server.py | nice-to-have | refactor |
 | audit-split-fh | Split fetcher-health.js | nice-to-have | refactor |

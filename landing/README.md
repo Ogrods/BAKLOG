@@ -4,7 +4,8 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 
 ## Files
 
-- `index.html` — page markup, inline base CSS, waitlist form. No build step.
+- `index.html` — page markup, inline base CSS, waitlist form shell. No build step.
+- `structured-data.json` — JSON-LD for crawlers (loaded externally for CSP compliance).
 - `main.js` — footer year, non-blocking font load, waitlist submit handler.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).

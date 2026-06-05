@@ -2104,7 +2104,7 @@ class Handler(SimpleHTTPRequestHandler):
         if _api_path(self) == "/api/auth/stream-ticket":
             self._handle_stream_ticket_mint()
             return
-        if self.path.rstrip("/") == "/api/runs/cancel":
+        if _api_path(self).rstrip("/") == "/api/runs/cancel":
             self._handle_cancel_all()
             return
         if self.path.startswith("/api/run/"):

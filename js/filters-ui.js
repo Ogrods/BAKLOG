@@ -28,7 +28,6 @@ import {
   itchIsGame,
   combinedPlaytime,
 } from './game-core.js';
-import { storeLogoHtml } from './store-logos.js';
 import { STORE_DISPLAY_ORDER, storeDisplayRank } from './dashboard-shared.js';
 import {
   getDealInfo,
@@ -734,12 +733,12 @@ export function renderSummary() {
         const titleText = itchTotal !== s.count
           ? `Open itch.io library tab (${s.count} games of ${itchTotal} total keys)`
           : "Open itch.io library tab";
-        return `<button type="button" class="summary-jump-chip px-3 py-2 rounded-full text-xs cursor-pointer" data-jump-view="itch" title="${titleText}">${s.label} <span class="font-semibold ml-1">${s.count}</span> <span class="ml-0.5 opacity-60">→</span></button>`;
+        return `<button type="button" class="summary-jump-chip cursor-pointer" data-jump-view="itch" title="${titleText}">${s.label} <span class="font-semibold ml-1">${s.count}</span> <span class="ml-0.5 opacity-60">→</span></button>`;
       }
       if (s.count === 0) return "";
       const isActive = activeStore === s.key;
       const title = isActive ? `Clear ${s.label} filter` : `Filter: ${s.label}`;
-      return `<button type="button" class="summary-store-chip${isActive ? " active" : ""}" data-store-filter="${escapeAttr(s.key)}" title="${escapeAttr(title)}"><span class="summary-store-chip-logo">${storeLogoHtml(s.key, { size: 'sm', title: s.label })}</span><span class="summary-store-chip-label">${escapeHtml(s.label)}</span> <span class="text-slate-100 font-semibold ml-1">${s.count}</span></button>`;
+      return `<button type="button" class="summary-store-chip${isActive ? " active" : ""}" data-store-filter="${escapeAttr(s.key)}" title="${escapeAttr(title)}"><span class="summary-store-chip-label">${escapeHtml(s.label)}</span> <span class="text-slate-100 font-semibold ml-1">${s.count}</span></button>`;
     })
     .join("");
   const statusChips = renderStatusChipsHtml(visible);

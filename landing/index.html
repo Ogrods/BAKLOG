@@ -33,34 +33,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" media="print" onload="this.media='all'" />
+  <link rel="stylesheet" id="google-fonts" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" media="print" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
   <link rel="stylesheet" href="demo.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <script src="demo.js" defer></script>
+  <script src="main.js" defer></script>
 
-  <!-- Structured data -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "BAKLOG",
-    "applicationCategory": "GameApplication",
-    "operatingSystem": "Windows, macOS, Linux",
-    "url": "https://baklog.app/",
-    "description": "BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, invite-only early access.",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    },
-    "publisher": {
-      "@type": "Organization",
-      "name": "BAKLOG",
-      "url": "https://baklog.app/"
-    }
-  }
-  </script>
+  <!-- Structured data (external file — CSP script-src 'self' blocks inline JSON-LD) -->
+  <script type="application/ld+json" src="structured-data.json"></script>
 
   <style>
     :root {
@@ -825,51 +806,5 @@
     </div>
   </footer>
 
-  <script>
-    document.getElementById("year").textContent = new Date().getFullYear();
-
-    const form = document.getElementById("waitlist");
-    const emailEl = document.getElementById("email");
-    const btn = document.getElementById("submitBtn");
-    const msg = document.getElementById("formMsg");
-    const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      msg.className = "form-msg";
-      msg.textContent = "";
-
-      const email = emailEl.value.trim();
-      if (!EMAIL_RE.test(email)) {
-        msg.className = "form-msg err";
-        msg.textContent = "Please enter a valid email.";
-        emailEl.focus();
-        return;
-      }
-
-      const website = form.elements["website"].value;
-      btn.disabled = true;
-      const original = btn.textContent;
-      btn.textContent = "Sending…";
-
-      try {
-        const res = await fetch("/api/subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, website }),
-        });
-        if (!res.ok) throw new Error("bad status");
-        form.querySelector(".waitlist-row").remove();
-        form.querySelector(".form-reassure").remove();
-        msg.className = "form-msg ok";
-        msg.textContent = "You're on the invite list. We send invites in small waves, so keep an eye on your inbox.";
-      } catch (err) {
-        btn.disabled = false;
-        btn.textContent = original;
-        msg.className = "form-msg err";
-        msg.textContent = "Something went wrong. Please try again in a moment.";
-      }
-    });
-  </script>
 </body>
 </html>

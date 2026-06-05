@@ -21,7 +21,16 @@ export const ITCH_CLASS_LABELS = {
   other: "Other",
 };
 
-export const DASH_STORE_COLORS = { ...STORE_BRAND_COLORS };
+// Chart-only color overrides: a few canonical brand primaries are too dark to
+// read on the dark chart canvases (Steam navy #1b2838, Epic near-black #2f2d2e,
+// Ubisoft pure black #000000). Charts use lighter on-brand tints; badges keep
+// STORE_BRAND_COLORS (they render on their own colored chips).
+export const DASH_STORE_COLORS = {
+  ...STORE_BRAND_COLORS,
+  steam: '#66c0f4',    // Steam light brand blue
+  epic: '#cfd2d6',     // Epic grayscale identity, lightened for contrast
+  ubisoft: '#0098db',  // Ubisoft Connect blue
+};
 
 export const DASH_STATUS_COLORS = {
   backlog: "#ef4444", next: "#38bdf8", playing: "#facc15", unfinished: "#f97316",

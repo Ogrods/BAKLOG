@@ -14,17 +14,6 @@
   const JITTER_PX = 4;
 
   const FINAL_COUNT = 2984;
-  const BATCH_SIZE = 200;
-  const STORE_SEQUENCE = (() => {
-    const out = [];
-    let remaining = FINAL_COUNT;
-    while (remaining > 0) {
-      const delta = Math.min(BATCH_SIZE, remaining);
-      out.push({ delta });
-      remaining -= delta;
-    }
-    return out;
-  })();
 
   const STATS = {
     playedHrs: 412,
@@ -36,26 +25,55 @@
     stores: 7,
   };
 
+  const DEMO_STORE_KEYS = ["steam", "gog", "epic", "psn", "xbox", "nintendo", "itch"];
+  const STORE_BRAND_COLORS = {
+    steam: "#1b2838",
+    epic: "#2f2d2e",
+    gog: "#5100dc",
+    psn: "#003791",
+    xbox: "#107c10",
+    nintendo: "#e60012",
+    itch: "#fa5c5c",
+  };
+  const STORE_GLYPH_PATHS = {
+    steam: "assets/store-logos/steam.svg",
+    epic: "assets/store-logos/epic.svg",
+    gog: "assets/store-logos/gog.svg",
+    psn: "assets/store-logos/playstation.svg",
+    xbox: "assets/store-logos/xbox.svg",
+    nintendo: "assets/store-logos/nintendo.svg",
+    itch: "assets/store-logos/itch.svg",
+  };
+  const STORE_LABELS = {
+    steam: "Steam",
+    gog: "GOG",
+    epic: "Epic",
+    psn: "PlayStation",
+    xbox: "Xbox",
+    nintendo: "Nintendo",
+    itch: "itch.io",
+  };
+
   const SPOTLIGHT_GAMES = [
     { title: "Emberfall", eyebrow: "Critically acclaimed", rating: 95, hltb: "42h", status: "in backlog", art: "assets/sample/hero-emberfall.webp", portrait: false },
     { title: "Ironveil", eyebrow: "Couch co-op", rating: 83, hltb: "10h", status: "in backlog", art: "assets/sample/cover-ironveil.webp", portrait: true },
-    { title: "Hollow Crown", eyebrow: "On sale now", rating: 92, saleCut: 80, price: "$5.99", art: "assets/sample/hero-hollow-crown.webp", portrait: false },
+    { title: "Rustbloom", eyebrow: "On sale now", rating: 92, saleCut: 80, price: "$5.99", art: "assets/sample/hero-rustbloom.webp", portrait: false },
     { title: "Ashlight Saga", eyebrow: "Highly rated", rating: 91, hltb: "55h", status: "in backlog", art: "assets/sample/cover-ashlight-saga.webp", portrait: true },
-    { title: "Tidewright", eyebrow: "New release", rating: 88, hltb: "26h", status: "next up", art: "assets/sample/hero-tidewright.webp", portrait: false },
-    { title: "Hollowmaw", eyebrow: "Hidden gem", rating: 84, hltb: "14h", status: "in backlog", art: "assets/sample/cover-hollowmaw.webp", portrait: true },
     { title: "Ashen Vale", eyebrow: "Long haul", rating: 90, hltb: "60h", status: "in progress", art: "assets/sample/hero-ashen-vale.webp", portrait: false },
     { title: "Encore", eyebrow: "Replay", rating: 93, hltb: "8h", status: "completed", art: "assets/sample/cover-encore.webp", portrait: true },
-    { title: "Stormhallow", eyebrow: "Up next", rating: 87, hltb: "33h", status: "next up", art: "assets/sample/hero-stormhallow.webp", portrait: false },
-    { title: "Apex Velocity", eyebrow: "Weekend-sized", rating: 89, hltb: "6h", status: "in backlog", art: "assets/sample/cover-apex-velocity.webp", portrait: true },
+    { title: "Starbreak", eyebrow: "New frontier", rating: 90, hltb: "30h", status: "next up", art: "assets/sample/hero-starbreak.webp", portrait: false },
+    { title: "Zephyr Edge", eyebrow: "Stylish action", rating: 88, hltb: "40h", status: "in backlog", art: "assets/sample/cover-zephyr-edge.webp", portrait: true },
+    { title: "Tidewright", eyebrow: "New release", rating: 88, hltb: "26h", status: "next up", art: "assets/sample/hero-tidewright.webp", portrait: false },
+    { title: "Hollowmaw", eyebrow: "Hidden gem", rating: 84, hltb: "14h", status: "in backlog", art: "assets/sample/cover-hollowmaw.webp", portrait: true },
     { title: "Dawnbanner", eyebrow: "Trending now", rating: 94, hltb: "38h", status: "in backlog", art: "assets/sample/hero-dawnbanner.webp", portrait: false },
-    { title: "Quick Byte", eyebrow: "Quick win", rating: 78, hltb: "3h", status: "in backlog", art: "assets/sample/cover-quick-byte.webp", portrait: true },
+    { title: "Apex Velocity", eyebrow: "Weekend-sized", rating: 89, hltb: "6h", status: "in backlog", art: "assets/sample/cover-apex-velocity.webp", portrait: true },
   ];
 
   const MARQUEE_ITEMS = [
     { icon: "S", cls: "is-emerald", label: "Steam", text: "<strong>257</strong> games synced" },
     { icon: "G", cls: "is-violet", label: "GOG", text: "<strong>673</strong> games synced" },
     { icon: "E", cls: "", label: "Epic", text: "<strong>259</strong> free claims counted" },
-    { icon: "D", cls: "is-amber", label: "Deals", text: "<strong class=\"dash-marquee-cut deal-cut-huge\">-80%</strong> on Hollow Crown" },
+    { icon: "D", cls: "is-amber", label: "Deals", text: "<strong class=\"dash-marquee-cut deal-cut-huge\">-80%</strong> on Rustbloom" },
     { icon: "P", cls: "is-rose", label: "PSN", text: "<strong>597</strong> titles imported" },
     { icon: "B", cls: "is-emerald", label: "Backlog", text: "<strong>2,847h</strong> to clear" },
     { icon: "R", cls: "", label: "Reviews", text: "<strong>78%</strong> avg across library" },
@@ -77,6 +95,10 @@
 
   function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
+  }
+
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
   function fmtCommas(n) {
@@ -102,23 +124,20 @@
   function spotlightInnerHtml(g, animClass, eager = false) {
     const loadAttr = eager ? 'fetchpriority="high"' : 'loading="lazy"';
     const decodeAttr = 'decoding="async"';
+    const alt = escapeHtml(g.title);
     const bg = g.portrait
       ? `<img class="dash-spotlight-art-bg is-loaded" src="${escapeHtml(g.art)}" alt="" aria-hidden="true" ${decodeAttr} ${loadAttr} />`
       : "";
     return `
       ${bg}
-      <img class="dash-spotlight-art is-loaded" src="${escapeHtml(g.art)}" alt="" ${decodeAttr} ${loadAttr} />
+      <img class="dash-spotlight-art is-loaded" src="${escapeHtml(g.art)}" alt="${alt}" ${decodeAttr} ${loadAttr} />
       <div class="dash-spotlight-sheen" aria-hidden="true"></div>
       <div class="dash-spotlight-gradient" aria-hidden="true"></div>
       <div class="dash-spotlight-body">
         <span class="dash-spotlight-eyebrow">${escapeHtml(g.eyebrow)}</span>
         <span class="dash-spotlight-title">${escapeHtml(g.title)}</span>
         <span class="dash-spotlight-meta">${metaHtml(g)}</span>
-      </div>
-      <span class="dash-spotlight-nav" aria-hidden="false">
-        <span class="dash-spotlight-nav-btn" role="button" tabindex="0" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</span>
-        <span class="dash-spotlight-nav-btn" role="button" tabindex="0" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</span>
-      </span>`;
+      </div>`;
   }
 
   function buildMarqueeHtml() {
@@ -128,16 +147,33 @@
     return `<div class="dash-marquee-track">${track}${track}</div>`;
   }
 
+  function buildStoreStripHtml() {
+    const items = DEMO_STORE_KEYS.map((key) => {
+      const color = STORE_BRAND_COLORS[key];
+      const glyph = STORE_GLYPH_PATHS[key];
+      const label = STORE_LABELS[key];
+      return `<span role="listitem"><span class="store-logo store-logo--glyph store-logo--md" style="--store-logo-bg:${color};--store-logo-glyph:url('${glyph}')" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"><span class="store-logo-glyph" aria-hidden="true"></span></span></span>`;
+    }).join("");
+    return `<div class="dash-hero-stores" aria-label="Stores in your library"><div class="store-logo-strip store-logo-strip--md" role="list" aria-label="Stores in your library">${items}</div></div>`;
+  }
+
   function buildMegaHtml() {
     return `
       <div class="dash-mega dash-mega--has-spotlight" id="dashboardMega">
         <div class="dash-mega-hero">
-          <button type="button" class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" aria-label="Spotlight game"></button>
+          <div class="dash-spotlight-host">
+            <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
+            <div class="dash-spotlight-nav" id="spotlightNav">
+              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
+              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
+            </div>
+          </div>
           <div class="dash-hero-eyebrow">Your library</div>
           <span class="library-count-host" data-libcount-host>
             <span class="dash-hero-number" id="dashHeroCount">0</span>
           </span>
           <div class="dash-hero-sub">games owned across ${STATS.stores} stores</div>
+          ${buildStoreStripHtml()}
           <div class="dash-hero-tagline">
             <span><strong>${STATS.completion}%</strong> complete</span>
             <span class="sep">·</span>
@@ -186,6 +222,29 @@
   // --- Count-up + popups ---
   let countDemoRan = false;
   let countTimers = [];
+  let countLoopActive = false;
+  let countNode = null;
+  let countFormat = fmtCommas;
+  let countFrom = 0;
+  let countTo = 0;
+  let countStart = 0;
+  let countDur = COUNT_ROLL_MS;
+
+  function countTick(now) {
+    if (!countNode) {
+      countLoopActive = false;
+      return;
+    }
+    const t = Math.min(1, (now - countStart) / countDur);
+    const v = countFrom + (countTo - countFrom) * easeInOutCubic(t);
+    countNode.textContent = countFormat(v);
+    if (t < 1) {
+      requestAnimationFrame(countTick);
+    } else {
+      countNode.textContent = countFormat(countTo);
+      countLoopActive = false;
+    }
+  }
 
   function clearCountTimers() {
     countTimers.forEach((id) => clearTimeout(id));
@@ -238,15 +297,16 @@
       const count = Number.isFinite(opts.popupCount) ? opts.popupCount : Math.min(delta, POPUP_CAP);
       spawnPopups(host, delta, count);
     }
-    const start = performance.now();
-    function tick(now) {
-      const t = Math.min(1, (now - start) / durationMs);
-      const v = safeFrom + (safeTo - safeFrom) * easeOutCubic(t);
-      node.textContent = format(v);
-      if (t < 1) requestAnimationFrame(tick);
-      else node.textContent = format(safeTo);
+    countNode = node;
+    countFormat = format;
+    countFrom = safeFrom;
+    countTo = safeTo;
+    countDur = durationMs;
+    countStart = performance.now();
+    if (!countLoopActive) {
+      countLoopActive = true;
+      requestAnimationFrame(countTick);
     }
-    requestAnimationFrame(tick);
   }
 
   function animatePillar(id, to, suffix) {
@@ -287,24 +347,13 @@
     if (!hero) return;
     reserveCountWidth(hero);
     hero.textContent = "0";
-    let running = 0;
-    let elapsed = 0;
-    const stepMs = 150;
-    STORE_SEQUENCE.forEach((step, i) => {
-      elapsed += i === 0 ? 0 : stepMs;
-      const prev = running;
-      running += step.delta;
-      const id = setTimeout(() => {
-        flashCountUp(hero, prev, running, fmtCommas, { popups: true, durationMs: 260, popupCount: 1 });
-      }, elapsed);
-      countTimers.push(id);
-    });
-    const pillarDelay = elapsed + 400;
+    const climbMs = 8000;
+    flashCountUp(hero, 0, FINAL_COUNT, fmtCommas, { popups: true, durationMs: climbMs, popupCount: 10 });
     countTimers.push(setTimeout(() => {
       animatePillar("dashHeroPlayed", STATS.playedHrs, "h");
       animatePillar("dashHeroBacklog", STATS.backlogHrs, "h");
       animatePillar("dashHeroAvg", STATS.avgRating, "%");
-    }, pillarDelay));
+    }, climbMs + 300));
   }
 
   function replayCountDemo() {
@@ -496,23 +545,21 @@
     el.addEventListener("pointerleave", endTilt);
     el.addEventListener("pointercancel", endTilt);
 
-    el.addEventListener("click", (e) => {
-      const nav = e.target.closest("[data-spotlight-nav]");
-      if (!nav) return;
-      e.preventDefault();
-      e.stopPropagation();
-      stepSpotlight(nav.dataset.spotlightNav === "prev" ? -1 : 1);
-    });
-
     el.addEventListener("keydown", (e) => {
-      const nav = e.target.closest("[data-spotlight-nav]");
-      if (nav && (e.key === "Enter" || e.key === " ")) {
-        e.preventDefault();
-        stepSpotlight(nav.dataset.spotlightNav === "prev" ? -1 : 1);
-        return;
-      }
       if (e.key === "ArrowLeft") { e.preventDefault(); stepSpotlight(-1); }
       else if (e.key === "ArrowRight") { e.preventDefault(); stepSpotlight(1); }
+    });
+  }
+
+  function wireSpotlightNav() {
+    const nav = document.getElementById("spotlightNav");
+    if (!nav || nav.dataset.navWired) return;
+    nav.dataset.navWired = "1";
+    nav.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-spotlight-nav]");
+      if (!btn) return;
+      e.preventDefault();
+      stepSpotlight(btn.dataset.spotlightNav === "prev" ? -1 : 1);
     });
   }
 
@@ -538,18 +585,35 @@
   }
 
   // --- Charts ---
-  const CHART_PALETTE = ["#38bdf8", "#22d3ee", "#a855f7", "#34d399", "#fbbf24", "#f472b6", "#94a3b8"];
+  // Dummy data keyed to the app's dashboard color maps (js/dashboard-shared.js
+  // DASH_STORE_COLORS / DASH_STATUS_COLORS / DASH_REVIEW_COLORS) so the landing
+  // donuts read like the real dashboard ribbon.
+  const STORE_DONUT = {
+    labels: ["Steam", "GOG", "Epic", "PSN", "Xbox", "Amazon", "itch.io"],
+    data: [40, 22, 14, 12, 6, 4, 2],
+    colors: ["#66c0f4", "#5100dc", "#cfd2d6", "#003791", "#107c10", "#ff9900", "#fa5c5c"],
+  };
+  const STATUS_DONUT = {
+    labels: ["Backlog", "Playing", "Finished", "Next", "Skip"],
+    data: [57, 18, 12, 9, 4],
+    colors: ["#ef4444", "#facc15", "#22c55e", "#38bdf8", "#475569"],
+  };
+  const REVIEW_DONUT = {
+    labels: ["Overwhelmingly Positive", "Very Positive", "Mostly Positive", "Mixed"],
+    data: [28, 42, 24, 6],
+    colors: ["#22c55e", "#34d399", "#86efac", "#fbbf24"],
+  };
 
-  function makeDonut(canvasId, labels, data) {
+  function makeDonut(canvasId, spec) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === "undefined") return null;
     return new Chart(canvas, {
       type: "doughnut",
       data: {
-        labels,
+        labels: spec.labels,
         datasets: [{
-          data,
-          backgroundColor: CHART_PALETTE.slice(0, data.length),
+          data: spec.data,
+          backgroundColor: spec.colors,
           borderWidth: 0,
           hoverOffset: 4,
         }],
@@ -557,8 +621,12 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: "62%",
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: {
+            position: "right",
+            labels: { color: "#ffffff", boxWidth: 12, padding: 8, font: { size: 11 } },
+          },
+        },
         animation: reducedMotion() ? false : { duration: 800 },
       },
     });
@@ -569,9 +637,9 @@
       Chart.defaults.color = "#94a3b8";
       Chart.defaults.borderColor = "#334155";
     }
-    makeDonut("chartStoreDonut", ["Steam", "GOG", "Epic", "PSN", "Xbox", "Amazon", "itch"], [40, 22, 14, 12, 6, 4, 2]);
-    makeDonut("chartStatusDonut", ["Backlog", "Playing", "Finished", "Next", "Skip"], [57, 18, 12, 9, 4]);
-    makeDonut("chartReviewDonut", ["Overwhelmingly", "Very Positive", "Positive", "Mixed"], [28, 42, 24, 6]);
+    makeDonut("chartStoreDonut", STORE_DONUT);
+    makeDonut("chartStatusDonut", STATUS_DONUT);
+    makeDonut("chartReviewDonut", REVIEW_DONUT);
   }
 
   // --- Init ---
@@ -581,6 +649,7 @@
     mount.innerHTML = buildMegaHtml();
 
     applySpotlight(SPOTLIGHT_GAMES[0], 0);
+    wireSpotlightNav();
     resetSpotlightTimer();
     startInsightRotation();
     requestAnimationFrame(() => initCharts());
@@ -589,7 +658,16 @@
     if (heroCount) {
       heroCount.style.cursor = "pointer";
       heroCount.title = "Click to replay the library import demo";
+      heroCount.setAttribute("tabindex", "0");
+      heroCount.setAttribute("role", "button");
+      heroCount.setAttribute("aria-label", "Replay library import demo");
       heroCount.addEventListener("click", replayCountDemo);
+      heroCount.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          replayCountDemo();
+        }
+      });
     }
 
     const demoSection = document.getElementById("demo");

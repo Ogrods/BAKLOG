@@ -2,6 +2,8 @@
 
 **Cross-store game backlog — local-only.**
 
+**Beta:** source is open under [MIT](LICENSE); the product is invite-only while we test. Request access at [baklog.app](https://baklog.app).
+
 ![Dashboard preview](dashboard.png)
 
 BAKLOG helps you browse, sort, and prioritize games across Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, and itch.io. Nothing is hosted on the web; your credentials and library JSON stay on your machine.

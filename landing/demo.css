@@ -64,6 +64,40 @@
 .dash-mega .dash-hero-tagline,
 .dash-mega .dash-hero-pillars { max-width: min(720px, 62%); }
 .dash-hero-sub { color: #94a3b8; font-size: 14px; margin-top: 6px; position: relative; z-index: 1; }
+.dash-mega .dash-hero-stores { max-width: min(720px, 62%); }
+.dash-hero-stores {
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+}
+.store-logo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.store-logo-strip [role="listitem"] { display: inline-flex; }
+.store-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border-radius: 4px;
+  background: var(--store-logo-bg, #64748b);
+  line-height: 1;
+}
+.store-logo--sm { width: 18px; height: 18px; }
+.store-logo--md { width: 22px; height: 22px; }
+.store-logo--lg { width: 24px; height: 24px; min-width: 24px; border-radius: 6px; }
+.store-logo-glyph {
+  display: block;
+  width: 62%;
+  height: 62%;
+  background: #fff;
+  -webkit-mask: var(--store-logo-glyph) center / contain no-repeat;
+          mask: var(--store-logo-glyph) center / contain no-repeat;
+}
 .dash-hero-tagline {
   margin-top: 14px;
   color: #cbd5e1;
@@ -101,18 +135,23 @@
 }
 
 /* Spotlight */
-.dash-spotlight {
+.dash-spotlight-host {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   width: 66%;
+  z-index: 0;
+}
+.dash-spotlight {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   background: transparent;
   border: 0;
   padding: 0;
   cursor: default;
   overflow: hidden;
-  z-index: 0;
   transition: opacity 0.3s ease;
   will-change: opacity;
   transform: translateZ(0);
@@ -247,7 +286,7 @@
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   backdrop-filter: blur(2px);
 }
-.dash-spotlight.dash-spotlight--multi .dash-spotlight-nav { display: flex; }
+.dash-spotlight-host:has(.dash-spotlight--multi) .dash-spotlight-nav { display: flex; }
 .dash-spotlight-nav-btn {
   width: 28px;
   height: 28px;
@@ -265,6 +304,10 @@
 }
 .dash-spotlight-nav-btn + .dash-spotlight-nav-btn { border-left: 1px solid rgba(51,65,85,0.6); }
 .dash-spotlight-nav-btn:hover { color: #f1f5f9; background: color-mix(in srgb, var(--bg-hover) 90%, transparent); }
+.dash-spotlight-nav-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
 .dash-spotlight-body {
   position: absolute;
   bottom: 14px;
@@ -498,6 +541,10 @@
 @media (max-width: 900px) {
   .dash-ribbon { grid-template-columns: 1fr; }
   .dash-insight, .dash-mega--has-spotlight .dash-insight { max-width: none; display: block; white-space: normal; }
+  /* The host is the 66%-wide right-pinned absolute box on desktop. On mobile it
+     must drop back into flow so the spotlight stacks full-width above the hero
+     text; keep position:relative so the nav buttons stay anchored to it. */
+  .dash-spotlight-host { position: relative; inset: auto; width: 100%; }
   .dash-spotlight { position: static; width: 100%; height: 180px; margin-bottom: 16px; border-radius: 10px; }
   .dash-spotlight-art { -webkit-mask-image: none; mask-image: none; }
   .dash-spotlight-body { left: 16px; right: 16px; max-width: none; text-align: left; align-items: flex-start; }
@@ -505,6 +552,7 @@
   .dash-spotlight-body .dash-spotlight-meta { text-align: left; }
   .dash-mega .dash-hero-number, .dash-mega .dash-hero-sub,
   .dash-mega .dash-hero-tagline, .dash-mega .dash-hero-pillars,
+  .dash-mega .dash-hero-stores,
   .dash-mega .library-count-host { max-width: none; }
 }
 @media (max-width: 640px) {

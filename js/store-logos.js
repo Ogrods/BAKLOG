@@ -104,6 +104,13 @@ export function storeLogoHtml(store, opts = {}) {
   const size = opts.size || 'md';
   const extra = opts.className ? ` ${opts.className}` : '';
   const manual = opts.manual ? ' manual' : '';
+  const asset = STORE_LOGO_ASSETS[key];
+  // Stores with a brand glyph render the SVG logo (masked, painted with the
+  // badge's text color). Abstract keys (other/manual/wishlist/itad) keep the
+  // letter fallback, which avoids the optical-centering issues of letterforms.
+  if (asset?.glyph) {
+    return `<span class="store-badge ${key}${SIZE_CLASS[size] || ''} store-badge--glyph${extra}${manual}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><span class="store-badge-glyph" aria-hidden="true" style="--store-badge-glyph:url('${escapeAttr(asset.glyph)}')"></span></span>`;
+  }
   const letter = storeLetter(key);
   return `<span class="store-badge ${key}${SIZE_CLASS[size] || ''}${extra}${manual}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${escapeHtml(letter)}</span>`;
 }

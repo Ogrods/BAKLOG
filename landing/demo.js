@@ -70,16 +70,16 @@
   ];
 
   const MARQUEE_ITEMS = [
-    { icon: "S", cls: "is-emerald", label: "Steam", text: "<strong>257</strong> games synced" },
-    { icon: "G", cls: "is-violet", label: "GOG", text: "<strong>673</strong> games synced" },
-    { icon: "E", cls: "", label: "Epic", text: "<strong>259</strong> free claims counted" },
-    { icon: "D", cls: "is-amber", label: "Deals", text: "<strong class=\"dash-marquee-cut deal-cut-huge\">-80%</strong> on Rustbloom" },
-    { icon: "P", cls: "is-rose", label: "PSN", text: "<strong>597</strong> titles imported" },
-    { icon: "B", cls: "is-emerald", label: "Backlog", text: "<strong>2,847h</strong> to clear" },
-    { icon: "R", cls: "", label: "Reviews", text: "<strong>78%</strong> avg across library" },
-    { icon: "I", cls: "is-violet", label: "itch.io", text: "<strong>1,044</strong> bundle keys" },
-    { icon: "W", cls: "is-amber", label: "Wishlist", text: "<strong>14</strong> deals live now" },
-    { icon: "C", cls: "is-emerald", label: "Complete", text: "<strong>12%</strong> of library finished" },
+    { icon: "S", cls: "is-emerald", label: "Steam", text: "<strong>257</strong> games synced", tip: "Games imported from your Steam library." },
+    { icon: "G", cls: "is-violet", label: "GOG", text: "<strong>673</strong> games synced", tip: "Games imported from your GOG library." },
+    { icon: "E", cls: "", label: "Epic", text: "<strong>259</strong> free claims counted", tip: "Epic Games Store free weekly claims counted in your library." },
+    { icon: "D", cls: "is-amber", label: "Deals", text: "<strong class=\"dash-marquee-cut deal-cut-huge\">-80%</strong> on Rustbloom", tip: "Biggest active discount on a wishlist game right now." },
+    { icon: "P", cls: "is-rose", label: "PSN", text: "<strong>597</strong> titles imported", tip: "Titles imported from your PlayStation library." },
+    { icon: "B", cls: "is-emerald", label: "Backlog", text: "<strong>2,847h</strong> to clear", tip: "Estimated HowLongToBeat main-story hours across your backlog." },
+    { icon: "R", cls: "", label: "Reviews", text: "<strong>78%</strong> avg across library", tip: "Average review score across rated games in your library." },
+    { icon: "I", cls: "is-violet", label: "itch.io", text: "<strong>1,044</strong> bundle keys", tip: "itch.io bundle keys in your library." },
+    { icon: "W", cls: "is-amber", label: "Wishlist", text: "<strong>14</strong> deals live now", tip: "Wishlist items with an active discount right now." },
+    { icon: "C", cls: "is-emerald", label: "Complete", text: "<strong>12%</strong> of library finished", tip: "Finished share of your library, excluding skipped games." },
   ];
 
   const INSIGHTS = [
@@ -113,6 +113,21 @@
       .replace(/"/g, "&quot;");
   }
 
+  // Canonical spotlight-eyebrow tooltips, mirrored from js/metric-tips.js
+  // (EYEBROW_TIPS). Landing-only marketing eyebrows with no canonical tip get
+  // no tooltip — same behaviour as the local hero for unknown eyebrows.
+  const EYEBROW_TIPS = {
+    "Critically acclaimed": "90%+ rated with enough reviews - among the best you own.",
+    "Couch co-op": "Supports local / same-couch co-op and is rated 70%+.",
+    "On sale now": "A wishlist game (not yet owned) with an active discount.",
+    "Highly rated": "82%+ rated with enough reviews to trust the score.",
+    "Long haul": "40h+ epic rated 80%+ with enough reviews - a big commitment that pays off.",
+    Replay: "A finished game worth revisiting - well-reviewed, with enough ratings. Surfaces rarely.",
+    "New release": "Released within the last year and rated 70%+.",
+    "Hidden gem": "80%+ rated but with few reviews - under-the-radar pick.",
+    "Weekend-sized": "8–15h to beat and rated 72%+ - fits in a weekend.",
+  };
+
   function metaHtml(g) {
     if (g.saleCut != null) {
       const cutCls = g.saleCut >= 75 ? "deal-cut-huge" : g.saleCut >= 50 ? "deal-cut-big" : "";
@@ -134,15 +149,15 @@
       <div class="dash-spotlight-sheen" aria-hidden="true"></div>
       <div class="dash-spotlight-gradient" aria-hidden="true"></div>
       <div class="dash-spotlight-body">
-        <span class="dash-spotlight-eyebrow">${escapeHtml(g.eyebrow)}</span>
+        <span class="dash-spotlight-eyebrow"${EYEBROW_TIPS[g.eyebrow] ? ` title="${escapeHtml(EYEBROW_TIPS[g.eyebrow])}"` : ""}>${escapeHtml(g.eyebrow)}</span>
         <span class="dash-spotlight-title">${escapeHtml(g.title)}</span>
-        <span class="dash-spotlight-meta">${metaHtml(g)}</span>
+        <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaHtml(g)}</span>
       </div>`;
   }
 
   function buildMarqueeHtml() {
     const item = (m) =>
-      `<span class="dash-marquee-item"><span class="dash-marquee-icon ${m.cls}">${m.icon}</span><span class="dash-marquee-label">${escapeHtml(m.label)}</span> ${m.text}</span>`;
+      `<span class="dash-marquee-item"${m.tip ? ` title="${escapeHtml(m.tip)}"` : ""}><span class="dash-marquee-icon ${m.cls}">${m.icon}</span><span class="dash-marquee-label">${escapeHtml(m.label)}</span> ${m.text}</span>`;
     const track = MARQUEE_ITEMS.map(item).join("");
     return `<div class="dash-marquee-track">${track}${track}</div>`;
   }
@@ -169,28 +184,28 @@
             </div>
           </div>
           <div class="dash-hero-eyebrow">Your library</div>
-          <span class="library-count-host" data-libcount-host>
+          <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores">
             <span class="dash-hero-number" id="dashHeroCount">0</span>
           </span>
-          <div class="dash-hero-sub">games owned across ${STATS.stores} stores</div>
+          <div class="dash-hero-sub" title="Library size and number of distinct storefronts">games owned across ${STATS.stores} stores</div>
           ${buildStoreStripHtml()}
           <div class="dash-hero-tagline">
-            <span><strong>${STATS.completion}%</strong> complete</span>
+            <span title="Finished share of library excluding skipped games"><strong>${STATS.completion}%</strong> complete</span>
             <span class="sep">·</span>
-            <span><strong>${STATS.years}</strong> yrs to clear at 2h/day</span>
+            <span title="Backlog HLTB main hours ÷ (2 hours × 365 days)"><strong>${STATS.years}</strong> yrs to clear at 2h/day</span>
             <span class="sep">·</span>
-            <span><strong>${STATS.wlDeals}</strong> deals live</span>
+            <span title="Wishlist items with an active discount right now"><strong>${STATS.wlDeals}</strong> deals live</span>
           </div>
           <div class="dash-hero-pillars">
-            <div class="dash-hero-pillar">
+            <div class="dash-hero-pillar" title="Sum of playtime across all games, in hours">
               <div class="dash-hero-pillar-value" id="dashHeroPlayed">0h</div>
               <div class="dash-hero-pillar-label">Played</div>
             </div>
-            <div class="dash-hero-pillar">
+            <div class="dash-hero-pillar" title="Sum of HowLongToBeat main-story hours across backlog games">
               <div class="dash-hero-pillar-value" id="dashHeroBacklog">0h</div>
               <div class="dash-hero-pillar-label">Backlog</div>
             </div>
-            <div class="dash-hero-pillar">
+            <div class="dash-hero-pillar" title="Mean review % across rated games">
               <div class="dash-hero-pillar-value" id="dashHeroAvg">0%</div>
               <div class="dash-hero-pillar-label">Avg review</div>
             </div>
@@ -201,17 +216,17 @@
         <div class="dash-mega-divider" aria-hidden="true"></div>
         <div class="dash-ribbon">
           <div class="dash-ribbon-tile">
-            <div class="dash-ribbon-eyebrow">Library by store</div>
+            <div class="dash-ribbon-eyebrow" title="Share of library per connected store">Library by store</div>
             <div class="dash-ribbon-chart"><canvas id="chartStoreDonut"></canvas></div>
             <div class="dash-ribbon-headline" id="ribbonStoreHeadline"><strong>Steam</strong> leads at 40%</div>
           </div>
           <div class="dash-ribbon-tile">
-            <div class="dash-ribbon-eyebrow">Status breakdown</div>
+            <div class="dash-ribbon-eyebrow" title="Personal backlog statuses">Status breakdown</div>
             <div class="dash-ribbon-chart"><canvas id="chartStatusDonut"></canvas></div>
             <div class="dash-ribbon-headline" id="ribbonStatusHeadline"><strong>57%</strong> still in backlog</div>
           </div>
           <div class="dash-ribbon-tile">
-            <div class="dash-ribbon-eyebrow">Review sentiment</div>
+            <div class="dash-ribbon-eyebrow" title="Steam review descriptor mix">Review sentiment</div>
             <div class="dash-ribbon-chart"><canvas id="chartReviewDonut"></canvas></div>
             <div class="dash-ribbon-headline" id="ribbonReviewHeadline">Mostly <strong>very positive</strong></div>
           </div>

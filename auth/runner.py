@@ -17,10 +17,11 @@ from auth.api_keys import (
     extract_xbox,
 )
 from auth.cdp_browser import (
+    STEALTH_INIT_SCRIPT,
     auth_banner_init_script,
-    is_blank_browser_url,
     launch_persistent_profile,
 )
+from auth.epic_wishlist_session import EPIC_WISHLIST_URL, epic_store_login_url
 from auth.registry import spec_for
 from auth.secrets import profile_dir
 
@@ -30,40 +31,7 @@ PSN_STORE_URL = "https://store.playstation.com/en-us/"
 PSN_SSOCOOKIE_URL = "https://ca.account.sony.com/api/v1/ssocookie"
 PSN_SSOCOOKIE_INTERVAL_SEC = 10
 
-_STEALTH_INIT = r"""
-(() => {
-  try { Object.defineProperty(navigator, 'webdriver', { get: () => undefined, configurable: true }); } catch (e) {}
-  try {
-    const orig = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver');
-    if (orig) Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => undefined });
-  } catch (e) {}
-  try {
-    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'], configurable: true });
-    Object.defineProperty(navigator, 'plugins', {
-      get: () => [
-        { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
-        { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
-        { name: 'Native Client', filename: 'internal-nacl-plugin' },
-      ],
-      configurable: true,
-    });
-  } catch (e) {}
-  try { window.chrome = window.chrome || { runtime: {}, app: { isInstalled: false } }; } catch (e) {}
-  try {
-    const oq = window.navigator.permissions && window.navigator.permissions.query;
-    if (oq) {
-      window.navigator.permissions.query = (p) =>
-        p && p.name === 'notifications'
-          ? Promise.resolve({ state: Notification.permission })
-          : oq.call(window.navigator.permissions, p);
-    }
-  } catch (e) {}
-  try { Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 }); } catch (e) {}
-  try { Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 }); } catch (e) {}
-  try { Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 0 }); } catch (e) {}
-  try { delete Object.getPrototypeOf(navigator).webdriver; } catch (e) {}
-})();
-"""
+_STEALTH_INIT = STEALTH_INIT_SCRIPT
 
 
 class AuthSession:
@@ -556,82 +524,61 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
     )
 
 
-EPIC_WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
+def _epic_on_wishlist(url: str) -> bool:
+    ul = (url or "").lower()
+    return "store.epicgames.com" in ul and "wishlist" in ul
 
 
-def _epic_wishlist_graphql_ok(payload: dict) -> bool:
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, dict):
-        return False
-    return "Wishlist" in data
-
-
-# Sign-in cookies (EPIC_DEVICE is set for anonymous visitors — excluded).
-_EPIC_SESSION_COOKIES = (
-    "epic_bearer_token",
-    "epic_sso",
-    "epic_sso_rm",
-    "epic_session_ap",
-    "epic_session_diesel",
-    "epic_session_reload",
-    "epic_eg1",
-    "refresh_epic_eg1",
-)
-
-
-def _epic_has_session(context) -> bool:
-    """True when the profile has Epic account or storefront session cookies."""
-    try:
-        cookies = context.cookies()
-    except Exception:  # noqa: BLE001
-        return False
-    for c in cookies:
-        name = (c.get("name") or "").lower()
-        domain = (c.get("domain") or "").lower()
-        if not c.get("value") or "epicgames.com" not in domain:
-            continue
-        if name in _EPIC_SESSION_COOKIES:
-            return True
-    return False
-
-
-def _epic_should_open_wishlist(url: str) -> bool:
-    """True when we should auto-navigate to the storefront wishlist."""
-    u = (url or "").lower()
-    if not u or is_blank_browser_url(u):
-        return True
-    if "challenge" in u or "cloudflare" in u:
-        return False
-    if "id.epicgames.com" in u and ("/login" in u or "signin" in u):
-        return False
-    if "store.epicgames.com" in u and "wishlist" in u:
-        return False
-    if "id.epicgames.com" in u:
-        return True
-    if "epicgames.com" in u and "store.epicgames.com" not in u:
-        return True
-    if "store.epicgames.com" in u and "wishlist" not in u:
-        return True
-    return False
+def _epic_on_login_page(url: str) -> bool:
+    ul = (url or "").lower()
+    return "id.epicgames.com" in ul or "/id/login" in ul
 
 
 def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
-    """Open store.epicgames.com/wishlist, wait for sign-in, return profile marker.
+    """Drive Epic storefront sign-in, wait for wishlist data, return profile marker.
 
     The saved browser profile (cache/auth/profiles/epic_wishlist) is reused by
-    fetch_epic_wishlist.py headlessly. After Epic sign-in we auto-open the
-    wishlist (store cookies are often set only once the storefront loads).
+    fetch_epic_wishlist.py. Connect completes when wishlistItems is present in
+    either a GraphQL response or Epic's dehydrated React Query HTML state.
     """
+    from auth.epic_wishlist_session import (
+        graphql_debug_entry,
+        is_epic_graphql_url,
+        storefront_bounced_to_home,
+        wishlist_capture_complete_from_html,
+        wishlist_graphql_ok,
+    )
+
     wishlist_loaded = False
+    saw_id_login = False
+    did_post_login_nav = False
     # Reader-thread handlers must NOT call response.json()/getResponseBody — that
     # issues another CDP command and waits on the very thread that pumps the
     # reply, deadlocking until timeout and freezing cookie polling. Just stash
     # candidate responses; the polling thread parses their bodies safely.
     candidates: list[Any] = []
+    seen_graphql: list[dict[str, Any]] = []
+
+    try:
+        _debug_path = profile_dir("epic_wishlist").parent / "epic_wishlist_connect_debug.json"
+    except Exception:  # noqa: BLE001
+        _debug_path = None
+
+    def _write_debug() -> None:
+        if _debug_path is None:
+            return
+        try:
+            _debug_path.parent.mkdir(parents=True, exist_ok=True)
+            _debug_path.write_text(
+                json.dumps(seen_graphql[:50], indent=2, default=str, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     def on_response(response) -> None:
         try:
-            if "store.epicgames.com/graphql" not in (response.url or ""):
+            if not is_epic_graphql_url(response.url or ""):
                 return
             if response.status == 200:
                 candidates.append(response)
@@ -639,60 +586,87 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
             pass
 
     def _drain_candidates() -> bool:
+        found = False
         while candidates:
             resp = candidates.pop(0)
             try:
-                if _epic_wishlist_graphql_ok(resp.json()):
-                    return True
+                payload = resp.json()
+            except Exception:  # noqa: BLE001
+                continue
+            try:
+                seen_graphql.append(graphql_debug_entry(resp.url or "", payload))
             except Exception:  # noqa: BLE001
                 pass
-        return False
+            if wishlist_graphql_ok(payload):
+                found = True
+        if seen_graphql:
+            _write_debug()
+        return found
 
     page.on("response", on_response)
     try:
-        page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
+        page.goto(epic_store_login_url(), wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
-    last_nav = 0.0
     while time.time() < deadline:
         if not wishlist_loaded and _drain_candidates():
             wishlist_loaded = True
-        if wishlist_loaded or _epic_has_session(context):
+        url = page.url or ""
+        ul = url.lower()
+        on_wishlist = _epic_on_wishlist(url)
+        if not wishlist_loaded and on_wishlist:
+            try:
+                if wishlist_capture_complete_from_html(page.content()):
+                    wishlist_loaded = True
+            except Exception:  # noqa: BLE001
+                pass
+        if _epic_on_login_page(url):
+            saw_id_login = True
+        if (
+            not wishlist_loaded
+            and not did_post_login_nav
+            and saw_id_login
+            and storefront_bounced_to_home(url)
+        ):
+            did_post_login_nav = True
+            try:
+                page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
+            except Exception:  # noqa: BLE001
+                pass
+            if not wishlist_loaded and _drain_candidates():
+                wishlist_loaded = True
+        if wishlist_loaded:
             try:
                 page.wait_for_timeout(800)
             except Exception:  # noqa: BLE001
                 pass
             return {"EPIC_STORE_COOKIE": "ready"}
 
-        url = page.url or ""
         now = time.time()
-        if _epic_should_open_wishlist(url) and now - last_nav > 4:
-            last_nav = now
-            try:
-                page.bring_to_front()
-            except Exception:  # noqa: BLE001
-                pass
-            try:
-                page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
-            except Exception:  # noqa: BLE001
-                pass
 
         if session and now - last_msg > 8:
             last_msg = now
-            ul = url.lower()
             if "challenge" in ul or "cloudflare" in ul:
                 msg = "Cloudflare challenge — click the checkbox if shown."
-            elif "login" in ul or ("id.epicgames.com" in ul and "authorize" in ul):
-                msg = "Sign in to your Epic account in the browser window."
-            elif _epic_should_open_wishlist(url):
-                msg = "Signed in — opening your Epic wishlist to capture the session."
-            elif "store.epicgames.com" in ul:
+            elif _epic_on_login_page(url) or "signin" in ul:
+                msg = (
+                    "Sign in to Epic in this window — you'll be returned to your "
+                    "wishlist automatically. Clear any Cloudflare check if shown."
+                )
+            elif on_wishlist:
                 msg = "On the wishlist page? Give it a moment to load."
+            elif "store.epicgames.com" in ul:
+                msg = (
+                    "Signed in? Opening your wishlist — give it a moment to load."
+                )
             else:
-                msg = "Sign in, then we'll open store.epicgames.com/wishlist for you."
+                msg = (
+                    "Sign in to Epic in this window — you'll be returned to your "
+                    "wishlist automatically."
+                )
             session.emit("waiting_for_user", {"message": msg})
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
@@ -1199,21 +1173,30 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
 def _extract_amazon_web(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Confirm Prime Gaming session; durable credential is the saved browser profile."""
     from amazon_web_client import (
+        COLLECTION_URLS,
         _capture_claims_from_response,
         _poll_prime_collection,
+        filter_codeless_claims,
+        raw_dump_path,
     )
 
     raw_claims: list[dict[str, Any]] = []
-    captured: dict[str, bool] = {"done": False}
+    captured: dict[str, bool] = {
+        "done": False,
+        "claims_captured": False,
+        "session_only_captured": False,
+    }
+    candidates: list[Any] = []
 
     def on_response(resp: Any) -> None:
-        _capture_claims_from_response(resp, raw_claims, captured)
+        _capture_claims_from_response(resp, candidates, raw_claims, captured)
 
     page.on("response", on_response)
     _poll_prime_collection(
         page,
         context,
         deadline=time.time() + SUCCESS_WAIT_SEC,
+        candidates=candidates,
         raw_claims=raw_claims,
         captured=captured,
         allow_session_only=True,
@@ -1223,6 +1206,25 @@ def _extract_amazon_web(page, context, session: AuthSession | None = None) -> di
     )
 
     if captured["done"]:
+        # If we successfully captured the claims payload (even an empty list),
+        # persist it for the later headless fetcher as a fallback.
+        if captured.get("claims_captured"):
+            path = raw_dump_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(
+                    {
+                        "urls": list(COLLECTION_URLS),
+                        "raw_claim_count": len(raw_claims),
+                        "raw_claims": raw_claims,
+                        "codeless_count": len(filter_codeless_claims(raw_claims)),
+                        "capture_reason": "headed_connect",
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
         return {"AMAZON_WEB_PROFILE": "ready"}
 
     raise RuntimeError(
@@ -1279,8 +1281,9 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
             "wishlist session automatically \u2014 no need to refresh the page."
         ),
         "epic_wishlist": (
-            "Sign in if prompted, then stay on store.epicgames.com/wishlist "
-            "until your wishlist finishes loading. Clear any Cloudflare check if shown."
+            "Sign in to Epic in this window — you'll be returned to your wishlist "
+            "automatically. Clear any Cloudflare check if shown, and keep this "
+            "window open until your wishlist finishes loading."
         ),
         "ubisoft": (
             "Sign in to Ubisoft and complete 2FA in the browser (use the login popup if it "

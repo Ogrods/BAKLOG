@@ -443,6 +443,17 @@ const GROUP_LABELS = {
   prices: 'Prices',
   enrich: 'Enrichment',
 };
+const GROUP_LABEL_TIPS = {
+  library: 'Library/store sources',
+  wishlist: 'Wishlist sources',
+  prices: 'Price sources',
+  enrich: 'Enrichment sources',
+};
+const COUNT_PILL_TITLES = {
+  stale: 'Fetchers whose cached data is past its freshness window — re-run to refresh',
+  missing: 'Data sources never fetched yet (no local cache) — click the chip to run them',
+  fresh: "Every fetcher's cache is up to date",
+};
 // Fixed order within the Enrichment group: keep the three Steam-derived
 // enrichers (orange edge) adjacent, then HLTB. Overrides the status/label
 // sort so they always render next to each other.
@@ -814,9 +825,26 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
     else if (st === 'queued') queued.push(label);
   }
   if (!running.length && !queued.length) {
+    if (fetchSuccessLabels.size > 0) {
+      const labels = [...fetchSuccessLabels];
+      const text = labels.length === 1
+        ? `✓ ${labels[0]} updated`
+        : `✓ ${labels.join(', ')} updated`;
+      el.classList.remove('hidden', 'is-streaming', 'fh-global-status-idle');
+      el.classList.add('fh-global-status-done');
+      if (textEl) textEl.textContent = text;
+      if (liveEl) liveEl.textContent = text;
+      if (tailEl) {
+        tailEl.textContent = '';
+        tailEl.classList.remove('fh-global-status-tail--err');
+      }
+      el.title = 'Fetch complete - click to view log';
+      el.setAttribute('aria-label', text);
+      return;
+    }
     // Stay visible as an idle affordance so the console is always reachable,
     // not only while a run is in flight.
-    el.classList.remove('hidden', 'is-streaming');
+    el.classList.remove('hidden', 'is-streaming', 'fh-global-status-done');
     el.classList.add('fh-global-status-idle');
     if (textEl) textEl.textContent = 'Fetcher log';
     if (liveEl) liveEl.textContent = '';
@@ -825,10 +853,10 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
       tailEl.classList.remove('fh-global-status-tail--err');
     }
     el.title = 'Show fetcher log';
+    el.setAttribute('aria-label', 'Fetcher log');
     return;
   }
-  el.classList.remove('hidden');
-  el.classList.remove('fh-global-status-idle');
+  el.classList.remove('hidden', 'fh-global-status-idle', 'fh-global-status-done');
   let text;
   if (running.length) {
     const extra = queued.length ? ` (+${queued.length} queued)` : '';
@@ -839,6 +867,7 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   if (textEl) textEl.textContent = text;
   if (liveEl) liveEl.textContent = text;
   el.title = `${text} - click to show log`;
+  el.setAttribute('aria-label', text);
 }
 
 export function humanizeAge(ms) {
@@ -878,6 +907,8 @@ const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
 /** Auto-queue ITAD when prices are older than 60min (7am–midnight local). */
 /** Chip stays in failed styling until the next successful run (not just ~10s runState). */
 const lastRunFailedByKey = new Map();
+/** Labels of fetchers that finished OK since the pill was last cleared. */
+const fetchSuccessLabels = new Set();
 
 // ---------------------------------------------------------------------------
 // Cosmetic chip-age ticker (in-place text only — never re-renders dashboard)
@@ -1074,6 +1105,14 @@ export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
 const STAT_LAYOUT_KEY = 'baklog-fetcher-stat-layout';
 const STAT_LAYOUTS = ['compact', 'landscape'];
 
+/** Survives innerHTML rebuilds — native <details> would re-collapse every render. */
+let legendTipsOpen = false;
+
+export function toggleLegendTips() {
+  legendTipsOpen = !legendTipsOpen;
+  renderDashboardFetcherHealth();
+}
+
 function statLayout() {
   try {
     const v = localStorage.getItem(STAT_LAYOUT_KEY);
@@ -1081,6 +1120,18 @@ function statLayout() {
   } catch {
     return 'compact';
   }
+}
+
+function syncStatLayoutToggle() {
+  const btn = document.getElementById('fetcherStatLayoutToggle');
+  if (!btn) return;
+  const layout = statLayout();
+  const landscape = layout === 'landscape';
+  btn.setAttribute('aria-pressed', landscape ? 'true' : 'false');
+  btn.setAttribute(
+    'aria-label',
+    landscape ? 'Switch to compact layout' : 'Switch to landscape layout',
+  );
 }
 
 export function cycleStatLayout() {
@@ -1397,6 +1448,13 @@ export const fetcherRunner = (() => {
     if (bd) bd.hidden = true;
     if (pop) pop.hidden = true;
     if (pill) pill.setAttribute('aria-expanded', 'false');
+    // Collapse the log console drawer so reopening the fetcher starts tidy.
+    const panel = logPanel();
+    if (panel && !panel.classList.contains('fh-log--collapsed')) {
+      panel.classList.add('fh-log--collapsed');
+      syncLogCollapseButton();
+    }
+    if (isFetcherInFlight()) suppressAutoExpand = true;
   }
 
   function showFetcherPopover({ focusPanel = true } = {}) {
@@ -1412,6 +1470,8 @@ export const fetcherRunner = (() => {
     if (pill) pill.setAttribute('aria-expanded', 'true');
     forceExpanded = true;
     suppressAutoExpand = false;
+    fetchSuccessLabels.clear();
+    updateGlobalFetcherIndicator(runStateByKey, source);
     buildLogPanelChrome();
     applyFetcherRowLayout();
     renderDashboardFetcherHealth();
@@ -1711,6 +1771,7 @@ export const fetcherRunner = (() => {
     const collapsed = isLogBodyCollapsed();
     btn.textContent = collapsed ? 'Expand' : 'Collapse';
     btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    btn.title = collapsed ? 'Expand log panel' : 'Collapse log panel';
   }
 
   function toggleLogBody() {
@@ -1726,12 +1787,13 @@ export const fetcherRunner = (() => {
     if (panel.dataset.built) return panel;
     panel.innerHTML = `
       <div class="fh-log-head">
-        <span class="fh-log-title" data-role="title">Fetcher log</span>
-        <span class="fh-log-status" data-role="status">idle</span>
-        <span class="fh-log-spacer"></span>
+        <div class="fh-log-headings">
+          <span class="fh-log-title" data-role="title">Fetcher log</span>
+          <span class="fh-log-status" data-role="status" aria-live="polite">idle</span>
+        </div>
         <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel" title="Stop all queued and running fetchers (Shift+click: force reset queue)">Cancel</button>
-        <button type="button" class="fh-log-btn" data-role="clear">Clear</button>
-        <button type="button" class="fh-log-btn" data-role="close" aria-expanded="true">Collapse</button>
+        <button type="button" class="fh-log-btn" data-role="clear" title="Clear log output (does not stop running fetchers)">Clear</button>
+        <button type="button" class="fh-log-btn" data-role="close" aria-expanded="true" title="Collapse log panel">Collapse</button>
       </div>
       <div class="fh-log-body" data-role="body"></div>
       <button type="button" class="fh-log-jump hidden" data-role="jump" aria-label="Jump to latest line" title="Jump to latest">&darr;</button>
@@ -2148,6 +2210,7 @@ export const fetcherRunner = (() => {
   }
 
   function markChipState(key, runState, runId = null) {
+    if (runState && runStateByKey.size === 0) fetchSuccessLabels.clear();
     if (runState) {
       runStateByKey.set(key, runState);
       if (runId) runIdByKey.set(key, runId);
@@ -2407,6 +2470,7 @@ export const fetcherRunner = (() => {
           clearAuthCooldown(key);
           const provider = FETCHER_AUTH_PROVIDER[key];
           if (provider) clearReconnectRequired(provider);
+          fetchSuccessLabels.add(src.label || key);
           markChipState(key, null);
         } else if (cancelled) {
           markChipState(key, null);
@@ -2465,6 +2529,7 @@ export const fetcherRunner = (() => {
           if (!ok && finished.status === 'done') {
             handleFetcherAuthOutcome(key, finished, '');
           }
+          if (ok) fetchSuccessLabels.add(src.label || key);
           markChipState(key, null);
           if (liveRunId === runId) liveRunId = null;
           return;
@@ -2726,6 +2791,29 @@ export function buildFetcherHealthRows() {
   return fetcherSources.map(src => ({ src, ...fetcherFreshness(src) }));
 }
 
+/** Auth-healthy for chip filter: not disconnected and not reconnect-required. */
+export function isFetcherAuthHealthy(key) {
+  return !isFetcherDisconnected(key) && !isFetcherReconnectRequired(key);
+}
+
+export function filterFetcherHealthRows(rows, { showConnected, showStaleMissing }) {
+  if (!showConnected && !showStaleMissing) return rows;
+  return rows.filter(r => {
+    const matchConnected = showConnected && isFetcherAuthHealthy(r.src.key);
+    const matchStaleMissing = showStaleMissing && (r.status === 'stale' || r.status === 'missing');
+    return matchConnected || matchStaleMissing;
+  });
+}
+
+function fetcherHealthEmptyMessage({ showConnected, showStaleMissing }) {
+  if (!showConnected && !showStaleMissing) return 'No fetchers.';
+  if (showConnected && showStaleMissing) {
+    return 'No connected or stale/missing fetchers match these filters.';
+  }
+  if (showConnected) return 'No connected fetchers match this filter.';
+  return 'No stale or missing fetchers match this filter.';
+}
+
 function fetcherStatTotals(rows) {
   const total = rows.length;
   const connected = rows.filter(isSourceConnected).length;
@@ -2756,10 +2844,10 @@ function statTileHtml(value, label, title, extraClass = '') {
 export function buildStatTilesHtml(rows) {
   const { lib, wish, enrich, lastSyncValue } = fetcherStatTotals(rows);
   return `
+      ${statTileHtml(lastSyncValue, 'Last sync', 'Most recent fetch across all sources', 'fh-stat--lastsync')}
       ${statTileHtml(lib.connected, 'Libraries', `${lib.connected} of ${lib.total} library sources connected`)}
       ${statTileHtml(wish.connected, 'Wishlists', `${wish.connected} of ${wish.total} wishlist sources connected`)}
-      ${statTileHtml(enrich.connected, 'Enrichment', `${enrich.connected} of ${enrich.total} enrichment sources connected`)}
-      ${statTileHtml(lastSyncValue, 'Last sync', 'Most recent fetch across all sources', 'fh-stat--lastsync')}`;
+      ${statTileHtml(enrich.connected, 'Enrichment', `${enrich.connected} of ${enrich.total} enrichment sources connected`)}`;
 }
 
 export function buildStatStripHtml(rows, mode = statLayout(), extrasHtml = '') {
@@ -2798,7 +2886,8 @@ export function renderDashboardFetcherHealth() {
   const slot = document.getElementById('dashboardFetcherHealth');
   if (!slot) return;
   const restoreBarToggleFocus = document.activeElement?.matches?.('[data-role="bar-toggle"]');
-  const showOnlyStale = !!state.prefs.fetcherHealthStaleOnly;
+  const showConnected = state.prefs.fetcherHealthShowConnected !== false;
+  const showStaleMissing = state.prefs.fetcherHealthShowStaleMissing !== false;
   const rows = fetcherSources.map(src => ({ src, ...fetcherFreshness(src) }));
   const staleRows = rows.filter(r => r.status === 'stale');
   const missingRows = rows.filter(r => r.status === 'missing');
@@ -2809,9 +2898,7 @@ export function renderDashboardFetcherHealth() {
     if (isFetcherDisconnected(r.src.key)) return false;
     return true;
   });
-  const visible = showOnlyStale
-    ? rows.filter(r => r.status === 'stale' || r.status === 'missing')
-    : rows;
+  const visible = filterFetcherHealthRows(rows, { showConnected, showStaleMissing });
   // Sort best -> worst by the chip's *effective* status (mirrors the precedence
   // chipHtml uses for displayStatus), so healthy fetchers float to the top and
   // anything needing attention sinks to the bottom. Active runs lead since the
@@ -2834,9 +2921,14 @@ export function renderDashboardFetcherHealth() {
   if (missingRows.length) summaryParts.push(`${missingRows.length} missing`);
   const healthSummary = summaryParts.length ? summaryParts.join(' · ') : 'All fresh';
   fetcherRunner.setBarSummary(healthSummary);
-  const countsHtml = summaryParts.length
-    ? `${staleRows.length ? `<span class="fh-count fh-count--stale">${staleRows.length} stale</span>` : ''}${missingRows.length ? `<span class="fh-count fh-count--missing">${missingRows.length} missing</span>` : ''}`
-    : '<span class="fh-count fh-count--fresh">All fresh</span>';
+  // The "missing" pill is always shown so it doesn't pop in/out: at 0 it stays
+  // put and turns green (fresh). The stale pill remains count-conditional.
+  const missingNone = missingRows.length === 0;
+  const stalePillHtml = staleRows.length
+    ? `<span class="fh-count fh-count--stale" title="${escapeAttr(COUNT_PILL_TITLES.stale)}">${staleRows.length} stale</span>`
+    : '';
+  const missingPillHtml = `<span class="fh-count ${missingNone ? 'fh-count--fresh' : 'fh-count--missing'}" title="${escapeAttr(missingNone ? COUNT_PILL_TITLES.fresh : COUNT_PILL_TITLES.missing)}">${missingRows.length} missing</span>`;
+  const countsHtml = `${stalePillHtml}${missingPillHtml}`;
   const apiReady = fetcherRunner.isApiAvailable();
   const probeDone = fetcherRunner.apiProbeFinished();
   const showReadonly = probeDone && !apiReady;
@@ -2863,13 +2955,8 @@ export function renderDashboardFetcherHealth() {
   const layout = statLayout();
   slot.dataset.statLayout = layout;
   const countsBlockHtml = `<span class="fh-counts">${countsHtml}</span>`;
-  // Compact floats the counts pill (e.g. "4 missing") into the stat strip's
-  // top-right, above the blue bar; landscape keeps it in the head.
-  const statStripHtml = buildStatStripHtml(
-    rows,
-    layout,
-    layout === 'compact' ? `<span class="fh-counts fh-counts--float">${countsHtml}</span>` : '',
-  );
+  const infoStripHtml = buildStatStripHtml(rows, 'compact', '');
+  const statStripHtml = buildStatStripHtml(rows, layout, '');
 
   function chipHtml({ src, status, count, ageLabel, iso }) {
     const covLabel = ENRICH_KEYS.has(src.key) ? coverageLabel(src.key) : null;
@@ -2893,9 +2980,6 @@ export function renderDashboardFetcherHealth() {
     const needsReconnect = !runActive && isFetcherReconnectRequired(src.key);
     const disconnected = !runActive && !needsReconnect && isFetcherDisconnected(src.key);
     const navProvider = !runActive ? connectionsNavigateProvider(src.key) : null;
-    const reconnectBtnProvider = reconnectProviderForFetcher(src.key)
-      || fetcherProviders(src.key).find(p => isProviderReconnectRequired(p))
-      || null;
     const authCooldownMs = (runState || needsReconnect || disconnected) ? 0 : authCooldownRemainingMs(src.key);
     const inAuthCooldown = authCooldownMs > 0;
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
@@ -2962,137 +3046,128 @@ export function renderDashboardFetcherHealth() {
       : '';
     let ageText = runState
       ? runState
-      : (needsReconnect ? 'reconnect' : (disconnected ? '' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel)));
+      : (disconnected ? '' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel));
     if (persistFailed && !runState) ageText = 'failed';
     else if (status === 'missing' && ageLabel === '?' && (count === 0 || count == null)) ageText = 'empty';
     const connectAttr = navProvider
       ? ` data-fetcher-connect="${escapeAttr(navProvider)}"`
       : '';
-    const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
+    const chipAriaLabel = `${chipLabel}, ${countStr}, ${ageText || status}`;
+    const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(chipAriaLabel)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>
       ${warnBadge}
       <span class="fh-chip-label">${escapeHtml(chipLabel)}</span>
       <span class="fh-chip-count">${escapeHtml(countStr)}</span>
       <span class="fh-chip-age">${escapeHtml(ageText)}</span>
     </button>`;
-    const reconnectControls = needsReconnect && reconnectBtnProvider
-      ? `<button type="button" class="fh-chip-reconnect-btn" data-fetcher-reconnect data-provider="${escapeAttr(reconnectBtnProvider)}" title="Reconnect ${escapeAttr(src.label)}">Reconnect</button>
-         <button type="button" class="fh-chip-reconnect-dismiss" data-fetcher-reconnect-dismiss data-provider="${escapeAttr(reconnectBtnProvider)}" aria-label="Dismiss reconnect hint">&times;</button>`
-      : '';
-    const chip = needsReconnect
-      ? `<div class="fh-chip-wrap fh-chip-wrap--reconnect">${chipBtn}${reconnectControls}</div>`
-      : chipBtn;
-    return chip;
+    return chipBtn;
   }
 
   const chipsHtml = visible.length
-    ? (showOnlyStale
-      ? `<div class="fh-group-chips">${visible.map(chipHtml).join('')}</div>`
-      : GROUP_ORDER.map(group => {
-          let groupRows = visible.filter(r => r.src.group === group);
-          if (!groupRows.length) return '';
-          if (group === 'enrich') {
-            const ord = k => {
-              const i = ENRICH_ORDER.indexOf(k);
-              return i < 0 ? ENRICH_ORDER.length : i;
-            };
-            groupRows = [...groupRows].sort((a, b) => healthRank(a) - healthRank(b) || ord(a.src.key) - ord(b.src.key));
-          }
-          let groupToggle = '';
-          if (group === 'prices') {
-            groupToggle = `<label class="fh-toggle fh-itad-auto" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
+    ? GROUP_ORDER.map(group => {
+        let groupRows = visible.filter(r => r.src.group === group);
+        if (!groupRows.length) return '';
+        if (group === 'enrich') {
+          const ord = k => {
+            const i = ENRICH_ORDER.indexOf(k);
+            return i < 0 ? ENRICH_ORDER.length : i;
+          };
+          groupRows = [...groupRows].sort((a, b) => healthRank(a) - healthRank(b) || ord(a.src.key) - ord(b.src.key));
+        }
+        let groupToggle = '';
+        if (group === 'prices') {
+          groupToggle = `<label class="fh-toggle fh-itad-auto" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
               <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${state.prefs.itadAutoRefreshDisabled ? '' : 'checked'} />
               Auto-refresh
             </label>`;
-          } else if (group === 'enrich') {
-            groupToggle = `<label class="fh-toggle" title="After a library fetch adds new games, queue HLTB, Reviews, Covers, and Co-op tags">
+        } else if (group === 'enrich') {
+          groupToggle = `<label class="fh-toggle" title="After a library fetch adds new games, queue HLTB, Reviews, Covers, and Co-op tags">
               <input id="autoEnrichOnAddToggle" type="checkbox" class="rounded" ${state.prefs.autoEnrichOnAdd !== false ? 'checked' : ''} />
               Auto-enrich new games
             </label>`;
-          }
-          return `<div class="fh-group">
+        }
+        return `<div class="fh-group">
             <div class="fh-group-head">
-              <div class="fh-group-label">${escapeHtml(GROUP_LABELS[group] || group)}</div>
+              <div class="fh-group-label" title="${escapeAttr(GROUP_LABEL_TIPS[group] || '')}">${escapeHtml(GROUP_LABELS[group] || group)}</div>
               ${groupToggle}
             </div>
             <div class="fh-group-chips">${groupRows.map(chipHtml).join('')}</div>
           </div>`;
-        }).join(''))
-    : '<span class="fh-empty">No stale or missing fetchers - nice.</span>';
+      }).join('')
+    : `<span class="fh-empty">${escapeHtml(fetcherHealthEmptyMessage({ showConnected, showStaleMissing }))}</span>`;
 
   const staleBtnDisabled = !apiReady || !runnableStale.length || Date.now() < runStaleCooldownUntil;
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
 
-  const actionsHtml = `
-        <div class="fh-head-actions">
-          <button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>
-          <label class="fh-toggle">
-            <input id="fetcherHealthStaleOnly" type="checkbox" class="rounded" ${showOnlyStale ? 'checked' : ''} />
-            Only stale / missing
-          </label>
-        </div>`;
-  // Counts pill ("4 missing") is placed per layout, never in the head: compact
-  // floats it into the stat strip; landscape pins it top-right across from the
-  // legend (see overviewHtml). Keeping it out of the head avoids duplication.
-  const headCountsHtml = '';
-  const headHtml = `
-      <div class="fh-head${apiReady ? '' : ' fh-readonly'}">
-        ${headCountsHtml}
-        ${actionsHtml}
-      </div>`;
-  const legendHtml = `
-      <details class="fh-legend">
-        <summary>Legend &amp; tips</summary>
-        <div class="fh-legend-items">
+  const staleButtonHtml = `<button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>`;
+  const filterToggleHtml = `<div class="fh-filter-toggles" title="Show fetchers matching any checked category; uncheck both to show all">
+            <label class="fh-toggle" title="Show connected fetchers (not disconnected or expired)">
+              <input id="fetcherHealthShowConnected" type="checkbox" class="rounded" ${showConnected ? 'checked' : ''} />
+              Connected
+            </label>
+            <label class="fh-toggle" title="Show fetchers with stale or missing cached data">
+              <input id="fetcherHealthShowStaleMissing" type="checkbox" class="rounded" ${showStaleMissing ? 'checked' : ''} />
+              Stale / missing
+            </label>
+          </div>`;
+  const legendTipsItemsHtml = `
           ${clickHint}
-          <span class="fh-legend-item"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
-          <span class="fh-legend-item">dim dashed = never fetched</span>
-          <span class="fh-legend-item">dot color = cache age</span>
-          <span class="fh-legend-item">reconnect = session expired (Connections, not these chips)</span>
-        </div>
-      </details>`;
+          <span class="fh-legend-item" title="Yellow ! on a chip — credentials missing for this profile; open Connections"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
+          <span class="fh-legend-item" title="Dim dashed chip border — this source has never been fetched">dim dashed = never fetched</span>
+          <span class="fh-legend-item" title="Dot color on each chip — how old the cached data is">dot color = cache age</span>
+          <span class="fh-legend-item" title="Reconnect label — session expired; fix in Connections, not by clicking the chip">reconnect = session expired (Connections, not these chips)</span>`;
+  const legendToggleHtml = `<button type="button" class="fh-legend-toggle${legendTipsOpen ? ' is-open' : ''}" data-role="fh-legend-toggle" aria-expanded="${legendTipsOpen ? 'true' : 'false'}" aria-controls="fhLegendTips" title="Show fetcher chip legend and tips">ⓘ Legend &amp; tips</button>`;
+  const legendTipsHtml = `<div id="fhLegendTips" class="fh-legend-tips${legendTipsOpen ? ' is-open' : ''}" role="region" aria-label="Fetcher legend and tips"${legendTipsOpen ? '' : ' aria-hidden="true"'}>${legendTipsItemsHtml}</div>`;
   const chipsBlockHtml = `<div class="fh-chips">${chipsHtml}</div>`;
+  const controlBarHtml = `
+      <div class="fh-legend-row fh-legend-row--bar">
+        <div class="fh-control-bar">
+          ${countsBlockHtml}
+          ${staleButtonHtml}
+          ${legendToggleHtml}
+          ${filterToggleHtml}
+        </div>
+      </div>`;
 
-  // Rail splits the overview into three columns: a skinny meter, a middle
-  // column with the breakdown tiles + head controls, and the chips on the
-  // right. Compact puts the legend + stacked run controls in one row under the
-  // divider, then the chips below.
+  // Landscape: 3-col rail (meter | tiles+controls | legend+chips).
+  // Compact: finalized top-info stack above chips.
   const overviewHtml = layout === 'landscape'
     ? `<div class="fh-rail-grid">
       ${statStripHtml}
       <div class="fh-rail-mid">
         ${buildStatTilesHtml(rows)}
-        ${headHtml}
+        <div class="fh-head fh-head--stack">
+          ${staleButtonHtml}
+          ${filterToggleHtml}
+          ${countsBlockHtml}
+          ${legendToggleHtml}
+        </div>
       </div>
       <div class="fh-rail-main">
-        <div class="fh-legend-row">
-          ${legendHtml}
-          ${countsBlockHtml}
-        </div>
         ${chipsBlockHtml}
       </div>
-    </div>`
-    : `${statStripHtml}
+    </div>
+    ${legendTipsHtml}`
+    : `${infoStripHtml}
     <div class="fh-rail-main">
-      <div class="fh-legend-row">
-        ${legendHtml}
-        ${actionsHtml}
-      </div>
+      ${controlBarHtml}
       ${chipsBlockHtml}
-    </div>`;
+    </div>
+    ${legendTipsHtml}`;
 
   slot.innerHTML = `
     <div class="fh-bar" data-role="fetcher-bar" title="Click to expand the fetcher console">
       <span class="fh-bar-dot" data-role="bar-dot" aria-hidden="true"></span>
       <span class="fh-bar-status" data-role="bar-status">Fetcher health</span>
       <span class="fh-bar-tail" data-role="bar-tail">No fetcher activity yet.</span>
-      <button type="button" class="fh-bar-toggle" data-role="bar-toggle" aria-expanded="false" aria-label="Expand fetcher">▸</button>
+      <button type="button" class="fh-bar-toggle" data-role="bar-toggle" aria-expanded="false" aria-label="Expand fetcher" title="Expand or collapse the fetcher console">▸</button>
     </div>
     ${readonlyBanner}
     ${overviewHtml}
   `;
   ensureAgeTicker();
   fetcherRunner.applyFetcherRowLayout();
+  syncStatLayoutToggle();
   if (restoreBarToggleFocus) {
     document.querySelector('[data-role="bar-toggle"]')?.focus();
   }

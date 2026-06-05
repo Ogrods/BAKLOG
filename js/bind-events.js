@@ -34,6 +34,7 @@ import {
   filteredGames,
   sortedGames,
   cancelPendingScrollTarget,
+  initTablePhoneLayout,
 } from './table-ui.js';
 import {
   renderPicks,
@@ -76,7 +77,7 @@ import { createGlobalKeydownHandler } from './events.js';
 import {
   fetcherRunner,
   renderDashboardFetcherHealth,
-  dismissReconnectRequired,
+  toggleLegendTips,
 } from './fetcher-health.js';
 import { reconnectProvider } from './connections.js';
 import {
@@ -117,8 +118,12 @@ export function bindEvents() {
   });
 
   document.getElementById("dashboardFetcherHealth")?.addEventListener("change", e => {
-    if (e.target.id === "fetcherHealthStaleOnly") {
-      state.prefs.fetcherHealthStaleOnly = e.target.checked;
+    if (e.target.id === "fetcherHealthShowConnected") {
+      state.prefs.fetcherHealthShowConnected = e.target.checked;
+      savePrefs();
+      renderDashboardFetcherHealth();
+    } else if (e.target.id === "fetcherHealthShowStaleMissing") {
+      state.prefs.fetcherHealthShowStaleMissing = e.target.checked;
       savePrefs();
       renderDashboardFetcherHealth();
     } else if (e.target.id === "itadAutoRefreshToggle") {
@@ -131,19 +136,10 @@ export function bindEvents() {
   });
 
   document.getElementById("dashboardFetcherHealth")?.addEventListener("click", e => {
-    const reconnectBtn = e.target.closest("[data-fetcher-reconnect]");
-    if (reconnectBtn) {
+    const legendToggle = e.target.closest("[data-role=\"fh-legend-toggle\"]");
+    if (legendToggle) {
       e.preventDefault();
-      e.stopPropagation();
-      reconnectProvider(reconnectBtn.dataset.provider, { autoStart: false });
-      return;
-    }
-    const dismissBtn = e.target.closest("[data-fetcher-reconnect-dismiss]");
-    if (dismissBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      dismissReconnectRequired(dismissBtn.dataset.provider);
-      renderDashboardFetcherHealth();
+      toggleLegendTips();
       return;
     }
     const staleBtn = e.target.closest(".fh-run-stale");
@@ -475,6 +471,10 @@ export function bindEvents() {
       e.preventDefault();
       switchView("connections");
     }
+    if (e.target.closest("[data-dash-goto-library]")) {
+      e.preventDefault();
+      switchView("library");
+    }
   });
   const dedupEl = document.getElementById("crossStoreDedup");
   if (dedupEl) {
@@ -541,6 +541,9 @@ export function bindEvents() {
     invalidateTableCache();
     renderTable();
   });
+  document.getElementById("brandMark")?.addEventListener("click", () => {
+    window.scrollTo(0, 0);
+  });
   document.querySelectorAll(".view-tab").forEach(btn => {
     btn.addEventListener("click", () => {
       const view = btn.dataset.view || "library";
@@ -559,6 +562,8 @@ export function bindEvents() {
     if (state.activeView !== "library") return;
     state.cleanupModeActive = !state.cleanupModeActive;
     updateCleanupBtnState();
+    state.selectedKeys.clear();
+    updateBulkBar();
     state.focusedRowIndex = 0;
     refreshFilterUI();
   });
@@ -741,4 +746,5 @@ export function bindEvents() {
     }
     e.target.value = "";
   });
+  initTablePhoneLayout();
 }

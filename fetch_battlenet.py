@@ -22,18 +22,17 @@ from fetchers._base import (
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
+    refuse_empty_result,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
+from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
 
 
-def raw_dump_json() -> Path:
-    from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "battlenet_raw.json"
+BATTLENET_RAW_DUMP = profile_raw_dump_path("battlenet_raw.json")
 HLTB_DELAY_SEC = 1.0
 
 # Map Blizzard's franchise icon filename to the canonical game site.
@@ -207,7 +206,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-raw",
         action="store_true",
-        help=f"Also write the raw API response to {raw_dump_json()} for debugging.",
+        help=f"Also write the raw API response to {BATTLENET_RAW_DUMP} for debugging.",
     )
     args = parser.parse_args()
     _configure_stdout()
@@ -257,11 +256,11 @@ def main() -> int:
             return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
 
     if args.dump_raw:
-        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
-        raw_dump_json().write_text(
+        BATTLENET_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
+        BATTLENET_RAW_DUMP.write_text(
             json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"Wrote raw response to {raw_dump_json()}.")
+        print(f"Wrote raw response to {BATTLENET_RAW_DUMP}.")
 
     raw_games = _extract_records(raw)
     seen: dict[str, dict] = {}
@@ -275,12 +274,18 @@ def main() -> int:
     deduped = list(seen.values())
     print(f"Found {len(deduped)} unique Battle.net entries (from {len(raw_games)} raw).")
 
-    if not deduped:
+    empty_exit = refuse_empty_result(
+        deduped,
+        label="Battle.net library",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_BATTLENET_JSON,
+    )
+    if empty_exit is not None:
         stats.error(
             "No game records found in the response. Re-run with --dump-raw and inspect "
-            f"{raw_dump_json()} to confirm the cookie hit the right account."
+            f"{BATTLENET_RAW_DUMP} to confirm the cookie hit the right account."
         )
-        return stats.finish("fetch_battlenet", t0, exit_code=2)
+        return stats.finish("fetch_battlenet", t0, exit_code=empty_exit)
 
     hltb_client = HltbClient()
     existing = load_existing()

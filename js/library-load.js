@@ -23,6 +23,7 @@ import {
   loadManualGames,
   bumpPersonalMemo,
   canonicalizeNotesAcrossTitles,
+  applyHiddenTitleNorms,
   filterOutHidden,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
@@ -233,6 +234,7 @@ export async function applyMergedLibrary() {
   recomputeCrossStoreHidden();
   state._lastNewlyAddedCount = recordLibraryFirstSeen();
   canonicalizeNotesAcrossTitles();
+  applyHiddenTitleNorms({ silent: true });
   state.dashboardDataReady = true;
   buildOwnedNormNames();
   const banner = document.getElementById("bootErrorBanner");

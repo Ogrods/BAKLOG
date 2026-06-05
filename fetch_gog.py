@@ -599,7 +599,8 @@ def main() -> int:
                 mark_invalid("gog", error=msg)
                 stats.error(msg)
                 return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
-            raise
+            stats.error(f"GOG library API HTTP error: {e}")
+            return stats.finish("fetch_gog", t0, exit_code=1)
 
         if not products:
             owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")

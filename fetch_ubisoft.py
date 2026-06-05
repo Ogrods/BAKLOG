@@ -20,17 +20,16 @@ from fetchers._base import (
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
+    refuse_empty_result,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
+from shared.raw_dumps import profile_raw_dump_path
 from ubisoft_client import UbisoftAuthError, UbisoftClient
 
 GAMES_UBISOFT_JSON = Path("games_ubisoft.json")
-def raw_dump_json() -> Path:
-    from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "ubisoft_raw.json"
+UBISOFT_RAW_DUMP = profile_raw_dump_path("ubisoft_raw.json")
 
 HLTB_DELAY_SEC = 1.0
 
@@ -281,7 +280,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-raw",
         action="store_true",
-        help=f"Also write the raw API response to {raw_dump_json()} for debugging.",
+        help=f"Also write the raw API response to {UBISOFT_RAW_DUMP} for debugging.",
     )
     args = parser.parse_args()
     _configure_stdout()
@@ -313,11 +312,11 @@ def main() -> int:
     print(f"Hit Ubisoft endpoint: {endpoint}")
 
     if args.dump_raw:
-        raw_dump_json().parent.mkdir(parents=True, exist_ok=True)
-        raw_dump_json().write_text(
+        UBISOFT_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
+        UBISOFT_RAW_DUMP.write_text(
             json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        print(f"Wrote raw response to {raw_dump_json()}.")
+        print(f"Wrote raw response to {UBISOFT_RAW_DUMP}.")
 
     raw_games = _extract_records(raw)
     seen: dict[str, dict] = {}
@@ -331,12 +330,18 @@ def main() -> int:
     deduped = list(seen.values())
     print(f"Found {len(deduped)} unique Ubisoft entries (from {len(raw_games)} raw).")
 
-    if not deduped:
+    empty_exit = refuse_empty_result(
+        deduped,
+        label="Ubisoft library",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_UBISOFT_JSON,
+    )
+    if empty_exit is not None:
         stats.error(
             "No game records found in the response. Re-run with --dump-raw and "
-            f"inspect {raw_dump_json()} to confirm the endpoint hit your library."
+            f"inspect {UBISOFT_RAW_DUMP} to confirm the endpoint hit your library."
         )
-        return stats.finish("fetch_ubisoft", t0, exit_code=2)
+        return stats.finish("fetch_ubisoft", t0, exit_code=empty_exit)
 
     hltb_client = HltbClient()
     existing = load_existing()

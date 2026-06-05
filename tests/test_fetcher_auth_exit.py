@@ -29,6 +29,15 @@ SESSION_AUTH_WISHLIST_SCRIPTS = [
     "fetch_ubisoft_wishlist.py",
 ]
 
+# Scripts that emit exit 4 on auth failure without a dedicated *AuthError type name.
+AUTH_EXIT_SCRIPTS_GENERIC = [
+    "fetch_amazon.py",
+    "fetch_humble.py",
+    "fetch_humble_wishlist.py",
+    "fetch_games.py",
+    "fetch_wishlist.py",
+]
+
 
 @pytest.mark.parametrize("script", AUTH_EXIT_SCRIPTS)
 def test_auth_error_branches_use_exit_code_4(script: str) -> None:
@@ -53,3 +62,13 @@ def test_wishlist_session_auth_uses_exit_code_4(script: str) -> None:
     assert "EXIT_CODE_AUTH" in text
     assert "mark_invalid" in text
     assert "exit_code=EXIT_CODE_AUTH" in text
+
+
+@pytest.mark.parametrize("script", AUTH_EXIT_SCRIPTS_GENERIC)
+def test_auth_failure_paths_use_exit_code_4(script: str) -> None:
+    text = (ROOT / script).read_text(encoding="utf-8")
+    assert "EXIT_CODE_AUTH" in text, f"{script} must import EXIT_CODE_AUTH"
+    assert "mark_invalid" in text, f"{script} must call mark_invalid on auth failure"
+    assert "exit_code=EXIT_CODE_AUTH" in text, (
+        f"{script} must finish with exit_code=EXIT_CODE_AUTH on auth failure"
+    )

@@ -11,11 +11,11 @@
 import { state } from './state.js';
 import { escapeHtml, formatNum } from './dom-util.js';
 import { renderDashboardFetcherHealth } from './fetcher-health.js';
-import { gameKey, hltbMain, ratingValue, normalizeGame, combinedPlaytime } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, normalizeGame, combinedPlaytime, itchIsGame } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
-import { animateCount, dashboardLibraryGames } from './dashboard-shared.js';
+import { animateCount, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
 import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView } from './dashboard-charts.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
@@ -24,6 +24,7 @@ import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRot
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
 import { THEME_CHANGE_EVENT } from './theme.js';
+import { storeLogoStripHtml } from './store-logos.js';
 
 // Re-exports — dashboard.js stays the single public entry point for the
 // dashboard surface. External callers (app.js / bind-events.js / etc.)
@@ -90,7 +91,7 @@ export function dashboardFingerprint() {
   }
   return JSON.stringify({
     dv: window._dataVersion || 0,
-    itch: (state.itchGames || []).length > 0,
+    itch: (state.itchGames || []).filter(itchIsGame).length,
     qw: state.prefs.quickWinMaxHours || 0,
     ihn: !!state.sessionPrefs.itchHideNonGames,
     rc: recentCount,
@@ -109,16 +110,25 @@ function computeMegaHeroStats(games, snap) {
   const rated = games.filter(g => ratingValue(g) > 0);
   const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length) : " - ";
   const wlDeals = state.wishlistGames.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
-  const stores = new Set(games.map(g => normalizeGame(g).store)).size;
+  const storeCountMap = {};
+  for (const g of games) {
+    const s = normalizeGame(g).store;
+    storeCountMap[s] = (storeCountMap[s] || 0) + 1;
+  }
+  const itchGames = (state.itchGames || []).filter(itchIsGame);
+  if (itchGames.length) storeCountMap.itch = (storeCountMap.itch || 0) + itchGames.length;
+  const storeKeys = sortStoresByDisplayOrder(Object.keys(storeCountMap));
+  const stores = storeKeys.length;
   const years = backlogHrs > 0 ? (backlogHrs / (2 * 365)).toFixed(1) : "0";
   return {
-    total: games.length,
+    total: games.length + itchGames.length,
     backlogHrs,
     playedHrs,
     completion,
     avgRating,
     wlDeals,
     stores,
+    storeKeys,
     years,
   };
 }
@@ -164,15 +174,27 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
   el.className = spotlight ? 'dash-mega dash-mega--has-spotlight' : 'dash-mega';
   syncSpotlightInMega(el, spotlight);
   const sub = el.querySelector('.dash-hero-sub');
-  if (sub) sub.textContent = `games owned across ${stats.stores} stores`;
+  if (sub) {
+    sub.textContent = `games owned across ${stats.stores} stores`;
+    sub.title = 'Library size and number of distinct storefronts';
+  }
+  const storeStrip = el.querySelector('.dash-hero-stores');
+  if (storeStrip) {
+    storeStrip.innerHTML = stats.storeKeys.length
+      ? storeLogoStripHtml(stats.storeKeys, { size: 'md' })
+      : '';
+    storeStrip.hidden = !stats.storeKeys.length;
+  }
+  const countHost = el.querySelector('.library-count-host, #dashHeroCount');
+  if (countHost) countHost.title = 'Total games in your merged library across all connected stores';
   const tagline = el.querySelector('.dash-hero-tagline');
   if (tagline) {
     tagline.innerHTML = `
         <span title="Finished share of library excluding skipped games"><strong>${stats.completion}%</strong> complete</span>
         <span class="sep">·</span>
-        <span><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
+        <span title="Backlog HLTB main hours ÷ (2 hours × 365 days)"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
-        <span><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>`;
+        <span title="Wishlist items with an active discount right now"><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>`;
   }
   applyMegaHeroCounters(stats);
   const marqueeKey = marqueeItems.map(it => `${it.glyph}|${it.label}|${it.valueHtml}`).join("\n");
@@ -212,8 +234,9 @@ function renderDashboardMega(games, snap) {
     <div class="dash-mega-hero">
       ${spotlight ? renderSpotlightHtml(spotlight) : ''}
       <div class="dash-hero-eyebrow">Your library</div>
-      <span class="library-count-host" data-libcount-host><span class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(stats.total))}</span></span>
-      <div class="dash-hero-sub">games owned across ${escapeHtml(String(stats.stores))} stores</div>
+      <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores"><span class="dash-hero-number" id="dashHeroCount">${escapeHtml(formatNum(stats.total))}</span></span>
+      <div class="dash-hero-sub" title="Library size and number of distinct storefronts">games owned across ${escapeHtml(String(stats.stores))} stores</div>
+      <div class="dash-hero-stores" aria-label="Stores in your library"${stats.storeKeys.length ? '' : ' hidden'}>${stats.storeKeys.length ? storeLogoStripHtml(stats.storeKeys, { size: 'md' }) : ''}</div>
       <div class="dash-hero-tagline">
         <span title="Finished share of library excluding skipped games"><strong>${stats.completion}%</strong> complete</span>
         <span class="sep">·</span>
@@ -241,17 +264,17 @@ function renderDashboardMega(games, snap) {
     <div class="dash-mega-divider" aria-hidden="true"></div>
     <div class="dash-ribbon">
       <div class="dash-ribbon-tile">
-        <div class="dash-ribbon-eyebrow">Library by store</div>
+        <div class="dash-ribbon-eyebrow" title="Share of library per connected store — click chart to filter">Library by store</div>
         <div class="dash-ribbon-chart"><canvas id="chartStoreDonut"></canvas></div>
         <div class="dash-ribbon-headline" id="ribbonStoreHeadline"></div>
       </div>
       <div class="dash-ribbon-tile">
-        <div class="dash-ribbon-eyebrow">Status breakdown</div>
+        <div class="dash-ribbon-eyebrow" title="Personal backlog statuses — click chart to filter">Status breakdown</div>
         <div class="dash-ribbon-chart"><canvas id="chartStatusDonut"></canvas></div>
         <div class="dash-ribbon-headline" id="ribbonStatusHeadline"></div>
       </div>
       <div class="dash-ribbon-tile">
-        <div class="dash-ribbon-eyebrow">Review sentiment</div>
+        <div class="dash-ribbon-eyebrow" title="Steam review descriptor mix — click chart to filter by rating">Review sentiment</div>
         <div class="dash-ribbon-chart"><canvas id="chartReviewDonut"></canvas></div>
         <div class="dash-ribbon-headline" id="ribbonReviewHeadline"></div>
       </div>
@@ -281,13 +304,37 @@ function renderDashboardOnboard() {
     el.hidden = true;
     return;
   }
-  if (state.allGames.length === 0 && connectedProviderCount() === 0) {
+  const games = state.allGames.length;
+  const connections = connectedProviderCount();
+  if (games === 0 && connections === 0) {
     el.hidden = false;
     el.innerHTML = `
       <div class="conn-onboard" role="region" aria-label="Get started">
         <p class="conn-onboard-title">Welcome</p>
         <p class="conn-onboard-lead">Connect your first store to fill this dashboard with your library, deals, and stats.</p>
         <button type="button" class="conn-onboard-btn" data-dash-goto-connections>Open Connections</button>
+      </div>`;
+  } else if (games === 0 && connections > 0) {
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="conn-onboard" role="region" aria-label="Next step">
+        <p class="conn-onboard-title">Stores connected</p>
+        <p class="conn-onboard-lead">Run a library fetch from Connections or the fetcher log, then open Library to browse your games.</p>
+        <div class="conn-onboard-actions">
+          <button type="button" class="conn-onboard-btn" data-dash-goto-connections>Connections</button>
+          <button type="button" class="conn-onboard-btn conn-onboard-btn--ghost" data-dash-goto-library>Open Library</button>
+        </div>
+      </div>`;
+  } else if (games > 0 && connections === 0) {
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="conn-onboard" role="region" aria-label="Next step">
+        <p class="conn-onboard-title">Library loaded</p>
+        <p class="conn-onboard-lead">Your games are here — connect more stores to merge libraries and unlock cross-store deals.</p>
+        <div class="conn-onboard-actions">
+          <button type="button" class="conn-onboard-btn" data-dash-goto-library>Open Library</button>
+          <button type="button" class="conn-onboard-btn conn-onboard-btn--ghost" data-dash-goto-connections>Connections</button>
+        </div>
       </div>`;
   } else {
     el.innerHTML = "";

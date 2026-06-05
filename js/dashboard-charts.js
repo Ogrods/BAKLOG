@@ -645,7 +645,7 @@ function renderScatterList(hits) {
   if (!hits.length) {
     el.classList.remove('is-open', 'is-frozen');
     el.setAttribute('aria-expanded', 'false');
-    el.innerHTML = '<div class="dash-scatter-list-hint">Click a cluster of games to inspect</div>';
+    el.innerHTML = '<div class="dash-scatter-list-hint" title="Overlapping points open this inspector; a single point jumps to the library">Click a cluster of games to inspect</div>';
     _scatterListLastKey = null;
     _scatterListLastHits = null;
     _scatterListLastFitCount = 0;
@@ -683,7 +683,7 @@ function renderScatterList(hits) {
     return `<button type="button" class="dash-scatter-list-row" data-key="${escapeAttr(pt.key)}" title="Jump to ${escapeAttr(pt.label)} in Library">
       ${coverHtml}
       <span class="dash-scatter-list-name">${escapeHtml(pt.label)}</span>
-      <span class="dash-scatter-list-meta">${pt.y}% · ${pt.x}h</span>
+      <span class="dash-scatter-list-meta" title="Steam review % · HLTB main hours">${pt.y}% · ${pt.x}h</span>
     </button>`;
   }).join('');
 
@@ -696,7 +696,7 @@ function renderScatterList(hits) {
 
   el.innerHTML = `
     <div class="dash-scatter-list-head">
-      <span class="dash-scatter-list-head-label">${headLabel}</span>
+      <span class="dash-scatter-list-head-label" title="${isCluster ? 'Overlapping scatter points in this cluster' : 'Single scatter point — click row to jump'}">${headLabel}</span>
       ${closeBtn}
     </div>
     <div class="dash-scatter-list-strip">${rowHtml}${overflowTile}</div>
@@ -941,12 +941,16 @@ export function renderDashboardCharts(games) {
     storeHeadlineEl.innerHTML = topStore[0]
       ? `<strong>${escapeHtml(DASH_STORE_LABELS[topStore[0]] || topStore[0])}</strong> ${storePct}%`
       : '<strong> - </strong>';
+    storeHeadlineEl.title = topStore[0]
+      ? `Largest store share: ${DASH_STORE_LABELS[topStore[0]] || topStore[0]} (${storePct}% of library)`
+      : '';
   }
 
   const backlogCount = games.filter(g => getPersonal(g).status === 'backlog').length;
   const statusHeadlineEl = document.getElementById('ribbonStatusHeadline');
   if (statusHeadlineEl) {
     statusHeadlineEl.innerHTML = `<strong>${escapeHtml(formatNum(backlogCount))}</strong> in backlog`;
+    statusHeadlineEl.title = `${backlogCount} games marked backlog — click chart to filter`;
   }
 
   const positive = ['Overwhelmingly Positive', 'Very Positive', 'Mostly Positive']
@@ -960,6 +964,7 @@ export function renderDashboardCharts(games) {
   const reviewHeadlineEl = document.getElementById('ribbonReviewHeadline');
   if (reviewHeadlineEl) {
     reviewHeadlineEl.innerHTML = `<strong>${positivePct}%</strong> positive`;
+    reviewHeadlineEl.title = `${positivePct}% of rated games are Mostly Positive or better`;
   }
 
   const yearCounts = {};

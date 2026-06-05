@@ -9,6 +9,7 @@
     "test:js": "vitest run",
     "test:js:watch": "vitest",
     "test:all": "python -m pytest -q && npm test",
+    "landing": "python -m http.server 4000 --directory landing",
     "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/module/index.js --bundle --format=esm --outfile=js/vendor/supabase-js.mjs"
   },
   "devDependencies": {

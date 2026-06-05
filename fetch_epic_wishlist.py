@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from datetime import UTC, datetime
@@ -25,6 +24,18 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid
+from auth.epic_wishlist_session import (
+    cloudflare_interstitial,
+    enrich_wishlist_elements_with_catalog,
+    extract_wishlist_payloads_from_html,
+    graphql_debug_entry,
+    is_epic_graphql_url,
+    storefront_auth_blocked,
+    storefront_auth_error_message,
+    storefront_signed_out,
+    wishlist_capture_complete_from_html,
+    wishlist_graphql_ok,
+)
 from auth.secrets import profile_dir
 from fetchers._base import (
     add_allow_empty_arg,
@@ -51,8 +62,6 @@ def dump_html() -> Path:
 def dump_json() -> Path:
     return dump_dir() / "wishlist_dump.json"
 HLTB_DELAY_SEC = 1.0
-
-_SIGN_IN_RE = re.compile(r"sign\s*in|log\s*in", re.I)
 
 LIBRARY_IMAGE_TYPES = (
     "DieselGameBoxTall",
@@ -219,9 +228,11 @@ def _elements_from_payload(payload: Any) -> list[dict]:
 
 
 def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[dict]:
-    """Merge wishlist GraphQL elements from captured JSON responses."""
+    """Merge wishlist elements from captured GraphQL and dehydrated HTML state."""
+    all_payloads = list(api_payloads)
+    all_payloads.extend(extract_wishlist_payloads_from_html(html))
     found: dict[str, dict] = {}
-    for payload in api_payloads:
+    for payload in all_payloads:
         for el in _elements_from_payload(payload):
             offer = el.get("offer") or {}
             namespace = el.get("namespace") or offer.get("namespace")
@@ -230,22 +241,38 @@ def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[dict]:
             if not eid:
                 continue
             found.setdefault(str(eid), el)
-    return list(found.values())
+    return enrich_wishlist_elements_with_catalog(html, list(found.values()))
 
 
-def _signed_out(html: str, url: str) -> bool:
-    u = (url or "").lower()
-    if "id.epicgames.com/login" in u or "/login" in u and "store" not in u:
+def _wishlist_capture_complete(html: str, api_payloads: list[Any]) -> bool:
+    if any(wishlist_graphql_ok(p) for p in api_payloads):
         return True
-    if "challenge" in u or "cloudflare" in u:
-        return True
-    if _SIGN_IN_RE.search(html or "") and "wishlist" not in (html or "").lower():
-        return True
-    return False
+    return wishlist_capture_complete_from_html(html)
+
+
+def _drain_wishlist_candidates(
+    candidates: list[Any], seen: list[dict[str, Any]] | None = None
+) -> list[Any]:
+    """Parse stashed GraphQL responses on the main thread (safe for CDP)."""
+    found: list[Any] = []
+    while candidates:
+        resp = candidates.pop(0)
+        try:
+            payload = resp.json()
+        except Exception:  # noqa: BLE001
+            continue
+        if seen is not None:
+            try:
+                seen.append(graphql_debug_entry(resp.url or "", payload))
+            except Exception:  # noqa: BLE001
+                pass
+        if wishlist_graphql_ok(payload):
+            found.append(payload)
+    return found
 
 
 def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
-    from auth.cdp_browser import launch_persistent_profile
+    from auth.cdp_browser import STEALTH_INIT_SCRIPT, launch_persistent_profile
 
     profile = profile_dir("epic_wishlist")
     if not profile.exists():
@@ -255,6 +282,7 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
         )
 
     api_payloads: list[Any] = []
+    seen_graphql: list[dict[str, Any]] = []
     # Network handlers run on the CDP reader thread; calling response.json()
     # there deadlocks (getResponseBody waits on the same thread). Stash
     # candidate responses and read their bodies from the main thread below.
@@ -262,30 +290,45 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
 
     def _capture(response) -> None:
         try:
-            url = (response.url or "").lower()
-            if "store.epicgames.com/graphql" not in url:
+            if not is_epic_graphql_url(response.url or ""):
                 return
             if response.status == 200:
                 candidates.append(response)
         except Exception:  # noqa: BLE001
             pass
 
-    with launch_persistent_profile(str(profile), headless=True) as ctx:
+    poll_deadline_s = min(max(timeout_s - 5, 20), 25)
+    poll_interval_ms = 500
+
+    # Match the headed connect window (--start-maximized, no off-screen offset).
+    # cf_clearance is bound to the browser fingerprint; off-screen positioning can
+    # still trigger a fresh Cloudflare Turnstile that never auto-resolves headlessly.
+    with launch_persistent_profile(str(profile), headless=False) as ctx:
+        ctx.add_init_script(STEALTH_INIT_SCRIPT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.on("response", _capture)
         page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
-        page.wait_for_timeout(4000)
-        for resp in list(candidates):
-            try:
-                payload = resp.json()
-            except Exception:  # noqa: BLE001
+
+        deadline = time.time() + poll_deadline_s
+        while time.time() < deadline:
+            new_payloads = _drain_wishlist_candidates(candidates, seen_graphql)
+            if new_payloads:
+                api_payloads.extend(new_payloads)
+                break
+            html = page.content()
+            url = page.url or WISHLIST_URL
+            # Cloudflare may show briefly on wishlist even with a valid profile —
+            # keep polling so headed Chrome can auto-resolve before we give up.
+            if cloudflare_interstitial(html, url):
+                page.wait_for_timeout(poll_interval_ms)
                 continue
-            if _elements_from_payload(payload) or (
-                isinstance(payload, dict)
-                and isinstance(payload.get("data"), dict)
-                and "Wishlist" in payload["data"]
-            ):
-                api_payloads.append(payload)
+            if storefront_signed_out(html, url):
+                break
+            page.wait_for_timeout(poll_interval_ms)
+
+        if not api_payloads:
+            api_payloads.extend(_drain_wishlist_candidates(candidates, seen_graphql))
+
         html = page.content()
         url = page.url or WISHLIST_URL
 
@@ -298,6 +341,7 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
                         "url": url,
                         "api_payload_count": len(api_payloads),
                         "api_payloads": api_payloads[:20],
+                        "graphql_seen": seen_graphql[:50],
                         "element_count": len(parse_wishlist_sources(html, api_payloads)),
                     },
                     indent=2,
@@ -338,7 +382,7 @@ def main() -> int:
     stats = RunStats()
     load_dotenv()
 
-    print("Fetching Epic wishlist via headless storefront page...", flush=True)
+    print("Fetching Epic wishlist via saved storefront profile...", flush=True)
     try:
         html, url, api_payloads = run_with_heartbeat(
             lambda: _fetch_with_profile(dump=args.dump),
@@ -357,12 +401,8 @@ def main() -> int:
         stats.error(msg)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
-    if _signed_out(html, url):
-        msg = (
-            "Epic storefront session is missing or expired. Open Connections, click "
-            "Epic (wishlist) \u2192 Connect, sign in at store.epicgames.com/wishlist "
-            "(clear Cloudflare if shown), and wait for the wishlist to load."
-        )
+    if not _wishlist_capture_complete(html, api_payloads) and storefront_auth_blocked(html, url):
+        msg = storefront_auth_error_message(html, url)
         mark_invalid("epic_wishlist", error=msg)
         stats.error(msg)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)

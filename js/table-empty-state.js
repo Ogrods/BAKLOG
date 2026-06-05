@@ -22,11 +22,11 @@ export function buildTableEmptyStateHtml(view, colspan = 13) {
 
   if (hasFilters) {
     const actions = [
-      `<button type="button" class="table-empty-state-btn" data-table-clear-filters>Clear all filters</button>`,
+      `<button type="button" class="table-empty-state-btn" data-table-clear-filters title="Clear all active filters">Clear all filters</button>`,
     ];
     if (view === "itch" && state.sessionPrefs.itchHideNonGames) {
       actions.push(
-        `<button type="button" class="table-empty-state-btn table-empty-state-btn-secondary" data-table-show-itch-nongames>Show non-games</button>`,
+        `<button type="button" class="table-empty-state-btn table-empty-state-btn-secondary" data-table-show-itch-nongames title="Include tools, soundtracks, and other non-game itch.io items">Show non-games</button>`,
       );
     }
     return `<tr class="table-empty-state-row"><td colspan="${col}"><div class="table-empty-state" role="status">
@@ -56,7 +56,7 @@ export function buildTableEmptyStateHtml(view, colspan = 13) {
   }
 
   const actions = shouldShowConnectionsCta(view)
-    ? `<div class="table-empty-state-actions"><button type="button" class="table-empty-state-btn" data-table-goto-connections>Open Connections</button></div>`
+    ? `<div class="table-empty-state-actions"><button type="button" class="table-empty-state-btn" data-table-goto-connections title="Connect stores and sync your library">Open Connections</button></div>`
     : '';
 
   return `<tr class="table-empty-state-row"><td colspan="${col}"><div class="table-empty-state" role="status">

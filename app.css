@@ -652,9 +652,9 @@ button[disabled] { cursor: not-allowed; }
 .dash-list-cover.placeholder .placeholder-initials { font-size: 10px; }
 .pick-cover.placeholder .placeholder-initials { font-size: 30px; }
 .pick-cover.placeholder .placeholder-caption { font-size: 10px; }
-.pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
-.pick-card { transition: transform 0.1s ease, background 0.1s ease; }
-.pick-card:hover { transform: translateY(-2px); background: rgb(51 65 85); }
+.pick-cover { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: color-mix(in srgb, var(--accent) 18%, transparent); display: block; }
+.pick-card { transition: transform 0.1s ease, background 0.1s ease; background: var(--accent-subtle); }
+.pick-card:hover { transform: translateY(-2px); background: color-mix(in srgb, var(--accent) 24%, transparent); }
 /* When the picks drawer is collapsed (#picksContainer.hidden), the section
    shrinks to just the header strip. That strip's `border-b border-slate-700`
    would then become the section's bottom edge, but because #picksSection has
@@ -667,6 +667,21 @@ button[disabled] { cursor: not-allowed; }
 }
 .pick-tab.active { border-color: var(--accent); color: var(--text); background: var(--accent-subtle); }
 .picks-limit-btn.active { background: var(--accent-dim); border-color: var(--accent-bright); color: #f8fafc; }
+/* Subtle hover affordance for the picks header controls. Active tabs/limits
+   keep their accent styling; only the resting (non-active) buttons react. */
+#picksSection #togglePicks { transition: background 0.12s ease, color 0.12s ease; }
+#picksSection #togglePicks:hover { background: var(--bg-hover); color: var(--text); }
+.pick-tab { transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease; }
+.pick-tab:not(.active):hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: var(--accent-muted, var(--accent));
+  color: var(--text);
+}
+.picks-limit-btn { transition: background 0.12s ease, color 0.12s ease; }
+.picks-limit-btn:not(.active):hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 /* === Picks + toolbar panels: theme the Tailwind-utility surfaces === */
 #picksSection,
 #toolbarSection { background: var(--bg-panel); }
@@ -745,6 +760,12 @@ button[disabled] { cursor: not-allowed; }
   background: linear-gradient(180deg, #1e293b 0%, #334155 50%, #1e293b 100%);
   z-index: 0;
   pointer-events: none;
+}
+.pick-card .cover-wrap.landscape::before {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg));
+}
+.pick-card .pick-cover.placeholder {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg));
 }
 .cover-wrap.landscape img.pick-cover,
 .cover-wrap.landscape img.deal-hero-cover,
@@ -913,6 +934,12 @@ button[disabled] { cursor: not-allowed; }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Range sliders (min rating, max length, deal filters, quick-win hours) follow
+   the active theme accent for the knob/track and use a pointer cursor. */
+input[type="range"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 .store-badge {
   display: inline-flex;
   align-items: center;
@@ -943,8 +970,91 @@ button[disabled] { cursor: not-allowed; }
 .store-badge.ea { background: #ff4747; color: #fff; font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
 .store-badge.itad { background: #22d3ee; color: #06303a; }
 .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
+.store-badge--md { height: 22px; min-width: 22px; font-size: 12px; border-radius: 5px; padding: 0 6px; }
 .store-badge--lg { height: 24px; min-width: 24px; font-size: 13px; border-radius: 6px; padding: 0 8px; }
+
+/* Full SVG store glyphs (CSS mask) — dashboard hero strip only, js/store-logos.js */
+.store-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border-radius: 4px;
+  background: var(--store-logo-bg, #64748b);
+  line-height: 1;
+}
+.store-logo--sm { width: 18px; height: 18px; }
+.store-logo--md { width: 22px; height: 22px; }
+.store-logo--lg { width: 24px; height: 24px; min-width: 24px; border-radius: 6px; }
+.store-logo--letter {
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.store-logo--manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
+.store-logo-glyph {
+  display: block;
+  width: 62%;
+  height: 62%;
+  background: #fff;
+  -webkit-mask: var(--store-logo-glyph) center / contain no-repeat;
+          mask: var(--store-logo-glyph) center / contain no-repeat;
+}
+
+/* Store badge strip layout — js/store-logos.js */
+.store-logo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.store-logo-strip [role="listitem"] { display: inline-flex; }
+.summary-store-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.summary-store-chip-logo { display: inline-flex; align-items: center; }
+.summary-store-chip-label { line-height: 1; }
+.pick-store .store-badge { position: absolute; top: 6px; right: 6px; z-index: 2; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
+.dash-spotlight-meta .dash-spotlight-store { vertical-align: -3px; margin-right: 2px; }
+.dash-hero-stores {
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+}
+.conn-onboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.conn-onboard-btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.conn-onboard-btn--ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
 .view-tab.active { border-color: var(--text-mute); color: var(--text-bright); background: var(--bg-elev); }
+/* Subtle hover affordance for the main view tabs. Inactive tabs lift slightly
+   and pick up a faint accent wash; the active tab keeps its solid styling. */
+.view-tab { transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease; }
+.view-tab:not(.active):hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: var(--accent-muted, var(--accent));
+  color: var(--text-bright);
+  transform: translateY(-1px);
+}
+.view-tab:active { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .view-tab { transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+  .view-tab:not(.active):hover, .view-tab:active { transform: none; }
+}
 .add-target-btn { color: #cbd5e1; }
 .add-target-btn.active { background: rgba(16, 185, 129, 0.25); color: #ecfdf5; box-shadow: inset 0 0 0 1px #10b981; }
 .deal-flag-low { color: #f97316; font-weight: 600; }
@@ -1033,7 +1143,36 @@ body.bulk-bar-open { padding-bottom: 56px; }
 #filterDrawerBackdrop.open { opacity: 1; pointer-events: auto; }
 #filterDrawer { transform: translateX(100%); transition: transform 0.22s ease; }
 #filterDrawer.open { transform: translateX(0); }
-.drawer-section { border-bottom: 1px solid rgb(51 65 85); padding-bottom: 0.75rem; margin-bottom: 0.75rem; }
+/* === Filter drawer: theme the Tailwind-utility slate surfaces so the panel
+   follows the active theme instead of staying fixed slate-blue. === */
+#filterDrawer { background: var(--bg-panel); border-left-color: var(--border); }
+#filterDrawer .bg-slate-700 { background: var(--bg-elev); }
+#filterDrawer .bg-slate-800 { background: var(--bg-panel); }
+#filterDrawer .hover\:bg-slate-600:hover,
+#filterDrawer .hover\:bg-slate-700:hover { background: var(--bg-hover); }
+#filterDrawer .border-slate-600 { border-color: var(--border); }
+#filterDrawer .border-slate-700 { border-color: var(--border-subtle); }
+#filterDrawer .text-slate-100 { color: var(--text); }
+#filterDrawer .text-slate-200 { color: var(--text); }
+#filterDrawer .text-slate-300 { color: var(--text-dim); }
+#filterDrawer .text-slate-400 { color: var(--text-mute); }
+#filterDrawer .hover\:text-slate-100:hover,
+#filterDrawer .hover\:text-slate-200:hover { color: var(--text); }
+/* Genre chips + co-op segments: resting (non-active) state uses theme tones,
+   and hover gets a faint accent wash. Active states keep their accent fill. */
+#filterDrawer .genre-chip:not(.active) { background: var(--bg-elev); border-color: var(--border); color: var(--text-dim); }
+#filterDrawer .genre-chip:not(.active):hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent-muted, var(--accent));
+  color: var(--text);
+}
+#filterDrawer .filter-segment:not(.active) { background: var(--bg-elev); border-color: var(--border); color: var(--text-dim); }
+#filterDrawer .filter-segment:not(.active):hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent-muted, var(--accent));
+  color: var(--text);
+}
+.drawer-section { border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.75rem; margin-bottom: 0.75rem; }
 .drawer-section:last-child { border-bottom: none; margin-bottom: 0; }
 .drawer-footer {
   border-top: 1px solid rgb(51 65 85);
@@ -1093,7 +1232,7 @@ body.bulk-bar-open { padding-bottom: 56px; }
 .kbd-group { display: inline-flex; gap: 0.15rem; }
 #genreChips.collapsed { max-height: 4.5rem; overflow: hidden; }
 #genreChips.expanded { max-height: none; }
-#cleanupModeBtn.active { ring: 2px; box-shadow: 0 0 0 2px #fb923c; }
+#cleanupModeBtn.active { box-shadow: 0 0 0 2px #fb923c; }
 /* === Kebab menu === */
 #kebabMenu { display: none; }
 #kebabMenu.open { display: block; }
@@ -1426,6 +1565,13 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .summary-stat-chip[data-stat="avg-price"] { --stat-accent: #64748b; }
 .summary-stat-chip--itch { --stat-accent: var(--brand-itch); }
 /* === App header / top banner === */
+/* Header padding is identical across every view so the top banner is the same
+   height everywhere (matches the dashboard/homepage). Only the sticky pin is
+   view-scoped below. */
+header.app-header {
+  padding-top: 1rem;
+  padding-bottom: 0.5rem;
+}
 /* Dashboard-only sticky header: the dashboard hides #summary (and the toolbar/
    table), so the header is a stable single row here and pins cleanly. Other
    views have variable-height summary chips + a sticky table thead, so we leave
@@ -1437,8 +1583,11 @@ html[data-init-view="connections"] header.app-header {
   z-index: 40;
   background: var(--bg);
   box-shadow: 0 1px 0 var(--border-subtle);
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
+}
+/* No shell top padding above the header on any view; the header carries its
+   own top padding instead (see header.app-header below). */
+.app-shell {
+  padding-top: 0;
 }
 .app-header-brand { cursor: default; margin-right: 1rem; }
 /* Equal height for tabs and profile trigger in the header row; the fetcher pill
@@ -1694,8 +1843,7 @@ html[data-theme="ember"] .brand-logo-mark {
   text-overflow: ellipsis;
 }
 .fh-bar-tail.stderr { color: #fda4af; }
-.fh-bar-toggle,
-.fh-head-collapse {
+.fh-bar-toggle {
   flex: 0 0 auto;
   font-size: 0.75rem;
   line-height: 1;
@@ -1707,13 +1855,11 @@ html[data-theme="ember"] .brand-logo-mark {
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.fh-bar-toggle:hover,
-.fh-head-collapse:hover {
+.fh-bar-toggle:hover {
   color: var(--text);
   background: var(--bg-hover);
 }
-.fh-bar-toggle:focus-visible,
-.fh-head-collapse:focus-visible {
+.fh-bar-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -1745,6 +1891,7 @@ html[data-theme="ember"] .brand-logo-mark {
   border-radius: 9999px;
   border: 1px solid transparent;
   white-space: nowrap;
+  cursor: default;
 }
 .fh-count--stale { color: #fcd34d; background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.32); }
 .fh-count--missing { color: #fca5a5; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.32); }
@@ -1786,6 +1933,7 @@ html[data-theme="ember"] .brand-logo-mark {
   color: var(--accent-muted); background: color-mix(in srgb, var(--accent) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   cursor: pointer;
+  transform: translateY(-1px);
   transition: background 120ms ease, border-color 120ms ease, max-width 320ms ease;
 }
 .fh-global-status-label {
@@ -1842,12 +1990,24 @@ html[data-theme="ember"] .brand-logo-mark {
 .fh-global-status-idle::before {
   background: #64748b; box-shadow: none; animation: none;
 }
-.fh-chips { display: flex; flex-direction: column; gap: 0.55rem; }
+.fh-global-status-done {
+  color: #86efac;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+  border-color: color-mix(in srgb, #22c55e 45%, transparent);
+}
+.fh-global-status-done:hover {
+  background: color-mix(in srgb, #22c55e 22%, transparent);
+  border-color: color-mix(in srgb, #22c55e 70%, transparent);
+}
+.fh-global-status-done::before {
+  background: #22c55e; box-shadow: none; animation: none;
+}
+.fh-chips { display: flex; flex-direction: column; gap: 0.4rem; }
 .fh-group { display: flex; flex-direction: column; gap: 0.25rem; }
 .fh-group-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .fh-group-label {
   font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: #64748b;
+  text-transform: uppercase; color: var(--accent);
 }
 .fh-group-head .fh-toggle { font-size: 0.68rem; }
 .fh-group-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
@@ -1901,16 +2061,6 @@ html[data-theme="ember"] .brand-logo-mark {
 }
 .fh-chip-auth-cooldown .fh-chip-dot { background: #f59e0b; }
 .fh-chip-auth-cooldown .fh-chip-age { color: #fbbf24; }
-.fh-chip-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  max-width: 100%;
-}
-.fh-chip-wrap--reconnect .fh-chip {
-  flex: 1 1 auto;
-  min-width: 0;
-}
 .fh-chip-reconnect-required {
   border-color: rgba(248, 113, 113, 0.65);
   background: rgba(248, 113, 113, 0.12);
@@ -1926,36 +2076,6 @@ html[data-theme="ember"] .brand-logo-mark {
 .fh-chip-reconnect-required .fh-chip-age,
 .fh-chip-disconnected .fh-chip-age { color: #fca5a5; }
 .fh-chip-reconnect .fh-chip-dot { background: #f87171; }
-.fh-chip-reconnect-btn {
-  flex: 0 0 auto;
-  font-size: 0.62rem;
-  line-height: 1.2;
-  padding: 0.2rem 0.4rem;
-  border-radius: 0.25rem;
-  border: 1px solid rgba(248, 113, 113, 0.55);
-  background: rgba(248, 113, 113, 0.18);
-  color: #fecaca;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.fh-chip-reconnect-btn:hover {
-  background: rgba(248, 113, 113, 0.28);
-  border-color: rgba(248, 113, 113, 0.75);
-}
-.fh-chip-reconnect-dismiss {
-  flex: 0 0 auto;
-  width: 1.1rem;
-  height: 1.1rem;
-  padding: 0;
-  border: none;
-  border-radius: 0.2rem;
-  background: transparent;
-  color: #94a3b8;
-  font-size: 0.85rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.fh-chip-reconnect-dismiss:hover { color: #e2e8f0; background: rgba(148, 163, 184, 0.15); }
 .fh-readonly-banner {
   font-size: 0.72rem; line-height: 1.35;
   padding: 0.45rem 0.55rem; margin-bottom: 0.35rem;
@@ -2012,11 +2132,23 @@ html[data-theme="ember"] .brand-logo-mark {
   padding: 0.45rem 0.65rem;
   background: color-mix(in srgb, var(--bg-panel) 85%, transparent);
   border-bottom: 1px solid var(--border-subtle);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex-shrink: 0;
 }
-.fh-log-title { font-size: 0.75rem; font-weight: 600; color: var(--text); }
-.fh-log-status { font-size: 0.7rem; color: var(--text-mute); }
+.fh-log-headings {
+  display: flex; align-items: baseline; gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fh-log-head .fh-log-btn { align-self: center; flex-shrink: 0; }
+.fh-log-title {
+  font-size: 0.75rem; font-weight: 600; color: var(--text); line-height: 1.2;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fh-log-status {
+  font-size: 0.7rem; color: var(--text-mute); line-height: 1.2;
+  white-space: nowrap; flex-shrink: 0;
+}
 .fh-log-status.running,
 .fh-log-status.launching { color: var(--accent); }
 .fh-log-status.done { color: #34d399; }
@@ -2059,7 +2191,6 @@ html[data-theme="ember"] .brand-logo-mark {
   75%  { content: 'working...'; }
   100% { content: 'working'; }
 }
-.fh-log-spacer { flex: 1; }
 .fh-log-btn {
   font-size: 0.7rem;
   padding: 0.15rem 0.5rem;
@@ -2086,20 +2217,23 @@ html[data-theme="ember"] .brand-logo-mark {
   white-space: pre-wrap;
   word-break: break-word;
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-mute) 45%, transparent) transparent;
 }
 .fh-log-body::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 .fh-log-body::-webkit-scrollbar-track {
   background: transparent;
 }
 .fh-log-body::-webkit-scrollbar-thumb {
-  background: rgb(51 65 85);
-  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-mute) 45%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 .fh-log-body::-webkit-scrollbar-thumb:hover {
-  background: rgb(71 85 105);
+  background: color-mix(in srgb, var(--text-mute) 70%, transparent);
+  background-clip: padding-box;
 }
 .fh-row.is-expanded .fh-log-body {
   flex: 1 1 auto;
@@ -2197,6 +2331,7 @@ html[data-theme="ember"] .brand-logo-mark {
   font-feature-settings: "tnum";
 }
 .dash-hero-sub { color: #94a3b8; font-size: 14px; margin-top: 6px; position: relative; z-index: 1; }
+.dash-mega .dash-hero-stores { max-width: min(720px, 62%); }
 .dash-hero-tagline {
   margin-top: 14px;
   color: #cbd5e1;
@@ -2434,6 +2569,10 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   pointer-events: none;
   overflow: hidden;
   border-radius: 4px;
+  /* Feather the horizontal edges so the blurred, screen-blended sweep fades out
+     instead of being hard-clipped by overflow:hidden into a vertical seam. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
   content: "";
@@ -3177,13 +3316,13 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 }
 .dash-scatter-list.is-frozen {
   border-color: var(--accent-border);
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .dash-scatter-list.is-pulsing { animation: scatter-list-pulse 320ms ease-out; }
 @keyframes scatter-list-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
-  60%  { box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
-  100% { box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
+  60%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
+  100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
 }
 .dash-scatter-list-close {
   flex-shrink: 0;
@@ -3264,7 +3403,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   cursor: pointer;
 }
 .dash-scatter-list-row:hover,
-.dash-scatter-list-row:focus-visible { background: rgba(56, 189, 248, 0.12); outline: none; }
+.dash-scatter-list-row:focus-visible { background: color-mix(in srgb, var(--accent) 12%, transparent); outline: none; }
 .dash-scatter-list-cover {
   width: 48px; height: 64px; object-fit: cover; border-radius: 4px; flex-shrink: 0;
   background: #1e293b;
@@ -3287,7 +3426,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   width: 72px;
   padding: 4px;
   border-radius: 6px;
-  background: rgba(56, 189, 248, 0.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
   border: 1px dashed rgba(148, 163, 184, 0.35);
   color: #94a3b8;
   text-align: center;
@@ -3310,6 +3449,47 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .table-hide-playtime col.col-played { width: 0; }
 .table-hide-lastplayed .col-lastplayed { display: none; }
 .table-hide-lastplayed col.col-lastplayed { width: 0; }
+
+/* Phone library: priority columns as card rows (no horizontal scroll). */
+#tableWrap.table-phone {
+  overflow-x: visible;
+}
+#tableWrap.table-phone .games-table {
+  min-width: 0;
+  display: block;
+}
+#tableWrap.table-phone .games-table thead {
+  display: none;
+}
+#tableWrap.table-phone .games-table tbody {
+  display: block;
+}
+#tableWrap.table-phone .games-table tbody tr:not(.virtual-spacer):not(.table-empty-state-row) {
+  display: grid;
+  grid-template-columns: 36px 56px 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0 8px;
+  align-items: center;
+  height: auto;
+  min-height: 72px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+#tableWrap.table-phone .games-table tbody tr td {
+  display: block;
+  max-height: none;
+  padding: 0;
+  border: none;
+}
+#tableWrap.table-phone .games-table tbody tr td:nth-child(1) { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+#tableWrap.table-phone .games-table tbody tr td:nth-child(2) { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+#tableWrap.table-phone .games-table tbody tr td:nth-child(3) { grid-column: 3 / span 2; grid-row: 1; min-width: 0; }
+#tableWrap.table-phone .games-table tbody tr td:nth-child(4) { grid-column: 4; grid-row: 2; justify-self: end; }
+#tableWrap.table-phone .games-table tbody tr td:nth-child(n+5) { display: none; }
+#tableWrap.table-phone .game-name-cell .flex { flex-direction: column; align-items: stretch; gap: 4px; }
+#tableWrap.table-phone .cover-wrap { width: 48px; }
+#tableWrap.table-phone .cover-wrap img.cover { max-height: 64px; }
+
 #tableWrap {
   width: 100%;
   border-top-left-radius: 0;
@@ -4839,7 +5019,8 @@ body {
   right: 0;
   top: calc(100% + 6px);
   width: min(560px, 94vw);
-  max-height: min(85vh, 720px);
+  /* Cap to viewport; inner scroll area handles overflow when content is taller. */
+  max-height: min(92vh, 920px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -4851,36 +5032,51 @@ body {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
   color: #cbd5e1;
 }
+/* Slimmer in compact, wider in landscape so source chips get more room.
+   Layout flag lives on the nested #dashboardFetcherHealth (data-stat-layout). */
+.fetcher-popover:has([data-stat-layout="compact"]) {
+  /* Phone-ish column (~390px) so compact proportions match narrow viewports. */
+  width: min(390px, calc(100vw - 24px));
+}
+.fetcher-popover:has([data-stat-layout="landscape"]) {
+  width: min(720px, 94vw);
+}
 .fetcher-popover[hidden] {
   display: none;
 }
 .fetcher-popover-head {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
   flex-shrink: 0;
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.35rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0;
+  margin: 0;
+  border-bottom: 0;
 }
 .fetcher-popover-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #e2e8f0;
+  display: none;
 }
 .fetcher-popover-close {
   flex-shrink: 0;
-  background: transparent;
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 24px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-subtle);
   color: #94a3b8;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0 8px;
   border-radius: 6px;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .fetcher-popover-close:hover {
   color: var(--text-bright);
@@ -4888,9 +5084,14 @@ body {
 }
 .fetcher-stat-layout-toggle {
   flex-shrink: 0;
-  margin-left: auto;
-  background: transparent;
-  border: 0;
+  margin-left: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 24px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-subtle);
   color: #64748b;
   font-size: 0.62rem;
   font-weight: 600;
@@ -4898,19 +5099,53 @@ body {
   text-transform: uppercase;
   line-height: 1;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0 8px;
   border-radius: 6px;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .fetcher-stat-layout-toggle:hover {
   color: var(--text-dim);
   background: var(--bg-hover);
+  border-color: var(--border);
 }
 .fetcher-popover-scroll {
   flex: 1 1 auto;
   min-height: 0;
+  /* Scroll when content exceeds the popover cap (scrollbar only when needed). */
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 2px;
+  padding-top: 2px;
+  /* Pull the scroll area into the popover's right padding so the scrollbar
+     hugs the right edge; keep a small inset so content doesn't sit under it. */
+  margin-right: -10px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-mute) 45%, transparent) transparent;
+}
+.fetcher-popover-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.fetcher-popover-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.fetcher-popover-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-mute) 45%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.fetcher-popover-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-mute) 70%, transparent);
+  background-clip: padding-box;
+}
+/* In the popover the panel itself is the container — drop the nested card
+   chrome so the floated Layout/X controls read as inside it. */
+.fetcher-popover .dash-fetcher-health {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  height: auto;
 }
 .fh-stats {
   display: grid;
@@ -4927,6 +5162,7 @@ body {
   background: rgba(148, 163, 184, 0.06);
   border: 1px solid rgba(51, 65, 85, 0.6);
   min-width: 0;
+  cursor: default;
 }
 .fh-stat-value {
   font-size: 1.05rem;
@@ -4996,18 +5232,19 @@ body {
   transform-origin: bottom;
   animation: fh-stat-meter-in 420ms ease 120ms backwards;
 }
+/* Compact overview: hero (row 1), bar (row 2), four pillars on row 3.
+   DOM order: hero, libraries, wishlists, enrichment, lastsync, bar. */
 .fh-stats--compact {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.3rem 0.4rem;
   position: relative;
-  padding-bottom: 0.5rem;
-  grid-template-columns: none;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 .fh-stats--compact .fh-stat--hero {
-  grid-column: auto;
-  order: 0;
+  grid-column: 1;
+  grid-row: 1;
   display: inline-flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -5019,41 +5256,130 @@ body {
   border-left: 0;
 }
 .fh-stats--compact .fh-stat--hero .fh-stat-value {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
+}
+.fh-stats--compact > .fh-stat-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0.05rem 0 0;
 }
 .fh-stats--compact .fh-stat:not(.fh-stat--hero) {
-  order: 3;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 0.3rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.02rem;
   padding: 0;
   background: transparent;
   border: 0;
+  min-width: 0;
 }
-/* Last sync leads the breakdown row, on the far left. */
-.fh-stats--compact .fh-stat:not(.fh-stat--hero).fh-stat--lastsync {
-  order: 2;
+.fh-stats--compact .fh-stat:not(.fh-stat--hero) .fh-stat-value {
+  font-size: 0.88rem;
 }
-/* Divider before every breakdown tile except the leftmost (Last sync). */
-.fh-stats--compact .fh-stat:not(.fh-stat--hero):not(.fh-stat--lastsync)::before {
-  content: '·';
-  margin-right: 0.35rem;
-  color: #475569;
-  font-weight: 600;
-  pointer-events: none;
+.fh-stats--compact .fh-stat:not(.fh-stat--hero) .fh-stat-label {
+  font-size: 0.5rem;
+  letter-spacing: 0.03em;
 }
-.fh-stats--compact > .fh-stat-bar {
-  flex-basis: 100%;
+.fh-stats--compact .fh-stat:not(.fh-stat--hero)::before {
+  display: none;
+}
+/* Four pillars share row 3, cols 1-4. DOM order (no floated counts pill):
+   hero(1), Libraries(2), Wishlists(3), Enrichment(4), Last sync(5), bar. */
+.fh-stats--compact > .fh-stat:nth-child(2) {
+  grid-row: 3;
+  grid-column: 1;
+}
+.fh-stats--compact > .fh-stat:nth-child(3) {
+  grid-row: 3;
+  grid-column: 2;
+}
+.fh-stats--compact > .fh-stat:nth-child(4) {
+  grid-row: 3;
+  grid-column: 3;
+}
+.fh-stats--compact > .fh-stat:nth-child(5) {
+  grid-row: 3;
+  grid-column: 4;
+}
+/* Compact popover: keep two chip columns at phone-ish width even below 640px viewport. */
+.fetcher-popover [data-stat-layout="compact"] .fh-group-chips {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.fh-legend-row--bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  padding-top: 0.4rem;
+}
+/* Control bar: pill top-left + Run stale top-right share row 1;
+   filter checkboxes sit under Run stale on row 2. */
+.fh-legend-row--bar .fh-control-bar {
   order: 1;
-  margin: 0;
-}
-/* Counts pill (e.g. "4 missing") sits on the hero line, far right, above the bar. */
-.fh-stats--compact .fh-counts--float {
-  order: 0;
-  margin-left: auto;
-  display: inline-flex;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 0.3rem;
+  column-gap: 0.5rem;
+  row-gap: 0.35rem;
+}
+.fh-legend-row--bar .fh-control-bar .fh-counts {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+.fh-legend-row--bar .fh-control-bar .fh-run-stale {
+  grid-column: 2;
+  grid-row: 1;
+  flex: 0 0 auto;
+}
+.fh-legend-row--bar .fh-control-bar .fh-legend-toggle {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  justify-self: start;
+}
+.fh-filter-toggles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: center;
+}
+.fh-legend-row--bar .fh-control-bar .fh-filter-toggles {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  justify-self: end;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.fh-legend-row--bar .fh-control-bar .fh-filter-toggles .fh-toggle {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+/* Landscape middle column: legend, counts pill, Run stale, and checkbox all
+   stacked vertically under the stat tiles. */
+.fh-head--stack {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border-bottom: 0;
+}
+.fh-head--stack .fh-counts { align-self: flex-start; }
+.fh-head--stack .fh-filter-toggles {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+.fh-head--stack .fh-filter-toggles .fh-toggle,
+.fh-head--stack .fh-toggle {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 0.35rem;
 }
 /* Compact: legend on the left, run controls stacked on the right, under a divider. */
 .fh-legend-row {
@@ -5067,6 +5393,49 @@ body {
 .fh-legend-row .fh-legend {
   flex: 1 1 auto;
   min-width: 0;
+}
+/* Toggle sits below the counts pill (hr divider); tips open above the console. */
+.fh-legend-toggle {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle, #334155);
+  background: transparent;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #475569;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+.fh-legend-toggle:hover,
+.fh-legend-toggle.is-open {
+  color: #94a3b8;
+}
+.fh-legend-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fh-head--stack .fh-legend-toggle {
+  align-self: stretch;
+}
+.fh-legend-tips {
+  display: none;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-subtle, #334155);
+  font-size: 0.62rem;
+  color: #64748b;
+}
+.fh-legend-tips.is-open {
+  display: flex;
+}
+.fh-legend-tips .fh-legend-item {
+  white-space: nowrap;
 }
 .fh-legend-row .fh-head-actions {
   flex: 0 0 auto;
@@ -5175,21 +5544,23 @@ body {
     grid-column: 3;
     grid-row: 1;
     min-width: 0;
+    padding-top: 0;
   }
-  .fetcher-popover [data-stat-layout="landscape"] .fh-rail-mid .fh-head {
-    position: static;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.4rem;
-    background: transparent;
-    border-bottom: 0;
-    padding: 0;
-    margin: 0;
+  /* Pull the first chip heading (LIBRARY) up to the top line, sharing it with
+     the Layout/x buttons: reserve their width on the right and enough height
+     so the first chip row clears the absolutely-positioned button cluster. */
+  .fetcher-popover [data-stat-layout="landscape"] .fh-rail-main .fh-group:first-child .fh-group-head {
+    min-height: 20px;
+    padding-right: 7rem;
+    flex-wrap: nowrap;
   }
-  .fetcher-popover [data-stat-layout="landscape"] .fh-rail-mid .fh-head-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.35rem;
+  /* Breathing room under the "only stale / missing" checkbox in the stack. */
+  .fetcher-popover [data-stat-layout="landscape"] .fh-head--stack .fh-toggle {
+    margin-bottom: 0.6rem;
+  }
+  /* Small gap under the counts pill in the stack. */
+  .fetcher-popover [data-stat-layout="landscape"] .fh-head--stack .fh-counts {
+    margin-bottom: 0.3rem;
   }
   .fetcher-popover [data-stat-layout="landscape"] .fh-group-chips {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5220,7 +5591,7 @@ body {
 .fetcher-popover .fh-group-chips {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 0.35rem;
+  gap: 0.3rem;
   align-items: stretch;
 }
 .fetcher-popover .fh-chip {
@@ -5237,12 +5608,6 @@ body {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.fetcher-popover .fh-chip-wrap {
-  width: 100%;
-}
-.fetcher-popover .fh-chip-wrap .fh-chip {
-  width: 100%;
 }
 .fh-log--collapsed .fh-log-body,
 .fh-log--collapsed .fh-log-jump {
@@ -5285,9 +5650,6 @@ body {
   overflow-y: auto;
 }
 @media (min-width: 1024px) {
-  .fetcher-popover {
-    max-height: min(88vh, 860px);
-  }
   .fetcher-popover .fh-row--popover .fh-log.open .fh-log-body {
     max-height: 360px;
   }
@@ -5301,6 +5663,9 @@ body {
     bottom: 10px;
     width: auto;
     max-height: none;
+  }
+  .fetcher-popover-scroll {
+    overflow-y: auto;
   }
   .fetcher-popover-close,
   .fetcher-stat-layout-toggle {

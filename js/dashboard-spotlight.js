@@ -3,7 +3,8 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, formatDollar } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, formatDollar, normalizeGame } from './game-core.js';
+import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo, cutBucketClass } from './deals.js';
 import { isBarrel, isLeveragePick, getLibrarySnapshot } from './sabermetrics.js';
@@ -467,10 +468,13 @@ export function spotlightInnerHtml(g) {
   const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
   const eyebrowTipText = eyebrowTip(eyebrow);
   const eyebrowTitleAttr = eyebrowTipText ? ` title="${escapeAttr(eyebrowTipText)}"` : '';
+  const storeKey = normalizeGame(g).store;
+  const storeGlyph = storeLogoHtml(storeKey, { size: 'sm', title: storeDisplayName(storeKey), className: 'dash-spotlight-store' });
   const customMeta = g._spotlightReason?.metaParts;
   const metaParts = customMeta?.length
-    ? customMeta
+    ? [storeGlyph, ...customMeta]
     : [
+      storeGlyph,
       `<strong>${rating}%</strong> review`,
       `<strong>${escapeHtml(hltbStr)}</strong> main`,
       escapeHtml(statusLabel),
@@ -483,7 +487,7 @@ export function spotlightInnerHtml(g) {
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
-      <span class="dash-spotlight-meta">${metaParts.join(' · ')}</span>
+      <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaParts.join(' · ')}</span>
     </div>
     <span class="dash-spotlight-nav" aria-hidden="false">
       <span class="dash-spotlight-nav-btn" role="button" tabindex="0" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</span>

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from amazon_web_client import amazon_signin_url
+from auth.epic_wishlist_session import epic_store_login_url
 
 AuthKind = Literal["form", "browser", "oauth", "local", "manual"]
 
@@ -149,7 +150,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Cloudflare may challenge once."
         ),
         env_keys=("EPIC_STORE_COOKIE",),
-        login_url="https://store.epicgames.com/en-US/wishlist",
+        login_url=epic_store_login_url(),
         success_url_pattern=r"store\.epicgames\.com",
         expiry_days=7,
         fetcher_keys=("wishlistEpic",),

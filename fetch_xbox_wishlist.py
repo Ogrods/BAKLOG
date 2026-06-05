@@ -52,6 +52,7 @@ from fetchers._base import (
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from hltb_client import HltbClient
 from shared.money import format_price, normalize_currency_code
+from shared.raw_dumps import raw_dumps_enabled
 
 GAMES_XBOX_WISHLIST_JSON = Path("games_wishlist_xbox.json")
 
@@ -460,9 +461,9 @@ def main() -> int:
         return stats.finish("fetch_xbox_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     ids, wishlists_branch = _extract_wishlist_ids(state)
-    if args.dump_state or not ids:
+    if args.dump_state or (not ids and raw_dumps_enabled()):
         # Dumping the wishlist + sample catalog branch makes shape-drift
-        # debugging trivial on a fresh sign-in (or zero-item wishlist).
+        # debugging trivial on a fresh sign-in (opt-in for zero-item wishlist).
         wishlist_state_dump().parent.mkdir(parents=True, exist_ok=True)
         wishlist_state_dump().write_text(
             json.dumps(

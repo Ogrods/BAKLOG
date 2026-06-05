@@ -64,7 +64,7 @@ jobs:
   python-macos:
     name: Python (macOS smoke)
     runs-on: macos-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -79,10 +79,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      # Catches cross-platform regressions (imports, paths, Amazon guards) on a
-      # non-Windows OS. Amazon integration tests are skipped off Windows.
-      - name: Run pytest
-        run: pytest -q
+      # Fast cross-platform smoke on macOS (full suite runs on Ubuntu/Windows).
+      # Catches import/path regressions without the 10m full-suite timeout.
+      - name: Run pytest smoke subset
+        run: |
+          pytest -q \
+            tests/test_server_personal.py \
+            tests/test_server_csrf.py \
+            tests/test_run_manager.py \
+            tests/test_fetcher_progress.py \
+            tests/test_fetcher_auth_exit.py \
+            tests/test_auth_secrets.py \
+            tests/test_amazon_web_auth.py \
+            tests/test_amazon_web_claims.py \
+            tests/test_cdp_browser.py \
+            -m "not integration"
 
   javascript:
     name: JavaScript (vitest)
@@ -94,7 +105,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies

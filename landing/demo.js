@@ -13,15 +13,18 @@
   const POPUP_LIFETIME_MS = 700;
   const JITTER_PX = 4;
 
-  const STORE_SEQUENCE = [
-    { delta: 257 },
-    { delta: 673 },
-    { delta: 597 },
-    { delta: 259 },
-    { delta: 154 },
-    { delta: 1044 },
-  ];
-  const FINAL_COUNT = STORE_SEQUENCE.reduce((s, x) => s + x.delta, 0);
+  const FINAL_COUNT = 2984;
+  const BATCH_SIZE = 200;
+  const STORE_SEQUENCE = (() => {
+    const out = [];
+    let remaining = FINAL_COUNT;
+    while (remaining > 0) {
+      const delta = Math.min(BATCH_SIZE, remaining);
+      out.push({ delta });
+      remaining -= delta;
+    }
+    return out;
+  })();
 
   const STATS = {
     playedHrs: 412,
@@ -232,7 +235,8 @@
     const host = opts.popups !== false ? node.closest("[data-libcount-host]") : null;
     if (host && safeTo > safeFrom) {
       const delta = safeTo - safeFrom;
-      spawnPopups(host, delta, Math.min(delta, POPUP_CAP));
+      const count = Number.isFinite(opts.popupCount) ? opts.popupCount : Math.min(delta, POPUP_CAP);
+      spawnPopups(host, delta, count);
     }
     const start = performance.now();
     function tick(now) {
@@ -285,13 +289,13 @@
     hero.textContent = "0";
     let running = 0;
     let elapsed = 0;
-    const stepMs = 850;
+    const stepMs = 150;
     STORE_SEQUENCE.forEach((step, i) => {
       elapsed += i === 0 ? 0 : stepMs;
       const prev = running;
       running += step.delta;
       const id = setTimeout(() => {
-        flashCountUp(hero, prev, running, fmtCommas, { popups: true });
+        flashCountUp(hero, prev, running, fmtCommas, { popups: true, durationMs: 260, popupCount: 1 });
       }, elapsed);
       countTimers.push(id);
     });

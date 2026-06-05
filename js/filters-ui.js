@@ -28,6 +28,8 @@ import {
   itchIsGame,
   combinedPlaytime,
 } from './game-core.js';
+import { storeLogoHtml } from './store-logos.js';
+import { STORE_DISPLAY_ORDER, storeDisplayRank } from './dashboard-shared.js';
 import {
   getDealInfo,
   effectiveDiscountPercent,
@@ -178,11 +180,11 @@ export function renderActiveFilterPills() {
   }
   wrap.classList.remove("hidden");
   wrap.innerHTML = pills.map(p => `
-    <button type="button" class="active-filter-pill" data-kind="${escapeAttr(p.kind)}" data-value="${escapeAttr(p.value)}" aria-label="Remove filter: ${escapeAttr(p.label)}">
+    <button type="button" class="active-filter-pill" data-kind="${escapeAttr(p.kind)}" data-value="${escapeAttr(p.value)}" aria-label="Remove filter: ${escapeAttr(p.label)}" title="Remove this filter">
       ${escapeHtml(p.label)}
       <span class="active-filter-pill-x" aria-hidden="true">×</span>
     </button>
-  `).join("") + `<button type="button" id="clearAllFiltersBtn" class="text-xs text-slate-400 hover:text-slate-200 underline ml-1">Clear all</button>`;
+  `).join("") + `<button type="button" id="clearAllFiltersBtn" class="text-xs text-slate-400 hover:text-slate-200 underline ml-1" title="Clear all active filters">Clear all</button>`;
   wrap.querySelector("#clearAllFiltersBtn")?.addEventListener("click", clearAllFilters);
   wrap.querySelectorAll(".active-filter-pill").forEach(btn => {
     btn.addEventListener("click", () => removeActiveFilter(btn.dataset.kind, btn.dataset.value));
@@ -348,6 +350,7 @@ export function updateCleanupBtnState() {
   btn.classList.toggle("active", state.cleanupModeActive);
   btn.classList.toggle("ring-2", state.cleanupModeActive);
   btn.classList.toggle("ring-orange-400", state.cleanupModeActive);
+  btn.setAttribute("aria-pressed", String(state.cleanupModeActive));
 }
 
 export function updateGenreChipsCollapse() {
@@ -362,6 +365,7 @@ export function updateGenreChipsCollapse() {
   }
   btn.classList.remove("hidden");
   btn.textContent = state.genreChipsExpanded ? "Show fewer genres" : `Show all (${count})`;
+  btn.title = state.genreChipsExpanded ? "Collapse the full genre list" : "Expand or collapse the full genre list";
   el.classList.toggle("collapsed", !state.genreChipsExpanded);
   el.classList.toggle("expanded", state.genreChipsExpanded);
 }
@@ -557,11 +561,9 @@ export function switchView(view) {
     state.activeView = view;
     state.prefs.activeView = view;
     state.selectedKeys.clear();
+    if (view !== "library") state.cleanupModeActive = false;
     if (!state._pendingFocusKey) state.focusedRowIndex = 0;
-    if (view === "dashboard") {
-      state.cleanupModeActive = false;
-    } else if (view === "wishlist") {
-      state.cleanupModeActive = false;
+    if (view === "wishlist") {
       state.sessionPrefs.statusFilter = "";
       syncFilterDomFromState();
       if (fromView === "library" && state.prefs.picksTab && state.prefs.picksTab !== "wishlistDeals") {
@@ -569,7 +571,6 @@ export function switchView(view) {
       }
       state.prefs.picksTab = "wishlistDeals";
     } else if (view === "itch") {
-      state.cleanupModeActive = false;
       if (fromView === "library" && state.prefs.picksTab && state.prefs.picksTab !== "topRated") {
         state.prefs.libraryPicksTab = state.prefs.picksTab;
       }
@@ -674,8 +675,8 @@ export function renderSummary() {
       <div class="w-full flex flex-wrap gap-2">
         ${resetChip}
         ${sourcesChip}
-        ${avgDisc != null ? `<div class="summary-stat-chip" data-stat="avg-discount">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
-        ${avgPrice != null ? `<div class="summary-stat-chip" data-stat="avg-price">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
+        ${avgDisc != null ? `<div class="summary-stat-chip" data-stat="avg-discount" title="Average discount % across on-sale wishlist items">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
+        ${avgPrice != null ? `<div class="summary-stat-chip" data-stat="avg-price" title="Average current deal price (USD) on wishlist">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
         ${onSaleChip}
         ${lowChip}
         ${ownedChip}
@@ -700,11 +701,11 @@ export function renderSummary() {
     const statusChips = renderStatusChipsHtml(itchScope);
     el.innerHTML = `
       <div class="w-full flex flex-wrap gap-2">
-        <div class="summary-stat-chip summary-stat-chip--itch">itch.io <span class="text-slate-100 font-semibold ml-1">${countLabel}</span></div>
-        <div class="summary-stat-chip summary-stat-chip--itch">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
-        <div class="summary-stat-chip summary-stat-chip--itch">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
-        <div class="summary-stat-chip summary-stat-chip--itch">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
-        ${fetched ? `<div class="summary-stat-chip summary-stat-chip--itch text-slate-400">Fetched ${escapeHtml(fetched)}</div>` : ""}
+        <div class="summary-stat-chip summary-stat-chip--itch" title="itch.io items in your library">itch.io <span class="text-slate-100 font-semibold ml-1">${countLabel}</span></div>
+        <div class="summary-stat-chip summary-stat-chip--itch" title="Sum of HLTB main hours on itch backlog">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
+        <div class="summary-stat-chip summary-stat-chip--itch" title="itch.io items with a community rating">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
+        <div class="summary-stat-chip summary-stat-chip--itch" title="Mean itch.io review % (rated items)">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
+        ${fetched ? `<div class="summary-stat-chip summary-stat-chip--itch text-slate-400" title="Last itch.io library fetch time">Fetched ${escapeHtml(fetched)}</div>` : ""}
       </div>
       ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
     return;
@@ -715,13 +716,14 @@ export function renderSummary() {
     amazon: "Amazon", xbox: "Xbox", battlenet: "Battle.net",
     ubisoft: "Ubisoft", nintendo: "Nintendo", itch: "itch.io", humble: "Humble", ea: "EA App",
   };
-  const storeCounts = Object.keys(storeLabels)
+  const storeCounts = STORE_DISPLAY_ORDER
+    .filter(k => storeLabels[k])
     .map(k => ({
       key: k,
       label: storeLabels[k],
       count: k === "itch" ? state.itchGames.filter(itchIsGame).length : state.allGames.filter(g => normalizeGame(g).store === k).length,
     }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => storeDisplayRank(a.key) - storeDisplayRank(b.key));
   const hiddenCount = state.allGames.length - visible.length;
   const sourceCount = storeCounts.filter(s => s.count > 0).length;
   const activeStore = state.prefs.storeFilter || "";
@@ -737,13 +739,13 @@ export function renderSummary() {
       if (s.count === 0) return "";
       const isActive = activeStore === s.key;
       const title = isActive ? `Clear ${s.label} filter` : `Filter: ${s.label}`;
-      return `<button type="button" class="summary-store-chip${isActive ? " active" : ""}" data-store-filter="${escapeAttr(s.key)}" title="${escapeAttr(title)}">${escapeHtml(s.label)} <span class="text-slate-100 font-semibold ml-1">${s.count}</span></button>`;
+      return `<button type="button" class="summary-store-chip${isActive ? " active" : ""}" data-store-filter="${escapeAttr(s.key)}" title="${escapeAttr(title)}"><span class="summary-store-chip-logo">${storeLogoHtml(s.key, { size: 'sm', title: s.label })}</span><span class="summary-store-chip-label">${escapeHtml(s.label)}</span> <span class="text-slate-100 font-semibold ml-1">${s.count}</span></button>`;
     })
     .join("");
   const statusChips = renderStatusChipsHtml(visible);
   el.innerHTML = `
     <div class="w-full flex flex-wrap gap-2">
-      <div class="summary-stat-chip" data-stat="games">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
+      <div class="summary-stat-chip" data-stat="games" title="Visible games in library (after filters and dedup)">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
       <div class="summary-stat-chip" data-stat="sources" title="Stores with games in your library">Sources <span class="text-slate-100 font-semibold ml-1">${sourceCount}</span></div>
       ${storeChips}
     </div>
@@ -771,7 +773,7 @@ export function renderGenreChips() {
   const genres = [...new Set(genreSource.flatMap(g => gameGenresCanonical(g)))].sort();
   const html = genres.map(genre => {
     const active = (state.prefs.genreFilters || []).includes(genre);
-    return `<button type="button" class="genre-chip px-2 py-1 rounded border border-slate-600 text-xs ${active ? "active" : "bg-slate-700 text-slate-300"}" data-genre="${escapeAttr(genre)}">${escapeHtml(genre)}</button>`;
+    return `<button type="button" class="genre-chip px-2 py-1 rounded border border-slate-600 text-xs ${active ? "active" : "bg-slate-700 text-slate-300"}" data-genre="${escapeAttr(genre)}" title="Toggle genre filter (OR/AND set in drawer)">${escapeHtml(genre)}</button>`;
   }).join("");
   document.getElementById("genreChips").innerHTML = html || '<span class="text-xs text-slate-400">No genres found.</span>';
   updateGenreChipsCollapse();

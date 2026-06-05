@@ -34,6 +34,7 @@ from fetchers._base import (
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
+from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_AMAZON_JSON = Path("games_amazon.json")
 HLTB_DELAY_SEC = 1.0
@@ -42,10 +43,7 @@ AMAZON_WEB_PROFILE = "amazon_web"
 LEGACY_ROW_SOURCE = "launcher"
 
 
-def raw_dump_json() -> Path:
-    from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "amazon_web_raw.json"
+AMAZON_RAW_DUMP = profile_raw_dump_path("amazon_web_raw.json")
 
 
 def _configure_stdout() -> None:
@@ -264,24 +262,104 @@ def _load_launcher_records(sql_dir: Path | None) -> list[dict]:
     return client.get_library_records()
 
 
-def _load_web_records(*, dump_raw: bool) -> list[dict]:
-    from amazon_web_client import AmazonWebClient, sniff_claims
-
-    dump = raw_dump_json() if dump_raw else None
+def _read_raw_dump_claims(*, path: Path) -> list[dict] | None:
     try:
-        if dump_raw:
-            _raw, records = sniff_claims(dump_path=dump)
-            print(f"Wrote raw claims dump to {dump}.", flush=True)
-        else:
-            records = AmazonWebClient().get_library_records()
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    raw_claims = data.get("raw_claims")
+    if not isinstance(raw_claims, list):
+        return None
+    return [c for c in raw_claims if isinstance(c, dict)]
+
+
+def _web_outcome_kind_from_capture(
+    *,
+    raw_claims: list[dict],
+    outcome: dict,
+    fallback_claims: list[dict] | None = None,
+) -> str | None:
+    """Pure mapping for tests / clearer handling.
+
+    outcome is the dict returned by amazon_web_client.sniff_claims().
+    """
+
+    capture_ok = bool(outcome.get("capture_ok"))
+    signed_in = bool(outcome.get("signed_in"))
+
+    if capture_ok:
+        # claims payload parsed successfully (even if raw_claims == []).
+        return "signed_in_empty" if not raw_claims else "signed_in_captured"
+
+    if not signed_in:
+        return None  # signed out should be handled via AmazonWebAuthError earlier
+
+    # signed-in but no live claims; caller may supply raw-dump fallback.
+    if fallback_claims is not None:
+        return "signed_in_empty" if not fallback_claims else "raw_dump_fallback"
+
+    return "signed_in_no_claims"
+
+
+def _load_web_records(*, dump_raw: bool) -> tuple[list[dict], str | None]:
+    """Return (records, web_outcome_kind).
+
+    web_outcome_kind is used so we can distinguish:
+    - signed-in-empty (claims payload captured but empty)
+    - signed-in-no-claims (headless parse failed; try raw-dump fallback)
+    """
+
+    from amazon_web_client import (
+        filter_codeless_claims,
+        raw_dump_max_age_s,
+        raw_dump_path,
+        sniff_claims,
+    )
+
+    dump = AMAZON_RAW_DUMP if dump_raw else None
+
+    try:
+        raw_claims, records, outcome = sniff_claims(dump_path=dump)
     except AmazonWebAuthError as e:
         mark_invalid(AMAZON_WEB_PROFILE, error=str(e))
         raise
+
     print(
         "Reading Prime Gaming claims (Amazon-fulfilled only, no external keys).",
         flush=True,
     )
-    return records
+
+    if dump_raw and dump is not None:
+        print(f"Wrote raw claims dump to {dump}.", flush=True)
+
+    if outcome.get("capture_ok"):
+        # Signed-in + claims payload parsed successfully (including empty list).
+        if not raw_claims:
+            return [], "signed_in_empty"
+        return records, "signed_in_captured"
+
+    # Signed-in, but live capture returned nothing: try raw-dump fallback.
+    # (We purposely do NOT overwrite the connect-time fallback dump unless
+    # --dump-raw was explicitly requested.)
+    if outcome.get("signed_in"):
+        raw_path = raw_dump_path()
+        max_age_s = raw_dump_max_age_s()
+        try:
+            age_s = time.time() - raw_path.stat().st_mtime
+        except OSError:
+            age_s = None
+        if age_s is not None and age_s <= max_age_s:
+            fallback_claims = _read_raw_dump_claims(path=raw_path)
+            if fallback_claims is not None:
+                fallback_records = filter_codeless_claims(fallback_claims)
+                if not fallback_claims:
+                    return [], "signed_in_empty"
+                return fallback_records, "raw_dump_fallback"
+
+        return [], "signed_in_no_claims"
+
+    # Should be unreachable: sniff_claims raises AmazonWebAuthError for signed-out.
+    return records, None
 
 
 def main() -> int:
@@ -309,7 +387,7 @@ def main() -> int:
     parser.add_argument(
         "--dump-raw",
         action="store_true",
-        help="Web source only: write cache/amazon_web_raw.json with full claims payload",
+        help=f"Web source only: write {AMAZON_RAW_DUMP} with full claims payload",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
@@ -332,13 +410,14 @@ def main() -> int:
     print(f"Amazon source: {source}", flush=True)
 
     try:
+        web_outcome_kind: str | None = None
         if source == "launcher":
             if sys.platform != "win32":
                 stats.error("Launcher source requires Windows (DPAPI). Use --source web.")
                 return stats.finish("fetch_amazon", t0, exit_code=1)
             records = _load_launcher_records(sql_dir)
         else:
-            records = _load_web_records(dump_raw=args.dump_raw)
+            records, web_outcome_kind = _load_web_records(dump_raw=args.dump_raw)
     except ImportError as e:
         stats.error(str(e))
         return stats.finish("fetch_amazon", t0, exit_code=1)
@@ -353,8 +432,11 @@ def main() -> int:
         return stats.finish("fetch_amazon", t0, exit_code=1)
 
     if not records:
-        stats.error("No Amazon games found for the selected source.")
-        return stats.finish("fetch_amazon", t0, exit_code=2)
+        if web_outcome_kind == "signed_in_empty":
+            print("Prime Gaming web: collection is empty (claims payload captured).", flush=True)
+        else:
+            stats.error("No Amazon games found for the selected source.")
+            return stats.finish("fetch_amazon", t0, exit_code=2)
 
     print(f"Found {len(records)} Amazon titles.", flush=True)
 
@@ -411,14 +493,16 @@ def main() -> int:
             )
         )
 
-    drift_exit = refuse_amazon_source_drift(
-        len(current_rows),
-        source=source,
-        allow_drift=args.allow_drift,
-        output_path=GAMES_AMAZON_JSON,
-    )
-    if drift_exit is not None:
-        return stats.finish("fetch_amazon", t0, exit_code=drift_exit)
+    drift_exit = None
+    if not (source == "web" and web_outcome_kind == "signed_in_empty"):
+        drift_exit = refuse_amazon_source_drift(
+            len(current_rows),
+            source=source,
+            allow_drift=args.allow_drift,
+            output_path=GAMES_AMAZON_JSON,
+        )
+        if drift_exit is not None:
+            return stats.finish("fetch_amazon", t0, exit_code=drift_exit)
 
     games_out = merge_amazon_sources(current_rows, carried_rows, source)
 

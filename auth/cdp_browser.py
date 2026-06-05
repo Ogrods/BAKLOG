@@ -41,6 +41,43 @@ _AUTOMATION_MASK_SCRIPT = (
     "try { delete Navigator.prototype.webdriver; } catch (e) {}"
 )
 
+# Full stealth init used by Connections sign-in and Prime Gaming headless fetch.
+# Stronger than _AUTOMATION_MASK_SCRIPT alone; shared so headed and headless paths match.
+STEALTH_INIT_SCRIPT = r"""
+(() => {
+  try { Object.defineProperty(navigator, 'webdriver', { get: () => undefined, configurable: true }); } catch (e) {}
+  try {
+    const orig = Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver');
+    if (orig) Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => undefined });
+  } catch (e) {}
+  try {
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'], configurable: true });
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [
+        { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+        { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+        { name: 'Native Client', filename: 'internal-nacl-plugin' },
+      ],
+      configurable: true,
+    });
+  } catch (e) {}
+  try { window.chrome = window.chrome || { runtime: {}, app: { isInstalled: false } }; } catch (e) {}
+  try {
+    const oq = window.navigator.permissions && window.navigator.permissions.query;
+    if (oq) {
+      window.navigator.permissions.query = (p) =>
+        p && p.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : oq.call(window.navigator.permissions, p);
+    }
+  } catch (e) {}
+  try { Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 }); } catch (e) {}
+  try { Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 }); } catch (e) {}
+  try { Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 0 }); } catch (e) {}
+  try { delete Object.getPrototypeOf(navigator).webdriver; } catch (e) {}
+})();
+"""
+
 _BROWSER_LAUNCH_HINT = (
     "Install Google Chrome or Microsoft Edge, set BAKLOG_CHROME_PATH to the browser "
     "executable, or try the other installed browser."
@@ -834,6 +871,15 @@ class CdpContext:
             return CdpContext._id_counter
 
     def close(self) -> None:
+        if self._proc.poll() is None:
+            try:
+                self._send("Browser.close")
+            except Exception:
+                pass
+            try:
+                self._proc.wait(timeout=8)
+            except Exception:
+                pass
         try:
             self._ws.close()
         except Exception:
@@ -889,12 +935,18 @@ def launch_persistent_profile(
     user_data_dir: str | Path,
     *,
     headless: bool | str = False,
+    window_position: tuple[int, int] | None = None,
+    window_size: tuple[int, int] | None = None,
 ) -> CdpContext:
     """Launch Chrome/Edge with a persistent profile and return a CDP context.
 
     ``headless`` may be ``False`` (visible), ``True`` or ``"new"`` (``--headless=new``),
     or ``"legacy"`` / ``"old"`` (classic ``--headless``). Some sites serve different
     SSR to ``--headless=new`` than to a visible window.
+
+    When ``window_position`` is set on a headed launch, the window is placed off-screen
+    (``--window-position`` / ``--window-size``) instead of maximized — same real-browser
+    fingerprint as a visible connect window without stealing focus.
     """
     exe = find_chromium_executable()
     port = _free_port()
@@ -921,6 +973,11 @@ def launch_persistent_profile(
         else:
             args.append("--headless=new")
         args.append("--window-size=1920,1080")
+    elif window_position is not None:
+        wx, wy = window_position
+        ww, wh = window_size if window_size is not None else (1280, 900)
+        args.append(f"--window-position={wx},{wy}")
+        args.append(f"--window-size={ww},{wh}")
     else:
         args.append("--start-maximized")
 

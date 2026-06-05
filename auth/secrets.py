@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import sys
 import threading
 from base64 import b64decode, b64encode
 from datetime import UTC, datetime
@@ -50,6 +51,20 @@ KEYRING_ACCOUNT = "secrets-master"
 _lock = threading.RLock()
 _cache: dict[str, Any] | None = None
 _master_password: str | None = None
+_warned_plaintext_master_key = False
+
+
+def _warn_plaintext_master_key(*, action: str) -> None:
+    global _warned_plaintext_master_key
+    if _warned_plaintext_master_key:
+        return
+    _warned_plaintext_master_key = True
+    path = _master_key_file()
+    print(
+        f"[auth] WARNING: OS keyring unavailable — {action} encryption key in plaintext "
+        f"at {path}. Prefer system keyring or set a master password.",
+        file=sys.stderr,
+    )
 
 
 def _now_iso() -> str:
@@ -97,6 +112,7 @@ def _save_keyring_key(key: bytes) -> None:
 
         keyring.set_password(SERVICE_NAME, KEYRING_ACCOUNT, b64encode(key).decode("ascii"))
     except Exception:
+        _warn_plaintext_master_key(action="writing")
         _master_key_file().write_bytes(key)
 
 
@@ -118,12 +134,14 @@ def _get_master_key() -> bytes:
     _ensure_dir()
     mk = _master_key_file()
     if mk.exists():
+        _warn_plaintext_master_key(action="reading")
         return mk.read_bytes()
 
     key = secrets.token_bytes(32)
     try:
         _save_keyring_key(key)
     except Exception:
+        _warn_plaintext_master_key(action="writing")
         _master_key_file().write_bytes(key)
     return key
 

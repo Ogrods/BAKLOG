@@ -3,10 +3,9 @@
  */
 
 import {
-  CLEANUP_MAX_RATING,
-  CLEANUP_MIN_AGE_MS,
   GENRE_ALIASES,
   ITCH_NON_GAME_CLASSIFICATIONS,
+  isCleanupCandidateFromParts,
 } from './state.js';
 
 const HLTB_BUCKETS_QUERY = [
@@ -274,13 +273,12 @@ function rowPlaytime(ctx, g) {
 
 function isCleanupCandidate(ctx, g) {
   const p = getPersonalRecord(ctx.personal, g);
-  if (p.status !== 'backlog') return false;
-  if (rowPlaytime(ctx, g) > 0) return false;
+  const explicitBacklog = hasPersonalEntry(ctx.personal, g) && p.status === 'backlog';
+  const norm = normalizeNameForDedup(g.name);
+  const played = rowPlaytime(ctx, g) > 0 || !!(norm && ctx.playedTitleNorms?.has(norm));
   const rating = ratingValue(g);
-  if (rating > 0 && rating >= CLEANUP_MAX_RATING) return false;
-  const released = parseReleaseForSort(g.release_date);
-  if (!released) return true;
-  return Date.now() - released >= CLEANUP_MIN_AGE_MS;
+  const releaseMs = parseReleaseForSort(g.release_date);
+  return isCleanupCandidateFromParts({ explicitBacklog, played, rating, releaseMs });
 }
 
 function itchIsGame(g) {
@@ -426,6 +424,7 @@ export function buildQueryContext(state, params) {
     // representatives. Used by rowPlaytime() so the worker path stays
     // consistent with the main-thread display.
     combinedPlaytime: combinedPlaytimeLookup(state),
+    playedTitleNorms: state.playedTitleNorms,
   };
 }
 
@@ -482,6 +481,7 @@ export function queryGamesAsync(state, params) {
       // we treat the payload as opaque, so flatten to entries; the worker
       // rebuilds the Map on the other side.
       combinedPlaytime: [...baseCtx.combinedPlaytime],
+      playedTitleNorms: [...state.playedTitleNorms],
     },
   };
   if (source.length < WORKER_THRESHOLD) {

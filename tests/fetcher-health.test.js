@@ -31,6 +31,8 @@ import {
   fetcherRunner,
   renderDashboardFetcherHealth,
   buildFetcherHealthRows,
+  filterFetcherHealthRows,
+  isFetcherAuthHealthy,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -1389,5 +1391,91 @@ describe('enrichment chip compact count', () => {
     expect(countText).not.toContain('new');
     const labelText = document.querySelector('.fh-chip[data-fetcher-key="steamTags"] .fh-chip-label')?.textContent;
     expect(labelText).toBe('Co-op tags');
+  });
+});
+
+describe('filterFetcherHealthRows', () => {
+  const row = (key, status) => ({
+    src: { key, label: key, group: 'library', metaKey: key, color: '#000', cmd: 'x.py' },
+    status,
+  });
+
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = { gog: 'connected', steam: 'disconnected' };
+  });
+
+  it('returns all rows when neither filter is checked', () => {
+    const rows = [row('gog', 'fresh'), row('steam', 'stale')];
+    expect(filterFetcherHealthRows(rows, { showConnected: false, showStaleMissing: false }))
+      .toEqual(rows);
+  });
+
+  it('connected only includes auth-healthy rows', () => {
+    const rows = [row('gog', 'fresh'), row('steam', 'fresh')];
+    const out = filterFetcherHealthRows(rows, { showConnected: true, showStaleMissing: false });
+    expect(out.map(r => r.src.key)).toEqual(['gog']);
+  });
+
+  it('stale/missing only includes stale or missing regardless of auth', () => {
+    const rows = [row('gog', 'fresh'), row('steam', 'stale'), row('gog', 'missing')];
+    const out = filterFetcherHealthRows(rows, { showConnected: false, showStaleMissing: true });
+    expect(out.map(r => r.src.key)).toEqual(['steam', 'gog']);
+  });
+
+  it('both checked uses union of connected and stale/missing', () => {
+    const rows = [
+      row('gog', 'fresh'),
+      row('steam', 'fresh'),
+      row('steam', 'stale'),
+    ];
+    const out = filterFetcherHealthRows(rows, { showConnected: true, showStaleMissing: true });
+    expect(out.map(r => r.src.key).sort()).toEqual(['gog', 'steam']);
+  });
+
+  it('connected filter keeps missing-data rows when auth is healthy', () => {
+    const rows = [row('gog', 'missing')];
+    expect(isFetcherAuthHealthy('gog')).toBe(true);
+    const out = filterFetcherHealthRows(rows, { showConnected: true, showStaleMissing: false });
+    expect(out).toHaveLength(1);
+  });
+});
+
+describe('renderDashboardFetcherHealth filter toggles', () => {
+  const stubFetchers = (fetchers) => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return { ok: true, json: async () => ({ fetchers }) };
+      }
+      if (u.includes('manifest.json')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="dashboardFetcherHealth"></div>';
+    state.prefs.fetcherHealthShowConnected = true;
+    state.prefs.fetcherHealthShowStaleMissing = true;
+    delete state.prefs.fetcherHealthStaleOnly;
+    connMock.loaded = true;
+    connMock.statuses = {};
+    stubFetchers([
+      { key: 'gog', label: 'GOG', metaKey: 'gog', group: 'library', color: '#000', cmd: 'fetch_gog.py', available: true },
+    ]);
+    fetcherRunner.invalidateApiProbe();
+  });
+
+  it('renders both filter checkbox ids', async () => {
+    await fetcherRunner.probeApi(true);
+    renderDashboardFetcherHealth();
+    expect(document.getElementById('fetcherHealthShowConnected')).toBeTruthy();
+    expect(document.getElementById('fetcherHealthShowStaleMissing')).toBeTruthy();
+    expect(document.getElementById('fetcherHealthStaleOnly')).toBeNull();
   });
 });

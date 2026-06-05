@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from auth import resolve_env
+from auth import mark_invalid, resolve_env
 from fetchers._base import (
     STEAM_CREDENTIALS_HINT,
     add_allow_empty_arg,
@@ -19,7 +19,7 @@ from fetchers._base import (
     refuse_empty_result,
     write_catalog_text,
 )
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 from steam_client import SteamClient
 from steam_metadata import coop_flags_from_categories
@@ -224,7 +224,15 @@ def main() -> int:
     existing = load_existing()
 
     print("Fetching owned games from Steam...")
-    owned_games = steam.get_owned_games()
+    try:
+        owned_games = steam.get_owned_games()
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code in (401, 403):
+            mark_invalid("steam", error=STEAM_CREDENTIALS_HINT)
+            stats.error(STEAM_CREDENTIALS_HINT)
+            return stats.finish("fetch_games", t0, exit_code=EXIT_CODE_AUTH)
+        stats.error(f"Steam API error: {e}")
+        return stats.finish("fetch_games", t0, exit_code=1)
     print(f"Found {len(owned_games)} entries in library.")
 
     if not args.appid:

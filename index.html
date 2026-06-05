@@ -102,20 +102,20 @@
     <div id="authSecretsBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="app-header mb-4">
       <div class="app-header-row flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0">
+        <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0" title="BAKLOG — cross-store backlog; data stays on this device">
           <span class="brand-logo-mark shrink-0" aria-hidden="true"></span>
           <h1 class="text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap m-0">BAKLOG</h1>
         </div>
         <div class="app-header-nav-wrap min-w-0">
           <nav class="app-header-nav flex flex-wrap items-center gap-1.5" aria-label="Main views">
-            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="dashboard">Dashboard</button>
-            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="library">Library</button>
-            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="wishlist">Wishlist</button>
-            <button type="button" class="view-tab hidden px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch">itch.io</button>
-            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections">Connections</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="dashboard" title="Overview: stats, spotlight, fetcher health">Dashboard</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="library" title="Your full game library and filters">Library</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="wishlist" title="Wishlist games and deal filters">Wishlist</button>
+            <button type="button" class="view-tab hidden px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch" title="itch.io library">itch.io</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections" title="Connect stores and manage API keys / OAuth">Connections</button>
           </nav>
         </div>
-        <span class="app-header-tagline text-[11px] hidden lg:inline self-center">Cross-store backlog · local-only</span>
+        <span class="app-header-tagline text-[11px] hidden sm:inline self-center" title="All data is stored locally — nothing is uploaded by default">Cross-store backlog · local-only</span>
         <div class="header-actions app-header-actions ml-auto flex items-center gap-2 shrink-0 self-center">
           <div id="fetcherPopoverAnchor" class="fetcher-popover-anchor relative shrink-0">
             <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle" title="Show fetcher log" aria-haspopup="dialog" aria-expanded="false" aria-controls="fetcherPopover"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText" class="fh-global-status-label">Fetcher log</span><span id="fetcherGlobalStatusTail" class="fh-global-status-tail" aria-hidden="true"></span></button>
@@ -124,8 +124,8 @@
               <h2 id="fetcherPopoverTitle" class="sr-only">Fetcher health and log</h2>
               <div class="fetcher-popover-head">
                 <span class="fetcher-popover-title" id="fetcherPopoverVisibleTitle">Fetchers</span>
-                <button type="button" class="fetcher-stat-layout-toggle" id="fetcherStatLayoutToggle" title="Switch overview layout (compact / landscape)">Layout</button>
-                <button type="button" class="fetcher-popover-close" data-fetcher-popover-close aria-label="Close fetcher">&times;</button>
+                <button type="button" class="fetcher-stat-layout-toggle" id="fetcherStatLayoutToggle" title="Switch overview layout (compact / landscape)" aria-pressed="false" aria-label="Switch to landscape layout">Layout</button>
+                <button type="button" class="fetcher-popover-close" data-fetcher-popover-close aria-label="Close fetcher" title="Close fetcher">&times;</button>
               </div>
               <div class="fetcher-popover-scroll">
                 <div id="fetcherRow" class="fh-row fh-row--popover is-expanded">
@@ -143,9 +143,9 @@
             <div id="profileMenu" class="profile-menu-panel" role="menu" aria-label="Profiles" hidden>
               <div id="profileMenuList" class="profile-menu-list"></div>
               <div class="profile-menu-divider" aria-hidden="true"></div>
-              <div class="profile-menu-theme-label">Theme · <span id="profileThemeName">Default</span></div>
+              <div class="profile-menu-theme-label" title="Accent color for charts and highlights (saved per profile)">Theme · <span id="profileThemeName">Default</span></div>
               <div id="profileThemeList" class="profile-menu-themes" role="group" aria-label="Color theme"></div>
-              <button type="button" role="menuitem" class="profile-menu-footer w-full text-left px-3 py-2 text-xs text-sky-300 hover:bg-slate-700/60 border-t border-slate-600/80" data-profile-manage>Manage profiles…</button>
+              <button type="button" role="menuitem" class="profile-menu-footer w-full text-left px-3 py-2 text-xs text-sky-300 hover:bg-slate-700/60 border-t border-slate-600/80" data-profile-manage title="Rename, create, or delete local profiles">Manage profiles…</button>
             </div>
           </div>
         </div>
@@ -197,11 +197,11 @@
           <div class="conn-progress"><span id="connProgressFill"></span></div>
         </div>
         <div class="conn-hero-actions">
-          <button type="button" id="connKebabBtn" class="conn-kebab-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Connections options">&#8942;</button>
+          <button type="button" id="connKebabBtn" class="conn-kebab-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Connections options" title="Connections options">&#8942;</button>
           <div id="connKebabMenu" class="conn-kebab-menu" role="menu" hidden>
-            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="howto">How connections work</button>
-            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="passphrase">Encryption passphrase</button>
-            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="bundle">Portable bundle&hellip;</button>
+            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="howto" title="How automatic sign-in, API keys, and local-only sources work">How connections work</button>
+            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="passphrase" title="Optional portable master password for encrypted credentials">Encryption passphrase</button>
+            <button type="button" role="menuitem" class="conn-kebab-item" data-conn-open="bundle" title="Export or import an encrypted bundle of all connections">Portable bundle&hellip;</button>
           </div>
         </div>
       </div>
@@ -275,7 +275,7 @@
             class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
         </label>
         <div class="flex flex-wrap gap-2 items-center mt-2">
-          <button type="button" id="masterPasswordSave" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Apply</button>
+          <button type="button" id="masterPasswordSave" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm" title="Save encryption passphrase (blank = OS keychain)">Apply</button>
           <span id="masterPasswordHint" class="text-slate-400 text-xs">Using OS keychain by default.</span>
         </div>
       </template>
@@ -291,8 +291,8 @@
           remember. We can't recover it for you.
         </p>
         <div class="flex flex-wrap gap-2 mt-3">
-          <button type="button" id="secretsExportBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm">Export bundle&hellip;</button>
-          <button type="button" id="secretsImportBtn" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Import bundle&hellip;</button>
+          <button type="button" id="secretsExportBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm" title="Export encrypted portable bundle of all connections">Export bundle&hellip;</button>
+          <button type="button" id="secretsImportBtn" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm" title="Import encrypted portable bundle from another machine">Import bundle&hellip;</button>
           <input type="file" id="secretsImportFile" accept=".bundle,application/octet-stream" class="hidden" />
         </div>
         <p id="secretsBundleHint" class="text-xs text-slate-400 mt-2"></p>
@@ -314,8 +314,8 @@
                 class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
             </label>
             <div class="flex flex-wrap gap-2 mt-3 justify-end">
-              <button type="button" id="secretsBundleCancel" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Cancel</button>
-              <button type="submit" id="secretsBundleSubmit" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm">Continue</button>
+              <button type="button" id="secretsBundleCancel" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm" title="Cancel bundle export/import">Cancel</button>
+              <button type="submit" id="secretsBundleSubmit" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm" title="Continue with bundle passphrase">Continue</button>
             </div>
           </form>
         </dialog>
@@ -324,25 +324,25 @@
 
     <section id="picksSection" class="bg-slate-800 rounded-lg mb-4">
       <div class="flex flex-wrap items-center gap-2 p-3 border-b border-slate-700 relative z-10">
-        <button id="togglePicks" class="px-2 py-1 rounded bg-slate-700 text-xs">Hide</button>
+        <button id="togglePicks" class="px-2 py-1 rounded bg-slate-700 text-xs" title="Hide or show the Picks panel">Hide</button>
         <h2 class="text-sm font-semibold tracking-wide text-slate-200 uppercase">Picks</h2>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs active" data-tab="topRated" data-pick-view="library">Top Rated</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp" data-pick-view="library">Next Up</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins" data-pick-view="library">Quick Wins</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems" data-pick-view="library">Hidden Gems</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo" data-pick-view="library">Return To</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs active" data-tab="topRated" data-pick-view="library" title="Highest Steam review % in backlog">Top Rated</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp" data-pick-view="library" title="Backlog games marked Next up">Next Up</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins" data-pick-view="library" title="Short HLTB backlog games (under max hours slider)">Quick Wins</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems" data-pick-view="library" title="High-rated backlog games with few Steam reviews">Hidden Gems</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo" data-pick-view="library" title="Started but unfinished — pick up where you left off">Return To</button>
         <button class="pick-tab px-2 py-1 rounded border border-emerald-700/60 text-xs text-emerald-300" data-tab="wishlistDeals" data-pick-view="wishlist" title="Best deals on your wishlist (ITAD + Steam)">Wishlist Deals</button>
         <span class="text-xs text-slate-300 ml-auto flex items-center gap-1">Show:
           <span id="picksLimitGroup" class="inline-flex rounded border border-slate-600 overflow-hidden" role="group" aria-label="Number of picks to show">
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="16">16</button>
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="24">24</button>
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="48">48</button>
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700" data-limit="96">96</button>
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="16" title="Show 16 pick cards">16</button>
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="24" title="Show 24 pick cards">24</button>
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="48" title="Show 48 pick cards">48</button>
+            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700" data-limit="96" title="Show 96 pick cards">96</button>
           </span>
         </span>
         <label id="quickWinMaxWrap" class="text-xs text-slate-300">Quick-win max hours:
-          <input id="quickWinMax" type="range" min="2" max="40" value="15" class="align-middle w-24" />
-          <span id="quickWinMaxVal">15</span>
+          <input id="quickWinMax" type="range" min="2" max="40" value="15" class="align-middle w-24" title="Max HLTB hours counted as a quick win" />
+          <span id="quickWinMaxVal" class="inline-block text-right tabular-nums" style="min-width:2ch">15</span>
         </label>
         <span id="pickMeta" class="text-xs text-slate-400"></span>
       </div>
@@ -355,26 +355,26 @@
 
     <section id="toolbarSection" class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
       <div class="toolbar-row flex flex-wrap gap-2 items-center">
-        <input id="search" type="search" placeholder="Search games or notes..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" />
-        <button type="button" id="openFiltersBtn" class="relative bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm whitespace-nowrap">
+        <input id="search" type="search" placeholder="Search games or notes..." class="bg-slate-700 border border-slate-600 rounded px-3 py-2 flex-1 min-w-[200px]" aria-label="Search games or notes" title="Search game names and notes ( / to focus)" />
+        <button type="button" id="openFiltersBtn" class="relative bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm whitespace-nowrap" title="Open filters; badge shows active filter count">
           Filters <span id="filtersBtnBadge" class="hidden ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-sky-600 text-[10px] font-bold">0</span>
         </button>
-        <button id="pickForMe" class="bg-amber-700 hover:bg-amber-600 px-3 py-2 rounded text-sm whitespace-nowrap">Pick for me</button>
+        <button id="pickForMe" class="bg-amber-700 hover:bg-amber-600 px-3 py-2 rounded text-sm whitespace-nowrap" title="Pick a random visible game · Shift+click widens to non-backlog / all wishlist">Pick for me</button>
         <button id="addGameBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded text-sm whitespace-nowrap" title="Manually add a game">+ Add game</button>
         <div class="relative">
-          <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions" aria-haspopup="menu" aria-expanded="false">⋯</button>
+          <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" title="More library actions and exports">⋯</button>
           <div id="kebabMenu" class="absolute right-0 top-full mt-1 z-30 min-w-[180px] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 text-sm">
-            <button type="button" id="pickForMeKebab" class="toolbar-kebab-pick--phone w-full text-left px-3 py-2 hover:bg-slate-700">Pick for me</button>
-            <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700">Reload library</button>
+            <button type="button" id="pickForMeKebab" class="toolbar-kebab-pick--phone w-full text-left px-3 py-2 hover:bg-slate-700" title="Pick a random visible game · Shift+click widens to non-backlog / all wishlist">Pick for me</button>
+            <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reload game catalogs and personal data from disk">Reload library</button>
             <button type="button" id="showFetcherLog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reopen the fetcher console (helpful if you closed it during a run)">Show fetcher log</button>
-            <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export CSV</button>
-            <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export personal data (status, notes)</button>
-            <button type="button" id="exportNotesOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700">Export notes only</button>
+            <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Download visible rows as CSV">Export CSV</button>
+            <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export statuses and notes JSON for backup or transfer">Export personal data (status, notes)</button>
+            <button type="button" id="exportNotesOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export only personal notes as JSON">Export notes only</button>
             <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Find stored statuses/notes whose game is no longer in any catalog (uninstalled, store disconnected, etc.)">Clean up unknown games…</button>
             <button type="button" id="reportBug" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy a sanitized bug bundle (errors + app context) to your clipboard. Nothing is sent anywhere.">Report a bug…</button>
-            <button type="button" id="hiddenGamesMenu" class="w-full text-left px-3 py-2 hover:bg-slate-700">Hidden games</button>
-            <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700">Copy top 20 backlog (Markdown)</button>
-            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
+            <button type="button" id="hiddenGamesMenu" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="View and restore games hidden from the library">Hidden games</button>
+            <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy top 20 backlog games as Markdown to clipboard">Copy top 20 backlog (Markdown)</button>
+            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer" title="Import personal data JSON (statuses, notes)">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
           </div>
         </div>
       </div>
@@ -416,12 +416,12 @@
             </div>
             <div class="dash-versus-grid">
               <div class="dash-versus-col dash-versus-col--rated">
-                <div class="dash-versus-col-head"><span class="dash-versus-dot"></span>Best rated</div>
+                <div class="dash-versus-col-head" title="Backlog games with the highest Steam review %"><span class="dash-versus-dot"></span>Best rated</div>
                 <div class="dash-versus-list" id="dashVersusRated"></div>
               </div>
               <div class="dash-versus-divider" aria-hidden="true"></div>
               <div class="dash-versus-col dash-versus-col--fast">
-                <div class="dash-versus-col-head"><span class="dash-versus-dot"></span>Fastest</div>
+                <div class="dash-versus-col-head" title="Short HLTB backlog picks (under quick-win max hours)"><span class="dash-versus-dot"></span>Fastest</div>
                 <div class="dash-versus-list" id="dashVersusFast"></div>
               </div>
             </div>
@@ -462,7 +462,7 @@
         </colgroup>
         <thead class="bg-slate-800 text-slate-300">
           <tr>
-            <th class="p-2"><label class="sr-only" for="selectAllVisible">Select all visible rows</label><input type="checkbox" id="selectAllVisible" /></th>
+            <th class="p-2"><label class="sr-only" for="selectAllVisible">Select all visible rows</label><input type="checkbox" id="selectAllVisible" title="Select or clear all visible rows" /></th>
             <th class="p-2" scope="col">
               <span class="sr-only">Cover art</span>
               <button id="backToTopCover" type="button" title="Back to top" aria-label="Back to top">
@@ -471,15 +471,15 @@
                 </svg>
               </button>
             </th>
-            <th data-sort="name" class="p-2 text-left">Game</th>
-            <th id="statusHeader" data-sort="status" class="p-2 text-left">Status</th>
-            <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right">Score</th>
-            <th data-sort="playtime_minutes" class="col-played p-2 text-right">Played</th>
+            <th data-sort="name" class="p-2 text-left" title="Click to sort; click again to reverse">Game</th>
+            <th id="statusHeader" data-sort="status" class="p-2 text-left" title="Click to sort; click again to reverse">Status</th>
+            <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right" title="Click to sort; click again to reverse">Score</th>
+            <th data-sort="playtime_minutes" class="col-played p-2 text-right" title="Click to sort; click again to reverse">Played</th>
             <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
-            <th data-sort="steam_review_percent" class="p-2 text-right">Steam %</th>
+            <th data-sort="steam_review_percent" class="p-2 text-right" title="Click to sort; click again to reverse">Steam %</th>
             <th id="priceHeader" data-sort="deal_price" class="p-2 text-right" title="Click: sort by current price (low → high) · Shift-click: sort by discount % (biggest sale first)">Price</th>
-            <th data-sort="release_date" class="p-2 text-left">Released</th>
-            <th data-sort="last_played" class="col-lastplayed p-2 text-left">Last played</th>
+            <th data-sort="release_date" class="p-2 text-left" title="Click to sort; click again to reverse">Released</th>
+            <th data-sort="last_played" class="col-lastplayed p-2 text-left" title="Click to sort; click again to reverse">Last played</th>
             <th class="p-2 text-left">Genres</th>
             <th class="p-2 text-left">Notes</th>
           </tr>
@@ -539,7 +539,7 @@
       <span class="text-slate-400 text-xs mr-2">Status:</span>
       <div id="bulkStatusButtons" class="flex flex-wrap gap-2 items-center"></div>
       <button type="button" id="bulkRemove" class="px-2 py-1 rounded bg-rose-900/80 hover:bg-rose-800 border border-rose-700/60 text-rose-100 text-xs font-medium" title="Delete custom entries; hide pulled entries (restorable from kebab menu)">Remove</button>
-      <button type="button" id="bulkClear" class="ml-auto px-2 py-1 rounded text-slate-400 hover:text-slate-200 text-xs">Clear selection</button>
+      <button type="button" id="bulkClear" class="ml-auto px-2 py-1 rounded text-slate-400 hover:text-slate-200 text-xs" title="Clear row selection">Clear selection</button>
     </div>
   </div>
 
@@ -548,7 +548,7 @@
   <aside id="filterDrawer" class="fixed top-0 right-0 h-full w-[min(360px,92vw)] bg-slate-800 border-l border-slate-600 z-50 flex flex-col shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="filterDrawerTitle" aria-hidden="true">
     <div class="flex items-center justify-between p-3 border-b border-slate-700 shrink-0">
       <h2 id="filterDrawerTitle" class="text-sm font-semibold text-slate-100 uppercase tracking-wide">Filters</h2>
-      <button type="button" id="closeFiltersBtn" class="text-slate-400 hover:text-slate-100 text-xl leading-none px-2" aria-label="Close filters">&times;</button>
+      <button type="button" id="closeFiltersBtn" class="text-slate-400 hover:text-slate-100 text-xl leading-none px-2" aria-label="Close filters" title="Close filters">&times;</button>
     </div>
     <div class="flex-1 overflow-y-auto p-3 space-y-0 text-sm">
       <!--
@@ -588,12 +588,12 @@
       <div id="wishlistStoreSection" class="drawer-section hidden">
         <label class="text-xs text-slate-400 block mb-2">Wishlist source</label>
         <div id="wishlistStoreChips" class="flex flex-wrap gap-1.5 items-center">
-          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs active bg-slate-700" data-wishlist-store="">All</button>
-          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="steam">Steam</button>
-          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="gog">GOG</button>
-          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="epic">Epic</button>
-          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="psn">PlayStation</button>
-          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="ubisoft">Ubisoft</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs active bg-slate-700" data-wishlist-store="" title="Filter wishlist to this store">All</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="steam" title="Filter wishlist to this store">Steam</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="gog" title="Filter wishlist to this store">GOG</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="epic" title="Filter wishlist to this store">Epic</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="psn" title="Filter wishlist to this store">PlayStation</button>
+          <button type="button" class="wishlist-store-chip px-2 py-1 rounded border border-slate-600 text-xs bg-slate-700" data-wishlist-store="ubisoft" title="Filter wishlist to this store">Ubisoft</button>
         </div>
         <p class="text-[11px] text-slate-400 mt-2 leading-snug">Filters the Wishlist tab to a single source store. Manual entries remain visible under "All".</p>
       </div>
@@ -601,14 +601,14 @@
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs text-slate-400">Genres</span>
           <label class="text-xs text-slate-400 flex items-center gap-1">Mode
-            <select id="genreMode" class="bg-slate-700 border border-slate-600 rounded text-xs px-1 py-0.5">
+            <select id="genreMode" class="bg-slate-700 border border-slate-600 rounded text-xs px-1 py-0.5" title="OR = any selected genre; AND = must match all">
               <option value="OR">OR</option>
               <option value="AND">AND</option>
             </select>
           </label>
         </div>
         <div id="genreChips" class="flex flex-wrap gap-1.5 collapsed"></div>
-        <button type="button" id="toggleGenreChipsBtn" class="hidden mt-2 text-xs text-sky-400 hover:underline"></button>
+        <button type="button" id="toggleGenreChipsBtn" class="hidden mt-2 text-xs text-sky-400 hover:underline" title="Expand or collapse the full genre list"></button>
       </div>
       <div class="drawer-section space-y-3">
         <label class="block text-xs text-slate-300">Min rating % <span id="minRatingVal" class="text-slate-100">0</span>
@@ -629,48 +629,48 @@
       <div id="coopSection" class="drawer-section">
         <label class="text-xs text-slate-400 block mb-2">Co-op</label>
         <div id="coopFilterSegmented" class="filter-segmented" role="radiogroup" aria-label="Co-op filter">
-          <button type="button" class="filter-segment active" data-coop-mode="off" role="radio" aria-checked="true">Off</button>
-          <button type="button" class="filter-segment" data-coop-mode="any" role="radio" aria-checked="false">Any</button>
-          <button type="button" class="filter-segment" data-coop-mode="online" role="radio" aria-checked="false">Online</button>
-          <button type="button" class="filter-segment" data-coop-mode="local" role="radio" aria-checked="false">Couch</button>
-          <button type="button" class="filter-segment" data-coop-mode="both" role="radio" aria-checked="false">Both</button>
+          <button type="button" class="filter-segment active" data-coop-mode="off" role="radio" aria-checked="true" title="Filter by Steam co-op tag">Off</button>
+          <button type="button" class="filter-segment" data-coop-mode="any" role="radio" aria-checked="false" title="Filter by Steam co-op tag">Any</button>
+          <button type="button" class="filter-segment" data-coop-mode="online" role="radio" aria-checked="false" title="Filter by Steam co-op tag">Online</button>
+          <button type="button" class="filter-segment" data-coop-mode="local" role="radio" aria-checked="false" title="Filter by Steam co-op tag">Couch</button>
+          <button type="button" class="filter-segment" data-coop-mode="both" role="radio" aria-checked="false" title="Filter by Steam co-op tag">Both</button>
         </div>
         <p class="text-[11px] text-slate-400 mt-1.5 leading-snug">Steam category tags. <strong>Any</strong> = online or couch. <strong>Both</strong> = must support both.</p>
       </div>
       <div id="libraryMiscSection" class="drawer-section space-y-2">
         <label class="flex items-center gap-2 text-xs text-slate-300">
-          <input id="unplayedOnly" type="checkbox" class="rounded" />
+          <input id="unplayedOnly" type="checkbox" class="rounded" title="Only games with zero recorded playtime" />
           Unplayed only
         </label>
         <label class="flex items-center gap-2 text-xs text-slate-300">
-          <input id="showScoreColumn" type="checkbox" />
+          <input id="showScoreColumn" type="checkbox" title="Show priority score column (rating ÷ log₂ HLTB)" />
           Show score column
         </label>
-        <button type="button" id="cleanupModeBtn" class="bg-orange-800 hover:bg-orange-700 px-3 py-2 rounded text-sm whitespace-nowrap" title="Backlog, 0 playtime, rating under 60%, released 2+ years ago">Cleanup mode</button>
+        <button type="button" id="cleanupModeBtn" class="bg-orange-800 hover:bg-orange-700 px-3 py-2 rounded text-sm whitespace-nowrap" aria-pressed="false" title="Backlog, 0 playtime, rating under 60%, released 2+ years ago">Cleanup mode</button>
         <p class="text-[11px] text-slate-400 mt-1 leading-snug">Surfaces obvious candidates to mark as <em>Skip</em>: backlog games you've never played, rated under 60%, released 2+ years ago. Pair with bulk select to clear them out fast.</p>
       </div>
       <div id="wishlistDealsSection" class="drawer-section space-y-2 hidden">
         <div class="flex items-center justify-between">
           <span class="text-xs uppercase tracking-wide text-emerald-300 font-semibold">Deal radar</span>
-          <button type="button" id="resetDealFiltersBtn" class="text-[11px] text-slate-400 hover:text-slate-200 underline">Reset</button>
+          <button type="button" id="resetDealFiltersBtn" class="text-[11px] text-slate-400 hover:text-slate-200 underline" title="Reset all deal-radar filters">Reset</button>
         </div>
         <label class="flex items-center gap-2 text-xs text-slate-300">
-          <input id="dealOnSaleOnly" type="checkbox" class="rounded" />
+          <input id="dealOnSaleOnly" type="checkbox" class="rounded" title="Only wishlist items currently discounted" />
           On sale only
         </label>
         <label class="flex items-center gap-2 text-xs text-slate-300">
-          <input id="dealHistoricalLowOnly" type="checkbox" class="rounded" />
+          <input id="dealHistoricalLowOnly" type="checkbox" class="rounded" title="Only items at or near ITAD historical low" />
           Historical low only <span class="text-[10px] text-amber-400 ml-1">via ITAD</span>
         </label>
         <label class="flex items-center gap-2 text-xs text-slate-300">
-          <input id="dealHideOwned" type="checkbox" class="rounded" />
+          <input id="dealHideOwned" type="checkbox" class="rounded" title="Hide wishlist titles that match a game already in your library" />
           Hide already-owned (matched by title)
         </label>
         <label class="block text-xs text-slate-300">Min discount % <span id="dealMinDiscountVal" class="text-slate-100">0</span>
-          <input id="dealMinDiscount" type="range" min="0" max="100" step="5" value="0" class="w-full mt-1" />
+          <input id="dealMinDiscount" type="range" min="0" max="100" step="5" value="0" class="w-full mt-1" title="Minimum discount % to show" />
         </label>
         <label class="block text-xs text-slate-300">Max price $ <span id="dealMaxPriceVal" class="text-slate-100">any</span>
-          <input id="dealMaxPrice" type="range" min="0" max="100" step="5" value="100" class="w-full mt-1" />
+          <input id="dealMaxPrice" type="range" min="0" max="100" step="5" value="100" class="w-full mt-1" title="Maximum deal price (USD) to show" />
         </label>
         <p class="text-[11px] text-slate-400 mt-1 leading-snug">Best results when deal prices are refreshed recently (ITAD chip in Fetcher health). Steam discount % is used as a fallback.</p>
       </div>

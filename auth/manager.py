@@ -494,16 +494,31 @@ def disconnect(provider: str) -> None:
     clear_browser_session(provider)
 
 
+# Cloudflare-gated storefronts where wiping the profile on reconnect forces a
+# new cf_clearance challenge every time and Epic drops the storefront session.
+PRESERVE_PROFILE_ON_RECONNECT = frozenset({"epic_wishlist"})
+
+
+def _should_clear_on_reconnect(provider: str) -> bool:
+    return provider not in PRESERVE_PROFILE_ON_RECONNECT
+
+
 def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
     spec = spec_for(provider)
     if spec.kind == "manual":
         raise ValueError(f"{provider} uses manual sign-in — click Open in browser and paste your API key")
     if spec.kind not in ("browser", "oauth"):
         raise ValueError(f"{provider} does not support browser sign-in")
-    if fresh:
+    if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.
         clear_browser_session(provider)
+    elif provider in PRESERVE_PROFILE_ON_RECONNECT:
+        # Keep profile on reconnect (connected/expired) but drop ghost cookies
+        # when starting from disconnected so connect cannot auto-complete on a
+        # stale storefront session left in the profile dir.
+        if _provider_state(provider) == "disconnected":
+            clear_browser_session(provider)
     session_id = uuid.uuid4().hex[:12]
     session = AuthSession(session_id, provider)
     with _sessions_lock:

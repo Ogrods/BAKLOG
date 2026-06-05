@@ -2,11 +2,45 @@
 // No database. Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX = 5;
+
+/** @type {Map<string, { start: number, count: number }>} */
+const rateBuckets = new Map();
+
+function clientIp(request) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return request.headers.get("x-real-ip") || "unknown";
+}
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  let entry = rateBuckets.get(ip);
+  if (!entry || now - entry.start > RATE_WINDOW_MS) {
+    entry = { start: now, count: 0 };
+    rateBuckets.set(ip, entry);
+  }
+  entry.count += 1;
+  if (rateBuckets.size > 10_000) {
+    for (const [key, bucket] of rateBuckets) {
+      if (now - bucket.start > RATE_WINDOW_MS) rateBuckets.delete(key);
+    }
+  }
+  return entry.count > RATE_MAX;
+}
 
 export default {
   async fetch(request) {
     if (request.method !== "POST") {
       return Response.json({ error: "Method not allowed" }, { status: 405 });
+    }
+
+    if (isRateLimited(clientIp(request))) {
+      return Response.json({ error: "Too many requests" }, {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      });
     }
 
     let body;

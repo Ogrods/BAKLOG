@@ -112,8 +112,13 @@ _STREAM_TICKET_TTL_SEC = 30.0
 _LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Cookie:\s*)([^\s]+)", re.I), r"\1[redacted]"),
+    (re.compile(r"(set-cookie:\s*)(.+)", re.I), r"\1[redacted]"),
     (re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*)[\"']?[\w\-]+", re.I), r"\1[redacted]"),
     (re.compile(r"([?&]ticket=)[^&\s]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(NPSSO[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(Ubi_v1[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(refresh_token[=:\s\"']+)[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(Authorization:\s*)(?!Bearer\s)([^\s,]+)", re.I), r"\1[redacted]"),
 ]
 
 

@@ -45,6 +45,23 @@ export const DASH_STORE_LABELS = {
   itch: "itch.io", other: "Other", manual: "Manual",
 };
 
+/** Canonical storefront display order (bizcard watermark sequence in tracker.html). */
+export const STORE_DISPLAY_ORDER = [
+  'steam', 'epic', 'gog', 'humble', 'itch', 'psn', 'xbox',
+  'nintendo', 'amazon', 'battlenet', 'ubisoft', 'ea',
+];
+
+export function storeDisplayRank(store) {
+  const key = (store || '').toLowerCase();
+  const idx = STORE_DISPLAY_ORDER.indexOf(key);
+  return idx === -1 ? STORE_DISPLAY_ORDER.length : idx;
+}
+
+export function sortStoresByDisplayOrder(stores) {
+  return [...new Set((stores || []).map(s => (s || '').toLowerCase()).filter(Boolean))]
+    .sort((a, b) => storeDisplayRank(a) - storeDisplayRank(b) || a.localeCompare(b));
+}
+
 export const HLTB_BUCKETS = [
   { minExclusive: null, maxInclusive: 2, label: "HLTB 0–2h" },
   { minExclusive: 2, maxInclusive: 5, label: "HLTB 2–5h" },

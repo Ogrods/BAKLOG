@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import tempfile
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from amazon_web_client import (
@@ -10,8 +12,10 @@ from amazon_web_client import (
     GAMING_HOME_URL,
     LUNA_CLAIMS_URL,
     amazon_signin_url,
+    classify_sniff_capture,
     collection_page_ready,
     collection_urls,
+    filter_codeless_claims,
     is_luna_error_page,
     is_luna_hub,
     is_signin_url,
@@ -21,6 +25,7 @@ from amazon_web_client import (
     try_parse_claims_from_html,
     try_parse_claims_from_text,
 )
+from fetch_amazon import _read_raw_dump_claims, _web_outcome_kind_from_capture
 
 
 class _FakeCookieJar:
@@ -111,3 +116,53 @@ def test_try_parse_claims_from_html_embedded_json():
     assert items is not None
     assert len(items) == 1
     assert items[0]["itemTitle"] == "Lake"
+
+
+def test_empty_collection_success_mapping() -> None:
+    outcome = {"capture_ok": True, "signed_in": True}
+    kind = _web_outcome_kind_from_capture(raw_claims=[], outcome=outcome)
+    assert kind == "signed_in_empty"
+
+
+def test_signed_out_auth_path_classification() -> None:
+    assert (
+        classify_sniff_capture(capture_ok=False, signed_in=False) == "signed_out"
+    )
+
+
+def test_raw_dump_fallback_builds_records() -> None:
+    # Minimal Amazon-fulfilled claim (passes codeless filter).
+    raw_claim = {
+        "itemTitle": "Lake",
+        "itemId": "amzn1.pg.item.lake",
+        "orderId": "amzn1.pg.order.1",
+        "orderState": "FULFILLED",
+    }
+
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "amazon_web_raw.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "raw_claim_count": 1,
+                    "raw_claims": [raw_claim],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        fallback_claims = _read_raw_dump_claims(path=path)
+        assert fallback_claims == [raw_claim]
+
+        sniff_outcome = {"capture_ok": False, "signed_in": True}
+        kind = _web_outcome_kind_from_capture(
+            raw_claims=[],
+            outcome=sniff_outcome,
+            fallback_claims=fallback_claims,
+        )
+        assert kind == "raw_dump_fallback"
+
+        records = filter_codeless_claims(fallback_claims)
+        assert len(records) == 1
+        assert records[0]["name"] == "Lake"

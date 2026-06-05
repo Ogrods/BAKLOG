@@ -74,10 +74,6 @@ export function dismissLibraryWatch(watchId) {
   if (!hasArmedWatches()) stopWatchPoll();
 }
 
-function ensureWatch(watch) {
-  armLibraryWatch(watch);
-}
-
 function findInSteamCatalog(games, watch) {
   if (!Array.isArray(games)) return null;
   const ids = new Set(watch.appids || []);
@@ -217,9 +213,11 @@ function stopWatchPoll() {
   }
 }
 
-/** Boot: arm Pico Park watch (user request) and start polling if needed. */
+/** Boot: drop the legacy auto-armed Pico Park watch, then resume any user watches. */
 export function initLibraryWatches() {
-  ensureWatch(PICO_PARK_WATCH);
+  // Pico Park was auto-armed for a one-off request; clear it so the waiting
+  // banner no longer reappears on every boot.
+  dismissLibraryWatch(PICO_PARK_WATCH.id);
   renderWaitingBanner();
   checkLibraryWatches();
   scheduleWatchPoll();

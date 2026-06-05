@@ -9,9 +9,9 @@ import {
   isHiddenGem,
   coverFallbackFor,
   libraryCoverFor,
-  storeLetter,
   earlyAccessRibbonHtml,
 } from './game-core.js';
+import { storeLogoHtml } from './store-logos.js';
 import {
   getDealInfo,
   dealScore,
@@ -30,10 +30,9 @@ export function pickCardHtml(g) {
   const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - ";
   const h = hltbMain(g);
   const store = normalizeGame(g).store;
-  const badge = store === "gog" ? "G" : store === "psn" ? "P" : store === "epic" ? "E" : store === "amazon" ? "A" : store === "nintendo" ? "N" : store === "xbox" ? "X" : store === "battlenet" ? "B" : store === "ubisoft" ? "U" : store === "other" ? "?" : "S";
   return `
-    <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
-      <span class="pick-store store-badge ${store}">${badge}</span>
+    <div class="pick-card relative rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
+      <span class="pick-store">${storeLogoHtml(store, { size: 'sm' })}</span>
       <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
         <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
@@ -65,8 +64,8 @@ export function dealCardHtml(g) {
   const shop = d && d.shop ? d.shop : "";
   const wishlistTarget = g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam");
   return `
-    <div class="pick-card relative bg-slate-700/50 rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
-      <span class="pick-store store-badge ${wishlistTarget}" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLetter(wishlistTarget)}</span>
+    <div class="pick-card relative rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
+      <span class="pick-store" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLogoHtml(wishlistTarget, { size: 'sm' })}</span>
       <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
         <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}

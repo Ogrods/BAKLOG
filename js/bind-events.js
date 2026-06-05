@@ -461,21 +461,6 @@ export function bindEvents() {
       applyPrefsChange({ prefs: patch }, { renderers: [syncDealFilterControls] });
       return;
     }
-    if (e.target.closest(".summary-wishlist-reset")) {
-      applyPrefsChange(
-        {
-          prefs: {
-            dealOnSaleOnly: false,
-            dealHistoricalLowOnly: false,
-            dealHideOwned: false,
-            wishlistStoreFilter: "",
-          },
-          sessionPrefs: { statusFilter: "" },
-        },
-        { renderers: [syncDealFilterControls, renderWishlistStoreChips] },
-      );
-      return;
-    }
     const chip = e.target.closest(".summary-jump-chip");
     if (!chip) return;
     const view = chip.dataset.jumpView;
@@ -701,6 +686,9 @@ export function bindEvents() {
     fetcherRunner.showFetcherPopover();
   });
   document.getElementById("fetcherGlobalStatus")?.addEventListener("click", toggleFetcherPopover);
+  document.getElementById("fetcherStatLayoutToggle")?.addEventListener("click", () => {
+    fetcherRunner.cycleStatLayout();
+  });
   kebabMenu.querySelectorAll("button, label").forEach(el => {
     el.addEventListener("click", () => kebabMenu.classList.remove("open"));
   });

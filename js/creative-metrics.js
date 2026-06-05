@@ -93,6 +93,9 @@ export function computeCreativeMetrics(games, snap) {
     shelfTime: null,
     timeCapsule: null,
     dollarsUnplayed: null,
+    totalMsrp: null,
+    pricedRows: null,
+    avgMsrp: null,
     whale: null,
     cheapestThrill: null,
     freePile: null,
@@ -222,6 +225,25 @@ export function computeCreativeMetrics(games, snap) {
     }
   }
   if (msrpSum > 0) out.dollarsUnplayed = msrpSum;
+
+  // Total library MSRP — sum of every row's regular price (display currency),
+  // counting only rows that actually have a comparable price. This iterates the
+  // same deduped list the dashboard renders, so it stays accurate to the rows.
+  let libraryMsrpSum = 0;
+  let pricedRows = 0;
+  for (const g of list) {
+    const reg = getDealInfo(g)?.regular;
+    if (reg != null && reg > 0) {
+      libraryMsrpSum += reg;
+      pricedRows++;
+    }
+  }
+  if (libraryMsrpSum > 0) out.totalMsrp = libraryMsrpSum;
+  if (pricedRows > 0) {
+    out.pricedRows = pricedRows;
+    out.avgMsrp = libraryMsrpSum / pricedRows;
+  }
+
   if (whaleGame) out.whale = { name: whaleGame.name, price: whalePrice };
   if (cheapGame) out.cheapestThrill = { name: cheapGame.name, price: cheapPrice, rating: cheapRating };
   if (freeCount > 0) out.freePile = freeCount;
@@ -506,6 +528,15 @@ export function appendCreativeMarqueeChips(push, games, snap, W = {}) {
   }
   if (m.dollarsUnplayed != null) {
     push('#', 'is-violet', formatDollar(m.dollarsUnplayed), 'MSRP sitting unplayed', null, { weight: friendly });
+  }
+  if (m.totalMsrp != null) {
+    push('#', 'is-violet', formatDollar(m.totalMsrp), 'total MSRP value', null, { weight: friendly });
+  }
+  if (m.pricedRows != null) {
+    push('#', 'is-violet', formatNum(m.pricedRows), 'priced library rows', null, { weight: friendly });
+  }
+  if (m.avgMsrp != null) {
+    push('#', 'is-violet', formatDollar(m.avgMsrp), 'avg MSRP per game', null, { weight: friendly });
   }
   if (m.cheapestThrill) {
     push('>', '', `${m.cheapestThrill.name} · ${formatDollar(m.cheapestThrill.price)} · ${m.cheapestThrill.rating}%`, 'cheapest thrill', null, { weight: friendly });

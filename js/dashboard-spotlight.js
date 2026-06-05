@@ -449,7 +449,7 @@ const SPOTLIGHT_STATUS_LABEL = {
 };
 
 function spotlightJumpDest(g) {
-  return g.store === 'wishlist' ? 'wishlist' : g.store === 'itch' ? 'itch.io' : 'library';
+  return g.store === 'wishlist' ? 'Wishlist' : g.store === 'itch' ? 'itch.io' : 'Library';
 }
 
 export function spotlightInnerHtml(g) {
@@ -510,12 +510,15 @@ export function primeSpotlightArt(btn) {
 
 function applySpotlightSlide(el, next) {
   el.classList.remove('has-portrait-art');
+  el.classList.remove('is-tilting');
+  el._spotlightTiltReset?.();
   el.innerHTML = spotlightInnerHtml(next);
   el.dataset.key = gameKey(next);
   el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
   el.classList.remove('is-fading');
   primeSpotlightArt(el);
   _spotlightCurrentKey = gameKey(next);
+  el._spotlightSyncHover?.();
 }
 
 function fadeToSpotlight(el, next) {
@@ -553,6 +556,174 @@ function wireSpotlightHover(el) {
   el.addEventListener('mouseenter', () => { paused = true; });
   el.addEventListener('mouseleave', () => { paused = false; });
   el._spotlightPaused = () => paused;
+
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const MAX_YAW = 12;
+  const MAX_PITCH = 7;
+  const HOVER_SCALE = 1.03;
+  const EASE = 0.14;
+  const BG_BASE_SCALE = 1.08;
+
+  const portraitArt = () =>
+    (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-art') : null);
+  const portraitBg = () =>
+    (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-art-bg') : null);
+  const portraitSheen = () =>
+    (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-sheen') : null);
+
+  let hovering = false;
+  let rafId = null;
+  let lastPointer = null;
+  // sx = gleam position across the art (0..1); op = gleam opacity factor (0..1).
+  const cur = { rx: 0, ry: 0, sc: 1, sx: 0.5, op: 0 };
+  const target = { rx: 0, ry: 0, sc: 1, sx: 0.5, op: 0 };
+
+  const writeTransform = (art) => {
+    art.style.transform =
+      `perspective(900px) rotateY(${cur.ry.toFixed(2)}deg) ` +
+      `rotateX(${cur.rx.toFixed(2)}deg) scale(${cur.sc.toFixed(4)}) translateZ(0)`;
+    const bg = portraitBg();
+    if (bg) {
+      bg.style.transform = `scale(${(BG_BASE_SCALE * cur.sc).toFixed(4)}) translateZ(0)`;
+    }
+    // The sheen ::before reads these via CSS: left tracks the cursor and the
+    // opacity factor fades the gleam in/out (see .is-tilting sheen rule).
+    el.style.setProperty('--sheen-x', `${(cur.sx * 100).toFixed(2)}%`);
+    el.style.setProperty('--sheen-op', cur.op.toFixed(3));
+  };
+
+  const clearPortraitTransforms = () => {
+    const art = portraitArt();
+    const bg = portraitBg();
+    if (art) art.style.transform = '';
+    if (bg) bg.style.transform = '';
+    el.style.removeProperty('--sheen-x');
+    el.style.removeProperty('--sheen-op');
+  };
+
+  const frame = () => {
+    const art = portraitArt();
+    if (!art) {
+      rafId = null;
+      clearPortraitTransforms();
+      el.classList.remove('is-tilting');
+      return;
+    }
+    cur.rx += (target.rx - cur.rx) * EASE;
+    cur.ry += (target.ry - cur.ry) * EASE;
+    cur.sc += (target.sc - cur.sc) * EASE;
+    cur.sx += (target.sx - cur.sx) * EASE;
+    cur.op += (target.op - cur.op) * EASE;
+    writeTransform(art);
+    const settled =
+      Math.abs(target.rx - cur.rx) < 0.02 &&
+      Math.abs(target.ry - cur.ry) < 0.02 &&
+      Math.abs(target.sc - cur.sc) < 0.0008 &&
+      Math.abs(target.sx - cur.sx) < 0.005 &&
+      Math.abs(target.op - cur.op) < 0.01;
+    if (!hovering && settled) {
+      cur.rx = 0;
+      cur.ry = 0;
+      cur.sc = 1;
+      cur.sx = 0.5;
+      cur.op = 0;
+      clearPortraitTransforms();
+      el.classList.remove('is-tilting');
+      rafId = null;
+      return;
+    }
+    rafId = requestAnimationFrame(frame);
+  };
+  const startLoop = () => {
+    if (rafId == null) rafId = requestAnimationFrame(frame);
+  };
+
+  const updateTiltFromClient = (clientX, clientY) => {
+    const art = portraitArt();
+    if (!art) return;
+    const r = art.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const px = Math.max(-0.5, Math.min(0.5, (clientX - r.left) / r.width - 0.5));
+    const py = Math.max(-0.5, Math.min(0.5, (clientY - r.top) / r.height - 0.5));
+    target.ry = px * MAX_YAW;
+    target.rx = -py * MAX_PITCH;
+    // Track the gleam against the visible art (the sheen strip), not the full
+    // card, so the highlight sits under the cursor over the portrait.
+    const sheen = portraitSheen();
+    const sr = sheen?.getBoundingClientRect();
+    if (sr && sr.width) {
+      target.sx = Math.max(0, Math.min(1, (clientX - sr.left) / sr.width));
+    } else {
+      target.sx = px + 0.5;
+    }
+  };
+
+  const endTilt = () => {
+    hovering = false;
+    target.rx = 0;
+    target.ry = 0;
+    target.sc = 1;
+    target.op = 0;
+    startLoop();
+  };
+
+  el._spotlightSyncHover = () => {
+    if (reduceMotion?.matches) return;
+    if (!el.matches(':hover')) {
+      endTilt();
+      return;
+    }
+    if (!portraitArt()) {
+      endTilt();
+      return;
+    }
+    hovering = true;
+    target.sc = HOVER_SCALE;
+    target.op = 1;
+    el.classList.add('is-tilting');
+    if (lastPointer) {
+      updateTiltFromClient(lastPointer.x, lastPointer.y);
+      // Snap the gleam to the cursor on entry; the opacity fade-in hides the jump.
+      cur.sx = target.sx;
+    }
+    startLoop();
+  };
+
+  el.addEventListener('pointerenter', (e) => {
+    if (e.pointerType === 'touch' || reduceMotion?.matches) return;
+    lastPointer = { x: e.clientX, y: e.clientY };
+    el._spotlightSyncHover();
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch' || reduceMotion?.matches) return;
+    lastPointer = { x: e.clientX, y: e.clientY };
+    if (!hovering) return;
+    updateTiltFromClient(e.clientX, e.clientY);
+    startLoop();
+  });
+
+  el.addEventListener('pointerleave', endTilt);
+  el.addEventListener('pointercancel', endTilt);
+
+  el._spotlightTiltReset = () => {
+    hovering = false;
+    if (rafId != null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    cur.rx = 0;
+    cur.ry = 0;
+    cur.sc = 1;
+    cur.sx = 0.5;
+    cur.op = 0;
+    target.rx = 0;
+    target.ry = 0;
+    target.sc = 1;
+    target.sx = 0.5;
+    target.op = 0;
+    clearPortraitTransforms();
+  };
 
   el.addEventListener('click', (e) => {
     const nav = e.target.closest('[data-spotlight-nav]');

@@ -658,10 +658,7 @@ export function renderSummary() {
     const onSaleActive = !!state.prefs.dealOnSaleOnly;
     const lowOnlyActive = !!state.prefs.dealHistoricalLowOnly;
     const hideOwnedActive = !!state.prefs.dealHideOwned;
-    const wishlistFiltersDirty = onSaleActive || lowOnlyActive || hideOwnedActive
-      || !!state.prefs.wishlistStoreFilter
-      || !!state.sessionPrefs?.statusFilter;
-    const resetChip = `<button type="button" class="summary-wishlist-reset px-3 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-xs cursor-pointer border border-slate-700${wishlistFiltersDirty ? " text-slate-200" : " text-slate-400 cursor-default"}" title="${wishlistFiltersDirty ? "Clear all wishlist filters" : "All wishlist entries"}"><span>Wishlist</span> <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="wishlist">${wl.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</button>`;
+    const resetChip = `<div class="summary-stat-chip" data-stat="wishlist" title="All wishlist entries"><span>Wishlist</span> <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="wishlist">${wl.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>`;
     const onSaleChip = `<button type="button" class="summary-deal-chip${onSaleActive ? " active" : ""}" data-wishlist-deal-filter="onSale" title="${onSaleActive ? "Clear: show only on-sale wishlist items" : "Show only on-sale wishlist items"}">On sale <span class="text-emerald-200 font-semibold ml-1">${onSale.length}</span></button>`;
     const lowChip = lows.length
       ? `<button type="button" class="summary-deal-chip historical${lowOnlyActive ? " active" : ""}" data-wishlist-deal-filter="historicalLow" title="${lowOnlyActive ? "Clear: show only historical lows" : "Show only historical lows"}">Historical low <span class="text-amber-300 font-semibold ml-1">${lows.length}</span></button>`
@@ -671,16 +668,16 @@ export function renderSummary() {
       : "";
     const statusChips = renderStatusChipsHtml(wl, WISHLIST_STATUS_CHIP_DEFS);
     const sourcesChip = sourceSet.size
-      ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs" title="Wishlist sources: ${escapeAttr(sourcesList)}">Sources <span class="text-slate-100 font-semibold ml-1">${sourceSet.size}</span></div>`
+      ? `<div class="summary-stat-chip" data-stat="sources" title="Wishlist sources: ${escapeAttr(sourcesList)}">Sources <span class="text-slate-100 font-semibold ml-1">${sourceSet.size}</span></div>`
       : "";
     el.innerHTML = `
       <div class="w-full flex flex-wrap gap-2">
         ${resetChip}
         ${sourcesChip}
+        ${avgDisc != null ? `<div class="summary-stat-chip" data-stat="avg-discount">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
+        ${avgPrice != null ? `<div class="summary-stat-chip" data-stat="avg-price">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
         ${onSaleChip}
         ${lowChip}
-        ${avgDisc != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
-        ${avgPrice != null ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
         ${ownedChip}
       </div>
       ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
@@ -703,19 +700,16 @@ export function renderSummary() {
     const statusChips = renderStatusChipsHtml(itchScope);
     el.innerHTML = `
       <div class="w-full flex flex-wrap gap-2">
-        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">itch.io <span class="text-slate-100 font-semibold ml-1">${countLabel}</span></div>
-        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
-        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
-        <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
-        ${fetched ? `<div class="px-3 py-2 rounded-full bg-slate-800 text-xs text-slate-400">Fetched ${escapeHtml(fetched)}</div>` : ""}
+        <div class="summary-stat-chip summary-stat-chip--itch">itch.io <span class="text-slate-100 font-semibold ml-1">${countLabel}</span></div>
+        <div class="summary-stat-chip summary-stat-chip--itch">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
+        <div class="summary-stat-chip summary-stat-chip--itch">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
+        <div class="summary-stat-chip summary-stat-chip--itch">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
+        ${fetched ? `<div class="summary-stat-chip summary-stat-chip--itch text-slate-400">Fetched ${escapeHtml(fetched)}</div>` : ""}
       </div>
       ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
     return;
   }
   const visible = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
-  const backlog = visible.filter(g => getPersonal(g).status === "backlog");
-  const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
-  const played = visible.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
   const storeLabels = {
     steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic",
     amazon: "Amazon", xbox: "Xbox", battlenet: "Battle.net",
@@ -728,9 +722,8 @@ export function renderSummary() {
       count: k === "itch" ? state.itchGames.filter(itchIsGame).length : state.allGames.filter(g => normalizeGame(g).store === k).length,
     }))
     .sort((a, b) => b.count - a.count);
-  const rated = visible.filter(g => ratingValue(g) > 0);
-  const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : " - ";
   const hiddenCount = state.allGames.length - visible.length;
+  const sourceCount = storeCounts.filter(s => s.count > 0).length;
   const activeStore = state.prefs.storeFilter || "";
   const storeChips = storeCounts
     .map(s => {
@@ -739,7 +732,7 @@ export function renderSummary() {
         const titleText = itchTotal !== s.count
           ? `Open itch.io library tab (${s.count} games of ${itchTotal} total keys)`
           : "Open itch.io library tab";
-        return `<button type="button" class="summary-jump-chip px-3 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-xs cursor-pointer border border-slate-700" data-jump-view="itch" title="${titleText}">${s.label} <span class="text-slate-100 font-semibold ml-1">${s.count}</span> <span class="text-slate-400 ml-0.5">→</span></button>`;
+        return `<button type="button" class="summary-jump-chip px-3 py-2 rounded-full text-xs cursor-pointer" data-jump-view="itch" title="${titleText}">${s.label} <span class="font-semibold ml-1">${s.count}</span> <span class="ml-0.5 opacity-60">→</span></button>`;
       }
       if (s.count === 0) return "";
       const isActive = activeStore === s.key;
@@ -750,11 +743,9 @@ export function renderSummary() {
   const statusChips = renderStatusChipsHtml(visible);
   el.innerHTML = `
     <div class="w-full flex flex-wrap gap-2">
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
+      <div class="summary-stat-chip" data-stat="games">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
+      <div class="summary-stat-chip" data-stat="sources" title="Stores with games in your library">Sources <span class="text-slate-100 font-semibold ml-1">${sourceCount}</span></div>
       ${storeChips}
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Played <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(played))}h</span></div>
-      <div class="px-3 py-2 rounded-full bg-slate-800 text-xs">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
     </div>
     ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
 }

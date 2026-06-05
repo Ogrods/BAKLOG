@@ -101,7 +101,7 @@ export function renderDashboardCoopSpotlight(games) {
       ? picks.map(g => {
           const cover = libraryCoverFor(g);
           const key = gameKey(g);
-          return `<button type="button" class="coop-pick-row" data-action="coop-pick-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library">
+          return `<button type="button" class="coop-pick-row" data-action="coop-pick-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in Library">
             <img class="coop-pick-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
             <span class="coop-pick-name-wrap"><span class="coop-pick-name">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span>
             <span class="coop-pick-rating">${ratingValue(g)}%</span>
@@ -216,7 +216,7 @@ export function renderDashboardPicksVersus(games) {
     const key = gameKey(g);
     const isCross = crossKeys.has(key);
     const star = isCross ? ' <span class="dash-versus-star" title="Also in the other list">*</span>' : "";
-    return `<button type="button" class="dash-list-row dash-versus-row ${accentCls}${isCross ? " is-cross" : ""}" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}${star}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400">${escapeHtml(scoreFn(g))}</span></button>`;
+    return `<button type="button" class="dash-list-row dash-versus-row ${accentCls}${isCross ? " is-cross" : ""}" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in Library"><img class="dash-list-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" /><span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}${star}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400">${escapeHtml(scoreFn(g))}</span></button>`;
   };
 
   const empty = '<p class="text-xs text-slate-400 italic">No matches yet.</p>';
@@ -279,7 +279,7 @@ export function renderDashboardRecentAdditions(games) {
     const coverHtml = cover
       ? `<img class="dash-list-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />`
       : `<div class="dash-list-cover placeholder" title="${escapeAttr(g.name)}"><span class="placeholder-initials">${escapeHtml(initialsFor(g.name))}</span></div>`;
-    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in the library">${coverHtml}<span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
+    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in Library">${coverHtml}<span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
   }).join('');
 }
 
@@ -551,6 +551,6 @@ export function renderDashboardItchRecap() {
     ${classHtml}
     ${genreHtml}
     <div class="itch-footer">
-      <button type="button" class="summary-jump-chip px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs border border-slate-600 cursor-pointer" data-jump-view="itch">Open itch.io tab →</button>
+      <button type="button" class="summary-jump-chip px-2 py-1 rounded text-xs cursor-pointer" data-jump-view="itch">Open itch.io tab →</button>
     </div>`;
 }

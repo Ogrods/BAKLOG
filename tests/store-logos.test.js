@@ -13,34 +13,47 @@ describe('storeLetter', () => {
   });
 });
 
+// Stores that render an SVG glyph badge (have a brand logo asset). Everything
+// else falls back to a letter badge.
+const GLYPH_STORES = new Set([
+  'steam', 'epic', 'gog', 'humble', 'psn', 'xbox',
+  'nintendo', 'amazon', 'itch', 'battlenet', 'ubisoft', 'ea',
+]);
+
 describe('storeLogoHtml', () => {
-  it('renders letter badge for known stores', () => {
+  it('renders an SVG glyph badge for known stores', () => {
     const html = storeLogoHtml('steam', { size: 'md' });
     expect(html).toContain('store-badge steam');
     expect(html).toContain('store-badge--md');
-    expect(html).toContain('>S<');
-    expect(html).not.toContain('store-logo--glyph');
+    expect(html).toContain('store-badge--glyph');
+    expect(html).toContain("--store-badge-glyph:url('assets/store-logos/steam.svg')");
+    expect(html).not.toContain('>S<');
     expect(html).toContain('aria-label="Steam"');
   });
 
   it('renders letter fallback for manual/other', () => {
     const html = storeLogoHtml('manual', { size: 'sm' });
     expect(html).toContain('store-badge manual');
+    expect(html).not.toContain('store-badge--glyph');
     expect(html).toContain('>M<');
     expect(html).toContain('aria-label=');
   });
 
-  it('uses canonical letters for itch, humble, and EA', () => {
-    expect(storeLogoHtml('itch', { size: 'sm' })).toContain('>I<');
-    expect(storeLogoHtml('humble', { size: 'sm' })).toContain('>H<');
-    expect(storeLogoHtml('ea', { size: 'sm' })).toContain('>EA<');
+  it('renders glyphs for itch, humble, and EA', () => {
+    expect(storeLogoHtml('itch', { size: 'sm' })).toContain("--store-badge-glyph:url('assets/store-logos/itch.svg')");
+    expect(storeLogoHtml('humble', { size: 'sm' })).toContain("--store-badge-glyph:url('assets/store-logos/humble-h.svg')");
+    expect(storeLogoHtml('ea', { size: 'sm' })).toContain("--store-badge-glyph:url('assets/store-logos/ea.svg')");
   });
 
   it('covers every codified store key', () => {
     for (const key of Object.keys(STORE_BADGE_LETTERS)) {
       const html = storeLogoHtml(key, { size: 'sm' });
       expect(html).toContain(`store-badge ${key}`);
-      expect(html).toContain(`>${STORE_BADGE_LETTERS[key]}<`);
+      if (GLYPH_STORES.has(key)) {
+        expect(html).toContain('store-badge--glyph');
+      } else {
+        expect(html).toContain(`>${STORE_BADGE_LETTERS[key]}<`);
+      }
     }
   });
 });

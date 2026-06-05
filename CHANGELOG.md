@@ -22,6 +22,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- **`.gitignore` store JSON globs** — `games_*.json` and `games_wishlist_*.json` replace per-file enumeration so Humble, EA, and Nintendo-wishlist catalog files (and future stores) cannot be committed accidentally.
+- **`gameId()` EA drift** — `js/game-core.js` now includes the `ea_id` fallback (aligned with `normalizeGame()` and the table-query worker).
+- **Landing CSP** — waitlist handler moved to `landing/main.js`; JSON-LD externalized to `landing/structured-data.json`; Google Fonts load via `id="google-fonts"` (no inline script). Demo spotlight nav uses sibling buttons (no nested interactive controls).
+- **Subscribe email sanitization** — `landing/api/subscribe.js` strips control characters before Resend `reply_to`.
+- **`/api/runs/cancel?force=1` routing** — `server.py` matches the path without query string so force-reset works when auth is on.
+
 ### Changed
 
 - **Connections status pills (3 states)** — scrapped the client-side "Connecting…" animation. Pills now show only **Connected**, **Unverified**, or **Not connected** from server truth (`displayStatus()`); `expired` still drives Reconnect chip/banner but displays as "Not connected" on the card. Post-connect speed uses Epic callback `BroadcastChannel` + a 30s time-boxed fast poll (no fake in-flight state).

@@ -153,7 +153,6 @@ function fireWatchAlert(watch, game) {
   const name = game?.name || watch.name;
   postDesktopNotification('BAKLOG - game added', `${name} is now in your Steam library.`);
   showFoundBanner(watch, game);
-  console.info(`[library-watch] ${name} detected in Steam catalog`);
 }
 
 /**

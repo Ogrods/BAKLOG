@@ -9,10 +9,12 @@ import pytest
 
 import server
 from fetchers.registry import (
+    AUTH_PROVIDER_BY_KEY,
     ENRICH_FETCHER_KEYS,
     LIBRARY_JSON_BY_KEY,
     MANIFEST_PATH,
     WISHLIST_JSON_BY_KEY,
+    WISHLIST_META_KEY_BY_FETCHER,
     validate_manifest,
 )
 
@@ -164,3 +166,27 @@ def test_registry_validate_manifest() -> None:
 
 def test_server_fetchers_match_manifest() -> None:
     assert set(server.FETCHERS.keys()) == {e["key"] for e in ENTRIES}
+
+
+def _parse_js_const_object(name: str, text: str) -> dict:
+    pattern = rf"export const {name} = (\{{[\s\S]*?\}});\n"
+    match = re.search(pattern, text)
+    assert match, f"missing export const {name} in fetcher-registry.js"
+    return json.loads(match.group(1))
+
+
+def _parse_js_const_set(name: str, text: str) -> set[str]:
+    pattern = rf"export const {name} = new Set\((\[.*?\])\);"
+    match = re.search(pattern, text)
+    assert match, f"missing export const {name} in fetcher-registry.js"
+    return set(json.loads(match.group(1)))
+
+
+def test_committed_fetcher_registry_js_matches_python() -> None:
+    """Committed js/fetcher-registry.js must match fetchers/registry.py maps."""
+    js_text = (ROOT / "js" / "fetcher-registry.js").read_text(encoding="utf-8")
+    assert _parse_js_const_object("LIBRARY_STORE_JSON", js_text) == LIBRARY_JSON_BY_KEY
+    assert _parse_js_const_object("WISHLIST_FETCHER_JSON", js_text) == WISHLIST_JSON_BY_KEY
+    assert _parse_js_const_object("WISHLIST_FETCHER_META_KEY", js_text) == WISHLIST_META_KEY_BY_FETCHER
+    assert _parse_js_const_set("ENRICH_FETCHER_KEYS", js_text) == set(ENRICH_FETCHER_KEYS)
+    assert _parse_js_const_object("FETCHER_AUTH_PROVIDER", js_text) == AUTH_PROVIDER_BY_KEY

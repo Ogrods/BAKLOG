@@ -35,7 +35,7 @@
       ]
     },
     {
-      "source": "/(main|demo)\\.js",
+      "source": "/(main|demo)\\.js|demo\\.css|structured-data\\.json",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]

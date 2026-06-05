@@ -160,6 +160,7 @@ describe('normalizeGame', () => {
     expect(normalizeGame({ store: 'gog', gog_id: 'g1', name: 'X' }).id).toBe('g1');
     expect(normalizeGame({ store: 'psn', psn_id: 'C1', name: 'X' }).id).toBe('C1');
     expect(normalizeGame({ store: 'epic', epic_catalog_id: 'e1', name: 'X' }).id).toBe('e1');
+    expect(normalizeGame({ store: 'ea', ea_id: 'ea-42', name: 'X' }).id).toBe('ea-42');
   });
 });
 
@@ -170,6 +171,10 @@ describe('gameKey', () => {
 
   it('falls back through alternative id fields', () => {
     expect(gameKey({ appid: 1 })).toBe('steam:1');
+  });
+
+  it('uses ea_id when that is the only identifier (matches normalizeGame + worker)', () => {
+    expect(gameKey({ store: 'ea', ea_id: 'ea-42', name: 'FIFA' })).toBe('ea:ea-42');
   });
 });
 

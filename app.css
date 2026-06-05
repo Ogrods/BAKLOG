@@ -676,6 +676,10 @@ button[disabled] { cursor: not-allowed; }
   border-color: var(--accent-muted, var(--accent));
   color: var(--text);
 }
+.pick-tab[data-tab="wishlistDeals"]:hover { cursor: default; }
+/* "Picks" is a static heading, not interactive — keep the default arrow cursor
+   instead of the text I-beam. */
+#picksSection h2 { cursor: default; }
 .picks-limit-btn { transition: background 0.12s ease, color 0.12s ease; }
 .picks-limit-btn:not(.active):hover {
   background: var(--bg-hover);
@@ -761,7 +765,23 @@ button[disabled] { cursor: not-allowed; }
   pointer-events: none;
 }
 .pick-card .cover-wrap.landscape::before {
-  background: color-mix(in srgb, var(--accent) 22%, var(--bg));
+  /* Flat tint as fallback; a blurred, dimmed copy of the cover art fills in
+     once markLandscape sets --cover-blur-img (js/covers.js). scale() hides the
+     soft blurred edges (clipped by .cover-wrap overflow:hidden). */
+  background-color: color-mix(in srgb, var(--accent) 22%, var(--bg));
+  background-image: var(--cover-blur-img, none);
+  background-size: cover;
+  background-position: center;
+  filter: blur(16px) brightness(0.6) saturate(1.15);
+  transform: scale(1.25);
+}
+.deal-hero .cover-wrap.landscape::before {
+  background-color: color-mix(in srgb, var(--accent) 22%, var(--bg));
+  background-image: var(--cover-blur-img, none);
+  background-size: cover;
+  background-position: center;
+  filter: blur(16px) brightness(0.6) saturate(1.15);
+  transform: scale(1.25);
 }
 .pick-card .pick-cover.placeholder {
   background: color-mix(in srgb, var(--accent) 22%, var(--bg));
@@ -955,6 +975,10 @@ input[type="range"] {
   flex-shrink: 0;
 }
 .store-badge.steam { background: var(--brand-steam); color: #fff; }
+/* Steam's brand navy (--brand-steam #1b2838) blends into the default theme's
+   slate background - outline it like Epic so the glyph stays legible. Scoped to
+   the default theme only; other themes have enough contrast. */
+html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #64748b; }
 .store-badge.gog { background: var(--brand-gog); color: #fff; }
 .store-badge.psn { background: var(--brand-psn); color: #fff; }
 .store-badge.epic { background: var(--brand-epic); color: #fff; box-shadow: inset 0 0 0 1px #64748b; }
@@ -966,11 +990,26 @@ input[type="range"] {
 .store-badge.other { background: #475569; color: #f1f5f9; }
 .store-badge.itch { background: var(--brand-itch); color: #fff; }
 .store-badge.humble { background: var(--brand-humble); color: #fff; }
-.store-badge.ea { background: var(--brand-ea); color: #fff; font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
+.store-badge.ea { background: var(--brand-ea); color: #fff; }
+/* "EA" is two letters, so the letter badge needs extra width/smaller type.
+   The glyph badge is square like the rest, so scope these to the letter case. */
+.store-badge.ea:not(.store-badge--glyph) { font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
 .store-badge.itad { background: #22d3ee; color: #06303a; }
 .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
 .store-badge--md { height: 22px; min-width: 22px; font-size: 12px; border-radius: 5px; padding: 0 6px; }
 .store-badge--lg { height: 24px; min-width: 24px; font-size: 13px; border-radius: 6px; padding: 0 8px; }
+/* SVG logo badges (js/store-logos.js storeLogoHtml). The mask glyph is painted
+   with currentColor so each store's text color (e.g. Amazon's dark ink) carries
+   over, and flex centering on .store-badge handles alignment perfectly. */
+.store-badge--glyph { padding: 0; }
+.store-badge-glyph {
+  display: block;
+  width: 68%;
+  height: 68%;
+  background: currentColor;
+  -webkit-mask: var(--store-badge-glyph) center / contain no-repeat;
+          mask: var(--store-badge-glyph) center / contain no-repeat;
+}
 
 /* Full SVG store glyphs (CSS mask) — dashboard hero strip only, js/store-logos.js */
 .store-logo {
@@ -1018,7 +1057,7 @@ input[type="range"] {
 .summary-store-chip-logo { display: inline-flex; align-items: center; }
 .summary-store-chip-label { line-height: 1; }
 .pick-store .store-badge { position: absolute; top: 6px; right: 6px; z-index: 2; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
-.dash-spotlight-meta .dash-spotlight-store { vertical-align: -3px; margin-right: 2px; }
+.dash-spotlight-meta .dash-spotlight-store { vertical-align: middle; margin-right: 2px; }
 .dash-hero-stores {
   margin-top: 10px;
   position: relative;
@@ -1421,6 +1460,18 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 #backToTop:hover, #backToTopCover:hover { opacity: 1; color: var(--accent); transform: translateY(-1px); }
 #backToTop:focus-visible, #backToTopCover:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: 2px; }
 #backToTop svg, #backToTopCover svg { width: 14px; height: 14px; }
+/* Subtle floating bob on the arrow (only while the button is shown). Lives on
+   the svg so it never fights the button's show/hover translateY transforms. */
+@keyframes backToTopBob {
+  0%, 100% { transform: translateY(1px); }
+  50% { transform: translateY(-1px); }
+}
+#backToTop.show svg, #backToTopCover.show svg {
+  animation: backToTopBob 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  #backToTop.show svg, #backToTopCover.show svg { animation: none; }
+}
 /* === Library summary chips: theme the Tailwind-utility count/stat chips === */
 #summary .bg-slate-800 { background: var(--bg-panel); }
 #summary .bg-slate-700 { background: var(--bg-elev); }
@@ -1436,7 +1487,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   line-height: 1rem;
@@ -1460,7 +1511,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 .status-chip[data-status-filter="__none__"] { --status-accent: #475569; }
 .summary-deal-chip {
   display: inline-flex; align-items: center; gap: 0.25rem;
-  padding: 0.45rem 0.85rem;
+  padding: 0.28rem 0.85rem;
   border-radius: 9999px;
   border: 1px solid rgba(16, 185, 129, 0.4);
   background: rgba(16, 185, 129, 0.12);
@@ -1495,7 +1546,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   line-height: 1rem;
@@ -1526,6 +1577,13 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 /* itch.io renders as a jump chip (links to its own tab) — give it the same
    brand-accent inset bar as the store chips. */
 .summary-jump-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  line-height: 1rem;
   box-shadow: inset 3px 0 0 var(--store-accent, #475569);
   background: var(--bg-elev);
   border: 1px solid var(--border);
@@ -1547,7 +1605,7 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   line-height: 1rem;
@@ -1569,7 +1627,10 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
    view-scoped below. */
 header.app-header {
   padding-top: 1rem;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+  /* Override the Tailwind mb-4 utility: with the slimmed summary chips, 1rem of
+     margin + the padding left an oversized gap under the chip row. */
+  margin-bottom: 0.5rem;
 }
 /* Dashboard-only sticky header: the dashboard hides #summary (and the toolbar/
    table), so the header is a stable single row here and pins cleanly. Other

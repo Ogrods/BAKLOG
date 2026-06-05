@@ -2,6 +2,11 @@
 // No database. Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+function sanitizeEmail(raw) {
+  if (typeof raw !== "string") return "";
+  return raw.replace(/[\x00-\x1f\x7f]/g, "").trim();
+}
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 5;
 
@@ -50,7 +55,7 @@ export default {
       body = {};
     }
 
-    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const email = sanitizeEmail(body.email);
     const website = typeof body.website === "string" ? body.website.trim() : "";
 
     // Honeypot: bots fill the hidden field. Pretend success, do nothing.

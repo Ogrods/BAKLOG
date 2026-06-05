@@ -1,0 +1,19 @@
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "BAKLOG",
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Windows, macOS, Linux",
+  "url": "https://baklog.app/",
+  "description": "BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, invite-only early access.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "BAKLOG",
+    "url": "https://baklog.app/"
+  }
+}

@@ -490,3 +490,36 @@ def test_cancel_all_scoped_to_active_profile(auth_server) -> None:
     cancelled_ids = {c.get("id") for c in cancelled}
     assert run_a.id in cancelled_ids
     assert run_b.id not in cancelled_ids
+
+
+def test_force_reset_scoped_to_active_profile(auth_server) -> None:
+    base, secret, _tmp = auth_server
+    uid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    uid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    account_profiles.ensure_profile_for_user(uid_a, "a@test.com")
+    account_profiles.ensure_profile_for_user(uid_b, "b@test.com")
+    key = next(iter(server.FETCHERS))
+    run_a = server.Run(key, profile_id=uid_a)
+    run_b = server.Run(key, profile_id=uid_b)
+    with server.MANAGER._lock:
+        server.MANAGER._runs_by_id[run_a.id] = run_a
+        server.MANAGER._runs_by_id[run_b.id] = run_b
+        run_a.status = "running"
+        run_b.status = "running"
+        server.MANAGER._pending.extend([run_a, run_b])
+        server.MANAGER._active = run_a
+    status, raw = _request(
+        base,
+        "/api/runs/cancel?force=1",
+        method="POST",
+        auth=_bearer(secret, sub=uid_a),
+        headers={"Content-Type": "application/json"},
+        body=b"{}",
+    )
+    assert status == 200
+    payload = json.loads(raw.decode("utf-8"))
+    assert payload.get("force") is True
+    cancelled = payload.get("cancelled") or []
+    cancelled_ids = {c.get("id") for c in cancelled}
+    assert run_a.id in cancelled_ids
+    assert run_b.id not in cancelled_ids

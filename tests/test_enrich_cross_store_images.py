@@ -10,7 +10,6 @@ import pytest
 
 import enrich_cross_store_images as enrich
 
-
 ARMATUS_ROW = {
     "store": "wishlist",
     "wishlist_store": "xbox",

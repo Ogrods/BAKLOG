@@ -15,8 +15,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -455,7 +453,15 @@ def main() -> int:
     if args.command in ("status", "all") and ping_server():
         code = max(code, cmd_status(run))
     if args.command in ("fetch", "all") and ping_server():
-        code = max(code, cmd_fetch(run, provider=args.provider, launch_connect=args.launch_connect, wait_connect=args.wait_connect))
+        code = max(
+            code,
+            cmd_fetch(
+                run,
+                provider=args.provider,
+                launch_connect=args.launch_connect,
+                wait_connect=args.wait_connect,
+            ),
+        )
 
     save_results(run)
     return code

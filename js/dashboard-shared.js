@@ -70,7 +70,7 @@ export const DASH_STORE_LABELS = {
   itch: "itch.io", other: "Other", manual: "Manual",
 };
 
-/** Canonical storefront display order (bizcard watermark sequence in tracker.html). */
+/** Canonical storefront display order (business-card watermark sequence). */
 export const STORE_DISPLAY_ORDER = [
   'steam', 'epic', 'gog', 'humble', 'itch', 'psn', 'xbox',
   'nintendo', 'amazon', 'battlenet', 'ubisoft', 'ea',

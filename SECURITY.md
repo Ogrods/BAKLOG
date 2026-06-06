@@ -8,8 +8,8 @@ claims. For the plain-language data inventory and network-host list, see
 
 **Optional invite-only accounts:** When `BAKLOG_SUPABASE_*` is set, Supabase
 hosts login only (email + JWT). Your library and Connections secrets still live
-under `profiles/<user-id>/` on the machine running `server.py`. See
-[docs/SUPABASE_AUTH.md](docs/SUPABASE_AUTH.md).
+under `profiles/<user-id>/` on the machine running `server.py`. Configure
+`BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`).
 
 Last updated: 2026-06-03.
 

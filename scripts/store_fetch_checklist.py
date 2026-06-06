@@ -55,7 +55,7 @@ def main() -> int:
             key = f.get("key", "?")
             label = f.get("label", key)
             print(f"  [ ] {key:16} {label}")
-    print("\nFull workflow: docs/LIVE_FETCH_CHECKLIST.md")
+    print("\nRun each fetcher from the dashboard Fetcher health row or via python fetch_*.py")
     return 0
 
 

@@ -6,13 +6,15 @@
 
 import { state } from './state.js';
 import { escapeHtml } from './dom-util.js';
-import { profileScopedStorageKey } from './profiles.js';
+import { LS_LIBRARY_WATCH, profileScopedStorageKey } from './profiles.js';
 import { fetchLibraryJson } from './library-load.js';
 import { applyPrefsChange, switchView } from './filters-ui.js';
 import { syncFilterDomFromState } from './prefs.js';
 import { invalidateTableCache, renderTable } from './table-ui.js';
 
-const WATCH_LS_KEY = profileScopedStorageKey('baklog-library-watch');
+function watchLsKey() {
+  return profileScopedStorageKey(LS_LIBRARY_WATCH);
+}
 const POLL_MS = 5 * 60 * 1000;
 
 /** PICO PARK (2021) and Pico Park Classic — either counts. */
@@ -37,7 +39,7 @@ function loadDoc() {
 
 function saveDoc(watches) {
   try {
-    localStorage.setItem(WATCH_LS_KEY, JSON.stringify({ watches }));
+    localStorage.setItem(watchLsKey(), JSON.stringify({ watches }));
   } catch {
     /* storage full / private mode */
   }

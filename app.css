@@ -261,6 +261,7 @@ html[data-init-view="connections"] .view-tab[data-view="connections"] {
 /* === Overlay stack (z-index tokens) ===
    auth gate 200 > boot curtain 150 > view overlay 140 > alpha nav 35 > row pill 1 */
 :root {
+  --marquee-px-per-sec: 48;
   --overlay-z-auth: 200;
   --overlay-z-boot: 150;
   --overlay-z-view: 140;
@@ -2853,10 +2854,11 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
 }
 .dash-marquee-track {
+  --marquee-duration: 180s;
   display: inline-flex;
   gap: 28px;
   white-space: nowrap;
-  animation: dashMarquee 180s linear infinite;
+  animation: dashMarquee var(--marquee-duration) linear infinite;
   will-change: transform;
 }
 .dash-marquee:hover .dash-marquee-track { animation-play-state: paused; }
@@ -2909,6 +2911,7 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 .dash-ribbon-eyebrow {
   font-size: 10px;
@@ -2917,8 +2920,35 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   color: var(--accent);
   font-weight: 600;
 }
-.dash-ribbon-chart { position: relative; height: 180px; }
-.dash-ribbon-chart canvas { max-height: 180px; }
+.dash-ribbon-chart { position: relative; height: 180px; min-width: 0; }
+.dash-ribbon-chart canvas { max-height: 180px; max-width: 100%; }
+
+/* While the viewport is actively resizing (js toggles html.ui-resizing with a
+   ~200ms trailing debounce), drop the per-frame backdrop blurs and pause the
+   spotlight float/sheen so the mega hero resizes smoothly. Effects are restored
+   once resize settles; the translucent backplates remain, so there is no pop. */
+html.ui-resizing .dash-hero-pillar,
+html.ui-resizing .dash-spotlight-body,
+html.ui-resizing .dash-spotlight-nav {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
+html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
+  animation-play-state: paused;
+}
+/* Drop the spotlight's own filter/mask compositing during resize (log: backdrop
+   blur was already none but filter:blur(18px) on art-bg was still active). */
+html.ui-resizing .dash-spotlight-art,
+html.ui-resizing .dash-spotlight-art-bg {
+  filter: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+html.ui-resizing .dash-spotlight-sheen::before {
+  filter: none;
+  opacity: 0;
+}
 .dash-ribbon-headline {
   text-align: center;
   font-size: 13px;

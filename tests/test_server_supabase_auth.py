@@ -131,6 +131,36 @@ def test_config_public_without_auth(auth_server) -> None:
     assert status == 200
     assert data["authRequired"] is True
     assert data["supabaseAnonKey"] == "anon-test"
+    assert data.get("localProfiles") is False
+
+
+def test_local_profiles_coexist_with_auth(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+    base, secret, _tmp = auth_server
+    monkeypatch.setenv("BAKLOG_LOCAL_PROFILES", "1")
+    status, data = _get_json(base, "/api/config")
+    assert status == 200
+    assert data["localProfiles"] is True
+
+    status, data = _get_json(base, "/api/profiles", auth=_bearer(secret))
+    assert status == 200
+    assert isinstance(data.get("profiles"), list)
+    assert len(data["profiles"]) >= 1
+
+    body = json.dumps({"label": "Work"}).encode("utf-8")
+    import urllib.request
+
+    req = urllib.request.Request(
+        f"{base}/api/profiles",
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": _bearer(secret),
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        assert resp.status == 201
 
 
 def test_personal_requires_bearer(auth_server) -> None:

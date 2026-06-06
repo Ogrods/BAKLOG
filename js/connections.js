@@ -7,8 +7,35 @@ import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
 import { state } from './state.js';
 import { storeLogoHtml } from './store-logos.js';
 import { STORE_BRAND_COLORS } from './store-brand-colors.js';
+import { formatPlatformList } from './platform-labels.js';
 
 export { FETCHER_AUTH_PROVIDER };
+
+const LOCAL_PROVIDER_FOOTER = {
+  amazon: {
+    connected: 'Auto-detected from Amazon Games launcher',
+    disconnected: 'Launcher library hidden - Connect to use it again, or use Prime web',
+  },
+  gog_galaxy: {
+    connected: 'Auto-detected from GOG Galaxy on this PC',
+    disconnected: 'Galaxy library hidden - Connect to use it again, or use GOG (web)',
+  },
+  itch_local: {
+    connected: 'Auto-detected from the itch desktop app',
+    disconnected: 'Local itch library hidden - Connect to use it again, or use an API key',
+  },
+};
+
+/** Footer copy for local provider cards (exported for tests). */
+export function localProviderFooterCopy(providerKey, connected) {
+  const copy = LOCAL_PROVIDER_FOOTER[providerKey];
+  if (!copy) {
+    return connected
+      ? 'Auto-detected locally on this PC'
+      : 'Local source hidden - Connect to use it again';
+  }
+  return connected ? copy.connected : copy.disconnected;
+}
 
 let _connPopoverRelease = null;
 
@@ -255,7 +282,7 @@ function groupConnectNote(groupKey, members) {
   if (groupKey === 'gog') {
     const lead = anyConnected
       ? 'Ready to pull - Galaxy and/or web session detected.'
-      : 'Install GOG Galaxy on this PC, or connect GOG (web) below.';
+      : 'Connect GOG (web) below, or install GOG Galaxy on Windows/macOS (Linux: web only).';
     return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one GOG source. Run the GOG fetcher and BAKLOG reads the Galaxy database first when present (file scan, library only), then falls back to your gog.com cookie session (web sign-in - library and wishlist).</p></div>`;
   }
   if (groupKey === 'itch') {
@@ -461,27 +488,22 @@ function disconnectBtnHtml(p, st) {
 function buildCardFooter(p, st) {
 
   if (p.available === false) {
-
-    const plats = (p.platforms || []).join(', ') || 'Windows';
-
+    const plats = formatPlatformList(p.platforms);
     return `
-
       <div class="conn-card-footer">
-
         <span class="conn-local-label">${escapeHtml(`Available on ${plats} only`)}</span>
-
       </div>`;
-
   }
 
   if (p.kind === 'local') {
     const connected = st === 'connected';
+    const label = localProviderFooterCopy(p.key, connected);
     return `
       <div class="conn-card-footer">
         ${connected
-          ? `<span class="conn-local-label">Auto-detected from Amazon Games launcher</span>
+          ? `<span class="conn-local-label">${escapeHtml(label)}</span>
              <button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}" title="Disconnect ${escapeAttr(p.label)} (credentials removed locally)">Disconnect</button>`
-          : `<span class="conn-local-label">Launcher library hidden - Connect to use it again, or use Prime web</span>
+          : `<span class="conn-local-label">${escapeHtml(label)}</span>
              <button type="button" class="conn-primary" data-enable-local data-provider="${escapeAttr(p.key)}" title="Enable ${escapeAttr(p.label)} from local launcher data">Connect</button>`
         }
       </div>`;
@@ -650,7 +672,7 @@ function buildRailItemHtml(p, selected) {
   const unav = unavailable ? ' is-unavailable' : '';
 
   const title = unavailable
-    ? `${p.label} is available on ${(p.platforms || []).join(', ') || 'Windows'} only`
+    ? `${p.label} is available on ${formatPlatformList(p.platforms)} only`
     : `Select ${p.label} to connect or manage`;
 
   return `

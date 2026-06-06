@@ -23,6 +23,15 @@ from shared.install_paths import bundle_root
 def _profiles_root() -> Path:
     return _auth_dir() / "profiles"
 
+
+def _is_within(base: Path, candidate: Path) -> bool:
+    """True only if candidate resolves to a path inside base (blocks ../ escapes)."""
+    try:
+        candidate.resolve().relative_to(base.resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
 MAGIC = b"BAKLOGSB"
 BUNDLE_VERSION = 1
 INNER_FORMAT = 1
@@ -242,8 +251,15 @@ def _restore_profiles(profiles: dict[str, Any], *, dry_run: bool) -> tuple[list[
     bytes_written = 0
     if not isinstance(profiles, dict):
         return imported, bytes_written
+    root = _profiles_root()
     for provider, files in profiles.items():
         if not isinstance(provider, str) or not isinstance(files, dict) or not files:
+            continue
+        # Reject provider names that would escape the profiles root (path traversal).
+        if provider in ("", ".", "..") or "/" in provider or "\\" in provider or os.sep in provider:
+            continue
+        target = profile_dir(provider)
+        if not _is_within(root, target):
             continue
         imported.append(provider)
         if dry_run:
@@ -251,7 +267,6 @@ def _restore_profiles(profiles: dict[str, Any], *, dry_run: bool) -> tuple[list[
                 if isinstance(b64, str):
                     bytes_written += len(b64) * 3 // 4
             continue
-        target = profile_dir(provider)
         if target.exists():
             shutil.rmtree(target, ignore_errors=True)
         target.mkdir(parents=True, exist_ok=True)
@@ -259,6 +274,9 @@ def _restore_profiles(profiles: dict[str, Any], *, dry_run: bool) -> tuple[list[
             if not isinstance(rel, str) or not isinstance(b64, str):
                 continue
             out_path = target / rel
+            # Block ../ traversal inside the archive — keep writes under target.
+            if not _is_within(target, out_path):
+                continue
             out_path.parent.mkdir(parents=True, exist_ok=True)
             data = base64.b64decode(b64.encode("ascii"))
             _atomic_write_bytes(out_path, data)

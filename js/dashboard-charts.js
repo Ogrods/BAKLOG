@@ -89,6 +89,26 @@ function ensureChartObserver() {
   return chartLazyObserver;
 }
 
+/** Pause or resume Chart.js responsive resize on mega-hero ribbon donuts during
+ *  a window drag (log: 72 resize events/gesture still triggered chart relayout). */
+export function setRibbonChartsResponsive(enabled) {
+  let touched = 0;
+  for (const chart of Object.values(dashboardCharts)) {
+    if (!chart?.canvas?.closest('.dash-ribbon-chart')) continue;
+    touched++;
+    if (enabled) {
+      if (chart._resizeQuietSaved == null) continue;
+      chart.options.responsive = chart._resizeQuietSaved;
+      delete chart._resizeQuietSaved;
+      try { chart.resize(); } catch (_) { /* disposed */ }
+    } else if (chart.options.responsive) {
+      chart._resizeQuietSaved = chart.options.responsive;
+      chart.options.responsive = false;
+    }
+  }
+  return touched;
+}
+
 export function destroyDashboardCharts() {
   // Rotations (insight + spotlight) are deliberately NOT stopped here so an in-place
   // dashboard re-render doesn't reset the spotlight. Use stopDashboardRotations()
@@ -134,6 +154,9 @@ function dashChartOptions(extra = {}) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    // Debounce Chart.js resize so a continuous viewport drag coalesces into one
+    // re-layout after it settles (mirrors the landing demo donut precaution).
+    resizeDelay: 200,
     plugins: { legend: { labels: { color: "#ffffff", boxWidth: 12 } } },
     ...(reduced || extraAnimation != null ? {
       animation: reduced ? { duration: 0 } : extraAnimation,

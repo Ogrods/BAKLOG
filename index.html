@@ -719,6 +719,18 @@
           </div>
         </div>
         <div class="profile-modal-section">
+          <label for="profilePinNew" class="profile-modal-label">Profile PIN</label>
+          <p id="profilePinNote" class="profile-modal-note text-xs text-slate-400 mb-1">Optional — lock this profile so switching in requires a PIN.</p>
+          <div id="profilePinCurrentWrap" class="profile-modal-row hidden">
+            <input type="password" id="profilePinCurrent" class="profile-modal-field" placeholder="Current PIN" maxlength="32" autocomplete="current-password" />
+          </div>
+          <div class="profile-modal-row">
+            <input type="password" id="profilePinNew" class="profile-modal-field" placeholder="New PIN (4–32 chars)" maxlength="32" autocomplete="new-password" />
+            <button type="button" id="profilePinSave" class="profile-modal-btn profile-modal-btn-neutral">Save PIN</button>
+            <button type="button" id="profilePinClear" class="profile-modal-btn profile-modal-btn-danger hidden">Remove PIN</button>
+          </div>
+        </div>
+        <div class="profile-modal-section">
           <label for="profileDeleteSelect" class="profile-modal-label">Delete another profile</label>
           <div class="profile-modal-row">
             <select id="profileDeleteSelect" class="profile-modal-field"></select>

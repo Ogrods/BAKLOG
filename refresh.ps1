@@ -10,6 +10,7 @@ python fetch_battlenet.py --skip-hltb 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_ubisoft.py --skip-hltb 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_nintendo.py --skip-hltb 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_humble.py --skip-hltb 2>&1 | Tee-Object -FilePath $log -Append
+python fetch_ea.py --skip-hltb 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_amazon.py --only-new 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_itch.py --only-new --skip-hltb 2>&1 | Tee-Object -FilePath $log -Append
 python enrich_steam_reviews.py --stores itch 2>&1 | Tee-Object -FilePath $log -Append

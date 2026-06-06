@@ -3,6 +3,7 @@ import { isAccountAuthMode } from './auth-gate.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
+import { formatPlatformList } from './platform-labels.js';
 import {
   noteFetcherAuthFailure,
   isProviderConnected,
@@ -13,7 +14,14 @@ import {
   ingestAuthStatusProviders,
   groupRepFor,
 } from './connections.js';
-import { profileScopedStorageKey } from './profiles.js';
+import {
+  LS_FETCHER_AUTH_COOLDOWN,
+  LS_FETCHER_LAST_SEQ,
+  LS_FETCHER_SUPPRESSED_RUNS,
+  LS_ITAD_LAST_AUTO_RUN,
+  LS_RECONNECT_DISMISSED,
+  profileScopedStorageKey,
+} from './profiles.js';
 import { savePrefs } from './prefs.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
@@ -28,7 +36,10 @@ import { bindEscapeClose, trapFocus } from './focus-trap.js';
 // moment the mapped provider shows "connected" in Connections (so reconnecting
 // never leaves the chip stuck disabled).
 const AUTH_COOLDOWN_STEPS_MS = [5 * 60_000, 15 * 60_000, 60 * 60_000];
-const AUTH_COOLDOWN_LS_KEY = profileScopedStorageKey('baklog-fetcher-auth-cooldown');
+
+function authCooldownLsKey() {
+  return profileScopedStorageKey(LS_FETCHER_AUTH_COOLDOWN);
+}
 
 /** Escalating cooldown duration for the Nth consecutive auth failure (1-based). */
 export function authCooldownDurationMs(strikes) {
@@ -39,7 +50,7 @@ export function authCooldownDurationMs(strikes) {
 function loadAuthCooldowns() {
   const m = new Map();
   try {
-    const raw = JSON.parse(localStorage.getItem(AUTH_COOLDOWN_LS_KEY) || '{}');
+    const raw = JSON.parse(localStorage.getItem(authCooldownLsKey()) || '{}');
     const now = Date.now();
     for (const [k, v] of Object.entries(raw)) {
       if (v && typeof v.until === 'number' && v.until > now) {
@@ -50,20 +61,29 @@ function loadAuthCooldowns() {
   return m;
 }
 
-const authCooldowns = loadAuthCooldowns();
-// Resume any cooldown persisted from a previous session.
-if (authCooldowns.size) setTimeout(() => scheduleAuthCooldownTick(), 0);
+let authCooldowns = new Map();
+let _profileScopedFetcherStateReady = false;
+
+/** Load profile-scoped LS after auth/profile id is known (call post-initAuthGate). */
+export function ensureProfileScopedFetcherState() {
+  if (_profileScopedFetcherStateReady) return;
+  _profileScopedFetcherStateReady = true;
+  authCooldowns = loadAuthCooldowns();
+  reconnectDismissed = loadReconnectDismissedSet();
+  if (authCooldowns.size) setTimeout(() => scheduleAuthCooldownTick(), 0);
+}
 
 function persistAuthCooldowns() {
   try {
     const obj = {};
     for (const [k, v] of authCooldowns) obj[k] = v;
-    localStorage.setItem(AUTH_COOLDOWN_LS_KEY, JSON.stringify(obj));
+    localStorage.setItem(authCooldownLsKey(), JSON.stringify(obj));
   } catch (_) { /* storage unavailable — in-memory map still enforces */ }
 }
 
 /** Record one auth failure for a fetcher key and (re)arm the escalating cooldown. */
 export function noteAuthCooldownStrike(key) {
+  ensureProfileScopedFetcherState();
   const strikes = Math.min((authCooldowns.get(key)?.strikes || 0) + 1, AUTH_COOLDOWN_STEPS_MS.length);
   authCooldowns.set(key, { until: Date.now() + authCooldownDurationMs(strikes), strikes });
   persistAuthCooldowns();
@@ -99,6 +119,7 @@ export function clearAuthCooldown(key) {
 /** Remaining cooldown for a fetcher key in ms, or 0. Self-heals on expiry or
  *  when the mapped provider is reconnected. */
 export function authCooldownRemainingMs(key) {
+  ensureProfileScopedFetcherState();
   const c = authCooldowns.get(key);
   if (!c) return 0;
   if (fetcherProviders(key).some(p => isProviderConnected(p))) {
@@ -153,15 +174,17 @@ function humanizeMissingRequirements(missing) {
 // ---------------------------------------------------------------------------
 // Per-provider reconnect-required (definitive auth / max-strike / server expired)
 // ---------------------------------------------------------------------------
-const RECONNECT_DISMISSED_LS_KEY = profileScopedStorageKey('baklog-reconnect-dismissed');
+function reconnectDismissedLsKey() {
+  return profileScopedStorageKey(LS_RECONNECT_DISMISSED);
+}
 /** @type {Set<string>} */
-let reconnectDismissed = loadReconnectDismissedSet();
+let reconnectDismissed = new Set();
 /** @type {Map<string, { at: number }>} */
 const reconnectRequiredByProvider = new Map();
 
 function loadReconnectDismissedSet() {
   try {
-    const raw = JSON.parse(localStorage.getItem(RECONNECT_DISMISSED_LS_KEY) || '[]');
+    const raw = JSON.parse(localStorage.getItem(reconnectDismissedLsKey()) || '[]');
     return new Set(Array.isArray(raw) ? raw.filter(x => typeof x === 'string') : []);
   } catch (_) {
     return new Set();
@@ -170,7 +193,7 @@ function loadReconnectDismissedSet() {
 
 function persistReconnectDismissed() {
   try {
-    localStorage.setItem(RECONNECT_DISMISSED_LS_KEY, JSON.stringify([...reconnectDismissed]));
+    localStorage.setItem(reconnectDismissedLsKey(), JSON.stringify([...reconnectDismissed]));
   } catch (_) { /* storage unavailable */ }
 }
 
@@ -207,17 +230,21 @@ function clearFailedStateForReconnectedProvider(provider) {
 /** User dismissed the inline reconnect chip affordance for this provider. */
 export function dismissReconnectRequired(provider) {
   if (!provider) return;
+  ensureProfileScopedFetcherState();
   reconnectDismissed.add(provider);
   persistReconnectDismissed();
 }
 
 export function isReconnectDismissed(provider) {
+  ensureProfileScopedFetcherState();
   return reconnectDismissed.has(provider);
 }
 
 /** True when provider needs reconnect and user has not dismissed the chip hint. */
 export function isProviderReconnectRequired(provider) {
-  if (!provider || reconnectDismissed.has(provider)) return false;
+  if (!provider) return false;
+  ensureProfileScopedFetcherState();
+  if (reconnectDismissed.has(provider)) return false;
   if (providerStatus(provider) === 'expired') return true;
   return reconnectRequiredByProvider.has(provider);
 }
@@ -372,7 +399,9 @@ const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
 const STALE_OVERRIDES = {
   itad: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
 };
-export const ITAD_LAST_AUTO_RUN_KEY = profileScopedStorageKey('baklog-itad-last-auto-run');
+export function itadLastAutoRunKey() {
+  return profileScopedStorageKey(LS_ITAD_LAST_AUTO_RUN);
+}
 export const ITAD_AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 export const ITAD_AUTO_QUIET_HOUR_END = 7;
 
@@ -1022,10 +1051,10 @@ export function maybeAutoRefreshItad(deps = {}) {
   if (fresh.ageMs < ITAD_AUTO_REFRESH_INTERVAL_MS) return false;
   const now = deps.now ?? Date.now();
   const lastRun = deps.getLastRun
-    ?? (() => Number(localStorage.getItem(ITAD_LAST_AUTO_RUN_KEY) || 0));
+    ?? (() => Number(localStorage.getItem(itadLastAutoRunKey()) || 0));
   if (now - lastRun() < ITAD_AUTO_REFRESH_INTERVAL_MS) return false;
   const setLastRun = deps.setLastRun
-    ?? (t => localStorage.setItem(ITAD_LAST_AUTO_RUN_KEY, String(t)));
+    ?? (t => localStorage.setItem(itadLastAutoRunKey(), String(t)));
   setLastRun(now);
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
   runFn('itad', { auto: true });
@@ -1154,8 +1183,8 @@ export const fetcherRunner = (() => {
   const reconnectAttempts = new Map();
   /** Run ids the user cancelled — do not reconnect or re-subscribe until gone from server. */
   const suppressedRunIds = new Set();
-  const SUPPRESSED_RUNS_KEY = profileScopedStorageKey('fetcher-suppressed-run-ids');
-  const LAST_SEQ_KEY = profileScopedStorageKey('fetcher-last-seq-by-run');
+  const SUPPRESSED_RUNS_KEY = profileScopedStorageKey(LS_FETCHER_SUPPRESSED_RUNS);
+  const LAST_SEQ_KEY = profileScopedStorageKey(LS_FETCHER_LAST_SEQ);
   const lastSeqByRunId = new Map();
   const IN_FLIGHT_POLL_MS = 10_000;
   const WAIT_QUEUE_SLOT_MS = 120_000;
@@ -3028,7 +3057,7 @@ export function renderDashboardFetcherHealth() {
     }
     const platformUnavailable = src.available === false;
     if (platformUnavailable) {
-      const plats = (src.platforms || []).join(', ') || 'Windows';
+      const plats = formatPlatformList(src.platforms);
       titleLines.push(`Unavailable on this OS - ${src.label} runs on ${plats} only.`);
     }
     const title = titleLines.join('\n');

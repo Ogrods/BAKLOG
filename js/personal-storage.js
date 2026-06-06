@@ -1,22 +1,12 @@
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
-
-const ACTIVE_PROFILE_LS = 'baklog-active-profile';
-
-function profileKeySuffix() {
-  try {
-    const id = localStorage.getItem(ACTIVE_PROFILE_LS) || 'default';
-    return id && id !== 'default' ? `:${id}` : '';
-  } catch {
-    return '';
-  }
-}
+import { profileScopedStorageKey } from './profiles.js';
 
 export function personalStorageKey() {
-  return `${STORAGE_KEY}${profileKeySuffix()}`;
+  return profileScopedStorageKey(STORAGE_KEY);
 }
 
 export function manualStorageKey() {
-  return `${MANUAL_KEY}${profileKeySuffix()}`;
+  return profileScopedStorageKey(MANUAL_KEY);
 }
 import { personalStore, configurePersonalStore } from './personal-store.js';
 import { createMemo } from './memo.js';

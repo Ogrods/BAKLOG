@@ -61,6 +61,7 @@ describe('personalStore.prepareForProfileSwitch', () => {
     vi.resetModules();
     vi.doMock('../js/auth-gate.js', () => ({
       isAccountAuthMode: () => true,
+      isLocalProfilesEnabled: () => false,
       getAccessToken: () => 'tok',
       whenAuthReady: () => Promise.resolve(),
       refreshAccessToken: async () => null,
@@ -95,6 +96,47 @@ describe('personalStore.prepareForProfileSwitch', () => {
     await personalStore.flush();
     expect(puts.length).toBeGreaterThanOrEqual(1);
     expect(puts[puts.length - 1].profile).toBeUndefined();
+  });
+
+  it('PUT body keeps profile claim in account auth + local profiles hybrid mode', async () => {
+    vi.resetModules();
+    vi.doMock('../js/auth-gate.js', () => ({
+      isAccountAuthMode: () => true,
+      isLocalProfilesEnabled: () => true,
+      getAccessToken: () => 'tok',
+      whenAuthReady: () => Promise.resolve(),
+      refreshAccessToken: async () => null,
+      handleApiUnauthorized: () => {},
+    }));
+    localStorage.setItem('baklog-active-profile', 'work');
+    const puts = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({ personal: {}, prefs: {}, manual: [] }),
+          };
+        }
+        if (url === '/api/personal' && opts?.method === 'PUT') {
+          puts.push(JSON.parse(opts.body));
+          return {
+            ok: true,
+            json: async () => JSON.parse(opts.body),
+          };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    state.personal = { game1: { status: 'backlog' } };
+    await personalStore.init();
+    personalStore.notify();
+    await personalStore.flush();
+    expect(puts.length).toBeGreaterThanOrEqual(1);
+    expect(puts[puts.length - 1].profile).toBe('work');
   });
 
   it('409 profile mismatch keeps local edits for a later flush', async () => {

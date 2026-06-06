@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import base64
+import hmac
+import os
 import shutil
 import sys
+import time
 from datetime import UTC, datetime
+from hashlib import scrypt
 from pathlib import Path
 from typing import Any
 
@@ -218,13 +223,153 @@ def delete_profile(profile_id: str) -> None:
         shutil.rmtree(dest)
 
 
+PIN_MIN_LEN = 4
+PIN_MAX_LEN = 32
+_PIN_SCRYPT_N = 2**14
+_PIN_SCRYPT_R = 8
+_PIN_SCRYPT_P = 1
+_PIN_MAX_ATTEMPTS = 5
+_PIN_LOCK_SECONDS = 30
+
+_pin_failures: dict[str, list[float]] = {}
+_pin_lock_until: dict[str, float] = {}
+
+
+def _profile_entry(doc: dict[str, Any], profile_id: str) -> dict[str, Any] | None:
+    for p in doc.get("profiles", []):
+        if isinstance(p, dict) and p.get("id") == profile_id:
+            return p
+    return None
+
+
+def profile_has_pin(profile_id: str, doc: dict[str, Any] | None = None) -> bool:
+    doc = doc if doc is not None else load_index()
+    p = _profile_entry(doc, profile_id)
+    pin_meta = p.get("pin") if isinstance(p, dict) else None
+    return bool(isinstance(pin_meta, dict) and pin_meta.get("hash") and pin_meta.get("salt"))
+
+
+def profile_requires_pin(profile_id: str) -> bool:
+    return profile_has_pin(profile_id)
+
+
+def _hash_pin(pin: str, salt: bytes) -> bytes:
+    return scrypt(
+        pin.encode("utf-8"),
+        salt=salt,
+        n=_PIN_SCRYPT_N,
+        r=_PIN_SCRYPT_R,
+        p=_PIN_SCRYPT_P,
+        dklen=32,
+    )
+
+
+def verify_profile_pin(profile_id: str, pin: str, doc: dict[str, Any] | None = None) -> bool:
+    doc = doc if doc is not None else load_index()
+    profile_id = normalize_profile_id(profile_id)
+    if not profile_has_pin(profile_id, doc):
+        return True
+    p = _profile_entry(doc, profile_id)
+    assert isinstance(p, dict)
+    pin_meta = p.get("pin")
+    assert isinstance(pin_meta, dict)
+    try:
+        salt = base64.b64decode(str(pin_meta.get("salt") or ""))
+        expected = base64.b64decode(str(pin_meta.get("hash") or ""))
+    except (ValueError, TypeError):
+        return False
+    actual = _hash_pin((pin or "").strip(), salt)
+    return hmac.compare_digest(actual, expected)
+
+
+def pin_rate_limit_error(profile_id: str) -> str | None:
+    until = _pin_lock_until.get(profile_id, 0.0)
+    if time.time() < until:
+        return f"too many PIN attempts — try again in {_PIN_LOCK_SECONDS} seconds"
+    return None
+
+
+def record_pin_failure(profile_id: str) -> None:
+    now = time.time()
+    failures = _pin_failures.setdefault(profile_id, [])
+    failures[:] = [t for t in failures if now - t < 300]
+    failures.append(now)
+    if len(failures) >= _PIN_MAX_ATTEMPTS:
+        _pin_lock_until[profile_id] = now + _PIN_LOCK_SECONDS
+
+
+def clear_pin_failures(profile_id: str) -> None:
+    _pin_failures.pop(profile_id, None)
+    _pin_lock_until.pop(profile_id, None)
+
+
+def set_profile_pin(profile_id: str, pin: str, current_pin: str | None = None) -> None:
+    profile_id = normalize_profile_id(profile_id)
+    pin = (pin or "").strip()
+    if len(pin) < PIN_MIN_LEN or len(pin) > PIN_MAX_LEN:
+        raise ValueError(f"PIN must be {PIN_MIN_LEN}-{PIN_MAX_LEN} characters")
+    doc = load_index()
+    p = _profile_entry(doc, profile_id)
+    if not isinstance(p, dict):
+        raise ValueError(f"unknown profile: {profile_id}")
+    if profile_has_pin(profile_id, doc):
+        limit_err = pin_rate_limit_error(profile_id)
+        if limit_err:
+            raise ValueError(limit_err)
+        if not current_pin or not verify_profile_pin(profile_id, current_pin, doc):
+            record_pin_failure(profile_id)
+            raise ValueError("current PIN is incorrect")
+        clear_pin_failures(profile_id)
+    salt = os.urandom(16)
+    p["pin"] = {
+        "salt": base64.b64encode(salt).decode("ascii"),
+        "hash": base64.b64encode(_hash_pin(pin, salt)).decode("ascii"),
+        "n": _PIN_SCRYPT_N,
+    }
+    save_index(doc)
+
+
+def clear_profile_pin(profile_id: str, current_pin: str) -> None:
+    profile_id = normalize_profile_id(profile_id)
+    doc = load_index()
+    p = _profile_entry(doc, profile_id)
+    if not isinstance(p, dict):
+        raise ValueError(f"unknown profile: {profile_id}")
+    if profile_has_pin(profile_id, doc):
+        limit_err = pin_rate_limit_error(profile_id)
+        if limit_err:
+            raise ValueError(limit_err)
+        if not verify_profile_pin(profile_id, current_pin, doc):
+            record_pin_failure(profile_id)
+            raise ValueError("current PIN is incorrect")
+    p.pop("pin", None)
+    save_index(doc)
+    clear_pin_failures(profile_id)
+
+
+def _public_profile_row(p: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any]:
+    pid = str(p.get("id") or "")
+    return {
+        "id": pid,
+        "label": p.get("label"),
+        "created_at": p.get("created_at"),
+        "hasPin": profile_has_pin(pid, doc) if pid else False,
+    }
+
+
 def profiles_status() -> dict[str, Any]:
     from shared.profile_paths import get_active_profile_id
 
+    doc = load_index()
     active = get_active_profile_id()
+    profiles = doc.get("profiles") if isinstance(doc.get("profiles"), list) else []
     return {
         "active": active,
         "active_label": profile_label(active),
         "legacy": is_legacy_layout(active),
-        "profiles": list_profiles(),
+        "profiles": [
+            _public_profile_row(p, doc)
+            for p in profiles
+            if isinstance(p, dict) and p.get("id")
+        ],
     }

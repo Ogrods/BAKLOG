@@ -262,6 +262,14 @@ def _refresh_personal_paths() -> None:
     RUN_HISTORY_FILE = RUNS_DIR / "history.json"
     QUEUE_FILE = RUNS_DIR / "queue.json"
     MANAGER.rebind_profile_paths()
+    # The decrypted secrets cache is keyed to the previous profile — drop it so the
+    # next load re-derives the new profile's HKDF subkey from its own secrets.bin.
+    try:
+        import auth.secrets as _secrets
+
+        _secrets.reset_cache()
+    except Exception:  # noqa: BLE001 - cache reset is best-effort
+        pass
 PERSONAL_BACKUP_KEEP = 10
 PERSONAL_MAX_BYTES = 32 * 1024 * 1024  # 32 MB hard cap on the PUT body
 _personal_lock = threading.RLock()
@@ -1791,6 +1799,17 @@ def _csrf_allowed(handler: SimpleHTTPRequestHandler) -> bool:
     return _origin_is_local(handler)
 
 
+def _csrf_allowed_strict(handler: SimpleHTTPRequestHandler) -> bool:
+    """Stricter CSRF for profile mutations — require explicit app header or bearer."""
+    from shared.supabase_auth import auth_enabled, verify_bearer_user
+
+    if auth_enabled() and verify_bearer_user(handler.headers.get("Authorization")):
+        return True
+    if not _request_host_is_local(handler):
+        return False
+    return handler.headers.get(_BAKLOG_LOCAL_HEADER) == "1"
+
+
 def _send_json(handler: SimpleHTTPRequestHandler, status: int, payload: Any) -> None:
     body = json.dumps(payload).encode("utf-8")
     handler.send_response(status)
@@ -1898,12 +1917,15 @@ def _send_auth_required(handler: SimpleHTTPRequestHandler) -> None:
 def _bind_request_user(handler: SimpleHTTPRequestHandler) -> str | None:
     """Verify bearer, ensure profile dir, pin request context. None after 401."""
     from shared.account_profiles import ensure_profile_for_user
-    from shared.supabase_auth import verify_bearer_user
+    from shared.supabase_auth import local_profiles_enabled, verify_bearer_user
 
     user = verify_bearer_user(handler.headers.get("Authorization"))
     if not user:
         _send_auth_required(handler)
         return None
+    if local_profiles_enabled():
+        # JWT proves identity; active profile comes from profiles/index.json.
+        return user["id"]
     pid = ensure_profile_for_user(user["id"], user.get("email") or None)
     set_request_profile_id(pid)
     return pid
@@ -1916,7 +1938,7 @@ def _bind_bearer_profile(handler: SimpleHTTPRequestHandler) -> bool:
 
 def _gate_static(handler: SimpleHTTPRequestHandler) -> bool:
     """Gate static catalog/cache paths when Supabase auth is on. Return False if handled."""
-    from shared.supabase_auth import auth_enabled
+    from shared.supabase_auth import auth_enabled, local_profiles_enabled, verify_bearer_user
 
     path_only = _path_only(handler)
     kind = _static_class(path_only)
@@ -1924,6 +1946,11 @@ def _gate_static(handler: SimpleHTTPRequestHandler) -> bool:
         handler.send_error(HTTPStatus.NOT_FOUND, "Not found")
         return False
     if kind == "data" and auth_enabled():
+        if local_profiles_enabled():
+            if not verify_bearer_user(handler.headers.get("Authorization")):
+                _send_auth_required(handler)
+                return False
+            return True
         return _bind_bearer_profile(handler)
     return True
 
@@ -1976,9 +2003,9 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
 
 
 def _profile_admin_blocked() -> bool:
-    from shared.supabase_auth import auth_enabled
+    from shared.supabase_auth import auth_enabled, local_profiles_enabled
 
-    return auth_enabled()
+    return auth_enabled() and not local_profiles_enabled()
 
 
 def _run_accessible(run: Run | None) -> Run | None:
@@ -2004,6 +2031,17 @@ class Handler(SimpleHTTPRequestHandler):
     def _reject_if_csrf(self) -> bool:
         """Return True when the request was rejected (caller should return)."""
         if _csrf_allowed(self):
+            return False
+        _send_json(
+            self,
+            HTTPStatus.FORBIDDEN,
+            {"error": "cross-origin request blocked — open BAKLOG from http://127.0.0.1 and retry"},
+        )
+        return True
+
+    def _reject_if_csrf_strict(self) -> bool:
+        """Stricter CSRF gate for profile admin routes."""
+        if _csrf_allowed_strict(self):
             return False
         _send_json(
             self,
@@ -2166,12 +2204,26 @@ class Handler(SimpleHTTPRequestHandler):
             self._handle_auth_secrets_import()
             return
         if self.path == "/api/profiles":
+            if self._reject_if_csrf_strict():
+                return
             self._handle_profiles_create()
             return
         if self.path == "/api/profiles/active":
+            if self._reject_if_csrf_strict():
+                return
             self._handle_profiles_set_active()
             return
+        path_only = self.path.split("?", 1)[0]
+        if path_only.startswith("/api/profiles/") and path_only.endswith("/pin"):
+            if self._reject_if_csrf_strict():
+                return
+            profile_id = path_only[len("/api/profiles/") : -len("/pin")].strip("/")
+            if profile_id:
+                self._handle_profiles_set_pin(profile_id)
+                return
         if self.path == "/api/personal":
+            if self._reject_if_csrf_strict():
+                return
             self._handle_personal_put()
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
@@ -2183,7 +2235,16 @@ class Handler(SimpleHTTPRequestHandler):
         if not _require_api_auth(self):
             return
         path_only = self.path.split("?", 1)[0]
+        if path_only.startswith("/api/profiles/") and path_only.endswith("/pin"):
+            if self._reject_if_csrf_strict():
+                return
+            profile_id = path_only[len("/api/profiles/") : -len("/pin")].strip("/")
+            if profile_id:
+                self._handle_profiles_clear_pin(profile_id)
+                return
         if path_only.startswith("/api/profiles/"):
+            if self._reject_if_csrf_strict():
+                return
             profile_id = path_only[len("/api/profiles/") :].strip("/")
             if profile_id and profile_id not in ("active",):
                 self._handle_profiles_delete(profile_id)
@@ -2197,12 +2258,16 @@ class Handler(SimpleHTTPRequestHandler):
         if not _require_api_auth(self):
             return
         if self.path == "/api/personal":
+            if self._reject_if_csrf_strict():
+                return
             self._handle_personal_put()
             return
         path_only = self.path.split("?", 1)[0]
         if path_only.startswith("/api/profiles/"):
+            if self._reject_if_csrf_strict():
+                return
             profile_id = path_only[len("/api/profiles/") :].strip("/")
-            if profile_id and profile_id not in ("active",):
+            if profile_id and profile_id not in ("active", "pin") and not profile_id.endswith("/pin"):
                 self._handle_profiles_rename(profile_id)
                 return
         if self.path.startswith("/api/auth/") and self.path.endswith("/credentials"):
@@ -2297,6 +2362,12 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.CREATED, created)
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except OSError as exc:
+            _send_json(
+                self,
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"profile create failed: {exc}"},
+            )
 
     def _handle_profiles_set_active(self) -> None:
         if _profile_admin_blocked():
@@ -2316,13 +2387,86 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "id is required"})
             return
         try:
-            from shared.profiles import set_active_profile
+            from shared.profiles import (
+                clear_pin_failures,
+                pin_rate_limit_error,
+                profile_requires_pin,
+                record_pin_failure,
+                set_active_profile,
+                verify_profile_pin,
+            )
 
+            locked = pin_rate_limit_error(profile_id)
+            if locked:
+                _send_json(self, HTTPStatus.TOO_MANY_REQUESTS, {"error": locked})
+                return
+            if profile_requires_pin(profile_id):
+                pin = str(payload.get("pin") or "").strip()
+                if not pin:
+                    _send_json(
+                        self,
+                        HTTPStatus.UNAUTHORIZED,
+                        {"error": "pin_required"},
+                    )
+                    return
+                if not verify_profile_pin(profile_id, pin):
+                    record_pin_failure(profile_id)
+                    _send_json(
+                        self,
+                        HTTPStatus.UNAUTHORIZED,
+                        {"error": "incorrect_pin"},
+                    )
+                    return
+            clear_pin_failures(profile_id)
             MANAGER.cancel_all_and_wait()
             result = set_active_profile(profile_id)
             _refresh_personal_paths()
-            # BAKLOG_PROFILE in the server process is dropped at import (_release_server_profile_env).
             _send_json(self, HTTPStatus.OK, result)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _handle_profiles_set_pin(self, profile_id: str) -> None:
+        if _profile_admin_blocked():
+            _send_json(
+                self,
+                HTTPStatus.FORBIDDEN,
+                {"error": "profile management is disabled while account sign-in is enabled"},
+            )
+            return
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        try:
+            from shared.profiles import set_profile_pin
+
+            pin = str(payload.get("pin") or "")
+            current = str(payload.get("currentPin") or payload.get("current_pin") or "").strip() or None
+            set_profile_pin(profile_id, pin, current_pin=current)
+            _send_json(self, HTTPStatus.OK, {"ok": True, "hasPin": True})
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _handle_profiles_clear_pin(self, profile_id: str) -> None:
+        if _profile_admin_blocked():
+            _send_json(
+                self,
+                HTTPStatus.FORBIDDEN,
+                {"error": "profile management is disabled while account sign-in is enabled"},
+            )
+            return
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        try:
+            from shared.profiles import clear_profile_pin
+
+            current = str(payload.get("currentPin") or payload.get("current_pin") or payload.get("pin") or "")
+            clear_profile_pin(profile_id, current)
+            _send_json(self, HTTPStatus.OK, {"ok": True, "hasPin": False})
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
@@ -2375,6 +2519,12 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.OK, {"ok": True})
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except OSError as exc:
+            _send_json(
+                self,
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": f"profile delete failed: {exc}"},
+            )
 
     def _handle_personal_get(self) -> None:
         try:

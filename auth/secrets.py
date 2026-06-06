@@ -13,9 +13,11 @@ from hashlib import scrypt
 from pathlib import Path
 from typing import Any
 
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-from shared.profile_paths import auth_dir
+from shared.profile_paths import auth_dir, get_active_profile_id
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -45,8 +47,14 @@ def _master_key_file() -> Path:
 AUTH_DIR: Path | None = None
 SECRETS_FILE: Path | None = None
 MASTER_KEY_FILE: Path | None = None
+# When set (e.g. inside auth.manager._with_profile_secrets), key derivation uses
+# this profile id instead of the live active profile. Keeps load/save/key in sync
+# with the patched SECRETS_FILE when operating on a non-active profile.
+PROFILE_ID_OVERRIDE: str | None = None
 SERVICE_NAME = "steam-backlog"
 KEYRING_ACCOUNT = "secrets-master"
+KEY_VERSION_LEGACY = 0
+KEY_VERSION_PROFILE = 1
 
 _lock = threading.RLock()
 _cache: dict[str, Any] | None = None
@@ -146,6 +154,31 @@ def _get_master_key() -> bytes:
     return key
 
 
+def _effective_profile_id() -> str:
+    override = globals().get("PROFILE_ID_OVERRIDE")
+    if isinstance(override, str) and override.strip():
+        return override.strip()
+    return get_active_profile_id() or "default"
+
+
+def reset_cache() -> None:
+    """Drop the decrypted secrets cache (call after the active profile changes)."""
+    global _cache
+    with _lock:
+        _cache = None
+
+
+def _get_profile_key(profile_id: str | None = None) -> bytes:
+    pid = (profile_id or _effective_profile_id() or "default").strip() or "default"
+    master = _get_master_key()
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b"baklog-profile:" + pid.encode("utf-8"),
+    ).derive(master)
+
+
 class SecretsCorruptError(RuntimeError):
     """secrets.bin exists but cannot be decrypted or parsed."""
 
@@ -176,9 +209,21 @@ def _atomic_write_secrets(data: bytes) -> None:
         raise
 
 
-def _decrypt_blob(raw: bytes) -> dict[str, Any]:
+def _decrypt_blob(raw: bytes, profile_id: str | None = None) -> dict[str, Any]:
     if len(raw) < 28:
         raise ValueError("secrets blob is too short to be valid")
+    if raw[0:1] == bytes([KEY_VERSION_PROFILE]) and len(raw) >= 29:
+        nonce, ciphertext = raw[1:13], raw[13:]
+        key = _get_profile_key(profile_id)
+        plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
+        doc = json.loads(plaintext.decode("utf-8"))
+        if not isinstance(doc, dict):
+            raise ValueError("secrets payload is not a JSON object")
+        doc.setdefault("providers", {})
+        doc.setdefault("settings", {})
+        return doc
+
+    # Legacy v0: master key directly on nonce || ciphertext.
     nonce, ciphertext = raw[:12], raw[12:]
     key = _get_master_key()
     plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
@@ -190,12 +235,18 @@ def _decrypt_blob(raw: bytes) -> dict[str, Any]:
     return doc
 
 
-def _encrypt_doc(doc: dict[str, Any]) -> bytes:
-    key = _get_master_key()
+def _encrypt_doc(doc: dict[str, Any], profile_id: str | None = None) -> bytes:
+    key = _get_profile_key(profile_id)
     nonce = os.urandom(12)
     plaintext = json.dumps(doc, ensure_ascii=False).encode("utf-8")
     ciphertext = AESGCM(key).encrypt(nonce, plaintext, None)
-    return nonce + ciphertext
+    return bytes([KEY_VERSION_PROFILE]) + nonce + ciphertext
+
+
+def _maybe_migrate_legacy_blob(raw: bytes, doc: dict[str, Any], profile_id: str | None) -> None:
+    if raw[:1] == bytes([KEY_VERSION_PROFILE]):
+        return
+    _atomic_write_secrets(_encrypt_doc(doc, profile_id))
 
 
 def load_doc() -> dict[str, Any]:
@@ -208,7 +259,10 @@ def load_doc() -> dict[str, Any]:
             _cache = _empty_doc()
             return json.loads(json.dumps(_cache))
         try:
-            _cache = _decrypt_blob(secrets.read_bytes())
+            raw = secrets.read_bytes()
+            pid = _effective_profile_id()
+            _cache = _decrypt_blob(raw, pid)
+            _maybe_migrate_legacy_blob(raw, _cache, pid)
         except Exception as exc:
             raise SecretsCorruptError(
                 f"cannot read {_secrets_file()}: corrupt or wrong passphrase"
@@ -219,7 +273,7 @@ def load_doc() -> dict[str, Any]:
 def save_doc(doc: dict[str, Any]) -> None:
     global _cache
     with _lock:
-        _atomic_write_secrets(_encrypt_doc(doc))
+        _atomic_write_secrets(_encrypt_doc(doc, _effective_profile_id()))
         _cache = json.loads(json.dumps(doc))
 
 
@@ -238,7 +292,7 @@ def secrets_store_corrupt() -> bool:
     if not secrets.is_file():
         return False
     try:
-        _decrypt_blob(secrets.read_bytes())
+        _decrypt_blob(secrets.read_bytes(), _effective_profile_id())
         return False
     except Exception:
         return True

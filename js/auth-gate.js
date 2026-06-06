@@ -23,9 +23,14 @@ let _authReadySettled = false;
 let _refreshInFlight = null;
 let _authHandling = null;
 let _accountProfileId = '';
+let _localProfiles = false;
 
 export function isAccountAuthMode() {
   return !!_authRequired;
+}
+
+export function isLocalProfilesEnabled() {
+  return _localProfiles;
 }
 
 export function getAccessToken() {
@@ -213,6 +218,7 @@ export async function initAuthGate() {
     return new Promise(() => {});
   }
   _authRequired = !!_config.authRequired;
+  _localProfiles = !!_config.localProfiles;
   if (!_authRequired) {
     setOverlayVisible(false);
     document.documentElement.removeAttribute('data-auth-required');

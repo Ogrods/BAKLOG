@@ -1,6 +1,7 @@
 /* BAKLOG landing: mega hero demo + funnel sections */
 
 :root {
+  --marquee-px-per-sec: 48;
   --text-dim: #cbd5e1;
   --bg-hover: #334155;
 }
@@ -360,10 +361,11 @@
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
 }
 .dash-marquee-track {
+  --marquee-duration: 180s;
   display: inline-flex;
   gap: 28px;
   white-space: nowrap;
-  animation: dashMarquee 180s linear infinite;
+  animation: dashMarquee var(--marquee-duration) linear infinite;
 }
 .dash-marquee:hover .dash-marquee-track { animation-play-state: paused; }
 @keyframes dashMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -397,10 +399,36 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 .dash-ribbon-eyebrow { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
-.dash-ribbon-chart { position: relative; width: 100%; height: 180px; min-height: 180px; flex-shrink: 0; }
-.dash-ribbon-chart canvas { display: block; width: 100% !important; height: 180px !important; max-height: 180px; }
+.dash-ribbon-chart { position: relative; width: 100%; height: 180px; min-height: 180px; min-width: 0; flex-shrink: 0; }
+.dash-ribbon-chart canvas { display: block; max-width: 100%; }
+
+/* While the viewport is actively resizing (js toggles html.ui-resizing with a
+   ~200ms trailing debounce), drop the per-frame backdrop blurs and pause the
+   spotlight float/sheen so the mega hero resizes smoothly. Effects are restored
+   once resize settles; the translucent backplates remain, so there is no pop. */
+html.ui-resizing .dash-hero-pillar,
+html.ui-resizing .dash-spotlight-body,
+html.ui-resizing .dash-spotlight-nav {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
+html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
+  animation-play-state: paused;
+}
+html.ui-resizing .dash-spotlight-art,
+html.ui-resizing .dash-spotlight-art-bg {
+  filter: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+html.ui-resizing .dash-spotlight-sheen::before {
+  filter: none;
+  opacity: 0;
+}
 .dash-ribbon-headline { text-align: center; font-size: 13px; color: #cbd5e1; }
 .dash-ribbon-headline strong { color: #f1f5f9; font-weight: 700; }
 
@@ -424,7 +452,7 @@
   position: relative;
   z-index: 1;
 }
-.dash-insight:empty::before { content: "\200B"; }
+.dash-insight-text:empty::before { content: "\200B"; }
 .dash-insight.is-visible { opacity: 1; }
 .dash-insight strong { color: #f1f5f9; font-weight: 600; }
 .dash-mega--has-spotlight .dash-insight { max-width: min(640px, 60%); }
@@ -540,32 +568,109 @@
 
 @media (max-width: 900px) {
   .dash-ribbon { grid-template-columns: 1fr; }
-  .dash-insight, .dash-mega--has-spotlight .dash-insight { max-width: none; display: block; white-space: normal; }
-  /* The host is the 66%-wide right-pinned absolute box on desktop. On mobile it
-     must drop back into flow so the spotlight stacks full-width above the hero
-     text; keep position:relative so the nav buttons stay anchored to it. */
-  .dash-spotlight-host { position: relative; inset: auto; width: 100%; }
-  .dash-spotlight { position: static; width: 100%; height: 180px; margin-bottom: 16px; border-radius: 10px; }
+  .dash-ribbon-chart { height: 220px; min-height: 220px; }
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .score-tile {
+    flex: unset;
+    max-width: none;
+    width: 100%;
+  }
+  .score-tile:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    width: calc(50% - 0.375rem);
+    justify-self: center;
+  }
+  /* Center the invite button so it lines up under the centered $0 tile. */
+  .section-invite { text-align: center; }
+  .dash-insight {
+    white-space: normal;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* Reserve height for the tallest rotating insight (3 lines at phone widths) so
+       swapping strings of different lengths never reflows the marquee/divider below. */
+    min-height: calc(1em * 1.5 * 3 + 14px);
+  }
+  .dash-insight-text {
+    text-align: center;
+    width: 100%;
+  }
+  /* Tablet/narrow: the spotlight stays a contained card pinned to the hero's
+     bottom-right (not a full-width banner). Hero text is left-constrained so it
+     never runs under the card; the host keeps the 66%-wide desktop box shape
+     scaled down and re-anchored to the bottom-right corner. */
+  .dash-mega .dash-hero-number, .dash-mega .dash-hero-sub,
+  .dash-mega .dash-hero-tagline, .dash-mega .dash-hero-pillars,
+  .dash-mega .dash-hero-stores,
+  .dash-mega .library-count-host,
+  .dash-mega--has-spotlight .dash-insight { max-width: 52%; }
+  .dash-spotlight-host {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(320px, 44%);
+    height: auto;
+  }
+  .dash-spotlight {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .dash-spotlight-body {
+    left: auto;
+    right: 12px;
+    bottom: 12px;
+    max-width: 88%;
+    text-align: right;
+    align-items: flex-end;
+  }
+}
+@media (max-width: 640px) {
+  .dash-mega { padding: 20px 18px 16px; }
+  /* Spotlight drops back into flow as a full-width banner above the stats */
+  .dash-spotlight-host { position: relative; inset: auto; width: 100%; height: auto; }
+  .dash-spotlight {
+    position: static;
+    width: 100%;
+    height: 180px;
+    margin-bottom: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+  }
   .dash-spotlight-art { -webkit-mask-image: none; mask-image: none; }
-  .dash-spotlight-body { left: 16px; right: 16px; max-width: none; text-align: left; align-items: flex-start; }
+  .dash-spotlight-body {
+    left: 16px;
+    right: 16px;
+    bottom: 14px;
+    max-width: none;
+    text-align: left;
+    align-items: flex-start;
+  }
   .dash-spotlight-body .dash-spotlight-title,
   .dash-spotlight-body .dash-spotlight-meta { text-align: left; }
   .dash-mega .dash-hero-number, .dash-mega .dash-hero-sub,
   .dash-mega .dash-hero-tagline, .dash-mega .dash-hero-pillars,
   .dash-mega .dash-hero-stores,
-  .dash-mega .library-count-host { max-width: none; }
-}
-@media (max-width: 640px) {
-  .dash-hero-pillars { grid-template-columns: 1fr; }
-  .dash-mega { padding: 20px 18px 16px; }
-  .section-invite { text-align: center; }
+  .dash-mega .library-count-host,
+  .dash-mega--has-spotlight .dash-insight { max-width: none; }
 }
 @media (max-width: 400px) {
+  /* 3-across or 1-column only — never a 2+1 orphan row */
+  .dash-hero-pillars { grid-template-columns: 1fr; }
   .score-grid { gap: 0.6rem; }
-  .score-tile { flex-basis: 130px; padding: 1rem 0.75rem; }
+  .score-tile { padding: 1rem 0.75rem; }
   .score-tile .num { font-size: 1.5rem; }
   .demo-mount { padding: 0 1rem; }
   .dash-marquee { margin-left: -0.25rem; margin-right: -0.25rem; }
+  /* Narrowest phones wrap the longest insight to 4 lines; reserve for it so the
+     rotating text neither reflows siblings nor gets clipped by overflow:hidden. */
+  .dash-insight { min-height: calc(1em * 1.5 * 4 + 14px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

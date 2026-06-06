@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -70,3 +71,43 @@ def test_gog_and_battlenet_connect_blob_used_by_resolve_env() -> None:
     mark_connected("battlenet", {"BATTLENET_COOKIE": "cookie=blizzard"})
     assert get_credentials("battlenet")["BATTLENET_COOKIE"] == "cookie=blizzard"
     assert resolve_env("BATTLENET_COOKIE", provider="battlenet") == "cookie=blizzard"
+
+
+def test_profile_subkeys_isolate_secrets_blob(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import os
+
+    from auth.secrets import KEY_VERSION_PROFILE, _decrypt_blob, _encrypt_doc
+
+    auth_dir = tmp_path / "auth"
+    monkeypatch.setattr("auth.secrets.AUTH_DIR", auth_dir)
+    monkeypatch.setattr("auth.secrets.SECRETS_FILE", auth_dir / "secrets.bin")
+    monkeypatch.setattr("auth.secrets.MASTER_KEY_FILE", auth_dir / ".master_key")
+    set_master_password_override("test-passphrase-for-unit-tests")
+
+    doc = {"providers": {"steam": {"STEAM_API_KEY": "abc"}}, "settings": {}}
+    raw = _encrypt_doc(doc, "work")
+    assert raw[0] == KEY_VERSION_PROFILE
+    out = _decrypt_blob(raw, "work")
+    assert out["providers"]["steam"]["STEAM_API_KEY"] == "abc"
+    with pytest.raises(Exception):
+        _decrypt_blob(raw, "default")
+
+    # Legacy v0 blob still decrypts and can migrate on load.
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    from auth.secrets import _get_master_key, load_doc
+
+    nonce = os.urandom(12)
+    legacy_plain = json.dumps(doc, ensure_ascii=False).encode("utf-8")
+    legacy_raw = nonce + AESGCM(_get_master_key()).encrypt(nonce, legacy_plain, None)
+    (auth_dir / "secrets.bin").write_bytes(legacy_raw)
+    import auth.secrets as secrets_mod
+
+    secrets_mod._cache = None
+    monkeypatch.setattr("shared.profile_paths.get_active_profile_id", lambda: "work")
+    loaded = load_doc()
+    assert loaded["providers"]["steam"]["STEAM_API_KEY"] == "abc"
+    migrated = (auth_dir / "secrets.bin").read_bytes()
+    assert migrated[0] == KEY_VERSION_PROFILE

@@ -6,11 +6,12 @@
 import { baklogFetch } from './api-client.js';
 import {
   isAccountAuthMode,
+  isLocalProfilesEnabled,
   getAccountEmail,
   getAccountProfileId,
   signOutAccount,
 } from './auth-gate.js';
-import { PREFS_KEY } from './state.js';
+import { MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from './state.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { escapeAttr } from './dom-util.js';
 import {
@@ -23,7 +24,33 @@ import {
 } from './theme.js';
 
 export const ACTIVE_PROFILE_LS = 'baklog-active-profile';
-export const ITAD_SNAPSHOT_PREFIX = 'baklog-itad-snapshot';
+
+const ITAD_SNAPSHOT_PREFIX = 'baklog-itad-snapshot';
+
+/** Base localStorage keys suffixed per profile (`:work`, etc.). Keep in sync with profileScopedStorageKey() callers. */
+export const LS_FETCHER_AUTH_COOLDOWN = 'baklog-fetcher-auth-cooldown';
+export const LS_RECONNECT_DISMISSED = 'baklog-reconnect-dismissed';
+export const LS_ITAD_LAST_AUTO_RUN = 'baklog-itad-last-auto-run';
+export const LS_FETCHER_SUPPRESSED_RUNS = 'fetcher-suppressed-run-ids';
+export const LS_FETCHER_LAST_SEQ = 'fetcher-last-seq-by-run';
+export const LS_LIBRARY_WATCH = 'baklog-library-watch';
+
+export const PROFILE_SCOPED_STORAGE_KEYS = Object.freeze([
+  PREFS_KEY,
+  ITAD_SNAPSHOT_PREFIX,
+  STORAGE_KEY,
+  MANUAL_KEY,
+  LS_FETCHER_AUTH_COOLDOWN,
+  LS_RECONNECT_DISMISSED,
+  LS_ITAD_LAST_AUTO_RUN,
+  LS_LIBRARY_WATCH,
+]);
+
+/** Profile-suffixed sessionStorage keys (fetcher SSE resume state). */
+export const PROFILE_SCOPED_SESSION_KEYS = Object.freeze([
+  LS_FETCHER_SUPPRESSED_RUNS,
+  LS_FETCHER_LAST_SEQ,
+]);
 
 let _status = null;
 let _menuOpen = false;
@@ -34,7 +61,7 @@ function el(id) {
 }
 
 export function activeProfileId() {
-  if (isAccountAuthMode()) {
+  if (isAccountAuthMode() && !isLocalProfilesEnabled()) {
     const bound = getAccountProfileId();
     if (bound) return bound;
   }
@@ -63,14 +90,12 @@ export function clearProfileLocalStorage(profileId) {
   try {
     const suffix = profileId && profileId !== 'default' ? `:${profileId}` : '';
     if (!suffix) return;
-    localStorage.removeItem(`${PREFS_KEY}${suffix}`);
-    localStorage.removeItem(`${ITAD_SNAPSHOT_PREFIX}${suffix}`);
-    localStorage.removeItem(`steam-backlog-personal${suffix}`);
-    localStorage.removeItem(`steam-backlog-manual-games${suffix}`);
-    localStorage.removeItem(`baklog-fetcher-auth-cooldown${suffix}`);
-    localStorage.removeItem(`baklog-reconnect-dismissed${suffix}`);
-    localStorage.removeItem(`baklog-itad-last-auto-run${suffix}`);
-    localStorage.removeItem(`fetcher-suppressed-run-ids${suffix}`);
+    for (const base of PROFILE_SCOPED_STORAGE_KEYS) {
+      localStorage.removeItem(`${base}${suffix}`);
+    }
+    for (const base of PROFILE_SCOPED_SESSION_KEYS) {
+      sessionStorage.removeItem(`${base}${suffix}`);
+    }
   } catch (_) { /* ignore */ }
 }
 
@@ -186,11 +211,20 @@ function renderMenuList() {
   const list = el('profileMenuList');
   if (!list || !_status) return;
   const active = _status.active;
+  const accountRow = isAccountAuthMode()
+    ? `<div class="profile-menu-account-email px-3 py-2 text-xs text-slate-400 border-b border-slate-600/80">${escapeHtml(getAccountEmail() || 'Signed in')}</div>`
+    : '';
   const rows = (_status.profiles || []).map((p) => {
     const selected = p.id === active;
-    return `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 ${selected ? 'profile-menu-option-active' : ''}" data-profile-switch="${p.id}" title="Switch to this profile">${escapeHtml(p.label || p.id)}${selected ? ' ✓' : ''}</button>`;
+    const lock = p.hasPin ? ' 🔒' : '';
+    return `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 ${selected ? 'profile-menu-option-active' : ''}" data-profile-switch="${escapeAttr(p.id)}" data-profile-has-pin="${p.hasPin ? '1' : '0'}" title="Switch to this profile">${escapeHtml(p.label || p.id)}${lock}${selected ? ' ✓' : ''}</button>`;
   });
-  list.innerHTML = rows.join('');
+  const signOutRow = isAccountAuthMode()
+    ? `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 border-t border-slate-600/80" data-account-signout title="Sign out of this account">Sign out</button>`
+    : '';
+  list.innerHTML = accountRow + rows.join('') + signOutRow;
+  const footer = document.querySelector('#profileMenu [data-profile-manage]');
+  if (footer) footer.classList.remove('hidden');
 }
 
 function escapeHtml(s) {
@@ -201,11 +235,13 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-async function switchProfile(id) {
+async function switchProfile(id, pin) {
   closeMenu();
   const { personalStore } = await import('./personal-store.js');
   await personalStore.prepareForProfileSwitch();
-  await api('POST', '/api/profiles/active', { id });
+  const body = { id };
+  if (pin) body.pin = pin;
+  await api('POST', '/api/profiles/active', body);
   localStorage.setItem(ACTIVE_PROFILE_LS, id);
   location.reload();
 }
@@ -365,14 +401,29 @@ export function bindProfilesUI() {
 
   menu.addEventListener('click', (e) => {
     if (handleMenuThemeClick(e)) return;
+    if (e.target.closest('[data-account-signout]')) {
+      closeMenu();
+      signOutAccount({ intentional: true }).finally(() => location.reload());
+      return;
+    }
     const sw = e.target.closest('[data-profile-switch]');
     if (sw) {
       const id = sw.getAttribute('data-profile-switch');
-      if (id && id !== _status?.active) switchProfile(id).catch((err) => alert(err.message));
+      if (id && id !== _status?.active) {
+        const needPin = sw.getAttribute('data-profile-has-pin') === '1';
+        const go = (pin) => switchProfile(id, pin).catch((err) => alert(err.message));
+        if (needPin) {
+          const entered = window.prompt('Enter PIN for this profile:');
+          if (entered != null && entered.trim()) go(entered.trim());
+        } else {
+          go();
+        }
+      }
       return;
     }
     if (e.target.closest('[data-profile-manage]')) {
       populateDeleteSelect();
+      syncPinManageFields();
       openManageModal();
     }
   });
@@ -388,8 +439,10 @@ export function bindProfilesUI() {
   el('profileRenameSave')?.addEventListener('click', () => renameActiveProfile());
   el('profileCreateBtn')?.addEventListener('click', () => createProfile());
   el('profileDeleteBtn')?.addEventListener('click', () => deleteSelectedProfile());
+  el('profilePinSave')?.addEventListener('click', () => saveProfilePin());
+  el('profilePinClear')?.addEventListener('click', () => clearProfilePin());
 
-  for (const id of ['profileRenameInput', 'profileNewName', 'profileDeleteSelect']) {
+  for (const id of ['profileRenameInput', 'profileNewName', 'profileDeleteSelect', 'profilePinNew', 'profilePinCurrent']) {
     el(id)?.addEventListener('input', clearManageMessages);
     el(id)?.addEventListener('change', clearManageMessages);
   }
@@ -467,11 +520,67 @@ async function syncAccountProfileId() {
   } catch (_) { /* ignore */ }
 }
 
+function syncPinManageFields() {
+  const active = (_status?.profiles || []).find((p) => p.id === _status?.active);
+  const hasPin = !!active?.hasPin;
+  const currentWrap = el('profilePinCurrentWrap');
+  const clearBtn = el('profilePinClear');
+  const note = el('profilePinNote');
+  if (currentWrap) currentWrap.classList.toggle('hidden', !hasPin);
+  if (clearBtn) clearBtn.classList.toggle('hidden', !hasPin);
+  if (note) {
+    note.textContent = hasPin
+      ? 'This profile requires a PIN to switch into it from another profile.'
+      : 'Optional — lock this profile so switching in requires a PIN.';
+  }
+}
+
+async function saveProfilePin() {
+  if (!_status?.active) return;
+  const pin = (el('profilePinNew')?.value || '').trim();
+  const current = (el('profilePinCurrent')?.value || '').trim();
+  if (!pin) {
+    showManageError('Enter a new PIN.');
+    return;
+  }
+  try {
+    const body = { pin };
+    if (current) body.currentPin = current;
+    await api('POST', `/api/profiles/${encodeURIComponent(_status.active)}/pin`, body);
+    if (el('profilePinNew')) el('profilePinNew').value = '';
+    if (el('profilePinCurrent')) el('profilePinCurrent').value = '';
+    await fetchProfilesStatus();
+    syncPinManageFields();
+    setManageStatus('PIN saved.');
+  } catch (e) {
+    showManageError(e.message);
+  }
+}
+
+async function clearProfilePin() {
+  if (!_status?.active) return;
+  const current = (el('profilePinCurrent')?.value || '').trim();
+  if (!current) {
+    showManageError('Enter the current PIN to remove it.');
+    return;
+  }
+  try {
+    await api('DELETE', `/api/profiles/${encodeURIComponent(_status.active)}/pin`, { currentPin: current });
+    if (el('profilePinCurrent')) el('profilePinCurrent').value = '';
+    if (el('profilePinNew')) el('profilePinNew').value = '';
+    await fetchProfilesStatus();
+    syncPinManageFields();
+    setManageStatus('PIN removed.');
+  } catch (e) {
+    showManageError(e.message);
+  }
+}
+
 export async function initProfiles() {
   applyColorThemeFromStorage();
   renderThemeList();
   const wrap = el('profileMenuWrap');
-  if (isAccountAuthMode()) {
+  if (isAccountAuthMode() && !isLocalProfilesEnabled()) {
     if (wrap) wrap.classList.remove('hidden');
     await syncAccountProfileId();
     renderAccountMenu(getAccountEmail());

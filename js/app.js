@@ -19,6 +19,7 @@ import {
   fetcherRunner,
   loadFetcherSources,
   configureFetcherHealth,
+  ensureProfileScopedFetcherState,
 } from './fetcher-health.js';
 import { initConnections, isItchTabAvailable } from './connections.js';
 import {
@@ -102,6 +103,7 @@ function hydrateState() {
 
 async function bootstrap() {
   await initAuthGate();
+  ensureProfileScopedFetcherState();
   const tBoot = typeof performance !== "undefined" ? performance.now() : Date.now();
   // Dashboard now uses direct ES imports for its dependencies (game-core,
   // deals, genres, personal-storage, prefs, filters-ui, table-ui). The

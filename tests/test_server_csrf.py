@@ -95,3 +95,48 @@ def test_local_origin_post_allowed(csrf_server: str) -> None:
     base = csrf_server
     status, _body = _post(base, "/api/runs/cancel", origin=base)
     assert status == 200
+
+
+def _put_personal(
+    base: str,
+    *,
+    origin: str | None = None,
+    local_header: bool = False,
+) -> tuple[int, dict]:
+    import urllib.error
+    import urllib.request
+
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if origin is not None:
+        headers["Origin"] = origin
+    if local_header:
+        headers[server._BAKLOG_LOCAL_HEADER] = "1"
+    body = json.dumps({"personal": {}, "prefs": {}, "manual": []}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base}/api/personal",
+        method="PUT",
+        headers=headers,
+        data=body,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status, json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        payload = exc.read().decode("utf-8")
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            parsed = {"error": payload}
+        return exc.code, parsed
+
+
+def test_personal_put_requires_local_header_not_origin_only(csrf_server: str) -> None:
+    base = csrf_server
+    status, body = _put_personal(base, origin=base)
+    assert status == 403
+    assert "cross-origin" in body.get("error", "").lower()
+
+
+def test_personal_put_allowed_with_local_header(csrf_server: str) -> None:
+    status, _body = _put_personal(csrf_server, local_header=True)
+    assert status == 200

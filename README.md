@@ -17,22 +17,23 @@ See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves 
 | OS | Status |
 |----|--------|
 | **Windows 10/11** | Fully supported (primary development target) |
-| **macOS** | Supported with limits — every store except **Amazon Games** and **GOG Galaxy (local)** |
-| **Linux** | Supported with limits — every store except **Amazon Games** and **GOG Galaxy (local)** |
+| **macOS** | Supported with limits — **Amazon Games (launcher)** and **GOG Galaxy (local)** are Windows/macOS-only local sources |
+| **Linux** | Supported with limits — **Amazon Games (launcher)** and **GOG Galaxy (local)** are unavailable; use web Connect instead |
 
-The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. **Windows-only local sources:** **Amazon Games** reads the desktop launcher's DPAPI-encrypted SQLite (no portable equivalent). **GOG Galaxy (local)** reads `galaxy-2.0.db` from the Galaxy install (Windows ProgramData or macOS Shared) — there is no supported Linux path, so Linux users use the GOG web cookie instead. On macOS/Linux, Amazon is shown as **Unavailable** in Connections and its fetcher chip is disabled; GOG library still works via web Connect or cookie.
+The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. **Windows-only local source:** **Amazon Games (launcher)** reads the desktop launcher's DPAPI-encrypted SQLite (no portable equivalent) — on macOS/Linux use **Amazon (Prime Gaming, web)** Connect instead; the Amazon fetcher still runs and auto-picks the web session. **GOG Galaxy (local)** reads `galaxy-2.0.db` from the Galaxy install (Windows ProgramData or macOS Shared) — there is no supported Linux path, so Linux users use **GOG (web)** instead. Platform-restricted local providers show as **Unavailable** on unsupported OSes; their fetcher chips stay enabled when a web fallback exists.
 
 Credentials are stored via your OS **keyring** (Windows Credential Manager, macOS Keychain, Linux Secret Service) with an AES-GCM file fallback — not DPAPI. See [`auth/secrets.py`](auth/secrets.py).
 
 **Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium for the Connect sign-in flow (override with `BAKLOG_CHROME_PATH`), then `pip install -e ".[dev]"` and `python server.py`.
 
-**Optional invite-only accounts:** Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. See [docs/SUPABASE_AUTH.md](docs/SUPABASE_AUTH.md). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing.
+**Optional invite-only accounts:** Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. See [docs/SUPABASE_AUTH.md](docs/SUPABASE_AUTH.md). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing. Set `BAKLOG_LOCAL_PROFILES=1` to keep the local Work/Play profile switcher available while Supabase sign-in stays on (optional per-profile PINs gate switching; profile mutations require the in-app `X-BAKLOG-Local` header).
 
 ### Store availability by platform
 
 | Store | Windows | macOS / Linux |
 |-------|:-------:|:-------------:|
 | Steam, GOG (web), PSN, Epic, Xbox, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA, ITAD | Yes | Yes |
+| Amazon (Prime Gaming, web) | Yes | Yes |
 | GOG Galaxy (local `galaxy-2.0.db`) | Yes | macOS only (no Linux Galaxy path) |
 | itch butler (local `butler.db`) | Yes | Yes |
 | Amazon Games (launcher DB) | Yes | No |

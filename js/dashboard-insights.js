@@ -9,6 +9,7 @@ import { getPersonal } from './personal-storage.js';
 import { getDealInfo, dealScore, isStealDeal, cutBucketClass } from './deals.js';
 import { formatMoney, displayCurrency } from './currency.js';
 import { registerPausable } from './visibility.js';
+export { applyMarqueeSpeed, observeMarqueeSpeed, MARQUEE_PX_PER_SEC } from './marquee-speed.js';
 import {
   getLibrarySnapshot,
   completionAverage,
@@ -704,19 +705,6 @@ export function buildMarqueeItems(games, snapIn) {
   });
 
   return spreadByFamily(applyMetricWeights(items), it => it.family, { wrap: true });
-}
-
-/** Visual scroll speed (px/s). Keep in sync with landing/demo.js. */
-export const MARQUEE_PX_PER_SEC = 24;
-
-/** Set marquee animation-duration from measured track width for constant px/s. */
-export function applyMarqueeSpeed(rootEl = document) {
-  const scope = rootEl && typeof rootEl.querySelector === 'function' ? rootEl : document;
-  const track = scope.querySelector('.dash-marquee-track');
-  if (!track) return;
-  const copyWidth = track.scrollWidth / 2;
-  if (!copyWidth) return;
-  track.style.animationDuration = `${copyWidth / MARQUEE_PX_PER_SEC}s`;
 }
 
 export function renderMarqueeHtml(items) {

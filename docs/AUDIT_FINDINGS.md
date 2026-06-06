@@ -292,7 +292,7 @@ Second-pass audit hunting gaps **not** covered by Sections 1–14, `FETCHER_AUDI
 | Subscribe rate limit is in-memory per Vercel isolate | med | `find_landing_subscribe_kv` | Needs KV/Upstash or Turnstile for prod abuse resistance |
 | `[Unreleased]` feature test gaps (deal badges HTML, export top 20, auth-cooldown integration, connections refresh errors) | med | `find_unreleased_feature_tests` | See Section 15b |
 | `table-query.js` mirrors ~400 lines of game-core/deals/genres with no parity test | med | `find_table_query_worker_parity` | Worker must stay DOM-free; add cross-path tests |
-| macOS CI smoke omits Galaxy/butler client + merge tests | low | `find_macos_ci_galaxy_itch` | Add to `.github/workflows/ci.yml` macOS subset |
+| macOS CI smoke omits Galaxy/butler client + merge tests | fixed | `find_macos_ci_galaxy_itch` | Added in 7a1ec54 to `.github/workflows/ci.yml` macOS subset |
 | README `ruff check` scope narrower than CI | low | `find_readme_ruff_scope` | Align README with `ruff check .` |
 | Version frozen at 0.6.0 while `[Unreleased]` is large | low | `find_version_cut` | Cut release or bump pre-release when ready |
 | Marketing one-pager domain drift | fixed | — | `baklog.local` → `baklog.app` |

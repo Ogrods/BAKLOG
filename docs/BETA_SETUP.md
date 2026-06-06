@@ -6,8 +6,9 @@ Invite-only early access. **Free forever** to import your library. Everything ru
 
 ## What you need
 
-- **Windows 10 or 11** (primary beta target)
-- **Google Chrome or Microsoft Edge** (required for store Connect sign-in)
+- **Windows 10 or 11** (primary beta target — packaged `.exe` when available)
+- **macOS or Linux** — clone-and-run with Python 3.11+ (see below; no frozen installer yet)
+- **Google Chrome or Chromium** (required for store Connect sign-in; set `BAKLOG_CHROME_PATH` if off the default path)
 - **~200 MB disk space** for the app + your library data
 
 You do **not** need a BAKLOG cloud account for local-only mode. If your invite includes Supabase login, use the email/password from your invite message.
@@ -46,9 +47,37 @@ If the release is a source folder zip:
 
 ---
 
+## Quick start (macOS / Linux — clone and run)
+
+Frozen installers are Windows-only for now. On macOS or Linux:
+
+```bash
+git clone https://github.com/Ogrods/BAKLOG.git
+cd BAKLOG
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+python server.py
+```
+
+Open **http://127.0.0.1:8765**, then **Connections** → **Connect** for each store.
+
+**Store caveats on non-Windows:**
+
+| Source | macOS / Linux |
+|--------|----------------|
+| Browser Connect (Steam, Epic, GOG web, etc.) | Supported |
+| itch app (local `butler.db`) | Supported |
+| GOG Galaxy (local) | macOS only — on Linux use **GOG (web)** |
+| Amazon Games launcher | Windows only — use **Amazon (Prime Gaming, web)** Connect |
+
+Unattended refresh: `./refresh.sh` (skips the Windows launcher Amazon path; run `python fetch_amazon.py --source web` after Prime web Connect if you use Amazon).
+
+---
+
 ## Chrome / Edge
 
-Connect drives a real browser window for sign-in (cookies, OAuth). BAKLOG does not bundle a browser. If Connect fails, install Chrome or Edge and try again.
+Connect drives a real browser window for sign-in (cookies, OAuth). BAKLOG does not bundle a browser. If Connect fails, install Chrome or Chromium and try again.
 
 ---
 

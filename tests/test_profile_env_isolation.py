@@ -124,6 +124,30 @@ def test_default_profile_unverified_when_only_process_env(
     assert steam["status"] == "unverified"
 
 
+def test_subprocess_env_decrypts_target_when_other_profile_active(
+    isolated_profiles: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A queued run for 'work' must decrypt work's secrets even if 'play' is active.
+
+    Regression: key derivation used the live active profile, not the patched target,
+    so reading a non-active profile's secrets.bin failed and silently returned {}.
+    """
+    create_profile("Work")
+    create_profile("Play")
+    set_active_profile("work")
+    monkeypatch.setenv("BAKLOG_PROFILE", "work")
+    set_provider_blob("itad", {"ITAD_API_KEY": "work-itad", "status": "connected"})
+    secrets_mod._cache = None
+
+    set_active_profile("play")
+    monkeypatch.setenv("BAKLOG_PROFILE", "play")
+    secrets_mod._cache = None
+
+    env = subprocess_env_for_profile("work")
+    assert env.get("ITAD_API_KEY") == "work-itad"
+
+
 def test_subprocess_env_omits_unset_provider_keys(
     isolated_profiles: None,
     monkeypatch: pytest.MonkeyPatch,

@@ -162,17 +162,6 @@
     return `<div class="dash-marquee-track">${track}${track}</div>`;
   }
 
-  /** Visual scroll speed (px/s). Keep in sync with js/dashboard-insights.js. */
-  const MARQUEE_PX_PER_SEC = 24;
-
-  function syncMarqueeSpeed() {
-    const track = document.querySelector(".dash-marquee-track");
-    if (!track) return;
-    const copyWidth = track.scrollWidth / 2;
-    if (!copyWidth) return;
-    track.style.animationDuration = `${copyWidth / MARQUEE_PX_PER_SEC}s`;
-  }
-
   function buildStoreStripHtml() {
     const items = DEMO_STORE_KEYS.map((key) => {
       const color = STORE_BRAND_COLORS[key];
@@ -221,7 +210,7 @@
               <div class="dash-hero-pillar-label">Avg review</div>
             </div>
           </div>
-          <span id="dashboardInsight" class="dash-insight" aria-live="polite"></span>
+          <span id="dashboardInsight" class="dash-insight" aria-live="polite"><span class="dash-insight-text"></span></span>
         </div>
         <div class="dash-marquee">${buildMarqueeHtml()}</div>
         <div class="dash-mega-divider" aria-hidden="true"></div>
@@ -595,10 +584,11 @@
 
   function rotateInsight() {
     const el = document.getElementById("dashboardInsight");
-    if (!el || !INSIGHTS.length) return;
+    const textEl = el && el.querySelector(".dash-insight-text");
+    if (!el || !textEl || !INSIGHTS.length) return;
     el.classList.remove("is-visible");
     setTimeout(() => {
-      el.innerHTML = INSIGHTS[insightIndex % INSIGHTS.length];
+      textEl.innerHTML = INSIGHTS[insightIndex % INSIGHTS.length];
       insightIndex++;
       el.classList.add("is-visible");
     }, reducedMotion() ? 0 : 200);
@@ -633,7 +623,12 @@
   // Right legend needs room for the donut + the longest label
   // ("Overwhelmingly Positive"); below this the key reads better stacked under.
   const LEGEND_SIDE_MIN_PX = 340;
-  const legendPositionFor = (px) => (px >= LEGEND_SIDE_MIN_PX ? "right" : "bottom");
+  // Ribbon is single-column below 900px; full-width tiles exceed the side-legend
+  // width threshold but 180px height cannot fit a right legend (log: vw 640/900).
+  const legendPositionFor = (px) => {
+    if (window.innerWidth <= 900) return "bottom";
+    return px >= LEGEND_SIDE_MIN_PX ? "right" : "bottom";
+  };
   const donutCharts = [];
   let donutLegendResizeHooked = false;
   let donutLegendResizeRaf = 0;
@@ -692,6 +687,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        resizeDelay: 200,
         plugins: {
           legend: {
             position: legendPos,
@@ -722,20 +718,38 @@
   }
 
   // --- Init ---
+  let disconnectMarqueeSpeed = null;
+
+  function wireMarqueeSpeed(root) {
+    if (disconnectMarqueeSpeed) disconnectMarqueeSpeed();
+    disconnectMarqueeSpeed = BaklogMarquee.observeMarqueeSpeed(root);
+  }
+
+  let resizeQuietTimer = 0;
+  function installResizeQuiet() {
+    const root = document.documentElement;
+    window.addEventListener("resize", () => {
+      root.classList.add("ui-resizing");
+      if (resizeQuietTimer) clearTimeout(resizeQuietTimer);
+      resizeQuietTimer = setTimeout(() => {
+        resizeQuietTimer = 0;
+        root.classList.remove("ui-resizing");
+      }, 200);
+    }, { passive: true });
+  }
+
   function init() {
     const mount = document.getElementById("demoMount");
     if (!mount) return;
     mount.innerHTML = buildMegaHtml();
+    installResizeQuiet();
+    wireMarqueeSpeed(mount);
 
     applySpotlight(SPOTLIGHT_GAMES[0], 0);
     wireSpotlightNav();
     resetSpotlightTimer();
     startInsightRotation();
-    requestAnimationFrame(() => {
-      initCharts();
-      syncMarqueeSpeed();
-    });
-    if (document.fonts?.ready) document.fonts.ready.then(syncMarqueeSpeed);
+    requestAnimationFrame(() => initCharts());
 
     const heroCount = document.getElementById("dashHeroCount");
     if (heroCount) {
@@ -759,6 +773,7 @@
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) {
             runCountDemo();
+            wireMarqueeSpeed(mount);
             obs.disconnect();
           }
         },

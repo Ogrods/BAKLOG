@@ -6,6 +6,7 @@ import {
   authCooldownRemainingMs,
   clearAuthCooldown,
 } from '../js/fetcher-health.js';
+import { ACTIVE_PROFILE_LS, LS_FETCHER_AUTH_COOLDOWN } from '../js/profiles.js';
 
 describe('authCooldownDurationMs', () => {
   it('escalates 5m -> 15m -> 60m and caps at the top step', () => {
@@ -53,5 +54,19 @@ describe('chip auth cooldown lifecycle', () => {
     expect(authCooldownRemainingMs('psn')).toBeGreaterThan(0);
     clearAuthCooldown('psn');
     expect(authCooldownRemainingMs('psn')).toBe(0);
+  });
+
+  it('loads cooldowns from the active profile key after ensureProfileScopedFetcherState', async () => {
+    vi.resetModules();
+    vi.useRealTimers();
+    localStorage.clear();
+    localStorage.setItem(ACTIVE_PROFILE_LS, 'work');
+    const key = `${LS_FETCHER_AUTH_COOLDOWN}:work`;
+    const until = Date.now() + 60_000;
+    localStorage.setItem(key, JSON.stringify({ psn: { until, strikes: 1 } }));
+    const mod = await import('../js/fetcher-health.js');
+    mod.ensureProfileScopedFetcherState();
+    expect(mod.authCooldownRemainingMs('psn')).toBeGreaterThan(0);
+    mod.clearAuthCooldown('psn');
   });
 });

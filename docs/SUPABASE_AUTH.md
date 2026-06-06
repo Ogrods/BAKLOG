@@ -30,6 +30,8 @@ Restart `python server.py`. The login overlay appears when URL + anon key are se
 
 **Local dev without Supabase:** set `BAKLOG_AUTH_DISABLED=1` in `.env` to skip JWT checks and use the normal profile switcher.
 
+**Supabase + local Work/Play profiles:** set `BAKLOG_LOCAL_PROFILES=1` to re-enable the header profile switcher while account sign-in stays on. You stay signed in to Supabase; switching profiles uses `profiles/index.json` (not the JWT `sub` folder). Optional per-profile PINs gate switching. Profile mutations require the `X-BAKLOG-Local: 1` header (sent by the app) so arbitrary websites cannot switch profiles via CSRF.
+
 ## 3. Migrate your existing library (optional)
 
 Your pre-auth data may live in `profiles/default/` or the repo root (legacy layout). Supabase users do **not** auto-link to `default`. To attach old data to your account:

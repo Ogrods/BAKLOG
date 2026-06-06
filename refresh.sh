@@ -32,6 +32,7 @@ run fetch_battlenet.py --skip-hltb
 run fetch_ubisoft.py --skip-hltb
 run fetch_nintendo.py --skip-hltb
 run fetch_humble.py --skip-hltb
+run fetch_ea.py --skip-hltb
 run fetch_itch.py --only-new --skip-hltb
 run enrich_steam_reviews.py --stores itch
 run fetch_wishlist.py --skip-hltb

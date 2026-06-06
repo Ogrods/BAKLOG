@@ -14,7 +14,8 @@ vi.mock('../js/deals.js', () => ({
 }));
 
 import { state } from '../js/state.js';
-import { buildMarqueeItems, renderMarqueeHtml, applyMarqueeSpeed, MARQUEE_PX_PER_SEC } from '../js/dashboard-insights.js';
+import { buildMarqueeItems, renderMarqueeHtml } from '../js/dashboard-insights.js';
+import { applyMarqueeSpeed, MARQUEE_PX_PER_SEC } from '../js/marquee-speed.js';
 import { marqueeTip } from '../js/metric-tips.js';
 import { getLibrarySnapshot, invalidateLibrarySnapshot } from '../js/sabermetrics.js';
 
@@ -81,7 +82,8 @@ describe('buildMarqueeItems', () => {
 });
 
 describe('applyMarqueeSpeed', () => {
-  it('sets animation-duration from measured track width', () => {
+  it('sets --marquee-duration from measured track width', () => {
+    document.documentElement.style.setProperty('--marquee-px-per-sec', String(MARQUEE_PX_PER_SEC));
     const root = document.createElement('div');
     root.innerHTML = `
       <div class="dash-marquee">
@@ -92,7 +94,7 @@ describe('applyMarqueeSpeed', () => {
 
     applyMarqueeSpeed(root);
 
-    expect(track.style.animationDuration).toBe(`${400 / MARQUEE_PX_PER_SEC}s`);
+    expect(track.style.getPropertyValue('--marquee-duration')).toBe(`${400 / MARQUEE_PX_PER_SEC}s`);
   });
 
   it('no-ops when track width is zero', () => {
@@ -103,6 +105,6 @@ describe('applyMarqueeSpeed', () => {
 
     applyMarqueeSpeed(root);
 
-    expect(track.style.animationDuration).toBe('');
+    expect(track.style.getPropertyValue('--marquee-duration')).toBe('');
   });
 });

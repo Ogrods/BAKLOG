@@ -17,10 +17,10 @@ import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, countUpDurationForDelta, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
-import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView } from './dashboard-charts.js';
+import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView, setRibbonChartsResponsive } from './dashboard-charts.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
-import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation, applyMarqueeSpeed } from './dashboard-insights.js';
+import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
 import { THEME_CHANGE_EVENT } from './theme.js';
@@ -53,6 +53,7 @@ let _dashMegaShellBuilt = false;
 let _dashRenderedFingerprint = "";
 const _dashLastCounters = {};
 let _marqueeItemsKey = "";
+let _marqueeSpeedDisconnect = null;
 
 // Entrance animations may only replay when switchView('dashboard') sets the
 // token and calls renderDashboard({ replay: true }). Bootstrap schedules and
@@ -172,8 +173,35 @@ function applyMegaHeroCounters(stats) {
   _dashCountersInitialized = true;
 }
 
-function scheduleMarqueeSpeed(rootEl) {
-  requestAnimationFrame(() => applyMarqueeSpeed(rootEl || document.getElementById('dashboardMega')));
+let _resizeQuietInstalled = false;
+let _resizeQuietTimer = 0;
+// Drop the mega hero's per-frame backdrop blurs and pause its spotlight
+// float/sheen while the window is actively resizing (css keys off
+// html.ui-resizing), then restore ~200ms after resize settles.
+function ensureResizeQuiet() {
+  if (_resizeQuietInstalled) return;
+  _resizeQuietInstalled = true;
+  const root = document.documentElement;
+  window.addEventListener('resize', () => {
+    const wasResizing = root.classList.contains('ui-resizing');
+    root.classList.add('ui-resizing');
+    if (!wasResizing) setRibbonChartsResponsive(false);
+    if (_resizeQuietTimer) clearTimeout(_resizeQuietTimer);
+    _resizeQuietTimer = setTimeout(() => {
+      _resizeQuietTimer = 0;
+      root.classList.remove('ui-resizing');
+      setRibbonChartsResponsive(true);
+    }, 200);
+  }, { passive: true });
+}
+
+function wireMarqueeSpeed(rootEl) {
+  ensureResizeQuiet();
+  if (_marqueeSpeedDisconnect) {
+    _marqueeSpeedDisconnect();
+    _marqueeSpeedDisconnect = null;
+  }
+  _marqueeSpeedDisconnect = observeMarqueeSpeed(rootEl || document.getElementById('dashboardMega'));
 }
 
 function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap) {
@@ -214,7 +242,7 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
       const divider = el.querySelector('.dash-mega-divider');
       divider?.insertAdjacentHTML('beforebegin', renderMarqueeHtml(marqueeItems));
     }
-    scheduleMarqueeSpeed(el);
+    wireMarqueeSpeed(el);
   }
   startInsightRotation(buildInsightPool(games, snap));
   startSpotlightRotation(spotlightPool);
@@ -294,7 +322,7 @@ function renderDashboardMega(games, snap) {
   primeSpotlightArt(document.getElementById('dashboardSpotlight'));
   startInsightRotation(buildInsightPool(games, snap));
   startSpotlightRotation(spotlightPool);
-  scheduleMarqueeSpeed(el);
+  wireMarqueeSpeed(el);
 }
 
 function runWhenIdle(fn, timeoutMs = 1200) {

@@ -24,6 +24,16 @@ def auth_disabled() -> bool:
     )
 
 
+def local_profiles_enabled() -> bool:
+    """Allow local Work/Play profile switching even when Supabase auth is on."""
+    return os.environ.get("BAKLOG_LOCAL_PROFILES", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def _jwt_secret() -> str:
     return os.environ.get("BAKLOG_SUPABASE_JWT_SECRET", "").strip()
 
@@ -53,6 +63,7 @@ def public_auth_config() -> dict[str, Any]:
         "supabaseUrl": _supabase_url(),
         "supabaseAnonKey": _anon_key(),
         "authRequired": auth_enabled(),
+        "localProfiles": local_profiles_enabled(),
     }
 
 

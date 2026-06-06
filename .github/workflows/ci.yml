@@ -96,6 +96,9 @@ jobs:
             tests/test_cdp_browser.py \
             tests/test_gog_galaxy_client.py \
             tests/test_itch_local_client.py \
+            tests/test_profile_pin.py \
+            tests/test_csrf_profiles.py \
+            tests/test_server_supabase_auth.py \
             -m "not integration"
 
   javascript:

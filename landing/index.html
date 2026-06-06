@@ -37,11 +37,13 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" /></noscript>
   <link rel="stylesheet" href="demo.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="marquee-speed.js" defer></script>
   <script src="demo.js" defer></script>
   <script src="main.js" defer></script>
 
-  <!-- Structured data (external file, CSP script-src 'self' blocks inline JSON-LD) -->
-  <script type="application/ld+json" src="structured-data.json"></script>
+  <!-- Structured data: inline. The src attribute is ignored on ld+json blocks,
+       and data blocks aren't executed so CSP script-src doesn't apply to them. -->
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","description":"BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, invite-only early access.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
 
   <style>
     :root {

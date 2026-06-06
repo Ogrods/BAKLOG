@@ -158,6 +158,14 @@ does:
   Prefer a real keychain or enable the master password.
 - **Browser `localStorage`.** Anything that can read the served origin can read
   your annotations and UI prefs there. It holds no credentials.
+- **Shared-family profile switching without a PIN.** Optional per-profile PINs
+  (`Manage profiles`) gate switching when `BAKLOG_LOCAL_PROFILES=1` is set
+  alongside Supabase auth. Without a PIN, anyone at the keyboard can switch
+  profiles while the app is open.
+- **Cross-profile secrets if the OS keyring master key is compromised.** Each
+  profile's `secrets.bin` uses a derived subkey (HKDF from the shared keyring
+  master + profile id). Sibling profiles cannot decrypt each other's blob from
+  disk alone, but a full keyring compromise still unlocks all profiles.
 - **Storefront terms of service and account flagging.** Automated fetches run
   under your account at your own risk. Replaying only your own session from your
   own IP (see [How BAKLOG reaches each store](#how-baklog-reaches-each-store))

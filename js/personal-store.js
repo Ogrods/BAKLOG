@@ -1,5 +1,5 @@
 import { baklogFetch, BAKLOG_LOCAL_HEADER, BAKLOG_LOCAL_HEADER_VALUE } from './api-client.js';
-import { getAccessToken, isAccountAuthMode } from './auth-gate.js';
+import { getAccessToken, isAccountAuthMode, isLocalProfilesEnabled } from './auth-gate.js';
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
 import { activeProfileId, prefsStorageKey, profileScopedStorageKey } from './profiles.js';
 
@@ -36,7 +36,10 @@ export const personalStore = (() => {
       manual: JSON.parse(JSON.stringify(getManualGamesFn())),
       libraryFirstSeen: JSON.parse(JSON.stringify(state.libraryFirstSeenByKey || {})),
     };
-    if (!isAccountAuthMode()) {
+    // Claim the active profile so the server's 409 stale-profile guard fires.
+    // In pure account-auth mode the JWT pins the profile, so the claim is omitted;
+    // but with local profiles re-enabled the switcher is live and the claim matters.
+    if (!isAccountAuthMode() || isLocalProfilesEnabled()) {
       snap.profile = activeProfileId();
     }
     return snap;
@@ -199,20 +202,17 @@ export const personalStore = (() => {
     const snap = snapshotLocal();
     const body = JSON.stringify(snap);
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        [BAKLOG_LOCAL_HEADER]: BAKLOG_LOCAL_HEADER_VALUE,
+      };
       if (isAccountAuthMode()) {
-        const headers = {
-          'Content-Type': 'application/json',
-          [BAKLOG_LOCAL_HEADER]: BAKLOG_LOCAL_HEADER_VALUE,
-        };
         const token = getAccessToken();
         if (token) headers.Authorization = `Bearer ${token}`;
-        fetch('/api/personal', { method: 'PUT', headers, body, keepalive: true }).catch((err) => {
-          console.warn('[personalStore] keepalive flush failed', err);
-        });
-      } else {
-        const blob = new Blob([body], { type: 'application/json' });
-        navigator.sendBeacon('/api/personal', blob);
       }
+      fetch('/api/personal', { method: 'PUT', headers, body, keepalive: true }).catch((err) => {
+        console.warn('[personalStore] keepalive flush failed', err);
+      });
     } catch (err) {
       console.warn('[personalStore] unload flush failed', err);
     }

@@ -47,3 +47,11 @@ dist/BAKLOG/
 dist/BAKLOG.exe
 
 .vercel
+
+# Marketing + internal documents (kept local, not in the public repo)
+marketing/
+docs/
+audit/
+tracker.html
+preview-bootstrap.html
+IP.md

@@ -128,10 +128,22 @@ export function bindEvents() {
       renderDashboardFetcherHealth();
     } else if (e.target.id === "itadAutoRefreshToggle") {
       state.prefs.itadAutoRefreshDisabled = !e.target.checked;
+      const slider = document.getElementById("itadAutoRefreshInterval");
+      if (slider) slider.disabled = !e.target.checked;
+      savePrefs();
+    } else if (e.target.id === "itadAutoRefreshInterval") {
+      state.prefs.itadAutoRefreshIntervalMin = Number(e.target.value);
       savePrefs();
     } else if (e.target.id === "autoEnrichOnAddToggle") {
       state.prefs.autoEnrichOnAdd = e.target.checked;
       savePrefs();
+    }
+  });
+
+  document.getElementById("dashboardFetcherHealth")?.addEventListener("input", e => {
+    if (e.target.id === "itadAutoRefreshInterval") {
+      const valEl = document.getElementById("itadAutoRefreshIntervalVal");
+      if (valEl) valEl.textContent = `${e.target.value}m`;
     }
   });
 

@@ -1,6 +1,10 @@
 /**
- * Games pre-hidden on first run (formerly Python fetcher denylists).
- * Users can restore any entry from the Hidden games panel.
+ * The hidden list (defaults): entries pre-hidden on first run, formerly Python
+ * fetcher denylists. Unlike the blacklist (isJunkEntry / JUNK_NAMES in
+ * js/game-core.js, which silently drops non-games for good), these are real
+ * library items a user can restore from the Hidden games panel. They seed the
+ * user-editable hidden list; any hide/restore the user makes on top lives in
+ * personal storage. Blacklist = hardcoded noise; hidden list = user-editable.
  */
 export const PRE_HIDDEN_KEYS = [
   { key: 'epic:4b5f1eb366dc45f0920d397c01b291ba:8d644d777e5042c187c03530b965dc17', name: 'Q.U.B.E. 2 - Glove Skin', store: 'epic' },

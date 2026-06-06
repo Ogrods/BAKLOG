@@ -34,27 +34,6 @@ PSN_SSOCOOKIE_INTERVAL_SEC = 10
 _STEALTH_INIT = STEALTH_INIT_SCRIPT
 
 
-# #region agent log
-def _cf7log(hypothesis: str, message: str, data: dict) -> None:
-    try:
-        import json as _json
-        import time as _time
-        from pathlib import Path as _Path
-
-        _path = _Path(__file__).resolve().parents[1] / "debug-cf7aab.log"
-        _line = _json.dumps(
-            {"sessionId": "cf7aab", "hypothesisId": hypothesis, "location": "auth/runner.py",
-             "message": message, "data": data, "timestamp": int(_time.time() * 1000)},
-            default=str,
-        )
-        with open(_path, "a", encoding="utf-8") as _f:
-            _f.write(_line + "\n")
-    except Exception:
-        pass
-# #endregion
-
-
-
 class AuthSession:
     __slots__ = ("id", "provider", "events", "_listeners", "_finished", "_lock")
 
@@ -1371,9 +1350,6 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
     )
     session.emit("waiting_for_user", {"message": connect_hint})
 
-    # #region agent log
-    _cf7log("HC4", "run_browser_auth about to launch window", {"provider": provider, "user_data": str(user_data)[-60:]})
-    # #endregion
     with launch_persistent_profile(user_data, headless=False) as context:
         context.add_init_script(_STEALTH_INIT)
         # Paint a persistent, click-through banner inside the popup so users see

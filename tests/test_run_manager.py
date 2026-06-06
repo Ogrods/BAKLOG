@@ -602,6 +602,54 @@ def test_max_runtime_cap_kills_run(runs_env, monkeypatch: pytest.MonkeyPatch):
     assert run.exit_code == -1
 
 
+def test_max_run_seconds_for_key_uses_fetcher_override(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1800.0)
+    monkeypatch.setitem(
+        server.FETCHERS,
+        "hltb",
+        {**(server.FETCHERS.get("hltb") or {}), "maxRunSeconds": 7200},
+    )
+    assert server._max_run_seconds_for_key("hltb") == 7200.0
+    assert server._max_run_seconds_for_key("steam") == 1800.0
+
+
+def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1.0)
+    monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
+    monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 9999)
+    mgr, _ = runs_env
+    monkeypatch.setitem(
+        server.FETCHERS,
+        "long_enrich",
+        {
+            "label": "Long enrich",
+            "argv": [
+                server.sys.executable,
+                "-c",
+                "print('start'); import time; time.sleep(30)",
+            ],
+            "refreshArgs": [],
+            "metaKey": "long_enrich",
+            "group": "enrich",
+            "color": "#fff",
+            "requires": [],
+            "maxRunSeconds": 5.0,
+        },
+    )
+    run = mgr.submit("long_enrich")
+    saw_cap = False
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        replay = run.replay_lines()
+        if any("maximum runtime (5" in m.get("text", "") for m in replay):
+            saw_cap = True
+            break
+        time.sleep(0.05)
+    assert saw_cap, "expected per-fetcher 5s cap message in run log"
+    assert run._finished.wait(timeout=15)
+    assert run.status == "failed"
+
+
 def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(server, "STALL_FIRST_NOTICE_SEC", 0.2)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)

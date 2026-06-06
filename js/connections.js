@@ -4,6 +4,7 @@ import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
+import { savePrefs } from './prefs.js';
 import { state } from './state.js';
 import { storeLogoHtml } from './store-logos.js';
 import { STORE_BRAND_COLORS } from './store-brand-colors.js';
@@ -56,6 +57,7 @@ let postConnectFastPollTimer = null;
 let postConnectFastPollStopAt = 0;
 
 let gridWired = false;
+let noteSaveTimer = null;
 
 let chromeWired = false;
 
@@ -258,11 +260,61 @@ export function groupRepFor(key) {
   return GROUP_OF[key] || key;
 }
 
-export function combinedGroupStatus(members) {
-  return members.reduce((best, p) => {
+export function combinedGroupStatus(members, groupKey) {
+  const def = groupKey ? PROVIDER_GROUPS[groupKey] : null;
+  if (def?.type === 'content') {
+    // Library + wishlist are separate sign-ins; the rail status follows the library
+    // card (listed first) so a connected wishlist cannot mask an expired library.
+    const libraryKey = def.members[0];
+    const library = (members || []).find(m => m.key === libraryKey);
+    return library?.status || 'disconnected';
+  }
+  return (members || []).reduce((best, p) => {
     const st = p.status || 'disconnected';
     return (STATUS_RANK[st] ?? 0) > (STATUS_RANK[best] ?? 0) ? st : best;
   }, 'disconnected');
+}
+
+const GROUP_PILL_WORD = {
+  expired: 'expired',
+  disconnected: 'not connected',
+  unverified: 'unverified',
+  unavailable: 'unavailable',
+};
+const GROUP_PILL_ORDER = ['expired', 'disconnected', 'unverified', 'unavailable'];
+
+/**
+ * Rail pill for content groups (library + wishlist are separate sign-ins). A
+ * single best/worst status can't tell the story when one member is connected
+ * and the other expired, so summarise: green when every member is connected,
+ * grey when nothing is set up yet, and an amber count pill ("1 expired",
+ * "1 not connected", "1 expired · 1 not connected") for any partial/attention
+ * state. Returns null for non-content groups (source groups like Amazon/GOG
+ * where any one connected member is enough) and for empty member sets.
+ */
+export function groupRailPill(members, groupKey) {
+  const def = groupKey ? PROVIDER_GROUPS[groupKey] : null;
+  if (def?.type !== 'content') return null;
+  const present = (members || []).filter(Boolean);
+  if (!present.length) return null;
+  const sts = present.map(m => m.status || 'disconnected');
+  const connectedCount = sts.filter(s => s === 'connected').length;
+
+  if (connectedCount === sts.length) {
+    return { cls: STATUS_CLASS.connected, label: STATUS_LABEL.connected, dotState: 'connected' };
+  }
+  if (sts.every(s => s === 'disconnected' || s === 'unavailable')) {
+    return { cls: STATUS_CLASS.disconnected, label: STATUS_LABEL.disconnected, dotState: 'disconnected' };
+  }
+  const counts = {};
+  for (const s of sts) {
+    if (s !== 'connected') counts[s] = (counts[s] || 0) + 1;
+  }
+  const label = GROUP_PILL_ORDER
+    .filter(s => counts[s])
+    .map(s => `${counts[s]} ${GROUP_PILL_WORD[s]}`)
+    .join(' \u00b7 ');
+  return { cls: STATUS_CLASS.expired, label, dotState: 'expired' };
 }
 
 /** Explanatory note above grouped provider cards (source vs content grouping). */
@@ -334,9 +386,10 @@ function railEntries() {
     out.push({
       key: g,
       label: PROVIDER_GROUPS[g].label,
-      status: combinedGroupStatus(members),
+      status: combinedGroupStatus(members, g),
       available: members.some(m => m.available !== false),
       _group: true,
+      _members: members,
     });
   }
   return out;
@@ -614,6 +667,15 @@ function buildCardHtml(p) {
       <span class="conn-facet conn-facet--source" title="Where credentials are stored">${escapeHtml(sourceFacet(p))}</span>
     </div>`;
 
+  const noteVal = (state.prefs?.connectionNotes || {})[p.key] || '';
+  const notesHtml = `
+    <div class="conn-notes">
+      <label class="conn-notes-label" for="conn-note-${escapeAttr(p.key)}">Notes</label>
+      <textarea id="conn-note-${escapeAttr(p.key)}" class="conn-note-input"
+        data-note-provider="${escapeAttr(p.key)}" rows="2"
+        placeholder="Private notes for this connection (saved to this profile)">${escapeHtml(noteVal)}</textarea>
+    </div>`;
+
   return `
 
     <article class="conn-card${p.kind === 'manual' ? ' conn-card--manual' : ''}" data-provider="${escapeAttr(p.key)}">
@@ -634,21 +696,27 @@ function buildCardHtml(p) {
 
       <div class="conn-card-body">
 
-        <h3>${escapeHtml(p.label)}</h3>
+        <div class="conn-card-body-main">
 
-        ${facets}
+          <h3>${escapeHtml(p.label)}</h3>
 
-        <p class="conn-desc">${escapeHtml(p.description || '')}</p>
+          ${facets}
 
-        ${tips}
+          <p class="conn-desc">${escapeHtml(p.description || '')}</p>
 
-        ${note}
+          ${tips}
 
-        ${err}
+          ${note}
 
-        ${expiry}
+          ${err}
 
-        <p class="conn-log hidden" aria-live="polite"></p>
+          ${expiry}
+
+          <p class="conn-log hidden" aria-live="polite"></p>
+
+        </div>
+
+        ${notesHtml}
 
       </div>
 
@@ -680,17 +748,24 @@ function buildRailItemHtml(p, selected) {
     ? `${p.label} is available on ${formatPlatformList(p.platforms)} only`
     : `Select ${p.label} to connect or manage`;
 
+  // Content groups (library + wishlist) summarise both members in one amber
+  // count pill; everything else uses the single-status pill.
+  const groupPill = p._group ? groupRailPill(p._members, p.key) : null;
+  const dotState = groupPill ? groupPill.dotState : pillSt;
+  const pillCls = groupPill ? groupPill.cls : (STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected);
+  const pillLabel = groupPill ? groupPill.label : (STATUS_LABEL[pillSt] || pillSt);
+
   return `
 
     <div class="conn-rail-item${sel}${unav}" data-provider="${escapeAttr(p.key)}" role="option" tabindex="${selected ? '0' : '-1'}" aria-selected="${selected ? 'true' : 'false'}" title="${escapeAttr(title)}">
 
-      <span class="conn-row-dot conn-row-dot--${escapeAttr(pillSt)}" aria-hidden="true" title="Status: green=connected, amber=unverified, red=expired"></span>
+      <span class="conn-row-dot conn-row-dot--${escapeAttr(dotState)}" aria-hidden="true" title="Status: green=connected, amber=unverified, red=expired"></span>
 
       ${storeLogoHtml(storeKey, { size: 'sm', title: p.label, className: 'conn-rail-badge' })}
 
       <span class="conn-row-label">${escapeHtml(p.label)}</span>
 
-      <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected} conn-row-pill" title="Connection status">${STATUS_LABEL[pillSt] || pillSt}</span>
+      <span class="${pillCls} conn-row-pill" title="Connection status">${escapeHtml(pillLabel)}</span>
 
     </div>`;
 
@@ -714,6 +789,30 @@ function buildSteamRailBlock(p, selected) {
 
     </div>`;
 
+}
+
+
+
+function captureConnNoteFocus() {
+  const active = document.activeElement;
+  if (!active?.classList?.contains('conn-note-input')) return null;
+  return {
+    provider: active.dataset.noteProvider,
+    selStart: active.selectionStart,
+    selEnd: active.selectionEnd,
+  };
+}
+
+function restoreConnNoteFocus(focusState, root) {
+  if (!focusState?.provider || !root) return;
+  const ta = root.querySelector(`.conn-note-input[data-note-provider="${focusState.provider}"]`);
+  if (!ta) return;
+  ta.focus();
+  try {
+    ta.setSelectionRange(focusState.selStart, focusState.selEnd);
+  } catch {
+    // setSelectionRange can fail on some browsers during rapid re-render
+  }
 }
 
 
@@ -756,6 +855,8 @@ function renderConnections() {
 
   rail.innerHTML = railParts.join('');
 
+  const noteFocus = captureConnNoteFocus();
+
   if (PROVIDER_GROUPS[selKey]) {
     const members = PROVIDER_GROUPS[selKey].members
       .map(k => authStatus.find(x => x.key === k))
@@ -768,6 +869,8 @@ function renderConnections() {
       ? buildCardHtml(selected)
       : '<p class="text-sm text-slate-400">Select a provider on the left to get started.</p>';
   }
+
+  restoreConnNoteFocus(noteFocus, pane);
 
 }
 
@@ -864,11 +967,6 @@ function handleLayoutClick(ev) {
   const primaryBtn = target.closest('.conn-primary');
 
   if (primaryBtn?.dataset.provider) {
-
-    // #region agent log
-    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'HC1',location:'connections.js:primaryClick',message:'conn-primary clicked',data:{provider:primaryBtn.dataset.provider,disabled:primaryBtn.disabled,label:(primaryBtn.textContent||'').trim().slice(0,40)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     runConnAction(primaryBtn.dataset.provider, () => startBrowserConnect(primaryBtn.dataset.provider));
 
     return;
@@ -982,6 +1080,17 @@ function wireGridEvents() {
   if (!container || !layout) return;
 
   container.addEventListener('click', handleLayoutClick);
+
+  container.addEventListener('input', (ev) => {
+    const ta = ev.target.closest('.conn-note-input');
+    if (!ta) return;
+    const provider = ta.dataset.noteProvider;
+    if (!provider) return;
+    if (!state.prefs.connectionNotes) state.prefs.connectionNotes = {};
+    state.prefs.connectionNotes[provider] = ta.value;
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(() => savePrefs(), 500);
+  });
 
   layout.addEventListener('keydown', handleLayoutKeydown);
 
@@ -1875,11 +1984,6 @@ async function startBrowserConnect(provider) {
     res = await baklogFetch(`/api/auth/${provider}/start${fresh ? '?fresh=1' : ''}`, { method: 'POST' });
 
   } catch (err) {
-
-    // #region agent log
-    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'HC2',location:'connections.js:startBrowserConnect',message:'start POST network error',data:{provider,fresh,err:String(err).slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
 
     return;
@@ -1887,10 +1991,6 @@ async function startBrowserConnect(provider) {
   }
 
   const data = await res.json().catch(() => ({}));
-
-  // #region agent log
-  fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'HC2',location:'connections.js:startBrowserConnect',message:'start POST response',data:{provider,fresh,ok:res.ok,status:res.status,session_id:data.session_id||null,error:data.error||null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   if (!res.ok) {
 

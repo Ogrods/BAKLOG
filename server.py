@@ -229,6 +229,18 @@ from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
 
 
+def _max_run_seconds_for_key(key: str) -> float:
+    """Per-fetcher runtime cap from manifest maxRunSeconds, else global default."""
+    spec = FETCHERS.get(key) or {}
+    override = spec.get("maxRunSeconds")
+    if override is not None:
+        try:
+            return max(60.0, float(override))
+        except (TypeError, ValueError):
+            pass
+    return MAX_RUN_SECONDS
+
+
 def _release_server_profile_env() -> str | None:
     """Drop BAKLOG_PROFILE from the server's own env so the profile menu /
     profiles/index.json always owns the active profile. Per-run fetchers set
@@ -511,6 +523,12 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
         platforms = entry.get("platforms") or []
         if not isinstance(platforms, list):
             platforms = []
+        max_run_seconds = entry.get("maxRunSeconds")
+        if max_run_seconds is not None:
+            try:
+                max_run_seconds = max(60.0, float(max_run_seconds))
+            except (TypeError, ValueError):
+                max_run_seconds = None
         fetchers[key] = {
             "label": label,
             # Absolute script path so the launch never depends on subprocess cwd.
@@ -521,6 +539,7 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
             "color": entry.get("color"),
             "requires": requires,
             "platforms": [str(p) for p in platforms],
+            "maxRunSeconds": max_run_seconds,
         }
     return fetchers
 
@@ -553,6 +572,21 @@ FETCHERS: dict[str, dict[str, Any]] = _load_fetchers()
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    if sys.platform == "win32":
+        # os.kill(pid, 0) is not a reliable existence probe on Windows (WinError 87).
+        try:
+            out = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            line = (out.stdout or "").strip()
+            return bool(line) and "no tasks are running" not in line.lower()
+        except (OSError, subprocess.TimeoutExpired):
+            return False
     try:
         os.kill(pid, 0)
     except OSError:
@@ -1271,6 +1305,41 @@ class RunManager:
             raise KeyError(key)
         with self._lock:
             active = self._active
+            _reject = (active and active.key == key and active.status in _IN_FLIGHT_STATUSES) or any(
+                r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending
+            )
+            if _reject:
+                # region agent log (session 21853a)
+                try:
+                    import json as _json
+                    import time as _time
+                    _rec = {
+                        "sessionId": "21853a",
+                        "hypothesisId": "H2",
+                        "location": "server.py:RunManager.submit",
+                        "message": "submit rejected (already queued or running)",
+                        "data": {
+                            "key": key,
+                            "active": (
+                                {"key": active.key, "status": active.status,
+                                 "finished": active._finished.is_set(),
+                                 "profile_id": active.profile_id}
+                                if active else None
+                            ),
+                            "pending": [
+                                {"key": r.key, "status": r.status,
+                                 "finished": r._finished.is_set(),
+                                 "in_pending_is_active": (r is active)}
+                                for r in self._pending
+                            ],
+                        },
+                        "timestamp": int(_time.time() * 1000),
+                    }
+                    with open(ROOT / "debug-21853a.log", "a", encoding="utf-8") as _fh:
+                        _fh.write(_json.dumps(_rec, default=str) + "\n")
+                except Exception:
+                    pass
+                # endregion
             if active and active.key == key and active.status in _IN_FLIGHT_STATUSES:
                 raise ValueError(f"{key} already queued or running")
             if any(r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending):
@@ -1487,11 +1556,51 @@ class RunManager:
         with self._lock:
             active = (
                 self._active.to_summary()
-                if self._active and self._active.status in ("launching", "running", "cancelling")
+                if self._active and self._active.status in _IN_FLIGHT_STATUSES
                 else None
             )
-            queued = [r.to_summary() for r in self._pending if r.status == "queued"]
+            queued = [
+                r.to_summary()
+                for r in self._pending
+                if r.status == "queued" and r is not self._active
+            ]
             history = list(self._history)
+            # region agent log (session 21853a)
+            _act = self._active
+            _itad_present = (_act and _act.key == "itad") or any(
+                r.key == "itad" for r in self._pending
+            )
+            if _itad_present:
+                try:
+                    import json as _json
+                    import time as _time
+                    _rec = {
+                        "sessionId": "21853a",
+                        "hypothesisId": "H2",
+                        "location": "server.py:RunManager.snapshot",
+                        "message": "snapshot built with itad present in manager state",
+                        "data": {
+                            "raw_active": (
+                                {"key": _act.key, "status": _act.status,
+                                 "finished": _act._finished.is_set()}
+                                if _act else None
+                            ),
+                            "raw_pending": [
+                                {"key": r.key, "status": r.status,
+                                 "finished": r._finished.is_set(),
+                                 "is_active": (r is _act)}
+                                for r in self._pending
+                            ],
+                            "reported_active": active,
+                            "reported_queue_keys": [q.get("key") for q in queued],
+                        },
+                        "timestamp": int(_time.time() * 1000),
+                    }
+                    with open(ROOT / "debug-21853a.log", "a", encoding="utf-8") as _fh:
+                        _fh.write(_json.dumps(_rec, default=str) + "\n")
+                except Exception:
+                    pass
+            # endregion
         return {"active": active, "queue": queued, "history": history}
 
     def _finalize_run(self, run: Run) -> None:
@@ -1666,6 +1775,7 @@ class RunManager:
         last_line_at = time.monotonic()
         last_stall_notice_at = 0.0
         run_started_mono = time.monotonic()
+        max_run_sec = _max_run_seconds_for_key(run.key)
         max_runtime_killed = False
         reader_done = False
 
@@ -1681,10 +1791,10 @@ class RunManager:
                 if proc.poll() is not None and line_queue.empty():
                     break
                 elapsed = now - run_started_mono
-                if elapsed >= MAX_RUN_SECONDS:
+                if elapsed >= max_run_sec:
                     run.add_line(
                         "stderr",
-                        f"[server] exceeded maximum runtime ({int(MAX_RUN_SECONDS)}s) — "
+                        f"[server] exceeded maximum runtime ({int(max_run_sec)}s) — "
                         f"force-killing PID {proc.pid}",
                     )
                     if proc.pid:

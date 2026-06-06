@@ -12,15 +12,12 @@ from fetch_humble import (
 )
 from fetch_humble_wishlist import (
     WishlistItem,
-    _signed_out_page,
-    parse_wishlist_sources,
-)
-from fetch_humble_wishlist import (
     _build_row as _build_wishlist_row,
+    _item_from_lookup,
 )
 
 ORDER_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_order_detail.json"
-WISHLIST_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_wishlist_next_data.html"
+LOOKUP_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_wishlist_lookup.json"
 
 
 def test_subproduct_is_game_heuristics() -> None:
@@ -67,9 +64,9 @@ def test_build_library_row_schema() -> None:
     assert "unredeemed key" in row["tags"]
 
 
-def test_parse_wishlist_from_next_data_fixture() -> None:
-    html = WISHLIST_FIXTURE.read_text(encoding="utf-8")
-    items = parse_wishlist_sources(html, [])
+def test_item_from_lookup_fixture() -> None:
+    data = json.loads(LOOKUP_FIXTURE.read_text(encoding="utf-8"))
+    items = [it for it in (_item_from_lookup(o) for o in data["result"]) if it]
     assert len(items) == 2
     titles = {it.title for it in items}
     assert "Hollow Knight" in titles
@@ -77,6 +74,13 @@ def test_parse_wishlist_from_next_data_fixture() -> None:
     celeste = next(it for it in items if it.title == "Celeste")
     assert celeste.discount_percent == 75
     assert celeste.price == "$4.99"
+    assert celeste.store_url == "https://www.humblebundle.com/store/celeste"
+
+
+def test_item_from_lookup_requires_title_and_machine() -> None:
+    assert _item_from_lookup({}) is None
+    assert _item_from_lookup({"machine_name": "x"}) is None
+    assert _item_from_lookup({"human_name": "X"}) is None
 
 
 def test_build_wishlist_row_schema() -> None:
@@ -97,9 +101,3 @@ def test_build_wishlist_row_schema() -> None:
     assert row["humble_product_id"] == "hollow_knight"
 
 
-def test_signed_out_login_page() -> None:
-    assert _signed_out_page("", "https://www.humblebundle.com/login")
-    assert not _signed_out_page(
-        WISHLIST_FIXTURE.read_text(encoding="utf-8"),
-        "https://www.humblebundle.com/store/wishlist",
-    )

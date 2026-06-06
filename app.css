@@ -750,8 +750,8 @@ th:hover .sort-arrow { opacity: 0.8; }
   outline-offset: 2px;
 }
 /* Tailwind v4 removed the default pointer cursor on <button>; restore it.
-   Specificity stays at a single element so class-level overrides like
-   `.conn-pill { cursor: default }` continue to win. */
+   Specificity stays at a single element so class-level cursor overrides
+   continue to win. */
 button { cursor: pointer; }
 button[disabled] { cursor: not-allowed; }
 /* === Covers & picks === */
@@ -2132,6 +2132,8 @@ html[data-theme="ember"] .brand-logo-mark {
 .fh-legend .fh-chip-warn { margin-right: 0.15rem; vertical-align: middle; }
 .fh-toggle { font-size: 0.7rem; color: #94a3b8; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; user-select: none; }
 .fh-itad-auto { margin-left: 0.15rem; }
+.fh-itad-interval input[type="range"] { width: 70px; margin: 0; vertical-align: middle; }
+.fh-itad-interval #itadAutoRefreshIntervalVal { font-size: 0.68rem; color: #94a3b8; min-width: 1.75rem; }
 .fh-group-chips { align-items: center; }
 /* Structure only - color is owned by the semantic state classes below, exactly
    one of which is always present (initial markup is fh-global-status-idle). */
@@ -4751,7 +4753,14 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-card-stripe { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--accent); }
 .conn-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .conn-head-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.conn-card-body { flex: 1; }
+.conn-card-body {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.conn-card-body-main { flex: 1 1 240px; min-width: 0; }
 .conn-card-body h3 { font-weight: 600; color: var(--text-bright); margin-top: 6px; font-size: 15px; }
 .conn-facets {
   display: flex;
@@ -4810,6 +4819,46 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-tips li:first-child { color: var(--text-dim); }
 .conn-tips li:first-child::before { background: var(--accent); }
 .conn-note { color: var(--text-mute); font-size: 11px; margin-top: 4px; }
+.conn-notes {
+  flex: 1 1 200px;
+  max-width: 280px;
+  margin-top: 0;
+  align-self: flex-end;
+}
+/* Narrow cards: notes stack full-width beneath the main content. */
+@media (max-width: 520px) {
+  .conn-notes { max-width: none; flex-basis: 100%; }
+}
+.conn-notes-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+  margin-bottom: 4px;
+}
+.conn-note-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 52px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  resize: vertical;
+  font-family: inherit;
+}
+.conn-note-input::placeholder { color: var(--text-mute); opacity: 0.85; }
+.conn-note-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
 .conn-group-note {
   font-size: 12px;
   color: #94a3b8;
@@ -4976,7 +5025,7 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
 .conn-pill--unverified { background: #0c4a6e; color: var(--accent-muted); }
 .conn-pill--warn { background: #78350f; color: #fcd34d; }
 .conn-pill--off { background: var(--bg-panel); color: var(--text-mute); border: 1px solid var(--border); }
-.conn-pill { cursor: default; }
+.conn-pill { cursor: pointer; }
 
 #connectionsContainer button,
 #connectionsContainer .conn-primary,

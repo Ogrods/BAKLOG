@@ -405,6 +405,13 @@ export function itadLastAutoRunKey() {
 export const ITAD_AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 export const ITAD_AUTO_QUIET_HOUR_END = 7;
 
+/** User-configured ITAD auto-refresh interval (15–60 min) from prefs. */
+export function itadAutoRefreshIntervalMs() {
+  const min = Number(state.prefs?.itadAutoRefreshIntervalMin);
+  if (!Number.isFinite(min)) return ITAD_AUTO_REFRESH_INTERVAL_MS;
+  return Math.min(60, Math.max(15, min)) * 60_000;
+}
+
 export function thresholdsForMetaKey(metaKey) {
   return STALE_OVERRIDES[metaKey] || FRESH_THRESHOLDS;
 }
@@ -1178,13 +1185,35 @@ export function maybeAutoRefreshItad(deps = {}) {
   const stateForFn = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
   if (stateForFn('itad')) return false;
   const fresh = fetcherFreshness(ITAD_SOURCE);
-  if (fresh.ageMs < ITAD_AUTO_REFRESH_INTERVAL_MS) return false;
+  const intervalMs = itadAutoRefreshIntervalMs();
+  if (fresh.ageMs < intervalMs) return false;
   const now = deps.now ?? Date.now();
   const lastRun = deps.getLastRun
     ?? (() => Number(localStorage.getItem(itadLastAutoRunKey()) || 0));
-  if (now - lastRun() < ITAD_AUTO_REFRESH_INTERVAL_MS) return false;
+  if (now - lastRun() < intervalMs) return false;
   const setLastRun = deps.setLastRun
     ?? (t => localStorage.setItem(itadLastAutoRunKey(), String(t)));
+  // region agent log (session 21853a)
+  try {
+    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '21853a' },
+      body: JSON.stringify({
+        sessionId: '21853a',
+        hypothesisId: 'H1',
+        location: 'fetcher-health.js:maybeAutoRefreshItad',
+        message: 'itad auto-run firing',
+        data: {
+          stateForItad: stateForFn('itad') || null,
+          runStateHasItad: runStateByKey.has('itad'),
+          freshAgeMs: fresh.ageMs,
+          lastRunDeltaMs: now - lastRun(),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch (_) { /* ignore */ }
+  // endregion
   setLastRun(now);
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
   runFn('itad', { auto: true });
@@ -1303,6 +1332,8 @@ export function cycleStatLayout() {
 export const fetcherRunner = (() => {
   let apiAvailable = null;
   const runStateByKey = new Map();
+  /** Keys with a POST /api/run in flight before run_id is assigned. */
+  const submitInFlightKeys = new Set();
   const runIdByKey = new Map();
   // One EventSource per run (queued or running). Keeping all of them open
   // means a still-running fetcher keeps streaming lines even after the user
@@ -2422,7 +2453,7 @@ export const fetcherRunner = (() => {
     if (cancelInFlight) return;
     await loadFetcherSources(true);
     const src = source(key);
-    if (!src || runStateByKey.has(key)) return;
+    if (!src || runStateByKey.has(key) || submitInFlightKeys.has(key)) return;
     // Auth-failure backoff: block while cooling down. Auto/bulk runs stay
     // silent; a chip click is already prevented by the disabled attribute, so
     // this only fires for programmatic callers — explain it once.
@@ -2485,7 +2516,9 @@ export const fetcherRunner = (() => {
 
     const url = `/api/run/${encodeURIComponent(key)}${refresh ? '?refresh=1' : ''}`;
     let res;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    submitInFlightKeys.add(key);
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
       if (cancelInFlight) return;
       try {
         res = await fetchWithTimeoutAndProbe(url, { method: 'POST' });
@@ -2496,7 +2529,7 @@ export const fetcherRunner = (() => {
       }
       if (res.status !== 409) break;
       // Benign: key already in flight, or a just-cancelled run still holds the
-      // server's active slot. Re-sync; retry once after a short settle window.
+      // server's active slot. Re-sync; retry once only if the server queue is free.
       const txt = await res.text().catch(() => '');
       logEvent('info', `[${src.label}: ${txt || 'already in flight'} — re-syncing queue]`);
       await syncFromServer();
@@ -2505,38 +2538,66 @@ export const fetcherRunner = (() => {
         && !cancelInFlight
         && !runStateByKey.has(key)
         && !isQueueFull();
+      // region agent log (session 21853a)
+      try {
+        fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '21853a' },
+          body: JSON.stringify({
+            sessionId: '21853a',
+            hypothesisId: 'H1H2',
+            location: 'fetcher-health.js:run:409',
+            message: 'submit got 409; evaluated retry',
+            data: {
+              key,
+              auto,
+              attempt,
+              bodyText: txt,
+              runStateHasKeyAfterSync: runStateByKey.has(key),
+              isQueueFull: isQueueFull(),
+              cancelInFlight,
+              canRetry,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      } catch (_) { /* ignore */ }
+      // endregion
       if (!canRetry) return;
       await new Promise(r => setTimeout(r, 600));
-    }
-    if (res.status === 409) return;
-    if (!res.ok) {
-      invalidateApiProbe();
-      const txt = await res.text().catch(() => '');
-      logEvent('error', `[server ${res.status}] ${txt || 'submit failed'}`);
-      setStatus('failed');
-      markChipState(key, null);
-      return;
-    }
-    const { run_id: runId } = await res.json();
-    markChipState(key, 'queued', runId);
-    ensureInFlightPolling();
-    let snapAfterSubmit = null;
-    try {
-      snapAfterSubmit = await fetchRunsSnapshot();
-    } catch (_) {}
-    const queueExtra = queueStatusExtra(snapAfterSubmit, runId);
-    if (queueExtra) {
-      logEvent('info', `(queue ${queueExtra})`);
-      syncLogPanelChrome(src, 'queued', queueExtra);
-    } else if (snapAfterSubmit?.active?.id === runId) {
-      syncLogPanelChrome(src, snapAfterSubmit.active.status);
-    } else if (liveRunId && liveRunId !== runId) {
-      const liveSrc = sourcesByRunId.get(liveRunId)?.src;
-      logEvent('info', `(queued after ${liveSrc?.label || 'current run'})`);
-    }
-    // Only hold an SSE for the active run — queued runs attach when promoted.
-    if (snapAfterSubmit?.active?.id === runId || !queueExtra) {
-      subscribe(runId, key, src);
+      }
+      if (res.status === 409) return;
+      if (!res.ok) {
+        invalidateApiProbe();
+        const txt = await res.text().catch(() => '');
+        logEvent('error', `[server ${res.status}] ${txt || 'submit failed'}`);
+        setStatus('failed');
+        markChipState(key, null);
+        return;
+      }
+      const { run_id: runId } = await res.json();
+      markChipState(key, 'queued', runId);
+      ensureInFlightPolling();
+      let snapAfterSubmit = null;
+      try {
+        snapAfterSubmit = await fetchRunsSnapshot();
+      } catch (_) {}
+      const queueExtra = queueStatusExtra(snapAfterSubmit, runId);
+      if (queueExtra) {
+        logEvent('info', `(queue ${queueExtra})`);
+        syncLogPanelChrome(src, 'queued', queueExtra);
+      } else if (snapAfterSubmit?.active?.id === runId) {
+        syncLogPanelChrome(src, snapAfterSubmit.active.status);
+      } else if (liveRunId && liveRunId !== runId) {
+        const liveSrc = sourcesByRunId.get(liveRunId)?.src;
+        logEvent('info', `(queued after ${liveSrc?.label || 'current run'})`);
+      }
+      // Only hold an SSE for the active run — queued runs attach when promoted.
+      if (snapAfterSubmit?.active?.id === runId || !queueExtra) {
+        subscribe(runId, key, src);
+      }
+    } finally {
+      submitInFlightKeys.delete(key);
     }
   }
 
@@ -2641,11 +2702,6 @@ export const fetcherRunner = (() => {
           ? `${(data.ended_at - data.started_at).toFixed(1)}s`
           : '';
         const outcome = cancelled ? 'cancelled' : ok ? 'done' : 'failed';
-        // #region agent log
-        if (key === 'wishlistHumble' || key === 'humble') {
-          fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'H4H5',location:'fetcher-health.js:runDone',message:'humble run finished',data:{key,outcome,status:data.status,exit_code:data.exit_code,failure_kind:data.failure_kind||null},timestamp:Date.now()})}).catch(()=>{});
-        }
-        // #endregion
         logEvent(
           'info',
           `[${src.label}: exit ${data.exit_code}] ${outcome}${duration ? ` in ${duration}` : ''}`,
@@ -2848,17 +2904,17 @@ export const fetcherRunner = (() => {
     }
   }
 
-  function _runDashboardPollTick() {
+  async function _runDashboardPollTick() {
     if (isPageHidden()) return;
-    syncFromServer();
+    await syncFromServer();
     maybeAutoRefreshItad();
   }
 
   function startDashboardPolling() {
     _dashboardPollWanted = true;
     if (pollTimer || !isApiAvailable() || isPageHidden()) return;
-    maybeAutoRefreshItad();
-    pollTimer = setInterval(_runDashboardPollTick, 30_000);
+    void syncFromServer().then(() => maybeAutoRefreshItad());
+    pollTimer = setInterval(() => { void _runDashboardPollTick(); }, 30_000);
   }
 
   function pauseDashboardPollForVisibility() {
@@ -3190,11 +3246,6 @@ export function renderDashboardFetcherHealth() {
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
     const displayStatus = runState
       || (persistFailed ? 'failed' : (needsReconnect ? 'reconnect' : status));
-    // #region agent log
-    if (src.key === 'wishlistHumble' || src.key === 'humble') {
-      fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'H1H2H3',location:'fetcher-health.js:chipHtml',message:'humble chip render state',data:{key:src.key,providerStatusHumble:providerStatus('humble'),disconnected,needsReconnect,persistFailed,runState:runState||null,authCooldownMs,displayStatus,status,navProvider},timestamp:Date.now()})}).catch(()=>{});
-    }
-    // #endregion
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0
       && !fetcherCredentialsSatisfied(src.key);
@@ -3286,9 +3337,15 @@ export function renderDashboardFetcherHealth() {
         }
         let groupToggle = '';
         if (group === 'prices') {
-          groupToggle = `<label class="fh-toggle fh-itad-auto" title="Runs ITAD up to once per hour between 7am and midnight when the dashboard is open.">
-              <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${state.prefs.itadAutoRefreshDisabled ? '' : 'checked'} />
+          const itadMin = Number(state.prefs.itadAutoRefreshIntervalMin) || 15;
+          const itadOff = !!state.prefs.itadAutoRefreshDisabled;
+          groupToggle = `<label class="fh-toggle fh-itad-auto" title="Runs ITAD between 7am and midnight when the dashboard is open.">
+              <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${itadOff ? '' : 'checked'} />
               Auto-refresh
+            </label>
+            <label class="fh-toggle fh-itad-interval" title="How often auto-refresh runs ITAD (15-60 min)">
+              <input id="itadAutoRefreshInterval" type="range" min="15" max="60" step="5" value="${itadMin}" ${itadOff ? 'disabled' : ''} aria-label="Auto-refresh interval (minutes)" />
+              <span id="itadAutoRefreshIntervalVal">${itadMin}m</span>
             </label>`;
         } else if (group === 'enrich') {
           groupToggle = `<label class="fh-toggle" title="After a library fetch adds new games, queue HLTB, Reviews, Covers, and Co-op tags">

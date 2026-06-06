@@ -66,6 +66,17 @@ describe('loadPrefs', () => {
     localStorage.setItem(prefsStorageKey(), JSON.stringify({ coopFilterMode: 'bogus' }));
     expect(loadPrefs().coopFilterMode).toBe('off');
   });
+
+  it('clamps itadAutoRefreshIntervalMin to 15-60 and snaps to step 5', () => {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 10 }));
+    expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(15);
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 72 }));
+    expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(60);
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 23 }));
+    expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(25);
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 'nope' }));
+    expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(15);
+  });
 });
 
 describe('getSavedSortForView', () => {

@@ -206,7 +206,7 @@
       "color": "#22d3ee",
       "requires": [{ "env": "ITAD_API_KEY", "note": "Free API key from isthereanydeal.com/dev/api/" }]
     },
-    { "key": "hltb", "label": "HLTB", "group": "enrich", "script": "enrich_hltb.py", "refreshArgs": ["--retry-misses"], "metaKey": "hltb", "color": "#a78bfa" },
+    { "key": "hltb", "label": "HLTB", "group": "enrich", "script": "enrich_hltb.py", "refreshArgs": ["--retry-misses"], "metaKey": "hltb", "color": "#a78bfa", "maxRunSeconds": 7200 },
     {
       "key": "steamReviews",
       "label": "Reviews",

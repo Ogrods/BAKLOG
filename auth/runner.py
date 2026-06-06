@@ -34,6 +34,27 @@ PSN_SSOCOOKIE_INTERVAL_SEC = 10
 _STEALTH_INIT = STEALTH_INIT_SCRIPT
 
 
+# #region agent log
+def _cf7log(hypothesis: str, message: str, data: dict) -> None:
+    try:
+        import json as _json
+        import time as _time
+        from pathlib import Path as _Path
+
+        _path = _Path(__file__).resolve().parents[1] / "debug-cf7aab.log"
+        _line = _json.dumps(
+            {"sessionId": "cf7aab", "hypothesisId": hypothesis, "location": "auth/runner.py",
+             "message": message, "data": data, "timestamp": int(_time.time() * 1000)},
+            default=str,
+        )
+        with open(_path, "a", encoding="utf-8") as _f:
+            _f.write(_line + "\n")
+    except Exception:
+        pass
+# #endregion
+
+
+
 class AuthSession:
     __slots__ = ("id", "provider", "events", "_listeners", "_finished", "_lock")
 
@@ -166,7 +187,14 @@ NINTENDO_ACCOUNT_URL = "https://ec.nintendo.com/my/transactions/"
 # Capturing any nintendo.com cookie isn't enough — sign-in completes on
 # accounts.nintendo.com, but the eShop session cookies only get set once we're
 # actually on ec.nintendo.com, so we must land there before reading the jar.
-_NINTENDO_SESSION_COOKIES = ("MIST", "JViDD", "_gh_sess", "NASID", "ecsid")
+_NINTENDO_SESSION_COOKIES = (
+    "MIST",
+    "JViDD",
+    "_gh_sess",
+    "NASID",
+    "ecsid",
+    "__Secure-next-auth.session-token",
+)
 
 
 def _nintendo_has_session(context) -> bool:
@@ -184,9 +212,13 @@ def _nintendo_has_session(context) -> bool:
 def _nintendo_session_has_id_token(context) -> bool:
     """Verify /api/auth/session returns an idToken (GraphQL prerequisite)."""
     try:
-        from nintendo_client import probe_session_id_token
+        from nintendo_client import PLAYWRIGHT_REQUEST_TIMEOUT_MS, probe_session_id_token
 
-        return bool(probe_session_id_token(context.request.get).get("ok"))
+        return bool(
+            probe_session_id_token(
+                context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS
+            ).get("ok")
+        )
     except Exception:
         return False
 
@@ -858,43 +890,56 @@ NINTENDO_WISHLIST_URL = "https://www.nintendo.com/us/wish-list/"
 NINTENDO_WISHLIST_POLL_SEC = 2.5
 
 
-def _nintendo_wishlist_page_ready(html: str, url: str) -> bool:
-    """True when the wish-list page looks loaded and not stuck on sign-in only."""
+def _nintendo_wishlist_session_ready(html: str, url: str, api_payloads: list[Any]) -> bool:
+    """True when storefront GraphQL confirms a signed-in wish-list session."""
+    from fetch_nintendo_wishlist import _wishlist_graphql_ok, parse_wishlist_sources
+
     u = (url or "").lower()
     if "accounts.nintendo.com/login" in u:
         return False
-    body = html or ""
-    if not body.strip():
-        return False
-    if "wish-list" not in u and "wishlist" not in u:
-        return False
-    lower = body.lower()
-    if "sign in" in lower and "wish list" not in lower and "wishlist" not in lower:
-        return False
-    # Empty wishlist copy still counts as a successful session.
-    if re.search(r"wish\s*list", lower, re.I):
+    if any(_wishlist_graphql_ok(p) for p in api_payloads):
         return True
-    if re.search(r"explore,\s*purchase,\s*or\s*remove", lower, re.I):
-        return True
-    return "nsuid" in lower or "/store/products/" in lower
+    return bool(parse_wishlist_sources(html, api_payloads))
 
 
 def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
     """Open nintendo.com/us/wish-list/, wait for sign-in, return marker cred."""
+    from fetch_nintendo_wishlist import (
+        _drain_nintendo_candidates,
+        _is_nintendo_graphql_url,
+    )
+
+    candidates: list[Any] = []
+
+    def _stash_graphql(response) -> None:
+        try:
+            if response.status >= 400:
+                return
+            if not _is_nintendo_graphql_url(response.url or ""):
+                return
+            ct = (response.headers.get("content-type") or "").lower()
+            if "json" not in ct:
+                return
+            candidates.append(response)
+        except Exception:  # noqa: BLE001
+            pass
+
+    page.on("response", _stash_graphql)
     try:
-        page.goto(NINTENDO_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
+        page.goto(NINTENDO_WISHLIST_URL, wait_until="commit", timeout=20000)
     except Exception:  # noqa: BLE001
         pass
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
     while time.time() < deadline:
+        api_payloads = _drain_nintendo_candidates(candidates)
         try:
             html = page.content()
         except Exception:  # noqa: BLE001
             html = ""
         url = page.url or ""
-        if _nintendo_wishlist_page_ready(html, url):
+        if _nintendo_wishlist_session_ready(html, url, api_payloads):
             try:
                 page.wait_for_timeout(800)
             except Exception:  # noqa: BLE001
@@ -927,12 +972,7 @@ HUMBLE_POLL_SEC = 2.5
 
 
 def _humble_has_session(context) -> bool:
-    """True when the saved profile has a Humble auth cookie."""
-    for c in context.cookies():
-        name = (c.get("name") or "").lower()
-        if name in ("_simpleauth_sess", "csrf_cookie"):
-            if c.get("value"):
-                return True
+    """True when the orders API accepts the profile (stale cookies alone are not enough)."""
     try:
         resp = context.request.get(HUMBLE_ORDERS_API, timeout=15_000)
         if resp.status == 200:
@@ -1043,12 +1083,15 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
 
         live = [pg for pg in context.pages if not pg.is_closed]
         main = _ubisoft_active_page(live) or (live[0] if live else context.new_page())
-        if len(live) > 1:
-            try:
-                main.bring_to_front()
-            except Exception:
-                pass
         urls = [(pg.url or "").lower() for pg in live]
+        if len(live) > 1:
+            main_url = (main.url or "").lower()
+            # Don't steal focus from the Ubisoft SDK while it hands off to the opener.
+            if "connect.ubisoft.com/login" in main_url or UBISOFT_SUCCESS_URL in main_url:
+                try:
+                    main.bring_to_front()
+                except Exception:
+                    pass
         on_success = any(UBISOFT_SUCCESS_URL in u for u in urls)
 
         # Post-2FA we land on connect.ubisoft.com/logged-in.html. That page doesn't
@@ -1328,6 +1371,9 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
     )
     session.emit("waiting_for_user", {"message": connect_hint})
 
+    # #region agent log
+    _cf7log("HC4", "run_browser_auth about to launch window", {"provider": provider, "user_data": str(user_data)[-60:]})
+    # #endregion
     with launch_persistent_profile(user_data, headless=False) as context:
         context.add_init_script(_STEALTH_INIT)
         # Paint a persistent, click-through banner inside the popup so users see

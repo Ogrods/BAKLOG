@@ -24,7 +24,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
+
+import requests
 
 from dotenv import load_dotenv
 
@@ -43,6 +45,62 @@ from shared.money import format_price, normalize_currency_code
 
 GAMES_NINTENDO_WISHLIST_JSON = Path("games_wishlist_nintendo.json")
 WISHLIST_URL = "https://www.nintendo.com/us/wish-list/"
+# Persisted Apollo query hash for the storefront Wishlist operation (nintendo.com bundle).
+WISHLIST_GQL_HASH = (
+    "d8e7500d7e8396f682defc557470f865ef7883b933d49c74c685b7f7c89b186b"
+)
+_WISHLIST_GQL_VARIABLES = {
+    "categories": ["ESHOP_PRODUCT", "NOA_PRODUCT"],
+    "page": 1,
+    "pageSize": 48,
+    "includeProductInfo": True,
+    "personalized": True,
+}
+
+
+# #region agent log
+def _dbg(hyp: str, msg: str, data: dict) -> None:
+    try:
+        import json as _j
+        import time as _t
+        rec = {
+            "sessionId": "6bc465", "runId": "run1", "hypothesisId": hyp,
+            "location": "fetch_nintendo_wishlist.py", "message": msg,
+            "data": data, "timestamp": int(_t.time() * 1000),
+        }
+        with open(
+            r"c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog\debug-6bc465.log",
+            "a", encoding="utf-8",
+        ) as _f:
+            _f.write(_j.dumps(rec, default=str) + "\n")
+    except Exception:
+        pass
+
+
+def _dbg_shape(p) -> dict:
+    try:
+        if isinstance(p, dict):
+            d = p.get("data") if isinstance(p.get("data"), dict) else {}
+            cust = d.get("customer") if isinstance(d.get("customer"), dict) else None
+            wl = cust.get("wishList") if isinstance(cust, dict) else None
+            items = wl.get("items") if isinstance(wl, dict) else None
+            return {
+                "top_keys": list(p.keys())[:8],
+                "data_keys": list(d.keys())[:8],
+                "has_customer": isinstance(cust, dict),
+                "customer_id": bool(cust and cust.get("id")) if isinstance(cust, dict) else False,
+                "has_wishList": isinstance(wl, dict),
+                "wishList_keys": list(wl.keys())[:8] if isinstance(wl, dict) else None,
+                "items_len": len(items) if isinstance(items, list) else None,
+            }
+        if isinstance(p, list):
+            return {"type": "list", "len": len(p)}
+        return {"type": type(p).__name__}
+    except Exception:
+        return {"err": True}
+# #endregion
+
+
 def dump_dir() -> Path:
     from shared.profile_paths import profile_cache_dir
 
@@ -300,6 +358,37 @@ def _store_url(product_id: str, path_or_url: str | None) -> str:
     return WISHLIST_URL
 
 
+def _wishlist_entry_dict(raw: dict) -> dict | None:
+    """Flatten GraphQL wish-list rows that nest product fields under ``product``."""
+    if not isinstance(raw, dict):
+        return None
+    product = raw.get("product")
+    if isinstance(product, dict):
+        return {**product, **{k: v for k, v in raw.items() if k != "product"}}
+    return raw
+
+
+def _customer_graphql_authed(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    cust = (payload.get("data") or {}).get("customer")
+    return isinstance(cust, dict) and bool(cust.get("id"))
+
+
+def _wishlist_graphql_ok(payload: Any) -> bool:
+    """True when the storefront Wishlist query answered (empty list still counts)."""
+    if not isinstance(payload, dict):
+        return False
+    wl = ((payload.get("data") or {}).get("customer") or {}).get("wishList")
+    return isinstance(wl, dict) and isinstance(wl.get("items"), list)
+
+
+def _wishlist_session_authenticated(api_payloads: list[Any]) -> bool:
+    return any(_wishlist_graphql_ok(p) for p in api_payloads) or any(
+        _customer_graphql_authed(p) for p in api_payloads
+    )
+
+
 def _looks_like_wishlist_item(obj: dict) -> bool:
     pid = None
     for k in _ID_KEYS:
@@ -356,9 +445,10 @@ def _collect_from_list(items: list) -> list[WishlistItem]:
     out: list[WishlistItem] = []
     seen: set[str] = set()
     for raw in items:
-        if not isinstance(raw, dict) or not _looks_like_wishlist_item(raw):
+        obj = _wishlist_entry_dict(raw) if isinstance(raw, dict) else None
+        if not obj or not _looks_like_wishlist_item(obj):
             continue
-        item = _item_from_dict(raw)
+        item = _item_from_dict(obj)
         if item and item.product_id not in seen:
             seen.add(item.product_id)
             out.append(item)
@@ -377,7 +467,13 @@ def _find_wishlist_lists(node: Any) -> list[list]:
             kl = key.lower()
             if not any(tok in kl for tok in ("wish", "item", "product", "game")):
                 continue
-            sample = [x for x in val[:5] if isinstance(x, dict)]
+            sample = [
+                obj
+                for x in val[:5]
+                if isinstance(x, dict)
+                for obj in [_wishlist_entry_dict(x)]
+                if obj
+            ]
             if not sample:
                 continue
             if sum(1 for s in sample if _looks_like_wishlist_item(s)) >= max(1, len(sample) // 2):
@@ -405,6 +501,11 @@ def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[WishlistI
 
     for payload in api_payloads:
         if isinstance(payload, dict):
+            wl_items = (
+                ((payload.get("data") or {}).get("customer") or {}).get("wishList") or {}
+            ).get("items")
+            if isinstance(wl_items, list):
+                _add_items(_collect_from_list(wl_items))
             for lst in _find_wishlist_lists(payload):
                 _add_items(_collect_from_list(lst))
         elif isinstance(payload, list):
@@ -446,6 +547,362 @@ def _signed_out(html: str, url: str) -> bool:
     return False
 
 
+def _is_nintendo_graphql_url(url: str) -> bool:
+    return "graph.nintendo.com" in (url or "").lower()
+
+
+def _is_nintendo_capture_url(url: str) -> bool:
+    return _is_nintendo_graphql_url(url)
+
+
+def _wishlist_capture_complete(html: str, api_payloads: list[Any]) -> bool:
+    if any(_wishlist_graphql_ok(p) for p in api_payloads):
+        return True
+    return bool(parse_wishlist_sources(html, api_payloads))
+
+
+def _is_stale_nintendo_tab(url: str) -> bool:
+    u = (url or "").lower()
+    return any(
+        tok in u
+        for tok in ("authorize", "accounts.nintendo.com/login", "chrome://")
+    )
+
+
+def _close_stale_nintendo_tabs(ctx) -> None:
+    """Drop restored OAuth tabs; keep blank tabs when they are the only target."""
+    pages = list(ctx.pages)
+    keepers = [
+        p
+        for p in pages
+        if "nintendo.com" in (p.url or "").lower() and not _is_stale_nintendo_tab(p.url or "")
+    ]
+    if not keepers and len(pages) == 1:
+        return
+    for page in pages:
+        if page in keepers:
+            continue
+        if _is_stale_nintendo_tab(page.url or ""):
+            try:
+                page.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def _pick_render_page(ctx):
+    for page in ctx.pages:
+        u = (page.url or "").lower()
+        if "wish-list" in u and not _is_stale_nintendo_tab(u):
+            return page
+    for page in ctx.pages:
+        u = (page.url or "").lower()
+        if "nintendo.com" in u and not _is_stale_nintendo_tab(u):
+            return page
+    if ctx.pages:
+        return ctx.pages[0]
+    return ctx.new_page()
+
+
+def _goto_wishlist_page(page, ctx, *, timeout_ms: int = 15_000):
+    """Navigate to the wish-list URL, recovering from dead CDP sessions."""
+    last_exc: Exception | None = None
+    for attempt in range(2):
+        try:
+            page.goto(WISHLIST_URL, wait_until="commit", timeout=timeout_ms)
+            if not (page.url or "").lower().startswith("chrome://"):
+                return page
+            last_exc = RuntimeError(f"stuck on {page.url}")
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if "session" not in str(exc).lower() and attempt == 0:
+                raise
+        try:
+            page = ctx.new_page()
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            break
+    if last_exc:
+        raise last_exc
+    return page
+
+
+def _clean_auth_header(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    val = value.strip()
+    if not val or val.lower() in {"null", "none", "undefined", "bearer null", "bearer undefined"}:
+        return None
+    return val
+
+
+def _note_graphql_auth(resp, auth_state: dict) -> None:
+    try:
+        req_headers = getattr(getattr(resp, "request", None), "headers", None) or {}
+        for key in _GRAPH_AUTH_HEADER_KEYS:
+            val = _clean_auth_header(req_headers.get(key))
+            if val:
+                auth_state.setdefault("headers", {})[key] = val
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _note_tokens_payload(payload: Any, auth_state: dict) -> None:
+    if not isinstance(payload, dict):
+        return
+    tokens = (payload.get("data") or {}).get("tokens")
+    if not isinstance(tokens, dict):
+        return
+    if tokens.get("accessToken"):
+        auth_state["bearer"] = tokens["accessToken"]
+    if tokens.get("customerToken"):
+        auth_state["customer_token"] = tokens["customerToken"]
+
+
+def _graphql_auth_ready(auth_state: dict) -> bool:
+    if _is_guest_storefront_auth({"__typename": auth_state.get("session_typename")}):
+        return False
+    headers = _build_graphql_auth_headers(auth_state)
+    return bool(
+        _clean_auth_header(headers.get("authorization"))
+        and _clean_auth_header(headers.get("x-customer-token"))
+    )
+
+
+def _direct_wishlist_graphql(ctx, auth_state: dict) -> dict | None:
+    """Call the Wishlist persisted query with storefront auth headers."""
+    if not _graphql_auth_ready(auth_state):
+        return None
+
+    headers = _build_graphql_auth_headers(auth_state)
+    headers.update(
+        {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            ),
+            "origin": "https://www.nintendo.com",
+            "referer": WISHLIST_URL,
+        }
+    )
+
+    extensions = json.dumps(
+        {"persistedQuery": {"version": 1, "sha256Hash": WISHLIST_GQL_HASH}},
+        separators=(",", ":"),
+    )
+    variables = json.dumps(_WISHLIST_GQL_VARIABLES, separators=(",", ":"))
+    url = (
+        "https://graph.nintendo.com/?operationName=Wishlist"
+        f"&variables={quote(variables)}&extensions={quote(extensions)}"
+    )
+    jar = {c["name"]: c["value"] for c in ctx.cookies() if c.get("name")}
+    debug: dict[str, Any] = {"status": None, "error": None, "items_len": None}
+    try:
+        resp = requests.get(url, cookies=jar, headers=headers, timeout=30)
+        debug["status"] = resp.status_code
+    except Exception as exc:  # noqa: BLE001
+        debug["error"] = str(exc)[:200]
+        auth_state["_direct_debug"] = debug
+        return None
+    if resp.status_code >= 400:
+        debug["error"] = (resp.text or "")[:200]
+        auth_state["_direct_debug"] = debug
+        return None
+    try:
+        payload = resp.json()
+    except json.JSONDecodeError:
+        debug["error"] = "json_decode"
+        auth_state["_direct_debug"] = debug
+        return None
+    wl_items = (
+        ((payload.get("data") or {}).get("customer") or {}).get("wishList") or {}
+    ).get("items")
+    if isinstance(wl_items, list):
+        debug["items_len"] = len(wl_items)
+    if payload.get("errors"):
+        debug["error"] = str(payload.get("errors"))[:200]
+    if _wishlist_graphql_ok(payload):
+        auth_state["_direct_debug"] = debug
+        return payload
+    auth_state["_direct_debug"] = debug
+    return None
+
+
+_GRAPH_AUTH_HEADER_KEYS = (
+    "authorization",
+    "x-customer-token",
+    "x-access-token",
+    "x-nintendo-graph",
+    "locale",
+)
+
+
+def _read_page_auth_session(page) -> dict[str, Any]:
+    try:
+        data = page.evaluate(
+            """() => {
+              const raw = localStorage.getItem('nintendo.customer.session');
+              if (!raw) return {};
+              try {
+                const parsed = JSON.parse(raw);
+                return parsed.value || parsed || {};
+              } catch (e) {
+                return {};
+              }
+            }"""
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _is_guest_storefront_auth(session: dict[str, Any]) -> bool:
+    typename = str(session.get("__typename") or "")
+    return "GuestAuthorization" in typename
+
+
+def _load_storefront_auth_from_page(page, auth_state: dict) -> dict[str, Any]:
+    session = _read_page_auth_session(page)
+    if session.get("customerToken"):
+        auth_state["customer_token"] = session["customerToken"]
+    if session.get("accessToken"):
+        auth_state["access_token"] = session["accessToken"]
+    if session.get("idToken"):
+        auth_state["id_token"] = session["idToken"]
+    auth_state["session_typename"] = session.get("__typename")
+    return session
+
+
+def _build_graphql_auth_headers(auth_state: dict) -> dict[str, str]:
+    headers: dict[str, str] = {
+        "content-type": "application/json",
+        "x-nintendo-graph": "true",
+        "locale": "en-US",
+    }
+    extra = auth_state.get("headers") or {}
+    id_token = auth_state.get("id_token")
+    access_token = auth_state.get("access_token") or auth_state.get("bearer")
+    customer_token = auth_state.get("customer_token")
+
+    if id_token:
+        headers["authorization"] = f"Bearer {id_token}"
+    elif extra.get("authorization"):
+        headers["authorization"] = extra["authorization"]
+    elif access_token:
+        headers["authorization"] = f"Bearer {access_token}"
+
+    if access_token:
+        headers["x-access-token"] = access_token
+    elif extra.get("x-access-token"):
+        headers["x-access-token"] = extra["x-access-token"]
+
+    if customer_token:
+        headers["x-customer-token"] = customer_token
+    elif extra.get("x-customer-token"):
+        headers["x-customer-token"] = extra["x-customer-token"]
+
+    for key in _GRAPH_AUTH_HEADER_KEYS:
+        if key in extra and key not in headers and _clean_auth_header(extra.get(key)):
+            headers[key] = extra[key]
+    return headers
+
+
+def _issue_storefront_tokens_via_page(page, auth_state: dict) -> bool:
+    """Reload storefront session tokens from browser storage."""
+    session = _load_storefront_auth_from_page(page, auth_state)
+    auth_state["_token_debug"] = {
+        "session_typename": session.get("__typename"),
+        "has_id_token": bool(session.get("idToken")),
+        "has_access_token": bool(session.get("accessToken")),
+        "has_customer_token": bool(session.get("customerToken")),
+    }
+    return _graphql_auth_ready(auth_state) and not _is_guest_storefront_auth(session)
+
+
+def _direct_wishlist_graphql_via_page(page, auth_state: dict) -> dict | None:
+    """Replay Wishlist GraphQL from the page context (full browser cookie jar)."""
+    if not _graphql_auth_ready(auth_state):
+        return None
+
+    extensions = json.dumps(
+        {"persistedQuery": {"version": 1, "sha256Hash": WISHLIST_GQL_HASH}},
+        separators=(",", ":"),
+    )
+    variables = json.dumps(_WISHLIST_GQL_VARIABLES, separators=(",", ":"))
+    url = (
+        "https://graph.nintendo.com/?operationName=Wishlist"
+        f"&variables={quote(variables)}&extensions={quote(extensions)}"
+    )
+    fetch_headers = _build_graphql_auth_headers(auth_state)
+
+    debug: dict[str, Any] = {"via": "page", "status": None, "error": None, "items_len": None}
+    try:
+        result = page.evaluate(
+            f"""async () => {{
+              const url = {json.dumps(url)};
+              const headers = {json.dumps(fetch_headers)};
+              const r = await fetch(url, {{ headers, credentials: "include" }});
+              const text = await r.text();
+              return {{ status: r.status, text }};
+            }}""",
+            timeout=30_000,
+        )
+    except Exception as exc:  # noqa: BLE001
+        debug["error"] = str(exc)[:200]
+        auth_state["_page_direct_debug"] = debug
+        return None
+
+    debug["status"] = result.get("status")
+    text = result.get("text") or ""
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        debug["error"] = text[:200]
+        auth_state["_page_direct_debug"] = debug
+        return None
+    wl_items = (
+        ((payload.get("data") or {}).get("customer") or {}).get("wishList") or {}
+    ).get("items")
+    if isinstance(wl_items, list):
+        debug["items_len"] = len(wl_items)
+    if payload.get("errors"):
+        debug["error"] = str(payload.get("errors"))[:200]
+    if _wishlist_graphql_ok(payload):
+        auth_state["_page_direct_debug"] = debug
+        return payload
+    auth_state["_page_direct_debug"] = debug
+    return None
+
+
+def _drain_nintendo_candidates(
+    candidates: list[Any],
+    *,
+    auth_state: dict | None = None,
+) -> list[Any]:
+    """Parse stashed responses on the main thread (CDP getResponseBody deadlocks on the reader thread)."""
+    found: list[Any] = []
+    while candidates:
+        resp = candidates.pop(0)
+        url = resp.url or ""
+        try:
+            if not _is_nintendo_capture_url(url):
+                continue
+            if auth_state is not None:
+                _note_graphql_auth(resp, auth_state)
+            ct = (resp.headers.get("content-type") or "").lower()
+            if "json" not in ct:
+                continue
+            body = resp.text()
+            if not body:
+                continue
+            payload = json.loads(body)
+            if auth_state is not None:
+                _note_tokens_payload(payload, auth_state)
+            found.append(payload)
+        except Exception:  # noqa: BLE001
+            continue
+    return found
+
+
 def _fetch_with_profile(
     *,
     dump: bool = False,
@@ -461,23 +918,42 @@ def _fetch_with_profile(
         )
 
     api_payloads: list[Any] = []
+    candidates: list[Any] = []
+    auth_state: dict[str, Any] = {"headers": {}}
+    captured_urls: list[dict] = []  # agent log
 
-    def _maybe_capture(response) -> None:
+    def _stash_response(response) -> None:
         try:
-            url = (response.url or "").lower()
             if response.status >= 400:
+                # #region agent log
+                try:
+                    if "graph.nintendo.com" in (response.url or "").lower():
+                        captured_urls.append({"url": (response.url or "")[:120], "status": response.status, "stashed": False, "reason": "status>=400"})
+                except Exception:
+                    pass
+                # #endregion
                 return
-            if "wish" not in url and "wishlist" not in url:
+            if not _is_nintendo_capture_url(response.url or ""):
                 return
             ct = (response.headers.get("content-type") or "").lower()
-            if "json" not in ct and "javascript" not in ct:
+            if "json" not in ct:
+                # #region agent log
+                captured_urls.append({"url": (response.url or "")[:120], "status": response.status, "stashed": False, "reason": f"ct={ct[:40]}"})
+                # #endregion
                 return
-            body = response.json()
-            api_payloads.append(body)
+            candidates.append(response)
+            # #region agent log
+            captured_urls.append({"url": (response.url or "")[:120], "status": response.status, "stashed": True, "ct": ct[:40]})
+            # #endregion
         except Exception:  # noqa: BLE001
             pass
 
+    poll_deadline_s = min(max(timeout_s - 5, 20), 30)
+    poll_interval_ms = 500
+
     with launch_persistent_profile(str(profile), headless=True) as ctx:
+        _close_stale_nintendo_tabs(ctx)
+
         # Cookie-first: a plain authenticated GET returns the SSR HTML without
         # booting the heavy Next.js client, which is faster and avoids the
         # renderer-stall path. Only fall back to a full page render when this
@@ -494,21 +970,151 @@ def _fetch_with_profile(
 
         url = WISHLIST_URL
         page_html = ""
+        cookie_parsed = parse_wishlist_sources(req_html, [])
+        cookie_signed_out = _signed_out(req_html, WISHLIST_URL)
         need_render = (
             len(req_html) < 2000
-            or _signed_out(req_html, WISHLIST_URL)
-            or not parse_wishlist_sources(req_html, [])
+            or cookie_signed_out
+            or not cookie_parsed
         )
+        # #region agent log
+        _dbg("H4", "cookie GET decision", {
+            "req_html_len": len(req_html),
+            "cookie_parsed_count": len(cookie_parsed),
+            "cookie_signed_out": cookie_signed_out,
+            "need_render": need_render,
+        })
+        # #endregion
         if need_render:
-            page = ctx.pages[0] if ctx.pages else ctx.new_page()
-            page.on("response", _maybe_capture)
+            page = _pick_render_page(ctx)
+            page.on("response", _stash_response)
+            render_exc = None
             try:
-                page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
-                page.wait_for_timeout(3000)
-                page_html = page.content()
-                url = page.url or WISHLIST_URL
+                page = _goto_wishlist_page(page, ctx)
             except Exception as exc:  # noqa: BLE001
-                print(f"  full page render failed ({exc}); using cookie HTML", flush=True)
+                render_exc = exc
+                print(f"  page navigation issue ({exc}); polling GraphQL responses", flush=True)
+
+            url = page.url or WISHLIST_URL
+            deadline = time.time() + poll_deadline_s
+            _loop_start = time.time()  # agent log
+            _exit_reason = "deadline"  # agent log
+            while time.time() < deadline:
+                drained = _drain_nintendo_candidates(candidates, auth_state=auth_state)
+                api_payloads.extend(drained)
+                for payload in drained:
+                    _note_tokens_payload(payload, auth_state)
+                if _wishlist_capture_complete(req_html, api_payloads):
+                    _exit_reason = "complete"  # agent log
+                    break
+                if _signed_out(req_html, url):
+                    _exit_reason = "signed_out"  # agent log
+                    break
+                page.wait_for_timeout(poll_interval_ms)
+
+            # Always drain remaining stashed responses (a late wishList response
+            # could otherwise be dropped when other payloads were already captured).
+            api_payloads.extend(
+                _drain_nintendo_candidates(candidates, auth_state=auth_state)
+            )
+
+            page_session = _load_storefront_auth_from_page(page, auth_state)
+            if (
+                not any(_wishlist_graphql_ok(p) for p in api_payloads)
+                and _is_guest_storefront_auth(page_session)
+            ):
+                print(
+                    "  storefront session is guest-only; reloading to restore signed-in tokens",
+                    flush=True,
+                )
+                try:
+                    page = _goto_wishlist_page(page, ctx)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"  guest-session reload issue ({exc})", flush=True)
+                retry_deadline = time.time() + min(poll_deadline_s, 15)
+                while time.time() < retry_deadline:
+                    drained = _drain_nintendo_candidates(
+                        candidates, auth_state=auth_state
+                    )
+                    api_payloads.extend(drained)
+                    for payload in drained:
+                        _note_tokens_payload(payload, auth_state)
+                    if any(_wishlist_graphql_ok(p) for p in api_payloads):
+                        _exit_reason = "complete_after_guest_reload"  # agent log
+                        break
+                    page.wait_for_timeout(poll_interval_ms)
+                api_payloads.extend(
+                    _drain_nintendo_candidates(candidates, auth_state=auth_state)
+                )
+                page_session = _load_storefront_auth_from_page(page, auth_state)
+
+            # The storefront SPA does not always fire the Wishlist GraphQL query.
+            # When token refresh completes but the React hook skips Wishlist, replay
+            # the persisted query with the same auth headers/tokens from hydration.
+            direct_payload = None
+            if (
+                not any(_wishlist_graphql_ok(p) for p in api_payloads)
+                and _wishlist_session_authenticated(api_payloads)
+                and not _signed_out(req_html, page.url or url)
+            ):
+                for payload in api_payloads:
+                    _note_tokens_payload(payload, auth_state)
+                if not _graphql_auth_ready(auth_state):
+                    token_deadline = time.time() + 10
+                    while time.time() < token_deadline:
+                        drained = _drain_nintendo_candidates(
+                            candidates, auth_state=auth_state
+                        )
+                        api_payloads.extend(drained)
+                        for payload in drained:
+                            _note_tokens_payload(payload, auth_state)
+                        if _graphql_auth_ready(auth_state) or any(
+                            _wishlist_graphql_ok(p) for p in api_payloads
+                        ):
+                            break
+                        page.wait_for_timeout(300)
+                if not _graphql_auth_ready(auth_state):
+                    _issue_storefront_tokens_via_page(page, auth_state)
+                if _graphql_auth_ready(auth_state):
+                    print("  wish list query did not fire; calling GraphQL directly", flush=True)
+                    direct_payload = _direct_wishlist_graphql(ctx, auth_state)
+                    if not direct_payload:
+                        direct_payload = _direct_wishlist_graphql_via_page(page, auth_state)
+                    if not direct_payload and _issue_storefront_tokens_via_page(page, auth_state):
+                        direct_payload = _direct_wishlist_graphql_via_page(page, auth_state)
+                    if direct_payload:
+                        api_payloads.append(direct_payload)
+                        _exit_reason = "direct_graphql"  # agent log
+
+            # #region agent log
+            _dbg("H1/H5", "poll loop exit", {
+                "exit_reason": _exit_reason,
+                "elapsed_s": round(time.time() - _loop_start, 1),
+                "api_payload_count": len(api_payloads),
+                "direct_graphql": bool(direct_payload),
+                "auth_ready": _graphql_auth_ready(auth_state),
+                "has_bearer": bool(auth_state.get("bearer")),
+                "has_customer_token": bool(auth_state.get("customer_token")),
+                "direct_debug": auth_state.get("_direct_debug"),
+                "page_direct_debug": auth_state.get("_page_direct_debug"),
+                "token_debug": auth_state.get("_token_debug"),
+                "session_typename": auth_state.get("session_typename"),
+                "auth_header_prefix": (auth_state.get("headers") or {}).get("authorization", "")[:32],
+                "page_url": page.url,
+                "captured_urls": captured_urls[:20],
+                "api_shapes": [_dbg_shape(p) for p in api_payloads[:8]],
+            })
+            # #endregion
+
+            try:
+                rendered = page.content()
+                if len(rendered) > len(page_html):
+                    page_html = rendered
+                    url = page.url or WISHLIST_URL
+            except Exception as exc:  # noqa: BLE001
+                if not render_exc:
+                    render_exc = exc
+                print(f"  page HTML capture skipped ({exc}); using cookie/GraphQL data", flush=True)
 
         html = page_html if len(page_html) > len(req_html) else req_html
 
@@ -603,7 +1209,13 @@ def main() -> int:
         msg = str(exc)
         is_transport = any(
             tok in msg.lower()
-            for tok in ("cdp command timed out", "websocket", "browser", "debugging endpoint")
+            for tok in (
+                "cdp command timed out",
+                "websocket",
+                "browser",
+                "debugging endpoint",
+                "session with given id",
+            )
         )
         if is_transport:
             stats.error(f"wishlist fetch transport error: {msg}")
@@ -623,11 +1235,63 @@ def main() -> int:
         return stats.finish("fetch_nintendo_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     items = parse_wishlist_sources(html, api_payloads)
+    # #region agent log
+    _dbg("H2", "final parse result", {
+        "items_parsed": len(items),
+        "api_payload_count": len(api_payloads),
+        "html_len": len(html),
+        "url": url,
+        "signed_out": _signed_out(html, url),
+        "session_authed": _wishlist_session_authenticated(api_payloads),
+        "api_shapes": [_dbg_shape(p) for p in api_payloads[:8]],
+    })
+    # #endregion
     print(
         f"  parsed {len(items)} wishlist items "
         f"({len(api_payloads)} captured JSON response(s))",
         flush=True,
     )
+
+    page_url = (url or "").lower()
+    capture_failed = (
+        not api_payloads
+        and (
+            page_url in {"about:blank", ""}
+            or page_url.startswith("chrome://")
+            or len(html) < 2000
+        )
+    )
+    if capture_failed:
+        msg = (
+            "Nintendo wishlist browser capture failed (no GraphQL responses). "
+            "Retry the fetch; if it keeps failing, reconnect Nintendo Store wishlist."
+        )
+        stats.error(msg)
+        return stats.finish("fetch_nintendo_wishlist", t0, exit_code=1)
+
+    if not items and not _wishlist_session_authenticated(api_payloads):
+        msg = (
+            "Nintendo wish-list session is missing or expired. Open the Connections "
+            "page, click 'Nintendo Store wishlist' \u2192 Connect, and sign in on "
+            "nintendo.com/us/wish-list/ inside the launched browser window."
+        )
+        mark_invalid("nintendo_wishlist", error=msg)
+        stats.error(msg)
+        return stats.finish("fetch_nintendo_wishlist", t0, exit_code=EXIT_CODE_AUTH)
+
+    if (
+        not items
+        and _wishlist_session_authenticated(api_payloads)
+        and not any(_wishlist_graphql_ok(p) for p in api_payloads)
+    ):
+        msg = (
+            "Nintendo wish-list session is signed in but stuck in a guest token state, "
+            "so the storefront never returned wish-list items. Open Connections and "
+            "reconnect 'Nintendo Store wishlist'."
+        )
+        mark_invalid("nintendo_wishlist", error=msg)
+        stats.error(msg)
+        return stats.finish("fetch_nintendo_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     if args.dump:
         return stats.finish("fetch_nintendo_wishlist", t0, exit_code=0, extra="dump only")

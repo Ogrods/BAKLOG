@@ -11,7 +11,9 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
 - `assets/sample/*.png` — fictional game covers for the spotlight carousel.
 - `api/subscribe.js` — Vercel serverless function; logs signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
+- `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
 - `sql/waitlist.sql` — one-time Supabase table for durable signup logging.
+- `sql/bug_reports.sql` — one-time Supabase table for durable bug-report logging.
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
 - `assets/store-logos/*.svg` — copy of repo-root `assets/store-logos/` for the hero trust strip (CSS mask). Re-sync when app logos change: `cp ../assets/store-logos/*.svg assets/store-logos/`.
 - `favicon.svg` — white BAKLOG mark.

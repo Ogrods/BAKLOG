@@ -69,3 +69,33 @@ Each person runs their own `python server.py`. The gate is invite-only access co
 - **API writes** accept a valid Bearer as CSRF-safe when auth is on (so tunnels work); localhost header/origin rules still apply when auth is off.
 - Game libraries and store credentials stay **on your machine** under `profiles/<user-id>/`. Supabase stores account email and auth metadata only.
 - `server.py` still binds to `127.0.0.1` by default. Enabling Supabase auth makes the app **safe to expose** (tunnel/reverse proxy) from a data-isolation standpoint; actually exposing the server remains an operational choice (see tracker Phase 6).
+
+## 8. Bug reports table (optional, for beta)
+
+The landing site's `/api/report` endpoint can persist opt-in bug reports when these env vars are set on Vercel (same project as the waitlist):
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Run [`landing/sql/bug_reports.sql`](../landing/sql/bug_reports.sql) once in the Supabase SQL editor (mirrors the waitlist grant-based pattern — RLS on, explicit service_role grants, no anon/public access):
+
+```sql
+create table if not exists public.bug_reports (
+  id uuid primary key default gen_random_uuid(),
+  app_version text not null default 'unknown',
+  ua text,
+  view text,
+  contact text,
+  note text,
+  error_count integer not null default 0,
+  bundle jsonb not null,
+  ip text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.bug_reports enable row level security;
+grant select, insert on public.bug_reports to service_role;
+-- No policies: anon/public have no access; service_role bypasses RLS.
+```
+
+Reports are submitted only when a beta tester explicitly clicks **Send report** in the app dialog. The bundle is the same whitelist documented in [PRIVACY.md](../PRIVACY.md#error-logs-and-bug-reporting). Optional `contact` and `note` fields are stored if the tester provides them.

@@ -204,24 +204,23 @@ function bindSignInForm() {
 }
 
 /**
- * Resolve only once a valid session exists. The app awaits this before booting,
- * so when auth is required the gate stays up (no boot-curtain flicker behind it).
+ * Resolve only once a valid session exists. The app awaits this before booting.
+ * Returning users keep the boot curtain until session probe succeeds; the sign-in
+ * overlay is shown only when login is actually required (avoids curtain flicker).
  */
 export async function initAuthGate() {
   ensureAuthReadyPromise();
-  setOverlayVisible(true);
-  document.documentElement.setAttribute('data-auth-required', '1');
   try {
     _config = await loadConfig();
   } catch {
     setAuthError('Could not load server config. Start python server.py and reload.');
+    setOverlayVisible(true);
     return new Promise(() => {});
   }
   _authRequired = !!_config.authRequired;
   _localProfiles = !!_config.localProfiles;
   if (!_authRequired) {
     setOverlayVisible(false);
-    document.documentElement.removeAttribute('data-auth-required');
     markAuthReady();
     return;
   }
@@ -252,7 +251,8 @@ export async function initAuthGate() {
   }
   if (session) {
     await _supabase.auth.signOut();
-    applySession(null);
+    _accessToken = null;
+    _accountProfileId = '';
   }
 
   _authedPromise = new Promise((resolve) => { _resolveAuthed = resolve; });

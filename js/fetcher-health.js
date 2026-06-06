@@ -668,8 +668,9 @@ function reviewableRows() {
   return [...nonSteamRows(), ...(state.itchGames || []).filter(itchIsGame)];
 }
 
-function coverableRows() {
-  return nonSteamRows();
+export function coverableRows() {
+  const itch = (state.itchGames || []).filter(itchIsGame);
+  return [...nonSteamRows(), ...(state.wishlistGames || []), ...itch];
 }
 
 function coverageOf(rows, pred) {
@@ -816,26 +817,139 @@ export async function loadFetcherSources(force = false) {
 }
 
 const GLOBAL_FETCHER_TAIL_CAP = 80;
+const GLOBAL_FETCHER_TAIL_THROTTLE_MS = 200;
+let globalTailPending = null;
+let globalTailTimer = null;
+let globalTailLastApply = 0;
 
-function setGlobalFetcherTail(text, kind = 'stdout') {
+function cancelGlobalFetcherTailThrottle() {
+  globalTailPending = null;
+  globalTailLastApply = 0;
+  if (globalTailTimer) {
+    clearTimeout(globalTailTimer);
+    globalTailTimer = null;
+  }
+}
+
+/** Semantic pill states. Exactly one is applied at a time so the active state
+ *  is never the faint "base" look (which read as grey). */
+const PILL_STATE_CLASSES = [
+  'fh-global-status-idle',
+  'fh-global-status-queued',
+  'fh-global-status-running',
+  'fh-global-status-done',
+  'fh-global-status-failed',
+];
+
+function setPillState(el, state) {
+  el.classList.remove('hidden', ...PILL_STATE_CLASSES);
+  el.classList.add(`fh-global-status-${state}`);
+}
+
+function prefersReducedMotion() {
+  return typeof matchMedia === 'function'
+    && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** The tail holds its text in an inner span so it can be marquee-scrolled when
+ *  the message overflows the reserved width without disturbing the clip box. */
+function tailInner(tailEl, create = false) {
+  let inner = tailEl.querySelector('.fh-global-status-tail-inner');
+  if (!inner && create) {
+    inner = document.createElement('span');
+    inner.className = 'fh-global-status-tail-inner';
+    tailEl.appendChild(inner);
+  }
+  return inner;
+}
+
+function clearGlobalFetcherTail(tailEl) {
+  if (!tailEl) return;
+  tailEl.textContent = '';
+  tailEl.classList.remove('fh-global-status-tail--err', 'is-scrolling');
+  tailEl.style.removeProperty('--tail-scroll-shift');
+  tailEl.style.removeProperty('--tail-scroll-dur');
+}
+
+/** Add/refresh the scroll marquee when the message is wider than the clip box. */
+function updateTailScroll(tailEl, inner) {
+  if (prefersReducedMotion()) {
+    tailEl.classList.remove('is-scrolling');
+    tailEl.style.removeProperty('--tail-scroll-shift');
+    tailEl.style.removeProperty('--tail-scroll-dur');
+    return;
+  }
+  const shift = inner.scrollWidth - tailEl.clientWidth;
+  if (shift > 4) {
+    const travel = shift + 12;
+    tailEl.style.setProperty('--tail-scroll-shift', `${travel}px`);
+    // ~40px/sec each way; doubled for the alternate return trip; min 4s.
+    tailEl.style.setProperty('--tail-scroll-dur', `${Math.max(4, (travel / 40) * 2).toFixed(1)}s`);
+    tailEl.classList.add('is-scrolling');
+  } else {
+    tailEl.classList.remove('is-scrolling');
+    tailEl.style.removeProperty('--tail-scroll-shift');
+    tailEl.style.removeProperty('--tail-scroll-dur');
+  }
+}
+
+function applyGlobalFetcherTail(text, kind = 'stdout') {
   const el = document.getElementById('fetcherGlobalStatus');
   const tailEl = document.getElementById('fetcherGlobalStatusTail');
-  if (!el || !tailEl || el.classList.contains('fh-global-status-idle')) return;
+  if (!el || !tailEl || !el.classList.contains('fh-global-status-running')) return;
   const line = String(text ?? '').trim();
   if (!line) return;
   const capped = line.length > GLOBAL_FETCHER_TAIL_CAP
     ? `${line.slice(0, GLOBAL_FETCHER_TAIL_CAP - 1)}…`
     : line;
   el.classList.add('is-streaming');
-  tailEl.textContent = capped;
+  const inner = tailInner(tailEl, true);
+  const changed = inner.textContent !== capped;
+  inner.textContent = capped;
   tailEl.classList.toggle('fh-global-status-tail--err', kind === 'stderr');
-  const reducedMotion = typeof matchMedia === 'function'
-    && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!reducedMotion && typeof tailEl.animate === 'function') {
-    tailEl.animate(
+  const reducedMotion = prefersReducedMotion();
+  if (changed && !reducedMotion && typeof inner.animate === 'function') {
+    inner.animate(
       [{ opacity: 0.35 }, { opacity: 0.8 }],
       { duration: 180, easing: 'ease-out', fill: 'forwards' },
     );
+  }
+  if (changed) {
+    const measure = () => updateTailScroll(tailEl, inner);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(measure);
+    else measure();
+  }
+}
+
+function setGlobalFetcherTail(text, kind = 'stdout') {
+  const el = document.getElementById('fetcherGlobalStatus');
+  const tailEl = document.getElementById('fetcherGlobalStatusTail');
+  if (!el || !tailEl || !el.classList.contains('fh-global-status-running')) return;
+  const line = String(text ?? '').trim();
+  if (!line) return;
+
+  el.classList.add('is-streaming');
+  globalTailPending = { text: line, kind };
+  const now = Date.now();
+  const elapsed = now - globalTailLastApply;
+
+  const flush = () => {
+    if (!globalTailPending) return;
+    const { text: pendingText, kind: pendingKind } = globalTailPending;
+    globalTailPending = null;
+    globalTailTimer = null;
+    globalTailLastApply = Date.now();
+    applyGlobalFetcherTail(pendingText, pendingKind);
+  };
+
+  if (elapsed >= GLOBAL_FETCHER_TAIL_THROTTLE_MS) {
+    if (globalTailTimer) {
+      clearTimeout(globalTailTimer);
+      globalTailTimer = null;
+    }
+    flush();
+  } else if (!globalTailTimer) {
+    globalTailTimer = setTimeout(flush, GLOBAL_FETCHER_TAIL_THROTTLE_MS - elapsed);
   }
 }
 
@@ -854,43 +968,59 @@ function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
     else if (st === 'queued') queued.push(label);
   }
   if (!running.length && !queued.length) {
+    // Failed takes precedence over done: a broken run is the most important
+    // thing to surface. lastRunFailedByKey is sticky until that source's next
+    // success or the next run starts, mirroring the per-chip failed styling.
+    const failedKeys = [...lastRunFailedByKey.keys()];
+    if (failedKeys.length > 0) {
+      const labels = failedKeys.map(k => sourceFn(k)?.label || k);
+      const text = labels.length === 1
+        ? `✕ ${labels[0]} failed`
+        : `✕ ${labels.join(', ')} failed`;
+      setPillState(el, 'failed');
+      el.classList.remove('is-streaming');
+      if (textEl) textEl.textContent = text;
+      if (liveEl) liveEl.textContent = text;
+      clearGlobalFetcherTail(tailEl);
+      cancelGlobalFetcherTailThrottle();
+      el.title = 'A fetcher failed - click to view the log';
+      el.setAttribute('aria-label', text);
+      return;
+    }
     if (fetchSuccessLabels.size > 0) {
       const labels = [...fetchSuccessLabels];
       const text = labels.length === 1
         ? `✓ ${labels[0]} updated`
         : `✓ ${labels.join(', ')} updated`;
-      el.classList.remove('hidden', 'is-streaming', 'fh-global-status-idle');
-      el.classList.add('fh-global-status-done');
+      setPillState(el, 'done');
+      el.classList.remove('is-streaming');
       if (textEl) textEl.textContent = text;
       if (liveEl) liveEl.textContent = text;
-      if (tailEl) {
-        tailEl.textContent = '';
-        tailEl.classList.remove('fh-global-status-tail--err');
-      }
+      clearGlobalFetcherTail(tailEl);
+      cancelGlobalFetcherTailThrottle();
       el.title = 'Fetch complete - click to view log';
       el.setAttribute('aria-label', text);
       return;
     }
     // Stay visible as an idle affordance so the console is always reachable,
     // not only while a run is in flight.
-    el.classList.remove('hidden', 'is-streaming', 'fh-global-status-done');
-    el.classList.add('fh-global-status-idle');
+    setPillState(el, 'idle');
+    el.classList.remove('is-streaming');
     if (textEl) textEl.textContent = 'Fetcher log';
     if (liveEl) liveEl.textContent = '';
-    if (tailEl) {
-      tailEl.textContent = '';
-      tailEl.classList.remove('fh-global-status-tail--err');
-    }
+    clearGlobalFetcherTail(tailEl);
+    cancelGlobalFetcherTailThrottle();
     el.title = 'Show fetcher log';
     el.setAttribute('aria-label', 'Fetcher log');
     return;
   }
-  el.classList.remove('hidden', 'fh-global-status-idle', 'fh-global-status-done');
   let text;
   if (running.length) {
+    setPillState(el, 'running');
     const extra = queued.length ? ` (+${queued.length} queued)` : '';
     text = `Fetching: ${running.join(', ')}${extra}`;
   } else {
+    setPillState(el, 'queued');
     text = `Queued: ${queued.join(', ')}`;
   }
   if (textEl) textEl.textContent = text;
@@ -1500,8 +1630,10 @@ export const fetcherRunner = (() => {
     forceExpanded = true;
     suppressAutoExpand = false;
     fetchSuccessLabels.clear();
+    lastRunFailedByKey.clear();
     updateGlobalFetcherIndicator(runStateByKey, source);
     buildLogPanelChrome();
+    expandLogBody();
     applyFetcherRowLayout();
     renderDashboardFetcherHealth();
     fetcherPopoverRelease?.();
@@ -1523,6 +1655,16 @@ export const fetcherRunner = (() => {
   function toggleFetcherPopover() {
     if (isFetcherPopoverOpen()) hideFetcherPopover();
     else showFetcherPopover();
+  }
+
+  function openFetcherLog({ focusPanel = false } = {}) {
+    if (fetcherPopoverEl()) {
+      showFetcherPopover({ focusPanel });
+      expandLogBody();
+      return true;
+    }
+    reopenLogPanel();
+    return true;
   }
 
   function isFetcherInFlight() {
@@ -1798,15 +1940,24 @@ export const fetcherRunner = (() => {
     const btn = logPanel()?.querySelector('[data-role="close"]');
     if (!btn) return;
     const collapsed = isLogBodyCollapsed();
-    btn.textContent = collapsed ? 'Expand' : 'Collapse';
+    btn.classList.toggle('is-collapsed', collapsed);
     btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    btn.title = collapsed ? 'Expand log panel' : 'Collapse log panel';
+    const label = collapsed ? 'Expand log panel' : 'Collapse log panel';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
   }
 
   function toggleLogBody() {
     const panel = logPanel();
     if (!panel) return;
     panel.classList.toggle('fh-log--collapsed');
+    syncLogCollapseButton();
+  }
+
+  function expandLogBody() {
+    const panel = logPanel();
+    if (!panel || !panel.classList.contains('fh-log--collapsed')) return;
+    panel.classList.remove('fh-log--collapsed');
     syncLogCollapseButton();
   }
 
@@ -1822,7 +1973,7 @@ export const fetcherRunner = (() => {
         </div>
         <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel" title="Stop all queued and running fetchers (Shift+click: force reset queue)">Cancel</button>
         <button type="button" class="fh-log-btn" data-role="clear" title="Clear log output (does not stop running fetchers)">Clear</button>
-        <button type="button" class="fh-log-btn" data-role="close" aria-expanded="true" title="Collapse log panel">Collapse</button>
+        <button type="button" class="fh-log-btn fh-log-toggle" data-role="close" aria-expanded="true" aria-label="Collapse log panel" title="Collapse log panel"><span class="fh-log-toggle-icon" aria-hidden="true">&#9662;</span></button>
       </div>
       <div class="fh-log-body" data-role="body"></div>
       <button type="button" class="fh-log-jump hidden" data-role="jump" aria-label="Jump to latest line" title="Jump to latest">&darr;</button>
@@ -1842,11 +1993,18 @@ export const fetcherRunner = (() => {
     return panel;
   }
 
+  /** Build/sync log chrome during runs without opening the popover or row. */
   function ensurePanel(src, serverStatus, extra) {
-    if (fetcherPopoverEl() && !suppressAutoExpand && !isFetcherPopoverOpen()) {
-      showFetcherPopover({ focusPanel: false });
+    const panel = buildLogPanelChrome();
+    if (!panel) return;
+    if (src && serverStatus) {
+      syncLogPanelChrome(src, serverStatus, extra);
+    } else if (src) {
+      const titleEl = panel.querySelector('[data-role="title"]');
+      if (titleEl) titleEl.textContent = src.label;
     }
-    expandPanel({ manual: false, src, serverStatus, extra });
+    updateCancelButton();
+    logBodyEl = panel.querySelector('[data-role="body"]');
   }
 
   /**
@@ -1869,7 +2027,9 @@ export const fetcherRunner = (() => {
       clearFollowTailIdleTimer();
     }
     logBodyEl = body || null;
-    return expandPanel({ manual: true });
+    const ok = expandPanel({ manual: true });
+    expandLogBody();
+    return ok;
   }
 
   function updateCancelButton() {
@@ -2481,6 +2641,11 @@ export const fetcherRunner = (() => {
           ? `${(data.ended_at - data.started_at).toFixed(1)}s`
           : '';
         const outcome = cancelled ? 'cancelled' : ok ? 'done' : 'failed';
+        // #region agent log
+        if (key === 'wishlistHumble' || key === 'humble') {
+          fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'H4H5',location:'fetcher-health.js:runDone',message:'humble run finished',data:{key,outcome,status:data.status,exit_code:data.exit_code,failure_kind:data.failure_kind||null},timestamp:Date.now()})}).catch(()=>{});
+        }
+        // #endregion
         logEvent(
           'info',
           `[${src.label}: exit ${data.exit_code}] ${outcome}${duration ? ` in ${duration}` : ''}`,
@@ -2755,6 +2920,7 @@ export const fetcherRunner = (() => {
     showFetcherPopover,
     hideFetcherPopover,
     toggleFetcherPopover,
+    openFetcherLog,
     isFetcherPopoverOpen,
     setBarSummary(text) {
       lastBarSummary = text;
@@ -2775,6 +2941,9 @@ export const fetcherRunner = (() => {
       clearFollowTailIdleTimer();
     },
     syncLogPanelChrome,
+    ensurePanelForTest(src, serverStatus, extra) {
+      ensurePanel(src, serverStatus, extra);
+    },
     fetchWithTimeout: fetchWithTimeoutAndProbe,
     cancelInFlightRuns,
     applyServerSnapshotInFlight,
@@ -2795,6 +2964,13 @@ export const fetcherRunner = (() => {
     },
     markRunFailedForTest(key) {
       lastRunFailedByKey.set(key, Date.now());
+    },
+    clearRunFailedForTest(key) {
+      lastRunFailedByKey.delete(key);
+    },
+    resetPillAggregatesForTest() {
+      lastRunFailedByKey.clear();
+      fetchSuccessLabels.clear();
     },
     isRunFailedForTest(key) {
       return lastRunFailedByKey.has(key);
@@ -3014,6 +3190,11 @@ export function renderDashboardFetcherHealth() {
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
     const displayStatus = runState
       || (persistFailed ? 'failed' : (needsReconnect ? 'reconnect' : status));
+    // #region agent log
+    if (src.key === 'wishlistHumble' || src.key === 'humble') {
+      fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'H1H2H3',location:'fetcher-health.js:chipHtml',message:'humble chip render state',data:{key:src.key,providerStatusHumble:providerStatus('humble'),disconnected,needsReconnect,persistFailed,runState:runState||null,authCooldownMs,displayStatus,status,navProvider},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0
       && !fetcherCredentialsSatisfied(src.key);
@@ -3129,15 +3310,19 @@ export function renderDashboardFetcherHealth() {
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
 
   const staleButtonHtml = `<button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>`;
-  const filterToggleHtml = `<div class="fh-filter-toggles" title="Show fetchers matching any checked category; uncheck both to show all">
-            <label class="fh-toggle" title="Show connected fetchers (not disconnected or expired)">
+  const filterHint = (!showConnected && !showStaleMissing)
+    ? 'Showing all'
+    : `Uncheck both to show all ${rows.length}`;
+  const filterToggleHtml = `<div class="fh-filter-toggles" title="Each checked box adds fetchers (OR). Disconnected sources with fresh data may stay hidden — uncheck both to reveal all.">
+            <label class="fh-toggle" title="Show fetchers whose store/session is connected (not disconnected or expired)">
               <input id="fetcherHealthShowConnected" type="checkbox" class="rounded" ${showConnected ? 'checked' : ''} />
               Connected
             </label>
-            <label class="fh-toggle" title="Show fetchers with stale or missing cached data">
+            <label class="fh-toggle" title="Show fetchers with stale or missing cached data (regardless of connection)">
               <input id="fetcherHealthShowStaleMissing" type="checkbox" class="rounded" ${showStaleMissing ? 'checked' : ''} />
               Stale / missing
             </label>
+            <span class="fh-filter-hint">${escapeHtml(filterHint)}</span>
           </div>`;
   const legendTipsItemsHtml = `
           ${clickHint}

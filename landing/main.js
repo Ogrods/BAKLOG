@@ -1,12 +1,9 @@
 /**
- * Landing page utilities: footer year, non-blocking fonts, waitlist form.
+ * Landing page utilities: footer year, waitlist form.
  */
 (function () {
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
-
-  const fontLink = document.getElementById("google-fonts");
-  if (fontLink) fontLink.media = "all";
 
   const form = document.getElementById("waitlist");
   if (!form) return;

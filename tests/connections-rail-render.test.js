@@ -44,6 +44,9 @@ vi.mock('../js/filters-ui.js', () => ({
 
 vi.mock('../js/state.js', () => ({
   state: { activeView: 'connections' },
+  STORAGE_KEY: 'steam-backlog-personal',
+  PREFS_KEY: 'steam-backlog-ui-prefs',
+  MANUAL_KEY: 'steam-backlog-manual-games',
 }));
 
 vi.mock('../js/visibility.js', () => ({

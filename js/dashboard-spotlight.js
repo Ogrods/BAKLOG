@@ -53,6 +53,7 @@ const SABER_PROTECTED_EYEBROWS = new Set([
   'Quick win',
   'Top-rated quick pick',
   'Random pick',
+  'Cat game',
 ]);
 
 let _stinkerChance = 0.02;
@@ -72,6 +73,28 @@ let _randomPickChance = 0.08;
 /** Test seam: override the random-pick probability (0 disables, 1 forces it). */
 export function setRandomPickChanceForTest(chance) {
   _randomPickChance = chance;
+}
+
+const CAT_GAME_EYEBROW = 'Cat game';
+let _catGameChance = 0.04;
+
+/** Test seam: override the cat-game probability (0 disables, 1 forces it). */
+export function setCatGameChanceForTest(chance) {
+  _catGameChance = chance;
+}
+
+const CAT_TITLE_RE = /\bcats?\b/i;
+
+/** One library title whose name contains "cat"/"cats" as a whole word. */
+function pickCatGame(eligible, excludeKeys) {
+  const cats = eligible.filter(g => {
+    const status = (getPersonal(g).status) || 'backlog';
+    if (status === 'skip' || status === 'live') return false;
+    if (excludeKeys.has(gameKey(g))) return false;
+    return CAT_TITLE_RE.test(g.name || '');
+  });
+  if (!cats.length) return null;
+  return cats[Math.floor(Math.random() * cats.length)];
 }
 
 /** One uniformly-random library title, skipping skip/live and any excluded keys. */
@@ -412,6 +435,24 @@ export function pickSpotlightGames(games) {
       });
       const insertAt = Math.floor(Math.random() * (pool.length + 1));
       pool.splice(insertAt, 0, entry);
+    }
+  }
+
+  if (Math.random() < _catGameChance) {
+    const protectedKeys = new Set(
+      pool
+        .filter(g => g._spotlightReason?.isRecent || g._spotlightReason?.isReplay || g._spotlightReason?.isBarrel || g._spotlightReason?.isRandom)
+        .map(gameKey),
+    );
+    const cat = pickCatGame(eligible, protectedKeys);
+    if (cat) {
+      const key = gameKey(cat);
+      const at = pool.findIndex(g => gameKey(g) === key);
+      if (at >= 0) pool.splice(at, 1);
+      const entry = Object.assign({}, cat, {
+        _spotlightReason: { eyebrow: CAT_GAME_EYEBROW, score: 50, isCatGame: true },
+      });
+      pool.splice(Math.floor(Math.random() * (pool.length + 1)), 0, entry);
     }
   }
 

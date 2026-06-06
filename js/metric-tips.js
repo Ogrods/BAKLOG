@@ -105,6 +105,7 @@ export const METRIC_TIPS = {
   'unique developers': 'Count of distinct developers in the library.',
   'top genre': 'Genre tag appearing on the most games.',
   'unique genres': 'Count of distinct genre tags.',
+  'cat games': 'Games with "cat" anywhere in the title (substring match).',
   'biggest store': 'Storefront with the most owned games.',
   'games per store avg': 'Total games ÷ number of stores.',
   'longest game beaten': 'Finished game with the highest HLTB main.',
@@ -196,6 +197,7 @@ export const EYEBROW_TIPS = {
   'Guilty pleasure': 'The lowest-rated game you finished anyway.',
   'Rare stinker': 'Rare easter egg: the single lowest-rated game in your whole catalog.',
   'Random pick': 'Dealer\u2019s choice: one title pulled at random from your library.',
+  'Cat game': 'A game with "cat" in the title. A rare treat for cat people.',
 };
 
 /**
@@ -234,6 +236,7 @@ export const EYEBROW_VARIANTS = {
   'Guilty pleasure': ['Guilty pleasure', 'Guilty fave', 'No regrets', 'Trashy fun'],
   'Rare stinker': ['Rare stinker', 'Certified stinker', 'Bottom tier', 'The worst'],
   'Random pick': ['Random pick', 'Dealer\u2019s choice', 'Wild card', 'Lucky dip'],
+  'Cat game': ['Cat game', 'Here, kitty', 'Meow', 'Cat content'],
 };
 
 /** @param {string} s */

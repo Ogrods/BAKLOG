@@ -7,6 +7,7 @@ import { filterOutHidden } from './personal-storage.js';
 import { prefersReducedMotion } from './motion.js';
 import { isPageHidden } from './visibility.js';
 import { STORE_BRAND_COLORS } from './store-brand-colors.js';
+import { getColorTheme } from './theme.js';
 
 export { STORE_BRAND_COLORS } from './store-brand-colors.js';
 
@@ -27,10 +28,26 @@ export const ITCH_CLASS_LABELS = {
 // STORE_BRAND_COLORS (they render on their own colored chips).
 export const DASH_STORE_COLORS = {
   ...STORE_BRAND_COLORS,
-  steam: '#66c0f4',    // Steam light brand blue
+  steam: '#66c0f4',    // Steam light brand blue (low-visibility-theme fallback)
   epic: '#cfd2d6',     // Epic grayscale identity, lightened for contrast
   ubisoft: '#0098db',  // Ubisoft Connect blue
 };
+
+// Steam's real navy (#1b2838) is unreadable on the dark chart canvas, so charts
+// use a blue tint. On low-contrast/near-black themes the bright baby blue reads
+// best; on the other themes a more on-brand Steam UI blue is used instead.
+const STEAM_LOWVIS_COLOR = '#66c0f4';   // bright baby blue
+const STEAM_NORMAL_COLOR = '#417a9b';   // Steam UI blue
+const STEAM_LOWVIS_THEMES = new Set(['default', 'dark', 'ember']);
+
+/** Resolve a store's chart color, switching Steam by theme readability. */
+export function dashStoreColor(store) {
+  const key = (store || '').toLowerCase();
+  if (key === 'steam') {
+    return STEAM_LOWVIS_THEMES.has(getColorTheme()) ? STEAM_LOWVIS_COLOR : STEAM_NORMAL_COLOR;
+  }
+  return DASH_STORE_COLORS[key] || '#64748b';
+}
 
 export const DASH_STATUS_COLORS = {
   backlog: "#ef4444", next: "#38bdf8", playing: "#facc15", unfinished: "#f97316",

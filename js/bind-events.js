@@ -70,7 +70,7 @@ import {
 } from './deals.js';
 import { reloadGames } from './library-load.js';
 import { bindAddGameModal } from './add-game-modal.js';
-import { copyBugBundleToClipboard } from './error-boundary.js';
+import { openBugReportDialog } from './bug-report.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
 import { bindHiddenPanelUI } from './hidden-panel.js';
 import { createGlobalKeydownHandler } from './events.js';
@@ -554,6 +554,12 @@ export function bindEvents() {
       // overlay → new content paints from y=0. Drill-ins go through
       // dashboard-drilldown.js which manages its own scroll target.
       cancelPendingScrollTarget();
+      const fromView = state.activeView;
+      // Hide dashboard before scrollTo — otherwise jumping to y=0 while still on
+      // the dashboard tab briefly exposes the mega hero at the top of the page.
+      if (fromView === "dashboard" && view !== "dashboard") {
+        document.getElementById("dashboardContainer")?.classList.add("hidden");
+      }
       window.scrollTo(0, 0);
       switchView(view);
     });
@@ -660,9 +666,6 @@ export function bindEvents() {
     kebabMenu.classList.remove("open");
     try { await reloadGames(); } catch { alert("Could not reload library files. Run the fetch scripts (fetch_games.py, fetch_gog.py, etc.) and reload."); }
   });
-  const toggleFetcherPopover = () => {
-    fetcherRunner.toggleFetcherPopover();
-  };
   document.getElementById("fetcherPopoverBackdrop")?.addEventListener("click", () => {
     fetcherRunner.hideFetcherPopover();
   });
@@ -688,9 +691,11 @@ export function bindEvents() {
   });
   document.getElementById("showFetcherLog")?.addEventListener("click", () => {
     kebabMenu.classList.remove("open");
-    fetcherRunner.showFetcherPopover();
+    fetcherRunner.openFetcherLog();
   });
-  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", toggleFetcherPopover);
+  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", () => {
+    fetcherRunner.openFetcherLog({ focusPanel: false });
+  });
   document.getElementById("fetcherStatLayoutToggle")?.addEventListener("click", () => {
     fetcherRunner.cycleStatLayout();
   });
@@ -714,19 +719,8 @@ export function bindEvents() {
     }
     download("baklog-notes-only.json", JSON.stringify(rows, null, 2), "application/json");
   });
-  document.getElementById("reportBug")?.addEventListener("click", async () => {
-    const ok = await copyBugBundleToClipboard();
-    const banner = document.getElementById("bootErrorBanner");
-    if (!banner) return;
-    banner.className = "migration-banner";
-    banner.textContent = ok
-      ? "Bug bundle copied. Paste it into a new GitHub issue."
-      : "Could not copy - use ?debug=1 overlay or trigger an error and click Copy bug bundle.";
-    banner.classList.remove("hidden");
-    window.setTimeout(() => {
-      banner.classList.add("hidden");
-      banner.textContent = "";
-    }, 5000);
+  document.getElementById("reportBug")?.addEventListener("click", () => {
+    openBugReportDialog();
   });
   document.getElementById("importNotes").addEventListener("change", async e => {
     const file = e.target.files[0];

@@ -105,6 +105,9 @@ export function showViewOverlay(view) {
   const lbl = document.getElementById("viewLoadingLabel");
   if (lbl) lbl.textContent = label;
   if (ov) {
+    const header = document.querySelector(".app-header");
+    const top = header ? Math.ceil(header.getBoundingClientRect().bottom) : 0;
+    ov.style.setProperty("--view-overlay-top", `${top}px`);
     ov.setAttribute("aria-hidden", "false");
     ov.classList.add("show");
   }
@@ -118,6 +121,11 @@ export function hideViewOverlay() {
     ov.setAttribute("aria-hidden", "true");
   }
   document.querySelectorAll(".view-tab").forEach(b => { b.disabled = false; });
+}
+
+export function isViewOverlayVisible() {
+  const ov = document.getElementById("viewLoadingOverlay");
+  return !!(ov && ov.classList.contains("show"));
 }
 
 /** Snapshot for ?debug=1 overlay. */

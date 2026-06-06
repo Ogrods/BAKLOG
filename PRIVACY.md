@@ -13,7 +13,7 @@ JSON and Connections secrets locally; only the login handshake talks to Supabase
 Nothing else leaves your machine except direct calls you make to the storefronts
 and enrichment services listed below.
 
-Last updated: 2026-06-02.
+Last updated: 2026-06-05.
 
 ## TL;DR
 
@@ -94,10 +94,13 @@ When an uncaught error or unhandled promise rejection fires, BAKLOG:
    `window.__baklogErrors` for this tab.
 2. Mirrors it into the `baklog-error-log` localStorage ring (last 200
    entries, oldest evicted).
-3. Surfaces a sticky red toast in the top-right corner with **Copy bug
-   bundle / Errors only / Details / Dismiss** buttons.
+3. Surfaces a sticky red toast in the top-right corner with **Send report /
+   Copy bug bundle / Errors only / Details / Dismiss** buttons.
 
-**"Copy bug bundle"** places a sanitized JSON payload on your clipboard. The
+**Send report** opens a consent dialog that shows the exact JSON payload,
+optional contact email and note fields, and sends the bundle only when you
+click **Send report** again. **Copy bug bundle** places the same sanitized
+JSON on your clipboard without any network request.
 bundle is a whitelist — only these fields are included:
 
 | Field | Why |
@@ -121,8 +124,11 @@ Browser stack traces reference the served URL (e.g.
 `http://localhost:8765/js/foo.js:123:45`), not your filesystem path.
 
 Once on your clipboard, the bundle is JSON you can paste anywhere — a
-GitHub issue, an email, a paste buffer for inspection. What happens after
-the clipboard is entirely your decision; BAKLOG never auto-sends it.
+GitHub issue, an email, a paste buffer for inspection. If you use **Send
+report**, the same whitelist bundle (plus optional contact/note) is POSTed to
+`https://baklog.app/api/report`, stored in the project's Supabase
+`bug_reports` table, and emailed to the maintainer. Nothing is sent unless
+you explicitly confirm in the dialog.
 
 ### Portable secret bundle
 
@@ -191,9 +197,9 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
 
 ## What does *not* happen
 
-- No telemetry, analytics, crash reports, or pings home — including the
-  error log: it stays in your browser until *you* explicitly copy it via
-  the "Copy bug bundle" button.
+- No telemetry, analytics, or silent crash reports — including the error
+  log: it stays in your browser until *you* copy it or explicitly send it via
+  **Send report** in the consent dialog.
 - No third-party ad/affiliate scripts (the deal links go straight to the store
   via ITAD).
 - No project-owned cloud service.

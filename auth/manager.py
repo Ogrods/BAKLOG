@@ -34,6 +34,41 @@ _LEGACY_ENV_ALIASES: dict[str, tuple[str, ...]] = {
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
+# #region agent log
+def _f15log(hyp: str, message: str, data: dict) -> None:
+    try:
+        import json as _json
+        import time as _time
+
+        _line = _json.dumps(
+            {"sessionId": "f15ccc", "hypothesisId": hyp, "location": "auth/manager.py",
+             "message": message, "data": data, "timestamp": int(_time.time() * 1000)},
+            default=str,
+        )
+        with open(ROOT / "debug-f15ccc.log", "a", encoding="utf-8") as _f:
+            _f.write(_line + "\n")
+    except Exception:
+        pass
+
+
+def _cf7log(hyp: str, message: str, data: dict) -> None:
+    try:
+        import json as _json
+        import time as _time
+
+        _line = _json.dumps(
+            {"sessionId": "cf7aab", "hypothesisId": hyp, "location": "auth/manager.py",
+             "message": message, "data": data, "timestamp": int(_time.time() * 1000)},
+            default=str,
+        )
+        with open(ROOT / "debug-cf7aab.log", "a", encoding="utf-8") as _f:
+            _f.write(_line + "\n")
+    except Exception:
+        pass
+# #endregion
+
+
 _active_sessions: dict[str, AuthSession] = {}
 _sessions_lock = threading.Lock()
 
@@ -519,10 +554,28 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
         raise ValueError(f"{provider} uses manual sign-in — click Open in browser and paste your API key")
     if spec.kind not in ("browser", "oauth"):
         raise ValueError(f"{provider} does not support browser sign-in")
+    # #region agent log
+    _f15log("A_C_D", "start_browser_auth entry", {
+        "provider": provider, "kind": spec.kind, "fresh": fresh,
+        "state_before": _provider_state(provider),
+        "profile_exists": profile_dir(provider).exists(),
+    })
+    _cf7log("HC3", "start_browser_auth entry", {
+        "provider": provider, "kind": spec.kind, "fresh": fresh,
+        "state_before": _provider_state(provider),
+    })
+    # #endregion
     if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.
-        clear_browser_session(provider)
+        # #region agent log
+        try:
+            clear_browser_session(provider)
+            _f15log("D", "clear_browser_session ok", {"provider": provider})
+        except Exception as _exc:
+            _f15log("D", "clear_browser_session RAISED", {"provider": provider, "err": str(_exc)})
+            raise
+        # #endregion
     elif provider in PRESERVE_PROFILE_ON_RECONNECT:
         # Keep profile on reconnect (connected/expired) but drop ghost cookies
         # when starting from disconnected so connect cannot auto-complete on a
@@ -537,6 +590,13 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
     def _worker() -> None:
         try:
             creds = run_browser_auth(provider, session)
+            # #region agent log
+            _f15log("A_B", "run_browser_auth returned", {
+                "provider": provider,
+                "creds_keys": sorted((creds or {}).keys()),
+                "creds_empty": not creds,
+            })
+            # #endregion
             if not creds:
                 # Window closed without a completed sign-in. Reset to a clean,
                 # current state so the chip never keeps a stale error from a
@@ -571,6 +631,11 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 mark_connected(provider, creds)
                 session.emit("extracted", {"status": "connected"})
         except Exception as exc:  # noqa: BLE001
+            # #region agent log
+            _cf7log("HC6", "worker EXCEPTION -> mark_invalid", {
+                "provider": provider, "err": str(exc)[:300],
+            })
+            # #endregion
             # Unexpected failure: clear stale state with a current message.
             mark_invalid(provider, error=f"Sign-in did not complete: {exc}")
             session.emit("error", {"message": str(exc)})

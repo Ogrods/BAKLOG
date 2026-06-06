@@ -90,7 +90,7 @@ class TestShouldPreservePopup:
 
 
 class TestRegisterPageDebugger:
-    def test_register_page_enables_skip_all_pauses(self) -> None:
+    def test_register_page_skips_debugger_for_storefront_auth(self) -> None:
         ctx = _bare_context()
         ctx._pages_by_session = {}
         ctx._pages_by_target = {}
@@ -107,8 +107,9 @@ class TestRegisterPageDebugger:
         page = ctx._register_page("TARGET-1", "SESSION-1")
 
         assert isinstance(page, CdpPage)
-        assert ("Debugger.enable", "SESSION-1") in calls
-        assert ("Debugger.setSkipAllPauses", "SESSION-1") in calls
+        assert not any(m.startswith("Debugger.") for m, _ in calls)
+        assert ("Page.enable", "SESSION-1") in calls
+        assert ("Network.enable", "SESSION-1") in calls
 
 
 class TestCdpErrors:

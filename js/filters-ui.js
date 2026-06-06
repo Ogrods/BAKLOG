@@ -53,7 +53,9 @@ import {
   tableFingerprint,
   isViewCached,
   scheduleScrollAfterLayoutSettled,
+  scheduleScrollAfterChromeSettled,
   hasPendingScrollTarget,
+  hasPendingToolbarScroll,
   setPendingScrollTarget,
   prewarmTableQueryForView,
   syncRowCountLabel,
@@ -394,6 +396,18 @@ export async function refreshFilterUI(options) {
     return;
   }
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
+  // Chart drill-ins: paint summary + picks before the table so toolbar scroll
+  // does not land while chrome above the table is still growing.
+  if (hasPendingToolbarScroll()) {
+    renderSummary();
+    if (!options?.skipPicks) renderPicks();
+    scheduleScrollAfterChromeSettled();
+    if (!options?.skipTable) {
+      if (options?.force) await renderTable({ force: true, drillIn: false });
+      else await renderTable({ drillIn: false });
+    }
+    return;
+  }
   if (!options?.skipTable) {
     if (options?.force || drillIn) await renderTable({ force: true, drillIn });
     else renderTable({ drillIn });
@@ -402,19 +416,19 @@ export async function refreshFilterUI(options) {
     const deferChrome = () => {
       renderSummary();
       if (!options?.skipPicks) renderPicks();
-      scheduleScrollAfterLayoutSettled();
+      scheduleScrollAfterChromeSettled();
     };
     if (typeof requestIdleCallback === "function") requestIdleCallback(deferChrome, { timeout: 800 });
     else setTimeout(deferChrome, 0);
     return;
   }
   if (options?.skipPicks) {
-    if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
+    if (hasPendingScrollTarget()) scheduleScrollAfterChromeSettled();
     return;
   }
   renderSummary();
   renderPicks();
-  if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
+  if (hasPendingScrollTarget()) scheduleScrollAfterChromeSettled();
 }
 
 let _filterDebounceTimer = null;
@@ -448,7 +462,9 @@ export function updateViewChrome(options) {
   const isItch = state.activeView === "itch";
   const isDash = state.activeView === "dashboard";
   const isConn = state.activeView === "connections";
+  const deferChrome = !!options?.deferTableChrome;
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
+  const hideTableUi = isDash || isConn || deferChrome;
   // Keep the FOUC guard in sync so its !important rules don't outlive the
   // initial view. Once the user switches views, the attribute matches reality.
   document.documentElement.setAttribute("data-init-view", state.activeView);
@@ -458,20 +474,20 @@ export function updateViewChrome(options) {
   // Quick-Wins slider visibility lives in picks-ui via updatePicksChrome;
   // import lazily here so we avoid a top-level cycle with picks-ui.
   document.getElementById("quickWinMaxWrap")?.classList.toggle("hidden", isWish || isItch);
-  document.getElementById("picksSection")?.classList.toggle("hidden", isDash || isConn);
-  document.getElementById("toolbarSection")?.classList.toggle("hidden", isDash || isConn);
-  document.getElementById("tableShell")?.classList.toggle("hidden", isDash || isConn);
-  document.getElementById("rowCount")?.classList.toggle("hidden", isDash || isConn);
-  if (!isDash && !isConn) syncRowCountLabel();
-  document.getElementById("summary")?.classList.toggle("hidden", isConn);
+  document.getElementById("picksSection")?.classList.toggle("hidden", hideTableUi);
+  document.getElementById("toolbarSection")?.classList.toggle("hidden", hideTableUi);
+  document.getElementById("tableShell")?.classList.toggle("hidden", hideTableUi);
+  document.getElementById("rowCount")?.classList.toggle("hidden", hideTableUi);
+  if (!hideTableUi) syncRowCountLabel();
+  document.getElementById("summary")?.classList.toggle("hidden", isConn || deferChrome);
   document.getElementById("alphaNavWrap")?.classList.toggle("dashboard-hidden", isDash || isConn);
   document.getElementById("dashboardContainer")?.classList.toggle("hidden", !isDash);
   document.getElementById("connectionsContainer")?.classList.toggle("hidden", !isConn);
   document.getElementById("libraryStatusSection")?.classList.add("hidden");
   document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
   // Cross-store dedup applies to library and wishlist (not itch — single store).
-  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isItch || isDash || isConn);
-  document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish);
+  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isItch || isDash || isConn || deferChrome);
+  document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish || deferChrome);
   const dedupHint = document.getElementById("crossStoreDedupHint");
   if (dedupHint) {
     dedupHint.textContent = isWish
@@ -489,7 +505,7 @@ export function updateViewChrome(options) {
   }
   if (isConn) refreshConnections();
   renderBulkStatusButtons();
-  if (!drillIn) renderSummary();
+  if (!drillIn && !deferChrome) renderSummary();
 }
 
 export function updatePickTabsVisibility() {
@@ -537,6 +553,11 @@ export function switchView(view) {
   const tableCached = !drillIn && view !== "dashboard" && isViewCached(view, fpBefore);
   const dashCached = view === "dashboard" && dashboardWasRendered();
   const useOverlay = drillIn || (!tableCached && !dashCached);
+  if (fromView === "dashboard" && view !== "dashboard") {
+    document.getElementById("dashboardContainer")?.classList.add("hidden");
+    cancelScheduledDashboardRender();
+    stopDashboardRotations();
+  }
   // Light-up the clicked tab immediately so the click feels responsive even on
   // first-render paths where doSwitch is deferred to the next rAF.
   syncViewTabAria(view);
@@ -582,7 +603,8 @@ export function switchView(view) {
     updateCleanupBtnState();
     updateBulkBar();
     const skipDashboardSchedule = view === "dashboard";
-    updateViewChrome({ drillIn, skipDashboardSchedule });
+    const deferTableChrome = useOverlay && !drillIn && view !== "dashboard";
+    updateViewChrome({ drillIn, skipDashboardSchedule, deferTableChrome });
     void flushDeferredRenders();
     const refreshDone = refreshFilterUI({ force: true, drillIn, skipDashboardSchedule });
     if (view === "dashboard") {
@@ -592,7 +614,7 @@ export function switchView(view) {
       ensureChartJs()
         .then(() => {
           if (state.activeView !== "dashboard") return;
-          renderDashboard({ replay: true });
+          renderDashboard({ replay: true, replayRibbonOnly: true });
         })
         .catch(err => console.warn("[switchView] Chart.js load failed", err))
         .finally(() => setDashReplayAllowed(false));
@@ -621,7 +643,11 @@ export function switchView(view) {
         // leak as an unhandledrejection (the render path above logs it).
         ensureChartJs().catch(() => {}).finally(() => hideViewOverlay());
       } else {
-        refreshDone.finally(() => hideViewOverlay());
+        refreshDone.finally(() => {
+          updateViewChrome({ skipDashboardSchedule: view === "dashboard" });
+          hideViewOverlay();
+          if (hasPendingScrollTarget()) scheduleScrollAfterChromeSettled();
+        });
       }
     }
   };

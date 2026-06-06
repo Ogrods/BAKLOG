@@ -76,8 +76,22 @@ describe('auth-gate', () => {
     await initAuthGate();
     const ov = document.getElementById('authGateOverlay');
     expect(ov.hidden).toBe(true);
+    expect(document.documentElement.hasAttribute('data-auth-required')).toBe(false);
     expect(getAccountEmail()).toBe('user@example.com');
     expect(getAccountProfileId()).toBe('550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('initAuthGate with valid session leaves boot curtain up', async () => {
+    document.documentElement.setAttribute('data-boot-loading', 'dashboard');
+    supabaseMock.setSession({
+      access_token: 'tok',
+      user: { email: 'user@example.com' },
+    });
+    const { initAuthGate } = await import('../js/auth-gate.js');
+    await initAuthGate();
+    expect(document.documentElement.hasAttribute('data-auth-required')).toBe(false);
+    expect(document.documentElement.hasAttribute('data-boot-loading')).toBe(true);
+    expect(document.getElementById('authGateOverlay').hidden).toBe(true);
   });
 
   it('handleApiUnauthorized re-shows overlay after boot', async () => {

@@ -29,7 +29,7 @@ let _pollTimer = null;
 
 function loadDoc() {
   try {
-    const raw = JSON.parse(localStorage.getItem(WATCH_LS_KEY) || '{}');
+    const raw = JSON.parse(localStorage.getItem(watchLsKey()) || '{}');
     const watches = raw?.watches;
     return Array.isArray(watches) ? watches : [];
   } catch {

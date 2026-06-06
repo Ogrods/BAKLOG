@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
-import { beginRowLoader, endRowLoader, forceHideRowLoader } from './loading-curtain.js';
-import { deferTableRender } from './render-gate.js';
+import { beginRowLoader, endRowLoader, forceHideRowLoader, isViewOverlayVisible } from './loading-curtain.js';
+import { deferTableRender, isTableDataView } from './render-gate.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
 import {
   collectTableParams,
@@ -511,10 +511,19 @@ export function formatPrice(g) {
 
 let _pendingScrollTarget = null;
 let _lastConsumeWasSmooth = false;
+let _chromeScrollObs = null;
+
+function disconnectChromeScrollObs() {
+  if (_chromeScrollObs) {
+    _chromeScrollObs.disconnect();
+    _chromeScrollObs = null;
+  }
+}
 
 export function setPendingScrollTarget(target) {
   if (!target) {
     _pendingScrollTarget = null;
+    disconnectChromeScrollObs();
     return;
   }
   _pendingScrollTarget = {
@@ -527,6 +536,7 @@ export function setPendingScrollTarget(target) {
 
 export function cancelPendingScrollTarget() {
   _pendingScrollTarget = null;
+  disconnectChromeScrollObs();
 }
 
 export function hasPendingScrollTarget() {
@@ -569,6 +579,11 @@ export function consumePendingScrollTarget(list = state._visibleList) {
   if (!t || t.consumed) return false;
 
   if (t.kind === "toolbar") {
+    if (!isToolbarScrollReady()) {
+      scheduleScrollAfterChromeSettled();
+      return false;
+    }
+    disconnectChromeScrollObs();
     scrollToToolbarAnchor({ smooth: !!t.smooth });
     t.consumed = true;
     _pendingScrollTarget = null;
@@ -624,6 +639,73 @@ export function scheduleScrollAfterLayoutSettled() {
       consumePendingScrollTarget(state._visibleList);
     });
   });
+}
+
+/** Category drill-ins: wait for summary/picks chrome to stop resizing before scrolling. */
+export function scheduleScrollAfterChromeSettled() {
+  const t = _pendingScrollTarget;
+  if (!t || t.consumed || t.kind !== 'toolbar') {
+    scheduleScrollAfterLayoutSettled();
+    return;
+  }
+
+  disconnectChromeScrollObs();
+
+  const tryConsume = () => {
+    if (!_pendingScrollTarget || _pendingScrollTarget.consumed) {
+      disconnectChromeScrollObs();
+      return;
+    }
+    if (isToolbarScrollReady()) {
+      disconnectChromeScrollObs();
+      scheduleScrollAfterLayoutSettled();
+    }
+  };
+
+  const picks = document.getElementById('picksSection');
+  const toolbar = document.getElementById('toolbarSection');
+  const summary = document.getElementById('summary');
+  if (!picks || !toolbar || typeof ResizeObserver !== 'function') {
+    const run = () => scheduleScrollAfterLayoutSettled();
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 800 });
+    else setTimeout(run, 0);
+    return;
+  }
+
+  _chromeScrollObs = new ResizeObserver(() => {
+    requestAnimationFrame(tryConsume);
+  });
+  _chromeScrollObs.observe(picks);
+  _chromeScrollObs.observe(toolbar);
+  if (summary) _chromeScrollObs.observe(summary);
+  requestAnimationFrame(() => requestAnimationFrame(tryConsume));
+}
+
+function scrollDeferredToRefreshFilterUI() {
+  return hasPendingToolbarScroll();
+}
+
+export function hasPendingToolbarScroll() {
+  return _pendingScrollTarget?.kind === 'toolbar' && !_pendingScrollTarget?.consumed;
+}
+
+/** Toolbar scroll must not run until library chrome + overlay have fully settled. */
+function isToolbarScrollReady() {
+  if (!isTableDataView(state.activeView)) return false;
+  if (isViewOverlayVisible()) return false;
+  const toolbar = document.getElementById('toolbarSection');
+  if (!toolbar || toolbar.classList.contains('hidden')) return false;
+  const picks = document.getElementById('picksSection');
+  if (!picks || picks.classList.contains('hidden')) return false;
+  if (picks.offsetHeight < 24) return false;
+  const picksTop = picks.offsetTop;
+  const toolbarTop = toolbar.offsetTop;
+  if (picksTop > 0 && toolbarTop > 0) {
+    if (toolbarTop < picksTop + picks.offsetHeight - 4) return false;
+    const toolbarRectTop = toolbar.getBoundingClientRect().top;
+    if (window.scrollY < 16 && toolbarRectTop < 80) return false;
+  }
+  return true;
 }
 
 export function focusGame(key) {
@@ -1067,7 +1149,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
         <div class="flex items-center gap-2">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 min-w-0">
-              ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate flex-1 min-w-0", escapeHtml(g.name))}
+              ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate min-w-0", escapeHtml(g.name))}
               ${ownedWish ? '<span class="text-amber-400 text-xs shrink-0" title="You already own this (matched by title)">owned</span>' : ""}
             </div>
             <div class="row-meta mt-1 flex items-center gap-1.5 flex-wrap">
@@ -1284,7 +1366,7 @@ export async function renderTable(opts) {
   const fp = tableFingerprint();
   if (!force && fp === _tableFingerprint && _lastRenderedView === state.activeView && state._visibleList && isTablePainted(state._visibleList)) {
     if (state._pendingFocusKey && state._visibleList) consumePendingFocus(state._visibleList);
-    if (hasPendingScrollTarget()) scheduleScrollAfterLayoutSettled();
+    if (hasPendingScrollTarget() && !scrollDeferredToRefreshFilterUI()) scheduleScrollAfterLayoutSettled();
     syncRowCountLabel();
     if (isTablePerfEnabled()) {
       console.log('[baklog-perf] renderTable skipped (fingerprint cache hit)', { view: state.activeView, fpLen: fp.length });
@@ -1413,7 +1495,7 @@ export async function renderTable(opts) {
   updateBulkBar();
   buildAlphaNav(list);
   consumePendingFocus(list);
-  if (hasPendingScrollTarget()) {
+  if (hasPendingScrollTarget() && !scrollDeferredToRefreshFilterUI()) {
     scheduleScrollAfterLayoutSettled();
   }
   perfMeasure(perfRun, 'post:bulk-alpha-focus', 'post:start');

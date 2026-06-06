@@ -164,7 +164,7 @@ export function familyForEyebrow(eyebrow) {
     return FAMILY.SABER;
   }
 
-  if (matchesAny(e, ['random pick', 'dealer', 'wild card', 'wildcard', 'lucky dip'])) {
+  if (matchesAny(e, ['random pick', 'dealer', 'wild card', 'wildcard', 'lucky dip', 'cat game', 'here, kitty', 'meow', 'cat content'])) {
     return FAMILY.WILDCARD;
   }
 

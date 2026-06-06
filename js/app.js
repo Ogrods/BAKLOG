@@ -21,6 +21,7 @@ import {
   configureFetcherHealth,
   ensureProfileScopedFetcherState,
 } from './fetcher-health.js';
+import { initAuthGate } from './auth-gate.js';
 import { initConnections, isItchTabAvailable } from './connections.js';
 import {
   initDashboard,
@@ -65,8 +66,9 @@ import { bindEvents } from './bind-events.js';
 import { initProfiles } from './profiles.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
+import { suppressChartStaggerForBoot, resizeRibbonCharts } from './dashboard-charts.js';
 import { prewarmTableQueryForView, tableFingerprint } from './table-ui.js';
-import { initAuthGate } from './auth-gate.js';
+import { initBugReportDialog } from './bug-report.js';
 
 // Personal-storage's setPersonal triggers a downstream render of
 // summary/picks/dashboard. Those callbacks live in filters-ui/picks-ui/
@@ -174,6 +176,7 @@ async function bootstrap() {
   renderBulkStatusButtons();
   renderPicksLimitButtons();
   startDebugOverlay();
+  initBugReportDialog();
   function scheduleIdlePrewarm() {
     const run = () => {
       if (state.activeView === "library" && state.dashboardDataReady) {
@@ -215,8 +218,12 @@ async function bootstrap() {
   try {
     await Promise.all([reloadPromise, fetcherPromise]);
   } finally {
+    suppressChartStaggerForBoot();
     liftBootCurtain(tBoot);
     hideViewOverlay();
+    if (state.activeView === "dashboard") {
+      requestAnimationFrame(() => resizeRibbonCharts());
+    }
     if (state.activeView === "itch" && !isItchTabAvailable()) {
       state.activeView = "dashboard";
       state.prefs.activeView = "dashboard";

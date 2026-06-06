@@ -412,7 +412,7 @@
     { id: "triage", label: "Triage" },
     { id: "debug", label: "Debug tools" },
     { id: "monetize", label: "Monetization" },
-    { id: "beta", label: "Beta" },
+    { id: "beta", label: "Beta / Discord" },
     { id: "cards", label: "Business cards" },
     { id: "sabermetrics", label: "Sabermetrics" },
     { id: "responsive", label: "Responsive" },
@@ -542,7 +542,7 @@
         { id: "p5_pricing", label: "Pricing decided (if paid): one number, no tiers at launch" },
         { id: "p5_build_release", label: "Build + publish the beta executable BEFORE inviting testers: (1) run packaging/build_windows.ps1 → dist\\BAKLOG\\BAKLOG.exe (PyInstaller onedir; needs pip install pyinstaller). (2) Smoke-test on a clean machine per docs/PACKAGING_PLAN.md test matrix — double-click exe, Connect Steam, Refresh, confirm games_*.json writes beside the exe and persists on restart. (3) Zip dist\\BAKLOG\\ → BAKLOG-win64.zip. (4) Create a GitHub Release (e.g. v0.6.0-beta.1) and attach the zip. (5) Confirm the setup link in the Beta tab emails resolves (github.com/Ogrods/BAKLOG/releases). Interim fallback for technical friends: scripts/build_installer.ps1 → zip (still requires Python). Tester instructions live in docs/BETA_SETUP.md." },
         { id: "p5_soft_launch", label: "Soft launch: invite-only beta with 10–20 friends before going public (send Beta-tab wave invite once p5_build_release release is live)" },
-        { id: "p5_beta_error_reporting", label: "Beta error reporting: give testers a frictionless way to send the local bug bundle back (Copy bug bundle in kebab — whitelist payload, scrubbed errors, activeView now included; Engineering tab lists hardening). Decide channel: prefilled GitHub issue, mailto, or paste form — local-first, opt-in, no silent telemetry" },
+        { id: "p5_beta_error_reporting", label: "[DONE] Beta error reporting: opt-in Send report dialog (js/bug-report.js) POSTs whitelist bug bundle to landing/api/report.js (Supabase bug_reports + Resend email). Kebab Report a bug…, error toast Send report, ?debug=1 overlay. Copy instead remains clipboard-only. No silent telemetry." },
         { id: "p5_metrics", label: "Decide what success looks like: stars, signups, retention, MRR? Pick one north-star" },
         { id: "audit_fetchers_repair", label: "Per-store fetcher repair (known broken): fix storefront integrations one at a time after API/auth drift — inventory in docs/AUDIT_FINDINGS.md §6; not a bulk audit fix" },
       ],
@@ -872,8 +872,8 @@
     { id: "bs_managed_login", title: "[RESOLVED] Managed CDP browser login generalized across cookie-based fetchers",
       body: "Resolved 2026-06-02. Every cookie/OAuth store now uses the same headed persistent-profile Connect flow (auth/cdp_browser.py + auth/runner.py::run_browser_auth). Credentials land in the encrypted auth blob via mark_connected; fetchers read them through resolve_env(..., provider=...) with no DevTools paste required for normal use. Reconnect-required chips on the dashboard call reconnectProvider() → startBrowserConnect() for browser providers. Humble was the last wiring gap — added to INLINE_PROVIDERS so _extract_humble_inline runs the session-aware branch (progress events, library-page navigation) instead of the degraded URL-pattern path. README.md rewritten: Connections → Connect is the primary path for GOG, PSN, Epic (library + wishlist), Xbox (+ wishlist), Battle.net, Ubisoft, Nintendo (+ wishlist), EA, Humble; DevTools/.env steps are labeled fallbacks (Battle.net app-bound encryption only affects legacy --browser edge jar reads, not Connect). Intentional exceptions: ITAD (manual API key paste); Amazon (Windows launcher SQLite); itch also has butler.db local scan (no Connect required when the itch app is installed) alongside the API-key path — same dual-source class as Amazon launcher/web. test_auth_secrets.py::test_gog_and_battlenet_connect_blob_used_by_resolve_env locks the GOG_AL / BATTLENET_COOKIE blob → fetcher contract." },
     { id: "bs_semver", title: "[RESOLVED] Semver source-of-truth + release discipline documented", body: "Resolved 2026-06-01. pyproject.toml is the single source of truth (currently 0.6.0); package.json mirrors it. CHANGELOG.md now has a 'Release discipline' block at the top documenting the SemVer contract + the bump → rename Unreleased block → tag → push workflow. First git tag (v0.6.0) intentionally left unpushed — that's a deliberate user action, not a tool action; the contract is in place so the tag itself is a one-liner." },
-    { id: "bs_telemetry", title: "[RESOLVED] Telemetry / error reporting — Hybrid local-only policy frozen",
-      body: "Resolved 2026-06-02. Policy: BAKLOG stays at zero network telemetry forever. The shipped surface is local-only:\n\n• js/error-boundary.js mirrors every captured error/unhandledrejection into a rolling 200-entry localStorage ring (baklog-error-log), survives reloads. Persisted stacks capped at 4KB; deduped errors track a repeats counter (bundle_version 2).\n\n• Toast gains a 'Copy bug bundle' button (alongside 'Errors only' + 'Details' + 'Dismiss'). Kebab menu adds 'Report a bug…' for the same bundle without needing a live error. Bundle is whitelist-built by buildBugBundle().\n\n• Debug overlay also exposes a 'Copy bug bundle' button so ?debug=1 sessions can grab a snapshot without needing a live error.\n\n• registerBugBundleContext({ getFingerprint, getActiveFilterCount }) wired from app.js after table-ui + filters-ui load — keeps error-boundary.js dependency-free so it can install before any other module runs.\n\n• PRIVACY.md + README document the workflow. CHANGELOG Unreleased entry added.\n\nDeferred (audit 2026-06-02):\n• URL / location.pathname not in bundle — search params can carry secrets; add only when a real bug demands it.\n• Pre-install error window (before installGlobalErrorHandler) — ~10ms window; inline head shim overkill.\n• Toast on rehydrate of prior-session errors — kebab entry covers the need.\n• Vitest for toast DOM click wiring — low drift risk; revisit on regression.\n• Vitest for localStorage quota-exceeded path — truncation fix prevents reaching quota first.\n\nWhy not Sentry / opt-in remote: keeping the 'private by default' pitch intact; local bundles solve the painful case." },
+    { id: "bs_telemetry", title: "[RESOLVED] Telemetry / error reporting — opt-in submit, no silent telemetry",
+      body: "Resolved 2026-06-05. Policy: no silent network telemetry. Reports leave the machine only on explicit user action.\n\n• js/error-boundary.js mirrors every captured error/unhandledrejection into a rolling 200-entry localStorage ring (baklog-error-log), survives reloads. Persisted stacks capped at 4KB; deduped errors track a repeats counter (bundle_version 2).\n\n• Toast: Send report (opens consent dialog), Copy bug bundle, Errors only, Details, Dismiss. Kebab Report a bug… opens the same dialog.\n\n• js/bug-report.js consent dialog shows payload preview + optional contact/note; submitBugReport() POSTs to https://baklog.app/api/report (landing/api/report.js → Supabase bug_reports + Resend email). Copy instead stays clipboard-only.\n\n• Debug overlay exposes Copy bug bundle + Send report.\n\n• registerBugBundleContext wired from app.js. PRIVACY.md + README + docs/SUPABASE_AUTH.md document the workflow.\n\nDeferred: Sentry/auto-crash SDK; URL search params in bundle; pre-install error shim." },
     { id: "bs_xbox_wishlist_empty", title: "[RESOLVED] fetch_xbox_wishlist.py now writes rows", body: "Resolved: the earlier 0.1 KB empty-array output is fixed. fetch_xbox_wishlist.py reuses the saved Xbox Store CDP browser profile (cache/auth/profiles/xbox_wishlist) and parses the rendered wishlist page; it now writes real rows to games_wishlist_xbox.json. Xbox wishlist is marked done in the matrix. (The separate Xbox library path, fetch_xbox.py via OpenXBL, is also done — it's a distinct login that can't be merged, since OpenXBL doesn't expose wishlists.)" },
     { id: "bs_secret_recovery", title: "[RESOLVED] Portable secrets bundle — export/import credentials + profiles",
       body: "Resolved 2026-06-02. Policy: single passphrase-encrypted file the user controls.\n\n• auth/bundle.py — export_bundle() / import_bundle() with BundleError subclasses (BadPassphrase, BadMagic, UnsupportedVersion, BundleTooLarge). Inner payload: gzip JSON with secrets_doc + base64-encoded CDP browser profiles. Always encrypted with its own scrypt+AES-GCM key (min 8-char passphrase); local OS keychain key never leaves the machine.\n\n• POST /api/auth/secrets/export (octet-stream download) + POST /api/auth/secrets/import (?passphrase= + raw body). CLI: python -m auth export-bundle / import-bundle (--dry-run).\n\n• Connections ⋮ menu gains a top-level Portable bundle… item that opens a dedicated popover with Export bundle… / Import bundle… buttons and an inline dialog passphrase prompt.\n\n• Import moves existing cache/auth/profiles/ to profiles_pre_import_<timestamp>/ before overwrite.\n\n• PRIVACY.md + README (Moving to a new machine) document the workflow.\n\nDeferred:\n• Cloud-storage auto-sync (Dropbox / iCloud / OneDrive) — user can drop the bundle in their own cloud folder.\n• Bundle key-rotation flow — equivalent to export-then-import.\n• Argon2id KDF — scrypt matches auth/secrets.py; future bundle_format = 2.\n• .env migration into bundle — stale env values could overwrite working blob values on import." },
@@ -4117,23 +4117,107 @@
       el("div", { style: "margin-top:0.5rem" }, copyBtn(m.name, "Subject: " + m.subject + "\n\n" + m.body)),
     ));
 
+    // Compact rules block for Discord's 1024-char fields (membership screening /
+    // embed field). Full text + playbook live in docs/DISCORD_RULES.md.
+    const COMPACT_RULES =
+"**BAKLOG Community Rules**\n" +
+"By joining you agree to these rules and Discord's ToS.\n\n" +
+"1. Be respectful. No personal attacks or harassment.\n" +
+"2. No hate or discrimination of any kind.\n" +
+"3. No spam, ads, or unsolicited self-promotion.\n" +
+"4. Stay on topic. Use the right channel.\n" +
+"5. English primary so staff can help everyone.\n" +
+"6. No NSFW or illegal content.\n" +
+"7. No piracy or cracked stores.\n" +
+"8. Never share store logins, cookies, API keys, .env files, or anyone's personal data.\n" +
+"9. Report bugs in #bug-reports with OS, version, and steps.\n" +
+"10. Follow staff direction. Their calls are final.\n" +
+"11. No drama, callouts, or brigading.\n" +
+"12. Have fun and share your backlog.";
+
+    const channelTable = tableEl(
+      ["Category", "Channels", "Notes"],
+      [
+        ["Info", "#welcome #rules #announcements #changelog #faq", "Lock rules/announcements/changelog read-only"],
+        ["Support", "#setup-help #connections-help #bug-reports #feature-requests", "Pin the bug-report template in #bug-reports"],
+        ["Community", "#general #showcase #off-topic", "#showcase for backlog screenshots"],
+        ["Beta (temporary)", "#beta-lounge #known-issues", "Delete at public launch"],
+        ["Staff (private)", "#mod-log #staff-chat", "Hidden from @everyone"],
+      ],
+    );
+
+    const roleTable = tableEl(
+      ["Role", "Who", "Intent"],
+      [
+        ["Owner", "You", "Full admin"],
+        ["Mod", "Trusted volunteers", "Manage messages, timeout, kick"],
+        ["Beta Tester", "Invite-wave members", "Access #beta-lounge; cosmetic badge after launch"],
+        ["Verified", "Anyone who accepted rules", "Gate for posting in support + community"],
+        ["Member", "Default on join", "Sees #welcome + #rules only until Verified"],
+      ],
+    );
+
     return el("section", { id: "panel-beta", class: "panel" + (state.activeTab === "beta" ? " active" : "") },
-      el("h1", {}, "Beta invites"),
-      el("p", {}, "Paste-ready email drafts for the ", el("strong", {}, "invite-only beta"), " (Phases → ", el("code", {}, "p5_soft_launch"), "). Signups are logged in the ", el("code", {}, "waitlist"), " Supabase table; each gets the confirmation auto-reply from ", el("code", {}, "landing/api/subscribe.js"), ". These are the manual follow-ups you send as you open waves."),
+      el("h1", {}, "Beta + Discord community"),
+      el("p", {}, "Operational home for the ", el("strong", {}, "invite-only beta"), " (Phases → ", el("code", {}, "p5_soft_launch"), ") and the Discord that supports it. Full Discord playbook: ", el("code", {}, "docs/DISCORD_COMMUNITY.md"), "; paste-ready rules: ", el("code", {}, "docs/DISCORD_RULES.md"), ". Tester setup: ", el("code", {}, "docs/BETA_SETUP.md"), "."),
+
+      el("h2", {}, "Discord community"),
+      el("div", { class: "callout" },
+        el("div", { class: "callout-title" }, "Lifecycle — beta to long term"),
+        el("div", { class: "callout-body" },
+          "Structure is built to survive launch. Permanent rules/channels/roles never hardcode \"beta\". At public launch: delete the beta addendum from ",
+          el("code", {}, "#rules"), ", archive ", el("code", {}, "#beta-lounge"), " + ", el("code", {}, "#known-issues"), ", stop assigning ",
+          el("strong", {}, "Beta Tester"), " (keep it on OGs as a badge), and post one open-membership note in ", el("code", {}, "#announcements"), ".",
+        ),
+      ),
+      el("div", { class: "callout warning" },
+        el("div", { class: "callout-title" }, "Security — never in any channel"),
+        el("div", { class: "callout-body" },
+          "Store logins, cookies, NPSSO, API keys, ", el("code", {}, ".env"), " / ", el("code", {}, "secrets.bin"),
+          ", or unredacted Connect browser dumps. On a leak: delete, DM the user to re-Connect that store, log in ",
+          el("code", {}, "#mod-log"), ". Matches ", el("code", {}, "SECURITY.md"), " (credentials are local + high-value).",
+        ),
+      ),
+      el("h3", { style: "margin-bottom:0.35rem" }, "Channels"),
+      channelTable,
+      el("h3", { style: "margin-bottom:0.35rem" }, "Roles"),
+      roleTable,
+      el("h3", { style: "margin-bottom:0.35rem" }, "Onboarding gate"),
+      el("p", { class: "muted", style: "font-size:0.86rem" },
+        "New joins see ", el("code", {}, "#welcome"), " + ", el("code", {}, "#rules"), " only. Accepting rules (Server Onboarding or a reaction role) grants ",
+        el("strong", {}, "Verified"), ", which unlocks posting. Put the compact rules below in the 1024-char membership-screening field; post the full ",
+        el("code", {}, "docs/DISCORD_RULES.md"), " block in ", el("code", {}, "#rules"), " (split into 2 messages — it exceeds Discord's 2000-char message cap).",
+      ),
+      el("div", { class: "card" },
+        el("h3", { style: "margin:0 0 0.25rem" }, "Compact rules (paste into the 1024-char field)"),
+        el("p", { class: "muted", style: "margin:0 0 0.5rem; font-size:0.82rem" }, "~650 chars. For Server Onboarding rules / a single embed field. Full set is in #rules."),
+        el("div", { class: "copy-snippet" }, COMPACT_RULES),
+        el("div", { style: "margin-top:0.5rem" }, copyBtn("Compact Discord rules", COMPACT_RULES)),
+      ),
+
+      el("h2", {}, "Beta testing"),
       el("div", { class: "callout warning" },
         el("div", { class: "callout-title" }, "Packaging (p4_packaging)"),
         el("div", { class: "callout-body" },
-          "Target: Windows ", el("code", {}, "BAKLOG.exe"), " (no Python). Plan: ", el("code", {}, "docs/PACKAGING_PLAN.md"), ". Tester instructions: ", el("code", {}, "docs/BETA_SETUP.md"), ". Interim: ", el("code", {}, "scripts/build_installer.ps1"), " → zip on GitHub Releases. Setup link in emails below points at ",
+          "Target: Windows ", el("code", {}, "BAKLOG.exe"), " (no Python). Plan: ", el("code", {}, "docs/PACKAGING_PLAN.md"), ". Interim: ", el("code", {}, "scripts/build_installer.ps1"), " → zip on GitHub Releases. Setup link in invites points at ",
           el("code", {}, SETUP_LINK), " until a dedicated download page ships.",
         ),
       ),
+      el("p", { class: "muted", style: "font-size:0.86rem" },
+        "Onboard in small waves so real-setup bugs get fixed before opening wider. Feedback routes: ", el("code", {}, "#bug-reports"),
+        " / ", el("code", {}, "#feature-requests"), " in Discord, plus ", el("strong", {}, "Copy bug bundle"),
+        " in the app kebab (scrubbed, local-only) or a direct email reply. Reproducible bugs graduate to GitHub Issues (the long-term record).",
+      ),
+
+      el("h2", {}, "Invite email drafts"),
       el("div", { class: "callout" },
         el("div", { class: "callout-title" }, "Voice + guardrails"),
         el("div", { class: "callout-body" },
-          "Hyphens only (no em dashes). Lead with what they get and that it's free forever to import. Set the beta expectation honestly (rough edges, small waves). No store-affiliation or traction claims. Swap ",
-          el("code", {}, "[first name]"), " before sending. Chrome or Edge required for Connect.",
+          "Hyphens only (no em dashes) across emails, Discord, and docs. Lead with what they get and that it's free forever to import. Set the beta expectation honestly (rough edges, small waves). No store-affiliation or traction claims. Swap ",
+          el("code", {}, "[first name]"), " before sending. Chrome or Chromium required for Connect.",
         ),
       ),
+      el("p", { class: "muted", style: "font-size:0.86rem" }, "Signups are logged in the ", el("code", {}, "waitlist"), " Supabase table; each gets the confirmation auto-reply from ", el("code", {}, "landing/api/subscribe.js"), ". These are the manual follow-ups you send as you open waves."),
       ...cards,
     );
   }

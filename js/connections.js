@@ -46,6 +46,9 @@ let _authStatusLoaded = false;
 let reconnectProviders = new Set();
 
 let pollTimer = null;
+// True while refreshConnections() is running, so the baklog:auth-status listener
+// (below) doesn't redundantly re-render — refreshConnections renders itself.
+let _connRefreshInFlight = false;
 
 const POST_CONNECT_FAST_POLL_MS = 3000;
 const POST_CONNECT_FAST_POLL_MAX_MS = 30_000;
@@ -289,7 +292,9 @@ function groupConnectNote(groupKey, members) {
     const lead = anyConnected
       ? 'Ready to pull - itch app and/or API key detected.'
       : 'Install the itch desktop app, or paste an API key below.';
-    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one itch.io source. Run the itch fetcher and BAKLOG reads butler.db from the itch app first when present, then falls back to your API key.</p></div>`;
+    const bundleNote = 'Heads up: games from itch.io bundles only sync after you claim them. Bundle items stay out of your library (and the itch app, so BAKLOG cannot see them) until you open each one from the bundle download page.';
+    const bundleTip = 'Fast way to claim a whole bundle: open your bundle download page (itch.io my-purchases bundles), Ctrl+click (Cmd+click on Mac) every download button to open each in its own tab - that claims it to your library - then close all the tabs at once. Repeat per page.';
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one itch.io source. Run the itch fetcher and BAKLOG reads butler.db from the itch app first when present, then falls back to your API key.</p><p>${escapeHtml(bundleNote)}</p><p>${escapeHtml(bundleTip)}</p></div>`;
   }
   return '';
 }
@@ -859,6 +864,10 @@ function handleLayoutClick(ev) {
   const primaryBtn = target.closest('.conn-primary');
 
   if (primaryBtn?.dataset.provider) {
+
+    // #region agent log
+    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'HC1',location:'connections.js:primaryClick',message:'conn-primary clicked',data:{provider:primaryBtn.dataset.provider,disabled:primaryBtn.disabled,label:(primaryBtn.textContent||'').trim().slice(0,40)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     runConnAction(primaryBtn.dataset.provider, () => startBrowserConnect(primaryBtn.dataset.provider));
 
@@ -1865,7 +1874,11 @@ async function startBrowserConnect(provider) {
 
     res = await baklogFetch(`/api/auth/${provider}/start${fresh ? '?fresh=1' : ''}`, { method: 'POST' });
 
-  } catch (_) {
+  } catch (err) {
+
+    // #region agent log
+    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'HC2',location:'connections.js:startBrowserConnect',message:'start POST network error',data:{provider,fresh,err:String(err).slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
 
@@ -1874,6 +1887,10 @@ async function startBrowserConnect(provider) {
   }
 
   const data = await res.json().catch(() => ({}));
+
+  // #region agent log
+  fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cf7aab'},body:JSON.stringify({sessionId:'cf7aab',hypothesisId:'HC2',location:'connections.js:startBrowserConnect',message:'start POST response',data:{provider,fresh,ok:res.ok,status:res.status,session_id:data.session_id||null,error:data.error||null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   if (!res.ok) {
 
@@ -1942,6 +1959,7 @@ async function startBrowserConnect(provider) {
 
 export async function refreshConnections() {
 
+  _connRefreshInFlight = true;
   try {
 
     await fetchAuthStatus();
@@ -1984,6 +2002,10 @@ export async function refreshConnections() {
     }
 
     renderHero();
+
+  } finally {
+
+    _connRefreshInFlight = false;
 
   }
 
@@ -2057,6 +2079,19 @@ if (typeof document !== 'undefined') {
       };
     } catch (_) { /* ignore */ }
   }
+
+  // Repaint the open Connections view the instant the auth-status cache changes
+  // out-of-band (e.g. a fetcher run just failed with 401 and the fast path called
+  // ingestAuthStatusProviders), instead of waiting up to 15s for the next poll.
+  // Skip when our own refreshConnections() drove the update — it renders itself.
+  document.addEventListener('baklog:auth-status', () => {
+    if (_connRefreshInFlight) return;
+    if (state.activeView !== 'connections' || isPageHidden()) return;
+    try {
+      renderConnections();
+      renderReconnectBanner();
+    } catch (_) { /* view not mounted */ }
+  });
 }
 
 

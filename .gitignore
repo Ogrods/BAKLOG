@@ -38,11 +38,21 @@ scripts/probe_nintendo_graphql.py
 scripts/probe_nintendo_graphql2.py
 scripts/probe_nintendo_graphql3.py
 
+# Scratch probes, baselines, sweep output, debug logs, IDE session files
+_tmp_*
+_baseline_*
+_sweep_output*.txt
+debug-*.log
+.cursor/
+.baklog_server.pid
+
 # Generated Lighthouse reports (npm run / npx lighthouse)
 lighthouse/
 
-# PyInstaller
+# PyInstaller + frontend build output (keep dist/.gitkeep)
 build/
+dist/*
+!dist/.gitkeep
 dist/BAKLOG/
 dist/BAKLOG.exe
 

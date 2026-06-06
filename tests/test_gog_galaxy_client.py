@@ -38,7 +38,7 @@ def _seed_galaxy_db(path: Path) -> None:
             INSERT INTO GamePieces VALUES
                 ('gog_1001', 23, 'Test GOG Game'),
                 ('gog_1001', 8, '{"background":"https://images.gog.com/bg.jpg"}'),
-                ('gog_1001', 9, '{"slug":"test-gog-game","genres":["RPG"]}'),
+                ('gog_1001', 9, '{"slug":"test-gog-game","genres":["RPG"],"releaseDate":1527552000}'),
                 ('steam_999', 23, '"Steam Only"');
             """
         )
@@ -57,7 +57,9 @@ def test_get_library_records_gog_only(tmp_path: Path) -> None:
     assert records[0]["header_image"] == "https://images.gog.com/bg.jpg"
     assert records[0]["store_url"] == "https://www.gog.com/game/test-gog-game"
     assert records[0]["genres"] == ["RPG"]
-    assert records[0]["release_date"] == "2020-05-01"
+    # release_date is the real game release (meta.releaseDate, Unix seconds),
+    # NOT the user's purchase date from ProductPurchaseDates.
+    assert records[0]["release_date"] == "2018-05-29"
 
 
 def _seed_galaxy_db_with_dlc(path: Path) -> None:

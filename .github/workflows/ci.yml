@@ -119,3 +119,28 @@ jobs:
 
       - name: Run vitest
         run: npm test
+
+  frontend-build:
+    name: Frontend build (esbuild)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Supabase vendor bundle
+        run: npm run vendor:supabase
+
+      - name: Build production frontend
+        run: npm run build
+
+      - name: Verify manifest
+        run: node -e "const m=require('./dist/manifest.json'); if(!m['js/app.js']||!m['app.css']) process.exit(1)"

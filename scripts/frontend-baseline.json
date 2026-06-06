@@ -1,0 +1,18 @@
+{
+  "capturedAt": "2026-06-06T22:23:05.365Z",
+  "note": "Raw dev frontend (no bundle). Chart.js and Supabase are lazy-loaded off critical path.",
+  "assets": {
+    "app.css": 191.6,
+    "tailwind.css": 24.7,
+    "index.html": 63.5,
+    "vendor/chart.umd.min.js": 201.1,
+    "js/ (all modules)": 1122,
+    "js/module_count": 67,
+    "js/vendor/supabase-js.mjs": 252.3
+  },
+  "lazyOffCriticalPath": [
+    "vendor/chart.umd.min.js via js/chart-loader.js (dashboard only)",
+    "js/vendor/supabase-js.mjs via js/auth-gate.js (account auth only)"
+  ],
+  "devCachePolicy": "Cache-Control: no-store on .js/.mjs/.css/.html (server.py Handler)"
+}

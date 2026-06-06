@@ -1,0 +1,6 @@
+# Developer / CI install (pytest, ruff). Not required to run the app.
+# Install: pip install -r requirements.txt -r requirements-dev.txt
+# Or:      pip install -e ".[dev]"
+pytest>=8.0
+pytest-timeout>=2.3
+ruff>=0.4

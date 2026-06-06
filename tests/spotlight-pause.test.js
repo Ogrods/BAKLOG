@@ -1,14 +1,17 @@
-/** Spotlight prev/next manual navigation. */
+/** Spotlight pause/play toggles the rotation timer. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
 import { gameKey } from "../js/game-core.js";
 
-describe("spotlight nav arrows", () => {
+describe("spotlight pause/play", () => {
   let pickSpotlightGames;
   let renderSpotlightHtml;
   let startSpotlightRotation;
   let stopSpotlightRotation;
-  let stepSpotlight;
+  let toggleSpotlightPause;
+  let isSpotlightRotationActive;
+  let getSpotlightPaused;
+  let SPOTLIGHT_INTERVAL_MS;
   let SPOTLIGHT_FADE_MS;
   let state;
 
@@ -40,7 +43,10 @@ describe("spotlight nav arrows", () => {
       renderSpotlightHtml,
       startSpotlightRotation,
       stopSpotlightRotation,
-      stepSpotlight,
+      toggleSpotlightPause,
+      isSpotlightRotationActive,
+      getSpotlightPaused,
+      SPOTLIGHT_INTERVAL_MS,
       SPOTLIGHT_FADE_MS,
       setStinkerChanceForTest,
     } = await import("../js/dashboard-spotlight.js"));
@@ -50,6 +56,7 @@ describe("spotlight nav arrows", () => {
   afterEach(() => {
     stopSpotlightRotation?.();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   const libraryGame = (id, rating = 85) => ({
@@ -68,16 +75,11 @@ describe("spotlight nav arrows", () => {
     const pool = pickSpotlightGames(games);
     expect(pool.length).toBeGreaterThan(1);
     document.body.innerHTML = renderSpotlightHtml(pool[0]);
-    const el = document.getElementById("dashboardSpotlight");
-    const wrap = document.getElementById("dashboardSpotlightWrap");
-    expect(wrap).toBeTruthy();
-    expect(wrap.querySelector(".dash-spotlight-nav")).toBeTruthy();
-    expect(el.dataset.key).toBe(gameKey(pool[0]));
     startSpotlightRotation(pool);
-    return { pool, el, wrap };
+    return { pool, el: document.getElementById("dashboardSpotlight") };
   }
 
-  it("steps forward and back with wrap", () => {
+  it("starts rotation by default and pauses/resumes on toggle", () => {
     const games = [];
     for (let i = 0; i < 5; i++) {
       state.personal[`steam:${i + 1}`] = { status: "backlog" };
@@ -85,43 +87,20 @@ describe("spotlight nav arrows", () => {
     }
     window._dataVersion = (window._dataVersion || 0) + 1;
     const { pool, el } = mountPool(games);
+    const startKey = el.dataset.key;
 
-    stepSpotlight(1);
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.dataset.key).toBe(gameKey(pool[1]));
+    expect(isSpotlightRotationActive()).toBe(true);
+    toggleSpotlightPause();
+    expect(getSpotlightPaused()).toBe(true);
+    expect(isSpotlightRotationActive()).toBe(false);
 
-    stepSpotlight(-1);
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.dataset.key).toBe(gameKey(pool[0]));
-  });
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + SPOTLIGHT_FADE_MS);
+    expect(el.dataset.key).toBe(startKey);
 
-  it("is a no-op when the pool has one game", () => {
-    state.personal = { "steam:1": { status: "backlog" } };
-    window._dataVersion = (window._dataVersion || 0) + 1;
-    const pool = pickSpotlightGames([libraryGame(1, 92)]);
-    expect(pool.length).toBe(1);
-    document.body.innerHTML = renderSpotlightHtml(pool[0]);
-    const el = document.getElementById("dashboardSpotlight");
-    const keyBefore = el.dataset.key;
-    startSpotlightRotation(pool);
-    expect(() => stepSpotlight(1)).not.toThrow();
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.dataset.key).toBe(keyBefore);
-  });
-
-  it("nav sibling buttons step without nesting inside the jump button", () => {
-    const games = [];
-    for (let i = 0; i < 5; i++) {
-      state.personal[`steam:${i + 1}`] = { status: "backlog" };
-      games.push(libraryGame(i + 1, 80 + i));
-    }
-    window._dataVersion = (window._dataVersion || 0) + 1;
-    const { pool, el, wrap } = mountPool(games);
-    const nextBtn = wrap.querySelector('[data-spotlight-nav="next"]');
-    expect(nextBtn.tagName).toBe("BUTTON");
-    expect(el.contains(nextBtn)).toBe(false);
-    nextBtn.click();
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
+    toggleSpotlightPause();
+    expect(getSpotlightPaused()).toBe(false);
+    expect(isSpotlightRotationActive()).toBe(true);
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + SPOTLIGHT_FADE_MS);
     expect(el.dataset.key).toBe(gameKey(pool[1]));
   });
 });

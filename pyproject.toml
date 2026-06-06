@@ -26,6 +26,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Dev/CI only — not required to run server.py or fetchers.
 dev = [
     "pytest>=8.0",
     "pytest-timeout>=2.3",

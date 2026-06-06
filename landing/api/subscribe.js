@@ -82,7 +82,7 @@ const CONFIRM_TEXT = `Thanks for requesting a BAKLOG invite.
 You're on the list. BAKLOG is in invite-only beta and we're onboarding in small waves, so you'll get a follow-up here when your spot opens up.
 
 A quick refresher on what you signed up for:
-- One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Nintendo, Amazon, EA, itch, Humble, and more.
+- One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App.
 - Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.
 - Free forever to import your library.
 
@@ -99,7 +99,7 @@ const CONFIRM_HTML = `<!doctype html>
       <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for requesting a BAKLOG invite. BAKLOG is in invite-only beta and we're onboarding in small waves, so you'll get a follow-up here when your spot opens up.</p>
       <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">A quick refresher on what you signed up for:</p>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
-        <li>One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Nintendo, Amazon, EA, itch, Humble, and more.</li>
+        <li>One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App.</li>
         <li>Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.</li>
         <li>Free forever to import your library.</li>
       </ul>

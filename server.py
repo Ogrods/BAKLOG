@@ -57,7 +57,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from shared.install_paths import bundle_root, data_root, is_frozen, static_root
+from shared.install_paths import (
+    built_immutable_assets,
+    bundle_root,
+    data_root,
+    is_frozen,
+    load_built_manifest,
+    serve_built_frontend,
+    static_root,
+)
 
 ROOT = data_root()
 
@@ -95,7 +103,8 @@ STUCK_NO_PROC_GRACE_SEC = LAUNCH_TIMEOUT_SEC + 15
 # wait so subsequent queued runs can still execute.
 _runs_file_lock = threading.Lock()
 
-# Statuses that occupy a queue slot (cap = 2: one active + one queued).
+
+# Statuses that occupy a queue slot (cap = 1: one active run only; no queuing).
 _IN_FLIGHT_STATUSES = frozenset({"queued", "launching", "running", "cancelling"})
 
 _sse_connections = 0
@@ -919,7 +928,13 @@ class RunManager:
     """Single-worker queue. Fetchers may share locks (PSN session, etc.) so
     we deliberately serialize them rather than spawn in parallel."""
 
-    def __init__(self, runs_dir: Path | None = None, *, enable_watchdog: bool = True) -> None:
+    def __init__(
+        self,
+        runs_dir: Path | None = None,
+        *,
+        enable_watchdog: bool = True,
+        reap_orphans: bool | None = None,
+    ) -> None:
         self._runs_dir = runs_dir or RUNS_DIR
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
@@ -933,7 +948,12 @@ class RunManager:
         self._runs_by_id: dict[str, Run] = {}
         self._last_queue_kick_at = 0.0
         self._watchdog_stop = threading.Event()
-        self._reap_orphan_processes()
+        # Only reap on explicit RunManager(runs_dir=...) for tests, or when the
+        # dev server calls MANAGER._reap_orphan_processes() at boot. Importing
+        # server.py (e.g. pytest) must not kill live fetchers from a running dev
+        # server — that shared active.json lives on disk.
+        if reap_orphans if reap_orphans is not None else runs_dir is not None:
+            self._reap_orphan_processes()
         self._start_worker_thread()
         self._watchdog_thread: threading.Thread | None = None
         if enable_watchdog:
@@ -1305,41 +1325,6 @@ class RunManager:
             raise KeyError(key)
         with self._lock:
             active = self._active
-            _reject = (active and active.key == key and active.status in _IN_FLIGHT_STATUSES) or any(
-                r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending
-            )
-            if _reject:
-                # region agent log (session 21853a)
-                try:
-                    import json as _json
-                    import time as _time
-                    _rec = {
-                        "sessionId": "21853a",
-                        "hypothesisId": "H2",
-                        "location": "server.py:RunManager.submit",
-                        "message": "submit rejected (already queued or running)",
-                        "data": {
-                            "key": key,
-                            "active": (
-                                {"key": active.key, "status": active.status,
-                                 "finished": active._finished.is_set(),
-                                 "profile_id": active.profile_id}
-                                if active else None
-                            ),
-                            "pending": [
-                                {"key": r.key, "status": r.status,
-                                 "finished": r._finished.is_set(),
-                                 "in_pending_is_active": (r is active)}
-                                for r in self._pending
-                            ],
-                        },
-                        "timestamp": int(_time.time() * 1000),
-                    }
-                    with open(ROOT / "debug-21853a.log", "a", encoding="utf-8") as _fh:
-                        _fh.write(_json.dumps(_rec, default=str) + "\n")
-                except Exception:
-                    pass
-                # endregion
             if active and active.key == key and active.status in _IN_FLIGHT_STATUSES:
                 raise ValueError(f"{key} already queued or running")
             if any(r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending):
@@ -1355,10 +1340,10 @@ class RunManager:
                 and active not in self._pending
             ):
                 in_flight += 1
-            if in_flight >= 2:
+            if in_flight >= 1:
                 raise ValueError(
-                    "queue full — one run is in progress and one is queued; "
-                    "wait for a slot before submitting another"
+                    "queue full — a fetch is already running; "
+                    "wait for it to finish before starting another"
                 )
             profile_id = get_active_profile_id()
             run = Run(
@@ -1565,42 +1550,6 @@ class RunManager:
                 if r.status == "queued" and r is not self._active
             ]
             history = list(self._history)
-            # region agent log (session 21853a)
-            _act = self._active
-            _itad_present = (_act and _act.key == "itad") or any(
-                r.key == "itad" for r in self._pending
-            )
-            if _itad_present:
-                try:
-                    import json as _json
-                    import time as _time
-                    _rec = {
-                        "sessionId": "21853a",
-                        "hypothesisId": "H2",
-                        "location": "server.py:RunManager.snapshot",
-                        "message": "snapshot built with itad present in manager state",
-                        "data": {
-                            "raw_active": (
-                                {"key": _act.key, "status": _act.status,
-                                 "finished": _act._finished.is_set()}
-                                if _act else None
-                            ),
-                            "raw_pending": [
-                                {"key": r.key, "status": r.status,
-                                 "finished": r._finished.is_set(),
-                                 "is_active": (r is _act)}
-                                for r in self._pending
-                            ],
-                            "reported_active": active,
-                            "reported_queue_keys": [q.get("key") for q in queued],
-                        },
-                        "timestamp": int(_time.time() * 1000),
-                    }
-                    with open(ROOT / "debug-21853a.log", "a", encoding="utf-8") as _fh:
-                        _fh.write(_json.dumps(_rec, default=str) + "\n")
-                except Exception:
-                    pass
-            # endregion
         return {"active": active, "queue": queued, "history": history}
 
     def _finalize_run(self, run: Run) -> None:
@@ -2131,6 +2080,60 @@ def _run_accessible(run: Run | None) -> Run | None:
     return None
 
 
+_BUILT_INDEX_HTML_CACHE: str | None = None
+
+
+def _built_index_html() -> str | None:
+    """index.html with hashed dist/ asset URLs when serving built frontend."""
+    global _BUILT_INDEX_HTML_CACHE
+    if not serve_built_frontend():
+        return None
+    if _BUILT_INDEX_HTML_CACHE is not None:
+        return _BUILT_INDEX_HTML_CACHE
+    manifest = load_built_manifest()
+    entry = manifest.get("js/app.js")
+    tailwind = manifest.get("tailwind.css")
+    app_css = manifest.get("app.css")
+    if not entry or not tailwind or not app_css:
+        return None
+    html = (bundle_root() / "index.html").read_text(encoding="utf-8")
+    html = html.replace('href="tailwind.css"', f'href="dist/{tailwind}"', 1)
+    html = html.replace('href="app.css"', f'href="dist/{app_css}"', 1)
+    html = html.replace('src="js/app.js"', f'src="dist/{entry}"', 1)
+    _BUILT_INDEX_HTML_CACHE = html
+    return html
+
+
+def _is_immutable_built_asset(path_only: str) -> bool:
+    clean = path_only.lstrip("/").replace("\\", "/")
+    if not clean.startswith("dist/"):
+        return False
+    rel = clean[len("dist/") :]
+    immutable = built_immutable_assets()
+    if rel in immutable:
+        return True
+    if rel.startswith("js/chunks/") and rel in immutable:
+        return True
+    # Any file under dist/js/ with a content hash in the name.
+    return bool(re.search(r"\.[a-f0-9]{8}\.", rel))
+
+
+def _maybe_serve_built_index(handler: SimpleHTTPRequestHandler, path_only: str) -> bool:
+    if path_only not in ("/", "/index.html"):
+        return False
+    html = _built_index_html()
+    if html is None:
+        return False
+    body = html.encode("utf-8")
+    handler.send_response(HTTPStatus.OK)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(body)
+    return True
+
+
 class Handler(SimpleHTTPRequestHandler):
     def handle(self) -> None:
         try:
@@ -2171,9 +2174,11 @@ class Handler(SimpleHTTPRequestHandler):
     _NO_CACHE_SUFFIXES = (".js", ".mjs", ".css", ".html")
 
     def end_headers(self) -> None:
-        path = self.path.split("?", 1)[0].lower()
-        # Root path serves index.html, which has no suffix — treat it the same.
-        if path.endswith(self._NO_CACHE_SUFFIXES) or path == "/" or path == "":
+        path = self.path.split("?", 1)[0]
+        path_lower = path.lower()
+        if serve_built_frontend() and _is_immutable_built_asset(path):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        elif path_lower.endswith(self._NO_CACHE_SUFFIXES) or path_lower in ("/", ""):
             self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
@@ -2247,6 +2252,8 @@ class Handler(SimpleHTTPRequestHandler):
         if not _gate_static(self):
             return
         if _maybe_serve_empty_library_json(self, path_only):
+            return
+        if _maybe_serve_built_index(self, path_only):
             return
         super().do_GET()
 
@@ -3427,6 +3434,7 @@ def main() -> None:
         signal.signal(signal.SIGTERM, _handle_exit)
 
     _exit_if_dev_server_busy()
+    MANAGER._reap_orphan_processes()
     handler = partial(Handler, directory=str(static_root()))
     try:
         httpd = BaklogDevServer((HOST, PORT), handler)
@@ -3436,6 +3444,10 @@ def main() -> None:
     with httpd:
         _write_pid_file()
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")
+        if serve_built_frontend():
+            print("Frontend: built dist/ assets (immutable cache on hashed files)")
+        else:
+            print("Frontend: raw ESM (set BAKLOG_SERVE_BUILT=1 after npm run build)")
         print(f"Python for fetchers: {_python_executable()}")
         print(f"Registered fetchers: {len(FETCHERS)}")
         print(f"Run history: {RUN_HISTORY_FILE} (max {MAX_HISTORY})")

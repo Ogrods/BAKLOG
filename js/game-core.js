@@ -390,7 +390,7 @@ export function spotlightCropForAspect(ratio) {
   if (!Number.isFinite(ratio) || ratio <= 0) {
     return { fit: "cover", pos: "35% center", portrait: false };
   }
-  if (ratio >= 2) return { fit: "cover", pos: "50% 40%", portrait: false };
+  if (ratio >= 2) return { fit: "cover", pos: "58% 40%", portrait: false };
   if (ratio >= 1.4) return { fit: "cover", pos: "35% center", portrait: false };
   return { fit: "contain", pos: "center", portrait: true };
 }

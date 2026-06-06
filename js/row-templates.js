@@ -23,5 +23,5 @@ export function buildStatusSelect(key, current) {
   const inner = STATUS_VALUES.map(
     v => `<option value="${v}"${v === current ? ' selected' : ''}>${STATUS_LABELS[v]}</option>`,
   ).join('');
-  return `<select data-game-key="${escapeAttr(key)}" data-field="status" class="row-ctl rounded text-xs" title="Set your backlog status — saves immediately">${inner}</select>`;
+  return `<select data-game-key="${escapeAttr(key)}" data-field="status" class="row-ctl rounded text-xs" title="Set your backlog status - saves immediately">${inner}</select>`;
 }

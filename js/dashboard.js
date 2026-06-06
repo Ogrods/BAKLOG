@@ -302,17 +302,17 @@ function renderDashboardMega(games, snap) {
     <div class="dash-mega-divider" aria-hidden="true"></div>
     <div class="dash-ribbon">
       <div class="dash-ribbon-tile">
-        <div class="dash-ribbon-eyebrow" title="Share of library per connected store — click chart to filter">Library by store</div>
+        <div class="dash-ribbon-eyebrow" title="Share of library per connected store - click chart to filter">Library by store</div>
         <div class="dash-ribbon-chart"><canvas id="chartStoreDonut"></canvas></div>
         <div class="dash-ribbon-headline" id="ribbonStoreHeadline"></div>
       </div>
       <div class="dash-ribbon-tile">
-        <div class="dash-ribbon-eyebrow" title="Personal backlog statuses — click chart to filter">Status breakdown</div>
+        <div class="dash-ribbon-eyebrow" title="Personal backlog statuses - click chart to filter">Status breakdown</div>
         <div class="dash-ribbon-chart"><canvas id="chartStatusDonut"></canvas></div>
         <div class="dash-ribbon-headline" id="ribbonStatusHeadline"></div>
       </div>
       <div class="dash-ribbon-tile">
-        <div class="dash-ribbon-eyebrow" title="Steam review descriptor mix — click chart to filter by rating">Review sentiment</div>
+        <div class="dash-ribbon-eyebrow" title="Steam review descriptor mix - click chart to filter by rating">Review sentiment</div>
         <div class="dash-ribbon-chart"><canvas id="chartReviewDonut"></canvas></div>
         <div class="dash-ribbon-headline" id="ribbonReviewHeadline"></div>
       </div>
@@ -369,7 +369,7 @@ function renderDashboardOnboard() {
     el.innerHTML = `
       <div class="conn-onboard" role="region" aria-label="Next step">
         <p class="conn-onboard-title">Library loaded</p>
-        <p class="conn-onboard-lead">Your games are here — connect more stores to merge libraries and unlock cross-store deals.</p>
+        <p class="conn-onboard-lead">Your games are here - connect more stores to merge libraries and unlock cross-store deals.</p>
         <div class="conn-onboard-actions">
           <button type="button" class="conn-onboard-btn" data-dash-goto-library>Open Library</button>
           <button type="button" class="conn-onboard-btn conn-onboard-btn--ghost" data-dash-goto-connections>Connections</button>

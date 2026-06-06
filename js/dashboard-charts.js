@@ -744,7 +744,7 @@ function renderScatterList(hits) {
 
   el.innerHTML = `
     <div class="dash-scatter-list-head">
-      <span class="dash-scatter-list-head-label" title="${isCluster ? 'Overlapping scatter points in this cluster' : 'Single scatter point — click row to jump'}">${headLabel}</span>
+      <span class="dash-scatter-list-head-label" title="${isCluster ? 'Overlapping scatter points in this cluster' : 'Single scatter point - click row to jump'}">${headLabel}</span>
       ${closeBtn}
     </div>
     <div class="dash-scatter-list-strip">${rowHtml}${overflowTile}</div>
@@ -998,7 +998,7 @@ export function renderDashboardCharts(games) {
   const statusHeadlineEl = document.getElementById('ribbonStatusHeadline');
   if (statusHeadlineEl) {
     statusHeadlineEl.innerHTML = `<strong>${escapeHtml(formatNum(backlogCount))}</strong> in backlog`;
-    statusHeadlineEl.title = `${backlogCount} games marked backlog — click chart to filter`;
+    statusHeadlineEl.title = `${backlogCount} games marked backlog - click chart to filter`;
   }
 
   const positive = ['Overwhelmingly Positive', 'Very Positive', 'Mostly Positive']

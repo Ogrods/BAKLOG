@@ -25,22 +25,6 @@ from shared.profile_paths import cache_json_path
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
-# #region agent log
-def _cf7log(hyp, message, data):
-    try:
-        import json as _j
-        import time as _t
-        from pathlib import Path as _P
-        _p = _P(__file__).resolve().parent / "debug-cf7aab.log"
-        with open(_p, "a", encoding="utf-8") as _f:
-            _f.write(_j.dumps({"sessionId": "cf7aab", "hypothesisId": hyp,
-                "location": "enrich_hltb.py", "message": message, "data": data,
-                "timestamp": int(_t.time() * 1000)}, default=str) + "\n")
-    except Exception:
-        pass
-# #endregion
-
-
 def mapping_file() -> Path:
     return cache_json_path("hltb_map.json")
 QUERY_DELAY_SEC = 0.15  # light spacing; each lookup is ~7s network-bound (see runtime logs)
@@ -58,6 +42,7 @@ STORE_FILES = [
     ("games_ubisoft.json", "ubisoft", None),
     ("games_nintendo.json", "nintendo", None),
     ("games_wishlist.json", "wishlist", None),
+    ("games_humble.json", "humble", None),
     ("games_itch.json", "itch", _itch_is_videogame),
     ("games_ea.json", "ea", None),
 ]
@@ -111,10 +96,9 @@ def main() -> int:
     mapping = load_mapping()
     grand_lookups = 0
     grand_updated = 0
-    # #region agent log
-    _run_t0 = time.monotonic()
-    total_network_sec = 0.0
-    _pending_lookups = 0
+    # Pre-pass: count pending lookups so the run prints an up-front time estimate
+    # (each lookup is ~7.5s network-bound, so a large backlog can run for a while).
+    pending_lookups = 0
     for filename, store, row_filter in STORE_FILES:
         if args.store and args.store != store:
             continue
@@ -132,19 +116,13 @@ def main() -> int:
                 continue
             if isinstance(cached, dict):
                 continue
-            _pending_lookups += 1
-    _est_sec = _pending_lookups * (QUERY_DELAY_SEC + 7.5)
+            pending_lookups += 1
+    est_sec = pending_lookups * (QUERY_DELAY_SEC + 7.5)
     print(
-        f"  ~{_pending_lookups} HLTB lookups pending "
-        f"(est. {int(_est_sec // 60)}m at ~{QUERY_DELAY_SEC + 7.5:.1f}s each)",
+        f"  ~{pending_lookups} HLTB lookups pending "
+        f"(est. {int(est_sec // 60)}m at ~{QUERY_DELAY_SEC + 7.5:.1f}s each)",
         flush=True,
     )
-    _cf7log("H1", "run start projection", {
-        "pending_lookups": _pending_lookups,
-        "est_sec": round(_est_sec, 0),
-        "query_delay": QUERY_DELAY_SEC,
-    })
-    # #endregion
     # Wall-clock heartbeat: HLTB network lookups are slow and often miss, so a
     # batch of new lookups (e.g. a fresh GOG library) can stay silent well past
     # the dev server's 180s stall watchdog and get force-killed. Ticked before
@@ -170,11 +148,6 @@ def main() -> int:
             f"\n=== {filename}: {len(missing)}/{len(games)} need HLTB{filter_note} ===",
             flush=True,
         )
-        # #region agent log
-        _cf7log("H1H5", "store start", {"file": filename, "missing": len(missing),
-            "eligible": len(eligible), "total": len(games),
-            "elapsed_sec": round(time.monotonic() - _run_t0, 1)})
-        # #endregion
         hb.reset()
         updated = 0
         store_lookups = 0
@@ -205,18 +178,11 @@ def main() -> int:
                 hit = cached
             else:
                 time.sleep(QUERY_DELAY_SEC)
-                # #region agent log
-                _lk0 = time.monotonic()
-                # #endregion
                 try:
                     hit = hltb.lookup(g.get("name") or "")
                 except Exception as e:
                     stats.warn(f"hltb error for {g.get('name')!r}: {e}")
                     continue
-                # #region agent log
-                _lk = time.monotonic() - _lk0
-                total_network_sec += _lk
-                # #endregion
                 grand_lookups += 1
                 store_lookups += 1
                 if hit:
@@ -226,20 +192,6 @@ def main() -> int:
                 mapping[key] = hit if hit else False
                 if grand_lookups % SAVE_EVERY_N_LOOKUPS == 0:
                     save_mapping(mapping)
-                # #region agent log
-                if _lk >= 3.0:
-                    _cf7log("H4", "slow lookup",
-                        {"name": (g.get("name") or "")[:60], "sec": round(_lk, 2)})
-                if grand_lookups % SAVE_EVERY_N_LOOKUPS == 0:
-                    _elapsed = time.monotonic() - _run_t0
-                    _cf7log("H2H3", "batch timing", {
-                        "grand_lookups": grand_lookups,
-                        "elapsed_sec": round(_elapsed, 1),
-                        "net_total_sec": round(total_network_sec, 1),
-                        "sleep_total_sec": round(grand_lookups * QUERY_DELAY_SEC, 1),
-                        "avg_net_sec": round(total_network_sec / grand_lookups, 3),
-                    })
-                # #endregion
 
             if not hit:
                 continue
@@ -267,11 +219,6 @@ def main() -> int:
             f"{store_skipped} skipped from cache)",
             flush=True,
         )
-        # #region agent log
-        _cf7log("H1H5", "store done", {"file": filename, "updated": updated,
-            "lookups": store_lookups, "hits": store_hits, "misses": store_misses,
-            "skipped": store_skipped, "elapsed_sec": round(time.monotonic() - _run_t0, 1)})
-        # #endregion
         save_mapping(mapping)
 
     save_mapping(mapping)

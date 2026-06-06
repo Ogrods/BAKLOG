@@ -104,7 +104,7 @@
     <div id="authSecretsBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <header class="app-header mb-4">
       <div class="app-header-row flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0" title="BAKLOG — cross-store backlog; data stays on this device">
+        <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0" title="BAKLOG - cross-store backlog; data stays on this device">
           <span class="brand-logo-mark shrink-0" aria-hidden="true"></span>
           <h1 class="brand-wordmark text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap m-0">BAKLOG</h1>
           <span class="brand-beta" aria-label="Beta">Beta</span>
@@ -118,7 +118,7 @@
             <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections" title="Connect stores and manage API keys / OAuth">Connections</button>
           </nav>
         </div>
-        <span class="app-header-tagline text-[11px] hidden sm:inline self-center" title="All data is stored locally — nothing is uploaded by default">Cross-store backlog · local-only</span>
+        <span class="app-header-tagline text-[11px] hidden sm:inline self-center" title="All data is stored locally - nothing is uploaded by default">Cross-store backlog · local-only</span>
         <div class="header-actions app-header-actions ml-auto flex items-center gap-2 shrink-0 self-center">
           <div id="fetcherPopoverAnchor" class="fetcher-popover-anchor relative shrink-0">
             <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle" title="Show fetcher log" aria-haspopup="dialog" aria-expanded="false" aria-controls="fetcherPopover"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText" class="fh-global-status-label">Fetcher log</span><span id="fetcherGlobalStatusTail" class="fh-global-status-tail" aria-hidden="true"><span class="fh-global-status-tail-inner"></span></span></button>
@@ -175,7 +175,7 @@
         var tips = [
           "Watch your spotlight for anything you want to recategorize.",
           "Own a physical copy? Add it manually - add whatever you want.",
-          "See a Humble icon but no other store? You probably still need to redeem the key in your Humble account.",
+          "See a Humble icon but no other store? It may be a DRM-free download from Humble, or a key to redeem elsewhere.",
           "Sort by time played to see what you actually play, then recategorize from there.",
           "Press / to jump straight to the search box.",
           "Press B, N, P, or F to set a status on the highlighted row.",
@@ -226,7 +226,7 @@
         <h3 class="conn-popover-title">How connections work</h3>
         <p class="conn-howto-note">
           Credentials you save via <em>Connect</em> are encrypted under <code>cache/auth/</code> on this machine.
-          A <code>.env</code> file still works as a fallback for terminal fetchers, but it is optional &mdash;
+          A <code>.env</code> file still works as a fallback for terminal fetchers, but it is optional -
           <em>Connect</em> is what verifies a store. Keys found only in <code>.env</code> show as <em>Unverified</em> until you click <em>Verify</em> on the card.
         </p>
         <div class="conn-howto-row">
@@ -235,7 +235,7 @@
             <p class="conn-howto-heading">Automatic browser sign-in</p>
             <p class="conn-howto-text">
               <strong>Steam, GOG, PlayStation, Xbox (play history), Xbox Store wishlist, Battle.net, Nintendo, Ubisoft, Epic wishlist.</strong>
-              Click <em>Connect</em> on the card and a Chromium window opens automatically. Sign in normally &mdash; when the page lands on the right spot, the window closes itself and the card flips to <em>Connected</em>. Don't close the window manually unless you cancel.
+              Click <em>Connect</em> on the card and a Chromium window opens automatically. Sign in normally - when the page lands on the right spot, the window closes itself and the card flips to <em>Connected</em>. Don't close the window manually unless you cancel.
             </p>
           </div>
         </div>
@@ -262,17 +262,17 @@
           <div>
             <p class="conn-howto-heading">Local-only</p>
             <p class="conn-howto-text">
-              <strong>Amazon Games:</strong> nothing to sign in to &mdash; we read the local Amazon Games launcher database on this PC. If you don't have it installed, this card just stays disconnected.
+              <strong>Amazon Games:</strong> nothing to sign in to - we read the local Amazon Games launcher database on this PC. If you don't have it installed, this card just stays disconnected.
             </p>
           </div>
         </div>
         <p class="conn-howto-note">
-          Everything is stored encrypted on this machine (OS keychain by default). Sessions expire eventually &mdash; when a fetcher fails with an auth error, the card flips to <em>Session expired</em> and you just click <em>Reconnect</em> to refresh.
+          Everything is stored encrypted on this machine (OS keychain by default). Sessions expire eventually - when a fetcher fails with an auth error, the card flips to <em>Session expired</em> and you just click <em>Reconnect</em> to refresh.
         </p>
       </template>
       <template id="tplConnPassphrasePopover">
         <h3 class="conn-popover-title">Encryption passphrase</h3>
-        <p class="text-xs text-slate-400 mb-2">Portable master password (optional &mdash; overrides OS keychain). Most users can leave this blank.</p>
+        <p class="text-xs text-slate-400 mb-2">Portable master password (optional - overrides OS keychain). Most users can leave this blank.</p>
         <label class="block text-xs text-slate-300">Passphrase
           <input id="masterPasswordInput" type="password" autocomplete="new-password" placeholder="Leave blank to use OS keychain"
             class="block mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm" />
@@ -290,7 +290,7 @@
           recover from a corrupted OS keychain.
         </p>
         <p class="conn-howto-note">
-          The bundle is encrypted with <strong>its own passphrase</strong> &mdash; pick something you'll
+          The bundle is encrypted with <strong>its own passphrase</strong> - pick something you'll
           remember. We can't recover it for you.
         </p>
         <div class="flex flex-wrap gap-2 mt-3">
@@ -333,7 +333,7 @@
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="nextUp" data-pick-view="library" title="Backlog games marked Next up">Next Up</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins" data-pick-view="library" title="Short HLTB backlog games (under max hours slider)">Quick Wins</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems" data-pick-view="library" title="High-rated backlog games with few Steam reviews">Hidden Gems</button>
-        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo" data-pick-view="library" title="Started but unfinished — pick up where you left off">Return To</button>
+        <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo" data-pick-view="library" title="Started but unfinished - pick up where you left off">Return To</button>
         <button class="pick-tab px-2 py-1 rounded border border-emerald-700/60 text-xs text-emerald-300" data-tab="wishlistDeals" data-pick-view="wishlist" title="Best deals on your wishlist (ITAD + Steam)">Wishlist Deals</button>
         <span class="text-xs text-slate-300 ml-auto flex items-center gap-1">Show:
           <span id="picksLimitGroup" class="inline-flex rounded border border-slate-600 overflow-hidden" role="group" aria-label="Number of picks to show">
@@ -722,7 +722,7 @@
         </div>
         <div class="profile-modal-section">
           <label for="profilePinNew" class="profile-modal-label">Profile PIN</label>
-          <p id="profilePinNote" class="profile-modal-note text-xs text-slate-400 mb-1">Optional — lock this profile so switching in requires a PIN.</p>
+          <p id="profilePinNote" class="profile-modal-note text-xs text-slate-400 mb-1">Optional - lock this profile so switching in requires a PIN.</p>
           <div id="profilePinCurrentWrap" class="profile-modal-row hidden">
             <input type="password" id="profilePinCurrent" class="profile-modal-field" placeholder="Current PIN" maxlength="32" autocomplete="current-password" />
           </div>

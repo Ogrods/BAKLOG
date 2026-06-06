@@ -12,8 +12,10 @@ from fetch_humble import (
 )
 from fetch_humble_wishlist import (
     WishlistItem,
-    _build_row as _build_wishlist_row,
     _item_from_lookup,
+)
+from fetch_humble_wishlist import (
+    _build_row as _build_wishlist_row,
 )
 
 ORDER_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_order_detail.json"

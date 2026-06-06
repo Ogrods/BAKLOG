@@ -7,7 +7,7 @@
 export const TIPS = [
   "Watch your spotlight for anything you want to recategorize.",
   "Own a physical copy? Add it manually - add whatever you want.",
-  "See a Humble icon but no other store? You probably still need to redeem the key in your Humble account.",
+  "See a Humble icon but no other store? It may be a DRM-free download from Humble, or a key to redeem elsewhere.",
   "Sort by time played to see what you actually play, then recategorize from there.",
   "Press / to jump straight to the search box.",
   "Press B, N, P, or F to set a status on the highlighted row.",

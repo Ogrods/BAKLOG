@@ -150,6 +150,15 @@ describe('fetcherFreshness', () => {
     expect(result.status).toBe('missing');
   });
 
+  it('defers missing for enrich/ITAD until dashboardDataReady', () => {
+    state.dashboardDataReady = false;
+    state.libraryMeta = { hltb: null, itad: null };
+    expect(fetcherFreshness({ key: 'hltb', metaKey: 'hltb', countFn: null }).status).toBe('pending');
+    expect(fetcherFreshness({ key: 'itad', metaKey: 'itad', countFn: null }).status).toBe('pending');
+    state.dashboardDataReady = true;
+    expect(fetcherFreshness({ key: 'hltb', metaKey: 'hltb', countFn: null }).status).toBe('missing');
+  });
+
   it('marks fresh for recent fetch', () => {
     state.libraryMeta = {
       steam: { game_count: 10, fetched_at: new Date().toISOString() },

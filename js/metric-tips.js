@@ -52,7 +52,7 @@ export const METRIC_TIPS = {
   'of available gamerscore': 'Earned gamerscore ÷ total available gamerscore.',
   'trophy efficiency': 'Average trophy completion % across games with trophy data.',
   'gamerscore efficiency': 'Total earned Xbox gamerscore ÷ total available.',
-  'platinum potential': 'Tracked games 80–99% complete that are short (≤12h) — an easy run to 100%.',
+  'platinum potential': 'Tracked games 80–99% complete that are short (≤12h) - an easy run to 100%.',
   'closest platinum': 'Among platinum-potential titles, the one nearest full completion.',
 
   // Sabermetrics - slash line & rates
@@ -189,7 +189,7 @@ export const EYEBROW_TIPS = {
   'Fast finish': '≤4h to beat - knock it out fast.',
   'Worth a look': 'Rated 70%+ - a reasonable option from the backlog.',
   // Saber / creative superlatives
-  Completionist: 'Earned every trophy/achievement — 100% complete.',
+  Completionist: 'Earned every trophy/achievement - 100% complete.',
   Whale: 'The priciest game (by MSRP) you own but have never launched.',
   'Gathering dust': 'The game that has sat unplayed on your shelf the longest.',
   'Time capsule': 'The oldest untouched backlog game by when it first appeared in your library.',

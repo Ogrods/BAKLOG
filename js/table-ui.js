@@ -424,7 +424,7 @@ export function updateHasNotesIndicatorInPlace(tr, g) {
   const notes = String(getPersonal(g).notes || "").trim();
   const dot = meta.querySelector(".has-notes-dot");
   if (notes) {
-    const tooltip = `${notes.slice(0, 160)} — click to edit notes`;
+    const tooltip = `${notes.slice(0, 160)} - click to edit notes`;
     if (dot) {
       dot.title = tooltip;
     } else {
@@ -1156,9 +1156,9 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
               ${coopPillsHtml(g)}
               ${state.activeView === "wishlist" ? "" : trophyProgressPillHtml(g)}
-              ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))} — click to edit notes" aria-label="Has notes">&#9998; note</span>` : ""}
+              ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))} - click to edit notes" aria-label="Has notes">&#9998; note</span>` : ""}
             </div>
-            ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400" title="Uncertain HowLongToBeat match — Shift+click HLTB to override">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
+            ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400" title="Uncertain HowLongToBeat match - Shift+click HLTB to override">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             ${earlyAccessPillHtml(g)}
@@ -1178,7 +1178,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
       <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
       <td class="p-2 notes-cell">
-        <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1" title="Personal notes — saved automatically">${escapeHtml(p.notes || "")}</textarea>
+        <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1" title="Personal notes - saved automatically">${escapeHtml(p.notes || "")}</textarea>
       </td>
     </tr>`;
 }

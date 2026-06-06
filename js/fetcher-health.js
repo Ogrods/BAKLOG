@@ -164,7 +164,7 @@ function humanizeMissingRequirements(missing) {
   if (keys.has('STEAM_API_KEY') && keys.has('STEAM_ID')) return 'Steam not connected';
   if (keys.has('STEAM_API_KEY') || keys.has('STEAM_ID')) return 'Steam not connected';
   if (keys.has('GOG_AL')) return 'GOG not connected';
-  if (keys.has('PSN_NPSSO')) return 'PSN not connected';
+  if (keys.has('PSN_NPSSO')) return 'PlayStation not connected';
   if (keys.has('ITCH_API_KEY')) return 'itch.io API key missing';
   if (keys.has('ITAD_API_KEY')) return 'ITAD API key missing';
   if (keys.has('XBL_API_KEY')) return 'Xbox API key missing';
@@ -304,6 +304,7 @@ export function reconnectProviderForFetcher(key) {
 }
 
 export function isFetcherReconnectRequired(key) {
+  if (!authStatusLoaded()) return false;
   const providers = fetcherProviders(key);
   if (!providers.some(p => isProviderReconnectRequired(p))) return false;
   // Dual-source fetchers: suppress when a non-reconnect sibling is connected.
@@ -471,6 +472,8 @@ export async function fetchWithTimeout(url, options = {}, ms = FETCH_TIMEOUT_MS)
   }
 }
 const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers', 'steamTags']);
+/** Cache JSON loaded after library files in reloadGames — avoid "missing" flash during boot. */
+const BOOT_DEFERRED_FETCHER_KEYS = new Set([...ENRICH_KEYS, 'itad']);
 const MAX_SSE_HINT = 'max 8 live streams';
 const GROUP_ORDER = ['library', 'wishlist', 'prices', 'enrich'];
 const GROUP_LABELS = {
@@ -486,8 +489,8 @@ const GROUP_LABEL_TIPS = {
   enrich: 'Enrichment sources',
 };
 const COUNT_PILL_TITLES = {
-  stale: 'Fetchers whose cached data is past its freshness window — re-run to refresh',
-  missing: 'Data sources never fetched yet (no local cache) — click the chip to run them',
+  stale: 'Fetchers whose cached data is past its freshness window - re-run to refresh',
+  missing: 'Data sources never fetched yet (no local cache) - click the chip to run them',
   fresh: "Every fetcher's cache is up to date",
 };
 // Fixed order within the Enrichment group: keep the three Steam-derived
@@ -508,7 +511,7 @@ const COUNT_FNS = {
 const CLICK_HINTS = {
   steam: 'Sync your Steam library - picks up new purchases & updated playtime',
   gog: 'Sync your GOG library - picks up new purchases & metadata',
-  psn: 'Sync your PSN library',
+  psn: 'Sync your PlayStation library',
   epic: 'Sync your Epic library',
   amazon: 'Sync your Amazon Prime Gaming library',
   xbox: 'Sync your Xbox library',
@@ -537,7 +540,7 @@ const CLICK_HINTS = {
 const REFRESH_HINTS = {
   steam: 'Re-fetch every game from Steam, ignoring local cache (slower, full rebuild)',
   gog: 'Re-fetch every game from GOG, ignoring local cache (slower, full rebuild)',
-  psn: 'Re-fetch every PSN entry, ignoring local cache',
+  psn: 'Re-fetch every PlayStation entry, ignoring local cache',
   epic: 'Re-fetch every Epic entry, ignoring local cache',
   wishlistGog: 'Re-fetch every wishlist entry from GOG, ignoring cached details',
   hltb: 'Also retry titles previously cached as "no HLTB match" - use after HLTB adds new entries',
@@ -1057,7 +1060,11 @@ export function fetcherFreshness(source) {
   const count = meta
     ? (source.countFn ? source.countFn(meta) : (meta.game_count ?? null))
     : null;
+  const deferKey = source.key || source.metaKey;
   if (!meta || !meta.fetched_at) {
+    if (!state.dashboardDataReady && BOOT_DEFERRED_FETCHER_KEYS.has(deferKey)) {
+      return { status: 'pending', ageMs: Infinity, count, ageLabel: '…', iso: null };
+    }
     return { status: 'missing', ageMs: Infinity, count, ageLabel: meta ? '?' : ' - ', iso: null };
   }
   const ts = Date.parse(meta.fetched_at);
@@ -1193,27 +1200,6 @@ export function maybeAutoRefreshItad(deps = {}) {
   if (now - lastRun() < intervalMs) return false;
   const setLastRun = deps.setLastRun
     ?? (t => localStorage.setItem(itadLastAutoRunKey(), String(t)));
-  // region agent log (session 21853a)
-  try {
-    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '21853a' },
-      body: JSON.stringify({
-        sessionId: '21853a',
-        hypothesisId: 'H1',
-        location: 'fetcher-health.js:maybeAutoRefreshItad',
-        message: 'itad auto-run firing',
-        data: {
-          stateForItad: stateForFn('itad') || null,
-          runStateHasItad: runStateByKey.has('itad'),
-          freshAgeMs: fresh.ageMs,
-          lastRunDeltaMs: now - lastRun(),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  } catch (_) { /* ignore */ }
-  // endregion
   setLastRun(now);
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
   runFn('itad', { auto: true });
@@ -1698,6 +1684,33 @@ export const fetcherRunner = (() => {
     return true;
   }
 
+  /**
+   * Scroll the open fetcher popover module to the console (`'console'`) so the
+   * user sees the log output that a chip click just produced, or back to the
+   * top (`'top'`) when the click was a no-op. No-op outside the popover (legacy
+   * inline row scrolls with the page).
+   */
+  function scrollPopoverModule(where) {
+    const pop = fetcherPopoverEl();
+    if (!pop || pop.hidden) return;
+    const scroller = pop.querySelector('.fetcher-popover-scroll');
+    if (!scroller) return;
+    requestAnimationFrame(() => {
+      if (where === 'console') {
+        const log = logPanel();
+        if (log) {
+          const logRect = log.getBoundingClientRect();
+          const scRect = scroller.getBoundingClientRect();
+          scroller.scrollTop += logRect.top - scRect.top - 8;
+        } else {
+          scroller.scrollTop = scroller.scrollHeight;
+        }
+      } else {
+        scroller.scrollTop = 0;
+      }
+    });
+  }
+
   function isFetcherInFlight() {
     return runStateByKey.size > 0 || lastServerInFlight || cancelInFlight;
   }
@@ -1912,10 +1925,10 @@ export const fetcherRunner = (() => {
     return runStateByKey.get(key) || null;
   }
 
-  // Count of fetchers currently running + queued client-side. The server
-  // enforces a hard cap of 2 (1 active + 1 queued); we mirror that here so
-  // the UI can disable other chips before the user wastes a click on a 409.
-  const MAX_IN_FLIGHT = 2;
+  // Count of fetchers currently running client-side. The server enforces a hard
+  // cap of 1 (no queuing); we mirror that here so the UI can disable other
+  // chips before the user wastes a click on a 409.
+  const MAX_IN_FLIGHT = 1;
   function inFlightCount() {
     return runStateByKey.size;
   }
@@ -2129,7 +2142,7 @@ export const fetcherRunner = (() => {
     lastServerInFlight = false;
     logEvent(
       'info',
-      force ? '[force reset — queue cleared locally]' : '[cancelled]',
+      force ? '[force reset - queue cleared locally]' : '[cancelled]',
     );
     flushLinesNow();
     setStatus('failed');
@@ -2163,7 +2176,7 @@ export const fetcherRunner = (() => {
       }
       const stillRunning = await waitForRunsToClear(ids, CANCEL_RECONCILE_WAIT_MS);
       if (stillRunning.size && !force) {
-        logEvent('info', '[queue still busy — force reset…]');
+        logEvent('info', '[queue still busy - force reset…]');
         await cancelInFlightRuns({ force: true });
         return;
       }
@@ -2449,11 +2462,20 @@ export const fetcherRunner = (() => {
   }
 
   async function run(key, { refresh = false, auto = false } = {}) {
-    if (!isApiAvailable()) return;
-    if (cancelInFlight) return;
+    if (!isApiAvailable()) {
+      if (!auto) scrollPopoverModule('top');
+      return;
+    }
+    if (cancelInFlight) {
+      if (!auto) scrollPopoverModule('top');
+      return;
+    }
     await loadFetcherSources(true);
     const src = source(key);
-    if (!src || runStateByKey.has(key) || submitInFlightKeys.has(key)) return;
+    if (!src || runStateByKey.has(key) || submitInFlightKeys.has(key)) {
+      if (!auto) scrollPopoverModule('top');
+      return;
+    }
     // Auth-failure backoff: block while cooling down. Auto/bulk runs stay
     // silent; a chip click is already prevented by the disabled attribute, so
     // this only fires for programmatic callers — explain it once.
@@ -2465,6 +2487,7 @@ export const fetcherRunner = (() => {
           'info',
           `[${src.label}: auth cooldown - ${authCooldownLabel(cooldownMs)} left. Reconnect in Connections to clear.]`,
         );
+        scrollPopoverModule('console');
       }
       return;
     }
@@ -2477,18 +2500,20 @@ export const fetcherRunner = (() => {
           `[${src.label}: not connected - connect in Connections before running. No request sent.]`,
         );
         if (provider) showReconnectBanner([provider]);
+        scrollPopoverModule('console');
       }
       return;
     }
-    // Hard cap mirrors server-side enforcement (max 1 active + 1 queued).
+    // Hard cap mirrors server-side enforcement (max 1 active run, no queuing).
     // Without this guard a fast double-click could land two POSTs before the
     // server's lock saw the first one as pending.
     if (isQueueFull()) {
       ensurePanel(src);
       logEvent(
         'info',
-        `[${src.label}: queue full - one run is in progress and one is queued]`,
+        `[${src.label}: queue full - a fetch is already running]`,
       );
+      if (!auto) scrollPopoverModule('console');
       return;
     }
     if (refresh && !src.supportsRefresh) {
@@ -2496,6 +2521,7 @@ export const fetcherRunner = (() => {
         'info',
         `[${src.label}: this fetcher has no force-refresh mode - a normal click already pulls the latest data]`,
       );
+      if (!auto) scrollPopoverModule('console');
       return;
     }
 
@@ -2512,6 +2538,7 @@ export const fetcherRunner = (() => {
       }
       const cmdSuffix = refresh ? ' --refresh' : '';
       logEvent('cmd', `$ ${src.cmd}${cmdSuffix}`);
+      if (!auto) scrollPopoverModule('console');
     }
 
     const url = `/api/run/${encodeURIComponent(key)}${refresh ? '?refresh=1' : ''}`;
@@ -2531,38 +2558,13 @@ export const fetcherRunner = (() => {
       // Benign: key already in flight, or a just-cancelled run still holds the
       // server's active slot. Re-sync; retry once only if the server queue is free.
       const txt = await res.text().catch(() => '');
-      logEvent('info', `[${src.label}: ${txt || 'already in flight'} — re-syncing queue]`);
+      logEvent('info', `[${src.label}: ${txt || 'already in flight'} - re-syncing queue]`);
       await syncFromServer();
       const canRetry =
         attempt === 0
         && !cancelInFlight
         && !runStateByKey.has(key)
         && !isQueueFull();
-      // region agent log (session 21853a)
-      try {
-        fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '21853a' },
-          body: JSON.stringify({
-            sessionId: '21853a',
-            hypothesisId: 'H1H2',
-            location: 'fetcher-health.js:run:409',
-            message: 'submit got 409; evaluated retry',
-            data: {
-              key,
-              auto,
-              attempt,
-              bodyText: txt,
-              runStateHasKeyAfterSync: runStateByKey.has(key),
-              isQueueFull: isQueueFull(),
-              cancelInFlight,
-              canRetry,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch (_) { /* ignore */ }
-      // endregion
       if (!canRetry) return;
       await new Promise(r => setTimeout(r, 600));
       }
@@ -3037,6 +3039,7 @@ export const fetcherRunner = (() => {
 
 function isSourceConnected(row) {
   return row.status !== 'missing'
+    && row.status !== 'pending'
     && !isFetcherDisconnected(row.src.key)
     && !isFetcherReconnectRequired(row.src.key);
 }
@@ -3172,7 +3175,7 @@ export function renderDashboardFetcherHealth() {
     if (isFetcherReconnectRequired(key)) return 7; // session expired
     if (isFetcherDisconnected(key)) return 6; // not connected
     if (authCooldownRemainingMs(key) > 0) return 5; // auth cooldown
-    const freshRank = { fresh: 1, recent: 2, stale: 3, missing: 4 };
+    const freshRank = { fresh: 1, recent: 2, stale: 3, pending: 3, missing: 4 };
     return freshRank[r.status] ?? 4;
   };
   visible.sort((a, b) => healthRank(a) - healthRank(b) || a.src.label.localeCompare(b.src.label));
@@ -3204,7 +3207,7 @@ export function renderDashboardFetcherHealth() {
   const readonlyBanner = showReadonly
     ? (isAccountAuthMode()
       ? `<div class="fh-readonly-banner" role="status">
-          Fetcher health is read-only — the server API did not respond (sign in, restart
+          Fetcher health is read-only - the server API did not respond (sign in, restart
           <code>python server.py</code>, or check the terminal for errors).
         </div>`
       : `<div class="fh-readonly-banner" role="status">
@@ -3274,9 +3277,9 @@ export function renderDashboardFetcherHealth() {
           configHint ? `Note:${configHint}` : '',
           'Server is offline - start `python server.py` to run fetchers from the UI.',
         ].filter(Boolean);
-    const queueFullElsewhere = fetcherRunner.inFlightCount() >= 2 && !runState;
+    const queueFullElsewhere = fetcherRunner.inFlightCount() >= 1 && !runState;
     if (queueFullElsewhere) {
-      titleLines.push('Queue full - one run is in progress and one is queued. Wait for a slot.');
+      titleLines.push('Queue full - a fetch is already running. Wait for it to finish.');
     }
     if (needsReconnect) {
       titleLines.push('Session expired - reconnect to refresh credentials, or dismiss to hide this hint.');
@@ -3309,6 +3312,7 @@ export function renderDashboardFetcherHealth() {
       ? runState
       : (disconnected ? '' : (inAuthCooldown ? authCooldownLabel(authCooldownMs) : ageLabel));
     if (persistFailed && !runState) ageText = 'failed';
+    else if (status === 'pending') ageText = '…';
     else if (status === 'missing' && ageLabel === '?' && (count === 0 || count == null)) ageText = 'empty';
     const connectAttr = navProvider
       ? ` data-fetcher-connect="${escapeAttr(navProvider)}"`
@@ -3370,7 +3374,7 @@ export function renderDashboardFetcherHealth() {
   const filterHint = (!showConnected && !showStaleMissing)
     ? 'Showing all'
     : `Uncheck both to show all ${rows.length}`;
-  const filterToggleHtml = `<div class="fh-filter-toggles" title="Each checked box adds fetchers (OR). Disconnected sources with fresh data may stay hidden — uncheck both to reveal all.">
+  const filterToggleHtml = `<div class="fh-filter-toggles" title="Each checked box adds fetchers (OR). Disconnected sources with fresh data may stay hidden - uncheck both to reveal all.">
             <label class="fh-toggle" title="Show fetchers whose store/session is connected (not disconnected or expired)">
               <input id="fetcherHealthShowConnected" type="checkbox" class="rounded" ${showConnected ? 'checked' : ''} />
               Connected
@@ -3383,10 +3387,10 @@ export function renderDashboardFetcherHealth() {
           </div>`;
   const legendTipsItemsHtml = `
           ${clickHint}
-          <span class="fh-legend-item" title="Yellow ! on a chip — credentials missing for this profile; open Connections"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
-          <span class="fh-legend-item" title="Dim dashed chip border — this source has never been fetched">dim dashed = never fetched</span>
-          <span class="fh-legend-item" title="Dot color on each chip — how old the cached data is">dot color = cache age</span>
-          <span class="fh-legend-item" title="Reconnect label — session expired; fix in Connections, not by clicking the chip">reconnect = session expired (Connections, not these chips)</span>`;
+          <span class="fh-legend-item" title="Yellow ! on a chip - credentials missing for this profile; open Connections"><span class="fh-chip-warn" aria-hidden="true">!</span> missing keys for this profile</span>
+          <span class="fh-legend-item" title="Dim dashed chip border - this source has never been fetched">dim dashed = never fetched</span>
+          <span class="fh-legend-item" title="Dot color on each chip - how old the cached data is">dot color = cache age</span>
+          <span class="fh-legend-item" title="Reconnect label - session expired; fix in Connections, not by clicking the chip">reconnect = session expired (Connections, not these chips)</span>`;
   const legendToggleHtml = `<button type="button" class="fh-legend-toggle${legendTipsOpen ? ' is-open' : ''}" data-role="fh-legend-toggle" aria-expanded="${legendTipsOpen ? 'true' : 'false'}" aria-controls="fhLegendTips" title="Show fetcher chip legend and tips">ⓘ Legend &amp; tips</button>`;
   const legendTipsHtml = `<div id="fhLegendTips" class="fh-legend-tips${legendTipsOpen ? ' is-open' : ''}" role="region" aria-label="Fetcher legend and tips"${legendTipsOpen ? '' : ' aria-hidden="true"'}>${legendTipsItemsHtml}</div>`;
   const chipsBlockHtml = `<div class="fh-chips">${chipsHtml}</div>`;

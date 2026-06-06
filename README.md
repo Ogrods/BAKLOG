@@ -24,7 +24,7 @@ The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-a
 
 Credentials are stored via your OS **keyring** (Windows Credential Manager, macOS Keychain, Linux Secret Service) with an AES-GCM file fallback — not DPAPI. See [`auth/secrets.py`](auth/secrets.py).
 
-**Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium for the Connect sign-in flow (override with `BAKLOG_CHROME_PATH`), then `pip install -e ".[dev]"` and `python server.py`.
+**Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium for the Connect sign-in flow (override with `BAKLOG_CHROME_PATH`), then `pip install -r requirements.txt` and `python server.py`. Developers/CI: `pip install -e ".[dev]"` (or `requirements-dev.txt`).
 
 **Optional invite-only accounts:** Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. Set `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing. Set `BAKLOG_LOCAL_PROFILES=1` to keep the local Work/Play profile switcher available while Supabase sign-in stays on (optional per-profile PINs gate switching; profile mutations require the in-app `X-BAKLOG-Local` header).
 
@@ -44,7 +44,7 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 |-------|------|
 | Data pipeline | Python 3 (`requests`, `python-dotenv`, `howlongtobeatpy`, `psnawp`, store-specific clients) |
 | Data files | `games_<store>.json` per source (generated, gitignored) |
-| Dashboard | Static HTML + ESM (`js/state.js`, `js/app.js`) + prebuilt Tailwind (`tailwind.css`) + Chart.js (CDN) |
+| Dashboard | Static HTML + ESM (`js/app.js` orchestrator) + prebuilt Tailwind (`tailwind.css`) + lazy Chart.js (`vendor/chart.umd.min.js`); optional `npm run build` → hashed `dist/` for production |
 | Personal edits | `data/personal.json` via the dev server (status, notes, priority, tags, prefs, manual games); browser `localStorage` is the cache + fallback for read-only mode |
 | View locally | `python server.py` → http://localhost:8765 (or `python -m http.server 8080` for read-only mode) |
 
@@ -81,6 +81,18 @@ In short: the **blacklist** removes noise that is never a game; the **hidden lis
 ## Dashboard CSS
 
 Tailwind is precompiled into `tailwind.css` (no browser JIT in dev). Rebuild the CSS only if you change the Tailwind build pipeline in the repo.
+
+## Frontend build (optional)
+
+Dev mode serves raw ES modules with `Cache-Control: no-store` (no `npm` required). For a smaller, cacheable production bundle:
+
+```bash
+npm ci
+npm run build          # minified CSS + bundled JS -> dist/manifest.json
+$env:BAKLOG_SERVE_BUILT='1'; python server.py   # PowerShell
+```
+
+Hashed assets under `dist/` get `immutable` long-term cache; `index.html` stays `no-store`. Baseline sizes: `node scripts/measure-baseline.mjs` → `scripts/frontend-baseline.json`.
 
 ## Setup
 

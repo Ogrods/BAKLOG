@@ -1448,7 +1448,8 @@ body.bulk-bar-open { padding-bottom: 56px; }
   .app-spinner { animation: none; border-top-color: var(--accent); opacity: 0.85; }
   .view-spinner { animation: none; border-top-color: var(--accent); opacity: 0.85; }
   .dash-spotlight,
-  .dash-spotlight-art { transition: none !important; }
+  .dash-spotlight-art,
+  .dash-spotlight-art-bg { transition: none !important; animation: none !important; }
   .dash-spotlight:hover .dash-spotlight-art { transform: none; }
   .dash-spotlight.has-portrait-art.is-tilting .dash-spotlight-art { transform: none !important; }
   .dash-spotlight.has-portrait-art.is-tilting .dash-spotlight-art-bg { transform: none !important; }
@@ -1815,6 +1816,8 @@ html[data-init-view="connections"] header.app-header {
   background: color-mix(in srgb, var(--accent, #38bdf8) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent, #38bdf8) 45%, transparent);
   white-space: nowrap;
+  /* Nudge up and to the left without shifting the header layout. */
+  transform: translate(-3px, -3px);
 }
 html[data-theme="default"] .app-header-brand h1 { color: #fff; }
 html[data-theme="dark"] .app-header-brand h1 { color: #fff; }
@@ -2312,6 +2315,8 @@ html[data-theme="ember"] .brand-logo-mark {
 .fh-chip-stale .fh-chip-dot { background: #ef4444; }
 .fh-chip-missing { border-style: dashed; opacity: 0.7; }
 .fh-chip-missing .fh-chip-dot { background: #475569; }
+.fh-chip-pending { opacity: 0.85; }
+.fh-chip-pending .fh-chip-dot { background: #64748b; opacity: 0.55; }
 .fh-chip-running { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .fh-chip-running .fh-chip-dot {
   background: var(--accent);
@@ -2684,12 +2689,23 @@ html[data-theme="ember"] .brand-logo-mark {
 .dash-mega-hero {
   position: relative;
 }
-.dash-spotlight {
+.dash-spotlight-wrap {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   width: 66%;
+  z-index: 0;
+  pointer-events: none;
+}
+.dash-spotlight-wrap .dash-spotlight,
+.dash-spotlight-wrap .dash-spotlight-nav {
+  pointer-events: auto;
+}
+.dash-spotlight {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   background: transparent;
   border: 0;
   padding: 0;
@@ -2737,7 +2753,7 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 35% center;
+  object-position: 50% 40%;
   opacity: 0;
   filter: brightness(1.1);
   transition: transform 0.6s ease, opacity 0.45s ease;
@@ -2749,7 +2765,57 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   backface-visibility: hidden;
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
-.dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04) translateZ(0); }
+.dash-spotlight-art-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bg-elev) 85%, var(--accent) 15%), color-mix(in srgb, var(--bg) 90%, var(--accent) 10%));
+  z-index: 1;
+}
+.dash-spotlight-art-placeholder .placeholder-initials {
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--text-bright) 70%, var(--accent));
+  text-shadow: 0 2px 12px color-mix(in srgb, var(--bg) 60%, transparent);
+}
+.dash-spotlight.has-art-placeholder .dash-spotlight-art-bg { display: none !important; }
+.dash-spotlight.is-lowres-art .dash-spotlight-art-bg {
+  display: block;
+  transition: opacity 0.45s ease;
+}
+.dash-spotlight.is-lowres-art .dash-spotlight-art {
+  object-fit: contain;
+  object-position: 62% 40%;
+}
+@keyframes spotlightLowresFgDrift {
+  from { transform: scale(1) translate(0%, 0%) translateZ(0); }
+  to { transform: scale(1.04) translate(1.2%, 0.6%) translateZ(0); }
+}
+@keyframes spotlightLowresBgDrift {
+  from { transform: scale(1.12) translate(0%, 0%) translateZ(0); }
+  to { transform: scale(1.22) translate(-2.5%, -1.5%) translateZ(0); }
+}
+.dash-spotlight.is-lowres-art .dash-spotlight-art.is-loaded {
+  animation: spotlightLowresFgDrift 16s ease-in-out infinite alternate;
+}
+.dash-spotlight.is-lowres-art .dash-spotlight-art-bg.is-loaded {
+  animation: spotlightLowresBgDrift 16s ease-in-out infinite alternate;
+}
+.dash-spotlight.is-lowres-art:hover .dash-spotlight-art.is-loaded,
+.dash-spotlight.is-lowres-art:hover .dash-spotlight-art-bg.is-loaded {
+  animation-play-state: paused;
+}
+@keyframes spotlightHeroZoom {
+  from { transform: scale(1) translateZ(0); }
+  to { transform: scale(1.06) translateZ(0); }
+}
+.dash-spotlight:not(.has-portrait-art):not(.is-lowres-art) .dash-spotlight-art.is-loaded {
+  animation: spotlightHeroZoom 12s ease-out forwards;
+}
+.dash-spotlight:not(.has-portrait-art):not(.is-lowres-art):hover .dash-spotlight-art.is-loaded {
+  animation-play-state: paused;
+}
 .dash-spotlight.has-portrait-art.is-tilting .dash-spotlight-art {
   animation: none !important;
   transition: filter 0.35s ease;
@@ -2757,7 +2823,15 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   will-change: transform;
 }
 .dash-spotlight.has-portrait-art.is-tilting .dash-spotlight-art-bg {
+  animation: none !important;
   will-change: transform;
+}
+@keyframes spotlightPortraitBgDrift {
+  0%, 100% { transform: scale(1.08) translate(0%, 0%) translateZ(0); }
+  50% { transform: scale(1.12) translate(-1.6%, -1%) translateZ(0); }
+}
+.dash-spotlight.has-portrait-art .dash-spotlight-art-bg.is-loaded {
+  animation: spotlightPortraitBgDrift 14s ease-in-out infinite;
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
   transition: opacity 0.45s ease, transform 0.35s ease, filter 0.35s ease;
@@ -2945,7 +3019,7 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   backdrop-filter: blur(2px);
 }
-.dash-spotlight.dash-spotlight--multi .dash-spotlight-nav {
+.dash-spotlight-wrap--multi .dash-spotlight-nav {
   display: flex;
 }
 .dash-spotlight-nav-btn {
@@ -2960,9 +3034,12 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   color: #cbd5e1;
   background: transparent;
   border: none;
+  padding: 0;
+  /* The ‹ › glyphs sit low in their line box; nudge up to baseline-match the pause bars. */
+  transform: translateY(-1px);
   user-select: none;
 }
-.dash-spotlight-nav-btn + .dash-spotlight-nav-btn {
+.dash-spotlight-nav > button + button {
   border-left: 1px solid rgba(51, 65, 85, 0.6);
 }
 .dash-spotlight-nav-btn:hover {
@@ -2970,6 +3047,28 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   background: color-mix(in srgb, var(--bg-hover) 90%, transparent);
 }
 .dash-spotlight-nav-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.dash-spotlight-pause {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  color: #cbd5e1;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.dash-spotlight-pause:hover {
+  color: #f1f5f9;
+  background: color-mix(in srgb, var(--bg-hover) 90%, transparent);
+}
+.dash-spotlight-pause:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
@@ -3181,11 +3280,13 @@ html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before 
   .dash-ribbon { grid-template-columns: 1fr; }
   .dash-insight,
   .dash-mega--has-spotlight .dash-insight { max-width: none; display: block; }
-  .dash-spotlight {
+  .dash-spotlight-wrap {
     position: static;
     width: 100%;
     height: 140px;
     margin-bottom: 16px;
+  }
+  .dash-spotlight {
     border-radius: 10px;
   }
   .dash-spotlight-art {

@@ -26,6 +26,7 @@ import json
 import re
 import sqlite3
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from gog_filters import (
@@ -114,6 +115,30 @@ def _meta_store_url(meta: object, gog_id: int) -> str:
         if isinstance(link, str) and link.startswith("http"):
             return link
     return f"https://www.gog.com/en/game/{gog_id}"
+
+
+def _release_date_from_meta(meta: object) -> str | None:
+    """Real game release date (YYYY-MM-DD) from the meta GamePiece.
+
+    GOG Galaxy stores ``releaseDate`` as a Unix timestamp (seconds) in the
+    title's meta blob. This is the actual release date — distinct from the
+    user's purchase date in ProductPurchaseDates, which must NOT be used here.
+    """
+    if not isinstance(meta, dict):
+        return None
+    raw = meta.get("releaseDate")
+    if raw is None:
+        return None
+    try:
+        ts = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if ts <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(ts, tz=UTC).date().isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def _genres_from_meta(meta: object) -> list[str]:
@@ -227,36 +252,6 @@ class GogGalaxyClient:
             elif meta_id is not None and tid == meta_id:
                 bucket["meta"] = parsed
         return by_key
-
-    def _load_purchase_dates(
-        self, conn: sqlite3.Connection, release_keys: list[str]
-    ) -> dict[str, str]:
-        if not release_keys or not self._table_exists(conn, "ProductPurchaseDates"):
-            return {}
-        cols = {
-            row[1].lower()
-            for row in conn.execute("PRAGMA table_info(ProductPurchaseDates)")
-        }
-        date_col = None
-        for candidate in ("purchasedate", "purchase_date", "date", "addeddate"):
-            if candidate in cols:
-                date_col = candidate
-                break
-        if not date_col:
-            return {}
-        placeholders = ",".join("?" * len(release_keys))
-        sql = (
-            f"SELECT gameReleaseKey, {date_col} FROM ProductPurchaseDates "
-            f"WHERE gameReleaseKey IN ({placeholders})"
-        )
-        out: dict[str, str] = {}
-        for rk, raw in conn.execute(sql, release_keys):
-            if raw and str(raw).strip() and not str(raw).startswith("0001-01-01"):
-                text = str(raw)
-                if "T" in text:
-                    text = text.split("T")[0]
-                out[str(rk)] = text
-        return out
 
     def _load_last_played(
         self, conn: sqlite3.Connection, release_keys: list[str]
@@ -386,7 +381,6 @@ class GogGalaxyClient:
                 conn, release_keys, type_ids
             )
             pieces = self._load_pieces_for_keys(conn, release_keys, type_ids)
-            purchase_dates = self._load_purchase_dates(conn, release_keys)
             last_played = self._load_last_played(conn, release_keys)
             owned_keys = set(release_keys)
         finally:
@@ -419,7 +413,7 @@ class GogGalaxyClient:
                     "raw_image": cover,
                     "header_image": cover,
                     "library_image": cover,
-                    "release_date": purchase_dates.get(rk),
+                    "release_date": _release_date_from_meta(meta),
                     "last_played": last_played.get(rk),
                     "genres": _genres_from_meta(meta),
                     "store_url": _meta_store_url(meta, gog_id),

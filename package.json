@@ -9,6 +9,11 @@
     "test:js": "vitest run",
     "test:js:watch": "vitest",
     "test:all": "python -m pytest -q && npm test",
+    "measure:baseline": "node scripts/measure-baseline.mjs",
+    "compare:build": "node scripts/compare-build.mjs",
+    "build:css": "node scripts/build-frontend.mjs --css-only",
+    "build:js": "node scripts/build-frontend.mjs --js-only",
+    "build": "node scripts/build-frontend.mjs",
     "landing": "python -m http.server 4000 --directory landing",
     "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/module/index.js --bundle --format=esm --outfile=js/vendor/supabase-js.mjs"
   },

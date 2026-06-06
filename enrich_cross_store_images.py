@@ -110,6 +110,32 @@ def needs_images(g: dict) -> bool:
     return False
 
 
+def is_steamstatic_url(url: str) -> bool:
+    return "steamstatic.com" in (url or "")
+
+
+def needs_lowres_upgrade(g: dict) -> bool:
+    if g.get("image_source") in ("steam_search", "steam_search_upgrade"):
+        return False
+    lib = g.get("library_image") or ""
+    hdr = g.get("header_image") or ""
+    if not lib and not hdr:
+        return False
+    if lib.endswith(".eprt") or hdr.endswith(".eprt"):
+        return False
+    if is_steamstatic_url(lib) or is_steamstatic_url(hdr):
+        return False
+    return True
+
+
+def should_process(g: dict, *, upgrade_lowres: bool) -> bool:
+    if needs_images(g):
+        return True
+    if upgrade_lowres and needs_lowres_upgrade(g):
+        return True
+    return False
+
+
 def load_meta() -> dict:
     path = meta_file()
     if path.exists():
@@ -129,6 +155,11 @@ def main() -> int:
         action="store_true",
         help="Re-search Steam for rows previously cached as having no Steam match.",
     )
+    parser.add_argument(
+        "--upgrade-lowres",
+        action="store_true",
+        help="Re-source native-store art (non-steamstatic URLs) to sharper Steam CDN images.",
+    )
     args = parser.parse_args()
 
     t0 = started("enrich_cross_store_images")
@@ -139,17 +170,24 @@ def main() -> int:
     # Persistent "this row exists on (store, id) but has no Steam match" set
     # so a re-click doesn't waste a Steam search hit on Hearthstone again.
     no_steam_match: set[str] = set(meta.get("no_steam_match", []))
+    lowres_checked: set[str] = set(meta.get("lowres_checked", []))
     if args.retry_misses:
         print(f"--retry-misses: clearing {len(no_steam_match)} cached non-matches", flush=True)
         no_steam_match.clear()
+        print(f"--retry-misses: clearing {len(lowres_checked)} cached low-res checks", flush=True)
+        lowres_checked.clear()
     cache_lock = Lock()
 
     def process(g: dict, store: str) -> dict | None:
-        if not needs_images(g):
+        missing = needs_images(g)
+        upgrading = args.upgrade_lowres and needs_lowres_upgrade(g)
+        if not missing and not upgrading:
             return None
         key = f"{store}:{g.get('id')}"
         with cache_lock:
             if key in no_steam_match:
+                return None
+            if upgrading and key in lowres_checked:
                 return None
         appid = g.get("steam_appid")
         if not appid:
@@ -157,13 +195,18 @@ def main() -> int:
         if not appid:
             with cache_lock:
                 no_steam_match.add(key)
+                if upgrading:
+                    lowres_checked.add(key)
             return None
         header, library = image_urls(appid)
         g = dict(g)
         g["header_image"] = header
         g["library_image"] = library
         g["steam_appid"] = appid
-        g["image_source"] = "steam_search"
+        g["image_source"] = "steam_search_upgrade" if upgrading and not missing else "steam_search"
+        with cache_lock:
+            if upgrading:
+                lowres_checked.add(key)
         return g
 
     for rel, store, row_filter in STORE_FILES:
@@ -173,12 +216,18 @@ def main() -> int:
         data = json.loads(path.read_text(encoding="utf-8"))
         games = data.get("games", [])
         eligible = [g for g in games if row_filter is None or row_filter(g)]
-        todo = [g for g in eligible if needs_images(g)]
+        todo = [g for g in eligible if should_process(g, upgrade_lowres=args.upgrade_lowres)]
         if not todo:
             print(f"{path.name}: nothing to enrich", flush=True)
             continue
         skip_cached = sum(
-            1 for g in todo if f"{store}:{g.get('id')}" in no_steam_match
+            1 for g in todo
+            if f"{store}:{g.get('id')}" in no_steam_match
+            or (
+                args.upgrade_lowres
+                and needs_lowres_upgrade(g)
+                and f"{store}:{g.get('id')}" in lowres_checked
+            )
         )
         fresh = len(todo) - skip_cached
         if fresh == 0:
@@ -223,6 +272,7 @@ def main() -> int:
                 "fetched_at": datetime.now(UTC).isoformat(),
                 "last_updated": updated,
                 "no_steam_match": sorted(no_steam_match),
+                "lowres_checked": sorted(lowres_checked),
             },
             indent=2,
         ),

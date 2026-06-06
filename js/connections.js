@@ -467,7 +467,7 @@ function renderOnboard() {
 
       <p class="conn-onboard-lead">Start with Steam - it imports your whole library in one sign-in. You can add the rest after.</p>
 
-      <button type="button" class="conn-onboard-btn" data-conn-start-steam title="Connect Steam — imports your library via browser sign-in">Start with Steam</button>
+      <button type="button" class="conn-onboard-btn" data-conn-start-steam title="Connect Steam - imports your library via browser sign-in">Start with Steam</button>
 
       <p class="conn-onboard-muted">or pick any store from the list below</p>
 
@@ -1765,7 +1765,7 @@ async function startEpicBrowserOAuth() {
 
   startPostConnectFastPoll();
 
-  if (log) log.textContent = 'Finish signing in in the new tab — this page updates once Epic connects.';
+  if (log) log.textContent = 'Finish signing in in the new tab - this page updates once Epic connects.';
 
 }
 

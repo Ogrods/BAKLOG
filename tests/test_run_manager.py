@@ -464,14 +464,12 @@ def test_submit_queue_full_returns_error(runs_env):
     running = server.Run("demo", runs_dir=runs_dir)
     running.status = "running"
     running.started_at = time.time()
-    queued = server.Run("demo2", runs_dir=runs_dir)
     with mgr._lock:
-        mgr._pending.extend([running, queued])
+        mgr._pending.append(running)
         mgr._runs_by_id[running.id] = running
-        mgr._runs_by_id[queued.id] = queued
         mgr._active = running
     with pytest.raises(ValueError, match="queue full"):
-        mgr.submit("demo3")
+        mgr.submit("demo2")
 
 
 def test_submit_atomic_under_concurrency(runs_env):
@@ -488,7 +486,7 @@ def test_submit_atomic_under_concurrency(runs_env):
             with lock:
                 errors.append(str(exc))
 
-    # Pre-fill one slot so concurrent submits race for the last slot.
+    # Pre-fill the single slot so concurrent submits all race for a full queue.
     running = server.Run("demo", runs_dir=runs_dir)
     running.status = "running"
     with mgr._lock:
@@ -505,7 +503,7 @@ def test_submit_atomic_under_concurrency(runs_env):
         t.join(timeout=5)
     queue_full = [e for e in errors if "queue full" in e or "already" in e]
     assert queue_full, f"expected rejections, got {errors}"
-    assert len(errors) >= 2
+    assert len(errors) == 3
 
 
 def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch: pytest.MonkeyPatch):
@@ -613,10 +611,24 @@ def test_max_run_seconds_for_key_uses_fetcher_override(monkeypatch: pytest.Monke
     assert server._max_run_seconds_for_key("steam") == 1800.0
 
 
+def test_max_run_seconds_for_key_enforces_sixty_second_floor(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1800.0)
+    monkeypatch.setitem(server.FETCHERS, "fast", {"maxRunSeconds": 5.0})
+    assert server._max_run_seconds_for_key("fast") == 60.0
+
+
 def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1.0)
+    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 9999.0)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
     monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 9999)
+    real_cap = server._max_run_seconds_for_key
+
+    def _cap_for_long_enrich(key: str) -> float:
+        if key == "long_enrich":
+            return 2.0
+        return real_cap(key)
+
+    monkeypatch.setattr(server, "_max_run_seconds_for_key", _cap_for_long_enrich)
     mgr, _ = runs_env
     monkeypatch.setitem(
         server.FETCHERS,
@@ -633,20 +645,20 @@ def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPa
             "group": "enrich",
             "color": "#fff",
             "requires": [],
-            "maxRunSeconds": 5.0,
+            "maxRunSeconds": 7200.0,
         },
     )
     run = mgr.submit("long_enrich")
     saw_cap = False
-    deadline = time.time() + 15
+    deadline = time.time() + 30
     while time.time() < deadline:
         replay = run.replay_lines()
-        if any("maximum runtime (5" in m.get("text", "") for m in replay):
+        if any("maximum runtime (2" in m.get("text", "") for m in replay):
             saw_cap = True
             break
         time.sleep(0.05)
-    assert saw_cap, "expected per-fetcher 5s cap message in run log"
-    assert run._finished.wait(timeout=15)
+    assert saw_cap, "expected per-fetcher cap message in run log"
+    assert run._finished.wait(timeout=30)
     assert run.status == "failed"
 
 

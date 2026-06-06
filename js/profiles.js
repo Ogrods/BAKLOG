@@ -531,7 +531,7 @@ function syncPinManageFields() {
   if (note) {
     note.textContent = hasPin
       ? 'This profile requires a PIN to switch into it from another profile.'
-      : 'Optional — lock this profile so switching in requires a PIN.';
+      : 'Optional - lock this profile so switching in requires a PIN.';
   }
 }
 

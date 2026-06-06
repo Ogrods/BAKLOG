@@ -120,21 +120,92 @@ def _is_entitlement_slug(name: str | None) -> bool:
     return bool(s) and "_" in s and not any(ch.isspace() for ch in s)
 
 
+# Epic catalog category paths that are never playable library games.
+_NON_GAME_CATEGORY_FRAGMENTS = (
+    "digitalextras",
+    "engines",
+    "software",
+)
+
+# Title keywords for non-game extras that still ship keyImages (soundtracks,
+# wallpapers, editors, etc.). Playable DLC maps/expansions are intentionally
+# excluded (e.g. "ARK Ragnarok", "Dying Light The Following").
+_NON_GAME_TITLE_RE = re.compile(
+    r"(?i)("
+    r"soundtrack|"
+    r"wallpaper|"
+    r"art\s+book|"
+    r"resource\s+archiver|"
+    r"pre[- ]?game\s+editor|"
+    r"puzzle\s+pack|"
+    r"glove\s+skin|"
+    r"public\s+testing|"
+    r"test\s+branch|"
+    r"\bcontent$"  # e.g. "Death Stranding Content"
+    r")"
+)
+
+
+def _is_non_game_title(title: str | None) -> bool:
+    s = str(title or "").strip()
+    if not s:
+        return False
+    if _is_entitlement_slug(s):
+        return True
+    return bool(_NON_GAME_TITLE_RE.search(s))
+
+
+def _should_keep_game_row(row: dict) -> bool:
+    """Final gate on output rows (catches cached survivors from merge_cached_row)."""
+    return not _is_non_game_title(row.get("name"))
+
+
+def _can_reuse_cached_epic_row(
+    cached: dict,
+    catalog_item: dict | None,
+    *,
+    skip_hltb: bool = False,
+) -> bool:
+    """Whether a prior on-disk row can skip catalog rebuild + enrichment.
+
+    Stale rows survive when ``hltb_main_hours`` is ``0`` (not ``None``) and a
+    library image exists — e.g. sandboxName ``Live`` rows that HLTB matched to
+    ShellShock Live while the catalog title is a train-sim DLC route.
+
+    The UI always runs Epic with ``--skip-hltb`` (see manifest.json); a blind
+    cache append on that flag bypassed all catalog validation before this check.
+    """
+    if catalog_item is not None:
+        if not _is_game_item(catalog_item):
+            return False
+        catalog_title = str(catalog_item.get("title") or "").strip()
+        cached_name = str(cached.get("name") or "").strip()
+        if catalog_title and cached_name and catalog_title.lower() != cached_name.lower():
+            return False
+    if not skip_hltb and cached.get("hltb_main_hours") is None:
+        return False
+    if not cached.get("library_image"):
+        return False
+    return True
+
+
 def _is_game_item(item: dict) -> bool:
-    if _is_entitlement_slug(item.get("title")):
+    title = item.get("title")
+    if _is_non_game_title(title):
         return False
     paths = [
-        c.get("path", "")
+        str(c.get("path", "")).lower()
         for c in (item.get("categories") or [])
         if isinstance(c, dict)
     ]
+    if any(any(frag in p for frag in _NON_GAME_CATEGORY_FRAGMENTS) for p in paths):
+        return False
     if any("addons" in p and "games" not in p for p in paths):
         return False
     if any("games" in p for p in paths):
         return True
-    if item.get("keyImages"):
-        return True
-    return bool(item.get("title"))
+    # keyImages alone is insufficient — Epic tags soundtracks/editors with cover art.
+    return bool(title and item.get("keyImages"))
 
 
 def _build_game_row(
@@ -207,11 +278,17 @@ def _build_game_row_from_record(
     cid = rec.get("catalogItemId")
     if not ns or not cid:
         return None
-    if catalog_item:
-        row = _build_game_row(str(cid), str(ns), catalog_item, hltb)
-        if row:
-            return row
+    # When catalog metadata exists, trust the game-vs-addon filter in
+    # _build_game_row. If it rejects the item (soundtrack/wallpaper/editor/
+    # asset pack), skip it — do NOT fall through to the bare fallback below,
+    # which would resurrect the very rows the filter deliberately dropped.
+    if catalog_item is not None:
+        return _build_game_row(str(cid), str(ns), catalog_item, hltb)
     name = rec.get("sandboxName") or rec.get("appName") or str(cid)
+    # No catalog hit: the only signal we have is the record name. Drop internal
+    # entitlement slugs (e.g. Fortnite_StWContent) that aren't real titles.
+    if _is_entitlement_slug(name):
+        return None
     row = {
         "store": "epic",
         "id": f"{ns}:{cid}",
@@ -222,7 +299,10 @@ def _build_game_row_from_record(
         "last_played": None,
         "header_image": None,
         "library_image": None,
-        "release_date": rec.get("acquisitionDate"),
+        # acquisitionDate is when the user added the game to their Epic library,
+        # NOT the game's release date — leaving it here made old titles surface
+        # as "New release". enrich_steam_tags backfills a real date when matched.
+        "release_date": None,
         "genres": [],
         "tags": [],
         "steam_review_percent": None,
@@ -315,7 +395,15 @@ def main() -> int:
     print("Fetching library...")
     records = client.get_library_records()
     apps = [r for r in records if r.get("recordType") == "APPLICATION"]
-    print(f"  {len(records)} entitlements, {len(apps)} applications", flush=True)
+    # Drop the Unreal Engine marketplace namespace ("ue"): these are engine asset
+    # packs (e.g. the Infinity Blade content packs), not playable store games.
+    ue_dropped = sum(1 for r in apps if str(r.get("namespace")) == "ue")
+    apps = [r for r in apps if str(r.get("namespace")) != "ue"]
+    print(
+        f"  {len(records)} entitlements, {len(apps)} applications "
+        f"(dropped {ue_dropped} UE marketplace assets)",
+        flush=True,
+    )
 
     empty_exit = refuse_empty_result(
         apps,
@@ -370,18 +458,17 @@ def main() -> int:
         item = catalog.get((ns, cid))
         name = (item or {}).get("title") or rec.get("sandboxName") or rec.get("appName") or cid
 
-        if not args.refresh and row_id in existing and args.skip_hltb:
-            games_out.append(existing[row_id])
-            continue
-        if (
-            not args.refresh
-            and row_id in existing
-            and not args.skip_hltb
-            and existing[row_id].get("hltb_main_hours") is not None
-            and existing[row_id].get("library_image")
-        ):
-            games_out.append(existing[row_id])
-            continue
+        if not args.refresh and row_id in existing:
+            cached_early = existing[row_id]
+            may_reuse = args.skip_hltb or (
+                cached_early.get("hltb_main_hours") is not None
+                and cached_early.get("library_image")
+            )
+            if may_reuse and _can_reuse_cached_epic_row(
+                cached_early, item, skip_hltb=args.skip_hltb
+            ):
+                games_out.append(cached_early)
+                continue
 
         print(f"[{i}/{len(apps_sorted)}] {name}")
 
@@ -410,9 +497,39 @@ def main() -> int:
         if row is None:
             skipped += 1
             continue
-        games_out.append(
-            merge_cached_row(row, cached_row, authoritative=EPIC, hltb_updated=hltb_updated)
-        )
+        merged = merge_cached_row(row, cached_row, authoritative=EPIC, hltb_updated=hltb_updated)
+        if not _should_keep_game_row(merged):
+            skipped += 1
+            continue
+        games_out.append(merged)
+
+    # Drop any non-game extras that survived via cached rows (name is not in the
+    # Epic authoritative merge set, so old soundtracks/editors can linger).
+    filtered: list[dict] = []
+    filtered_non_game = 0
+    for g in games_out:
+        if _should_keep_game_row(g):
+            filtered.append(g)
+        else:
+            filtered_non_game += 1
+    games_out = filtered
+
+    # Collapse duplicate entitlements: Epic hands out many catalogItemIds under
+    # one namespace for the same title (base game + editions/DLC tokens that all
+    # report the identical name), e.g. "Fallout: New Vegas" x7. Keep the first
+    # row per (namespace, name) — distinct names in a namespace (real DLC like
+    # "ARK Ragnarok") are preserved.
+    deduped: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    collapsed = 0
+    for g in games_out:
+        key = (str(g.get("epic_namespace")), (g.get("name") or "").strip().lower())
+        if key in seen:
+            collapsed += 1
+            continue
+        seen.add(key)
+        deduped.append(g)
+    games_out = deduped
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
@@ -421,7 +538,12 @@ def main() -> int:
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
     write_catalog_text(GAMES_EPIC_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
-    print(f"\nWrote {len(games_out)} games to {GAMES_EPIC_JSON} (skipped {skipped}).", flush=True)
+    print(
+        f"\nWrote {len(games_out)} games to {GAMES_EPIC_JSON} "
+        f"(skipped {skipped}, filtered {filtered_non_game} non-game extras, "
+        f"collapsed {collapsed} duplicate entitlements).",
+        flush=True,
+    )
     print("Reload the dashboard (or click Reload library) to refresh Picks.", flush=True)
     stats.ok = len(games_out)
     return stats.finish("fetch_epic", t0, exit_code=0, extra=f"{len(games_out)} games")

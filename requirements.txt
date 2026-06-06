@@ -1,3 +1,5 @@
+# Lean runtime install for users (clone and run). For pytest/ruff use requirements-dev.txt
+# or: pip install -e ".[dev]"
 requests>=2.31.0
 python-dotenv>=1.0.0
 browser-cookie3>=0.20.0

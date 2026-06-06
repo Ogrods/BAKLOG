@@ -2,7 +2,7 @@
 """Holistic connection + fetcher health sweep for the active profile.
 
 Reads auth status from auth.manager (no API bearer needed), optionally runs
-store/wishlist fetchers, and logs NDJSON to debug-21853a.log for debug sessions.
+store/wishlist fetchers, and prints a health summary to stdout.
 
 Usage:
   python scripts/connection_sweep.py status
@@ -19,7 +19,6 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LOG_PATH = ROOT / "debug-21853a.log"
 
 # Mirror js/fetcher-health.js FETCHER_PROVIDER_GROUP
 FETCHER_PROVIDER_GROUP: dict[str, tuple[str, ...]] = {
@@ -30,24 +29,6 @@ FETCHER_PROVIDER_GROUP: dict[str, tuple[str, ...]] = {
 
 STORE_GROUPS = ("library", "wishlist")
 ENRICH_GROUP = "enrich"
-
-
-def _dbg(hyp: str, location: str, message: str, **data) -> None:
-    # region agent log (session 21853a)
-    try:
-        rec = {
-            "sessionId": "21853a",
-            "hypothesisId": hyp,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        with open(LOG_PATH, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(rec, default=str) + "\n")
-    except Exception:
-        pass
-    # endregion
 
 
 def _status_by_key() -> dict[str, dict]:
@@ -170,18 +151,6 @@ def cmd_status() -> int:
     expired = sum(1 for r in status_map.values() if r.get("status") == "expired")
     unverified = sum(1 for r in status_map.values() if r.get("status") == "unverified")
 
-    _dbg(
-        "H4",
-        "connection_sweep.py:status",
-        "provider status summary",
-        profile_id=pid,
-        profile_label=label,
-        connected=connected,
-        expired=expired,
-        unverified=unverified,
-        total=len(status_map),
-    )
-
     print(f"Profile: {label} ({pid})")
     print(f"{'STATUS':12} {'KEY':22} LABEL")
     print("-" * 60)
@@ -192,15 +161,6 @@ def cmd_status() -> int:
         err = row.get("last_error")
         suffix = f"  — {err[:60]}" if err and st != "connected" else ""
         print(f"[{mark:10}] {key:22} {row.get('label', '')}{suffix}")
-        _dbg(
-            "H4",
-            "connection_sweep.py:status_row",
-            "provider row",
-            key=key,
-            status=st,
-            last_error=err,
-            fetcher_keys=row.get("fetcher_keys"),
-        )
 
     print(f"\n{connected} connected, {expired} expired, {unverified} unverified")
     return 0 if expired == 0 else 1
@@ -235,7 +195,6 @@ def cmd_fetch(*, include_enrich: bool, fetcher: str | None, timeout_s: float) ->
             providers = fetcher_providers(key)
             prov_status = {p: status_map.get(p, {}).get("status") for p in providers}
             print(f"[SKIP] {key:18} providers not connected: {prov_status}")
-            _dbg("H3", "connection_sweep.py:fetch_skip", "credentials not satisfied", key=key, providers=prov_status)
             continue
 
         print(f"Running {key}…", flush=True)
@@ -257,31 +216,9 @@ def cmd_fetch(*, include_enrich: bool, fetcher: str | None, timeout_s: float) ->
             if tail:
                 print(f"  tail: {tail[-200:]}")
 
-        hyp = "H1"
-        if key.startswith("wishlist"):
-            hyp = "H2"
-        if rows == 0 and result.get("ok"):
-            hyp = "H5"
-        _dbg(
-            hyp,
-            "connection_sweep.py:fetch_result",
-            "fetcher finished",
-            key=key,
-            providers=fetcher_providers(key),
-            **{k: v for k, v in result.items() if k != "tail"},
-        )
-
     passed = sum(1 for r in results if r.get("ok"))
     failed = len(results) - passed
     print(f"\nSweep: {passed} passed, {failed} failed, {len(keys) - len(results)} skipped")
-    _dbg(
-        "H1",
-        "connection_sweep.py:fetch_summary",
-        "sweep complete",
-        passed=passed,
-        failed=failed,
-        results=[{k: v for k, v in r.items() if k != "tail"} for r in results],
-    )
     return exit_code
 
 
@@ -295,8 +232,6 @@ def main() -> int:
     parser.add_argument("--fetcher", help="Single fetcher key")
     parser.add_argument("--timeout", type=float, default=600.0, help="Per-fetcher timeout seconds")
     args = parser.parse_args()
-
-    _dbg("H0", "connection_sweep.py:main", "sweep started", command=args.command, runId="sweep")
 
     code = 0
     if args.command in ("status", "all"):

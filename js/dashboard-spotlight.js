@@ -23,7 +23,7 @@ function isOnSale(g) {
   return !!(d && ((d.cut || 0) > 0 || d.isHistoricalLow));
 }
 
-const SPOTLIGHT_INTERVAL_MS = 7000;
+export const SPOTLIGHT_INTERVAL_MS = 9000;
 export const SPOTLIGHT_FADE_MS = 300;
 const RECENT_SPOTLIGHT_CAP = 5;
 const RECENT_QUOTA = 5;
@@ -129,6 +129,25 @@ let _spotlightFadeTimer = null;
 let _spotlightIndex = 0;
 let _spotlightPool = [];
 let _spotlightCurrentKey = null;
+let _spotlightPaused = false;
+let _spotlightPausedByUser = false;
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+}
+
+export function getSpotlightPaused() {
+  return _spotlightPaused;
+}
+
+export function setSpotlightPausedForTest(paused) {
+  _spotlightPaused = paused;
+  _spotlightPausedByUser = true;
+}
+
+export function isSpotlightRotationActive() {
+  return _spotlightTimer != null;
+}
 
 export function getSpotlightPool() { return _spotlightPool; }
 export function getSpotlightCurrentKey() { return _spotlightCurrentKey; }
@@ -522,26 +541,33 @@ export function spotlightInnerHtml(g) {
     ];
   return `
     <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
-    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="lazy" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
+    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="eager" fetchpriority="high" decoding="async" width="1920" height="620" data-name="${escapeAttr(g.name)}" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
     <div class="dash-spotlight-sheen" aria-hidden="true"></div>
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
       <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaParts.join(' · ')}</span>
-    </div>
-    <span class="dash-spotlight-nav" aria-hidden="false">
-      <span class="dash-spotlight-nav-btn" role="button" tabindex="0" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</span>
-      <span class="dash-spotlight-nav-btn" role="button" tabindex="0" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</span>
-    </span>`;
+    </div>`;
+}
+
+function spotlightNavHtml() {
+  return `<div class="dash-spotlight-nav" aria-label="Spotlight slides">
+    <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
+    <button type="button" class="dash-spotlight-pause" data-spotlight-pause aria-pressed="false" aria-label="Pause rotation" title="Pause rotation">&#10074;&#10074;</button>
+    <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
+  </div>`;
 }
 
 export function renderSpotlightHtml(g) {
   const key = gameKey(g);
-  return `
+  return `<div class="dash-spotlight-wrap" id="dashboardSpotlightWrap" role="group" aria-roledescription="carousel">
+    <span class="sr-only dash-spotlight-live" id="dashboardSpotlightLive" aria-live="polite"></span>
     <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}">
       ${spotlightInnerHtml(g)}
-    </button>`;
+    </button>
+    ${spotlightNavHtml()}
+  </div>`;
 }
 
 export function primeSpotlightArt(btn) {
@@ -553,8 +579,85 @@ export function primeSpotlightArt(btn) {
   }
 }
 
+function announceSpotlightSlide(game) {
+  const live = document.getElementById('dashboardSpotlightLive');
+  if (!live || !game) return;
+  const eyebrow = game._spotlightReason?.eyebrow || 'Spotlight';
+  live.textContent = `${eyebrowVariant(eyebrow, gameKey(game))}: ${game.name}`;
+}
+
+function updateSpotlightControlsUI() {
+  const wrap = document.getElementById('dashboardSpotlightWrap');
+  if (!wrap) return;
+  const multi = _spotlightPool.length > 1;
+  wrap.classList.toggle('dash-spotlight-wrap--multi', multi);
+
+  const pauseBtn = wrap.querySelector('[data-spotlight-pause]');
+  if (pauseBtn) {
+    pauseBtn.setAttribute('aria-pressed', _spotlightPaused ? 'true' : 'false');
+    pauseBtn.setAttribute('aria-label', _spotlightPaused ? 'Play rotation' : 'Pause rotation');
+    pauseBtn.title = _spotlightPaused ? 'Play rotation' : 'Pause rotation';
+    pauseBtn.innerHTML = _spotlightPaused ? '&#9654;' : '&#10074;&#10074;';
+    pauseBtn.hidden = !multi;
+  }
+}
+
+function navDeltaFromTarget(target) {
+  const dir = target?.dataset?.spotlightNav;
+  if (dir === 'prev') return -1;
+  if (dir === 'next') return 1;
+  return parseInt(dir, 10) || 0;
+}
+
+function wireSpotlightControls(wrap) {
+  if (!wrap || wrap.dataset.controlsWired) return;
+  wrap.dataset.controlsWired = '1';
+
+  wrap.addEventListener('click', (e) => {
+    const nav = e.target.closest('[data-spotlight-nav]');
+    if (nav) {
+      e.preventDefault();
+      e.stopPropagation();
+      stepSpotlight(navDeltaFromTarget(nav));
+      return;
+    }
+    const pause = e.target.closest('[data-spotlight-pause]');
+    if (pause) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSpotlightPause();
+    }
+  });
+
+  wrap.addEventListener('keydown', (e) => {
+    const nav = e.target.closest('[data-spotlight-nav]');
+    if (nav && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      e.stopPropagation();
+      stepSpotlight(navDeltaFromTarget(nav));
+      return;
+    }
+    const pause = e.target.closest('[data-spotlight-pause]');
+    if (pause && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSpotlightPause();
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopPropagation();
+      stepSpotlight(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      e.stopPropagation();
+      stepSpotlight(1);
+    }
+  });
+}
+
 function applySpotlightSlide(el, next) {
-  el.classList.remove('has-portrait-art');
+  el.classList.remove('has-portrait-art', 'has-art-placeholder', 'is-lowres-art');
   el.classList.remove('is-tilting');
   el._spotlightTiltReset?.();
   el.innerHTML = spotlightInnerHtml(next);
@@ -564,6 +667,8 @@ function applySpotlightSlide(el, next) {
   primeSpotlightArt(el);
   _spotlightCurrentKey = gameKey(next);
   el._spotlightSyncHover?.();
+  announceSpotlightSlide(next);
+  updateSpotlightControlsUI();
 }
 
 function fadeToSpotlight(el, next) {
@@ -583,8 +688,8 @@ function stopSpotlightTimer() {
 function startSpotlightTimer(el) {
   stopSpotlightTimer();
   _spotlightTimer = setInterval(() => {
-    const paused = el._spotlightPaused?.() ?? false;
-    if (paused) return;
+    const hoverPaused = el._spotlightPaused?.() ?? false;
+    if (hoverPaused || _spotlightPaused) return;
     if (!document.getElementById('dashboardSpotlight')) {
       stopSpotlightRotation();
       return;
@@ -608,6 +713,9 @@ function wireSpotlightHover(el) {
   const HOVER_SCALE = 1.03;
   const EASE = 0.14;
   const BG_BASE_SCALE = 1.08;
+  // Keep a sliver of the portrait's left edge interactive; detach in the faded
+  // card area well before the full-width art rect's left edge.
+  const PORTRAIT_LEFT_INSET = 0.08;
 
   const portraitArt = () =>
     (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-art') : null);
@@ -615,6 +723,47 @@ function wireSpotlightHover(el) {
     (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-art-bg') : null);
   const portraitSheen = () =>
     (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-sheen') : null);
+
+  // Resting pose of the CSS float keyframes (the 0%/100% frame of each
+  // spotlightFloatN). On release we ease to this pose so that when `is-tilting`
+  // is removed and the keyframe animation resumes at 0%, the handoff is seamless
+  // instead of snapping from a flat (0deg) rest pose.
+  const FLOAT_ANCHORS = {
+    'portrait-anim-1': { ry: -3, rx: 1 },
+    'portrait-anim-2': { ry: 3, rx: -1 },
+    'portrait-anim-3': { ry: -4, rx: 1.2 },
+    'portrait-anim-4': { ry: 2.5, rx: -0.8 },
+  };
+  const floatAnchor = () => {
+    for (const cls in FLOAT_ANCHORS) {
+      if (el.classList.contains(cls)) return FLOAT_ANCHORS[cls];
+    }
+    return { ry: 0, rx: 0 };
+  };
+
+  const portraitInteractionRect = () => {
+    const sheen = portraitSheen();
+    const sr = sheen?.getBoundingClientRect();
+    if (!sr?.width) return null;
+    const inset = sr.width * PORTRAIT_LEFT_INSET;
+    return {
+      left: sr.left + inset,
+      right: sr.right,
+      top: sr.top,
+      bottom: sr.bottom,
+      width: sr.width - inset,
+      height: sr.height,
+      sheenRect: sr,
+    };
+  };
+
+  const pointerInPortraitZone = (clientX, clientY) => {
+    const zone = portraitInteractionRect();
+    if (!zone) return false;
+    if (clientX < zone.left || clientX > zone.right) return false;
+    if (zone.height > 0 && (clientY < zone.top || clientY > zone.bottom)) return false;
+    return true;
+  };
 
   let hovering = false;
   let rafId = null;
@@ -667,8 +816,6 @@ function wireSpotlightHover(el) {
       Math.abs(target.sx - cur.sx) < 0.005 &&
       Math.abs(target.op - cur.op) < 0.01;
     if (!hovering && settled) {
-      cur.rx = 0;
-      cur.ry = 0;
       cur.sc = 1;
       cur.sx = 0.5;
       cur.op = 0;
@@ -686,27 +833,38 @@ function wireSpotlightHover(el) {
   const updateTiltFromClient = (clientX, clientY) => {
     const art = portraitArt();
     if (!art) return;
-    const r = art.getBoundingClientRect();
+    const zone = portraitInteractionRect();
+    const r = zone || art.getBoundingClientRect();
     if (!r.width || !r.height) return;
     const px = Math.max(-0.5, Math.min(0.5, (clientX - r.left) / r.width - 0.5));
     const py = Math.max(-0.5, Math.min(0.5, (clientY - r.top) / r.height - 0.5));
     target.ry = px * MAX_YAW;
     target.rx = -py * MAX_PITCH;
-    // Track the gleam against the visible art (the sheen strip), not the full
-    // card, so the highlight sits under the cursor over the portrait.
-    const sheen = portraitSheen();
-    const sr = sheen?.getBoundingClientRect();
-    if (sr && sr.width) {
+    const sr = zone?.sheenRect || portraitSheen()?.getBoundingClientRect();
+    if (sr?.width) {
       target.sx = Math.max(0, Math.min(1, (clientX - sr.left) / sr.width));
     } else {
       target.sx = px + 0.5;
     }
   };
 
+  const engageTilt = (clientX, clientY) => {
+    hovering = true;
+    target.sc = HOVER_SCALE;
+    target.op = 1;
+    el.classList.add('is-tilting');
+    updateTiltFromClient(clientX, clientY);
+    cur.sx = target.sx;
+    startLoop();
+  };
+
   const endTilt = () => {
     hovering = false;
-    target.rx = 0;
-    target.ry = 0;
+    // Ease back to the float keyframe's rest pose (not flat 0deg) so the swap
+    // back to the CSS animation on settle is seamless.
+    const anchor = floatAnchor();
+    target.rx = anchor.rx;
+    target.ry = anchor.ry;
     target.sc = 1;
     target.op = 0;
     startLoop();
@@ -722,16 +880,11 @@ function wireSpotlightHover(el) {
       endTilt();
       return;
     }
-    hovering = true;
-    target.sc = HOVER_SCALE;
-    target.op = 1;
-    el.classList.add('is-tilting');
-    if (lastPointer) {
-      updateTiltFromClient(lastPointer.x, lastPointer.y);
-      // Snap the gleam to the cursor on entry; the opacity fade-in hides the jump.
-      cur.sx = target.sx;
+    if (!lastPointer || !pointerInPortraitZone(lastPointer.x, lastPointer.y)) {
+      endTilt();
+      return;
     }
-    startLoop();
+    engageTilt(lastPointer.x, lastPointer.y);
   };
 
   el.addEventListener('pointerenter', (e) => {
@@ -743,7 +896,16 @@ function wireSpotlightHover(el) {
   el.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch' || reduceMotion?.matches) return;
     lastPointer = { x: e.clientX, y: e.clientY };
-    if (!hovering) return;
+    if (!portraitArt()) return;
+    const inZone = pointerInPortraitZone(e.clientX, e.clientY);
+    if (!hovering) {
+      if (inZone) engageTilt(e.clientX, e.clientY);
+      return;
+    }
+    if (!inZone) {
+      endTilt();
+      return;
+    }
     updateTiltFromClient(e.clientX, e.clientY);
     startLoop();
   });
@@ -769,33 +931,18 @@ function wireSpotlightHover(el) {
     target.op = 0;
     clearPortraitTransforms();
   };
+}
 
-  el.addEventListener('click', (e) => {
-    const nav = e.target.closest('[data-spotlight-nav]');
-    if (!nav) return;
-    e.preventDefault();
-    e.stopPropagation();
-    stepSpotlight(nav.dataset.spotlightNav === 'prev' ? -1 : 1);
-  });
-
-  el.addEventListener('keydown', (e) => {
-    const nav = e.target.closest('[data-spotlight-nav]');
-    if (nav && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      e.stopPropagation();
-      stepSpotlight(nav.dataset.spotlightNav === 'prev' ? -1 : 1);
-      return;
-    }
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      e.stopPropagation();
-      stepSpotlight(-1);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      e.stopPropagation();
-      stepSpotlight(1);
-    }
-  });
+export function toggleSpotlightPause() {
+  _spotlightPausedByUser = true;
+  _spotlightPaused = !_spotlightPaused;
+  const el = document.getElementById('dashboardSpotlight');
+  if (_spotlightPaused) {
+    stopSpotlightTimer();
+  } else if (el && _rotationWanted && _spotlightPool.length > 1) {
+    startSpotlightTimer(el);
+  }
+  updateSpotlightControlsUI();
 }
 
 export function stepSpotlight(delta) {
@@ -805,70 +952,71 @@ export function stepSpotlight(delta) {
   const len = _spotlightPool.length;
   _spotlightIndex = (_spotlightIndex + delta + len) % len;
   fadeToSpotlight(el, _spotlightPool[_spotlightIndex]);
-  if (_rotationWanted) {
+  if (_rotationWanted && !_spotlightPaused) {
     stopSpotlightTimer();
     startSpotlightTimer(el);
   }
 }
 
 export function startSpotlightRotation(pool) {
+  const wrap = document.getElementById('dashboardSpotlightWrap');
   const el = document.getElementById('dashboardSpotlight');
-  if (el) {
-    if (pool && pool.length > 1) el.classList.add('dash-spotlight--multi');
-    else el.classList.remove('dash-spotlight--multi');
-  }
   if (!pool || pool.length <= 1) {
     stopSpotlightRotation();
     _spotlightPool = pool || [];
     _rotationWanted = false;
+    updateSpotlightControlsUI();
     return;
   }
   _rotationWanted = true;
   if (!el) return;
+  if (!_spotlightPausedByUser) {
+    _spotlightPaused = prefersReducedMotion();
+  }
   const domMatches = !!pool[0] && el.dataset.key === gameKey(pool[0]);
   _spotlightPool = pool;
+  wireSpotlightControls(wrap);
   wireSpotlightHover(el);
-  // Same slide still mounted: resume rotation only (no innerHTML swap / fade-in).
+  updateSpotlightControlsUI();
+  announceSpotlightSlide(pool[_spotlightIndex] || pool[0]);
   if (domMatches) {
     if (_spotlightTimer) return;
-    startSpotlightTimer(el);
+    if (!_spotlightPaused) startSpotlightTimer(el);
     return;
   }
   stopSpotlightRotation();
-  // _spotlightIndex is intentionally NOT reset — pickSpotlightGames has already
-  // arranged the pool so the previously-displayed game is at index 0; on first
-  // load _spotlightIndex is already 0 from module init.
   _spotlightIndex = 0;
-  startSpotlightTimer(el);
+  if (!_spotlightPaused) startSpotlightTimer(el);
 }
 
 export function syncSpotlightInMega(el, spotlight) {
   const hero = el.querySelector('.dash-mega-hero');
+  const existingWrap = document.getElementById('dashboardSpotlightWrap');
   const existing = document.getElementById('dashboardSpotlight');
   const newKey = spotlight ? gameKey(spotlight) : null;
   if (spotlight && existing?.dataset.key === newKey) {
     primeSpotlightArt(existing);
     return;
   }
-  if (spotlight && existing) {
+  if (spotlight && existingWrap) {
     stopSpotlightRotation();
-    existing.outerHTML = renderSpotlightHtml(spotlight);
+    existingWrap.outerHTML = renderSpotlightHtml(spotlight);
     primeSpotlightArt(document.getElementById('dashboardSpotlight'));
     return;
   }
-  if (spotlight && !existing && hero) {
+  if (spotlight && !existingWrap && hero) {
     hero.insertAdjacentHTML('afterbegin', renderSpotlightHtml(spotlight));
     primeSpotlightArt(document.getElementById('dashboardSpotlight'));
     return;
   }
-  existing?.remove();
+  existingWrap?.remove();
 }
 
 if (typeof document !== 'undefined') {
   registerPausable({
     pause: stopSpotlightRotation,
     resume() {
-      if (_rotationWanted && _spotlightPool.length > 1) {
+      if (_rotationWanted && _spotlightPool.length > 1 && !_spotlightPaused) {
         startSpotlightRotation(_spotlightPool);
       }
     },

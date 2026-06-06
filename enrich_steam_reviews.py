@@ -67,7 +67,8 @@ def _number_tokens(s: str) -> set[str]:
 
 
 _SPINOFF_MARKERS = re.compile(
-    r"\b(director|artbook|soundtrack|wallpaper|dlc|upgrade|deluxe|bundle|pack|skin|ost)\b"
+    r"\b(director|artbook|soundtrack|wallpaper|dlc|upgrade|deluxe|bundle|pack|skin|ost"
+    r"|ascended|relaunched|reloaded)\b"
 )
 
 

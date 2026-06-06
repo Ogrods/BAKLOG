@@ -50,7 +50,7 @@ window.coverFallback = function (img) {
     img.outerHTML = `<div class="dash-list-cover placeholder" title="${rSafe}"><span class="placeholder-initials">${rInitials}</span></div>`;
     return;
   }
-  const dashRow = img.closest(".dash-versus-row, .dash-list-row, .coop-pick-row, .dash-spotlight, .itch-hero-card");
+  const dashRow = img.closest(".dash-versus-row, .dash-list-row, .coop-pick-row, .itch-hero-card");
   if (dashRow) {
     const key = dashRow.dataset.key || dashRow.dataset.gameKey;
     if (key && !window.__dashFailedCovers.has(key)) {
@@ -94,20 +94,23 @@ function assignPortraitAnimClass(spot) {
   clearPortraitAnimClasses(spot);
   spot.classList.add(`portrait-anim-${1 + Math.floor(Math.random() * PORTRAIT_ANIM_COUNT)}`);
 }
+const LOWRES_FACTOR = 0.7;
 window.applySpotlightArtFit = function (img) {
   if (!img?.naturalWidth) return;
   const ratio = img.naturalWidth / img.naturalHeight;
   const crop = spotlightCropForAspect(ratio);
-  img.style.objectFit = crop.fit;
   img.style.objectPosition = crop.pos;
   const spot = img.closest(".dash-spotlight");
   if (!spot) return;
   const bg = spot.querySelector(".dash-spotlight-art-bg");
   const sheen = spot.querySelector(".dash-spotlight-sheen");
+  const src = img.currentSrc || img.src;
+
   if (crop.portrait && bg) {
-    const src = img.currentSrc || img.src;
+    img.style.objectFit = crop.fit;
     if (src && bg.src !== src) bg.src = src;
     spot.classList.add("has-portrait-art");
+    spot.classList.remove("is-lowres-art");
     assignPortraitAnimClass(spot);
     bg.classList.add("is-loaded");
     if (sheen) {
@@ -117,8 +120,22 @@ window.applySpotlightArtFit = function (img) {
   } else {
     spot.classList.remove("has-portrait-art");
     clearPortraitAnimClasses(spot);
-    bg?.classList.remove("is-loaded");
     if (sheen) sheen.style.width = "";
+
+    const slotW = (spot.clientWidth || 0) * (window.devicePixelRatio || 1);
+    const lowRes = img.naturalWidth > 0 && slotW > 0
+      && img.naturalWidth < slotW * LOWRES_FACTOR;
+
+    if (lowRes && bg) {
+      img.style.objectFit = "contain";
+      if (src && bg.src !== src) bg.src = src;
+      spot.classList.add("is-lowres-art");
+      bg.classList.add("is-loaded");
+    } else {
+      img.style.objectFit = crop.fit;
+      spot.classList.remove("is-lowres-art");
+      bg?.classList.remove("is-loaded");
+    }
   }
   spot._spotlightSyncHover?.();
 };
@@ -126,7 +143,7 @@ window.spotlightArtFallback = function (img) {
   const list = (img.dataset.spotlightCandidates || "").split("|").filter(Boolean);
   let idx = parseInt(img.dataset.spotlightIdx || "0", 10) + 1;
   const spot = img.closest(".dash-spotlight");
-  spot?.classList.remove("has-portrait-art");
+  spot?.classList.remove("has-portrait-art", "is-lowres-art");
   clearPortraitAnimClasses(spot);
   while (idx < list.length) {
     if (img.src !== list[idx]) {
@@ -136,8 +153,17 @@ window.spotlightArtFallback = function (img) {
     }
     idx++;
   }
-  img.classList.add("is-loaded");
-  window.coverFallback(img);
+  const name = img.dataset.name || spot?.querySelector(".dash-spotlight-title")?.textContent?.trim() || "Game";
+  const words = name.split(/\s+/).filter(Boolean);
+  const initials = (words.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3);
+  const safeName = name.replace(/"/g, "&quot;");
+  spot?.classList.add("has-art-placeholder");
+  spot?.querySelector(".dash-spotlight-art-bg")?.classList.remove("is-loaded");
+  if (spot?.querySelector(".dash-spotlight-sheen")) spot.querySelector(".dash-spotlight-sheen").style.width = "";
+  img.outerHTML =
+    `<div class="dash-spotlight-art dash-spotlight-art-placeholder is-loaded" aria-hidden="true" title="${safeName}">` +
+    `<span class="placeholder-initials">${initials}</span></div>`;
+  spot?._spotlightSyncHover?.();
 };
 window.markLandscape = function (img) {
   if (!img?.classList) return;

@@ -20,3 +20,31 @@ def test_data_dir_override(monkeypatch, tmp_path):
     monkeypatch.setenv("BAKLOG_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
     assert install_paths.data_root() == tmp_path.resolve()
+
+
+def test_serve_built_false_without_manifest(monkeypatch, tmp_path):
+    monkeypatch.delenv("BAKLOG_SERVE_BUILT", raising=False)
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
+    monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
+    install_paths._BUILT_MANIFEST_CACHE = None
+    assert install_paths.serve_built_frontend() is False
+    assert install_paths.load_built_manifest() == {}
+
+
+def test_serve_built_true_with_flag_and_manifest(monkeypatch, tmp_path):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "manifest.json").write_text(
+        '{"app.css":"app.abc.css","js/app.js":"js/app-XYZ.js","js/chunks":[]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("BAKLOG_SERVE_BUILT", "1")
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
+    monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
+    install_paths._BUILT_MANIFEST_CACHE = None
+    assert install_paths.serve_built_frontend() is True
+    manifest = install_paths.load_built_manifest()
+    assert manifest["app.css"] == "app.abc.css"
+    assets = install_paths.built_immutable_assets()
+    assert "app.abc.css" in assets
+    assert "js/app-XYZ.js" in assets

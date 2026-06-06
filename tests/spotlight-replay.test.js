@@ -372,7 +372,13 @@ describe("spotlight rotation safety", () => {
   });
 
   it("stopSpotlightRotation prevents fade timer from mutating innerHTML after click", async () => {
-    const { startSpotlightRotation, stopSpotlightRotation } = await import("../js/dashboard-spotlight.js");
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      media: "",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const { startSpotlightRotation, stopSpotlightRotation, SPOTLIGHT_INTERVAL_MS } = await import("../js/dashboard-spotlight.js");
     const games = [
       { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
       { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
@@ -389,7 +395,7 @@ describe("spotlight rotation safety", () => {
     el.dataset.key = "steam:1";
 
     startSpotlightRotation(games);
-    vi.advanceTimersByTime(7000);
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
     expect(el.classList.contains("is-fading")).toBe(true);
 
     stopSpotlightRotation();

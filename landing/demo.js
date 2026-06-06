@@ -84,7 +84,7 @@
 
   const INSIGHTS = [
     "You own <strong>600</strong> games. You've played <strong>40</strong>.",
-    "Every deal site tells you a game is <strong>80% off</strong>. BAKLOG tells you you already own it on Epic.",
+    "Every deal site tells you a game is <strong>80% off</strong>. BAKLOG tells you that you already own it on Epic.",
     "<strong>2,847h</strong> backlog at 2h/day is <strong>3.9 years</strong> to clear.",
     "Connect once, fetch once. You're done until you buy something new.",
     "We drop the DLC skins and soundtracks, so the count is real games.",

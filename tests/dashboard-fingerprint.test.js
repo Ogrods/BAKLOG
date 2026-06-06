@@ -25,7 +25,7 @@ describe('dashboardFingerprint', () => {
     expect(a).toBe(b);
   });
 
-  it('changes when quickWinMaxHours, itch presence, itchHideNonGames, or data version change', () => {
+  it('changes when quickWinMaxHours, itch presence, or itchHideNonGames change', () => {
     const base = dashboardFingerprint();
 
     state.prefs.quickWinMaxHours = 20;
@@ -40,10 +40,11 @@ describe('dashboardFingerprint', () => {
     const b3 = dashboardFingerprint();
     state.sessionPrefs.itchHideNonGames = false;
     expect(dashboardFingerprint()).not.toBe(b3);
+  });
 
-    resetState();
+  it('does NOT change when _dataVersion bumps (avoids chart teardown on no-op refetches)', () => {
     const b4 = dashboardFingerprint();
-    window._dataVersion = 2;
-    expect(dashboardFingerprint()).not.toBe(b4);
+    window._dataVersion = (window._dataVersion || 0) + 2;
+    expect(dashboardFingerprint()).toBe(b4);
   });
 });

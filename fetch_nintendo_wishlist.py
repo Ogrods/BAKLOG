@@ -27,7 +27,6 @@ from typing import Any
 from urllib.parse import quote, urljoin
 
 import requests
-
 from dotenv import load_dotenv
 
 from auth import mark_invalid
@@ -56,49 +55,6 @@ _WISHLIST_GQL_VARIABLES = {
     "includeProductInfo": True,
     "personalized": True,
 }
-
-
-# #region agent log
-def _dbg(hyp: str, msg: str, data: dict) -> None:
-    try:
-        import json as _j
-        import time as _t
-        rec = {
-            "sessionId": "6bc465", "runId": "run1", "hypothesisId": hyp,
-            "location": "fetch_nintendo_wishlist.py", "message": msg,
-            "data": data, "timestamp": int(_t.time() * 1000),
-        }
-        with open(
-            r"c:\Users\DanOg\Documents\My Docs\Coding Stuff\steam-backlog\debug-6bc465.log",
-            "a", encoding="utf-8",
-        ) as _f:
-            _f.write(_j.dumps(rec, default=str) + "\n")
-    except Exception:
-        pass
-
-
-def _dbg_shape(p) -> dict:
-    try:
-        if isinstance(p, dict):
-            d = p.get("data") if isinstance(p.get("data"), dict) else {}
-            cust = d.get("customer") if isinstance(d.get("customer"), dict) else None
-            wl = cust.get("wishList") if isinstance(cust, dict) else None
-            items = wl.get("items") if isinstance(wl, dict) else None
-            return {
-                "top_keys": list(p.keys())[:8],
-                "data_keys": list(d.keys())[:8],
-                "has_customer": isinstance(cust, dict),
-                "customer_id": bool(cust and cust.get("id")) if isinstance(cust, dict) else False,
-                "has_wishList": isinstance(wl, dict),
-                "wishList_keys": list(wl.keys())[:8] if isinstance(wl, dict) else None,
-                "items_len": len(items) if isinstance(items, list) else None,
-            }
-        if isinstance(p, list):
-            return {"type": "list", "len": len(p)}
-        return {"type": type(p).__name__}
-    except Exception:
-        return {"err": True}
-# #endregion
 
 
 def dump_dir() -> Path:
@@ -920,31 +876,17 @@ def _fetch_with_profile(
     api_payloads: list[Any] = []
     candidates: list[Any] = []
     auth_state: dict[str, Any] = {"headers": {}}
-    captured_urls: list[dict] = []  # agent log
 
     def _stash_response(response) -> None:
         try:
             if response.status >= 400:
-                # #region agent log
-                try:
-                    if "graph.nintendo.com" in (response.url or "").lower():
-                        captured_urls.append({"url": (response.url or "")[:120], "status": response.status, "stashed": False, "reason": "status>=400"})
-                except Exception:
-                    pass
-                # #endregion
                 return
             if not _is_nintendo_capture_url(response.url or ""):
                 return
             ct = (response.headers.get("content-type") or "").lower()
             if "json" not in ct:
-                # #region agent log
-                captured_urls.append({"url": (response.url or "")[:120], "status": response.status, "stashed": False, "reason": f"ct={ct[:40]}"})
-                # #endregion
                 return
             candidates.append(response)
-            # #region agent log
-            captured_urls.append({"url": (response.url or "")[:120], "status": response.status, "stashed": True, "ct": ct[:40]})
-            # #endregion
         except Exception:  # noqa: BLE001
             pass
 
@@ -977,14 +919,6 @@ def _fetch_with_profile(
             or cookie_signed_out
             or not cookie_parsed
         )
-        # #region agent log
-        _dbg("H4", "cookie GET decision", {
-            "req_html_len": len(req_html),
-            "cookie_parsed_count": len(cookie_parsed),
-            "cookie_signed_out": cookie_signed_out,
-            "need_render": need_render,
-        })
-        # #endregion
         if need_render:
             page = _pick_render_page(ctx)
             page.on("response", _stash_response)
@@ -997,18 +931,14 @@ def _fetch_with_profile(
 
             url = page.url or WISHLIST_URL
             deadline = time.time() + poll_deadline_s
-            _loop_start = time.time()  # agent log
-            _exit_reason = "deadline"  # agent log
             while time.time() < deadline:
                 drained = _drain_nintendo_candidates(candidates, auth_state=auth_state)
                 api_payloads.extend(drained)
                 for payload in drained:
                     _note_tokens_payload(payload, auth_state)
                 if _wishlist_capture_complete(req_html, api_payloads):
-                    _exit_reason = "complete"  # agent log
                     break
                 if _signed_out(req_html, url):
-                    _exit_reason = "signed_out"  # agent log
                     break
                 page.wait_for_timeout(poll_interval_ms)
 
@@ -1040,7 +970,6 @@ def _fetch_with_profile(
                     for payload in drained:
                         _note_tokens_payload(payload, auth_state)
                     if any(_wishlist_graphql_ok(p) for p in api_payloads):
-                        _exit_reason = "complete_after_guest_reload"  # agent log
                         break
                     page.wait_for_timeout(poll_interval_ms)
                 api_payloads.extend(
@@ -1084,27 +1013,6 @@ def _fetch_with_profile(
                         direct_payload = _direct_wishlist_graphql_via_page(page, auth_state)
                     if direct_payload:
                         api_payloads.append(direct_payload)
-                        _exit_reason = "direct_graphql"  # agent log
-
-            # #region agent log
-            _dbg("H1/H5", "poll loop exit", {
-                "exit_reason": _exit_reason,
-                "elapsed_s": round(time.time() - _loop_start, 1),
-                "api_payload_count": len(api_payloads),
-                "direct_graphql": bool(direct_payload),
-                "auth_ready": _graphql_auth_ready(auth_state),
-                "has_bearer": bool(auth_state.get("bearer")),
-                "has_customer_token": bool(auth_state.get("customer_token")),
-                "direct_debug": auth_state.get("_direct_debug"),
-                "page_direct_debug": auth_state.get("_page_direct_debug"),
-                "token_debug": auth_state.get("_token_debug"),
-                "session_typename": auth_state.get("session_typename"),
-                "auth_header_prefix": (auth_state.get("headers") or {}).get("authorization", "")[:32],
-                "page_url": page.url,
-                "captured_urls": captured_urls[:20],
-                "api_shapes": [_dbg_shape(p) for p in api_payloads[:8]],
-            })
-            # #endregion
 
             try:
                 rendered = page.content()
@@ -1235,17 +1143,6 @@ def main() -> int:
         return stats.finish("fetch_nintendo_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     items = parse_wishlist_sources(html, api_payloads)
-    # #region agent log
-    _dbg("H2", "final parse result", {
-        "items_parsed": len(items),
-        "api_payload_count": len(api_payloads),
-        "html_len": len(html),
-        "url": url,
-        "signed_out": _signed_out(html, url),
-        "session_authed": _wishlist_session_authenticated(api_payloads),
-        "api_shapes": [_dbg_shape(p) for p in api_payloads[:8]],
-    })
-    # #endregion
     print(
         f"  parsed {len(items)} wishlist items "
         f"({len(api_payloads)} captured JSON response(s))",

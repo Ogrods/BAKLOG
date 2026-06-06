@@ -361,7 +361,6 @@ def _public_profile_row(p: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any
 def profiles_status() -> dict[str, Any]:
     from shared.profile_paths import get_active_profile_id
 
-    finalize_default_profile_migration()
     doc = load_index()
     active = get_active_profile_id()
     profiles = doc.get("profiles") if isinstance(doc.get("profiles"), list) else []

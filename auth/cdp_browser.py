@@ -35,27 +35,6 @@ except ImportError as exc:  # pragma: no cover
 _BLANK_URLS = frozenset({"", "about:blank", "chrome://newtab/"})
 
 
-# #region agent log
-def _cf7log(hypothesis: str, message: str, data: dict) -> None:
-    try:
-        _path = Path(__file__).resolve().parents[1] / "debug-cf7aab.log"
-        _line = json.dumps(
-            {
-                "sessionId": "cf7aab",
-                "hypothesisId": hypothesis,
-                "location": "auth/cdp_browser.py",
-                "message": message,
-                "data": data,
-                "timestamp": int(time.time() * 1000),
-            },
-            default=str,
-        )
-        with open(_path, "a", encoding="utf-8") as _f:
-            _f.write(_line + "\n")
-    except Exception:
-        pass
-# #endregion
-
 # Hides the navigator.webdriver automation signal without a launch flag (the
 # flag triggers Chrome/Edge's "unsupported command-line flag" warning bar).
 _AUTOMATION_MASK_SCRIPT = (
@@ -693,16 +672,24 @@ class CdpHttpClient:
     def __init__(self, context: CdpContext) -> None:
         self._context = context
 
-    def get(self, url: str, *, timeout: float = 30_000) -> CdpHttpResponse:
+    def get(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float = 30_000,
+    ) -> CdpHttpResponse:
         cookies = self._context.cookies()
         jar = {c["name"]: c["value"] for c in cookies if c.get("name")}
-        headers = {
+        req_headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                 "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             ),
         }
-        resp = requests.get(url, cookies=jar, headers=headers, timeout=timeout / 1000.0)
+        if headers:
+            req_headers.update(headers)
+        resp = requests.get(url, cookies=jar, headers=req_headers, timeout=timeout / 1000.0)
         return CdpHttpResponse(resp.status_code, resp.text)
 
 
@@ -1286,16 +1273,6 @@ def launch_persistent_profile(
     # --disable-blink-features=AutomationControlled launch flag (which triggers
     # Chrome/Edge's "unsupported command-line flag" infobar). Runs before any
     # page script on every document, including frames.
-    # #region agent log
-    try:
-        _cf7log("HC5", "launch_persistent_profile ok", {
-            "page_count": len(context.pages),
-            "proc_alive": context._proc.poll() is None,
-            "port": context._port,
-        })
-    except Exception:
-        pass
-    # #endregion
     context.add_init_script(_AUTOMATION_MASK_SCRIPT)
 
     return context

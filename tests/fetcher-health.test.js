@@ -5,6 +5,7 @@ import {
   humanizeAge,
   diffItadDeals,
   maybeAutoRefreshItad,
+  itadAutoRefreshIntervalMs,
   ITAD_AUTO_REFRESH_INTERVAL_MS,
   serverChipState,
   fetchWithTimeout,
@@ -273,6 +274,32 @@ describe('maybeAutoRefreshItad', () => {
       runFn,
     })).toBe(false);
     expect(runFn).not.toHaveBeenCalled();
+  });
+
+  it('honors itadAutoRefreshIntervalMin pref for data-age and last-run gates', () => {
+    state.prefs.itadAutoRefreshIntervalMin = 60;
+    const intervalMs = itadAutoRefreshIntervalMs();
+    expect(intervalMs).toBe(60 * 60_000);
+    const runFn = vi.fn();
+    const now = Date.now();
+    state.libraryMeta.itad.fetched_at = new Date(now - 30 * 60_000).toISOString();
+    expect(maybeAutoRefreshItad({
+      getHour: () => 10,
+      now,
+      getLastRun: () => 0,
+      isApiAvailable: () => true,
+      stateFor: () => null,
+      runFn,
+    })).toBe(false);
+    state.libraryMeta.itad.fetched_at = new Date(now - 65 * 60_000).toISOString();
+    expect(maybeAutoRefreshItad({
+      getHour: () => 10,
+      now,
+      getLastRun: () => 0,
+      isApiAvailable: () => true,
+      stateFor: () => null,
+      runFn,
+    })).toBe(true);
   });
 });
 

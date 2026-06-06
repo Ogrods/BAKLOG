@@ -108,6 +108,20 @@ def _configure_stdout() -> None:
             pass
 
 
+def _wishlist_page_ready(html: str) -> bool:
+    """True when wishlist tiles are in the DOM or the page shows an empty list."""
+    if _TILE_OPEN_RE.search(html):
+        return True
+    # Hydrated wishlist shell: list container is present and the page is fully sized.
+    if (
+        "wishlist-items-list" in html
+        and len(html) > 200_000
+        and _EMPTY_PHRASE.search(html)
+    ):
+        return True
+    return False
+
+
 def _fetch_wishlist_html(timeout_s: int = 45) -> tuple[str, str]:
     """Load the wishlist page with the saved Ubisoft profile, headless."""
     from auth.cdp_browser import launch_persistent_profile
@@ -119,11 +133,26 @@ def _fetch_wishlist_html(timeout_s: int = 45) -> tuple[str, str]:
             "Open the Connections page and connect Ubisoft first."
         )
 
+    poll_deadline_s = min(max(timeout_s - 5, 15), 25)
+    poll_interval_ms = 500
+
     with launch_persistent_profile(str(profile), headless=True) as ctx:
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
-        page.wait_for_timeout(3000)
-        return page.title(), page.content()
+
+        title = ""
+        html = ""
+        deadline = time.time() + poll_deadline_s
+        while time.time() < deadline:
+            title = page.title() or ""
+            html = page.content()
+            if _wishlist_page_ready(html):
+                break
+            if "sign in" in title.lower():
+                break
+            page.wait_for_timeout(poll_interval_ms)
+
+        return title, html
 
 
 def _classify_kind(name: str, edition: str | None) -> str:

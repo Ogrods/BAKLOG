@@ -16,6 +16,16 @@ export { storeLetter };
 
 // === Constants & config ===
 export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "humble", "ea", "other", "manual"];
+
+// --- The blacklist ---------------------------------------------------------
+// JUNK_NAMES + JUNK_NAME_PATTERNS are the "blacklist": entries that are not
+// games at all (store apps, DLC skins, soundtracks, internal entitlement
+// slugs). isJunkEntry() drops them unconditionally — they are never shown and
+// users cannot restore them. This is distinct from the "hidden list" (see
+// js/hidden-defaults.js), which is real games a user has chosen to hide and can
+// restore from the Hidden games panel. Blacklist = noise, hardcoded; hidden
+// list = user-editable. Python fetchers carry mirror blacklists at the source
+// (e.g. _is_entitlement_slug in fetch_epic.py, psn_client.py, gog_filters.py).
 export const JUNK_NAMES = new Set([
   "live",
   "hbo max",
@@ -42,6 +52,12 @@ const JUNK_NAME_PATTERNS = [
   // mismatched Steam score. Match a trailing "wallpaper" only, so legit titles
   // like "Wallpaper Engine" are unaffected. Mirrors psn_client.py.
   /\bwallpaper$/i,
+  // Epic internal entitlement slugs leak in as titles (e.g.
+  // "Fortnite_StWContent", "Fortnite_Studio"): a single token with no spaces
+  // joined by an underscore. Real titles use spaces ("Aerial_Knight's Never
+  // Yield" has a space, so it is unaffected). Mirrors _is_entitlement_slug in
+  // fetch_epic.py.
+  /^\S*_\S*$/,
 ];
 
 const MIN_REVIEW_COUNT = 50;
@@ -101,6 +117,12 @@ export function applyCoopOverrides(g) {
   return g;
 }
 
+/**
+ * Blacklist check: true when an entry is not a real game (store apps, DLC
+ * skins, soundtracks, entitlement slugs) and should be dropped silently. This
+ * is the hardcoded blacklist — not the user-editable hidden list. See the
+ * JUNK_NAMES comment above and js/hidden-defaults.js.
+ */
 export function isJunkEntry(g) {
   const raw = String(g.name || "").trim();
   if (!raw) return true;

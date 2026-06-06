@@ -65,6 +65,19 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 - A–Z jump nav pinned to the right edge (xl+ screens)
 - **Wishlist deal radar:** filter by On Sale / Historical Low / Min Discount % / Max Price, hide already-owned cross-store
 
+### Blacklist vs hidden list
+
+Two different mechanisms keep the library clean — keep the terms distinct:
+
+| | **Blacklist** | **Hidden list** |
+|---|---|---|
+| What | Entries that aren't games (store apps, DLC skins, soundtracks, internal entitlement slugs like `Fortnite_StWContent`) | Real games a user chooses not to see |
+| Who decides | Hardcoded by us | The user |
+| Editable | No — never shown, can't be restored | Yes — restore any entry from the **Hidden games** panel |
+| Where | `isJunkEntry()` / `JUNK_NAMES` / `JUNK_NAME_PATTERNS` in [`js/game-core.js`](js/game-core.js), mirrored by Python source filters (e.g. `_is_entitlement_slug` in `fetch_epic.py`, `psn_client.py`, `gog_filters.py`) | User hides in personal storage, seeded by the pre-hidden defaults in [`js/hidden-defaults.js`](js/hidden-defaults.js) |
+
+In short: the **blacklist** removes noise that is never a game; the **hidden list** is a user preference for games they own but don't want cluttering the view. When adding new filtering, decide which bucket it belongs in first.
+
 ## Dashboard CSS
 
 Tailwind is precompiled into `tailwind.css` (no browser JIT in dev). Rebuild the CSS only if you change the Tailwind build pipeline in the repo.

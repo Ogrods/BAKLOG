@@ -110,6 +110,12 @@ describe('isJunkEntry', () => {
     expect(isJunkEntry({ name: 'Death Stranding — HD Wallpaper' })).toBe(true);
     expect(isJunkEntry({ name: 'Wallpaper Engine' })).toBe(false);
   });
+
+  it('flags Epic entitlement slugs but not real underscored titles', () => {
+    expect(isJunkEntry({ name: 'Fortnite_StWContent' })).toBe(true);
+    expect(isJunkEntry({ name: 'Fortnite_Studio' })).toBe(true);
+    expect(isJunkEntry({ name: "Aerial_Knight's Never Yield" })).toBe(false);
+  });
 });
 
 describe('dedupeWithinStore', () => {

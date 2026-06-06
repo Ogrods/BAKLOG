@@ -24,6 +24,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- **Blacklist: Epic entitlement slugs** — internal Epic slugs that leak in as titles (single token, no spaces, joined by an underscore — e.g. `Fortnite_StWContent`, `Fortnite_Studio`) are dropped by the hardcoded *blacklist* (`isJunkEntry` in `js/game-core.js`, mirrored by `_is_entitlement_slug` in `fetch_epic.py`). Real titles use spaces (`Aerial_Knight's Never Yield`) so they are unaffected. Terminology note: the **blacklist** is hardcoded non-games that are never shown; the **hidden list** is user-editable games restorable from the Hidden games panel (seeded by `js/hidden-defaults.js`). New filtering should pick a bucket — see the README "Blacklist vs hidden list" table.
 - **`.gitignore` store JSON globs** — `games_*.json` and `games_wishlist_*.json` replace per-file enumeration so Humble, EA, and Nintendo-wishlist catalog files (and future stores) cannot be committed accidentally.
 - **`gameId()` EA drift** — `js/game-core.js` now includes the `ea_id` fallback (aligned with `normalizeGame()` and the table-query worker).
 - **Landing CSP** — waitlist handler moved to `landing/main.js`; JSON-LD externalized to `landing/structured-data.json`; Google Fonts load via `id="google-fonts"` (no inline script). Demo spotlight nav uses sibling buttons (no nested interactive controls).

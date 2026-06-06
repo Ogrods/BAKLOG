@@ -157,7 +157,7 @@ After connection, Python fetcher subprocesses receive **profile-scoped environme
 1. Collapse rows sharing the same `store:id`, keeping highest metadata score (`scoreEntry`).
 2. Collapse rows sharing the same `store::normalizeNameForDedup(name)`.
 
-Junk entries (betas, wallpapers, costume DLC patterns) are filtered via `isJunkEntry()`.
+The **blacklist** — entries that are not games (betas, wallpapers, costume DLC patterns, internal entitlement slugs) — is filtered unconditionally via `isJunkEntry()` (mirrored by Python source filters such as `_is_entitlement_slug` in `fetch_epic.py`). This is distinct from the user-editable **hidden list** (real games a user hides and can restore from the Hidden games panel; defaults in `js/hidden-defaults.js`).
 
 **PSN within-store dedupe (fetch time).** `psn_client.py::_dedupe_by_name()` groups by `_dedupe_key(name)` (subtitle split + NFKD normalization distinct from JS), prefers PS5 > PS4 > PS3 > Vita, merges `concept_id`, `np_communication_id`, playtime, and rebuilds `store_url` from merged IDs.
 

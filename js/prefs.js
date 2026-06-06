@@ -40,6 +40,8 @@ export function loadPrefs() {
     dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {},
     fetcherHealthShowConnected: true, fetcherHealthShowStaleMissing: true,
     autoEnrichOnAdd: true, coopFilterMode: "off", fetcherCollapsed: true,
+    itadAutoRefreshIntervalMin: 15,
+    connectionNotes: {},
   };
   let merged;
   try { merged = { ...fallback, ...(JSON.parse(localStorage.getItem(prefsStorageKey()) || "{}")) }; } catch { return fallback; }
@@ -64,6 +66,16 @@ export function loadPrefs() {
   delete merged.itchHideNonGames;
   delete merged.tagFilters;
   delete merged.tagFilterMode;
+  const rawItadMin = Number(merged.itadAutoRefreshIntervalMin);
+  if (!Number.isFinite(rawItadMin)) {
+    merged.itadAutoRefreshIntervalMin = 15;
+  } else {
+    const clamped = Math.min(60, Math.max(15, rawItadMin));
+    merged.itadAutoRefreshIntervalMin = Math.round(clamped / 5) * 5;
+  }
+  if (!merged.connectionNotes || typeof merged.connectionNotes !== 'object' || Array.isArray(merged.connectionNotes)) {
+    merged.connectionNotes = {};
+  }
   return merged;
 }
 

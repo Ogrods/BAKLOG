@@ -109,7 +109,20 @@ def _epic_store_url_from_record(rec: dict, name: str) -> str:
     return f"https://store.epicgames.com/en-US/browse?q={quote(name)}"
 
 
+def _is_entitlement_slug(name: str | None) -> bool:
+    """Internal entitlement slugs leak in as titles (e.g. ``Fortnite_StWContent``,
+    ``Fortnite_Studio``): a single token with no spaces joined by an underscore.
+
+    Real titles use spaces, so ``Aerial_Knight's Never Yield`` is unaffected.
+    Mirrors the ``/^\\S*_\\S*$/`` junk pattern in js/game-core.js.
+    """
+    s = str(name or "").strip()
+    return bool(s) and "_" in s and not any(ch.isspace() for ch in s)
+
+
 def _is_game_item(item: dict) -> bool:
+    if _is_entitlement_slug(item.get("title")):
+        return False
     paths = [
         c.get("path", "")
         for c in (item.get("categories") or [])

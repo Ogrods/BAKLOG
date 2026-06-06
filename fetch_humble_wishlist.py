@@ -2,28 +2,30 @@
 """Fetch Humble Store wishlist into games_wishlist_humble.json.
 
 Reuses the saved Humble browser profile (same login as fetch_humble.py).
-Loads https://www.humblebundle.com/store/wishlist and parses embedded JSON
-plus any wishlist XHR responses captured during hydration.
+
+Humble's /store/wishlist page is a React app that only embeds the wishlist as a
+list of product *slugs* in ``window.models.user_json.wishlist`` — no product
+details, and the product/lookup API is behind Cloudflare. So we drive a real
+(headed, off-screen) Chrome window — same approach as the Epic wishlist fetch —
+which clears Cloudflare, read the slug list, then call /store/api/lookup from
+inside the page (carrying cf_clearance) to resolve titles, prices and images.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
-from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
-from urllib.parse import quote, urljoin
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
 from auth import mark_invalid
-from fetch_humble import _launch_humble_ctx
+from auth.secrets import profile_dir
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
@@ -37,27 +39,25 @@ from shared.money import format_price, normalize_currency_code
 
 GAMES_HUMBLE_WISHLIST_JSON = Path("games_wishlist_humble.json")
 WISHLIST_URL = "https://www.humblebundle.com/store/wishlist"
+LOOKUP_PATH = "/store/api/lookup"
 
+# Headed but off-screen: same real-browser fingerprint as the connect window
+# (so Cloudflare lets the store API through) without stealing focus.
+_WL_WINDOW_POS = (-32000, 0)
+_WL_WINDOW_SIZE = (1280, 900)
+# How long to wait for Cloudflare to clear and window.models.user_json to appear.
+_CLEARANCE_WAIT_SEC = 35
+_LOOKUP_BATCH = 20
 
-def _humble_wishlist_cache() -> Path:
-    from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "humble"
-
-
-def dump_html() -> Path:
-    return _humble_wishlist_cache() / "wishlist_dump.html"
-
-
-def dump_json() -> Path:
-    return _humble_wishlist_cache() / "wishlist_dump.json"
 HLTB_DELAY_SEC = 1.0
 
-_NEXT_DATA_RE = re.compile(
-    r'<script[^>]*id="__NEXT_DATA__"[^>]*>(\{.*?\})</script>',
-    re.DOTALL | re.IGNORECASE,
+# Preferred product image fields from the lookup API (largest first).
+_IMAGE_KEYS = (
+    "large_capsule",
+    "featured_image_recommendation",
+    "standard_carousel_image",
+    "icon",
 )
-_SIGN_IN_RE = re.compile(r"sign\s*in|log\s*in", re.I)
 
 
 @dataclass
@@ -72,6 +72,16 @@ class WishlistItem:
     currency: str | None
 
 
+def _humble_wishlist_cache() -> Path:
+    from shared.profile_paths import profile_cache_dir
+
+    return profile_cache_dir() / "humble"
+
+
+def dump_json() -> Path:
+    return _humble_wishlist_cache() / "wishlist_dump.json"
+
+
 def _configure_stdout() -> None:
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -80,114 +90,47 @@ def _configure_stdout() -> None:
             pass
 
 
-def _walk(node: Any, depth: int = 0, max_depth: int = 14) -> Iterable[Any]:
-    if depth > max_depth or node is None:
-        return
-    yield node
-    if isinstance(node, dict):
-        for v in node.values():
-            yield from _walk(v, depth + 1, max_depth)
-    elif isinstance(node, list):
-        for v in node:
-            yield from _walk(v, depth + 1, max_depth)
+def _price_from_lookup(obj: dict) -> tuple[str | None, str | None, int | None, str | None]:
+    cur = obj.get("current_price") if isinstance(obj.get("current_price"), dict) else {}
+    full = obj.get("full_price") if isinstance(obj.get("full_price"), dict) else {}
+    currency = normalize_currency_code(cur.get("currency") or full.get("currency") or "USD")
 
+    def _amt(d: dict) -> float | None:
+        v = d.get("amount")
+        return float(v) if isinstance(v, (int, float)) else None
 
-def _extract_next_data(html: str) -> dict | None:
-    m = _NEXT_DATA_RE.search(html)
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(1))
-    except json.JSONDecodeError:
-        return None
-
-
-def _product_id(obj: dict) -> str | None:
-    for key in ("machine_name", "machineName", "product_machine_name", "slug", "id"):
-        val = obj.get(key)
-        if isinstance(val, str) and val.strip():
-            s = val.strip()
-            if len(s) >= 2 and not s.isdigit():
-                return s
-    return None
-
-
-def _title(obj: dict) -> str | None:
-    for key in ("human_name", "humanName", "title", "name", "display_name", "product_name"):
-        val = obj.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-    return None
-
-
-def _image(obj: dict) -> str | None:
-    for key in ("tile_image", "tileImage", "icon", "image", "thumbnail", "box_art"):
-        val = obj.get(key)
-        if isinstance(val, str) and val.startswith(("http", "//")):
-            return val if val.startswith("http") else "https:" + val
-        if isinstance(val, dict):
-            u = val.get("url") or val.get("path")
-            if isinstance(u, str) and u.startswith("http"):
-                return u
-    return None
-
-
-def _prices(obj: dict) -> tuple[str | None, str | None, int | None, str | None]:
-    current = obj.get("current_price") or obj.get("price") or obj.get("sale_price")
-    full = obj.get("full_price") or obj.get("msrp") or obj.get("regular_price")
-    currency = obj.get("currency") or "USD"
-
-    def _num(v: Any) -> float | None:
-        if isinstance(v, (int, float)):
-            return float(v)
-        if isinstance(v, dict):
-            for k in ("amount", "value", "raw"):
-                if isinstance(v.get(k), (int, float)):
-                    return float(v[k])
-        return None
-
-    cur = _num(current)
-    reg = _num(full)
-    if cur is None and isinstance(obj.get("price_info"), dict):
-        pi = obj["price_info"]
-        cur = _num(pi.get("current"))
-        reg = _num(pi.get("full")) or reg
-        currency = pi.get("currency") or currency
-
-    cur_norm = normalize_currency_code(currency)
-
-    def _fmt(v: float | None) -> str | None:
-        if v is None:
-            return None
-        return format_price(v, cur_norm)
-
+    cur_amt = _amt(cur)
+    full_amt = _amt(full)
+    price = format_price(cur_amt, currency) if cur_amt is not None else None
+    price_initial = format_price(full_amt, currency) if full_amt is not None else None
     discount = None
-    if cur is not None and reg is not None and reg > 0 and cur < reg:
-        discount = round(100 * (1 - cur / reg))
-    return _fmt(cur), _fmt(reg), discount, cur_norm
+    if cur_amt is not None and full_amt and full_amt > 0 and cur_amt < full_amt:
+        discount = round(100 * (1 - cur_amt / full_amt))
+    return price, price_initial, discount, currency
 
 
-def _looks_like_product(obj: dict) -> bool:
-    pid = _product_id(obj)
-    title = _title(obj)
-    return bool(pid and title)
-
-
-def _item_from_dict(obj: dict) -> WishlistItem | None:
-    pid = _product_id(obj)
-    title = _title(obj)
-    if not pid or not title:
+def _item_from_lookup(obj: dict) -> WishlistItem | None:
+    """Build a WishlistItem from one /store/api/lookup result entry."""
+    if not isinstance(obj, dict):
         return None
-    price, price_initial, discount, currency = _prices(obj)
-    path = obj.get("url") or obj.get("link")
-    if isinstance(path, str) and path.startswith("/"):
-        store_url = urljoin("https://www.humblebundle.com", path)
-    else:
-        store_url = f"https://www.humblebundle.com/store/{quote(pid, safe='')}"
+    machine = str(obj.get("machine_name") or "").strip()
+    title = str(obj.get("human_name") or "").strip()
+    if not machine or not title:
+        return None
+    image = None
+    for key in _IMAGE_KEYS:
+        val = obj.get(key)
+        if isinstance(val, str) and val.startswith("http"):
+            image = val
+            break
+    human_url = str(obj.get("human_url") or "").strip()
+    slug = human_url or machine
+    store_url = f"https://www.humblebundle.com/store/{quote(slug, safe='')}"
+    price, price_initial, discount, currency = _price_from_lookup(obj)
     return WishlistItem(
-        product_id=pid,
+        product_id=machine,
         title=title,
-        image_url=_image(obj),
+        image_url=image,
         store_url=store_url,
         price=price,
         price_initial=price_initial,
@@ -196,105 +139,111 @@ def _item_from_dict(obj: dict) -> WishlistItem | None:
     )
 
 
-def _collect_product_lists(node: Any) -> list[list]:
-    hits: list[list] = []
-    for n in _walk(node):
-        if not isinstance(n, dict):
+def _read_wishlist_state(page) -> dict:
+    """Read window.models.user_json once the page is past any Cloudflare gate.
+
+    Returns ``{state: 'ok', wishlist: [...slugs]}`` when logged in,
+    ``{state: 'signed_out'}`` when the session is gone, or ``{state: 'pending'}``
+    while the real page (and user_json) has not loaded yet.
+    """
+    raw = page.evaluate(
+        """() => {
+            try {
+              const uj = (window.models && window.models.user_json) || null;
+              if (!uj) return JSON.stringify({state: 'pending'});
+              if (uj.is_logged_in === false) return JSON.stringify({state: 'signed_out'});
+              return JSON.stringify({state: 'ok', wishlist: uj.wishlist || []});
+            } catch (e) { return JSON.stringify({state: 'pending'}); }
+        }""",
+        timeout=15,
+    )
+    try:
+        out = json.loads(raw) if isinstance(raw, str) else {}
+        return out if isinstance(out, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _lookup_products(page, slugs: list[str]) -> list[dict]:
+    """Resolve product slugs to detail dicts via /store/api/lookup (in-page fetch).
+
+    The fetch runs inside the page so it carries the browser's cf_clearance and
+    cookies — a plain Python request to the same endpoint gets a Cloudflare 403.
+    """
+    results: list[dict] = []
+    for start in range(0, len(slugs), _LOOKUP_BATCH):
+        batch = slugs[start:start + _LOOKUP_BATCH]
+        batch_js = json.dumps(batch)
+        js = (
+            "async () => {"
+            f"  const slugs = {batch_js};"
+            "  const qs = slugs.map(s => `products[]=${encodeURIComponent(s)}`).join('&');"
+            f"  const r = await fetch(`{LOOKUP_PATH}?${{qs}}`, "
+            "    {headers: {'X-Requested-With': 'XMLHttpRequest'}, credentials: 'include'});"
+            "  if (!r.ok) return JSON.stringify({error: r.status});"
+            "  const j = await r.json();"
+            "  return JSON.stringify(j);"
+            "}"
+        )
+        try:
+            raw = page.evaluate(js, timeout=45)
+            obj = json.loads(raw) if isinstance(raw, str) else {}
+        except Exception:  # noqa: BLE001
             continue
-        for key, val in n.items():
-            if not isinstance(val, list) or len(val) == 0:
-                continue
-            kl = key.lower()
-            if "wish" not in kl and "product" not in kl and "item" not in kl:
-                continue
-            sample = [x for x in val[:8] if isinstance(x, dict)]
-            if not sample:
-                continue
-            if sum(1 for s in sample if _looks_like_product(s)) >= max(1, len(sample) // 2):
-                hits.append(val)
-    return hits
+        if isinstance(obj, dict) and isinstance(obj.get("result"), list):
+            results.extend(r for r in obj["result"] if isinstance(r, dict))
+    return results
 
 
-def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[WishlistItem]:
-    found: dict[str, WishlistItem] = {}
+def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
+    """Return (items, signed_out) from the headed Humble wishlist page."""
+    from auth.cdp_browser import STEALTH_INIT_SCRIPT, launch_persistent_profile
 
-    def _add(items: list[WishlistItem]) -> None:
-        for it in items:
-            found.setdefault(it.product_id, it)
+    profile = profile_dir("humble")
+    if not profile.exists():
+        raise RuntimeError(
+            "No saved Humble profile at cache/auth/profiles/humble. "
+            "Open the Connections page and connect Humble Bundle first."
+        )
 
-    next_data = _extract_next_data(html)
-    if next_data:
-        for lst in _collect_product_lists(next_data):
-            _add([x for x in (_item_from_dict(o) for o in lst) if x])
-
-    for payload in api_payloads:
-        if isinstance(payload, dict):
-            for lst in _collect_product_lists(payload):
-                _add([x for x in (_item_from_dict(o) for o in lst) if x])
-            # Flat wishlist array at top level
-            for key in ("wishlist", "products", "items"):
-                val = payload.get(key)
-                if isinstance(val, list):
-                    _add([x for x in (_item_from_dict(o) for o in val if isinstance(o, dict)) if x])
-        elif isinstance(payload, list):
-            _add([x for x in (_item_from_dict(o) for o in payload if isinstance(o, dict)) if x])
-
-    return sorted(found.values(), key=lambda x: x.title.lower())
-
-
-def _signed_out_page(html: str, url: str) -> bool:
-    u = (url or "").lower()
-    if "login" in u and "wishlist" not in u:
-        return True
-    if _SIGN_IN_RE.search(html or "") and "wishlist" not in (html or "").lower():
-        return True
-    return False
-
-
-def _fetch_wishlist(*, dump: bool = False) -> tuple[str, str, list[Any]]:
-    api_payloads: list[Any] = []
-
-    def _capture(resp) -> None:
-        try:
-            url = (resp.url or "").lower()
-            if resp.status >= 400:
-                return
-            if "wishlist" not in url and "wish" not in url:
-                return
-            ct = (resp.headers.get("content-type") or "").lower()
-            if "json" not in ct:
-                return
-            api_payloads.append(resp.json())
-        except Exception:  # noqa: BLE001
-            pass
-
-    with _launch_humble_ctx(headless=True) as ctx:
-        req_html = ""
-        try:
-            resp = ctx.request.get(WISHLIST_URL, timeout=45_000)
-            if resp.status < 400:
-                req_html = resp.text()
-        except Exception:  # noqa: BLE001
-            pass
-
+    with launch_persistent_profile(
+        str(profile),
+        headless=False,
+        window_position=_WL_WINDOW_POS,
+        window_size=_WL_WINDOW_SIZE,
+    ) as ctx:
+        ctx.add_init_script(STEALTH_INIT_SCRIPT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        page.on("response", _capture)
         page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=45_000)
-        page.wait_for_timeout(3000)
-        page_html = page.content()
-        url = page.url or WISHLIST_URL
-        html = page_html if len(page_html) > len(req_html) else req_html
+
+        slugs: list[str] | None = None
+        deadline = time.time() + _CLEARANCE_WAIT_SEC
+        while time.time() < deadline:
+            state = _read_wishlist_state(page)
+            if state.get("state") == "signed_out":
+                return [], True
+            if state.get("state") == "ok":
+                slugs = [s for s in (state.get("wishlist") or []) if isinstance(s, str)]
+                break
+            page.wait_for_timeout(1000)
+
+        if slugs is None:
+            raise RuntimeError(
+                "Humble wishlist page did not load (Cloudflare challenge or timeout)."
+            )
+
+        results = _lookup_products(page, slugs) if slugs else []
+        items = [it for it in (_item_from_lookup(o) for o in results) if it]
 
         if dump:
-            dump_html().parent.mkdir(parents=True, exist_ok=True)
-            dump_html().write_text(html, encoding="utf-8")
+            dump_json().parent.mkdir(parents=True, exist_ok=True)
             dump_json().write_text(
                 json.dumps(
                     {
-                        "url": url,
-                        "api_payload_count": len(api_payloads),
-                        "api_payloads": api_payloads[:20],
-                        "next_data_keys": list((_extract_next_data(html) or {}).keys())[:30],
+                        "slug_count": len(slugs),
+                        "slugs": slugs,
+                        "result_count": len(results),
+                        "results": results[:20],
                     },
                     indent=2,
                     default=str,
@@ -302,9 +251,9 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[str, str, list[Any]]:
                 ),
                 encoding="utf-8",
             )
-            print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
+            print(f"  wrote {dump_json()}", flush=True)
 
-        return html, url, api_payloads
+        return items, False
 
 
 def _build_row(item: WishlistItem, hltb: dict | None) -> dict:
@@ -356,7 +305,7 @@ def main() -> int:
     parser.add_argument(
         "--dump",
         action="store_true",
-        help=f"Save raw HTML + JSON to {dump_html().parent}/",
+        help=f"Save resolved wishlist JSON to {dump_json().parent}/",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
@@ -365,9 +314,9 @@ def main() -> int:
     stats = RunStats()
     load_dotenv()
 
-    print("Fetching Humble wishlist via headless store page...", flush=True)
+    print("Fetching Humble wishlist via saved store profile...", flush=True)
     try:
-        html, url, api_payloads = run_with_heartbeat(
+        items, signed_out = run_with_heartbeat(
             lambda: _fetch_wishlist(dump=args.dump),
             "Humble wishlist capture",
         )
@@ -376,7 +325,7 @@ def main() -> int:
         stats.error(str(exc))
         return stats.finish("fetch_humble_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
-    if _signed_out_page(html, url):
+    if signed_out:
         msg = (
             "Humble session is missing or expired. Open Connections, click Humble Bundle "
             "\u2192 Connect, and sign in at humblebundle.com inside the browser window."
@@ -385,11 +334,7 @@ def main() -> int:
         stats.error(msg)
         return stats.finish("fetch_humble_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
-    items = parse_wishlist_sources(html, api_payloads)
-    print(
-        f"  parsed {len(items)} wishlist items ({len(api_payloads)} captured JSON responses)",
-        flush=True,
-    )
+    print(f"  parsed {len(items)} wishlist items", flush=True)
 
     if args.dump:
         return stats.finish("fetch_humble_wishlist", t0, exit_code=0, extra="dump only")

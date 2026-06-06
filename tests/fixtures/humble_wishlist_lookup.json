@@ -1,0 +1,21 @@
+{
+  "request": 0,
+  "result": [
+    {
+      "machine_name": "hollow_knight",
+      "human_name": "Hollow Knight",
+      "human_url": "hollow-knight",
+      "large_capsule": "https://cdn.humblebundle.com/images/hollow_knight.jpg",
+      "current_price": { "currency": "USD", "amount": 14.99 },
+      "full_price": { "currency": "USD", "amount": 14.99 }
+    },
+    {
+      "machine_name": "celeste",
+      "human_name": "Celeste",
+      "human_url": "celeste",
+      "icon": "https://cdn.humblebundle.com/images/celeste.jpg",
+      "current_price": { "currency": "USD", "amount": 4.99 },
+      "full_price": { "currency": "USD", "amount": 19.99 }
+    }
+  ]
+}

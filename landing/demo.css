@@ -186,7 +186,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 35% center;
+  object-position: var(--spotlight-focal, 35% center);
   opacity: 0;
   filter: brightness(1.1);
   transition: transform 0.6s ease, opacity 0.45s ease;
@@ -402,32 +402,69 @@
   min-width: 0;
 }
 .dash-ribbon-eyebrow { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
-.dash-ribbon-chart { position: relative; width: 100%; height: 180px; min-height: 180px; min-width: 0; flex-shrink: 0; }
-.dash-ribbon-chart canvas { display: block; max-width: 100%; }
+.dash-ribbon-figure {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.dash-ribbon-chart {
+  position: relative;
+  flex: 0 0 130px;
+  width: 130px;
+  height: 130px;
+  min-width: 0;
+  min-height: 0;
+}
+.dash-ribbon-chart canvas { display: block; width: 100% !important; height: 100% !important; max-width: 100%; }
+.dash-ribbon-legend {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px 12px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #e2e8f0;
+}
+.dash-ribbon-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dash-ribbon-legend-swatch {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.dash-ribbon-legend-label {
+  min-width: 0;
+  word-break: break-word;
+}
 
 /* While the viewport is actively resizing (js toggles html.ui-resizing with a
-   ~200ms trailing debounce), drop the per-frame backdrop blurs and pause the
-   spotlight float/sheen so the mega hero resizes smoothly. Effects are restored
-   once resize settles; the translucent backplates remain, so there is no pop. */
-html.ui-resizing .dash-hero-pillar,
+   ~200ms trailing debounce), pause motion and cheapen paints that fight reflow. */
+html.ui-resizing .dash-mega { contain: layout style; }
+html.ui-resizing .dash-ribbon-tile { contain: layout paint; }
+html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
+html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before,
+html.ui-resizing .dash-marquee-track {
+  animation-play-state: paused;
+}
+html.ui-resizing .dash-spotlight-art-bg {
+  filter: brightness(0.5);
+}
+html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
+  filter: none;
+}
 html.ui-resizing .dash-spotlight-body,
 html.ui-resizing .dash-spotlight-nav {
   backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
-html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
-  animation-play-state: paused;
-}
-html.ui-resizing .dash-spotlight-art,
-html.ui-resizing .dash-spotlight-art-bg {
-  filter: none;
-  -webkit-mask-image: none;
-  mask-image: none;
-}
-html.ui-resizing .dash-spotlight-sheen::before {
-  filter: none;
-  opacity: 0;
 }
 .dash-ribbon-headline { text-align: center; font-size: 13px; color: #cbd5e1; }
 .dash-ribbon-headline strong { color: #f1f5f9; font-weight: 700; }
@@ -568,7 +605,16 @@ html.ui-resizing .dash-spotlight-sheen::before {
 
 @media (max-width: 900px) {
   .dash-ribbon { grid-template-columns: 1fr; }
-  .dash-ribbon-chart { height: 220px; min-height: 220px; }
+  /* Tiles are now full-width but short; center the donut + legend and grow the
+     ring so the wide row isn't mostly empty space on the right. */
+  .dash-ribbon-figure { justify-content: center; gap: 32px; }
+  .dash-ribbon-chart { flex-basis: 180px; width: 180px; height: 180px; }
+  .dash-ribbon-legend {
+    flex: 0 1 auto;
+    grid-template-columns: repeat(2, auto);
+    column-gap: 28px;
+    font-size: 12px;
+  }
   .score-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -622,6 +668,9 @@ html.ui-resizing .dash-spotlight-sheen::before {
     border-radius: 10px;
     overflow: hidden;
   }
+  .dash-spotlight.has-portrait-art .dash-spotlight-art {
+    object-position: 28% center;
+  }
   .dash-spotlight-body {
     left: auto;
     right: 12px;
@@ -631,38 +680,25 @@ html.ui-resizing .dash-spotlight-sheen::before {
     align-items: flex-end;
   }
 }
+@media (max-width: 520px) {
+  .dash-ribbon-figure {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .dash-ribbon-legend {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-items: start;
+  }
+}
 @media (max-width: 640px) {
   .dash-mega { padding: 20px 18px 16px; }
-  /* Spotlight drops back into flow as a full-width banner above the stats */
-  .dash-spotlight-host { position: relative; inset: auto; width: 100%; height: auto; }
-  .dash-spotlight {
-    position: static;
-    width: 100%;
-    height: 180px;
-    margin-bottom: 16px;
-    border-radius: 10px;
-    overflow: hidden;
-  }
-  .dash-spotlight-art { -webkit-mask-image: none; mask-image: none; }
-  .dash-spotlight-body {
-    left: 16px;
-    right: 16px;
-    bottom: 14px;
-    max-width: none;
-    text-align: left;
-    align-items: flex-start;
-  }
-  .dash-spotlight-body .dash-spotlight-title,
-  .dash-spotlight-body .dash-spotlight-meta { text-align: left; }
-  .dash-mega .dash-hero-number, .dash-mega .dash-hero-sub,
-  .dash-mega .dash-hero-tagline, .dash-mega .dash-hero-pillars,
-  .dash-mega .dash-hero-stores,
-  .dash-mega .library-count-host,
-  .dash-mega--has-spotlight .dash-insight { max-width: none; }
 }
 @media (max-width: 400px) {
   /* 3-across or 1-column only — never a 2+1 orphan row */
   .dash-hero-pillars { grid-template-columns: 1fr; }
+  .dash-spotlight-host { width: min(280px, 48%); }
   .score-grid { gap: 0.6rem; }
   .score-tile { padding: 1rem 0.75rem; }
   .score-tile .num { font-size: 1.5rem; }

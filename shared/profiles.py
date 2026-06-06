@@ -90,6 +90,12 @@ def _copy_tree_if_missing(
     return copied
 
 
+def finalize_default_profile_migration() -> None:
+    """Complete root -> profiles/default/ when legacy layout still applies to default."""
+    if is_legacy_layout(DEFAULT_PROFILE_ID):
+        ensure_default_profile_dir()
+
+
 def ensure_default_profile_dir() -> Path:
     """Copy repo-root data into profiles/default/ (resumable: copy-if-missing)."""
     dest = profile_data_dir(DEFAULT_PROFILE_ID)
@@ -202,11 +208,6 @@ def rename_profile(profile_id: str, label: str) -> dict[str, Any]:
 
 def delete_profile(profile_id: str) -> None:
     profile_id = normalize_profile_id(profile_id)
-    if profile_id == DEFAULT_PROFILE_ID:
-        if is_legacy_layout():
-            raise ValueError("cannot delete default profile while using legacy layout")
-        if profile_data_dir(DEFAULT_PROFILE_ID).is_dir():
-            raise ValueError("cannot delete default profile after migration")
     doc = load_index()
     profiles = [p for p in doc.get("profiles", []) if isinstance(p, dict)]
     if len(profiles) <= 1:
@@ -360,6 +361,7 @@ def _public_profile_row(p: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any
 def profiles_status() -> dict[str, Any]:
     from shared.profile_paths import get_active_profile_id
 
+    finalize_default_profile_migration()
     doc = load_index()
     active = get_active_profile_id()
     profiles = doc.get("profiles") if isinstance(doc.get("profiles"), list) else []

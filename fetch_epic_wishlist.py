@@ -49,6 +49,7 @@ from hltb_client import HltbClient
 
 GAMES_WISHLIST_EPIC_JSON = Path("games_wishlist_epic.json")
 WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
+
 def dump_dir() -> Path:
     from shared.profile_paths import epic_cache_dir
 
@@ -244,6 +245,44 @@ def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[dict]:
     return enrich_wishlist_elements_with_catalog(html, list(found.values()))
 
 
+_CDP_TRANSPORT_MSG = (
+    "cdp command timed out",
+    "websocket",
+    "socket",
+    "connection aborted",
+    "debugging endpoint",
+    "browser",
+    "10053",
+    "established connection was aborted",
+)
+_CDP_TRANSPORT_TYPES = (
+    "websocketconnectionclosedexception",
+    "connectionabortederror",
+    "connectionreseterror",
+    "brokenpipeerror",
+)
+
+
+def _is_cdp_transport_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    type_name = type(exc).__name__.lower()
+    if any(tok in msg for tok in _CDP_TRANSPORT_MSG):
+        return True
+    return any(tok in type_name for tok in _CDP_TRANSPORT_TYPES)
+
+
+def _read_page_html(page, *, timeout: float = 10) -> str:
+    """Read page HTML with a short CDP timeout so a dead socket fails fast."""
+    html = page.evaluate(
+        """() => {
+            const d = document.documentElement;
+            return d ? d.outerHTML : '';
+        }""",
+        timeout=timeout,
+    )
+    return html if isinstance(html, str) else ""
+
+
 def _wishlist_capture_complete(html: str, api_payloads: list[Any]) -> bool:
     if any(wishlist_graphql_ok(p) for p in api_payloads):
         return True
@@ -271,7 +310,7 @@ def _drain_wishlist_candidates(
     return found
 
 
-def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
+def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
     from auth.cdp_browser import STEALTH_INIT_SCRIPT, launch_persistent_profile
 
     profile = profile_dir("epic_wishlist")
@@ -300,28 +339,45 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
     poll_deadline_s = min(max(timeout_s - 5, 20), 25)
     poll_interval_ms = 500
 
-    # Match the headed connect window (--start-maximized, no off-screen offset).
-    # cf_clearance is bound to the browser fingerprint; off-screen positioning can
-    # still trigger a fresh Cloudflare Turnstile that never auto-resolves headlessly.
-    with launch_persistent_profile(str(profile), headless=False) as ctx:
+    # Headed off-screen: same browser fingerprint as connect without stealing focus
+    # or inviting accidental window close during automated fetch.
+    with launch_persistent_profile(
+        str(profile),
+        headless=False,
+        window_position=(-32000, 0),
+        window_size=(1280, 900),
+    ) as ctx:
         ctx.add_init_script(STEALTH_INIT_SCRIPT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.on("response", _capture)
         page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
 
         deadline = time.time() + poll_deadline_s
+        consecutive_transport = 0
         while time.time() < deadline:
             new_payloads = _drain_wishlist_candidates(candidates, seen_graphql)
             if new_payloads:
                 api_payloads.extend(new_payloads)
                 break
-            html = page.content()
-            url = page.url or WISHLIST_URL
+            try:
+                html = _read_page_html(page)
+                url = page.url or WISHLIST_URL
+                consecutive_transport = 0
+            except Exception as exc:  # noqa: BLE001
+                if _is_cdp_transport_error(exc):
+                    consecutive_transport += 1
+                    if consecutive_transport >= 3:
+                        raise
+                    page.wait_for_timeout(poll_interval_ms)
+                    continue
+                raise
             # Cloudflare may show briefly on wishlist even with a valid profile —
             # keep polling so headed Chrome can auto-resolve before we give up.
             if cloudflare_interstitial(html, url):
                 page.wait_for_timeout(poll_interval_ms)
                 continue
+            if wishlist_capture_complete_from_html(html):
+                break
             if storefront_signed_out(html, url):
                 break
             page.wait_for_timeout(poll_interval_ms)
@@ -329,9 +385,14 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
         if not api_payloads:
             api_payloads.extend(_drain_wishlist_candidates(candidates, seen_graphql))
 
-        html = page.content()
-        url = page.url or WISHLIST_URL
-
+        try:
+            html = _read_page_html(page, timeout=15)
+            url = page.url or WISHLIST_URL
+        except Exception as exc:  # noqa: BLE001
+            if _is_cdp_transport_error(exc) and api_payloads:
+                html, url = "", page.url or WISHLIST_URL
+            else:
+                raise
         if dump:
             dump_dir().mkdir(parents=True, exist_ok=True)
             dump_html().write_text(html, encoding="utf-8")
@@ -353,6 +414,26 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
             print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
 
         return html, url, api_payloads
+
+
+def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
+    last_exc: BaseException | None = None
+    for attempt in range(2):
+        try:
+            return _fetch_with_profile_once(dump=dump, timeout_s=timeout_s)
+        except Exception as exc:  # noqa: BLE001
+            if attempt == 0 and _is_cdp_transport_error(exc):
+                last_exc = exc
+                print(
+                    "  Epic browser connection lost — relaunching and retrying once...",
+                    flush=True,
+                )
+                time.sleep(1.5)
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Epic wishlist fetch failed after retry")
 
 
 def _load_existing() -> dict[str, dict]:
@@ -390,10 +471,7 @@ def main() -> int:
         )
     except Exception as exc:  # noqa: BLE001
         msg = str(exc)
-        is_transport = any(
-            tok in msg.lower()
-            for tok in ("cdp command timed out", "websocket", "browser", "debugging endpoint")
-        )
+        is_transport = _is_cdp_transport_error(exc)
         if is_transport:
             stats.error(f"wishlist fetch transport error: {msg}")
             return stats.finish("fetch_epic_wishlist", t0, exit_code=1)
@@ -480,4 +558,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

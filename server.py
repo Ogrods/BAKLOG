@@ -3184,10 +3184,112 @@ def _dev_server_port_busy() -> bool:
         return False
 
 
+# Records the PID of the live dev server so a restart can reclaim the port if a
+# previous instance was orphaned (e.g. the terminal window was closed instead of
+# Ctrl+C, so graceful shutdown never ran and the listener kept holding the port).
+PID_FILE = ROOT / ".baklog_server.pid"
+
+
+def _write_pid_file() -> None:
+    try:
+        PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError as exc:
+        print(f"[server] could not write pid file: {exc}", file=sys.stderr, flush=True)
+
+
+def _remove_pid_file() -> None:
+    try:
+        if PID_FILE.is_file() and PID_FILE.read_text(encoding="utf-8").strip() == str(os.getpid()):
+            PID_FILE.unlink()
+    except OSError:
+        pass
+
+
+def _pid_is_python_server(pid: int) -> bool:
+    """Best-effort confirm pid is a live Python process running this server,
+    so reclaim never kills an unrelated process that reused the pid."""
+    if not _pid_alive(pid):
+        return False
+    if sys.platform != "win32":
+        return True
+    try:
+        out = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return "python" in (out.stdout or "").lower()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _pid_from_pid_file() -> int | None:
+    try:
+        recorded = PID_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return int(recorded) if recorded.isdigit() else None
+
+
+def _pid_listening_on_port() -> int | None:
+    """The PID currently LISTENING on HOST:PORT, via netstat (Windows) — covers
+    orphans that predate the pid file (e.g. closed-terminal leftovers)."""
+    if sys.platform != "win32":
+        return None
+    try:
+        out = subprocess.run(
+            ["netstat", "-ano", "-p", "TCP"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    needle = f"{HOST}:{PORT}"
+    for line in (out.stdout or "").splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[0].upper() == "TCP" and parts[1] == needle and parts[3].upper() == "LISTENING":
+            if parts[-1].isdigit():
+                return int(parts[-1])
+    return None
+
+
+def _reclaim_stale_server() -> bool:
+    """If the busy port is held by our own orphaned instance, terminate it so this
+    start can take over. Prefers the pid file, falls back to whoever is listening
+    on the port. Returns True if a reclaim was attempted."""
+    me = os.getpid()
+    candidates = [_pid_from_pid_file(), _pid_listening_on_port()]
+    for pid in candidates:
+        if pid is None or pid == me:
+            continue
+        if not _pid_is_python_server(pid):
+            continue
+        print(
+            f"[server] port {PORT} held by orphaned instance (pid {pid}) — reclaiming it",
+            file=sys.stderr,
+            flush=True,
+        )
+        _terminate_pid(pid)
+        return True
+    return False
+
+
 def _exit_if_dev_server_busy() -> None:
-    if _dev_server_port_busy():
-        print(_DEV_SERVER_BUSY_MSG, file=sys.stderr, flush=True)
-        raise SystemExit(1)
+    if not _dev_server_port_busy():
+        return
+    if _reclaim_stale_server():
+        for _ in range(30):  # up to ~3s for the orphan's socket to close
+            time.sleep(0.1)
+            if not _dev_server_port_busy():
+                return
+    print(_DEV_SERVER_BUSY_MSG, file=sys.stderr, flush=True)
+    raise SystemExit(1)
 
 
 class BaklogDevServer(ThreadingHTTPServer):
@@ -3196,7 +3298,14 @@ class BaklogDevServer(ThreadingHTTPServer):
 
 def main() -> None:
     atexit.register(_shutdown_server)
+    atexit.register(_remove_pid_file)
     _maybe_import_legacy_env()
+    try:
+        from shared.profiles import finalize_default_profile_migration
+
+        finalize_default_profile_migration()
+    except Exception as exc:  # noqa: BLE001 - must not block server boot
+        print(f"[profiles] default migration finalize skipped: {exc}", file=sys.stderr, flush=True)
 
     def _handle_exit(signum: int, _frame: Any) -> None:
         print(f"\nShutting down (signal {signum}).")
@@ -3215,6 +3324,7 @@ def main() -> None:
         print(_DEV_SERVER_BUSY_MSG, file=sys.stderr, flush=True)
         raise SystemExit(1) from None
     with httpd:
+        _write_pid_file()
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")
         print(f"Python for fetchers: {_python_executable()}")
         print(f"Registered fetchers: {len(FETCHERS)}")

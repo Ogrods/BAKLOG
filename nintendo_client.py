@@ -34,8 +34,18 @@ PERSISTED_QUERY_HASH = (
 PAGE_SIZE = 10
 LEGACY_TRANSACTIONS_URL = "https://ec.nintendo.com/api/my/transactions"
 NINTENDO_SESSION_COOKIE_NAMES = frozenset(
-    {"MIST", "JViDD", "_gh_sess", "NASID", "ecsid"}
+    {
+        "MIST",
+        "JViDD",
+        "_gh_sess",
+        "NASID",
+        "ecsid",
+        "__Secure-next-auth.session-token",
+    }
 )
+# Playwright APIRequestContext.get timeout is milliseconds; requests uses seconds.
+PLAYWRIGHT_REQUEST_TIMEOUT_MS = 30_000
+REQUESTS_TIMEOUT_SEC = 30
 
 
 class NintendoAuthError(Exception):
@@ -116,7 +126,7 @@ def _drain_graphql_candidates(
     return added
 
 
-def probe_session_id_token(http_get) -> dict[str, Any]:
+def probe_session_id_token(http_get, *, timeout: float = REQUESTS_TIMEOUT_SEC) -> dict[str, Any]:
     """Probe /api/auth/session; return {ok, status, id_token_present, error}."""
     out: dict[str, Any] = {
         "ok": False,
@@ -125,7 +135,7 @@ def probe_session_id_token(http_get) -> dict[str, Any]:
         "error": None,
     }
     try:
-        resp = http_get(SESSION_URL, timeout=30)
+        resp = http_get(SESSION_URL, timeout=timeout)
         status = int(getattr(resp, "status", 0) or 0)
         out["status"] = status
         if status != 200:
@@ -183,7 +193,7 @@ class NintendoClient:
                 "User-Agent": self._user_agent,
             }
         )
-        auth = session.get(SESSION_URL, timeout=30)
+        auth = session.get(SESSION_URL, timeout=REQUESTS_TIMEOUT_SEC)
         if auth.status_code in (401, 403):
             raise NintendoAuthError(
                 f"Nintendo rejected the session ({auth.status_code}). "
@@ -214,11 +224,13 @@ class NintendoClient:
         """Fallback: session idToken + Savanna persisted query via profile cookies."""
         collected: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
-        probe = probe_session_id_token(context.request.get)
+        probe = probe_session_id_token(
+            context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS
+        )
         if not probe.get("ok"):
             return collected
 
-        session_resp = context.request.get(SESSION_URL, timeout=30)
+        session_resp = context.request.get(SESSION_URL, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS)
         try:
             session_body = json.loads(session_resp.text())
         except (ValueError, TypeError):
@@ -250,7 +262,7 @@ class NintendoClient:
                 }
             )
             url = f"{GRAPHQL_URL}?{query}"
-            resp = context.request.get(url, headers=headers, timeout=30)
+            resp = context.request.get(url, headers=headers, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS)
             if resp.status != 200:
                 break
             try:
@@ -331,7 +343,9 @@ class NintendoClient:
                 candidates, collected, seen_ids
             )
 
-            debug["session_probe"] = probe_session_id_token(context.request.get)
+            debug["session_probe"] = probe_session_id_token(
+                context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS
+            )
             try:
                 debug["final_url"] = page.url
                 debug["page_title"] = page.title()

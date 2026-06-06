@@ -31,7 +31,8 @@ describe("drill-anchor pending scroll target", () => {
     scrollToSpy = vi.spyOn(win, "scrollTo").mockImplementation(() => {});
 
     document.body.innerHTML = `
-      <section id="picksSection" style="height:120px"><div id="picksGrid"></div></section>
+      <div id="viewLoadingOverlay" class="app-view-overlay" aria-hidden="true"></div>
+      <section id="picksSection" style="height:120px"><div id="picksGrid"><div class="pick-card">x</div></div></section>
       <div id="toolbarSection" style="height:80px;margin-top:200px">toolbar</div>
       <div id="tableShell" style="margin-top:400px">
         <table class="games-table"><thead></thead>
@@ -42,7 +43,14 @@ describe("drill-anchor pending scroll target", () => {
       </div>
     `;
 
+    // happy-dom does not compute layout, so offsetHeight is always 0; stub the
+    // picks height so the real-browser "chrome settled" gate can be exercised.
+    const picks = document.getElementById("picksSection");
+    if (picks) Object.defineProperty(picks, "offsetHeight", { configurable: true, value: 120 });
+
     vi.resetModules();
+    const { state } = await import("../js/state.js");
+    state.activeView = "library";
   });
 
   it("consumePendingScrollTarget scrolls toolbar for kind=toolbar", async () => {
@@ -54,6 +62,26 @@ describe("drill-anchor pending scroll target", () => {
     const arg = scrollToSpy.mock.calls[0][0];
     expect(typeof arg.top).toBe("number");
     expect(arg.behavior).toBe("auto");
+  });
+
+  it("defers toolbar scroll while dashboard view is still active", async () => {
+    const { state } = await import("../js/state.js");
+    const { setPendingScrollTarget, consumePendingScrollTarget } = await import("../js/table-ui.js");
+    state.activeView = "dashboard";
+    document.getElementById("toolbarSection")?.classList.add("hidden");
+    setPendingScrollTarget({ kind: "toolbar" });
+    const ok = consumePendingScrollTarget([]);
+    expect(ok).toBe(false);
+    expect(scrollToSpy).not.toHaveBeenCalled();
+  });
+
+  it("defers toolbar scroll while view overlay is visible", async () => {
+    const { setPendingScrollTarget, consumePendingScrollTarget } = await import("../js/table-ui.js");
+    document.getElementById("viewLoadingOverlay")?.classList.add("show");
+    setPendingScrollTarget({ kind: "toolbar" });
+    const ok = consumePendingScrollTarget([]);
+    expect(ok).toBe(false);
+    expect(scrollToSpy).not.toHaveBeenCalled();
   });
 
   it("consumePendingScrollTarget scrolls row into view for kind=row", async () => {

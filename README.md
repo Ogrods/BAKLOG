@@ -318,15 +318,19 @@ Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher
 
 When something goes wrong, BAKLOG captures uncaught errors and unhandled
 promise rejections automatically and surfaces a sticky red toast in the
-top-right corner. Three buttons:
+top-right corner. From the toast, kebab menu (**Report a bug…**), or
+`?debug=1` overlay you can:
 
-- **Copy bug bundle** — assembles a sanitized JSON payload (errors + app
-  context: version, view, data version, filter count, table fingerprint,
-  last render time, dashboard counters) and copies it to your clipboard.
-  Paste it into a [new GitHub issue](https://github.com/Ogrods/steam-backlog/issues/new). Nothing is sent anywhere by the app — what you do with the
-  clipboard is up to you. Personal notes, library JSON, and credentials are
-  never included (see [PRIVACY.md](PRIVACY.md#error-logs-and-bug-reporting) for
-  the full whitelist).
+- **Send report** — opens a consent dialog showing the exact sanitized JSON
+  payload (errors + app context: version, view, data version, filter count,
+  table fingerprint, last render time, dashboard counters). Add an optional
+  contact email and note, then confirm to POST the bundle to the maintainer.
+  Nothing is sent until you click **Send report** in the dialog. Personal
+  notes, library JSON, and credentials are never included (see
+  [PRIVACY.md](PRIVACY.md#error-logs-and-bug-reporting) for the full whitelist).
+- **Copy bug bundle** — same payload to your clipboard with no network request.
+  Paste into a [new GitHub issue](https://github.com/Ogrods/steam-backlog/issues/new)
+  if you prefer.
 - **Errors only** — copies just the error array, without app context.
 - **Details** — expand the stack trace inline.
 

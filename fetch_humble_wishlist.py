@@ -37,6 +37,51 @@ from shared.money import format_price, normalize_currency_code
 
 GAMES_HUMBLE_WISHLIST_JSON = Path("games_wishlist_humble.json")
 WISHLIST_URL = "https://www.humblebundle.com/store/wishlist"
+
+
+# #region agent log
+def _cf7log(hypothesis: str, message: str, data: dict) -> None:
+    try:
+        _path = Path(__file__).resolve().parent / "debug-cf7aab.log"
+        _line = json.dumps(
+            {
+                "sessionId": "cf7aab",
+                "hypothesisId": hypothesis,
+                "location": "fetch_humble_wishlist.py",
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            },
+            default=str,
+        )
+        with open(_path, "a", encoding="utf-8") as _f:
+            _f.write(_line + "\n")
+    except Exception:
+        pass
+# #endregion
+
+
+# #region agent log
+def _dbglog(hypothesis: str, message: str, data: dict) -> None:
+    try:
+        _path = Path(__file__).resolve().parent / "debug-f15ccc.log"
+        _line = json.dumps(
+            {
+                "sessionId": "f15ccc",
+                "hypothesisId": hypothesis,
+                "location": "fetch_humble_wishlist.py",
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            },
+            default=str,
+        )
+        with open(_path, "a", encoding="utf-8") as _f:
+            _f.write(_line + "\n")
+    except Exception:
+        pass
+# #endregion
+
 def _humble_wishlist_cache() -> Path:
     from shared.profile_paths import profile_cache_dir
 
@@ -251,10 +296,22 @@ def _signed_out_page(html: str, url: str) -> bool:
 
 def _fetch_wishlist(*, dump: bool = False) -> tuple[str, str, list[Any]]:
     api_payloads: list[Any] = []
+    # #region agent log
+    _diag: dict[str, Any] = {"all_resp": 0, "json_urls": [], "matched": 0}
+    # #endregion
 
     def _capture(resp) -> None:
         try:
             url = (resp.url or "").lower()
+            # #region agent log
+            _diag["all_resp"] += 1
+            try:
+                _ct = (resp.headers.get("content-type") or "").lower()
+            except Exception:
+                _ct = ""
+            if "json" in _ct and len(_diag["json_urls"]) < 40:
+                _diag["json_urls"].append({"url": (resp.url or "")[:160], "status": resp.status})
+            # #endregion
             if resp.status >= 400:
                 return
             if "wishlist" not in url and "wish" not in url:
@@ -262,14 +319,19 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[str, str, list[Any]]:
             ct = (resp.headers.get("content-type") or "").lower()
             if "json" not in ct:
                 return
+            # #region agent log
+            _diag["matched"] += 1
+            # #endregion
             api_payloads.append(resp.json())
         except Exception:  # noqa: BLE001
             pass
 
     with _launch_humble_ctx(headless=True) as ctx:
         req_html = ""
+        req_status = None
         try:
             resp = ctx.request.get(WISHLIST_URL, timeout=45_000)
+            req_status = resp.status
             if resp.status < 400:
                 req_html = resp.text()
         except Exception:  # noqa: BLE001
@@ -282,6 +344,58 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[str, str, list[Any]]:
         page_html = page.content()
         url = page.url or WISHLIST_URL
         html = page_html if len(page_html) > len(req_html) else req_html
+
+        # #region agent log
+        _nd = _extract_next_data(html)
+        _h = (html or "").lower()
+        _dbglog(
+            "H1H2H3H4H5",
+            "humble wishlist fetch diagnostics",
+            {
+                "final_url": (url or "")[:200],
+                "req_status": req_status,
+                "req_html_len": len(req_html),
+                "page_html_len": len(page_html),
+                "next_data_present": _nd is not None,
+                "next_data_keys": list((_nd or {}).keys())[:25],
+                "sign_in_regex_match": bool(_SIGN_IN_RE.search(html or "")),
+                "has_wishlist_token": "wishlist" in _h,
+                "has_add_to_cart": "add to cart" in _h or "add-to-cart" in _h,
+                "signed_out_detected": _signed_out_page(html, url),
+                "api_payloads": len(api_payloads),
+                "total_responses": _diag["all_resp"],
+                "matched_wishlist_responses": _diag["matched"],
+                "json_response_urls": _diag["json_urls"],
+            },
+        )
+        # Probe where product data lives in the HTML, and whether it's a
+        # signed-out shell. Counts markers + grabs small snippets only.
+        _appjson = re.findall(r'<script[^>]*type="application/json"[^>]*>', html or "", re.I)
+        _appjson_ids = re.findall(
+            r'<script[^>]*type="application/json"[^>]*\bid="([^"]+)"', html or "", re.I
+        )
+        _hn_idx = _h.find("human_name")
+        _mn_idx = _h.find("machine_name")
+        _gw_idx = _h.find("gamekey")
+        _wl_idx = _h.find('"wishlist"')
+        _snippet_at = _hn_idx if _hn_idx != -1 else _mn_idx
+        _snippet = (html or "")[max(0, _snippet_at - 60):_snippet_at + 200] if _snippet_at != -1 else ""
+        _dbglog(
+            "H1H2H3H5",
+            "humble wishlist html shape probe",
+            {
+                "appjson_script_count": len(_appjson),
+                "appjson_script_ids": _appjson_ids[:20],
+                "count_human_name": _h.count("human_name"),
+                "count_machine_name": _h.count("machine_name"),
+                "count_gamekey": _h.count("gamekey"),
+                "has_quoted_wishlist": _wl_idx != -1,
+                "login_form_marker": ('name="username"' in _h) or ("please sign" in _h) or ("log in to" in _h),
+                "wishlist_empty_marker": ("wishlist is empty" in _h) or ("no items" in _h),
+                "product_data_snippet": _snippet,
+            },
+        )
+        # #endregion
 
         if dump:
             dump_html().parent.mkdir(parents=True, exist_ok=True)
@@ -370,11 +484,13 @@ def main() -> int:
             "Humble wishlist capture",
         )
     except Exception as exc:  # noqa: BLE001
+        _cf7log("H4H5", "wishlist fetch EXCEPTION -> EXIT_CODE_AUTH", {"exc": str(exc)[:200]})
         mark_invalid("humble", error=f"wishlist fetch failed: {exc}")
         stats.error(str(exc))
         return stats.finish("fetch_humble_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     if _signed_out_page(html, url):
+        _cf7log("H5", "signed_out_page TRUE -> EXIT_CODE_AUTH", {"url": (url or "")[:200]})
         msg = (
             "Humble session is missing or expired. Open Connections, click Humble Bundle "
             "\u2192 Connect, and sign in at humblebundle.com inside the browser window."
@@ -384,6 +500,7 @@ def main() -> int:
         return stats.finish("fetch_humble_wishlist", t0, exit_code=EXIT_CODE_AUTH)
 
     items = parse_wishlist_sources(html, api_payloads)
+    _cf7log("H4", "wishlist parsed", {"item_count": len(items), "api_payloads": len(api_payloads), "url": (url or "")[:160]})
     print(
         f"  parsed {len(items)} wishlist items ({len(api_payloads)} captured JSON responses)",
         flush=True,
@@ -399,6 +516,7 @@ def main() -> int:
         output_path=GAMES_HUMBLE_WISHLIST_JSON,
     )
     if empty_exit is not None:
+        _cf7log("H4", "refuse_empty_result -> non-zero exit", {"empty_exit": empty_exit, "item_count": len(items)})
         return stats.finish("fetch_humble_wishlist", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
         items,
@@ -407,6 +525,7 @@ def main() -> int:
         output_path=GAMES_HUMBLE_WISHLIST_JSON,
     )
     if drift_exit is not None:
+        _cf7log("H4", "refuse_drift_result -> non-zero exit", {"drift_exit": drift_exit, "item_count": len(items)})
         return stats.finish("fetch_humble_wishlist", t0, exit_code=drift_exit)
 
     hltb_client = HltbClient() if args.hltb else None

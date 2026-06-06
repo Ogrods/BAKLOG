@@ -34,6 +34,28 @@ except ImportError as exc:  # pragma: no cover
 
 _BLANK_URLS = frozenset({"", "about:blank", "chrome://newtab/"})
 
+
+# #region agent log
+def _cf7log(hypothesis: str, message: str, data: dict) -> None:
+    try:
+        _path = Path(__file__).resolve().parents[1] / "debug-cf7aab.log"
+        _line = json.dumps(
+            {
+                "sessionId": "cf7aab",
+                "hypothesisId": hypothesis,
+                "location": "auth/cdp_browser.py",
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            },
+            default=str,
+        )
+        with open(_path, "a", encoding="utf-8") as _f:
+            _f.write(_line + "\n")
+    except Exception:
+        pass
+# #endregion
+
 # Hides the navigator.webdriver automation signal without a launch flag (the
 # flag triggers Chrome/Edge's "unsupported command-line flag" warning bar).
 _AUTOMATION_MASK_SCRIPT = (
@@ -384,6 +406,7 @@ class CdpPage:
         self._request_handlers: list[Callable[[_RequestProxy], None]] = []
         self._response_handlers: list[Callable[[CdpResponse], None]] = []
         self._pending_requests: dict[str, CdpRequest] = {}
+        self._pending_popup_url: str | None = None
 
     @property
     def url(self) -> str:
@@ -485,6 +508,24 @@ class CdpPage:
             {"url": url},
             session_id=self._session_id,
         )
+        if wait_until == "commit":
+            deadline = time.time() + timeout / 1000.0
+            while time.time() < deadline:
+                try:
+                    result = self._context._send(
+                        "Page.getNavigationHistory", session_id=self._session_id
+                    )
+                    entries = result.get("entries") or []
+                    idx = result.get("currentIndex", -1)
+                    if 0 <= idx < len(entries):
+                        nav_url = entries[idx].get("url") or ""
+                        if nav_url and nav_url not in ("about:blank", ""):
+                            self._url = nav_url
+                            return
+                except Exception:
+                    pass
+                time.sleep(0.15)
+            return
         deadline = time.time() + timeout / 1000.0
         while time.time() < deadline:
             try:
@@ -688,6 +729,7 @@ class CdpContext:
         self._request_handlers: list[Callable[[_RequestProxy], None]] = []
         self._init_scripts: list[str] = []
         self._page_handlers: list[Callable[[CdpPage], None]] = []
+        self._ubisoft_native_popup_targets: set[str] = set()
         self.request = CdpHttpClient(self)
 
     def on(self, event: str, handler: Callable) -> None:
@@ -781,15 +823,8 @@ class CdpContext:
         self._send("Page.enable", session_id=session_id)
         self._send("Runtime.enable", session_id=session_id)
         self._send("Network.enable", session_id=session_id)
-        try:
-            self._send("Debugger.enable", session_id=session_id)
-            self._send(
-                "Debugger.setSkipAllPauses",
-                {"skip": True},
-                session_id=session_id,
-            )
-        except Exception:
-            pass
+        # Do not enable Debugger.* — Ubisoft Connect (and similar storefronts)
+        # detect CDP debugging and hang the login page in perpetual loading.
         for src in self._init_scripts:
             self._apply_init_script(page, src)
         return page
@@ -817,10 +852,13 @@ class CdpContext:
             others = [p for p in self.pages if p is not page and not p.is_closed]
 
             if _should_preserve_popup(url):
-                try:
-                    page.bring_to_front()
-                except Exception:
-                    pass
+                # Blank OAuth popups must stay open but should not steal focus
+                # until they navigate to a real sign-in URL.
+                if not is_blank_browser_url(url):
+                    try:
+                        page.bring_to_front()
+                    except Exception:
+                        pass
                 return
 
             try:
@@ -861,9 +899,72 @@ class CdpContext:
                 if page in self.pages:
                     self.pages.remove(page)
             return
+        if method == "Target.targetCreated":
+            _info = params.get("targetInfo") or {}
+            if _info.get("type") == "page":
+                threading.Thread(
+                    target=self._on_target_created,
+                    args=(_info,),
+                    daemon=True,
+                ).start()
+            return
+        if method == "Target.targetInfoChanged":
+            info = params.get("targetInfo") or {}
+            target_id = info.get("targetId", "")
+            page = self._pages_by_target.get(target_id)
+            new_url = (info.get("url") or "").strip()
+            if page:
+                if new_url:
+                    page._url = new_url
+            return
         page = self._pages_by_session.get(session_id or "")
+        if page and method == "Page.windowOpen":
+            open_url = (params.get("url") or "").strip()
+            if open_url:
+                page._pending_popup_url = open_url
         if page and method.startswith("Network."):
             page._handle_network_event(method, params)
+
+    def _pending_ubisoft_login_url(self, opener_id: str) -> str | None:
+        opener = self._pages_by_target.get(opener_id)
+        if not opener:
+            return None
+        deadline = time.time() + 1.0
+        while time.time() < deadline:
+            pending = (getattr(opener, "_pending_popup_url", None) or "").strip()
+            if "connect.ubisoft.com/login" in pending.lower():
+                return pending
+            time.sleep(0.05)
+        return None
+
+    def _on_target_created(self, info: dict) -> None:
+        """Manually attach new page targets (auto-attach is disabled).
+
+        The Ubisoft Connect login popup is deliberately left unattached so Chrome
+        drives its window.open navigation and OAuth handshake natively; CDP
+        attachment (even briefly) interrupts it and the popup hangs blank.
+        """
+        target_id = info.get("targetId", "")
+        if not target_id or target_id in self._pages_by_target:
+            return
+        if target_id in self._ubisoft_native_popup_targets:
+            return
+        opener_id = str(info.get("openerId") or info.get("openerFrameId") or "")
+        popup_url = (info.get("url") or "").strip()
+        if opener_id and is_blank_browser_url(popup_url):
+            login_url = self._pending_ubisoft_login_url(opener_id)
+            if login_url:
+                self._ubisoft_native_popup_targets.add(target_id)
+                return
+        # Everything else: attach via CDP. The resulting Target.attachedToTarget
+        # event is handled by _on_attached_to_target (registration + merge worker).
+        try:
+            self._send(
+                "Target.attachToTarget",
+                {"targetId": target_id, "flatten": True},
+            )
+        except Exception:
+            pass
 
     def _on_attached_to_target(self, params: dict) -> None:
         info = params.get("targetInfo") or {}
@@ -871,17 +972,56 @@ class CdpContext:
         target_id = info.get("targetId", "")
         if info.get("type") != "page" or not sid or not target_id:
             return
+        # Safety net: if a Ubisoft login popup ever gets attached, release it so it
+        # keeps running natively (the real gate is in _on_target_created).
+        if target_id in self._ubisoft_native_popup_targets:
+            try:
+                self._send("Target.detachFromTarget", {"sessionId": sid})
+            except Exception:
+                pass
+            return
         if target_id in self._pages_by_target:
             return
         page = self._register_page(target_id, sid)
         if page not in self.pages:
             self.pages.append(page)
+        self._maybe_navigate_blank_popup(page, info)
         if len(self.pages) > 1:
             threading.Thread(
                 target=self._merge_popup_worker,
                 args=(page,),
                 daemon=True,
             ).start()
+
+    def _maybe_navigate_blank_popup(self, page: CdpPage, info: dict) -> None:
+        """CDP-attached popups often stay on about:blank; drive them to window.open's URL."""
+        opener_id = str(info.get("openerId") or info.get("openerFrameId") or "")
+        if not opener_id:
+            return
+        opener = self._pages_by_target.get(opener_id)
+        if not opener:
+            return
+        target_url = (getattr(opener, "_pending_popup_url", None) or "").strip()
+        if not target_url:
+            return
+        current = (info.get("url") or page._url or "").strip()
+        if not is_blank_browser_url(current):
+            return
+
+        def _nav() -> None:
+            url = target_url
+            deadline = time.time() + 2.0
+            while not url and time.time() < deadline:
+                time.sleep(0.05)
+                url = (getattr(opener, "_pending_popup_url", None) or "").strip()
+            if not url:
+                return
+            try:
+                page.goto(url, wait_until="commit", timeout=15_000)
+            except Exception:
+                pass
+
+        threading.Thread(target=_nav, daemon=True).start()
 
     def _send(
         self,
@@ -976,6 +1116,49 @@ def _reader_loop(
             )
 
 
+def _ensure_persistent_session_prefs(profile: Path) -> None:
+    """Make the launched profile keep session cookies across runs.
+
+    OAuth/login popups (Microsoft, Google, etc.) frequently set *session*
+    cookies — no Expires/Max-Age — which Chrome keeps in memory and drops on
+    exit unless the profile is set to "Continue where you left off"
+    (``session.restore_on_startup = 1``). Persistent cookies already survive via
+    ``--user-data-dir``; this closes the gap for session-cookie sign-ins so a
+    Connect window stays logged in between sessions.
+
+    Merges into ``Default/Preferences`` (created on first run by Chrome) without
+    clobbering anything else, and marks a clean prior exit so Chrome doesn't show
+    the "restore pages?" bubble over the login UI.
+    """
+    try:
+        default_dir = profile / "Default"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        prefs_path = default_dir / "Preferences"
+        prefs: dict[str, Any] = {}
+        if prefs_path.exists():
+            try:
+                loaded = json.loads(prefs_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    prefs = loaded
+            except (json.JSONDecodeError, OSError):
+                prefs = {}
+        session = prefs.get("session")
+        if not isinstance(session, dict):
+            session = {}
+        # 1 == restore the last session ("Continue where you left off").
+        session["restore_on_startup"] = 1
+        prefs["session"] = session
+        profile_node = prefs.get("profile")
+        if not isinstance(profile_node, dict):
+            profile_node = {}
+        profile_node["exit_type"] = "Normal"
+        profile_node["exited_cleanly"] = True
+        prefs["profile"] = profile_node
+        prefs_path.write_text(json.dumps(prefs), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def launch_persistent_profile(
     user_data_dir: str | Path,
     *,
@@ -997,6 +1180,7 @@ def launch_persistent_profile(
     port = _free_port()
     profile = Path(user_data_dir)
     profile.mkdir(parents=True, exist_ok=True)
+    _ensure_persistent_session_prefs(profile)
 
     args = [
         str(exe),
@@ -1075,13 +1259,19 @@ def launch_persistent_profile(
         target=_reader_loop, args=(ws, pending, context), daemon=True
     ).start()
 
+    # Discover targets but do NOT auto-attach: auto-attach force-attaches every
+    # new target the instant it is created, which interrupts the native
+    # window.open navigation for storefront OAuth popups (Ubisoft Connect hangs
+    # blank). We manually attach each new page in _on_target_created instead, so
+    # we can leave specific popups (Ubisoft login) entirely native.
     context._send("Target.setAutoAttach", {
-        "autoAttach": True,
+        "autoAttach": False,
         "waitForDebuggerOnStart": False,
         "flatten": True,
     })
+    context._send("Target.setDiscoverTargets", {"discover": True})
 
-    # Attach existing page targets (autoAttach covers new ones).
+    # Attach existing page targets (new ones are attached via _on_target_created).
     targets = _fetch_json(f"http://127.0.0.1:{port}/json/list", timeout=5)
     for t in targets:
         if t.get("type") == "page":
@@ -1096,6 +1286,16 @@ def launch_persistent_profile(
     # --disable-blink-features=AutomationControlled launch flag (which triggers
     # Chrome/Edge's "unsupported command-line flag" infobar). Runs before any
     # page script on every document, including frames.
+    # #region agent log
+    try:
+        _cf7log("HC5", "launch_persistent_profile ok", {
+            "page_count": len(context.pages),
+            "proc_alive": context._proc.poll() is None,
+            "port": context._port,
+        })
+    except Exception:
+        pass
+    # #endregion
     context.add_init_script(_AUTOMATION_MASK_SCRIPT)
 
     return context

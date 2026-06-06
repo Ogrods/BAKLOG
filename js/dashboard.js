@@ -91,7 +91,8 @@ export function dashboardFingerprint() {
     if (d) dealSig += (d.cut || 0) + (d.isHistoricalLow ? 1000 : 0);
   }
   return JSON.stringify({
-    dv: window._dataVersion || 0,
+    // Omit _dataVersion — it bumps on every merge (including no-op wishlist
+    // re-fetches) and would defeat this fingerprint, forcing chart teardown.
     itch: (state.itchGames || []).filter(itchIsGame).length,
     qw: state.prefs.quickWinMaxHours || 0,
     ihn: !!state.sessionPrefs.itchHideNonGames,
@@ -175,9 +176,9 @@ function applyMegaHeroCounters(stats) {
 
 let _resizeQuietInstalled = false;
 let _resizeQuietTimer = 0;
-// Drop the mega hero's per-frame backdrop blurs and pause its spotlight
-// float/sheen while the window is actively resizing (css keys off
-// html.ui-resizing), then restore ~200ms after resize settles.
+// Pause ribbon chart responsive relayout and spotlight float/sheen animations
+// while the window is actively resizing (css keys off html.ui-resizing), then
+// restore ~200ms after resize settles.
 function ensureResizeQuiet() {
   if (_resizeQuietInstalled) return;
   _resizeQuietInstalled = true;
@@ -383,6 +384,7 @@ function renderDashboardOnboard() {
 export async function renderDashboard(opts = {}) {
   if (state.activeView !== "dashboard") return;
   renderDashboardOnboard();
+  if (!state.dashboardDataReady) return;
   try {
     await ensureChartJs();
   } catch (err) {
@@ -401,7 +403,6 @@ export async function renderDashboard(opts = {}) {
   const content = document.getElementById("dashboardContent");
   // Boot curtain covers Chart.js / data-not-ready during cold load; no in-card loader.
   if (typeof Chart === "undefined") return;
-  if (!state.dashboardDataReady) return;
   content?.classList.remove("hidden");
 
   const fp = dashboardFingerprint();
@@ -415,7 +416,7 @@ export async function renderDashboard(opts = {}) {
         startSpotlightRotation(spotlightPool);
         const snapReplay = getLibrarySnapshot(games);
         startInsightRotation(buildInsightPool(games, snapReplay));
-        replayDashboardChartAnimations();
+        replayDashboardChartAnimations({ ribbonOnly: !!opts.replayRibbonOnly });
         _dashRenderStats.replay++;
       } finally {
         _dashRenderInFlight = false;

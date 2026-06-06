@@ -87,6 +87,21 @@ def test_normalize_profile_id_rejects_unsafe() -> None:
         normalize_profile_id("bad id")
 
 
+def test_finalize_migration_when_default_dir_exists_without_marker(
+    isolated_profiles: Path,
+) -> None:
+    """Stuck installs: profiles/default/ copied but .migration_complete missing."""
+    (isolated_profiles / "games_steam.json").write_text("{}", encoding="utf-8")
+    default_dir = isolated_profiles / "profiles" / "default"
+    default_dir.mkdir(parents=True)
+    (default_dir / "games_steam.json").write_text("{}", encoding="utf-8")
+    assert profile_paths.is_legacy_layout("default") is True
+    profiles.finalize_default_profile_migration()
+    assert profile_paths.migration_complete_path().is_file()
+    assert profile_paths.is_legacy_layout("default") is False
+    assert profile_paths.profile_root("default") == default_dir
+
+
 def test_migration_marker_gates_legacy_layout(isolated_profiles: Path) -> None:
     """profiles/default/ may exist mid-copy; layout flips only after .migration_complete."""
     (isolated_profiles / "games_steam.json").write_text("{}", encoding="utf-8")
@@ -115,11 +130,17 @@ def test_migration_resumes_missing_files(isolated_profiles: Path) -> None:
     assert (default_dir / "games_gog.json").is_file()
 
 
-def test_delete_default_blocked_after_migration(isolated_profiles: Path) -> None:
+def test_delete_default_allowed_when_not_active(isolated_profiles: Path) -> None:
     (isolated_profiles / "games_steam.json").write_text("{}", encoding="utf-8")
     profiles.create_profile("Work")
-    with pytest.raises(ValueError, match="default"):
-        profiles.delete_profile("default")
+    doc = profile_paths.load_index()
+    doc["active"] = "work"
+    profile_paths.save_index(doc)
+    profiles.delete_profile("default")
+    assert not (isolated_profiles / "profiles" / "default").is_dir()
+    remaining = profile_paths.load_index()["profiles"]
+    assert len(remaining) == 1
+    assert remaining[0]["id"] == "work"
 
 
 def test_delete_profile_refuses_active(isolated_profiles: Path) -> None:

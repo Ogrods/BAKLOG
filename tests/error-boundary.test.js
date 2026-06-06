@@ -16,15 +16,18 @@
  * top because vitest+vite doesn't support cache-busting dynamic imports.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
 import {
   _resetForTests,
   buildBugBundle,
+  BUG_REPORT_ENDPOINT,
+  getBugReportEndpoint,
   getCapturedErrors,
   installGlobalErrorHandler,
   registerBugBundleContext,
   reportError,
+  submitBugReport,
 } from "../js/error-boundary.js";
 
 function installWindow({ versionMeta = "9.9.9-test", localStorageRaw } = {}) {
@@ -271,5 +274,63 @@ describe("buildBugBundle shape", () => {
       "session",
       "session_count",
     ]);
+  });
+});
+
+describe("submitBugReport", () => {
+  /** @type {import('vitest').Mock} */
+  let fetchMock;
+
+  beforeEach(() => {
+    installWindow({ versionMeta: "9.9.9-test" });
+    _resetForTests();
+    fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+    global.fetch = fetchMock;
+    window.__BAKLOG_REPORT_ENDPOINT = "https://test.example/api/report";
+  });
+
+  afterEach(() => {
+    delete global.fetch;
+    delete window.__BAKLOG_REPORT_ENDPOINT;
+    teardownWindow();
+  });
+
+  it("does not call fetch until explicitly invoked", () => {
+    reportError(new Error("idle"));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("POSTs trimmed bundle with contact and note caps", async () => {
+    for (let i = 0; i < 30; i += 1) {
+      reportError(new Error(`persisted-${i}`));
+    }
+    await submitBugReport({
+      contact: `${"a".repeat(400)}@example.com`,
+      note: "b".repeat(3000),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://test.example/api/report");
+    expect(opts.method).toBe("POST");
+    expect(opts.headers["Content-Type"]).toBe("application/json");
+    const body = JSON.parse(opts.body);
+    expect(body.bundle.bundle).toBe("baklog-bug-bundle");
+    expect(body.bundle.errors.persisted.length).toBeLessThanOrEqual(25);
+    expect(body.contact.length).toBe(320);
+    expect(body.note.length).toBe(2000);
+  });
+
+  it("throws when the server returns a non-OK status", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) });
+    await expect(submitBugReport()).rejects.toThrow("report failed: 502");
+  });
+
+  it("defaults endpoint to baklog.app when no override is set", () => {
+    delete window.__BAKLOG_REPORT_ENDPOINT;
+    expect(getBugReportEndpoint()).toBe("https://baklog.app/api/report");
+    expect(BUG_REPORT_ENDPOINT).toBe("https://baklog.app/api/report");
   });
 });

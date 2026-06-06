@@ -33,6 +33,7 @@ import {
   buildFetcherHealthRows,
   filterFetcherHealthRows,
   isFetcherAuthHealthy,
+  coverableRows,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -1069,6 +1070,51 @@ describe('fetcher header popover', () => {
     expect(fetcherRunner.isFetcherPopoverOpen()).toBe(false);
   });
 
+  it('showFetcherPopover expands log when it starts collapsed', () => {
+    const log = document.getElementById('fetcherRunLog');
+    log.classList.add('open', 'fh-log--collapsed');
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    expect(log.classList.contains('fh-log--collapsed')).toBe(false);
+  });
+
+  it('openFetcherLog opens popover and expands log body', () => {
+    const log = document.getElementById('fetcherRunLog');
+    log.classList.add('open', 'fh-log--collapsed');
+    fetcherRunner.openFetcherLog({ focusPanel: false });
+    expect(document.getElementById('fetcherPopover').hidden).toBe(false);
+    expect(log.classList.contains('fh-log--collapsed')).toBe(false);
+  });
+
+  it('openFetcherLog keeps popover open when already visible', () => {
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    fetcherRunner.hideFetcherPopover();
+    const log = document.getElementById('fetcherRunLog');
+    log.classList.add('fh-log--collapsed');
+    fetcherRunner.openFetcherLog({ focusPanel: false });
+    expect(document.getElementById('fetcherPopover').hidden).toBe(false);
+    expect(log.classList.contains('fh-log--collapsed')).toBe(false);
+    fetcherRunner.openFetcherLog({ focusPanel: false });
+    expect(document.getElementById('fetcherPopover').hidden).toBe(false);
+    expect(log.classList.contains('fh-log--collapsed')).toBe(false);
+  });
+
+  it('ensurePanel does not open a closed popover while work is pending', () => {
+    const pop = document.getElementById('fetcherPopover');
+    const src = { key: 'steam', label: 'Steam' };
+    expect(pop.hidden).toBe(true);
+
+    fetcherRunner.applyServerSnapshotInFlight({ active: { key: 'steam', id: 'r1', status: 'running' } });
+    fetcherRunner.ensurePanelForTest(src, 'running');
+    expect(pop.hidden).toBe(true);
+    expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
+
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    expect(pop.hidden).toBe(false);
+
+    fetcherRunner.applyServerSnapshotInFlight({});
+    fetcherRunner.revertFetcherLayoutIfIdle();
+  });
+
   it('console Collapse toggles only the log body, not the popover', () => {
     fetcherRunner.showFetcherPopover({ focusPanel: false });
     fetcherRunner.reopenLogPanel();
@@ -1080,18 +1126,22 @@ describe('fetcher header popover', () => {
 
     closeBtn.click();
     expect(log.classList.contains('fh-log--collapsed')).toBe(true);
-    expect(closeBtn.textContent).toBe('Expand');
+    expect(closeBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(closeBtn.classList.contains('is-collapsed')).toBe(true);
     expect(pop.hidden).toBe(false);
     expect(document.getElementById('fetcherRow').classList.contains('is-expanded')).toBe(true);
 
     closeBtn.click();
     expect(log.classList.contains('fh-log--collapsed')).toBe(false);
-    expect(closeBtn.textContent).toBe('Collapse');
+    expect(closeBtn.getAttribute('aria-expanded')).toBe('true');
+    expect(closeBtn.classList.contains('is-collapsed')).toBe(false);
   });
 });
 
 describe('header pill ticker', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    fetcherRunner.resetPillAggregatesForTest();
     document.body.innerHTML = `
       <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle">
         <span id="fetcherGlobalStatusLive" class="sr-only" aria-live="polite"></span>
@@ -1106,8 +1156,11 @@ describe('header pill ticker', () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     document.body.innerHTML = '';
     fetcherRunner.markChipStateForTest('steam', null);
+    fetcherRunner.resetPillAggregatesForTest();
   });
 
   it('streams the latest log line into the tail while active', () => {
@@ -1125,6 +1178,7 @@ describe('header pill ticker', () => {
     fetcherRunner.markChipStateForTest('steam', 'running');
     fetcherRunner.appendLineForTest('First line');
     fetcherRunner.appendLineForTest('Second line');
+    vi.advanceTimersByTime(200);
     expect(document.getElementById('fetcherGlobalStatusTail').textContent).toBe('Second line');
   });
 
@@ -1139,6 +1193,35 @@ describe('header pill ticker', () => {
     expect(pill.classList.contains('is-streaming')).toBe(false);
     expect(tail.textContent).toBe('');
     expect(pill.classList.contains('fh-global-status-idle')).toBe(true);
+  });
+
+  it('uses the running (blue) state, not idle, while a fetcher runs', () => {
+    const pill = document.getElementById('fetcherGlobalStatus');
+    fetcherRunner.markChipStateForTest('steam', 'running');
+    expect(pill.classList.contains('fh-global-status-running')).toBe(true);
+    expect(pill.classList.contains('fh-global-status-idle')).toBe(false);
+    expect(pill.classList.contains('fh-global-status-queued')).toBe(false);
+  });
+
+  it('uses the queued (amber) state when only queued, nothing running', () => {
+    const pill = document.getElementById('fetcherGlobalStatus');
+    fetcherRunner.markChipStateForTest('steam', 'queued');
+    expect(pill.classList.contains('fh-global-status-queued')).toBe(true);
+    expect(pill.classList.contains('fh-global-status-running')).toBe(false);
+    expect(pill.classList.contains('fh-global-status-idle')).toBe(false);
+  });
+
+  it('shows the failed (red) state after a run fails', () => {
+    const pill = document.getElementById('fetcherGlobalStatus');
+    try {
+      fetcherRunner.markRunFailedForTest('steam');
+      fetcherRunner.markChipStateForTest('steam', null);
+      expect(pill.classList.contains('fh-global-status-failed')).toBe(true);
+      expect(pill.classList.contains('fh-global-status-idle')).toBe(false);
+      expect(document.getElementById('fetcherGlobalStatusText').textContent).toMatch(/failed$/);
+    } finally {
+      fetcherRunner.clearRunFailedForTest('steam');
+    }
   });
 });
 
@@ -1477,5 +1560,30 @@ describe('renderDashboardFetcherHealth filter toggles', () => {
     expect(document.getElementById('fetcherHealthShowConnected')).toBeTruthy();
     expect(document.getElementById('fetcherHealthShowStaleMissing')).toBeTruthy();
     expect(document.getElementById('fetcherHealthStaleOnly')).toBeNull();
+  });
+});
+
+describe('coverableRows', () => {
+  beforeEach(() => {
+    state.allGames = [
+      { store: 'steam', id: 1, name: 'Steam Game' },
+      { store: 'gog', id: 'g1', name: 'GOG Game' },
+    ];
+    state.wishlistGames = [
+      { store: 'wishlist', id: 'xbox-9NQPJ4M6SMDF', name: 'Armatus', header_image: null },
+    ];
+    state.itchGames = [
+      { store: 'itch', id: '1', name: 'Itch Game', classification: 'game' },
+      { store: 'itch', id: '2', name: 'Map Tool', classification: 'tool' },
+    ];
+  });
+
+  it('includes non-Steam library, wishlist, and itch games but not itch tools', () => {
+    const keys = coverableRows().map((g) => `${g.store}:${g.id}`);
+    expect(keys).not.toContain('steam:1');
+    expect(keys).toContain('gog:g1');
+    expect(keys).toContain('wishlist:xbox-9NQPJ4M6SMDF');
+    expect(keys).toContain('itch:1');
+    expect(keys).not.toContain('itch:2');
   });
 });

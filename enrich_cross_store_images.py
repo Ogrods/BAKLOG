@@ -6,6 +6,7 @@ import json
 import re
 import sys
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from dotenv import load_dotenv
 
 from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
+from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -31,17 +33,26 @@ HEARTBEAT_EVERY = 25
 def meta_file() -> Path:
     return cache_json_path("cross_store_images_meta.json")
 
-STORE_FILES = [
-    (Path("games_gog.json"), "gog"),
-    (Path("games_psn.json"), "psn"),
-    (Path("games_epic.json"), "epic"),
-    (Path("games_amazon.json"), "amazon"),
-    (Path("games_xbox.json"), "xbox"),
-    (Path("games_battlenet.json"), "battlenet"),
-    (Path("games_ubisoft.json"), "ubisoft"),
-    (Path("games_nintendo.json"), "nintendo"),
-    (Path("games_humble.json"), "humble"),
-    (Path("games_ea.json"), "ea"),
+STORE_FILES: list[tuple[Path, str, Callable[[dict], bool] | None]] = [
+    (Path("games_gog.json"), "gog", None),
+    (Path("games_psn.json"), "psn", None),
+    (Path("games_epic.json"), "epic", None),
+    (Path("games_amazon.json"), "amazon", None),
+    (Path("games_xbox.json"), "xbox", None),
+    (Path("games_battlenet.json"), "battlenet", None),
+    (Path("games_ubisoft.json"), "ubisoft", None),
+    (Path("games_nintendo.json"), "nintendo", None),
+    (Path("games_humble.json"), "humble", None),
+    (Path("games_itch.json"), "itch", _itch_is_videogame),
+    (Path("games_ea.json"), "ea", None),
+    (Path("games_wishlist.json"), "wishlist", None),
+    (Path("games_wishlist_gog.json"), "wishlist", None),
+    (Path("games_wishlist_epic.json"), "wishlist", None),
+    (Path("games_wishlist_psn.json"), "wishlist", None),
+    (Path("games_wishlist_ubisoft.json"), "wishlist", None),
+    (Path("games_wishlist_xbox.json"), "wishlist", None),
+    (Path("games_wishlist_nintendo.json"), "wishlist", None),
+    (Path("games_wishlist_humble.json"), "wishlist", None),
 ]
 
 
@@ -155,13 +166,14 @@ def main() -> int:
         g["image_source"] = "steam_search"
         return g
 
-    for rel, store in STORE_FILES:
+    for rel, store, row_filter in STORE_FILES:
         path = catalog_file(rel)
         if not path.exists():
             continue
         data = json.loads(path.read_text(encoding="utf-8"))
         games = data.get("games", [])
-        todo = [g for g in games if needs_images(g)]
+        eligible = [g for g in games if row_filter is None or row_filter(g)]
+        todo = [g for g in eligible if needs_images(g)]
         if not todo:
             print(f"{path.name}: nothing to enrich", flush=True)
             continue

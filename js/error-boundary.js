@@ -233,6 +233,7 @@ function buildToast() {
       <pre class="baklog-error-toast-stack" data-field="stack"></pre>
     </div>
     <div class="baklog-error-toast-foot">
+      <button type="button" class="baklog-error-toast-btn" data-action="send-report" aria-label="Send a bug report" title="Open the report dialog to review and send this bug bundle. Nothing is sent until you confirm.">Send report</button>
       <button type="button" class="baklog-error-toast-btn" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a JSON bug bundle (errors + app context) to your clipboard so you can paste it into a GitHub issue. Nothing is sent anywhere - what you do with the clipboard is up to you.">Copy bug bundle</button>
       <button type="button" class="baklog-error-toast-btn" data-action="copy" title="Copy just the error list as JSON">Errors only</button>
       <button type="button" class="baklog-error-toast-btn" data-action="toggle-details" aria-label="Toggle error details">Details</button>
@@ -249,6 +250,8 @@ function buildToast() {
       copyErrorLog(btn);
     } else if (action === 'copy-bundle') {
       copyBugBundle(btn);
+    } else if (action === 'send-report') {
+      window.dispatchEvent(new CustomEvent('baklog:open-bug-report'));
     } else if (action === 'toggle-details') {
       _detailsOpen = !_detailsOpen;
       const details = el.querySelector('[data-field="details"]');
@@ -422,6 +425,36 @@ export function registerBugBundleContext(ctx) {
 
 function copyBugBundle(btn) {
   copyTextToClipboard(JSON.stringify(buildBugBundle(), null, 2), btn);
+}
+
+export const BUG_REPORT_ENDPOINT = 'https://baklog.app/api/report';
+
+/** Resolve report endpoint (meta tag / window override / default). */
+export function getBugReportEndpoint() {
+  return (typeof document !== 'undefined' && document.querySelector('meta[name="baklog-report-endpoint"]')?.content)
+    || (typeof window !== 'undefined' && window.__BAKLOG_REPORT_ENDPOINT)
+    || BUG_REPORT_ENDPOINT;
+}
+
+/**
+ * Submit the sanitized bug bundle to the opt-in report endpoint.
+ * Only called on explicit user action (Send report in the consent dialog).
+ * @param {{ contact?: string, note?: string }} [opts]
+ */
+export async function submitBugReport({ contact = '', note = '' } = {}) {
+  const bundle = buildBugBundle();
+  bundle.errors.persisted = bundle.errors.persisted.slice(-25);
+  const res = await fetch(getBugReportEndpoint(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bundle,
+      contact: String(contact).slice(0, 320),
+      note: String(note).slice(0, 2000),
+    }),
+  });
+  if (!res.ok) throw new Error(`report failed: ${res.status}`);
+  return res.json().catch(() => ({}));
 }
 
 /**

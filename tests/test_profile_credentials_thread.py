@@ -36,20 +36,29 @@ def _write_blob(profile_id: str, key: str) -> None:
         secrets_mod.SECRETS_FILE,
         secrets_mod.MASTER_KEY_FILE,
         secrets_mod._cache,
+        secrets_mod.PROFILE_ID_OVERRIDE,
     )
     secrets_mod.AUTH_DIR = target
     secrets_mod.SECRETS_FILE = target / "secrets.bin"
     secrets_mod.MASTER_KEY_FILE = target / ".master_key"
     secrets_mod._cache = None
+    # Encrypt with this profile's HKDF subkey so the read path (which sets the
+    # same override) can decrypt it; otherwise the blob is keyed to the active
+    # profile and silently fails to decrypt.
+    secrets_mod.PROFILE_ID_OVERRIDE = profile_id
     try:
         set_provider_blob(
             "steam",
             {"STEAM_API_KEY": key, "STEAM_ID": "1", "status": "connected"},
         )
     finally:
-        secrets_mod.AUTH_DIR, secrets_mod.SECRETS_FILE, secrets_mod.MASTER_KEY_FILE, secrets_mod._cache = (
-            saved
-        )
+        (
+            secrets_mod.AUTH_DIR,
+            secrets_mod.SECRETS_FILE,
+            secrets_mod.MASTER_KEY_FILE,
+            secrets_mod._cache,
+            secrets_mod.PROFILE_ID_OVERRIDE,
+        ) = saved
 
 
 def test_concurrent_profile_credentials_env_isolation(

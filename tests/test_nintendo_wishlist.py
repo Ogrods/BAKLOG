@@ -6,6 +6,8 @@ from pathlib import Path
 from fetch_nintendo_wishlist import (
     _build_row,
     _signed_out,
+    _wishlist_graphql_ok,
+    _wishlist_session_authenticated,
     parse_wishlist_sources,
 )
 
@@ -48,3 +50,46 @@ def test_build_row_schema() -> None:
 def test_signed_out_login_page() -> None:
     assert _signed_out("", "https://accounts.nintendo.com/login")
     assert not _signed_out(FIXTURE.read_text(encoding="utf-8"), "https://www.nintendo.com/us/wish-list/")
+
+
+def test_parse_wishlist_from_graphql_payload() -> None:
+    payload = {
+        "data": {
+            "customer": {
+                "id": "cust-1",
+                "wishList": {
+                    "items": [
+                        {
+                            "id": "wl-1",
+                            "product": {
+                                "nsUid": "71000000012345",
+                                "title": "GraphQL Adventure",
+                                "url": "/us/store/products/graphql-adventure-switch/",
+                                "image": {"url": "https://assets.nintendo.com/test.jpg"},
+                            },
+                        }
+                    ],
+                    "hasNextPage": False,
+                },
+            }
+        }
+    }
+    items = parse_wishlist_sources("", [payload])
+    assert len(items) == 1
+    assert items[0].title == "GraphQL Adventure"
+    assert _wishlist_graphql_ok(payload)
+    assert _wishlist_session_authenticated([payload])
+
+
+def test_empty_authenticated_wishlist_counts_as_session() -> None:
+    payload = {
+        "data": {
+            "customer": {
+                "id": "cust-1",
+                "wishList": {"items": [], "hasNextPage": False},
+            }
+        }
+    }
+    assert _wishlist_graphql_ok(payload)
+    assert _wishlist_session_authenticated([payload])
+    assert parse_wishlist_sources("", [payload]) == []

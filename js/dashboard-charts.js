@@ -7,7 +7,7 @@ import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverF
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { focusGame } from './table-ui.js';
-import { DASH_STORE_COLORS, DASH_STATUS_COLORS, DASH_REVIEW_COLORS, DASH_STORE_LABELS, HLTB_BUCKETS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
+import { dashStoreColor, DASH_STATUS_COLORS, DASH_REVIEW_COLORS, DASH_STORE_LABELS, HLTB_BUCKETS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
 import { prefersReducedMotion } from './motion.js';
 // Click handlers route into drilldown helpers. One-way import; drilldown
 // does not import this module.
@@ -43,6 +43,22 @@ const CHART_STAGGER_MS = 120;
 const chartRenderQueue = [];
 let chartRenderTimer = null;
 let lastChartRenderAt = 0;
+let _chartStaggerSuppressedUntil = 0;
+
+/** Batch lazy chart paints when the boot curtain reveals the dashboard (log: stagger queue caused 6×120ms pop-in). */
+export function suppressChartStaggerForBoot(ms = 900) {
+  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  _chartStaggerSuppressedUntil = now + ms;
+}
+
+export function resizeRibbonCharts() {
+  for (const chart of Object.values(dashboardCharts)) {
+    const canvas = chart?.canvas;
+    if (!canvas || !canvas.parentNode || !canvas.closest('.dash-ribbon-chart')) continue;
+    if (!document.body.contains(canvas)) continue;
+    try { chart.resize(); } catch (_) { /* disposed */ }
+  }
+}
 
 function drainChartRenderQueue() {
   chartRenderTimer = null;
@@ -64,6 +80,11 @@ function drainChartRenderQueue() {
 }
 
 function scheduleStaggeredChartRender(fn) {
+  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  if (now < _chartStaggerSuppressedUntil) {
+    try { fn(); } catch (err) { console.error("Lazy chart render failed:", err); }
+    return;
+  }
   chartRenderQueue.push(fn);
   if (chartRenderTimer == null) {
     chartRenderTimer = setTimeout(drainChartRenderQueue, 0);
@@ -132,15 +153,12 @@ export function destroyDashboardCharts() {
   lastChartRenderAt = 0;
 }
 
-/** Replay the entrance animation on every live chart without rebuilding it. */
-export function replayDashboardChartAnimations() {
-  // Single animated pass on every live chart. reset() rewinds the animation
-  // state to its `from` values; update() then animates back to current data.
-  // Pair with animations.resize.duration:0 (in dashChartOptions) so the
-  // container unhide on tab change can't trigger a second resize animation
-  // racing with this one. Scatter replays its points-only entrance like the
-  // rest — only the points move (y rise + radius pop), never the grid/axes.
+/** Replay the entrance animation on live charts without rebuilding them. */
+export function replayDashboardChartAnimations({ ribbonOnly = false } = {}) {
+  // Tab return: ribbonOnly skips scatter / bar charts — reset+update on thousands
+  // of scatter points blocked the main thread and froze the dashboard.
   for (const chart of Object.values(dashboardCharts)) {
+    if (ribbonOnly && !chart?.canvas?.closest('.dash-ribbon-chart')) continue;
     try {
       chart.reset();
       chart.update();
@@ -218,6 +236,13 @@ function setDashboardChart(id, config) {
   }
   const build = () => {
     if (!document.body.contains(canvas)) return;
+    // Chart.js responsive init reads the canvas's parent box; a chart built while
+    // #dashboardContainer is display:none (boot curtain) crashes in getMaximumSize.
+    if (canvas.offsetParent === null && canvas.getClientRects().length === 0) {
+      pendingChartRenders.set(id, build);
+      ensureChartObserver()?.observe(canvas);
+      return;
+    }
     dashboardCharts[id] = new Chart(canvas, config);
   };
   const observer = ensureChartObserver();
@@ -783,7 +808,7 @@ export function renderDashboardCharts(games) {
     type: "doughnut",
     data: {
       labels: storeEntries.map(([k]) => DASH_STORE_LABELS[k] || k),
-      datasets: [{ data: storeEntries.map(([, v]) => v), backgroundColor: storeEntries.map(([k]) => DASH_STORE_COLORS[k] || "#64748b"), borderWidth: 0 }],
+      datasets: [{ data: storeEntries.map(([, v]) => v), backgroundColor: storeEntries.map(([k]) => dashStoreColor(k)), borderWidth: 0 }],
     },
     options: dashChartOptions({
       plugins: { legend: donutLegendHighlight() },
@@ -853,7 +878,7 @@ export function renderDashboardCharts(games) {
     const totalB = (backlogByStore.backlog[b] || 0) + (backlogByStore.finished[b] || 0);
     return totalB - totalA;
   });
-  const storeBrandColors = sortedStores.map(s => DASH_STORE_COLORS[s] || "#64748b");
+  const storeBrandColors = sortedStores.map(s => dashStoreColor(s));
   setDashboardChart("chartBacklogStore", {
     type: "bar",
     data: {

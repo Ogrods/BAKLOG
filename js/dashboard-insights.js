@@ -651,6 +651,9 @@ export function buildMarqueeItems(games, snapIn) {
   const topStore = Object.entries(storeCounts).sort((a, b) => b[1] - a[1])[0];
   if (topStore) push('>', '', `${topStore[0]} · ${formatNum(topStore[1])}`, 'biggest store');
 
+  const catGames = games.filter(g => String(g.name || '').toLowerCase().includes('cat')).length;
+  if (catGames) push('=^..^=', 'is-violet', formatNum(catGames), 'cat games', null, { weight: W.friendly });
+
   if (stores > 0 && total > 0) {
     const avgPerStore = Math.round(total / stores);
     push('~', 'is-amber', formatNum(avgPerStore), 'games per store avg');

@@ -20,6 +20,7 @@ import { state } from './state.js';
 import { tableFingerprint } from './table-ui.js';
 import { collectActiveFilters } from './filters-ui.js';
 import { getErrorCount, buildBugBundle } from './error-boundary.js';
+import { openBugReportDialog } from './bug-report.js';
 import { getCurtainState } from './loading-curtain.js';
 import { countOrphanPersonalKeys } from './personal-storage.js';
 import { registerPausable } from './visibility.js';
@@ -66,7 +67,8 @@ function buildOverlay() {
       <dt>orphans</dt><dd data-field="orphans" title="state.personal keys with no matching game in any catalog. Surfaced read-only; clean up via kebab → Clean up unknown games."> - </dd>
     </dl>
     <div class="baklog-debug-overlay-foot">
-      <button type="button" class="baklog-debug-overlay-bundle" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a sanitized JSON bug bundle to clipboard. Nothing is sent anywhere.">Copy bug bundle</button>
+      <button type="button" class="baklog-debug-overlay-bundle" data-action="copy-bundle" aria-label="Copy a sanitized bug bundle to the clipboard" title="Copy a sanitized JSON bug bundle to clipboard. Nothing is sent until you choose Send report.">Copy bug bundle</button>
+      <button type="button" class="baklog-debug-overlay-bundle" data-action="send-report" aria-label="Send a bug report" title="Open the report dialog to review and send this bug bundle.">Send report</button>
       <div class="baklog-debug-overlay-hint">?debug=1 · <code>localStorage.removeItem('${STORAGE_KEY}')</code></div>
     </div>
   `;
@@ -75,6 +77,9 @@ function buildOverlay() {
   });
   el.querySelector('[data-action="copy-bundle"]')?.addEventListener('click', (ev) => {
     copyBundleFromOverlay(ev.currentTarget);
+  });
+  el.querySelector('[data-action="send-report"]')?.addEventListener('click', () => {
+    openBugReportDialog();
   });
   return el;
 }

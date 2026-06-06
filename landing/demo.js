@@ -55,17 +55,17 @@
   };
 
   const SPOTLIGHT_GAMES = [
-    { title: "Emberfall", eyebrow: "Critically acclaimed", rating: 95, hltb: "42h", status: "in backlog", art: "assets/sample/hero-emberfall.webp", portrait: false },
+    { title: "Emberfall", eyebrow: "Critically acclaimed", rating: 95, hltb: "42h", status: "in backlog", art: "assets/sample/hero-emberfall.webp", portrait: false, focal: "72% 42%" },
     { title: "Ironveil", eyebrow: "Couch co-op", rating: 83, hltb: "10h", status: "in backlog", art: "assets/sample/cover-ironveil.webp", portrait: true },
-    { title: "Rustbloom", eyebrow: "On sale now", rating: 92, saleCut: 80, price: "$5.99", art: "assets/sample/hero-rustbloom.webp", portrait: false },
+    { title: "Rustbloom", eyebrow: "On sale now", rating: 92, saleCut: 80, price: "$5.99", art: "assets/sample/hero-rustbloom.webp", portrait: false, focal: "58% 38%" },
     { title: "Ashlight Saga", eyebrow: "Highly rated", rating: 91, hltb: "55h", status: "in backlog", art: "assets/sample/cover-ashlight-saga.webp", portrait: true },
-    { title: "Ashen Vale", eyebrow: "Long haul", rating: 90, hltb: "60h", status: "in progress", art: "assets/sample/hero-ashen-vale.webp", portrait: false },
+    { title: "Ashen Vale", eyebrow: "Long haul", rating: 90, hltb: "60h", status: "in progress", art: "assets/sample/hero-ashen-vale.webp", portrait: false, focal: "68% 35%" },
     { title: "Encore", eyebrow: "Replay", rating: 93, hltb: "8h", status: "completed", art: "assets/sample/cover-encore.webp", portrait: true },
-    { title: "Starbreak", eyebrow: "New frontier", rating: 90, hltb: "30h", status: "next up", art: "assets/sample/hero-starbreak.webp", portrait: false },
+    { title: "Starbreak", eyebrow: "New frontier", rating: 90, hltb: "30h", status: "next up", art: "assets/sample/hero-starbreak.webp", portrait: false, focal: "52% 58%" },
     { title: "Zephyr Edge", eyebrow: "Stylish action", rating: 88, hltb: "40h", status: "in backlog", art: "assets/sample/cover-zephyr-edge.webp", portrait: true },
-    { title: "Tidewright", eyebrow: "New release", rating: 88, hltb: "26h", status: "next up", art: "assets/sample/hero-tidewright.webp", portrait: false },
+    { title: "Tidewright", eyebrow: "New release", rating: 88, hltb: "26h", status: "next up", art: "assets/sample/hero-tidewright.webp", portrait: false, focal: "68% 50%" },
     { title: "Hollowmaw", eyebrow: "Hidden gem", rating: 84, hltb: "14h", status: "in backlog", art: "assets/sample/cover-hollowmaw.webp", portrait: true },
-    { title: "Dawnbanner", eyebrow: "Trending now", rating: 94, hltb: "38h", status: "in backlog", art: "assets/sample/hero-dawnbanner.webp", portrait: false },
+    { title: "Dawnbanner", eyebrow: "Trending now", rating: 94, hltb: "38h", status: "in backlog", art: "assets/sample/hero-dawnbanner.webp", portrait: false, focal: "70% 45%" },
     { title: "Apex Velocity", eyebrow: "Weekend-sized", rating: 89, hltb: "6h", status: "in backlog", art: "assets/sample/cover-apex-velocity.webp", portrait: true },
   ];
 
@@ -143,9 +143,10 @@
     const bg = g.portrait
       ? `<img class="dash-spotlight-art-bg is-loaded" src="${escapeHtml(g.art)}" alt="" aria-hidden="true" ${decodeAttr} ${loadAttr} />`
       : "";
+    const focalStyle = (!g.portrait && g.focal) ? ` style="--spotlight-focal:${g.focal}"` : "";
     return `
       ${bg}
-      <img class="dash-spotlight-art is-loaded" src="${escapeHtml(g.art)}" alt="${alt}" ${decodeAttr} ${loadAttr} />
+      <img class="dash-spotlight-art is-loaded" src="${escapeHtml(g.art)}" alt="${alt}"${focalStyle} ${decodeAttr} ${loadAttr} />
       <div class="dash-spotlight-sheen" aria-hidden="true"></div>
       <div class="dash-spotlight-gradient" aria-hidden="true"></div>
       <div class="dash-spotlight-body">
@@ -217,17 +218,26 @@
         <div class="dash-ribbon">
           <div class="dash-ribbon-tile">
             <div class="dash-ribbon-eyebrow" title="Share of library per connected store">Library by store</div>
-            <div class="dash-ribbon-chart"><canvas id="chartStoreDonut"></canvas></div>
+            <div class="dash-ribbon-figure">
+              <div class="dash-ribbon-chart"><canvas id="chartStoreDonut"></canvas></div>
+              <ul class="dash-ribbon-legend" id="legendStoreDonut"></ul>
+            </div>
             <div class="dash-ribbon-headline" id="ribbonStoreHeadline"><strong>Steam</strong> leads at 40%</div>
           </div>
           <div class="dash-ribbon-tile">
             <div class="dash-ribbon-eyebrow" title="Personal backlog statuses">Status breakdown</div>
-            <div class="dash-ribbon-chart"><canvas id="chartStatusDonut"></canvas></div>
+            <div class="dash-ribbon-figure">
+              <div class="dash-ribbon-chart"><canvas id="chartStatusDonut"></canvas></div>
+              <ul class="dash-ribbon-legend" id="legendStatusDonut"></ul>
+            </div>
             <div class="dash-ribbon-headline" id="ribbonStatusHeadline"><strong>57%</strong> still in backlog</div>
           </div>
           <div class="dash-ribbon-tile">
             <div class="dash-ribbon-eyebrow" title="Steam review descriptor mix">Review sentiment</div>
-            <div class="dash-ribbon-chart"><canvas id="chartReviewDonut"></canvas></div>
+            <div class="dash-ribbon-figure">
+              <div class="dash-ribbon-chart"><canvas id="chartReviewDonut"></canvas></div>
+              <ul class="dash-ribbon-legend" id="legendReviewDonut"></ul>
+            </div>
             <div class="dash-ribbon-headline" id="ribbonReviewHeadline">Mostly <strong>very positive</strong></div>
           </div>
         </div>
@@ -620,59 +630,33 @@
     colors: ["#22c55e", "#34d399", "#86efac", "#fbbf24"],
   };
 
-  // Right legend needs room for the donut + the longest label
-  // ("Overwhelmingly Positive"); below this the key reads better stacked under.
-  const LEGEND_SIDE_MIN_PX = 340;
-  // Ribbon is single-column below 900px; full-width tiles exceed the side-legend
-  // width threshold but 180px height cannot fit a right legend (log: vw 640/900).
-  const legendPositionFor = (px) => {
-    if (window.innerWidth <= 900) return "bottom";
-    return px >= LEGEND_SIDE_MIN_PX ? "right" : "bottom";
-  };
   const donutCharts = [];
-  let donutLegendResizeHooked = false;
-  let donutLegendResizeRaf = 0;
 
-  function donutLegendLabels(position) {
-    return {
-      color: "#ffffff",
-      boxWidth: 12,
-      padding: position === "bottom" ? 6 : 8,
-      font: { size: 11 },
-    };
+  function legendListIdForCanvas(canvasId) {
+    return canvasId.replace(/^chart/, "legend");
   }
 
-  function syncDonutLegendPositions() {
-    for (const chart of donutCharts) {
-      const canvas = chart.canvas;
-      const host = canvas?.parentElement;
-      if (!host) continue;
-      const next = legendPositionFor(host.clientWidth);
-      const legend = chart.options.plugins.legend;
-      if (legend.position === next) continue;
-      legend.position = next;
-      legend.labels = donutLegendLabels(next);
-      chart.update("none");
-    }
-  }
-
-  function hookDonutLegendResize() {
-    if (donutLegendResizeHooked) return;
-    donutLegendResizeHooked = true;
-    window.addEventListener("resize", () => {
-      if (donutLegendResizeRaf) cancelAnimationFrame(donutLegendResizeRaf);
-      donutLegendResizeRaf = requestAnimationFrame(() => {
-        donutLegendResizeRaf = 0;
-        syncDonutLegendPositions();
-      });
+  function buildHtmlLegend(canvasId, spec) {
+    const list = document.getElementById(legendListIdForCanvas(canvasId));
+    if (!list) return;
+    list.replaceChildren();
+    spec.labels.forEach((label, i) => {
+      const li = document.createElement("li");
+      const swatch = document.createElement("span");
+      swatch.className = "dash-ribbon-legend-swatch";
+      swatch.style.backgroundColor = spec.colors[i] || "#94a3b8";
+      const text = document.createElement("span");
+      text.className = "dash-ribbon-legend-label";
+      text.textContent = label;
+      li.append(swatch, text);
+      list.appendChild(li);
     });
   }
 
   function makeDonut(canvasId, spec) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === "undefined") return null;
-    const host = canvas.parentElement;
-    const legendPos = legendPositionFor(host ? host.clientWidth : 0);
+    buildHtmlLegend(canvasId, spec);
     const chart = new Chart(canvas, {
       type: "doughnut",
       data: {
@@ -685,20 +669,45 @@
         }],
       },
       options: {
-        responsive: true,
+        responsive: false,
         maintainAspectRatio: false,
-        resizeDelay: 200,
         plugins: {
-          legend: {
-            position: legendPos,
-            labels: donutLegendLabels(legendPos),
-          },
+          legend: { display: false },
         },
         animation: reducedMotion() ? false : { duration: 800 },
       },
     });
     donutCharts.push(chart);
     return chart;
+  }
+
+  let syncDonutRaf = 0;
+  function syncDonutChartSizes(stagger) {
+    if (syncDonutRaf) cancelAnimationFrame(syncDonutRaf);
+    const run = () => {
+      syncDonutRaf = 0;
+      const charts = donutCharts.filter((c) => c?.canvas);
+      if (!charts.length) return;
+      let i = 0;
+      const step = () => {
+        const chart = charts[i];
+        chart.options.animation = false;
+        chart.resize();
+        i++;
+        if (i < charts.length && stagger !== false) {
+          requestAnimationFrame(step);
+        } else {
+          while (i < charts.length) {
+            charts[i].options.animation = false;
+            charts[i].resize();
+            i++;
+          }
+        }
+      };
+      step();
+    };
+    if (stagger === false) run();
+    else syncDonutRaf = requestAnimationFrame(run);
   }
 
   function initCharts() {
@@ -713,8 +722,7 @@
     makeDonut("chartStoreDonut", STORE_DONUT);
     makeDonut("chartStatusDonut", STATUS_DONUT);
     makeDonut("chartReviewDonut", REVIEW_DONUT);
-    hookDonutLegendResize();
-    syncDonutLegendPositions();
+    syncDonutChartSizes(false);
   }
 
   // --- Init ---
@@ -734,6 +742,7 @@
       resizeQuietTimer = setTimeout(() => {
         resizeQuietTimer = 0;
         root.classList.remove("ui-resizing");
+        syncDonutChartSizes();
       }, 200);
     }, { passive: true });
   }

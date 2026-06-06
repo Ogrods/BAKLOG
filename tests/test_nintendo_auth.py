@@ -26,6 +26,19 @@ def test_nintendo_has_session_requires_named_cookies() -> None:
 
     assert _nintendo_has_session(CtxOk()) is True
 
+    class CtxNextAuth:
+        @staticmethod
+        def cookies():
+            return [
+                {
+                    "name": "__Secure-next-auth.session-token",
+                    "value": "sess",
+                    "domain": "ec.nintendo.com",
+                },
+            ]
+
+    assert _nintendo_has_session(CtxNextAuth()) is True
+
 
 def test_nintendo_session_has_id_token(monkeypatch) -> None:
     class Ctx:

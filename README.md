@@ -8,7 +8,7 @@
 
 BAKLOG helps you browse, sort, and prioritize games across **12 library sources and 8 wishlists** — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App. Nothing is hosted on the web; your credentials and library JSON stay on your machine.
 
-**New to collecting?** You don't need an existing library on any store. Start free on Steam (free-to-play), Epic (weekly free game), Prime Gaming (free keys), Battle.net (StarCraft), Ubisoft (Rainbow Six Siege), or itch.io (pay-what-you-want) — then let BAKLOG track your collection from day one.
+**New to collecting?** You don't need an existing library on any store. Start free on Steam (free-to-play), Epic (weekly free game), Prime Gaming (free keys), GOG (periodic giveaways), Battle.net (StarCraft), Ubisoft (Rainbow Six Siege), or itch.io (pay-what-you-want) — then let BAKLOG track your collection from day one. **Claimable Now** surfaces a curated free-game feed (Epic, Prime, GOG) right in your dashboard so you never miss a weekly drop.
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
@@ -476,6 +476,8 @@ No nested `src/` folder — run fetchers from the repo root so paths stay simple
 ### Dev checks
 
 Run everything (pytest + vitest): `.\scripts\test-all.ps1` or `npm run test:all`.
+
+**Internal docs** (marketing, licensing leads, audits) live in local gitignored folders such as `marketing/` — not in the public repo or on Vercel. Sync them to a private GitHub repo with `.\scripts\sync-internal-repo.ps1` (see script header for one-time setup).
 
 Original per-suite commands:
 

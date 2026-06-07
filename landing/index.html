@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BAKLOG: One honest backlog across every store</title>
-  <meta name="description" content="BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, free forever, invite-only early access." />
+  <meta name="description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists across Steam, Epic, GOG, PSN, Xbox, Amazon, itch &amp; more. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Free forever, invite-only early access." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="BAKLOG" />
@@ -18,14 +18,14 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://baklog.app/" />
   <meta property="og:title" content="BAKLOG: One honest backlog across every store" />
-  <meta property="og:description" content="BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, free forever, invite-only early access." />
+  <meta property="og:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Free forever, invite-only early access." />
   <meta property="og:image" content="https://baklog.app/assets/og.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="BAKLOG: one honest backlog across every store" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="BAKLOG: One honest backlog across every store" />
-  <meta name="twitter:description" content="BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, free forever, invite-only early access." />
+  <meta name="twitter:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Free forever, invite-only early access." />
   <meta name="twitter:image" content="https://baklog.app/assets/og.png" />
   <meta name="twitter:image:alt" content="BAKLOG: one honest backlog across every store" />
 
@@ -40,7 +40,7 @@
 
   <!-- Structured data: inline. The src attribute is ignored on ld+json blocks,
        and data blocks aren't executed so CSP script-src doesn't apply to them. -->
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","description":"BAKLOG fetches your library from every store on your behalf and brings it home to your machine. One honest backlog, local-first, free forever, invite-only early access.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","description":"Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Free forever, invite-only early access.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
 
   <style>
     @font-face {
@@ -566,7 +566,7 @@
       <span class="hero-store" style="--store-bg:#f05556;--store-glyph:url('assets/store-logos/ea.svg')"><span class="hero-store-glyph"></span></span>
     </div>
 
-    <p class="hero-store-caption">No games yet? Start free — Steam, Epic, Prime, Battle.net, Ubisoft &amp; itch.io.</p>
+    <p class="hero-store-caption">No games yet? Start free — Steam, Epic, GOG, PSN, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, or EA App.</p>
 
     <form class="waitlist" id="waitlist" novalidate>
       <div class="waitlist-row">
@@ -684,7 +684,7 @@
             <li>One-click connect, cross-store dedupe</li>
             <li>Combined playtime &amp; review scores</li>
             <li>Auto-filters DLC, soundtracks &amp; store apps so the count is honest</li>
-            <li>Syncs automatically; new purchases show up on their own</li>
+            <li>Auto-fetches when you connect a store; optional refresh for data older than 24h</li>
           </ul>
         </article>
 
@@ -752,8 +752,8 @@
         </div>
         <div class="step">
           <div class="num">2</div>
-          <h3>It syncs itself</h3>
-          <p>BAKLOG opens a channel to each store and brings everything you own back to one honest table, then keeps it updated automatically. No refresh button to babysit.</p>
+          <h3>Auto-fetch on connect</h3>
+          <p>BAKLOG opens a channel to each store and brings everything you own back to one honest table. Fetcher chips light up as each library lands. Turn on optional auto-refresh in Connections to quietly update stores older than 24h while the app is open.</p>
         </div>
         <div class="step">
           <div class="num">3</div>
@@ -784,7 +784,7 @@
         </article>
         <article class="card">
           <h3>vs manual loggers</h3>
-          <p>Backloggd is manual logging. BAKLOG auto-imports twelve libraries and eight wishlist sources, so your backlog builds itself.</p>
+          <p>Backloggd is manual logging. BAKLOG auto-imports twelve libraries and eight wishlist sources when you connect each store.</p>
         </article>
       </div>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
@@ -820,7 +820,7 @@
         </details>
         <details>
           <summary>Do I have to refresh it?</summary>
-          <p>No. The first sync builds your whole library automatically when you connect, and BAKLOG keeps it updated on its own as you buy or claim new games. It's genuinely set-and-forget, not a daily chore. Deal radar tracks prices in the background too.</p>
+          <p>Not manually. When you connect a store, BAKLOG auto-fetches its library. While the app is open, you can enable auto-refresh for stores older than 24h (Connections, off by default). ITAD deal prices refresh on a schedule. There is no background sync while BAKLOG is closed and no cloud sync between machines.</p>
         </details>
         <details>
           <summary>Why is my count different from what the store shows?</summary>

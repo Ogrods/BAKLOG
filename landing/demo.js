@@ -181,14 +181,10 @@
     return `
       <div class="dash-mega dash-mega--has-spotlight" id="dashboardMega">
         <div class="dash-mega-hero">
-          <div class="dash-spotlight-host">
-            <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
-            <div class="dash-spotlight-nav" id="spotlightNav">
-              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
-              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
-            </div>
-          </div>
           <div class="dash-hero-stage">
+            <div class="dash-spotlight-host">
+              <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
+            </div>
             <div class="dash-hero-textblock">
               <div class="dash-hero-eyebrow">Your library</div>
               <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores">
@@ -204,6 +200,11 @@
                 <span title="Wishlist items with an active discount right now"><strong>${STATS.wlDeals}</strong> deals live</span>
               </div>
             </div>
+          </div>
+          <div class="dash-spotlight-nav" id="spotlightNav">
+            <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
+            <button type="button" class="dash-spotlight-nav-btn dash-spotlight-nav-toggle" data-spotlight-toggle aria-label="Pause spotlight" aria-pressed="false" title="Pause">⏸</button>
+            <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
           </div>
           <div class="dash-hero-pillars">
             <div class="dash-hero-pillar dash-spotlight-pillar" id="dashboardSpotlightCard" aria-live="polite"></div>
@@ -409,6 +410,7 @@
   let spotlightTimer = null;
   let spotlightFadeTimer = null;
   let spotlightPaused = false;
+  let spotlightUserPaused = false;
 
   function animClassFor(i) {
     return `portrait-anim-${(i % 4) + 1}`;
@@ -456,7 +458,7 @@
     if (spotlightTimer) clearInterval(spotlightTimer);
     if (SPOTLIGHT_GAMES.length <= 1 || reducedMotion()) return;
     spotlightTimer = setInterval(() => {
-      if (spotlightPaused) return;
+      if (spotlightPaused || spotlightUserPaused) return;
       stepSpotlight(1);
     }, SPOTLIGHT_INTERVAL_MS);
   }
@@ -594,11 +596,29 @@
     });
   }
 
+  function updateSpotlightToggle() {
+    const btn = document.querySelector("[data-spotlight-toggle]");
+    if (!btn) return;
+    const label = spotlightUserPaused ? "Play spotlight" : "Pause spotlight";
+    btn.textContent = spotlightUserPaused ? "▶" : "⏸";
+    btn.setAttribute("aria-label", label);
+    btn.setAttribute("aria-pressed", String(spotlightUserPaused));
+    btn.title = spotlightUserPaused ? "Play" : "Pause";
+  }
+
   function wireSpotlightNav() {
     const nav = document.getElementById("spotlightNav");
     if (!nav || nav.dataset.navWired) return;
     nav.dataset.navWired = "1";
     nav.addEventListener("click", (e) => {
+      const toggle = e.target.closest("[data-spotlight-toggle]");
+      if (toggle) {
+        e.preventDefault();
+        spotlightUserPaused = !spotlightUserPaused;
+        updateSpotlightToggle();
+        resetSpotlightTimer();
+        return;
+      }
       const btn = e.target.closest("[data-spotlight-nav]");
       if (!btn) return;
       e.preventDefault();

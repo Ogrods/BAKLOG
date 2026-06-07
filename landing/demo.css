@@ -180,6 +180,8 @@
 }
 /* Desktop: full-height right column (matches app .dash-spotlight-wrap). */
 @media (min-width: 901px) {
+  /* Host lives inside .dash-hero-stage; static stage so absolute host anchors to .dash-mega-hero. */
+  .dash-mega--has-spotlight .dash-hero-stage { position: static; }
   .dash-mega--has-spotlight .dash-spotlight-host {
     position: absolute;
     top: -28px;
@@ -341,7 +343,9 @@
   position: absolute;
   top: 14px;
   right: 14px;
-  z-index: 5;
+  /* Sibling of the spotlight host (not a child) so it escapes the host's
+     stacking context and sits above the hero textblock overlay. */
+  z-index: 6;
   display: none;
   border-radius: 6px;
   overflow: hidden;
@@ -349,7 +353,7 @@
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   backdrop-filter: blur(2px);
 }
-.dash-spotlight-host:has(.dash-spotlight--multi) .dash-spotlight-nav { display: flex; }
+.dash-mega-hero:has(.dash-spotlight--multi) .dash-spotlight-nav { display: flex; }
 .dash-spotlight-nav-btn {
   width: 28px;
   height: 28px;
@@ -365,6 +369,11 @@
   border: none;
   user-select: none;
 }
+/* Both the chevron and pause glyphs render slightly low in the UI font; extra
+   bottom padding nudges each centered glyph up to the true vertical middle.
+   border-box keeps the 28px button size. */
+.dash-spotlight-nav-toggle { font-size: 11px; padding-bottom: 3px; }
+.dash-spotlight-nav-btn:not(.dash-spotlight-nav-toggle) { padding: 1px 0 3px; }
 .dash-spotlight-nav-btn + .dash-spotlight-nav-btn { border-left: 1px solid rgba(51,65,85,0.6); }
 .dash-spotlight-nav-btn:hover { color: #f1f5f9; background: color-mix(in srgb, var(--bg-hover) 90%, transparent); }
 .dash-spotlight-nav-btn:focus-visible {
@@ -727,9 +736,8 @@ html.ui-resizing .dash-ribbon-chart canvas {
     text-align: center;
     width: 100%;
   }
-  /* Tablet and down: art is a fixed-height background; the non-cell text overlays
-     it at the top-left (beside the nav arrows); the stat cells flow below.
-     Host is a mega-hero sibling (not inside stage); overlay the stage band. */
+  /* Tablet and down: art is a background inside the stage band; text overlays
+     at the top-left (beside the nav arrows); the stat cells flow below. */
   .dash-mega-hero {
     display: flex;
     flex-direction: column;
@@ -768,12 +776,8 @@ html.ui-resizing .dash-ribbon-chart canvas {
   }
   .dash-spotlight-host {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: auto;
+    inset: 0;
     width: 100%;
-    height: 240px;
     border-radius: 10px;
     overflow: hidden;
     z-index: 0;
@@ -791,9 +795,12 @@ html.ui-resizing .dash-ribbon-chart canvas {
   .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
     -webkit-mask-image: none;
     mask-image: none;
-    object-position: center center;
     padding: 0;
   }
+  /* Keep the 15% rightward offset on the foreground cover at all sizes; the
+     blurred backdrop stays centered. */
+  .dash-spotlight.has-portrait-art .dash-spotlight-art { object-position: 65% center; }
+  .dash-spotlight.has-portrait-art .dash-spotlight-art-bg { object-position: center center; }
   .dash-spotlight .dash-spotlight-body { display: none; }
   .dash-hero-pillars {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -855,22 +862,49 @@ html.ui-resizing .dash-ribbon-chart canvas {
 }
 @media (max-width: 640px) {
   .dash-mega { padding: 20px 18px 16px; }
-  /* Small screens only: fade the portrait art at the bottom so it blends into
-     the panel behind the overlaid text. No gradient at the 900px tablet width. */
-  .dash-spotlight.has-portrait-art .dash-spotlight-art,
+  /* Small screens only: fade the blurred backdrop at the bottom so it blends into
+     the panel behind the overlaid text. Foreground cover is tucked separately. */
   .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
     -webkit-mask-image: linear-gradient(180deg, #000 58%, transparent 100%);
     mask-image: linear-gradient(180deg, #000 58%, transparent 100%);
   }
+  /* Non-hero (portrait) cover: smaller, bottom-right with padding. */
+  .dash-spotlight.has-portrait-art .dash-spotlight-art {
+    top: auto;
+    left: auto;
+    right: 20px;
+    bottom: 20px;
+    width: auto;
+    height: 70%;
+    max-width: calc(100% - 40px);
+    object-fit: contain;
+    object-position: right bottom;
+    padding: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .dash-spotlight.has-portrait-art .dash-spotlight-sheen { display: none; }
   /* Balance the 7 store logos into two even rows (4 + 3), break "7 stores" onto
      its own line, and give the art stage extra height for the taller text block. */
   .dash-hero-stage { min-height: 300px; }
-  .dash-spotlight-host { height: 300px; }
   .dash-hero-stores .store-logo-strip { max-width: 112px; }
   .dash-hero-sub-count { display: block; }
   /* Stack the tagline stats one per line; drop the inline separators. */
   .dash-hero-tagline { flex-direction: column; gap: 4px; }
   .dash-hero-tagline .sep { display: none; }
+}
+@media (max-width: 500px) {
+  .dash-hero-pillar:not(.dash-spotlight-pillar) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 10px 6px;
+  }
+  .dash-hero-pillar:not(.dash-spotlight-pillar) .dash-hero-pillar-label {
+    text-align: center;
+  }
 }
 @media (max-width: 400px) {
   .dash-hero-pillar:not(.dash-spotlight-pillar) {

@@ -68,7 +68,7 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 - **Wishlist deal radar:** filter by On Sale / Historical Low / Min Discount % / Max Price, hide already-owned cross-store
 - **Connections tab:** one-click store auth (browser sign-in or API keys), encrypted credential storage, portable secrets bundle
 - **Auto-fetch on connect** (default on): when you connect or reconnect a store, BAKLOG auto-fetches its library and opens the fetcher log
-- **Auto-refresh stale stores** (default off): optional Connections toggle — quietly refreshes one store older than 24h every ~30 min while the app is open
+- **Auto-refresh stale stores** (default on): Connections toggle — quietly refreshes one store older than 24h every ~30 min while the app is open
 - **Auto-enrich** (default on): after a library fetch adds games, queues HLTB, reviews, covers, and co-op tags
 - **ITAD auto-refresh** (default on): deal prices refresh on a 15–60 min schedule while the dashboard is open
 
@@ -380,7 +380,7 @@ If you instead serve the dashboard read-only via `python -m http.server`, the da
 
 ## Auto-refresh on a schedule
 
-While BAKLOG is open, you can enable **auto-refresh stores older than 24h** on the Connections tab (off by default). ITAD deal prices also refresh on a schedule from the Fetcher health panel.
+While BAKLOG is open, **auto-refresh stores older than 24h** is on by default on the Connections tab (toggle to disable). ITAD deal prices also refresh on a schedule from the Fetcher health panel.
 
 For refreshes while BAKLOG is closed, use the helper script for your OS, or click any chip in the **Fetcher health** row from the UI. Scripts and UI runs use the same fetch sequence and log to `refresh.log`.
 

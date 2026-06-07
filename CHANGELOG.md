@@ -22,6 +22,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Changed
+
+- **Auto-refresh stores older than 24h now defaults on** — the Connections pref `autoFetchStale24h` ships enabled (`js/prefs.js`); new installs quietly refresh one stale store per ~30 min while the app is open, and the toggle in `index.html` is checked by default. Still user-disablable. README and landing copy updated to match.
+
 ### Fixed
 
 - **Blacklist: Epic entitlement slugs** — internal Epic slugs that leak in as titles (single token, no spaces, joined by an underscore — e.g. `Fortnite_StWContent`, `Fortnite_Studio`) are dropped by the hardcoded *blacklist* (`isJunkEntry` in `js/game-core.js`, mirrored by `_is_entitlement_slug` in `fetch_epic.py`). Real titles use spaces (`Aerial_Knight's Never Yield`) so they are unaffected. Terminology note: the **blacklist** is hardcoded non-games that are never shown; the **hidden list** is user-editable games restorable from the Hidden games panel (seeded by `js/hidden-defaults.js`). New filtering should pick a bucket — see the README "Blacklist vs hidden list" table.

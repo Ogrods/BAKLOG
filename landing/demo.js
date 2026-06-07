@@ -137,7 +137,14 @@
     return `<strong>${g.rating}%</strong> review · <strong>${escapeHtml(g.hltb)}</strong> main · ${escapeHtml(g.status)}`;
   }
 
-  function spotlightInnerHtml(g, animClass, eager = false) {
+  function spotlightBodyHtml(g) {
+    return `
+        <span class="dash-spotlight-eyebrow"${EYEBROW_TIPS[g.eyebrow] ? ` title="${escapeHtml(EYEBROW_TIPS[g.eyebrow])}"` : ""}>${escapeHtml(g.eyebrow)}</span>
+        <span class="dash-spotlight-title">${escapeHtml(g.title)}</span>
+        <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaHtml(g)}</span>`;
+  }
+
+  function spotlightInnerHtml(g, eager = false) {
     const loadAttr = eager ? 'fetchpriority="high"' : 'loading="lazy"';
     const decodeAttr = 'decoding="async"';
     const alt = escapeHtml(g.title);
@@ -150,11 +157,7 @@
       <img class="dash-spotlight-art is-loaded" src="${escapeHtml(g.art)}" alt="${alt}"${focalStyle} ${decodeAttr} ${loadAttr} />
       <div class="dash-spotlight-sheen" aria-hidden="true"></div>
       <div class="dash-spotlight-gradient" aria-hidden="true"></div>
-      <div class="dash-spotlight-body">
-        <span class="dash-spotlight-eyebrow"${EYEBROW_TIPS[g.eyebrow] ? ` title="${escapeHtml(EYEBROW_TIPS[g.eyebrow])}"` : ""}>${escapeHtml(g.eyebrow)}</span>
-        <span class="dash-spotlight-title">${escapeHtml(g.title)}</span>
-        <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaHtml(g)}</span>
-      </div>`;
+      <div class="dash-spotlight-body">${spotlightBodyHtml(g)}</div>`;
   }
 
   function buildMarqueeHtml() {
@@ -178,27 +181,32 @@
     return `
       <div class="dash-mega dash-mega--has-spotlight" id="dashboardMega">
         <div class="dash-mega-hero">
-          <div class="dash-spotlight-host">
-            <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
-            <div class="dash-spotlight-nav" id="spotlightNav">
-              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
-              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
+          <div class="dash-hero-stage">
+            <div class="dash-spotlight-host">
+              <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
+              <div class="dash-spotlight-nav" id="spotlightNav">
+                <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
+                <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
+              </div>
+            </div>
+            <div class="dash-hero-textblock">
+              <div class="dash-hero-eyebrow">Your library</div>
+              <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores">
+                <span class="dash-hero-number" id="dashHeroCount">0</span>
+              </span>
+              <div class="dash-hero-sub" title="Library size and number of distinct storefronts">games owned across <span class="dash-hero-sub-count">${STATS.stores} stores</span></div>
+              ${buildStoreStripHtml()}
+              <div class="dash-hero-tagline">
+                <span title="Finished share of library excluding skipped games"><strong>${STATS.completion}%</strong> complete</span>
+                <span class="sep">·</span>
+                <span title="Backlog HLTB main hours ÷ (2 hours × 365 days)"><strong>${STATS.years}</strong> yrs to clear at 2h/day</span>
+                <span class="sep">·</span>
+                <span title="Wishlist items with an active discount right now"><strong>${STATS.wlDeals}</strong> deals live</span>
+              </div>
             </div>
           </div>
-          <div class="dash-hero-eyebrow">Your library</div>
-          <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores">
-            <span class="dash-hero-number" id="dashHeroCount">0</span>
-          </span>
-          <div class="dash-hero-sub" title="Library size and number of distinct storefronts">games owned across ${STATS.stores} stores</div>
-          ${buildStoreStripHtml()}
-          <div class="dash-hero-tagline">
-            <span title="Finished share of library excluding skipped games"><strong>${STATS.completion}%</strong> complete</span>
-            <span class="sep">·</span>
-            <span title="Backlog HLTB main hours ÷ (2 hours × 365 days)"><strong>${STATS.years}</strong> yrs to clear at 2h/day</span>
-            <span class="sep">·</span>
-            <span title="Wishlist items with an active discount right now"><strong>${STATS.wlDeals}</strong> deals live</span>
-          </div>
           <div class="dash-hero-pillars">
+            <div class="dash-hero-pillar dash-spotlight-pillar" id="dashboardSpotlightCard" aria-live="polite"></div>
             <div class="dash-hero-pillar" title="Sum of playtime across all games, in hours">
               <div class="dash-hero-pillar-value" id="dashHeroPlayed">0h</div>
               <div class="dash-hero-pillar-label">Played</div>
@@ -268,6 +276,8 @@
       requestAnimationFrame(countTick);
     } else {
       countNode.textContent = countFormat(countTo);
+      countNode.style.minWidth = "";
+      countNode.style.textAlign = "";
       countLoopActive = false;
     }
   }
@@ -361,7 +371,6 @@
     const w = hero.getBoundingClientRect().width;
     if (w) {
       hero.style.minWidth = `${Math.ceil(w)}px`;
-      hero.style.textAlign = "right";
     }
     hero.textContent = prev;
   }
@@ -411,18 +420,26 @@
     const portrait = g.portrait;
     el.className = "dash-spotlight dash-spotlight--multi" +
       (portrait ? ` has-portrait-art ${animClassFor(i)}` : "");
-    el.innerHTML = spotlightInnerHtml(g, animClassFor(i));
+    el.innerHTML = spotlightInnerHtml(g);
     wireSpotlightHover(el);
+
+    const card = document.getElementById("dashboardSpotlightCard");
+    if (card) {
+      card.innerHTML = `<div class="dash-spotlight-body">${spotlightBodyHtml(g)}</div>`;
+    }
   }
 
   function fadeToSpotlight(next, i) {
     const el = document.getElementById("dashboardSpotlight");
     if (!el) return;
+    const card = document.getElementById("dashboardSpotlightCard");
     el.classList.add("is-fading");
+    if (card) card.classList.add("is-fading");
     if (spotlightFadeTimer) clearTimeout(spotlightFadeTimer);
     spotlightFadeTimer = setTimeout(() => {
       applySpotlight(next, i);
       el.classList.remove("is-fading");
+      if (card) card.classList.remove("is-fading");
       spotlightFadeTimer = null;
     }, SPOTLIGHT_FADE_MS);
   }
@@ -490,6 +507,14 @@
     };
 
     const frame = () => {
+      // #region agent log
+      try {
+        if (document.documentElement.classList.contains("ui-resizing")) {
+          const g = (typeof globalThis !== "undefined" ? globalThis : window);
+          g.__dbgSpotlightFramesDuringResize = (g.__dbgSpotlightFramesDuringResize || 0) + 1;
+        }
+      } catch (_) {}
+      // #endregion
       const art = portraitArt();
       if (!art) {
         rafId = null;
@@ -734,15 +759,77 @@
     disconnectMarqueeSpeed = BaklogMarquee.observeMarqueeSpeed(root);
   }
 
+  const RESIZE_PAINT_SKIP_SEL = "header.hero, section.band:not(#demo)";
+
+  function syncResizePaintSkip() {
+    const vh = window.innerHeight;
+    for (const el of document.querySelectorAll(RESIZE_PAINT_SKIP_SEL)) {
+      const r = el.getBoundingClientRect();
+      const offscreen = r.bottom < 0 || r.top > vh;
+      if (offscreen) {
+        el.style.setProperty("--cv-height", `${Math.round(el.offsetHeight)}px`);
+        el.classList.add("resize-skip-paint");
+      } else {
+        el.classList.remove("resize-skip-paint");
+        el.style.removeProperty("--cv-height");
+      }
+    }
+  }
+
+  function clearResizePaintSkip() {
+    for (const el of document.querySelectorAll(RESIZE_PAINT_SKIP_SEL)) {
+      el.classList.remove("resize-skip-paint");
+      el.style.removeProperty("--cv-height");
+    }
+  }
+
   let resizeQuietTimer = 0;
   function installResizeQuiet() {
     const root = document.documentElement;
+    // #region agent log
+    let __dbgMegaTopBefore = null, __dbgScrollBefore = 0, __dbgActive = false;
+    const __dbgMegaTop = () => {
+      const m = document.getElementById("dashboardMega");
+      return m ? Math.round(m.getBoundingClientRect().top) : null;
+    };
+    // #endregion
     window.addEventListener("resize", () => {
+      // #region agent log
+      if (!__dbgActive) {
+        __dbgActive = true;
+        __dbgScrollBefore = window.scrollY;
+        __dbgMegaTopBefore = __dbgMegaTop();
+      }
+      // #endregion
       root.classList.add("ui-resizing");
+      syncResizePaintSkip();
+      // #region agent log
+      const __megaTopDuring = __dbgMegaTop();
+      // #endregion
       if (resizeQuietTimer) clearTimeout(resizeQuietTimer);
       resizeQuietTimer = setTimeout(() => {
         resizeQuietTimer = 0;
         root.classList.remove("ui-resizing");
+        clearResizePaintSkip();
+        // #region agent log
+        const __megaTopAfter = __dbgMegaTop();
+        const __scrolledBy = window.scrollY - __dbgScrollBefore;
+        const __payload = {
+          megaTopBefore: __dbgMegaTopBefore,
+          megaTopDuring: __megaTopDuring,
+          megaTopAfter: __megaTopAfter,
+          shiftOnEnter: (__megaTopDuring != null && __dbgMegaTopBefore != null) ? __megaTopDuring - __dbgMegaTopBefore : null,
+          shiftOnExit: (__megaTopAfter != null && __megaTopDuring != null) ? __megaTopAfter - __megaTopDuring : null,
+          userScrolledBy: __scrolledBy,
+          headerHeight: (() => { const h = document.querySelector("header.hero"); return h ? Math.round(h.getBoundingClientRect().height) : null; })(),
+          sectionHeadHeight: (() => { const s = document.querySelector(".demo-section .section-head"); return s ? Math.round(s.getBoundingClientRect().height) : null; })(),
+          innerWidth: window.innerWidth,
+        };
+        const __body = JSON.stringify({sessionId:'21853a',runId:'post-fix-no-jump',hypothesisId:'H14',location:'demo.js:installResizeQuiet',message:'mega vertical shift on ui-resizing toggle',data:__payload,timestamp:Date.now()});
+        fetch('/api/_debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:__body}).catch(()=>{});
+        __dbgActive = false;
+        __dbgMegaTopBefore = null;
+        // #endregion
         syncDonutChartSizes();
       }, 200);
     }, { passive: true });

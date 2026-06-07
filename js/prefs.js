@@ -41,6 +41,8 @@ export function loadPrefs() {
     fetcherHealthShowConnected: true, fetcherHealthShowStaleMissing: true,
     autoEnrichOnAdd: true, coopFilterMode: "off", fetcherCollapsed: true,
     itadAutoRefreshIntervalMin: 15,
+    autoFetchOnConnect: true,
+    autoFetchStale24h: false,
     connectionNotes: {},
   };
   let merged;

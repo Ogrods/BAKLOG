@@ -817,6 +817,13 @@ function restoreConnNoteFocus(focusState, root) {
 
 
 
+function renderConnPrefs() {
+  const onConnect = document.getElementById('autoFetchOnConnectToggle');
+  const stale24h = document.getElementById('autoFetchStale24hToggle');
+  if (onConnect) onConnect.checked = state.prefs.autoFetchOnConnect !== false;
+  if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
+}
+
 function renderConnections() {
 
   const rail = document.getElementById('connRail');
@@ -826,6 +833,8 @@ function renderConnections() {
   if (!rail || !pane) return;
 
   renderHero();
+
+  renderConnPrefs();
 
   renderOnboard();
 
@@ -1090,6 +1099,16 @@ function wireGridEvents() {
     state.prefs.connectionNotes[provider] = ta.value;
     clearTimeout(noteSaveTimer);
     noteSaveTimer = setTimeout(() => savePrefs(), 500);
+  });
+
+  container.addEventListener('change', (ev) => {
+    if (ev.target.id === 'autoFetchOnConnectToggle') {
+      state.prefs.autoFetchOnConnect = ev.target.checked;
+      savePrefs();
+    } else if (ev.target.id === 'autoFetchStale24hToggle') {
+      state.prefs.autoFetchStale24h = ev.target.checked;
+      savePrefs();
+    }
   });
 
   layout.addEventListener('keydown', handleLayoutKeydown);

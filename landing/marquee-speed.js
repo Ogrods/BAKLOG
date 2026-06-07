@@ -15,7 +15,20 @@
   function applyMarqueeSpeed(rootEl) {
     const track = scopeEl(rootEl).querySelector(".dash-marquee-track");
     if (!track) return;
+    // #region agent log
+    const __t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
     const copyWidth = track.scrollWidth / 2;
+    const __t1 = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    try {
+      const g = (typeof globalThis !== "undefined" ? globalThis : window);
+      g.__dbgMarqueeApply = (g.__dbgMarqueeApply || 0) + 1;
+      const ms = __t1 - __t0;
+      if (ms > (g.__dbgMarqueeMaxMs || 0)) g.__dbgMarqueeMaxMs = ms;
+      if (document.documentElement.classList.contains("ui-resizing")) {
+        g.__dbgMarqueeApplyDuringResize = (g.__dbgMarqueeApplyDuringResize || 0) + 1;
+      }
+    } catch (_) {}
+    // #endregion
     if (!copyWidth) return;
     track.style.setProperty("--marquee-duration", `${copyWidth / pxPerSec()}s`);
   }

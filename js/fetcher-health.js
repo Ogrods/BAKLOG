@@ -18,6 +18,7 @@ import {
   LS_FETCHER_AUTH_COOLDOWN,
   LS_FETCHER_LAST_SEQ,
   LS_FETCHER_SUPPRESSED_RUNS,
+  LS_AUTO_STALE_LAST_RUN,
   LS_ITAD_LAST_AUTO_RUN,
   LS_RECONNECT_DISMISSED,
   profileScopedStorageKey,
@@ -273,12 +274,36 @@ export async function syncReconnectFromAuthStatus() {
   } catch (_) { /* server offline or timed out */ }
 }
 
+const prevStatusByProvider = new Map();
+
+/** Detect disconnected/expired → connected and optionally auto-fetch that provider's keys. */
+export function processAuthStatusTransitions(providers, prevMap = prevStatusByProvider, deps = {}) {
+  for (const p of providers || []) {
+    const prev = prevMap.get(p.key);
+    const transitioned = prev !== undefined && prev !== 'connected' && p.status === 'connected';
+    if (transitioned) {
+      const prefOn = deps.autoFetchOnConnect ?? (state.prefs.autoFetchOnConnect !== false);
+      if (prefOn) {
+        const runConnect = deps.maybeAutoFetchOnConnect ?? maybeAutoFetchOnConnect;
+        void runConnect(p.fetcher_keys || [], deps);
+      }
+    }
+    prevMap.set(p.key, p.status);
+  }
+  return prevMap;
+}
+
+export function resetAuthStatusTransitionsForTest() {
+  prevStatusByProvider.clear();
+}
+
 // Re-render the dashboard chips the instant auth status changes anywhere
 // (e.g. a connection made in the Connections tab), not just on the 30s poll.
 // connections.js fires this from its single auth-status cache write.
 if (typeof document !== 'undefined') {
   document.addEventListener('baklog:auth-status', ev => {
     const providers = ev?.detail?.providers || [];
+    processAuthStatusTransitions(providers);
     for (const p of providers) {
       if (p.status === 'expired') markReconnectRequired(p.key);
       else if (p.status === 'connected') {
@@ -1203,6 +1228,99 @@ export function maybeAutoRefreshItad(deps = {}) {
   setLastRun(now);
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
   runFn('itad', { auto: true });
+  return true;
+}
+
+export const AUTO_STALE_AGE_MS = 24 * 60 * 60 * 1000;
+export const AUTO_STALE_STAGGER_MS = 30 * 60 * 1000;
+
+export function autoStaleLastRunKey() {
+  return profileScopedStorageKey(LS_AUTO_STALE_LAST_RUN);
+}
+
+/** After a store connects, open the fetcher log and run that provider's fetcher_keys. */
+export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {
+  if (state.prefs.autoFetchOnConnect === false) return false;
+  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
+  if (!isApiAvailableFn()) return false;
+
+  const loadFn = deps.loadFetcherSources ?? (async () => loadFetcherSources(true));
+  await loadFn();
+
+  const sources = deps.sources ?? fetcherSources;
+  const keys = (fetcherKeys || []).filter((key) => sources.some((s) => s.key === key));
+  if (!keys.length) return false;
+
+  const openLogFn = deps.openFetcherLog ?? (() => fetcherRunner.openFetcherLog({ focusPanel: false }));
+  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
+  const waitFn = deps.waitForQueueSlot ?? ((o) => fetcherRunner.waitForQueueSlot(o));
+  const getCancelEpochFn = deps.getCancelEpoch ?? (() => fetcherRunner.getCancelEpoch());
+
+  openLogFn();
+  const primaryKey = keys[0];
+  if (typeof document !== 'undefined') {
+    requestAnimationFrame(() => {
+      document.querySelector(
+        `#dashboardFetcherHealth .fh-chip[data-fetcher-key="${primaryKey}"]`,
+      )?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  const batchEpoch = getCancelEpochFn();
+  for (const key of keys) {
+    if (getCancelEpochFn() !== batchEpoch) break;
+    await waitFn({ batchEpoch });
+    if (getCancelEpochFn() !== batchEpoch) break;
+    await runFn(key, { auto: true });
+  }
+  return true;
+}
+
+/** Quietly refresh the stalest store fetcher older than 24h (one per stagger window). */
+export function maybeAutoFetchStale24h(deps = {}) {
+  if (state.prefs.autoFetchStale24h !== true) return false;
+  if (isPageHidden()) return false;
+  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
+  if (!isApiAvailableFn()) return false;
+  const inFlightFn = deps.inFlightCount ?? (() => fetcherRunner.inFlightCount());
+  if (inFlightFn() > 0) return false;
+
+  const now = deps.now ?? Date.now();
+  const getLastRun = deps.getLastRun
+    ?? (() => Number(localStorage.getItem(autoStaleLastRunKey()) || 0));
+  if (now - getLastRun() < AUTO_STALE_STAGGER_MS) return false;
+
+  const sources = deps.sources ?? fetcherSources;
+  const freshnessFn = deps.fetcherFreshness ?? fetcherFreshness;
+  const credsFn = deps.fetcherCredentialsSatisfied ?? fetcherCredentialsSatisfied;
+  const stateForFn = deps.stateFor ?? ((k) => fetcherRunner.stateFor(k));
+  const cooldownFn = deps.authCooldownRemainingMs ?? authCooldownRemainingMs;
+  const disconnectedFn = deps.isFetcherDisconnected ?? isFetcherDisconnected;
+  const reconnectFn = deps.isFetcherReconnectRequired ?? isFetcherReconnectRequired;
+
+  const candidates = sources.filter((src) => {
+    if (src.key === 'itad') return false;
+    if (!FETCHER_AUTH_PROVIDER[src.key]) return false;
+    const { ageMs } = freshnessFn(src);
+    if (ageMs < AUTO_STALE_AGE_MS) return false;
+    if (src.missingRequirements?.length && !credsFn(src.key)) return false;
+    if (stateForFn(src.key)) return false;
+    if (cooldownFn(src.key) > 0) return false;
+    if (disconnectedFn(src.key)) return false;
+    if (reconnectFn(src.key)) return false;
+    return true;
+  });
+
+  if (!candidates.length) return false;
+
+  candidates.sort((a, b) => freshnessFn(b).ageMs - freshnessFn(a).ageMs);
+  const pick = candidates[0];
+
+  const setLastRun = deps.setLastRun
+    ?? ((t) => localStorage.setItem(autoStaleLastRunKey(), String(t)));
+  setLastRun(now);
+  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
+  runFn(pick.key, { auto: true });
   return true;
 }
 
@@ -2910,12 +3028,16 @@ export const fetcherRunner = (() => {
     if (isPageHidden()) return;
     await syncFromServer();
     maybeAutoRefreshItad();
+    maybeAutoFetchStale24h();
   }
 
   function startDashboardPolling() {
     _dashboardPollWanted = true;
     if (pollTimer || !isApiAvailable() || isPageHidden()) return;
-    void syncFromServer().then(() => maybeAutoRefreshItad());
+    void syncFromServer().then(() => {
+      maybeAutoRefreshItad();
+      maybeAutoFetchStale24h();
+    });
     pollTimer = setInterval(() => { void _runDashboardPollTick(); }, 30_000);
   }
 

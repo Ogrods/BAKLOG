@@ -1,6 +1,16 @@
 /**
  * BAKLOG landing page: interactive mega-hero demo with dummy data.
  * Self-contained; no app module imports.
+ *
+ * Effect lifecycle (gated by reducedMotion() and html.ui-resizing in demo.css):
+ *   Spotlight — resetSpotlightTimer/stepSpotlight/fadeToSpotlight rotate slides;
+ *               wireSpotlightHover drives portrait tilt + sheen via is-tilting;
+ *               wireSpotlightNav handles pause + prev/next.
+ *   Count-up — runCountDemo/spawnPopups (IntersectionObserver on #demo).
+ *   Insight — startInsightRotation/rotateInsight toggles .is-visible.
+ *   Resize — installResizeQuiet toggles html.ui-resizing; syncDonutChartSizes on quiet end.
+ *
+ * Run `npm run check:spotlight` before editing this file or landing/demo.css.
  */
 (function () {
   "use strict";
@@ -177,15 +187,18 @@
     return `<div class="dash-hero-stores" aria-label="Stores in your library"><div class="store-logo-strip store-logo-strip--md" role="list" aria-label="Stores in your library">${items}</div></div>`;
   }
 
+  /** Mega hero DOM: .dash-mega-hero is the sole positioning parent (desktop host bleed
+   *  anchors here when .dash-hero-stage is position:static). Stage = bg art band; textblock,
+   *  nav, pillars, and insight = fg overlay siblings (tablet) or in-flow cells (desktop). */
   function buildMegaHtml() {
     return `
       <div class="dash-mega dash-mega--has-spotlight" id="dashboardMega">
         <div class="dash-mega-hero">
-          <div class="dash-hero-stage">
-            <div class="dash-spotlight-host">
+          <div class="dash-hero-stage" data-layer="bg">
+            <div class="dash-spotlight-host" data-layer="bg">
               <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
             </div>
-            <div class="dash-hero-textblock">
+            <div class="dash-hero-textblock" data-layer="fg">
               <div class="dash-hero-eyebrow">Your library</div>
               <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores">
                 <span class="dash-hero-number" id="dashHeroCount">0</span>
@@ -201,12 +214,12 @@
               </div>
             </div>
           </div>
-          <div class="dash-spotlight-nav" id="spotlightNav">
+          <div class="dash-spotlight-nav" id="spotlightNav" data-layer="fg">
             <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
             <button type="button" class="dash-spotlight-nav-btn dash-spotlight-nav-toggle" data-spotlight-toggle aria-label="Pause spotlight" aria-pressed="false" title="Pause">⏸</button>
             <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
           </div>
-          <div class="dash-hero-pillars">
+          <div class="dash-hero-pillars" data-layer="fg">
             <div class="dash-hero-pillar dash-spotlight-pillar" id="dashboardSpotlightCard" aria-live="polite"></div>
             <div class="dash-hero-pillar" title="Sum of playtime across all games, in hours">
               <div class="dash-hero-pillar-value" id="dashHeroPlayed">0h</div>
@@ -221,7 +234,7 @@
               <div class="dash-hero-pillar-label">Avg review</div>
             </div>
           </div>
-          <span id="dashboardInsight" class="dash-insight" aria-live="polite"><span class="dash-insight-text"></span></span>
+          <span id="dashboardInsight" class="dash-insight" data-layer="fg" aria-live="polite"><span class="dash-insight-text"></span></span>
         </div>
         <div class="dash-marquee">${buildMarqueeHtml()}</div>
         <div class="dash-mega-divider" aria-hidden="true"></div>
@@ -405,12 +418,49 @@
     runCountDemo();
   }
 
-  // --- Spotlight ---
+  // --- Spotlight rotation / fade (CSS: .is-fading, prefers-reduced-motion) ---
   let spotlightIndex = 0;
   let spotlightTimer = null;
   let spotlightFadeTimer = null;
   let spotlightPaused = false;
   let spotlightUserPaused = false;
+
+  /** Pin stable state for visual-regression captures (scripts/spotlight-visual-check.mjs). */
+  function freezeForVisualTest() {
+    if (spotlightTimer) {
+      clearInterval(spotlightTimer);
+      spotlightTimer = null;
+    }
+    if (insightTimer) {
+      clearInterval(insightTimer);
+      insightTimer = null;
+    }
+    if (spotlightFadeTimer) {
+      clearTimeout(spotlightFadeTimer);
+      spotlightFadeTimer = null;
+    }
+    clearCountTimers();
+    countLoopActive = false;
+    countDemoRan = true;
+    document.querySelectorAll(".library-count-popup").forEach((el) => el.remove());
+    const hero = document.getElementById("dashHeroCount");
+    if (hero) {
+      hero.textContent = fmtCommas(FINAL_COUNT);
+      hero.style.minWidth = "";
+    }
+    const played = document.getElementById("dashHeroPlayed");
+    const backlog = document.getElementById("dashHeroBacklog");
+    const avg = document.getElementById("dashHeroAvg");
+    if (played) played.textContent = `${fmtCommas(STATS.playedHrs)}h`;
+    if (backlog) backlog.textContent = `${fmtCommas(STATS.backlogHrs)}h`;
+    if (avg) avg.textContent = `${STATS.avgRating}%`;
+    const insight = document.getElementById("dashboardInsight");
+    const insightText = insight && insight.querySelector(".dash-insight-text");
+    if (insight && insightText) {
+      insightText.innerHTML = INSIGHTS[0];
+      insight.classList.add("is-visible");
+    }
+  }
 
   function animClassFor(i) {
     return `portrait-anim-${(i % 4) + 1}`;
@@ -463,6 +513,7 @@
     }, SPOTLIGHT_INTERVAL_MS);
   }
 
+  /** Portrait pointer tilt + sheen (CSS: .is-tilting, html.ui-resizing, prefers-reduced-motion). */
   function wireSpotlightHover(el) {
     if (!el || el.dataset.hoverWired) return;
     el.dataset.hoverWired = "1";
@@ -606,6 +657,7 @@
     btn.title = spotlightUserPaused ? "Play" : "Pause";
   }
 
+  /** Prev/next + pause toggle (CSS: .dash-spotlight-nav; timer in resetSpotlightTimer). */
   function wireSpotlightNav() {
     const nav = document.getElementById("spotlightNav");
     if (!nav || nav.dataset.navWired) return;
@@ -626,7 +678,7 @@
     });
   }
 
-  // --- Insight rotation ---
+  // --- Insight rotation (CSS: .dash-insight.is-visible, prefers-reduced-motion) ---
   let insightIndex = 0;
   let insightTimer = null;
 
@@ -719,6 +771,7 @@
     return chart;
   }
 
+  /** Sync Chart.js bitmaps to --ribbon-chart-size after resize quiet (pairs with html.ui-resizing). */
   let syncDonutRaf = 0;
   function syncDonutChartSizes(stagger) {
     if (syncDonutRaf) cancelAnimationFrame(syncDonutRaf);
@@ -795,6 +848,7 @@
     }
   }
 
+  /** Debounced html.ui-resizing: pauses CSS motion + defers donut resize until drag ends. */
   let resizeQuietTimer = 0;
   function installResizeQuiet() {
     const root = document.documentElement;
@@ -863,4 +917,17 @@
   } else {
     init();
   }
+
+  /** Visual-regression hook (inert unless called by scripts/spotlight-visual-check.mjs). */
+  window.__demoTest = {
+    landscapeIndex: 0,
+    portraitIndex: 1,
+    freezeForVisualTest,
+    showSlide(index) {
+      freezeForVisualTest();
+      const i = Math.max(0, Math.min(SPOTLIGHT_GAMES.length - 1, index | 0));
+      spotlightIndex = i;
+      applySpotlight(SPOTLIGHT_GAMES[i], i);
+    },
+  };
 })();

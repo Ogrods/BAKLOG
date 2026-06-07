@@ -227,17 +227,9 @@
       font-weight: 500;
       font-size: clamp(1rem, 2.6vw, 1.5rem);
       color: var(--text-bright);
-      margin: 1.25rem auto 0;
+      margin: 1.1rem auto 0;
       max-width: 22ch;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
-    }
-
-    .hero-sub {
-      font-size: clamp(0.98rem, 2vw, 1.12rem);
-      color: var(--text-mute);
-      max-width: 48ch;
-      margin: 0.75rem auto 0;
-      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
     }
 
     /* Compact store trust strip - same SVG mask system as the app (assets/store-logos) */
@@ -247,7 +239,7 @@
       justify-content: center;
       align-items: center;
       gap: 6px 7px;
-      margin: 1rem auto 0;
+      margin: 0.85rem auto 0;
       max-width: min(100%, 22rem);
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.21s both;
     }
@@ -274,12 +266,12 @@
     }
     .hero-store-caption {
       display: block;
-      margin: 0.5rem auto 0;
+      margin: 0.4rem auto 0;
       font-size: 0.72rem;
       letter-spacing: 0.03em;
       color: var(--text-mute);
       opacity: 0.88;
-      max-width: 40ch;
+      max-width: 32ch;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
     }
     .hero-store-caption a {
@@ -292,7 +284,7 @@
 
     /* ---------- Waitlist form ---------- */
     .waitlist {
-      margin: 2rem auto 0;
+      margin: 1.65rem auto 0;
       width: 100%;
       max-width: 460px;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
@@ -371,19 +363,6 @@
     .form-msg { margin: 0.9rem 0 0; font-size: 0.95rem; min-height: 1.2em; }
     .form-msg.ok { color: #6ee7b7; }
     .form-msg.err { color: #fca5a5; }
-
-    .scroll-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      margin-top: 1.8rem;
-      padding: 0.25rem 0.5rem;
-      font-size: 0.85rem;
-      color: var(--text-mute);
-      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
-    }
-    .scroll-link:hover { color: var(--accent); }
 
     /* ---------- Generic sections ---------- */
     section.band { padding: 5.5rem 0; border-top: 1px solid var(--border-subtle); }
@@ -469,12 +448,10 @@
     @media (max-height: 720px) {
       .hero-inner { padding: 2rem 1.25rem; }
       .hero-badge { margin-top: 0.75rem; }
-      .hero-tagline { margin-top: 0.9rem; }
-      .hero-sub { margin-top: 0.5rem; }
-      .hero-store-strip { margin-top: 0.65rem; }
-      .hero-store-caption { margin-top: 0.35rem; }
-      .waitlist { margin-top: 1.25rem; }
-      .scroll-link { margin-top: 1rem; }
+      .hero-tagline { margin-top: 0.85rem; }
+      .hero-store-strip { margin-top: 0.55rem; }
+      .hero-store-caption { margin-top: 0.3rem; }
+      .waitlist { margin-top: 1.1rem; }
       .form-reassure { margin-top: 0.65rem; gap: 0.35rem; }
     }
     @media (max-height: 560px) {
@@ -484,12 +461,10 @@
         font-size: clamp(2rem, 8vw, 3.5rem);
         margin-top: clamp(-2rem, -3.5vw, -0.75rem);
       }
-      .hero-tagline { font-size: clamp(1rem, 2.8vw, 1.35rem); margin-top: 0.6rem; }
-      .hero-sub { font-size: 0.9rem; margin-top: 0.4rem; }
+      .hero-tagline { font-size: clamp(1rem, 2.8vw, 1.35rem); margin-top: 0.55rem; }
       .hero-store { width: 18px; height: 18px; }
       .hero-store-caption { font-size: 0.68rem; }
-      .waitlist { margin-top: 0.9rem; }
-      .scroll-link { margin-top: 0.65rem; font-size: 0.78rem; }
+      .waitlist { margin-top: 0.85rem; }
       .form-secure, .form-invite { font-size: 0.75rem; }
     }
 
@@ -505,14 +480,16 @@
 
     @media (max-width: 400px) {
       .hero-inner { padding-left: 1rem; padding-right: 1rem; }
+      .hero-badge { letter-spacing: 0.1em; }
       .hero-store-strip { gap: 5px 6px; max-width: 100%; }
+      .hero-store { width: 20px; height: 20px; }
+      .hero-store-caption { font-size: 0.68rem; max-width: 100%; }
       .wordmark { letter-spacing: 0.12em; }
-      .hero-sub { max-width: 36ch; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .hero-mark, .wordmark, .hero-badge, .hero-tagline, .hero-sub, .hero-store-strip, .hero-store-caption, .waitlist, .scroll-link { animation: none; }
+      .hero-mark, .wordmark, .hero-badge, .hero-tagline, .hero-store-strip, .hero-store-caption, .waitlist { animation: none; }
       .card, .btn { transition: none; }
     }
 
@@ -572,7 +549,6 @@
       Free forever &middot; Invite-only early access
     </p>
     <p class="hero-tagline">One honest backlog across every store.</p>
-    <p class="hero-sub">BAKLOG goes to every store for you, opens a channel from each one straight to your machine, and finally shows you what to play next. Fetch once, and you're done until you buy something new.</p>
 
     <!-- order: STORE_DISPLAY_ORDER / bizcard BIZCARD_STORES -->
     <div class="hero-store-strip" aria-hidden="true">
@@ -589,6 +565,8 @@
       <span class="hero-store" style="--store-bg:#000000;--store-glyph:url('assets/store-logos/ubisoft.svg')"><span class="hero-store-glyph"></span></span>
       <span class="hero-store" style="--store-bg:#f05556;--store-glyph:url('assets/store-logos/ea.svg')"><span class="hero-store-glyph"></span></span>
     </div>
+
+    <p class="hero-store-caption">No games yet? Start free with Epic or Prime.</p>
 
     <form class="waitlist" id="waitlist" novalidate>
       <div class="waitlist-row">
@@ -632,10 +610,39 @@
     </div>
   </section>
 
+  <!-- ============ START FROM ZERO ============ -->
+  <section class="band" id="start">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Starting from zero?</span>
+        <h2>You don't need to own a thing. Start collecting today.</h2>
+        <p>You don't need an existing library on any of the twelve stores. The free pipelines fill a backlog on their own.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>Make a free Epic account</h3>
+          <p>Claim this week's free game. Epic gives one away every Thursday.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>Have Amazon Prime?</h3>
+          <p>Install Prime Gaming on your PC and claim the monthly free drops.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>Point BAKLOG at it</h3>
+          <p>Connect once and your new collection counts itself from day one.</p>
+        </div>
+      </div>
+      <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
+    </div>
+  </section>
+
   <!-- ============ STORE WALL ============ -->
   <section class="band logo-wall-section" id="stores">
     <div class="wrap">
-      <span class="eyebrow">Works with what you already own</span>
+      <span class="eyebrow">Works with what you own - or start from scratch</span>
       <h2>Twelve libraries and eight wishlists. One honest table.</h2>
       <div class="logo-wall" aria-hidden="true">
         <!-- order: STORE_DISPLAY_ORDER / hero strip -->
@@ -806,6 +813,10 @@
         <details>
           <summary>Is it free?</summary>
           <p>The library import is free forever. Optional upgrades remove sponsored deal cards and cover deep achievement syncs that hit store APIs on your behalf.</p>
+        </details>
+        <details>
+          <summary>I don't really own games yet - is BAKLOG still for me?</summary>
+          <p>Yes. You don't need a paid library to start. Make a free Epic account and claim this week's free game, or install Amazon Prime Gaming on your PC and grab the monthly drops. BAKLOG tracks your collection from the first claim.</p>
         </details>
         <details>
           <summary>How often do I have to refresh?</summary>

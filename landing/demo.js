@@ -86,7 +86,7 @@
     "You own <strong>600</strong> games. You've played <strong>40</strong>.",
     "Every deal site tells you a game is <strong>80% off</strong>. BAKLOG tells you that you already own it on Epic.",
     "<strong>2,847h</strong> backlog at 2h/day is <strong>3.9 years</strong> to clear.",
-    "Connect a store and BAKLOG auto-fetches — fetcher chips light up as the count climbs.",
+    "Connect a store and BAKLOG auto-fetches - fetcher chips light up as the count climbs.",
     "We drop the DLC skins and soundtracks, so the count is real games.",
     "There is no BAKLOG server to breach.",
   ];
@@ -116,7 +116,7 @@
 
   // Canonical spotlight-eyebrow tooltips, mirrored from js/metric-tips.js
   // (EYEBROW_TIPS). Landing-only marketing eyebrows with no canonical tip get
-  // no tooltip — same behaviour as the local hero for unknown eyebrows.
+  // no tooltip - same behaviour as the local hero for unknown eyebrows.
   const EYEBROW_TIPS = {
     "Critically acclaimed": "90%+ rated with enough reviews - among the best you own.",
     "Couch co-op": "Supports local / same-couch co-op and is rated 70%+.",
@@ -181,14 +181,14 @@
     return `
       <div class="dash-mega dash-mega--has-spotlight" id="dashboardMega">
         <div class="dash-mega-hero">
-          <div class="dash-hero-stage">
-            <div class="dash-spotlight-host">
-              <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
-              <div class="dash-spotlight-nav" id="spotlightNav">
-                <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
-                <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
-              </div>
+          <div class="dash-spotlight-host">
+            <div class="dash-spotlight dash-spotlight--multi has-portrait-art portrait-anim-1" id="dashboardSpotlight" role="group" aria-roledescription="carousel" aria-label="Spotlight game"></div>
+            <div class="dash-spotlight-nav" id="spotlightNav">
+              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="prev" aria-label="Previous spotlight" title="Previous">‹</button>
+              <button type="button" class="dash-spotlight-nav-btn" data-spotlight-nav="next" aria-label="Next spotlight" title="Next">›</button>
             </div>
+          </div>
+          <div class="dash-hero-stage">
             <div class="dash-hero-textblock">
               <div class="dash-hero-eyebrow">Your library</div>
               <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores">
@@ -507,14 +507,6 @@
     };
 
     const frame = () => {
-      // #region agent log
-      try {
-        if (document.documentElement.classList.contains("ui-resizing")) {
-          const g = (typeof globalThis !== "undefined" ? globalThis : window);
-          g.__dbgSpotlightFramesDuringResize = (g.__dbgSpotlightFramesDuringResize || 0) + 1;
-        }
-      } catch (_) {}
-      // #endregion
       const art = portraitArt();
       if (!art) {
         rafId = null;
@@ -786,50 +778,14 @@
   let resizeQuietTimer = 0;
   function installResizeQuiet() {
     const root = document.documentElement;
-    // #region agent log
-    let __dbgMegaTopBefore = null, __dbgScrollBefore = 0, __dbgActive = false;
-    const __dbgMegaTop = () => {
-      const m = document.getElementById("dashboardMega");
-      return m ? Math.round(m.getBoundingClientRect().top) : null;
-    };
-    // #endregion
     window.addEventListener("resize", () => {
-      // #region agent log
-      if (!__dbgActive) {
-        __dbgActive = true;
-        __dbgScrollBefore = window.scrollY;
-        __dbgMegaTopBefore = __dbgMegaTop();
-      }
-      // #endregion
       root.classList.add("ui-resizing");
       syncResizePaintSkip();
-      // #region agent log
-      const __megaTopDuring = __dbgMegaTop();
-      // #endregion
       if (resizeQuietTimer) clearTimeout(resizeQuietTimer);
       resizeQuietTimer = setTimeout(() => {
         resizeQuietTimer = 0;
         root.classList.remove("ui-resizing");
         clearResizePaintSkip();
-        // #region agent log
-        const __megaTopAfter = __dbgMegaTop();
-        const __scrolledBy = window.scrollY - __dbgScrollBefore;
-        const __payload = {
-          megaTopBefore: __dbgMegaTopBefore,
-          megaTopDuring: __megaTopDuring,
-          megaTopAfter: __megaTopAfter,
-          shiftOnEnter: (__megaTopDuring != null && __dbgMegaTopBefore != null) ? __megaTopDuring - __dbgMegaTopBefore : null,
-          shiftOnExit: (__megaTopAfter != null && __megaTopDuring != null) ? __megaTopAfter - __megaTopDuring : null,
-          userScrolledBy: __scrolledBy,
-          headerHeight: (() => { const h = document.querySelector("header.hero"); return h ? Math.round(h.getBoundingClientRect().height) : null; })(),
-          sectionHeadHeight: (() => { const s = document.querySelector(".demo-section .section-head"); return s ? Math.round(s.getBoundingClientRect().height) : null; })(),
-          innerWidth: window.innerWidth,
-        };
-        const __body = JSON.stringify({sessionId:'21853a',runId:'post-fix-no-jump',hypothesisId:'H14',location:'demo.js:installResizeQuiet',message:'mega vertical shift on ui-resizing toggle',data:__payload,timestamp:Date.now()});
-        fetch('/api/_debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:__body}).catch(()=>{});
-        __dbgActive = false;
-        __dbgMegaTopBefore = null;
-        // #endregion
         syncDonutChartSizes();
       }, 200);
     }, { passive: true });

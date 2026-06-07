@@ -25,6 +25,7 @@ import {
   backlogPace,
   hoardRate,
   qualityStartRate,
+  topWarGame,
   formatRate,
   formatPct100,
   cleanupCandidateCount,
@@ -234,6 +235,10 @@ export function buildInsightPool(games, snapIn) {
   const avg = completionAverage(snap);
   if (avg != null) {
     add(`Finish rate: <strong>${formatRate(avg)}</strong>`, METRIC_WEIGHT.moderate);
+  }
+  const warTop = topWarGame(snap);
+  if (warTop) {
+    add(`Top WAR pick: <strong>${escapeHtml(warTop.g.name)}</strong> · ${warTop.war}`, METRIC_WEIGHT.cryptic);
   }
   const pyth = pythagoreanCompletion(snap);
   if (pyth != null && Math.abs(pyth.delta) >= 0.02) {
@@ -445,6 +450,8 @@ export function buildMarqueeItems(games, snapIn) {
   if (hoard != null) push('^', 'is-rose', formatPct100(hoard), 'hoard rate (never touched)', null, { weight: W.moderate });
   const qs = qualityStartRate(snap);
   if (qs != null) push('+', 'is-emerald', formatPct100(qs), 'quality start rate', null, { weight: W.moderate });
+  const warTop = topWarGame(snap);
+  if (warTop) push('*', 'is-violet', `${warTop.g.name} · ${warTop.war}`, 'top WAR', null, { weight: W.cryptic });
   const cleanup = cleanupCandidateCount(snap);
   if (cleanup) push('^', 'is-rose', formatNum(cleanup), 'cleanup candidates', null, { weight: W.friendly });
   const clutchCount = backlog.filter(g => isLeveragePick(g)).length;

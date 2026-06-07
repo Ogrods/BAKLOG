@@ -7,7 +7,7 @@ import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandida
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo, cutBucketClass } from './deals.js';
-import { isBarrel, isLeveragePick, getLibrarySnapshot } from './sabermetrics.js';
+import { isBarrel, isLeveragePick, getLibrarySnapshot, topWarGame } from './sabermetrics.js';
 import { computeSpotlightSuperlatives } from './creative-metrics.js';
 import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
 import { familyForEyebrow, spreadByFamily } from './stat-families.js';
@@ -347,6 +347,22 @@ export function pickSpotlightGames(games) {
 
   const snap = getLibrarySnapshot(games);
   const saberPicks = computeSpotlightSuperlatives(eligible, snap);
+  const mvp = topWarGame(snap);
+  if (mvp?.g && hasArt(mvp.g)) {
+    const rating = ratingValue(mvp.g);
+    const hltb = hltbMain(mvp.g);
+    const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
+    saberPicks.push({
+      key: gameKey(mvp.g),
+      eyebrow: 'MVP pick',
+      score: rating + 11,
+      metaParts: [
+        `<strong>${mvp.war} WAR</strong>`,
+        `<strong>${rating}%</strong> review`,
+        `<strong>${escapeHtml(hltbStr)}</strong> main`,
+      ],
+    });
+  }
 
   const saberByKey = new Map();
   for (const pick of saberPicks) {

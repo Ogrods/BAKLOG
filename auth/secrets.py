@@ -13,6 +13,7 @@ from hashlib import scrypt
 from pathlib import Path
 from typing import Any
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -213,15 +214,21 @@ def _decrypt_blob(raw: bytes, profile_id: str | None = None) -> dict[str, Any]:
     if len(raw) < 28:
         raise ValueError("secrets blob is too short to be valid")
     if raw[0:1] == bytes([KEY_VERSION_PROFILE]) and len(raw) >= 29:
-        nonce, ciphertext = raw[1:13], raw[13:]
-        key = _get_profile_key(profile_id)
-        plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
-        doc = json.loads(plaintext.decode("utf-8"))
-        if not isinstance(doc, dict):
-            raise ValueError("secrets payload is not a JSON object")
-        doc.setdefault("providers", {})
-        doc.setdefault("settings", {})
-        return doc
+        try:
+            nonce, ciphertext = raw[1:13], raw[13:]
+            key = _get_profile_key(profile_id)
+            plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
+            doc = json.loads(plaintext.decode("utf-8"))
+            if not isinstance(doc, dict):
+                raise ValueError("secrets payload is not a JSON object")
+            doc.setdefault("providers", {})
+            doc.setdefault("settings", {})
+            return doc
+        except InvalidTag:
+            # A legacy v0 blob whose random nonce happens to begin with
+            # KEY_VERSION_PROFILE collides with the version prefix. Fall through
+            # and retry as legacy rather than treating it as corrupt.
+            pass
 
     # Legacy v0: master key directly on nonce || ciphertext.
     nonce, ciphertext = raw[:12], raw[12:]

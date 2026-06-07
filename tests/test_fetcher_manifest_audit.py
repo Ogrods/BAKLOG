@@ -70,7 +70,7 @@ def test_refresh_args_supported_by_script(entry: dict) -> None:
 @pytest.mark.parametrize("entry", ENTRIES, ids=[e["key"] for e in ENTRIES])
 def test_reload_mapping(entry: dict) -> None:
     key = entry["key"]
-    if key in ENRICH_KEYS or key == "itad":
+    if key in ENRICH_KEYS or key in ("itad", "claims"):
         return
     assert key in LIBRARY_STORE_JSON or key in WISHLIST_FETCHER_JSON, (
         f"{key} has no reloadAfterFetcher mapping in app.js"

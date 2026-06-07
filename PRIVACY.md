@@ -191,6 +191,7 @@ your machine to the storefront — there is no project-owned middleman.
 | `gaming.amazon.com` | Amazon Prime Gaming (local SQLite — no remote call) |
 | `howlongtobeat.com` | HLTB enrichment |
 | `api.isthereanydeal.com` | ITAD pricing |
+| `baklog.app` | Public **Claimable Now** feed (`free-claims.json`) — read-only list of free giveaways; no account data sent |
 
 Cover-art enrichment (`enrich_cross_store_images.py`) hits Steam's CDN. The
 inline Add-game flow hits `store.steampowered.com/api/storesearch/`.

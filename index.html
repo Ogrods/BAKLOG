@@ -99,6 +99,7 @@
     <div id="migrationBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
     <div id="undoToast" class="hidden" role="status" aria-live="polite"></div>
     <div id="itadAlertBanner" class="migration-banner itad-alert-banner hidden" role="status" aria-live="polite"></div>
+    <div id="claimableBanner" class="migration-banner claimable-banner hidden" role="status" aria-live="polite"></div>
     <div id="libraryWatchBanner" class="migration-banner library-watch-banner hidden" role="status" aria-live="polite"></div>
     <div id="authReconnectBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
     <div id="authSecretsBanner" class="migration-banner hidden" role="alert" aria-live="assertive"></div>
@@ -336,6 +337,8 @@
         </dialog>
       </template>
     </section>
+
+    <div id="claimableNowModule" class="hidden mb-4"></div>
 
     <section id="picksSection" class="bg-slate-800 rounded-lg mb-4">
       <div class="flex flex-wrap items-center gap-2 p-3 border-b border-slate-700 relative z-10">
@@ -865,6 +868,8 @@
       </div>
     </div>
   </div>
+
+  <dialog id="claimDetailDialog" class="claim-detail-dialog bg-transparent border-0 p-0 backdrop:bg-black/60"></dialog>
 
   <script type="module" src="js/app.js"></script>
 </body>

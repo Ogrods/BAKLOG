@@ -1,0 +1,9 @@
+# Gitignored internal paths mirrored to the private baklog-internal repo.
+# One path per line; # comments and blank lines are ignored.
+marketing/
+docs/
+audit/
+admin/
+tracker.html
+preview-bootstrap.html
+IP.md

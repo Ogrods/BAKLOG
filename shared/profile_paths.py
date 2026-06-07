@@ -160,6 +160,10 @@ def itad_path(*, profile_id: str | None = None) -> Path:
     return catalog_path("itad_prices.json", profile_id=profile_id)
 
 
+def free_claims_path(*, profile_id: str | None = None) -> Path:
+    return catalog_path("free_claims.json", profile_id=profile_id)
+
+
 def personal_dir(*, profile_id: str | None = None) -> Path:
     return profile_root(profile_id) / "data"
 
@@ -222,6 +226,8 @@ def resolve_catalog_path(path: Path, *, profile_id: str | None = None) -> Path:
         return catalog_path(name, profile_id=profile_id)
     if name == "itad_prices.json":
         return itad_path(profile_id=profile_id)
+    if name == "free_claims.json":
+        return free_claims_path(profile_id=profile_id)
     return profile_root(profile_id) / path
 
 

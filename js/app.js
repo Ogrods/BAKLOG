@@ -244,6 +244,9 @@ async function bootstrap() {
     // only appear when a live fetcher/manual action adds games afterward.
     armLibraryCountAnimations();
     initLibraryWatches();
+    if (!fetcherRunner.isApiAvailable()) {
+      void import('./claimable.js').then(m => m.startClaimableReadOnlyPolling());
+    }
   }
   if (migrationInfo.pendingMigration) {
     showMigrationBanner(migrationInfo.pendingMigration, {

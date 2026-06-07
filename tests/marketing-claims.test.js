@@ -1,5 +1,5 @@
 /** Public marketing copy must not over-claim auto-sync / background behavior. */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const BANNED = [
@@ -11,15 +11,16 @@ const BANNED = [
   /syncs automatically/i,
 ];
 
-const FILES = [
-  'landing/index.html',
-  'marketing/one-pager.html',
-  'marketing/index.html',
-];
+// landing/ is the public marketing surface and is always present in CI.
+// marketing/ is kept local-only (gitignored), so guard those assertions
+// behind a file-existence check to avoid failing in CI.
+const PUBLIC_FILES = ['landing/index.html'];
+const LOCAL_FILES = ['marketing/one-pager.html', 'marketing/index.html'];
 
 describe('marketing copy guardrails', () => {
-  for (const rel of FILES) {
-    it(`${rel} avoids over-claimed auto-sync phrases`, () => {
+  for (const rel of [...PUBLIC_FILES, ...LOCAL_FILES]) {
+    const run = PUBLIC_FILES.includes(rel) || existsSync(rel) ? it : it.skip;
+    run(`${rel} avoids over-claimed auto-sync phrases`, () => {
       const text = readFileSync(rel, 'utf8');
       for (const pattern of BANNED) {
         expect(text, `banned phrase ${pattern}`).not.toMatch(pattern);
@@ -33,12 +34,25 @@ describe('marketing copy guardrails', () => {
     expect(text).toMatch(/90 sec|~90 seconds|90 seconds/i);
   });
 
-  it('one-pager does not list system tray as shipped', () => {
+  const onePagerIt = existsSync('marketing/one-pager.html') ? it : it.skip;
+
+  onePagerIt('one-pager lists system tray as shipped', () => {
     const text = readFileSync('marketing/one-pager.html', 'utf8');
     const shippedBlock = text.slice(
       text.indexOf('Product (shipped)'),
-      text.indexOf('Planned') > -1 ? text.indexOf('Planned') : text.length,
+      text.indexOf('Business model'),
     );
-    expect(shippedBlock.toLowerCase()).not.toMatch(/system tray/);
+    expect(shippedBlock.toLowerCase()).toMatch(/system tray/);
+  });
+
+  onePagerIt('one-pager places cloud sync in roadmap strip, not stat strip', () => {
+    const text = readFileSync('marketing/one-pager.html', 'utf8');
+    const statStrip = text.slice(
+      text.indexOf('stat-strip'),
+      text.indexOf('<div class="cols">'),
+    );
+    expect(statStrip.toLowerCase()).not.toMatch(/cloud sync/);
+    expect(text).toMatch(/roadmap-strip[\s\S]*cloud sync/i);
+    expect(text).toMatch(/#1 priority/i);
   });
 });

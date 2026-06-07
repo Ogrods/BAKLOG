@@ -4,6 +4,7 @@
 games_*.json
 games_wishlist_*.json
 itad_prices.json
+free_claims.json
 broken_images.json
 still_missing_images.json
 cache/
@@ -41,6 +42,8 @@ scripts/probe_nintendo_graphql3.py
 # Scratch probes, baselines, sweep output, debug logs, IDE session files
 _tmp_*
 _baseline_*
+tmp/spotlight-after/
+tmp/spotlight-diff/
 _sweep_output*.txt
 debug-*.log
 .cursor/

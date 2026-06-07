@@ -1,4 +1,5 @@
-/* BAKLOG landing: mega hero demo + funnel sections */
+/* BAKLOG landing: mega hero demo + funnel sections
+ * Run `npm run check:spotlight` before editing this file or landing/demo.js. */
 
 :root {
   --marquee-px-per-sec: 48;
@@ -35,13 +36,39 @@
   background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
   pointer-events: none;
 }
-.dash-mega-hero { position: relative; min-height: 200px; }
+.dash-mega-hero {
+  position: relative;
+  min-height: 200px;
+  /* Spotlight layout tokens — overridden per breakpoint on .dash-mega--has-spotlight */
+  --stage-min-h: 200px;
+  --cover-pad: 14px 0;
+  --cover-object-pos: 65% center;
+  --cover-bg-object-pos: center center;
+  --cover-fit: contain;
+  --host-top: auto;
+  --host-right: auto;
+  --host-bottom: auto;
+  --host-left: auto;
+  --host-width: auto;
+  --spotlight-wrapper-mask: none;
+  --stage-text-overlay: none;
+  --portrait-bg-mask: none;
+  --portrait-art-inset-top: 0;
+  --portrait-art-inset-right: 0;
+  --portrait-art-inset-bottom: 0;
+  --portrait-art-inset-left: 0;
+  --portrait-art-width: 100%;
+  --portrait-art-height: 100%;
+  --marquee-edge-fade: 60px;
+  --ribbon-chart-size: 130px;
+  --ribbon-figure-gap: 12px;
+}
 /* Never use display:contents here — crossing the 900px breakpoint after a
    desktop load leaves the hero number stranded outside the text block. */
 .dash-hero-stage {
   display: block;
   position: relative;
-  min-height: 200px;
+  min-height: var(--stage-min-h, 200px);
 }
 .dash-hero-textblock {
   display: flex;
@@ -152,9 +179,42 @@
 .dash-spotlight-pillar { display: none; }
 .dash-spotlight-pillar.is-fading { opacity: 0; transition: opacity 0.3s ease; }
 
+/*
+ * SPOTLIGHT LAYOUT INVARIANTS (landing demo)
+ * Run `npm run check:spotlight` before editing this block or landing/demo.js.
+ *
+ * Three layout modes (single positioning parent = .dash-mega-hero):
+ *   Desktop  min-width:901px — stage position:static; host bleeds top:-28 right:-32 width:66%;
+ *                            left fade via .dash-spotlight wrapper alpha mask (NOT host::before).
+ *   Tablet   max-width:900px — hero flex-column; stage band host inset:0; stage::before text overlay;
+ *                            portrait cover padding 20px 0.
+ *   Mobile   max-width:640px — portrait cover bottom-right inset; backdrop bottom-fade; sheen off.
+ *
+ * Layer order (z-index scale on .dash-mega--has-spotlight):
+ *   art-bg(0) → overlay(1) → art(1) → gradient(2) → text(2) → body(5) → nav(6)
+ */
+.dash-mega--has-spotlight {
+  --z-art-bg: 0;
+  --z-art: 1;
+  --z-gradient: 2;
+  --z-overlay: 1;
+  --z-text: 2;
+  --z-body: 5;
+  --z-nav: 6;
+  --z-host-fade: 4;
+}
+.dash-mega--has-spotlight .dash-hero-eyebrow,
+.dash-mega--has-spotlight .dash-hero-number,
+.dash-mega--has-spotlight .dash-hero-sub,
+.dash-mega--has-spotlight .dash-hero-stores,
+.dash-mega--has-spotlight .dash-hero-tagline,
+.dash-mega--has-spotlight .dash-hero-pillars,
+.dash-mega--has-spotlight .dash-insight { z-index: var(--z-overlay); }
+.dash-mega--has-spotlight .dash-hero-textblock { z-index: var(--z-overlay); }
+
 /* Spotlight — desktop layout set in min-width:901px block below */
 .dash-spotlight-host {
-  z-index: 0;
+  z-index: var(--z-art-bg, 0);
   overflow: hidden;
 }
 /* Wide rgba fade (same idea as tablet dash-hero-stage::before). Solid
@@ -166,7 +226,7 @@
   left: 0;
   bottom: 0;
   width: min(54%, 480px);
-  z-index: 4;
+  z-index: var(--z-host-fade, 4);
   pointer-events: none;
   background: linear-gradient(
     90deg,
@@ -182,24 +242,31 @@
 @media (min-width: 901px) {
   /* Host lives inside .dash-hero-stage; static stage so absolute host anchors to .dash-mega-hero. */
   .dash-mega--has-spotlight .dash-hero-stage { position: static; }
+  .dash-mega--has-spotlight .dash-mega-hero {
+    --host-top: -28px;
+    --host-right: -32px;
+    --host-bottom: 0;
+    --host-left: auto;
+    --host-width: 66%;
+    --spotlight-wrapper-mask: linear-gradient(90deg, transparent 0%, transparent 8%, rgba(0, 0, 0, 0.55) 30%, #000 52%, #000 100%);
+  }
   .dash-mega--has-spotlight .dash-spotlight-host {
     position: absolute;
-    top: -28px;
-    right: -32px;
-    bottom: 0;
-    left: auto;
-    width: 66%;
-    z-index: 0;
+    top: var(--host-top);
+    right: var(--host-right);
+    bottom: var(--host-bottom);
+    left: var(--host-left);
+    width: var(--host-width);
+    z-index: var(--z-art-bg);
     overflow: hidden;
   }
-  /* Fade the image's left edge to transparent so the real card gradient shows
-     through (seamless), instead of overlaying an opaque slate color that does
-     not match the .dash-mega 135deg gradient. Mirrors app.css spotlight mask. */
+  /* Left fade: dissolve art into the real card via a wide alpha mask on the wrapper.
+     Do NOT use an opaque ::before overlay here — it sits at z-index 4 above the mask
+     and its #1e293b left edge mismatches the card gradient, leaving a vertical seam. */
   .dash-mega--has-spotlight .dash-spotlight-host::before { display: none; }
-  .dash-mega--has-spotlight .dash-spotlight-art,
-  .dash-mega--has-spotlight .dash-spotlight-art-bg {
-    -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.25) 30%, rgba(0, 0, 0, 0.6) 55%, rgba(0, 0, 0, 0.9) 78%, #000 92%);
-    mask-image: linear-gradient(90deg, transparent 0%, transparent 10%, rgba(0, 0, 0, 0.25) 30%, rgba(0, 0, 0, 0.6) 55%, rgba(0, 0, 0, 0.9) 78%, #000 92%);
+  .dash-mega--has-spotlight .dash-spotlight {
+    -webkit-mask-image: var(--spotlight-wrapper-mask);
+    mask-image: var(--spotlight-wrapper-mask);
   }
 }
 .dash-spotlight {
@@ -213,6 +280,7 @@
   overflow: hidden;
   transition: opacity 0.3s ease;
   will-change: opacity;
+  transform: translateZ(0);
 }
 .dash-spotlight.is-fading .dash-spotlight-art,
 .dash-spotlight.is-fading .dash-spotlight-art-bg,
@@ -249,7 +317,7 @@
   transition: transform 0.6s ease, opacity 0.45s ease;
   -webkit-mask-image: none;
   mask-image: none;
-  z-index: 1;
+  z-index: var(--z-art, 1);
   will-change: opacity, transform;
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
@@ -257,10 +325,13 @@
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
   transition: opacity 0.45s ease, transform 0.35s ease, filter 0.35s ease;
   box-sizing: border-box;
-  padding: 14px 0;
+  padding: var(--cover-pad);
   filter: brightness(1.32);
-  object-fit: contain;
-  object-position: 65% center;
+  object-fit: var(--cover-fit);
+  object-position: var(--cover-object-pos);
+}
+.dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
+  object-position: var(--cover-bg-object-pos);
 }
 .dash-spotlight.has-portrait-art.is-tilting .dash-spotlight-art-bg {
   will-change: transform;
@@ -281,7 +352,7 @@
   width: auto;
   aspect-ratio: 600 / 900;
   transform: translateX(-50%);
-  z-index: 1;
+  z-index: var(--z-art, 1);
   pointer-events: none;
   overflow: hidden;
   border-radius: 4px;
@@ -328,7 +399,7 @@
 .dash-spotlight-gradient {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: var(--z-gradient, 2);
   /* Right-edge vignette only; left fade is host::before above. */
   background: linear-gradient(
     90deg,
@@ -345,7 +416,7 @@
   right: 14px;
   /* Sibling of the spotlight host (not a child) so it escapes the host's
      stacking context and sits above the hero textblock overlay. */
-  z-index: 6;
+  z-index: var(--z-nav, 6);
   display: none;
   border-radius: 6px;
   overflow: hidden;
@@ -392,7 +463,7 @@
   text-align: right;
   align-items: flex-end;
   color: #f1f5f9;
-  z-index: 5;
+  z-index: var(--z-body, 5);
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -421,15 +492,15 @@
   color: transparent;
 }
 
-/* Marquee */
+/* Marquee — edge fade via --marquee-edge-fade on .dash-mega-hero (default 60px) */
 .dash-marquee {
   margin-top: 14px;
   margin-bottom: 14px;
   padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
   overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--marquee-edge-fade, 60px), #000 calc(100% - var(--marquee-edge-fade, 60px)), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--marquee-edge-fade, 60px), #000 calc(100% - var(--marquee-edge-fade, 60px)), transparent 100%);
 }
 .dash-marquee-track {
   --marquee-duration: 180s;
@@ -459,7 +530,7 @@
   color: transparent;
 }
 
-/* Ribbon */
+/* Ribbon — chart size via --ribbon-chart-size / --ribbon-figure-gap on .dash-mega */
 .dash-mega-divider { margin: 0 -4px 18px; border-top: 1px solid var(--border-subtle); }
 .dash-ribbon { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .dash-ribbon-tile {
@@ -476,14 +547,14 @@
 .dash-ribbon-figure {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--ribbon-figure-gap, 12px);
   min-width: 0;
 }
 .dash-ribbon-chart {
   position: relative;
-  flex: 0 0 130px;
-  width: 130px;
-  height: 130px;
+  flex: 0 0 var(--ribbon-chart-size, 130px);
+  width: var(--ribbon-chart-size, 130px);
+  height: var(--ribbon-chart-size, 130px);
   min-width: 0;
   min-height: 0;
 }
@@ -522,7 +593,11 @@
    ~200ms trailing debounce), skip rendering work for everything OUTSIDE the demo
    and pause motion. Logs proved layout is cheap (<1ms) but per-frame raster of the
    full page (vw-clamped headings, gradients) cost 130–215ms on slow drags. Skipping
-   the off-screen sections drops that to <30ms without blanking the visible hero. */
+   the off-screen sections drops that to <30ms without blanking the visible hero.
+ *
+ * Donut charts: syncDonutChartSizes() runs once after resize ends (installResizeQuiet).
+ * During drag, html.ui-resizing resets canvas width/height so stale bitmaps are not
+ * CSS-stretched mid-gesture — see .dash-ribbon-chart canvas rules below. */
 /* Only applied via JS to sections fully off-screen, with measured --cv-height
    so document flow doesn't jump (logs: section-head 72px placeholder vs 192px
    real height caused exactly 120px mega shift per resize gesture). */
@@ -601,7 +676,7 @@ html.ui-resizing .dash-ribbon-chart canvas {
   text-shadow: 0 0 8px rgba(110,231,183,0.55), 0 1px 2px rgba(0,0,0,0.6);
   pointer-events: none;
   white-space: nowrap;
-  z-index: 5;
+  z-index: var(--z-body, 5);
   animation: baklog-libcount-pop 700ms ease-out forwards;
 }
 @keyframes baklog-libcount-pop {
@@ -695,11 +770,14 @@ html.ui-resizing .dash-ribbon-chart canvas {
 .cta-band p { color: var(--text-mute); margin: 0.85rem auto 1.5rem; max-width: 40ch; }
 
 @media (max-width: 900px) {
+  .dash-mega {
+    --ribbon-chart-size: 180px;
+    --ribbon-figure-gap: 32px;
+  }
   .dash-ribbon { grid-template-columns: 1fr; }
   /* Tiles are now full-width but short; center the donut + legend and grow the
      ring so the wide row isn't mostly empty space on the right. */
-  .dash-ribbon-figure { justify-content: center; gap: 32px; }
-  .dash-ribbon-chart { flex-basis: 180px; width: 180px; height: 180px; }
+  .dash-ribbon-figure { justify-content: center; }
   .dash-ribbon-legend {
     flex: 0 1 auto;
     grid-template-columns: repeat(2, auto);
@@ -738,6 +816,11 @@ html.ui-resizing .dash-ribbon-chart canvas {
   }
   /* Tablet and down: art is a background inside the stage band; text overlays
      at the top-left (beside the nav arrows); the stat cells flow below. */
+  .dash-mega--has-spotlight .dash-mega-hero {
+    --stage-min-h: 240px;
+    --cover-pad: 20px 0;
+    --stage-text-overlay: linear-gradient(115deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.5) 38%, rgba(2,6,23,0) 66%);
+  }
   .dash-mega-hero {
     display: flex;
     flex-direction: column;
@@ -749,11 +832,14 @@ html.ui-resizing .dash-ribbon-chart canvas {
   .dash-mega .dash-hero-stores,
   .dash-mega .library-count-host,
   .dash-mega--has-spotlight .dash-insight { max-width: 100%; }
+  /* Stack the tagline stats one per line; drop the inline separators. */
+  .dash-hero-tagline { flex-direction: column; gap: 4px; }
+  .dash-hero-tagline .sep { display: none; }
   .dash-hero-stage {
     display: block;
     position: relative;
     width: 100%;
-    min-height: 240px;
+    min-height: var(--stage-min-h);
     border-radius: 10px;
     overflow: hidden;
   }
@@ -761,26 +847,27 @@ html.ui-resizing .dash-ribbon-chart canvas {
     content: "";
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: var(--z-overlay, 1);
     pointer-events: none;
-    background: linear-gradient(115deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.5) 38%, rgba(2,6,23,0) 66%);
+    background: var(--stage-text-overlay, linear-gradient(115deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.5) 38%, rgba(2,6,23,0) 66%));
   }
   .dash-hero-textblock {
     display: flex;
     flex-direction: column;
     gap: 4px;
     position: relative;
-    z-index: 2;
+    z-index: var(--z-text, 2);
     padding: 16px 18px;
     max-width: calc(100% - 80px);
   }
+  .dash-mega--has-spotlight .dash-hero-textblock { z-index: var(--z-text); }
   .dash-spotlight-host {
     position: absolute;
     inset: 0;
     width: 100%;
     border-radius: 10px;
     overflow: hidden;
-    z-index: 0;
+    z-index: var(--z-art-bg, 0);
   }
   .dash-spotlight-host::before { display: none; }
   .dash-spotlight {
@@ -795,12 +882,9 @@ html.ui-resizing .dash-ribbon-chart canvas {
   .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
     -webkit-mask-image: none;
     mask-image: none;
-    padding: 0;
   }
-  /* Keep the 15% rightward offset on the foreground cover at all sizes; the
-     blurred backdrop stays centered. */
-  .dash-spotlight.has-portrait-art .dash-spotlight-art { object-position: 65% center; }
-  .dash-spotlight.has-portrait-art .dash-spotlight-art-bg { object-position: center center; }
+  /* Blurred backdrop stays full-bleed; foreground cover padding from --cover-pad. */
+  .dash-spotlight.has-portrait-art .dash-spotlight-art-bg { padding: 0; }
   .dash-spotlight .dash-spotlight-body { display: none; }
   .dash-hero-pillars {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -849,10 +933,10 @@ html.ui-resizing .dash-ribbon-chart canvas {
   .dash-insight { border-radius: 10px; }
 }
 @media (max-width: 520px) {
+  .dash-mega { --ribbon-figure-gap: 10px; }
   .dash-ribbon-figure {
     flex-direction: column;
     align-items: center;
-    gap: 10px;
   }
   .dash-ribbon-legend {
     width: 100%;
@@ -862,13 +946,24 @@ html.ui-resizing .dash-ribbon-chart canvas {
 }
 @media (max-width: 640px) {
   .dash-mega { padding: 20px 18px 16px; }
+  .dash-mega--has-spotlight .dash-mega-hero {
+    --stage-min-h: 300px;
+    --portrait-bg-mask: linear-gradient(180deg, #000 58%, transparent 100%);
+    --cover-pad: 0;
+    --cover-object-pos: right bottom;
+    --portrait-art-inset-top: auto;
+    --portrait-art-inset-right: 20px;
+    --portrait-art-inset-bottom: 20px;
+    --portrait-art-inset-left: auto;
+    --portrait-art-width: auto;
+    --portrait-art-height: 70%;
+  }
   /* Small screens only: fade the blurred backdrop at the bottom so it blends into
      the panel behind the overlaid text. Foreground cover is tucked separately. */
   .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
-    -webkit-mask-image: linear-gradient(180deg, #000 58%, transparent 100%);
-    mask-image: linear-gradient(180deg, #000 58%, transparent 100%);
+    -webkit-mask-image: var(--portrait-bg-mask);
+    mask-image: var(--portrait-bg-mask);
   }
-  /* Non-hero (portrait) cover: smaller, bottom-right with padding. */
   .dash-spotlight.has-portrait-art .dash-spotlight-art {
     top: auto;
     left: auto;
@@ -886,12 +981,8 @@ html.ui-resizing .dash-ribbon-chart canvas {
   .dash-spotlight.has-portrait-art .dash-spotlight-sheen { display: none; }
   /* Balance the 7 store logos into two even rows (4 + 3), break "7 stores" onto
      its own line, and give the art stage extra height for the taller text block. */
-  .dash-hero-stage { min-height: 300px; }
   .dash-hero-stores .store-logo-strip { max-width: 112px; }
   .dash-hero-sub-count { display: block; }
-  /* Stack the tagline stats one per line; drop the inline separators. */
-  .dash-hero-tagline { flex-direction: column; gap: 4px; }
-  .dash-hero-tagline .sep { display: none; }
 }
 @media (max-width: 500px) {
   .dash-hero-pillar:not(.dash-spotlight-pillar) {

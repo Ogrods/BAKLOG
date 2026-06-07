@@ -33,6 +33,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **Marketing copy consistency** — landing page, content kit, investor deck, one-pager, README, and waitlist email aligned to shipped auto-fetch behavior (on-connect default on; 24h stale refresh default off; no background/cloud sync claims). Magic-moment numbers standardized to 0 → 2,000+ in ~90 seconds; fetcher panel described as 25 chips (12+8 stores + ITAD + enrichers).
 - **Connections status pills (3 states)** — scrapped the client-side "Connecting…" animation. Pills now show only **Connected**, **Unverified**, or **Not connected** from server truth (`displayStatus()`); `expired` still drives Reconnect chip/banner but displays as "Not connected" on the card. Post-connect speed uses Epic callback `BroadcastChannel` + a 30s time-boxed fast poll (no fake in-flight state).
 
 ### Fixed
@@ -55,6 +56,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - **Humble in Steam enrichers** — `enrich_steam_reviews.py` and `enrich_cross_store_images.py` now process `games_humble.json`; reviews enricher uses `humble_steam_app_id` when present.
 - **Humble Bundle library + wishlist** — new `humble` Connections provider (CDP browser profile at `cache/auth/profiles/humble`, one login for both fetchers). `fetch_humble.py` walks `/api/v1/user/order` + per-order detail, games-only by default (`--include-nongames` escape hatch), writes `games_humble.json`. `fetch_humble_wishlist.py` loads `humblebundle.com/store/wishlist`, parses `__NEXT_DATA__` + captured wishlist XHR, writes `games_wishlist_humble.json`. Manifest keys `humble` + `wishlistHumble`; `--dump` saves `cache/humble/*` for parser tuning.
 - **Nintendo Store wishlist fetcher** — new `nintendo_wishlist` Connections provider (CDP browser profile at `cache/auth/profiles/nintendo_wishlist`, separate from the eShop `nintendo` library path). `fetch_nintendo_wishlist.py` loads `nintendo.com/us/wish-list/` headlessly, parses `__NEXT_DATA__` and captured wishlist JSON, writes `games_wishlist_nintendo.json`. Manifest key `wishlistNintendo`; `--dump` saves `cache/nintendo/wishlist_dump.*` for parser tuning.
+- **Auto-fetch on connect + stale-store refresh** — Connections prefs: **Auto-fetch when a store connects** (default on) runs that provider's fetcher keys on disconnect/expired → connected transitions (not first boot); **Auto-refresh stores older than 24h** (default off) quietly refreshes one stale store per ~30 min while the app is open. See `js/fetcher-health.js` and `tests/auto-fetch.test.js`.
 - **Chip-level auth-failure backoff** — when a fetcher run ends in an auth-ish failure (401/403, expired cookie/session, rejected sign-in) the chip cools down with an escalating window on consecutive failures (5m → 15m → 60m). While cooling down the chip is disabled, shows an `auth Nm` badge + tooltip, and is skipped by both auto-refresh and the bulk "Run stale" sweep — closing the request-flood path against a provider that needs reconnecting. The cooldown clears on the next successful run, when the timer expires, or the moment the mapped provider shows "connected" in Connections (so reconnecting never leaves a chip stuck). Persisted across reloads.
 - **PSN trophy completion pill** — library rows with `trophy_progress` show a slim muted `🏆 N%` pill in the game-name meta line (no new column); wishlist rows omit it.
 - **SECURITY.md threat model** — formal local-first security model: trust-boundary diagram, protected assets, the at-rest crypto (AES-256-GCM with an OS-keychain key; scrypt N=2¹⁴ for the optional master password and the portable bundle), and an explicit out-of-scope list (local malware, plaintext `.env`/cookie jars, the `.master_key` fallback, storefront ToS). Linked from README and PRIVACY.md. Marketing suite gains a "Nothing to breach" security campaign and a founder-truth line on why local install *is* the security posture.
@@ -142,8 +144,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
   /api/stream/<run_id>` streams stdout/stderr over SSE, `GET/PUT
   /api/personal` reads/writes `data/personal.json`. Runs are serialized through
   a single-worker queue; fetcher argv is whitelisted server-side.
-- **Fetcher health row (dashboard)** — compact chip strip for all 15 data
-  sources (stores, wishlists, ITAD, HLTB) with freshness coloring, entry
+- **Fetcher health row (dashboard)** — compact chip strip for all 25 fetchers
+  (12 library + 8 wishlist + ITAD + 4 enrichers) with freshness coloring, entry
   counts, and an "Only stale / missing" toggle. When `server.py` is running,
   chips become buttons that enqueue the matching fetch script and open a live
   log panel below the row.

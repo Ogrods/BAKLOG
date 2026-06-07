@@ -6,7 +6,7 @@
 
 ![Dashboard preview](dashboard.png)
 
-BAKLOG helps you browse, sort, and prioritize games across Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, and itch.io. Nothing is hosted on the web; your credentials and library JSON stay on your machine.
+BAKLOG helps you browse, sort, and prioritize games across **12 library sources and 8 wishlists** — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App. Nothing is hosted on the web; your credentials and library JSON stay on your machine.
 
 **New to collecting?** You don't need an existing library on any store. Start free on Steam (free-to-play), Epic (weekly free game), Prime Gaming (free keys), Battle.net (StarCraft), Ubisoft (Rainbow Six Siege), or itch.io (pay-what-you-want) — then let BAKLOG track your collection from day one.
 
@@ -66,6 +66,11 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 - Multi-store dashboard with store filter chips and store badges
 - A–Z jump nav pinned to the right edge (xl+ screens)
 - **Wishlist deal radar:** filter by On Sale / Historical Low / Min Discount % / Max Price, hide already-owned cross-store
+- **Connections tab:** one-click store auth (browser sign-in or API keys), encrypted credential storage, portable secrets bundle
+- **Auto-fetch on connect** (default on): when you connect or reconnect a store, BAKLOG auto-fetches its library and opens the fetcher log
+- **Auto-refresh stale stores** (default off): optional Connections toggle — quietly refreshes one store older than 24h every ~30 min while the app is open
+- **Auto-enrich** (default on): after a library fetch adds games, queues HLTB, reviews, covers, and co-op tags
+- **ITAD auto-refresh** (default on): deal prices refresh on a 15–60 min schedule while the dashboard is open
 
 ### Blacklist vs hidden list
 
@@ -375,7 +380,9 @@ If you instead serve the dashboard read-only via `python -m http.server`, the da
 
 ## Auto-refresh on a schedule
 
-The cross-platform way to run fetchers is from the UI — click any chip in the **Fetcher health** row. For unattended refreshes, use the helper script for your OS. Both run the same fetch sequence and log to `refresh.log`.
+While BAKLOG is open, you can enable **auto-refresh stores older than 24h** on the Connections tab (off by default). ITAD deal prices also refresh on a schedule from the Fetcher health panel.
+
+For refreshes while BAKLOG is closed, use the helper script for your OS, or click any chip in the **Fetcher health** row from the UI. Scripts and UI runs use the same fetch sequence and log to `refresh.log`.
 
 **Windows** (`refresh.ps1`):
 

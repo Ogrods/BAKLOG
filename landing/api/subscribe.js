@@ -85,6 +85,7 @@ A quick refresher on what you signed up for:
 - One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App.
 - Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.
 - Free forever to import your library.
+- Auto-fetches when you connect a store (fetcher chips light up as your library lands).
 
 No action needed right now - just keep an eye on your inbox.
 
@@ -102,6 +103,7 @@ const CONFIRM_HTML = `<!doctype html>
         <li>One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App.</li>
         <li>Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.</li>
         <li>Free forever to import your library.</li>
+        <li>Auto-fetches when you connect a store (fetcher chips light up as your library lands).</li>
       </ul>
       <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">No action needed right now - just keep an eye on your inbox.</p>
       <p style="font-size:14px;line-height:1.6;margin:0;color:#94a3b8;">- The BAKLOG team<br /><a href="https://baklog.app" style="color:#38bdf8;">baklog.app</a></p>

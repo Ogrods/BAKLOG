@@ -1879,6 +1879,20 @@ def _send_json(handler: SimpleHTTPRequestHandler, status: int, payload: Any) -> 
     handler.wfile.write(body)
 
 
+def _handle_debug_log(handler: SimpleHTTPRequestHandler) -> None:
+    """Append one NDJSON debug line (local dev only)."""
+    length = int(handler.headers.get("Content-Length", 0))
+    body = handler.rfile.read(length) if length else b""
+    if body.strip():
+        try:
+            with (ROOT / "debug-21853a.log").open("ab") as f:
+                f.write(body.strip() + b"\n")
+        except OSError:
+            pass
+    handler.send_response(HTTPStatus.NO_CONTENT)
+    handler.end_headers()
+
+
 def _send_bytes(
     handler: SimpleHTTPRequestHandler,
     status: int,
@@ -2270,6 +2284,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - http.server API
         self._begin_request()
+        if _api_path(self) == "/api/_debug-log":
+            _handle_debug_log(self)
+            return
         if self._reject_if_csrf():
             return
         if not _require_api_auth(self):

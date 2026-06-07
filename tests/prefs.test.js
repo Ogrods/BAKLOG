@@ -67,6 +67,12 @@ describe('loadPrefs', () => {
     expect(loadPrefs().coopFilterMode).toBe('off');
   });
 
+  it('defaults autoFetchOnConnect true and autoFetchStale24h false', () => {
+    const p = loadPrefs();
+    expect(p.autoFetchOnConnect).toBe(true);
+    expect(p.autoFetchStale24h).toBe(false);
+  });
+
   it('clamps itadAutoRefreshIntervalMin to 15-60 and snaps to step 5', () => {
     localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 10 }));
     expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(15);

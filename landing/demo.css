@@ -36,6 +36,20 @@
   pointer-events: none;
 }
 .dash-mega-hero { position: relative; min-height: 200px; }
+/* Never use display:contents here — crossing the 900px breakpoint after a
+   desktop load leaves the hero number stranded outside the text block. */
+.dash-hero-stage {
+  display: block;
+  position: relative;
+  min-height: 200px;
+}
+.dash-hero-textblock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+}
 .dash-hero-eyebrow {
   font-size: 11px;
   letter-spacing: 0.18em;
@@ -51,6 +65,7 @@
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
+  text-align: left;
   background: linear-gradient(180deg, #f1f5f9 0%, #94a3b8 140%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -134,15 +149,39 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.dash-spotlight-pillar { display: none; }
+.dash-spotlight-pillar.is-fading { opacity: 0; transition: opacity 0.3s ease; }
 
 /* Spotlight */
 .dash-spotlight-host {
   position: absolute;
   top: 0;
+  left: 0;
   right: 0;
   bottom: 0;
-  width: 66%;
   z-index: 0;
+  overflow: hidden;
+}
+/* Wide rgba fade (same idea as tablet dash-hero-stage::before). Solid
+   --bg-panel overlays create their own hard edge against the card gradient. */
+.dash-spotlight-host::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(54%, 480px);
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.96) 0%,
+    rgba(30, 41, 59, 0.78) 18%,
+    rgba(15, 23, 42, 0.55) 38%,
+    rgba(15, 23, 42, 0.22) 58%,
+    rgba(15, 23, 42, 0.06) 76%,
+    transparent 100%
+  );
 }
 .dash-spotlight {
   position: absolute;
@@ -155,7 +194,6 @@
   overflow: hidden;
   transition: opacity 0.3s ease;
   will-change: opacity;
-  transform: translateZ(0);
 }
 .dash-spotlight.is-fading .dash-spotlight-art,
 .dash-spotlight.is-fading .dash-spotlight-art-bg,
@@ -171,9 +209,9 @@
   display: none;
   pointer-events: none;
   filter: blur(18px) brightness(0.5);
-  transform: scale(1.08) translateZ(0);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0,0,0,0.25) 32%, rgba(0,0,0,0.6) 56%, rgba(0,0,0,0.9) 80%, #000 95%);
-  mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0,0,0,0.25) 32%, rgba(0,0,0,0.6) 56%, rgba(0,0,0,0.9) 80%, #000 95%);
+  transform: scale(1.08);
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
   display: block;
@@ -190,21 +228,20 @@
   opacity: 0;
   filter: brightness(1.1);
   transition: transform 0.6s ease, opacity 0.45s ease;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0,0,0,0.25) 32%, rgba(0,0,0,0.6) 56%, rgba(0,0,0,0.9) 80%, #000 95%);
-  mask-image: linear-gradient(90deg, transparent 0%, transparent 12%, rgba(0,0,0,0.25) 32%, rgba(0,0,0,0.6) 56%, rgba(0,0,0,0.9) 80%, #000 95%);
+  -webkit-mask-image: none;
+  mask-image: none;
   z-index: 1;
   will-change: opacity, transform;
-  backface-visibility: hidden;
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
-.dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04) translateZ(0); }
+.dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04); }
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
   transition: opacity 0.45s ease, transform 0.35s ease, filter 0.35s ease;
   box-sizing: border-box;
   padding: 14px 0;
   filter: brightness(1.32);
   object-fit: contain;
-  object-position: center center;
+  object-position: 65% center;
 }
 .dash-spotlight.has-portrait-art.is-tilting .dash-spotlight-art-bg {
   will-change: transform;
@@ -221,7 +258,7 @@
   position: absolute;
   top: 14px;
   bottom: 14px;
-  left: 50%;
+  left: 65%;
   width: auto;
   aspect-ratio: 600 / 900;
   transform: translateX(-50%);
@@ -272,14 +309,22 @@
 .dash-spotlight-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--bg) 0%, transparent) 0%, color-mix(in srgb, var(--bg) 0%, transparent) 45%, color-mix(in srgb, var(--bg) 15%, transparent) 85%, color-mix(in srgb, var(--bg) 45%, transparent) 100%);
+  z-index: 2;
+  /* Right-edge vignette only; left fade is host::before above. */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 55%,
+    color-mix(in srgb, var(--bg) 12%, transparent) 82%,
+    color-mix(in srgb, var(--bg) 40%, transparent) 100%
+  );
   pointer-events: none;
 }
 .dash-spotlight-nav {
   position: absolute;
   top: 14px;
   right: 14px;
-  z-index: 3;
+  z-index: 5;
   display: none;
   border-radius: 6px;
   overflow: hidden;
@@ -321,7 +366,7 @@
   text-align: right;
   align-items: flex-end;
   color: #f1f5f9;
-  z-index: 2;
+  z-index: 5;
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -448,23 +493,43 @@
 }
 
 /* While the viewport is actively resizing (js toggles html.ui-resizing with a
-   ~200ms trailing debounce), pause motion and cheapen paints that fight reflow. */
-html.ui-resizing .dash-mega { contain: layout style; }
+   ~200ms trailing debounce), skip rendering work for everything OUTSIDE the demo
+   and pause motion. Logs proved layout is cheap (<1ms) but per-frame raster of the
+   full page (vw-clamped headings, gradients) cost 130–215ms on slow drags. Skipping
+   the off-screen sections drops that to <30ms without blanking the visible hero. */
+/* Only applied via JS to sections fully off-screen, with measured --cv-height
+   so document flow doesn't jump (logs: section-head 72px placeholder vs 192px
+   real height caused exactly 120px mega shift per resize gesture). */
+html.ui-resizing header.hero.resize-skip-paint,
+html.ui-resizing section.band:not(#demo).resize-skip-paint {
+  content-visibility: hidden;
+  contain-intrinsic-size: auto var(--cv-height, 480px);
+}
+html.ui-resizing .dash-mega { contain: layout paint style; }
 html.ui-resizing .dash-ribbon-tile { contain: layout paint; }
+/* Pause animations and zero out transitions so motion doesn't fight the drag. */
 html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
 html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before,
 html.ui-resizing .dash-marquee-track {
   animation-play-state: paused;
 }
-html.ui-resizing .dash-spotlight-art-bg {
-  filter: brightness(0.5);
+html.ui-resizing .dash-mega-hero,
+html.ui-resizing .dash-mega-hero * {
+  transition-duration: 0s !important;
 }
-html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
-  filter: none;
-}
+/* Drop only blurs (cheap to remove, barely visible) — keep the hero fully painted. */
 html.ui-resizing .dash-spotlight-body,
-html.ui-resizing .dash-spotlight-nav {
+html.ui-resizing .dash-spotlight-nav,
+html.ui-resizing .dash-hero-pillar {
   backdrop-filter: none;
+}
+/* Donut bitmaps sync once after resize ends; avoid CSS-stretching stale canvases mid-drag. */
+html.ui-resizing .dash-ribbon-chart canvas {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
 }
 .dash-ribbon-headline { text-align: center; font-size: 13px; color: #cbd5e1; }
 .dash-ribbon-headline strong { color: #f1f5f9; font-weight: 700; }
@@ -645,21 +710,53 @@ html.ui-resizing .dash-spotlight-nav {
     text-align: center;
     width: 100%;
   }
-  /* Tablet/narrow: the spotlight stays a contained card pinned to the hero's
-     bottom-right (not a full-width banner). Hero text is left-constrained so it
-     never runs under the card; the host keeps the 66%-wide desktop box shape
-     scaled down and re-anchored to the bottom-right corner. */
+  /* Tablet and down: art is a fixed-height background; the non-cell text overlays
+     it at the top-left (beside the nav arrows); the stat cells flow below. */
+  .dash-mega-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
   .dash-mega .dash-hero-number, .dash-mega .dash-hero-sub,
   .dash-mega .dash-hero-tagline, .dash-mega .dash-hero-pillars,
   .dash-mega .dash-hero-stores,
   .dash-mega .library-count-host,
-  .dash-mega--has-spotlight .dash-insight { max-width: 52%; }
+  .dash-mega--has-spotlight .dash-insight { max-width: 100%; }
+  .dash-hero-stage {
+    display: block;
+    position: relative;
+    width: 100%;
+    min-height: 240px;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .dash-hero-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(115deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.5) 38%, rgba(2,6,23,0) 66%);
+  }
+  .dash-hero-textblock {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    z-index: 2;
+    padding: 16px 18px;
+    max-width: calc(100% - 80px);
+  }
   .dash-spotlight-host {
     position: absolute;
-    inset: 0 0 0 auto;
-    width: min(320px, 44%);
-    height: auto;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 0;
   }
+  .dash-spotlight-host::before { display: none; }
   .dash-spotlight {
     position: absolute;
     inset: 0;
@@ -668,17 +765,59 @@ html.ui-resizing .dash-spotlight-nav {
     border-radius: 10px;
     overflow: hidden;
   }
-  .dash-spotlight.has-portrait-art .dash-spotlight-art {
-    object-position: 28% center;
+  .dash-spotlight.has-portrait-art .dash-spotlight-art,
+  .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
+    -webkit-mask-image: none;
+    mask-image: none;
+    object-position: center center;
+    padding: 0;
   }
-  .dash-spotlight-body {
-    left: auto;
-    right: 12px;
-    bottom: 12px;
-    max-width: 88%;
-    text-align: right;
-    align-items: flex-end;
+  .dash-spotlight .dash-spotlight-body { display: none; }
+  .dash-hero-pillars {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    max-width: 100%;
+    margin-top: 0;
   }
+  .dash-spotlight-pillar {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    grid-column: 1 / -1;
+  }
+  .dash-spotlight-pillar .dash-spotlight-body {
+    position: static;
+    display: flex;
+    max-width: none;
+    text-align: left;
+    align-items: flex-start;
+    background: transparent;
+    border: none;
+    padding: 0;
+    backdrop-filter: none;
+  }
+  .dash-spotlight-pillar .dash-spotlight-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 15px;
+    line-height: 1.25;
+  }
+  .dash-spotlight-pillar .dash-spotlight-meta { text-align: left; }
+  .dash-hero-pillar:not(.dash-spotlight-pillar) {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .dash-hero-pillar:not(.dash-spotlight-pillar) .dash-hero-pillar-value {
+    font-size: clamp(16px, 5vw, 26px);
+    white-space: nowrap;
+  }
+  .dash-mega--has-spotlight .dash-insight { margin-top: 0; }
+  .dash-insight { border-radius: 10px; }
 }
 @media (max-width: 520px) {
   .dash-ribbon-figure {
@@ -694,11 +833,30 @@ html.ui-resizing .dash-spotlight-nav {
 }
 @media (max-width: 640px) {
   .dash-mega { padding: 20px 18px 16px; }
+  /* Small screens only: fade the portrait art at the bottom so it blends into
+     the panel behind the overlaid text. No gradient at the 900px tablet width. */
+  .dash-spotlight.has-portrait-art .dash-spotlight-art,
+  .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
+    -webkit-mask-image: linear-gradient(180deg, #000 58%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 58%, transparent 100%);
+  }
+  /* Balance the 7 store logos into two even rows (4 + 3), break "7 stores" onto
+     its own line, and give the art stage extra height for the taller text block. */
+  .dash-hero-stage { min-height: 300px; }
+  .dash-hero-stores .store-logo-strip { max-width: 112px; }
+  .dash-hero-sub-count { display: block; }
+  /* Stack the tagline stats one per line; drop the inline separators. */
+  .dash-hero-tagline { flex-direction: column; gap: 4px; }
+  .dash-hero-tagline .sep { display: none; }
 }
 @media (max-width: 400px) {
-  /* 3-across or 1-column only — never a 2+1 orphan row */
-  .dash-hero-pillars { grid-template-columns: 1fr; }
-  .dash-spotlight-host { width: min(280px, 48%); }
+  .dash-hero-pillar:not(.dash-spotlight-pillar) {
+    padding: 10px 8px;
+  }
+  .dash-hero-pillar:not(.dash-spotlight-pillar) .dash-hero-pillar-label {
+    font-size: 10px;
+    margin-top: 4px;
+  }
   .score-grid { gap: 0.6rem; }
   .score-tile { padding: 1rem 0.75rem; }
   .score-tile .num { font-size: 1.5rem; }
@@ -710,7 +868,7 @@ html.ui-resizing .dash-spotlight-nav {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dash-spotlight, .dash-spotlight-art { transition: none !important; animation: none !important; }
+  .dash-spotlight, .dash-spotlight-art, .dash-spotlight-pillar { transition: none !important; animation: none !important; }
   .dash-spotlight.has-portrait-art.is-tilting .dash-spotlight-art-bg { transform: none !important; }
   .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before { animation: none !important; }
   .dash-marquee-track { animation: none !important; }

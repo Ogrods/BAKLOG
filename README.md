@@ -8,7 +8,7 @@
 
 BAKLOG helps you browse, sort, and prioritize games across Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, and itch.io. Nothing is hosted on the web; your credentials and library JSON stay on your machine.
 
-**New to collecting?** You don't need an existing library on any store. Make a free Epic account or install Amazon Prime Gaming on your PC, claim a few free games, then let BAKLOG track them from day one.
+**New to collecting?** You don't need an existing library on any store. Start free on Steam (free-to-play), Epic (weekly free game), Prime Gaming (free keys), Battle.net (StarCraft), Ubisoft (Rainbow Six Siege), or itch.io (pay-what-you-want) — then let BAKLOG track your collection from day one.
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 

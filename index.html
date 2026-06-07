@@ -211,6 +211,16 @@
       <p class="conn-hint">Click <strong>Connect</strong> or <strong>Verify</strong>. A sign-in window opens and closes itself when done.
         <button type="button" class="conn-hint-help" data-conn-open="howto" aria-haspopup="dialog" aria-label="How connections work" title="How connections work">?</button>
       </p>
+      <div id="connPrefs" class="conn-prefs fh-filter-toggles" role="group" aria-label="Automatic fetch preferences">
+        <label class="fh-toggle" title="After you connect or reconnect a store, pull its data and open the fetcher log">
+          <input id="autoFetchOnConnectToggle" type="checkbox" class="rounded" checked />
+          Auto-fetch when a store connects
+        </label>
+        <label class="fh-toggle" title="While the app is open, quietly refresh any store whose data is older than 24 hours, one store at a time (~30 min apart)">
+          <input id="autoFetchStale24hToggle" type="checkbox" class="rounded" />
+          Auto-refresh stores older than 24h
+        </label>
+      </div>
       <div id="connOnboard" hidden></div>
       <div id="connLayout">
         <nav id="connRail" role="listbox" aria-label="Providers"></nav>

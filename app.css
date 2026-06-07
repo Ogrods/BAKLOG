@@ -4382,6 +4382,13 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   background: rgba(251, 191, 36, 0.08);
   border: 1px solid rgba(251, 191, 36, 0.25);
 }
+.conn-prefs {
+  margin: 0.5rem 0 0.85rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+}
 .conn-hint {
   display: flex;
   align-items: center;

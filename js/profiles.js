@@ -31,6 +31,7 @@ const ITAD_SNAPSHOT_PREFIX = 'baklog-itad-snapshot';
 export const LS_FETCHER_AUTH_COOLDOWN = 'baklog-fetcher-auth-cooldown';
 export const LS_RECONNECT_DISMISSED = 'baklog-reconnect-dismissed';
 export const LS_ITAD_LAST_AUTO_RUN = 'baklog-itad-last-auto-run';
+export const LS_AUTO_STALE_LAST_RUN = 'baklog-auto-stale-last-run';
 export const LS_FETCHER_SUPPRESSED_RUNS = 'fetcher-suppressed-run-ids';
 export const LS_FETCHER_LAST_SEQ = 'fetcher-last-seq-by-run';
 export const LS_LIBRARY_WATCH = 'baklog-library-watch';
@@ -43,6 +44,7 @@ export const PROFILE_SCOPED_STORAGE_KEYS = Object.freeze([
   LS_FETCHER_AUTH_COOLDOWN,
   LS_RECONNECT_DISMISSED,
   LS_ITAD_LAST_AUTO_RUN,
+  LS_AUTO_STALE_LAST_RUN,
   LS_LIBRARY_WATCH,
 ]);
 

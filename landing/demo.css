@@ -720,17 +720,14 @@ html.ui-resizing .dash-ribbon-chart canvas {
 .logo-wall-caption { color: var(--text-mute); font-size: 0.9rem; max-width: 52ch; margin: 0 auto; line-height: 1.5; }
 .section-invite { margin-top: 1.75rem; }
 
-/* Funnel: score grid */
+/* Funnel: score grid — 6 tiles = 3×2 on desktop, 2×3 on tablet */
 .score-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   margin-top: 1.5rem;
 }
 .score-tile {
-  flex: 1 1 180px;
-  max-width: 260px;
   background: linear-gradient(160deg, var(--bg-panel), rgba(30,41,59,0.4));
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
@@ -796,21 +793,9 @@ html.ui-resizing .dash-ribbon-chart canvas {
     font-size: 12px;
   }
   .score-grid {
-    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
-  .score-tile {
-    flex: unset;
-    max-width: none;
-    width: 100%;
-  }
-  .score-tile:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-    width: calc(50% - 0.375rem);
-    justify-self: center;
-  }
-  /* Center the invite button so it lines up under the centered $0 tile. */
   .section-invite { text-align: center; }
   .dash-insight {
     white-space: normal;

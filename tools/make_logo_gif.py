@@ -10,6 +10,7 @@ Requires: Pillow (pip install pillow)
 Run:
   python tools/make_logo_gif.py              # timber toss/drop/scatter (both motto + plain)
   python tools/make_logo_gif.py midnight     # six white-on-black drop GIFs
+  python tools/make_logo_gif.py blue         # deck-navy orbit GIF(s)
 """
 
 from __future__ import annotations
@@ -85,6 +86,27 @@ class GifPreset:
 
 def timber_preset(out_w: int = 400, out_h: int = 400, supersample: int = 4) -> GifPreset:
     return GifPreset(out_w=out_w, out_h=out_h, supersample=supersample)
+
+
+def blue_preset(out_w: int = 400, out_h: int = 400, supersample: int = 4) -> GifPreset:
+    """Deck hero: navy gradient + sky-blue pills + still wordmark."""
+    return GifPreset(
+        out_w=out_w,
+        out_h=out_h,
+        supersample=supersample,
+        log_fill="#38bdf8",
+        log_edge="#22d3ee",
+        knob_edge="#0c4a6e",
+        bg_top="#0f172a",
+        bg_bottom="#0b1220",
+        wordmark_color="#7dd3fc",
+        wordmark_shadow="#0b1220",
+        wordmark_size=0.108,
+        wordmark_gap=0.028,
+        layout_mode="wordmark",
+        shadow_rgba=(0, 0, 0, 48),
+        word_shadow=True,
+    )
 
 
 def midnight_preset(
@@ -254,6 +276,107 @@ def make_pill_sprite(pill: dict, layout: MarkLayout, preset: GifPreset) -> Image
         width=max(1, int(layout.scale * 0.5)),
     )
     return layer
+
+
+def _gradient_axis(layout: MarkLayout) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Mark bbox top-left and bottom-right corners in canvas coords (gradient axis)."""
+    tl = layout.to_canvas(VIEWBOX[0], VIEWBOX[1])
+    br = layout.to_canvas(VIEWBOX[0] + VIEWBOX[2], VIEWBOX[1] + VIEWBOX[3])
+    return tl, br
+
+
+def make_gradient_pill_sprite(
+    slot_center: tuple[float, float],
+    layout: MarkLayout,
+    preset: GifPreset,
+    stops: tuple[tuple[float, str], ...],
+) -> Image.Image:
+    """A pill sprite filled with a diagonal gradient sampled in global mark space.
+
+    Colors are sampled at the pill's resting slot position so the assembled mark
+    reproduces the continuous top-left -> bottom-right gradient of the SVG logo.
+    No edge stroke (matches the flat-filled SVG); knob is punched transparent.
+    """
+    import numpy as np
+
+    rw, rh = 46, 24  # all pills share rect dims
+    knob_off_x = -11.0  # knob sits 11 units left of pill center (identical for all)
+    r = 12
+    pad = int(KNOB_R * layout.scale * 2 + 20)
+    cw = int(rw * layout.scale + pad * 2)
+    ch = int(rh * layout.scale + pad * 2)
+    cx, cy = cw / 2, ch / 2
+
+    # Shape alpha (rounded rect minus knob hole), no edge.
+    shape = Image.new("L", (cw, ch), 0)
+    sdraw = ImageDraw.Draw(shape)
+    px0 = cx - (rw * layout.scale) / 2
+    py0 = cy - (rh * layout.scale) / 2
+    px1 = px0 + rw * layout.scale
+    py1 = py0 + rh * layout.scale
+    sdraw.rounded_rectangle((px0, py0, px1, py1), radius=r * layout.scale, fill=255)
+    klx = cx + knob_off_x * layout.scale
+    kly = cy
+    kr = KNOB_R * layout.scale
+    sdraw.ellipse((klx - kr, kly - kr, klx + kr, kly + kr), fill=0)
+
+    # Gradient sampled at canvas position of each sprite pixel (slot-anchored).
+    (tlx, tly), (brx, bry) = _gradient_axis(layout)
+    ax, ay = brx - tlx, bry - tly
+    denom = ax * ax + ay * ay or 1.0
+
+    lx = np.arange(cw, dtype=np.float64) - cx + slot_center[0]
+    ly = np.arange(ch, dtype=np.float64) - cy + slot_center[1]
+    gx, gy = np.meshgrid(lx, ly)
+    t = ((gx - tlx) * ax + (gy - tly) * ay) / denom
+    t = np.clip(t, 0.0, 1.0)
+
+    offs = [s[0] for s in stops]
+    cols = [np.array(_hex_rgb(s[1]), dtype=np.float64) for s in stops]
+    rgb = np.empty((ch, cw, 3), dtype=np.float64)
+    for k in range(3):
+        rgb[..., k] = cols[0][k]
+    for j in range(len(stops) - 1):
+        lo, hi = offs[j], offs[j + 1]
+        span = (hi - lo) or 1.0
+        local = np.clip((t - lo) / span, 0.0, 1.0)
+        seg = (t >= lo) if j == 0 else (t > lo)
+        for k in range(3):
+            rgb[..., k] = np.where(seg, cols[j][k] + (cols[j + 1][k] - cols[j][k]) * local, rgb[..., k])
+
+    arr = np.empty((ch, cw, 4), dtype=np.uint8)
+    arr[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8)
+    arr[..., 3] = np.asarray(shape, dtype=np.uint8)
+    return Image.fromarray(arr, mode="RGBA")
+
+
+def _draw_static_wordmark(
+    bg: Image.Image,
+    layout: MarkLayout,
+    preset: GifPreset,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+) -> None:
+    """Draw a fully-opaque, non-animated BAKLOG wordmark (orbit use)."""
+    ch = preset.canvas_h
+    word_fs = int(ch * preset.wordmark_size)
+    draw = ImageDraw.Draw(bg)
+    fnt = font if getattr(font, "size", None) == word_fs else resolve_font(word_fs)
+    chars = list(WORDMARK)
+    char_widths = [draw.textbbox((0, 0), c, font=fnt)[2] for c in chars]
+    gap = word_fs * LETTER_SPACING
+    total_w = sum(char_widths) + gap * (len(chars) - 1)
+    _, mark_bottom = layout.to_canvas(VIEWBOX[0] + VIEWBOX[2], VIEWBOX[1] + VIEWBOX[3])
+    base_y = mark_bottom + ch * preset.wordmark_gap
+    fill_rgb = _hex_rgb(preset.wordmark_color)
+    cx = (preset.canvas_w - total_w) / 2
+    for i, ch_char in enumerate(chars):
+        if preset.word_shadow:
+            shadow_rgb = _hex_rgb(preset.wordmark_shadow)
+            ox = max(2, int(preset.supersample * 0.6))
+            oy = max(3, int(preset.supersample * 0.9))
+            draw.text((cx + ox, base_y + oy), ch_char, font=fnt, fill=shadow_rgb + (140,))
+        draw.text((cx, base_y), ch_char, font=fnt, fill=fill_rgb + (255,))
+        cx += char_widths[i] + gap
 
 
 def draw_background(preset: GifPreset) -> Image.Image:
@@ -502,6 +625,94 @@ def motion_scatter(layout: MarkLayout, preset: GifPreset, n_frames: int) -> list
     return frames
 
 
+# ── Motion D: Orbit (clockwise slot-swap) ────────────────────────────────────
+# Per-hop frame budget (at FPS). Raise these to slow the orbit down; the
+# seamless loop length is derived from them (see ORBIT_LOOP_FRAMES).
+ORBIT_HOP_MOVE = 28
+ORBIT_HOP_HOLD = 48
+ORBIT_HOPS = 3
+ORBIT_LOOP_FRAMES = ORBIT_HOPS * (ORBIT_HOP_MOVE + ORBIT_HOP_HOLD)
+# Diagonal gradient matching the top-left deck mark (mark-gradient.svg):
+# blue -> cyan -> purple along the mark's top-left -> bottom-right bbox axis.
+ORBIT_GRADIENT_STOPS = (
+    (0.0, "#38bdf8"),
+    (0.5, "#22d3ee"),
+    (1.0, "#a855f7"),
+)
+
+
+def _slot_at_hop(pill_idx: int, hop: int) -> int:
+    """Slot index for pill i after hop complete swaps (hop=0 → home slot).
+
+    Counter-clockwise cycle (top -> bl -> br -> top in screen terms)."""
+    return (pill_idx + hop) % 3
+
+
+def _polar_from_centroid(
+    cx: float, cy: float, px: float, py: float,
+) -> tuple[float, float]:
+    return math.atan2(py - cy, px - cx), math.hypot(px - cx, py - cy)
+
+
+def _cw_arc_theta(theta_start: float, theta_end: float, t: float) -> float:
+    """Interpolate angle clockwise (screen coords, y-down)."""
+    diff = (theta_end - theta_start) % (2 * math.pi)
+    if diff <= 1e-6:
+        diff = 2 * math.pi
+    if diff > math.pi:
+        diff -= 2 * math.pi
+    return theta_start + diff * t
+
+
+def motion_orbit(layout: MarkLayout, preset: GifPreset, n_frames: int) -> list[list[PillState]]:
+    """Three pills swap slots clockwise; identical mark after every hop."""
+    finals = [layout.pill_center(p) for p in PILLS]
+    cx = sum(f[0] for f in finals) / 3
+    cy = sum(f[1] for f in finals) / 3
+
+    slot_polar = [
+        _polar_from_centroid(cx, cy, finals[s][0], finals[s][1]) for s in range(3)
+    ]
+
+    hop_move = ORBIT_HOP_MOVE
+    hop_hold = ORBIT_HOP_HOLD
+    hop_total = hop_move + hop_hold
+    loop_frames = ORBIT_LOOP_FRAMES
+
+    frames: list[list[PillState]] = []
+    for fi in range(n_frames):
+        hop_idx = (fi % loop_frames) // hop_total
+        hop_t = (fi % loop_frames) % hop_total
+        in_hold = hop_t >= hop_move
+
+        states: list[PillState] = []
+        for i, _pill in enumerate(PILLS):
+            start_slot = _slot_at_hop(i, hop_idx)
+            end_slot = _slot_at_hop(i, hop_idx + 1)
+            sx, sy = finals[start_slot]
+            ex, ey = finals[end_slot]
+
+            if in_hold:
+                x, y = ex, ey
+                sx_scale, sy_scale = 1.0, 1.0
+            else:
+                p = ease_out_cubic(hop_t / hop_move)
+                ts, rs = slot_polar[start_slot]
+                te, re = slot_polar[end_slot]
+                theta = _cw_arc_theta(ts, te, p)
+                r = lerp(rs, re, p)
+                x = cx + r * math.cos(theta)
+                y = cy + r * math.sin(theta)
+                snap_t = max(0.0, (hop_t - hop_move * 0.82) / (hop_move * 0.18))
+                squash = decay_bounce(snap_t, amp=0.05, freq=4.5, decay=9.0)
+                sx_scale = 1.0 + squash
+                sy_scale = 1.0 - squash * 0.75
+
+            states.append(PillState(x, y, 0.0, sx_scale, sy_scale))
+        frames.append(states)
+    return frames
+
+
 # ── Wordmark phase ───────────────────────────────────────────────────────────
 def apply_wordmark_phase(
     pill_frames: list[list[PillState]],
@@ -583,6 +794,73 @@ def save_gif(path: Path, frames: list[Image.Image], preset: GifPreset) -> None:
     )
 
 
+def build_orbit_animation(
+    preset: GifPreset,
+    include_wordmark: bool = True,
+    loop_frames: int = ORBIT_LOOP_FRAMES,
+    gradient_stops: tuple[tuple[float, str], ...] | None = None,
+) -> list[Image.Image]:
+    """Orbit loop with optional still wordmark visible from frame 0.
+
+    When ``gradient_stops`` is given, pills are filled with a global-space
+    diagonal gradient (per slot) so the assembled mark matches the SVG logo;
+    pills crossfade between slot colors as they swap, keeping the resting mark
+    identical after every hop.
+    """
+    layout = compute_layout(preset)
+    word_fs = int(preset.canvas_h * preset.wordmark_size)
+    font = resolve_font(word_fs) if include_wordmark else None
+    pill_frames = motion_orbit(layout, preset, loop_frames)
+
+    if gradient_stops is None:
+        sprites = [make_pill_sprite(p, layout, preset) for p in PILLS]
+        frames: list[Image.Image] = []
+        for st in pill_frames:
+            fr = render_frame(
+                layout, preset, sprites, st,
+                word_alpha=1.0 if include_wordmark else 0.0,
+                word_drop=0.0,
+                font=font,
+            )
+            frames.append(fr.convert("RGB"))
+        return frames
+
+    slot_centers = [layout.pill_center(p) for p in PILLS]
+    slot_sprites = [
+        make_gradient_pill_sprite(slot_centers[s], layout, preset, gradient_stops)
+        for s in range(3)
+    ]
+    hop_move = ORBIT_HOP_MOVE
+    hop_total = ORBIT_HOP_MOVE + ORBIT_HOP_HOLD
+
+    frames = []
+    for fi, st in enumerate(pill_frames):
+        hop_idx = (fi % loop_frames) // hop_total
+        hop_t = (fi % loop_frames) % hop_total
+        in_hold = hop_t >= hop_move
+        move_p = 1.0 if in_hold else ease_out_cubic(hop_t / hop_move)
+
+        bg = draw_background(preset).convert("RGBA")
+        for i in range(3):
+            start_slot = _slot_at_hop(i, hop_idx)
+            end_slot = _slot_at_hop(i, hop_idx + 1)
+            if in_hold or end_slot == start_slot:
+                sprite = slot_sprites[end_slot]
+            else:
+                sprite = Image.blend(
+                    slot_sprites[start_slot], slot_sprites[end_slot], move_p
+                )
+            state = st[i]
+            composite_pill(
+                bg, sprite, state.x, state.y, state.angle, preset,
+                state.scale_x, state.scale_y,
+            )
+        if include_wordmark and font is not None:
+            _draw_static_wordmark(bg, layout, preset, font)
+        frames.append(bg.convert("RGB"))
+    return frames
+
+
 def build_animation(
     preset: GifPreset,
     motion_fn: Callable,
@@ -643,6 +921,39 @@ def run_timber_batch(arg: str) -> None:
             print(f"{len(frames)} frames")
 
 
+def run_blue_batch() -> None:
+    """Deck-navy orbit: mark + still wordmark, plus mark-only plain variant."""
+    preset = blue_preset()
+    print(f"Blue orbit batch -> {OUT_DIR}")
+    print(f"Canvas {preset.canvas_w}x{preset.canvas_h} -> {preset.out_w}x{preset.out_h} @ {FPS}fps")
+
+    jobs = (
+        ("logo-orbit-blue.gif", True),
+        ("logo-orbit-blue-plain.gif", False),
+    )
+    for filename, wordmark in jobs:
+        plain_preset = preset
+        if not wordmark:
+            plain_preset = GifPreset(
+                out_w=preset.out_w,
+                out_h=preset.out_h,
+                supersample=preset.supersample,
+                log_fill=preset.log_fill,
+                log_edge=preset.log_edge,
+                knob_edge=preset.knob_edge,
+                bg_top=preset.bg_top,
+                bg_bottom=preset.bg_bottom,
+                layout_mode="mark_center",
+                shadow_rgba=preset.shadow_rgba,
+            )
+        print(f"  {filename}...", end=" ", flush=True)
+        frames = build_orbit_animation(
+            plain_preset, include_wordmark=wordmark, gradient_stops=ORBIT_GRADIENT_STOPS
+        )
+        save_gif(OUT_DIR / filename, frames, plain_preset)
+        print(f"{len(frames)} frames")
+
+
 def run_midnight_batch() -> None:
     """Six white-on-black drop GIFs: sm/lg × wordmark / plain square / plain wide."""
     jobs = (
@@ -670,6 +981,8 @@ def main() -> int:
     arg = sys.argv[1] if len(sys.argv) > 1 else "both"
     if arg == "midnight":
         run_midnight_batch()
+    elif arg == "blue":
+        run_blue_batch()
     else:
         run_timber_batch(arg)
     print("\nDone.")

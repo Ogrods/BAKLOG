@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-06-07T21:06:32.308472+00:00",
+  "items": [
+    {
+      "id": "gog-test",
+      "store": "gog",
+      "title": "Test Giveaway",
+      "claim_url": "https://www.gog.com/",
+      "header_image": null,
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2099-12-31T23:59:59Z"
+    }
+  ]
+}

@@ -273,6 +273,7 @@
       color: var(--text-mute);
       opacity: 0.88;
       max-width: 32ch;
+      text-wrap: balance;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
     }
     .hero-store-caption a {
@@ -376,11 +377,16 @@
     .problem h2 { font-size: clamp(2rem, 6vw, 3.6rem); max-width: 16ch; }
     .problem p { color: var(--text-mute); font-size: 1.15rem; max-width: 52ch; margin: 1.3rem 0 0; text-wrap: pretty; }
 
-    /* Feature cards */
+    /* Feature cards — 4-up = 2×2; 3-up = single row on wide viewports */
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 1.2rem;
+    }
+    @media (min-width: 900px) {
+      .features-grid:has(> :nth-child(3):last-child) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
     .card {
       background: linear-gradient(160deg, var(--bg-panel), rgba(30, 41, 59, 0.4));
@@ -408,9 +414,17 @@
     .card li { margin: 0.3rem 0; }
     .card li::marker { color: var(--accent); }
 
-    /* How it works */
-    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; counter-reset: step; }
-    .step { position: relative; padding-top: 0.5rem; }
+    /* How it works — equal-height cards so uneven copy stays balanced */
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; counter-reset: step; align-items: stretch; }
+    .step {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(160deg, var(--bg-panel), rgba(30, 41, 59, 0.4));
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 1.4rem 1.5rem 1.5rem;
+    }
     .step .num {
       font-family: var(--font-display);
       font-weight: 700;
@@ -474,6 +488,7 @@
       .section-head { margin-bottom: 2rem; }
       .wrap { padding: 0 1.25rem; }
       .features-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; }
       footer { padding: 3rem 0 3.5rem; }
       /* Pull the wordmark a touch closer to the logo mark on phones. */
       .wordmark { margin-top: clamp(-4rem, -7vw, -1.75rem); }
@@ -547,7 +562,7 @@
     <h1 class="wordmark">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></h1>
     <p class="hero-badge">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-      Free forever to import &middot; $5/mo optional &middot; Invite-only early access
+      Free forever to import &middot; Invite-only early access
     </p>
     <p class="hero-tagline">One honest backlog across every store.</p>
 
@@ -567,7 +582,7 @@
       <span class="hero-store" style="--store-bg:#f05556;--store-glyph:url('assets/store-logos/ea.svg')"><span class="hero-store-glyph"></span></span>
     </div>
 
-    <p class="hero-store-caption">No games yet? Start free with Epic or Prime.</p>
+    <p class="hero-store-caption">No games yet? Start free with Epic, GOG, or&nbsp;Prime.</p>
 
     <form class="waitlist" id="waitlist" novalidate>
       <div class="waitlist-row">

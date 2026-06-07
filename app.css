@@ -3276,6 +3276,17 @@ html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before 
 .dash-insight strong { color: #f1f5f9; font-weight: 600; }
 .dash-mega--has-spotlight .dash-insight { max-width: min(640px, 60%); }
 .dash-kpi-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); }
+/* Desktop: bleed the spotlight art to the card's top/right edges so it fills the
+   full height of the mega hero. The .dash-mega padding (28px top / 32px right)
+   otherwise insets the absolutely-positioned wrap; cancel it with negative
+   offsets. The card clips via overflow:hidden + border-radius. Below 900px the
+   wrap is position:static (stacked), so this is scoped to the desktop layout. */
+@media (min-width: 901px) {
+  .dash-mega--has-spotlight .dash-spotlight-wrap {
+    top: -28px;
+    right: -32px;
+  }
+}
 @media (max-width: 900px) {
   .dash-ribbon { grid-template-columns: 1fr; }
   .dash-insight,
@@ -4382,12 +4393,35 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   background: rgba(251, 191, 36, 0.08);
   border: 1px solid rgba(251, 191, 36, 0.25);
 }
+.conn-hint-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.conn-hint-row > .conn-hint,
+.conn-hint-row > .conn-prefs {
+  flex: 1 1 50%;
+  min-width: 0;
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .conn-hint-row { flex-direction: column; }
+}
 .conn-prefs {
   margin: 0.5rem 0 0.85rem;
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+}
+#connPrefs.conn-prefs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem 0.85rem;
 }
 .conn-hint {
   display: flex;

@@ -42,7 +42,7 @@ export function loadPrefs() {
     autoEnrichOnAdd: true, coopFilterMode: "off", fetcherCollapsed: true,
     itadAutoRefreshIntervalMin: 15,
     autoFetchOnConnect: true,
-    autoFetchStale24h: false,
+    autoFetchStale24h: true,
     connectionNotes: {},
   };
   let merged;

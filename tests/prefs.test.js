@@ -67,10 +67,10 @@ describe('loadPrefs', () => {
     expect(loadPrefs().coopFilterMode).toBe('off');
   });
 
-  it('defaults autoFetchOnConnect true and autoFetchStale24h false', () => {
+  it('defaults autoFetchOnConnect true and autoFetchStale24h true', () => {
     const p = loadPrefs();
     expect(p.autoFetchOnConnect).toBe(true);
-    expect(p.autoFetchStale24h).toBe(false);
+    expect(p.autoFetchStale24h).toBe(true);
   });
 
   it('clamps itadAutoRefreshIntervalMin to 15-60 and snaps to step 5', () => {

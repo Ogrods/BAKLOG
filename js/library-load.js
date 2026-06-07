@@ -41,6 +41,15 @@ import {
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 import { consumeItadAutoRunFlag, diffItadDeals, maybeAutoEnrichNewAdditions } from './fetcher-health.js';
+import {
+  loadClaimableNow,
+  consumeClaimsAutoRunFlag,
+  diffClaims,
+  showClaimableBanner,
+  saveClaimsSnapshot,
+  refreshClaimableUi,
+} from './claimable.js';
+import { claimsSnapshotStorageKey } from './profiles.js';
 import { fireLibraryCountFlash } from './library-count-animation.js';
 import { itadSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
@@ -66,6 +75,7 @@ async function refreshLibraryChromeAfterMerge() {
   await refreshFilterUI({ force: true });
   if (state.activeView === 'wishlist') {
     updateWishlistDrawerVisibility();
+    refreshClaimableUi();
   }
 }
 
@@ -369,6 +379,18 @@ export async function reloadAfterFetcher(key) {
     if (key === "steamReviews") await loadSteamReviewCache();
     if (key === "steamCovers") await loadSteamCoversMeta();
     if (key === "steamTags") await loadSteamTagsMeta();
+  } else if (key === 'claims') {
+    const wasAuto = consumeClaimsAutoRunFlag();
+    let prevIds = new Set();
+    try {
+      const raw = localStorage.getItem(claimsSnapshotStorageKey());
+      if (raw) prevIds = new Set(JSON.parse(raw)?.ids || []);
+    } catch (_) { /* ignore */ }
+    await loadClaimableNow();
+    const { newCount } = diffClaims(prevIds, state.claimableFeed?.items || []);
+    if (wasAuto && newCount > 0) showClaimableBanner(newCount);
+    saveClaimsSnapshot(state.claimableFeed?.items || []);
+    refreshClaimableUi();
   } else if (WISHLIST_FETCHER_JSON[key]) {
     const metaKey = WISHLIST_FETCHER_META_KEY[key];
     state.libraryMeta[metaKey] = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
@@ -459,11 +481,13 @@ export async function reloadGames() {
   rebuildWishlistFromMetas();
   await Promise.all([
     loadItadPrices(),
+    loadClaimableNow(),
     loadHltbCache(),
     loadSteamReviewCache(),
     loadSteamCoversMeta(),
     loadSteamTagsMeta(),
   ]);
+  saveClaimsSnapshot(state.claimableFeed?.items || []);
   await applyMergedLibrary();
   void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
 }

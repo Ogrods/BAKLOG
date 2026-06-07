@@ -78,6 +78,13 @@ except ImportError:
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
+ADMIN_ENABLED = os.environ.get("BAKLOG_ADMIN") == "1"
+FREE_CLAIMS_INPUT_PATH = Path(
+    os.environ.get("BAKLOG_FREE_CLAIMS_INPUT", "free-claims.input.json")
+)
+FREE_CLAIMS_AUTO_PATH = Path("curated/free_claims.auto.json")
+FREE_CLAIMS_BUILT_PATH = Path("landing/free-claims.json")
+INTERNAL_JOBS_OVERLAY = bundle_root() / "admin" / "admin-jobs.json"
 _DEV_SERVER_BUSY_MSG = (
     f"BAKLOG dev server is already running on http://{HOST}:{PORT} — "
     "stop that instance first (it owns the port)."
@@ -225,6 +232,7 @@ from shared.profile_paths import (  # noqa: E402
     cache_json_path,
     catalog_path,
     clear_request_profile_id,
+    free_claims_path,
     get_active_profile_id,
     personal_backup_dir,
     personal_dir,
@@ -234,13 +242,14 @@ from shared.profile_paths import (  # noqa: E402
     set_request_profile_id,
 )
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
+from shared.safe_write import safe_write_text  # noqa: E402
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
 
 
 def _max_run_seconds_for_key(key: str) -> float:
     """Per-fetcher runtime cap from manifest maxRunSeconds, else global default."""
-    spec = FETCHERS.get(key) or {}
+    spec = FETCHERS.get(key) or INTERNAL_JOBS.get(key) or {}
     override = spec.get("maxRunSeconds")
     if override is not None:
         try:
@@ -577,6 +586,154 @@ def _missing_requirements(requires: list[dict[str, Any]]) -> list[str]:
 
 FETCHERS: dict[str, dict[str, Any]] = _load_fetchers()
 
+_DEFAULT_INTERNAL_JOBS: dict[str, dict[str, Any]] = {
+    "claimSources": {
+        "label": "Fetch claim sources",
+        "script": "fetch_claim_sources.py",
+        "group": "claims",
+        "description": "Auto-discover free claims from Epic, GamerPower, and ITAD giveaways RSS",
+        "args": [],
+        "options": {
+            "--dry-run": {"type": "bool", "default": False},
+            "--source": {
+                "type": "enum",
+                "values": ["all", "epic", "gamerpower", "itad"],
+                "default": "all",
+            },
+        },
+    },
+    "buildClaims": {
+        "label": "Build free claims feed",
+        "script": "build_free_claims.py",
+        "group": "claims",
+        "description": "Merge manual + auto items, enrich with Steam metadata, publish feed",
+        "args": [],
+        "options": {
+            "--dry-run": {"type": "bool", "default": False},
+            "--no-profile": {"type": "bool", "default": False},
+        },
+    },
+}
+
+
+def _normalize_internal_job_entry(raw: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    key = str(raw.get("key") or "").strip()
+    script = str(raw.get("script") or "").strip()
+    if not key or not script:
+        return None
+    args = raw.get("args") or []
+    if not isinstance(args, list):
+        args = []
+    options = raw.get("options") or {}
+    if not isinstance(options, dict):
+        options = {}
+    return key, {
+        "label": str(raw.get("label") or key),
+        "script": script,
+        "group": str(raw.get("group") or "internal"),
+        "description": str(raw.get("description") or ""),
+        "args": [str(a) for a in args],
+        "options": options,
+    }
+
+
+def _load_internal_jobs() -> dict[str, dict[str, Any]]:
+    jobs = {k: dict(v) for k, v in _DEFAULT_INTERNAL_JOBS.items()}
+    if INTERNAL_JOBS_OVERLAY.is_file():
+        try:
+            overlay = json.loads(INTERNAL_JOBS_OVERLAY.read_text(encoding="utf-8"))
+            for raw in overlay.get("jobs") or []:
+                if not isinstance(raw, dict):
+                    continue
+                normalized = _normalize_internal_job_entry(raw)
+                if not normalized:
+                    continue
+                key, entry = normalized
+                if key in FETCHERS:
+                    print(
+                        f"[internal] skipping job {key}: collides with fetcher key",
+                        file=sys.stderr,
+                    )
+                    continue
+                jobs[key] = entry
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[internal] admin-jobs.json load failed: {exc!r}", file=sys.stderr)
+    for key in list(jobs):
+        if key in FETCHERS:
+            print(
+                f"[internal] built-in job {key} collides with fetcher key — omitting",
+                file=sys.stderr,
+            )
+            del jobs[key]
+    return jobs
+
+
+def _internal_job_argv(spec: dict[str, Any], extra_args: list[str]) -> list[str]:
+    base = spec.get("args") or []
+    script = spec["script"]
+    return _argv(str(bundle_root() / script), *base, *extra_args)
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value in (1, "1", "true", "True", "yes", "on"):
+        return True
+    if value in (0, "0", "false", "False", "no", "off", None, ""):
+        return False
+    raise ValueError(f"invalid boolean value: {value!r}")
+
+
+def validate_internal_args(spec: dict[str, Any], args: dict[str, Any]) -> list[str]:
+    """Convert validated {flag: value} dict to argv tokens."""
+    options = spec.get("options") or {}
+    extra: list[str] = []
+    for flag, value in args.items():
+        if flag not in options:
+            raise ValueError(f"unknown option: {flag}")
+        opt = options[flag]
+        opt_type = opt.get("type")
+        if opt_type == "bool":
+            if _coerce_bool(value):
+                extra.append(flag)
+        elif opt_type == "enum":
+            val = str(value if value is not None else opt.get("default", ""))
+            allowed = opt.get("values") or []
+            if val not in allowed:
+                raise ValueError(f"invalid value for {flag}: {val!r}")
+            default = str(opt.get("default", ""))
+            if val != default:
+                extra.extend([flag, val])
+        else:
+            raise ValueError(f"unsupported option type for {flag}")
+    return extra
+
+
+def _validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
+    items = doc.get("items")
+    if not isinstance(items, list):
+        return "items must be a list"
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            return f"items[{i}] must be an object"
+        for field in ("id", "store", "title", "claim_url"):
+            if not str(item.get(field) or "").strip():
+                return f"items[{i}] missing {field}"
+    return None
+
+
+def _read_optional_json(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+INTERNAL_JOBS: dict[str, dict[str, Any]] = _load_internal_jobs()
+
 
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
@@ -699,6 +856,7 @@ class Run:
         "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
         "_log_path", "_runs_dir", "profile_id", "_cancelling_since", "_no_proc_since",
         "_history_note", "_next_seq", "_total_lines", "_finalized",
+        "_internal", "_internal_extra_args",
     )
 
     def __init__(
@@ -708,13 +866,22 @@ class Run:
         *,
         runs_dir: Path = RUNS_DIR,
         profile_id: str | None = None,
+        internal: bool = False,
+        extra_args: list[str] | None = None,
     ) -> None:
-        spec = FETCHERS[key]
+        if internal:
+            if key not in INTERNAL_JOBS:
+                raise KeyError(key)
+            spec = INTERNAL_JOBS[key]
+        else:
+            spec = FETCHERS[key]
         self.id: str = uuid.uuid4().hex[:12]
         self.key: str = key
         self.profile_id: str = profile_id or get_active_profile_id()
         self.label: str = spec["label"]
         self.refresh: bool = refresh
+        self._internal = internal
+        self._internal_extra_args = list(extra_args or [])
         self.status: str = "queued"  # queued | launching | running | cancelling | done | failed | cancelled
         self.started_at: float | None = None
         self.ended_at: float | None = None
@@ -861,6 +1028,11 @@ class Run:
         self._finished.set()
 
     def argv(self) -> list[str]:
+        if self._internal:
+            return _internal_job_argv(
+                INTERNAL_JOBS[self.key],
+                self._internal_extra_args,
+            )
         spec = FETCHERS[self.key]
         argv = list(spec["argv"])
         if self.refresh:
@@ -1351,6 +1523,50 @@ class RunManager:
                 refresh=refresh,
                 runs_dir=runs_dir(profile_id=profile_id),
                 profile_id=profile_id,
+            )
+            self._pending.append(run)
+            self._runs_by_id[run.id] = run
+            self._queue.put(run)
+        self._persist_queue()
+        self._ensure_worker_thread()
+        return run
+
+    def submit_internal(
+        self,
+        key: str,
+        extra_args: list[str] | None = None,
+        *,
+        profile_id: str | None = None,
+    ) -> Run:
+        if key not in INTERNAL_JOBS:
+            raise KeyError(key)
+        with self._lock:
+            active = self._active
+            if active and active.key == key and active.status in _IN_FLIGHT_STATUSES:
+                raise ValueError(f"{key} already queued or running")
+            if any(r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending):
+                raise ValueError(f"{key} already queued or running")
+            in_flight = sum(
+                1 for r in self._pending if r.status in _IN_FLIGHT_STATUSES
+            )
+            if (
+                active
+                and active.status in _IN_FLIGHT_STATUSES
+                and active not in self._pending
+            ):
+                in_flight += 1
+            if in_flight >= 1:
+                raise ValueError(
+                    "queue full — a fetch is already running; "
+                    "wait for it to finish before starting another"
+                )
+            pid = profile_id or get_active_profile_id()
+            run = Run(
+                key,
+                runs_dir=runs_dir(profile_id=pid),
+                profile_id=pid,
+                internal=True,
+                extra_args=extra_args or [],
             )
             self._pending.append(run)
             self._runs_by_id[run.id] = run
@@ -1948,6 +2164,10 @@ def _static_class(path_only: str) -> str:
     """Classify a non-API path: public | data | deny."""
     clean = _normalize_static_path(path_only)
     parts = [p for p in clean.split("/") if p]
+    if parts and parts[0] == "admin":
+        if not ADMIN_ENABLED:
+            return "deny"
+        return "public"
     if any(p.startswith(".") for p in parts):
         return "deny"
     if parts and parts[0] == "profiles":
@@ -1960,7 +2180,7 @@ def _static_class(path_only: str) -> str:
         if parts[1] in PROFILE_CACHE_JSON_FILES:
             return "data"
         return "deny"
-    if _LIBRARY_JSON_RE.match(clean) or clean.lower() == "/itad_prices.json":
+    if _LIBRARY_JSON_RE.match(clean) or clean.lower() in ("/itad_prices.json", "/free_claims.json"):
         return "data"
     return "public"
 
@@ -2021,6 +2241,15 @@ def _maybe_serve_empty_library_json(handler: SimpleHTTPRequestHandler, path: str
     if catalog_path(filename).is_file():
         return False
     _send_json(handler, HTTPStatus.OK, {"game_count": 0, "games": []})
+    return True
+
+
+def _maybe_serve_empty_claims_json(handler: SimpleHTTPRequestHandler, path: str) -> bool:
+    if path.lower() != "/free_claims.json":
+        return False
+    if free_claims_path().is_file():
+        return False
+    _send_json(handler, HTTPStatus.OK, {"generated_at": None, "items": []})
     return True
 
 
@@ -2190,8 +2419,13 @@ class Handler(SimpleHTTPRequestHandler):
         if clean.startswith("profiles/"):
             # Block direct static access to another profile's tree (use top-level paths).
             return str(profile_root() / ".profile_static_blocked" / clean)
-        if _LIBRARY_JSON_RE.match("/" + clean) or clean == "itad_prices.json":
-            disk = catalog_path(clean) if clean != "itad_prices.json" else catalog_path("itad_prices.json")
+        if _LIBRARY_JSON_RE.match("/" + clean) or clean in ("itad_prices.json", "free_claims.json"):
+            if clean == "itad_prices.json":
+                disk = catalog_path("itad_prices.json")
+            elif clean == "free_claims.json":
+                disk = free_claims_path()
+            else:
+                disk = catalog_path(clean)
             if disk.is_file():
                 return str(disk)
         if clean.startswith("cache/"):
@@ -2228,6 +2462,18 @@ class Handler(SimpleHTTPRequestHandler):
             rest = path[len("/api/auth/") : -len("/stream")].strip("/")
             self._handle_auth_stream(rest)
             return
+        if path == "/api/internal/jobs":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_jobs_get()
+            return
+        if path == "/api/internal/free-claims":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_free_claims_get()
+            return
         if not _require_api_auth(self):
             return
         if path == "/api/runs":
@@ -2253,6 +2499,8 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if _maybe_serve_empty_library_json(self, path_only):
             return
+        if _maybe_serve_empty_claims_json(self, path_only):
+            return
         if _maybe_serve_built_index(self, path_only):
             return
         super().do_GET()
@@ -2272,9 +2520,17 @@ class Handler(SimpleHTTPRequestHandler):
         self._begin_request()
         if self._reject_if_csrf():
             return
+        path = _api_path(self)
+        if path.startswith("/api/internal/run/"):
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            key = path[len("/api/internal/run/") :].strip("/").split("/", 1)[0]
+            self._handle_internal_submit(key)
+            return
         if not _require_api_auth(self):
             return
-        if _api_path(self) == "/api/auth/stream-ticket":
+        if path == "/api/auth/stream-ticket":
             self._handle_stream_ticket_mint()
             return
         if _api_path(self).rstrip("/") == "/api/runs/cancel":
@@ -2372,6 +2628,13 @@ class Handler(SimpleHTTPRequestHandler):
         self._begin_request()
         if self._reject_if_csrf():
             return
+        path = _api_path(self)
+        if path == "/api/internal/free-claims":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_free_claims_put()
+            return
         if not _require_api_auth(self):
             return
         if self.path == "/api/personal":
@@ -2429,6 +2692,85 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.OK, data)
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _handle_internal_jobs_get(self) -> None:
+        jobs = [
+            {
+                "key": key,
+                "label": spec["label"],
+                "group": spec.get("group", "internal"),
+                "description": spec.get("description", ""),
+                "options": spec.get("options") or {},
+            }
+            for key, spec in INTERNAL_JOBS.items()
+        ]
+        _send_json(self, HTTPStatus.OK, {"jobs": jobs})
+
+    def _handle_internal_submit(self, key: str) -> None:
+        if key not in INTERNAL_JOBS:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown internal job: {key}"})
+            return
+        payload, err = _read_json_body(self)
+        if err == "empty body":
+            payload = {}
+        elif err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        args_in = payload.get("args") or {}
+        if not isinstance(args_in, dict):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "args must be an object"})
+            return
+        try:
+            extra = validate_internal_args(INTERNAL_JOBS[key], args_in)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        try:
+            run = MANAGER.submit_internal(key, extra)
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.CONFLICT, {"error": str(exc)})
+            return
+        _send_json(
+            self,
+            HTTPStatus.ACCEPTED,
+            {
+                "run_id": run.id,
+                "key": run.key,
+                "label": run.label,
+                "status": run.status,
+            },
+        )
+
+    def _handle_internal_free_claims_get(self) -> None:
+        root = data_root()
+        _send_json(
+            self,
+            HTTPStatus.OK,
+            {
+                "input": _read_optional_json(root / FREE_CLAIMS_INPUT_PATH) or {"items": []},
+                "auto": _read_optional_json(root / FREE_CLAIMS_AUTO_PATH),
+                "built": _read_optional_json(root / FREE_CLAIMS_BUILT_PATH),
+            },
+        )
+
+    def _handle_internal_free_claims_put(self) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        validation_err = _validate_free_claims_payload(payload)
+        if validation_err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
+            return
+        out_path = data_root() / FREE_CLAIMS_INPUT_PATH
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        safe_write_text(
+            out_path,
+            json.dumps(payload, indent=2, ensure_ascii=False),
+        )
+        _send_json(self, HTTPStatus.OK, {"ok": True, "items": len(payload.get("items") or [])})
 
     @staticmethod
     def _parse_run_submit_path(rest: str) -> tuple[str, bool]:

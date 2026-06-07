@@ -35,7 +35,7 @@ function isApiUrl(url) {
 function isDataUrl(url) {
   const s = pathOnly(url);
   if (_DATA_JSON_RE.test(s)) return true;
-  if (s === '/itad_prices.json') return true;
+  if (s === '/itad_prices.json' || s === '/free_claims.json') return true;
   if (_CACHE_META_RE.test(s)) return true;
   return false;
 }

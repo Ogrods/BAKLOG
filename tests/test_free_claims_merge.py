@@ -1,0 +1,165 @@
+"""Tests for auto-sourced free-claim discovery and merge."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from shared.free_claims_sources import (
+    dedup_claim_items,
+    merge_manual_and_auto,
+    parse_epic_element,
+    parse_gamerpower_item,
+    parse_itad_rss,
+    platforms_to_store,
+    should_skip_itad_title,
+)
+
+
+def _epic_element(*, discount: int, title: str = "Free Game", slug: str = "free-game-123") -> dict:
+    return {
+        "title": title,
+        "offerMappings": [{"pageSlug": slug, "pageType": "productHome"}],
+        "keyImages": [{"type": "OfferImageWide", "url": "https://example.com/wide.jpg"}],
+        "promotions": {
+            "promotionalOffers": [
+                {
+                    "promotionalOffers": [
+                        {
+                            "startDate": "2020-01-01T00:00:00.000Z",
+                            "endDate": "2099-12-31T23:59:59.000Z",
+                            "discountSetting": {
+                                "discountType": "PERCENTAGE",
+                                "discountPercentage": discount,
+                            },
+                        }
+                    ]
+                }
+            ],
+            "upcomingPromotionalOffers": [],
+        },
+    }
+
+
+def test_epic_keeps_only_zero_discount_offers():
+    now = datetime(2026, 6, 7, tzinfo=UTC)
+    free = parse_epic_element(_epic_element(discount=0), now=now)
+    sale = parse_epic_element(_epic_element(discount=20, title="On Sale"), now=now)
+    assert free is not None
+    assert free["store"] == "epic"
+    assert free["claim_url"].endswith("/free-game-123")
+    assert sale is None
+
+
+def test_gamerpower_platforms_to_store_mapping():
+    assert platforms_to_store("PC, Steam") == "steam"
+    assert platforms_to_store("PC, Epic Games Store") == "epic"
+    assert platforms_to_store("PC, GOG, DRM-Free") == "gog"
+    assert platforms_to_store("PC, Itch.io, DRM-Free") == "itch"
+
+
+def test_gamerpower_parses_end_date_and_na():
+    active = parse_gamerpower_item(
+        {
+            "id": 42,
+            "title": "Test Game (Steam) Giveaway",
+            "status": "Active",
+            "platforms": "PC, Steam",
+            "open_giveaway_url": "https://www.gamerpower.com/open/test",
+            "end_date": "2026-06-08 23:59:00",
+            "image": "https://example.com/img.jpg",
+            "description": "Free on Steam.",
+        }
+    )
+    no_end = parse_gamerpower_item(
+        {
+            "id": 43,
+            "title": "No End Game (GOG) Giveaway",
+            "status": "Active",
+            "platforms": "PC, GOG",
+            "open_giveaway_url": "https://www.gamerpower.com/open/no-end",
+            "end_date": "N/A",
+        }
+    )
+    assert active is not None
+    assert active["store"] == "steam"
+    assert active["ends_at"] == "2026-06-08T23:59:00Z"
+    assert no_end is not None
+    assert no_end["ends_at"] is None
+
+
+def test_itad_filters_bundle_and_noise_titles():
+    assert should_skip_itad_title("Build your own Bundle Fanatical") is True
+    assert should_skip_itad_title("Free Beta Access Key") is True
+    rss = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>Steam Free Game Giveaway</title>
+      <link>https://isthereanydeal.com/giveaway/steam-free</link>
+      <description>Claim on Steam.</description>
+    </item>
+    <item>
+      <title>Build your own Bundle</title>
+      <link>https://isthereanydeal.com/giveaway/bundle</link>
+      <description>Fanatical bundle.</description>
+    </item>
+  </channel>
+</rss>"""
+    items = parse_itad_rss(rss)
+    assert len(items) == 1
+    assert items[0]["store"] == "steam"
+    assert items[0]["source"] == "itad"
+
+
+def test_dedup_prefers_epic_over_gamerpower_for_same_title():
+    items = dedup_claim_items(
+        [
+            {
+                "id": "gamerpower-1",
+                "store": "epic",
+                "title": "Relaxing Simulator",
+                "claim_url": "https://www.gamerpower.com/open/relaxing",
+                "source": "gamerpower",
+            },
+            {
+                "id": "epic-relaxing-simulator",
+                "store": "epic",
+                "title": "Relaxing Simulator",
+                "claim_url": "https://store.epicgames.com/en-US/p/relaxing-simulator",
+                "source": "epic",
+            },
+        ]
+    )
+    assert len(items) == 1
+    assert items[0]["source"] == "epic"
+
+
+def test_merge_manual_wins_on_duplicate_title_and_id():
+    manual = [
+        {
+            "id": "epic-manual",
+            "store": "epic",
+            "title": "Manual Override",
+            "claim_url": "https://example.com/manual",
+        }
+    ]
+    auto = [
+        {
+            "id": "epic-manual",
+            "store": "epic",
+            "title": "Manual Override",
+            "claim_url": "https://store.epicgames.com/en-US/p/auto",
+            "source": "epic",
+        },
+        {
+            "id": "gog-auto",
+            "store": "gog",
+            "title": "GOG Freebie",
+            "claim_url": "https://www.gog.com/game/freebie",
+            "source": "gamerpower",
+        },
+    ]
+    merged = merge_manual_and_auto(manual, auto)
+    assert len(merged) == 2
+    assert merged[0]["claim_url"] == "https://example.com/manual"
+    assert merged[1]["id"] == "gog-auto"

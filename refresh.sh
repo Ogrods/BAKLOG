@@ -41,4 +41,5 @@ run fetch_ubisoft_wishlist.py
 run fetch_nintendo_wishlist.py
 run fetch_humble_wishlist.py
 run fetch_itad.py
+run fetch_free_claims.py
 run enrich_cross_store_images.py

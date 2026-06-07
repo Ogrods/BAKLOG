@@ -198,6 +198,18 @@ export function bindEvents() {
   document.getElementById("dashboardWishlistStats")?.addEventListener("click", onWishlistStatsClick);
   document.getElementById("wishlistDealRadar")?.addEventListener("click", onWishlistStatsClick);
 
+  void import('./claimable.js').then((claimable) => {
+    document.getElementById('claimableNowModule')?.addEventListener('click', (e) => {
+      claimable.handleClaimableClick(e);
+    });
+    document.getElementById('claimableBanner')?.addEventListener('click', (e) => {
+      claimable.handleClaimableBannerClick(e);
+    });
+    document.getElementById('claimDetailDialog')?.addEventListener('click', (e) => {
+      if (e.target.closest('[data-claim-clear]')) claimable.handleClaimableClick(e);
+    });
+  });
+
   const onDashListClick = e => {
     const row = e.target.closest('[data-action="dash-list-jump"]');
     if (!row || !row.dataset.key) return;

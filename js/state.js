@@ -13,8 +13,10 @@ export const state = {
     steam: null, gog: null, psn: null, epic: null, amazon: null,
     xbox: null, battlenet: null, ubisoft: null, nintendo: null, itch: null, humble: null, ea: null,
     wishlist: null, wishlistGog: null, wishlistEpic: null, wishlistPsn: null, wishlistUbisoft: null, wishlistXbox: null, wishlistNintendo: null, wishlistHumble: null,
-    itad: null, hltb: null,
+    itad: null, claims: null, hltb: null,
   },
+  claimableFeed: null,
+  claimableNow: [],
   crossStoreHiddenKeys: new Set(),
   crossStoreOwnedStores: new Map(),
   /**

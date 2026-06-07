@@ -20,4 +20,5 @@ python fetch_ubisoft_wishlist.py 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_nintendo_wishlist.py 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_humble_wishlist.py 2>&1 | Tee-Object -FilePath $log -Append
 python fetch_itad.py 2>&1 | Tee-Object -FilePath $log -Append
+python fetch_free_claims.py 2>&1 | Tee-Object -FilePath $log -Append
 python enrich_cross_store_images.py 2>&1 | Tee-Object -FilePath $log -Append

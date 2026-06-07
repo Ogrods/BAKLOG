@@ -455,6 +455,7 @@ export function updateWishlistDrawerVisibility() {
     radar.classList.toggle("hidden", !showRadar);
     if (showRadar) renderDashboardWishlistStats();
   }
+  void import('./claimable.js').then(m => m.renderClaimableModule());
 }
 
 export function updateViewChrome(options) {
@@ -677,9 +678,12 @@ export function renderSummary() {
     const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
     const lows = wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; });
     const owned = wl.filter(g => isOwnedByTitle(g.name)).length;
-    const cuts = onSale.map(g => effectiveDiscountPercent(g)).filter(c => c > 0);
+    // 100%-off (free-to-claim) deals skew the averages (0 price, max discount),
+    // so they're excluded from Avg discount / Avg price.
+    const isFullyFree = g => effectiveDiscountPercent(g) >= 100;
+    const cuts = onSale.map(g => effectiveDiscountPercent(g)).filter(c => c > 0 && c < 100);
     const avgDisc = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : null;
-    const prices = wl.map(g => effectiveSortPrice(g)).filter(p => p != null);
+    const prices = wl.filter(g => !isFullyFree(g)).map(g => effectiveSortPrice(g)).filter(p => p != null);
     const avgPrice = prices.length ? (prices.reduce((s, p) => s + p, 0) / prices.length).toFixed(2) : null;
     const onSaleActive = !!state.prefs.dealOnSaleOnly;
     const lowOnlyActive = !!state.prefs.dealHistoricalLowOnly;

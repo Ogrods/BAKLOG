@@ -1,14 +1,10 @@
 {
-  "generated_at": "2026-06-07T21:37:17.321974+00:00",
   "items": [
     {
       "id": "gog-test",
       "store": "gog",
       "title": "GOG Test Giveaway",
       "claim_url": "https://www.gog.com/",
-      "header_image": null,
-      "genres": [],
-      "blurb": null,
       "ends_at": "2099-12-31T23:59:59Z"
     },
     {
@@ -16,9 +12,6 @@
       "store": "steam",
       "title": "Steam Test Giveaway",
       "claim_url": "https://store.steampowered.com/",
-      "header_image": null,
-      "genres": [],
-      "blurb": null,
       "ends_at": "2099-12-31T23:59:59Z"
     }
   ]

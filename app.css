@@ -1240,6 +1240,132 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   0%, 100% { opacity: 1; }
   50% { opacity: 0.78; }
 }
+@keyframes claimFireGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35), 0 0 18px rgba(249, 115, 22, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.55), 0 0 28px rgba(244, 114, 182, 0.45);
+  }
+}
+.claim-fire-card {
+  position: relative;
+  border-color: rgba(249, 115, 22, 0.45) !important;
+  animation: claimFireGlow 2.2s ease-in-out infinite;
+}
+.claim-fire-card::before {
+  background: linear-gradient(90deg, #fbbf24, #f97316, #f472b6) !important;
+}
+.claim-cut-fire {
+  animation: dealHugePulse 1.8s ease-in-out infinite;
+}
+.claimable-banner {
+  border-left-color: #f97316;
+}
+.claim-hero-cover-fallback {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 4.5rem;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.25), rgba(56, 189, 248, 0.15));
+}
+.claim-detail-cover {
+  width: 100%;
+  max-height: 10rem;
+  object-fit: cover;
+  margin-top: 0.75rem;
+}
+.claim-detail-dialog::backdrop {
+  background: rgba(2, 6, 23, 0.72);
+}
+.claim-rows-card {
+  padding: 0.75rem 1rem 0.5rem;
+}
+.claim-rows-head {
+  margin-bottom: 0.5rem;
+}
+.claim-rows {
+  display: flex;
+  flex-direction: column;
+}
+.claim-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0.6rem 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.75rem;
+  width: 100%;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-radius: 0.25rem;
+  transition: background 0.1s ease;
+}
+.claim-row:hover {
+  background: color-mix(in srgb, var(--bg-hover) 55%, transparent);
+}
+.claim-row:last-child {
+  border-bottom: none;
+}
+.claim-row-cover-wrap {
+  display: block;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.claim-row-cover {
+  width: 28px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-elev);
+  display: block;
+}
+.claim-row-cover.claim-hero-cover-fallback {
+  min-height: 42px;
+  width: 28px;
+}
+.claim-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.claim-row-title {
+  font-weight: 500;
+  color: #e2e8f0;
+  font-size: 0.8125rem;
+}
+.claim-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.15rem;
+  color: #94a3b8;
+  font-size: 0.6875rem;
+}
+.claim-row-ends {
+  color: rgba(251, 191, 36, 0.9);
+}
+.claim-row-review {
+  color: #94a3b8;
+}
+.claim-row-genres {
+  color: #64748b;
+  max-width: 12rem;
+}
+.claim-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  padding-right: 0.25rem;
+}
+.claim-row-actions button {
+  white-space: nowrap;
+  padding: 0.3rem 0.7rem;
+}
 /* === Table virtual scroll & compact controls === */
 .row-ctl { max-width: 6.5rem; padding: 0.1rem 0.2rem; font-size: 0.7rem; line-height: 1.1; }
 /* Per-row controls (status select, HLTB button): neutral theme tokens so they
@@ -1457,6 +1583,9 @@ body.bulk-bar-open { padding-bottom: 56px; }
   .dash-marquee-track { animation: none !important; }
   tr.row-flash { animation: none; }
   .deal-flag-cut.deal-flag-cut--huge { animation: none; opacity: 1; }
+  .claim-fire-card,
+  .claim-cut-fire { animation: none; }
+  .claim-fire-card { box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.4); }
   .fh-global-status::before,
   .fh-global-status-tail { transition: none; }
   .fh-global-status-running::before { animation: none; }

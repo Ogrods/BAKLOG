@@ -20,9 +20,11 @@ import {
   LS_FETCHER_SUPPRESSED_RUNS,
   LS_AUTO_STALE_LAST_RUN,
   LS_ITAD_LAST_AUTO_RUN,
+  LS_CLAIMS_LAST_AUTO_RUN,
   LS_RECONNECT_DISMISSED,
   profileScopedStorageKey,
 } from './profiles.js';
+import { markClaimsPendingAutoRun } from './claimable.js';
 import { savePrefs } from './prefs.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
@@ -424,9 +426,14 @@ const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
 // ITAD is a deal feed — library-style 7d/30d thresholds are misleading.
 const STALE_OVERRIDES = {
   itad: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
+  claims: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
 };
 export function itadLastAutoRunKey() {
   return profileScopedStorageKey(LS_ITAD_LAST_AUTO_RUN);
+}
+
+export function claimsLastAutoRunKey() {
+  return profileScopedStorageKey(LS_CLAIMS_LAST_AUTO_RUN);
 }
 export const ITAD_AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
 export const ITAD_AUTO_QUIET_HOUR_END = 7;
@@ -436,6 +443,10 @@ export function itadAutoRefreshIntervalMs() {
   const min = Number(state.prefs?.itadAutoRefreshIntervalMin);
   if (!Number.isFinite(min)) return ITAD_AUTO_REFRESH_INTERVAL_MS;
   return Math.min(60, Math.max(15, min)) * 60_000;
+}
+
+export function claimsAutoRefreshIntervalMs() {
+  return itadAutoRefreshIntervalMs();
 }
 
 export function thresholdsForMetaKey(metaKey) {
@@ -498,7 +509,7 @@ export async function fetchWithTimeout(url, options = {}, ms = FETCH_TIMEOUT_MS)
 }
 const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers', 'steamTags']);
 /** Cache JSON loaded after library files in reloadGames — avoid "missing" flash during boot. */
-const BOOT_DEFERRED_FETCHER_KEYS = new Set([...ENRICH_KEYS, 'itad']);
+const BOOT_DEFERRED_FETCHER_KEYS = new Set([...ENRICH_KEYS, 'itad', 'claims']);
 const MAX_SSE_HINT = 'max 8 live streams';
 const GROUP_ORDER = ['library', 'wishlist', 'prices', 'enrich'];
 const GROUP_LABELS = {
@@ -525,6 +536,7 @@ const ENRICH_ORDER = ['steamTags', 'steamCovers', 'steamReviews', 'hltb'];
 
 const COUNT_FNS = {
   itad: m => Object.keys(m?.by_key || {}).length,
+  claims: m => (m?.items || []).length,
   hltb: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
   steamReviews: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
   steamCovers: m => (m?.last_updated != null ? m.last_updated : null),
@@ -555,6 +567,7 @@ const CLICK_HINTS = {
   wishlistNintendo: 'Sync your Nintendo Store wishlist',
   wishlistHumble: 'Sync your Humble Store wishlist',
   itad: 'Refresh wishlist price quotes from IsThereAnyDeal',
+  claims: 'Download free claimable games (GOG giveaways, Epic, Prime, Steam keys)',
   hltb: "Look up HowLongToBeat hours for games we haven't checked yet",
   steamReviews: 'Pull missing Steam review scores for non-Steam games',
   steamCovers: 'Generate covers for non-Steam games missing artwork',
@@ -1101,6 +1114,7 @@ export function fetcherFreshness(source) {
 }
 
 const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
+const CLAIMS_SOURCE = { key: 'claims', metaKey: 'claims', countFn: COUNT_FNS.claims };
 
 /** Auto-queue ITAD when prices are older than 60min (7am–midnight local). */
 /** Chip stays in failed styling until the next successful run (not just ~10s runState). */
@@ -1228,6 +1242,28 @@ export function maybeAutoRefreshItad(deps = {}) {
   setLastRun(now);
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
   runFn('itad', { auto: true });
+  return true;
+}
+
+export function maybeAutoRefreshClaims(deps = {}) {
+  if (isPageHidden()) return false;
+  if (state.prefs.claimsAutoRefreshDisabled) return false;
+  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
+  if (!isApiAvailableFn()) return false;
+  const stateForFn = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
+  if (stateForFn('claims')) return false;
+  const fresh = fetcherFreshness(CLAIMS_SOURCE);
+  const intervalMs = claimsAutoRefreshIntervalMs();
+  if (fresh.ageMs < intervalMs) return false;
+  const now = deps.now ?? Date.now();
+  const lastRun = deps.getLastRun
+    ?? (() => Number(localStorage.getItem(claimsLastAutoRunKey()) || 0));
+  if (now - lastRun() < intervalMs) return false;
+  const setLastRun = deps.setLastRun
+    ?? (t => localStorage.setItem(claimsLastAutoRunKey(), String(t)));
+  setLastRun(now);
+  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
+  runFn('claims', { auto: true });
   return true;
 }
 
@@ -2645,6 +2681,8 @@ export const fetcherRunner = (() => {
 
     if (auto && key === 'itad') {
       itadPendingAutoRun = true;
+    } else if (auto && key === 'claims') {
+      markClaimsPendingAutoRun();
     } else {
       ensurePanel(src);
       if (src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) {
@@ -3028,6 +3066,7 @@ export const fetcherRunner = (() => {
     if (isPageHidden()) return;
     await syncFromServer();
     maybeAutoRefreshItad();
+    maybeAutoRefreshClaims();
     maybeAutoFetchStale24h();
   }
 
@@ -3036,6 +3075,7 @@ export const fetcherRunner = (() => {
     if (pollTimer || !isApiAvailable() || isPageHidden()) return;
     void syncFromServer().then(() => {
       maybeAutoRefreshItad();
+      maybeAutoRefreshClaims();
       maybeAutoFetchStale24h();
     });
     pollTimer = setInterval(() => { void _runDashboardPollTick(); }, 30_000);

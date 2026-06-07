@@ -322,6 +322,17 @@
 }
 .dash-spotlight-art.is-loaded { opacity: 1; }
 .dash-spotlight:hover .dash-spotlight-art { transform: scale(1.04); }
+/* Ken Burns slow zoom on landscape hero art (mirrors app spotlightHeroZoom). */
+@keyframes spotlightHeroZoom {
+  from { transform: scale(1) translateZ(0); }
+  to { transform: scale(1.06) translateZ(0); }
+}
+.dash-spotlight:not(.has-portrait-art) .dash-spotlight-art.is-loaded {
+  animation: spotlightHeroZoom 12s ease-out forwards;
+}
+.dash-spotlight:not(.has-portrait-art):hover .dash-spotlight-art.is-loaded {
+  animation-play-state: paused;
+}
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
   transition: opacity 0.45s ease, transform 0.35s ease, filter 0.35s ease;
   box-sizing: border-box;

@@ -83,7 +83,9 @@ FREE_CLAIMS_INPUT_PATH = Path(
     os.environ.get("BAKLOG_FREE_CLAIMS_INPUT", "free-claims.input.json")
 )
 FREE_CLAIMS_AUTO_PATH = Path("curated/free_claims.auto.json")
+FREE_CLAIMS_APPROVED_PATH = Path("curated/free_claims.approved.json")
 FREE_CLAIMS_BUILT_PATH = Path("landing/free-claims.json")
+SPONSORS_PATH = Path(os.environ.get("BAKLOG_SPONSORS_INPUT", "curated/sponsors.json"))
 INTERNAL_JOBS_OVERLAY = bundle_root() / "admin" / "admin-jobs.json"
 _DEV_SERVER_BUSY_MSG = (
     f"BAKLOG dev server is already running on http://{HOST}:{PORT} — "
@@ -606,7 +608,7 @@ _DEFAULT_INTERNAL_JOBS: dict[str, dict[str, Any]] = {
         "label": "Build free claims feed",
         "script": "build_free_claims.py",
         "group": "claims",
-        "description": "Merge manual + auto items, enrich with Steam metadata, publish feed",
+        "description": "Merge manual + approved auto items, enrich with Steam metadata, publish feed",
         "args": [],
         "options": {
             "--dry-run": {"type": "bool", "default": False},
@@ -719,6 +721,45 @@ def _validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
         for field in ("id", "store", "title", "claim_url"):
             if not str(item.get(field) or "").strip():
                 return f"items[{i}] missing {field}"
+    return None
+
+
+def _validate_approved_payload(doc: dict[str, Any]) -> str | None:
+    ids = doc.get("ids")
+    if not isinstance(ids, list):
+        return "ids must be a list"
+    for i, item_id in enumerate(ids):
+        if not str(item_id or "").strip():
+            return f"ids[{i}] must be a non-empty string"
+    return None
+
+
+def _validate_sponsors_payload(doc: dict[str, Any]) -> str | None:
+    items = doc.get("items")
+    if not isinstance(items, list):
+        return "items must be a list"
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            return f"items[{i}] must be an object"
+        for field in ("id", "title"):
+            if not str(item.get(field) or "").strip():
+                return f"items[{i}] missing {field}"
+        url = item.get("url")
+        if url is not None and str(url).strip():
+            u = str(url).strip()
+            if not (u.startswith("http://") or u.startswith("https://")):
+                return f"items[{i}] url must start with http:// or https://"
+        priority = item.get("priority")
+        if priority is not None and not isinstance(priority, (int, float)):
+            return f"items[{i}] priority must be numeric"
+        enabled = item.get("enabled")
+        if enabled is not None and not isinstance(enabled, bool):
+            return f"items[{i}] enabled must be boolean"
+        kind = item.get("kind")
+        if kind is not None and str(kind).strip():
+            k = str(kind).strip().lower()
+            if k not in ("house", "sponsor"):
+                return f"items[{i}] kind must be house or sponsor"
     return None
 
 
@@ -2474,6 +2515,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._handle_internal_free_claims_get()
             return
+        if path == "/api/internal/sponsors":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_sponsors_get()
+            return
         if not _require_api_auth(self):
             return
         if path == "/api/runs":
@@ -2629,11 +2676,23 @@ class Handler(SimpleHTTPRequestHandler):
         if self._reject_if_csrf():
             return
         path = _api_path(self)
+        if path == "/api/internal/free-claims/approved":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_free_claims_approved_put()
+            return
         if path == "/api/internal/free-claims":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
             self._handle_internal_free_claims_put()
+            return
+        if path == "/api/internal/sponsors":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_sponsors_put()
             return
         if not _require_api_auth(self):
             return
@@ -2744,12 +2803,17 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_internal_free_claims_get(self) -> None:
         root = data_root()
+        approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
+        approved_ids = approved_doc.get("ids") or []
+        if not isinstance(approved_ids, list):
+            approved_ids = []
         _send_json(
             self,
             HTTPStatus.OK,
             {
                 "input": _read_optional_json(root / FREE_CLAIMS_INPUT_PATH) or {"items": []},
                 "auto": _read_optional_json(root / FREE_CLAIMS_AUTO_PATH),
+                "approved": approved_ids,
                 "built": _read_optional_json(root / FREE_CLAIMS_BUILT_PATH),
             },
         )
@@ -2765,6 +2829,53 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
             return
         out_path = data_root() / FREE_CLAIMS_INPUT_PATH
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        safe_write_text(
+            out_path,
+            json.dumps(payload, indent=2, ensure_ascii=False),
+        )
+        _send_json(self, HTTPStatus.OK, {"ok": True, "items": len(payload.get("items") or [])})
+
+    def _handle_internal_free_claims_approved_put(self) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        validation_err = _validate_approved_payload(payload)
+        if validation_err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
+            return
+        ids = [str(item_id).strip() for item_id in payload.get("ids") or [] if str(item_id).strip()]
+        out_path = data_root() / FREE_CLAIMS_APPROVED_PATH
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        safe_write_text(
+            out_path,
+            json.dumps({"ids": ids}, indent=2, ensure_ascii=False),
+        )
+        _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(ids)})
+
+    def _handle_internal_sponsors_get(self) -> None:
+        root = data_root()
+        _send_json(
+            self,
+            HTTPStatus.OK,
+            {
+                "input": _read_optional_json(root / SPONSORS_PATH) or {"items": []},
+            },
+        )
+
+    def _handle_internal_sponsors_put(self) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        validation_err = _validate_sponsors_payload(payload)
+        if validation_err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
+            return
+        out_path = data_root() / SPONSORS_PATH
         out_path.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(
             out_path,

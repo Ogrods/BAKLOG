@@ -631,6 +631,9 @@ def motion_scatter(layout: MarkLayout, preset: GifPreset, n_frames: int) -> list
 ORBIT_HOP_MOVE = 28
 ORBIT_HOP_HOLD = 48
 ORBIT_HOPS = 3
+ORBIT_STAGGER = 4  # frames between each pill's departure
+# slot departure order (top leads, then bottom-left, then bottom-right)
+ORBIT_STAGGER_RANK = {2: 0, 0: 1, 1: 2}
 ORBIT_LOOP_FRAMES = ORBIT_HOPS * (ORBIT_HOP_MOVE + ORBIT_HOP_HOLD)
 # Diagonal gradient matching the top-left deck mark (mark-gradient.svg):
 # blue -> cyan -> purple along the mark's top-left -> bottom-right bbox axis.
@@ -646,6 +649,13 @@ def _slot_at_hop(pill_idx: int, hop: int) -> int:
 
     Counter-clockwise cycle (top -> bl -> br -> top in screen terms)."""
     return (pill_idx + hop) % 3
+
+
+def _orbit_progress(hop_t: float, start_slot: int) -> float:
+    """Per-pill move progress within a hop (0 at departure, 1 at arrival)."""
+    delay = ORBIT_STAGGER_RANK[start_slot] * ORBIT_STAGGER
+    span = ORBIT_HOP_MOVE - ORBIT_STAGGER * 2  # 3 pills -> 2 gaps
+    return clamp01((hop_t - delay) / max(span, 1))
 
 
 def _polar_from_centroid(
@@ -664,20 +674,33 @@ def _cw_arc_theta(theta_start: float, theta_end: float, t: float) -> float:
     return theta_start + diff * t
 
 
-def motion_orbit(layout: MarkLayout, preset: GifPreset, n_frames: int) -> list[list[PillState]]:
-    """Three pills swap slots clockwise; identical mark after every hop."""
-    finals = [layout.pill_center(p) for p in PILLS]
-    cx = sum(f[0] for f in finals) / 3
-    cy = sum(f[1] for f in finals) / 3
+def motion_orbit(
+    layout: MarkLayout,
+    preset: GifPreset,
+    n_frames: int,
+    straight: bool = True,
+) -> list[list[PillState]]:
+    """Three pills swap slots; identical mark after every hop.
 
-    slot_polar = [
-        _polar_from_centroid(cx, cy, finals[s][0], finals[s][1]) for s in range(3)
-    ]
+    ``straight=True`` moves each pill in a straight line to its next slot with a
+    slight per-pill stagger; ``straight=False`` is the legacy circular-arc swap
+    (all pills depart together, travelling on an arc around the centroid).
+    """
+    finals = [layout.pill_center(p) for p in PILLS]
 
     hop_move = ORBIT_HOP_MOVE
     hop_hold = ORBIT_HOP_HOLD
     hop_total = hop_move + hop_hold
     loop_frames = ORBIT_LOOP_FRAMES
+
+    cx = cy = 0.0
+    slot_polar: list[tuple[float, float]] = []
+    if not straight:
+        cx = sum(f[0] for f in finals) / 3
+        cy = sum(f[1] for f in finals) / 3
+        slot_polar = [
+            _polar_from_centroid(cx, cy, finals[s][0], finals[s][1]) for s in range(3)
+        ]
 
     frames: list[list[PillState]] = []
     for fi in range(n_frames):
@@ -695,6 +718,15 @@ def motion_orbit(layout: MarkLayout, preset: GifPreset, n_frames: int) -> list[l
             if in_hold:
                 x, y = ex, ey
                 sx_scale, sy_scale = 1.0, 1.0
+            elif straight:
+                raw_p = _orbit_progress(hop_t, start_slot)
+                p = ease_out_cubic(raw_p)
+                x = lerp(sx, ex, p)
+                y = lerp(sy, ey, p)
+                snap_t = max(0.0, (raw_p - 0.82) / 0.18)
+                squash = decay_bounce(snap_t, amp=0.05, freq=4.5, decay=9.0)
+                sx_scale = 1.0 + squash
+                sy_scale = 1.0 - squash * 0.75
             else:
                 p = ease_out_cubic(hop_t / hop_move)
                 ts, rs = slot_polar[start_slot]
@@ -799,18 +831,20 @@ def build_orbit_animation(
     include_wordmark: bool = True,
     loop_frames: int = ORBIT_LOOP_FRAMES,
     gradient_stops: tuple[tuple[float, str], ...] | None = None,
+    straight: bool = True,
 ) -> list[Image.Image]:
     """Orbit loop with optional still wordmark visible from frame 0.
 
     When ``gradient_stops`` is given, pills are filled with a global-space
     diagonal gradient (per slot) so the assembled mark matches the SVG logo;
     pills crossfade between slot colors as they swap, keeping the resting mark
-    identical after every hop.
+    identical after every hop. ``straight`` selects straight-line (staggered)
+    vs. legacy circular-arc travel.
     """
     layout = compute_layout(preset)
     word_fs = int(preset.canvas_h * preset.wordmark_size)
     font = resolve_font(word_fs) if include_wordmark else None
-    pill_frames = motion_orbit(layout, preset, loop_frames)
+    pill_frames = motion_orbit(layout, preset, loop_frames, straight=straight)
 
     if gradient_stops is None:
         sprites = [make_pill_sprite(p, layout, preset) for p in PILLS]
@@ -838,7 +872,6 @@ def build_orbit_animation(
         hop_idx = (fi % loop_frames) // hop_total
         hop_t = (fi % loop_frames) % hop_total
         in_hold = hop_t >= hop_move
-        move_p = 1.0 if in_hold else ease_out_cubic(hop_t / hop_move)
 
         bg = draw_background(preset).convert("RGBA")
         for i in range(3):
@@ -847,6 +880,8 @@ def build_orbit_animation(
             if in_hold or end_slot == start_slot:
                 sprite = slot_sprites[end_slot]
             else:
+                raw_p = _orbit_progress(hop_t, start_slot) if straight else (hop_t / hop_move)
+                move_p = ease_out_cubic(raw_p)
                 sprite = Image.blend(
                     slot_sprites[start_slot], slot_sprites[end_slot], move_p
                 )
@@ -928,10 +963,12 @@ def run_blue_batch() -> None:
     print(f"Canvas {preset.canvas_w}x{preset.canvas_h} -> {preset.out_w}x{preset.out_h} @ {FPS}fps")
 
     jobs = (
-        ("logo-orbit-blue.gif", True),
-        ("logo-orbit-blue-plain.gif", False),
+        # filename, wordmark, straight
+        ("logo-orbit-blue.gif", True, True),
+        ("logo-orbit-blue-plain.gif", False, True),
+        ("logo-orbit-blue-circle.gif", True, False),
     )
-    for filename, wordmark in jobs:
+    for filename, wordmark, straight in jobs:
         plain_preset = preset
         if not wordmark:
             plain_preset = GifPreset(
@@ -948,7 +985,10 @@ def run_blue_batch() -> None:
             )
         print(f"  {filename}...", end=" ", flush=True)
         frames = build_orbit_animation(
-            plain_preset, include_wordmark=wordmark, gradient_stops=ORBIT_GRADIENT_STOPS
+            plain_preset,
+            include_wordmark=wordmark,
+            gradient_stops=ORBIT_GRADIENT_STOPS,
+            straight=straight,
         )
         save_gif(OUT_DIR / filename, frames, plain_preset)
         print(f"{len(frames)} frames")

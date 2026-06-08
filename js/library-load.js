@@ -49,6 +49,7 @@ import {
   saveClaimsSnapshot,
   refreshClaimableUi,
 } from './claimable.js';
+import { loadSponsoredDeals } from './sponsored-deals.js';
 import { claimsSnapshotStorageKey } from './profiles.js';
 import { fireLibraryCountFlash } from './library-count-animation.js';
 import { itadSnapshotStorageKey } from './profiles.js';
@@ -482,6 +483,7 @@ export async function reloadGames() {
   await Promise.all([
     loadItadPrices(),
     loadClaimableNow(),
+    loadSponsoredDeals(),
     loadHltbCache(),
     loadSteamReviewCache(),
     loadSteamCoversMeta(),

@@ -184,25 +184,33 @@ export function computeRecentSpotlightKeys(games) {
   return new Set(keys);
 }
 
+function compareRecentAdditionEntries(a, b) {
+  // Newest first. Within a batch (same first-seen timestamp, e.g. a bulk
+  // fetch import) rank by rating, then fall back to alphabetical so ties
+  // are deterministic even when neither game has a rating yet.
+  if (b.at !== a.at) return b.at - a.at;
+  const ra = ratingValue(a.g);
+  const rb = ratingValue(b.g);
+  if (rb !== ra) return rb - ra;
+  return (a.g.name || "").localeCompare(b.g.name || "");
+}
+
+function compareBackfillAdditionEntries(a, b) {
+  const ra = ratingValue(a.g);
+  const rb = ratingValue(b.g);
+  if (rb !== ra) return rb - ra;
+  return (a.g.name || "").localeCompare(b.g.name || "");
+}
+
 /** Top N library games by first-seen timestamp (for dashboard recents card). */
 export function computeRecentAdditions(games, cap = 10) {
   if (!state.prefs.librarySeenSeeded) return [];
   const seen = state.libraryFirstSeenByKey || {};
-  return games
-    .map(g => ({ g, at: seen[gameKey(g)] ?? 0 }))
-    .filter(e => e.at > 0)
-    .sort((a, b) => {
-      // Newest first. Within a batch (same first-seen timestamp, e.g. a bulk
-      // fetch import) rank by rating, then fall back to alphabetical so ties
-      // are deterministic even when neither game has a rating yet.
-      if (b.at !== a.at) return b.at - a.at;
-      const ra = ratingValue(a.g);
-      const rb = ratingValue(b.g);
-      if (rb !== ra) return rb - ra;
-      return (a.g.name || "").localeCompare(b.g.name || "");
-    })
-    .slice(0, cap)
-    .map(e => ({ ...e.g, _addedAt: e.at }));
+  const entries = games.map(g => ({ g, at: seen[gameKey(g)] ?? 0 }));
+  const timestamped = entries.filter(e => e.at > 0).sort(compareRecentAdditionEntries);
+  const baseline = entries.filter(e => e.at <= 0).sort(compareBackfillAdditionEntries);
+  const result = [...timestamped, ...baseline].slice(0, cap);
+  return result.map(e => ({ ...e.g, _addedAt: e.at }));
 }
 
 function gameSpotlightReason(g, recentKeys) {

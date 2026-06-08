@@ -187,6 +187,18 @@ export function bindEvents() {
       focusGame(card.dataset.key);
       return;
     }
+    if (action === "sponsored-dismiss") {
+      e.stopPropagation();
+      import('./sponsored-deals.js').then(({ dismissSponsoredDeal }) => {
+        dismissSponsoredDeal(card.dataset.sponsorId);
+        renderDashboardWishlistStats();
+      });
+      return;
+    }
+    if (action === "sponsored-deal") {
+      if (card.dataset.sponsorUrl) window.open(card.dataset.sponsorUrl, "_blank", "noopener");
+      return;
+    }
     if (action === "deal-on-sale") {
       drillWishlistDealFilter({ onSaleOnly: true });
       return;
@@ -197,6 +209,15 @@ export function bindEvents() {
   };
   document.getElementById("dashboardWishlistStats")?.addEventListener("click", onWishlistStatsClick);
   document.getElementById("wishlistDealRadar")?.addEventListener("click", onWishlistStatsClick);
+
+  // Metered deep achievement/trophy sync: the trophy popover consumes a quota
+  // unit and asks us to re-pull the store's achievement data (a refresh run).
+  document.addEventListener("baklog:deep-sync", (e) => {
+    const store = e.detail?.store;
+    if (store === "psn" || store === "xbox") {
+      fetcherRunner.run(store, { refresh: true });
+    }
+  });
 
   void import('./claimable.js').then((claimable) => {
     document.getElementById('claimableNowModule')?.addEventListener('click', (e) => {

@@ -8,6 +8,7 @@ import {
   getVisibleClaims,
   diffClaims,
   isClaimOwned,
+  stripClaimTitleDecorations,
   dismissClaim,
 } from '../js/claimable.js';
 
@@ -66,10 +67,47 @@ describe('getVisibleClaims', () => {
   });
 });
 
+describe('stripClaimTitleDecorations', () => {
+  it('strips GamerPower giveaway suffixes', () => {
+    expect(stripClaimTitleDecorations('Rogue Waters (Epic Games) Giveaway')).toBe('Rogue Waters');
+  });
+
+  it('strips ITAD store suffixes', () => {
+    expect(stripClaimTitleDecorations('Rogue Waters free at EGS on Epic Game Store')).toBe('Rogue Waters');
+    expect(stripClaimTitleDecorations('Remothered: Tormented Fathers on Steam')).toBe('Remothered: Tormented Fathers');
+  });
+});
+
 describe('isClaimOwned', () => {
   it('matches normalized title against ownedNormNames', () => {
     state.ownedNormNames = new Set(['hollow knight']);
     expect(isClaimOwned({ title: 'Hollow Knight' })).toBe(true);
+  });
+
+  it('matches decorated giveaway titles against ownedNormNames', () => {
+    state.ownedNormNames = new Set(['rogue waters']);
+    expect(isClaimOwned({
+      id: 'gamerpower-3667',
+      store: 'epic',
+      title: 'Rogue Waters (Epic Games) Giveaway',
+    })).toBe(true);
+    expect(isClaimOwned({
+      id: 'itad-0c69ed1f1bd8',
+      store: 'epic',
+      title: 'Rogue Waters free at EGS on Epic Game Store',
+    })).toBe(true);
+  });
+
+  it('hides decorated owned claims from visible feed', () => {
+    state.ownedNormNames = new Set(['rogue waters']);
+    const items = [{
+      id: 'gamerpower-3667',
+      store: 'epic',
+      title: 'Rogue Waters (Epic Games) Giveaway',
+      claim_url: 'https://www.gamerpower.com/open/rogue-waters-epic-games-giveaway',
+      ends_at: '2099-01-01T00:00:00Z',
+    }];
+    expect(getVisibleClaims(items)).toHaveLength(0);
   });
 });
 

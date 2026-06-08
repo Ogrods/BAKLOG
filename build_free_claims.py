@@ -20,6 +20,7 @@ from shared.safe_write import safe_write_text
 
 INPUT_PATH = Path("free-claims.input.json")
 AUTO_PATH = Path("curated/free_claims.auto.json")
+APPROVED_PATH = Path("curated/free_claims.approved.json")
 OUTPUT_PATH = Path("landing/free-claims.json")
 FALLBACK_PATH = Path("curated/free_claims.fallback.json")
 STORE_DELAY_SEC = 1.5
@@ -143,6 +144,19 @@ def _load_auto_items(path: Path) -> list[dict]:
     return items if isinstance(items, list) else []
 
 
+def _load_approved_ids(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    ids = doc.get("ids") or []
+    if not isinstance(ids, list):
+        return set()
+    return {str(item_id).strip() for item_id in ids if str(item_id).strip()}
+
+
 def main() -> int:
     _configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -174,7 +188,17 @@ def main() -> int:
         stats.error("input.items must be a list")
         return stats.finish("build_free_claims", t0, exit_code=1)
 
-    auto_items = _load_auto_items(AUTO_PATH)
+    auto_items_all = _load_auto_items(AUTO_PATH)
+    approved_ids = _load_approved_ids(APPROVED_PATH)
+    auto_items = [
+        item
+        for item in auto_items_all
+        if str(item.get("id") or "").strip() in approved_ids
+    ]
+    if auto_items_all:
+        stats.warn(
+            f"auto feed: {len(auto_items)} approved of {len(auto_items_all)} available"
+        )
     raw_items = merge_manual_and_auto(manual_items, auto_items)
     if auto_items:
         stats.warn(f"merged {len(auto_items)} auto item(s); {len(raw_items)} total before enrich")

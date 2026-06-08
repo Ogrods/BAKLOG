@@ -189,6 +189,28 @@ def _can_reuse_cached_epic_row(
     return True
 
 
+def _epic_row_id(rec: dict) -> str:
+    return f"{rec['namespace']}:{rec['catalogItemId']}"
+
+
+def _needs_catalog_fetch(rec: dict, existing: dict[str, dict], args: argparse.Namespace) -> bool:
+    """Whether this entitlement needs a live catalog API lookup."""
+    if args.refresh:
+        return True
+    row_id = _epic_row_id(rec)
+    cached = existing.get(row_id)
+    if cached is None:
+        return True
+    if not _should_keep_game_row(cached):
+        return True
+    may_reuse = args.skip_hltb or (
+        cached.get("hltb_main_hours") is not None and cached.get("library_image")
+    )
+    if not may_reuse:
+        return True
+    return not _can_reuse_cached_epic_row(cached, None, skip_hltb=args.skip_hltb)
+
+
 def _is_game_item(item: dict) -> bool:
     title = item.get("title")
     if _is_non_game_title(title):
@@ -422,29 +444,46 @@ def main() -> int:
     if drift_exit is not None:
         return stats.finish("fetch_epic", t0, exit_code=drift_exit)
 
-    print(f"Fetching catalog metadata ({CATALOG_WORKERS} workers)...", flush=True)
+    existing = load_existing()
+    apps_needing_catalog = apps if args.refresh else [
+        rec for rec in apps if _needs_catalog_fetch(rec, existing, args)
+    ]
+    catalog_skipped = len(apps) - len(apps_needing_catalog)
     catalog: dict[tuple[str, str], dict] = {}
 
-    def fetch_one(rec: dict) -> tuple[tuple[str, str], dict | None]:
-        ns, cid = str(rec["namespace"]), str(rec["catalogItemId"])
-        return (ns, cid), client.get_catalog_item(ns, cid)
+    if apps_needing_catalog:
+        if catalog_skipped:
+            print(
+                f"Fetching catalog metadata for {len(apps_needing_catalog)} entitlements "
+                f"({catalog_skipped} cached, skipping API) — {CATALOG_WORKERS} workers...",
+                flush=True,
+            )
+        else:
+            print(f"Fetching catalog metadata ({CATALOG_WORKERS} workers)...", flush=True)
 
-    catalog_hb = HeartbeatTimer(interval=25.0)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=CATALOG_WORKERS) as ex:
-        futures = [ex.submit(fetch_one, rec) for rec in apps]
-        for i, fut in enumerate(concurrent.futures.as_completed(futures), 1):
-            catalog_hb.tick_progress(i, len(futures), "Epic catalog", f"{len(catalog)} hits")
-            try:
-                key, item = fut.result()
-                if item:
-                    catalog[key] = item
-            except Exception as e:
-                stats.warn(f"catalog: {e}")
+        def fetch_one(rec: dict) -> tuple[tuple[str, str], dict | None]:
+            ns, cid = str(rec["namespace"]), str(rec["catalogItemId"])
+            return (ns, cid), client.get_catalog_item(ns, cid)
 
-    print(f"  catalog hits: {len(catalog)}/{len(apps)}")
+        catalog_hb = HeartbeatTimer(interval=25.0)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=CATALOG_WORKERS) as ex:
+            futures = [ex.submit(fetch_one, rec) for rec in apps_needing_catalog]
+            for i, fut in enumerate(concurrent.futures.as_completed(futures), 1):
+                catalog_hb.tick_progress(
+                    i, len(futures), "Epic catalog", f"{len(catalog)} hits"
+                )
+                try:
+                    key, item = fut.result()
+                    if item:
+                        catalog[key] = item
+                except Exception as e:
+                    stats.warn(f"catalog: {e}")
+
+        print(f"  catalog hits: {len(catalog)}/{len(apps_needing_catalog)}")
+    elif catalog_skipped:
+        print(f"  catalog: all {catalog_skipped} entitlements reused from cache (no API calls)", flush=True)
 
     hltb_client = HltbClient()
-    existing = load_existing()
     games_out: list[dict] = []
     skipped = 0
 
@@ -454,7 +493,7 @@ def main() -> int:
     )
     for i, rec in enumerate(apps_sorted, 1):
         ns, cid = str(rec["namespace"]), str(rec["catalogItemId"])
-        row_id = f"{ns}:{cid}"
+        row_id = _epic_row_id(rec)
         item = catalog.get((ns, cid))
         name = (item or {}).get("title") or rec.get("sandboxName") or rec.get("appName") or cid
 

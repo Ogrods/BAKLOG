@@ -555,7 +555,9 @@ export function trophyProgressPillHtml(g) {
   const gsCurAttr = gsCur != null ? ` data-gs-cur="${gsCur}"` : "";
   const gsTotalAttr = gsTotal != null ? ` data-gs-total="${gsTotal}"` : "";
   const tip = `${label}: ${pct}%`;
-  return `<button type="button" class="trophy-pill" data-trophy-pop data-store="${escapeAttr(store)}" data-pct="${pct}" data-label="${escapeAttr(label)}"${gsCurAttr}${gsTotalAttr} aria-label="${escapeAttr(tip)}" aria-haspopup="true" aria-expanded="false" title="${escapeAttr(tip)}">&#127942; ${pct}%</button>`;
+  const keyAttr = ` data-key="${escapeAttr(gameKey(g))}"`;
+  const nameAttr = g.name ? ` data-name="${escapeAttr(g.name)}"` : "";
+  return `<button type="button" class="trophy-pill" data-trophy-pop data-store="${escapeAttr(store)}"${keyAttr}${nameAttr} data-pct="${pct}" data-label="${escapeAttr(label)}"${gsCurAttr}${gsTotalAttr} aria-label="${escapeAttr(tip)}" aria-haspopup="true" aria-expanded="false" title="${escapeAttr(tip)}">&#127942; ${pct}%</button>`;
 }
 
 export function singleStoreBadgeHtml(s, title) {

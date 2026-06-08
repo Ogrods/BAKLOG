@@ -1,35 +1,22 @@
 {
-  "generated_at": "2026-06-07T22:11:50.572130+00:00",
+  "fetched_at": "2026-06-07T22:11:50.085490+00:00",
+  "sources": {
+    "epic": 2,
+    "gamerpower": 15,
+    "itad": 16
+  },
+  "attribution": [
+    "GamerPower.com"
+  ],
   "items": [
-    {
-      "id": "gog-test",
-      "store": "gog",
-      "title": "GOG Test Giveaway",
-      "claim_url": "https://www.gog.com/",
-      "header_image": null,
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2099-12-31T23:59:59Z"
-    },
-    {
-      "id": "steam-test",
-      "store": "steam",
-      "title": "Steam Test Giveaway",
-      "claim_url": "https://store.steampowered.com/",
-      "header_image": null,
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2099-12-31T23:59:59Z"
-    },
     {
       "id": "epic-rogue-waters-9764d6",
       "store": "epic",
       "title": "Rogue Waters",
       "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters-9764d6",
-      "header_image": "https://cdn1.epicgames.com/offer/d5241c76f178492ea1540fce45616757/rogue-waters-wide_2560x1440-81c0f87c8e7c4bb09e2d7d9c94213104",
-      "genres": [],
-      "blurb": null,
       "ends_at": "2026-06-11T15:00:00Z",
+      "header_image": "https://cdn1.epicgames.com/offer/d5241c76f178492ea1540fce45616757/rogue-waters-wide_2560x1440-81c0f87c8e7c4bb09e2d7d9c94213104",
+      "blurb": null,
       "source": "epic"
     },
     {
@@ -37,10 +24,9 @@
       "store": "epic",
       "title": "Songs of Conquest",
       "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
-      "header_image": "https://cdn1.epicgames.com/offer/d5241c76f178492ea1540fce45616757/s2_2560x1440-5c396b18c3e1460fb4a268cc6bbdfaa2",
-      "genres": [],
-      "blurb": null,
       "ends_at": "2026-06-11T15:00:00Z",
+      "header_image": "https://cdn1.epicgames.com/offer/d5241c76f178492ea1540fce45616757/s2_2560x1440-5c396b18c3e1460fb4a268cc6bbdfaa2",
+      "blurb": null,
       "source": "epic"
     },
     {
@@ -48,10 +34,9 @@
       "store": "steam",
       "title": "Remothered: Tormented Fathers (Steam) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/remothered-tormented-fathers-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25ced022820.jpg",
-      "genres": [],
-      "blurb": "Score Remothered: Tormented Fathers for free via Steam until 8 Jun! Remothered: Tormented Fathers is a realistic survival game with unpredictable twists. Don´t miss it!",
       "ends_at": "2026-06-08T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a25ced022820.jpg",
+      "blurb": "Score Remothered: Tormented Fathers for free via Steam until 8 Jun! Remothered: Tormented Fathers is a realistic survival game with unpredictable twists. Don´t miss it!",
       "source": "gamerpower"
     },
     {
@@ -59,10 +44,9 @@
       "store": "epic",
       "title": "Relaxing Simulator (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/relaxing-simulator-epic-games-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25c2413d322.jpg",
-      "genres": [],
-      "blurb": "Just relax and grab Relaxing Simulator for free on the Epic Games Store for the ultimate relaxing experience!",
       "ends_at": "2026-06-14T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a25c2413d322.jpg",
+      "blurb": "Just relax and grab Relaxing Simulator for free on the Epic Games Store for the ultimate relaxing experience!",
       "source": "gamerpower"
     },
     {
@@ -70,10 +54,9 @@
       "store": "gog",
       "title": "Remothered: Broken Porcelain (GOG) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/remothered-broken-porcelain-gog-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25bfb499a3c.jpg",
-      "genres": [],
-      "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
       "ends_at": "2026-06-08T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a25bfb499a3c.jpg",
+      "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
       "source": "gamerpower"
     },
     {
@@ -81,10 +64,9 @@
       "store": "other",
       "title": "Flufftopia (itchio) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/flufftopia-itchio-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25903df2853.jpg",
-      "genres": [],
-      "blurb": "Flufftopia is free on itch.io until June 14th 2026. Flufftopia is a small clicker game with a story. Check it out!",
       "ends_at": "2026-06-14T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a25903df2853.jpg",
+      "blurb": "Flufftopia is free on itch.io until June 14th 2026. Flufftopia is a small clicker game with a story. Check it out!",
       "source": "gamerpower"
     },
     {
@@ -92,10 +74,9 @@
       "store": "epic",
       "title": "Songs of Conquest (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/songs-of-conquest-epic-games-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2194d7915ac.jpg",
-      "genres": [],
-      "blurb": "Claim Songs of Conquest for free on the Epic Games Store. Songs of Conquest is a turn-based strategy game with tactical combat and kingdom management. This game has lots of positive reviews, so don't miss it!",
       "ends_at": "2026-06-11T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a2194d7915ac.jpg",
+      "blurb": "Claim Songs of Conquest for free on the Epic Games Store. Songs of Conquest is a turn-based strategy game with tactical combat and kingdom management. This game has lots of positive reviews, so don't miss it!",
       "source": "gamerpower"
     },
     {
@@ -103,10 +84,9 @@
       "store": "epic",
       "title": "Rogue Waters (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/rogue-waters-epic-games-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2193ea2f810.jpg",
-      "genres": [],
-      "blurb": "Set sail with this giveaway! Grab Rogue Waters for free on Epic Games Store until 11 June. Rogue Waters is a 3d tactical turn-based rogue-lite game set in a pirate world.",
       "ends_at": "2026-06-11T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a2193ea2f810.jpg",
+      "blurb": "Set sail with this giveaway! Grab Rogue Waters for free on Epic Games Store until 11 June. Rogue Waters is a 3d tactical turn-based rogue-lite game set in a pirate world.",
       "source": "gamerpower"
     },
     {
@@ -114,10 +94,9 @@
       "store": "steam",
       "title": "Tell Me Why (Steam) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/tell-me-why-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6478b9dcae7be.jpg",
-      "genres": [],
-      "blurb": "Dive into the Riveting World of Tell Me Why for FREE on Steam! Tell Me Why is a multi-award winning episodic adventure game from Dontnod Entertainment! Don't pass up the chance to experience this extraordinary game for free!",
       "ends_at": "2026-07-01T23:59:59Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6478b9dcae7be.jpg",
+      "blurb": "Dive into the Riveting World of Tell Me Why for FREE on Steam! Tell Me Why is a multi-award winning episodic adventure game from Dontnod Entertainment! Don't pass up the chance to experience this extraordinary game for free!",
       "source": "gamerpower"
     },
     {
@@ -125,10 +104,9 @@
       "store": "steam",
       "title": "Gravity Circuit (Steam) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/gravity-circuit-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a1dbddf722cd.jpg",
-      "genres": [],
-      "blurb": "Looking for a cool Steam game? Grab Gravity Circuit for free via Steam until June 14. Gravity Circuit is a action packed 2D platformer in the spirit of console classics. Don´t miss this one.",
       "ends_at": "2026-06-14T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a1dbddf722cd.jpg",
+      "blurb": "Looking for a cool Steam game? Grab Gravity Circuit for free via Steam until June 14. Gravity Circuit is a action packed 2D platformer in the spirit of console classics. Don´t miss this one.",
       "source": "gamerpower"
     },
     {
@@ -136,10 +114,9 @@
       "store": "other",
       "title": "Mr.Brocco And Co (IndieGala) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/mr-brocco-and-co-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/68ce9db7d6736.jpg",
-      "genres": [],
-      "blurb": "Your fight against fast food begins today! Download Mr.Brocco And Co for free via IndieGala. Mr.Brocco And Co is a 2D platform game where junk food is trying to take over!",
       "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/68ce9db7d6736.jpg",
+      "blurb": "Your fight against fast food begins today! Download Mr.Brocco And Co for free via IndieGala. Mr.Brocco And Co is a 2D platform game where junk food is trying to take over!",
       "source": "gamerpower"
     },
     {
@@ -147,10 +124,9 @@
       "store": "other",
       "title": "The Brave Little Cloud (IndieGala) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/the-brave-little-cloud-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/68bafea6b0b4d.jpg",
-      "genres": [],
-      "blurb": "Save the world… as a cloud. Download The Brave Little Cloud for free on IndieGala! The Brave Little Cloud is a 2D platformer where you play as a small cloud on a quest to battle evil.",
       "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/68bafea6b0b4d.jpg",
+      "blurb": "Save the world… as a cloud. Download The Brave Little Cloud for free on IndieGala! The Brave Little Cloud is a 2D platformer where you play as a small cloud on a quest to battle evil.",
       "source": "gamerpower"
     },
     {
@@ -158,10 +134,9 @@
       "store": "other",
       "title": "Carlos the Taco (IndieGala) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/carlos-the-taco-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/68b1ae1e5c9ce.jpg",
-      "genres": [],
-      "blurb": "Become the Taco! Finally, a free game made for taco fans! Download Carlos the Taco for free on IndieGala. Carlos the Taco is a 2D platformer set in Mexico where you play as a taco!",
       "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/68b1ae1e5c9ce.jpg",
+      "blurb": "Become the Taco! Finally, a free game made for taco fans! Download Carlos the Taco for free on IndieGala. Carlos the Taco is a 2D platformer set in Mexico where you play as a taco!",
       "source": "gamerpower"
     },
     {
@@ -169,10 +144,9 @@
       "store": "itch",
       "title": "Madness Inside (itch.io) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/madness-inside-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/67c76007697b3.jpg",
-      "genres": [],
-      "blurb": "Download Madness Inside for free on Itch.io! Madness Inside is an indie psychological walking simulator where you explore a psychiatric hospital.",
       "ends_at": "2026-08-01T23:59:59Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/67c76007697b3.jpg",
+      "blurb": "Download Madness Inside for free on Itch.io! Madness Inside is an indie psychological walking simulator where you explore a psychiatric hospital.",
       "source": "gamerpower"
     },
     {
@@ -180,10 +154,9 @@
       "store": "other",
       "title": "GigaBash (Stove) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/gigabash-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/69567c4ee0fa3.jpg",
-      "genres": [],
-      "blurb": "Score GigaBash for free via Stove and claim your place as king among Titans! GigaBash is a multiplayer arena brawler with gigantic film-inspired kaiju and fully destructible environments.",
       "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/69567c4ee0fa3.jpg",
+      "blurb": "Score GigaBash for free via Stove and claim your place as king among Titans! GigaBash is a multiplayer arena brawler with gigantic film-inspired kaiju and fully destructible environments.",
       "source": "gamerpower"
     },
     {
@@ -191,10 +164,9 @@
       "store": "itch",
       "title": "Dual Chroma: Academy Carols (itch.io) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/dual-chroma-academy-carols-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/63c6f67bb9c8b.jpg",
-      "genres": [],
-      "blurb": "Grab Dual Chroma: Academy Carols for free on itch.io! Dual Chroma: Academy Carols is a slice-of-life Visual Novel. Check it out, If you are a fan of this type of game!",
       "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/63c6f67bb9c8b.jpg",
+      "blurb": "Grab Dual Chroma: Academy Carols for free on itch.io! Dual Chroma: Academy Carols is a slice-of-life Visual Novel. Check it out, If you are a fan of this type of game!",
       "source": "gamerpower"
     },
     {
@@ -202,10 +174,9 @@
       "store": "itch",
       "title": "Dora Diginoid: Metroidvania sci-fi adventure game",
       "claim_url": "https://www.gamerpower.com/open/dora-diginoid-metroidvania-sci-fi-adventure-game",
-      "header_image": "https://www.gamerpower.com/offers/1b/62dec9fa9312b.jpg",
-      "genres": [],
-      "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
       "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/62dec9fa9312b.jpg",
+      "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
       "source": "gamerpower"
     },
     {
@@ -213,10 +184,9 @@
       "store": "gog",
       "title": "Remothered: Broken Porcelain on GOG",
       "claim_url": "https://isthereanydeal.com/giveaways/16246/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/remothered-broken-porcelain/info/\">Remothered: Broken Porcelain</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 08 Jun 2026 19:45:45 +0200\n                                        | <a href=https://www.gog.com/en/game/remothered_broken_porcelain>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/remothered-broken-porcelain/info/\">Remothered: Broken Porcelain</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 08 Jun 2026 19:45:45 +0200\n                                        | <a href=https://www.gog.com/en/game/remothered_broken_porcelain>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -224,10 +194,9 @@
       "store": "steam",
       "title": "Remothered: Tormented Fathers on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16245/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/remothered-tormented-fathers/info/\">Remothered: Tormented Fathers</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 08 Jun 2026 20:44:31 +0200\n                                        | <a href=https://store.steampowered.com/app/633360/Remothered_Tormented_Fathers/>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/remothered-tormented-fathers/info/\">Remothered: Tormented Fathers</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 08 Jun 2026 20:44:31 +0200\n                                        | <a href=https://store.steampowered.com/app/633360/Remothered_Tormented_Fathers/>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -235,10 +204,9 @@
       "store": "epic",
       "title": "Wytchwood free for mobile on EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16242/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/wytchwood/info/\">Wytchwood</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-8bd7d123bc59474ebb2552793dc0fdbb-69657a7a252741bdbc72fbaebe5bb07b&amp;offers=1-8bd7d123bc59474ebb2552793dc0fdbb-e503745d0b2e4391b4454a3d1b75f22e>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/wytchwood/info/\">Wytchwood</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-8bd7d123bc59474ebb2552793dc0fdbb-69657a7a252741bdbc72fbaebe5bb07b&amp;offers=1-8bd7d123bc59474ebb2552793dc0fdbb-e503745d0b2e4391b4454a3d1b75f22e>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -246,10 +214,9 @@
       "store": "epic",
       "title": "Songs of Conquest free at EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16239/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/songs-of-conquest/info/\">Songs of Conquest</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/p/songs-of-conquest>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/songs-of-conquest/info/\">Songs of Conquest</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/p/songs-of-conquest>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -257,10 +224,9 @@
       "store": "epic",
       "title": "Rogue Waters free at EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16240/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/rogue-waters/info/\">Rogue Waters</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/p/rogue-waters-9764d6>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/rogue-waters/info/\">Rogue Waters</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/p/rogue-waters-9764d6>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -268,10 +234,9 @@
       "store": "steam",
       "title": "Tell Me Why - Chapters 1,2,3 - FREE on Steam on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16229/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/tell-me-why/info/\">Tell Me Why</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-2/info/\">Tell Me Why: Chapter 2</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-3/info/\">Tell Me Why: Chapter 3</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Wed, 01 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1180660/Tell_Me_Why>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/tell-me-why/info/\">Tell Me Why</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-2/info/\">Tell Me Why: Chapter 2</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-3/info/\">Tell Me Why: Chapter 3</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Wed, 01 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1180660/Tell_Me_Why>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -279,10 +244,9 @@
       "store": "steam",
       "title": "Gravity Circuit free on Steam on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16228/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/gravity-circuit/info/\">Gravity Circuit</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Tue, 14 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/858710/Gravity_Circuit/>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/gravity-circuit/info/\">Gravity Circuit</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Tue, 14 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/858710/Gravity_Circuit/>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -290,10 +254,9 @@
       "store": "other",
       "title": "Mr.Brocco & Co - FREE on IndieGala on IndieGala Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16196/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/mr-brocco-and-co/info/\">Mr.Brocco &amp; Co</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/mrbrocco-co>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/mr-brocco-and-co/info/\">Mr.Brocco &amp; Co</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/mrbrocco-co>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -301,10 +264,9 @@
       "store": "steam",
       "title": "World of Warships x Azur Lane - Quest for AL Avrora - FREE on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16170/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/world-of-warships-x-azur-lane-quest-for-al-avrora--1/info/\">World of Warships x Azur Lane — Quest for AL Avrora</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 18 Jun 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/4627430/World_of_Warships_x_Azur_Lane__Quest_for_AL_Avrora/>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/world-of-warships-x-azur-lane-quest-for-al-avrora--1/info/\">World of Warships x Azur Lane — Quest for AL Avrora</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 18 Jun 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/4627430/World_of_Warships_x_Azur_Lane__Quest_for_AL_Avrora/>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -312,10 +274,9 @@
       "store": "epic",
       "title": "MONGIL: STAR DIVE free in game items. on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16166/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/divers-mega-pack/info/\">Divers Mega Pack</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/mongil-star-dive-divers-mega-pack-a3d25d>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/divers-mega-pack/info/\">Divers Mega Pack</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/mongil-star-dive-divers-mega-pack-a3d25d>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -323,10 +284,9 @@
       "store": "epic",
       "title": "RAVEN II in game currency pack on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16165/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/raven2-half-anniversary-starter-pack/info/\">RAVEN2 Half anniversary Starter Pack</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/raven2-raven2-half-anniversary-starter-pack-6b8076>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/raven2-half-anniversary-starter-pack/info/\">RAVEN2 Half anniversary Starter Pack</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/raven2-raven2-half-anniversary-starter-pack-6b8076>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -334,10 +294,9 @@
       "store": "other",
       "title": "The Brave Little Cloud - FREE on IndieGala on IndieGala Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16143/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/the-brave-little-cloud/info/\">The Brave Little Cloud</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/the-brave-little-cloud>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/the-brave-little-cloud/info/\">The Brave Little Cloud</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/the-brave-little-cloud>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -345,10 +304,9 @@
       "store": "other",
       "title": "Carlos the Taco - FREE on IndieGala on IndieGala Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16092/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/carlos-the-taco/info/\">Carlos the Taco</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/carlos-the-taco>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/carlos-the-taco/info/\">Carlos the Taco</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/carlos-the-taco>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -356,10 +314,9 @@
       "store": "itch",
       "title": "Madness Inside free on itchio on Itch.io",
       "claim_url": "https://isthereanydeal.com/giveaways/15895/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/madness-inside/info/\">Madness inside</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 01 Aug 2026 18:00:00 +0200\n                                        | <a href=https://zv-games.itch.io/madness-inside>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/madness-inside/info/\">Madness inside</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 01 Aug 2026 18:00:00 +0200\n                                        | <a href=https://zv-games.itch.io/madness-inside>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -367,10 +324,9 @@
       "store": "itch",
       "title": "Smiley Dusty at Itch.io on Itch.io",
       "claim_url": "https://isthereanydeal.com/giveaways/15746/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
       "source": "itad"
     },
     {
@@ -378,14 +334,10 @@
       "store": "other",
       "title": "Die Young: Prologue - FREE on IndieGala",
       "claim_url": "https://isthereanydeal.com/giveaways/7433/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "<a href=\"https://isthereanydeal.com/game/die-young-prologue/info/\">Die Young: Prologue</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/die-young-prologue>go to giveaway</a>",
       "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/die-young-prologue/info/\">Die Young: Prologue</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/die-young-prologue>go to giveaway</a>",
       "source": "itad"
     }
-  ],
-  "attribution": [
-    "GamerPower.com"
   ]
 }

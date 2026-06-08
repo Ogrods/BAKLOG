@@ -1038,6 +1038,29 @@ button[disabled] { cursor: not-allowed; }
   line-height: 1.35;
 }
 .trophy-pop-gs strong { color: #f8fafc; font-weight: 600; }
+/* Metered deep-sync footer inside the trophy popover. */
+.trophy-pop-meter {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trophy-pop-sync {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.trophy-pop-sync:hover:not(:disabled) { background: rgba(56, 189, 248, 0.12); }
+.trophy-pop-sync:disabled { color: #64748b; border-color: rgba(100, 116, 139, 0.4); cursor: not-allowed; }
+.trophy-pop-meter-label { font-size: 10px; color: #94a3b8; line-height: 1.3; }
 /* === Chips & badges === */
 .genre-chip.active { background: var(--accent-dim); border-color: var(--accent-bright); color: #f8fafc; }
 .store-chip.active { background: #7c3aed; border-color: #a78bfa; color: #f8fafc; }
@@ -2001,6 +2024,48 @@ html[data-theme="ember"] .brand-logo-mark {
   pointer-events: none;
   z-index: 2;
 }
+/* Sponsored / house deal slot — distinct from organic deal cards, with a clear
+   disclosure badge. Amber top-rail (vs emerald) so it never masquerades as a
+   wishlist deal you tracked yourself. */
+.sponsored-deal-card { display: flex; flex-direction: column; cursor: pointer; }
+.sponsored-deal-card.deal-rail-card::before { background: #f59e0b; }
+.sponsored-deal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.sponsored-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  line-height: 1.4;
+}
+.sponsored-deal-house .sponsored-badge { color: #38bdf8; border-color: rgba(56, 189, 248, 0.5); }
+.sponsored-deal-body { display: flex; gap: 0.75rem; align-items: center; flex: 1; min-height: 0; }
+.sponsored-deal-cover { width: 56px; height: 56px; object-fit: cover; border-radius: 0.5rem; flex-shrink: 0; }
+.sponsored-deal-meta { display: flex; flex-direction: column; gap: 0.2rem; }
+.sponsored-deal-name { font-weight: 600; color: rgb(241 245 249); line-height: 1.25; }
+.sponsored-deal-tagline { font-size: 0.75rem; color: rgb(148 163 184); line-height: 1.3; }
+.sponsored-deal-cta { font-size: 0.75rem; font-weight: 600; color: #f59e0b; margin-top: 0.15rem; }
+.sponsored-deal-house .sponsored-deal-cta { color: #38bdf8; }
+.sponsored-deal-dismiss {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: rgb(148 163 184);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 3;
+}
+.sponsored-deal-dismiss:hover { color: rgb(226 232 240); background: rgba(148, 163, 184, 0.15); }
 .dash-card.hidden { display: none; }
 /* Dashboard card headings follow the active theme (override Tailwind text-slate-*) */
 .dash-card > h3,
@@ -2915,7 +2980,10 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
 }
 .dash-spotlight.is-lowres-art .dash-spotlight-art {
   object-fit: contain;
-  object-position: 62% 40%;
+  object-position: 100% 40%;
+  /* Hard edges: low-res contained art keeps crisp boundaries (no edge fade). */
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 @keyframes spotlightLowresFgDrift {
   from { transform: scale(1) translate(0%, 0%) translateZ(0); }
@@ -3317,8 +3385,10 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
 .dash-marquee-item strong { color: #f1f5f9; font-weight: 700; }
 .dash-marquee-item .dash-marquee-label { color: #94a3b8; }
 .dash-marquee-icon {
-  width: 22px;
+  min-width: 22px;
   height: 22px;
+  padding: 0 6px;
+  box-sizing: border-box;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -4315,9 +4385,12 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 }
 .dash-recent-list {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
+  /* Always reserve 10 equal-height cells so per-row spacing is identical
+     whether the user has 2 recents or 10. Items auto-fill from the top, so
+     fewer than 10 items occupy the top cells and leave empty space below. */
+  grid-template-rows: repeat(10, 1fr);
+  align-items: start;
   gap: 4px;
   min-height: 0;
 }

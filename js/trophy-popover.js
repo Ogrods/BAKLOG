@@ -1,6 +1,8 @@
 import { escapeHtml } from './dom-util.js';
+import { meterLabel, canDeepSync, consumeDeepSync } from './achievement-meter.js';
 
 const POP_ID = 'trophyPop';
+const DEEP_SYNC_STORES = new Set(['psn', 'xbox']);
 const GAP = 6;
 const VIEWPORT_PAD = 8;
 
@@ -17,8 +19,26 @@ function ensurePop() {
   popEl.className = 'trophy-pop';
   popEl.setAttribute('role', 'tooltip');
   popEl.hidden = true;
+  popEl.addEventListener('click', onDeepSyncClick);
   document.body.appendChild(popEl);
   return popEl;
+}
+
+function onDeepSyncClick(e) {
+  const btn = e.target.closest('[data-deep-sync]');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (btn.disabled) return;
+  const res = consumeDeepSync(btn.dataset.key || null);
+  if (res.ok) {
+    document.dispatchEvent(new CustomEvent('baklog:deep-sync', {
+      detail: { store: btn.dataset.store, key: btn.dataset.key || null, name: btn.dataset.name || null },
+    }));
+  }
+  // Rebuild the footer so the quota label + disabled state reflect the new
+  // balance (or the gated "out of deep syncs" message).
+  if (anchorEl) popEl.innerHTML = buildPopHtml(anchorEl);
 }
 
 function parseNum(val) {
@@ -44,7 +64,22 @@ function buildPopHtml(pill) {
   return `<p class="trophy-pop-title">${escapeHtml(label)}</p>
     <p class="trophy-pop-pct">${clamped}%</p>
     <div class="trophy-pop-bar" aria-hidden="true"><span class="trophy-pop-fill" style="width:${clamped}%"></span></div>
-    ${gsHtml}`;
+    ${gsHtml}
+    ${buildMeterHtml(pill)}`;
+}
+
+/** Metered deep-sync footer for PSN/Xbox pills: cached % is free, a full
+ *  achievement/trophy re-pull is rate-limited by the daily allowance. */
+function buildMeterHtml(pill) {
+  const store = (pill.dataset.store || '').toLowerCase();
+  if (!DEEP_SYNC_STORES.has(store)) return '';
+  const allowed = canDeepSync();
+  const key = pill.dataset.key || '';
+  const name = pill.dataset.name || '';
+  return `<div class="trophy-pop-meter">
+    <button type="button" class="trophy-pop-sync" data-deep-sync data-store="${escapeHtml(store)}" data-key="${escapeHtml(key)}" data-name="${escapeHtml(name)}"${allowed ? '' : ' disabled'}>Deep sync</button>
+    <span class="trophy-pop-meter-label">${escapeHtml(meterLabel())}</span>
+  </div>`;
 }
 
 function positionPop(pill) {

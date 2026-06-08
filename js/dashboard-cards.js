@@ -7,6 +7,7 @@ import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverF
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
+import { sponsoredDealSlotHtml } from './sponsored-deals.js';
 import { focusGame } from './table-ui.js';
 import { DASH_STORE_LABELS, DASH_STORE_COLORS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
 // Itch click routing uses dashDrillItchGenre from the drilldown module.
@@ -49,8 +50,9 @@ function resolveItchHeroOrder(freshCandidates) {
 
 /** Relative "added" label from first-seen timestamp (mirrors fetcher humanizeAge thresholds). */
 function formatAddedAgo(ts) {
+  if (!ts) return '—';
   const ms = Date.now() - ts;
-  if (!Number.isFinite(ms) || ms < 0) return ' - ';
+  if (!Number.isFinite(ms) || ms < 0) return '—';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
@@ -298,6 +300,7 @@ export function buildWishlistStatsHtml() {
         cuts: [],
       }),
       dealStealsCardHtml([]),
+      sponsoredDealSlotHtml(),
     ].join("");
   }
 
@@ -341,6 +344,7 @@ export function buildWishlistStatsHtml() {
       cuts,
     }),
     dealStealsCardHtml(steals),
+    sponsoredDealSlotHtml(),
   ].join("");
 }
 

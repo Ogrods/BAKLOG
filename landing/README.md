@@ -9,7 +9,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `main.js` — footer year, non-blocking font load, waitlist submit handler.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
-- `assets/sample/*.png` — fictional game covers for the spotlight carousel.
+- `assets/sample/*.{webp,png}` — fictional game covers for the spotlight carousel.
 - `api/subscribe.js` — Vercel serverless function; logs signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
 - `sql/waitlist.sql` — one-time Supabase table for durable signup logging.

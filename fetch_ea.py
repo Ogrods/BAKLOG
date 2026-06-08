@@ -28,10 +28,13 @@ from ea_session import DEFAULT_TRIGGER_URLS, probe_ea_token, sniff_ea_bearer
 from fetchers._authoritative import EA
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    row_key_by_id,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
@@ -166,7 +169,7 @@ def _tags_for(item: dict) -> list[str]:
     if methods & EA_PLAY_OWNERSHIP and not (methods & REAL_OWNERSHIP):
         tags.append("ea_play")
     if methods & XGP_ONLY:
-        tags.append("xbox_game_pass")
+        tags.append("game-pass")
     return tags
 
 
@@ -229,6 +232,7 @@ def _build_row(
         "release_date": None,
         "genres": [],
         "tags": _tags_for(item),
+        "game_pass": bool(_ownership_methods(item) & XGP_ONLY),
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,
@@ -261,6 +265,7 @@ def main() -> int:
     load_dotenv()
     parser = argparse.ArgumentParser(description="Fetch EA App library (unofficial GraphQL)")
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     parser.add_argument("--skip-hltb", action="store_true")
     parser.add_argument("--dump-raw", action="store_true")
     parser.add_argument(
@@ -400,6 +405,13 @@ def main() -> int:
     )
     if drift_exit is not None:
         return stats.finish("fetch_ea", t0, exit_code=drift_exit)
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=row_key_by_id,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

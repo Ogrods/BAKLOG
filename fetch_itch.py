@@ -32,6 +32,8 @@ from fetchers._base import (
     add_allow_empty_arg,
     add_dry_run_arg,
     add_hltb_args,
+    add_no_carry_arg,
+    apply_carry_forward,
     carry_enrichment,
     catalog_file,
     configure_stdout,
@@ -159,6 +161,28 @@ def _build_row(entry: dict, hltb: dict | None) -> dict | None:
                 "hltb_name": hltb.get("hltb_name"),
             }
         )
+    return row
+
+
+def _enrich_row_from_game_doc(row: dict, doc: dict | None) -> dict:
+    """Merge full game/<id> payload description and tags into a library row."""
+    if not doc:
+        return row
+    for key in ("description", "short_text"):
+        val = doc.get(key)
+        if isinstance(val, str) and val.strip():
+            row["short_text"] = val.strip()
+            break
+    extra_genres = _genres(doc)
+    if extra_genres:
+        merged = list(row.get("genres") or [])
+        seen = {g.lower() for g in merged}
+        for g in extra_genres:
+            low = g.lower()
+            if low not in seen:
+                merged.append(g)
+                seen.add(low)
+        row["genres"] = merged
     return row
 
 
@@ -371,10 +395,16 @@ def main() -> int:
     )
     add_dry_run_arg(parser)
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     parser.add_argument(
         "--games-only",
         action="store_true",
         help="Only write rows classified as videogames (tools/soundtracks/etc. omitted).",
+    )
+    parser.add_argument(
+        "--enrich-details",
+        action="store_true",
+        help="Fetch full game/<id> docs (API source only) to merge description and tags.",
     )
     args = parser.parse_args()
     configure_stdout()
@@ -556,6 +586,12 @@ def main() -> int:
                 }
 
             row = _build_row(entry, hltb)
+            if row and args.enrich_details:
+                try:
+                    doc = client.game(int(gid))
+                    row = _enrich_row_from_game_doc(row, doc)
+                except Exception as e:
+                    print(f"  enrich-details warning: {e}", flush=True)
             if row:
                 current_rows.append(
                     merge_cached_row(
@@ -605,6 +641,13 @@ def main() -> int:
     )
     if drift_exit is not None:
         return stats.finish("fetch_itch", t0, exit_code=drift_exit)
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=_match_key,
+        no_carry=args.no_carry,
+    )
 
     sorted_games = sorted(games_out, key=lambda g: g["name"].lower())
     write_games_json(GAMES_ITCH_JSON, store="itch", games=sorted_games)

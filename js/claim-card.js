@@ -254,10 +254,14 @@ export function claimableModuleMarkup(claims, {
   const showHiddenBtn = showHiddenButtonHtml || '';
   const attributionHtml = claimAttributionHtml(attribution);
   if (!list.length) {
-    return `<section class="claimable-now-module dash-card claim-rows-card" aria-label="Claimable Now">
-      <div class="dash-kpi-label claim-rows-head">Claimable Now</div>
-      <p class="text-sm text-slate-400 mt-2">All current claims are hidden.</p>
-      ${showHiddenBtn}
+    return `<section class="claimable-now-module dash-card claim-rows-card claim-empty-card" aria-label="Claimable Now">
+      <div class="claim-empty-row">
+        <div class="claim-empty-text">
+          <span class="dash-kpi-label claim-rows-head">Claimable Now</span>
+          <span class="claim-empty-msg">No new free games to claim right now.</span>
+        </div>
+        <div class="claim-empty-actions">${showHiddenBtn}</div>
+      </div>
       ${attributionHtml}
     </section>`;
   }

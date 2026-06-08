@@ -47,6 +47,12 @@ def test_fetch_scripts_do_not_duplicate_allow_drift_in_source() -> None:
         )
 
 
+def test_fetch_nintendo_help_lists_rebuild_flag() -> None:
+    proc = _run_help("fetch_nintendo.py")
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "--rebuild" in (proc.stdout or "")
+
+
 def test_fetch_humble_accepts_skip_hltb_flag() -> None:
     """Manifest passes --skip-hltb; script must advertise it in --help."""
     proc = _run_help("fetch_humble.py")

@@ -27,6 +27,8 @@ except ImportError:
         """Stub when amazon_client is unavailable (non-Windows)."""
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     carry_enrichment,
     catalog_file,
     merge_cached_row,
@@ -390,6 +392,7 @@ def main() -> int:
         help=f"Web source only: write {AMAZON_RAW_DUMP} with full claims payload",
     )
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_amazon")
@@ -505,6 +508,13 @@ def main() -> int:
             return stats.finish("fetch_amazon", t0, exit_code=drift_exit)
 
     games_out = merge_amazon_sources(current_rows, carried_rows, source)
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=_match_key,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

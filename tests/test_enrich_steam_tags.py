@@ -99,6 +99,8 @@ def test_enricher_writes_coop_and_fills_missing_genres(
                 # must not write them onto the row.
                 "metacritic": {"score": 88},
                 "controller_support": "full",
+                "developers": ["Enrich Dev"],
+                "publishers": ["Enrich Pub"],
                 "achievements": {"total": 30},
             },
         }
@@ -121,10 +123,11 @@ def test_enricher_writes_coop_and_fills_missing_genres(
     assert g1["coop_local"] is False
     assert g1["genres"] == ["Action", "RPG"]
     assert g1["release_date"] == "Mar 15, 2024"
-    # Extras on the payload (metacritic/controller/achievements) must not
-    # leak onto the row — we don't surface them anywhere.
-    assert "metacritic_score" not in g1
-    assert "controller_support" not in g1
+    assert g1["metacritic_score"] == 88
+    assert g1["controller_support"] == "full"
+    assert g1["developers"] == ["Enrich Dev"]
+    assert g1["publishers"] == ["Enrich Pub"]
+    assert g1["early_access"] is False
     assert "achievements_total" not in g1
 
     # Row 2 — appid match 0 in mapping → no enrichment, existing genres kept.

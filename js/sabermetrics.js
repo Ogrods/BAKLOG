@@ -2,7 +2,7 @@
 // Pure functions; snapshot built once per dashboard render and reused.
 
 import { state } from './state.js';
-import { gameKey, hltbMain, ratingValue, hasEnoughReviews, combinedPlaytime, normalizeGame } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, hasEnoughReviews, combinedPlaytime, normalizeGame, firstPlayedAt, playSessionCount } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo, computeWishlistWoba, isCleanupCandidate } from './deals.js';
 import { gameGenresCanonical } from './genres.js';
@@ -92,6 +92,8 @@ export function buildLibrarySnapshot(games) {
   let skip = 0;
   let backlogHrs = 0;
   let playedHrs = 0;
+  let psnSessionTotal = 0;
+  let oldestFirstPlayedMs = null;
 
   for (const g of list) {
     const st = getPersonal(g).status || 'backlog';
@@ -106,6 +108,12 @@ export function buildLibrarySnapshot(games) {
     if (st === 'next') next++;
     if (combinedPlaytime(g) > 0) touched++;
     playedHrs += combinedPlaytime(g) / 60;
+    const sessions = playSessionCount(g);
+    if (sessions != null) psnSessionTotal += sessions;
+    const fp = firstPlayedAt(g);
+    if (fp != null && (oldestFirstPlayedMs == null || fp < oldestFirstPlayedMs)) {
+      oldestFirstPlayedMs = fp;
+    }
   }
 
   const rBar = libraryMeanRating(list);
@@ -127,6 +135,8 @@ export function buildLibrarySnapshot(games) {
     completionRate,
     backlogHrs,
     playedHrs,
+    psnSessionTotal,
+    oldestFirstPlayedMs,
     rBar,
     rRep,
     mendozaLine: rRep,

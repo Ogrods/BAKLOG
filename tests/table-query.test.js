@@ -11,6 +11,7 @@ import {
   resolveCoopFilterMode,
   passesCoopFilter,
   isEarlyAccess,
+  isGamePass,
   queryGames,
   buildQueryContext,
   collectTableParams,
@@ -130,6 +131,34 @@ describe('isEarlyAccess', () => {
   });
 });
 
+describe('isGamePass', () => {
+  it('returns true when game_pass flag is set', () => {
+    expect(isGamePass({ game_pass: true })).toBe(true);
+  });
+
+  it('detects legacy xbox_game_pass tag', () => {
+    expect(isGamePass({ tags: ['xbox_game_pass'] })).toBe(true);
+  });
+
+  it('returns false for owned purchases', () => {
+    expect(isGamePass({ tags: ['pc'], game_pass: false })).toBe(false);
+  });
+});
+
+describe('gamePass filter', () => {
+  it('filters to subscription rows only', () => {
+    const gp = { ...baseGame, store: 'xbox', id: 'x1', game_pass: true };
+    const owned = { ...baseGame, store: 'xbox', id: 'x2', game_pass: false };
+    const source = [gp, owned];
+    const out = queryGames({
+      source,
+      ctx: ctx({ params: collectTableParams({ gamePassOnly: true }) }),
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('x1');
+  });
+});
+
 describe('gameKey', () => {
   it('builds store:id from explicit fields', () => {
     expect(gameKey({ store: 'gog', id: 42 })).toBe('gog:42');
@@ -238,6 +267,8 @@ describe('collectTableParams', () => {
       status: '',
       unplayed: false,
       earlyAccess: false,
+      gamePass: false,
+      staleOnly: false,
       minRating: 0,
       maxHours: 200,
     });
@@ -249,6 +280,8 @@ describe('collectTableParams', () => {
       status: '',
       unplayed: false,
       earlyAccess: false,
+      gamePass: false,
+      staleOnly: false,
       minRating: 0,
       maxHours: 200,
     });
@@ -261,6 +294,8 @@ describe('collectTableParams', () => {
         statusFilter: 'next',
         unplayedOnly: true,
         earlyAccessOnly: true,
+        gamePassOnly: true,
+        staleOnly: true,
         minRating: 70,
         maxHours: 12,
       }),
@@ -269,6 +304,8 @@ describe('collectTableParams', () => {
       status: 'next',
       unplayed: true,
       earlyAccess: true,
+      gamePass: true,
+      staleOnly: true,
       minRating: 70,
       maxHours: 12,
     });
@@ -280,6 +317,8 @@ describe('collectTableParams', () => {
       status: '',
       unplayed: false,
       earlyAccess: false,
+      gamePass: false,
+      staleOnly: false,
       minRating: 40,
       maxHours: 5,
     });

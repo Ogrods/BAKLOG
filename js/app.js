@@ -135,8 +135,10 @@ async function bootstrap() {
   bindEvents();
   await initProfiles();
   document.getElementById("showScoreColumn").checked = !!state.prefs.showScoreColumn;
+  document.getElementById("rowHeroBackdrop").checked = !!state.prefs.rowHeroBackdrop;
   const tableWrap = document.getElementById("tableWrap");
   tableWrap?.classList.toggle("table-hide-score", !state.prefs.showScoreColumn);
+  document.body.classList.toggle("row-hero-on", !!state.prefs.rowHeroBackdrop);
   tableWrap?.classList.toggle("table-hide-playtime", state.activeView === "wishlist");
   tableWrap?.classList.toggle("table-hide-lastplayed", state.activeView === "wishlist");
   document.getElementById("genreMode").value = state.prefs.genreFilterMode;

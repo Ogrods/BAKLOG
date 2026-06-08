@@ -83,6 +83,18 @@ describe('loadPrefs', () => {
     localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 'nope' }));
     expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(15);
   });
+
+  it('clamps claimsAutoRefreshIntervalMin to 30-360 and snaps to step 30', () => {
+    expect(loadPrefs().claimsAutoRefreshIntervalMin).toBe(120);
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ claimsAutoRefreshIntervalMin: 10 }));
+    expect(loadPrefs().claimsAutoRefreshIntervalMin).toBe(30);
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ claimsAutoRefreshIntervalMin: 500 }));
+    expect(loadPrefs().claimsAutoRefreshIntervalMin).toBe(360);
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ claimsAutoRefreshIntervalMin: 100 }));
+    expect(loadPrefs().claimsAutoRefreshIntervalMin).toBe(90);
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ claimsAutoRefreshIntervalMin: 'nope' }));
+    expect(loadPrefs().claimsAutoRefreshIntervalMin).toBe(120);
+  });
 });
 
 describe('getSavedSortForView', () => {

@@ -57,6 +57,18 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from shared.dev_server_pids import (
+    pid_alive as _pid_alive,
+)
+from shared.dev_server_pids import (
+    pid_is_python_server as _pid_is_python_server,
+)
+from shared.dev_server_pids import (
+    pid_listening_on_port as _pid_listening_on_port_impl,
+)
+from shared.dev_server_pids import (
+    terminate_pid as _terminate_pid,
+)
 from shared.install_paths import (
     built_immutable_assets,
     bundle_root,
@@ -855,48 +867,6 @@ def _read_optional_json(path: Path) -> dict[str, Any] | None:
 
 
 INTERNAL_JOBS: dict[str, dict[str, Any]] = _load_internal_jobs()
-
-
-def _pid_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    if sys.platform == "win32":
-        # os.kill(pid, 0) is not a reliable existence probe on Windows (WinError 87).
-        try:
-            out = subprocess.run(
-                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-            line = (out.stdout or "").strip()
-            return bool(line) and "no tasks are running" not in line.lower()
-        except (OSError, subprocess.TimeoutExpired):
-            return False
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
-
-
-def _terminate_pid(pid: int) -> None:
-    if pid <= 0:
-        return
-    if sys.platform == "win32":
-        subprocess.run(
-            ["taskkill", "/PID", str(pid), "/T", "/F"],
-            capture_output=True,
-            check=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-    else:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except OSError:
-            pass
 
 
 def _kill_pids_async(pids: list[int]) -> None:
@@ -2404,6 +2374,7 @@ _EMPTY_CACHE_META_JSON: dict[str, dict[str, Any]] = {
     "steam_review_map.json": {"fetched_at": None},
     "cross_store_images_meta.json": {"fetched_at": None, "no_steam_match": []},
     "steam_tags_meta.json": {"fetched_at": None},
+    "protondb_map.json": {"fetched_at": None},
     "fx_rates.json": {"fetched_at": None, "rates": {}},
 }
 
@@ -3668,13 +3639,6 @@ class Handler(SimpleHTTPRequestHandler):
             target=_trigger_dev_shutdown, name="dev-shutdown", daemon=True
         ).start()
 
-    def _handle_shutdown(self) -> None:
-        """Graceful shutdown for the tray launcher (localhost + X-BAKLOG-Local only)."""
-        _send_json(self, HTTPStatus.OK, {"ok": True})
-        threading.Thread(
-            target=_trigger_dev_shutdown, name="dev-shutdown", daemon=True
-        ).start()
-
     def _handle_auth_session_get(self) -> None:
         """Lightweight account session probe (JWT + bound profile + plan)."""
         from shared.entitlement import current_plan
@@ -4252,27 +4216,6 @@ def _remove_pid_file() -> None:
         pass
 
 
-def _pid_is_python_server(pid: int) -> bool:
-    """Best-effort confirm pid is a live Python process running this server,
-    so reclaim never kills an unrelated process that reused the pid."""
-    if not _pid_alive(pid):
-        return False
-    if sys.platform != "win32":
-        return True
-    try:
-        out = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        return "python" in (out.stdout or "").lower()
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-
-
 def _pid_from_pid_file() -> int | None:
     try:
         recorded = PID_FILE.read_text(encoding="utf-8").strip()
@@ -4282,28 +4225,8 @@ def _pid_from_pid_file() -> int | None:
 
 
 def _pid_listening_on_port() -> int | None:
-    """The PID currently LISTENING on HOST:PORT, via netstat (Windows) — covers
-    orphans that predate the pid file (e.g. closed-terminal leftovers)."""
-    if sys.platform != "win32":
-        return None
-    try:
-        out = subprocess.run(
-            ["netstat", "-ano", "-p", "TCP"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    needle = f"{HOST}:{PORT}"
-    for line in (out.stdout or "").splitlines():
-        parts = line.split()
-        if len(parts) >= 5 and parts[0].upper() == "TCP" and parts[1] == needle and parts[3].upper() == "LISTENING":
-            if parts[-1].isdigit():
-                return int(parts[-1])
-    return None
+    """The PID currently LISTENING on HOST:PORT (see shared.dev_server_pids)."""
+    return _pid_listening_on_port_impl(HOST, PORT)
 
 
 def _reclaim_stale_server() -> bool:

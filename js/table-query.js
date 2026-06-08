@@ -47,6 +47,8 @@ export function collectTableParams(sessionPrefs) {
     status: s.statusFilter || '',
     unplayed: !!s.unplayedOnly,
     earlyAccess: !!s.earlyAccessOnly,
+    gamePass: !!s.gamePassOnly,
+    staleOnly: !!s.staleOnly,
     minRating: +(s.minRating || 0),
     maxHours: s.maxHours == null ? 200 : +s.maxHours,
   };
@@ -78,6 +80,17 @@ export function isEarlyAccess(g) {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
     if (typeof t === 'string' && t.toLowerCase().includes('early access')) return true;
+  }
+  return false;
+}
+
+export function isGamePass(g) {
+  if (!g) return false;
+  if (g.game_pass === true) return true;
+  for (const t of g.tags || []) {
+    if (typeof t !== 'string') continue;
+    const norm = t.toLowerCase().replace(/_/g, '-');
+    if (norm === 'game-pass' || norm === 'xbox-game-pass') return true;
   }
   return false;
 }
@@ -353,6 +366,8 @@ function passesFilter(ctx, g) {
   }
   if (params.unplayed && rowPlaytime(ctx, g) > 0) return false;
   if (params.earlyAccess && !isEarlyAccess(g)) return false;
+  if (params.gamePass && !isGamePass(g)) return false;
+  if (params.staleOnly && !g.stale) return false;
   if (!passesCoopFilter(g, resolveCoopFilterMode(prefs))) return false;
   const rating = ratingValue(g);
   if (params.minRating > 0 && rating < params.minRating) return false;

@@ -453,8 +453,23 @@ export function itadAutoRefreshIntervalMs() {
   return Math.min(60, Math.max(15, min)) * 60_000;
 }
 
+export const CLAIMS_AUTO_REFRESH_INTERVAL_MS = 120 * 60_000;
+
+/** User-configured free-claims auto-refresh interval (30–360 min) from prefs. */
 export function claimsAutoRefreshIntervalMs() {
-  return itadAutoRefreshIntervalMs();
+  const min = Number(state.prefs?.claimsAutoRefreshIntervalMin);
+  if (!Number.isFinite(min)) return CLAIMS_AUTO_REFRESH_INTERVAL_MS;
+  return Math.min(360, Math.max(30, min)) * 60_000;
+}
+
+/** Compact label for an interval in minutes, e.g. 45 → "45m", 120 → "2h", 90 → "1h 30m". */
+export function formatRefreshIntervalLabel(min) {
+  const m = Number(min);
+  if (!Number.isFinite(m)) return '';
+  if (m < 60) return `${m}m`;
+  const hours = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${hours}h` : `${hours}h ${rem}m`;
 }
 
 export function thresholdsForMetaKey(metaKey) {
@@ -515,7 +530,7 @@ export async function fetchWithTimeout(url, options = {}, ms = FETCH_TIMEOUT_MS)
     clearTimeout(timer);
   }
 }
-const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers', 'steamTags']);
+const ENRICH_KEYS = new Set(['hltb', 'steamReviews', 'steamCovers', 'steamTags', 'protondb']);
 /** Cache JSON loaded after library files in reloadGames — avoid "missing" flash during boot. */
 const BOOT_DEFERRED_FETCHER_KEYS = new Set([...ENRICH_KEYS, 'itad', 'claims']);
 const MAX_SSE_HINT = 'max 8 live streams';
@@ -540,7 +555,7 @@ const COUNT_PILL_TITLES = {
 // Fixed order within the Enrichment group: keep the three Steam-derived
 // enrichers (orange edge) adjacent, then HLTB. Overrides the status/label
 // sort so they always render next to each other.
-const ENRICH_ORDER = ['steamTags', 'steamCovers', 'steamReviews', 'hltb'];
+const ENRICH_ORDER = ['steamTags', 'steamCovers', 'steamReviews', 'protondb', 'hltb'];
 
 const COUNT_FNS = {
   itad: m => Object.keys(m?.by_key || {}).length,
@@ -549,6 +564,7 @@ const COUNT_FNS = {
   steamReviews: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
   steamCovers: m => (m?.last_updated != null ? m.last_updated : null),
   steamTags: m => (m?.rows_updated != null ? m.rows_updated : null),
+  protondb: m => Object.keys(m || {}).filter(k => k !== 'fetched_at').length,
 };
 
 // Plain-English description of what a normal click does for each fetcher.
@@ -580,6 +596,7 @@ const CLICK_HINTS = {
   steamReviews: 'Pull missing Steam review scores for non-Steam games',
   steamCovers: 'Generate covers for non-Steam games missing artwork',
   steamTags: 'Backfill co-op tags + missing genres on non-Steam games using Steam category data',
+  protondb: 'Pull ProtonDB Linux / Steam Deck compatibility tiers for Steam-matched games',
 };
 
 // What Shift+click (--refresh) actually changes, per fetcher.
@@ -594,6 +611,8 @@ const REFRESH_HINTS = {
     'Also retry titles previously cached as "no Steam app match" - use after Steam lists the game',
   steamCovers: 'Also retry rows previously cached as "no Steam match" - use after Steam adds new entries',
   steamTags: 'Re-fetch Steam appdetails ignoring the local cache - picks up newly-added Steam categories',
+  protondb:
+    'Also retry appids previously cached as "no reports" and re-fetch rows that already have a tier',
 };
 
 // Pending breakdown for the enrichment chips so the tooltip can say
@@ -671,6 +690,24 @@ function pendingForEnrich(key) {
     }
     return { unchecked, retry: 0, noMatch };
   }
+  if (key === 'protondb') {
+    const reviewCache = state.libraryMeta.steamReviews || {};
+    const protonCache = state.libraryMeta.protondb || {};
+    const rows = protondbEligibleRows();
+    let unchecked = 0;
+    let noMatch = 0;
+    for (const g of rows) {
+      if (g.protondb_tier != null) continue;
+      const appid = protonAppIdForRow(g, reviewCache);
+      if (!appid) {
+        noMatch++;
+        continue;
+      }
+      if (protonCache[String(appid)] === false) noMatch++;
+      else unchecked++;
+    }
+    return { unchecked, retry: 0, noMatch };
+  }
   return null;
 }
 
@@ -724,6 +761,18 @@ function reviewableRows() {
   return [...nonSteamRows(), ...(state.itchGames || []).filter(itchIsGame)];
 }
 
+function protonAppIdForRow(g, reviewCache) {
+  const store = g.store || 'steam';
+  if (store === 'steam') return g.id;
+  const v = reviewCache[`${store}:${g.id}`];
+  return v || null;
+}
+
+function protondbEligibleRows() {
+  const reviewCache = state.libraryMeta.steamReviews || {};
+  return allLibraryRows().filter(g => protonAppIdForRow(g, reviewCache));
+}
+
 export function coverableRows() {
   const itch = (state.itchGames || []).filter(itchIsGame);
   return [...nonSteamRows(), ...(state.wishlistGames || []), ...itch];
@@ -761,6 +810,10 @@ const COVERAGE_FNS = {
       g => g.coop_online !== undefined || g.coop_local !== undefined,
     );
   },
+  protondb: () => coverageOf(
+    protondbEligibleRows(),
+    g => g.protondb_tier != null,
+  ),
 };
 
 function coverageLabel(key) {
@@ -786,7 +839,9 @@ function coverageTooltipLine(key) {
       ? 'have Steam review scores'
       : key === 'steamTags'
         ? 'have Steam-derived co-op tags'
-        : 'have artwork';
+        : key === 'protondb'
+          ? 'have ProtonDB compatibility tiers'
+          : 'have artwork';
   let line = `${formatNum(covered)} of ${formatNum(total)} ${verb}.`;
   if (!pending) return line;
   if (pending.unchecked > 0) {
@@ -3548,16 +3603,37 @@ export function renderDashboardFetcherHealth() {
         }
         let groupToggle = '';
         if (group === 'prices') {
+          // Each price chip gets its own row paired with its auto-refresh
+          // control (checkbox + slider + value). The chip is the label, so the
+          // "ITAD auto-refresh" / "Claims auto-refresh" text labels are dropped.
           const itadMin = Number(state.prefs.itadAutoRefreshIntervalMin) || 15;
           const itadOff = !!state.prefs.itadAutoRefreshDisabled;
-          groupToggle = `<label class="fh-toggle fh-itad-auto" title="Runs ITAD between 7am and midnight when the dashboard is open.">
-              <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${itadOff ? '' : 'checked'} />
-              Auto-refresh
-            </label>
-            <label class="fh-toggle fh-itad-interval" title="How often auto-refresh runs ITAD (15-60 min)">
-              <input id="itadAutoRefreshInterval" type="range" min="15" max="60" step="5" value="${itadMin}" ${itadOff ? 'disabled' : ''} aria-label="Auto-refresh interval (minutes)" />
+          const claimsMin = Number(state.prefs.claimsAutoRefreshIntervalMin) || 120;
+          const claimsOff = !!state.prefs.claimsAutoRefreshDisabled;
+          const itadRow = groupRows.find(r => r.src.key === 'itad');
+          const claimsRow = groupRows.find(r => r.src.key === 'claims');
+          const otherRows = groupRows.filter(r => r.src.key !== 'itad' && r.src.key !== 'claims');
+          const itadCtrl = `<div class="fh-price-ctrl fh-itad-interval" title="How often auto-refresh runs ITAD (15-60 min)">
+              <input id="itadAutoRefreshToggle" type="checkbox" class="rounded" ${itadOff ? '' : 'checked'} title="Runs ITAD between 7am and midnight when the dashboard is open." aria-label="ITAD auto-refresh" />
+              <input id="itadAutoRefreshInterval" type="range" min="15" max="60" step="5" value="${itadMin}" ${itadOff ? 'disabled' : ''} aria-label="ITAD auto-refresh interval (minutes)" />
               <span id="itadAutoRefreshIntervalVal">${itadMin}m</span>
-            </label>`;
+            </div>`;
+          const claimsCtrl = `<div class="fh-price-ctrl fh-claims-interval" title="How often auto-refresh checks free claims (30-360 min)">
+              <input id="claimsAutoRefreshToggle" type="checkbox" class="rounded" ${claimsOff ? '' : 'checked'} title="Auto-refresh free game claims while the dashboard is open." aria-label="Claims auto-refresh" />
+              <input id="claimsAutoRefreshInterval" type="range" min="30" max="360" step="30" value="${claimsMin}" ${claimsOff ? 'disabled' : ''} aria-label="Claims auto-refresh interval (minutes)" />
+              <span id="claimsAutoRefreshIntervalVal">${formatRefreshIntervalLabel(claimsMin)}</span>
+            </div>`;
+          const priceRows = [
+            itadRow ? `<div class="fh-price-row">${chipHtml(itadRow)}${itadCtrl}</div>` : '',
+            claimsRow ? `<div class="fh-price-row">${chipHtml(claimsRow)}${claimsCtrl}</div>` : '',
+            ...otherRows.map(r => `<div class="fh-price-row">${chipHtml(r)}</div>`),
+          ].join('');
+          return `<div class="fh-group fh-group--prices">
+              <div class="fh-group-head">
+                <div class="fh-group-label" title="${escapeAttr(GROUP_LABEL_TIPS[group] || '')}">${escapeHtml(GROUP_LABELS[group] || group)}</div>
+              </div>
+              <div class="fh-price-rows">${priceRows}</div>
+            </div>`;
         } else if (group === 'enrich') {
           groupToggle = `<label class="fh-toggle" title="After a library fetch adds new games, queue HLTB, Reviews, Covers, and Co-op tags">
               <input id="autoEnrichOnAddToggle" type="checkbox" class="rounded" ${state.prefs.autoEnrichOnAdd !== false ? 'checked' : ''} />

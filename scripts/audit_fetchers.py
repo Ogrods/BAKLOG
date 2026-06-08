@@ -51,6 +51,7 @@ ENRICH_CACHE_BY_KEY: dict[str, str] = {
     "steamReviews": "steam_review_map.json",
     "steamCovers": "cross_store_images_meta.json",
     "steamTags": "steam_tags_meta.json",
+    "protondb": "protondb_map.json",
 }
 
 GROUP_ORDER = ("library", "wishlist", "prices", "enrich")

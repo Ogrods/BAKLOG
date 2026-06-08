@@ -115,6 +115,11 @@ export const METRIC_TIPS = {
   'avg completionist run': 'Mean HLTB completionist hours where known.',
   'co-op ready': 'Games with online or local co-op flags.',
   'priority flagged': 'Games with a personal priority flag set.',
+  'first PSN session': 'Owned title with the earliest PSN first_played date in your library.',
+  'most PSN sessions': 'PSN title with the highest play_count (launch sessions).',
+  'PSN sessions total': 'Sum of PSN play_count across your library.',
+  'PSN library tenure': 'Years since your earliest recorded PSN first_played date.',
+  'session grinder': 'High session count relative to hours played (short repeat launches).',
 
   // Creative metrics (marquee)
   'comfort genre': 'Genre with the most finished games - where you actually deliver.',

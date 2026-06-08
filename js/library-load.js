@@ -190,6 +190,10 @@ export async function loadSteamTagsMeta() {
   await loadCacheMeta("cache/steam_tags_meta.json", "steamTags");
 }
 
+export async function loadProtondbCache() {
+  await loadCacheMeta("cache/protondb_map.json", "protondb");
+}
+
 /** Stamp first-seen timestamps for library keys (silent seed on first load).
  *  Returns count of keys newly stamped with a real timestamp (0 on first seed). */
 export function recordLibraryFirstSeen() {
@@ -398,11 +402,15 @@ export async function reloadAfterFetcher(key) {
       const raw = localStorage.getItem(claimsSnapshotStorageKey());
       if (raw) prevIds = new Set(JSON.parse(raw)?.ids || []);
     } catch (_) { /* ignore */ }
+    const visibleBefore = (state.claimableNow || []).length;
     await loadClaimableNow();
     const { newCount } = diffClaims(prevIds, state.claimableFeed?.items || []);
     if (wasAuto && newCount > 0) showClaimableBanner(newCount);
     saveClaimsSnapshot(state.claimableFeed?.items || []);
     refreshClaimableUi();
+    // #region agent log
+    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',hypothesisId:'B',location:'library-load.js:refreshAfterFetch:claims',message:'claims fetch refreshed feed',data:{wasAuto,visibleBefore,visibleAfter:(state.claimableNow||[]).length,feedItems:(state.claimableFeed?.items||[]).length,newCount},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   } else if (WISHLIST_FETCHER_JSON[key]) {
     const metaKey = WISHLIST_FETCHER_META_KEY[key];
     state.libraryMeta[metaKey] = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
@@ -499,6 +507,7 @@ export async function reloadGames() {
     loadSteamReviewCache(),
     loadSteamCoversMeta(),
     loadSteamTagsMeta(),
+    loadProtondbCache(),
   ]);
   saveClaimsSnapshot(state.claimableFeed?.items || []);
   await applyMergedLibrary();

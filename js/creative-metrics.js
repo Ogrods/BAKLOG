@@ -10,6 +10,8 @@ import {
   hltbMain,
   ratingValue,
   combinedPlaytime,
+  firstPlayedAt,
+  playSessionCount,
 } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
@@ -110,6 +112,8 @@ export function computeCreativeMetrics(games, snap) {
     patiencePays: null,
     gotAway: null,
     wishlistAge: null,
+    psnTenureYears: null,
+    sessionHeavy: null,
   };
 
   if (list.length < 5) return out;
@@ -339,6 +343,23 @@ export function computeCreativeMetrics(games, snap) {
     out.wishlistAge = { name: wlDated[0].g.name, days: wlDated[0].days };
   }
 
+  if (snap.oldestFirstPlayedMs != null) {
+    const yrs = ((now - snap.oldestFirstPlayedMs) / (365.25 * MS_PER_DAY)).toFixed(1);
+    out.psnTenureYears = yrs;
+  }
+
+  const sessionHeavy = list
+    .map(g => ({ g, n: playSessionCount(g), hrs: combinedPlaytime(g) / 60 }))
+    .filter(x => x.n != null && x.n >= 10 && x.hrs > 0 && x.n / x.hrs >= 3)
+    .sort((a, b) => (b.n / b.hrs) - (a.n / a.hrs))[0];
+  if (sessionHeavy) {
+    out.sessionHeavy = {
+      name: sessionHeavy.g.name,
+      sessions: sessionHeavy.n,
+      hours: Math.round(sessionHeavy.hrs * 10) / 10,
+    };
+  }
+
   return out;
 }
 
@@ -501,6 +522,12 @@ export function appendCreativeInsights(entries, games, snap, W = {}) {
   if (m.workWeeksPill != null) {
     add(`Backlog = <strong>${formatNum(m.workWeeksPill)}</strong> work-weeks`, friendly);
   }
+  if (m.psnTenureYears != null) {
+    add(`PSN tenure: <strong>${escapeHtml(String(m.psnTenureYears))}</strong> yrs since first session`, moderate);
+  }
+  if (m.sessionHeavy) {
+    add(`Session grinder: <strong>${escapeHtml(m.sessionHeavy.name)}</strong> · ${formatNum(m.sessionHeavy.sessions)} sessions / ${m.sessionHeavy.hours}h`, moderate);
+  }
 }
 
 /**
@@ -564,5 +591,11 @@ export function appendCreativeMarqueeChips(push, games, snap, W = {}) {
   }
   if (m.wishlistAge) {
     push('*', 'is-violet', `${m.wishlistAge.name} · ${formatNum(m.wishlistAge.days)}d`, 'oldest wishlist', null, { weight: normal });
+  }
+  if (m.psnTenureYears != null) {
+    push('~', 'is-amber', `${m.psnTenureYears} yrs`, 'PSN library tenure', null, { weight: friendly });
+  }
+  if (m.sessionHeavy) {
+    push('*', 'is-violet', `${m.sessionHeavy.name} · ${formatNum(m.sessionHeavy.sessions)}`, 'session grinder', null, { weight: friendly });
   }
 }

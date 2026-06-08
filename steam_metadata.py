@@ -35,6 +35,33 @@ def coop_flags_from_categories(categories: list[dict] | None) -> tuple[bool, boo
     return (online, local)
 
 
+def _string_list(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        text = str(item).strip() if item is not None else ""
+        if text:
+            out.append(text)
+    return out
+
+
+def early_access_from_appdetails(details: dict | None) -> bool:
+    """True when Steam marks the title as Early Access or coming soon."""
+    if not details:
+        return False
+    release = details.get("release_date") or {}
+    if release.get("coming_soon") is True:
+        return True
+    for g in details.get("genres") or []:
+        if not isinstance(g, dict):
+            continue
+        desc = str(g.get("description") or "").strip().lower()
+        if "early access" in desc:
+            return True
+    return False
+
+
 def enrichment_from_appdetails(details: dict | None) -> dict:
     """Project a Steam ``appdetails`` ``data`` payload into a normalized dict.
 
@@ -46,14 +73,25 @@ def enrichment_from_appdetails(details: dict | None) -> dict:
       coop_local            bool
       genres                list[str]
       release_date          str | None
+      metacritic_score      int | None
+      developers            list[str]
+      publishers            list[str]
+      controller_support    str | None
+      early_access          bool
     """
+    empty = {
+        "coop_online": False,
+        "coop_local": False,
+        "genres": [],
+        "release_date": None,
+        "metacritic_score": None,
+        "developers": [],
+        "publishers": [],
+        "controller_support": None,
+        "early_access": False,
+    }
     if not details:
-        return {
-            "coop_online": False,
-            "coop_local": False,
-            "genres": [],
-            "release_date": None,
-        }
+        return empty
 
     coop_online, coop_local = coop_flags_from_categories(details.get("categories"))
 
@@ -73,11 +111,28 @@ def enrichment_from_appdetails(details: dict | None) -> dict:
     if isinstance(release_date, str):
         release_date = release_date.strip() or None
 
+    metacritic = details.get("metacritic") or {}
+    score = metacritic.get("score") if isinstance(metacritic, dict) else None
+    if score is not None:
+        try:
+            score = int(score)
+        except (TypeError, ValueError):
+            score = None
+
+    controller = details.get("controller_support")
+    if controller is not None:
+        controller = str(controller).strip() or None
+
     return {
         "coop_online": coop_online,
         "coop_local": coop_local,
         "genres": genres,
         "release_date": release_date,
+        "metacritic_score": score,
+        "developers": _string_list(details.get("developers")),
+        "publishers": _string_list(details.get("publishers")),
+        "controller_support": controller,
+        "early_access": early_access_from_appdetails(details),
     }
 
 
@@ -96,6 +151,11 @@ ALWAYS_WRITE_FIELDS: frozenset[str] = frozenset({
 FILL_IF_MISSING_FIELDS: frozenset[str] = frozenset({
     "genres",
     "release_date",
+    "metacritic_score",
+    "developers",
+    "publishers",
+    "controller_support",
+    "early_access",
 })
 
 

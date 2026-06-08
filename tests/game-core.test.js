@@ -22,9 +22,18 @@ import {
   recomputeCrossStoreHidden,
   combinedPlaytime,
   combinedPlaytimeTooltip,
+  playSessionCount,
+  firstPlayedAt,
+  firstPlayedYear,
+  psnPlatformsLineHtml,
   storeUrlForGame,
   trophyProgressPillHtml,
   platinumBadgeHtml,
+  gamePassBadgeHtml,
+  coverArtCandidates,
+  landscapeArtCandidates,
+  spotlightArtCandidates,
+  steamLibraryHeroUrl,
 } from '../js/game-core.js';
 import { state } from '../js/state.js';
 
@@ -321,6 +330,32 @@ describe('combinedPlaytime (cross-store)', () => {
     expect(combinedPlaytime(rep)).toBe(300);
   });
 
+  it('appends PSN session count to playtime tooltip', () => {
+    const g = {
+      store: 'psn',
+      id: 'NPWR99',
+      name: 'Sessions Test',
+      playtime_minutes: 120,
+      play_count: 42,
+    };
+    expect(playSessionCount(g)).toBe(42);
+    expect(combinedPlaytimeTooltip(g)).toBe('42 sessions');
+  });
+
+  it('combines cross-store playtime and PSN sessions in tooltip', () => {
+    state.allGames = [
+      { store: 'steam', id: 99, name: 'Combo', playtime_minutes: 600 },
+      { store: 'psn', id: 'NPWR99', name: 'Combo', playtime_minutes: 60, play_count: 7 },
+    ];
+    recomputeCrossStoreHidden();
+    const rep = state.allGames[0];
+    const tip = combinedPlaytimeTooltip(rep);
+    expect(tip).toContain('STEAM: 10.0h');
+    expect(tip).not.toContain('sessions');
+    const psnRow = state.allGames[1];
+    expect(combinedPlaytimeTooltip(psnRow)).toBe('7 sessions');
+  });
+
   it('coerces NaN / negative playtime to 0', () => {
     state.allGames = [
       { store: 'steam', id: 5, name: 'Wobble', playtime_minutes: 'oops' },
@@ -329,6 +364,25 @@ describe('combinedPlaytime (cross-store)', () => {
     ];
     recomputeCrossStoreHidden();
     expect(combinedPlaytime(state.allGames[0])).toBe(90);
+  });
+});
+
+describe('PSN metadata helpers', () => {
+  it('parses first_played and year', () => {
+    const g = { store: 'psn', id: 'x', first_played: '2019-06-15T12:00:00Z' };
+    expect(firstPlayedAt(g)).toBe(Date.parse('2019-06-15T12:00:00Z'));
+    expect(firstPlayedYear(g)).toBe(2019);
+  });
+
+  it('renders read-only platforms line for PSN rows', () => {
+    const html = psnPlatformsLineHtml({
+      store: 'psn',
+      id: 'x',
+      psn_platforms: ['PS4', 'PS5'],
+    });
+    expect(html).toContain('psn-platforms-line');
+    expect(html).toContain('Platforms: PS4, PS5');
+    expect(psnPlatformsLineHtml({ store: 'steam', id: 1 })).toBe('');
   });
 });
 
@@ -512,6 +566,18 @@ describe('trophyProgressPillHtml', () => {
   });
 });
 
+describe('gamePassBadgeHtml', () => {
+  it('renders GP pill for subscription rows', () => {
+    const html = gamePassBadgeHtml({ store: 'xbox', id: '1', game_pass: true });
+    expect(html).toContain('game-pass-pill');
+    expect(html).toContain('GP');
+  });
+
+  it('returns empty for non-subscription rows', () => {
+    expect(gamePassBadgeHtml({ store: 'steam', id: 1 })).toBe('');
+  });
+});
+
 describe('platinumBadgeHtml', () => {
   it('returns empty when platinum is not earned', () => {
     expect(platinumBadgeHtml(null)).toBe('');
@@ -524,5 +590,32 @@ describe('platinumBadgeHtml', () => {
     expect(html).toContain('plat-badge');
     expect(html).toContain('PLAT');
     expect(html).toContain('Platinum trophy earned');
+  });
+});
+
+describe('coverArtCandidates / landscapeArtCandidates', () => {
+  const steamGame = {
+    store: 'steam',
+    id: 12345,
+    name: 'Test Game',
+    library_image: 'https://cdn.akamai.steamstatic.com/steam/apps/12345/library_600x900.jpg',
+    header_image: 'https://cdn.akamai.steamstatic.com/steam/apps/12345/header.jpg',
+  };
+
+  it('coverArtCandidates prefers portrait Steam URLs first', () => {
+    const urls = coverArtCandidates(steamGame);
+    expect(urls[0]).toContain('library_600x900_2x.jpg');
+    expect(urls.some((u) => u.includes('library_hero'))).toBe(false);
+  });
+
+  it('landscapeArtCandidates prefers library hero first', () => {
+    const urls = landscapeArtCandidates(steamGame);
+    expect(urls[0]).toBe(steamLibraryHeroUrl('12345'));
+    expect(urls.some((u) => u.includes('header.jpg'))).toBe(true);
+  });
+
+  it('spotlightArtCandidates still leads with hero', () => {
+    const urls = spotlightArtCandidates(steamGame);
+    expect(urls[0]).toBe(steamLibraryHeroUrl('12345'));
   });
 });

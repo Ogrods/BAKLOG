@@ -14,15 +14,18 @@ from auth import mark_invalid, resolve_env
 from fetchers._base import (
     STEAM_CREDENTIALS_HINT,
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     catalog_file,
     refuse_drift_result,
     refuse_empty_result,
+    row_key_by_appid,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
 from steam_client import SteamClient
-from steam_metadata import coop_flags_from_categories
+from steam_metadata import coop_flags_from_categories, enrichment_from_appdetails
 
 GAMES_STEAM_JSON = Path("games_steam.json")
 HLTB_DELAY_SEC = 1.0
@@ -126,6 +129,17 @@ def _build_game_row(
         "currency": price.get("currency"),
     }
 
+    meta = enrichment_from_appdetails(details)
+    row.update(
+        {
+            "metacritic_score": meta["metacritic_score"],
+            "developers": meta["developers"],
+            "publishers": meta["publishers"],
+            "controller_support": meta["controller_support"],
+            "early_access": meta["early_access"],
+        }
+    )
+
     if hltb:
         row.update(
             {
@@ -207,6 +221,7 @@ def main() -> int:
     parser.add_argument("--appid", type=int, help="Fetch a single app by ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_games")
@@ -340,6 +355,13 @@ def main() -> int:
     )
     if drift_exit is not None:
         return stats.finish("fetch_games", t0, exit_code=drift_exit)
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=row_key_by_appid,
+        no_carry=args.no_carry,
+    )
 
     # Inline write (not write_games_json) because the payload includes steam_id at root.
     # Per-row enrichment is preserved via cached_row in the loop above.

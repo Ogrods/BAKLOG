@@ -128,6 +128,7 @@ NO_EMPTY_GUARD_SCRIPTS = {
     "enrich_steam_reviews.py",
     "enrich_cross_store_images.py",
     "enrich_steam_tags.py",
+    "enrich_protondb.py",
 }
 
 

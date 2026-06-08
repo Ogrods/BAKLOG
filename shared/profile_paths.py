@@ -206,6 +206,7 @@ PROFILE_CACHE_JSON_FILES = frozenset({
     "steam_review_map.json",
     "cross_store_images_meta.json",
     "steam_tags_meta.json",
+    "protondb_map.json",
     "fx_rates.json",
 })
 

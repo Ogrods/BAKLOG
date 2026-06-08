@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from shared.free_claims_sources import (
+    carry_claim_enrichment,
     dedup_claim_items,
     merge_manual_and_auto,
     parse_epic_element,
@@ -163,3 +164,36 @@ def test_merge_manual_wins_on_duplicate_title_and_id():
     assert len(merged) == 2
     assert merged[0]["claim_url"] == "https://example.com/manual"
     assert merged[1]["id"] == "gog-auto"
+
+
+def test_carry_claim_enrichment_fills_missing_fields_only() -> None:
+    fresh = {
+        "id": "itad-b07aac9ebd26",
+        "store": "epic",
+        "title": "Wytchwood",
+        "claim_url": "https://example.com/w",
+        "header_image": None,
+    }
+    existing = {
+        "id": "itad-b07aac9ebd26",
+        "header_image": "https://cdn.example/portrait.jpg",
+        "review_percent": 93,
+        "steam_appid": 729000,
+        "genres": ["Adventure"],
+    }
+    out = carry_claim_enrichment(fresh, existing)
+    assert out["header_image"] == existing["header_image"]
+    assert out["review_percent"] == 93
+    assert out["steam_appid"] == 729000
+    assert out["genres"] == ["Adventure"]
+    assert out["title"] == "Wytchwood"
+
+
+def test_carry_claim_enrichment_does_not_clobber_fresh_cover() -> None:
+    fresh = {
+        "id": "gamerpower-1",
+        "header_image": "https://www.gamerpower.com/new.jpg",
+    }
+    existing = {"id": "gamerpower-1", "header_image": "https://cdn.example/old.jpg"}
+    out = carry_claim_enrichment(fresh, existing)
+    assert out["header_image"] == "https://www.gamerpower.com/new.jpg"

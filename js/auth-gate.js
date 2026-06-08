@@ -24,6 +24,7 @@ let _refreshInFlight = null;
 let _authHandling = null;
 let _accountProfileId = '';
 let _localProfiles = false;
+let _plan = 'free';
 
 export function isAccountAuthMode() {
   return !!_authRequired;
@@ -31,6 +32,16 @@ export function isAccountAuthMode() {
 
 export function isLocalProfilesEnabled() {
   return _localProfiles;
+}
+
+/** Effective plan from GET /api/config ("free" | "pro"). */
+export function getPlan() {
+  return _plan;
+}
+
+/** True for the paid tier (server-side background refresh, etc.). */
+export function isPro() {
+  return _plan === 'pro';
 }
 
 export function getAccessToken() {
@@ -219,6 +230,7 @@ export async function initAuthGate() {
   }
   _authRequired = !!_config.authRequired;
   _localProfiles = !!_config.localProfiles;
+  _plan = (typeof _config.plan === 'string' && _config.plan) || 'free';
   if (!_authRequired) {
     setOverlayVisible(false);
     markAuthReady();

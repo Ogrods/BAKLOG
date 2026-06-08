@@ -20,6 +20,26 @@ ITAD_SKIP_KEYWORDS = ("bundle", "beta", "dlc", "loot", " key")
 
 SOURCE_PRECEDENCE = {"epic": 0, "gamerpower": 1, "itad": 2}
 
+# Fields written by build_free_claims enrichment and carried across auto-feed fetches.
+CLAIM_ENRICH_FIELDS = ("header_image", "review_percent", "steam_appid", "genres", "blurb")
+
+
+def carry_claim_enrichment(fresh: dict, existing: dict | None) -> dict:
+    """Copy persisted enrichment from a prior auto-feed row when the fresh fetch lacks it."""
+    if not existing:
+        return fresh
+    out = dict(fresh)
+    for key in CLAIM_ENRICH_FIELDS:
+        win_val = out.get(key)
+        lose_val = existing.get(key)
+        if key == "genres":
+            if (not win_val or win_val == []) and isinstance(lose_val, list) and lose_val:
+                out[key] = lose_val
+            continue
+        if (win_val is None or win_val == "") and lose_val not in (None, ""):
+            out[key] = lose_val
+    return out
+
 
 def norm_title(title: str) -> str:
     """Normalize a game title for dedup/merge keys."""

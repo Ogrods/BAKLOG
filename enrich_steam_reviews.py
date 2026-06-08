@@ -24,7 +24,7 @@ from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_t
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
-from shared.steam_match import normalize_title, pick_appid
+from shared.steam_match import pick_appid
 from steam_client import SteamClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")

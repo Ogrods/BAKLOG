@@ -188,6 +188,57 @@ def test_free_claims_put_validation(admin_server: tuple[str, Path]) -> None:
     assert "missing" in str(data.get("error", ""))
 
 
+def test_free_claims_put_rejects_bad_claim_url(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "PUT",
+        "/api/internal/free-claims",
+        body={
+            "items": [
+                {
+                    "id": "bad-url",
+                    "store": "steam",
+                    "title": "Bad",
+                    "claim_url": "javascript:alert(1)",
+                }
+            ]
+        },
+    )
+    assert code == 400
+    assert "claim_url" in str(data.get("error", ""))
+
+
+def test_internal_enrich_requires_local_header(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    payload = json.dumps({"items": []}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base}/api/internal/free-claims/enrich",
+        method="POST",
+        headers={"Content-Type": "application/json"},
+        data=payload,
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(req, timeout=10)
+    assert exc.value.code == 403
+
+
+def test_internal_enrich_rejects_oversized_batch(
+    admin_server: tuple[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base, _ = admin_server
+    monkeypatch.setattr(server, "MAX_ADMIN_ENRICH_BATCH", 2)
+    code, data = _request(
+        base,
+        "POST",
+        "/api/internal/free-claims/enrich",
+        body={"items": [{}, {}, {}]},
+    )
+    assert code == 400
+    assert "maximum" in str(data.get("error", ""))
+
+
 def test_free_claims_put_writes_file(admin_server: tuple[str, Path]) -> None:
     base, claims_input = admin_server
     payload = {
@@ -294,7 +345,8 @@ def test_free_claims_approved_put_writes_field_overrides(
             "title": "Edited",
             "claim_url": "https://store.epicgames.com/en-US/p/edited",
             "ends_at": "2099-01-01T00:00:00Z",
-        }
+        },
+        "ignored-id": {"title": "Should Drop"},
     }
 
 
@@ -449,6 +501,67 @@ def test_free_claims_enrich_returns_items_without_writing_feed(
     assert enriched.get("blurb") == "A free itch.io giveaway"
     assert not built_path.is_file()
     assert not fallback_path.is_file()
+
+
+def test_free_claims_enrich_persists_auto_feed(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base, _ = admin_server
+    auto_path = tmp_path / "curated" / "free_claims.auto.json"
+    auto_path.parent.mkdir(parents=True, exist_ok=True)
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "itad-b07aac9ebd26",
+                        "store": "epic",
+                        "title": "Wytchwood",
+                        "claim_url": "https://example.com/w",
+                        "header_image": None,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    import build_free_claims as bfc
+
+    def fake_enrich(raw: dict, last_call: list[float], cover_lookup=None) -> dict:
+        return {
+            **raw,
+            "header_image": bfc._steam_portrait_cover(729000),
+            "steam_appid": 729000,
+            "review_percent": 93,
+        }
+
+    monkeypatch.setattr(bfc, "_enrich_item", fake_enrich)
+
+    code, data = _request(
+        base,
+        "POST",
+        "/api/internal/free-claims/enrich",
+        body={
+            "items": [
+                {
+                    "id": "itad-b07aac9ebd26",
+                    "store": "epic",
+                    "title": "Wytchwood",
+                    "claim_url": "https://example.com/w",
+                }
+            ]
+        },
+    )
+    assert code == 200
+    assert data.get("persisted") == 1
+    saved = json.loads(auto_path.read_text(encoding="utf-8"))
+    row = saved["items"][0]
+    assert row["header_image"] == bfc._steam_portrait_cover(729000)
+    assert row["steam_appid"] == 729000
+    assert row["review_percent"] == 93
 
 
 def test_free_claims_enrich_rejects_bad_payload(admin_server: tuple[str, Path]) -> None:

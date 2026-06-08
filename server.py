@@ -87,6 +87,8 @@ FREE_CLAIMS_APPROVED_PATH = Path("curated/free_claims.approved.json")
 FREE_CLAIMS_BUILT_PATH = Path("landing/free-claims.json")
 SPONSORS_PATH = Path(os.environ.get("BAKLOG_SPONSORS_INPUT", "curated/sponsors.json"))
 INTERNAL_JOBS_OVERLAY = bundle_root() / "admin" / "admin-jobs.json"
+MAX_ADMIN_CLAIM_ITEMS = int(os.environ.get("BAKLOG_MAX_ADMIN_CLAIM_ITEMS", "500"))
+MAX_ADMIN_ENRICH_BATCH = int(os.environ.get("BAKLOG_MAX_ADMIN_ENRICH_BATCH", "64"))
 _DEV_SERVER_BUSY_MSG = (
     f"BAKLOG dev server is already running on http://{HOST}:{PORT} — "
     "stop that instance first (it owns the port)."
@@ -619,10 +621,24 @@ _DEFAULT_INTERNAL_JOBS: dict[str, dict[str, Any]] = {
 }
 
 
+def _script_under_bundle(script: str) -> bool:
+    """True when script resolves to a .py file under bundle_root (no path escape)."""
+    rel = str(script or "").strip().replace("\\", "/").lstrip("/")
+    if not rel or ".." in rel.split("/") or not rel.endswith(".py"):
+        return False
+    root = bundle_root().resolve()
+    try:
+        target = (root / rel).resolve()
+        target.relative_to(root)
+        return target.is_file()
+    except (OSError, ValueError):
+        return False
+
+
 def _normalize_internal_job_entry(raw: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
     key = str(raw.get("key") or "").strip()
     script = str(raw.get("script") or "").strip()
-    if not key or not script:
+    if not key or not script or not _script_under_bundle(script):
         return None
     args = raw.get("args") or []
     if not isinstance(args, list):
@@ -673,7 +689,9 @@ def _load_internal_jobs() -> dict[str, dict[str, Any]]:
 
 def _internal_job_argv(spec: dict[str, Any], extra_args: list[str]) -> list[str]:
     base = spec.get("args") or []
-    script = spec["script"]
+    script = str(spec.get("script") or "").strip()
+    if not _script_under_bundle(script):
+        raise ValueError(f"invalid internal job script: {script!r}")
     return _argv(str(bundle_root() / script), *base, *extra_args)
 
 
@@ -712,16 +730,47 @@ def validate_internal_args(spec: dict[str, Any], args: dict[str, Any]) -> list[s
     return extra
 
 
+def _is_safe_http_url(url: str) -> bool:
+    u = str(url or "").strip()
+    return u.startswith("http://") or u.startswith("https://")
+
+
+def _resolve_contained_data_path(rel: Path) -> Path | None:
+    """Resolve rel under data_root(); None when the path escapes the data root."""
+    root = data_root().resolve()
+    try:
+        target = (root / rel).resolve()
+        target.relative_to(root)
+        return target
+    except (OSError, ValueError):
+        return None
+
+
+def _admin_list_too_large(items: list[Any], *, cap: int, label: str) -> str | None:
+    if len(items) > cap:
+        return f"{label} exceeds maximum of {cap} items"
+    return None
+
+
+def _is_internal_admin_path(path: str) -> bool:
+    return path.startswith("/api/internal/")
+
+
 def _validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
     items = doc.get("items")
     if not isinstance(items, list):
         return "items must be a list"
+    too_large = _admin_list_too_large(items, cap=MAX_ADMIN_CLAIM_ITEMS, label="items")
+    if too_large:
+        return too_large
     for i, item in enumerate(items):
         if not isinstance(item, dict):
             return f"items[{i}] must be an object"
         for field in ("id", "store", "title", "claim_url"):
             if not str(item.get(field) or "").strip():
                 return f"items[{i}] missing {field}"
+        if not _is_safe_http_url(str(item.get("claim_url") or "")):
+            return f"items[{i}] claim_url must start with http:// or https://"
     return None
 
 
@@ -752,6 +801,8 @@ def _validate_approved_payload(doc: dict[str, Any]) -> str | None:
                     return f"field_overrides[{key}] unknown key {field!r}"
                 if field in ("title", "claim_url") and not str(field_val or "").strip():
                     return f"field_overrides[{key}][{field}] must be a non-empty string"
+                if field == "claim_url" and not _is_safe_http_url(str(field_val or "")):
+                    return f"field_overrides[{key}][claim_url] must start with http:// or https://"
                 if field == "ends_at" and field_val is not None and not str(field_val).strip():
                     return f"field_overrides[{key}][ends_at] must be a non-empty string"
     dismissed = doc.get("dismissed")
@@ -1739,8 +1790,11 @@ class RunManager:
         all_pids: list[int] = []
         for entry in _read_active_runs():
             pid = int(entry.get("pid") or 0)
-            if pid > 0:
-                all_pids.append(pid)
+            if pid <= 0:
+                continue
+            if profile_id is not None and str(entry.get("profile_id") or "") != str(profile_id):
+                continue
+            all_pids.append(pid)
         for run in targets:
             run.cancelled = True
             with run._lock:
@@ -2109,6 +2163,9 @@ class RunManager:
 
 
 MANAGER = RunManager()
+
+# Pro-tier background scheduler (created/started in main(); None under pytest import).
+SCHEDULER: Any = None
 
 
 def _header_hostname(value: str | None) -> str | None:
@@ -2498,6 +2555,10 @@ class Handler(SimpleHTTPRequestHandler):
     def handle(self) -> None:
         try:
             super().handle()
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            # Client cancelled an in-flight request (e.g. rapid page reload).
+            # Benign on Windows (WinError 10053); skip the noisy traceback.
+            pass
         finally:
             clear_request_profile_id()
 
@@ -2650,37 +2711,6 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if _maybe_serve_built_index(self, path_only):
             return
-        # #region agent log
-        _cache_parts = [p for p in path_only.split("/") if p]
-        if len(_cache_parts) >= 2 and _cache_parts[0] == "cache" and _cache_parts[1] in PROFILE_CACHE_JSON_FILES:
-            try:
-                _disk = cache_json_path(_cache_parts[1])
-                _active = get_active_profile_id()
-                with open(ROOT / "debug-238065.log", "a", encoding="utf-8") as _agent_f:
-                    _agent_f.write(
-                        json.dumps(
-                            {
-                                "sessionId": "238065",
-                                "runId": "pre-fix",
-                                "hypothesisId": "H1",
-                                "location": "server.py:do_GET",
-                                "message": "profile cache GET",
-                                "data": {
-                                    "path": path_only,
-                                    "profile": _active,
-                                    "disk": str(_disk),
-                                    "profileExists": _disk.is_file(),
-                                    "rootCacheExists": (ROOT / "cache" / _cache_parts[1]).is_file(),
-                                },
-                                "timestamp": int(time.time() * 1000),
-                            },
-                            ensure_ascii=False,
-                        )
-                        + "\n"
-                    )
-            except OSError:
-                pass
-        # #endregion
         super().do_GET()
 
     def do_HEAD(self) -> None:  # noqa: N802 - http.server API
@@ -2696,9 +2726,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - http.server API
         self._begin_request()
-        if self._reject_if_csrf():
-            return
         path = _api_path(self)
+        if _is_internal_admin_path(path):
+            if self._reject_if_csrf_strict():
+                return
+        elif self._reject_if_csrf():
+            return
         if path.startswith("/api/internal/run/"):
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
@@ -2829,9 +2862,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_PUT(self) -> None:  # noqa: N802 - http.server API
         self._begin_request()
-        if self._reject_if_csrf():
-            return
         path = _api_path(self)
+        if _is_internal_admin_path(path):
+            if self._reject_if_csrf_strict():
+                return
+        elif self._reject_if_csrf():
+            return
         if path == "/api/internal/free-claims/approved":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
@@ -2873,9 +2909,14 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---- handlers ----------------------------------------------------------
     def _handle_config_get(self) -> None:
+        from shared.entitlement import current_plan
         from shared.supabase_auth import public_auth_config
 
-        _send_json(self, HTTPStatus.OK, public_auth_config())
+        config = dict(public_auth_config())
+        # Entitlement: signed JWT claim (when a bearer is sent) wins, else the
+        # local license file / BAKLOG_PLAN override. Defaults to "free".
+        config["plan"] = current_plan(self.headers.get("Authorization"))
+        _send_json(self, HTTPStatus.OK, config)
 
     def _handle_fetchers(self) -> None:
         try:
@@ -2967,7 +3008,17 @@ class Handler(SimpleHTTPRequestHandler):
         if not isinstance(items, list):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "items must be a list"})
             return
-        from build_free_claims import _build_cover_lookup, _enrich_item
+        too_large = _admin_list_too_large(
+            items, cap=MAX_ADMIN_ENRICH_BATCH, label="enrich items",
+        )
+        if too_large:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": too_large})
+            return
+        from build_free_claims import (
+            _build_cover_lookup,
+            _enrich_item,
+            merge_enriched_items_into_auto_feed,
+        )
 
         cover_lookup = _build_cover_lookup(
             [raw for raw in items if isinstance(raw, dict)]
@@ -2979,10 +3030,25 @@ class Handler(SimpleHTTPRequestHandler):
                 enriched.append({})
                 continue
             enriched.append(_enrich_item(raw, last_call, cover_lookup))
+
+        root = data_root()
+        auto_path = root / FREE_CLAIMS_AUTO_PATH
+        auto_doc = _read_optional_json(auto_path) or {}
+        auto_ids = {
+            str(it.get("id") or "").strip()
+            for it in (auto_doc.get("items") or [])
+            if isinstance(it, dict) and str(it.get("id") or "").strip()
+        }
+        to_persist = [
+            row for row in enriched
+            if isinstance(row, dict) and str(row.get("id") or "").strip() in auto_ids
+        ]
+        persisted = merge_enriched_items_into_auto_feed(auto_path, to_persist)
+
         _send_json(
             self,
             HTTPStatus.OK,
-            {"items": enriched, "count": len(enriched)},
+            {"items": enriched, "count": len(enriched), "persisted": persisted},
         )
 
     def _handle_internal_free_claims_preview(self) -> None:
@@ -3031,6 +3097,14 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "field_overrides must be an object"})
             return
 
+        manual_list = [it for it in (manual_items or []) if isinstance(it, dict)]
+        auto_list = [it for it in (auto_items or []) if isinstance(it, dict)]
+        for label, lst in (("manual_items", manual_list), ("auto_items", auto_list)):
+            too_large = _admin_list_too_large(lst, cap=MAX_ADMIN_CLAIM_ITEMS, label=label)
+            if too_large:
+                _send_json(self, HTTPStatus.BAD_REQUEST, {"error": too_large})
+                return
+
         from build_free_claims import preview_publish_items
 
         approved_ids = {
@@ -3046,8 +3120,8 @@ class Handler(SimpleHTTPRequestHandler):
                 clean_store[k] = v
 
         items = preview_publish_items(
-            manual_items=[it for it in manual_items if isinstance(it, dict)],
-            auto_items_all=[it for it in auto_items if isinstance(it, dict)],
+            manual_items=manual_list,
+            auto_items_all=auto_list,
             approved_ids=approved_ids,
             store_overrides=clean_store,
             field_overrides={
@@ -3056,37 +3130,6 @@ class Handler(SimpleHTTPRequestHandler):
                 if str(k).strip() and isinstance(v, dict)
             },
         )
-        # region agent log
-        try:
-            import json as _dj
-            import time as _dt
-            from pathlib import Path as _DP
-            _approved_auto = [
-                it for it in auto_items
-                if isinstance(it, dict) and str(it.get("id") or "").strip() in approved_ids
-            ]
-            _in_hdr = sum(1 for it in _approved_auto if str(it.get("header_image") or "").strip())
-            _in_rev = sum(1 for it in _approved_auto if it.get("review_percent") is not None)
-            _out_hdr = sum(1 for it in items if str(it.get("header_image") or "").strip())
-            _out_rev = sum(1 for it in items if it.get("review_percent") is not None)
-            _DP(__file__).with_name("debug-77d804.log").open("a", encoding="utf-8").write(
-                _dj.dumps({
-                    "sessionId": "77d804",
-                    "location": "server.py:_handle_internal_free_claims_preview",
-                    "message": "preview enrichment in/out counts",
-                    "data": {
-                        "approved_auto_count": len(_approved_auto),
-                        "in_header": _in_hdr, "in_review": _in_rev,
-                        "out_items": len(items), "out_header": _out_hdr, "out_review": _out_rev,
-                    },
-                    "timestamp": int(_dt.time() * 1000),
-                    "hypothesisId": "H2",
-                    "runId": "post-fix",
-                }) + "\n"
-            )
-        except Exception:
-            pass
-        # endregion
         _send_json(self, HTTPStatus.OK, {"items": items, "count": len(items)})
 
     def _handle_internal_free_claims_get(self) -> None:
@@ -3128,7 +3171,10 @@ class Handler(SimpleHTTPRequestHandler):
         if validation_err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
             return
-        out_path = data_root() / FREE_CLAIMS_INPUT_PATH
+        out_path = _resolve_contained_data_path(FREE_CLAIMS_INPUT_PATH)
+        if out_path is None:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid free-claims input path"})
+            return
         out_path.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(
             out_path,
@@ -3158,7 +3204,7 @@ class Handler(SimpleHTTPRequestHandler):
         allowed_fields = {"title", "claim_url", "ends_at"}
         for key, val in (payload.get("field_overrides") or {}).items():
             k = str(key).strip()
-            if not k or k not in id_set or not isinstance(val, dict):
+            if not k or not isinstance(val, dict):
                 continue
             cleaned: dict[str, str] = {}
             for field, field_val in val.items():
@@ -3189,15 +3235,6 @@ class Handler(SimpleHTTPRequestHandler):
             out_path,
             json.dumps(out, indent=2, ensure_ascii=False),
         )
-        # #region agent log
-        try:
-            import time
-            _log_path = data_root() / "debug-5ea56e.log"
-            with _log_path.open("a", encoding="utf-8") as _lf:
-                _lf.write(json.dumps({"sessionId": "5ea56e", "location": "server.py:_handle_internal_free_claims_approved_put", "message": "approved written", "data": {"idsCount": len(ids), "fieldOverrideKeys": list(field_overrides_out.keys()), "titleOverrides": {k: v.get("title") for k, v in field_overrides_out.items() if isinstance(v, dict) and v.get("title")}}, "timestamp": int(time.time() * 1000), "hypothesisId": "H2"}) + "\n")
-        except OSError:
-            pass
-        # #endregion
         _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(ids)})
 
     def _handle_internal_sponsors_get(self) -> None:
@@ -3220,7 +3257,10 @@ class Handler(SimpleHTTPRequestHandler):
         if validation_err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
             return
-        out_path = data_root() / SPONSORS_PATH
+        out_path = _resolve_contained_data_path(SPONSORS_PATH)
+        if out_path is None:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid sponsors input path"})
+            return
         out_path.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(
             out_path,
@@ -3570,7 +3610,11 @@ class Handler(SimpleHTTPRequestHandler):
         qs = parse_qs(parsed.query)
         force_vals = qs.get("force", ["0"])
         force = force_vals[0].lower() in ("1", "true", "yes")
-        scope_pid = get_active_profile_id() if auth_enabled() else None
+        scope_pid = None
+        if auth_enabled():
+            scope_pid = _bind_request_user(self)
+            if scope_pid is None:
+                return
         if force:
             payload = MANAGER.force_reset(profile_id=scope_pid)
         else:
@@ -4034,7 +4078,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if time.time() - last_ping > 30:
                     self._sse_write_raw(b": keepalive\n\n")
                     last_ping = time.time()
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as exc:
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
             # Browser closed the SSE (tab switch, reload, navigate). Not an error.
             pass
         finally:
@@ -4064,7 +4108,25 @@ class Handler(SimpleHTTPRequestHandler):
         super().log_message(format, *args)
 
 
+def _start_background_scheduler() -> None:
+    """Start the pro-tier background refresh scheduler (best-effort)."""
+    global SCHEDULER
+    try:
+        from scheduler import BackgroundScheduler
+
+        SCHEDULER = BackgroundScheduler(
+            manager=MANAGER,
+            fetchers=FETCHERS,
+            missing_requirements=lambda reqs: _missing_requirements(reqs),
+        )
+        SCHEDULER.start()
+    except Exception as exc:  # noqa: BLE001 - scheduler must never block server boot
+        print(f"[scheduler] not started: {exc!r}", file=sys.stderr, flush=True)
+
+
 def _shutdown_server() -> None:
+    if SCHEDULER is not None:
+        SCHEDULER.stop()
     MANAGER.shutdown()
 
 
@@ -4233,6 +4295,7 @@ def main() -> None:
 
     _exit_if_dev_server_busy()
     MANAGER._reap_orphan_processes()
+    _start_background_scheduler()
     handler = partial(Handler, directory=str(static_root()))
     try:
         httpd = BaklogDevServer((HOST, PORT), handler)

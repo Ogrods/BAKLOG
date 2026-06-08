@@ -1,4 +1,4 @@
-/** Auto-fetch on connect + staggered 24h background refresh. */
+/** Auto-fetch on connect + staggered 24h background refresh (runs while hidden). */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('processAuthStatusTransitions', () => {
@@ -266,6 +266,39 @@ describe('maybeAutoFetchStale24h', () => {
     expect(ok).toBe(true);
     expect(runFn).toHaveBeenCalledWith('gog', { auto: true });
     expect(setLastRun).toHaveBeenCalled();
+  });
+
+  it('still runs while the page is hidden (minimized/unfocused window)', () => {
+    // Phase 1: auto-refresh must keep working when document.visibilityState is
+    // 'hidden'. Guards against a regression that re-adds an isPageHidden() bail.
+    const original = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    });
+    try {
+      const runFn = vi.fn();
+      const ok = maybeAutoFetchStale24h({
+        isApiAvailable: () => true,
+        inFlightCount: () => 0,
+        now: Date.now(),
+        getLastRun: () => 0,
+        setLastRun: vi.fn(),
+        sources,
+        fetcherFreshness: () => ({ ageMs: AUTO_STALE_AGE_MS + 1 }),
+        fetcherCredentialsSatisfied: () => true,
+        stateFor: () => null,
+        authCooldownRemainingMs: () => 0,
+        isFetcherDisconnected: () => false,
+        isFetcherReconnectRequired: () => false,
+        runFn,
+      });
+      expect(ok).toBe(true);
+      expect(runFn).toHaveBeenCalledTimes(1);
+      expect(runFn.mock.calls[0][1]).toEqual({ auto: true });
+    } finally {
+      if (original) Object.defineProperty(document, 'visibilityState', original);
+    }
   });
 
   it('excludes itad and pure enrichers', () => {

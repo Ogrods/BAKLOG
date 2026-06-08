@@ -13,7 +13,7 @@ import { storeLogoStripHtml } from '../js/store-logos.js';
 describe('STORE_DISPLAY_ORDER', () => {
   it('matches the bizcard hierarchy with itch behind humble', () => {
     expect(STORE_DISPLAY_ORDER).toEqual([
-      'steam', 'epic', 'gog', 'humble', 'itch', 'psn', 'xbox',
+      'steam', 'epic', 'gog', 'humble', 'itch', 'indiegala', 'psn', 'xbox',
       'nintendo', 'amazon', 'battlenet', 'ubisoft', 'ea',
     ]);
   });

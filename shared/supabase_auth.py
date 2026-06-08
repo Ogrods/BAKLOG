@@ -169,6 +169,41 @@ def verify_bearer_user(authorization: str | None) -> dict[str, str] | None:
     }
 
 
+def _extract_plan(payload: dict[str, Any]) -> str | None:
+    """Pull a plan/entitlement string from a verified JWT payload.
+
+    Looks at a top-level ``plan`` claim first (set via a Supabase access-token
+    hook), then ``app_metadata.plan`` / ``user_metadata.plan``.
+    """
+    candidates: list[Any] = [payload.get("plan")]
+    for meta_key in ("app_metadata", "user_metadata"):
+        meta = payload.get(meta_key)
+        if isinstance(meta, dict):
+            candidates.append(meta.get("plan"))
+    for value in candidates:
+        if isinstance(value, str) and value.strip():
+            return value.strip().lower()
+    return None
+
+
+def verify_bearer_plan(authorization: str | None) -> str | None:
+    """Return the signed plan claim for a valid token, else None.
+
+    Because the token signature is verified, this claim cannot be forged
+    without a valid Supabase session — the basis for entitlement gating when
+    auth is enabled.
+    """
+    if not auth_enabled():
+        return None
+    raw = _parse_bearer(authorization)
+    if not raw:
+        return None
+    payload = _decode_access_token(raw)
+    if not payload:
+        return None
+    return _extract_plan(payload)
+
+
 def reset_jwks_client_for_tests() -> None:
     """Clear cached JWKS client (tests only)."""
     global _cached_jwks_client

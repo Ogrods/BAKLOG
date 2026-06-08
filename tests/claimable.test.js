@@ -193,7 +193,7 @@ describe('claimSourceHtml', () => {
 
   it('renders a linked badge when tag is "a"', () => {
     const html = claimSourceHtml('itad', { tag: 'a' });
-    expect(html).toContain('IsThereAnyDeal');
+    expect(html).toContain('>ITAD<');
     expect(html).toContain('href="https://isthereanydeal.com/"');
   });
 

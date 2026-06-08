@@ -218,10 +218,11 @@
           <input id="autoFetchOnConnectToggle" type="checkbox" class="rounded" checked />
           Auto-fetch when a store connects
         </label>
-        <label class="fh-toggle" title="While the app is open, quietly refresh any store whose data is older than 24 hours, one store at a time (~30 min apart)">
+        <label class="fh-toggle" title="While BAKLOG is open - including minimized or unfocused - quietly refresh any store whose data is older than 24 hours, one store at a time (~30 min apart). Does not run while fully closed.">
           <input id="autoFetchStale24hToggle" type="checkbox" class="rounded" checked />
           Auto-refresh stores older than 24h
         </label>
+        <p id="bgRefreshPlanNote" class="conn-prefs-note" hidden></p>
       </div>
       </div>
       <div id="connOnboard" hidden></div>
@@ -276,6 +277,15 @@
             <p class="conn-howto-heading">Local-only</p>
             <p class="conn-howto-text">
               <strong>Amazon Games:</strong> nothing to sign in to - we read the local Amazon Games launcher database on this PC. If you don't have it installed, this card just stays disconnected.
+            </p>
+          </div>
+        </div>
+        <div class="conn-howto-row">
+          <div class="conn-howto-glyph" aria-hidden="true">E</div>
+          <div>
+            <p class="conn-howto-heading">When auto-refresh runs</p>
+            <p class="conn-howto-text">
+              <strong>Auto-refresh stores older than 24h</strong> keeps working while BAKLOG is open, including when the window is <strong>minimized or not in focus</strong> - so a backgrounded dashboard still refreshes. It's best-effort: your browser may slow background timers down (and can pause a long-hidden tab until you return). It does <strong>not</strong> run while BAKLOG is fully closed - background refresh without keeping the app open is a planned paid feature.
             </p>
           </div>
         </div>

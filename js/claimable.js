@@ -191,9 +191,6 @@ function applyFeedDoc(doc) {
 
 function applyVisibleClaims() {
   state.claimableNow = getVisibleClaims(state.claimableFeed?.items || []);
-  // #region agent log
-  try { const items = state.claimableFeed?.items || []; const dis = dismissedClaimsMap(); const now = Date.now(); let expired=0,owned=0,dismissed=0,missing=0; for (const c of items){ if(!c?.id||!c.claim_url||!c.store){missing++;continue;} if(dis[c.id]){dismissed++;continue;} if(c.ends_at){const e=Date.parse(c.ends_at); if(Number.isFinite(e)&&e<now){expired++;continue;}} if(isClaimOwned(c)){owned++;} } fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0ffc'},body:JSON.stringify({sessionId:'fc0ffc',hypothesisId:'B',location:'claimable.js:applyVisibleClaims',message:'claim visibility breakdown',data:{total:items.length,visible:state.claimableNow.length,missing,dismissed,expired,owned,ownedNormSize:state.ownedNormNames?.size||0,dashboardDataReady:state.dashboardDataReady,activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{}); } catch(_){}
-  // #endregion
 }
 
 async function loadLocalClaimsFile() {
@@ -226,9 +223,6 @@ export async function loadClaimableNow({ preferHosted = false } = {}) {
     } catch (_) { /* network */ }
   }
   if (!doc?.items?.length) doc = { generated_at: null, items: [] };
-  // #region agent log
-  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0ffc'},body:JSON.stringify({sessionId:'fc0ffc',hypothesisId:'A',location:'claimable.js:loadClaimableNow',message:'claims feed selection',data:{preferHosted,localItems:localDoc?.items?.length||0,localGen:localDoc?.generated_at||localDoc?.fetched_at||null,fallbackItems:fallbackDoc?.items?.length||0,fallbackGen:fallbackDoc?.generated_at||null,chosenItems:doc?.items?.length||0,chosenGen:doc?.generated_at||doc?.fetched_at||null},timestamp:Date.now()})}).catch(()=>{}); } catch(_){}
-  // #endregion
   applyFeedDoc(doc);
   return state.claimableNow;
 }
@@ -281,7 +275,7 @@ function formatEndsAt(endsAt) {
 const CLAIM_SOURCE_META = {
   epic: { label: 'Epic', url: 'https://store.epicgames.com/free-games' },
   gamerpower: { label: 'GamerPower', url: 'https://www.gamerpower.com/' },
-  itad: { label: 'IsThereAnyDeal', url: 'https://isthereanydeal.com/' },
+  itad: { label: 'ITAD', url: 'https://isthereanydeal.com/' },
 };
 
 /** Per-claim "referenced via <provider>" badge — where the listing was sourced from. */
@@ -542,18 +536,24 @@ function animateClaimOut(id, commit) {
   });
 
   let finished = false;
-  const finish = () => { if (finished) return; finished = true; commit(); };
-  el.addEventListener('transitionend', (ev) => { if (ev.propertyName === 'height') finish(); });
-  setTimeout(finish, 360); // fallback if transitionend never fires
+  const finish = (via) => {
+    if (finished) return; finished = true;
+    commit();
+  };
+  el.addEventListener('transitionend', (ev) => { if (ev.propertyName === 'height') finish('transitionend'); });
+  setTimeout(() => finish('timeout'), 360); // fallback if transitionend never fires
 }
 
 export function handleClaimableClick(e) {
   const clearBtn = e.target.closest('[data-claim-clear]');
   if (clearBtn) {
     const id = clearBtn.dataset.claimClear;
+    const inModule = !!clearBtn.closest('#claimableNowModule');
+    const skipAnim = inModule && (state.claimableNow?.length || 0) <= 1;
     // Only animate when clearing from the inline list; the detail dialog covers
     // the card, so there animate would just delay the dialog close pointlessly.
-    if (clearBtn.closest('#claimableNowModule')) animateClaimOut(id, () => dismissClaim(id));
+    // Skip animation for the last/only claim — the whole module hides on dismiss.
+    if (inModule && !skipAnim) animateClaimOut(id, () => dismissClaim(id));
     else dismissClaim(id);
     return true;
   }

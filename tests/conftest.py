@@ -67,6 +67,10 @@ def _default_supabase_auth_off(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("BAKLOG_SUPABASE_ANON_KEY", raising=False)
     monkeypatch.delenv("BAKLOG_SUPABASE_JWT_SECRET", raising=False)
     monkeypatch.delenv("BAKLOG_AUTH_DISABLED", raising=False)
+    # Dev .env often sets these; tests assume the default profile + no local switcher.
+    monkeypatch.delenv("BAKLOG_LOCAL_PROFILES", raising=False)
+    monkeypatch.delenv("BAKLOG_PROFILE", raising=False)
+    monkeypatch.delenv("BAKLOG_PLAN", raising=False)
     supabase_auth.reset_jwks_client_for_tests()
 
 

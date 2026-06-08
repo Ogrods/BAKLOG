@@ -1,5 +1,5 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
-import { isAccountAuthMode } from './auth-gate.js';
+import { isAccountAuthMode, isPro } from './auth-gate.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
@@ -822,6 +822,20 @@ function renderConnPrefs() {
   const stale24h = document.getElementById('autoFetchStale24hToggle');
   if (onConnect) onConnect.checked = state.prefs.autoFetchOnConnect !== false;
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
+
+  const note = document.getElementById('bgRefreshPlanNote');
+  if (note) {
+    if (isPro()) {
+      note.textContent =
+        'Pro: background refresh keeps stale stores fresh even when BAKLOG is closed to the tray.';
+      note.classList.add('conn-prefs-note--pro');
+    } else {
+      note.textContent =
+        'Auto-refresh runs while BAKLOG is open (even minimized). Pro adds background refresh while closed to the tray.';
+      note.classList.remove('conn-prefs-note--pro');
+    }
+    note.hidden = false;
+  }
 }
 
 function renderConnections() {

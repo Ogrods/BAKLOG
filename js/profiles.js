@@ -11,7 +11,7 @@ import {
   getAccountProfileId,
   signOutAccount,
 } from './auth-gate.js';
-import { MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from './state.js';
+import { LIBRARY_FIRST_SEEN_KEY, MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from './state.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { escapeAttr } from './dom-util.js';
 import {
@@ -81,6 +81,10 @@ function profileKeySuffix(id) {
 
 export function prefsStorageKey() {
   return `${PREFS_KEY}${profileKeySuffix()}`;
+}
+
+export function libraryFirstSeenStorageKey() {
+  return `${LIBRARY_FIRST_SEEN_KEY}${profileKeySuffix()}`;
 }
 
 export function itadSnapshotStorageKey() {

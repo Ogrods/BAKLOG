@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from typing import Any
 from xml.etree import ElementTree
 
+from shared.steam_match import strip_giveaway_decorations
+
 EPIC_FREE_GAMES_URL = (
     "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
     "?locale=en-US&country=US&allowCountries=US"
@@ -42,9 +44,40 @@ def carry_claim_enrichment(fresh: dict, existing: dict | None) -> dict:
 
 
 def norm_title(title: str) -> str:
-    """Normalize a game title for dedup/merge keys."""
-    base = re.sub(r"[^a-z0-9]+", " ", (title or "").lower()).strip()
+    """Normalize a game title for dedup/merge keys.
+
+    Giveaway/store decorations are stripped first (via the shared
+    ``strip_giveaway_decorations`` matcher) so the same game from different
+    sources — e.g. "Portal 2 (Steam) Giveaway" vs "Portal 2 free on Steam" vs
+    "Portal 2" — collapses to one key instead of slipping past dedup.
+    """
+    stripped = strip_giveaway_decorations(str(title or ""))
+    base = stripped.lower().replace("&", " and ").replace("+", " and ")
+    base = re.sub(r"[^a-z0-9]+", " ", base).strip()
     return re.sub(r"\s+", " ", base)
+
+
+def claim_match_keys(item: dict) -> set[str]:
+    """Stable dedup keys for matching a claim across feed id churn.
+
+    Sync pair: ``js/claimable.js`` ``claimDedupKey`` — the frontend picks one
+    key (appid first, else title); here we return a set so maintainer approval
+    can match when one row carries a ``steam_appid`` and the surviving row only
+    has a normalized title after a source flip.
+    """
+    keys: set[str] = set()
+    appid = item.get("steam_appid")
+    if appid is not None:
+        try:
+            appid_int = int(appid)
+            if appid_int:
+                keys.add(f"appid:{appid_int}")
+        except (TypeError, ValueError):
+            pass
+    title_norm = norm_title(str(item.get("title") or ""))
+    if title_norm:
+        keys.add(f"title:{title_norm}")
+    return keys
 
 
 def merge_key(item: dict) -> str:
@@ -78,23 +111,32 @@ def merge_manual_and_auto(manual_items: list[dict], auto_items: list[dict]) -> l
     return merged
 
 
-def dedup_claim_items(items: list[dict]) -> list[dict]:
-    """Dedup auto items by normalized title; lower SOURCE_PRECEDENCE wins."""
-    by_title: dict[str, dict] = {}
+def dedup_claim_items_by_id(items: list[dict]) -> list[dict]:
+    """Dedup auto items by stable ``id`` only; lower SOURCE_PRECEDENCE wins on ties.
+
+    Cross-source copies of the same game (different ids) are all kept so the
+    admin DUPE stamp can flag them. Rows without an id each get a synthetic key
+    so they are never silently dropped.
+    """
+    by_key: dict[str, dict] = {}
+    anon = 0
     for item in items:
-        title_key = norm_title(str(item.get("title") or ""))
-        if not title_key:
-            continue
+        item_id = str(item.get("id") or "").strip()
+        if item_id:
+            key = item_id
+        else:
+            key = f"_anon:{anon}"
+            anon += 1
         source = str(item.get("source") or "")
         rank = SOURCE_PRECEDENCE.get(source, 99)
-        existing = by_title.get(title_key)
+        existing = by_key.get(key)
         if existing is None:
-            by_title[title_key] = item
+            by_key[key] = item
             continue
         existing_rank = SOURCE_PRECEDENCE.get(str(existing.get("source") or ""), 99)
         if rank < existing_rank:
-            by_title[title_key] = item
-    return list(by_title.values())
+            by_key[key] = item
+    return list(by_key.values())
 
 
 def _parse_iso_dt(value: str | None) -> datetime | None:

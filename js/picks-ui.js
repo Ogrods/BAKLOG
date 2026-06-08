@@ -125,6 +125,17 @@ export function effectivePicksTab() {
 }
 
 export function renderPicks() {
+  // #region agent log
+  try {
+    const _c = !!state.prefs.picksCollapsed;
+    const _hidden = document.getElementById('picksContainer')?.classList.contains('hidden');
+    const _btn = document.getElementById('togglePicks')?.textContent;
+    const _diverged = (_btn === 'Hide' && _hidden === true) || (_btn === 'Show' && _hidden === false) || (_c === true && _hidden === false) || (_c === false && _hidden === true);
+    if (_diverged) {
+      fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'E',location:'picks-ui.js:renderPicks',message:'DIVERGENCE detected',data:{collapsed:_c,containerHidden:_hidden,btn:_btn,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),initView:document.documentElement.getAttribute('data-init-view'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
+    }
+  } catch (_e) {}
+  // #endregion
   const tab = effectivePicksTab();
   const pickView = state.activeView === "wishlist" ? "wishlist" : state.activeView === "itch" ? "itch" : "library";
   const visibleLibrary = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));

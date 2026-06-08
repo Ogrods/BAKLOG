@@ -1,5 +1,5 @@
 import { escapeHtml } from './dom-util.js';
-import { meterLabel, canDeepSync, consumeDeepSync } from './achievement-meter.js';
+import { isPro } from './auth-gate.js';
 
 const POP_ID = 'trophyPop';
 const DEEP_SYNC_STORES = new Set(['psn', 'xbox']);
@@ -8,9 +8,7 @@ const VIEWPORT_PAD = 8;
 
 let popEl = null;
 let anchorEl = null;
-let pinned = false;
 let hoverAnchor = null;
-let escRelease = null;
 
 function ensurePop() {
   if (popEl?.isConnected) return popEl;
@@ -30,15 +28,13 @@ function onDeepSyncClick(e) {
   e.preventDefault();
   e.stopPropagation();
   if (btn.disabled) return;
-  const res = consumeDeepSync(btn.dataset.key || null);
-  if (res.ok) {
-    document.dispatchEvent(new CustomEvent('baklog:deep-sync', {
-      detail: { store: btn.dataset.store, key: btn.dataset.key || null, name: btn.dataset.name || null },
-    }));
-  }
-  // Rebuild the footer so the quota label + disabled state reflect the new
-  // balance (or the gated "out of deep syncs" message).
-  if (anchorEl) popEl.innerHTML = buildPopHtml(anchorEl);
+  document.dispatchEvent(new CustomEvent('baklog:deep-sync', {
+    detail: {
+      store: btn.dataset.store,
+      key: btn.dataset.key || null,
+      name: btn.dataset.name || null,
+    },
+  }));
 }
 
 function parseNum(val) {
@@ -52,9 +48,18 @@ function buildPopHtml(pill) {
   const pct = parseNum(pill.dataset.pct) ?? 0;
   const gsCur = parseNum(pill.dataset.gsCur);
   const gsTotal = parseNum(pill.dataset.gsTotal);
+  const troCur = parseNum(pill.dataset.troCur);
+  const troTotal = parseNum(pill.dataset.troTotal);
+  const store = (pill.dataset.store || '').toLowerCase();
   const clamped = Math.max(0, Math.min(100, pct));
   let gsHtml = '';
-  if (gsCur != null || gsTotal != null) {
+  if (store === 'psn' && (troCur != null || troTotal != null)) {
+    const cur = troCur ?? 0;
+    const total = troTotal ?? 0;
+    const remain = troTotal != null && troCur != null ? Math.max(0, total - cur) : null;
+    const remainBit = remain != null ? ` · ${remain.toLocaleString()} remaining` : '';
+    gsHtml = `<p class="trophy-pop-gs">Trophies: <strong>${cur.toLocaleString()}</strong> / <strong>${total.toLocaleString()}</strong>${remainBit}</p>`;
+  } else if (gsCur != null || gsTotal != null) {
     const cur = gsCur ?? 0;
     const total = gsTotal ?? 0;
     const remain = gsTotal != null && gsCur != null ? Math.max(0, total - cur) : null;
@@ -68,23 +73,23 @@ function buildPopHtml(pill) {
     ${buildMeterHtml(pill)}`;
 }
 
-/** Metered deep-sync footer for PSN/Xbox pills: cached % is free, a full
- *  achievement/trophy re-pull is rate-limited by the daily allowance. */
+/** Pro-only deep-sync footer for PSN/Xbox pills: cached % is free; a full
+ *  achievement/trophy re-pull is a paid-tier action. */
 function buildMeterHtml(pill) {
+  if (!isPro()) return '';
   const store = (pill.dataset.store || '').toLowerCase();
   if (!DEEP_SYNC_STORES.has(store)) return '';
-  const allowed = canDeepSync();
   const key = pill.dataset.key || '';
   const name = pill.dataset.name || '';
   return `<div class="trophy-pop-meter">
-    <button type="button" class="trophy-pop-sync" data-deep-sync data-store="${escapeHtml(store)}" data-key="${escapeHtml(key)}" data-name="${escapeHtml(name)}"${allowed ? '' : ' disabled'}>Deep sync</button>
-    <span class="trophy-pop-meter-label">${escapeHtml(meterLabel())}</span>
+    <button type="button" class="trophy-pop-sync" data-deep-sync data-store="${escapeHtml(store)}" data-key="${escapeHtml(key)}" data-name="${escapeHtml(name)}">Deep sync</button>
   </div>`;
 }
 
 function positionPop(pill) {
   const pop = ensurePop();
   pop.hidden = false;
+  pop.classList.toggle('trophy-pop--interactive', !!pop.querySelector('[data-deep-sync]'));
   const rect = pill.getBoundingClientRect();
   const popRect = pop.getBoundingClientRect();
   let top = rect.top - popRect.height - GAP;
@@ -101,61 +106,28 @@ function setExpanded(pill, open) {
   pill.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
-function clearEscBinding() {
-  escRelease?.();
-  escRelease = null;
-}
-
-function hidePop({ clearPin = true } = {}) {
+function hidePop() {
   if (!popEl) return;
   popEl.hidden = true;
+  popEl.classList.remove('trophy-pop--interactive');
   if (anchorEl) setExpanded(anchorEl, false);
   anchorEl = null;
   hoverAnchor = null;
-  if (clearPin) pinned = false;
-  clearEscBinding();
 }
 
-function showFor(pill, { pin = false } = {}) {
+function showFor(pill) {
   if (!pill?.matches?.('[data-trophy-pop]')) return;
   const pop = ensurePop();
   pop.innerHTML = buildPopHtml(pill);
   anchorEl = pill;
-  if (pin) {
-    pinned = true;
-    hoverAnchor = null;
-  } else {
-    hoverAnchor = pill;
-  }
+  hoverAnchor = pill;
   setExpanded(pill, true);
   positionPop(pill);
-  if (pin && !escRelease) {
-    const onEsc = (ev) => {
-      if (ev.key === 'Escape') {
-        ev.preventDefault();
-        hidePop();
-      }
-    };
-    document.addEventListener('keydown', onEsc);
-    escRelease = () => document.removeEventListener('keydown', onEsc);
-  }
-}
-
-function isPill(el) {
-  return el?.matches?.('[data-trophy-pop]');
-}
-
-function onDocumentClick(e) {
-  if (!pinned || !popEl || popEl.hidden) return;
-  const pill = e.target.closest('[data-trophy-pop]');
-  if (pill === anchorEl || popEl.contains(e.target)) return;
-  hidePop();
 }
 
 function onScrollOrResize() {
   if (!popEl || popEl.hidden || !anchorEl) return;
-  if (pinned) positionPop(anchorEl);
-  else hidePop({ clearPin: false });
+  hidePop();
 }
 
 export function initTrophyPopover() {
@@ -165,51 +137,30 @@ export function initTrophyPopover() {
   document.addEventListener('mouseover', (e) => {
     const pill = e.target.closest('[data-trophy-pop]');
     if (!pill) return;
-    if (pinned && anchorEl !== pill) return;
-    showFor(pill, { pin: false });
+    showFor(pill);
   });
 
   document.addEventListener('mouseout', (e) => {
-    if (pinned) return;
     const from = e.target.closest('[data-trophy-pop]');
     if (!from || from !== hoverAnchor) return;
     const to = e.relatedTarget;
     if (to && (from.contains(to) || popEl?.contains(to))) return;
-    hidePop({ clearPin: false });
+    hidePop();
   });
 
   document.addEventListener('focusin', (e) => {
     const pill = e.target.closest('[data-trophy-pop]');
     if (!pill) return;
-    if (pinned && anchorEl !== pill) return;
-    showFor(pill, { pin: false });
+    showFor(pill);
   });
 
   document.addEventListener('focusout', (e) => {
-    if (pinned) return;
     const pill = e.target.closest('[data-trophy-pop]');
     if (!pill || pill !== hoverAnchor) return;
     const to = e.relatedTarget;
     if (to && (pill.contains(to) || popEl?.contains(to))) return;
-    hidePop({ clearPin: false });
+    hidePop();
   });
-
-  document.addEventListener('click', (e) => {
-    const pill = e.target.closest('[data-trophy-pop]');
-    if (!pill) {
-      onDocumentClick(e);
-      return;
-    }
-    e.stopPropagation();
-    e.preventDefault();
-    if (pinned && anchorEl === pill) {
-      hidePop();
-      return;
-    }
-    showFor(pill, { pin: true });
-  });
-
-  document.addEventListener('click', onDocumentClick, true);
 
   window.addEventListener('scroll', onScrollOrResize, true);
   window.addEventListener('resize', onScrollOrResize);

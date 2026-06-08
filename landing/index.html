@@ -448,6 +448,34 @@
       .card--premium ul { columns: 2; column-gap: 2rem; }
     }
 
+    .tier-compare {
+      grid-column: 1 / -1;
+      width: 100%;
+      margin-top: 1.2rem;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    .tier-compare th,
+    .tier-compare td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .tier-compare thead th {
+      color: var(--text-mute);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .tier-compare tbody th { font-weight: 500; color: var(--text); }
+    .tier-compare tbody td { color: var(--text-mute); text-align: center; }
+    .tier-compare .premium-badge { font-size: 0.6rem; vertical-align: middle; margin-left: 0.25rem; }
+    @media (max-width: 599px) {
+      .tier-compare { display: block; overflow-x: auto; }
+    }
+
     /* How it works — equal-height cards so uneven copy stays balanced */
     .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; counter-reset: step; align-items: stretch; }
     .step {
@@ -764,6 +792,7 @@
             <li>Epic Games Store Mobile runs its own giveaways — claim from your phone, count on your PC</li>
             <li>Notification banner when new free games drop</li>
             <li>Ownership-aware: hides titles already in your library</li>
+            <li>Full games only — DLC packs, add-ons, and in-game bonuses are filtered out of the free feed</li>
             <li>Free tier — no paywall on the feed; GamerPower attribution when applicable</li>
           </ul>
         </article>
@@ -788,14 +817,67 @@
           </div>
           <p>The free tier keeps everything you need to import, browse, and decide what to play next. The optional <strong>$5/mo</strong> ($50/yr) tier layers on power-user conveniences — none of today's free features ever move behind it.</p>
           <ul>
-            <li>On-demand bulk refresh — the "run stale" queue sweep, off by default to honor the no-queue free tier</li>
+            <li>Queue every stale store at once — one click queues all your outdated libraries and they refresh back-to-back (free tier: one store at a time, on demand)</li>
             <li>Scheduled stale-store refresh without keeping the app open</li>
             <li>Cloud sync across machines</li>
             <li>No sponsored deal cards</li>
-            <li>Priority deep achievement/trophy enrichment</li>
+            <li>Deep achievement/trophy sync — full on-demand re-pull (free tier: cached % only)</li>
             <li>Deal &amp; watchlist alerts</li>
+            <li>Bonus claimables feed — the DLC, add-ons, and in-game bonuses we filter out of the free feed, surfaced just for paid members</li>
           </ul>
         </article>
+
+        <table class="tier-compare" aria-label="Free vs paid tier">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Free</th>
+              <th>Paid <span class="premium-badge">Planned</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Import &amp; browse all stores</th>
+              <td>✓</td>
+              <td>✓</td>
+            </tr>
+            <tr>
+              <th scope="row">Manual store refresh</th>
+              <td>One at a time</td>
+              <td>Queue all stale stores</td>
+            </tr>
+            <tr>
+              <th scope="row">Auto-refresh while app is open</th>
+              <td>✓ (one store / ~30 min)</td>
+              <td>✓</td>
+            </tr>
+            <tr>
+              <th scope="row">Refresh while app is closed</th>
+              <td>—</td>
+              <td>✓</td>
+            </tr>
+            <tr>
+              <th scope="row">Claimable Now (full games)</th>
+              <td>✓</td>
+              <td>✓ + bonus DLC/bonus feed</td>
+            </tr>
+            <tr>
+              <th scope="row">Sponsored deal cards</th>
+              <td>Shown</td>
+              <td>Removed</td>
+            </tr>
+            <tr>
+              <th scope="row">Deep achievement/trophy sync</th>
+              <td>Cached % only</td>
+              <td>Full re-pull</td>
+            </tr>
+            <tr>
+              <th scope="row">Cloud sync</th>
+              <td>—</td>
+              <td>✓</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
     </div>
@@ -815,7 +897,7 @@
         <div class="score-tile"><div class="num">100%</div><div class="lbl">on your machine, nothing uploaded</div></div>
         <div class="score-tile"><div class="num">90 sec</div><div class="lbl">from empty to your whole library</div></div>
         <div class="score-tile"><div class="num">$0</div><div class="lbl">free forever to import your library</div></div>
-        <div class="score-tile"><div class="num">$5</div><div class="lbl">optional paid tier / mo</div></div>
+        <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (paid, planned)</div></div>
       </div>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
     </div>
@@ -896,11 +978,15 @@
         </details>
         <details>
           <summary>Is it free?</summary>
-          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary %. The optional <strong>$5/mo</strong> paid tier ($50/yr, <strong>planned</strong>) will remove sponsored deal cards and bundle cloud sync, scheduled refresh, and priority deep achievement sync. Nothing paywalled today stays paywalled when paid launches.</p>
+          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary % (no on-demand deep re-pull). <strong>Claimable Now</strong> on the free tier surfaces full-game giveaways only — DLC packs, add-ons, and in-game bonuses are filtered out. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. The optional <strong>$5/mo</strong> paid tier ($50/yr, <strong>planned</strong>) will add queued bulk refresh (every stale store in one sweep), scheduled refresh without the app open, no sponsored deal cards, cloud sync, deep achievement/trophy sync (full re-pull), and a bonus claimables feed for those DLC and bonus drops. Nothing paywalled today stays paywalled when paid launches.</p>
         </details>
         <details>
           <summary>What's in the paid tier?</summary>
-          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> (planned): no sponsored deal cards, cloud sync across machines, on-demand bulk refresh (the "run stale" queue sweep), scheduled stale-store refresh without keeping the app open, priority deep achievement/trophy API enrichment, and deal/watchlist alerts. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
+          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> (planned): no sponsored deal cards, cloud sync across machines, <strong>queued bulk refresh</strong> — queue every stale store and let them run back-to-back instead of babysitting one at a time, scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), deal/watchlist alerts, and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
+        </details>
+        <details>
+          <summary>What's the difference between free and paid refresh?</summary>
+          <p>On the free tier, you refresh one store at a time — click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. The planned paid tier adds <strong>queued bulk refresh</strong>: one action queues every store that needs updating, and they run back-to-back so you can kick it off and walk away. Paid also adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). Your credentials and data still stay on your machine — only the convenience layer changes.</p>
         </details>
         <details>
           <summary>Does BAKLOG show me free games to claim?</summary>
@@ -970,9 +1056,10 @@
       <div class="foot-meta">
         <strong>baklog.app</strong>. One honest backlog across every store.<br />
         Free forever to import &middot; $5/mo optional &middot; Invite-only early access. Invites go out in small waves.<br />
-        <p class="foot-invite"><a href="#waitlist">Request an invite</a> &middot; <a href="mailto:dan@baklog.app">dan@baklog.app</a></p>
-        Local-first &middot; No telemetry &middot; MIT &middot; &copy; <span id="year"></span> Dan Ogrodnik<br />
-        BAKLOG&trade; is a trademark of Dan Ogrodnik
+        <!-- Discord invite: keep in sync with shared/community.json + index.html kebab menu -->
+        <p class="foot-invite"><a href="#waitlist">Request an invite</a> &middot; <a href="https://discord.gg/baklog" target="_blank" rel="noopener noreferrer">Discord</a> &middot; <a href="mailto:dan@baklog.app">dan@baklog.app</a></p>
+        Local-first &middot; No telemetry &middot; MIT &middot; &copy; <span id="year"></span> BAKLOG<br />
+        BAKLOG&trade; is a trademark of its owner
       </div>
     </div>
   </footer>

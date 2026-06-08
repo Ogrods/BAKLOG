@@ -49,6 +49,11 @@ def main() -> int:
         help="Hosted feed URL (default: BAKLOG_CLAIMS_URL or baklog.app)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Validate only; do not write")
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Allow writing an empty claims file (e.g. genuinely no live giveaways).",
+    )
     args = parser.parse_args()
 
     stats = RunStats()
@@ -60,25 +65,38 @@ def main() -> int:
         stats.error(f"could not load feed: {exc}")
         return stats.finish("fetch_free_claims", t0, exit_code=1)
 
-    items = data.get("items") or []
-    valid = 0
-    for item in items:
+    raw_items = data.get("items") or []
+    valid_items: list[dict] = []
+    invalid = 0
+    for item in raw_items:
         if not isinstance(item, dict):
+            invalid += 1
             continue
         if not item.get("id") or not item.get("claim_url") or not item.get("store"):
+            invalid += 1
             continue
-        valid += 1
+        valid_items.append(item)
+    valid = len(valid_items)
+    if invalid:
+        stats.warn(f"dropped {invalid} malformed claim row(s) (need id, store, claim_url)")
 
-    if valid == 0 and items:
-        stats.error("feed has items but none passed validation (need id, store, claim_url)")
+    # Refuse to overwrite the user's claims with nothing unless explicitly allowed.
+    if valid == 0 and not args.allow_empty:
+        stats.error(
+            "feed produced 0 valid claim(s) (need id, store, claim_url) — refusing to "
+            "overwrite. Re-run with --allow-empty if there are genuinely no live giveaways."
+        )
         return stats.finish("fetch_free_claims", t0, exit_code=2)
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "source_url": args.url,
         "generated_at": data.get("generated_at"),
-        "items": items,
+        "items": valid_items,
     }
+    attribution = data.get("attribution")
+    if isinstance(attribution, list) and attribution:
+        payload["attribution"] = attribution
 
     out = free_claims_path()
     if args.dry_run:

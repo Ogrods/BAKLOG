@@ -269,6 +269,10 @@ export function renderDashboardRecentAdditions(games) {
     return;
   }
   const ageTitle = 'Time since first tracked in your library';
+  // Only show the age column once at least one row has a genuine add date
+  // (first-seen or manual added_at). When the card is pure proxy-ordered
+  // backfill, every age would render '—', so hide the column entirely.
+  const showAges = recents.some(g => g._addedAt);
   const initialsFor = name => {
     const words = String(name || '').split(/\s+/).filter(Boolean);
     return (words.slice(0, 3).map(w => w[0]).join('') || '?').toUpperCase().slice(0, 3);
@@ -277,11 +281,13 @@ export function renderDashboardRecentAdditions(games) {
     const cover = libraryCoverFor(g);
     const fallback = coverFallbackFor(g);
     const key = gameKey(g);
-    const addedLabel = formatAddedAgo(g._addedAt);
     const coverHtml = cover
       ? `<img class="dash-list-cover" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(fallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />`
       : `<div class="dash-list-cover placeholder" title="${escapeAttr(g.name)}"><span class="placeholder-initials">${escapeHtml(initialsFor(g.name))}</span></div>`;
-    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in Library">${coverHtml}<span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span><span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(addedLabel)}</span></button>`;
+    const ageHtml = showAges
+      ? `<span class="text-slate-400 dash-recent-age" title="${escapeAttr(ageTitle)}">${escapeHtml(formatAddedAgo(g._addedAt))}</span>`
+      : '';
+    return `<button type="button" class="dash-list-row dash-recent-row" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in Library">${coverHtml}<span class="dash-row-title flex-1"><span class="truncate">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span>${ageHtml}</button>`;
   }).join('');
 }
 

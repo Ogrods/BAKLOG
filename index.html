@@ -400,6 +400,8 @@
             <button type="button" id="exportNotesOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export only personal notes as JSON">Export notes only</button>
             <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Find stored statuses/notes whose game is no longer in any catalog (uninstalled, store disconnected, etc.)">Clean up unknown games…</button>
             <button type="button" id="reportBug" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Review and optionally send a sanitized bug report (errors + app context). Nothing is sent until you confirm in the dialog.">Report a bug…</button>
+            <!-- Discord invite: keep in sync with shared/community.json + landing/index.html footer -->
+            <a id="joinDiscord" href="https://discord.gg/baklog" target="_blank" rel="noopener noreferrer" class="w-full text-left px-3 py-2 hover:bg-slate-700 block" title="Chat with other beta testers and the maintainer (opens Discord in a new tab)">Join community (Discord)</a>
             <button type="button" id="hiddenGamesMenu" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="View and restore games hidden from the library">Hidden games</button>
             <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy top 20 backlog games as Markdown to clipboard">Copy top 20 backlog (Markdown)</button>
             <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer" title="Import personal data JSON (statuses, notes)">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
@@ -729,41 +731,48 @@
         <h3 id="profileManageTitle" class="text-lg font-semibold text-slate-100">Manage profiles</h3>
         <button type="button" id="profileManageClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
-      <div class="p-3 space-y-3 overflow-y-auto flex-1 text-sm text-slate-300">
-        <p class="profile-modal-note text-xs text-slate-400">Each profile has its own library files, connections, and personal data under <code class="text-slate-300">profiles/&lt;name&gt;/</code>. Your first extra profile copies today&apos;s data into <code class="text-slate-300">profiles/default/</code>; root files stay as backup. Switching profiles cancels any in-flight fetchers, then reloads the app.</p>
+      <div class="p-3 space-y-4 overflow-y-auto flex-1 text-sm text-slate-300">
+        <p class="profile-modal-note text-xs text-slate-400">Each profile keeps its own library, connections, and personal data under <code class="text-slate-300">profiles/&lt;name&gt;/</code>. Your first extra profile copies today&apos;s data into <code class="text-slate-300">profiles/default/</code> as a backup. Switching profiles reloads the app.</p>
+
         <div class="profile-modal-section">
-          <label for="profileRenameInput" class="profile-modal-label">Rename active profile</label>
+          <label for="profileNewName" class="profile-modal-label">Create a new profile</label>
           <div class="profile-modal-row">
-            <input type="text" id="profileRenameInput" class="profile-modal-field" maxlength="64" />
-            <button type="button" id="profileRenameSave" class="profile-modal-btn profile-modal-btn-neutral">Save</button>
-          </div>
-        </div>
-        <div class="profile-modal-section">
-          <label for="profileNewName" class="profile-modal-label">Add profile</label>
-          <div class="profile-modal-row">
-            <input type="text" id="profileNewName" class="profile-modal-field" placeholder="e.g. Work" maxlength="64" />
+            <input type="text" id="profileNewName" name="baklog-new-profile" class="profile-modal-field" placeholder="e.g. Work" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" />
             <button type="button" id="profileCreateBtn" class="profile-modal-btn profile-modal-btn-primary">Create</button>
           </div>
         </div>
-        <div class="profile-modal-section">
-          <label for="profilePinNew" class="profile-modal-label">Profile PIN</label>
-          <p id="profilePinNote" class="profile-modal-note text-xs text-slate-400 mb-1">Optional - lock this profile so switching in requires a PIN.</p>
-          <div id="profilePinCurrentWrap" class="profile-modal-row hidden">
-            <input type="password" id="profilePinCurrent" class="profile-modal-field" placeholder="Current PIN" maxlength="32" autocomplete="current-password" />
+
+        <div class="profile-modal-group">
+          <div class="profile-modal-group-title">Current profile</div>
+          <div class="profile-modal-section">
+            <label for="profileRenameInput" class="profile-modal-label">Name</label>
+            <div class="profile-modal-row">
+              <input type="text" id="profileRenameInput" name="baklog-rename-profile" class="profile-modal-field" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" />
+              <button type="button" id="profileRenameSave" class="profile-modal-btn profile-modal-btn-neutral">Save</button>
+            </div>
           </div>
-          <div class="profile-modal-row">
-            <input type="password" id="profilePinNew" class="profile-modal-field" placeholder="New PIN (4–32 chars)" maxlength="32" autocomplete="new-password" />
-            <button type="button" id="profilePinSave" class="profile-modal-btn profile-modal-btn-neutral">Save PIN</button>
-            <button type="button" id="profilePinClear" class="profile-modal-btn profile-modal-btn-danger hidden">Remove PIN</button>
+          <div class="profile-modal-section">
+            <label for="profilePinNew" class="profile-modal-label">PIN lock <span class="profile-modal-optional">optional</span></label>
+            <p id="profilePinNote" class="profile-modal-note text-xs text-slate-400">Lock this profile so switching into it requires a PIN.</p>
+            <div id="profilePinCurrentWrap" class="profile-modal-row hidden">
+              <input type="text" id="profilePinCurrent" name="baklog-pin-current" class="profile-modal-field profile-modal-pin" placeholder="Current PIN" maxlength="32" inputmode="numeric" autocomplete="off" data-1p-ignore data-lpignore="true" />
+            </div>
+            <div class="profile-modal-row">
+              <input type="text" id="profilePinNew" name="baklog-pin-new" class="profile-modal-field profile-modal-pin" placeholder="New PIN (4–32 chars)" maxlength="32" inputmode="numeric" autocomplete="off" data-1p-ignore data-lpignore="true" />
+              <button type="button" id="profilePinSave" class="profile-modal-btn profile-modal-btn-neutral">Save PIN</button>
+              <button type="button" id="profilePinClear" class="profile-modal-btn profile-modal-btn-danger hidden">Remove</button>
+            </div>
           </div>
         </div>
-        <div class="profile-modal-section">
-          <label for="profileDeleteSelect" class="profile-modal-label">Delete another profile</label>
+
+        <div class="profile-modal-section profile-modal-danger">
+          <label for="profileDeleteSelect" class="profile-modal-label">Delete a profile</label>
           <div class="profile-modal-row">
             <select id="profileDeleteSelect" class="profile-modal-field"></select>
             <button type="button" id="profileDeleteBtn" class="profile-modal-btn profile-modal-btn-danger">Delete</button>
           </div>
         </div>
+
         <p id="profileManageStatus" class="profile-modal-status hidden" role="status" aria-live="polite"></p>
         <p id="profileManageError" class="profile-modal-error hidden" role="alert"></p>
       </div>
@@ -880,6 +889,7 @@
   </div>
 
   <dialog id="claimDetailDialog" class="claim-detail-dialog bg-transparent border-0 p-0 backdrop:bg-black/60" tabindex="-1"></dialog>
+  <dialog id="claimHiddenDialog" class="claim-detail-dialog claim-hidden-dialog bg-transparent border-0 p-0 backdrop:bg-black/60" tabindex="-1"></dialog>
 
   <script type="module" src="js/app.js"></script>
 </body>

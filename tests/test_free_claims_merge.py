@@ -6,8 +6,10 @@ from datetime import UTC, datetime
 
 from shared.free_claims_sources import (
     carry_claim_enrichment,
-    dedup_claim_items,
+    claim_match_keys,
+    dedup_claim_items_by_id,
     merge_manual_and_auto,
+    norm_title,
     parse_epic_element,
     parse_gamerpower_item,
     parse_itad_rss,
@@ -112,13 +114,37 @@ def test_itad_filters_bundle_and_noise_titles():
     assert items[0]["source"] == "itad"
 
 
-def test_dedup_prefers_epic_over_gamerpower_for_same_title():
-    items = dedup_claim_items(
+def test_dedup_by_id_keeps_cross_source_same_title():
+    items = dedup_claim_items_by_id(
         [
             {
                 "id": "gamerpower-1",
                 "store": "epic",
                 "title": "Relaxing Simulator",
+                "claim_url": "https://www.gamerpower.com/open/relaxing",
+                "source": "gamerpower",
+            },
+            {
+                "id": "epic-relaxing-simulator",
+                "store": "epic",
+                "title": "Relaxing Simulator",
+                "claim_url": "https://store.epicgames.com/en-US/p/relaxing-simulator",
+                "source": "epic",
+            },
+        ]
+    )
+    assert len(items) == 2
+    sources = {item["source"] for item in items}
+    assert sources == {"gamerpower", "epic"}
+
+
+def test_dedup_by_id_collapses_same_id_prefers_epic():
+    items = dedup_claim_items_by_id(
+        [
+            {
+                "id": "epic-relaxing-simulator",
+                "store": "epic",
+                "title": "Relaxing Simulator (GamerPower)",
                 "claim_url": "https://www.gamerpower.com/open/relaxing",
                 "source": "gamerpower",
             },
@@ -187,6 +213,44 @@ def test_carry_claim_enrichment_fills_missing_fields_only() -> None:
     assert out["steam_appid"] == 729000
     assert out["genres"] == ["Adventure"]
     assert out["title"] == "Wytchwood"
+
+
+def test_claim_match_keys_appid_and_title() -> None:
+    keys = claim_match_keys(
+        {
+            "id": "gamerpower-2386",
+            "title": "Tell Me Why (Steam) Giveaway",
+            "steam_appid": 1180660,
+        }
+    )
+    assert keys == {"appid:1180660", "title:tell me why"}
+
+
+def test_claim_match_keys_title_only() -> None:
+    keys = claim_match_keys(
+        {
+            "id": "epic-songs-of-conquest",
+            "title": "Songs of Conquest",
+        }
+    )
+    assert keys == {"title:songs of conquest"}
+
+
+def test_claim_match_keys_empty_when_no_title_or_appid() -> None:
+    assert claim_match_keys({"id": "itad-x", "title": "!!!"}) == set()
+
+
+def test_norm_title_treats_ampersand_and_and_as_equivalent() -> None:
+    assert norm_title("Mr.Brocco & Co") == "mr brocco and co"
+    assert norm_title("Mr.Brocco And Co (IndieGala) Giveaway") == "mr brocco and co"
+
+
+def test_claim_match_keys_collapses_ampersand_and_and_titles() -> None:
+    amp = claim_match_keys({"id": "itad-brocco", "title": "Mr.Brocco & Co"})
+    and_title = claim_match_keys(
+        {"id": "gp-brocco", "title": "Mr.Brocco And Co (IndieGala) Giveaway"}
+    )
+    assert amp & and_title == {"title:mr brocco and co"}
 
 
 def test_carry_claim_enrichment_does_not_clobber_fresh_cover() -> None:

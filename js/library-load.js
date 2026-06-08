@@ -21,6 +21,7 @@ import {
 } from './deals.js';
 import {
   loadManualGames,
+  saveLibraryFirstSeen,
   bumpPersonalMemo,
   canonicalizeNotesAcrossTitles,
   applyHiddenTitleNorms,
@@ -195,22 +196,32 @@ export function recordLibraryFirstSeen() {
   if (!state.libraryFirstSeenByKey || typeof state.libraryFirstSeenByKey !== 'object') {
     state.libraryFirstSeenByKey = {};
   }
+  const mapWasEmpty = Object.keys(state.libraryFirstSeenByKey).length === 0;
   const seeded = !!state.prefs.librarySeenSeeded;
+  // If the persisted map is empty but seeding already happened, the first-seen
+  // data was lost upstream (server doc reset, or the migration path skipped
+  // applyServerDoc, leaving the in-memory map empty while the prefs flag stayed
+  // true). Re-seed as baseline rather than flooding "Recently added" with the
+  // entire library stamped at the current time.
+  const effectiveSeeded = seeded && !mapWasEmpty;
   let changed = false;
   let newlyStamped = 0;
   for (const g of state.allGames) {
     const key = gameKey(g);
     if (key in state.libraryFirstSeenByKey) continue;
-    state.libraryFirstSeenByKey[key] = seeded ? Date.now() : 0;
+    state.libraryFirstSeenByKey[key] = effectiveSeeded ? Date.now() : 0;
     changed = true;
-    if (seeded) newlyStamped += 1;
+    if (effectiveSeeded) newlyStamped += 1;
   }
   if (!state.prefs.librarySeenSeeded) {
     state.prefs.librarySeenSeeded = true;
     changed = true;
   }
-  if (changed) personalStore.notify();
-  return seeded ? newlyStamped : 0;
+  if (changed) {
+    saveLibraryFirstSeen(state.libraryFirstSeenByKey);
+    personalStore.notify();
+  }
+  return effectiveSeeded ? newlyStamped : 0;
 }
 
 function countLibraryVisible() {

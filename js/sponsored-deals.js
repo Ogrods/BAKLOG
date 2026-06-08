@@ -13,7 +13,7 @@
  *   kind: "house" -> "House" disclosure; anything else -> "Sponsored".
  */
 import { state } from './state.js';
-import { escapeHtml, escapeAttr } from './dom-util.js';
+import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
 import { normalizeNameForDedup } from './game-core.js';
 import { isOwnedByTitle } from './deals.js';
 import { savePersonal } from './personal-storage.js';
@@ -99,10 +99,10 @@ export function sponsoredDealCardHtml(item) {
     : 'Paid placement. Disclosed sponsored slot — funds the free tier.';
   const cta = item.cta || 'Learn more';
   const tagline = item.tagline ? `<div class="sponsored-deal-tagline">${escapeHtml(item.tagline)}</div>` : '';
-  const cover = item.cover
+  const cover = isSafeHttpUrl(item.cover)
     ? `<img class="sponsored-deal-cover" src="${escapeAttr(item.cover)}" alt="" loading="lazy" onerror="this.style.display='none'" />`
     : '';
-  const url = item.url ? escapeAttr(item.url) : '';
+  const url = isSafeHttpUrl(item.url) ? escapeAttr(item.url) : '';
   return `<button type="button"
     class="deal-card-clickable dash-card deal-rail-card sponsored-deal-card${isHouse ? ' sponsored-deal-house' : ''} text-left w-full"
     data-action="sponsored-deal"

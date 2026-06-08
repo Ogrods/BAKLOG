@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec for BAKLOG (Windows onedir). Run via packaging/build_windows.ps1.
+# Entry point is server.py (HTTP server + fetcher dispatch). For the system tray
+# icon in dev/dist builds, run tray_app.py separately — see scripts/build_installer.ps1.
 
 import sys
 from pathlib import Path

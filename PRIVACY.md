@@ -101,7 +101,8 @@ When an uncaught error or unhandled promise rejection fires, BAKLOG:
 optional contact email and note fields, and sends the bundle only when you
 click **Send report** again. **Copy bug bundle** places the same sanitized
 JSON on your clipboard without any network request.
-bundle is a whitelist — only these fields are included:
+
+The **bug bundle** is a whitelist — only these fields are included:
 
 | Field | Why |
 |-------|-----|
@@ -129,6 +130,40 @@ report**, the same whitelist bundle (plus optional contact/note) is POSTed to
 `https://baklog.app/api/report`, stored in the project's Supabase
 `bug_reports` table, and emailed to the maintainer. Nothing is sent unless
 you explicitly confirm in the dialog.
+
+**Fetcher failures are a separate channel.** When a store refresh fails,
+`server.py` records stdout/stderr in `profiles/<id>/cache/runs/<run_id>.jsonl`
+and streams lines to the Fetcher health panel via SSE (`status`, `line`, and
+`done` events). Exit codes follow the fetcher contract: `0` ok, `1` runtime
+error, `2` refused empty, `3` refused drift, `4` auth failure. Those
+operational logs are **not** sent to the bug-report endpoint — use the
+fetcher console, run log file, or **Report a bug…** if the dashboard itself
+misbehaves.
+
+#### How to test bug reporting (maintainers)
+
+1. **Trigger capture** — with the app open at `http://127.0.0.1:8765`, run in
+   DevTools: `throw new Error('baklog-test')` or
+   `Promise.reject(new Error('baklog-test'))`. Expect a sticky red toast and
+   `window.__baklogErrors.items.length > 0`.
+2. **Inspect the bundle** — kebab menu → **Report a bug…** (or toast **Send
+   report**). The dialog preview shows the scrubbed JSON; confirm no Bearer
+   tokens, cookies, or API keys appear in stacks.
+3. **Copy without network** — **Copy bug bundle** or **Errors only**; paste
+   into a GitHub issue to verify shape.
+4. **Send report (production path)** — confirm in the dialog; POST goes to
+   `https://baklog.app/api/report` (Resend email + optional Supabase
+   `bug_reports`).
+5. **Local endpoint override** — uncomment or add in `index.html`:
+   `<meta name="baklog-report-endpoint" content="http://127.0.0.1:3000/api/report" />`,
+   or set `window.__BAKLOG_REPORT_ENDPOINT` before bootstrap. Point at a mock
+   that returns `{ "ok": true }` so you never hit production during dev.
+6. **Clear history** — `localStorage.removeItem('baklog-error-log')` in
+   DevTools resets the persisted ring.
+
+Caught errors in bootstrap (personal store init, fetcher chrome, Chart.js load,
+invalid personal-data import) also call `reportError()` so they appear in the
+toast and bundle even when the code handles them gracefully.
 
 ### Portable secret bundle
 

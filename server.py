@@ -11,7 +11,7 @@ Endpoints:
     POST /api/run/<key>            -> {run_id, status}    (queues a fetcher)
     POST /api/run/<run_id>/cancel  -> cancel one queued or running fetcher
     POST /api/runs/cancel          -> cancel all in-flight fetchers (active + queue)
-    GET  /api/stream/<run_id>      -> SSE: line / done / error events (?since=N or Last-Event-ID for resume)
+    GET  /api/stream/<run_id>      -> SSE: status / line / done events (?since=N or Last-Event-ID for resume)
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
     GET  /api/profiles        -> {active, active_label, legacy, profiles[]}
@@ -2166,6 +2166,8 @@ MANAGER = RunManager()
 
 # Pro-tier background scheduler (created/started in main(); None under pytest import).
 SCHEDULER: Any = None
+# Live dev server instance — used by POST /api/shutdown (tray graceful quit).
+_DEV_HTTPD: ThreadingHTTPServer | None = None
 
 
 def _header_hostname(value: str | None) -> str | None:
@@ -2727,6 +2729,11 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - http.server API
         self._begin_request()
         path = _api_path(self)
+        if path == "/api/shutdown":
+            if self._reject_if_csrf_strict():
+                return
+            self._handle_shutdown()
+            return
         if _is_internal_admin_path(path):
             if self._reject_if_csrf_strict():
                 return
@@ -3069,6 +3076,10 @@ class Handler(SimpleHTTPRequestHandler):
         if approved is not None and not isinstance(approved, list):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "approved_ids must be a list"})
             return
+        dismissed = payload.get("dismissed")
+        if dismissed is not None and not isinstance(dismissed, list):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "dismissed must be a list"})
+            return
 
         root = data_root()
         if manual_items is None:
@@ -3089,6 +3100,9 @@ class Handler(SimpleHTTPRequestHandler):
         if field_overrides is None:
             approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
             field_overrides = approved_doc.get("field_overrides") or {}
+        if dismissed is None:
+            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
+            dismissed = approved_doc.get("dismissed") or []
 
         if not isinstance(store_overrides, dict):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "store_overrides must be an object"})
@@ -3118,6 +3132,16 @@ class Handler(SimpleHTTPRequestHandler):
             v = str(val or "").strip().lower()
             if k and v:
                 clean_store[k] = v
+        dismissed_ids = {
+            str(item_id).strip()
+            for item_id in (dismissed or [])
+            if str(item_id).strip()
+        }
+
+        built_doc = _read_optional_json(root / FREE_CLAIMS_BUILT_PATH) or {}
+        live_items = [
+            it for it in (built_doc.get("items") or []) if isinstance(it, dict)
+        ]
 
         items = preview_publish_items(
             manual_items=manual_list,
@@ -3129,8 +3153,24 @@ class Handler(SimpleHTTPRequestHandler):
                 for k, v in field_overrides.items()
                 if str(k).strip() and isinstance(v, dict)
             },
+            dismissed_ids=dismissed_ids,
+            live_items=live_items,
         )
-        _send_json(self, HTTPStatus.OK, {"items": items, "count": len(items)})
+        # Mirror build_free_claims.py: the published feed carries the GamerPower
+        # attribution credit whenever a GamerPower-sourced item is present, so the
+        # preview iframe renders the same footer a brand-new user sees.
+        from build_free_claims import GAMERPOWER_ATTRIBUTION
+
+        attribution = (
+            [GAMERPOWER_ATTRIBUTION]
+            if any(item.get("source") == "gamerpower" for item in items)
+            else []
+        )
+        _send_json(
+            self,
+            HTTPStatus.OK,
+            {"items": items, "count": len(items), "attribution": attribution},
+        )
 
     def _handle_internal_free_claims_get(self) -> None:
         root = data_root()
@@ -3621,15 +3661,33 @@ class Handler(SimpleHTTPRequestHandler):
             payload = {"cancelled": MANAGER.cancel_all(profile_id=scope_pid)}
         _send_json(self, HTTPStatus.OK, payload)
 
+    def _handle_shutdown(self) -> None:
+        """Graceful shutdown for the tray launcher (localhost + X-BAKLOG-Local only)."""
+        _send_json(self, HTTPStatus.OK, {"ok": True})
+        threading.Thread(
+            target=_trigger_dev_shutdown, name="dev-shutdown", daemon=True
+        ).start()
+
+    def _handle_shutdown(self) -> None:
+        """Graceful shutdown for the tray launcher (localhost + X-BAKLOG-Local only)."""
+        _send_json(self, HTTPStatus.OK, {"ok": True})
+        threading.Thread(
+            target=_trigger_dev_shutdown, name="dev-shutdown", daemon=True
+        ).start()
+
     def _handle_auth_session_get(self) -> None:
-        """Lightweight account session probe (JWT + bound profile)."""
+        """Lightweight account session probe (JWT + bound profile + plan)."""
+        from shared.entitlement import current_plan
         from shared.profile_paths import get_active_profile_id
         from shared.supabase_auth import verify_bearer_user
 
-        user = verify_bearer_user(self.headers.get("Authorization"))
+        authorization = self.headers.get("Authorization")
+        user = verify_bearer_user(authorization)
         if not user:
             _send_auth_required(self)
             return
+        # Resolve plan from the same verified bearer so the UI gets the real plan
+        # after sign-in (GET /api/config is fetched without a bearer at boot).
         _send_json(
             self,
             HTTPStatus.OK,
@@ -3637,6 +3695,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "ok": True,
                 "email": user.get("email") or "",
                 "profile": get_active_profile_id(),
+                "plan": current_plan(authorization),
             },
         )
 
@@ -4130,6 +4189,17 @@ def _shutdown_server() -> None:
     MANAGER.shutdown()
 
 
+def _trigger_dev_shutdown() -> None:
+    """Graceful shutdown for tray quit / POST /api/shutdown."""
+    _shutdown_server()
+    httpd = _DEV_HTTPD
+    if httpd is not None:
+        try:
+            httpd.shutdown()
+        except OSError:
+            pass
+
+
 def _maybe_import_legacy_env() -> None:
     """One-time: migrate root .env credentials into the default profile's encrypted
     blob, then archive .env as .env.imported. Never blocks server start on failure."""
@@ -4274,6 +4344,7 @@ class BaklogDevServer(ThreadingHTTPServer):
 
 
 def main() -> None:
+    global _DEV_HTTPD
     atexit.register(_shutdown_server)
     atexit.register(_remove_pid_file)
     _maybe_import_legacy_env()
@@ -4302,6 +4373,7 @@ def main() -> None:
     except OSError:
         print(_DEV_SERVER_BUSY_MSG, file=sys.stderr, flush=True)
         raise SystemExit(1) from None
+    _DEV_HTTPD = httpd
     with httpd:
         _write_pid_file()
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")

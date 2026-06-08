@@ -11,6 +11,7 @@ from pathlib import Path
 
 import requests
 
+from fetchers._base import refuse_empty_result
 from fetchers._progress import RunStats, started
 from shared.free_claims_sources import (
     EPIC_FREE_GAMES_URL,
@@ -18,7 +19,7 @@ from shared.free_claims_sources import (
     GAMERPOWER_URL,
     ITAD_GIVEAWAYS_RSS,
     carry_claim_enrichment,
-    dedup_claim_items,
+    dedup_claim_items_by_id,
     parse_epic_payload,
     parse_gamerpower_payload,
     parse_itad_rss,
@@ -116,8 +117,27 @@ def collect_claims(
             if stats:
                 stats.warn(f"ITAD source skipped: {exc}")
 
-    deduped = dedup_claim_items(collected)
+    deduped = dedup_claim_items_by_id(collected)
     return deduped, counts
+
+
+def _load_existing_items(output: Path) -> tuple[dict[str, dict], int]:
+    """Return ({id: row}, total_row_count) from a prior auto feed, if present."""
+    existing_by_id: dict[str, dict] = {}
+    count = 0
+    if output.is_file():
+        try:
+            old_doc = json.loads(output.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return existing_by_id, 0
+        for row in old_doc.get("items") or []:
+            if not isinstance(row, dict):
+                continue
+            count += 1
+            row_id = str(row.get("id") or "").strip()
+            if row_id:
+                existing_by_id[row_id] = row
+    return existing_by_id, count
 
 
 def main() -> int:
@@ -131,6 +151,16 @@ def main() -> int:
         help="Which source(s) to fetch (default: all)",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Allow writing an empty feed (e.g. genuinely no live giveaways).",
+    )
+    parser.add_argument(
+        "--allow-drift",
+        action="store_true",
+        help="Allow a feed sharply smaller than the prior run (partial source outage).",
+    )
     args = parser.parse_args()
 
     stats = RunStats()
@@ -143,23 +173,35 @@ def main() -> int:
 
     items, counts = collect_claims(sources, stats=stats)
 
-    existing_by_id: dict[str, dict] = {}
-    if args.output.is_file():
-        try:
-            old_doc = json.loads(args.output.read_text(encoding="utf-8"))
-            for row in old_doc.get("items") or []:
-                if not isinstance(row, dict):
-                    continue
-                row_id = str(row.get("id") or "").strip()
-                if row_id:
-                    existing_by_id[row_id] = row
-        except (OSError, json.JSONDecodeError):
-            pass
+    existing_by_id, prior_count = _load_existing_items(args.output)
     if existing_by_id:
         items = [
             carry_claim_enrichment(item, existing_by_id.get(str(item.get("id") or "").strip()))
             for item in items
         ]
+
+    # Refuse to clobber a good feed with nothing (e.g. every source failed) —
+    # mirrors the library fetcher exit-2 contract.
+    code = refuse_empty_result(
+        items,
+        label="fetch_claim_sources",
+        allow_empty=args.allow_empty,
+        output_path=args.output,
+    )
+    if code is not None:
+        return stats.finish("fetch_claim_sources", t0, exit_code=code)
+
+    # Refuse a suspicious shrink vs the prior feed (partial source outage) so a
+    # half-collected run can't silently halve the published claims (exit 3).
+    if not args.allow_drift and prior_count > 0:
+        floor = max(1, prior_count // 2)
+        if len(items) < floor:
+            stats.error(
+                f"fetch_claim_sources collected {len(items)} item(s) but the prior feed "
+                f"had {prior_count} (under the 50% floor) — likely a partial source outage. "
+                "Re-run with --allow-drift if this drop is real."
+            )
+            return stats.finish("fetch_claim_sources", t0, exit_code=3)
 
     fetched_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)

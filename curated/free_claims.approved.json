@@ -1,35 +1,33 @@
 {
   "ids": [
-    "gamerpower-3673",
-    "gamerpower-3672",
     "gamerpower-3671",
-    "gamerpower-3287",
     "gamerpower-3266",
     "gamerpower-3096",
     "gamerpower-3446",
     "gamerpower-2204",
-    "itad-9dcfdf2b0b35",
     "itad-b07aac9ebd26",
-    "itad-50a2b5b1d7a6",
     "itad-0c69ed1f1bd8",
     "itad-073a56345192",
-    "itad-047270155013",
     "gamerpower-1604",
+    "itad-1b0433806065",
+    "itad-dd5b5b16e035",
+    "itad-de23882e1f39",
+    "gamerpower-2386",
+    "gamerpower-3665",
     "itad-0d4598c53ffe",
-    "itad-1b0433806065"
+    "itad-7a69412dd110"
   ],
+  "store_overrides": {
+    "gamerpower-3671": "indiegala",
+    "gamerpower-3266": "indiegala",
+    "gamerpower-3446": "indiegala",
+    "itad-1b0433806065": "indiegala",
+    "itad-dd5b5b16e035": "indiegala",
+    "itad-0d4598c53ffe": "indiegala"
+  },
   "field_overrides": {
-    "gamerpower-3673": {
-      "title": "Relaxing Simulator"
-    },
-    "gamerpower-3672": {
-      "title": "Remothered: Broken Porcelain"
-    },
     "gamerpower-3671": {
       "title": "Flufftopia"
-    },
-    "gamerpower-3287": {
-      "title": "Mr.Brocco And Co"
     },
     "gamerpower-3266": {
       "title": "Carlos the Taco"
@@ -42,9 +40,6 @@
     },
     "gamerpower-2204": {
       "title": "Dual Chroma: Academy Carols"
-    },
-    "itad-9dcfdf2b0b35": {
-      "title": "Remothered: Tormented Fathers"
     },
     "itad-1b0433806065": {
       "title": "Die Young: Prologue"
@@ -64,34 +59,38 @@
     "itad-0c69ed1f1bd8": {
       "title": "Rogue Waters"
     },
-    "itad-50a2b5b1d7a6": {
-      "title": "Tell Me Why"
+    "gamerpower-1604": {
+      "title": "Dora Diginoid"
     },
-    "itad-047270155013": {
-      "title": "Gravity Circuit"
+    "itad-7a69412dd110": {
+      "title": "Relaxing Simulator"
     },
     "itad-0d4598c53ffe": {
       "title": "Mr.Brocco & Co"
     },
-    "gamerpower-1604": {
-      "title": "Dora Diginoid"
+    "gamerpower-2386": {
+      "title": "Tell Me Why"
+    },
+    "gamerpower-3665": {
+      "title": "Gravity Circuit"
     }
   },
   "dismissed": [
-    "itad-239f10d33b17",
     "gamerpower-3674",
-    "epic-rogue-waters-9764d6",
     "gamerpower-3667",
-    "gamerpower-3665",
-    "epic-songs-of-conquest",
     "gamerpower-3668",
     "itad-8b45ae1603ee",
     "itad-98730029b14b",
     "itad-d85d5bb4128d",
-    "gamerpower-3272",
+    "gamerpower-3287",
     "itad-78f8867f4481",
-    "gamerpower-2386",
-    "itad-7a69412dd110",
-    "itad-48cfa4ebeae5"
+    "itad-48cfa4ebeae5",
+    "itad-239f10d33b17",
+    "gamerpower-3673",
+    "epic-songs-of-conquest",
+    "epic-rogue-waters-9764d6",
+    "gamerpower-3272",
+    "itad-50a2b5b1d7a6",
+    "itad-047270155013"
   ]
 }

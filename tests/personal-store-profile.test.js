@@ -178,4 +178,71 @@ describe('personalStore.prepareForProfileSwitch', () => {
 
     expect(putCount).toBe(2);
   });
+
+  it('merges cached libraryFirstSeen with server doc and writes cache to localStorage', async () => {
+    const { libraryFirstSeenStorageKey } = await import('../js/profiles.js');
+    localStorage.setItem(
+      libraryFirstSeenStorageKey(),
+      JSON.stringify({ 'steam:1': 1000, 'steam:2': 2000 }),
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: {},
+              manual: [],
+              libraryFirstSeen: { 'steam:2': 5000, 'steam:3': 3000 },
+            }),
+          };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    await personalStore.init();
+
+    expect(state.libraryFirstSeenByKey).toEqual({
+      'steam:1': 1000,
+      'steam:2': 5000,
+      'steam:3': 3000,
+    });
+    expect(JSON.parse(localStorage.getItem(libraryFirstSeenStorageKey()))).toEqual({
+      'steam:1': 1000,
+      'steam:2': 5000,
+      'steam:3': 3000,
+    });
+  });
+
+  it('treats libraryFirstSeen-only server doc as meaningful (applies without migration)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url === '/api/personal') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: {},
+              prefs: {},
+              manual: [],
+              libraryFirstSeen: { 'steam:9': 9000 },
+            }),
+          };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    state.personal = {};
+    const result = await personalStore.init();
+    expect(result.pendingMigration).toBeNull();
+    expect(result.migrated).toBe(true);
+    expect(state.libraryFirstSeenByKey).toEqual({ 'steam:9': 9000 });
+  });
 });

@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { isSafeHttpUrl } from './dom-util.js';
 import {
   gameKey,
   findGameByKey,
@@ -71,6 +72,7 @@ import {
 import { reloadGames } from './library-load.js';
 import { bindAddGameModal } from './add-game-modal.js';
 import { openBugReportDialog } from './bug-report.js';
+import { reportError } from './error-boundary.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
 import { bindHiddenPanelUI } from './hidden-panel.js';
 import { createGlobalKeydownHandler } from './events.js';
@@ -96,6 +98,9 @@ import {
  * No-op when picks is already collapsed.
  */
 function closePicksIfOpen() {
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'C',location:'bind-events.js:100',message:'closePicksIfOpen entry',data:{earlyReturn:!!state.prefs.picksCollapsed,collapsed:state.prefs.picksCollapsed,containerHidden:document.getElementById('picksContainer')?.classList.contains('hidden'),btn:document.getElementById('togglePicks')?.textContent,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (state.prefs.picksCollapsed) return;
   state.prefs.picksCollapsed = true;
   savePrefs();
@@ -164,6 +169,7 @@ export function bindEvents() {
     if (!chip) return;
     if (chip.dataset.fetcherConnect) {
       e.preventDefault();
+      fetcherRunner.hideFetcherPopover();
       reconnectProvider(chip.dataset.fetcherConnect, { autoStart: false });
       return;
     }
@@ -180,7 +186,7 @@ export function bindEvents() {
     // (ITAD shop link or Steam store) instead of refocusing the same row that's
     // already visible in the table below. Dashboard path still drills into the row.
     if (action === "deal-hero" && card.dataset.dealUrl && state.activeView === "wishlist") {
-      window.open(card.dataset.dealUrl, "_blank", "noopener");
+      if (isSafeHttpUrl(card.dataset.dealUrl)) window.open(card.dataset.dealUrl, "_blank", "noopener,noreferrer");
       return;
     }
     if ((action === "deal-hero" || action === "deal-steal-jump") && card.dataset.key) {
@@ -196,7 +202,7 @@ export function bindEvents() {
       return;
     }
     if (action === "sponsored-deal") {
-      if (card.dataset.sponsorUrl) window.open(card.dataset.sponsorUrl, "_blank", "noopener");
+      if (isSafeHttpUrl(card.dataset.sponsorUrl)) window.open(card.dataset.sponsorUrl, "_blank", "noopener,noreferrer");
       return;
     }
     if (action === "deal-on-sale") {
@@ -210,13 +216,11 @@ export function bindEvents() {
   document.getElementById("dashboardWishlistStats")?.addEventListener("click", onWishlistStatsClick);
   document.getElementById("wishlistDealRadar")?.addEventListener("click", onWishlistStatsClick);
 
-  // Metered deep achievement/trophy sync: the trophy popover consumes a quota
-  // unit and asks us to re-pull the store's achievement data (a refresh run).
-  document.addEventListener("baklog:deep-sync", (e) => {
+  // Pro-only deep achievement/trophy sync: re-pull the store's achievement data.
+  document.addEventListener("baklog:deep-sync", async (e) => {
     const store = e.detail?.store;
-    if (store === "psn" || store === "xbox") {
-      fetcherRunner.run(store, { refresh: true });
-    }
+    if (store !== "psn" && store !== "xbox") return;
+    await fetcherRunner.run(store, { refresh: true });
   });
 
   void import('./claimable.js').then((claimable) => {
@@ -233,6 +237,17 @@ export function bindEvents() {
         return;
       }
       if (e.target.closest('[data-claim-clear]')) claimable.handleClaimableClick(e);
+    });
+    document.getElementById('claimHiddenDialog')?.addEventListener('click', (e) => {
+      const dlg = e.currentTarget;
+      if (e.target === dlg) {
+        claimable.closeHiddenClaimsModal();
+        return;
+      }
+      const restoreBtn = e.target.closest('[data-claim-restore]');
+      if (restoreBtn) {
+        claimable.restoreClaim(restoreBtn.dataset.claimRestore);
+      }
     });
   });
 
@@ -446,6 +461,9 @@ export function bindEvents() {
     savePrefs();
     document.getElementById("picksContainer").classList.toggle("hidden", state.prefs.picksCollapsed);
     document.getElementById("togglePicks").textContent = state.prefs.picksCollapsed ? "Show" : "Hide";
+    // #region agent log
+    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'B',location:'bind-events.js:460',message:'toggle click',data:{collapsed:state.prefs.picksCollapsed,containerHidden:document.getElementById('picksContainer')?.classList.contains('hidden'),btn:document.getElementById('togglePicks')?.textContent,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),initView:document.documentElement.getAttribute('data-init-view'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!state.prefs.picksCollapsed) renderPicks();
   });
   document.querySelectorAll(".pick-tab").forEach(btn => {
@@ -772,6 +790,9 @@ export function bindEvents() {
   document.getElementById("reportBug")?.addEventListener("click", () => {
     openBugReportDialog();
   });
+  document.getElementById("joinDiscord")?.addEventListener("click", () => {
+    kebabMenu.classList.remove("open");
+  });
   document.getElementById("importNotes").addEventListener("change", async e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -782,6 +803,7 @@ export function bindEvents() {
       renderTable();
     } catch (err) {
       console.warn('[importNotes] invalid JSON', err);
+      reportError(err, { source: 'importNotes', kind: 'import' });
       const banner = document.getElementById('bootErrorBanner');
       if (banner) {
         banner.textContent = 'Notes import failed - file is not valid JSON.';

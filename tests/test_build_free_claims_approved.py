@@ -36,6 +36,24 @@ def test_infer_store_from_text_maps_itchio_giveaways() -> None:
     ) == "itch"
 
 
+def test_infer_store_from_text_maps_indiegala_giveaways() -> None:
+    assert bfc._infer_store_from_text(
+        "other",
+        "Carlos the Taco (IndieGala) Giveaway",
+        "Download Carlos the Taco for free via IndieGala.",
+        "https://www.gamerpower.com/open/carlos-the-taco-pc-giveaway",
+    ) == "indiegala"
+
+
+def test_infer_store_from_text_prefers_itch_over_indiegala() -> None:
+    assert bfc._infer_store_from_text(
+        "other",
+        "Some Game",
+        "Free on itch.io, also listed on IndieGala.",
+        "",
+    ) == "itch"
+
+
 def test_infer_store_from_text_keeps_explicit_store() -> None:
     assert bfc._infer_store_from_text("epic", "Foo", "", "") == "epic"
 
@@ -403,6 +421,11 @@ def test_enrich_item_resolves_steam_appid_and_review(
         },
     )
     monkeypatch.setattr(bfc, "_steam_review_percent", lambda appid, lc: 98)
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: bfc._steam_portrait_cover(appid),
+    )
 
     out = bfc._enrich_item(raw, last_call)
 
@@ -460,6 +483,11 @@ def test_enrich_item_resolves_steam_cover_for_non_steam_row(
         },
     )
     monkeypatch.setattr(bfc, "_steam_review_percent", lambda appid, lc: 91)
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: bfc._steam_portrait_cover(appid),
+    )
 
     out = bfc._enrich_item(raw, [0.0])
 
@@ -492,12 +520,81 @@ def test_enrich_item_upgrades_gamerpower_cover_to_portrait(
         lambda appid, lc: {"name": "Tell Me Why", "genres": []},
     )
     monkeypatch.setattr(bfc, "_steam_review_percent", lambda appid, lc: 82)
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: bfc._steam_portrait_cover(appid),
+    )
 
     out = bfc._enrich_item(raw, [0.0])
 
     assert out["steam_appid"] == 1180660
     assert out["header_image"] == bfc._steam_portrait_cover(1180660)
     assert "gamerpower.com" not in (out["header_image"] or "")
+
+
+def test_enrich_item_falls_back_to_appdetails_header_when_portrait_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_header = (
+        "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"
+        "973000/header.jpg"
+    )
+    raw = {
+        "id": "itad-1b0433806065",
+        "store": "indiegala",
+        "title": "Die Young: Prologue",
+        "claim_url": "https://isthereanydeal.com/giveaways/7433/",
+        "steam_appid": 973000,
+        "source": "itad",
+    }
+    monkeypatch.setattr(bfc, "_verified_portrait_cover", lambda appid, lc: None)
+    monkeypatch.setattr(
+        bfc,
+        "_steam_app_details",
+        lambda appid, lc: {
+            "name": "Die Young: Prologue",
+            "header_image": real_header,
+        },
+    )
+    monkeypatch.setattr(bfc, "_steam_review_percent", lambda appid, lc: 78)
+
+    out = bfc._enrich_item(raw, [0.0])
+
+    assert out["steam_appid"] == 973000
+    assert out["header_image"] == real_header
+    assert out["header_image"] != bfc._steam_portrait_cover(973000)
+
+
+def test_enrich_item_uses_verified_portrait_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw = {
+        "id": "gamerpower-2386",
+        "store": "steam",
+        "title": "Tell Me Why (Steam) Giveaway",
+        "claim_url": "https://www.gamerpower.com/open/tell-me-why-steam-giveaway",
+        "steam_appid": 1180660,
+        "source": "gamerpower",
+    }
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: bfc._steam_portrait_cover(appid),
+    )
+    monkeypatch.setattr(
+        bfc,
+        "_steam_app_details",
+        lambda appid, lc: {
+            "name": "Tell Me Why",
+            "header_image": "https://cdn.example/tell-me-why-header.jpg",
+        },
+    )
+    monkeypatch.setattr(bfc, "_steam_review_percent", lambda appid, lc: 82)
+
+    out = bfc._enrich_item(raw, [0.0])
+
+    assert out["header_image"] == bfc._steam_portrait_cover(1180660)
 
 
 def test_enrich_item_borrows_cover_from_sibling_source(
@@ -529,6 +626,37 @@ def test_enrich_item_borrows_cover_from_sibling_source(
     assert out["header_image"] == "https://www.gamerpower.com/offers/madness.jpg"
 
 
+def test_enrich_item_upgrades_cover_when_sibling_has_better_portrait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    steam_portrait = bfc._steam_portrait_cover(2074560)
+    gamerpower_banner = "https://www.gamerpower.com/offers/1b/68ce9db7d6736.jpg"
+    monkeypatch.setattr(
+        bfc,
+        "_resolve_steam_appid_by_title",
+        lambda title, lc, blurb=None: None,
+    )
+    lookup = bfc._build_cover_lookup(
+        [
+            {
+                "id": "itad-brocco",
+                "title": "Mr.Brocco & Co - FREE on IndieGala on IndieGala Store",
+                "header_image": steam_portrait,
+            }
+        ]
+    )
+    raw = {
+        "id": "gamerpower-3287",
+        "store": "other",
+        "title": "Mr.Brocco And Co (IndieGala) Giveaway",
+        "claim_url": "https://www.gamerpower.com/open/mr-brocco-and-co-pc-giveaway",
+        "header_image": gamerpower_banner,
+        "source": "gamerpower",
+    }
+    out = bfc._enrich_item(raw, [0.0], lookup)
+    assert out["header_image"] == steam_portrait
+
+
 def test_resolve_steam_appid_from_itad_blurb(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -541,6 +669,126 @@ def test_resolve_steam_appid_from_itad_blurb(
         last_call=[0.0],
     )
     assert appid == 858710
+
+
+def test_preview_publish_items_carries_live_review_percent() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[
+            {
+                "id": "epic-rogue-waters-9764d6",
+                "store": "epic",
+                "title": "Rogue Waters",
+                "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters",
+                "ends_at": "2026-12-01T00:00:00Z",
+            },
+        ],
+        approved_ids={"epic-rogue-waters-9764d6"},
+        live_items=[
+            {
+                "id": "epic-rogue-waters-9764d6",
+                "store": "epic",
+                "title": "Rogue Waters",
+                "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters",
+                "review_percent": 76,
+            },
+        ],
+        now=now,
+    )
+    assert len(items) == 1
+    assert items[0]["review_percent"] == 76
+
+
+def test_preview_publish_items_borrows_review_by_title_when_id_differs() -> None:
+    """A re-keyed ITAD copy (no appid, different id than the live Epic row) should
+    still borrow the review % from its same-title live sibling."""
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[
+            {
+                "id": "itad-0c69ed1f1bd8",
+                "store": "epic",
+                "title": "Rogue Waters",
+                "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters",
+                "ends_at": "2026-12-01T00:00:00Z",
+            },
+        ],
+        approved_ids={"itad-0c69ed1f1bd8"},
+        live_items=[
+            {
+                "id": "epic-rogue-waters-9764d6",
+                "store": "epic",
+                "title": "Rogue Waters",
+                "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters",
+                "review_percent": 76,
+            },
+        ],
+        now=now,
+    )
+    assert len(items) == 1
+    assert items[0]["id"] == "itad-0c69ed1f1bd8"
+    assert items[0]["review_percent"] == 76
+
+
+def test_preview_publish_items_carries_forward_approved_missing_from_feed() -> None:
+    """An approved claim absent from the fresh auto feed but still present in the
+    live feed (not dismissed, not expired) must be carried into the preview, just
+    like the build does, so it is not falsely reported as removed."""
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[],
+        approved_ids={"itad-9dcfdf2b0b35"},
+        live_items=[
+            {
+                "id": "itad-9dcfdf2b0b35",
+                "store": "itad",
+                "title": "Remothered: Tormented Fathers",
+                "claim_url": "https://example.com/remothered",
+                "review_percent": 74,
+                "ends_at": None,
+            },
+        ],
+        now=now,
+    )
+    assert [it["id"] for it in items] == ["itad-9dcfdf2b0b35"]
+
+
+def test_preview_publish_items_does_not_carry_dismissed_or_expired() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[],
+        approved_ids={"itad-dismissed", "itad-expired"},
+        dismissed_ids={"itad-dismissed"},
+        live_items=[
+            {
+                "id": "itad-dismissed",
+                "store": "itad",
+                "title": "Dismissed Game",
+                "claim_url": "https://example.com/d",
+            },
+            {
+                "id": "itad-expired",
+                "store": "itad",
+                "title": "Expired Game",
+                "claim_url": "https://example.com/e",
+                "ends_at": "2026-05-01T00:00:00Z",
+            },
+        ],
+        now=now,
+    )
+    assert items == []
 
 
 def test_preview_publish_items_merges_without_network() -> None:
@@ -606,6 +854,299 @@ def test_resolve_steam_appid_by_title_uses_itad_slug_fallback(
     assert calls == ["Obscure Giveaway Title", "wytchwood"]
 
 
+def test_build_publishes_key_matched_row_when_approved_id_flipped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Approved itad id absent after dedup; surviving epic row should still publish."""
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+
+    input_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-songs-of-conquest",
+                        "store": "epic",
+                        "title": "Songs of Conquest",
+                        "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps(
+            {
+                "ids": ["itad-073a56345192"],
+                "field_overrides": {
+                    "itad-073a56345192": {"title": "Songs of Conquest"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None: {
+            "id": raw["id"],
+            "store": raw["store"],
+            "title": raw["title"],
+            "claim_url": raw["claim_url"],
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    ids = {item["id"] for item in built["items"]}
+    assert ids == {"epic-songs-of-conquest"}
+
+
+def test_build_key_matched_row_inherits_store_and_field_overrides(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+
+    input_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "gamerpower-3272",
+                        "store": "other",
+                        "title": "The Brave Little Cloud (IndieGala) Giveaway",
+                        "claim_url": "https://www.gamerpower.com/open/the-brave-little-cloud-pc-giveaway",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "gamerpower",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps(
+            {
+                "ids": ["itad-dd5b5b16e035"],
+                "store_overrides": {"itad-dd5b5b16e035": "indiegala"},
+                "field_overrides": {
+                    "itad-dd5b5b16e035": {"title": "The Brave Little Cloud"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None: {
+            "id": raw["id"],
+            "store": raw["store"],
+            "title": raw["title"],
+            "claim_url": raw["claim_url"],
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert len(built["items"]) == 1
+    item = built["items"][0]
+    assert item["id"] == "gamerpower-3272"
+    assert item["store"] == "indiegala"
+    assert item["title"] == "The Brave Little Cloud"
+
+
+def test_build_absent_approved_id_without_override_title_stays_id_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+
+    input_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-other",
+                        "store": "epic",
+                        "title": "Unrelated Game",
+                        "claim_url": "https://store.epicgames.com/en-US/p/other",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(json.dumps({"ids": ["itad-missing-no-title"]}), encoding="utf-8")
+
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None: {
+            "id": raw["id"],
+            "store": raw["store"],
+            "title": raw["title"],
+            "claim_url": raw["claim_url"],
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert built["items"] == []
+
+
+def test_preview_publish_items_matches_by_stable_key() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[
+            {
+                "id": "epic-rogue-waters-9764d6",
+                "store": "epic",
+                "title": "Rogue Waters",
+                "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters-9764d6",
+                "ends_at": "2099-01-01T00:00:00Z",
+            }
+        ],
+        approved_ids={"itad-0c69ed1f1bd8"},
+        field_overrides={"itad-0c69ed1f1bd8": {"title": "Rogue Waters"}},
+        now=now,
+    )
+    assert [item["id"] for item in items] == ["epic-rogue-waters-9764d6"]
+
+
+def test_preview_publish_items_excludes_dismissed_key_matched_duplicate() -> None:
+    """Hidden feed row must not re-enter via stale approved id title key."""
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[
+            {
+                "id": "epic-rogue-waters-9764d6",
+                "store": "epic",
+                "title": "Rogue Waters",
+                "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters-9764d6",
+                "ends_at": "2099-01-01T00:00:00Z",
+            }
+        ],
+        approved_ids={"itad-0c69ed1f1bd8"},
+        field_overrides={"itad-0c69ed1f1bd8": {"title": "Rogue Waters"}},
+        dismissed_ids={"epic-rogue-waters-9764d6"},
+        now=now,
+    )
+    assert items == []
+
+
+def test_build_excludes_dismissed_key_matched_duplicate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """main() must honor dismissed so hidden dupes do not publish."""
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+
+    input_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-songs-of-conquest",
+                        "store": "epic",
+                        "title": "Songs of Conquest",
+                        "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps(
+            {
+                "ids": ["itad-073a56345192"],
+                "field_overrides": {
+                    "itad-073a56345192": {"title": "Songs of Conquest"},
+                },
+                "dismissed": ["epic-songs-of-conquest"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None: {
+            "id": raw["id"],
+            "store": raw["store"],
+            "title": raw["title"],
+            "claim_url": raw["claim_url"],
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert built["items"] == []
+
+
 def test_merge_enriched_items_into_auto_feed(tmp_path: Path) -> None:
     auto_path = tmp_path / "free_claims.auto.json"
     auto_path.write_text(
@@ -641,3 +1182,75 @@ def test_merge_enriched_items_into_auto_feed(tmp_path: Path) -> None:
     assert row["steam_appid"] == 729000
     assert row["review_percent"] == 93
     assert row["genres"] == ["Adventure"]
+
+
+def test_enrich_item_light_keeps_existing_header() -> None:
+    real_header = (
+        "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"
+        "973000/header.jpg"
+    )
+    raw = {
+        "id": "itad-1b0433806065",
+        "store": "indiegala",
+        "title": "Die Young: Prologue",
+        "claim_url": "https://isthereanydeal.com/giveaways/7433/",
+        "header_image": real_header,
+        "steam_appid": 973000,
+        "source": "itad",
+    }
+    out = bfc._enrich_item_light(raw, None)
+    assert out["header_image"] == real_header
+    assert out["header_image"] != bfc._steam_portrait_cover(973000)
+
+
+def test_enrich_item_light_synthesizes_portrait_when_no_header() -> None:
+    raw = {
+        "id": "gamerpower-2386",
+        "store": "steam",
+        "title": "Tell Me Why (Steam) Giveaway",
+        "claim_url": "https://www.gamerpower.com/open/tell-me-why",
+        "steam_appid": 1180660,
+        "source": "gamerpower",
+    }
+    out = bfc._enrich_item_light(raw, None)
+    assert out["header_image"] == bfc._steam_portrait_cover(1180660)
+
+
+def test_merge_enriched_items_overwrites_dead_portrait_with_header(
+    tmp_path: Path,
+) -> None:
+    dead_portrait = bfc._steam_portrait_cover(973000)
+    real_header = (
+        "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"
+        "973000/header.jpg"
+    )
+    auto_path = tmp_path / "free_claims.auto.json"
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "itad-1b0433806065",
+                        "store": "indiegala",
+                        "title": "Die Young: Prologue",
+                        "claim_url": "https://example.com/dy",
+                        "header_image": dead_portrait,
+                        "steam_appid": 973000,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    enriched = [
+        {
+            "id": "itad-1b0433806065",
+            "header_image": real_header,
+            "steam_appid": 973000,
+            "review_percent": 78,
+        }
+    ]
+    updated = bfc.merge_enriched_items_into_auto_feed(auto_path, enriched)
+    assert updated == 1
+    saved = json.loads(auto_path.read_text(encoding="utf-8"))
+    assert saved["items"][0]["header_image"] == real_header

@@ -554,10 +554,19 @@ export function trophyProgressPillHtml(g) {
   const gsTotal = g.xbox_gamerscore_total;
   const gsCurAttr = gsCur != null ? ` data-gs-cur="${gsCur}"` : "";
   const gsTotalAttr = gsTotal != null ? ` data-gs-total="${gsTotal}"` : "";
+  const troCur = g.psn_trophies_earned;
+  const troTotal = g.psn_trophies_total;
+  const troCurAttr = troCur != null ? ` data-tro-cur="${troCur}"` : "";
+  const troTotalAttr = troTotal != null ? ` data-tro-total="${troTotal}"` : "";
   const tip = `${label}: ${pct}%`;
   const keyAttr = ` data-key="${escapeAttr(gameKey(g))}"`;
   const nameAttr = g.name ? ` data-name="${escapeAttr(g.name)}"` : "";
-  return `<button type="button" class="trophy-pill" data-trophy-pop data-store="${escapeAttr(store)}"${keyAttr}${nameAttr} data-pct="${pct}" data-label="${escapeAttr(label)}"${gsCurAttr}${gsTotalAttr} aria-label="${escapeAttr(tip)}" aria-haspopup="true" aria-expanded="false" title="${escapeAttr(tip)}">&#127942; ${pct}%</button>`;
+  return `<button type="button" class="trophy-pill" data-trophy-pop data-store="${escapeAttr(store)}"${keyAttr}${nameAttr} data-pct="${pct}" data-label="${escapeAttr(label)}"${gsCurAttr}${gsTotalAttr}${troCurAttr}${troTotalAttr} aria-label="${escapeAttr(tip)}" aria-haspopup="true" aria-expanded="false" title="${escapeAttr(tip)}">&#127942; ${pct}%</button>`;
+}
+
+export function platinumBadgeHtml(g) {
+  if (!g || !g.psn_platinum_earned) return "";
+  return '<span class="plat-badge" title="Platinum trophy earned">PLAT</span>';
 }
 
 export function singleStoreBadgeHtml(s, title) {

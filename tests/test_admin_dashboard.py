@@ -621,6 +621,31 @@ def test_free_claims_preview_dry_run_merge(
     assert not built_path.is_file()
 
 
+def test_free_claims_preview_excludes_dismissed_key_matched_duplicate(
+    admin_server: tuple[str, Path],
+) -> None:
+    """Dismissed hidden row must not re-enter preview via stale approved title key."""
+    base, _ = admin_server
+    payload = {
+        "manual_items": [],
+        "auto_items": [
+            {
+                "id": "epic-rogue-waters-9764d6",
+                "store": "epic",
+                "title": "Rogue Waters",
+                "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters-9764d6",
+                "ends_at": "2099-01-01T00:00:00Z",
+            }
+        ],
+        "approved_ids": ["itad-0c69ed1f1bd8"],
+        "field_overrides": {"itad-0c69ed1f1bd8": {"title": "Rogue Waters"}},
+        "dismissed": ["epic-rogue-waters-9764d6"],
+    }
+    code, data = _request(base, "POST", "/api/internal/free-claims/preview", body=payload)
+    assert code == 200
+    assert data.get("items") == []
+
+
 def test_free_claims_preview_bypasses_supabase_auth(
     admin_server: tuple[str, Path],
     monkeypatch: pytest.MonkeyPatch,

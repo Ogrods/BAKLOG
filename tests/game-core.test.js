@@ -24,6 +24,7 @@ import {
   combinedPlaytimeTooltip,
   storeUrlForGame,
   trophyProgressPillHtml,
+  platinumBadgeHtml,
 } from '../js/game-core.js';
 import { state } from '../js/state.js';
 
@@ -496,5 +497,32 @@ describe('trophyProgressPillHtml', () => {
     });
     expect(html).toContain('data-gs-cur="500"');
     expect(html).toContain('data-gs-total="1000"');
+  });
+
+  it('emits PSN trophy count data attributes when present', () => {
+    const html = trophyProgressPillHtml({
+      store: 'psn',
+      id: 'abc',
+      trophy_progress: 73,
+      psn_trophies_earned: 12,
+      psn_trophies_total: 33,
+    });
+    expect(html).toContain('data-tro-cur="12"');
+    expect(html).toContain('data-tro-total="33"');
+  });
+});
+
+describe('platinumBadgeHtml', () => {
+  it('returns empty when platinum is not earned', () => {
+    expect(platinumBadgeHtml(null)).toBe('');
+    expect(platinumBadgeHtml({ store: 'psn', id: 'abc' })).toBe('');
+    expect(platinumBadgeHtml({ store: 'psn', id: 'abc', psn_platinum_earned: false })).toBe('');
+  });
+
+  it('renders a platinum badge when earned', () => {
+    const html = platinumBadgeHtml({ store: 'psn', id: 'abc', psn_platinum_earned: true });
+    expect(html).toContain('plat-badge');
+    expect(html).toContain('PLAT');
+    expect(html).toContain('Platinum trophy earned');
   });
 });

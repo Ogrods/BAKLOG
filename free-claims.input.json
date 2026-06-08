@@ -1,3 +1,34 @@
 {
-  "items": []
+  "items": [
+    {
+      "id": "gamerpower-3672",
+      "store": "gog",
+      "title": "Remothered: Broken Porcelain",
+      "claim_url": "https://www.gamerpower.com/open/remothered-broken-porcelain-gog-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1142390/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
+      "ends_at": "2026-06-08T23:59:00Z",
+      "steam_appid": 1142390,
+      "review_percent": 60,
+      "source": "gamerpower"
+    },
+    {
+      "id": "itad-9dcfdf2b0b35",
+      "store": "steam",
+      "title": "Remothered: Tormented Fathers",
+      "claim_url": "https://isthereanydeal.com/giveaways/16245/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/633360/library_600x900_2x.jpg",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Indie"
+      ],
+      "blurb": "Remothered: Tormented Fathers",
+      "ends_at": null,
+      "steam_appid": 633360,
+      "review_percent": 74,
+      "source": "itad"
+    }
+  ]
 }

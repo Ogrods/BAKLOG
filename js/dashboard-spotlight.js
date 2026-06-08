@@ -28,6 +28,12 @@ export const SPOTLIGHT_FADE_MS = 300;
 const RECENT_SPOTLIGHT_CAP = 5;
 const RECENT_QUOTA = 5;
 
+// No-repeat window: once a game is shown it shouldn't surface again for roughly
+// this many rotations. The pool is reshuffled on every dashboard rebuild, so
+// without this guard a just-seen title could reappear a slide or two later.
+// Capped to pool.length - 1 at lookup time so small libraries can't deadlock.
+export const SPOTLIGHT_NO_REPEAT_WINDOW = 25;
+
 // Rare "stinker" easter egg: occasionally the spotlight surfaces the
 // lowest-rated game in your catalog with a tongue-in-cheek eyebrow. Same rarity
 // as the rare boot-loading tip (RARE_CHANCE in js/tips.js).
@@ -131,6 +137,54 @@ let _spotlightPool = [];
 let _spotlightCurrentKey = null;
 let _spotlightPaused = false;
 let _spotlightPausedByUser = false;
+// Keys of recently-shown slides, oldest first. Persists across pool rebuilds so
+// the no-repeat window survives dashboard re-renders. Self-capped in
+// recordSpotlightShown so it can't grow unbounded.
+let _spotlightRecentKeys = [];
+
+/** Effective no-repeat window, never larger than pool.length - 1 (avoids deadlock). */
+function spotlightNoRepeatWindow() {
+  return Math.min(SPOTLIGHT_NO_REPEAT_WINDOW, Math.max(0, _spotlightPool.length - 1));
+}
+
+function isSpotlightRecentlyShown(key) {
+  const window = spotlightNoRepeatWindow();
+  if (window <= 0) return false;
+  const start = Math.max(0, _spotlightRecentKeys.length - window);
+  for (let i = start; i < _spotlightRecentKeys.length; i++) {
+    if (_spotlightRecentKeys[i] === key) return true;
+  }
+  return false;
+}
+
+function recordSpotlightShown(key) {
+  if (!key) return;
+  if (_spotlightRecentKeys[_spotlightRecentKeys.length - 1] === key) return;
+  _spotlightRecentKeys.push(key);
+  if (_spotlightRecentKeys.length > SPOTLIGHT_NO_REPEAT_WINDOW * 4) {
+    _spotlightRecentKeys = _spotlightRecentKeys.slice(-SPOTLIGHT_NO_REPEAT_WINDOW * 2);
+  }
+}
+
+/** Test seam: inspect / reset the no-repeat history. */
+export function getSpotlightRecentKeysForTest() { return _spotlightRecentKeys.slice(); }
+export function resetSpotlightRecentKeysForTest() { _spotlightRecentKeys = []; }
+
+/**
+ * Next auto-rotation index that skips any slide inside the no-repeat window.
+ * Walks forward from the current index; if every candidate is still within the
+ * window (shouldn't happen given the window cap) it falls back to the next slot.
+ */
+function nextSpotlightIndex() {
+  const len = _spotlightPool.length;
+  if (len <= 1) return _spotlightIndex;
+  let idx = _spotlightIndex;
+  for (let step = 0; step < len; step++) {
+    idx = (idx + 1) % len;
+    if (!isSpotlightRecentlyShown(gameKey(_spotlightPool[idx]))) return idx;
+  }
+  return (_spotlightIndex + 1) % len;
+}
 
 function prefersReducedMotion() {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
@@ -195,22 +249,84 @@ function compareRecentAdditionEntries(a, b) {
   return (a.g.name || "").localeCompare(b.g.name || "");
 }
 
-function compareBackfillAdditionEntries(a, b) {
-  const ra = ratingValue(a.g);
-  const rb = ratingValue(b.g);
-  if (rb !== ra) return rb - ra;
-  return (a.g.name || "").localeCompare(b.g.name || "");
+function parseAddedAtMs(g) {
+  const raw = g.added_at;
+  if (!raw) return 0;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : 0;
 }
 
-/** Top N library games by first-seen timestamp (for dashboard recents card). */
+function parseLastPlayedMs(g) {
+  const lp = g.last_played;
+  if (lp == null || lp === '') return 0;
+  const n = Number(lp);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  // Steam rtime_last_played is epoch seconds; values already in ms stay valid.
+  return n < 1e12 ? n * 1000 : n;
+}
+
+/** Sort key for backfill rows (baseline games without first-seen > 0). */
+function backfillSortKey(g) {
+  const added = parseAddedAtMs(g);
+  if (added > 0) return { tier: 1, ms: added };
+  const played = parseLastPlayedMs(g);
+  if (played > 0) return { tier: 2, ms: played };
+  const release = parseReleaseForSort(g.release_date);
+  if (release > 0) return { tier: 3, ms: release };
+  return { tier: 4, ms: 0 };
+}
+
+function compareBackfillEntries(a, b) {
+  const ka = backfillSortKey(a.g);
+  const kb = backfillSortKey(b.g);
+  if (ka.tier !== kb.tier) return ka.tier - kb.tier;
+  if (kb.ms !== ka.ms) return kb.ms - ka.ms;
+  return (a.g.name || '').localeCompare(b.g.name || '');
+}
+
+function displayAddedAtForRecent(g, firstSeen) {
+  if (firstSeen > 0) return firstSeen;
+  const added = parseAddedAtMs(g);
+  return added > 0 ? added : null;
+}
+
+/** Top N library games for the dashboard recents card.
+ *  Genuinely-tracked additions (first-seen > 0) lead; remaining slots backfill
+ *  from the rest of the library by added_at -> last_played -> release year.
+ *  _addedAt is set only for true add dates (first-seen or added_at). */
 export function computeRecentAdditions(games, cap = 10) {
-  if (!state.prefs.librarySeenSeeded) return [];
+  if (!games.length) return [];
   const seen = state.libraryFirstSeenByKey || {};
-  const entries = games.map(g => ({ g, at: seen[gameKey(g)] ?? 0 }));
-  const timestamped = entries.filter(e => e.at > 0).sort(compareRecentAdditionEntries);
-  const baseline = entries.filter(e => e.at <= 0).sort(compareBackfillAdditionEntries);
-  const result = [...timestamped, ...baseline].slice(0, cap);
-  return result.map(e => ({ ...e.g, _addedAt: e.at }));
+  const picked = new Set();
+  const out = [];
+
+  const tracked = games
+    .map(g => ({ g, at: seen[gameKey(g)] ?? 0 }))
+    .filter(e => e.at > 0)
+    .sort(compareRecentAdditionEntries);
+
+  for (const e of tracked) {
+    if (out.length >= cap) break;
+    const key = gameKey(e.g);
+    if (picked.has(key)) continue;
+    picked.add(key);
+    out.push({ ...e.g, _addedAt: e.at });
+  }
+
+  if (out.length < cap) {
+    const backfill = games
+      .filter(g => !picked.has(gameKey(g)))
+      .map(g => ({ g }))
+      .sort(compareBackfillEntries);
+    for (const e of backfill) {
+      if (out.length >= cap) break;
+      const key = gameKey(e.g);
+      picked.add(key);
+      out.push({ ...e.g, _addedAt: displayAddedAtForRecent(e.g, 0) });
+    }
+  }
+
+  return out;
 }
 
 function gameSpotlightReason(g, recentKeys) {
@@ -712,6 +828,7 @@ function applySpotlightSlide(el, next) {
   el.classList.remove('is-fading');
   primeSpotlightArt(el);
   _spotlightCurrentKey = gameKey(next);
+  recordSpotlightShown(_spotlightCurrentKey);
   el._spotlightSyncHover?.();
   announceSpotlightSlide(next);
   updateSpotlightControlsUI();
@@ -740,7 +857,7 @@ function startSpotlightTimer(el) {
       stopSpotlightRotation();
       return;
     }
-    _spotlightIndex = (_spotlightIndex + 1) % _spotlightPool.length;
+    _spotlightIndex = nextSpotlightIndex();
     fadeToSpotlight(el, _spotlightPool[_spotlightIndex]);
   }, SPOTLIGHT_INTERVAL_MS);
 }
@@ -1025,6 +1142,11 @@ export function startSpotlightRotation(pool) {
   wireSpotlightHover(el);
   updateSpotlightControlsUI();
   announceSpotlightSlide(pool[_spotlightIndex] || pool[0]);
+  // The initial slide is painted via renderSpotlightHtml (not applySpotlightSlide),
+  // so seed the no-repeat history with whatever is actually on screen. Use the
+  // live element key (not pool[0]) so a reshuffled pool whose front differs from
+  // the displayed slide can't poison the recency window with an unseen game.
+  recordSpotlightShown(el.dataset.key || (pool[0] && gameKey(pool[0])));
   if (domMatches) {
     if (_spotlightTimer) return;
     if (!_spotlightPaused) startSpotlightTimer(el);

@@ -1,0 +1,16 @@
+[
+  { "input": "Foo (Steam) Giveaway", "expected": "Foo" },
+  { "input": "Rogue Waters (Epic Games) Giveaway", "expected": "Rogue Waters" },
+  { "input": "Rogue Waters free at EGS on Epic Game Store", "expected": "Rogue Waters" },
+  { "input": "Relaxing Simulator free on EpicGameStore", "expected": "Relaxing Simulator" },
+  { "input": "Relaxing Simulator free on EpicGameStore on Epic Game Store", "expected": "Relaxing Simulator" },
+  { "input": "Northgard free for mobile on EGS", "expected": "Northgard" },
+  { "input": "Warframe in game items", "expected": "Warframe" },
+  { "input": "Warframe in game currency pack bonus", "expected": "Warframe" },
+  { "input": "Remothered free on GOG", "expected": "Remothered" },
+  { "input": "Remothered: Tormented Fathers on Steam", "expected": "Remothered: Tormented Fathers" },
+  { "input": "Saga - Chapters 1,2,3", "expected": "Saga" },
+  { "input": "Hollow Knight Giveaway", "expected": "Hollow Knight" },
+  { "input": "Plain Title", "expected": "Plain Title" },
+  { "input": "", "expected": "" }
+]

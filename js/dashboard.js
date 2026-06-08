@@ -94,6 +94,7 @@ export function dashboardFingerprint() {
   return JSON.stringify({
     // Omit _dataVersion — it bumps on every merge (including no-op wishlist
     // re-fetches) and would defeat this fingerprint, forcing chart teardown.
+    lg: dashboardLibraryGames().length,
     itch: (state.itchGames || []).filter(itchIsGame).length,
     qw: state.prefs.quickWinMaxHours || 0,
     ihn: !!state.sessionPrefs.itchHideNonGames,

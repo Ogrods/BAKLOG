@@ -25,7 +25,7 @@ from fetchers._base import (
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
-from xbox_client import XboxAuthError, XboxClient
+from xbox_client import XboxAuthError, XboxClient, XboxRateLimitError
 
 GAMES_XBOX_JSON = Path("games_xbox.json")
 HLTB_DELAY_SEC = 1.0
@@ -140,6 +140,13 @@ def main() -> int:
         gt = client.get_gamertag()
         print(f"OpenXBL account: {gt or '(unknown gamertag)'}", flush=True)
         titles = client.get_title_history()
+    except XboxRateLimitError as e:
+        # Throttling is transient and key-agnostic — do NOT mark_invalid (that
+        # wrongly flips the connection to "expired", prompts a reconnect, and
+        # the reconnect's own OpenXBL calls burn even more of the hourly quota).
+        # Keep the saved key and fail as a plain error so the chip retries later.
+        stats.error(str(e))
+        return stats.finish("fetch_xbox", t0, exit_code=1)
     except XboxAuthError as e:
         mark_invalid("xbox", error=str(e))
         stats.error(str(e))

@@ -587,6 +587,42 @@ class CdpPage:
         except Exception:
             pass
 
+    def focus_window(self) -> None:
+        """Raise the browser window to the OS foreground (above other apps).
+
+        ``Page.bringToFront`` only activates the tab inside Chrome; on Windows the
+        connect window frequently opens *behind* the dashboard/IDE. Toggling the
+        window state (minimize then restore via ``Browser.setWindowBounds``)
+        forces the OS to raise and focus the window past the foreground lock, then
+        we re-activate the tab so the login page is the one shown on top.
+        """
+        try:
+            result = self._context._send(
+                "Browser.getWindowForTarget", {"targetId": self._target_id}
+            )
+        except Exception:
+            result = {}
+        window_id = result.get("windowId")
+        if window_id is None:
+            self.bring_to_front()
+            return
+        bounds = result.get("bounds") or {}
+        restore_state = bounds.get("windowState") or "normal"
+        if restore_state == "minimized":
+            restore_state = "normal"
+        try:
+            self._context._send(
+                "Browser.setWindowBounds",
+                {"windowId": window_id, "bounds": {"windowState": "minimized"}},
+            )
+            self._context._send(
+                "Browser.setWindowBounds",
+                {"windowId": window_id, "bounds": {"windowState": restore_state}},
+            )
+        except Exception:
+            pass
+        self.bring_to_front()
+
     def close(self) -> None:
         if self._closed:
             return

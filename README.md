@@ -28,6 +28,26 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 
 **Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium for the Connect sign-in flow (override with `BAKLOG_CHROME_PATH`), then `pip install -r requirements.txt` and `python server.py`. Developers/CI: `pip install -e ".[dev]"` (or `requirements-dev.txt`).
 
+### System tray (optional)
+
+Keep BAKLOG running in the background with a tray icon — starts the same local server, opens your browser, and offers **Open**, **Restart**, and **Quit** from the menu:
+
+```powershell
+pip install pystray Pillow   # tray UI (included in requirements optional deps)
+.\.venv\Scripts\pythonw.exe tray_app.py
+```
+
+Or build a portable folder (includes its own `.venv` + tray `.bat` files):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
+# then run dist\baklog\Start BAKLOG (tray).bat
+```
+
+**Start at login:** the tray menu can register login autostart (Windows registry / macOS LaunchAgent / Linux XDG). In dev this launches `tray_app.py`; the PyInstaller `BAKLOG.exe` bundle is server-only (no tray icon) — use the tray launcher or `refresh.ps1` / OS scheduler for closed-app refresh.
+
+**Pro background refresh:** when the server process is alive (tray or `python server.py`), the paid tier scheduler refreshes stale stores without an open browser tab. Under Supabase auth, sign in once in the browser so the server caches your plan for headless refresh.
+
 **Optional invite-only accounts:** Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. Set `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing. Set `BAKLOG_LOCAL_PROFILES=1` to keep the local Work/Play profile switcher available while Supabase sign-in stays on (optional per-profile PINs gate switching; profile mutations require the in-app `X-BAKLOG-Local` header).
 
 ### Store availability by platform
@@ -71,6 +91,16 @@ Credentials are stored via your OS **keyring** (Windows Credential Manager, macO
 - **Auto-refresh stale stores** (default on): Connections toggle — quietly refreshes one store older than 24h every ~30 min while the app is open
 - **Auto-enrich** (default on): after a library fetch adds games, queues HLTB, reviews, covers, and co-op tags
 - **ITAD auto-refresh** (default on): deal prices refresh on a 15–60 min schedule while the dashboard is open
+
+### Planned paid tier ($5/mo)
+
+BAKLOG is free forever to import and browse. A planned optional paid tier adds power-user conveniences — none of today's free features will move behind it:
+
+- **Queued bulk refresh** — queue every stale store in one sweep; fetchers run back-to-back (free tier: one store at a time, on demand)
+- Scheduled stale-store refresh without keeping the app open
+- Cloud sync, no sponsored deal cards, deep achievement/trophy sync (full re-pull; free tier: cached % only), deal alerts, bonus claimables feed
+
+See [baklog.app](https://baklog.app/) for the full free-vs-paid breakdown.
 
 ### Blacklist vs hidden list
 
@@ -370,6 +400,31 @@ The last 200 errors are kept in browser `localStorage` so the bundle can
 include history across reloads. Clear the ring with
 `localStorage.removeItem('baklog-error-log')` in DevTools.
 
+**Fetcher failures are separate.** Store refresh problems show up in the
+Fetcher health panel and `profiles/<id>/cache/runs/*.jsonl` logs (exit codes
+0–4). They are not auto-sent to the bug-report endpoint.
+
+**Quick test:** DevTools → `throw new Error('test')` → sticky toast appears →
+**Report a bug…** shows the scrubbed bundle preview. Nothing is POSTed until
+you click **Send report** in the dialog. For local dev without hitting
+production, set `window.__BAKLOG_REPORT_ENDPOINT` or the
+`baklog-report-endpoint` meta tag in `index.html` (see
+[PRIVACY.md](PRIVACY.md#error-logs-and-bug-reporting)).
+
+### Community & support
+
+- **Discord** — [Join the community](https://discord.gg/baklog) for beta chat,
+  `#bug-reports`, and `#feature-requests`. No app data is piped to Discord;
+  use **Report a bug…** or paste a **Copy bug bundle** when filing bugs.
+- **GitHub** — [Open an issue](https://github.com/Ogrods/steam-backlog/issues/new)
+  for reproducible bugs and feature requests (long-term record).
+- **Email** — [dan@baklog.app](mailto:dan@baklog.app) for invite or support
+  questions.
+
+Discord invite URL is canonical in
+[`shared/community.json`](shared/community.json) — keep it in sync with the
+landing footer and app kebab menu.
+
 ### Personal data storage
 
 When you launch via `python server.py` (the recommended mode), your statuses, notes, priorities, tags, UI prefs, and manually-added games are persisted to `data/personal.json`. The file is the source of truth — back it up, sync it via Dropbox/OneDrive/git, copy it to another machine. The dev server writes atomically (temp file + rename) and keeps a rolling set of timestamped backups in `data/personal_backups/` so a bad save can't wipe earlier edits.
@@ -438,6 +493,7 @@ crontab -e
 | `enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |
 | `enrich_hltb.py` | Backfill HLTB hours on any store JSON |
 | `python -m enrichers <cmd>` | Wrapper: `hltb`, `steam-reviews`, `cross-store-images` |
+| `tray_app.py` | Optional system tray launcher (starts `server.py`, opens browser) |
 | `shared/`, `fetchers/` | Shared JSON slim + fetcher base helpers |
 | `js/state.js`, `js/app.js` | Dashboard app (ES modules) |
 | `steam_client.py` | Steam Web API + Store API client |

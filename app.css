@@ -419,7 +419,7 @@ html[data-init-view="connections"] .view-tab[data-view="connections"] {
   --brand-humble: #cb272c;
   --brand-ea: #f05556;
   --brand-itch: #fa5c5c;
-  --brand-indiegala: #1faf38;
+  --brand-indiegala: #e41f27;
 }
 
 html[data-theme="dark"] {
@@ -897,7 +897,9 @@ button[disabled] { cursor: not-allowed; }
   transform: scale(1.25);
 }
 .deal-hero .cover-wrap.landscape::before,
-.claim-hero-card .cover-wrap.landscape::before {
+.claim-hero-card .cover-wrap.landscape::before,
+.claim-row-cover-wrap.landscape::before,
+.claim-cover-wrap.landscape::before {
   background-color: color-mix(in srgb, var(--accent) 22%, var(--bg));
   background-image: var(--cover-blur-img, none);
   background-size: cover;
@@ -910,6 +912,8 @@ button[disabled] { cursor: not-allowed; }
 }
 .cover-wrap.landscape img.pick-cover,
 .cover-wrap.landscape img.deal-hero-cover,
+.cover-wrap.landscape img.claim-row-cover,
+.cover-wrap.landscape img.claim-cover-thumb,
 .cover-wrap.landscape img.cover { position: relative; z-index: 1; background: transparent; }
 .cover.landscape, .pick-cover.landscape, .deal-hero-cover.landscape { background: transparent; }
 .cover-wrap.landscape .ea-ribbon { z-index: 2; }
@@ -967,6 +971,20 @@ button[disabled] { cursor: not-allowed; }
 }
 .coop-pill-online { background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%); color: #06141f; }
 .coop-pill-local { background: linear-gradient(180deg, #34d399 0%, #047857 100%); color: #052017; }
+.plat-badge {
+  display: inline-flex; align-items: center;
+  background: linear-gradient(180deg, #e8eef5 0%, #9eb4cc 55%, #6b7f96 100%);
+  color: #0f172a;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.4;
+  flex-shrink: 0;
+  border: 1px solid rgba(158, 180, 204, 0.55);
+}
 .trophy-pill {
   display: inline-flex; align-items: center; gap: 2px;
   padding: 0 5px; height: 16px;
@@ -978,7 +996,7 @@ button[disabled] { cursor: not-allowed; }
   border: 1px solid rgba(148, 163, 184, 0.25);
   white-space: nowrap;
   flex-shrink: 0;
-  cursor: pointer;
+  cursor: default;
   user-select: none;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -988,11 +1006,6 @@ button[disabled] { cursor: not-allowed; }
   background: rgba(148, 163, 184, 0.22);
   border-color: rgba(148, 163, 184, 0.45);
   outline: none;
-}
-.trophy-pill[aria-expanded="true"] {
-  color: #f8fafc;
-  background: rgba(251, 191, 36, 0.15);
-  border-color: rgba(251, 191, 36, 0.45);
 }
 .trophy-pop {
   position: fixed;
@@ -1040,29 +1053,31 @@ button[disabled] { cursor: not-allowed; }
   line-height: 1.35;
 }
 .trophy-pop-gs strong { color: #f8fafc; font-weight: 600; }
-/* Metered deep-sync footer inside the trophy popover. */
+.trophy-pop--interactive { pointer-events: auto; }
 .trophy-pop-meter {
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  border-top: 1px solid #334155;
 }
 .trophy-pop-sync {
-  flex-shrink: 0;
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
   font-size: 11px;
   font-weight: 600;
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #f8fafc;
+  background: rgba(124, 58, 237, 0.35);
+  border: 1px solid rgba(167, 139, 250, 0.55);
   border-radius: 6px;
-  padding: 2px 8px;
-  background: transparent;
   cursor: pointer;
 }
-.trophy-pop-sync:hover:not(:disabled) { background: rgba(56, 189, 248, 0.12); }
-.trophy-pop-sync:disabled { color: #64748b; border-color: rgba(100, 116, 139, 0.4); cursor: not-allowed; }
-.trophy-pop-meter-label { font-size: 10px; color: #94a3b8; line-height: 1.3; }
+.trophy-pop-sync:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.5);
+}
+.trophy-pop-sync:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 /* === Chips & badges === */
 .genre-chip.active { background: var(--accent-dim); border-color: var(--accent-bright); color: #f8fafc; }
 .store-chip.active { background: #7c3aed; border-color: #a78bfa; color: #f8fafc; }
@@ -1110,11 +1125,11 @@ input[type="range"] {
   justify-content: center;
   box-sizing: border-box;
   text-align: center;
-  min-width: 16px;
+  width: 16px;
   height: 16px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 0 5px;
+  padding: 0;
   border-radius: 4px;
   line-height: 1;
   flex-shrink: 0;
@@ -1137,14 +1152,13 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .store-badge.indiegala { background: var(--brand-indiegala); color: #fff; }
 .store-badge.humble { background: var(--brand-humble); color: #fff; }
 .store-badge.ea { background: var(--brand-ea); color: #fff; }
-/* "EA" / "IG" are two letters, so the letter badge needs extra width/smaller type.
-   The glyph badge is square like the rest, so scope these to the letter case. */
+/* "EA" / "IG" are two letters — smaller type so they fit the square badge. */
 .store-badge.ea:not(.store-badge--glyph),
-.store-badge.indiegala:not(.store-badge--glyph) { font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
+.store-badge.indiegala:not(.store-badge--glyph) { font-size: 0.52rem; font-weight: 800; letter-spacing: -0.02em; }
 .store-badge.itad { background: #22d3ee; color: #06303a; }
 .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
-.store-badge--md { height: 22px; min-width: 22px; font-size: 12px; border-radius: 5px; padding: 0 6px; }
-.store-badge--lg { height: 24px; min-width: 24px; font-size: 13px; border-radius: 6px; padding: 0 8px; }
+.store-badge--md { width: 22px; height: 22px; font-size: 14px; border-radius: 5px; padding: 0; }
+.store-badge--lg { width: 24px; height: 24px; font-size: 15px; border-radius: 6px; padding: 0; }
 /* SVG logo badges (js/store-logos.js storeLogoHtml). The mask glyph is painted
    with currentColor so each store's text color (e.g. Amazon's dark ink) carries
    over, and flex centering on .store-badge handles alignment perfectly. */
@@ -1174,9 +1188,64 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .store-logo--lg { width: 24px; height: 24px; min-width: 24px; border-radius: 6px; }
 .store-logo--letter {
   color: #fff;
-  font-size: 0.58rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
+}
+.store-logo--letter.store-logo--sm { font-size: 0.66rem; }
+.store-logo--letter.store-logo--md { font-size: 0.82rem; }
+.store-logo--letter.store-logo--lg { font-size: 0.9rem; }
+/* Short lowercase wordmark (e.g. "gog") squeezed into the square hero badge.
+   The badge box stays untransformed so it lines up with sibling badges; only
+   the inner .store-logo-word is nudged up for optical centering. */
+.store-logo--word {
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: -0.04em;
+  font-feature-settings: "kern" 1;
+  line-height: 1;
+}
+.store-logo--word.store-logo--sm { font-size: 0.52rem; }
+.store-logo--word.store-logo--md { font-size: 0.64rem; }
+.store-logo--word.store-logo--lg { font-size: 0.7rem; }
+.store-logo-word { display: block; transform: translateY(0); }
+.store-logo--md .store-logo-word,
+.store-logo--lg .store-logo-word { transform: translateY(-1px); }
+/* Squeezed lowercase "gog" wordmark in the purple square badge — used sitewide
+   by storeLogoHtml for GOG. Box stays even with sibling badges; the wordmark
+   scales at a constant ~0.373 font-to-box ratio so proportions hold at every
+   size. Vertical centering via flex (inner .store-badge-word nudge in em so it
+   scales with the text). */
+.store-badge--word {
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  font-size: 0.46rem;           /* 16px box (sm) — larger so it reads in dense rows */
+}
+.conn-rail-badge.store-badge--word {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 0.42rem;           /* 18px box */
+}
+.store-badge--md.store-badge--word { font-size: 0.513rem; }  /* 22px box */
+.store-badge--lg.store-badge--word { font-size: 0.56rem; }   /* 24px box */
+.store-badge-word { display: block; transform: translateY(0.06em); }
+/* Connections rail badge: nudge the "gog" wordmark 1px right for optical centering. */
+.conn-rail-badge.store-badge--word .store-badge-word { transform: translate(1px, 0.06em); }
+/* Connections detail card badge (lg): nudge the "gog" wordmark up + right 1px. */
+.conn-card-badge.store-badge--word .store-badge-word { transform: translate(1px, calc(0.06em - 1px)); }
+/* Connections detail card badge (lg): nudge the "gog" wordmark up + right 1px. */
+.conn-card-badge.store-badge--word .store-badge-word { transform: translate(1px, -0.5px); }
+/* Small library/row badges (sm, not rail/md/lg): bump the wordmark up + left a
+   touch for optical centering at the tiny 16px size. */
+.store-badge--word:not(.conn-rail-badge):not(.store-badge--md):not(.store-badge--lg) .store-badge-word {
+  transform: translate(1px, -2px);
+}
+/* Small library/row badges: PlayStation glyph reads slightly left at 16px. */
+.store-badge.psn:not(.conn-rail-badge):not(.store-badge--md):not(.store-badge--lg) .store-badge-glyph {
+  transform: translate(1px, 0);
 }
 .store-logo--manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
 .store-logo-glyph {
@@ -1187,6 +1256,8 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   -webkit-mask: var(--store-logo-glyph) center / contain no-repeat;
           mask: var(--store-logo-glyph) center / contain no-repeat;
 }
+/* Nintendo Switch glyph reads slightly right in its viewBox; nudge 1px left. */
+.store-logo.nintendo .store-logo-glyph { transform: translate(-1px, 0); }
 
 /* Store badge strip layout — js/store-logos.js */
 .store-logo-strip {
@@ -1485,6 +1556,48 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 }
 .claim-attribution a:hover {
   color: #cbd5e1;
+}
+.claim-hidden-dialog[open] {
+  width: min(100vw - 2rem, 36rem);
+  max-width: calc(100vw - 2rem);
+}
+.claim-hidden-panel .claim-hidden-intro {
+  margin: 0;
+}
+.claim-hidden-list {
+  max-height: min(60vh, 24rem);
+  overflow-y: auto;
+}
+.claim-hidden-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.375rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+.claim-hidden-row-cover-wrap {
+  flex-shrink: 0;
+  width: 3.5rem;
+  height: 2rem;
+  display: block;
+  overflow: hidden;
+  border-radius: 0.25rem;
+}
+.claim-hidden-row-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.claim-hidden-row-title {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #f8fafc);
+}
+.claim-show-hidden-btn {
+  display: inline-block;
 }
 .claim-rows-card {
   padding: 0.75rem 1rem 0.5rem;
@@ -2818,6 +2931,11 @@ html[data-theme="ember"] .brand-logo-mark {
   background: rgba(248, 113, 113, 0.12);
   cursor: pointer;
 }
+/* Chips carrying data-fetcher-connect route to Connections on click — they are
+   live affordances, not blocked actions, so they must show the pointer even when
+   they also carry reconnect-required / auth-cooldown styling (which otherwise sets
+   cursor: not-allowed). Placed after those rules so it wins on source order. */
+.fh-chip[data-fetcher-connect]:not(:disabled) { cursor: pointer; }
 .fh-chip-reconnect-required .fh-chip-dot,
 .fh-chip-disconnected .fh-chip-dot { background: #f87171; }
 .fh-chip-reconnect-required .fh-chip-age,
@@ -3259,13 +3377,14 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
 .dash-spotlight.is-lowres-art .dash-spotlight-art {
   object-fit: contain;
   object-position: 100% 40%;
+  transform-origin: 0% 40%;
   /* Hard edges: low-res contained art keeps crisp boundaries (no edge fade). */
   -webkit-mask-image: none;
   mask-image: none;
 }
 @keyframes spotlightLowresFgDrift {
-  from { transform: scale(1) translate(0%, 0%) translateZ(0); }
-  to { transform: scale(1.04) translate(1.2%, 0.6%) translateZ(0); }
+  from { transform: scale(1) translateZ(0); }
+  to { transform: scale(1.04) translateZ(0); }
 }
 @keyframes spotlightLowresBgDrift {
   from { transform: scale(1.12) translate(0%, 0%) translateZ(0); }
@@ -5073,6 +5192,12 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-row-dot--expired { background: #fb923c; }
 .conn-row-dot--disconnected { background: #475569; }
 .conn-rail-badge { height: 18px; min-width: 18px; font-size: 10.5px; }
+/* Per-store optical centering for rail glyphs (vars from js/store-logos.js
+   STORE_RAIL_GLYPH_OFFSET). Several brand SVGs are visually lopsided in their
+   viewBox, so a small translate makes each icon read centered next to the dot. */
+.conn-rail-badge .store-badge-glyph {
+  transform: translate(var(--store-badge-offset-x, 0), var(--store-badge-offset-y, 0));
+}
 .conn-row-label { color: var(--text-bright); font-size: 13px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conn-row-pill { font-size: 10px; white-space: nowrap; }
 /* The entire rail row is clickable (role=option), so keep every child — status
@@ -5297,6 +5422,41 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .profile-modal-error {
   font-size: 0.75rem;
   color: #f87171;
+}
+.profile-modal-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.75rem;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+.profile-modal-group-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+.profile-modal-optional {
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  font-size: 0.6rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  border: 1px solid #475569;
+  border-radius: 0.25rem;
+}
+/* Mask PIN input without using a password field, so browser/password-manager
+   autofill never targets it. Chromium-only property, matches the local app. */
+.profile-modal-pin {
+  -webkit-text-security: disc;
+}
+.profile-modal-danger .profile-modal-label {
+  color: #fb7185;
 }
 
 .conn-popover-backdrop {
@@ -6302,32 +6462,36 @@ body {
   gap: 0.45rem;
   padding-top: 0.4rem;
 }
-/* Control bar: pill top-left + Run stale top-right share row 1;
-   filter checkboxes sit under Run stale on row 2. */
+/* Compact: pull the first chip heading (LIBRARY) up tight under the control bar. */
+.fetcher-popover [data-stat-layout="compact"] .fh-rail-main {
+  gap: 0.2rem;
+}
+/* Control bar: counts (+ optional Run stale) left; filter checkboxes right;
+   hint under filters; legend toggle full-width divider row. */
 .fh-legend-row--bar .fh-control-bar {
   order: 1;
   width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   column-gap: 0.5rem;
   row-gap: 0.35rem;
 }
 .fh-legend-row--bar .fh-control-bar .fh-counts {
-  grid-column: 1;
-  grid-row: 1;
+  flex: 0 0 auto;
   align-self: start;
 }
 .fh-legend-row--bar .fh-control-bar .fh-run-stale {
-  grid-column: 2;
-  grid-row: 1;
   flex: 0 0 auto;
 }
 .fh-legend-row--bar .fh-control-bar .fh-legend-toggle {
-  grid-column: 1;
-  grid-row: 2;
-  align-self: start;
-  justify-self: start;
+  flex: 0 0 auto;
+  width: auto;
+  margin-left: auto;
+  align-self: center;
+  padding: 0;
+  border-top: 0;
 }
 .fh-filter-toggles {
   display: inline-flex;
@@ -6349,14 +6513,15 @@ body {
 }
 .fh-head--stack .fh-filter-toggles .fh-filter-hint {
   text-align: left;
+  flex: 0 0 auto;
 }
 .fh-legend-row--bar .fh-control-bar .fh-filter-toggles {
-  grid-column: 2;
-  grid-row: 2;
+  flex: 1 1 auto;
+  min-width: 0;
   align-self: start;
-  justify-self: end;
-  flex-direction: column;
-  align-items: flex-end;
+  justify-content: flex-end;
+  flex-direction: row;
+  align-items: center;
 }
 .fh-legend-row--bar .fh-control-bar .fh-filter-toggles .fh-toggle {
   flex-direction: row-reverse;
@@ -6369,7 +6534,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.45rem;
+  gap: 0.3rem;
   padding: 0;
   margin: 0;
   background: transparent;
@@ -6426,7 +6591,10 @@ body {
   outline-offset: 2px;
 }
 .fh-head--stack .fh-legend-toggle {
-  align-self: stretch;
+  align-self: flex-start;
+  width: auto;
+  padding: 0;
+  border-top: 0;
 }
 .fh-legend-tips {
   display: none;
@@ -6560,14 +6728,6 @@ body {
     min-height: 20px;
     padding-right: 7rem;
     flex-wrap: nowrap;
-  }
-  /* Breathing room under the "only stale / missing" checkbox in the stack. */
-  .fetcher-popover [data-stat-layout="landscape"] .fh-head--stack .fh-toggle {
-    margin-bottom: 0.6rem;
-  }
-  /* Small gap under the counts pill in the stack. */
-  .fetcher-popover [data-stat-layout="landscape"] .fh-head--stack .fh-counts {
-    margin-bottom: 0.3rem;
   }
   .fetcher-popover [data-stat-layout="landscape"] .fh-group-chips {
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+
 from shared.steam_match import (
     appid_from_steam_url,
     close_enough_title,
@@ -9,6 +14,18 @@ from shared.steam_match import (
     pick_appid,
     strip_giveaway_decorations,
 )
+
+_STRIP_VECTORS = json.loads(
+    (Path(__file__).parent / "fixtures" / "giveaway_title_strip.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+@pytest.mark.parametrize("case", _STRIP_VECTORS, ids=lambda c: c["input"] or "<empty>")
+def test_strip_giveaway_decorations_matches_shared_vectors(case: dict) -> None:
+    """Parity with js/claimable.js + admin/claims-workspace.js (same fixture)."""
+    assert strip_giveaway_decorations(case["input"]) == case["expected"]
 
 
 def test_strip_giveaway_decorations_steam_suffix() -> None:

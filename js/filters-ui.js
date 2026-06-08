@@ -476,6 +476,9 @@ export function updateViewChrome(options) {
   // import lazily here so we avoid a top-level cycle with picks-ui.
   document.getElementById("quickWinMaxWrap")?.classList.toggle("hidden", isWish || isItch);
   document.getElementById("picksSection")?.classList.toggle("hidden", hideTableUi);
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'D',location:'filters-ui.js:478',message:'switchView picksSection toggle',data:{hideTableUi,collapsed:state.prefs.picksCollapsed,containerHidden:document.getElementById('picksContainer')?.classList.contains('hidden'),btn:document.getElementById('togglePicks')?.textContent,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),initView:document.documentElement.getAttribute('data-init-view'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   document.getElementById("toolbarSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("tableShell")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("rowCount")?.classList.toggle("hidden", hideTableUi);

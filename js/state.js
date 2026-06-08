@@ -1,6 +1,7 @@
 export const STORAGE_KEY = 'steam-backlog-personal';
 export const PREFS_KEY = 'steam-backlog-ui-prefs';
 export const MANUAL_KEY = 'steam-backlog-manual-games';
+export const LIBRARY_FIRST_SEEN_KEY = 'steam-backlog-library-first-seen';
 
 export const state = {
   allGames: [],

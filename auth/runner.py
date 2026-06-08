@@ -1368,6 +1368,14 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
         session.add_listener(_sync_auth_banner)
         page = context.pages[0] if context.pages else context.new_page()
 
+        # Raise the connect window to the OS foreground — on Windows it often
+        # opens behind the dashboard/IDE, and Page.bringToFront alone only swaps
+        # the active tab without focusing the window.
+        try:
+            page.focus_window()
+        except Exception:
+            pass
+
         if provider in INLINE_PROVIDERS:
             if provider == "psn":
                 try:

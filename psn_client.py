@@ -45,6 +45,10 @@ class PsnGameEntry:
     image_url: str | None
     platforms: list[str]
     trophy_progress: int | None
+    trophies_earned: int | None
+    trophies_total: int | None
+    has_platinum: bool
+    platinum_earned: bool
     playtime_minutes: int
     last_played: str | None
     first_played: str | None
@@ -210,6 +214,37 @@ def _is_non_game(name: str) -> bool:
 
 def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
+
+
+def _trophy_set_sum(trophy_set) -> int:
+    if trophy_set is None:
+        return 0
+    return sum(
+        int(getattr(trophy_set, tier, 0) or 0)
+        for tier in ("bronze", "silver", "gold", "platinum")
+    )
+
+
+def _trophy_set_platinum(trophy_set) -> int:
+    if trophy_set is None:
+        return 0
+    return int(getattr(trophy_set, "platinum", 0) or 0)
+
+
+def _trophy_counts_from_title(trophy) -> tuple[int | None, int | None, bool, bool]:
+    """Return (earned, total, has_platinum, platinum_earned) from a TrophyTitle."""
+    earned_set = getattr(trophy, "earned_trophies", None)
+    defined_set = getattr(trophy, "defined_trophies", None)
+    earned = _trophy_set_sum(earned_set)
+    total = _trophy_set_sum(defined_set)
+    has_platinum = _trophy_set_platinum(defined_set) >= 1
+    platinum_earned = _trophy_set_platinum(earned_set) >= 1
+    return (
+        earned if total else None,
+        total if total else None,
+        has_platinum,
+        platinum_earned,
+    )
 
 
 def _new_stat_agg() -> dict[str, dict]:
@@ -458,6 +493,9 @@ class PsnClient:
             if not comm_id:
                 continue
             name = _display_name(trophy.title_name or f"PSN {comm_id}")
+            trophies_earned, trophies_total, has_platinum, platinum_earned = (
+                _trophy_counts_from_title(trophy)
+            )
             entry = PsnGameEntry(
                 id=comm_id,
                 np_communication_id=comm_id,
@@ -467,6 +505,10 @@ class PsnClient:
                 image_url=trophy.title_icon_url,
                 platforms=_platform_labels(trophy.title_platform),
                 trophy_progress=trophy.progress,
+                trophies_earned=trophies_earned,
+                trophies_total=trophies_total,
+                has_platinum=has_platinum,
+                platinum_earned=platinum_earned,
                 playtime_minutes=0,
                 last_played=_iso(trophy.last_updated_datetime),
                 first_played=None,
@@ -491,8 +533,11 @@ class PsnClient:
 
         for i, entitlement in enumerate(self._client.game_entitlements(limit=None), 1):
             hb.tick_progress(i, 0, "PSN entitlements")
+            if entitlement.get("isGame") is False or entitlement.get("isBeta") is True:
+                continue
             title_meta = entitlement.get("titleMeta") or {}
             concept_meta = entitlement.get("conceptMeta") or {}
+            game_meta = entitlement.get("gameMeta") or {}
             title_id = title_meta.get("titleId")
             if not title_id or title_id in seen_title_ids:
                 continue
@@ -500,11 +545,15 @@ class PsnClient:
             name = _display_name(
                 title_meta.get("name")
                 or concept_meta.get("name")
-                or (entitlement.get("gameMeta") or {}).get("name")
+                or game_meta.get("name")
                 or f"PSN {title_id}"
             )
             concept_id = concept_meta.get("conceptId")
-            image = title_meta.get("imageUrl") or concept_meta.get("iconUrl")
+            image = (
+                title_meta.get("imageUrl")
+                or concept_meta.get("iconUrl")
+                or game_meta.get("iconUrl")
+            )
             entry_id = title_id
             entries[entry_id] = PsnGameEntry(
                 id=entry_id,
@@ -515,6 +564,10 @@ class PsnClient:
                 image_url=image,
                 platforms=_platform_from_title_id(title_id),
                 trophy_progress=None,
+                trophies_earned=None,
+                trophies_total=None,
+                has_platinum=False,
+                platinum_earned=False,
                 playtime_minutes=0,
                 last_played=None,
                 first_played=None,

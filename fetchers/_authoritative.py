@@ -40,6 +40,10 @@ PSN = library_authoritative(
     "concept_id",
     "psn_platforms",
     "trophy_progress",
+    "psn_trophies_earned",
+    "psn_trophies_total",
+    "psn_has_platinum",
+    "psn_platinum_earned",
     "first_played",
 )
 AMAZON = library_authoritative(

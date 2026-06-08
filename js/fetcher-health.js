@@ -225,6 +225,9 @@ function fetcherKeysForProvider(provider) {
  *  sticky failed/cooldown chip state so chips recover without a fresh run. */
 function clearFailedStateForReconnectedProvider(provider) {
   for (const key of fetcherKeysForProvider(provider)) {
+    // #region agent log
+    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'B',location:'fetcher-health.js:228',message:'clearFailedStateForReconnectedProvider',data:{provider,key,wasFailed:lastRunFailedByKey.has(key)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     lastRunFailedByKey.delete(key);
     clearAuthCooldown(key);
   }
@@ -257,6 +260,24 @@ export function reconnectRequiredForFetcherKey(key) {
   return isFetcherReconnectRequired(key);
 }
 
+/** Apply reconnect / failed-chip recovery when auth status rows change.
+ *  Must run before processAuthStatusTransitions so prevStatusByProvider still
+ *  holds the prior status for transition detection. */
+function applyAuthStatusProviderEffects(providers) {
+  for (const p of providers || []) {
+    if (p.status === 'expired') markReconnectRequired(p.key);
+    else if (p.status === 'connected') {
+      const prev = prevStatusByProvider.get(p.key);
+      const transitionedToConnected = prev !== undefined && prev !== 'connected';
+      const hadReconnectFlag = reconnectRequiredByProvider.has(p.key);
+      clearReconnectRequired(p.key);
+      if (transitionedToConnected || hadReconnectFlag) {
+        clearFailedStateForReconnectedProvider(p.key);
+      }
+    }
+  }
+}
+
 /** Sync reconnect-required from GET /api/auth/status (survives reload).
  *  Uses the shared timeout so a hung endpoint can't stall the sync loop. */
 export async function syncReconnectFromAuthStatus() {
@@ -265,14 +286,7 @@ export async function syncReconnectFromAuthStatus() {
     if (!res.ok) return;
     const data = await res.json();
     ingestAuthStatusProviders(data.providers || []);
-    for (const p of data.providers || []) {
-      if (p.status === 'expired') markReconnectRequired(p.key);
-      else if (p.status === 'connected') {
-        const wasReconnect = reconnectRequiredByProvider.has(p.key);
-        clearReconnectRequired(p.key);
-        if (wasReconnect) clearFailedStateForReconnectedProvider(p.key);
-      }
-    }
+    applyAuthStatusProviderEffects(data.providers || []);
   } catch (_) { /* server offline or timed out */ }
 }
 
@@ -305,16 +319,10 @@ export function resetAuthStatusTransitionsForTest() {
 if (typeof document !== 'undefined') {
   document.addEventListener('baklog:auth-status', ev => {
     const providers = ev?.detail?.providers || [];
+    applyAuthStatusProviderEffects(providers);
     processAuthStatusTransitions(providers);
-    for (const p of providers) {
-      if (p.status === 'expired') markReconnectRequired(p.key);
-      else if (p.status === 'connected') {
-        const wasReconnect = reconnectRequiredByProvider.has(p.key);
-        clearReconnectRequired(p.key);
-        if (wasReconnect) clearFailedStateForReconnectedProvider(p.key);
-      }
-    }
     try { renderDashboardFetcherHealth(); } catch (_) { /* not mounted */ }
+    try { fetcherRunner.refreshGlobalIndicator(); } catch (_) { /* runner not ready */ }
   });
   document.addEventListener('baklog:reconnect-dismiss', ev => {
     for (const p of ev?.detail?.providers || []) dismissReconnectRequired(p);
@@ -1099,18 +1107,19 @@ export function fetcherFreshness(source) {
     ? (source.countFn ? source.countFn(meta) : (meta.game_count ?? null))
     : null;
   const deferKey = source.key || source.metaKey;
-  if (!meta || !meta.fetched_at) {
+  const fetchedAt = meta?.fetched_at || meta?.generated_at || null;
+  if (!meta || !fetchedAt) {
     if (!state.dashboardDataReady && BOOT_DEFERRED_FETCHER_KEYS.has(deferKey)) {
       return { status: 'pending', ageMs: Infinity, count, ageLabel: '…', iso: null };
     }
     return { status: 'missing', ageMs: Infinity, count, ageLabel: meta ? '?' : ' - ', iso: null };
   }
-  const ts = Date.parse(meta.fetched_at);
+  const ts = Date.parse(fetchedAt);
   const ageMs = Number.isFinite(ts) ? Date.now() - ts : Infinity;
   let status = 'stale';
   if (ageMs < thresholds.fresh) status = 'fresh';
   else if (ageMs < thresholds.recent) status = 'recent';
-  return { status, ageMs, count, ageLabel: humanizeAge(ageMs), iso: meta.fetched_at };
+  return { status, ageMs, count, ageLabel: humanizeAge(ageMs), iso: fetchedAt };
 }
 
 const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
@@ -1277,7 +1286,10 @@ export function autoStaleLastRunKey() {
   return profileScopedStorageKey(LS_AUTO_STALE_LAST_RUN);
 }
 
-/** After a store connects, open the fetcher log and run that provider's fetcher_keys. */
+/** After a store connects, open the fetcher log and run only that provider's
+ *  corresponding (primary) fetcher — the library for store sign-ins, the
+ *  wishlist for dedicated wishlist sign-ins. The relative wishlist/library and
+ *  any enrich keys are left to the stale-24h refresh + auto-enrich passes. */
 export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {
   if (state.prefs.autoFetchOnConnect === false) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
@@ -1306,11 +1318,9 @@ export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {
   }
 
   const batchEpoch = getCancelEpochFn();
-  for (const key of keys) {
-    if (getCancelEpochFn() !== batchEpoch) break;
-    await waitFn({ batchEpoch });
-    if (getCancelEpochFn() !== batchEpoch) break;
-    await runFn(key, { auto: true });
+  await waitFn({ batchEpoch });
+  if (getCancelEpochFn() === batchEpoch) {
+    await runFn(primaryKey, { auto: true });
   }
   return true;
 }
@@ -2407,6 +2417,9 @@ export const fetcherRunner = (() => {
         } else if (hist.status === 'cancelled') {
           markChipState(key, null);
         } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'D',location:'fetcher-health.js:2419',message:'reconcile snapshot marks failed',data:{key,status:hist.status,exit_code:hist.exit_code,hasPersistFailed:lastRunFailedByKey.has(key)},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           markChipState(key, 'failed');
         }
         if (hist.id) clearLastSeq(hist.id);
@@ -2619,20 +2632,23 @@ export const fetcherRunner = (() => {
     updateFetcherBar();
   }
 
+  // Returns true only when a run was actually submitted to the server; false on
+  // any early bail (API down, cooldown, disconnected, queue full, submit error)
+  // so callers can react when a requested run never actually started.
   async function run(key, { refresh = false, auto = false } = {}) {
     if (!isApiAvailable()) {
       if (!auto) scrollPopoverModule('top');
-      return;
+      return false;
     }
     if (cancelInFlight) {
       if (!auto) scrollPopoverModule('top');
-      return;
+      return false;
     }
     await loadFetcherSources(true);
     const src = source(key);
     if (!src || runStateByKey.has(key) || submitInFlightKeys.has(key)) {
       if (!auto) scrollPopoverModule('top');
-      return;
+      return false;
     }
     // Auth-failure backoff: block while cooling down. Auto/bulk runs stay
     // silent; a chip click is already prevented by the disabled attribute, so
@@ -2647,7 +2663,7 @@ export const fetcherRunner = (() => {
         );
         scrollPopoverModule('console');
       }
-      return;
+      return false;
     }
     if (isFetcherDisconnected(key)) {
       if (!auto) {
@@ -2660,7 +2676,7 @@ export const fetcherRunner = (() => {
         if (provider) showReconnectBanner([provider]);
         scrollPopoverModule('console');
       }
-      return;
+      return false;
     }
     // Hard cap mirrors server-side enforcement (max 1 active run, no queuing).
     // Without this guard a fast double-click could land two POSTs before the
@@ -2672,7 +2688,7 @@ export const fetcherRunner = (() => {
         `[${src.label}: queue full - a fetch is already running]`,
       );
       if (!auto) scrollPopoverModule('console');
-      return;
+      return false;
     }
     if (refresh && !src.supportsRefresh) {
       logEvent(
@@ -2680,7 +2696,7 @@ export const fetcherRunner = (() => {
         `[${src.label}: this fetcher has no force-refresh mode - a normal click already pulls the latest data]`,
       );
       if (!auto) scrollPopoverModule('console');
-      return;
+      return false;
     }
 
     if (auto && key === 'itad') {
@@ -2706,13 +2722,13 @@ export const fetcherRunner = (() => {
     submitInFlightKeys.add(key);
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
-      if (cancelInFlight) return;
+      if (cancelInFlight) return false;
       try {
         res = await fetchWithTimeoutAndProbe(url, { method: 'POST' });
       } catch (err) {
         logEvent('error', `[client] cannot reach server: ${err}`);
         setStatus('failed');
-        return;
+        return false;
       }
       if (res.status !== 409) break;
       // Benign: key already in flight, or a just-cancelled run still holds the
@@ -2725,17 +2741,17 @@ export const fetcherRunner = (() => {
         && !cancelInFlight
         && !runStateByKey.has(key)
         && !isQueueFull();
-      if (!canRetry) return;
+      if (!canRetry) return false;
       await new Promise(r => setTimeout(r, 600));
       }
-      if (res.status === 409) return;
+      if (res.status === 409) return false;
       if (!res.ok) {
         invalidateApiProbe();
         const txt = await res.text().catch(() => '');
         logEvent('error', `[server ${res.status}] ${txt || 'submit failed'}`);
         setStatus('failed');
         markChipState(key, null);
-        return;
+        return false;
       }
       const { run_id: runId } = await res.json();
       markChipState(key, 'queued', runId);
@@ -2761,6 +2777,7 @@ export const fetcherRunner = (() => {
     } finally {
       submitInFlightKeys.delete(key);
     }
+    return true;
   }
 
   async function runAllStale() {
@@ -2871,6 +2888,9 @@ export const fetcherRunner = (() => {
         const data = JSON.parse(evt.data);
         const cancelled = data.status === 'cancelled';
         const ok = data.status === 'done' && data.exit_code === 0;
+        // #region agent log
+        fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'A',location:'fetcher-health.js:2885',message:'done SSE event',data:{key,status:data.status,exit_code:data.exit_code,failure_kind:data.failure_kind,ok,cancelled},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const duration = data.started_at && data.ended_at
           ? `${(data.ended_at - data.started_at).toFixed(1)}s`
           : '';
@@ -2943,6 +2963,9 @@ export const fetcherRunner = (() => {
         }
         if (finished) {
           const ok = finished.status === 'done' && finished.exit_code === 0;
+          // #region agent log
+          fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'C',location:'fetcher-health.js:2957',message:'onerror recovery finished run',data:{key,status:finished.status,exit_code:finished.exit_code,failure_kind:finished.failure_kind,ok},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           logEvent('info', `[${src.label}: stream dropped after exit ${finished.exit_code}]`);
           if (liveRunId === runId) setStatus(ok ? 'done' : 'failed');
           if (ok && finished.id !== _lastAppliedDoneRunId) {
@@ -3160,6 +3183,9 @@ export const fetcherRunner = (() => {
       lastBarSummary = text;
     },
     syncLogHeightToCard,
+    refreshGlobalIndicator() {
+      updateGlobalFetcherIndicator(runStateByKey, source);
+    },
     flushLinesNow,
     appendLineForTest(text, kind = 'stdout') {
       appendLine(text, kind);
@@ -3425,6 +3451,11 @@ export function renderDashboardFetcherHealth() {
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
     const displayStatus = runState
       || (persistFailed ? 'failed' : (needsReconnect ? 'reconnect' : status));
+    // #region agent log
+    if (src.key === 'ubisoft' || src.key === 'wishlistUbisoft') {
+      fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'E',location:'fetcher-health.js:3442',message:'ubisoft chip render',data:{key:src.key,displayStatus,runState,persistFailed,needsReconnect,disconnected,inAuthCooldown,freshnessStatus:status,hasFailedKey:lastRunFailedByKey.has(src.key)},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0
       && !fetcherCredentialsSatisfied(src.key);
@@ -3577,8 +3608,8 @@ export function renderDashboardFetcherHealth() {
         <div class="fh-control-bar">
           ${countsBlockHtml}
           ${staleButtonHtml}
-          ${legendToggleHtml}
           ${filterToggleHtml}
+          ${legendToggleHtml}
         </div>
       </div>`;
 
@@ -3590,9 +3621,9 @@ export function renderDashboardFetcherHealth() {
       <div class="fh-rail-mid">
         ${buildStatTilesHtml(rows)}
         <div class="fh-head fh-head--stack">
+          ${countsBlockHtml}
           ${staleButtonHtml}
           ${filterToggleHtml}
-          ${countsBlockHtml}
           ${legendToggleHtml}
         </div>
       </div>

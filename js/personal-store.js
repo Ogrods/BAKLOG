@@ -1,7 +1,7 @@
 import { baklogFetch, BAKLOG_LOCAL_HEADER, BAKLOG_LOCAL_HEADER_VALUE } from './api-client.js';
 import { getAccessToken, isAccountAuthMode, isLocalProfilesEnabled } from './auth-gate.js';
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
-import { activeProfileId, prefsStorageKey, profileScopedStorageKey } from './profiles.js';
+import { activeProfileId, libraryFirstSeenStorageKey, prefsStorageKey, profileScopedStorageKey } from './profiles.js';
 
 function personalStorageKey() {
   return profileScopedStorageKey(STORAGE_KEY);
@@ -49,7 +49,20 @@ export const personalStore = (() => {
     const personalKeys = Object.keys(snap.personal || {}).filter(k => k !== '__migrated_v3');
     if (personalKeys.length) return true;
     if ((snap.manual || []).length) return true;
+    const seen = snap.libraryFirstSeen || {};
+    if (Object.keys(seen).length) return true;
     return false;
+  }
+
+  function _loadCachedLibraryFirstSeen() {
+    try {
+      const raw = localStorage.getItem(libraryFirstSeenStorageKey());
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
   }
 
   async function probe() {
@@ -156,13 +169,19 @@ export const personalStore = (() => {
       }
     }
     state.prefs = merged;
-    state.libraryFirstSeenByKey = (doc.libraryFirstSeen && typeof doc.libraryFirstSeen === 'object')
+    const localSeen = _loadCachedLibraryFirstSeen();
+    const serverSeen = (doc.libraryFirstSeen && typeof doc.libraryFirstSeen === 'object')
       ? doc.libraryFirstSeen
       : {};
+    state.libraryFirstSeenByKey = { ...localSeen, ...serverSeen };
     const manual = Array.isArray(doc.manual) ? doc.manual : [];
     localStorage.setItem(personalStorageKey(), JSON.stringify(state.personal));
     localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
     localStorage.setItem(manualStorageKey(), JSON.stringify(manual));
+    localStorage.setItem(
+      libraryFirstSeenStorageKey(),
+      JSON.stringify(state.libraryFirstSeenByKey),
+    );
     setManualGamesFn(manual);
   }
 

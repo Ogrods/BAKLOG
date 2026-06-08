@@ -6,14 +6,20 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { state } from '../js/state.js';
 import {
   getVisibleClaims,
+  getHiddenClaims,
   diffClaims,
   isClaimOwned,
   stripClaimTitleDecorations,
   dismissClaim,
+  restoreClaim,
   claimAttributionHtml,
   claimSourceHtml,
   feedGeneratedAt,
   pickNewerFeed,
+  sanitizeBlurb,
+  handleClaimableClick,
+  loadClaimableNow,
+  claimCoverFallback,
 } from '../js/claimable.js';
 
 function resetState() {
@@ -73,6 +79,20 @@ describe('pickNewerFeed', () => {
     };
     expect(pickNewerFeed(empty, only)?.items?.[0]?.id).toBe('only');
     expect(feedGeneratedAt({ fetched_at: '2026-06-02T00:00:00Z' })).toBe(Date.parse('2026-06-02T00:00:00Z'));
+  });
+
+  it('prefers fresher fetched_at over stale generated_at on profile feeds', () => {
+    const profile = {
+      generated_at: '2026-06-08T09:07:44.166264+00:00',
+      fetched_at: '2026-06-08T17:39:06.835602+00:00',
+      items: [{ id: 'profile', store: 'epic', title: 'Profile', claim_url: 'https://example.com/p' }],
+    };
+    const bundled = {
+      generated_at: '2026-06-08T17:31:14.766880+00:00',
+      items: [{ id: 'bundled', store: 'epic', title: 'Bundled', claim_url: 'https://example.com/b' }],
+    };
+    expect(pickNewerFeed(profile, bundled)?.items?.[0]?.id).toBe('profile');
+    expect(feedGeneratedAt(profile)).toBe(Date.parse(profile.fetched_at));
   });
 });
 
@@ -208,5 +228,175 @@ describe('dismissClaim', () => {
     dismissClaim('gog-bar');
     expect(state.personal.__dismissedClaims['gog-bar']).toBeTypeOf('number');
     expect(getVisibleClaims(sampleItems).map(c => c.id)).toEqual(['epic-foo']);
+  });
+});
+
+describe('getHiddenClaims', () => {
+  it('returns only dismissed, non-owned, non-expired claims', () => {
+    state.personal.__dismissedClaims = { 'epic-foo': Date.now(), 'gog-bar': Date.now() };
+    const hidden = getHiddenClaims(sampleItems);
+    expect(hidden.map(c => c.id)).toEqual(['gog-bar', 'epic-foo']);
+  });
+
+  it('excludes expired and non-dismissed claims', () => {
+    state.personal.__dismissedClaims = { expired: Date.now(), 'epic-foo': Date.now() };
+    const hidden = getHiddenClaims(sampleItems);
+    expect(hidden.map(c => c.id)).toEqual(['epic-foo']);
+  });
+
+  it('excludes owned claims even when dismissed', () => {
+    state.personal.__dismissedClaims = { 'epic-foo': Date.now() };
+    state.ownedNormNames = new Set(['foo game']);
+    expect(getHiddenClaims(sampleItems)).toHaveLength(0);
+  });
+});
+
+describe('restoreClaim', () => {
+  it('removes dismissal and returns claim to visible list', () => {
+    state.claimableFeed = { items: sampleItems };
+    state.personal.__dismissedClaims = { 'gog-bar': Date.now() };
+    restoreClaim('gog-bar');
+    expect(state.personal.__dismissedClaims['gog-bar']).toBeUndefined();
+    expect(getVisibleClaims(sampleItems).map(c => c.id)).toEqual(['gog-bar', 'epic-foo']);
+    expect(getHiddenClaims(sampleItems).map(c => c.id)).toEqual([]);
+  });
+});
+
+describe('dismissals survive feed id churn', () => {
+  const churnFeed = (id, url) => ({ id, store: 'epic', title: 'Foo Game', claim_url: url });
+
+  it('keeps a cleared claim hidden when its feed id changes between reloads', () => {
+    state.claimableFeed = { items: [churnFeed('epic-foo', 'https://example.com/foo')] };
+    state.claimableNow = state.claimableFeed.items;
+    dismissClaim('epic-foo');
+    // Same game returns under a different source id (e.g. epic source dropped,
+    // gamerpower remains) after a feed regeneration.
+    const regenerated = [churnFeed('gamerpower-foo', 'https://example.com/foo2')];
+    expect(getVisibleClaims(regenerated).map(c => c.id)).toEqual([]);
+    expect(getHiddenClaims(regenerated).map(c => c.id)).toEqual(['gamerpower-foo']);
+  });
+
+  it('keeps a cleared claim hidden after cross-store enrichment adds a steam appid', () => {
+    // Cleared while the feed had no appid (keyed by title), then the pipeline
+    // enriches the same game with a steam_appid (key would flip to appid:…).
+    const noAppid = { id: 'gamerpower-foo', store: 'epic', title: 'Foo Game', claim_url: 'https://example.com/foo' };
+    state.claimableFeed = { items: [noAppid] };
+    state.claimableNow = state.claimableFeed.items;
+    dismissClaim('gamerpower-foo');
+    const enriched = [{ ...noAppid, id: 'epic-foo', steam_appid: 12345 }];
+    expect(getVisibleClaims(enriched).map(c => c.id)).toEqual([]);
+    expect(getHiddenClaims(enriched).map(c => c.id)).toEqual(['epic-foo']);
+  });
+
+  it('keeps a cleared claim hidden after a steam appid is dropped from the feed', () => {
+    const withAppid = { id: 'epic-foo', store: 'epic', title: 'Foo Game', claim_url: 'https://example.com/foo', steam_appid: 12345 };
+    state.claimableFeed = { items: [withAppid] };
+    state.claimableNow = state.claimableFeed.items;
+    dismissClaim('epic-foo');
+    const noAppid = [{ id: 'gamerpower-foo', store: 'epic', title: 'Foo Game', claim_url: 'https://example.com/foo' }];
+    expect(getVisibleClaims(noAppid).map(c => c.id)).toEqual([]);
+    expect(getHiddenClaims(noAppid).map(c => c.id)).toEqual(['gamerpower-foo']);
+  });
+
+  it('restore via the new feed id un-hides the game', () => {
+    state.claimableFeed = { items: [churnFeed('epic-foo', 'https://example.com/foo')] };
+    state.claimableNow = state.claimableFeed.items;
+    dismissClaim('epic-foo');
+    const regenerated = [churnFeed('gamerpower-foo', 'https://example.com/foo2')];
+    state.claimableFeed = { items: regenerated };
+    state.claimableNow = regenerated;
+    restoreClaim('gamerpower-foo');
+    expect(getVisibleClaims(regenerated).map(c => c.id)).toEqual(['gamerpower-foo']);
+    expect(getHiddenClaims(regenerated).map(c => c.id)).toEqual([]);
+  });
+});
+
+describe('dismissed claims survive an empty/failed feed load', () => {
+  it('does not wipe dismissals when every claim source fails at boot', async () => {
+    const realFetch = globalThis.fetch;
+    state.personal.__dismissedClaims = {
+      'gamerpower-1604': 1,
+      'itad-de23882e1f39': 2,
+    };
+    // Simulate a boot where the feed is unavailable (transient failure /
+    // mid-regeneration). Let debug-log POSTs through to the ingest server.
+    globalThis.fetch = (url, init) => {
+      if (String(url).includes('/ingest/')) return realFetch(url, init);
+      return Promise.reject(new Error('network down'));
+    };
+    try {
+      await loadClaimableNow();
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    expect(Object.keys(state.personal.__dismissedClaims).sort())
+      .toEqual(['gamerpower-1604', 'itad-de23882e1f39']);
+  });
+});
+
+describe('sanitizeBlurb', () => {
+  it('strips html tags and decodes entities', () => {
+    expect(sanitizeBlurb('<a href="x">Hello</a> &amp; more')).toBe('Hello & more');
+  });
+
+  it('removes ITAD giveaway boilerplate', () => {
+    expect(sanitizeBlurb('Great game expires on Jan 1 | go to giveaway')).toBe('Great game');
+  });
+
+  it('does not leave executable markup', () => {
+    const out = sanitizeBlurb('<img src=x onerror=alert(1)>hi there');
+    expect(out).not.toContain('<');
+    expect(out).toContain('hi there');
+  });
+
+  it('strips leftover bare giveaway urls', () => {
+    expect(sanitizeBlurb('Claim it now https://itad.example/giveaway/abc done'))
+      .toBe('Claim it now done');
+  });
+
+  it('returns empty for falsy input', () => {
+    expect(sanitizeBlurb('')).toBe('');
+    expect(sanitizeBlurb(null)).toBe('');
+  });
+});
+
+describe('handleClaimableClick URL safety', () => {
+  it('opens only safe http(s) claim urls via window.open', () => {
+    const opened = [];
+    const orig = window.open;
+    window.open = (url) => { opened.push(url); return null; };
+    try {
+      state.claimableFeed = {
+        items: [
+          { id: 'safe', store: 'epic', title: 'Safe', claim_url: 'https://example.com/safe' },
+          { id: 'evil', store: 'epic', title: 'Evil', claim_url: 'javascript:alert(1)' },
+        ],
+      };
+      state.claimableNow = state.claimableFeed.items;
+      const mkEvent = (id) => {
+        const btn = document.createElement('button');
+        btn.setAttribute('data-claim-go', id);
+        document.body.appendChild(btn);
+        return { target: btn };
+      };
+      handleClaimableClick(mkEvent('safe'));
+      handleClaimableClick(mkEvent('evil'));
+    } finally {
+      window.open = orig;
+    }
+    expect(opened).toEqual(['https://example.com/safe']);
+  });
+});
+
+describe('claimCoverFallback', () => {
+  it('returns modern shared Steam header URL when steam_appid is set', () => {
+    expect(claimCoverFallback({ steam_appid: 973000 })).toBe(
+      'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg',
+    );
+  });
+
+  it('returns empty string when steam_appid is missing', () => {
+    expect(claimCoverFallback({ title: 'No appid' })).toBe('');
+    expect(claimCoverFallback({ steam_appid: '' })).toBe('');
   });
 });

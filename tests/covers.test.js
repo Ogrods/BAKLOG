@@ -9,6 +9,35 @@ import {
   syncCoverFits,
 } from '../js/covers.js';
 
+describe('coverFallback placeholder escaping', () => {
+  it('does not inject markup from a malicious game name', () => {
+    const wrap = document.createElement('div');
+    const img = document.createElement('img');
+    // If initials/caption were not escaped, this would inject an <img onerror>.
+    img.dataset.name = 'A <img src=x onerror=alert(1)> B';
+    img.src = 'https://cdn.example/broken.jpg';
+    wrap.appendChild(img);
+    document.body.appendChild(wrap);
+    window.coverFallback(img);
+    expect(wrap.innerHTML).toContain('placeholder-initials');
+    // The original <img> was replaced by the placeholder div, and the malicious
+    // name must not have created any new <img>/<script> element.
+    expect(wrap.querySelector('img')).toBeNull();
+    expect(wrap.querySelector('script')).toBeNull();
+    // Initials text is escaped ("<" -> "&lt;").
+    expect(wrap.innerHTML).toContain('&lt;');
+  });
+});
+
+describe('portraitCoverImgHtml escapes the src', () => {
+  beforeEach(() => { window.__landscapeCovers = new Set(); });
+  it('escapes a quote in the cover url', () => {
+    const html = portraitCoverImgHtml('https://cdn.example/"onerror=x.jpg', 'claim-row-cover');
+    expect(html).not.toContain('"onerror=x');
+    expect(html).toContain('&quot;onerror=x');
+  });
+});
+
 describe('portraitCoverImgSelector', () => {
   it('includes claim row and admin thumb classes', () => {
     expect(portraitCoverImgSelector).toContain('img.claim-row-cover');

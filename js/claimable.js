@@ -1,6 +1,6 @@
 /** Maintainer-curated free claimable games (Claimable Now) — aggregated from Epic, GamerPower, and ITAD. */
 import { state } from './state.js';
-import { escapeHtml, escapeAttr } from './dom-util.js';
+import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
 import { normalizeNameForDedup, gameKey } from './game-core.js';
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { savePersonal } from './personal-storage.js';
@@ -9,6 +9,29 @@ import { switchView } from './filters-ui.js';
 import { claimsSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
 import { syncCoverFits } from './covers.js';
+import {
+  stripClaimTitleDecorations,
+  dedupeClaims,
+  sortClaims,
+  sanitizeBlurb,
+  reviewPercentValue,
+  claimCoverUrl,
+  claimCoverFallback,
+  formatEndsAt,
+  claimSourceHtml,
+  claimAttributionHtml,
+  claimableModuleMarkup,
+} from './claim-card.js';
+
+// Re-export the shared pure helpers consumed elsewhere (tests, admin) so the
+// public surface of this module is unchanged after the claim-card.js split.
+export {
+  stripClaimTitleDecorations,
+  sanitizeBlurb,
+  claimCoverFallback,
+  claimSourceHtml,
+  claimAttributionHtml,
+} from './claim-card.js';
 
 export const CLAIMS_HOSTED_URL = 'https://baklog.app/free-claims.json';
 const FALLBACK_PATH = 'curated/free_claims.fallback.json';
@@ -16,7 +39,6 @@ const MAX_VISIBLE = 5;
 
 let _claimsVisibleCount = MAX_VISIBLE;
 let _readOnlyPollTimer = null;
-let _detailClaimId = null;
 
 export function getClaimsEndpoint() {
   return (document.querySelector('meta[name="baklog-claims-endpoint"]')?.content)
@@ -29,10 +51,39 @@ function dismissedClaimsMap() {
   return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
 }
 
+// Dismissals are also keyed by the stable dedup key (appid / title-norm), not
+// just the volatile feed id. The displayed claim's id can change between feed
+// regenerations (e.g. the same game flips from an epic-* to a gamerpower-*
+// source after dedup), so an id-only dismissal would reappear on reload. The
+// key map keeps a cleared claim hidden as long as the same game is in the feed.
+function dismissedClaimKeysMap() {
+  const m = state.personal.__dismissedClaimKeys;
+  return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+}
+
+function findClaimById(id) {
+  return (state.claimableFeed?.items || []).find(c => c.id === id)
+    || (state.claimableNow || []).find(c => c.id === id)
+    || null;
+}
+
+function isClaimDismissed(c) {
+  if (!c) return false;
+  if (dismissedClaimsMap()[c.id]) return true;
+  const keyMap = dismissedClaimKeysMap();
+  return claimDedupKeys(c).some(k => keyMap[k]);
+}
+
 export function dismissClaim(id) {
   if (!id) return;
   if (!state.personal.__dismissedClaims) state.personal.__dismissedClaims = {};
   state.personal.__dismissedClaims[id] = Date.now();
+  const claim = findClaimById(id);
+  if (claim) {
+    if (!state.personal.__dismissedClaimKeys) state.personal.__dismissedClaimKeys = {};
+    const now = Date.now();
+    for (const k of claimDedupKeys(claim)) state.personal.__dismissedClaimKeys[k] = now;
+  }
   savePersonal();
   pruneDismissedClaims(state.claimableFeed?.items || []);
   applyVisibleClaims();
@@ -41,36 +92,55 @@ export function dismissClaim(id) {
   closeClaimDetail();
 }
 
-function pruneDismissedClaims(feedItems) {
-  const feedIds = new Set((feedItems || []).map(c => c?.id).filter(Boolean));
-  const dismissed = dismissedClaimsMap();
+export function restoreClaim(id) {
+  if (!id) return;
+  const claim = findClaimById(id);
+  const idMap = state.personal.__dismissedClaims;
+  const keyMap = state.personal.__dismissedClaimKeys;
   let changed = false;
+  if (idMap && idMap[id] != null) { delete idMap[id]; changed = true; }
+  if (claim && keyMap) {
+    for (const k of claimDedupKeys(claim)) {
+      if (keyMap[k] != null) { delete keyMap[k]; changed = true; }
+    }
+  }
+  if (!changed) return;
+  savePersonal();
+  applyVisibleClaims();
+  renderClaimableModule();
+  updateClaimableBanner();
+  const hidden = getHiddenClaims(state.claimableFeed?.items || []);
+  if (!hidden.length) closeHiddenClaimsModal();
+  else openHiddenClaimsModal();
+}
+
+function pruneDismissedClaims(feedItems) {
+  // An empty feed is indistinguishable from a failed / mid-regeneration load,
+  // so never prune against it — doing so would wipe every dismissal whenever the
+  // claims feed is briefly unavailable at boot (the cleared-overnight bug).
+  if (!feedItems || feedItems.length === 0) return;
+  const feedIds = new Set(feedItems.map(c => c?.id).filter(Boolean));
+  const feedKeys = new Set(feedItems.flatMap(c => claimDedupKeys(c)).filter(Boolean));
+  let changed = false;
+  const dismissed = dismissedClaimsMap();
   for (const id of Object.keys(dismissed)) {
     if (!feedIds.has(id)) {
       delete dismissed[id];
       changed = true;
     }
   }
+  const dismissedKeys = dismissedClaimKeysMap();
+  for (const k of Object.keys(dismissedKeys)) {
+    if (!feedKeys.has(k)) {
+      delete dismissedKeys[k];
+      changed = true;
+    }
+  }
   if (changed) {
     state.personal.__dismissedClaims = dismissed;
+    state.personal.__dismissedClaimKeys = dismissedKeys;
     savePersonal();
   }
-}
-
-/** Strip giveaway/store boilerplate from auto-sourced claim titles before ownership match. */
-export function stripClaimTitleDecorations(title) {
-  let t = String(title || '').trim();
-  if (!t) return t;
-  t = t.replace(/\s*\([^)]*\)\s*giveaway\s*$/i, '');
-  t = t.replace(/\s+free\s+(at\s+egs\s+)?on\s+epic\s+game\s+store.*$/i, '');
-  t = t.replace(/\s+free\s+for\s+mobile\s+on\s+egs.*$/i, '');
-  t = t.replace(/\s+in\s+game\s+(items?|currency\s+pack).*$/i, '');
-  t = t.replace(/\s+free\s+on\s+(steam|itchio|itch\.io|gog|indiegala).*$/i, '');
-  t = t.replace(/\s*-\s*free\s+on\s+indiegala.*$/i, '');
-  t = t.replace(/\s+on\s+(steam|gog|itch\.?io|epic\s+game\s+store)\s*$/i, '');
-  t = t.replace(/\s+-\s+chapters?[\s\d,]+.*$/i, '');
-  t = t.replace(/\s+giveaway\s*$/i, '');
-  return t.trim();
 }
 
 function claimTitleNorms(title) {
@@ -99,24 +169,51 @@ export function isClaimOwned(claim) {
   return false;
 }
 
+// Every stable identity a claim can be matched on. A claim's appid is filled in
+// by cross-store enrichment *between* feed regenerations, so the single
+// canonical dedup key (appid when present, else title) flips from `title:…` to
+// `appid:…` once enrichment lands — which would resurrect a cleared claim.
+// Dismissals are stored against (and checked against) all of these keys so a
+// cleared claim stays cleared regardless of whether a given feed snapshot
+// happens to carry the appid.
+function claimDedupKeys(c) {
+  if (!c) return [];
+  const keys = [];
+  if (c.steam_appid != null && c.steam_appid !== '') keys.push(`appid:${c.steam_appid}`);
+  const norm = normalizeNameForDedup(stripClaimTitleDecorations(c.title || ''));
+  if (norm) keys.push(`title:${norm}`);
+  if (!keys.length && c.id) keys.push(`id:${c.id}`);
+  return keys;
+}
+
+function isClaimEligible(c, now = Date.now()) {
+  if (!c?.id || !c.claim_url || !c.store) return false;
+  if (c.ends_at) {
+    const end = Date.parse(c.ends_at);
+    if (Number.isFinite(end) && end < now) return false;
+  }
+  if (isClaimOwned(c)) return false;
+  return true;
+}
+
 export function getVisibleClaims(items) {
-  const dismissed = dismissedClaimsMap();
   const now = Date.now();
-  return (items || []).filter((c) => {
-    if (!c?.id || !c.claim_url || !c.store) return false;
-    if (dismissed[c.id]) return false;
-    if (c.ends_at) {
-      const end = Date.parse(c.ends_at);
-      if (Number.isFinite(end) && end < now) return false;
-    }
-    if (isClaimOwned(c)) return false;
+  const filtered = (items || []).filter((c) => {
+    if (!isClaimEligible(c, now)) return false;
+    if (isClaimDismissed(c)) return false;
     return true;
-  }).sort((a, b) => {
-    const ea = a.ends_at ? Date.parse(a.ends_at) : Infinity;
-    const eb = b.ends_at ? Date.parse(b.ends_at) : Infinity;
-    if (ea !== eb) return ea - eb;
-    return String(a.title || '').localeCompare(String(b.title || ''));
   });
+  return sortClaims(dedupeClaims(filtered));
+}
+
+export function getHiddenClaims(items) {
+  const now = Date.now();
+  const filtered = (items || []).filter((c) => {
+    if (!isClaimEligible(c, now)) return false;
+    if (!isClaimDismissed(c)) return false;
+    return true;
+  });
+  return sortClaims(dedupeClaims(filtered));
 }
 
 export function diffClaims(prevIds, items) {
@@ -166,11 +263,15 @@ async function loadBundledFallback() {
   }
 }
 
-/** Parse feed timestamp for local vs bundled comparison (profile uses fetched_at). */
+/** Newest timestamp on a feed doc (profile fetcher stamps fetched_at; bundled uses generated_at). */
 export function feedGeneratedAt(doc) {
-  const raw = doc?.generated_at || doc?.fetched_at || '';
-  const t = Date.parse(raw);
-  return Number.isFinite(t) ? t : 0;
+  const gen = Date.parse(doc?.generated_at || '');
+  const fetched = Date.parse(doc?.fetched_at || '');
+  const ts = [
+    Number.isFinite(gen) ? gen : 0,
+    Number.isFinite(fetched) ? fetched : 0,
+  ];
+  return Math.max(...ts);
 }
 
 /** Prefer the feed with the newer generated_at when both have items. */
@@ -186,6 +287,9 @@ function applyFeedDoc(doc) {
   state.claimableFeed = doc && typeof doc === 'object' ? doc : null;
   state.libraryMeta.claims = state.claimableFeed;
   pruneDismissedClaims(state.claimableFeed?.items || []);
+  // A fresh feed resets the "show more" expansion so a stale, inflated slice
+  // can't carry over after claims expire or the feed shrinks.
+  _claimsVisibleCount = MAX_VISIBLE;
   applyVisibleClaims();
 }
 
@@ -245,152 +349,63 @@ export function markClaimsPendingAutoRun() {
   claimsPendingAutoRun = true;
 }
 
-/**
- * ITAD-sourced claims ship `blurb` as raw HTML (anchor tags + literal giveaway
- * URLs + "expires on … | go to giveaway" boilerplate). Escaping it for display
- * leaks that markup/URL as visible text, so strip tags, decode the handful of
- * entities ITAD emits, and drop the giveaway boilerplate before rendering.
- */
-export function sanitizeBlurb(raw) {
-  if (!raw) return '';
-  let t = String(raw)
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0*39;|&apos;/g, "'");
-  t = t.replace(/\s*\|?\s*(unknown expiry|expires on[^|]*)\s*\|?\s*go to giveaway\s*/i, ' ');
-  return t.replace(/\s+/g, ' ').trim();
+function showHiddenClaimsButtonHtml(count) {
+  if (!count) return '';
+  const n = count;
+  return `<button type="button" class="claim-show-hidden-btn text-sm text-slate-400 hover:text-slate-200 underline mt-2" data-claim-show-hidden>Show hidden (${n})</button>`;
 }
 
-function formatEndsAt(endsAt) {
-  if (!endsAt) return null;
-  const t = Date.parse(endsAt);
-  if (!Number.isFinite(t)) return null;
-  const d = new Date(t);
-  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
-
-const CLAIM_SOURCE_META = {
-  epic: { label: 'Epic', url: 'https://store.epicgames.com/free-games' },
-  gamerpower: { label: 'GamerPower', url: 'https://www.gamerpower.com/' },
-  itad: { label: 'ITAD', url: 'https://isthereanydeal.com/' },
-};
-
-/** Per-claim "referenced via <provider>" badge — where the listing was sourced from. */
-export function claimSourceHtml(source, { tag = 'span' } = {}) {
-  const key = String(source || '').toLowerCase();
-  const meta = CLAIM_SOURCE_META[key];
-  if (!meta) return '';
-  const label = escapeHtml(meta.label);
-  const inner = (tag === 'a')
-    ? `<a href="${escapeAttr(meta.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
-    : label;
-  return `<span class="claim-source" title="Referenced via ${label}">via ${inner}</span>`;
-}
-
-/** Render feed attribution credits (e.g. GamerPower.com API terms). */
-export function claimAttributionHtml(attribution) {
-  const items = (attribution || []).filter(Boolean);
-  if (!items.length) return '';
-  const parts = items.map((name) => {
-    const label = escapeHtml(String(name));
-    if (/gamerpower/i.test(name)) {
-      return `<a href="https://www.gamerpower.com/" target="_blank" rel="noopener noreferrer">${label}</a>`;
-    }
-    return label;
-  });
-  return `<p class="claim-attribution">Giveaway data via ${parts.join(' · ')}</p>`;
-}
-
-function claimCardHtml(claim) {
+function hiddenClaimRowHtml(claim) {
   const title = escapeHtml(claim.title || 'Free game');
   const store = claim.store || 'other';
-  const cover = claim.header_image || '';
-  const blurbText = sanitizeBlurb(claim.blurb);
-  const blurb = blurbText ? `<p class="claim-hero-blurb text-sm text-slate-400 mt-1">${escapeHtml(blurbText)}</p>` : '';
-  const review = claim.review_percent != null
-    ? `<span class="deal-hero-stat" title="Steam review score"><span class="deal-hero-stat-dot deal-hero-stat-dot-review"></span>${claim.review_percent}%</span>`
-    : '';
+  const cover = claimCoverUrl(claim);
   const ends = formatEndsAt(claim.ends_at);
-  const endsHtml = ends ? `<span class="text-xs text-amber-300/90">Ends ${escapeHtml(ends)}</span>` : '';
-  const genres = (claim.genres || []).slice(0, 2).map(escapeHtml).join(' · ');
-  const genreHtml = genres ? `<span class="deal-hero-genres">${genres}</span>` : '';
-  const ls = cover ? window.coverLandscapeAttr(cover) : '';
-  const coverHtml = cover
-    ? `<img class="deal-hero-cover${ls}" src="${escapeAttr(cover)}" alt="" loading="lazy" onload="window.markLandscape(this)" />`
-    : `<span class="deal-hero-cover claim-hero-cover-fallback" aria-hidden="true"></span>`;
-
-  return `<article class="claim-hero-card dash-card deal-rail-card claim-fire-card w-full" data-claim-id="${escapeAttr(claim.id)}">
-    <div class="dash-kpi-label">Claimable Now</div>
-    <div class="deal-hero-body mt-2">
-      <span class="cover-wrap deal-hero-cover-wrap${ls}">${coverHtml}</span>
-      <div class="deal-hero-meta min-w-0 flex-1">
-        <div class="deal-hero-top">
-          <div class="deal-hero-name font-medium text-slate-100">${title}</div>
-          <div class="deal-hero-prices mt-1">
-            <span class="deal-hero-price claim-free-label">Free to claim</span>
-          </div>
-        </div>
-        <div class="deal-hero-badges flex flex-wrap items-center gap-1.5 mt-1">
-          <span class="deal-cut-badge deal-cut-huge claim-cut-fire">100% off</span>
-          ${storeLogoHtml(store, { size: 'sm', title: storeDisplayName(store) })}
-          ${claimSourceHtml(claim.source)}
-          ${endsHtml}
-        </div>
-        ${blurb}
-        <div class="deal-hero-stats mt-2">
-          <div class="deal-hero-stats-row">${review}${genreHtml}</div>
-        </div>
-        <div class="claim-hero-actions flex flex-wrap gap-2 mt-3">
-          <button type="button" class="btn-claim-open bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold px-3 py-1.5 rounded" data-claim-go="${escapeAttr(claim.id)}">Claim free →</button>
-          <button type="button" class="btn-claim-clear text-slate-400 hover:text-slate-200 text-sm px-2 py-1.5 rounded border border-slate-600" data-claim-clear="${escapeAttr(claim.id)}">Clear</button>
-        </div>
-      </div>
-    </div>
-  </article>`;
-}
-
-function claimRowsHeaderHtml() {
-  return `<div class="claim-rows-header" aria-hidden="true">
-    <span class="claim-cell-cover"></span>
-    <span class="claim-cell-title">Title</span>
-    <span class="claim-cell-meta">
-      <span class="claim-cell-review">Review</span>
-      <span class="claim-cell-ends">Ends</span>
-    </span>
-    <span class="claim-cell-actions"></span>
-  </div>`;
-}
-
-function claimRowHtml(claim) {
-  const title = escapeHtml(claim.title || 'Free game');
-  const store = claim.store || 'other';
-  const cover = claim.header_image || '';
-  const ends = formatEndsAt(claim.ends_at);
-  const review = claim.review_percent != null ? `${claim.review_percent}%` : '—';
   const endsHtml = ends ? `Ends ${escapeHtml(ends)}` : '—';
   const ls = cover ? window.coverLandscapeAttr(cover) : '';
   const coverHtml = cover
-    ? `<img class="claim-row-cover${ls}" src="${escapeAttr(cover)}" alt="" loading="lazy" onload="window.markLandscape(this)" />`
-    : `<span class="claim-row-cover claim-hero-cover-fallback" aria-hidden="true"></span>`;
-  return `<div class="claim-row claim-fire-card" data-claim-id="${escapeAttr(claim.id)}">
-    <span class="claim-cell-cover cover-wrap claim-row-cover-wrap${ls}">${coverHtml}</span>
-    <span class="claim-cell-title">
-      <span class="claim-row-title truncate">${title}</span>
-      <span class="claim-cell-store">${storeLogoHtml(store, { size: 'sm', title: storeDisplayName(store) })}</span>
-      ${claimSourceHtml(claim.source)}
+    ? `<img class="claim-hidden-row-cover${ls}" src="${escapeAttr(cover)}" alt="" loading="lazy" onload="window.markLandscape(this)" />`
+    : `<span class="claim-hidden-row-cover claim-hero-cover-fallback" aria-hidden="true"></span>`;
+  return `<div class="claim-hidden-row" data-claim-id="${escapeAttr(claim.id)}">
+    <span class="claim-hidden-row-cover-wrap cover-wrap${ls}">${coverHtml}</span>
+    <span class="claim-hidden-row-meta min-w-0 flex-1">
+      <span class="claim-hidden-row-title truncate">${title}</span>
+      <span class="claim-hidden-row-badges flex flex-wrap items-center gap-1.5 mt-0.5">
+        ${storeLogoHtml(store, { size: 'sm', title: storeDisplayName(store) })}
+        ${claimSourceHtml(claim.source)}
+        <span class="text-xs text-slate-500">${endsHtml}</span>
+      </span>
     </span>
-    <span class="claim-cell-meta">
-      <span class="claim-cell-review">${review}</span>
-      <span class="claim-cell-ends">${endsHtml}</span>
-    </span>
-    <span class="claim-cell-actions">
-      <button type="button" class="btn-claim-open bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-2.5 py-1 rounded" data-claim-go="${escapeAttr(claim.id)}">Claim free →</button>
-      <button type="button" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded border border-slate-600" data-claim-clear="${escapeAttr(claim.id)}">Clear</button>
-    </span>
+    <button type="button" class="claim-hidden-restore-btn text-xs text-sky-300 hover:text-sky-200 px-2 py-1 rounded border border-slate-600 shrink-0" data-claim-restore="${escapeAttr(claim.id)}">Restore</button>
   </div>`;
+}
+
+export function openHiddenClaimsModal() {
+  const dlg = document.getElementById('claimHiddenDialog');
+  if (!dlg) return;
+  const hidden = getHiddenClaims(state.claimableFeed?.items || []);
+  if (!hidden.length) {
+    closeHiddenClaimsModal();
+    return;
+  }
+  dlg.innerHTML = `
+    <form method="dialog" class="claim-detail-panel claim-hidden-panel">
+      <div class="claim-detail-header">
+        <h2 class="claim-detail-title">Hidden claim notifications</h2>
+        <button type="submit" class="claim-detail-close" aria-label="Close">×</button>
+      </div>
+      <p class="claim-hidden-intro text-sm text-slate-400 mt-2">Claims you cleared from notifications. Restore any you want to see again.</p>
+      <div class="claim-hidden-list mt-3 space-y-2">${hidden.map(hiddenClaimRowHtml).join('')}</div>
+    </form>`;
+  if (typeof dlg.showModal === 'function') {
+    dlg.showModal();
+    dlg.focus();
+  }
+  syncCoverFits(dlg);
+}
+
+export function closeHiddenClaimsModal() {
+  const dlg = document.getElementById('claimHiddenDialog');
+  if (dlg?.open) dlg.close();
 }
 
 export function renderClaimableModule() {
@@ -398,33 +413,19 @@ export function renderClaimableModule() {
   if (!mount) return;
   const show = state.activeView === 'wishlist' && state.dashboardDataReady;
   const claims = state.claimableNow || [];
-  if (!show || !claims.length) {
+  const hiddenCount = getHiddenClaims(state.claimableFeed?.items || []).length;
+  if (!show || (!claims.length && !hiddenCount)) {
     mount.classList.add('hidden');
     mount.innerHTML = '';
     return;
   }
   mount.classList.remove('hidden');
-  const visible = claims.slice(0, _claimsVisibleCount);
-  const remaining = claims.length - visible.length;
-  const more = remaining > 0
-    ? `<button type="button" class="text-sm text-sky-300 hover:text-sky-200 underline mt-2" data-claim-show-more>+${remaining} more →</button>`
-    : '';
-  const attribution = claimAttributionHtml(state.claimableFeed?.attribution);
-  if (claims.length === 1) {
-    mount.innerHTML = `<section class="claimable-now-module space-y-3" aria-label="Claimable Now">
-      ${claimCardHtml(claims[0])}
-      ${attribution}
-    </section>`;
-    syncCoverFits(mount);
-    return;
-  }
-  mount.innerHTML = `<section class="claimable-now-module dash-card claim-rows-card" aria-label="Claimable Now">
-    <div class="dash-kpi-label claim-rows-head">Claimable Now</div>
-    <div class="claim-rows">${claimRowsHeaderHtml()}${visible.map(claimRowHtml).join('')}</div>
-    ${more}
-    ${attribution}
-  </section>`;
-  syncCoverFits(mount);
+  mount.innerHTML = claimableModuleMarkup(claims, {
+    visibleCount: _claimsVisibleCount,
+    attribution: state.claimableFeed?.attribution,
+    showHiddenButtonHtml: showHiddenClaimsButtonHtml(hiddenCount),
+  });
+  if (claims.length) syncCoverFits(mount);
 }
 
 export function showClaimableBanner(newCount) {
@@ -456,21 +457,25 @@ export function openClaimDetail(id) {
     || state.claimableNow.find(c => c.id === id);
   const dlg = document.getElementById('claimDetailDialog');
   if (!claim || !dlg) return;
-  _detailClaimId = id;
   const owned = isClaimOwned(claim);
   const ends = formatEndsAt(claim.ends_at);
-  const cover = claim.header_image
-    ? `<img src="${escapeAttr(claim.header_image)}" alt="" class="claim-detail-cover" />`
+  const coverUrl = claimCoverUrl(claim);
+  const cover = coverUrl
+    ? `<img src="${escapeAttr(coverUrl)}" data-fallback="${escapeAttr(claimCoverFallback(claim))}" data-name="${escapeAttr(claim.title || '')}" alt="" class="claim-detail-cover" onerror="window.coverFallback(this)" />`
     : '';
-  const review = claim.review_percent != null ? `${claim.review_percent}% Steam reviews` : '';
+  const reviewPct = reviewPercentValue(claim);
+  const review = reviewPct != null ? `${reviewPct}% Steam reviews` : '';
   const blurbText = sanitizeBlurb(claim.blurb);
   const blurb = blurbText ? `<p class="claim-detail-blurb">${escapeHtml(blurbText)}</p>` : '';
   const endsHtml = ends
     ? `<span class="claim-detail-ends">Ends ${escapeHtml(ends)}</span>`
     : '';
+  const claimable = !owned && isSafeHttpUrl(claim.claim_url);
   const claimBtn = owned
     ? `<p class="claim-detail-owned">Already in your library.</p>`
-    : `<a href="${escapeAttr(claim.claim_url)}" target="_blank" rel="noopener" class="claim-detail-claim-btn">Claim free →</a>`;
+    : (claimable
+      ? `<a href="${escapeAttr(claim.claim_url)}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn">Claim free →</a>`
+      : `<p class="claim-detail-owned">Claim link unavailable.</p>`);
   dlg.innerHTML = `
     <form method="dialog" class="claim-detail-panel">
       <div class="claim-detail-header">
@@ -499,7 +504,6 @@ export function openClaimDetail(id) {
 
 export function closeClaimDetail() {
   const dlg = document.getElementById('claimDetailDialog');
-  _detailClaimId = null;
   if (dlg?.open) dlg.close();
 }
 
@@ -562,12 +566,7 @@ export function handleClaimableClick(e) {
     const id = goBtn.dataset.claimGo;
     const claim = (state.claimableFeed?.items || []).find(c => c.id === id)
       || state.claimableNow.find(c => c.id === id);
-    if (claim?.claim_url) window.open(claim.claim_url, '_blank', 'noopener');
-    return true;
-  }
-  const openBtn = e.target.closest('[data-claim-open]');
-  if (openBtn) {
-    openClaimDetail(openBtn.dataset.claimOpen);
+    if (isSafeHttpUrl(claim?.claim_url)) window.open(claim.claim_url, '_blank', 'noopener,noreferrer');
     return true;
   }
   const card = e.target.closest('[data-claim-id]');
@@ -578,6 +577,10 @@ export function handleClaimableClick(e) {
   if (e.target.closest('[data-claim-show-more]')) {
     _claimsVisibleCount += MAX_VISIBLE;
     renderClaimableModule();
+    return true;
+  }
+  if (e.target.closest('[data-claim-show-hidden]')) {
+    openHiddenClaimsModal();
     return true;
   }
   return false;

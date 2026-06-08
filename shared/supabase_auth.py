@@ -172,14 +172,15 @@ def verify_bearer_user(authorization: str | None) -> dict[str, str] | None:
 def _extract_plan(payload: dict[str, Any]) -> str | None:
     """Pull a plan/entitlement string from a verified JWT payload.
 
-    Looks at a top-level ``plan`` claim first (set via a Supabase access-token
-    hook), then ``app_metadata.plan`` / ``user_metadata.plan``.
+    Only server-controlled claims are trusted: a top-level ``plan`` claim (set
+    via a Supabase access-token hook) and ``app_metadata.plan``. ``user_metadata``
+    is deliberately ignored — Supabase users can edit their own ``user_metadata``
+    via the client SDK, so trusting it would let a free user self-assign ``pro``.
     """
     candidates: list[Any] = [payload.get("plan")]
-    for meta_key in ("app_metadata", "user_metadata"):
-        meta = payload.get(meta_key)
-        if isinstance(meta, dict):
-            candidates.append(meta.get("plan"))
+    app_meta = payload.get("app_metadata")
+    if isinstance(app_meta, dict):
+        candidates.append(app_meta.get("plan"))
     for value in candidates:
         if isinstance(value, str) and value.strip():
             return value.strip().lower()

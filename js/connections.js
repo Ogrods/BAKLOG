@@ -684,7 +684,7 @@ function buildCardHtml(p) {
 
       <div class="conn-card-head">
 
-        ${storeLogoHtml(storeKey, { size: 'lg', title: p.label })}
+        ${storeLogoHtml(storeKey, { size: 'lg', title: p.label, className: 'conn-card-badge' })}
 
         <div class="conn-head-actions">
 

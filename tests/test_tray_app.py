@@ -8,8 +8,12 @@ status/lifecycle guards without spawning a real server.
 from __future__ import annotations
 
 import socket
+import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -60,10 +64,127 @@ def test_controller_start_noop_when_already_listening(monkeypatch):
     assert ctl.proc is None
 
 
+def test_controller_start_spawns_and_waits(monkeypatch):
+    calls: list[list[str]] = []
+    port_seq = iter([False, False, True])
+
+    class FakeProc:
+        def poll(self):
+            return None
+
+    def fake_popen(argv, **kwargs):
+        calls.append(argv)
+        return FakeProc()
+
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: next(port_seq, True))
+    monkeypatch.setattr(tray_app.subprocess, "Popen", fake_popen)
+    ctl = tray_app.ServerController()
+    assert ctl.start(wait_secs=1.0) is True
+    assert len(calls) == 1
+
+
+def test_controller_start_fails_when_child_exits_early(monkeypatch):
+    class DeadProc:
+        def poll(self):
+            return 1
+
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
+    monkeypatch.setattr(tray_app.subprocess, "Popen", lambda *a, **k: DeadProc())
+    ctl = tray_app.ServerController()
+    assert ctl.start(wait_secs=0.5) is False
+    assert ctl.proc is None
+
+
+def test_controller_stop_requests_graceful_shutdown(monkeypatch):
+    graceful = {"called": False}
+
+    class LiveProc:
+        pid = 4242
+        _dead = False
+
+        def poll(self):
+            return 1 if self._dead else None
+
+        def wait(self, timeout=None):
+            self._dead = True
+            return 0
+
+        def terminate(self):
+            self._dead = True
+
+        def kill(self):
+            self._dead = True
+
+    proc = LiveProc()
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: True)
+    monkeypatch.setattr(
+        tray_app,
+        "_request_graceful_shutdown",
+        lambda: graceful.__setitem__("called", True) or True,
+    )
+    ctl = tray_app.ServerController()
+    ctl.proc = proc
+    ctl.stop()
+    assert graceful["called"] is True
+    assert ctl.proc is None
+
+
+def test_controller_restart_blocked_for_foreign_server(monkeypatch):
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: True)
+    ctl = tray_app.ServerController()
+    assert ctl.restart() is False
+
+
+def test_controller_restart_stops_and_starts(monkeypatch):
+    stopped = {"n": 0}
+    port_open = {"v": False}
+
+    class LiveProc:
+        pid = 1
+
+        def poll(self):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_stop_port():
+        port_open["v"] = False
+
+    def fake_start(wait_secs=12.0):
+        port_open["v"] = True
+        ctl.proc = LiveProc()
+        return True
+
+    ctl = tray_app.ServerController()
+    ctl.proc = LiveProc()
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: port_open["v"])
+    monkeypatch.setattr(ctl, "stop", lambda: stopped.__setitem__("n", stopped["n"] + 1))
+    monkeypatch.setattr(ctl, "start", fake_start)
+    assert ctl.restart() is True
+    assert stopped["n"] == 1
+
+
+def test_request_graceful_shutdown_true_when_port_closed(monkeypatch):
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
+    assert tray_app._request_graceful_shutdown() is True
+
+
 def test_controller_stop_is_safe_with_no_process():
     ctl = tray_app.ServerController()
     ctl.stop()  # must not raise
     assert ctl.proc is None
+
+
+def test_run_headless_returns_1_on_start_failure(monkeypatch):
+    ctl = tray_app.ServerController()
+    monkeypatch.setattr(ctl, "start", lambda wait_secs=12.0: False)
+    assert tray_app._run_headless(ctl) == 1
+
+
+def test_main_exits_when_lock_held(monkeypatch):
+    monkeypatch.setattr(tray_app, "acquire_tray_lock", lambda: False)
+    assert tray_app.main() == 0
 
 
 def test_make_icon_image_dimensions():
@@ -97,3 +218,23 @@ def test_port_open_false_for_unused_port(monkeypatch):
     s.close()
     monkeypatch.setattr(tray_app, "PORT", free_port)
     assert tray_app._port_open(timeout=0.2) is False
+
+
+def test_server_watchdog_notifies_on_owned_child_death(monkeypatch):
+    notified: list[tuple[str, str]] = []
+    monkeypatch.setattr(tray_app, "_tray_notify", lambda icon, t, m: notified.append((t, m)))
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
+
+    class DeadProc:
+        def poll(self):
+            return 1
+
+    ctl = tray_app.ServerController()
+    ctl.proc = DeadProc()
+    icon = MagicMock()
+    tray_app._start_server_watchdog(icon, ctl)
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline and not notified:
+        time.sleep(0.05)
+    assert notified
+    assert notified[0][0] == "BAKLOG server stopped"

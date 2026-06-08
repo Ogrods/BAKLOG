@@ -28,12 +28,23 @@ def _stat(
     )
 
 
+def _trophy_set(*, bronze=0, silver=0, gold=0, platinum=0) -> SimpleNamespace:
+    return SimpleNamespace(
+        bronze=bronze,
+        silver=silver,
+        gold=gold,
+        platinum=platinum,
+    )
+
+
 def _trophy(
     *,
     comm_id: str = "NPWR22022_00",
     name: str = "Fortnite",
     title_id: str = "PPSA01922_00",
     platform: str = "PS5",
+    earned: SimpleNamespace | None = None,
+    defined: SimpleNamespace | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         np_communication_id=comm_id,
@@ -43,6 +54,8 @@ def _trophy(
         title_icon_url=None,
         progress=10,
         last_updated_datetime=datetime(2024, 2, 17, 20, 21, 43),
+        earned_trophies=earned,
+        defined_trophies=defined,
     )
 
 
@@ -140,6 +153,10 @@ def test_edition_suffix_groups_via_dedupe_key() -> None:
         image_url=None,
         platforms=["PS5"],
         trophy_progress=None,
+        trophies_earned=None,
+        trophies_total=None,
+        has_platinum=False,
+        platinum_earned=False,
         playtime_minutes=0,
         last_played=None,
         first_played=None,
@@ -148,3 +165,57 @@ def test_edition_suffix_groups_via_dedupe_key() -> None:
     )
     _apply_stat_to_entry(entry, _stat(title_id="A", name="Game Name", hours=5), stat_agg)
     assert entry.playtime_minutes == 15 * 60
+
+
+def test_trophy_counts_and_platinum_flags() -> None:
+    earned = _trophy_set(bronze=10, silver=4, gold=2, platinum=1)
+    defined = _trophy_set(bronze=20, silver=8, gold=4, platinum=1)
+    client = object.__new__(PsnClient)
+    client._client = _FakePsnMe(
+        [],
+        [
+            _trophy(
+                comm_id="NPWR99999_00",
+                name="Platinum Game",
+                earned=earned,
+                defined=defined,
+            )
+        ],
+    )
+    game = next(g for g in client.collect_library() if g.name == "Platinum Game")
+    assert game.trophies_earned == 17
+    assert game.trophies_total == 33
+    assert game.has_platinum is True
+    assert game.platinum_earned is True
+
+
+def test_entitlement_beta_and_non_game_skipped() -> None:
+    client = object.__new__(PsnClient)
+    client._client = _FakePsnMe(
+        [],
+        [],
+        entitlements=[
+            {
+                "isGame": False,
+                "titleMeta": {"titleId": "CUSA00001_00", "name": "Not A Game"},
+            },
+            {
+                "isBeta": True,
+                "titleMeta": {"titleId": "CUSA00002_00", "name": "Beta Build"},
+            },
+            {
+                "titleMeta": {
+                    "titleId": "CUSA00003_00",
+                    "name": "Real Game",
+                    "imageUrl": "https://example.com/title.jpg",
+                },
+                "conceptMeta": {"conceptId": "123", "name": "Real Game"},
+                "gameMeta": {"name": "Real Game", "iconUrl": "https://example.com/icon.jpg"},
+            },
+        ],
+    )
+    games = client.collect_library()
+    names = {g.name for g in games}
+    assert "Not A Game" not in names
+    assert "Beta Build" not in names
+    assert "Real Game" in names

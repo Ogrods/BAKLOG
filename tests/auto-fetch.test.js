@@ -99,7 +99,7 @@ describe('maybeAutoFetchOnConnect', () => {
     expect(runFn).not.toHaveBeenCalled();
   });
 
-  it('runs provider fetcher_keys serialized', async () => {
+  it('runs only the corresponding (primary) fetcher, not the relative wishlist/reviews', async () => {
     const runFn = vi.fn().mockResolvedValue(undefined);
     const waitForQueueSlot = vi.fn().mockResolvedValue(undefined);
     const ok = await maybeAutoFetchOnConnect(['steam', 'wishlistSteam', 'steamReviews'], {
@@ -112,9 +112,26 @@ describe('maybeAutoFetchOnConnect', () => {
       getCancelEpoch: () => 1,
     });
     expect(ok).toBe(true);
-    expect(runFn.mock.calls.map((c) => c[0])).toEqual(['steam', 'wishlistSteam', 'steamReviews']);
-    expect(runFn.mock.calls.every((c) => c[1]?.auto === true)).toBe(true);
-    expect(waitForQueueSlot).toHaveBeenCalledTimes(3);
+    expect(runFn).toHaveBeenCalledTimes(1);
+    expect(runFn.mock.calls[0][0]).toBe('steam');
+    expect(runFn.mock.calls[0][1]?.auto).toBe(true);
+    expect(waitForQueueSlot).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the wishlist for a dedicated wishlist provider', async () => {
+    const runFn = vi.fn().mockResolvedValue(undefined);
+    const ok = await maybeAutoFetchOnConnect(['wishlistEpic'], {
+      isApiAvailable: () => true,
+      loadFetcherSources: async () => {},
+      sources: [{ key: 'wishlistEpic', label: 'Epic WL', group: 'wishlist', missingRequirements: [] }],
+      runFn,
+      openFetcherLog: () => {},
+      waitForQueueSlot: async () => {},
+      getCancelEpoch: () => 1,
+    });
+    expect(ok).toBe(true);
+    expect(runFn).toHaveBeenCalledTimes(1);
+    expect(runFn.mock.calls[0][0]).toBe('wishlistEpic');
   });
 
   it('returns false when API is unavailable', async () => {

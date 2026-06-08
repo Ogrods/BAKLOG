@@ -12,6 +12,26 @@ class XboxAuthError(Exception):
     pass
 
 
+class XboxRateLimitError(XboxAuthError):
+    """OpenXBL throttled the request (HTTP 429 / body code 429).
+
+    Subclasses XboxAuthError so existing ``except XboxAuthError`` handlers keep
+    catching it, but lets callers distinguish a transient rate limit (the key is
+    fine) from a real credential rejection (401) so they don't force a reconnect.
+    """
+
+
+def _rate_limit_message(resp: requests.Response) -> str:
+    msg = (
+        "OpenXBL rate limit reached (HTTP 429). The free OpenXBL tier caps "
+        "requests per hour — your API key is still valid, just wait and retry."
+    )
+    retry_after = (resp.headers.get("Retry-After") or "").strip()
+    if retry_after:
+        msg += f" Retry after {retry_after}s."
+    return msg
+
+
 class XboxClient:
     def __init__(self, api_key: str):
         key = (api_key or "").strip()
@@ -31,11 +51,17 @@ class XboxClient:
         resp = self.session.get(url, timeout=timeout)
         if resp.status_code == 401:
             raise XboxAuthError("Invalid XBL_API_KEY")
+        if resp.status_code == 429:
+            raise XboxRateLimitError(_rate_limit_message(resp))
         if resp.status_code >= 400:
             raise XboxAuthError(f"OpenXBL {resp.status_code}: {resp.text[:200]}")
         data = resp.json()
         if isinstance(data, dict) and data.get("code") not in (None, 200, "200", "SUCCESS"):
-            msg = data.get("message") or data.get("code")
+            code = data.get("code")
+            msg = data.get("message") or code
+            # OpenXBL often signals throttling as HTTP 200 with body code 429.
+            if str(code).strip() == "429" or str(msg).strip() == "429":
+                raise XboxRateLimitError(_rate_limit_message(resp))
             raise XboxAuthError(f"OpenXBL error: {msg}")
         return data
 

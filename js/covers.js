@@ -4,6 +4,18 @@
 // `syncCoverFits` for callers that need to re-prime cached images.
 
 import { sanitizeCoverUrl, spotlightCropForAspect } from "./game-core.js";
+import { escapeAttr } from "./dom-util.js";
+
+// Full HTML escape (text + attribute) for values interpolated into placeholder
+// markup built via outerHTML. Game names (and the initials derived from them)
+// come from catalog data and can contain "<", quotes, etc., so they must be
+// escaped before they reach innerHTML/outerHTML.
+function escHtml(s) {
+  return String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]),
+  );
+}
 
 const DASH_FAILED_COVERS_KEY = "baklog-dash-failed-covers";
 window.__dashFailedCovers = window.__dashFailedCovers || (() => {
@@ -45,8 +57,8 @@ window.coverFallback = function (img) {
   if (recentRow) {
     const rName = img.dataset.name || "";
     const rWords = rName.split(/\s+/).filter(Boolean);
-    const rInitials = (rWords.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3);
-    const rSafe = rName.replace(/"/g, "&quot;");
+    const rInitials = escHtml((rWords.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3));
+    const rSafe = escHtml(rName);
     img.outerHTML = `<div class="dash-list-cover placeholder" title="${rSafe}"><span class="placeholder-initials">${rInitials}</span></div>`;
     return;
   }
@@ -63,10 +75,10 @@ window.coverFallback = function (img) {
   const name = img.dataset.name || "";
   const cls = img.classList.contains("pick-cover") ? "pick-cover placeholder" : "cover placeholder";
   const words = name.split(/\s+/).filter(Boolean);
-  const initials = (words.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3);
+  const initials = escHtml((words.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3));
   const captionRaw = words.slice(0, 4).join(" ").slice(0, 28);
-  const safeName = name.replace(/"/g, "&quot;");
-  const safeCap = captionRaw.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const safeName = escHtml(name);
+  const safeCap = escHtml(captionRaw);
   img.outerHTML = `<div class="${cls}" title="${safeName}"><span class="placeholder-initials">${initials}</span><span class="placeholder-caption">${safeCap}</span></div>`;
 };
 const LANDSCAPE_CACHE_KEY = "baklog-landscape-covers";
@@ -158,8 +170,8 @@ window.spotlightArtFallback = function (img) {
   }
   const name = img.dataset.name || spot?.querySelector(".dash-spotlight-title")?.textContent?.trim() || "Game";
   const words = name.split(/\s+/).filter(Boolean);
-  const initials = (words.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3);
-  const safeName = name.replace(/"/g, "&quot;");
+  const initials = escHtml((words.slice(0, 3).map(w => w[0]).join("") || "?").toUpperCase().slice(0, 3));
+  const safeName = escHtml(name);
   spot?.classList.add("has-art-placeholder");
   spot?.querySelector(".dash-spotlight-art-bg")?.classList.remove("is-loaded");
   if (spot?.querySelector(".dash-spotlight-sheen")) spot.querySelector(".dash-spotlight-sheen").style.width = "";
@@ -178,8 +190,13 @@ window.markLandscape = function (img) {
     wrap.classList.toggle("landscape", isLandscape);
     // Letterboxed (contained) covers paint a blurred copy of the art behind
     // them instead of a flat fill. Cleared when the cover fills the frame.
-    if (isLandscape && src) wrap.style.setProperty("--cover-blur-img", `url("${src}")`);
-    else wrap.style.removeProperty("--cover-blur-img");
+    // src is the browser-normalized image URL; strip quotes/parens defensively
+    // so a crafted value can't break out of the CSS url("...") custom property.
+    if (isLandscape && src) {
+      wrap.style.setProperty("--cover-blur-img", `url("${src.replace(/["()]/g, "")}")`);
+    } else {
+      wrap.style.removeProperty("--cover-blur-img");
+    }
   }
   if (src) {
     const had = window.__landscapeCovers.has(src);
@@ -193,7 +210,8 @@ const PORTRAIT_COVER_IMG_SELECTOR =
 
 /**
  * Portrait cover slot HTML — wrap + img with landscape letterbox hooks.
- * `url` must already be escapeAttr'd. Returns empty string when no url.
+ * The cover URL is escaped here, so callers may pass a raw URL. Returns empty
+ * string when no url.
  */
 export function portraitCoverImgHtml(url, imgClass, wrapExtraClass = "") {
   const cover = String(url || "").trim();
@@ -201,7 +219,7 @@ export function portraitCoverImgHtml(url, imgClass, wrapExtraClass = "") {
   const ls = window.coverLandscapeAttr(cover);
   const wrapCls = `cover-wrap${wrapExtraClass ? ` ${wrapExtraClass}` : ""}${ls}`;
   const imgCls = `${imgClass}${ls}`;
-  return `<span class="${wrapCls}"><img class="${imgCls}" src="${cover}" alt="" loading="lazy" onload="window.markLandscape(this)" /></span>`;
+  return `<span class="${wrapCls}"><img class="${imgCls}" src="${escapeAttr(cover)}" alt="" loading="lazy" onload="window.markLandscape(this)" /></span>`;
 }
 
 /** Virtual scroll rebuilds rows from HTML; cached images often skip inline onload. */

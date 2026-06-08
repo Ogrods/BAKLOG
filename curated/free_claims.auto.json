@@ -1,9 +1,9 @@
 {
-  "fetched_at": "2026-06-08T09:10:09.420781+00:00",
+  "fetched_at": "2026-06-08T21:31:08.204191+00:00",
   "sources": {
     "epic": 2,
-    "gamerpower": 15,
-    "itad": 17
+    "gamerpower": 13,
+    "itad": 15
   },
   "attribution": [
     "GamerPower.com"
@@ -30,38 +30,16 @@
       "source": "epic"
     },
     {
-      "id": "gamerpower-3674",
-      "store": "steam",
-      "title": "Remothered: Tormented Fathers (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/remothered-tormented-fathers-steam-giveaway",
-      "ends_at": "2026-06-08T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25ced022820.jpg",
-      "blurb": "Score Remothered: Tormented Fathers for free via Steam until 8 Jun! Remothered: Tormented Fathers is a realistic survival game with unpredictable twists. Don´t miss it!",
-      "source": "gamerpower"
-    },
-    {
       "id": "gamerpower-3673",
       "store": "epic",
       "title": "Relaxing Simulator (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/relaxing-simulator-epic-games-giveaway",
       "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2965380/library_600x900_2x.jpg",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a25c2413d322.jpg",
       "blurb": "Just relax and grab Relaxing Simulator for free on the Epic Games Store for the ultimate relaxing experience!",
       "source": "gamerpower",
       "review_percent": 89,
       "steam_appid": 2965380
-    },
-    {
-      "id": "gamerpower-3672",
-      "store": "gog",
-      "title": "Remothered: Broken Porcelain (GOG) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/remothered-broken-porcelain-gog-giveaway",
-      "ends_at": "2026-06-08T23:59:00Z",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1142390/library_600x900_2x.jpg",
-      "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
-      "source": "gamerpower",
-      "review_percent": 60,
-      "steam_appid": 1142390
     },
     {
       "id": "gamerpower-3671",
@@ -99,7 +77,7 @@
       "title": "Tell Me Why (Steam) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/tell-me-why-steam-giveaway",
       "ends_at": "2026-07-01T23:59:59Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6478b9dcae7be.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1180660/library_600x900_2x.jpg",
       "blurb": "Dive into the Riveting World of Tell Me Why for FREE on Steam! Tell Me Why is a multi-award winning episodic adventure game from Dontnod Entertainment! Don't pass up the chance to experience this extraordinary game for free!",
       "source": "gamerpower",
       "review_percent": 82,
@@ -115,9 +93,15 @@
       "title": "Gravity Circuit (Steam) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/gravity-circuit-steam-giveaway",
       "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a1dbddf722cd.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/858710/library_600x900_2x.jpg",
       "blurb": "Looking for a cool Steam game? Grab Gravity Circuit for free via Steam until June 14. Gravity Circuit is a action packed 2D platformer in the spirit of console classics. Don´t miss this one.",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 92,
+      "steam_appid": 858710,
+      "genres": [
+        "Action",
+        "Indie"
+      ]
     },
     {
       "id": "gamerpower-3287",
@@ -204,37 +188,10 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16247/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2965380/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/relaxing-simulator/info/\">Relaxing Simulator</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 15 Jun 2026 07:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/relaxing-simulator-4cca47>go to giveaway</a>",
+      "blurb": "Relaxing Simulator",
       "source": "itad",
       "review_percent": 89,
       "steam_appid": 2965380
-    },
-    {
-      "id": "itad-8b45ae1603ee",
-      "store": "gog",
-      "title": "Remothered: Broken Porcelain on GOG",
-      "claim_url": "https://isthereanydeal.com/giveaways/16246/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/remothered-broken-porcelain/info/\">Remothered: Broken Porcelain</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 08 Jun 2026 19:45:45 +0200\n                                        | <a href=https://www.gog.com/en/game/remothered_broken_porcelain>go to giveaway</a>",
-      "source": "itad"
-    },
-    {
-      "id": "itad-9dcfdf2b0b35",
-      "store": "steam",
-      "title": "Remothered: Tormented Fathers on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16245/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/633360/library_600x900_2x.jpg",
-      "blurb": "Remothered: Tormented Fathers",
-      "source": "itad",
-      "review_percent": 74,
-      "steam_appid": 633360,
-      "genres": [
-        "Action",
-        "Adventure",
-        "Indie"
-      ]
     },
     {
       "id": "itad-b07aac9ebd26",
@@ -278,15 +235,9 @@
       "title": "Tell Me Why - Chapters 1,2,3 - FREE on Steam on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16229/",
       "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1180660/library_600x900_2x.jpg",
-      "blurb": "Tell Me Why Tell Me Why: Chapter 2 Tell Me Why: Chapter 3",
-      "source": "itad",
-      "review_percent": 82,
-      "steam_appid": 1180660,
-      "genres": [
-        "Adventure",
-        "Free To Play"
-      ]
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/tell-me-why/info/\">Tell Me Why</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-2/info/\">Tell Me Why: Chapter 2</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-3/info/\">Tell Me Why: Chapter 3</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Wed, 01 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1180660/Tell_Me_Why>go to giveaway</a>",
+      "source": "itad"
     },
     {
       "id": "itad-047270155013",
@@ -294,15 +245,9 @@
       "title": "Gravity Circuit free on Steam on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16228/",
       "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/858710/library_600x900_2x.jpg",
-      "blurb": "Gravity Circuit",
-      "source": "itad",
-      "review_percent": 92,
-      "steam_appid": 858710,
-      "genres": [
-        "Action",
-        "Indie"
-      ]
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/gravity-circuit/info/\">Gravity Circuit</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Tue, 14 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/858710/Gravity_Circuit/>go to giveaway</a>",
+      "source": "itad"
     },
     {
       "id": "itad-0d4598c53ffe",
@@ -394,7 +339,7 @@
       "title": "Die Young: Prologue - FREE on IndieGala",
       "claim_url": "https://isthereanydeal.com/giveaways/7433/",
       "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/973000/library_600x900_2x.jpg",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
       "blurb": "Die Young: Prologue",
       "source": "itad",
       "review_percent": 78,

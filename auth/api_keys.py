@@ -450,9 +450,6 @@ def extract_itad(page, context, session: AuthSession | None = None) -> dict[str,
     )
 
 
-_XBL_DASHBOARD_PATHS = ("/dashboard", "/app", "/keys", "/")
-
-
 def _xbl_signed_in(url: str) -> bool:
     u = (url or "").lower()
     if "xbl.io" not in u:
@@ -460,6 +457,56 @@ def _xbl_signed_in(url: str) -> bool:
     if any(p in u for p in ("/login", "login.live.com", "account.microsoft.com")):
         return False
     return True
+
+
+def _xbl_fetch_keys_json(page) -> list[str]:
+    """Return OpenXBL key strings from the xbl.io keys endpoint via in-page XHR.
+
+    xbl.io exposes the signed-in account's API keys as JSON at /keys (the same
+    payload you'd see by visiting the URL). We fetch it from the page's own
+    origin with ``credentials: 'include'`` so it carries the session cookie,
+    instead of navigating the visible window there. That avoids flashing the
+    raw JSON (and the 404 from probing /dashboard, /app) at the user before the
+    connect window closes, and reads the key straight from the source of truth.
+    """
+    try:
+        result = page.evaluate(
+            """async () => {
+                const urls = ['https://xbl.io/keys', 'https://xbl.io/app/keys'];
+                const out = [];
+                const seen = new Set();
+                const push = v => {
+                    if (typeof v !== 'string') return;
+                    v = v.trim();
+                    if (!v || seen.has(v)) return;
+                    if (!/^[A-Za-z0-9_-]{24,128}$/.test(v)) return;
+                    seen.add(v);
+                    out.push(v);
+                };
+                for (const u of urls) {
+                    try {
+                        const res = await fetch(u, {
+                            credentials: 'include',
+                            headers: { Accept: 'application/json' },
+                        });
+                        if (!res.ok) continue;
+                        const data = await res.json();
+                        const keys = (data && data.keys) || [];
+                        for (const k of keys) {
+                            if (!k) continue;
+                            push(k.key || k.apiKey || k.value || '');
+                        }
+                        if (out.length) return out;
+                    } catch (e) {}
+                }
+                return out;
+            }"""
+        )
+        if isinstance(result, list):
+            return [str(x).strip() for x in result if isinstance(x, str) and x.strip()]
+    except Exception:
+        pass
+    return []
 
 
 def _xbl_scrape_key_candidates(page) -> list[str]:
@@ -533,17 +580,28 @@ def _xbl_scrape_key_candidates(page) -> list[str]:
     return []
 
 
-def _xbox_key_valid(key: str) -> bool:
-    """Non-raising OpenXBL key probe — used to filter scrape candidates."""
-    from xbox_client import XboxAuthError, XboxClient
+def _xbox_key_check(key: str) -> str:
+    """Probe an OpenXBL key: 'valid' | 'invalid' | 'rate_limited' (non-raising)."""
+    from xbox_client import XboxAuthError, XboxClient, XboxRateLimitError
 
     try:
         XboxClient(key).get_account()
-        return True
+        return "valid"
+    except XboxRateLimitError:
+        return "rate_limited"
     except XboxAuthError:
-        return False
+        return "invalid"
     except Exception:  # noqa: BLE001
-        return False
+        return "invalid"
+
+
+def _xbox_key_valid(key: str) -> bool:
+    """Strict validity for scraped DOM candidates — used to filter candidates.
+
+    A rate limit counts as invalid here on purpose: while throttled we can't
+    tell a real key from a stray 24-128 char token, so we never lock onto one.
+    """
+    return _xbox_key_check(key) == "valid"
 
 
 def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str, str]:
@@ -563,7 +621,6 @@ def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str,
     page.on("request", on_request)
 
     deadline = time.time() + SUCCESS_WAIT_SEC
-    visited: set[str] = set()
     last_message = 0.0
 
     def _accept(candidates: list[str]) -> dict[str, str] | None:
@@ -573,31 +630,32 @@ def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str,
                 return captured
         return None
 
+    def _accept_trusted(candidates: list[str]) -> dict[str, str] | None:
+        # Candidates pulled from the authenticated /keys endpoint (or sniffed
+        # request header) are the user's real keys, so a 429 means valid-but-
+        # throttled — accept it rather than looping to the 5-min timeout.
+        for cand in candidates:
+            if _xbox_key_check(cand) in ("valid", "rate_limited"):
+                captured["XBL_API_KEY"] = cand
+                return captured
+        return None
+
     while time.time() < deadline:
         # Request-header key is ground truth — prefer it, but still validate.
         if header_key.get("XBL_API_KEY"):
-            hit = _accept([header_key["XBL_API_KEY"]])
+            hit = _accept_trusted([header_key["XBL_API_KEY"]])
             if hit:
                 return hit
 
         url = (page.url or "").lower()
 
         if _xbl_signed_in(url):
-            # Try common dashboard paths once each
-            for path in _XBL_DASHBOARD_PATHS:
-                if path in visited:
-                    continue
-                try:
-                    page.goto(f"https://xbl.io{path}", wait_until="domcontentloaded", timeout=15000)
-                    visited.add(path)
-                    page.wait_for_timeout(1200)
-                except Exception:
-                    visited.add(path)
-                    continue
-                hit = _accept(_xbl_scrape_key_candidates(page))
-                if hit:
-                    return hit
-            # Re-scrape current page periodically — user might be clicking around
+            # Read the key from xbl.io's JSON keys endpoint in the background
+            # (no visible navigation, so the user never sees the raw JSON / 404).
+            hit = _accept_trusted(_xbl_fetch_keys_json(page))
+            if hit:
+                return hit
+            # Fallback: scrape whatever key is on the current page (still no nav).
             hit = _accept(_xbl_scrape_key_candidates(page))
             if hit:
                 return hit

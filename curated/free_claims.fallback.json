@@ -1,6 +1,32 @@
 {
-  "generated_at": "2026-06-08T09:07:44.166264+00:00",
+  "generated_at": "2026-06-08T20:10:46.473271+00:00",
   "items": [
+    {
+      "id": "epic-rogue-waters-9764d6",
+      "store": "epic",
+      "title": "Rogue Waters",
+      "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters-9764d6",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-06-11T15:00:00Z",
+      "steam_appid": 1691190,
+      "review_percent": 76,
+      "source": "epic"
+    },
+    {
+      "id": "epic-songs-of-conquest",
+      "store": "epic",
+      "title": "Songs of Conquest",
+      "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-06-11T15:00:00Z",
+      "steam_appid": 867210,
+      "review_percent": 86,
+      "source": "epic"
+    },
     {
       "id": "gamerpower-3673",
       "store": "epic",
@@ -15,21 +41,8 @@
       "source": "gamerpower"
     },
     {
-      "id": "gamerpower-3672",
-      "store": "gog",
-      "title": "Remothered: Broken Porcelain",
-      "claim_url": "https://www.gamerpower.com/open/remothered-broken-porcelain-gog-giveaway",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1142390/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
-      "ends_at": "2026-06-08T23:59:00Z",
-      "steam_appid": 1142390,
-      "review_percent": 60,
-      "source": "gamerpower"
-    },
-    {
       "id": "gamerpower-3671",
-      "store": "itch",
+      "store": "indiegala",
       "title": "Flufftopia",
       "claim_url": "https://www.gamerpower.com/open/flufftopia-itchio-giveaway",
       "header_image": "https://www.gamerpower.com/offers/1b/6a25903df2853.jpg",
@@ -39,19 +52,53 @@
       "source": "gamerpower"
     },
     {
-      "id": "gamerpower-3287",
-      "store": "other",
-      "title": "Mr.Brocco And Co",
-      "claim_url": "https://www.gamerpower.com/open/mr-brocco-and-co-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/68ce9db7d6736.jpg",
+      "id": "gamerpower-2386",
+      "store": "steam",
+      "title": "Tell Me Why",
+      "claim_url": "https://www.gamerpower.com/open/tell-me-why-steam-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1180660/library_600x900_2x.jpg",
+      "genres": [
+        "Adventure",
+        "Free To Play"
+      ],
+      "blurb": "Dive into the Riveting World of Tell Me Why for FREE on Steam! Tell Me Why is a multi-award winning episodic adventure game from Dontnod Entertainment! Don't pass up the chance to experience this extraordinary game for free!",
+      "ends_at": "2026-07-01T23:59:59Z",
+      "steam_appid": 1180660,
+      "review_percent": 82,
+      "source": "gamerpower"
+    },
+    {
+      "id": "gamerpower-3665",
+      "store": "steam",
+      "title": "Gravity Circuit",
+      "claim_url": "https://www.gamerpower.com/open/gravity-circuit-steam-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/858710/library_600x900_2x.jpg",
+      "genres": [
+        "Action",
+        "Indie"
+      ],
+      "blurb": "Looking for a cool Steam game? Grab Gravity Circuit for free via Steam until June 14. Gravity Circuit is a action packed 2D platformer in the spirit of console classics. Don´t miss this one.",
+      "ends_at": "2026-06-14T23:59:00Z",
+      "steam_appid": 858710,
+      "review_percent": 92,
+      "source": "gamerpower"
+    },
+    {
+      "id": "gamerpower-3272",
+      "store": "indiegala",
+      "title": "The Brave Little Cloud",
+      "claim_url": "https://www.gamerpower.com/open/the-brave-little-cloud-pc-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Your fight against fast food begins today! Download Mr.Brocco And Co for free via IndieGala. Mr.Brocco And Co is a 2D platform game where junk food is trying to take over!",
+      "blurb": "Save the world… as a cloud. Download The Brave Little Cloud for free on IndieGala! The Brave Little Cloud is a 2D platformer where you play as a small cloud on a quest to battle evil.",
       "ends_at": null,
+      "steam_appid": 2635070,
+      "review_percent": 97,
       "source": "gamerpower"
     },
     {
       "id": "gamerpower-3266",
-      "store": "other",
+      "store": "indiegala",
       "title": "Carlos the Taco",
       "claim_url": "https://www.gamerpower.com/open/carlos-the-taco-pc-giveaway",
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2081930/library_600x900_2x.jpg",
@@ -77,7 +124,7 @@
     },
     {
       "id": "gamerpower-3446",
-      "store": "other",
+      "store": "indiegala",
       "title": "GigaBash",
       "claim_url": "https://www.gamerpower.com/open/gigabash-pc-giveaway",
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1546400/library_600x900_2x.jpg",
@@ -113,6 +160,69 @@
       "source": "gamerpower"
     },
     {
+      "id": "itad-b07aac9ebd26",
+      "store": "epic",
+      "title": "Wytchwood",
+      "claim_url": "https://isthereanydeal.com/giveaways/16242/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/729000/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Wytchwood",
+      "ends_at": null,
+      "steam_appid": 729000,
+      "review_percent": 93,
+      "source": "itad"
+    },
+    {
+      "id": "itad-0d4598c53ffe",
+      "store": "indiegala",
+      "title": "Mr.Brocco & Co",
+      "claim_url": "https://isthereanydeal.com/giveaways/16196/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Mr.Brocco & Co",
+      "ends_at": null,
+      "steam_appid": 2074560,
+      "review_percent": 83,
+      "source": "itad"
+    },
+    {
+      "id": "itad-de23882e1f39",
+      "store": "itch",
+      "title": "Smiley Dusty",
+      "claim_url": "https://isthereanydeal.com/giveaways/15746/",
+      "header_image": null,
+      "genres": [],
+      "blurb": "Smiley Dusty",
+      "ends_at": null,
+      "source": "itad"
+    },
+    {
+      "id": "itad-1b0433806065",
+      "store": "indiegala",
+      "title": "Die Young: Prologue",
+      "claim_url": "https://isthereanydeal.com/giveaways/7433/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
+      "genres": [],
+      "blurb": "Die Young: Prologue",
+      "ends_at": null,
+      "steam_appid": 973000,
+      "review_percent": 78,
+      "source": "itad"
+    },
+    {
+      "id": "gamerpower-3672",
+      "store": "gog",
+      "title": "Remothered: Broken Porcelain",
+      "claim_url": "https://www.gamerpower.com/open/remothered-broken-porcelain-gog-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1142390/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
+      "ends_at": "2026-06-08T23:59:00Z",
+      "steam_appid": 1142390,
+      "review_percent": 60,
+      "source": "gamerpower"
+    },
+    {
       "id": "itad-9dcfdf2b0b35",
       "store": "steam",
       "title": "Remothered: Tormented Fathers",
@@ -127,127 +237,6 @@
       "ends_at": null,
       "steam_appid": 633360,
       "review_percent": 74,
-      "source": "itad"
-    },
-    {
-      "id": "itad-b07aac9ebd26",
-      "store": "epic",
-      "title": "Wytchwood",
-      "claim_url": "https://isthereanydeal.com/giveaways/16242/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/729000/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Wytchwood",
-      "ends_at": null,
-      "steam_appid": 729000,
-      "review_percent": 93,
-      "source": "itad"
-    },
-    {
-      "id": "itad-073a56345192",
-      "store": "epic",
-      "title": "Songs of Conquest",
-      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Songs of Conquest",
-      "ends_at": null,
-      "steam_appid": 867210,
-      "review_percent": 86,
-      "source": "itad"
-    },
-    {
-      "id": "itad-0c69ed1f1bd8",
-      "store": "epic",
-      "title": "Rogue Waters",
-      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Rogue Waters",
-      "ends_at": null,
-      "steam_appid": 1691190,
-      "review_percent": 76,
-      "source": "itad"
-    },
-    {
-      "id": "itad-50a2b5b1d7a6",
-      "store": "steam",
-      "title": "Tell Me Why",
-      "claim_url": "https://isthereanydeal.com/giveaways/16229/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1180660/library_600x900_2x.jpg",
-      "genres": [
-        "Adventure",
-        "Free To Play"
-      ],
-      "blurb": "Tell Me Why Tell Me Why: Chapter 2 Tell Me Why: Chapter 3",
-      "ends_at": null,
-      "steam_appid": 1180660,
-      "review_percent": 82,
-      "source": "itad"
-    },
-    {
-      "id": "itad-047270155013",
-      "store": "steam",
-      "title": "Gravity Circuit",
-      "claim_url": "https://isthereanydeal.com/giveaways/16228/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/858710/library_600x900_2x.jpg",
-      "genres": [
-        "Action",
-        "Indie"
-      ],
-      "blurb": "Gravity Circuit",
-      "ends_at": null,
-      "steam_appid": 858710,
-      "review_percent": 92,
-      "source": "itad"
-    },
-    {
-      "id": "itad-0d4598c53ffe",
-      "store": "other",
-      "title": "Mr.Brocco & Co -",
-      "claim_url": "https://isthereanydeal.com/giveaways/16196/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Mr.Brocco & Co",
-      "ends_at": null,
-      "steam_appid": 2074560,
-      "review_percent": 83,
-      "source": "itad"
-    },
-    {
-      "id": "itad-dd5b5b16e035",
-      "store": "other",
-      "title": "The Brave Little Cloud -",
-      "claim_url": "https://isthereanydeal.com/giveaways/16143/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "The Brave Little Cloud",
-      "ends_at": null,
-      "steam_appid": 2635070,
-      "review_percent": 97,
-      "source": "itad"
-    },
-    {
-      "id": "itad-de23882e1f39",
-      "store": "itch",
-      "title": "Smiley Dusty at Itch.io",
-      "claim_url": "https://isthereanydeal.com/giveaways/15746/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "Smiley Dusty",
-      "ends_at": null,
-      "source": "itad"
-    },
-    {
-      "id": "itad-1b0433806065",
-      "store": "other",
-      "title": "Die Young: Prologue -",
-      "claim_url": "https://isthereanydeal.com/giveaways/7433/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/973000/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Die Young: Prologue",
-      "ends_at": null,
-      "steam_appid": 973000,
-      "review_percent": 78,
       "source": "itad"
     }
   ],

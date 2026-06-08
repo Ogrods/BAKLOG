@@ -183,4 +183,15 @@ describe('recordLibraryFirstSeen', () => {
     expect(n).toBe(1);
     expect(state.libraryFirstSeenByKey[gameKey({ store: 'gog', id: '9', name: 'New' })]).toBeGreaterThan(0);
   });
+
+  it('re-seeds as baseline when the map is empty but seeded flag is true (desync)', () => {
+    // Simulates the server-doc-reset / migration path where applyServerDoc never
+    // populated the in-memory map but prefs.librarySeenSeeded persisted as true.
+    state.prefs = { librarySeenSeeded: true };
+    state.libraryFirstSeenByKey = {};
+    const n = recordLibraryFirstSeen();
+    expect(n).toBe(0);
+    expect(state.libraryFirstSeenByKey[gameKey(state.allGames[0])]).toBe(0);
+    expect(state.libraryFirstSeenByKey[gameKey(state.allGames[1])]).toBe(0);
+  });
 });

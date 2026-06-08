@@ -1,5 +1,5 @@
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
-import { profileScopedStorageKey } from './profiles.js';
+import { libraryFirstSeenStorageKey, profileScopedStorageKey } from './profiles.js';
 
 export function personalStorageKey() {
   return profileScopedStorageKey(STORAGE_KEY);
@@ -29,6 +29,26 @@ export function bumpPersonalMemo() {
 // === Storage ===
 export function loadPersonal() {
   try { return JSON.parse(localStorage.getItem(personalStorageKey()) || "{}"); } catch { return {}; }
+}
+
+export function loadLibraryFirstSeen() {
+  try {
+    const raw = localStorage.getItem(libraryFirstSeenStorageKey());
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveLibraryFirstSeen(map) {
+  try {
+    localStorage.setItem(
+      libraryFirstSeenStorageKey(),
+      JSON.stringify(map && typeof map === 'object' ? map : {}),
+    );
+  } catch { /* quota / private mode */ }
 }
 
 export function migrateV3() {

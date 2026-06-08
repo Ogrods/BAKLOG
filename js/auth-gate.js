@@ -130,6 +130,9 @@ async function probeServerToken() {
     const data = await res.json();
     if (data.profile) _accountProfileId = String(data.profile);
     if (data.email) _accountEmail = data.email;
+    // Plan from the bearer-authenticated probe — /api/config is fetched without
+    // a bearer at boot, so this is where JWT-based pro reaches the UI.
+    if (typeof data.plan === 'string' && data.plan) _plan = data.plan;
     return !!data.ok;
   } catch {
     return false;

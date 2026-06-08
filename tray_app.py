@@ -7,7 +7,12 @@ a normal browser window against your local data.
 
 Run it:
     python tray_app.py            # dev (clone-and-run)
-    BAKLOG.exe (tray build)       # frozen onedir build
+    pythonw tray_app.py           # dev, no console window (Windows)
+    Start BAKLOG (tray).bat       # from scripts/build_installer.ps1 output
+
+The PyInstaller bundle (``BAKLOG.exe`` from packaging/baklog.spec) is the
+**server** entry only — use ``tray_app.py`` (or the tray .bat) for the icon.
+Frozen login autostart launches ``BAKLOG.exe`` (server, no tray icon).
 
 Optional deps (tray UI):
     pip install pystray Pillow
@@ -19,18 +24,31 @@ server, opens the browser, and waits — same data, no tray icon.
 from __future__ import annotations
 
 import os
+import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path
 
 from shared.install_paths import bundle_root, is_frozen
-from shared.startup import is_startup_enabled, startup_supported, toggle_startup
+from shared.startup import (
+    is_startup_enabled,
+    python_executable,
+    startup_supported,
+    toggle_startup,
+)
+from shared.tray_lock import acquire_tray_lock
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
+_BAKLOG_LOCAL_HEADER = "X-BAKLOG-Local"
+_GRACEFUL_SHUTDOWN_WAIT_SEC = 8.0
+_TERMINATE_WAIT_SEC = 5.0
 
 
 def server_url() -> str:
@@ -46,24 +64,6 @@ def _port_open(timeout: float = 0.3) -> bool:
         return False
 
 
-def python_executable() -> str:
-    """The interpreter used to launch server.py in dev. Prefers the project venv
-    so the tray doesn't accidentally use the Windows Store python stub."""
-    override = os.environ.get("BAKLOG_PYTHON", "").strip()
-    if override:
-        return override
-    root = bundle_root()
-    candidates = [
-        root / ".venv" / "Scripts" / "python.exe",  # Windows
-        root / ".venv" / "bin" / "python",          # POSIX
-        root / ".venv" / "bin" / "python3",
-    ]
-    for cand in candidates:
-        if cand.is_file():
-            return str(cand)
-    return sys.executable
-
-
 def _server_argv() -> list[str]:
     """Command that launches the BAKLOG server.
 
@@ -73,6 +73,37 @@ def _server_argv() -> list[str]:
     if is_frozen():
         return [sys.executable]
     return [python_executable(), str(bundle_root() / "server.py")]
+
+
+def _request_graceful_shutdown() -> bool:
+    """Ask the server to shut down via localhost API. True when the port closes."""
+    if not _port_open():
+        return True
+    req = urllib.request.Request(
+        f"http://{HOST}:{PORT}/api/shutdown",
+        method="POST",
+        headers={_BAKLOG_LOCAL_HEADER: "1", "Content-Length": "0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            if resp.status != 200:
+                return False
+    except (urllib.error.URLError, OSError, TimeoutError):
+        return False
+    deadline = time.monotonic() + _GRACEFUL_SHUTDOWN_WAIT_SEC
+    while time.monotonic() < deadline:
+        if not _port_open():
+            return True
+        time.sleep(0.15)
+    return not _port_open()
+
+
+def _tray_notify(icon, title: str, message: str) -> None:
+    """Best-effort tray balloon/toast; never raises."""
+    try:
+        icon.notify(message, title=title)
+    except Exception:  # noqa: BLE001 - notifications are optional
+        print(f"[tray] {title}: {message}", file=sys.stderr, flush=True)
 
 
 def make_icon_image(size: int = 64):
@@ -155,12 +186,22 @@ class ServerController:
     def is_running(self) -> bool:
         return _port_open()
 
+    def owns_server(self) -> bool:
+        """True when this controller spawned the live server child."""
+        return self._owns_live_child()
+
     def _owns_live_child(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
 
     def start(self, wait_secs: float = 12.0) -> bool:
-        """Start the server unless something is already listening. Returns True
-        when the port is accepting connections afterward."""
+        """Start the server unless something is already serving. Returns True
+        only when the port is accepting connections afterward.
+
+        If a server we don't own is already listening (a prior instance or a
+        manual ``python server.py``), we use it rather than double-binding —
+        ``stop()``/``restart()`` only ever touch our own child, so we never kill
+        a foreign listener.
+        """
         if self.is_running():
             return True
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -174,26 +215,53 @@ class ServerController:
             if _port_open():
                 return True
             if self.proc.poll() is not None:
+                # Child exited before binding — failed start; don't report success.
+                self.proc = None
                 return False
             time.sleep(0.15)
-        return _port_open()
+        # Timed out: only a success if OUR child is still alive and serving.
+        if self._owns_live_child() and _port_open():
+            return True
+        self.stop()
+        return False
 
     def stop(self) -> None:
         if not self._owns_live_child():
             self.proc = None
             return
         proc = self.proc
-        try:
-            proc.terminate()
+        assert proc is not None
+        pid = proc.pid
+        # Graceful path: POST /api/shutdown runs _shutdown_server() in the child
+        # so in-flight fetchers are cancelled before the process exits. On Windows
+        # proc.terminate() is TerminateProcess and skips atexit handlers.
+        if _port_open():
+            _request_graceful_shutdown()
             try:
-                proc.wait(timeout=5)
+                proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                proc.kill()
-        except OSError:
-            pass
+                pass
+        if proc.poll() is None and sys.platform != "win32":
+            try:
+                os.kill(pid, signal.SIGTERM)
+                proc.wait(timeout=_TERMINATE_WAIT_SEC)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        if proc.poll() is None:
+            try:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=_TERMINATE_WAIT_SEC)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            except OSError:
+                pass
         self.proc = None
 
     def restart(self) -> bool:
+        """Restart our server child. False when a foreign listener blocks restart."""
+        if not self._owns_live_child() and self.is_running():
+            return False
         self.stop()
         # Give the listener socket a moment to close before re-binding.
         for _ in range(30):
@@ -228,12 +296,39 @@ def _run_headless(controller: ServerController) -> int:
         while True:
             time.sleep(1.0)
             if controller.proc is not None and controller.proc.poll() is not None:
+                print("[tray] server exited unexpectedly", file=sys.stderr, flush=True)
                 break
     except KeyboardInterrupt:
         pass
     finally:
         controller.stop()
     return 0
+
+
+def _start_server_watchdog(icon, controller: ServerController) -> threading.Thread:
+    """Notify when our owned server child dies and nothing is listening."""
+
+    def _loop() -> None:
+        notified = False
+        while True:
+            time.sleep(2.0)
+            if controller._owns_live_child():
+                notified = False
+                continue
+            proc = controller.proc
+            if proc is not None and proc.poll() is not None:
+                controller.proc = None
+                if not notified and not controller.is_running():
+                    notified = True
+                    _tray_notify(
+                        icon,
+                        "BAKLOG server stopped",
+                        "The local server exited unexpectedly. Use Open BAKLOG to restart.",
+                    )
+
+    thread = threading.Thread(target=_loop, name="tray-server-watch", daemon=True)
+    thread.start()
+    return thread
 
 
 def run_tray() -> int:
@@ -245,17 +340,28 @@ def run_tray() -> int:
         return _run_headless(controller)
 
     started = controller.start()
-    if not started:
+    if started:
+        open_browser()
+    else:
         print("[tray] server failed to start", file=sys.stderr, flush=True)
-    open_browser()
 
     def _on_open(icon, _item) -> None:  # noqa: ANN001 - pystray callback signature
         if not controller.is_running():
-            controller.start()
+            if not controller.start():
+                _tray_notify(icon, "Start failed", "Could not start the BAKLOG server.")
+                return
         open_browser()
 
     def _on_restart(icon, _item) -> None:  # noqa: ANN001
-        controller.restart()
+        if not controller.restart():
+            if controller.is_running() and not controller.owns_server():
+                _tray_notify(
+                    icon,
+                    "Restart skipped",
+                    "The server was not started by BAKLOG tray — restart it manually.",
+                )
+            else:
+                _tray_notify(icon, "Restart failed", "Could not restart the BAKLOG server.")
 
     def _on_quit(icon, _item) -> None:  # noqa: ANN001
         controller.stop()
@@ -279,6 +385,7 @@ def run_tray() -> int:
     menu_items.append(pystray.MenuItem("Quit", _on_quit))
     menu = pystray.Menu(*menu_items)
     icon = pystray.Icon("baklog", load_icon_image(), "BAKLOG", menu=menu)
+    _start_server_watchdog(icon, controller)
     try:
         icon.run()
     finally:
@@ -287,6 +394,9 @@ def run_tray() -> int:
 
 
 def main() -> int:
+    if not acquire_tray_lock():
+        print("[tray] another BAKLOG tray instance is already running", file=sys.stderr, flush=True)
+        return 0
     return run_tray()
 
 

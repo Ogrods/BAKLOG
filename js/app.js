@@ -8,7 +8,7 @@ import { state } from './state.js';
 // Side-effect import: installs window.coverFallback / window.markLandscape
 // before any module emits row HTML that references them inline.
 import './covers.js';
-import { installGlobalErrorHandler, registerBugBundleContext } from './error-boundary.js';
+import { installGlobalErrorHandler, registerBugBundleContext, reportError } from './error-boundary.js';
 
 // Install the global error + unhandled-rejection listeners as early as
 // possible — before any other module-level code runs in this file — so that
@@ -30,6 +30,7 @@ import {
 import { escapeHtml } from './dom-util.js';
 import {
   loadPersonal,
+  loadLibraryFirstSeen,
   migrateV3,
   stripLegacyTags,
   seedPreHiddenDefaults,
@@ -100,6 +101,7 @@ function hydrateState() {
   state.personal = loadPersonal();
   state.prefs = loadPrefs();
   state.sessionPrefs = loadSessionPrefs();
+  state.libraryFirstSeenByKey = loadLibraryFirstSeen();
   setBootCurtainLabel(state.prefs.activeView);
 }
 
@@ -117,6 +119,7 @@ async function bootstrap() {
     migrationInfo = await personalStore.init();
   } catch (err) {
     console.warn("[personalStore] init failed, falling back to localStorage", err);
+    reportError(err, { source: "personalStore.init", kind: "bootstrap" });
   }
   migrateV3();
   stripLegacyTags();
@@ -141,6 +144,9 @@ async function bootstrap() {
   document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;
   document.getElementById("picksContainer").classList.toggle("hidden", state.prefs.picksCollapsed);
   document.getElementById("togglePicks").textContent = state.prefs.picksCollapsed ? "Show" : "Hide";
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'A',location:'app.js:146',message:'boot picks sync',data:{collapsed:state.prefs.picksCollapsed,containerHidden:document.getElementById('picksContainer')?.classList.contains('hidden'),btn:document.getElementById('togglePicks')?.textContent,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),initView:document.documentElement.getAttribute('data-init-view'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   // Hide duplicates is a session pref (state.sessionPrefs.crossStoreDedup) —
   // defaults on each reload via loadSessionPrefs(); never persisted.
   recomputeCrossStoreHidden();
@@ -214,6 +220,7 @@ async function bootstrap() {
   // probeApi/syncFromServer threw and Promise.all never settled cleanly.
   const fetcherPromise = bootstrapFetcherChrome().catch(err => {
     console.warn("[bootstrap] fetcher chrome init failed", err);
+    reportError(err, { source: "bootstrapFetcherChrome", kind: "bootstrap" });
   });
   try {
     await Promise.all([reloadPromise, fetcherPromise]);
@@ -235,7 +242,10 @@ async function bootstrap() {
     if (state.activeView === "dashboard") {
       ensureChartJs()
         .then(() => { if (state.activeView === "dashboard") scheduleDashboardRender(); })
-        .catch(err => console.warn("[bootstrap] Chart.js load failed", err));
+        .catch(err => {
+          console.warn("[bootstrap] Chart.js load failed", err);
+          reportError(err, { source: "ensureChartJs", kind: "bootstrap" });
+        });
     } else {
       scheduleIdlePrewarm();
     }

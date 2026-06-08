@@ -12,7 +12,7 @@ export const STORE_BRAND_COLORS = {
   nintendo: '#e60012',   // Nintendo corporate red
   amazon: '#ff9900',     // Amazon smile orange
   itch: '#fa5c5c',       // itch.io press-kit carnation
-  indiegala: '#1faf38',  // IndieGala brand green
+  indiegala: '#e41f27',  // IndieGala brand red ("gala" script)
   battlenet: '#148eff',  // Battle.net blue
   ubisoft: '#000000',    // Ubisoft Connect / corporate black
   ea: '#f05556',         // EA coral red (2020+ identity)

@@ -15,6 +15,7 @@ import {
   isProviderReconnectRequired,
   reconnectRequiredForFetcherKey,
   syncReconnectFromAuthStatus,
+  processAuthStatusTransitions,
   noteAuthCooldownStrike,
   authCooldownDurationMs,
   refreshChipAgesInPlace,
@@ -165,6 +166,21 @@ describe('fetcherFreshness', () => {
     };
     const result = fetcherFreshness({ metaKey: 'steam', countFn: null });
     expect(result.status).toBe('fresh');
+  });
+
+  it('uses generated_at when fetched_at is absent (bundled claims feed)', () => {
+    const iso = new Date().toISOString();
+    state.libraryMeta = {
+      claims: { generated_at: iso, items: [{ id: 'a' }] },
+    };
+    const result = fetcherFreshness({
+      key: 'claims',
+      metaKey: 'claims',
+      countFn: m => (m?.items || []).length,
+    });
+    expect(result.status).toBe('fresh');
+    expect(result.ageLabel).not.toBe('?');
+    expect(result.iso).toBe(iso);
   });
 
   it('uses tighter thresholds for ITAD', () => {
@@ -595,7 +611,17 @@ describe('reconnect-required state', () => {
     expect(isProviderReconnectRequired('xbox_wishlist')).toBe(false);
   });
 
-  it('connected event does not clear failed chip without prior reconnect-required', () => {
+  it('connected event clears failed chip when provider transitions to connected', () => {
+    processAuthStatusTransitions([{ key: 'xbox_wishlist', status: 'expired' }]);
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    document.dispatchEvent(new CustomEvent('baklog:auth-status', {
+      detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
+    }));
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(false);
+  });
+
+  it('connected event does not clear failed chip on repeat poll when already connected', () => {
+    processAuthStatusTransitions([{ key: 'xbox_wishlist', status: 'connected' }]);
     fetcherRunner.markRunFailedForTest('wishlistXbox');
     document.dispatchEvent(new CustomEvent('baklog:auth-status', {
       detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },

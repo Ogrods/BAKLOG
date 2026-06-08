@@ -3,7 +3,6 @@
 
 import argparse
 import json
-import re
 import sys
 import time
 from collections.abc import Callable
@@ -19,6 +18,7 @@ from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
+from shared.steam_match import pick_appid
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 load_dotenv()
@@ -56,13 +56,6 @@ STORE_FILES: list[tuple[Path, str, Callable[[dict], bool] | None]] = [
 ]
 
 
-def normalize(name: str) -> str:
-    s = (name or "").lower()
-    s = re.sub(r"[\u2122\u00ae\u00a9]", "", s)
-    s = re.sub(r"[^a-z0-9]+", " ", s)
-    return re.sub(r"\s+", " ", s).strip()
-
-
 def steam_search_appid(name: str) -> int | None:
     time.sleep(SEARCH_DELAY)
     try:
@@ -85,11 +78,10 @@ def steam_search_appid(name: str) -> int | None:
         return None
     if not items:
         return None
-    target = normalize(name)
-    for item in items:
-        if normalize(item.get("name", "")) == target:
-            return int(item["id"])
-    return int(items[0]["id"])
+    # Shared matcher: exact normalized match, else a guarded close-enough
+    # fallback that rejects sequels/spin-offs. Previously this returned
+    # items[0] blindly, which assigned the wrong cover for ambiguous names.
+    return pick_appid(items, name)
 
 
 def image_urls(appid: int) -> tuple[str, str]:

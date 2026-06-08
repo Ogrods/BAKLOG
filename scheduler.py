@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from shared.entitlement import is_pro
+from shared.entitlement import is_pro_background
 from shared.platform_support import platform_supported
 from shared.profile_paths import (
     catalog_path,
@@ -79,7 +79,7 @@ class BackgroundScheduler:
         fetchers: dict[str, dict[str, Any]],
         missing_requirements: Callable[[list], list],
         interval_sec: float = SCHEDULER_INTERVAL_SEC,
-        is_pro_fn: Callable[[], bool] = is_pro,
+        is_pro_fn: Callable[[], bool] = is_pro_background,
     ) -> None:
         self._manager = manager
         self._fetchers = fetchers

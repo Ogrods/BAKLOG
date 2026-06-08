@@ -16,7 +16,7 @@ jobs:
   python:
     name: Python (ruff + pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

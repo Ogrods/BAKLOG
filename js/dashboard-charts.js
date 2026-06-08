@@ -16,6 +16,14 @@ import { dashDrillStore, dashDrillStatus, dashDrillStoreStatus, dashSetReleaseYe
 export const dashboardCharts = {};
 const pendingChartRenders = new Map();
 
+// #region agent log
+function __dbgCharts(location, message, data, hypothesisId) {
+  try {
+    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdd7ff'},body:JSON.stringify({sessionId:'cdd7ff',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
+  } catch (_) {}
+}
+// #endregion
+
 function cssAccentVar(name) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return v || null;
@@ -243,7 +251,11 @@ function setDashboardChart(id, config) {
       ensureChartObserver()?.observe(canvas);
       return;
     }
+    // #region agent log
+    const __t0 = performance.now();
     dashboardCharts[id] = new Chart(canvas, config);
+    if (id === "chartScatter") __dbgCharts('dashboard-charts.js:scatter', 'scatter chart built', { pts: config?.data?.datasets?.[0]?.data?.length, animDur: config?.options?.animation?.duration, buildMs: Math.round(performance.now() - __t0) }, 'F');
+    // #endregion
   };
   const observer = ensureChartObserver();
   if (!observer) {
@@ -1175,7 +1187,12 @@ export function renderDashboardCharts(games) {
     },
   };
   const scatterAnimReduced = prefersReducedMotion();
-  const scatterAnimDuration = 1000;
+  // Large libraries can't afford the dual y+radius entrance (log: 1220 pts →
+  // 116ms build + janky frames). Keep a visible pop by animating radius only at
+  // a shorter duration — drops the per-point axis-rise interpolation and the
+  // upfront getPixelForValue(0) per point, halving per-frame redraw pressure.
+  const scatterAnimHeavy = scatterPts.length > 500;
+  const scatterAnimDuration = scatterAnimHeavy ? 550 : 1000;
   setDashboardChart("chartScatter", {
     type: "scatter",
     data: {
@@ -1193,6 +1210,14 @@ export function renderDashboardCharts(games) {
       ...(scatterAnimReduced ? {
         animation: { duration: 0 },
         animations: {},
+      } : scatterAnimHeavy ? {
+        // Cheap radius-only pop for large libraries: every point grows from r=0
+        // with no axis-rise. One numeric tween per point, no per-point scale
+        // lookup, shorter duration — keeps the entrance without the chug.
+        animation: { duration: scatterAnimDuration, easing: "easeOutQuart" },
+        animations: {
+          radius: { type: "number", duration: scatterAnimDuration, easing: "easeOutQuart", from: 0 },
+        },
       } : {
         animation: { duration: scatterAnimDuration, easing: "easeOutQuart" },
         animations: {

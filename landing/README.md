@@ -75,7 +75,7 @@ vercel dev   # run from landing/  (uses .env / Vercel env)
 
 ## Claimable Now feed (`free-claims.json`)
 
-The local app and read-only mode pull a maintainer-curated list of free giveaways from `https://baklog.app/free-claims.json`. This file is **not** built by Vercel — you publish it from the repo:
+The local app and read-only mode pull a maintainer-curated list of free giveaways from `https://baklog.app/free-claims.json`. The feed aggregates active giveaways from Epic, GamerPower, and IsThereAnyDeal (Epic, GOG, Steam, Prime, and more). This file is **not** built by Vercel — you publish it from the repo:
 
 0. Run `python fetch_claim_sources.py` (optionally `--dry-run`) to refresh auto-discovered claims from Epic, GamerPower, and ITAD giveaways RSS into `curated/free_claims.auto.json`. Epic is the most reliable source; GamerPower and ITAD broaden coverage for GOG/Steam and other stores. **GamerPower requires attribution** — the published feed includes `"attribution": ["GamerPower.com"]` when any GamerPower item is included.
 1. Edit `free-claims.input.json` at the repo root (add/update manual `items` with `id`, `store`, `title`, `claim_url`, optional `ends_at`, `steam_appid`, `notes`). Manual entries always win over auto-sourced duplicates.

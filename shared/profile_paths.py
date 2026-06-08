@@ -164,6 +164,10 @@ def free_claims_path(*, profile_id: str | None = None) -> Path:
     return catalog_path("free_claims.json", profile_id=profile_id)
 
 
+def sponsors_path(*, profile_id: str | None = None) -> Path:
+    return catalog_path("sponsors.json", profile_id=profile_id)
+
+
 def personal_dir(*, profile_id: str | None = None) -> Path:
     return profile_root(profile_id) / "data"
 

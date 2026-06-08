@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BAKLOG: One honest backlog across every store</title>
-  <meta name="description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists across Steam, Epic, GOG, PSN, Xbox, Amazon, itch &amp; more. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: a curated free-game feed in your dashboard. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
+  <meta name="description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists across Steam, Epic, GOG, PSN, Xbox, Amazon, itch &amp; more. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="BAKLOG" />
@@ -18,14 +18,14 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://baklog.app/" />
   <meta property="og:title" content="BAKLOG: One honest backlog across every store" />
-  <meta property="og:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: a curated free-game feed in your dashboard. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
+  <meta property="og:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
   <meta property="og:image" content="https://baklog.app/assets/og.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="BAKLOG: one honest backlog across every store" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="BAKLOG: One honest backlog across every store" />
-  <meta name="twitter:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: a curated free-game feed in your dashboard. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
+  <meta name="twitter:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
   <meta name="twitter:image" content="https://baklog.app/assets/og.png" />
   <meta name="twitter:image:alt" content="BAKLOG: one honest backlog across every store" />
 
@@ -40,7 +40,7 @@
 
   <!-- Structured data: inline. The src attribute is ignored on ld+json blocks,
        and data blocks aren't executed so CSP script-src doesn't apply to them. -->
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","description":"Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: a curated free-game feed in your dashboard. Free forever to import; optional $5/mo paid tier. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Paid","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","description":"Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import; optional $5/mo paid tier. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Paid","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
 
   <style>
     @font-face {
@@ -170,10 +170,15 @@
       pointer-events: none;
     }
 
+    .hero-mark-wrap {
+      display: inline-block;
+      line-height: 0;
+      filter: drop-shadow(0 12px 40px rgba(56, 189, 248, 0.28));
+    }
+
     .hero-mark {
       width: clamp(180px, 32vw, 340px);
       height: auto;
-      filter: drop-shadow(0 12px 40px rgba(56, 189, 248, 0.28));
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
@@ -543,21 +548,23 @@
   <!-- ============ HERO ============ -->
   <header class="hero">
     <div class="hero-inner">
-    <svg class="hero-mark" viewBox="0 0 100 100" role="img" aria-label="BAKLOG logo">
-      <defs>
-        <mask id="knobs" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
-          <rect width="100" height="100" fill="#fff"/>
-          <circle cx="14" cy="64" r="8" fill="#000"/>
-          <circle cx="64" cy="64" r="8" fill="#000"/>
-          <circle cx="39" cy="36" r="8" fill="#000"/>
-        </mask>
-      </defs>
-      <g fill="#ffffff" mask="url(#knobs)">
-        <rect x="2"  y="52" width="46" height="24" rx="12" ry="12"/>
-        <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
-        <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
-      </g>
-    </svg>
+    <span class="hero-mark-wrap">
+      <svg class="hero-mark" viewBox="0 0 100 100" role="img" aria-label="BAKLOG logo">
+        <defs>
+          <mask id="knobs" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+            <rect width="100" height="100" fill="#fff"/>
+            <circle cx="14" cy="64" r="8" fill="#000"/>
+            <circle cx="64" cy="64" r="8" fill="#000"/>
+            <circle cx="39" cy="36" r="8" fill="#000"/>
+          </mask>
+        </defs>
+        <g fill="#ffffff" mask="url(#knobs)">
+          <rect x="2"  y="52" width="46" height="24" rx="12" ry="12"/>
+          <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
+          <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
+        </g>
+      </svg>
+    </span>
 
     <h1 class="wordmark">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></h1>
     <p class="hero-badge">
@@ -638,7 +645,7 @@
         <div class="step">
           <div class="num">1</div>
           <h3>Claim this week's free games</h3>
-          <p>Epic and Prime Gaming both give away free games every Thursday, and GOG runs its own giveaways between sales. BAKLOG surfaces them in <strong>Claimable Now</strong>, a curated free-game feed right in your dashboard, so you never miss a drop.</p>
+          <p>Epic, Prime Gaming, GOG, Steam keys, and more drop free games every week. BAKLOG surfaces them in <strong>Claimable Now</strong> — a maintainer-curated feed aggregated from the Epic Store, GamerPower, and IsThereAnyDeal — right in your dashboard, so you never miss a drop.</p>
         </div>
         <div class="step">
           <div class="num">2</div>
@@ -722,12 +729,12 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
           </div>
           <h3>Free games, surfaced</h3>
-          <p><strong>Claimable Now</strong> is a curated free-game feed that shows this week's Epic, Prime, and GOG claims right in your dashboard - skipping anything you already own.</p>
+          <p><strong>Claimable Now</strong> aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard, skipping anything you already own.</p>
           <ul>
-            <li>Maintainer-curated feed of active giveaways</li>
+            <li>Maintainer-approved feed of active giveaways (auto-discovered + hand-curated)</li>
             <li>Notification banner when new free games drop</li>
             <li>Ownership-aware: hides titles already in your library</li>
-            <li>Free tier - no paywall on the feed</li>
+            <li>Free tier — no paywall on the feed; GamerPower attribution when applicable</li>
           </ul>
         </article>
 
@@ -851,11 +858,11 @@
         </details>
         <details>
           <summary>Does BAKLOG show me free games to claim?</summary>
-          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that surfaces this week's free claims from Epic, Prime Gaming, and GOG right in your dashboard. A notification banner alerts you when new drops land. The feed is ownership-aware - it skips games you already own somewhere in your library. Included on the free tier.</p>
+          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard. A notification banner alerts you when new drops land. The feed is ownership-aware — it skips games you already own somewhere in your library. Included on the free tier.</p>
         </details>
         <details>
           <summary>I don't really own games yet - is BAKLOG still for me?</summary>
-          <p>Yes. You don't need a paid library to start. Steam free-to-play, Epic's weekly free game, Prime Gaming key drops, GOG's periodic giveaways, StarCraft on Battle.net, Rainbow Six Siege on Ubisoft, and pay-what-you-want itch.io indies are all free entry points. BAKLOG tracks your collection from the first claim - and <strong>Claimable Now</strong> surfaces the curated free-game feed so you never miss a weekly drop.</p>
+          <p>Yes. You don't need a paid library to start. Steam free-to-play, Epic's weekly free game, Prime Gaming key drops, GOG's periodic giveaways, StarCraft on Battle.net, Rainbow Six Siege on Ubisoft, and pay-what-you-want itch.io indies are all free entry points. BAKLOG tracks your collection from the first claim — and <strong>Claimable Now</strong> aggregates the week's free drops from Epic, GamerPower, and IsThereAnyDeal so you never miss one.</p>
         </details>
         <details>
           <summary>Do I have to refresh it?</summary>

@@ -27,6 +27,7 @@ import webbrowser
 from pathlib import Path
 
 from shared.install_paths import bundle_root, is_frozen
+from shared.startup import is_startup_enabled, startup_supported, toggle_startup
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
@@ -260,11 +261,23 @@ def run_tray() -> int:
         controller.stop()
         icon.stop()
 
-    menu = pystray.Menu(
+    def _toggle_startup(icon, _item) -> None:  # noqa: ANN001
+        toggle_startup()
+
+    menu_items = [
         pystray.MenuItem("Open BAKLOG", _on_open, default=True),
         pystray.MenuItem("Restart server", _on_restart),
-        pystray.MenuItem("Quit", _on_quit),
-    )
+    ]
+    if startup_supported():
+        menu_items.append(
+            pystray.MenuItem(
+                "Start at login",
+                _toggle_startup,
+                checked=lambda item: is_startup_enabled(),
+            )
+        )
+    menu_items.append(pystray.MenuItem("Quit", _on_quit))
+    menu = pystray.Menu(*menu_items)
     icon = pystray.Icon("baklog", load_icon_image(), "BAKLOG", menu=menu)
     try:
         icon.run()

@@ -188,11 +188,30 @@ window.markLandscape = function (img) {
   }
 };
 
+const PORTRAIT_COVER_IMG_SELECTOR =
+  "img.cover, img.pick-cover, img.deal-hero-cover, img.claim-row-cover, img.claim-cover-thumb";
+
+/**
+ * Portrait cover slot HTML — wrap + img with landscape letterbox hooks.
+ * `url` must already be escapeAttr'd. Returns empty string when no url.
+ */
+export function portraitCoverImgHtml(url, imgClass, wrapExtraClass = "") {
+  const cover = String(url || "").trim();
+  if (!cover) return "";
+  const ls = window.coverLandscapeAttr(cover);
+  const wrapCls = `cover-wrap${wrapExtraClass ? ` ${wrapExtraClass}` : ""}${ls}`;
+  const imgCls = `${imgClass}${ls}`;
+  return `<span class="${wrapCls}"><img class="${imgCls}" src="${cover}" alt="" loading="lazy" onload="window.markLandscape(this)" /></span>`;
+}
+
 /** Virtual scroll rebuilds rows from HTML; cached images often skip inline onload. */
 export function syncCoverFits(root) {
   if (!root?.querySelectorAll) return;
-  for (const img of root.querySelectorAll("img.cover, img.pick-cover, img.deal-hero-cover")) {
+  for (const img of root.querySelectorAll(PORTRAIT_COVER_IMG_SELECTOR)) {
     if (img.complete && img.naturalWidth > 0) window.markLandscape(img);
     else img.addEventListener("load", () => window.markLandscape(img), { once: true });
   }
 }
+
+/** Exposed for tests — selector used by syncCoverFits. */
+export const portraitCoverImgSelector = PORTRAIT_COVER_IMG_SELECTOR;

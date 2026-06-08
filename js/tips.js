@@ -14,7 +14,7 @@ export const TIPS = [
   "Ctrl+Z undoes your last status change.",
   "Turn on Hide duplicates to collapse the same game across stores.",
   "Click any dashboard chart to drill into those exact games.",
-  "Just bought a game? Steam's API can take up to 24 hours to show it.",
+  "Just bought a game? API connections can often take up to 24 hours to show it.",
   "Co-op data (online, couch, campaign) is hard to pin down. Spot something off? Let us know.",
   "There's more than one back-to-top button.",
 ];

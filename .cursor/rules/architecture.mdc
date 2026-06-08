@@ -1,0 +1,38 @@
+---
+description: BAKLOG repo map and core invariants
+alwaysApply: true
+---
+
+# BAKLOG architecture
+
+Local-only cross-store backlog. Read `AGENTS.md` first.
+
+## Repo map
+
+- `server.py` — stdlib HTTP server (127.0.0.1:8765), static files + `/api/*` + SSE
+- `auth/` — encrypted credentials, CDP browser sign-in, provider registry
+- `fetch_*.py` + `fetchers/manifest.json` — whitelisted store fetchers
+- `shared/` — `profile_paths.py`, `install_paths.py`, `free_claims_sources.py`
+- `index.html` + `js/` — vanilla ESM dashboard (no build required for dev)
+- `landing/` — static marketing site (Vercel); separate from app bundle
+- `curated/` — repo-global sponsor + free-claims auto feeds
+- `tests/` — pytest (Python) + Vitest (JS)
+
+## Profile data layout
+
+```
+profiles/<id>/
+  games_*.json, itad_prices.json, free_claims.json
+  data/personal.json
+  cache/auth/secrets.bin, cache/runs/
+```
+
+Active profile: `profiles/index.json` → `active`; override with `BAKLOG_PROFILE`.
+
+## Invariants
+
+- Use `.venv` Python on Windows.
+- Never commit personal data or gitignored internal paths to public repo.
+- Fetcher exit codes: 0 ok, 1 error, 2 empty refused, 3 drift refused, 4 auth.
+- Mutating localhost requests: `X-BAKLOG-Local: 1`.
+- Deep docs: `docs/ARCHITECTURE.md` (private maintainer clone).

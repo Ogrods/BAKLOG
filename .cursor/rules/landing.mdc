@@ -1,0 +1,32 @@
+---
+description: Marketing landing page (static Vercel deploy)
+globs: landing/**
+alwaysApply: false
+---
+
+# Landing page
+
+## Deploy
+
+- Root for Vercel: `landing/` (see `landing/vercel.json`, `landing/README.md`)
+- Static HTML/CSS/JS — no frontend build step
+- Local preview: `npm run landing` or `python -m http.server 4000 --directory landing`
+
+## Key files
+
+- `landing/index.html` — hero, waitlist, `#demo` interactive section
+- `landing/demo.js` — IIFE with dummy data (`STATS`, `SPOTLIGHT_GAMES`); mirrors app UX, no app imports
+- `landing/demo.css` — demo dashboard chrome
+- `landing/main.js` — waitlist POST to `/api/subscribe`
+- `landing/free-claims.json` — built by `build_free_claims.py` at repo root
+
+## Serverless
+
+- `landing/api/subscribe.js` — waitlist (Resend + optional Supabase)
+- `landing/api/report.js` — opt-in bug reports from local app
+
+## Keep in sync
+
+- `landing/marquee-speed.js` ↔ `js/marquee-speed.js` (duplicate IIFE vs ESM)
+- Sample covers: `landing/assets/sample/*.{webp,png}` (fictional games)
+- Demo stats in `demo.js` are independent from app state — update both if changing marketing numbers

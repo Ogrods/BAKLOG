@@ -46,7 +46,12 @@ tmp/spotlight-after/
 tmp/spotlight-diff/
 _sweep_output*.txt
 debug-*.log
-.cursor/
+# Cursor IDE — commit public agent rules only; logs and internal rules stay local
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+.cursor/rules/internal-*.mdc
+.cursor/hooks.json
 .baklog_server.pid
 
 # Generated Lighthouse reports (npm run / npx lighthouse)

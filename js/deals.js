@@ -202,7 +202,7 @@ export function dealSaleScoreboardCardHtml({ onSaleCount, totalCount, avgCut, be
       </div>`
     : "";
   return `<button type="button" class="deal-card-clickable dash-card deal-rail-card text-left w-full" data-action="deal-on-sale" title="Show wishlist items on sale">
-    <div class="dash-kpi-label">Sale scoreboard</div>
+    <div class="dash-kpi-label" title="Wishlist sale stats from ITAD / Steam pricing">Sale scoreboard</div>
     <div class="sale-scoreboard mt-2">
       <div class="sale-stat" title="Wishlist items with an active discount">
         <div class="sale-stat-label">On sale</div>

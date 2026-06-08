@@ -567,7 +567,7 @@ const CLICK_HINTS = {
   wishlistNintendo: 'Sync your Nintendo Store wishlist',
   wishlistHumble: 'Sync your Humble Store wishlist',
   itad: 'Refresh wishlist price quotes from IsThereAnyDeal',
-  claims: 'Download free claimable games (GOG giveaways, Epic, Prime, Steam keys)',
+  claims: 'Download free claimable games (aggregated via Epic, GamerPower, IsThereAnyDeal)',
   hltb: "Look up HowLongToBeat hours for games we haven't checked yet",
   steamReviews: 'Pull missing Steam review scores for non-Steam games',
   steamCovers: 'Generate covers for non-Steam games missing artwork',
@@ -2811,7 +2811,14 @@ export const fetcherRunner = (() => {
       try { prior.es.close(); } catch (_) {}
       sourcesByRunId.delete(runId);
     }
-    const es = new EventSource(await urlWithStreamTicket(streamUrl(runId)));
+    let esUrl;
+    try {
+      esUrl = await urlWithStreamTicket(streamUrl(runId));
+    } catch (_) {
+      scheduleReconnect(runId, key, src, { queuedOnly });
+      return;
+    }
+    const es = new EventSource(esUrl);
     sourcesByRunId.set(runId, { es, key, src });
     const recentLog = [];
 
@@ -2911,8 +2918,8 @@ export const fetcherRunner = (() => {
 
     es.onerror = async () => {
       if (suppressedRunIds.has(runId) || cancelInFlight) return;
-      if (es.readyState === EventSource.CONNECTING) return;
       if (!sourcesByRunId.has(runId)) return;
+      // Close immediately so the browser cannot auto-reconnect with a consumed ticket.
       try { es.close(); } catch (_) {}
       sourcesByRunId.delete(runId);
       try {

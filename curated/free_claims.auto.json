@@ -1,9 +1,9 @@
 {
-  "fetched_at": "2026-06-07T22:11:50.085490+00:00",
+  "fetched_at": "2026-06-08T04:12:11.013939+00:00",
   "sources": {
     "epic": 2,
     "gamerpower": 15,
-    "itad": 16
+    "itad": 17
   },
   "attribution": [
     "GamerPower.com"
@@ -178,6 +178,16 @@
       "header_image": "https://www.gamerpower.com/offers/1b/62dec9fa9312b.jpg",
       "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
       "source": "gamerpower"
+    },
+    {
+      "id": "itad-7a69412dd110",
+      "store": "epic",
+      "title": "Relaxing Simulator free on EpicGameStore on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16247/",
+      "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/relaxing-simulator/info/\">Relaxing Simulator</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 15 Jun 2026 07:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/relaxing-simulator-4cca47>go to giveaway</a>",
+      "source": "itad"
     },
     {
       "id": "itad-8b45ae1603ee",

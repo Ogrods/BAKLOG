@@ -215,6 +215,35 @@ def test_free_claims_get_returns_approved(admin_server: tuple[str, Path], tmp_pa
     code, data = _request(base, "GET", "/api/internal/free-claims")
     assert code == 200
     assert data.get("approved") == ["epic-a", "gamerpower-1"]
+    assert data.get("field_overrides") == {}
+
+
+def test_free_claims_get_returns_field_overrides(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    approved_path.parent.mkdir(parents=True, exist_ok=True)
+    approved_path.write_text(
+        json.dumps(
+            {
+                "ids": ["epic-a"],
+                "field_overrides": {
+                    "epic-a": {
+                        "title": "Custom Title",
+                        "claim_url": "https://store.epicgames.com/en-US/p/custom",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    assert data.get("field_overrides") == {
+        "epic-a": {
+            "title": "Custom Title",
+            "claim_url": "https://store.epicgames.com/en-US/p/custom",
+        }
+    }
 
 
 def test_free_claims_approved_put_validation(admin_server: tuple[str, Path]) -> None:
@@ -238,6 +267,96 @@ def test_free_claims_approved_put_writes_file(admin_server: tuple[str, Path], tm
     assert data.get("ids") == 2
     saved = json.loads(approved_path.read_text(encoding="utf-8"))
     assert saved["ids"] == ["epic-approved", "gamerpower-42"]
+
+
+def test_free_claims_approved_put_writes_field_overrides(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    payload = {
+        "ids": ["epic-approved"],
+        "field_overrides": {
+            "epic-approved": {
+                "title": "Edited",
+                "claim_url": "https://store.epicgames.com/en-US/p/edited",
+                "ends_at": "2099-01-01T00:00:00Z",
+            },
+            "ignored-id": {"title": "Should Drop"},
+        },
+    }
+    code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body=payload)
+    assert code == 200
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert saved["field_overrides"] == {
+        "epic-approved": {
+            "title": "Edited",
+            "claim_url": "https://store.epicgames.com/en-US/p/edited",
+            "ends_at": "2099-01-01T00:00:00Z",
+        }
+    }
+
+
+def test_free_claims_get_returns_dismissed(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    approved_path.parent.mkdir(parents=True, exist_ok=True)
+    approved_path.write_text(
+        json.dumps({"ids": ["epic-a"], "dismissed": ["gamerpower-junk"]}),
+        encoding="utf-8",
+    )
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    assert data.get("dismissed") == ["gamerpower-junk"]
+
+
+def test_free_claims_approved_put_writes_dismissed(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    payload = {
+        "ids": ["epic-approved"],
+        "dismissed": ["gamerpower-junk", "gamerpower-junk", "epic-approved"],
+    }
+    code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body=payload)
+    assert code == 200
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    # Deduped, and ids that are also approved are excluded.
+    assert saved["dismissed"] == ["gamerpower-junk"]
+
+
+def test_free_claims_approved_put_dismissed_validation(
+    admin_server: tuple[str, Path],
+) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "PUT",
+        "/api/internal/free-claims/approved",
+        body={"ids": ["epic-a"], "dismissed": ["ok", ""]},
+    )
+    assert code == 400
+    assert "dismissed[1]" in str(data.get("error", ""))
+
+
+def test_free_claims_approved_put_field_overrides_validation(
+    admin_server: tuple[str, Path],
+) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "PUT",
+        "/api/internal/free-claims/approved",
+        body={
+            "ids": ["epic-a"],
+            "field_overrides": {"epic-a": {"bad_key": "nope"}},
+        },
+    )
+    assert code == 400
+    assert "unknown key" in str(data.get("error", ""))
 
 
 def test_sponsors_put_validation(admin_server: tuple[str, Path]) -> None:
@@ -297,3 +416,153 @@ def test_validate_internal_args_bool_and_enum() -> None:
     assert argv == ["--dry-run", "--source", "epic"]
     argv_default = server.validate_internal_args(spec, {"--source": "all"})
     assert argv_default == []
+
+
+def test_free_claims_enrich_returns_items_without_writing_feed(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    base, _ = admin_server
+    built_path = tmp_path / "landing" / "free-claims.json"
+    fallback_path = tmp_path / "curated" / "free_claims.fallback.json"
+    payload = {
+        "items": [
+            {
+                "id": "itch-demo",
+                "store": "itch",
+                "title": "Demo on itch.io",
+                "claim_url": "https://example.itch.io/demo",
+                "blurb": "A free itch.io giveaway",
+            }
+        ]
+    }
+    code, data = _request(base, "POST", "/api/internal/free-claims/enrich", body=payload)
+    assert code == 200
+    items = data.get("items")
+    assert isinstance(items, list)
+    assert len(items) == 1
+    enriched = items[0]
+    assert enriched["id"] == "itch-demo"
+    assert enriched["store"] == "itch"
+    assert enriched["title"] == "Demo on itch.io"
+    assert enriched["claim_url"] == "https://example.itch.io/demo"
+    assert enriched.get("blurb") == "A free itch.io giveaway"
+    assert not built_path.is_file()
+    assert not fallback_path.is_file()
+
+
+def test_free_claims_enrich_rejects_bad_payload(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "POST",
+        "/api/internal/free-claims/enrich",
+        body={"items": "not-a-list"},
+    )
+    assert code == 400
+    assert "items must be a list" in str(data.get("error", ""))
+
+
+def test_free_claims_preview_dry_run_merge(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    base, _ = admin_server
+    built_path = tmp_path / "landing" / "free-claims.json"
+    payload = {
+        "manual_items": [
+            {
+                "id": "manual-1",
+                "store": "steam",
+                "title": "Manual Game",
+                "claim_url": "https://store.steampowered.com/app/1",
+            }
+        ],
+        "auto_items": [
+            {
+                "id": "epic-approved",
+                "store": "epic",
+                "title": "Approved Epic",
+                "claim_url": "https://store.epicgames.com/en-US/p/approved",
+                "source": "epic",
+                "ends_at": "2026-12-01T00:00:00Z",
+            },
+            {
+                "id": "gog-hidden",
+                "store": "gog",
+                "title": "Hidden GOG",
+                "claim_url": "https://www.gog.com/game/hidden",
+                "source": "gamerpower",
+            },
+        ],
+        "approved_ids": ["epic-approved"],
+    }
+    code, data = _request(base, "POST", "/api/internal/free-claims/preview", body=payload)
+    assert code == 200
+    items = data.get("items")
+    assert isinstance(items, list)
+    ids = {it["id"] for it in items}
+    assert "manual-1" in ids
+    assert "epic-approved" in ids
+    assert "gog-hidden" not in ids
+    assert not built_path.is_file()
+
+
+def test_free_claims_preview_bypasses_supabase_auth(
+    admin_server: tuple[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Internal preview must not require a Supabase JWT when BAKLOG_ADMIN=1."""
+    import shared.supabase_auth as supabase_auth
+
+    base, _ = admin_server
+    monkeypatch.setattr(supabase_auth, "auth_enabled", lambda: True)
+    code, data = _request(
+        base,
+        "POST",
+        "/api/internal/free-claims/preview",
+        body={"manual_items": [], "auto_items": [], "approved_ids": []},
+    )
+    assert code == 200
+    assert isinstance(data.get("items"), list)
+
+
+def test_runs_status_bypasses_supabase_auth_under_admin(
+    admin_server: tuple[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The admin Jobs run-console polls /api/runs without an account JWT; under
+    BAKLOG_ADMIN=1 it must not 401 when Supabase auth is enabled."""
+    import shared.supabase_auth as supabase_auth
+
+    base, _ = admin_server
+    monkeypatch.setattr(supabase_auth, "auth_enabled", lambda: True)
+    code, data = _request(base, "GET", "/api/runs")
+    assert code == 200
+    assert "history" in data
+
+
+def test_unknown_internal_post_returns_404_not_401(
+    admin_server: tuple[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import shared.supabase_auth as supabase_auth
+
+    base, _ = admin_server
+    monkeypatch.setattr(supabase_auth, "auth_enabled", lambda: True)
+    code, _ = _request(base, "POST", "/api/internal/foo", body={})
+    assert code == 404
+
+
+def test_free_claims_preview_trailing_slash(
+    admin_server: tuple[str, Path],
+) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "POST",
+        "/api/internal/free-claims/preview/",
+        body={"manual_items": [], "auto_items": [], "approved_ids": []},
+    )
+    assert code == 200
+    assert isinstance(data.get("items"), list)

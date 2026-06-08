@@ -17,7 +17,7 @@ import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, countUpDurationForDelta, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
-import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView, setRibbonChartsResponsive } from './dashboard-charts.js';
+import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView, setRibbonChartsResponsive, suppressChartStaggerForBoot } from './dashboard-charts.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
@@ -41,6 +41,30 @@ export { dashDrillCoop } from './dashboard-drilldown.js';
 // initDashboard remains as a hook for any future first-paint setup.
 export function initDashboard() {}
 
+// #region agent log
+function __dbgDash(location, message, data, hypothesisId) {
+  try {
+    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdd7ff'},body:JSON.stringify({sessionId:'cdd7ff',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
+  } catch (_) {}
+}
+let __dbgFrameMonRunning = false;
+function __dbgStartFrameMonitor(tag) {
+  if (__dbgFrameMonRunning || typeof requestAnimationFrame === 'undefined') return;
+  __dbgFrameMonRunning = true;
+  const start = performance.now();
+  let last = start, frames = 0, janky = 0, maxGap = 0, sumGap = 0;
+  const tick = (now) => {
+    const gap = now - last; last = now; frames++; sumGap += gap;
+    if (gap > maxGap) maxGap = gap;
+    if (gap > 50) janky++;
+    if (now - start < 2500) { requestAnimationFrame(tick); return; }
+    __dbgFrameMonRunning = false;
+    __dbgDash('dashboard.js:framemon', 'frame monitor result', { tag, frames, janky, maxGapMs: Math.round(maxGap), avgGapMs: Math.round(sumGap / Math.max(1, frames)), durMs: Math.round(now - start) }, 'F');
+  };
+  requestAnimationFrame(tick);
+}
+// #endregion
+
 export function stopDashboardRotations() {
   stopInsightRotation();
   stopSpotlightRotation();
@@ -48,6 +72,7 @@ export function stopDashboardRotations() {
 }
 
 let _dashboardRenderTimer = null;
+let _dashboardRenderPending = false;
 let _dashCountersInitialized = false;
 let _dashMegaShellBuilt = false;
 let _dashRenderedFingerprint = "";
@@ -429,6 +454,9 @@ export async function renderDashboard(opts = {}) {
 
   _dashRenderInFlight = true;
   try {
+    // Lazy lower charts can appear seconds after sync render; boot-only stagger
+    // suppression expired before they painted (log: 120ms gaps + 1.6s to scatter).
+    suppressChartStaggerForBoot(1200);
     destroyDashboardCharts();
     Chart.defaults.color = "#94a3b8";
     Chart.defaults.borderColor = "#334155";
@@ -441,6 +469,9 @@ export async function renderDashboard(opts = {}) {
       console.error("Dashboard mega error:", err);
     }
     renderDashboardItchRecap();
+    // #region agent log
+    __dbgStartFrameMonitor('scatter-anim-retune');
+    // #endregion
     try {
       renderDashboardCharts(games);
     } catch (err) {
@@ -471,18 +502,30 @@ export async function renderDashboard(opts = {}) {
     _dashRenderStats.lastFullAt = now;
   } finally {
     _dashRenderInFlight = false;
+    if (_dashboardRenderPending) {
+      _dashboardRenderPending = false;
+      scheduleDashboardRender();
+    }
   }
 }
 
 export function cancelScheduledDashboardRender() {
   clearTimeout(_dashboardRenderTimer);
   _dashboardRenderTimer = null;
+  _dashboardRenderPending = false;
 }
 
 export function scheduleDashboardRender() {
   if (state.activeView !== "dashboard") return;
+  if (_dashRenderInFlight) {
+    _dashboardRenderPending = true;
+    return;
+  }
   clearTimeout(_dashboardRenderTimer);
-  _dashboardRenderTimer = setTimeout(renderDashboard, 80);
+  _dashboardRenderTimer = setTimeout(() => {
+    _dashboardRenderTimer = null;
+    void renderDashboard();
+  }, 80);
 }
 
 /** Has the dashboard ever been rendered in this session? */

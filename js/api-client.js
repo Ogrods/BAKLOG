@@ -35,7 +35,7 @@ function isApiUrl(url) {
 function isDataUrl(url) {
   const s = pathOnly(url);
   if (_DATA_JSON_RE.test(s)) return true;
-  if (s === '/itad_prices.json' || s === '/free_claims.json') return true;
+  if (s === '/itad_prices.json' || s === '/free_claims.json' || s === '/sponsors.json') return true;
   if (_CACHE_META_RE.test(s)) return true;
   return false;
 }
@@ -129,8 +129,11 @@ export async function mintStreamTicket() {
 
 /** Append ?ticket= for authenticated SSE streams. */
 export async function urlWithStreamTicket(url) {
+  if (!isAccountAuthMode()) return url;
   const ticket = await mintStreamTicket();
-  if (!ticket) return url;
+  if (!ticket) {
+    throw new Error('Could not mint SSE stream ticket');
+  }
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}ticket=${encodeURIComponent(ticket)}`;
 }

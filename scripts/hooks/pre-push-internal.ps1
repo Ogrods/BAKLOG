@@ -1,4 +1,4 @@
-# Pre-push internal sync helper — runs from scripts/hooks/pre-push.
+# Pre-push internal sync helper - runs from scripts/hooks/pre-push.
 # Syncs gitignored internal paths to baklog-internal when they changed since last sync.
 param(
     [string]$InternalRepo = ""
@@ -14,7 +14,7 @@ if (-not $InternalRepo) {
 }
 
 if (-not (Test-Path $manifestFile)) {
-    Write-Host "[pre-push] No internal manifest — skipping internal sync." -ForegroundColor DarkGray
+    Write-Host "[pre-push] No internal manifest - skipping internal sync." -ForegroundColor DarkGray
     exit 0
 }
 
@@ -56,11 +56,11 @@ if (-not $lastSync) {
 }
 
 if (-not $needsSync) {
-    Write-Host "[pre-push] Internal docs unchanged since last sync — skipping." -ForegroundColor DarkGray
+    Write-Host "[pre-push] Internal docs unchanged since last sync - skipping." -ForegroundColor DarkGray
     exit 0
 }
 
-Write-Host "[pre-push] Internal docs changed — syncing to private repo..." -ForegroundColor Cyan
+Write-Host "[pre-push] Internal docs changed - syncing to private repo..." -ForegroundColor Cyan
 & $syncScript -InternalRepo $InternalRepo -Push
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[pre-push] Internal sync failed. Push aborted." -ForegroundColor Red

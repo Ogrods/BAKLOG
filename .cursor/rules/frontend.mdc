@@ -1,0 +1,40 @@
+---
+description: Dashboard frontend — vanilla ESM modules and styling
+globs: js/**,app.css,index.html,tailwind.css,styles/**
+alwaysApply: false
+---
+
+# Frontend (dashboard)
+
+## Architecture
+
+- Vanilla ES modules; `"type": "module"` in `package.json`
+- `js/app.js` orchestrates boot: `state.js`, `bind-events.js`, views, dashboard, table
+- No build required for dev — browser loads raw `js/*.js`
+- Optional prod: `npm run build` → esbuild `dist/` + `dist/manifest.json`
+
+## Key modules
+
+| Area | Modules |
+|------|---------|
+| State | `state.js`, `personal-storage.js`, `personal-store.js`, `prefs.js` |
+| Table | `table-query.js`, `table-query.worker.js`, `table-ui.js`, `filters-ui.js` |
+| Dashboard | `dashboard.js`, `dashboard-spotlight.js`, `dashboard-charts.js`, `dashboard-cards.js` |
+| Fetchers | `fetcher-health.js`, `connections.js`, `fetcher-registry.js` |
+| API | `api-client.js` (`baklogFetch`, CSRF header, auth token) |
+
+## Sync pairs (update together)
+
+- `js/store-brand-colors.js` ↔ `app.css` `:root --brand-*`
+- `js/theme.js` ↔ `app.css` `html[data-theme]`
+- `js/fetcher-registry.js` — generated from `fetchers/registry.py`
+
+## Views
+
+Tabs in `index.html`: dashboard, library, wishlist, itch (conditional), connections
+
+## Patterns
+
+- Use `escapeHtml` / `escapeAttr` from `dom-util.js` for user-derived strings
+- Off-main-thread filtering via `table-query.worker.js`
+- Lazy Chart.js via `chart-loader.js`

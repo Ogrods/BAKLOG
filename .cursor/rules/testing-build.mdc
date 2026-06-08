@@ -1,0 +1,45 @@
+---
+description: Tests, CI scripts, and optional frontend build
+globs: tests/**,*.test.js,vitest.config.js,pyproject.toml,package.json,scripts/build-frontend.mjs,scripts/test-all.ps1
+alwaysApply: false
+---
+
+# Testing & build
+
+## Python (pytest)
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest              # default: -m 'not integration'
+.\.venv\Scripts\python.exe -m pytest -m integration  # real-browser CDP tests
+```
+
+- Config: `pyproject.toml` (`testpaths = ["tests"]`, `timeout = 60`)
+- Integration marker for Chrome/Edge CDP flows
+
+## JavaScript (Vitest)
+
+```powershell
+npm test
+```
+
+- Config: `vitest.config.js`
+- Tests in `tests/*.test.js` and `tests/js/*.test.js`
+
+## Full suite
+
+```powershell
+.\scripts\test-all.ps1   # pytest + JS (CI parity)
+```
+
+## Frontend build (optional)
+
+```powershell
+npm run build   # esbuild → dist/; server auto-serves when dist/manifest.json exists
+```
+
+- Source: `scripts/build-frontend.mjs`
+- Tailwind: committed `tailwind.css` (precompiled from `styles/tailwind-input.css`)
+
+## Fetcher audits
+
+- `scripts/audit_fetchers.py`, `tests/test_fetcher_manifest_audit.py` — manifest vs scripts

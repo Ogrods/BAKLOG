@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BAKLOG — Fetcher → Hero Count Animation Demo</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-hover: #1e293b;
+      --border: #334155;
+      --border-subtle: #1e293b;
+      --accent: #38bdf8;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --dim: #64748b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0 0 4px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .lead {
+      margin: 0 0 24px;
+      font-size: 0.85rem;
+      color: var(--dim);
+    }
+    /* --- Mock dashboard mega hero --- */
+    .dash-mega {
+      background: color-mix(in srgb, var(--bg) 92%, #1e293b);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 32px 24px;
+      margin-bottom: 20px;
+    }
+    .dash-hero-eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 8px;
+    }
+    .library-count-host {
+      position: relative;
+      display: inline-block;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+    .dash-hero-number {
+      font-size: clamp(48px, 7vw, 84px);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      background: linear-gradient(180deg, #f1f5f9 0%, #94a3b8 140%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      display: block;
+      transform-origin: left center;
+      will-change: transform;
+    }
+    .dash-hero-sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    /* Impact ring (gather only) */
+    .count-impact-ring {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 1.2em;
+      height: 1.2em;
+      margin-top: -0.6em;
+      border-radius: 50%;
+      border: 2px solid rgba(110, 231, 183, 0.7);
+      pointer-events: none;
+      transform: scale(0.6);
+      opacity: 0;
+      animation: count-ring-pulse 520ms ease-out forwards;
+    }
+    @keyframes count-ring-pulse {
+      0% { transform: scale(0.5); opacity: 0.9; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+    /* --- Fetcher health mock --- */
+    .fh-panel {
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+    .fh-panel-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .fh-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .fh-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.5rem 0.2rem 0.4rem;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--bg) 60%, transparent);
+      border: 1px solid var(--border-subtle);
+      font-size: 0.7rem;
+      line-height: 1.3;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .fh-chip:hover { background: color-mix(in srgb, var(--bg-hover) 85%, transparent); }
+    .fh-chip.is-selected {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .fh-chip-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.6);
+      background: #34d399;
+    }
+    .fh-chip-label { color: #e2e8f0; font-weight: 600; }
+    .fh-chip-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+    /* --- Controls --- */
+    .controls {
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .controls h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .row label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    select, input[type="number"] {
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 0.85rem;
+    }
+    input[type="number"] { width: 72px; }
+    .preset-btns { display: flex; gap: 6px; }
+    .btn {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+      border-radius: 8px;
+      color: #e0f2fe;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn--ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+    }
+    .btn--ghost:hover:not(:disabled) { background: var(--bg-hover); }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .anim-label {
+      font-size: 0.72rem;
+      color: var(--dim);
+      margin-top: 12px;
+      margin-bottom: 6px;
+    }
+    .status {
+      margin-top: 14px;
+      font-size: 0.75rem;
+      color: var(--dim);
+      min-height: 1.2em;
+    }
+    .level-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 4px;
+    }
+    .level-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .level-switch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .level-btn.is-active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+    .level-legend {
+      font-size: 0.68rem;
+      color: var(--dim);
+      margin: 0 0 10px;
+      line-height: 1.4;
+    }
+    .fx-release-flash {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      pointer-events: none;
+      will-change: transform, opacity;
+      z-index: 10001;
+    }
+    /* --- Transient FX layers (fixed, composited) --- */
+    .fx-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+    }
+    .fx-tracer {
+      position: fixed;
+      left: 0;
+      top: 0;
+      transform: translate(-50%, -50%);
+      font-weight: 800;
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+      color: #6ee7b7;
+      text-shadow: 0 0 10px rgba(110, 231, 183, 0.6), 0 1px 3px rgba(0,0,0,0.5);
+      will-change: transform, opacity;
+      z-index: 10000;
+    }
+    .fx-tracer--glyph {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(0,0,0,0.4);
+    }
+    /* Charge beam: gathering orb at the chip, then a quick release shot. */
+    .fx-charge-orb {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0.2);
+      pointer-events: none;
+      filter: blur(0.5px);
+      will-change: transform, opacity, box-shadow;
+      z-index: 10000;
+    }
+    .fx-shot {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 4px;
+      transform-origin: left center;
+      border-radius: 3px;
+      pointer-events: none;
+      will-change: transform, opacity;
+      z-index: 9998;
+      background-repeat: no-repeat;
+    }
+    /* Little energy bits that materialize around the chip and flow inward to
+       the charging orb. */
+    .fx-charge-bit {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      pointer-events: none;
+      will-change: transform, opacity;
+      z-index: 9999;
+    }
+    .fx-particle {
+      position: fixed;
+      left: 0;
+      top: 0;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      font-size: 11px;
+      line-height: 1;
+      color: #6ee7b7;
+      text-shadow: 0 0 8px rgba(110, 231, 183, 0.55), 0 1px 2px rgba(0,0,0,0.6);
+      pointer-events: none;
+      will-change: transform, opacity;
+      z-index: 10000;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .count-impact-ring { animation: none !important; }
+    }
+    .open-warn {
+      display: none;
+      background: rgba(251, 191, 36, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 0.82rem;
+      color: #fde68a;
+      line-height: 1.45;
+    }
+    .open-warn a { color: #7dd3fc; font-weight: 600; }
+    .open-warn code { font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+  <div id="openWarn" class="open-warn" role="status" hidden></div>
+  <div class="page">
+    <h1>Fetcher → Hero Count — Animation Demo</h1>
+    <p class="lead">Three lightweight travel animations from a fetcher chip to the dashboard hero number, then a scale bump + count roll. Best opened at <a href="http://127.0.0.1:8765/count-animation-demo.html">http://127.0.0.1:8765/count-animation-demo.html</a> while <code>python server.py</code> is running (IDE file previews block <code>file://</code> pages).</p>
+
+    <section class="dash-mega" aria-label="Mock dashboard hero">
+      <div class="dash-hero-eyebrow">Your library</div>
+      <span class="library-count-host" data-libcount-host>
+        <span class="dash-hero-number" id="dashHeroCount">1,946</span>
+      </span>
+      <div class="dash-hero-sub">games owned across 5 stores</div>
+    </section>
+
+    <section class="fh-panel" aria-label="Mock fetcher health">
+      <div class="fh-panel-title">Fetcher log — click a chip to select source</div>
+      <div class="fh-chips" id="chipRow"></div>
+    </section>
+
+    <section class="controls">
+      <h2>Trigger animations</h2>
+      <div class="row">
+        <label>
+          Delta
+          <input type="number" id="deltaInput" min="1" max="9999" value="1">
+        </label>
+        <div class="preset-btns">
+          <button type="button" class="btn btn--ghost" data-delta="1">+1</button>
+          <button type="button" class="btn btn--ghost" data-delta="12">+12</button>
+          <button type="button" class="btn btn--ghost" data-delta="257">+257</button>
+        </div>
+        <label>
+          <input type="checkbox" id="reduceMotionToggle">
+          Reduced motion preview
+        </label>
+      </div>
+      <div class="level-row">
+        <span class="level-label">Intensity</span>
+        <div class="level-switch" id="levelSwitch" role="group" aria-label="Animation intensity level">
+          <button type="button" class="btn btn--ghost level-btn is-active" data-level="auto">Auto</button>
+          <button type="button" class="btn btn--ghost level-btn" data-level="1">L1 subtle</button>
+          <button type="button" class="btn btn--ghost level-btn" data-level="2">L2 moderate</button>
+          <button type="button" class="btn btn--ghost level-btn" data-level="3">L3 dramatic</button>
+        </div>
+      </div>
+      <p class="level-legend">Auto thresholds: <strong>L1</strong> = +1–4 · <strong>L2</strong> = +5–24 · <strong>L3</strong> = +25+. Same level applies to all three animations.</p>
+      <p class="anim-label">Animation 1 — Tracer tokens (fire one-by-one, count ticks up per token)</p>
+      <div class="btn-row">
+        <button type="button" class="btn" id="btnTracer">1. Tracer tokens</button>
+      </div>
+      <p class="anim-label">Animation 2 — Charge-up shot (gather energy, release a fast shot)</p>
+      <div class="btn-row">
+        <button type="button" class="btn" id="btnBeam">2. Charge-up shot</button>
+      </div>
+      <p class="anim-label">Animation 3 — Magnetic gather (particles sucked into number)</p>
+      <div class="btn-row">
+        <button type="button" class="btn" id="btnGather">3. Magnetic gather</button>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button type="button" class="btn" id="btnRunAll">Run all (sequence)</button>
+        <button type="button" class="btn btn--ghost" id="btnReset">Reset count</button>
+      </div>
+      <p class="status" id="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <div class="fx-layer" id="fxLayer" aria-hidden="true"></div>
+
+  <script>
+    const __inIframe = window.parent !== window;
+    const __isFile = location.protocol === 'file:';
+    if (__isFile || __inIframe) {
+      const warn = document.getElementById('openWarn');
+      if (warn) {
+        warn.hidden = false;
+        warn.innerHTML = __isFile && __inIframe
+          ? 'This page is open as <code>file://</code> inside an IDE preview frame — Chrome blocks that and animations may not run. Open <a href="http://127.0.0.1:8765/count-animation-demo.html" target="_blank" rel="noopener">http://127.0.0.1:8765/count-animation-demo.html</a> in your browser (start <code>python server.py</code> first).'
+          : __isFile
+            ? 'Opened via <code>file://</code> — use the local server instead: <a href="http://127.0.0.1:8765/count-animation-demo.html" target="_blank" rel="noopener">http://127.0.0.1:8765/count-animation-demo.html</a> (<code>python server.py</code>).'
+            : 'Opened inside a preview frame — open <a href="http://127.0.0.1:8765/count-animation-demo.html" target="_blank" rel="noopener">http://127.0.0.1:8765/count-animation-demo.html</a> in a normal browser tab for reliable animations.';
+      }
+    }
+
+    const STORE_BRAND_COLORS = {
+      steam: '#66c0f4',
+      gog: '#a855f7',
+      psn: '#3b82f6',
+      epic: '#cfd2d6',
+      itch: '#fa5c5c',
+    };
+    const STORES = [
+      { key: 'steam', label: 'Steam', count: '257' },
+      { key: 'gog', label: 'GOG', count: '673' },
+      { key: 'psn', label: 'PSN', count: '597' },
+      { key: 'epic', label: 'Epic', count: '259' },
+      { key: 'itch', label: 'itch.io', count: '1,044' },
+    ];
+
+    const INITIAL_COUNT = 1946;
+    const TRACER_ROLL_MS = 260;
+    const SHOT_MS = 150;
+    const SHOT_HEIGHT = { thin: 3, med: 5, thick: 8 };
+    const SHOT_GLOW = { thin: 8, med: 14, thick: 22 };
+
+    // Delta → intensity level (auto mode). Tunable thresholds.
+    const LEVEL_BANDS = [{ max: 4, level: 1 }, { max: 24, level: 2 }];
+    const INTENSITY = {
+      1: {
+        tracer: { cap: 3, stagger: 120, travel: 280, roll: 220, glow: 8, ring: false, bump: 1.06 },
+        charge: { ms: 420, orbMax: 0.85, bitEvery: 60, shot: 'thin', flash: false, ring: false, bump: 1.06 },
+        gather: { count: 4, stagger: 180, arcDeg: 120, spread: 60, travel: 560, ring: false, bump: 1.06 },
+      },
+      2: {
+        tracer: { cap: 8, stagger: 140, travel: 300, roll: 250, glow: 14, ring: false, bump: 1.10 },
+        charge: { ms: 620, orbMax: 1.2, bitEvery: 32, shot: 'med', flash: false, ring: true, bump: 1.12 },
+        gather: { count: 10, stagger: 160, arcDeg: 240, spread: 110, travel: 620, ring: true, bump: 1.12 },
+      },
+      3: {
+        tracer: { cap: 16, stagger: 90, travel: 320, roll: 260, glow: 22, ring: true, bump: 1.16 },
+        charge: { ms: 900, orbMax: 1.6, bitEvery: 20, shot: 'thick', flash: true, ring: true, bump: 1.18 },
+        gather: { count: 18, stagger: 120, arcDeg: 360, spread: 170, travel: 700, ring: true, bump: 1.18 },
+      },
+    };
+
+    let currentCount = INITIAL_COUNT;
+    let selectedStore = 'steam';
+    let levelMode = 'auto'; // 'auto' | 1 | 2 | 3
+    let busy = false;
+    let rollRaf = 0;
+    let rollSettle = null;
+
+    const hero = document.getElementById('dashHeroCount');
+    const host = document.querySelector('[data-libcount-host]');
+    const chipRow = document.getElementById('chipRow');
+    const fxLayer = document.getElementById('fxLayer');
+    const statusEl = document.getElementById('status');
+    const deltaInput = document.getElementById('deltaInput');
+    const reduceMotionToggle = document.getElementById('reduceMotionToggle');
+
+    function fmtCommas(n) {
+      return Math.round(n).toLocaleString('en-US');
+    }
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+    function countUpDurationForDelta(delta) {
+      const d = Math.abs(Math.round(delta)) || 0;
+      return Math.min(1300, Math.max(450, 400 + 50 * Math.sqrt(d)));
+    }
+    function shouldReduceMotion() {
+      if (reduceMotionToggle.checked) return true;
+      return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+    }
+    function setStatus(msg) { statusEl.textContent = msg; }
+    function getDelta() {
+      const n = parseInt(deltaInput.value, 10);
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    }
+    function levelForDelta(d) {
+      for (const b of LEVEL_BANDS) if (d <= b.max) return b.level;
+      return 3;
+    }
+    function resolveLevel(delta) {
+      if (levelMode === 'auto') return levelForDelta(delta);
+      return levelMode;
+    }
+    function intensityAt(level) {
+      return INTENSITY[level] || INTENSITY[2];
+    }
+    function getAccent() {
+      return (getComputedStyle(document.documentElement)
+        .getPropertyValue('--accent') || '').trim() || '#38bdf8';
+    }
+    function centerOf(rect) {
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    }
+    function getChipEl() {
+      return chipRow.querySelector(`[data-store="${selectedStore}"]`);
+    }
+    function getRects() {
+      const chip = getChipEl();
+      if (!chip || !hero) return null;
+      return { chip: chip.getBoundingClientRect(), hero: hero.getBoundingClientRect() };
+    }
+
+    function renderChips() {
+      chipRow.innerHTML = STORES.map(s => `
+        <button type="button" class="fh-chip fh-chip-fresh${s.key === selectedStore ? ' is-selected' : ''}"
+                data-store="${s.key}" title="${s.label} fetcher">
+          <span class="fh-chip-dot" style="background:${STORE_BRAND_COLORS[s.key]}"></span>
+          <span class="fh-chip-label">${s.label}</span>
+          <span class="fh-chip-count">${s.count}</span>
+        </button>`).join('');
+      chipRow.querySelectorAll('.fh-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedStore = btn.dataset.store;
+          renderChips();
+        });
+      });
+    }
+
+    function cancelRoll() {
+      if (rollRaf) cancelAnimationFrame(rollRaf);
+      rollRaf = 0;
+      // Settle (resolve) any in-flight roll so its awaiter never orphans.
+      // Without this, overlapping rolls (tracer fires faster than a roll
+      // completes) cancel the rAF but leave the prior promise unresolved,
+      // hanging Promise.all and leaving the episode stuck busy.
+      if (rollSettle) {
+        const settle = rollSettle;
+        rollSettle = null;
+        settle();
+      }
+    }
+
+    function bumpNumber(node, bumpScale = 1.12) {
+      if (shouldReduceMotion()) return Promise.resolve();
+      return node.animate(
+        [
+          { transform: 'scale(1)' },
+          { transform: `scale(${bumpScale})`, offset: 0.35 },
+          { transform: 'scale(1)' },
+        ],
+        { duration: 420, easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)', fill: 'none' },
+      ).finished.catch(() => {});
+    }
+
+    /** Split `total` across `count` popups; last absorbs the remainder. */
+    function chunkDelta(total, count) {
+      const baseChunk = Math.floor(total / count);
+      let remaining = total;
+      const labels = [];
+      for (let i = 0; i < count; i++) {
+        const value = i === count - 1 ? remaining : Math.max(1, baseChunk);
+        remaining -= value;
+        labels.push(value);
+      }
+      return labels;
+    }
+
+    function rollCount(node, from, to, durationOverrideMs) {
+      cancelRoll();
+      if (from === to) {
+        node.textContent = fmtCommas(to);
+        return Promise.resolve();
+      }
+      if (shouldReduceMotion()) {
+        node.textContent = fmtCommas(to);
+        return Promise.resolve();
+      }
+      const durationMs = durationOverrideMs || countUpDurationForDelta(to - from);
+      const start = performance.now();
+      return new Promise(resolve => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          node.textContent = fmtCommas(to);
+          rollRaf = 0;
+          rollSettle = null;
+          resolve();
+        };
+        rollSettle = finish;
+        function tick(now) {
+          if (settled) return;
+          const t = Math.min(1, (now - start) / durationMs);
+          const v = from + (to - from) * easeInOutCubic(t);
+          node.textContent = fmtCommas(v);
+          if (t < 1) {
+            rollRaf = requestAnimationFrame(tick);
+          } else {
+            finish();
+          }
+        }
+        rollRaf = requestAnimationFrame(tick);
+      });
+    }
+
+    async function finishEpisode(prev, next, opts = {}) {
+      if (opts.ring) spawnImpactRing();
+      await bumpNumber(hero, opts.bump || 1.12);
+      await rollCount(hero, prev, next);
+      currentCount = next;
+      const lvl = opts.level ? ` L${opts.level}` : '';
+      setStatus(`Landed +${next - prev}${lvl} → ${fmtCommas(next)}`);
+    }
+
+    function spawnImpactRing() {
+      const ring = document.createElement('span');
+      ring.className = 'count-impact-ring';
+      ring.setAttribute('aria-hidden', 'true');
+      host.appendChild(ring);
+      ring.addEventListener('animationend', () => ring.remove(), { once: true });
+      setTimeout(() => { if (ring.isConnected) ring.remove(); }, 600);
+    }
+
+    function cleanupFx() {
+      fxLayer.innerHTML = '';
+    }
+
+    /** One tracer token: arcs chip → hero, then resolves so the caller can
+     *  increment the count on arrival. */
+    function flyTracerToken(label, from, to, brand, cfg) {
+      const mid = {
+        x: (from.x + to.x) / 2,
+        y: Math.min(from.y, to.y) - Math.min(80, Math.abs(from.y - to.y) * 0.35 + 40),
+      };
+      const el = document.createElement('span');
+      el.className = 'fx-tracer fx-tracer--glyph';
+      el.style.background = brand;
+      el.style.boxShadow = `0 0 ${cfg.glow}px ${brand}, 0 0 ${cfg.glow * 0.5}px rgba(255,255,255,0.35)`;
+      el.textContent = `+${label}`;
+      el.style.left = `${from.x}px`;
+      el.style.top = `${from.y}px`;
+      fxLayer.appendChild(el);
+
+      const dx1 = mid.x - from.x;
+      const dy1 = mid.y - from.y;
+      const dx2 = to.x - from.x;
+      const dy2 = to.y - from.y;
+      const peakScale = 1.1 + cfg.glow * 0.01;
+
+      return el.animate(
+        [
+          { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+          { transform: `translate(calc(-50% + ${dx1}px), calc(-50% + ${dy1}px)) scale(${peakScale})`, opacity: 1, offset: 0.45 },
+          { transform: `translate(calc(-50% + ${dx2}px), calc(-50% + ${dy2}px)) scale(0.35)`, opacity: 0 },
+        ],
+        { duration: cfg.travel, easing: 'cubic-bezier(0.25, 0.9, 0.35, 1)', fill: 'forwards' },
+      ).finished.then(() => el.remove());
+    }
+
+    /** Animation 1: fire tokens ONE BY ONE (staggered); each arrival rolls the
+     *  number up by its chunk. Intensity level scales cap, glow, and ring. */
+    function runTracer(prev, next, level) {
+      const cfg = intensityAt(level).tracer;
+      const delta = next - prev;
+      const count = Math.min(delta, cfg.cap);
+      const labels = chunkDelta(delta, count);
+      const brand = STORE_BRAND_COLORS[selectedStore] || '#6ee7b7';
+      let running = prev;
+
+      const launches = [];
+      for (let i = 0; i < count; i++) {
+        launches.push(new Promise(resolve => {
+          setTimeout(() => {
+            const rects = getRects();
+            const from = rects ? centerOf(rects.chip) : { x: 0, y: 0 };
+            const to = rects ? centerOf(rects.hero) : { x: 0, y: 0 };
+            const base = running;
+            const target = running + labels[i];
+            running = target;
+            flyTracerToken(labels[i], from, to, brand, cfg).then(() => {
+              bumpNumber(hero, cfg.bump);
+              rollCount(hero, base, target, cfg.roll).then(resolve);
+            });
+          }, i * cfg.stagger);
+        }));
+      }
+      return Promise.all(launches).then(() => {
+        hero.textContent = fmtCommas(next);
+        if (cfg.ring) spawnImpactRing();
+      });
+    }
+
+    /** Emit a stream of little glowing bits that materialize at random points
+     *  around `center` and flow inward to it. Runs for `durationMs`, resolving
+     *  once every spawned bit has finished + been cleaned up. */
+    function spawnChargeBits(center, color, durationMs, bitEvery = 26, burstMax = 2) {
+      const STOP_AT = 0.86;
+      const start = performance.now();
+      const bitPromises = [];
+
+      return new Promise(resolveAll => {
+        const timer = setInterval(() => {
+          const elapsed = performance.now() - start;
+          if (elapsed >= durationMs * STOP_AT) {
+            clearInterval(timer);
+            Promise.all(bitPromises).then(resolveAll);
+            return;
+          }
+          const burst = 1 + Math.floor(Math.random() * burstMax);
+          for (let b = 0; b < burst; b++) {
+            const ang = Math.random() * Math.PI * 2;
+            const radius = 36 + Math.random() * 54;
+            const sx = center.x + Math.cos(ang) * radius;
+            const sy = center.y + Math.sin(ang) * radius;
+            const el = document.createElement('span');
+            el.className = 'fx-charge-bit';
+            el.style.left = `${sx}px`;
+            el.style.top = `${sy}px`;
+            el.style.background = color;
+            el.style.boxShadow = `0 0 6px ${color}`;
+            fxLayer.appendChild(el);
+            const dur = 260 + Math.random() * 220;
+            const anim = el.animate(
+              [
+                { transform: 'translate(-50%, -50%) scale(0.3)', opacity: 0 },
+                { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, offset: 0.25 },
+                { transform: `translate(calc(-50% + ${center.x - sx}px), calc(-50% + ${center.y - sy}px)) scale(0.2)`, opacity: 0 },
+              ],
+              { duration: dur, easing: 'cubic-bezier(0.4, 0, 0.5, 1)', fill: 'forwards' },
+            );
+            bitPromises.push(anim.finished.catch(() => {}).then(() => el.remove()));
+          }
+        }, bitEvery);
+      });
+    }
+
+    function spawnReleaseFlash(at, color) {
+      const flash = document.createElement('span');
+      flash.className = 'fx-release-flash';
+      flash.style.left = `${at.x}px`;
+      flash.style.top = `${at.y}px`;
+      flash.style.background = `radial-gradient(circle, #ffffff 0%, ${color} 40%, transparent 70%)`;
+      fxLayer.appendChild(flash);
+      flash.animate(
+        [
+          { transform: 'translate(-50%, -50%) scale(0.4)', opacity: 1 },
+          { transform: 'translate(-50%, -50%) scale(2.2)', opacity: 0 },
+        ],
+        { duration: 220, easing: 'ease-out', fill: 'forwards' },
+      ).finished.catch(() => {}).then(() => flash.remove());
+    }
+
+    /** Animation 2: charge-up shot — orb grows tiny→large + inward bits, then
+     *  fast streak. Level scales wind-up, bit density, shot thickness, flash. */
+    async function runBeam(prev, next, rects, level) {
+      const cfg = intensityAt(level).charge;
+      const from = centerOf(rects.chip);
+      const to = centerOf(rects.hero);
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      const accent = getAccent();
+      const m = cfg.orbMax;
+
+      const orb = document.createElement('span');
+      orb.className = 'fx-charge-orb';
+      orb.style.left = `${from.x}px`;
+      orb.style.top = `${from.y}px`;
+      orb.style.background = `radial-gradient(circle, #ffffff 0%, ${accent} 55%, transparent 75%)`;
+      fxLayer.appendChild(orb);
+      const orbDone = orb.animate(
+        [
+          { transform: 'translate(-50%, -50%) scale(0.08)', opacity: 0, boxShadow: `0 0 4px ${accent}`, offset: 0 },
+          { transform: `translate(-50%, -50%) scale(${0.3 * m})`, opacity: 1, boxShadow: `0 0 10px 1px ${accent}`, offset: 0.25 },
+          { transform: `translate(-50%, -50%) scale(${0.7 * m})`, opacity: 1, boxShadow: `0 0 20px 4px ${accent}`, offset: 0.55 },
+          { transform: `translate(-50%, -50%) scale(${1.2 * m})`, opacity: 1, boxShadow: `0 0 30px 7px ${accent}`, offset: 0.82 },
+          { transform: `translate(-50%, -50%) scale(${1.55 * m})`, opacity: 1, boxShadow: `0 0 38px 10px ${accent}`, offset: 0.92 },
+          { transform: `translate(-50%, -50%) scale(${0.5 * m})`, opacity: 0.85, boxShadow: `0 0 10px 2px ${accent}`, offset: 1 },
+        ],
+        { duration: cfg.ms, easing: 'cubic-bezier(0.55, 0, 0.7, 0.4)', fill: 'forwards' },
+      ).finished.catch(() => {});
+
+      const burstMax = level >= 3 ? 3 : level >= 2 ? 2 : 1;
+      spawnChargeBits(from, accent, cfg.ms, cfg.bitEvery, burstMax);
+
+      await orbDone;
+      orb.remove();
+      if (cfg.flash) spawnReleaseFlash(from, accent);
+
+      const shot = document.createElement('div');
+      shot.className = 'fx-shot';
+      shot.style.left = `${from.x}px`;
+      shot.style.top = `${from.y}px`;
+      shot.style.width = `${len}px`;
+      shot.style.height = `${SHOT_HEIGHT[cfg.shot] || 4}px`;
+      shot.style.backgroundImage = `linear-gradient(90deg, ${accent}00 0%, ${accent} 55%, #ffffff 100%)`;
+      shot.style.boxShadow = `0 0 ${SHOT_GLOW[cfg.shot] || 12}px ${accent}`;
+      fxLayer.appendChild(shot);
+      await shot.animate(
+        [
+          { transform: `rotate(${angle}deg) scaleX(0)`, opacity: 1 },
+          { transform: `rotate(${angle}deg) scaleX(1)`, opacity: 1, offset: 0.7 },
+          { transform: `rotate(${angle}deg) scaleX(1)`, opacity: 0 },
+        ],
+        { duration: SHOT_MS, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)', fill: 'forwards' },
+      ).finished.catch(() => {});
+      shot.remove();
+    }
+
+    /** Animation 3: particles launch ONE-BY-ONE, each fanning OUT along a
+     *  level-scaled arc (many directions — L3 is full 360°), then curve in. */
+    function runGather(prev, next, rects, level) {
+      const g = intensityAt(level).gather;
+      const delta = next - prev;
+      const count = Math.min(delta, g.count);
+      const from = centerOf(rects.chip);
+      const to = centerOf(rects.hero);
+      const tx = to.x - from.x;
+      const ty = to.y - from.y;
+      const labels = chunkDelta(delta, count);
+      const baseAng = Math.atan2(ty, tx);
+      const arcRad = (g.arcDeg * Math.PI) / 180;
+
+      const promises = [];
+      for (let i = 0; i < count; i++) {
+        promises.push(new Promise(resolve => {
+          setTimeout(() => {
+            const el = document.createElement('span');
+            el.className = 'fx-particle';
+            el.textContent = `+${labels[i]}`;
+            el.style.left = `${from.x}px`;
+            el.style.top = `${from.y}px`;
+            if (level >= 3) {
+              el.style.fontSize = '12px';
+              el.style.textShadow = '0 0 12px rgba(110, 231, 183, 0.75), 0 1px 2px rgba(0,0,0,0.6)';
+            }
+            fxLayer.appendChild(el);
+
+            // Even angular slots across arcDeg, centered on chip→hero, + jitter.
+            const slot = count > 1 ? (i / (count - 1)) - 0.5 : 0;
+            const ang = baseAng + slot * arcRad + (Math.random() - 0.5) * 0.45;
+            const mag = g.spread * (0.55 + Math.random() * 0.55);
+            const launch = 0.18 + Math.random() * 0.18;
+            const midX = tx * launch + Math.cos(ang) * mag;
+            const midY = ty * launch + Math.sin(ang) * mag;
+            const dur = g.travel + Math.random() * 80;
+
+            const anim = el.animate(
+              [
+                { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                { transform: `translate(calc(-50% + ${midX}px), calc(-50% + ${midY}px)) scale(0.95)`, opacity: 0.95, offset: 0.5 },
+                { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(0)`, opacity: 0 },
+              ],
+              { duration: dur, easing: 'cubic-bezier(0.34, 0.02, 0.28, 1)', fill: 'forwards' },
+            );
+            anim.finished.catch(() => {}).then(() => { el.remove(); resolve(); });
+          }, i * g.stagger);
+        }));
+      }
+      return Promise.all(promises);
+    }
+
+    async function playAnimation(kind) {
+      if (busy) return;
+      const delta = getDelta();
+      const level = resolveLevel(delta);
+      const rects = getRects();
+      if (!rects) {
+        setStatus('Missing chip or hero element.');
+        return;
+      }
+      busy = true;
+      setButtonsDisabled(true);
+      cleanupFx();
+      const prev = currentCount;
+      const next = prev + delta;
+      const storeLabel = STORES.find(s => s.key === selectedStore)?.label || selectedStore;
+      const modeLabel = levelMode === 'auto' ? `auto→L${level}` : `L${level}`;
+      setStatus(`${kind} ${modeLabel}: ${storeLabel} +${delta}…`);
+
+      try {
+        if (shouldReduceMotion()) {
+          hero.textContent = fmtCommas(next);
+          currentCount = next;
+          setStatus(`Reduced motion: snapped to ${fmtCommas(next)}`);
+          return;
+        }
+
+        const I = intensityAt(level);
+        if (kind === 'tracer') {
+          await runTracer(prev, next, level);
+          currentCount = next;
+          setStatus(`Landed +${next - prev} L${level} → ${fmtCommas(next)}`);
+        } else if (kind === 'beam') {
+          await runBeam(prev, next, rects, level);
+          await finishEpisode(prev, next, { ring: I.charge.ring, bump: I.charge.bump, level });
+        } else if (kind === 'gather') {
+          await runGather(prev, next, rects, level);
+          await finishEpisode(prev, next, { ring: I.gather.ring, bump: I.gather.bump, level });
+        }
+      } finally {
+        busy = false;
+        setButtonsDisabled(false);
+      }
+    }
+
+    async function runAllSequence() {
+      if (busy) return;
+      const kinds = ['tracer', 'beam', 'gather'];
+      const savedDelta = getDelta();
+      deltaInput.value = '1';
+      for (const kind of kinds) {
+        await playAnimation(kind);
+        await new Promise(r => setTimeout(r, 400));
+      }
+      deltaInput.value = String(savedDelta);
+      setStatus('Run all complete.');
+    }
+
+    function setButtonsDisabled(disabled) {
+      document.querySelectorAll('.btn').forEach(b => { b.disabled = disabled; });
+    }
+
+    function resetCount() {
+      cancelRoll();
+      cleanupFx();
+      busy = false;
+      currentCount = INITIAL_COUNT;
+      hero.textContent = fmtCommas(INITIAL_COUNT);
+      hero.style.transform = '';
+      setButtonsDisabled(false);
+      setStatus('Reset to 1,946');
+    }
+
+    document.getElementById('btnTracer').addEventListener('click', () => playAnimation('tracer'));
+    document.getElementById('btnBeam').addEventListener('click', () => playAnimation('beam'));
+    document.getElementById('btnGather').addEventListener('click', () => playAnimation('gather'));
+    document.getElementById('btnRunAll').addEventListener('click', runAllSequence);
+    document.getElementById('btnReset').addEventListener('click', resetCount);
+    document.querySelectorAll('[data-delta]').forEach(btn => {
+      btn.addEventListener('click', () => { deltaInput.value = btn.dataset.delta; });
+    });
+    document.querySelectorAll('.level-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const raw = btn.dataset.level;
+        levelMode = raw === 'auto' ? 'auto' : parseInt(raw, 10);
+        document.querySelectorAll('.level-btn').forEach(b => {
+          b.classList.toggle('is-active', b === btn);
+        });
+      });
+    });
+
+    renderChips();
+    setStatus('Select a chip, pick a delta + intensity, then trigger an animation.');
+  </script>
+</body>
+</html>

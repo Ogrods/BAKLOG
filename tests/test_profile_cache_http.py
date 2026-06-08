@@ -70,12 +70,12 @@ def test_cache_json_served_from_active_profile_not_repo_root(
     assert data.get("marker") != "root"
 
 
-def test_missing_profile_cache_does_not_leak_root_cache(
+def test_missing_profile_cache_returns_empty_stub_not_root_cache(
     profile_cache_server: str,
     tmp_path: Path,
 ) -> None:
-    """A non-legacy profile without its own cache file 404s rather than serving
-    the default profile's repo-root cache (which would show misleading ages)."""
+    """A non-legacy profile without its own cache file gets an empty stub (200)
+    rather than serving the default profile's repo-root cache."""
     create_profile("Work")
     set_active_profile("work")
     server._refresh_personal_paths()
@@ -88,12 +88,22 @@ def test_missing_profile_cache_does_not_leak_root_cache(
     )
     # No profiles/work/cache/steam_review_map.json on purpose.
 
-    try:
-        _get_json(f"{profile_cache_server}/cache/steam_review_map.json")
-        raised = None
-    except urllib.error.HTTPError as exc:
-        raised = exc.code
-    assert raised == 404
+    data = _get_json(f"{profile_cache_server}/cache/steam_review_map.json")
+    assert data.get("fetched_at") is None
+    assert data.get("marker") != "root"
+
+
+def test_missing_profile_cross_store_meta_stub_shape(
+    profile_cache_server: str,
+    tmp_path: Path,
+) -> None:
+    create_profile("Work")
+    set_active_profile("work")
+    server._refresh_personal_paths()
+
+    data = _get_json(f"{profile_cache_server}/cache/cross_store_images_meta.json")
+    assert data.get("fetched_at") is None
+    assert data.get("no_steam_match") == []
 
 
 def test_profiles_url_prefix_blocked(

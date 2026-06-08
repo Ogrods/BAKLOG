@@ -14,10 +14,13 @@ from auth import mark_invalid, resolve_env
 from fetchers._authoritative import PSN
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    row_key_by_id,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
@@ -41,8 +44,6 @@ def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
     tags: list[str] = []
     if entry.trophy_progress is not None:
         tags.append(f"Trophy {entry.trophy_progress}%")
-    if entry.play_count is not None:
-        tags.append(f"Sessions {entry.play_count}")
 
     row = {
         "store": "psn",
@@ -55,6 +56,7 @@ def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
         "playtime_minutes": entry.playtime_minutes,
         "last_played": entry.last_played,
         "first_played": entry.first_played,
+        "play_count": entry.play_count,
         "header_image": entry.image_url,
         "library_image": entry.image_url,
         "release_date": None,
@@ -110,6 +112,7 @@ def main() -> int:
     parser.add_argument("--id", dest="psn_id", help="Fetch a single title by np_communication_id or title_id")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_psn")
@@ -222,6 +225,13 @@ def main() -> int:
         )
         if drift_exit is not None:
             return stats.finish("fetch_psn", t0, exit_code=drift_exit)
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=row_key_by_id,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

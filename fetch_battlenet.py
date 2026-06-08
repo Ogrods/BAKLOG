@@ -19,10 +19,13 @@ from battlenet_client import BattleNetAuthError, BattleNetClient
 from fetchers._authoritative import BATTLENET
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    row_key_by_id,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
@@ -194,6 +197,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Battle.net library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     load_dotenv()
     env_cookie = resolve_env("BATTLENET_COOKIE", provider="battlenet")
     default_browser = "env" if env_cookie else os.getenv("BATTLENET_BROWSER", "edge")
@@ -321,6 +325,13 @@ def main() -> int:
     )
     if drift_exit is not None:
         return stats.finish("fetch_battlenet", t0, exit_code=drift_exit)
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=row_key_by_id,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

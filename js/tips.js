@@ -17,7 +17,19 @@ export const TIPS = [
   "Just bought a game? API connections can often take up to 24 hours to show it.",
   "Co-op data (online, couch, campaign) is hard to pin down. Spot something off? Let us know.",
   "There's more than one back-to-top button.",
+  "Leaving your spotlight running helps us accrue ad revenue around the clock!",
+  "Can't afford to chip in? We get it - just leave your spotlight running and the ad revenue keeps us going.",
 ];
+
+// The spotlight/ad-revenue tips share a single rotation slot: they appear at the
+// same frequency as any other tip, alternating which message shows each time.
+export const AD_TIPS = [
+  "Leaving your spotlight running helps us accrue ad revenue around the clock!",
+  "Can't afford to chip in? We get it - just leave your spotlight running and the ad revenue keeps us going.",
+];
+const AD_SLOT = "\u0000ad-slot";
+const SELECT_POOL = [...TIPS.filter(t => !AD_TIPS.includes(t)), AD_SLOT];
+let _adIndex = 0;
 
 export const RARE_TIP = "My backlog is bigger than yours.";
 export const RARE_CHANCE = 0.02;
@@ -43,12 +55,24 @@ function bootCurtainActive() {
   );
 }
 
+/** Map a tip to its rotation slot; the ad-revenue tips collapse to one slot. */
+function slotKey(tip) {
+  return AD_TIPS.includes(tip) ? AD_SLOT : tip;
+}
+
 /** Pick the next tip; ~2% rare easter-egg, else random helpful (no immediate repeat). */
 export function pickTip(prev = null) {
   if (Math.random() < RARE_CHANCE) return RARE_TIP;
-  const pool = prev ? TIPS.filter(t => t !== prev) : TIPS;
-  const choices = pool.length ? pool : TIPS;
-  return choices[Math.floor(Math.random() * choices.length)];
+  const prevSlot = prev ? slotKey(prev) : null;
+  const pool = prevSlot ? SELECT_POOL.filter(t => t !== prevSlot) : SELECT_POOL;
+  const choices = pool.length ? pool : SELECT_POOL;
+  const choice = choices[Math.floor(Math.random() * choices.length)];
+  if (choice === AD_SLOT) {
+    const tip = AD_TIPS[_adIndex % AD_TIPS.length];
+    _adIndex = (_adIndex + 1) % AD_TIPS.length;
+    return tip;
+  }
+  return choice;
 }
 
 export function stopBootTipRotation() {

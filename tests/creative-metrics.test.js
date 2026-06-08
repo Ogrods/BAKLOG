@@ -44,6 +44,26 @@ describe('creative-metrics', () => {
     expect(m.diagnosis).toBeNull();
   });
 
+  it('computes PSN tenure and session grinder when snapshot has PSN data', () => {
+    const games = Array.from({ length: 6 }, (_, i) =>
+      game({
+        id: String(i),
+        store: i <= 1 ? 'psn' : 'steam',
+        first_played: i === 0 ? '2018-01-01T00:00:00Z' : undefined,
+        play_count: i === 1 ? 30 : undefined,
+        playtime_minutes: i === 1 ? 5 * 60 : 0,
+      }),
+    );
+    const snap = {
+      ...buildLibrarySnapshot(games),
+      oldestFirstPlayedMs: Date.parse('2018-01-01T00:00:00Z'),
+      psnSessionTotal: 30,
+    };
+    const m = computeCreativeMetrics(games, snap);
+    expect(m.psnTenureYears).not.toBeNull();
+    expect(m.sessionHeavy?.name).toBe(games[1].name);
+  });
+
   it('computes work-weeks from backlog hours', () => {
     const games = Array.from({ length: 6 }, (_, i) =>
       game({ id: String(i), status: 'backlog', hltb_main_hours: 40 }),

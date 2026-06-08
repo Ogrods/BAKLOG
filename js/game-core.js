@@ -5,7 +5,7 @@ import {
   isCleanupCandidateFromParts,
 } from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
-import { isEarlyAccess } from './table-query.js';
+import { isEarlyAccess, isGamePass } from './table-query.js';
 import { STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { getPersonal, hasPersonalEntry } from './personal-storage.js';
 import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
@@ -236,15 +236,56 @@ export function combinedPlaytime(g) {
   return Math.max(0, Number(g.playtime_minutes) || 0);
 }
 
-/** Title-attribute breakdown like "Steam: 12.3h · PSN: 4.7h". Empty when no aggregate. */
+/** PSN session count when present on the row. */
+export function playSessionCount(g) {
+  if (!g) return null;
+  const store = normalizeGame(g).store;
+  if (store !== "psn") return null;
+  const n = Number(g.play_count);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Parse catalog `first_played` ISO to epoch ms, or null. */
+export function firstPlayedAt(g) {
+  if (!g?.first_played) return null;
+  const t = Date.parse(String(g.first_played));
+  return Number.isFinite(t) ? t : null;
+}
+
+/** Calendar year of first PSN session, when known. */
+export function firstPlayedYear(g) {
+  const t = firstPlayedAt(g);
+  return t != null ? new Date(t).getUTCFullYear() : null;
+}
+
+/** Read-only PSN platform line for the notes column (not personal.notes). */
+export function psnPlatformsLineHtml(g) {
+  const ng = normalizeGame(g);
+  if (ng.store !== "psn") return "";
+  const platforms = (g.psn_platforms || []).map(String).map(s => s.trim()).filter(Boolean);
+  if (!platforms.length) return "";
+  const label = platforms.join(", ");
+  return `<p class="psn-platforms-line" title="PlayStation platforms from PSN">Platforms: ${escapeHtml(label)}</p>`;
+}
+
+/** Title-attribute breakdown like "Steam: 12.3h · PSN: 4.7h" plus PSN sessions. */
 export function combinedPlaytimeTooltip(g) {
+  if (!g) return "";
+  const parts = [];
   const entry = state.crossStorePlaytimeByKey?.get(gameKey(g));
-  if (!entry) return "";
-  const parts = entry.perStore
-    .filter(p => p.minutes > 0)
-    .map(p => `${p.store.toUpperCase()}: ${(p.minutes / 60).toFixed(1)}h`);
-  if (parts.length < 2) return "";
-  return `Combined across stores - ${parts.join(" · ")}`;
+  if (entry) {
+    const storeParts = entry.perStore
+      .filter(p => p.minutes > 0)
+      .map(p => `${p.store.toUpperCase()}: ${(p.minutes / 60).toFixed(1)}h`);
+    if (storeParts.length >= 2) {
+      parts.push(`Combined across stores - ${storeParts.join(" · ")}`);
+    }
+  }
+  const sessions = playSessionCount(g);
+  if (sessions != null) {
+    parts.push(`${sessions.toLocaleString()} session${sessions === 1 ? "" : "s"}`);
+  }
+  return parts.join(" · ");
 }
 
 export function isCleanupCandidate(g) {
@@ -356,28 +397,60 @@ export function steamLibraryHeroUrl(appId) {
   return `${STEAM_CDN}/${appId}/library_hero.jpg`;
 }
 
+function dedupeArtUrls(urls) {
+  const seen = new Set();
+  const out = [];
+  for (const url of urls) {
+    const u = sanitizeCoverUrl(url);
+    if (!u || seen.has(u)) continue;
+    seen.add(u);
+    out.push(u);
+  }
+  return out;
+}
+
+/** Portrait cover URLs for the cover gallery, best-first. */
+export function coverArtCandidates(g) {
+  const ng = normalizeGame(g);
+  const urls = [];
+  const appId = steamAppIdFromGame(ng);
+  if (appId) {
+    urls.push(`${STEAM_CDN}/${appId}/library_600x900_2x.jpg`);
+    urls.push(`${STEAM_CDN}/${appId}/library_600x900.jpg`);
+  }
+  urls.push(ng.library_image);
+  const lib = libraryCoverFor(ng);
+  if (lib) urls.push(lib);
+  return dedupeArtUrls(urls);
+}
+
+/** Wide landscape URLs for the cover gallery, best-first. */
+export function landscapeArtCandidates(g) {
+  const ng = normalizeGame(g);
+  const urls = [];
+  const appId = steamAppIdFromGame(ng);
+  if (appId) urls.push(steamLibraryHeroUrl(appId));
+  urls.push(ng.header_image);
+  const fb = coverFallbackFor(ng);
+  if (fb) urls.push(fb);
+  return dedupeArtUrls(urls);
+}
+
 /** Spotlight art URLs, best-first: hero → 600×900 portrait → header/square → other covers. */
 export function spotlightArtCandidates(g) {
   const ng = normalizeGame(g);
-  const seen = new Set();
-  const out = [];
-  const push = (url) => {
-    const u = sanitizeCoverUrl(url);
-    if (!u || seen.has(u)) return;
-    seen.add(u);
-    out.push(u);
-  };
+  const urls = [];
   const appId = steamAppIdFromGame(ng);
   if (appId) {
-    push(steamLibraryHeroUrl(appId));
-    push(`${STEAM_CDN}/${appId}/library_600x900_2x.jpg`);
-    push(`${STEAM_CDN}/${appId}/library_600x900.jpg`);
+    urls.push(steamLibraryHeroUrl(appId));
+    urls.push(`${STEAM_CDN}/${appId}/library_600x900_2x.jpg`);
+    urls.push(`${STEAM_CDN}/${appId}/library_600x900.jpg`);
   }
-  push(ng.library_image);
-  push(ng.header_image);
+  urls.push(ng.library_image);
+  urls.push(ng.header_image);
   const lib = libraryCoverFor(ng);
-  if (lib) push(lib);
-  return out;
+  if (lib) urls.push(lib);
+  return dedupeArtUrls(urls);
 }
 
 export function spotlightArtUrl(g) {
@@ -533,6 +606,12 @@ export function earlyAccessPillHtml(g) {
   return isEarlyAccess(g) ? '<span class="ea-pill" title="Early Access">EA</span>' : "";
 }
 
+export function gamePassBadgeHtml(g) {
+  return isGamePass(g)
+    ? '<span class="game-pass-pill" title="Xbox Game Pass or EA Play via subscription">GP</span>'
+    : "";
+}
+
 export function coopPillsHtml(g) {
   if (!g) return "";
   const bits = [];
@@ -567,6 +646,14 @@ export function trophyProgressPillHtml(g) {
 export function platinumBadgeHtml(g) {
   if (!g || !g.psn_platinum_earned) return "";
   return '<span class="plat-badge" title="Platinum trophy earned">PLAT</span>';
+}
+
+/** Shown when a catalog row was carried forward (missing from the latest store fetch). */
+export function staleBadgeHtml(g) {
+  if (!g?.stale) return "";
+  const since = g.stale_since ? ` since ${String(g.stale_since).slice(0, 10)}` : "";
+  const tip = `Not seen in the latest store sync${since}. Re-run with --rebuild to drop.`;
+  return `<span class="stale-badge" title="${escapeAttr(tip)}">stale</span>`;
 }
 
 export function singleStoreBadgeHtml(s, title) {

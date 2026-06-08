@@ -334,8 +334,11 @@ First Steam run may take several minutes for a large library (Store API is rate-
 | `enrich_steam_reviews.py` | Backfill Steam review % on non-Steam rows via Steam store search (gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, itch). Use `--stores nintendo` etc. to limit; Shift+click adds `--retry-misses`. |
 | `enrich_cross_store_images.py` | Backfill `header_image` / `library_image` from the Steam CDN for non-Steam rows (gog, psn, epic, amazon, xbox, battlenet, ubisoft, nintendo). |
 | `enrich_hltb.py` | Backfill HLTB hours on any `games_*.json` row missing them |
+| `enrich_protondb.py` | Backfill ProtonDB Linux / Steam Deck compatibility tiers on Steam-matched rows (`protondb_tier`/`confidence`/`report_count`/`score`/`trending_tier`); no API key. Shift+click adds `--retry-misses`. |
 | `fetch_itad.py` | Cross-store deal prices → `itad_prices.json` (wishlist by default); refreshes `cache/fx_rates.json` and converts wishlist store prices to display currency |
 | `fetch_fx.py` | Refresh FX rates only (`cache/fx_rates.json`, Frankfurter; 24h cache) |
+
+**Data attribution:** Steam Deck / Linux compatibility data is sourced from [ProtonDB](https://www.protondb.com), whose community report data is made available under the [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/). BAKLOG is not affiliated with or endorsed by ProtonDB.
 
 ## Open the dashboard
 

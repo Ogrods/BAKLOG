@@ -7,6 +7,10 @@ import {
   maybeAutoRefreshItad,
   itadAutoRefreshIntervalMs,
   ITAD_AUTO_REFRESH_INTERVAL_MS,
+  claimsAutoRefreshIntervalMs,
+  CLAIMS_AUTO_REFRESH_INTERVAL_MS,
+  formatRefreshIntervalLabel,
+  maybeAutoRefreshClaims,
   serverChipState,
   fetchWithTimeout,
   markReconnectRequired,
@@ -325,6 +329,83 @@ describe('maybeAutoRefreshItad', () => {
       stateFor: () => null,
       runFn,
     })).toBe(true);
+  });
+});
+
+describe('formatRefreshIntervalLabel', () => {
+  it('formats minutes, whole hours, and mixed durations', () => {
+    expect(formatRefreshIntervalLabel(30)).toBe('30m');
+    expect(formatRefreshIntervalLabel(45)).toBe('45m');
+    expect(formatRefreshIntervalLabel(60)).toBe('1h');
+    expect(formatRefreshIntervalLabel(120)).toBe('2h');
+    expect(formatRefreshIntervalLabel(90)).toBe('1h 30m');
+    expect(formatRefreshIntervalLabel('nope')).toBe('');
+  });
+});
+
+describe('maybeAutoRefreshClaims', () => {
+  beforeEach(() => {
+    connMock.statuses = {};
+    state.prefs = {};
+    state.libraryMeta = {
+      claims: {
+        fetched_at: new Date(Date.now() - 2 * CLAIMS_AUTO_REFRESH_INTERVAL_MS).toISOString(),
+      },
+    };
+  });
+
+  it('falls back to the default interval without a pref', () => {
+    expect(claimsAutoRefreshIntervalMs()).toBe(CLAIMS_AUTO_REFRESH_INTERVAL_MS);
+  });
+
+  it('honors claimsAutoRefreshIntervalMin pref (clamped 30-360 min)', () => {
+    state.prefs.claimsAutoRefreshIntervalMin = 90;
+    expect(claimsAutoRefreshIntervalMs()).toBe(90 * 60_000);
+    state.prefs.claimsAutoRefreshIntervalMin = 5;
+    expect(claimsAutoRefreshIntervalMs()).toBe(30 * 60_000);
+    state.prefs.claimsAutoRefreshIntervalMin = 9999;
+    expect(claimsAutoRefreshIntervalMs()).toBe(360 * 60_000);
+  });
+
+  it('respects claimsAutoRefreshDisabled pref', () => {
+    state.prefs.claimsAutoRefreshDisabled = true;
+    const runFn = vi.fn();
+    expect(maybeAutoRefreshClaims({
+      isApiAvailable: () => true,
+      stateFor: () => null,
+      runFn,
+    })).toBe(false);
+    expect(runFn).not.toHaveBeenCalled();
+  });
+
+  it('queues claims when stale and gates pass', () => {
+    const runFn = vi.fn();
+    const setLastRun = vi.fn();
+    const now = 4_000_000_000;
+    const ok = maybeAutoRefreshClaims({
+      now,
+      getLastRun: () => 0,
+      setLastRun,
+      isApiAvailable: () => true,
+      stateFor: () => null,
+      runFn,
+    });
+    expect(ok).toBe(true);
+    expect(runFn).toHaveBeenCalledWith('claims', { auto: true });
+    expect(setLastRun).toHaveBeenCalledWith(now);
+  });
+
+  it('returns early when last auto-run is within the interval', () => {
+    const runFn = vi.fn();
+    const now = Date.now();
+    expect(maybeAutoRefreshClaims({
+      now,
+      getLastRun: () => now - CLAIMS_AUTO_REFRESH_INTERVAL_MS / 2,
+      isApiAvailable: () => true,
+      stateFor: () => null,
+      runFn,
+    })).toBe(false);
+    expect(runFn).not.toHaveBeenCalled();
   });
 });
 

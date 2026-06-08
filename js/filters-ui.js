@@ -212,6 +212,8 @@ export function removeActiveFilter(kind, value) {
     case "status":          return applyPrefsChange({ sessionPrefs: { statusFilter: "" } });
     case "unplayed":        return applyPrefsChange({ sessionPrefs: { unplayedOnly: false } });
     case "earlyAccess":     return applyPrefsChange({ sessionPrefs: { earlyAccessOnly: false } });
+    case "gamePass":        return applyPrefsChange({ sessionPrefs: { gamePassOnly: false } });
+    case "stale":           return applyPrefsChange({ sessionPrefs: { staleOnly: false } });
     case "minRating":       return applyPrefsChange({ sessionPrefs: { minRating: 0 } });
     case "maxHours":        return applyPrefsChange({ sessionPrefs: { maxHours: 200 } });
     case "store":           return applyPrefsChange({ prefs: { storeFilter: "" } },           { renderers: [renderStoreChips] });
@@ -293,6 +295,8 @@ export function clearAllFilters() {
         statusFilter: "",
         unplayedOnly: false,
         earlyAccessOnly: false,
+        gamePassOnly: false,
+        staleOnly: false,
         minRating: 0,
         maxHours: 200,
         crossStoreDedup: false,
@@ -494,13 +498,15 @@ export function updateViewChrome(options) {
   document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish || deferChrome);
   const dedupHint = document.getElementById("crossStoreDedupHint");
   if (dedupHint) {
-    dedupHint.textContent = isWish
+    dedupHint.title = isWish
       ? "Hides the same title listed on multiple wishlist stores. Store priority matches Library."
       : "Filter by store using the chips at the top of the page.";
   }
   document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
-  document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isDash || isConn);
-  document.getElementById("coopSection")?.classList.toggle("hidden", isDash || isConn);
+  document.getElementById("displayToolsSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
+  document.getElementById("gamePassSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
+  document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isItch || isDash || isConn);
+  document.getElementById("coopSection")?.classList.toggle("hidden", isItch || isDash || isConn);
   if (isDash && !options?.skipDashboardSchedule) scheduleDashboardRender();
   else {
     // Keep charts built so a later return-to-dashboard can replay their
@@ -757,6 +763,8 @@ export function renderSummary() {
     }))
     .sort((a, b) => storeDisplayRank(a.key) - storeDisplayRank(b.key));
   const hiddenCount = state.allGames.length - visible.length;
+  const staleCount = state.allGames.filter(g => g.stale).length;
+  const staleActive = !!state.sessionPrefs.staleOnly;
   const sourceCount = storeCounts.filter(s => s.count > 0).length;
   const activeStore = state.prefs.storeFilter || "";
   const storeChips = storeCounts
@@ -775,10 +783,14 @@ export function renderSummary() {
     })
     .join("");
   const statusChips = renderStatusChipsHtml(visible);
+  const staleChip = staleCount
+    ? `<button type="button" class="summary-stale-chip${staleActive ? " active" : ""}" data-stale-filter="1" title="${staleActive ? "Clear: show all library games" : "Show only games not seen in the latest store sync"}">Stale sync <span class="text-amber-200 font-semibold ml-1">${staleCount}</span></button>`
+    : "";
   el.innerHTML = `
     <div class="w-full flex flex-wrap gap-2">
       <div class="summary-stat-chip" data-stat="games" title="Visible games in library (after filters and dedup)">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
       <div class="summary-stat-chip" data-stat="sources" title="Stores with games in your library">Sources <span class="text-slate-100 font-semibold ml-1">${sourceCount}</span></div>
+      ${staleChip}
       ${storeChips}
     </div>
     ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;

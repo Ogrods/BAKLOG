@@ -76,13 +76,15 @@ function isClaimDismissed(c) {
 
 export function dismissClaim(id) {
   if (!id) return;
+  const beforeVisible = (state.claimableNow || []).length;
   if (!state.personal.__dismissedClaims) state.personal.__dismissedClaims = {};
   state.personal.__dismissedClaims[id] = Date.now();
   const claim = findClaimById(id);
+  const dedupKeys = claim ? claimDedupKeys(claim) : [];
   if (claim) {
     if (!state.personal.__dismissedClaimKeys) state.personal.__dismissedClaimKeys = {};
     const now = Date.now();
-    for (const k of claimDedupKeys(claim)) state.personal.__dismissedClaimKeys[k] = now;
+    for (const k of dedupKeys) state.personal.__dismissedClaimKeys[k] = now;
   }
   savePersonal();
   pruneDismissedClaims(state.claimableFeed?.items || []);
@@ -90,6 +92,9 @@ export function dismissClaim(id) {
   renderClaimableModule();
   updateClaimableBanner();
   closeClaimDetail();
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',hypothesisId:'A',location:'claimable.js:dismissClaim',message:'claim dismissed',data:{id,beforeVisible,afterVisible:(state.claimableNow||[]).length,dedupKeys,title:claim?.title||null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 }
 
 export function restoreClaim(id) {
@@ -109,8 +114,10 @@ export function restoreClaim(id) {
   applyVisibleClaims();
   renderClaimableModule();
   updateClaimableBanner();
-  const hidden = getHiddenClaims(state.claimableFeed?.items || []);
-  if (!hidden.length) closeHiddenClaimsModal();
+  const feedItems = state.claimableFeed?.items || [];
+  const hidden = getHiddenClaims(feedItems);
+  const owned = getOwnedClaims(feedItems);
+  if (!hidden.length && !owned.length) closeHiddenClaimsModal();
   else openHiddenClaimsModal();
 }
 
@@ -216,6 +223,20 @@ export function getHiddenClaims(items) {
   return sortClaims(dedupeClaims(filtered));
 }
 
+/** Feed items filtered out because they match a game already in the library. */
+export function getOwnedClaims(items) {
+  const now = Date.now();
+  const filtered = (items || []).filter((c) => {
+    if (!c?.id || !c.claim_url || !c.store) return false;
+    if (c.ends_at) {
+      const end = Date.parse(c.ends_at);
+      if (Number.isFinite(end) && end < now) return false;
+    }
+    return isClaimOwned(c);
+  });
+  return sortClaims(dedupeClaims(filtered));
+}
+
 export function diffClaims(prevIds, items) {
   const visible = getVisibleClaims(items);
   let newCount = 0;
@@ -283,7 +304,7 @@ export function pickNewerFeed(primary, secondary) {
   return feedGeneratedAt(b) > feedGeneratedAt(a) ? b : a;
 }
 
-function applyFeedDoc(doc) {
+function applyFeedDoc(doc, source = 'unknown') {
   state.claimableFeed = doc && typeof doc === 'object' ? doc : null;
   state.libraryMeta.claims = state.claimableFeed;
   pruneDismissedClaims(state.claimableFeed?.items || []);
@@ -291,10 +312,31 @@ function applyFeedDoc(doc) {
   // can't carry over after claims expire or the feed shrinks.
   _claimsVisibleCount = MAX_VISIBLE;
   applyVisibleClaims();
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',hypothesisId:'B',location:'claimable.js:applyFeedDoc',message:'feed applied',data:{source,feedItems:(state.claimableFeed?.items||[]).length,visible:(state.claimableNow||[]).length,generatedAt:state.claimableFeed?.generated_at||null,fetchedAt:state.claimableFeed?.fetched_at||null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 }
 
 function applyVisibleClaims() {
-  state.claimableNow = getVisibleClaims(state.claimableFeed?.items || []);
+  const items = state.claimableFeed?.items || [];
+  const now = Date.now();
+  let owned = 0;
+  let expired = 0;
+  let ineligible = 0;
+  const dismissedTitles = [];
+  for (const c of items) {
+    if (!c?.id || !c.claim_url || !c.store) { ineligible += 1; continue; }
+    if (c.ends_at) {
+      const end = Date.parse(c.ends_at);
+      if (Number.isFinite(end) && end < now) { expired += 1; continue; }
+    }
+    if (isClaimOwned(c)) { owned += 1; continue; }
+    if (isClaimDismissed(c)) { dismissedTitles.push(c.title || c.id); continue; }
+  }
+  state.claimableNow = getVisibleClaims(items);
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',hypothesisId:'D',location:'claimable.js:applyVisibleClaims',message:'visibility recompute',data:{total:items.length,visible:(state.claimableNow||[]).length,dismissed:dismissedTitles.length,owned,expired,ineligible,dismissedMapSize:Object.keys(dismissedClaimsMap()).length,dismissedKeyMapSize:Object.keys(dismissedClaimKeysMap()).length,dismissedTitles},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 }
 
 async function loadLocalClaimsFile() {
@@ -327,7 +369,11 @@ export async function loadClaimableNow({ preferHosted = false } = {}) {
     } catch (_) { /* network */ }
   }
   if (!doc?.items?.length) doc = { generated_at: null, items: [] };
-  applyFeedDoc(doc);
+  const feedSource = doc === localDoc ? 'local'
+    : doc === fallbackDoc ? 'fallback'
+      : doc?.generated_at && !doc?.fetched_at ? 'hosted'
+        : 'merged';
+  applyFeedDoc(doc, feedSource);
   return state.claimableNow;
 }
 
@@ -379,22 +425,63 @@ function hiddenClaimRowHtml(claim) {
   </div>`;
 }
 
+// Owned claims are auto-hidden (already in the library), so the row mirrors the
+// dismissed-claim row but swaps the Restore action for a static "In library" tag.
+function ownedClaimRowHtml(claim) {
+  const title = escapeHtml(claim.title || 'Free game');
+  const store = claim.store || 'other';
+  const cover = claimCoverUrl(claim);
+  const ends = formatEndsAt(claim.ends_at);
+  const endsHtml = ends ? `Ends ${escapeHtml(ends)}` : '—';
+  const ls = cover ? window.coverLandscapeAttr(cover) : '';
+  const coverHtml = cover
+    ? `<img class="claim-hidden-row-cover${ls}" src="${escapeAttr(cover)}" alt="" loading="lazy" onload="window.markLandscape(this)" />`
+    : `<span class="claim-hidden-row-cover claim-hero-cover-fallback" aria-hidden="true"></span>`;
+  return `<div class="claim-hidden-row claim-owned-row">
+    <span class="claim-hidden-row-cover-wrap cover-wrap${ls}">${coverHtml}</span>
+    <span class="claim-hidden-row-meta min-w-0 flex-1">
+      <span class="claim-hidden-row-title truncate">${title}</span>
+      <span class="claim-hidden-row-badges flex flex-wrap items-center gap-1.5 mt-0.5">
+        ${storeLogoHtml(store, { size: 'sm', title: storeDisplayName(store) })}
+        ${claimSourceHtml(claim.source)}
+        <span class="text-xs text-slate-500">${endsHtml}</span>
+      </span>
+    </span>
+    <span class="claim-owned-tag text-xs text-emerald-300 px-2 py-1 rounded border border-emerald-700/60 shrink-0">In library</span>
+  </div>`;
+}
+
 export function openHiddenClaimsModal() {
   const dlg = document.getElementById('claimHiddenDialog');
   if (!dlg) return;
-  const hidden = getHiddenClaims(state.claimableFeed?.items || []);
-  if (!hidden.length) {
+  const feedItems = state.claimableFeed?.items || [];
+  const hidden = getHiddenClaims(feedItems);
+  const owned = getOwnedClaims(feedItems);
+  if (!hidden.length && !owned.length) {
     closeHiddenClaimsModal();
     return;
   }
+  const hiddenSection = hidden.length
+    ? `<p class="claim-hidden-intro text-sm text-slate-400 mt-2">Claims you cleared from notifications. Restore any you want to see again.</p>
+      <div class="claim-hidden-list mt-3 space-y-2">${hidden.map(hiddenClaimRowHtml).join('')}</div>`
+    : '';
+  const ownedSection = owned.length
+    ? `<div class="claim-owned-section mt-4 pt-4 border-t border-slate-700/60">
+        <h3 class="claim-owned-heading text-sm font-medium text-slate-300">Already in your library</h3>
+        <p class="claim-owned-intro text-sm text-slate-400 mt-1">Hidden automatically because you already own ${owned.length === 1 ? 'this game' : 'these games'}.</p>
+        <div class="claim-hidden-list mt-3 space-y-2">${owned.map(ownedClaimRowHtml).join('')}</div>
+      </div>`
+    : '';
   dlg.innerHTML = `
     <form method="dialog" class="claim-detail-panel claim-hidden-panel">
       <div class="claim-detail-header">
         <h2 class="claim-detail-title">Hidden claim notifications</h2>
         <button type="submit" class="claim-detail-close" aria-label="Close">×</button>
       </div>
-      <p class="claim-hidden-intro text-sm text-slate-400 mt-2">Claims you cleared from notifications. Restore any you want to see again.</p>
-      <div class="claim-hidden-list mt-3 space-y-2">${hidden.map(hiddenClaimRowHtml).join('')}</div>
+      <div class="claim-hidden-scroll">
+        ${hiddenSection}
+        ${ownedSection}
+      </div>
     </form>`;
   if (typeof dlg.showModal === 'function') {
     dlg.showModal();
@@ -412,9 +499,25 @@ export function renderClaimableModule() {
   const mount = document.getElementById('claimableNowModule');
   if (!mount) return;
   const show = state.activeView === 'wishlist' && state.dashboardDataReady;
-  const claims = state.claimableNow || [];
-  const hiddenCount = getHiddenClaims(state.claimableFeed?.items || []).length;
-  if (!show || (!claims.length && !hiddenCount)) {
+  const feedItems = state.claimableFeed?.items || [];
+  // Recompute the visible set from the current feed + owned + dismissed state on
+  // every render. state.claimableNow can be stale: it is first computed during
+  // boot (loadClaimableNow) before ownedNormNames finishes building, and the
+  // post-merge refreshClaimableUi only recomputes when the wishlist tab is
+  // already active. Without this, switching to wishlist paints owned games as
+  // claimable, and the first Clear click triggers the recompute that drops them
+  // all at once — looking like one click cleared several. Recomputing here keeps
+  // the painted list consistent with hiddenCount/ownedCount below.
+  const claimsBefore = (state.claimableNow || []).length;
+  state.claimableNow = getVisibleClaims(feedItems);
+  const claims = state.claimableNow;
+  const hiddenCount = getHiddenClaims(feedItems).length;
+  const ownedCount = getOwnedClaims(feedItems).length;
+  const hide = !show || (!claims.length && !hiddenCount && !ownedCount);
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',runId:'post-fix',hypothesisId:'H',location:'claimable.js:renderClaimableModule',message:'module render',data:{hide,show,activeView:state.activeView,dashboardDataReady:state.dashboardDataReady,claimsBefore,claimsCount:claims.length,hiddenCount,ownedCount,feedItems:feedItems.length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  if (hide) {
     mount.classList.add('hidden');
     mount.innerHTML = '';
     return;
@@ -423,7 +526,7 @@ export function renderClaimableModule() {
   mount.innerHTML = claimableModuleMarkup(claims, {
     visibleCount: _claimsVisibleCount,
     attribution: state.claimableFeed?.attribution,
-    showHiddenButtonHtml: showHiddenClaimsButtonHtml(hiddenCount),
+    showHiddenButtonHtml: showHiddenClaimsButtonHtml(hiddenCount + ownedCount),
   });
   if (claims.length) syncCoverFits(mount);
 }
@@ -522,6 +625,9 @@ function findClaimEl(id) {
 function animateClaimOut(id, commit) {
   const el = findClaimEl(id);
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',hypothesisId:'F',location:'claimable.js:animateClaimOut',message:'animate start',data:{id,foundEl:!!el,reduceMotion:!!reduceMotion},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!el || reduceMotion) { commit(); return; }
 
   const h = el.getBoundingClientRect().height;
@@ -542,6 +648,9 @@ function animateClaimOut(id, commit) {
   let finished = false;
   const finish = (via) => {
     if (finished) return; finished = true;
+    // #region agent log
+    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',hypothesisId:'F',location:'claimable.js:animateClaimOut.finish',message:'animate finish',data:{id,via},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     commit();
   };
   el.addEventListener('transitionend', (ev) => { if (ev.propertyName === 'height') finish('transitionend'); });
@@ -550,6 +659,11 @@ function animateClaimOut(id, commit) {
 
 export function handleClaimableClick(e) {
   const clearBtn = e.target.closest('[data-claim-clear]');
+  const goBtnEarly = e.target.closest('[data-claim-go]');
+  const cardEarly = e.target.closest('[data-claim-id]');
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'88c551'},body:JSON.stringify({sessionId:'88c551',hypothesisId:'A',location:'claimable.js:handleClaimableClick',message:'claim click',data:{action:clearBtn?'clear':goBtnEarly?'go':cardEarly?'open':e.target.closest('[data-claim-show-more]')?'more':e.target.closest('[data-claim-show-hidden]')?'hidden':'unknown',claimId:clearBtn?.dataset.claimClear||goBtnEarly?.dataset.claimGo||cardEarly?.dataset.claimId||null,visibleBefore:(state.claimableNow||[]).length,tagName:e.target?.tagName||null,evType:e.type||null,evDetail:e.detail,isTrusted:e.isTrusted,currentTargetId:e.currentTarget?.id||null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (clearBtn) {
     const id = clearBtn.dataset.claimClear;
     const inModule = !!clearBtn.closest('#claimableNowModule');

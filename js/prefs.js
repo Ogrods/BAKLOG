@@ -34,7 +34,7 @@ export function syncCoopFilterSegmented() {
 export function loadPrefs() {
   const fallback = {
     picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false,
-    showScoreColumn: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15,
+    showScoreColumn: false, rowHeroBackdrop: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15,
     storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16,
     dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false,
     dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {},
@@ -42,6 +42,7 @@ export function loadPrefs() {
     fetcherHealthShowConnected: true, fetcherHealthShowStaleMissing: true,
     autoEnrichOnAdd: true, coopFilterMode: "off", fetcherCollapsed: true,
     itadAutoRefreshIntervalMin: 15,
+    claimsAutoRefreshIntervalMin: 120,
     autoFetchOnConnect: true,
     autoFetchStale24h: true,
     connectionNotes: {},
@@ -76,6 +77,13 @@ export function loadPrefs() {
     const clamped = Math.min(60, Math.max(15, rawItadMin));
     merged.itadAutoRefreshIntervalMin = Math.round(clamped / 5) * 5;
   }
+  const rawClaimsMin = Number(merged.claimsAutoRefreshIntervalMin);
+  if (!Number.isFinite(rawClaimsMin)) {
+    merged.claimsAutoRefreshIntervalMin = 120;
+  } else {
+    const clamped = Math.min(360, Math.max(30, rawClaimsMin));
+    merged.claimsAutoRefreshIntervalMin = Math.round(clamped / 30) * 30;
+  }
   if (!merged.connectionNotes || typeof merged.connectionNotes !== 'object' || Array.isArray(merged.connectionNotes)) {
     merged.connectionNotes = {};
   }
@@ -91,6 +99,7 @@ export function loadSessionPrefs() {
     statusFilter: "",
     unplayedOnly: false,
     earlyAccessOnly: false,
+    gamePassOnly: false,
     minRating: 0,
     maxHours: 200,
   };
@@ -121,6 +130,7 @@ export function syncFilterDomFromState() {
   setVal("statusFilter", s.statusFilter || "");
   setChecked("unplayedOnly", s.unplayedOnly);
   setChecked("earlyAccessOnly", s.earlyAccessOnly);
+  setChecked("gamePassOnly", s.gamePassOnly);
   const minR = s.minRating || 0;
   setVal("minRating", minR);
   const minRVal = document.getElementById("minRatingVal");

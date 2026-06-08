@@ -32,7 +32,7 @@ def library_authoritative(*extra: str) -> frozenset[str]:
 
 
 GOG = library_authoritative("gog_id", "source")
-EPIC = library_authoritative("epic_namespace", "epic_catalog_id")
+EPIC = library_authoritative("epic_namespace", "epic_catalog_id", "acquired_at")
 PSN = library_authoritative(
     "psn_id",
     "np_communication_id",
@@ -45,6 +45,7 @@ PSN = library_authoritative(
     "psn_has_platinum",
     "psn_platinum_earned",
     "first_played",
+    "play_count",
 )
 AMAZON = library_authoritative(
     "amazon_id",
@@ -60,13 +61,14 @@ XBOX = library_authoritative(
     "trophy_progress",
     "xbox_gamerscore_current",
     "xbox_gamerscore_total",
+    "game_pass",
 )
 BATTLENET = library_authoritative("battlenet_id")
 UBISOFT = library_authoritative("ubisoft_id")
-NINTENDO = library_authoritative("nintendo_id")
+NINTENDO = library_authoritative("nintendo_id", "nintendo_platform")
 HUMBLE = library_authoritative(
     "humble_id",
     "humble_gamekey",
     "humble_steam_app_id",
 )
-EA = library_authoritative("ea_id", "ea_offer_id", "ea_game_slug")
+EA = library_authoritative("ea_id", "ea_offer_id", "ea_game_slug", "game_pass")

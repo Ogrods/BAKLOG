@@ -29,10 +29,13 @@ from auth.secrets import profile_dir
 from fetchers._authoritative import HUMBLE
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    row_key_by_id,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
@@ -340,6 +343,7 @@ def main() -> int:
         help=f"Save sample API payloads to {dump_path()} and exit",
     )
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_humble")
@@ -412,6 +416,13 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+
+    rows = apply_carry_forward(
+        rows,
+        existing,
+        key_fn=row_key_by_id,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

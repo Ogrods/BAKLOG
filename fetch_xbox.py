@@ -17,10 +17,13 @@ from auth import mark_invalid, resolve_env
 from fetchers._authoritative import XBOX
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    row_key_by_id,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
@@ -72,7 +75,8 @@ def _build_row(title: dict, hltb: dict | None) -> dict:
     gp = title.get("gamePass") or {}
     image = _https(title.get("displayImage"))
     tags: list[str] = []
-    if gp.get("isGamePass"):
+    is_gp = bool(gp.get("isGamePass"))
+    if is_gp:
         tags.append("game-pass")
     devices = title.get("devices") or []
     if devices:
@@ -107,6 +111,7 @@ def _build_row(title: dict, hltb: dict | None) -> dict:
         "currency": None,
         "xbox_gamerscore_current": ach.get("currentGamerscore"),
         "xbox_gamerscore_total": ach.get("totalGamerscore"),
+        "game_pass": is_gp,
     }
     if hltb:
         row.update(
@@ -125,6 +130,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Xbox library via OpenXBL")
     parser.add_argument("--skip-hltb", action="store_true")
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_xbox")
@@ -199,6 +205,13 @@ def main() -> int:
             )
         )
         stats.ok += 1
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=row_key_by_id,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

@@ -79,6 +79,21 @@ describe('getDealInfo', () => {
     expect(d?.isHistoricalLow).toBe(true);
   });
 
+  it('passes ITAD historical low amounts through', () => {
+    state.itadByKey['wishlist:wl-1'] = {
+      price: 9.99,
+      regular: 39.99,
+      cut: 75,
+      is_historical_low: true,
+      history_low_all: 7.49,
+      history_low_year: 8.99,
+      shop: 'Steam',
+    };
+    const d = getDealInfo(baseGame);
+    expect(d?.historyLowAll).toBe(7.49);
+    expect(d?.historyLowYear).toBe(8.99);
+  });
+
   it('uses year low when only is_historical_low_year', () => {
     state.itadByKey['wishlist:wl-1'] = {
       price: 14,
@@ -212,6 +227,13 @@ describe('dealShopShort and shopSlug', () => {
 });
 
 describe('dealLowBadgeHtml and priceLowStarHtml', () => {
+  it('includes historical low amount in tooltip', () => {
+    const html = dealLowBadgeHtml({ lowKind: 'all', historyLowAll: 4.99 });
+    expect(html).toContain('4.99');
+    const star = priceLowStarHtml({ lowKind: 'year', historyLowYear: 12.5 });
+    expect(star).toContain('12.5');
+  });
+
   it('renders all-time, year, generic low, and empty', () => {
     expect(dealLowBadgeHtml({ lowKind: 'all' })).toContain('all-time');
     expect(dealLowBadgeHtml({ lowKind: 'year' })).toContain('1yr');

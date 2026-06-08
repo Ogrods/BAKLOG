@@ -241,6 +241,15 @@
         { "env": "STEAM_API_KEY", "note": "Reuses Steam appdetails cache to backfill coop tags + genres for non-Steam rows" },
         { "env": "STEAM_ID", "note": "Steam Web API identity (same as library fetch)" }
       ]
+    },
+    {
+      "key": "protondb",
+      "label": "ProtonDB",
+      "group": "enrich",
+      "script": "enrich_protondb.py",
+      "refreshArgs": ["--retry-misses", "--refresh"],
+      "metaKey": "protondb",
+      "color": "#1b9aee"
     }
   ]
 }

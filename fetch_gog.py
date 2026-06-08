@@ -19,6 +19,8 @@ from auth.session_probe import probe_gog_session
 from fetchers._authoritative import GOG
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     carry_enrichment,
     catalog_file,
     merge_cached_row,
@@ -37,6 +39,13 @@ LEGACY_ROW_SOURCE = "web"
 # Stable metadata that the other GOG source may have populated (web has release_date;
 # local Galaxy DB often does not). Carried on source flip after merge_cached_row.
 _GOG_CROSS_SOURCE_CARRY = ("release_date", "genres", "header_image", "library_image", "tags")
+
+
+def _needs_product_details(args, cached_row: dict | None) -> bool:
+    """Whether the web fetch path should call gameDetails for this row."""
+    if args.refresh or cached_row is None or args.gog_id:
+        return True
+    return not (cached_row.get("genres") or [])
 
 
 def _configure_stdout() -> None:
@@ -458,6 +467,7 @@ def main() -> int:
     parser.add_argument("--id", type=int, dest="gog_id", help="Fetch a single product by GOG ID")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_gog")
@@ -642,7 +652,7 @@ def main() -> int:
 
             cached_row = existing.get(gog_id)
 
-            need_details = args.refresh or cached_row is None or args.gog_id
+            need_details = _needs_product_details(args, cached_row)
             details = None
             if need_details:
                 try:
@@ -712,6 +722,13 @@ def main() -> int:
             "duplicate(s) across mixed gog_id sources.",
             flush=True,
         )
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=_match_key,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

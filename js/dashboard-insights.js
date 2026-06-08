@@ -3,7 +3,7 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, itchIsGame, combinedPlaytime } from './game-core.js';
+import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, itchIsGame, combinedPlaytime, firstPlayedAt, firstPlayedYear, playSessionCount } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo, dealScore, isStealDeal, cutBucketClass } from './deals.js';
@@ -230,6 +230,26 @@ export function buildInsightPool(games, snapIn) {
     : null;
   if (closest && closest.trophy_progress < 100) {
     add(`Closest to 100%: <strong>${escapeHtml(closest.name)}</strong> · ${Math.round(closest.trophy_progress)}%`);
+  }
+
+  const withFirstPlayed = games
+    .map(g => ({ g, t: firstPlayedAt(g) }))
+    .filter(x => x.t != null)
+    .sort((a, b) => a.t - b.t);
+  if (withFirstPlayed[0]) {
+    const yr = firstPlayedYear(withFirstPlayed[0].g);
+    add(`Playing since <strong>${yr ?? '?'}</strong>: <strong>${escapeHtml(withFirstPlayed[0].g.name)}</strong>`, METRIC_WEIGHT.moderate);
+  }
+
+  const sessionGames = games
+    .map(g => ({ g, n: playSessionCount(g) }))
+    .filter(x => x.n != null)
+    .sort((a, b) => b.n - a.n);
+  if (sessionGames[0]) {
+    add(`Most sessions: <strong>${escapeHtml(sessionGames[0].g.name)}</strong> · ${formatNum(sessionGames[0].n)}`, METRIC_WEIGHT.moderate);
+  }
+  if (snap.psnSessionTotal > 0) {
+    add(`PSN sessions: <strong>${formatNum(snap.psnSessionTotal)}</strong> total`, METRIC_WEIGHT.moderate);
   }
 
   const avg = completionAverage(snap);
@@ -705,6 +725,25 @@ export function buildMarqueeItems(games, snapIn) {
 
   const priorityCount = games.filter(g => (getPersonal(g).priority || 0) > 0).length;
   if (priorityCount) push('*', 'is-violet', formatNum(priorityCount), 'priority flagged');
+
+  const oldestPlayed = games
+    .map(g => ({ g, t: firstPlayedAt(g) }))
+    .filter(x => x.t != null)
+    .sort((a, b) => a.t - b.t)[0];
+  if (oldestPlayed) {
+    const yr = firstPlayedYear(oldestPlayed.g);
+    push('^', 'is-rose', `${oldestPlayed.g.name} · ${yr ?? '?'}`, 'first PSN session');
+  }
+  const topSessions = games
+    .map(g => ({ g, n: playSessionCount(g) }))
+    .filter(x => x.n != null)
+    .sort((a, b) => b.n - a.n)[0];
+  if (topSessions) {
+    push('*', 'is-violet', `${topSessions.g.name} · ${formatNum(topSessions.n)}`, 'most PSN sessions');
+  }
+  if (snap.psnSessionTotal > 0) {
+    push('>', '', formatNum(snap.psnSessionTotal), 'PSN sessions total');
+  }
 
   appendCreativeMarqueeChips(push, games, snap, METRIC_WEIGHT);
 

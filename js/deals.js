@@ -322,6 +322,17 @@ export function itadPriceDropped(g) {
   return false;
 }
 
+function historicalLowTooltip(d, kind) {
+  const amount = kind === "year" ? d?.historyLowYear : d?.historyLowAll;
+  const label = kind === "year"
+    ? "Lowest price in the past year"
+    : "Lowest recorded price (all-time)";
+  if (amount != null && Number.isFinite(Number(amount))) {
+    return `${label} — was ${formatDollar(Number(amount))}`;
+  }
+  return label;
+}
+
 export function dealDroppedBadgeHtml(g) {
   return itadPriceDropped(g)
     ? '<span class="deal-badge-drop" title="Price dropped since your last ITAD refresh">↓ dropped</span>'
@@ -337,13 +348,14 @@ export function ownedElsewhereBadgeHtml(g) {
 export function dealLowBadgeHtml(d) {
   if (!d) return "";
   if (d.lowKind === "all" || (d.isHistoricalLow && !d.isHistoricalLowYear)) {
-    return '<span class="deal-badge-low" title="Lowest recorded price (all-time)">★ all-time</span>';
+    return `<span class="deal-badge-low" title="${escapeAttr(historicalLowTooltip(d, "all"))}">★ all-time</span>`;
   }
   if (d.lowKind === "year" || d.isHistoricalLowYear) {
-    return '<span class="deal-badge-low deal-badge-low-year" title="Lowest price in the past year">★ 1yr low</span>';
+    return `<span class="deal-badge-low deal-badge-low-year" title="${escapeAttr(historicalLowTooltip(d, "year"))}">★ 1yr low</span>`;
   }
   if (d.isHistoricalLow) {
-    return '<span class="deal-badge-low" title="Historical low">★ low</span>';
+    const tip = historicalLowTooltip(d, "all") || historicalLowTooltip(d, "year") || "Historical low";
+    return `<span class="deal-badge-low" title="${escapeAttr(tip)}">★ low</span>`;
   }
   return "";
 }
@@ -355,9 +367,16 @@ export function priceLowStarHtml(d) {
   if (!d) return "";
   const allTime = d.lowKind === "all" || (d.isHistoricalLow && !d.isHistoricalLowYear);
   const yearLow = d.lowKind === "year" || d.isHistoricalLowYear;
-  if (allTime) return '<span class="price-low-star" title="Lowest recorded price (all-time)">★</span>';
-  if (yearLow) return '<span class="price-low-star price-low-star-year" title="Lowest price in the past year">★</span>';
-  if (d.isHistoricalLow) return '<span class="price-low-star" title="Historical low">★</span>';
+  if (allTime) {
+    return `<span class="price-low-star" title="${escapeAttr(historicalLowTooltip(d, "all"))}">★</span>`;
+  }
+  if (yearLow) {
+    return `<span class="price-low-star price-low-star-year" title="${escapeAttr(historicalLowTooltip(d, "year"))}">★</span>`;
+  }
+  if (d.isHistoricalLow) {
+    const tip = historicalLowTooltip(d, "all") || historicalLowTooltip(d, "year") || "Historical low";
+    return `<span class="price-low-star" title="${escapeAttr(tip)}">★</span>`;
+  }
   return "";
 }
 
@@ -425,6 +444,8 @@ export function getDealInfo(g) {
       isHistoricalLow: isAllTime || isYear,
       isHistoricalLowYear: isYear,
       lowKind: isAllTime ? "all" : isYear ? "year" : null,
+      historyLowAll: itad.history_low_all ?? null,
+      historyLowYear: itad.history_low_year ?? null,
       shop: itad.shop,
       url: itad.url,
     };

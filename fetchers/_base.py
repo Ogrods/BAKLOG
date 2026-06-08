@@ -75,6 +75,95 @@ def add_allow_empty_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_no_carry_arg(parser: argparse.ArgumentParser) -> None:
+    """Opt out of carry-forward so a fetch writes only the fresh upstream set."""
+    parser.add_argument(
+        "--rebuild",
+        "--no-carry",
+        dest="no_carry",
+        action="store_true",
+        help=(
+            "Write only games returned by this fetch (drop stale carried rows). "
+            "Use to prune genuinely removed titles."
+        ),
+    )
+
+
+# Row markers for games carried forward from a prior catalog when absent from
+# the latest upstream fetch (windowed APIs, partial captures, etc.).
+STALE_FIELD = "stale"
+STALE_SINCE_FIELD = "stale_since"
+LAST_SEEN_FIELD = "last_seen"
+
+RowKeyFn = Callable[[dict[str, Any]], str]
+
+
+def carry_forward_missing(
+    fresh_rows: list[dict[str, Any]],
+    existing_rows: list[dict[str, Any]],
+    *,
+    key_fn: RowKeyFn,
+    now_iso: str | None = None,
+) -> list[dict[str, Any]]:
+    """Union prior catalog rows missing from the fresh fetch; tag them stale."""
+    now = now_iso or datetime.now(UTC).isoformat()
+    present = {key_fn(r) for r in fresh_rows}
+    out: list[dict[str, Any]] = []
+    for row in fresh_rows:
+        merged = dict(row)
+        merged[LAST_SEEN_FIELD] = now
+        merged.pop(STALE_FIELD, None)
+        merged.pop(STALE_SINCE_FIELD, None)
+        out.append(merged)
+    for old in existing_rows:
+        if key_fn(old) in present:
+            continue
+        carried = dict(old)
+        carried[STALE_FIELD] = True
+        carried.setdefault(STALE_SINCE_FIELD, now)
+        carried.setdefault(LAST_SEEN_FIELD, old.get(LAST_SEEN_FIELD))
+        out.append(carried)
+    return out
+
+
+def apply_carry_forward(
+    games_out: list[dict[str, Any]],
+    existing: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    *,
+    key_fn: RowKeyFn,
+    no_carry: bool = False,
+    now_iso: str | None = None,
+) -> list[dict[str, Any]]:
+    """Carry forward missing rows unless ``--rebuild`` / ``--no-carry``."""
+    if no_carry:
+        return games_out
+    existing_rows = list(existing.values()) if isinstance(existing, dict) else list(existing)
+    carried = carry_forward_missing(
+        games_out,
+        existing_rows,
+        key_fn=key_fn,
+        now_iso=now_iso,
+    )
+    added = len(carried) - len(games_out)
+    if added:
+        print(
+            f"  Carried forward {added} game(s) missing from this fetch "
+            f"(marked {STALE_FIELD}=true).",
+            flush=True,
+        )
+    return carried
+
+
+def row_key_by_id(row: dict[str, Any]) -> str:
+    """Default carry-forward key for single-source library fetchers."""
+    return str(row.get("id"))
+
+
+def row_key_by_appid(row: dict[str, Any]) -> str:
+    """Steam carry-forward key (appid primary, id fallback)."""
+    return str(row.get("appid") or row.get("id"))
+
+
 def refuse_empty_result(
     items: list[Any] | int,
     *,
@@ -229,6 +318,12 @@ ENRICHMENT_FIELDS = (
     "hltb_name",
     "coop_online",
     "coop_local",
+    "metacritic_score",
+    "developers",
+    "publishers",
+    "controller_support",
+    "early_access",
+    "acquired_at",
 )
 
 # Pricing legitimately drops to 0/empty (free game, sale ends) — allow overwrite.

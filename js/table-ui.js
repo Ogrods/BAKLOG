@@ -25,8 +25,10 @@ import {
   coopPillsHtml,
   trophyProgressPillHtml,
   platinumBadgeHtml,
+  staleBadgeHtml,
   earlyAccessRibbonHtml,
   earlyAccessPillHtml,
+  gamePassBadgeHtml,
   priorityScore,
   formatHours,
   formatDate,
@@ -37,6 +39,7 @@ import {
   recomputeCrossStoreHidden,
   combinedPlaytime,
   combinedPlaytimeTooltip,
+  psnPlatformsLineHtml,
   ratingValue,
 } from './game-core.js';
 import {
@@ -142,7 +145,10 @@ function markFocusedRow(key) {
   document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
   document.querySelectorAll("tr.row-picked").forEach(r => r.classList.remove("row-picked"));
   const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
-  if (row) row.classList.add("row-focused", "row-picked");
+  if (row) {
+    row.classList.add("row-focused", "row-picked");
+    preloadRowHeroEl(row);
+  }
   return row;
 }
 
@@ -445,9 +451,22 @@ export function updateRowInPlace(tr, g) {
   const key = gameKey(g);
   const selected = state.selectedKeys.has(key);
   const focused = tr.classList.contains("row-focused");
-  tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
+  const { heroClass, heroStyle } = rowHeroAttrs(g);
+  tr.className = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}${heroClass}`;
+  if (heroStyle) tr.setAttribute('style', heroStyle);
+  else tr.removeAttribute('style');
   if (cleanup) tr.title = 'Cleanup candidate: tagged backlog, 0h, rated under 60%, 2+ yrs old';
   else tr.removeAttribute('title');
+}
+
+function rowHeroAttrs(g) {
+  const hero = coverFallbackFor(g);
+  if (!hero) return { heroClass: '', heroStyle: '' };
+  const safe = hero.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return {
+    heroClass: ' row-has-hero',
+    heroStyle: `--row-hero:url('${safe}')`,
+  };
 }
 
 function rowClass(g, lowConf) {
@@ -786,6 +805,7 @@ export function focusRow(key) {
   if (!row) return;
   document.querySelectorAll("tr.row-focused").forEach(r => r.classList.remove("row-focused"));
   row.classList.add("row-focused");
+  preloadRowHeroEl(row);
 }
 
 export function openStoreForFocused() {
@@ -824,6 +844,7 @@ export function tableFingerprint() {
     maxH: sp.maxHours == null ? 200 : +sp.maxHours,
     unp: !!sp.unplayedOnly,
     ea: !!sp.earlyAccessOnly,
+    stale: !!sp.staleOnly,
     store: state.prefs.storeFilter || "",
     wstore: state.prefs.wishlistStoreFilter || "",
     releaseYear: state.prefs.releaseYearFilter || "",
@@ -932,7 +953,7 @@ let _paintGen = 0;
 const FIRST_CHUNK = 50;
 /** Must match .games-table tbody tr { height } in app.css */
 const ROW_HEIGHT = 76;
-export const TABLE_COLSPAN = 13;
+export const TABLE_COLSPAN = 14;
 const VIRTUAL_OVERSCAN = 20;
 let _virtualList = null;
 let _virtualCtx = null;
@@ -943,6 +964,38 @@ let _virtualWindow = { start: 0, end: 0 };
 let _virtualWindowList = null;
 let _virtualScrollRaf = 0;
 let _virtualScrollBound = false;
+
+const _warmedHeroes = new Set();
+
+function preloadHeroUrl(url) {
+  if (!url || _warmedHeroes.has(url)) return;
+  _warmedHeroes.add(url);
+  const img = new Image();
+  img.decoding = "async";
+  try { img.fetchPriority = "low"; } catch { /* unsupported */ }
+  img.src = url;
+}
+
+function heroUrlFromRow(tr) {
+  const v = tr.style.getPropertyValue("--row-hero");
+  const m = v && v.match(/url\(['"]?([^'")]+)['"]?\)/);
+  return m ? m[1] : "";
+}
+
+export function preloadRowHeroEl(tr) {
+  if (!state.prefs.rowHeroBackdrop || !tr) return;
+  preloadHeroUrl(heroUrlFromRow(tr));
+}
+
+export function warmVisibleRowHeroes() {
+  if (!state.prefs.rowHeroBackdrop) return;
+  const tbody = document.getElementById("tbody");
+  if (!tbody) return;
+  const rows = [...tbody.querySelectorAll("tr.row-has-hero")];
+  const run = () => rows.forEach(tr => preloadHeroUrl(heroUrlFromRow(tr)));
+  if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 1200 });
+  else setTimeout(run, 0);
+}
 
 function cancelPaintJobs() {
   _paintGen++;
@@ -1082,6 +1135,7 @@ function paintVirtualSlice(start, end) {
     run.meta.virtualWindow = { start, end, total: list.length, domRows: end - start };
   }
   scheduleCoverFitSync(tbody);
+  warmVisibleRowHeroes();
 }
 
 function tbodyRowCount() {
@@ -1142,8 +1196,10 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const selected = state.selectedKeys.has(key);
   const focused = idx === state.focusedRowIndex;
   const cleanupTitle = cleanup ? ' title="Cleanup candidate: tagged backlog, 0h, rated under 60%, 2+ yrs old"' : '';
-  const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}`;
-  return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}"${cleanupTitle}>
+  const { heroClass, heroStyle } = rowHeroAttrs(g);
+  const heroAttr = heroStyle ? ` style="${heroStyle}"` : '';
+  const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}${heroClass}`;
+  return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}"${heroAttr}${cleanupTitle}>
       <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} title="Select for bulk status or remove" /></td>
       <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="p-2 game-name-cell">
@@ -1155,6 +1211,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
             </div>
             <div class="row-meta mt-1 flex items-center gap-1.5 flex-wrap">
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
+              ${staleBadgeHtml(g)}
               ${coopPillsHtml(g)}
               ${state.activeView === "wishlist" ? "" : trophyProgressPillHtml(g)}
               ${state.activeView === "wishlist" ? "" : platinumBadgeHtml(g)}
@@ -1164,6 +1221,7 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             ${earlyAccessPillHtml(g)}
+            ${gamePassBadgeHtml(g)}
             ${hiddenGem ? '<span class="text-purple-400 shrink-0" style="cursor: default" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
           </div>
         </div>
@@ -1175,11 +1233,13 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
         <button data-hltb-edit="${escapeAttr(key)}" class="px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
       </td>
       <td class="p-2 text-right" title="${g.steam_review_percent != null ? `Steam review: ${g.steam_review_percent}%` : 'No Steam review data'}">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - "}</td>
+      <td class="p-2 text-right text-slate-300" title="${g.metacritic_score != null ? `Metacritic: ${g.metacritic_score}` : 'No Metacritic score'}">${g.metacritic_score != null ? g.metacritic_score : " - "}</td>
       <td class="p-2 text-right">${formatPrice(g)}</td>
       <td class="p-2 text-slate-300">${formatReleaseDate(g.release_date)}</td>
       <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
       <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
-      <td class="p-2 notes-cell">
+      <td class="p-2 notes-cell${psnPlatformsLineHtml(g) ? " has-psn-platforms" : ""}">
+        ${psnPlatformsLineHtml(g)}
         <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1" title="Personal notes - saved automatically">${escapeHtml(p.notes || "")}</textarea>
       </td>
     </tr>`;
@@ -1224,6 +1284,7 @@ function paintTableBody(list, opts = {}) {
     const syncCoverMs = timeSyncCoverFits(tbody) ?? 0;
     recordChunkPaint('oneshot', syncCoverMs);
     if (run) perfMeasure(run, 'paint:total', 'paint:start', { rows: list.length, path: 'oneshot' });
+    warmVisibleRowHeroes();
     return;
   }
 

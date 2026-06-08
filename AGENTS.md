@@ -36,7 +36,15 @@ Deep reference (maintainer clone only): `docs/ARCHITECTURE.md` in the private `b
 .\.venv\Scripts\python.exe -m pytest          # Python (skips integration by default)
 npm test                                       # Vitest (JS)
 $env:BAKLOG_ADMIN="1"; .\.venv\Scripts\python.exe server.py   # dev + admin
+.\.venv\Scripts\python.exe scripts\stop_baklog.py             # stop strays (+ --dry-run)
 ```
+
+Run the dev server in **one** dedicated terminal and reuse it — `server.py` is a
+blocking `serve_forever()` loop, so spawning a fresh `python server.py` per task
+leaves the old ones running and they pile up (Cursor's "N agents with open
+processes" at quit). To clean up after a messy session: `stop_baklog.py` (graceful
+`POST /api/shutdown`, then force-kills any server/tray still on port 8765 and
+clears `.baklog_server.pid`).
 
 ## Progress tracker
 

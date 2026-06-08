@@ -18,10 +18,13 @@ from epic_client import LOGIN_URL, EpicAuthError, EpicClient, default_epic_cache
 from fetchers._authoritative import EPIC
 from fetchers._base import (
     add_allow_empty_arg,
+    add_no_carry_arg,
+    apply_carry_forward,
     catalog_file,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
+    row_key_by_id,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
@@ -277,6 +280,7 @@ def _build_game_row(
         "price_initial": None,
         "discount_percent": None,
         "currency": None,
+        "acquired_at": None,
     }
     if hltb:
         row.update(
@@ -289,6 +293,15 @@ def _build_game_row(
             }
         )
     return row
+
+
+def _acquired_at_from_record(rec: dict | None) -> str | None:
+    if not rec:
+        return None
+    val = rec.get("acquisitionDate")
+    if isinstance(val, str) and val.strip():
+        return val.strip()
+    return None
 
 
 def _build_game_row_from_record(
@@ -305,7 +318,12 @@ def _build_game_row_from_record(
     # asset pack), skip it — do NOT fall through to the bare fallback below,
     # which would resurrect the very rows the filter deliberately dropped.
     if catalog_item is not None:
-        return _build_game_row(str(cid), str(ns), catalog_item, hltb)
+        row = _build_game_row(str(cid), str(ns), catalog_item, hltb)
+        if row is not None:
+            acquired = _acquired_at_from_record(rec)
+            if acquired:
+                row["acquired_at"] = acquired
+        return row
     name = rec.get("sandboxName") or rec.get("appName") or str(cid)
     # No catalog hit: the only signal we have is the record name. Drop internal
     # entitlement slugs (e.g. Fortnite_StWContent) that aren't real titles.
@@ -341,6 +359,7 @@ def _build_game_row_from_record(
         "price_initial": None,
         "discount_percent": None,
         "currency": None,
+        "acquired_at": _acquired_at_from_record(rec),
     }
     if hltb:
         row.update(
@@ -391,6 +410,7 @@ def main() -> int:
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     parser.add_argument("--auth-help", action="store_true", help="Print Epic login instructions")
     add_allow_empty_arg(parser)
+    add_no_carry_arg(parser)
     args = parser.parse_args()
     _configure_stdout()
     t0 = started("fetch_epic")
@@ -569,6 +589,22 @@ def main() -> int:
         seen.add(key)
         deduped.append(g)
     games_out = deduped
+
+    drift_exit = refuse_drift_result(
+        games_out,
+        label="Epic library rows",
+        allow_drift=args.allow_drift,
+        output_path=GAMES_EPIC_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_epic", t0, exit_code=drift_exit)
+
+    games_out = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=row_key_by_id,
+        no_carry=args.no_carry,
+    )
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

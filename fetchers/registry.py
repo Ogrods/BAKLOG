@@ -73,7 +73,7 @@ WISHLIST_META_KEY_BY_FETCHER: dict[str, str] = {
     "wishlistHumble": "wishlistHumble",
 }
 
-ENRICH_FETCHER_KEYS = frozenset({"hltb", "steamReviews", "steamCovers", "steamTags"})
+ENRICH_FETCHER_KEYS = frozenset({"hltb", "steamReviews", "steamCovers", "steamTags", "protondb"})
 
 
 def load_manifest(path: Path | None = None) -> dict[str, Any]:

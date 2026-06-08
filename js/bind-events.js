@@ -29,6 +29,8 @@ import {
   initAlphaNav,
   focusGame,
   focusRow,
+  preloadRowHeroEl,
+  warmVisibleRowHeroes,
   visibleListForKeyboard,
   scrollToRowIndex,
   openStoreForFocused,
@@ -43,6 +45,7 @@ import {
   renderPicksLimitButtons,
 } from './picks-ui.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
+import { openCoverGallery } from './cover-gallery.js';
 import { initTrophyPopover } from './trophy-popover.js';
 import {
   openFiltersDrawer,
@@ -80,6 +83,7 @@ import {
   fetcherRunner,
   renderDashboardFetcherHealth,
   toggleLegendTips,
+  formatRefreshIntervalLabel,
 } from './fetcher-health.js';
 import { reconnectProvider } from './connections.js';
 import {
@@ -110,7 +114,7 @@ function closePicksIfOpen() {
 }
 
 const SUMMARY_FILTER_CHIP_SELECTOR =
-  ".status-chip, .summary-store-chip, .summary-deal-chip[data-wishlist-deal-filter], .summary-wishlist-reset";
+  ".status-chip, .summary-store-chip, .summary-stale-chip, .summary-deal-chip[data-wishlist-deal-filter], .summary-wishlist-reset";
 
 export function bindEvents() {
   initTrophyPopover();
@@ -139,6 +143,14 @@ export function bindEvents() {
     } else if (e.target.id === "itadAutoRefreshInterval") {
       state.prefs.itadAutoRefreshIntervalMin = Number(e.target.value);
       savePrefs();
+    } else if (e.target.id === "claimsAutoRefreshToggle") {
+      state.prefs.claimsAutoRefreshDisabled = !e.target.checked;
+      const slider = document.getElementById("claimsAutoRefreshInterval");
+      if (slider) slider.disabled = !e.target.checked;
+      savePrefs();
+    } else if (e.target.id === "claimsAutoRefreshInterval") {
+      state.prefs.claimsAutoRefreshIntervalMin = Number(e.target.value);
+      savePrefs();
     } else if (e.target.id === "autoEnrichOnAddToggle") {
       state.prefs.autoEnrichOnAdd = e.target.checked;
       savePrefs();
@@ -149,6 +161,9 @@ export function bindEvents() {
     if (e.target.id === "itadAutoRefreshInterval") {
       const valEl = document.getElementById("itadAutoRefreshIntervalVal");
       if (valEl) valEl.textContent = `${e.target.value}m`;
+    } else if (e.target.id === "claimsAutoRefreshInterval") {
+      const valEl = document.getElementById("claimsAutoRefreshIntervalVal");
+      if (valEl) valEl.textContent = formatRefreshIntervalLabel(e.target.value);
     }
   });
 
@@ -312,6 +327,7 @@ export function bindEvents() {
   });
   document.getElementById("openFiltersBtn").addEventListener("click", openFiltersDrawer);
   document.getElementById("closeFiltersBtn").addEventListener("click", closeFiltersDrawer);
+  document.getElementById("resetDrawerFiltersBtn")?.addEventListener("click", clearAllFilters);
   document.getElementById("filterDrawerBackdrop").addEventListener("click", closeFiltersDrawer);
   document.getElementById("toggleGenreChipsBtn").addEventListener("click", () => {
     state.genreChipsExpanded = !state.genreChipsExpanded;
@@ -344,6 +360,7 @@ export function bindEvents() {
     statusFilter:     el => ({ key: "statusFilter",    val: el.value }),
     unplayedOnly:     el => ({ key: "unplayedOnly",    val: !!el.checked }),
     earlyAccessOnly:  el => ({ key: "earlyAccessOnly", val: !!el.checked }),
+    gamePassOnly:     el => ({ key: "gamePassOnly", val: !!el.checked }),
     minRating:        el => ({ key: "minRating",       val: +el.value || 0 }),
     maxHours:         el => ({ key: "maxHours",        val: +el.value || 0 }),
   };
@@ -437,6 +454,12 @@ export function bindEvents() {
     savePrefs();
     document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !e.target.checked);
   });
+  document.getElementById("rowHeroBackdrop").addEventListener("change", e => {
+    state.prefs.rowHeroBackdrop = e.target.checked;
+    savePrefs();
+    document.body.classList.toggle("row-hero-on", e.target.checked);
+    if (e.target.checked) warmVisibleRowHeroes();
+  });
   document.getElementById("quickWinMax").addEventListener("input", e => {
     state.prefs.quickWinMaxHours = +e.target.value;
     document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;
@@ -513,6 +536,11 @@ export function bindEvents() {
       const val = storeChip.dataset.storeFilter || "";
       const next = state.prefs.storeFilter === val ? "" : val;
       applyPrefsChange({ prefs: { storeFilter: next } });
+      return;
+    }
+    const staleChip = e.target.closest(".summary-stale-chip");
+    if (staleChip) {
+      applyPrefsChange({ sessionPrefs: { staleOnly: !state.sessionPrefs.staleOnly } });
       return;
     }
     const dealChip = e.target.closest(".summary-deal-chip[data-wishlist-deal-filter]");
@@ -663,6 +691,10 @@ export function bindEvents() {
     if (g) t.value = getPersonal(g).notes || "";
     t.blur();
   });
+  document.getElementById("tbody").addEventListener("mouseover", e => {
+    const tr = e.target.closest("tr.row-has-hero");
+    if (tr) preloadRowHeroEl(tr);
+  });
   document.getElementById("tbody").addEventListener("click", e => {
     const notesDot = e.target.closest(".has-notes-dot");
     if (notesDot) {
@@ -670,6 +702,15 @@ export function bindEvents() {
       const tr = notesDot.closest("tr[data-row-key]");
       tr?.querySelector(".notes-input")?.focus();
       return;
+    }
+    const coverEl = e.target.closest(".cover-wrap, .cover");
+    if (coverEl) {
+      const tr = coverEl.closest("tr[data-row-key]");
+      if (tr) {
+        e.stopPropagation();
+        openCoverGallery(tr.dataset.rowKey);
+        return;
+      }
     }
     if (!e.target.closest("select, input, a, button, [data-hltb-edit], .has-notes-dot")) {
       const tr = e.target.closest("tr[data-row-key]");

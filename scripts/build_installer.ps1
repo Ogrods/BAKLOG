@@ -33,5 +33,13 @@ python server.py
 pause
 "@ | Set-Content -Encoding ASCII (Join-Path $Out "Start BAKLOG.bat")
 
+@"
+@echo off
+cd /d "%~dp0"
+rem Launch BAKLOG into the system tray (opens your backlog in a browser window).
+start "" pythonw tray_app.py
+"@ | Set-Content -Encoding ASCII (Join-Path $Out "Start BAKLOG (tray).bat")
+
 Write-Host "Done. Output: $Out"
 Write-Host "First run: open Connections tab and sign in to each store (Chrome or Edge required)."
+Write-Host "Tray launcher: 'Start BAKLOG (tray).bat' (needs: pip install pystray Pillow)."

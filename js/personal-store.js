@@ -80,6 +80,71 @@ export const personalStore = (() => {
     'viewSorts',
   ];
 
+  function _nonBacklogCount(personalObj) {
+    let n = 0;
+    for (const [k, v] of Object.entries(personalObj || {})) {
+      if (String(k).startsWith('__') || !v || typeof v !== 'object') continue;
+      if ((v.status || 'backlog') !== 'backlog') n += 1;
+    }
+    return n;
+  }
+
+  function _isMeaningfulPersonalRecord(rec) {
+    if (!rec || typeof rec !== 'object') return false;
+    const st = rec.status || 'backlog';
+    if (st !== 'backlog') return true;
+    if (String(rec.notes || '').trim()) return true;
+    if (rec.hltb_override != null && rec.hltb_override !== '') return true;
+    if (rec.hidden === true) return true;
+    if (rec.priority) return true;
+    return false;
+  }
+
+  function _mergePersonalPreferMeaningful(basePersonal, incomingPersonal) {
+    const out = { ...(basePersonal || {}) };
+    for (const [key, rec] of Object.entries(incomingPersonal || {})) {
+      if (String(key).startsWith('__')) {
+        if (!(key in out)) out[key] = rec;
+        continue;
+      }
+      if (!_isMeaningfulPersonalRecord(rec)) continue;
+      const existing = out[key];
+      if (!existing || typeof existing !== 'object') {
+        out[key] = { ...rec };
+        continue;
+      }
+      const existingSt = existing.status || 'backlog';
+      const incomingSt = rec.status || 'backlog';
+      const merged = { ...existing };
+      if (existingSt === 'backlog' && incomingSt !== 'backlog') {
+        merged.status = incomingSt;
+        if (rec.started_at) merged.started_at = rec.started_at;
+        if (rec.finished_at) merged.finished_at = rec.finished_at;
+      }
+      const existingNotes = String(existing.notes || '');
+      const incomingNotes = String(rec.notes || '');
+      if (incomingNotes.length > existingNotes.length) merged.notes = incomingNotes;
+      if (rec.hltb_override != null && rec.hltb_override !== '' && merged.hltb_override == null) {
+        merged.hltb_override = rec.hltb_override;
+      }
+      if (rec.hidden === true) merged.hidden = true;
+      out[key] = merged;
+    }
+    return out;
+  }
+
+  function _loadLegacyUnscopedPersonal() {
+    if (personalStorageKey() === STORAGE_KEY) return null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
   function applyServerDoc(doc) {
     state.personal = doc.personal || {};
     const serverPrefs = doc.prefs || {};
@@ -108,10 +173,25 @@ export const personalStore = (() => {
 
     const serverHas = isMeaningful(serverDoc || {});
     const localHas = isMeaningful(localSnapBeforeProbe);
+    const legacyPersonal = _loadLegacyUnscopedPersonal();
 
     if (serverHas) {
-      applyServerDoc(serverDoc);
+      let personal = serverDoc.personal || {};
+      const serverNonBacklog = _nonBacklogCount(personal);
+      if (localHas) {
+        personal = _mergePersonalPreferMeaningful(personal, localSnapBeforeProbe.personal);
+      }
+      if (legacyPersonal) {
+        personal = _mergePersonalPreferMeaningful(personal, legacyPersonal);
+      }
+      const merged = _nonBacklogCount(personal) > serverNonBacklog;
+      applyServerDoc({ ...serverDoc, personal });
       initComplete = true;
+      if (merged) {
+        dirty = true;
+        clearTimeout(pushTimer);
+        pushTimer = setTimeout(flush, PUSH_DEBOUNCE_MS);
+      }
       return { migrated: true, pendingMigration: null };
     }
 

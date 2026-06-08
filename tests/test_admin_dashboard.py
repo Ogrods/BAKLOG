@@ -207,6 +207,90 @@ def test_free_claims_put_writes_file(admin_server: tuple[str, Path]) -> None:
     assert saved["items"][0]["title"] == "Test Game"
 
 
+def test_free_claims_get_returns_approved(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    approved_path.parent.mkdir(parents=True, exist_ok=True)
+    approved_path.write_text(json.dumps({"ids": ["epic-a", "gamerpower-1"]}), encoding="utf-8")
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    assert data.get("approved") == ["epic-a", "gamerpower-1"]
+
+
+def test_free_claims_approved_put_validation(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "PUT",
+        "/api/internal/free-claims/approved",
+        body={"ids": ["ok", ""]},
+    )
+    assert code == 400
+    assert "ids[1]" in str(data.get("error", ""))
+
+
+def test_free_claims_approved_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    payload = {"ids": ["epic-approved", "gamerpower-42"]}
+    code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body=payload)
+    assert code == 200
+    assert data.get("ids") == 2
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert saved["ids"] == ["epic-approved", "gamerpower-42"]
+
+
+def test_sponsors_put_validation(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "PUT",
+        "/api/internal/sponsors",
+        body={"items": [{"id": "sp1", "title": "Ad", "url": "ftp://bad.example"}]},
+    )
+    assert code == 400
+    assert "url must start with http" in str(data.get("error", ""))
+
+
+def test_sponsors_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path.parent.mkdir(parents=True, exist_ok=True)
+    sponsors_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    payload = {
+        "items": [
+            {
+                "id": "house-test",
+                "kind": "house",
+                "title": "Back BAKLOG",
+                "tagline": "Support local-first backlog",
+                "cta": "Learn more",
+                "url": "https://baklog.app/#waitlist",
+                "enabled": True,
+                "priority": 0,
+            }
+        ]
+    }
+    code, data = _request(base, "PUT", "/api/internal/sponsors", body=payload)
+    assert code == 200
+    assert data.get("items") == 1
+    saved = json.loads(sponsors_path.read_text(encoding="utf-8"))
+    assert saved["items"][0]["title"] == "Back BAKLOG"
+
+
+def test_sponsors_get_returns_input(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path.parent.mkdir(parents=True, exist_ok=True)
+    sponsors_path.write_text(
+        json.dumps({"items": [{"id": "a", "title": "Existing"}]}),
+        encoding="utf-8",
+    )
+    code, data = _request(base, "GET", "/api/internal/sponsors")
+    assert code == 200
+    assert data["input"]["items"][0]["id"] == "a"
+
+
 def test_validate_internal_args_bool_and_enum() -> None:
     spec = server.INTERNAL_JOBS["claimSources"]
     argv = server.validate_internal_args(spec, {"--dry-run": True, "--source": "epic"})

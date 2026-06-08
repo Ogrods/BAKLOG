@@ -525,7 +525,7 @@
 .dash-marquee-item { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; }
 .dash-marquee-item strong { color: #f1f5f9; font-weight: 700; }
 .dash-marquee-icon {
-  width: 22px; height: 22px; border-radius: 999px;
+  min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent-subtle); color: var(--accent);
   font-size: 11px; font-weight: 700; flex-shrink: 0;

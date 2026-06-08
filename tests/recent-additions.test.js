@@ -46,12 +46,19 @@ describe('computeRecentAdditions', () => {
     expect(result[0]._addedAt).toBeGreaterThan(result[1]._addedAt);
   });
 
-  it('skips games without a first-seen timestamp', () => {
-    const g1 = game('1');
-    const g2 = game('2');
-    state.libraryFirstSeenByKey[gameKey(g1)] = Date.now();
-    const result = computeRecentAdditions([g1, g2]);
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('1');
+  it('backfills from baseline library when fewer than cap have timestamps', () => {
+    const now = Date.now();
+    const games = [];
+    for (let i = 0; i < 12; i++) {
+      const g = game(String(i), `Game ${i}`);
+      state.libraryFirstSeenByKey[gameKey(g)] = i < 2 ? now - i * 1000 : 0;
+      games.push(g);
+    }
+    const result = computeRecentAdditions(games, 10);
+    expect(result).toHaveLength(10);
+    expect(result[0].id).toBe('0');
+    expect(result[1].id).toBe('1');
+    expect(result.filter(g => g._addedAt > 0)).toHaveLength(2);
+    expect(result.filter(g => g._addedAt === 0)).toHaveLength(8);
   });
 });

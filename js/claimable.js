@@ -56,16 +56,45 @@ function pruneDismissedClaims(feedItems) {
   }
 }
 
+/** Strip giveaway/store boilerplate from auto-sourced claim titles before ownership match. */
+export function stripClaimTitleDecorations(title) {
+  let t = String(title || '').trim();
+  if (!t) return t;
+  t = t.replace(/\s*\([^)]*\)\s*giveaway\s*$/i, '');
+  t = t.replace(/\s+free\s+(at\s+egs\s+)?on\s+epic\s+game\s+store.*$/i, '');
+  t = t.replace(/\s+free\s+for\s+mobile\s+on\s+egs.*$/i, '');
+  t = t.replace(/\s+in\s+game\s+(items?|currency\s+pack).*$/i, '');
+  t = t.replace(/\s+free\s+on\s+(steam|itchio|itch\.io|gog|indiegala).*$/i, '');
+  t = t.replace(/\s*-\s*free\s+on\s+indiegala.*$/i, '');
+  t = t.replace(/\s+on\s+(steam|gog|itch\.?io|epic\s+game\s+store)\s*$/i, '');
+  t = t.replace(/\s+-\s+chapters?[\s\d,]+.*$/i, '');
+  t = t.replace(/\s+giveaway\s*$/i, '');
+  return t.trim();
+}
+
+function claimTitleNorms(title) {
+  const raw = String(title || '');
+  const norms = new Set();
+  for (const candidate of [raw, stripClaimTitleDecorations(raw)]) {
+    const n = normalizeNameForDedup(candidate);
+    if (n) norms.add(n);
+  }
+  return [...norms];
+}
+
 export function isClaimOwned(claim) {
   if (!claim) return false;
   const appid = claim.steam_appid;
+  let appidMatched = false;
   if (appid != null) {
     const sid = String(appid);
-    if (state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)) return true;
-    if (state.allGames.some(g => gameKey(g) === `steam:${sid}`)) return true;
+    if (state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)) appidMatched = true;
+    else if (state.allGames.some(g => gameKey(g) === `steam:${sid}`)) appidMatched = true;
   }
-  const norm = normalizeNameForDedup(claim.title || '');
-  if (norm && state.ownedNormNames?.has(norm)) return true;
+  const norms = claimTitleNorms(claim.title);
+  const titleMatched = norms.some(n => state.ownedNormNames?.has(n));
+  if (appidMatched) return true;
+  if (titleMatched) return true;
   return false;
 }
 

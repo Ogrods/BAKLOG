@@ -128,6 +128,9 @@ window.applySpotlightArtFit = function (img) {
 
     if (lowRes && bg) {
       img.style.objectFit = "contain";
+      // Contained low-res art is pillarboxed; pin its right edge to the
+      // container's right edge (inline wins over the stylesheet rule).
+      img.style.objectPosition = "100% 40%";
       if (src && bg.src !== src) bg.src = src;
       spot.classList.add("is-lowres-art");
       bg.classList.add("is-loaded");

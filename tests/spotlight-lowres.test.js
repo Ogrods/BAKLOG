@@ -53,6 +53,7 @@ describe("spotlight low-res art", () => {
     expect(spot.classList.contains("is-lowres-art")).toBe(true);
     expect(spot.classList.contains("has-portrait-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
+    expect(img.style.objectPosition).toBe("100% 40%");
     expect(spot.querySelector(".dash-spotlight-art-bg").classList.contains("is-loaded")).toBe(true);
   });
 

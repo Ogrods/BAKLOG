@@ -37,6 +37,8 @@ export const state = {
   itchGames: [],
   itadByKey: {},
   itadPriceDroppedKeys: new Set(),
+  /** Disclosed sponsored/house deal slots (loaded from sponsors.json). */
+  sponsoredDeals: [],
   dashboardDataReady: false,
   activeView: 'dashboard',
   selectedKeys: new Set(),

@@ -109,6 +109,15 @@ describe('canonical cross-store notes', () => {
     setPersonal(hadesSteam, 'notes', 'same', { silent: true });
     expect(reconcileNotesAcrossTitles()).toBe(false);
   });
+
+  it('canonicalizeNotesAcrossTitles does not materialize empty personal rows', () => {
+    state.allGames = [hadesSteam, hadesEpic, { store: 'steam', id: 99, name: 'Lonely Game' }];
+    state.personal = {};
+    delete state.personal.__notes_canonicalized_v1;
+    canonicalizeNotesAcrossTitles();
+    const keys = Object.keys(state.personal).filter(k => !k.startsWith('__'));
+    expect(keys).toEqual([]);
+  });
 });
 
 describe('orphan personal keys', () => {

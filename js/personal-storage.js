@@ -245,6 +245,7 @@ function mirrorNoteToKeys(keys, note, options) {
   let changed = false;
   for (const key of keys) {
     if (isMetaPersonalKey(key)) continue;
+    if (!text && !state.personal[key]) continue;
     if (!state.personal[key]) state.personal[key] = { ...PERSONAL_DEFAULT };
     if (String(state.personal[key].notes ?? "") === text) continue;
     state.personal[key].notes = text;

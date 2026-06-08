@@ -38,6 +38,7 @@ export function loadPrefs() {
     storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16,
     dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false,
     dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {},
+    hideSponsoredDeals: false,
     fetcherHealthShowConnected: true, fetcherHealthShowStaleMissing: true,
     autoEnrichOnAdd: true, coopFilterMode: "off", fetcherCollapsed: true,
     itadAutoRefreshIntervalMin: 15,

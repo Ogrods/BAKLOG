@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "generated_at": null,
+  "items": [
+    {
+      "id": "house-support-baklog",
+      "kind": "house",
+      "title": "Back BAKLOG",
+      "tagline": "Local-first, no server to breach. Help fund development.",
+      "cta": "Join the waitlist",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "",
+      "priority": 0,
+      "enabled": true
+    }
+  ]
+}

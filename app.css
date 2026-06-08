@@ -756,7 +756,7 @@ button { cursor: pointer; }
 button[disabled] { cursor: not-allowed; }
 /* === Covers & picks === */
 .cover { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; background: #1e293b; display: block; }
-.cover.landscape, .pick-cover.landscape { object-fit: contain; }
+.cover.landscape, .pick-cover.landscape, .claim-row-cover.landscape, .claim-cover-thumb.landscape { object-fit: contain; }
 .placeholder {
   background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   display: flex; flex-direction: column;
@@ -895,7 +895,8 @@ button[disabled] { cursor: not-allowed; }
   filter: blur(16px) brightness(0.6) saturate(1.15);
   transform: scale(1.25);
 }
-.deal-hero .cover-wrap.landscape::before {
+.deal-hero .cover-wrap.landscape::before,
+.claim-hero-card .cover-wrap.landscape::before {
   background-color: color-mix(in srgb, var(--accent) 22%, var(--bg));
   background-image: var(--cover-blur-img, none);
   background-size: cover;
@@ -1297,9 +1298,190 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   max-height: 10rem;
   object-fit: cover;
   margin-top: 0.75rem;
+  border-radius: 0.375rem;
+}
+.claim-detail-dialog {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+.claim-detail-dialog:focus {
+  outline: none;
 }
 .claim-detail-dialog::backdrop {
   background: rgba(2, 6, 23, 0.72);
+}
+/* Tailwind v4 preflight applies `* { margin: 0 }` as an author rule, which
+   overrides the UA `dialog:modal { margin: auto }` that centers native modals —
+   without this the dialog anchors to the top-left. Restoring margin:auto plus a
+   width cap also stops long claim text from stretching it edge-to-edge. */
+.claim-detail-dialog[open] {
+  margin: auto;
+  width: min(100vw - 2rem, 28rem);
+  max-width: calc(100vw - 2rem);
+  background: transparent;
+  border: 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+.claim-detail-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  width: 100%;
+  background-clip: padding-box;
+}
+.claim-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.claim-detail-title {
+  margin: 0;
+  padding-right: 1.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary, #f8fafc);
+}
+.claim-detail-close {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-mute);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.claim-detail-close:hover {
+  color: var(--text-primary, #f8fafc);
+}
+.claim-detail-close:focus:not(:focus-visible) {
+  outline: none;
+}
+.claim-detail-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+.claim-detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.claim-detail-ends {
+  font-size: 0.75rem;
+  color: rgb(252 211 77 / 0.9);
+}
+.claim-detail-review {
+  font-size: 0.75rem;
+  color: var(--text-mute);
+}
+.claim-detail-blurb {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #cbd5e1);
+}
+.claim-detail-owned {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: #6ee7b7;
+}
+/* Claimable "fire" identity gradient — hardcoded (not --brand-grad, which is
+   only defined in the ember theme) so the CTA renders consistently in every
+   theme, matching the .claim-cut-fire badge + .claim-fire-card glow. */
+.claim-detail-claim-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(95deg, #fbbf24 0%, #f97316 55%, #e2502a 100%);
+  color: #1a1205;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+  transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.claim-detail-claim-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(249, 115, 22, 0.45);
+}
+.claim-detail-claim-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(249, 115, 22, 0.4);
+}
+.claim-detail-claim-btn:focus-visible {
+  outline: 2px solid #fff7ed;
+  outline-offset: 2px;
+}
+.claim-detail-clear {
+  display: block;
+  margin-top: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 0.875rem;
+  color: var(--text-mute);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.claim-detail-clear:hover {
+  color: var(--text-secondary, #cbd5e1);
+}
+.claim-detail-panel .claim-attribution {
+  margin-top: 0.75rem;
+}
+.claim-source {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+.claim-source a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.claim-source a:hover {
+  color: #cbd5e1;
+}
+.claim-cell-title .claim-source {
+  flex-shrink: 0;
+}
+.claim-attribution {
+  margin: 0.5rem 0 0;
+  padding-top: 0.35rem;
+  font-size: 0.625rem;
+  line-height: 1.4;
+  color: #64748b;
+}
+.claim-attribution a {
+  color: #94a3b8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.claim-attribution a:hover {
+  color: #cbd5e1;
 }
 .claim-rows-card {
   padding: 0.75rem 1rem 0.5rem;
@@ -1310,15 +1492,39 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .claim-rows {
   display: flex;
   flex-direction: column;
+  --claim-grid: 28px minmax(0, 1fr) 3.5rem auto auto;
+}
+.claim-rows-header,
+.claim-row {
+  display: grid;
+  grid-template-columns: var(--claim-grid);
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem 0.35rem 0.4rem;
+  width: 100%;
+}
+.claim-cell-meta {
+  display: contents;
+}
+.claim-rows-header {
+  padding-top: 0;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.claim-rows-header .claim-cell-title,
+.claim-rows-header .claim-cell-store,
+.claim-rows-header .claim-cell-review,
+.claim-rows-header .claim-cell-ends {
+  white-space: nowrap;
 }
 .claim-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.35rem 0.6rem 0.35rem 0.4rem;
   border-bottom: 1px solid var(--border-subtle);
   font-size: 0.75rem;
-  width: 100%;
   background: transparent;
   border-left: none;
   border-right: none;
@@ -1332,10 +1538,15 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .claim-row:last-child {
   border-bottom: none;
 }
+.claim-cell-cover {
+  display: block;
+  line-height: 0;
+}
 .claim-row-cover-wrap {
   display: block;
-  flex-shrink: 0;
   line-height: 0;
+  overflow: hidden;
+  border-radius: 4px;
 }
 .claim-row-cover {
   width: 28px;
@@ -1349,45 +1560,98 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   min-height: 42px;
   width: 28px;
 }
-.claim-row-main {
-  flex: 1;
+.claim-cell-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   min-width: 0;
 }
 .claim-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 500;
   color: #e2e8f0;
   font-size: 0.8125rem;
 }
-.claim-row-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.5rem;
-  margin-top: 0.15rem;
+.claim-cell-title .claim-cell-store {
+  flex-shrink: 0;
+  line-height: 0;
+}
+.claim-cell-review {
+  text-align: right;
   color: #94a3b8;
   font-size: 0.6875rem;
+  white-space: nowrap;
 }
-.claim-row-ends {
+.claim-cell-ends {
   color: rgba(251, 191, 36, 0.9);
+  font-size: 0.6875rem;
+  white-space: nowrap;
 }
-.claim-row-review {
-  color: #94a3b8;
-}
-.claim-row-genres {
-  color: #64748b;
-  max-width: 12rem;
-}
-.claim-row-actions {
+.claim-cell-actions {
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  margin-left: auto;
   padding-right: 0.25rem;
 }
-.claim-row-actions button {
+.claim-cell-actions button {
   white-space: nowrap;
   padding: 0.3rem 0.7rem;
+}
+@media (max-width: 480px) {
+  .claim-rows-header {
+    display: none;
+  }
+  .claim-rows {
+    --claim-grid: 28px minmax(0, 1fr) auto;
+  }
+  .claim-row {
+    grid-template-columns: var(--claim-grid);
+    grid-template-rows: auto auto;
+    row-gap: 0.15rem;
+  }
+  .claim-cell-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .claim-cell-cover {
+    grid-row: 1 / span 2;
+  }
+  .claim-cell-title {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .claim-cell-actions {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+  .claim-cell-store {
+    font-size: 0.6875rem;
+  }
+  .claim-cell-ends {
+    font-size: 0.625rem;
+  }
+}
+/* Fluid exit when a claim is cleared (height/opacity collapse + slide). */
+.claim-clearing {
+  overflow: hidden;
+  pointer-events: none;
+  border-bottom-color: transparent !important;
+  transition:
+    height 0.22s ease,
+    opacity 0.16s ease,
+    transform 0.22s ease,
+    margin 0.22s ease,
+    padding 0.22s ease;
 }
 /* === Table virtual scroll & compact controls === */
 .row-ctl { max-width: 6.5rem; padding: 0.1rem 0.2rem; font-size: 0.7rem; line-height: 1.1; }
@@ -1609,6 +1873,7 @@ body.bulk-bar-open { padding-bottom: 56px; }
   .claim-fire-card,
   .claim-cut-fire { animation: none; }
   .claim-fire-card { box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.4); }
+  .claim-clearing { transition: none; }
   .fh-global-status::before,
   .fh-global-status-tail { transition: none; }
   .fh-global-status-running::before { animation: none; }
@@ -2031,11 +2296,16 @@ html[data-theme="ember"] .brand-logo-mark {
 .sponsored-deal-card.deal-rail-card::before { background: #f59e0b; }
 .sponsored-deal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .sponsored-badge {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  z-index: 3;
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #f59e0b;
+  background: var(--bg-panel);
   border: 1px solid rgba(245, 158, 11, 0.5);
   border-radius: 999px;
   padding: 0.05rem 0.45rem;
@@ -3305,11 +3575,16 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   font-weight: 700;
   color: var(--text-bright);
   text-shadow: 0 2px 8px color-mix(in srgb, var(--bg) 55%, transparent);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   text-align: right;
   max-width: 100%;
+  /* Long titles wrap to at most two balanced lines, then ellipsis. */
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .dash-spotlight-meta { font-size: 11px; color: var(--text-dim); text-align: right; }
 .dash-spotlight-meta strong { color: var(--text-bright); font-weight: 600; }
@@ -5811,6 +6086,7 @@ body {
   /* Scroll when content exceeds the popover cap (scrollbar only when needed). */
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding-top: 2px;
   /* Pull the scroll area into the popover's right padding so the scrollbar
      hugs the right edge; keep a small inset so content doesn't sit under it. */
@@ -6360,6 +6636,7 @@ body {
   min-height: 0;
   max-height: min(28vh, 240px);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 @media (min-width: 1024px) {
   .fetcher-popover .fh-row--popover .fh-log.open .fh-log-body {
@@ -6396,4 +6673,39 @@ body {
   .fetcher-popover .fh-row--popover .fh-log.open {
     max-height: min(40vh, 320px);
   }
+}
+
+/* === Cursor philosophy ===
+ * text: memeable/shareable stat values only (brag stats you'd paste into chat)
+ * default: badges, pills, chips, labels — tooltip is primary communication
+ * pointer / not-allowed / progress: interactive states (defined elsewhere) */
+
+.dash-hero-number,
+.library-count-host [data-count-target],
+.dash-hero-tagline strong,
+.dash-hero-pillar-value,
+.dash-ribbon-headline strong,
+.sale-stat-value,
+.coop-side-stat-value {
+  cursor: text;
+}
+
+.dash-hero-eyebrow,
+.dash-hero-sub,
+.dash-hero-chip,
+.dash-hero-chip strong,
+.dash-hero-pillar-label,
+.dash-ribbon-eyebrow,
+.dash-kpi-label,
+.dash-insight,
+.dash-marquee-item,
+.dash-marquee-label,
+.dash-marquee-icon,
+.dash-versus-badge,
+.sale-stat-label,
+.sale-stat-caption,
+.coop-side-stat-label,
+.fh-stat-value,
+.fh-stat-label {
+  cursor: default;
 }

@@ -242,6 +242,7 @@ from shared.profile_paths import (  # noqa: E402
     profile_root,
     runs_dir,
     set_request_profile_id,
+    sponsors_path,
 )
 from shared.safe_write import safe_write_text  # noqa: E402
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
@@ -731,6 +732,35 @@ def _validate_approved_payload(doc: dict[str, Any]) -> str | None:
     for i, item_id in enumerate(ids):
         if not str(item_id or "").strip():
             return f"ids[{i}] must be a non-empty string"
+    overrides = doc.get("store_overrides")
+    if overrides is not None:
+        if not isinstance(overrides, dict):
+            return "store_overrides must be an object"
+        for key, val in overrides.items():
+            if not str(val or "").strip():
+                return f"store_overrides[{key}] must be a non-empty string"
+    field_overrides = doc.get("field_overrides")
+    if field_overrides is not None:
+        if not isinstance(field_overrides, dict):
+            return "field_overrides must be an object"
+        allowed = {"title", "claim_url", "ends_at"}
+        for key, val in field_overrides.items():
+            if not isinstance(val, dict):
+                return f"field_overrides[{key}] must be an object"
+            for field, field_val in val.items():
+                if field not in allowed:
+                    return f"field_overrides[{key}] unknown key {field!r}"
+                if field in ("title", "claim_url") and not str(field_val or "").strip():
+                    return f"field_overrides[{key}][{field}] must be a non-empty string"
+                if field == "ends_at" and field_val is not None and not str(field_val).strip():
+                    return f"field_overrides[{key}][ends_at] must be a non-empty string"
+    dismissed = doc.get("dismissed")
+    if dismissed is not None:
+        if not isinstance(dismissed, list):
+            return "dismissed must be a list"
+        for i, item_id in enumerate(dismissed):
+            if not str(item_id or "").strip():
+                return f"dismissed[{i}] must be a non-empty string"
     return None
 
 
@@ -2184,9 +2214,9 @@ def _stream_resume_since(handler: SimpleHTTPRequestHandler) -> int:
     return since
 
 
-# Known catalog files the dashboard probes on boot. When a store hasn't been
-# fetched yet the file simply doesn't exist — return an empty catalog instead
-# of 404 so the browser console stays clean during the connection pass.
+# Known catalog / cache-meta files the dashboard probes on boot. When a store or
+# enrichment fetcher hasn't run yet the file simply doesn't exist — return an
+# empty stub instead of 404 so the browser console stays clean on first load.
 _LIBRARY_JSON_RE = re.compile(r"^/games_[a-z0-9_]+\.json$", re.I)
 
 
@@ -2221,7 +2251,11 @@ def _static_class(path_only: str) -> str:
         if parts[1] in PROFILE_CACHE_JSON_FILES:
             return "data"
         return "deny"
-    if _LIBRARY_JSON_RE.match(clean) or clean.lower() in ("/itad_prices.json", "/free_claims.json"):
+    if _LIBRARY_JSON_RE.match(clean) or clean.lower() in (
+        "/itad_prices.json",
+        "/free_claims.json",
+        "/sponsors.json",
+    ):
         return "data"
     return "public"
 
@@ -2294,6 +2328,43 @@ def _maybe_serve_empty_claims_json(handler: SimpleHTTPRequestHandler, path: str)
     return True
 
 
+def _maybe_serve_empty_sponsors_json(handler: SimpleHTTPRequestHandler, path: str) -> bool:
+    if path.lower() != "/sponsors.json":
+        return False
+    if sponsors_path().is_file():
+        return False
+    _send_json(handler, HTTPStatus.OK, {"version": 1, "generated_at": None, "items": []})
+    return True
+
+
+# Minimal stubs when a profile has not run enrichment fetchers yet. Return 200
+# instead of 404 so the browser console stays clean; never fall back to another
+# profile's repo-root cache (see find_profile_cache_http / find_dashboard_cache_meta_404_console).
+_EMPTY_CACHE_META_JSON: dict[str, dict[str, Any]] = {
+    "hltb_map.json": {"fetched_at": None},
+    "steam_review_map.json": {"fetched_at": None},
+    "cross_store_images_meta.json": {"fetched_at": None, "no_steam_match": []},
+    "steam_tags_meta.json": {"fetched_at": None},
+    "fx_rates.json": {"fetched_at": None, "rates": {}},
+}
+
+
+def _maybe_serve_empty_cache_meta_json(handler: SimpleHTTPRequestHandler, path: str) -> bool:
+    parts = [p for p in path.split("/") if p]
+    if len(parts) != 2 or parts[0] != "cache":
+        return False
+    name = parts[1]
+    if name not in PROFILE_CACHE_JSON_FILES:
+        return False
+    if cache_json_path(name).is_file():
+        return False
+    payload = _EMPTY_CACHE_META_JSON.get(name)
+    if payload is None:
+        return False
+    _send_json(handler, HTTPStatus.OK, payload)
+    return True
+
+
 def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] | None, str | None]:
     try:
         length = int(handler.headers.get("Content-Length") or 0)
@@ -2314,7 +2385,8 @@ def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] |
 
 
 def _api_path(handler: SimpleHTTPRequestHandler) -> str:
-    return handler.path.split("?", 1)[0]
+    raw = handler.path.split("?", 1)[0]
+    return raw.rstrip("/") or "/"
 
 
 def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
@@ -2326,9 +2398,27 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
         return True
     if path == "/api/config":
         return True
+    if ADMIN_ENABLED and _is_admin_exempt_api(path):
+        return True
     if not auth_enabled():
         return True
     return _bind_request_user(handler) is not None
+
+
+def _is_admin_exempt_api(path: str) -> bool:
+    """Endpoints the local admin console (BAKLOG_ADMIN=1) may reach without a
+    Supabase bearer token. Covers internal admin routes plus the RunManager
+    status/stream/control endpoints the Jobs run-console polls (the admin console
+    is local-only and does not carry an account JWT)."""
+    if path.startswith("/api/internal/"):
+        return True
+    if path == "/api/runs" or path.startswith("/api/runs/"):
+        return True
+    if path.startswith("/api/run/"):
+        return True
+    if path.startswith("/api/stream/"):
+        return True
+    return False
 
 
 def _profile_admin_blocked() -> bool:
@@ -2460,11 +2550,17 @@ class Handler(SimpleHTTPRequestHandler):
         if clean.startswith("profiles/"):
             # Block direct static access to another profile's tree (use top-level paths).
             return str(profile_root() / ".profile_static_blocked" / clean)
-        if _LIBRARY_JSON_RE.match("/" + clean) or clean in ("itad_prices.json", "free_claims.json"):
+        if _LIBRARY_JSON_RE.match("/" + clean) or clean in (
+            "itad_prices.json",
+            "free_claims.json",
+            "sponsors.json",
+        ):
             if clean == "itad_prices.json":
                 disk = catalog_path("itad_prices.json")
             elif clean == "free_claims.json":
                 disk = free_claims_path()
+            elif clean == "sponsors.json":
+                disk = sponsors_path()
             else:
                 disk = catalog_path(clean)
             if disk.is_file():
@@ -2548,8 +2644,43 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if _maybe_serve_empty_claims_json(self, path_only):
             return
+        if _maybe_serve_empty_sponsors_json(self, path_only):
+            return
+        if _maybe_serve_empty_cache_meta_json(self, path_only):
+            return
         if _maybe_serve_built_index(self, path_only):
             return
+        # #region agent log
+        _cache_parts = [p for p in path_only.split("/") if p]
+        if len(_cache_parts) >= 2 and _cache_parts[0] == "cache" and _cache_parts[1] in PROFILE_CACHE_JSON_FILES:
+            try:
+                _disk = cache_json_path(_cache_parts[1])
+                _active = get_active_profile_id()
+                with open(ROOT / "debug-238065.log", "a", encoding="utf-8") as _agent_f:
+                    _agent_f.write(
+                        json.dumps(
+                            {
+                                "sessionId": "238065",
+                                "runId": "pre-fix",
+                                "hypothesisId": "H1",
+                                "location": "server.py:do_GET",
+                                "message": "profile cache GET",
+                                "data": {
+                                    "path": path_only,
+                                    "profile": _active,
+                                    "disk": str(_disk),
+                                    "profileExists": _disk.is_file(),
+                                    "rootCacheExists": (ROOT / "cache" / _cache_parts[1]).is_file(),
+                                },
+                                "timestamp": int(time.time() * 1000),
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
+            except OSError:
+                pass
+        # #endregion
         super().do_GET()
 
     def do_HEAD(self) -> None:  # noqa: N802 - http.server API
@@ -2575,6 +2706,31 @@ class Handler(SimpleHTTPRequestHandler):
             key = path[len("/api/internal/run/") :].strip("/").split("/", 1)[0]
             self._handle_internal_submit(key)
             return
+        if path == "/api/internal/free-claims/enrich":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_free_claims_enrich()
+            return
+        if path == "/api/internal/free-claims/preview":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            self._handle_internal_free_claims_preview()
+            return
+        if path == "/api/auth/stream-ticket":
+            from shared.supabase_auth import auth_enabled, verify_bearer_user
+
+            # Admin console has no Supabase JWT; mint tickets with localhost CSRF only.
+            if (
+                auth_enabled()
+                and ADMIN_ENABLED
+                and verify_bearer_user(self.headers.get("Authorization")) is None
+                and _request_host_is_local(self)
+                and self.headers.get(_BAKLOG_LOCAL_HEADER) == "1"
+            ):
+                self._handle_stream_ticket_mint()
+                return
         if not _require_api_auth(self):
             return
         if path == "/api/auth/stream-ticket":
@@ -2801,12 +2957,153 @@ class Handler(SimpleHTTPRequestHandler):
             },
         )
 
+    def _handle_internal_free_claims_enrich(self) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        items = payload.get("items")
+        if not isinstance(items, list):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "items must be a list"})
+            return
+        from build_free_claims import _build_cover_lookup, _enrich_item
+
+        cover_lookup = _build_cover_lookup(
+            [raw for raw in items if isinstance(raw, dict)]
+        )
+        last_call = [0.0]
+        enriched: list[dict[str, Any]] = []
+        for raw in items:
+            if not isinstance(raw, dict):
+                enriched.append({})
+                continue
+            enriched.append(_enrich_item(raw, last_call, cover_lookup))
+        _send_json(
+            self,
+            HTTPStatus.OK,
+            {"items": enriched, "count": len(enriched)},
+        )
+
+    def _handle_internal_free_claims_preview(self) -> None:
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        manual_items = payload.get("manual_items")
+        auto_items = payload.get("auto_items")
+        approved = payload.get("approved_ids")
+        if manual_items is not None and not isinstance(manual_items, list):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "manual_items must be a list"})
+            return
+        if auto_items is not None and not isinstance(auto_items, list):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "auto_items must be a list"})
+            return
+        if approved is not None and not isinstance(approved, list):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "approved_ids must be a list"})
+            return
+
+        root = data_root()
+        if manual_items is None:
+            manual_doc = _read_optional_json(root / FREE_CLAIMS_INPUT_PATH) or {}
+            manual_items = manual_doc.get("items") or []
+        if auto_items is None:
+            auto_doc = _read_optional_json(root / FREE_CLAIMS_AUTO_PATH) or {}
+            auto_items = auto_doc.get("items") or []
+        if approved is None:
+            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
+            approved = approved_doc.get("ids") or []
+
+        store_overrides = payload.get("store_overrides")
+        if store_overrides is None:
+            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
+            store_overrides = approved_doc.get("store_overrides") or {}
+        field_overrides = payload.get("field_overrides")
+        if field_overrides is None:
+            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
+            field_overrides = approved_doc.get("field_overrides") or {}
+
+        if not isinstance(store_overrides, dict):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "store_overrides must be an object"})
+            return
+        if not isinstance(field_overrides, dict):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "field_overrides must be an object"})
+            return
+
+        from build_free_claims import preview_publish_items
+
+        approved_ids = {
+            str(item_id).strip()
+            for item_id in approved
+            if str(item_id).strip()
+        }
+        clean_store: dict[str, str] = {}
+        for key, val in store_overrides.items():
+            k = str(key).strip()
+            v = str(val or "").strip().lower()
+            if k and v:
+                clean_store[k] = v
+
+        items = preview_publish_items(
+            manual_items=[it for it in manual_items if isinstance(it, dict)],
+            auto_items_all=[it for it in auto_items if isinstance(it, dict)],
+            approved_ids=approved_ids,
+            store_overrides=clean_store,
+            field_overrides={
+                str(k).strip(): v
+                for k, v in field_overrides.items()
+                if str(k).strip() and isinstance(v, dict)
+            },
+        )
+        # region agent log
+        try:
+            import json as _dj
+            import time as _dt
+            from pathlib import Path as _DP
+            _approved_auto = [
+                it for it in auto_items
+                if isinstance(it, dict) and str(it.get("id") or "").strip() in approved_ids
+            ]
+            _in_hdr = sum(1 for it in _approved_auto if str(it.get("header_image") or "").strip())
+            _in_rev = sum(1 for it in _approved_auto if it.get("review_percent") is not None)
+            _out_hdr = sum(1 for it in items if str(it.get("header_image") or "").strip())
+            _out_rev = sum(1 for it in items if it.get("review_percent") is not None)
+            _DP(__file__).with_name("debug-77d804.log").open("a", encoding="utf-8").write(
+                _dj.dumps({
+                    "sessionId": "77d804",
+                    "location": "server.py:_handle_internal_free_claims_preview",
+                    "message": "preview enrichment in/out counts",
+                    "data": {
+                        "approved_auto_count": len(_approved_auto),
+                        "in_header": _in_hdr, "in_review": _in_rev,
+                        "out_items": len(items), "out_header": _out_hdr, "out_review": _out_rev,
+                    },
+                    "timestamp": int(_dt.time() * 1000),
+                    "hypothesisId": "H2",
+                    "runId": "post-fix",
+                }) + "\n"
+            )
+        except Exception:
+            pass
+        # endregion
+        _send_json(self, HTTPStatus.OK, {"items": items, "count": len(items)})
+
     def _handle_internal_free_claims_get(self) -> None:
         root = data_root()
         approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
         approved_ids = approved_doc.get("ids") or []
         if not isinstance(approved_ids, list):
             approved_ids = []
+        store_overrides = approved_doc.get("store_overrides")
+        if not isinstance(store_overrides, dict):
+            store_overrides = {}
+        field_overrides = approved_doc.get("field_overrides")
+        if not isinstance(field_overrides, dict):
+            field_overrides = {}
+        dismissed = approved_doc.get("dismissed")
+        if not isinstance(dismissed, list):
+            dismissed = []
         _send_json(
             self,
             HTTPStatus.OK,
@@ -2814,6 +3111,9 @@ class Handler(SimpleHTTPRequestHandler):
                 "input": _read_optional_json(root / FREE_CLAIMS_INPUT_PATH) or {"items": []},
                 "auto": _read_optional_json(root / FREE_CLAIMS_AUTO_PATH),
                 "approved": approved_ids,
+                "store_overrides": store_overrides,
+                "field_overrides": field_overrides,
+                "dismissed": dismissed,
                 "built": _read_optional_json(root / FREE_CLAIMS_BUILT_PATH),
             },
         )
@@ -2847,12 +3147,57 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
             return
         ids = [str(item_id).strip() for item_id in payload.get("ids") or [] if str(item_id).strip()]
+        id_set = set(ids)
+        overrides: dict[str, str] = {}
+        for key, val in (payload.get("store_overrides") or {}).items():
+            k = str(key).strip()
+            v = str(val or "").strip().lower()
+            if k and v and k in id_set:
+                overrides[k] = v
+        field_overrides_out: dict[str, dict[str, str]] = {}
+        allowed_fields = {"title", "claim_url", "ends_at"}
+        for key, val in (payload.get("field_overrides") or {}).items():
+            k = str(key).strip()
+            if not k or k not in id_set or not isinstance(val, dict):
+                continue
+            cleaned: dict[str, str] = {}
+            for field, field_val in val.items():
+                if field not in allowed_fields:
+                    continue
+                text = str(field_val or "").strip()
+                if text:
+                    cleaned[field] = text
+            if cleaned:
+                field_overrides_out[k] = cleaned
+        dismissed: list[str] = []
+        seen_dismissed: set[str] = set()
+        for item_id in payload.get("dismissed") or []:
+            d = str(item_id).strip()
+            if d and d not in id_set and d not in seen_dismissed:
+                dismissed.append(d)
+                seen_dismissed.add(d)
+        out: dict[str, Any] = {"ids": ids}
+        if overrides:
+            out["store_overrides"] = overrides
+        if field_overrides_out:
+            out["field_overrides"] = field_overrides_out
+        if dismissed:
+            out["dismissed"] = dismissed
         out_path = data_root() / FREE_CLAIMS_APPROVED_PATH
         out_path.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(
             out_path,
-            json.dumps({"ids": ids}, indent=2, ensure_ascii=False),
+            json.dumps(out, indent=2, ensure_ascii=False),
         )
+        # #region agent log
+        try:
+            import time
+            _log_path = data_root() / "debug-5ea56e.log"
+            with _log_path.open("a", encoding="utf-8") as _lf:
+                _lf.write(json.dumps({"sessionId": "5ea56e", "location": "server.py:_handle_internal_free_claims_approved_put", "message": "approved written", "data": {"idsCount": len(ids), "fieldOverrideKeys": list(field_overrides_out.keys()), "titleOverrides": {k: v.get("title") for k, v in field_overrides_out.items() if isinstance(v, dict) and v.get("title")}}, "timestamp": int(time.time() * 1000), "hypothesisId": "H2"}) + "\n")
+        except OSError:
+            pass
+        # #endregion
         _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(ids)})
 
     def _handle_internal_sponsors_get(self) -> None:
@@ -3689,7 +4034,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if time.time() - last_ping > 30:
                     self._sse_write_raw(b": keepalive\n\n")
                     last_ping = time.time()
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as exc:
             # Browser closed the SSE (tab switch, reload, navigate). Not an error.
             pass
         finally:

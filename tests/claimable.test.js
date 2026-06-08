@@ -10,6 +10,10 @@ import {
   isClaimOwned,
   stripClaimTitleDecorations,
   dismissClaim,
+  claimAttributionHtml,
+  claimSourceHtml,
+  feedGeneratedAt,
+  pickNewerFeed,
 } from '../js/claimable.js';
 
 function resetState() {
@@ -45,6 +49,31 @@ const sampleItems = [
 
 beforeEach(() => {
   resetState();
+});
+
+describe('pickNewerFeed', () => {
+  it('prefers the feed with the newer generated_at', () => {
+    const older = {
+      generated_at: '2026-06-07T22:11:50.572130+00:00',
+      items: [{ id: 'stale', store: 'epic', title: 'Stale', claim_url: 'https://example.com/a' }],
+    };
+    const newer = {
+      generated_at: '2026-06-08T03:38:12.049819+00:00',
+      items: [{ id: 'fresh', store: 'epic', title: 'Fresh', claim_url: 'https://example.com/b' }],
+    };
+    expect(pickNewerFeed(older, newer)?.items?.[0]?.id).toBe('fresh');
+    expect(pickNewerFeed(newer, older)?.items?.[0]?.id).toBe('fresh');
+  });
+
+  it('falls back when only one feed has items', () => {
+    const empty = { generated_at: '2099-01-01T00:00:00Z', items: [] };
+    const only = {
+      generated_at: '2026-06-01T00:00:00Z',
+      items: [{ id: 'only', store: 'steam', title: 'Only', claim_url: 'https://example.com/c' }],
+    };
+    expect(pickNewerFeed(empty, only)?.items?.[0]?.id).toBe('only');
+    expect(feedGeneratedAt({ fetched_at: '2026-06-02T00:00:00Z' })).toBe(Date.parse('2026-06-02T00:00:00Z'));
+  });
 });
 
 describe('getVisibleClaims', () => {
@@ -123,6 +152,53 @@ describe('diffClaims', () => {
     const prev = new Set();
     const { newCount } = diffClaims(prev, sampleItems);
     expect(newCount).toBe(2);
+  });
+});
+
+describe('claimAttributionHtml', () => {
+  it('returns empty string when attribution is missing', () => {
+    expect(claimAttributionHtml()).toBe('');
+    expect(claimAttributionHtml([])).toBe('');
+  });
+
+  it('renders GamerPower credit with link', () => {
+    const html = claimAttributionHtml(['GamerPower.com']);
+    expect(html).toContain('claim-attribution');
+    expect(html).toContain('Giveaway data via');
+    expect(html).toContain('href="https://www.gamerpower.com/"');
+    expect(html).toContain('GamerPower.com');
+  });
+
+  it('joins multiple attribution sources', () => {
+    const html = claimAttributionHtml(['GamerPower.com', 'IsThereAnyDeal']);
+    expect(html).toContain('GamerPower.com');
+    expect(html).toContain('IsThereAnyDeal');
+    expect(html).toContain(' · ');
+  });
+});
+
+describe('claimSourceHtml', () => {
+  it('returns empty string for missing or unknown source', () => {
+    expect(claimSourceHtml()).toBe('');
+    expect(claimSourceHtml('')).toBe('');
+    expect(claimSourceHtml('mystery')).toBe('');
+  });
+
+  it('renders a plain "via <provider>" badge by default', () => {
+    const html = claimSourceHtml('gamerpower');
+    expect(html).toContain('claim-source');
+    expect(html).toContain('via GamerPower');
+    expect(html).not.toContain('<a ');
+  });
+
+  it('renders a linked badge when tag is "a"', () => {
+    const html = claimSourceHtml('itad', { tag: 'a' });
+    expect(html).toContain('IsThereAnyDeal');
+    expect(html).toContain('href="https://isthereanydeal.com/"');
+  });
+
+  it('is case-insensitive on the source key', () => {
+    expect(claimSourceHtml('EPIC')).toContain('via Epic');
   });
 });
 

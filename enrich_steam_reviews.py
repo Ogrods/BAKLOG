@@ -11,7 +11,6 @@ itch.io: only videogame rows per itch_game.itch_is_videogame (skips tools, asset
 """
 
 import json
-import re
 import sys
 import time
 from collections.abc import Callable
@@ -25,6 +24,7 @@ from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_t
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
+from shared.steam_match import normalize_title, pick_appid
 from steam_client import SteamClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -60,52 +60,6 @@ def _humble_steam_appid(g: dict) -> int | None:
         return int(raw)
     except (TypeError, ValueError):
         return None
-
-
-def _number_tokens(s: str) -> set[str]:
-    return set(re.findall(r"\b(\d+)\b", s))
-
-
-_SPINOFF_MARKERS = re.compile(
-    r"\b(director|artbook|soundtrack|wallpaper|dlc|upgrade|deluxe|bundle|pack|skin|ost"
-    r"|ascended|relaunched|reloaded)\b"
-)
-
-
-def _close_enough_title(target: str, candidate: str) -> bool:
-    """Substring fallback for Steam store search — reject sequels and spin-offs."""
-    if not candidate:
-        return False
-    if candidate == target:
-        return True
-    if candidate not in target and target not in candidate:
-        return False
-    # e.g. "death stranding" must not match "death stranding 2 on beach"
-    if _number_tokens(candidate) - _number_tokens(target):
-        return False
-    if not candidate.startswith(target):
-        return False
-    suffix = candidate[len(target) :].strip()
-    if not suffix:
-        return True
-    if _SPINOFF_MARKERS.search(suffix):
-        return False
-    # Allow short subtitles only (e.g. "death stranding 2" -> "… on beach")
-    return len(suffix.split()) <= 2
-
-
-def normalize(name: str) -> str:
-    s = (name or "").lower()
-    s = re.sub(r"[\u2122\u00ae\u00a9]", "", s)
-    s = re.sub(r"[^a-z0-9]+", " ", s)
-    s = re.sub(
-        r"\b(remastered|edition|complete|gold|definitive|enhanced|classic|goty|"
-        r"of the year|game of the year|special|standard|deluxe|collection|"
-        r"anthology|pack|the|hd|remake)\b",
-        " ",
-        s,
-    )
-    return re.sub(r"\s+", " ", s).strip()
 
 
 def load_mapping() -> dict:
@@ -148,16 +102,7 @@ def steam_search(name: str) -> int | None:
         return None
     if not items:
         return None
-    target = normalize(name)
-    for item in items:
-        if normalize(item.get("name", "")) == target:
-            return int(item["id"])
-    # fall back to first result if its title is "close enough"
-    first = items[0]
-    first_norm = normalize(first.get("name", ""))
-    if first_norm and _close_enough_title(target, first_norm):
-        return int(first["id"])
-    return None
+    return pick_appid(items, name)
 
 
 def steam_appids_by_id() -> set[int]:

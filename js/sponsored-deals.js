@@ -50,18 +50,23 @@ async function fetchJson(path) {
     const res = await dataFetch(`${path}?t=${Date.now()}`);
     if (!res.ok) return null;
     return await res.json();
-  } catch {
+  } catch (_) {
     return null;
   }
 }
 
 export async function loadSponsoredDeals() {
   let doc = await fetchJson(SPONSORS_LOCAL_PATH);
+  let source = 'local';
   if (!doc?.items?.length) {
     doc = await fetchJson(SPONSORS_FALLBACK_PATH);
+    source = 'fallback';
   }
   const items = Array.isArray(doc?.items) ? doc.items : [];
   state.sponsoredDeals = items.filter(it => it && typeof it === 'object' && it.id && it.title);
+  // #region agent log
+  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0ffc'},body:JSON.stringify({sessionId:'fc0ffc',hypothesisId:'E',location:'sponsored-deals.js:loadSponsoredDeals',message:'sponsors feed',data:{source,rawItems:items.length,kept:state.sponsoredDeals.length},timestamp:Date.now()})}).catch(()=>{}); } catch(_){}
+  // #endregion
   return state.sponsoredDeals;
 }
 
@@ -82,6 +87,9 @@ export function getEligibleSponsoredDeal() {
     }
     return true;
   });
+  // #region agent log
+  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0ffc'},body:JSON.stringify({sessionId:'fc0ffc',hypothesisId:'D',location:'sponsored-deals.js:getEligibleSponsoredDeal',message:'sponsor eligibility',data:{total:(state.sponsoredDeals||[]).length,eligible:eligible.length,chosenId:eligible[0]?.id||null,hideSponsored:!!state.prefs?.hideSponsoredDeals,ownedNormSize:state.ownedNormNames?.size||0},timestamp:Date.now()})}).catch(()=>{}); } catch(_){}
+  // #endregion
   if (!eligible.length) return null;
   eligible.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
   return eligible[0];

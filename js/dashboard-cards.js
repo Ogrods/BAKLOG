@@ -332,6 +332,9 @@ export function buildWishlistStatsHtml() {
   const avgCut = onSale.length ? Math.round(cutSum / onSale.length) : 0;
   const steals = wl.filter(isStealDeal);
 
+  // #region agent log
+  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0ffc'},body:JSON.stringify({sessionId:'fc0ffc',hypothesisId:'C',location:'dashboard-cards.js:buildWishlistStatsHtml',message:'deals stats inputs',data:{wl:wl.length,onSale:onSale.length,withDeals:withDeals.length,hasTopDeal:!!topDeal,topDealName:topDeal?.name||null,hasPricing,avgCut,bestCut,steals:steals.length,itadKeys:Object.keys(state.itadByKey||{}).length},timestamp:Date.now()})}).catch(()=>{}); } catch(_){}
+  // #endregion
   return [
     topDeal ? dealHeroCardHtml(topDeal) : dealHeroEmptyHtml(),
     dealSaleScoreboardCardHtml({

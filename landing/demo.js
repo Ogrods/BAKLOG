@@ -83,6 +83,7 @@
     { icon: "S", cls: "is-emerald", label: "Steam", text: "<strong>257</strong> games synced", tip: "Games imported from your Steam library." },
     { icon: "G", cls: "is-violet", label: "GOG", text: "<strong>673</strong> games synced", tip: "Games imported from your GOG library." },
     { icon: "E", cls: "", label: "Epic", text: "<strong>259</strong> free claims counted", tip: "Epic Games Store free weekly claims counted in your library." },
+    { icon: "F", cls: "is-sky", label: "Free", text: "<strong>12</strong> giveaways live", tip: "Claimable Now: active free games aggregated from Epic, GamerPower, and IsThereAnyDeal." },
     { icon: "D", cls: "is-amber", label: "Deals", text: "<strong class=\"dash-marquee-cut deal-cut-huge\">-80%</strong> on Rustbloom", tip: "Biggest active discount on a wishlist game right now." },
     { icon: "P", cls: "is-rose", label: "PSN", text: "<strong>597</strong> titles imported", tip: "Titles imported from your PlayStation library." },
     { icon: "B", cls: "is-emerald", label: "Backlog", text: "<strong>2,847h</strong> to clear", tip: "Estimated HowLongToBeat main-story hours across your backlog." },

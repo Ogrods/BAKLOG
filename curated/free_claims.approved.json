@@ -1,0 +1,76 @@
+{
+  "ids": [
+    "gamerpower-3673",
+    "gamerpower-3672",
+    "gamerpower-3671",
+    "gamerpower-2386",
+    "gamerpower-3287",
+    "gamerpower-3266",
+    "gamerpower-3096",
+    "gamerpower-3446",
+    "gamerpower-2204",
+    "gamerpower-1604",
+    "itad-9dcfdf2b0b35",
+    "itad-1b0433806065",
+    "itad-de23882e1f39",
+    "itad-b07aac9ebd26",
+    "itad-dd5b5b16e035"
+  ],
+  "field_overrides": {
+    "gamerpower-3673": {
+      "title": "Relaxing Simulator"
+    },
+    "gamerpower-3672": {
+      "title": "Remothered: Broken Porcelain"
+    },
+    "gamerpower-3671": {
+      "title": "Flufftopia"
+    },
+    "gamerpower-2386": {
+      "title": "Tell Me Why"
+    },
+    "gamerpower-3287": {
+      "title": "Mr.Brocco And Co"
+    },
+    "gamerpower-3266": {
+      "title": "Carlos the Taco"
+    },
+    "gamerpower-3096": {
+      "title": "Madness Inside"
+    },
+    "gamerpower-3446": {
+      "title": "GigaBash"
+    },
+    "gamerpower-2204": {
+      "title": "Dual Chroma: Academy Carols"
+    },
+    "itad-9dcfdf2b0b35": {
+      "title": "Remothered: Tormented Fathers"
+    },
+    "itad-1b0433806065": {
+      "title": "Die Young: Prologue -"
+    },
+    "itad-de23882e1f39": {
+      "title": "Smiley Dusty at Itch.io"
+    },
+    "itad-b07aac9ebd26": {
+      "title": "Wytchwood"
+    },
+    "itad-dd5b5b16e035": {
+      "title": "The Brave Little Cloud -"
+    }
+  },
+  "dismissed": [
+    "itad-239f10d33b17",
+    "gamerpower-3674",
+    "epic-rogue-waters-9764d6",
+    "gamerpower-3667",
+    "gamerpower-3665",
+    "epic-songs-of-conquest",
+    "gamerpower-3668",
+    "itad-8b45ae1603ee",
+    "itad-98730029b14b",
+    "itad-d85d5bb4128d",
+    "gamerpower-3272"
+  ]
+}

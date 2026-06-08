@@ -227,6 +227,11 @@ export function bindEvents() {
       claimable.handleClaimableBannerClick(e);
     });
     document.getElementById('claimDetailDialog')?.addEventListener('click', (e) => {
+      const dlg = e.currentTarget;
+      if (e.target === dlg) {
+        claimable.closeClaimDetail();
+        return;
+      }
       if (e.target.closest('[data-claim-clear]')) claimable.handleClaimableClick(e);
     });
   });

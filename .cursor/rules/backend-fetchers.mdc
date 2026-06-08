@@ -1,0 +1,36 @@
+---
+description: Python server, fetchers, auth, and profile paths
+globs: server.py,fetch_*.py,fetchers/**,build_free_claims.py,fetch_claim_sources.py,auth/**,shared/**,enrich_*.py,baklog_fetcher_dispatch.py
+alwaysApply: false
+---
+
+# Backend & fetchers
+
+## Fetcher contract
+
+- Register in `fetchers/manifest.json` (`key`, `script`, `args`, optional `requires`, `group`).
+- Implement `main() -> int`; use `fetchers/_progress.py` for exit codes and heartbeats.
+- Write output atomically via `shared/profile_paths.resolve_catalog_path()`.
+- Resolve credentials with `auth.resolve_env()`; call `auth.mark_invalid()` on auth failure (exit 4).
+
+## Server API groups
+
+- `/api/run/<key>`, `/api/stream/<run_id>` — fetcher jobs (RunManager, queue cap 1 active)
+- `/api/personal`, `/api/profiles/*` — personal data + multi-profile
+- `/api/auth/*` — CDP sign-in, credentials, stream tickets
+- `/api/internal/*` — admin only (`BAKLOG_ADMIN=1`)
+
+## Auth storage
+
+- `auth/secrets.py` — AES-GCM `cache/auth/secrets.bin`; master key in OS keyring
+- `auth/runner.py` + `auth/cdp_browser.py` — headed CDP flows per provider
+
+## Claim pipeline (maintainer)
+
+- `fetch_claim_sources.py` → `curated/free_claims.auto.json`
+- `build_free_claims.py` → `landing/free-claims.json` (+ optional profile copy)
+- Manual input: `free-claims.input.json`
+
+## Groups in manifest
+
+`library` (12 stores), `wishlist` (8), `prices` (ITAD, free claims), `enrich` (HLTB, reviews, covers, co-op tags)

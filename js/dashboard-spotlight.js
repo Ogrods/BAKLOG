@@ -537,13 +537,34 @@ function spotlightJumpDest(g) {
   return g.store === 'wishlist' ? 'Wishlist' : g.store === 'itch' ? 'itch.io' : 'Library';
 }
 
+// Secondary stat for the default spotlight meta line. Prefers HLTB main time,
+// but when a game has no HLTB estimate we substitute the next most useful stat
+// (playtime → completion → release year) instead of rendering a bare "? main".
+function spotlightSecondaryStat(g) {
+  const hltb = hltbMain(g);
+  if (hltb != null) {
+    return `<strong>${escapeHtml(`${Math.round(hltb)}h`)}</strong> main`;
+  }
+  const playtime = combinedPlaytime(g);
+  if (playtime > 0) {
+    return `<strong>${Math.round(playtime / 60)}h</strong> played`;
+  }
+  const trophy = g.trophy_progress;
+  if (trophy != null && trophy > 0) {
+    return `<strong>${Math.round(trophy)}%</strong> complete`;
+  }
+  const released = parseReleaseForSort(g.release_date);
+  if (released > 0) {
+    return `<strong>${new Date(released).getFullYear()}</strong> release`;
+  }
+  return null;
+}
+
 export function spotlightInnerHtml(g) {
   const candidates = spotlightArtCandidates(g);
   const art = candidates[0] || "";
   const candidateAttr = escapeAttr(candidates.join("|"));
   const rating = ratingValue(g);
-  const hltb = hltbMain(g);
-  const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
   const status = (getPersonal(g).status) || 'backlog';
   const statusLabel = g.store === 'wishlist'
     ? 'on your wishlist'
@@ -555,12 +576,13 @@ export function spotlightInnerHtml(g) {
   const storeKey = normalizeGame(g).store;
   const storeGlyph = storeLogoHtml(storeKey, { size: 'sm', title: storeDisplayName(storeKey), className: 'dash-spotlight-store' });
   const customMeta = g._spotlightReason?.metaParts;
+  const secondaryStat = spotlightSecondaryStat(g);
   const metaParts = customMeta?.length
     ? [storeGlyph, ...customMeta]
     : [
       storeGlyph,
       `<strong>${rating}%</strong> review`,
-      `<strong>${escapeHtml(hltbStr)}</strong> main`,
+      ...(secondaryStat ? [secondaryStat] : []),
       escapeHtml(statusLabel),
     ];
   return `

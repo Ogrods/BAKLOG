@@ -8,3 +8,6 @@ tracker.html
 preview-bootstrap.html
 IP.md
 tools/make_ads.py
+.cursor/rules/
+.cursor/hooks.json
+scripts/hooks/remind-tracker.py

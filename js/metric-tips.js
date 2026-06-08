@@ -133,6 +133,7 @@ export const METRIC_TIPS = {
   'backlog in work-weeks': 'Backlog HLTB hours expressed in 40-hour work-weeks.',
   'at historical low now': 'Wishlist items currently at an all-time or yearly low.',
   'oldest wishlist': 'Wishlist item waiting the longest.',
+  'gay character: you, the player.': 'Rare MGSV codec easter egg — you are the gay character.',
 
   // Insight-only concepts (leading text before colon)
   'Biggest backlog': 'Genre with the most backlog HLTB hours stacked up.',

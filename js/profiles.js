@@ -245,6 +245,24 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Forget the target profile's last-open tab so switching always lands on the
+ * dashboard instead of restoring whatever view that profile was left on.
+ */
+function resetTabMemoryForProfile(id) {
+  try {
+    const suffix = id && id !== 'default' ? `:${id}` : '';
+    const key = `${PREFS_KEY}${suffix}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const prefs = JSON.parse(raw);
+    if (prefs && prefs.activeView && prefs.activeView !== 'dashboard') {
+      prefs.activeView = 'dashboard';
+      localStorage.setItem(key, JSON.stringify(prefs));
+    }
+  } catch (_) { /* ignore */ }
+}
+
 async function switchProfile(id, pin) {
   closeMenu();
   const { personalStore } = await import('./personal-store.js');
@@ -253,6 +271,7 @@ async function switchProfile(id, pin) {
   if (pin) body.pin = pin;
   await api('POST', '/api/profiles/active', body);
   localStorage.setItem(ACTIVE_PROFILE_LS, id);
+  resetTabMemoryForProfile(id);
   location.reload();
 }
 

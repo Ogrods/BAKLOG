@@ -503,7 +503,11 @@ def test_enrich_item_upgrades_gamerpower_cover_to_portrait(
 def test_enrich_item_borrows_cover_from_sibling_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(bfc, "_resolve_steam_appid_by_title", lambda title, lc: None)
+    monkeypatch.setattr(
+        bfc,
+        "_resolve_steam_appid_by_title",
+        lambda title, lc, blurb=None: None,
+    )
     lookup = bfc._build_cover_lookup(
         [
             {
@@ -574,3 +578,66 @@ def test_preview_publish_items_merges_without_network() -> None:
     ids = {it["id"] for it in items}
     assert ids == {"manual-1", "epic-ok"}
     assert all(it.get("claim_url") and it.get("store") for it in items)
+
+
+def test_itad_slug_from_blurb() -> None:
+    blurb = '<a href="https://isthereanydeal.com/game/wytchwood/info/">Wytchwood</a>'
+    assert bfc._itad_slug_from_blurb(blurb) == "wytchwood"
+
+
+def test_resolve_steam_appid_by_title_uses_itad_slug_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_search(term: str, lc: list[float]) -> list[dict]:
+        calls.append(term)
+        if term == "wytchwood":
+            return [{"id": 729000, "name": "Wytchwood"}]
+        return []
+
+    monkeypatch.setattr(bfc, "_steam_storesearch", fake_search)
+    appid = bfc._resolve_steam_appid_by_title(
+        "Obscure Giveaway Title",
+        [0.0],
+        blurb='<a href="https://isthereanydeal.com/game/wytchwood/info/">Wytchwood</a>',
+    )
+    assert appid == 729000
+    assert calls == ["Obscure Giveaway Title", "wytchwood"]
+
+
+def test_merge_enriched_items_into_auto_feed(tmp_path: Path) -> None:
+    auto_path = tmp_path / "free_claims.auto.json"
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "itad-b07aac9ebd26",
+                        "store": "epic",
+                        "title": "Wytchwood",
+                        "claim_url": "https://example.com/w",
+                        "header_image": None,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    enriched = [
+        {
+            "id": "itad-b07aac9ebd26",
+            "header_image": bfc._steam_portrait_cover(729000),
+            "steam_appid": 729000,
+            "review_percent": 93,
+            "genres": ["Adventure"],
+        }
+    ]
+    updated = bfc.merge_enriched_items_into_auto_feed(auto_path, enriched)
+    assert updated == 1
+    saved = json.loads(auto_path.read_text(encoding="utf-8"))
+    row = saved["items"][0]
+    assert row["header_image"] == bfc._steam_portrait_cover(729000)
+    assert row["steam_appid"] == 729000
+    assert row["review_percent"] == 93
+    assert row["genres"] == ["Adventure"]

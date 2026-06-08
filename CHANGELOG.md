@@ -24,7 +24,19 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **Claim source badge reads "ITAD"** — the per-claim "via …" attribution badge for IsThereAnyDeal-sourced giveaways now shows the short **ITAD** label (`CLAIM_SOURCE_META.itad` in `js/claimable.js`), matching the abbreviation used elsewhere in the UI. The hover tooltip and source link are unchanged.
 - **Auto-refresh stores older than 24h now defaults on** — the Connections pref `autoFetchStale24h` ships enabled (`js/prefs.js`); new installs quietly refresh one stale store per ~30 min while the app is open, and the toggle in `index.html` is checked by default. Still user-disablable. README and landing copy updated to match.
+- **Bulk "Run stale" button hidden** — the fetcher-health bulk queue sweep conflicts with the no-queue free-tier philosophy, so the button is no longer rendered (`staleButtonHtml` is empty in `js/fetcher-health.js`). `runAllStale()` and its click handler stay intact (dormant) for a one-line re-enable. On-demand bulk refresh is repositioned as a planned paid-tier perk; landing page gains a "Paid tier (planned)" premium box and the FAQ lists the run-stale queue sweep. Single-store 24h auto-refresh stays free.
+
+### Fixed
+
+- **Agent debug instrumentation purged** — removed leftover Cursor debug-mode `fetch()` POSTs to dead local ingest ports (`127.0.0.1:7320`, `:7802`) and the `debug-3a594f.log` writer in `server.py` from `js/claimable.js`, `js/sponsored-deals.js`, `js/dashboard.js`, `js/dashboard-charts.js`, `js/dashboard-cards.js`, and `js/library-load.js`. These were firing on normal dashboard loads and spamming `ERR_CONNECTION_REFUSED`.
+- **`/api/runs/cancel` profile scope** — when Supabase auth is on, cancel-all / force-reset now scopes to the signed-in user's profile via `_bind_request_user()` instead of the local `profiles/index.json` active id (which broke per-user isolation tests and could cancel another account's runs).
+- **Pytest env isolation** — `tests/conftest.py` clears `BAKLOG_LOCAL_PROFILES`, `BAKLOG_PROFILE`, and `BAKLOG_PLAN` from dev `.env` so CI/local runs match the default-profile assumptions in auth and enricher tests.
+
+### Added
+
+- **Plan / entitlement (moat-preserving ads)** — `shared/entitlement.py` resolves `free` vs `pro` (env override → signed Supabase JWT claim → local `license.json` honor-system file). `GET /api/config` exposes `plan`; `js/auth-gate.js` `isPro()` gates the sponsored deal slot (`getEligibleSponsoredDeal` returns null for pro). Paid tier removes ads without reversing the local-first privacy moat; hosted feed coupling + Ed25519 offline license deferred.
 
 ### Fixed
 

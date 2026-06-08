@@ -419,6 +419,35 @@
     .card li { margin: 0.3rem 0; }
     .card li::marker { color: var(--accent); }
 
+    /* Wide premium callout — spans the full features grid as an intentional box */
+    .card--premium {
+      grid-column: 1 / -1;
+      border-color: var(--accent);
+      background: linear-gradient(160deg, rgba(56, 189, 248, 0.12), var(--bg-panel));
+    }
+    .card--premium .card-head {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .card--premium h3 { margin-bottom: 0; }
+    .premium-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      padding: 0.15rem 0.55rem;
+      white-space: nowrap;
+    }
+    @media (min-width: 900px) {
+      .card--premium ul { columns: 2; column-gap: 2rem; }
+    }
+
     /* How it works — equal-height cards so uneven copy stays balanced */
     .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; counter-reset: step; align-items: stretch; }
     .step {
@@ -589,7 +618,7 @@
       <span class="hero-store" style="--store-bg:#f05556;--store-glyph:url('assets/store-logos/ea.svg')"><span class="hero-store-glyph"></span></span>
     </div>
 
-    <p class="hero-store-caption">No games yet? Start free with Epic, GOG, or&nbsp;Prime.</p>
+    <p class="hero-store-caption">No games yet? Start free with Epic, GOG, or&nbsp;Prime — Epic's weekly free game is claimable from your phone.</p>
 
     <form class="waitlist" id="waitlist" novalidate>
       <div class="waitlist-row">
@@ -645,7 +674,7 @@
         <div class="step">
           <div class="num">1</div>
           <h3>Claim this week's free games</h3>
-          <p>Epic, Prime Gaming, GOG, Steam keys, and more drop free games every week. BAKLOG surfaces them in <strong>Claimable Now</strong> — a maintainer-curated feed aggregated from the Epic Store, GamerPower, and IsThereAnyDeal — right in your dashboard, so you never miss a drop.</p>
+          <p>Epic, Prime Gaming, GOG, Steam keys, and more drop free games every week. Epic's weekly freebie can be claimed straight from the Epic Games Store Mobile app on supported devices — no computer required — and the mobile store runs its own giveaways too. BAKLOG surfaces active drops in <strong>Claimable Now</strong> — a maintainer-curated feed aggregated from the Epic Store, GamerPower, and IsThereAnyDeal — right in your dashboard, so you never miss a drop.</p>
         </div>
         <div class="step">
           <div class="num">2</div>
@@ -729,9 +758,10 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
           </div>
           <h3>Free games, surfaced</h3>
-          <p><strong>Claimable Now</strong> aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard, skipping anything you already own.</p>
+          <p><strong>Claimable Now</strong> aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard, skipping anything you already own. Epic's weekly free game is claimable from the Epic Games Store Mobile app on supported devices — no PC needed.</p>
           <ul>
             <li>Maintainer-approved feed of active giveaways (auto-discovered + hand-curated)</li>
+            <li>Epic Games Store Mobile runs its own giveaways — claim from your phone, count on your PC</li>
             <li>Notification banner when new free games drop</li>
             <li>Ownership-aware: hides titles already in your library</li>
             <li>Free tier — no paywall on the feed; GamerPower attribution when applicable</li>
@@ -748,6 +778,22 @@
             <li>Local-first; runs on your machine</li>
             <li>Credentials encrypted, never uploaded</li>
             <li>Zero telemetry. MIT-licensed.</li>
+          </ul>
+        </article>
+
+        <article class="card card--premium">
+          <div class="card-head">
+            <h3>Paid tier</h3>
+            <span class="premium-badge">Planned</span>
+          </div>
+          <p>The free tier keeps everything you need to import, browse, and decide what to play next. The optional <strong>$5/mo</strong> ($50/yr) tier layers on power-user conveniences — none of today's free features ever move behind it.</p>
+          <ul>
+            <li>On-demand bulk refresh — the "run stale" queue sweep, off by default to honor the no-queue free tier</li>
+            <li>Scheduled stale-store refresh without keeping the app open</li>
+            <li>Cloud sync across machines</li>
+            <li>No sponsored deal cards</li>
+            <li>Priority deep achievement/trophy enrichment</li>
+            <li>Deal &amp; watchlist alerts</li>
           </ul>
         </article>
       </div>
@@ -854,15 +900,15 @@
         </details>
         <details>
           <summary>What's in the paid tier?</summary>
-          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> (planned): no sponsored deal cards, cloud sync across machines, scheduled stale-store refresh without keeping the app open, priority deep achievement/trophy API enrichment, and deal/watchlist alerts. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
+          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> (planned): no sponsored deal cards, cloud sync across machines, on-demand bulk refresh (the "run stale" queue sweep), scheduled stale-store refresh without keeping the app open, priority deep achievement/trophy API enrichment, and deal/watchlist alerts. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
         </details>
         <details>
           <summary>Does BAKLOG show me free games to claim?</summary>
-          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard. A notification banner alerts you when new drops land. The feed is ownership-aware — it skips games you already own somewhere in your library. Included on the free tier.</p>
+          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard. Epic's weekly free game can be claimed from the Epic Games Store Mobile app on supported devices — no computer required — and the mobile store runs its own giveaways too. A notification banner alerts you when new drops land. The feed is ownership-aware — it skips games you already own somewhere in your library. Included on the free tier.</p>
         </details>
         <details>
           <summary>I don't really own games yet - is BAKLOG still for me?</summary>
-          <p>Yes. You don't need a paid library to start. Steam free-to-play, Epic's weekly free game, Prime Gaming key drops, GOG's periodic giveaways, StarCraft on Battle.net, Rainbow Six Siege on Ubisoft, and pay-what-you-want itch.io indies are all free entry points. BAKLOG tracks your collection from the first claim — and <strong>Claimable Now</strong> aggregates the week's free drops from Epic, GamerPower, and IsThereAnyDeal so you never miss one.</p>
+          <p>Yes. You don't need a paid library to start. Steam free-to-play, Epic's weekly free game (claimable from the Epic Games Store Mobile app on supported devices — no PC needed), Prime Gaming key drops, GOG's periodic giveaways, StarCraft on Battle.net, Rainbow Six Siege on Ubisoft, and pay-what-you-want itch.io indies are all free entry points. BAKLOG tracks your collection from the first claim — and <strong>Claimable Now</strong> aggregates the week's free drops from Epic, GamerPower, and IsThereAnyDeal so you never miss one.</p>
         </details>
         <details>
           <summary>Do I have to refresh it?</summary>

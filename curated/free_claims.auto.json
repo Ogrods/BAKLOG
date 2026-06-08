@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-06-08T04:12:11.013939+00:00",
+  "fetched_at": "2026-06-08T09:10:09.420781+00:00",
   "sources": {
     "epic": 2,
     "gamerpower": 15,
@@ -45,9 +45,11 @@
       "title": "Relaxing Simulator (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/relaxing-simulator-epic-games-giveaway",
       "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25c2413d322.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2965380/library_600x900_2x.jpg",
       "blurb": "Just relax and grab Relaxing Simulator for free on the Epic Games Store for the ultimate relaxing experience!",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 89,
+      "steam_appid": 2965380
     },
     {
       "id": "gamerpower-3672",
@@ -55,9 +57,11 @@
       "title": "Remothered: Broken Porcelain (GOG) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/remothered-broken-porcelain-gog-giveaway",
       "ends_at": "2026-06-08T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25bfb499a3c.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1142390/library_600x900_2x.jpg",
       "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 60,
+      "steam_appid": 1142390
     },
     {
       "id": "gamerpower-3671",
@@ -97,7 +101,13 @@
       "ends_at": "2026-07-01T23:59:59Z",
       "header_image": "https://www.gamerpower.com/offers/1b/6478b9dcae7be.jpg",
       "blurb": "Dive into the Riveting World of Tell Me Why for FREE on Steam! Tell Me Why is a multi-award winning episodic adventure game from Dontnod Entertainment! Don't pass up the chance to experience this extraordinary game for free!",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 82,
+      "steam_appid": 1180660,
+      "genres": [
+        "Adventure",
+        "Free To Play"
+      ]
     },
     {
       "id": "gamerpower-3665",
@@ -135,9 +145,11 @@
       "title": "Carlos the Taco (IndieGala) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/carlos-the-taco-pc-giveaway",
       "ends_at": null,
-      "header_image": "https://www.gamerpower.com/offers/1b/68b1ae1e5c9ce.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2081930/library_600x900_2x.jpg",
       "blurb": "Become the Taco! Finally, a free game made for taco fans! Download Carlos the Taco for free on IndieGala. Carlos the Taco is a 2D platformer set in Mexico where you play as a taco!",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 85,
+      "steam_appid": 2081930
     },
     {
       "id": "gamerpower-3096",
@@ -145,9 +157,11 @@
       "title": "Madness Inside (itch.io) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/madness-inside-itch-io-giveaway",
       "ends_at": "2026-08-01T23:59:59Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/67c76007697b3.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3102000/library_600x900_2x.jpg",
       "blurb": "Download Madness Inside for free on Itch.io! Madness Inside is an indie psychological walking simulator where you explore a psychiatric hospital.",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 76,
+      "steam_appid": 3102000
     },
     {
       "id": "gamerpower-3446",
@@ -155,9 +169,11 @@
       "title": "GigaBash (Stove) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/gigabash-pc-giveaway",
       "ends_at": null,
-      "header_image": "https://www.gamerpower.com/offers/1b/69567c4ee0fa3.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1546400/library_600x900_2x.jpg",
       "blurb": "Score GigaBash for free via Stove and claim your place as king among Titans! GigaBash is a multiplayer arena brawler with gigantic film-inspired kaiju and fully destructible environments.",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 94,
+      "steam_appid": 1546400
     },
     {
       "id": "gamerpower-2204",
@@ -165,9 +181,11 @@
       "title": "Dual Chroma: Academy Carols (itch.io) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/dual-chroma-academy-carols-itch-io-giveaway",
       "ends_at": null,
-      "header_image": "https://www.gamerpower.com/offers/1b/63c6f67bb9c8b.jpg",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2299730/library_600x900_2x.jpg",
       "blurb": "Grab Dual Chroma: Academy Carols for free on itch.io! Dual Chroma: Academy Carols is a slice-of-life Visual Novel. Check it out, If you are a fan of this type of game!",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "review_percent": 86,
+      "steam_appid": 2299730
     },
     {
       "id": "gamerpower-1604",
@@ -185,9 +203,11 @@
       "title": "Relaxing Simulator free on EpicGameStore on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16247/",
       "ends_at": null,
-      "header_image": null,
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2965380/library_600x900_2x.jpg",
       "blurb": "<a href=\"https://isthereanydeal.com/game/relaxing-simulator/info/\">Relaxing Simulator</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 15 Jun 2026 07:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/relaxing-simulator-4cca47>go to giveaway</a>",
-      "source": "itad"
+      "source": "itad",
+      "review_percent": 89,
+      "steam_appid": 2965380
     },
     {
       "id": "itad-8b45ae1603ee",
@@ -205,9 +225,16 @@
       "title": "Remothered: Tormented Fathers on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16245/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/remothered-tormented-fathers/info/\">Remothered: Tormented Fathers</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 08 Jun 2026 20:44:31 +0200\n                                        | <a href=https://store.steampowered.com/app/633360/Remothered_Tormented_Fathers/>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/633360/library_600x900_2x.jpg",
+      "blurb": "Remothered: Tormented Fathers",
+      "source": "itad",
+      "review_percent": 74,
+      "steam_appid": 633360,
+      "genres": [
+        "Action",
+        "Adventure",
+        "Indie"
+      ]
     },
     {
       "id": "itad-b07aac9ebd26",
@@ -215,9 +242,11 @@
       "title": "Wytchwood free for mobile on EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16242/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/wytchwood/info/\">Wytchwood</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-8bd7d123bc59474ebb2552793dc0fdbb-69657a7a252741bdbc72fbaebe5bb07b&amp;offers=1-8bd7d123bc59474ebb2552793dc0fdbb-e503745d0b2e4391b4454a3d1b75f22e>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/729000/library_600x900_2x.jpg",
+      "blurb": "Wytchwood",
+      "source": "itad",
+      "review_percent": 93,
+      "steam_appid": 729000
     },
     {
       "id": "itad-073a56345192",
@@ -225,9 +254,11 @@
       "title": "Songs of Conquest free at EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16239/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/songs-of-conquest/info/\">Songs of Conquest</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/p/songs-of-conquest>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
+      "blurb": "Songs of Conquest",
+      "source": "itad",
+      "review_percent": 86,
+      "steam_appid": 867210
     },
     {
       "id": "itad-0c69ed1f1bd8",
@@ -235,9 +266,11 @@
       "title": "Rogue Waters free at EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16240/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/rogue-waters/info/\">Rogue Waters</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 11 Jun 2026 16:59:00 +0200\n                                        | <a href=https://store.epicgames.com/p/rogue-waters-9764d6>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "blurb": "Rogue Waters",
+      "source": "itad",
+      "review_percent": 76,
+      "steam_appid": 1691190
     },
     {
       "id": "itad-50a2b5b1d7a6",
@@ -245,9 +278,15 @@
       "title": "Tell Me Why - Chapters 1,2,3 - FREE on Steam on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16229/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/tell-me-why/info/\">Tell Me Why</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-2/info/\">Tell Me Why: Chapter 2</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-3/info/\">Tell Me Why: Chapter 3</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Wed, 01 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1180660/Tell_Me_Why>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1180660/library_600x900_2x.jpg",
+      "blurb": "Tell Me Why Tell Me Why: Chapter 2 Tell Me Why: Chapter 3",
+      "source": "itad",
+      "review_percent": 82,
+      "steam_appid": 1180660,
+      "genres": [
+        "Adventure",
+        "Free To Play"
+      ]
     },
     {
       "id": "itad-047270155013",
@@ -255,9 +294,15 @@
       "title": "Gravity Circuit free on Steam on Steam",
       "claim_url": "https://isthereanydeal.com/giveaways/16228/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/gravity-circuit/info/\">Gravity Circuit</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Tue, 14 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/858710/Gravity_Circuit/>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/858710/library_600x900_2x.jpg",
+      "blurb": "Gravity Circuit",
+      "source": "itad",
+      "review_percent": 92,
+      "steam_appid": 858710,
+      "genres": [
+        "Action",
+        "Indie"
+      ]
     },
     {
       "id": "itad-0d4598c53ffe",
@@ -265,9 +310,11 @@
       "title": "Mr.Brocco & Co - FREE on IndieGala on IndieGala Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16196/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/mr-brocco-and-co/info/\">Mr.Brocco &amp; Co</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/mrbrocco-co>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
+      "blurb": "Mr.Brocco & Co",
+      "source": "itad",
+      "review_percent": 83,
+      "steam_appid": 2074560
     },
     {
       "id": "itad-78f8867f4481",
@@ -305,9 +352,11 @@
       "title": "The Brave Little Cloud - FREE on IndieGala on IndieGala Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16143/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/the-brave-little-cloud/info/\">The Brave Little Cloud</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/the-brave-little-cloud>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
+      "blurb": "The Brave Little Cloud",
+      "source": "itad",
+      "review_percent": 97,
+      "steam_appid": 2635070
     },
     {
       "id": "itad-98730029b14b",
@@ -336,7 +385,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/15746/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
+      "blurb": "Smiley Dusty",
       "source": "itad"
     },
     {
@@ -345,9 +394,11 @@
       "title": "Die Young: Prologue - FREE on IndieGala",
       "claim_url": "https://isthereanydeal.com/giveaways/7433/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/die-young-prologue/info/\">Die Young: Prologue</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/die-young-prologue>go to giveaway</a>",
-      "source": "itad"
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/973000/library_600x900_2x.jpg",
+      "blurb": "Die Young: Prologue",
+      "source": "itad",
+      "review_percent": 78,
+      "steam_appid": 973000
     }
   ]
 }

@@ -3,18 +3,20 @@
     "gamerpower-3673",
     "gamerpower-3672",
     "gamerpower-3671",
-    "gamerpower-2386",
     "gamerpower-3287",
     "gamerpower-3266",
     "gamerpower-3096",
     "gamerpower-3446",
     "gamerpower-2204",
-    "gamerpower-1604",
     "itad-9dcfdf2b0b35",
-    "itad-1b0433806065",
-    "itad-de23882e1f39",
     "itad-b07aac9ebd26",
-    "itad-dd5b5b16e035"
+    "itad-50a2b5b1d7a6",
+    "itad-0c69ed1f1bd8",
+    "itad-073a56345192",
+    "itad-047270155013",
+    "gamerpower-1604",
+    "itad-0d4598c53ffe",
+    "itad-1b0433806065"
   ],
   "field_overrides": {
     "gamerpower-3673": {
@@ -25,9 +27,6 @@
     },
     "gamerpower-3671": {
       "title": "Flufftopia"
-    },
-    "gamerpower-2386": {
-      "title": "Tell Me Why"
     },
     "gamerpower-3287": {
       "title": "Mr.Brocco And Co"
@@ -48,16 +47,34 @@
       "title": "Remothered: Tormented Fathers"
     },
     "itad-1b0433806065": {
-      "title": "Die Young: Prologue -"
+      "title": "Die Young: Prologue"
     },
     "itad-de23882e1f39": {
-      "title": "Smiley Dusty at Itch.io"
+      "title": "Smiley Dusty"
     },
     "itad-b07aac9ebd26": {
       "title": "Wytchwood"
     },
     "itad-dd5b5b16e035": {
-      "title": "The Brave Little Cloud -"
+      "title": "The Brave Little Cloud"
+    },
+    "itad-073a56345192": {
+      "title": "Songs of Conquest"
+    },
+    "itad-0c69ed1f1bd8": {
+      "title": "Rogue Waters"
+    },
+    "itad-50a2b5b1d7a6": {
+      "title": "Tell Me Why"
+    },
+    "itad-047270155013": {
+      "title": "Gravity Circuit"
+    },
+    "itad-0d4598c53ffe": {
+      "title": "Mr.Brocco & Co"
+    },
+    "gamerpower-1604": {
+      "title": "Dora Diginoid"
     }
   },
   "dismissed": [
@@ -71,6 +88,10 @@
     "itad-8b45ae1603ee",
     "itad-98730029b14b",
     "itad-d85d5bb4128d",
-    "gamerpower-3272"
+    "gamerpower-3272",
+    "itad-78f8867f4481",
+    "gamerpower-2386",
+    "itad-7a69412dd110",
+    "itad-48cfa4ebeae5"
   ]
 }

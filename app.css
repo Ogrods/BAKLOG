@@ -419,6 +419,7 @@ html[data-init-view="connections"] .view-tab[data-view="connections"] {
   --brand-humble: #cb272c;
   --brand-ea: #f05556;
   --brand-itch: #fa5c5c;
+  --brand-indiegala: #1faf38;
 }
 
 html[data-theme="dark"] {
@@ -1133,11 +1134,13 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .store-badge.ubisoft { background: var(--brand-ubisoft); color: #fff; }
 .store-badge.other { background: #475569; color: #f1f5f9; }
 .store-badge.itch { background: var(--brand-itch); color: #fff; }
+.store-badge.indiegala { background: var(--brand-indiegala); color: #fff; }
 .store-badge.humble { background: var(--brand-humble); color: #fff; }
 .store-badge.ea { background: var(--brand-ea); color: #fff; }
-/* "EA" is two letters, so the letter badge needs extra width/smaller type.
+/* "EA" / "IG" are two letters, so the letter badge needs extra width/smaller type.
    The glyph badge is square like the rest, so scope these to the letter case. */
-.store-badge.ea:not(.store-badge--glyph) { font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
+.store-badge.ea:not(.store-badge--glyph),
+.store-badge.indiegala:not(.store-badge--glyph) { font-size: 0.52rem; font-weight: 800; letter-spacing: 0; min-width: 1.35rem; }
 .store-badge.itad { background: #22d3ee; color: #06303a; }
 .store-badge.manual { outline: 1px dashed #f59e0b; outline-offset: 1px; }
 .store-badge--md { height: 22px; min-width: 22px; font-size: 12px; border-radius: 5px; padding: 0 6px; }
@@ -1492,7 +1495,7 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .claim-rows {
   display: flex;
   flex-direction: column;
-  --claim-grid: 28px minmax(0, 1fr) 3.5rem auto auto;
+  --claim-grid: 28px minmax(0, 1fr) 5rem 9rem 12rem;
 }
 .claim-rows-header,
 .claim-row {
@@ -1521,6 +1524,10 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .claim-rows-header .claim-cell-review,
 .claim-rows-header .claim-cell-ends {
   white-space: nowrap;
+}
+.claim-rows-header .claim-cell-review,
+.claim-rows-header .claim-cell-ends {
+  text-align: left;
 }
 .claim-row {
   border-bottom: 1px solid var(--border-subtle);
@@ -1580,12 +1587,13 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   line-height: 0;
 }
 .claim-cell-review {
-  text-align: right;
+  text-align: left;
   color: #94a3b8;
   font-size: 0.6875rem;
   white-space: nowrap;
 }
 .claim-cell-ends {
+  text-align: left;
   color: rgba(251, 191, 36, 0.9);
   font-size: 0.6875rem;
   white-space: nowrap;
@@ -4899,6 +4907,17 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   align-items: center;
   justify-content: flex-end;
   gap: 0.35rem 0.85rem;
+}
+.conn-prefs-note {
+  flex-basis: 100%;
+  margin: 0.15rem 0 0;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  color: var(--text-mute, #94a3b8);
+  text-align: right;
+}
+.conn-prefs-note--pro {
+  color: var(--accent, #38bdf8);
 }
 .conn-hint {
   display: flex;

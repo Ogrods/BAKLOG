@@ -67,12 +67,12 @@ export const DASH_REVIEW_COLORS = {
 export const DASH_STORE_LABELS = {
   steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic", amazon: "Amazon",
   xbox: "Xbox", battlenet: "Battle.net", ubisoft: "Ubisoft", nintendo: "Nintendo", humble: "Humble", ea: "EA App",
-  itch: "itch.io", other: "Other", manual: "Manual",
+  itch: "itch.io", indiegala: "IndieGala", other: "Other", manual: "Manual",
 };
 
 /** Canonical storefront display order (business-card watermark sequence). */
 export const STORE_DISPLAY_ORDER = [
-  'steam', 'epic', 'gog', 'humble', 'itch', 'psn', 'xbox',
+  'steam', 'epic', 'gog', 'humble', 'itch', 'indiegala', 'psn', 'xbox',
   'nintendo', 'amazon', 'battlenet', 'ubisoft', 'ea',
 ];
 

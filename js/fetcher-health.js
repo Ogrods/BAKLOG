@@ -1221,7 +1221,9 @@ if (typeof document !== 'undefined' && !document.__baklogFetcherAgeVisListener) 
 }
 
 export function maybeAutoRefreshItad(deps = {}) {
-  if (isPageHidden()) return false;
+  // Auto-refresh keeps running while the page is hidden (minimized / unfocused
+  // window) so a backgrounded dashboard still refreshes; subject to browser
+  // background-timer throttling. It does NOT run when the app is fully closed.
   if (state.prefs.itadAutoRefreshDisabled) return false;
   if (isFetcherDisconnected('itad')) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
@@ -1246,7 +1248,8 @@ export function maybeAutoRefreshItad(deps = {}) {
 }
 
 export function maybeAutoRefreshClaims(deps = {}) {
-  if (isPageHidden()) return false;
+  // Continues while the page is hidden (minimized / unfocused); see
+  // maybeAutoRefreshItad for the caveat. Not run when the app is fully closed.
   if (state.prefs.claimsAutoRefreshDisabled) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
   if (!isApiAvailableFn()) return false;
@@ -1315,7 +1318,9 @@ export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {
 /** Quietly refresh the stalest store fetcher older than 24h (one per stagger window). */
 export function maybeAutoFetchStale24h(deps = {}) {
   if (state.prefs.autoFetchStale24h !== true) return false;
-  if (isPageHidden()) return false;
+  // Runs while the page is hidden (minimized / unfocused window) too. Browser
+  // background-timer throttling may slow the cadence; full background refresh
+  // while the app is closed is the paid server-side scheduler, not this loop.
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
   if (!isApiAvailableFn()) return false;
   const inFlightFn = deps.inFlightCount ?? (() => fetcherRunner.inFlightCount());
@@ -1617,10 +1622,9 @@ export const fetcherRunner = (() => {
   }
 
   function ensureInFlightPolling() {
-    if (inFlightPollTimer || !isApiAvailable() || isPageHidden()) return;
+    if (inFlightPollTimer || !isApiAvailable()) return;
     if (runStateByKey.size === 0 && sourcesByRunId.size === 0) return;
     inFlightPollTimer = setInterval(() => {
-      if (isPageHidden()) return;
       syncFromServer().catch(() => {});
       if (runStateByKey.size === 0 && sourcesByRunId.size === 0 && !lastServerInFlight) {
         clearInterval(inFlightPollTimer);
@@ -2805,6 +2809,10 @@ export const fetcherRunner = (() => {
 
   async function subscribe(runId, key, src, { reconnect = false, quiet = false, queuedOnly = false } = {}) {
     if (suppressedRunIds.has(runId) || cancelInFlight || queuedOnly) return;
+    // Keep live SSE log streams closed while the page is hidden: the auto-fetch
+    // loop and /api/runs polling keep working (Phase 1), but there's no log view
+    // to feed. On resume, syncFromServer re-subscribes to any active run.
+    if (isPageHidden()) return;
     clearReconnect(runId);
     const prior = sourcesByRunId.get(runId);
     if (prior) {
@@ -3070,7 +3078,9 @@ export const fetcherRunner = (() => {
   }
 
   async function _runDashboardPollTick() {
-    if (isPageHidden()) return;
+    // Intentionally not gated on page visibility: the auto-fetch loop keeps
+    // running while the window is minimized/unfocused (best-effort, subject to
+    // browser background-timer throttling).
     await syncFromServer();
     maybeAutoRefreshItad();
     maybeAutoRefreshClaims();
@@ -3079,18 +3089,13 @@ export const fetcherRunner = (() => {
 
   function startDashboardPolling() {
     _dashboardPollWanted = true;
-    if (pollTimer || !isApiAvailable() || isPageHidden()) return;
+    if (pollTimer || !isApiAvailable()) return;
     void syncFromServer().then(() => {
       maybeAutoRefreshItad();
       maybeAutoRefreshClaims();
       maybeAutoFetchStale24h();
     });
     pollTimer = setInterval(() => { void _runDashboardPollTick(); }, 30_000);
-  }
-
-  function pauseDashboardPollForVisibility() {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
   }
 
   function stopDashboardPolling() {
@@ -3105,13 +3110,15 @@ export const fetcherRunner = (() => {
   if (typeof document !== 'undefined') {
     registerPausable({
       pause() {
-        pauseDashboardPollForVisibility();
-        stopInFlightPolling();
+        // Keep the dashboard + in-flight poll loops running while hidden so a
+        // minimized/unfocused window still auto-refreshes (Phase 1). Only the
+        // live SSE log streams are closed, since their output isn't visible.
         closeAllStreams();
       },
       resume() {
+        // Catch up immediately when the window returns to the foreground.
         syncFromServer().catch(() => {});
-        if (_dashboardPollWanted && !pollTimer && isApiAvailable() && !isPageHidden()) {
+        if (_dashboardPollWanted && !pollTimer && isApiAvailable()) {
           pollTimer = setInterval(_runDashboardPollTick, 30_000);
         }
         if (runStateByKey.size > 0 || sourcesByRunId.size > 0 || lastServerInFlight) {
@@ -3539,7 +3546,9 @@ export function renderDashboardFetcherHealth() {
   const staleBtnDisabled = !apiReady || !runnableStale.length || Date.now() < runStaleCooldownUntil;
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
 
-  const staleButtonHtml = `<button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale or missing fetcher that has credentials">${escapeHtml(staleBtnLabel)}</button>`;
+  // Bulk "Run stale" queue sweep is reserved for the planned paid tier; hidden for now.
+  // (runAllStale and its click handler stay intact so this is a one-line re-enable.)
+  const staleButtonHtml = '';
   const filterHint = (!showConnected && !showStaleMissing)
     ? 'Showing all'
     : `Uncheck both to show all ${rows.length}`;

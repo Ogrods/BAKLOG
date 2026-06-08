@@ -17,6 +17,7 @@ from shared.free_claims_sources import (
     GAMERPOWER_ATTRIBUTION,
     GAMERPOWER_URL,
     ITAD_GIVEAWAYS_RSS,
+    carry_claim_enrichment,
     dedup_claim_items,
     parse_epic_payload,
     parse_gamerpower_payload,
@@ -141,6 +142,25 @@ def main() -> int:
         sources = {args.source}
 
     items, counts = collect_claims(sources, stats=stats)
+
+    existing_by_id: dict[str, dict] = {}
+    if args.output.is_file():
+        try:
+            old_doc = json.loads(args.output.read_text(encoding="utf-8"))
+            for row in old_doc.get("items") or []:
+                if not isinstance(row, dict):
+                    continue
+                row_id = str(row.get("id") or "").strip()
+                if row_id:
+                    existing_by_id[row_id] = row
+        except (OSError, json.JSONDecodeError):
+            pass
+    if existing_by_id:
+        items = [
+            carry_claim_enrichment(item, existing_by_id.get(str(item.get("id") or "").strip()))
+            for item in items
+        ]
+
     fetched_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
     payload = {

@@ -17,8 +17,16 @@ import pytest
 
 @pytest.fixture
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    from shared.profile_paths import DEFAULT_PROFILE_ID
+
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("shared.profile_paths.profile_root", lambda profile_id=None: tmp_path)
+    monkeypatch.setattr(
+        "shared.profile_paths.get_active_profile_id",
+        lambda: DEFAULT_PROFILE_ID,
+    )
+    # auth.manager imports get_active_profile_id at module load — patch both bindings.
+    monkeypatch.setattr("auth.manager.get_active_profile_id", lambda: DEFAULT_PROFILE_ID)
     (tmp_path / "cache").mkdir()
     # Mapping built by enrich_steam_reviews.py — only "gog:1" has a match.
     (tmp_path / "cache" / "steam_review_map.json").write_text(

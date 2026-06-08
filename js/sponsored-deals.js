@@ -4,7 +4,8 @@
  * Honest by design: every sponsored slot carries a visible "Sponsored" (or
  * "House") disclosure, is ownership-aware (a slot whose `match_title` you
  * already own is skipped), and can be dismissed. The slot is part of the free
- * tier; the planned paid tier removes it via `prefs.hideSponsoredDeals`.
+ * tier; the paid (pro) tier removes it via the server-resolved entitlement
+ * (`isPro()`), and the free `prefs.hideSponsoredDeals` toggle still hides it.
  *
  * Feed shape (sponsors.json / curated/sponsors.json):
  *   { version, generated_at, items: [{ id, kind, title, tagline, cta, url,
@@ -17,6 +18,7 @@ import { normalizeNameForDedup } from './game-core.js';
 import { isOwnedByTitle } from './deals.js';
 import { savePersonal } from './personal-storage.js';
 import { dataFetch } from './api-client.js';
+import { isPro } from './auth-gate.js';
 
 const SPONSORS_LOCAL_PATH = 'sponsors.json';
 const SPONSORS_FALLBACK_PATH = 'curated/sponsors.json';
@@ -57,16 +59,11 @@ async function fetchJson(path) {
 
 export async function loadSponsoredDeals() {
   let doc = await fetchJson(SPONSORS_LOCAL_PATH);
-  let source = 'local';
   if (!doc?.items?.length) {
     doc = await fetchJson(SPONSORS_FALLBACK_PATH);
-    source = 'fallback';
   }
   const items = Array.isArray(doc?.items) ? doc.items : [];
   state.sponsoredDeals = items.filter(it => it && typeof it === 'object' && it.id && it.title);
-  // #region agent log
-  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0ffc'},body:JSON.stringify({sessionId:'fc0ffc',hypothesisId:'E',location:'sponsored-deals.js:loadSponsoredDeals',message:'sponsors feed',data:{source,rawItems:items.length,kept:state.sponsoredDeals.length},timestamp:Date.now()})}).catch(()=>{}); } catch(_){}
-  // #endregion
   return state.sponsoredDeals;
 }
 
@@ -75,7 +72,8 @@ export async function loadSponsoredDeals() {
  * its date window, not dismissed, and (when it names a game) not already owned.
  */
 export function getEligibleSponsoredDeal() {
-  if (state.prefs?.hideSponsoredDeals) return null;
+  // Pro entitlement (server-resolved) removes the slot; the free hide toggle also hides it.
+  if (isPro() || state.prefs?.hideSponsoredDeals) return null;
   const now = Date.now();
   const eligible = (state.sponsoredDeals || []).filter(item => {
     if (item.enabled === false) return false;
@@ -87,9 +85,6 @@ export function getEligibleSponsoredDeal() {
     }
     return true;
   });
-  // #region agent log
-  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0ffc'},body:JSON.stringify({sessionId:'fc0ffc',hypothesisId:'D',location:'sponsored-deals.js:getEligibleSponsoredDeal',message:'sponsor eligibility',data:{total:(state.sponsoredDeals||[]).length,eligible:eligible.length,chosenId:eligible[0]?.id||null,hideSponsored:!!state.prefs?.hideSponsoredDeals,ownedNormSize:state.ownedNormNames?.size||0},timestamp:Date.now()})}).catch(()=>{}); } catch(_){}
-  // #endregion
   if (!eligible.length) return null;
   eligible.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
   return eligible[0];

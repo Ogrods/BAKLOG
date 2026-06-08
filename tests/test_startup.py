@@ -6,7 +6,7 @@ import plistlib
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -248,7 +248,7 @@ def test_enable_disable_noop_on_unsupported_platform(monkeypatch):
 def test_win_round_trip_integration(monkeypatch):
     """Enable then disable via real registry; cleans up afterward."""
     try:
-        import winreg
+        import winreg  # noqa: F401  # availability guard; real registry work is in startup.*
     except ImportError:
         pytest.skip("winreg unavailable")
     monkeypatch.setattr(startup, "startup_argv", lambda: ["test.exe", "tray"])

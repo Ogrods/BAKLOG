@@ -7,13 +7,14 @@
  * a visible disclosure, and must disappear when the user opts out.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getEligibleSponsoredDeal,
   sponsoredDealCardHtml,
   sponsoredDealSlotHtml,
   dismissSponsoredDeal,
 } from '../js/sponsored-deals.js';
+import * as authGate from '../js/auth-gate.js';
 import { state } from '../js/state.js';
 
 function sponsor(overrides = {}) {
@@ -55,10 +56,18 @@ describe('getEligibleSponsoredDeal', () => {
     expect(getEligibleSponsoredDeal()).toBeNull();
   });
 
-  it('returns null when the user opted out (planned paid tier)', () => {
+  it('returns null when the user opted out (free hide toggle)', () => {
     state.prefs.hideSponsoredDeals = true;
     state.sponsoredDeals = [sponsor()];
     expect(getEligibleSponsoredDeal()).toBeNull();
+  });
+
+  it('returns null for the paid (pro) entitlement even without the hide toggle', () => {
+    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    state.prefs.hideSponsoredDeals = false;
+    state.sponsoredDeals = [sponsor()];
+    expect(getEligibleSponsoredDeal()).toBeNull();
+    spy.mockRestore();
   });
 
   it('skips a slot for a game the user already owns', () => {

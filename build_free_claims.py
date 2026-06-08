@@ -14,7 +14,12 @@ from pathlib import Path
 import requests
 
 from fetchers._progress import RunStats, started
-from shared.free_claims_sources import GAMERPOWER_ATTRIBUTION, merge_manual_and_auto, norm_title
+from shared.free_claims_sources import (
+    CLAIM_ENRICH_FIELDS,
+    GAMERPOWER_ATTRIBUTION,
+    merge_manual_and_auto,
+    norm_title,
+)
 from shared.profile_paths import free_claims_path
 from shared.safe_write import safe_write_text
 from shared.steam_match import appid_from_steam_url, pick_appid, strip_giveaway_decorations
@@ -28,6 +33,10 @@ STORE_DELAY_SEC = 1.5
 STEAM_STORESEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 STEAM_HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
 FIELD_OVERRIDE_KEYS = frozenset({"title", "claim_url", "ends_at"})
+ITAD_GAME_SLUG_RE = re.compile(
+    r"isthereanydeal\.com/game/([^/\"'>]+)/info",
+    re.IGNORECASE,
+)
 
 
 def _configure_stdout() -> None:
@@ -191,13 +200,33 @@ def _appid_from_steam_urls(claim_url: str, blurb: object = None) -> int | None:
     return None
 
 
-def _resolve_steam_appid_by_title(title: str, last_call: list[float]) -> int | None:
+def _itad_slug_from_blurb(blurb: object) -> str | None:
+    """Extract a human title from an ITAD game info link embedded in the blurb."""
+    match = ITAD_GAME_SLUG_RE.search(str(blurb or ""))
+    if not match:
+        return None
+    slug = match.group(1).strip().replace("-", " ")
+    return slug or None
+
+
+def _resolve_steam_appid_by_title(
+    title: str,
+    last_call: list[float],
+    *,
+    blurb: object = None,
+) -> int | None:
     """Resolve a Steam appid via storesearch on a decoration-stripped title."""
     term = strip_giveaway_decorations(title)
-    if not term:
-        return None
-    items = _steam_storesearch(term, last_call)
-    return pick_appid(items, term)
+    if term:
+        items = _steam_storesearch(term, last_call)
+        appid = pick_appid(items, term)
+        if appid is not None:
+            return appid
+    slug_term = _itad_slug_from_blurb(blurb)
+    if slug_term and slug_term.lower() != (term or "").lower():
+        items = _steam_storesearch(slug_term, last_call)
+        return pick_appid(items, slug_term)
+    return None
 
 
 def _resolve_steam_appid(
@@ -214,7 +243,7 @@ def _resolve_steam_appid(
         return appid
     if store != "steam":
         return None
-    return _resolve_steam_appid_by_title(title, last_call)
+    return _resolve_steam_appid_by_title(title, last_call, blurb=blurb)
 
 
 _ITCH_HINT = re.compile(r"itch\.?io", re.IGNORECASE)
@@ -272,7 +301,7 @@ def _enrich_item(
             header = borrowed
 
     if appid is None and (not header or review is None) and store != "steam":
-        appid = _resolve_steam_appid_by_title(title, last_call)
+        appid = _resolve_steam_appid_by_title(title, last_call, blurb=raw.get("blurb"))
 
     if appid:
         details = _steam_app_details(appid, last_call)
@@ -526,6 +555,75 @@ def preview_publish_items(
             continue
         items.append(_enrich_item_light(raw, cover_lookup))
     return items
+
+
+def _apply_enrich_fields_to_item(target: dict, source: dict) -> bool:
+    """Merge enrichment fields from source onto target; returns True when target changed."""
+    changed = False
+    for field in CLAIM_ENRICH_FIELDS:
+        if field == "genres":
+            src_genres = source.get("genres")
+            if isinstance(src_genres, list) and src_genres and target.get("genres") != src_genres:
+                target["genres"] = src_genres
+                changed = True
+            continue
+        src_val = source.get(field)
+        if src_val is None or src_val == "":
+            continue
+        if field == "header_image":
+            existing = str(target.get("header_image") or "").strip()
+            new_val = str(src_val).strip()
+            if not new_val:
+                continue
+            if not existing or _cover_quality(new_val) > _cover_quality(existing):
+                if target.get(field) != new_val:
+                    target[field] = new_val
+                    changed = True
+            continue
+        if target.get(field) != src_val:
+            target[field] = src_val
+            changed = True
+    return changed
+
+
+def merge_enriched_items_into_auto_feed(
+    auto_path: Path,
+    enriched_items: list[dict],
+) -> int:
+    """Persist enrichment onto the on-disk auto feed matched by item id."""
+    if not auto_path.is_file():
+        return 0
+    try:
+        doc = json.loads(auto_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    items = doc.get("items") or []
+    if not isinstance(items, list):
+        return 0
+
+    by_id = {
+        str(item.get("id") or "").strip(): item
+        for item in enriched_items
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    }
+    if not by_id:
+        return 0
+
+    updated = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("id") or "").strip()
+        enriched = by_id.get(item_id)
+        if not enriched:
+            continue
+        if _apply_enrich_fields_to_item(item, enriched):
+            updated += 1
+
+    if updated:
+        doc["items"] = items
+        safe_write_text(auto_path, json.dumps(doc, indent=2, ensure_ascii=False))
+    return updated
 
 
 def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:

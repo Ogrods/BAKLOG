@@ -16,14 +16,6 @@ import { dashDrillStore, dashDrillStatus, dashDrillStoreStatus, dashSetReleaseYe
 export const dashboardCharts = {};
 const pendingChartRenders = new Map();
 
-// #region agent log
-function __dbgCharts(location, message, data, hypothesisId) {
-  try {
-    fetch('http://127.0.0.1:7802/ingest/0232577c-f7f4-4f4a-8e3c-33a0b1bde1d9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdd7ff'},body:JSON.stringify({sessionId:'cdd7ff',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{});
-  } catch (_) {}
-}
-// #endregion
-
 function cssAccentVar(name) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return v || null;
@@ -251,11 +243,7 @@ function setDashboardChart(id, config) {
       ensureChartObserver()?.observe(canvas);
       return;
     }
-    // #region agent log
-    const __t0 = performance.now();
     dashboardCharts[id] = new Chart(canvas, config);
-    if (id === "chartScatter") __dbgCharts('dashboard-charts.js:scatter', 'scatter chart built', { pts: config?.data?.datasets?.[0]?.data?.length, animDur: config?.options?.animation?.duration, buildMs: Math.round(performance.now() - __t0) }, 'F');
-    // #endregion
   };
   const observer = ensureChartObserver();
   if (!observer) {

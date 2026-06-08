@@ -82,7 +82,7 @@
   const MARQUEE_ITEMS = [
     { icon: "S", cls: "is-emerald", label: "Steam", text: "<strong>257</strong> games synced", tip: "Games imported from your Steam library." },
     { icon: "G", cls: "is-violet", label: "GOG", text: "<strong>673</strong> games synced", tip: "Games imported from your GOG library." },
-    { icon: "E", cls: "", label: "Epic", text: "<strong>259</strong> free claims counted", tip: "Epic Games Store free weekly claims counted in your library." },
+    { icon: "E", cls: "", label: "Epic", text: "<strong>259</strong> free claims counted", tip: "Epic Games Store free weekly claims counted in your library — claimable from the Epic Games Store Mobile app on supported devices." },
     { icon: "F", cls: "is-sky", label: "Free", text: "<strong>12</strong> giveaways live", tip: "Claimable Now: active free games aggregated from Epic, GamerPower, and IsThereAnyDeal." },
     { icon: "D", cls: "is-amber", label: "Deals", text: "<strong class=\"dash-marquee-cut deal-cut-huge\">-80%</strong> on Rustbloom", tip: "Biggest active discount on a wishlist game right now." },
     { icon: "P", cls: "is-rose", label: "PSN", text: "<strong>597</strong> titles imported", tip: "Titles imported from your PlayStation library." },
@@ -96,6 +96,7 @@
   const INSIGHTS = [
     "You own <strong>600</strong> games. You've played <strong>40</strong>.",
     "Every deal site tells you a game is <strong>80% off</strong>. BAKLOG tells you that you already own it on Epic.",
+    "Epic's weekly free game is claimable from your phone — the Epic Games Store Mobile even runs its own giveaways.",
     "<strong>2,847h</strong> backlog at 2h/day is <strong>3.9 years</strong> to clear.",
     "Connect a store and BAKLOG auto-fetches - fetcher chips light up as the count climbs.",
     "We drop the DLC skins and soundtracks, so the count is real games.",

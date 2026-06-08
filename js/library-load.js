@@ -54,7 +54,6 @@ import { claimsSnapshotStorageKey } from './profiles.js';
 import { fireLibraryCountFlash } from './library-count-animation.js';
 import { itadSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
-import { activeProfileId } from './profiles.js';
 import {
   deferPicksRender,
   deferSummaryRender,
@@ -156,9 +155,6 @@ export function showItadAlertBanner({ newSales, newHistoricalLows }) {
 export async function loadCacheMeta(url, metaKey) {
   try {
     const res = await dataFetch(`${url}?t=${Date.now()}`);
-    // #region agent log
-    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'238065'},body:JSON.stringify({sessionId:'238065',runId:'post-fix',hypothesisId:'H2',location:'library-load.js:loadCacheMeta',message:'cache meta fetch result',data:{url,metaKey,status:res.status,ok:res.ok,profileId:activeProfileId(),wishlistCount:state.wishlistGames?.length??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!res.ok) {
       state.libraryMeta[metaKey] = null;
       return;

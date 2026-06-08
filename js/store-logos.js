@@ -17,6 +17,7 @@ export const STORE_BADGE_LETTERS = {
   humble: 'H',
   ea: 'EA',
   itch: 'I',
+  indiegala: 'IG',
   itad: 'I',
   other: '?',
   manual: 'M',

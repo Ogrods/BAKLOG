@@ -243,8 +243,8 @@ from shared.profile_paths import (  # noqa: E402
     runs_dir,
     set_request_profile_id,
 )
-from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
 from shared.safe_write import safe_write_text  # noqa: E402
+from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
 

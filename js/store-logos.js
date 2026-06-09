@@ -78,7 +78,7 @@ export const STORE_RAIL_GLYPH_OFFSET = {
   psn: { x: 0.5 },
   xbox: {},
   nintendo: { x: 0.5 },
-  amazon: { x: 0.5, y: -0.5 },
+  amazon: { x: -0.5, y: -0.5 },
   itch: {},
   humble: {},
   battlenet: { x: 0.5 },

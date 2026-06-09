@@ -8,14 +8,13 @@ drop matters. Pass ``--include-library`` to also look up every owned game.
 import argparse
 import json
 import os
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from auth import resolve_env
-from fetchers._base import add_allow_empty_arg, refuse_empty_result
+from fetchers._base import add_allow_empty_arg, configure_stdout, refuse_empty_result
 from fetchers._progress import RunStats, started
 from itad_client import ItadClient, ItadError
 from shared.fx import ensure_fx_rates
@@ -33,14 +32,6 @@ LIBRARY_FILES = [
     "games_amazon.json",
 ]
 WISHLIST_FILE = "games_wishlist.json"
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _collect_titles(include_library: bool) -> list[tuple[str, str]]:
@@ -93,7 +84,7 @@ def main() -> int:
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_itad")
     stats = RunStats()
     load_dotenv()

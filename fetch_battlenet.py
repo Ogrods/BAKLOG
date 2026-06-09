@@ -22,6 +22,7 @@ from fetchers._base import (
     add_no_carry_arg,
     apply_carry_forward,
     catalog_file,
+    configure_stdout,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
@@ -52,14 +53,6 @@ FRANCHISE_STORE_URLS: dict[str, str] = {
     "warcraft-rumble.svg": "https://warcraftrumble.blizzard.com/",
     "heroes-of-the-storm.svg": "https://heroesofthestorm.blizzard.com/",
 }
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 # Strip the trademark glyphs Blizzard sprinkles into every title.
@@ -213,7 +206,7 @@ def main() -> int:
         help=f"Also write the raw API response to {BATTLENET_RAW_DUMP} for debugging.",
     )
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_battlenet")
     stats = RunStats()
     env_cookie = resolve_env("BATTLENET_COOKIE", provider="battlenet")

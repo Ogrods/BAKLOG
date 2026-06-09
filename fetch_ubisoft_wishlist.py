@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -34,6 +33,7 @@ from auth.secrets import profile_dir
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -98,14 +98,6 @@ class WishlistItem:
     unit_sale_price: float | None
     platform: str | None
     kind: str                # "game" or "dlc"
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _wishlist_page_ready(html: str) -> bool:
@@ -333,7 +325,7 @@ def main() -> int:
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_ubisoft_wishlist")
     stats = RunStats()
 

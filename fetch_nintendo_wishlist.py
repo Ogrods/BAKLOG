@@ -34,6 +34,7 @@ from auth.secrets import profile_dir
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -118,14 +119,6 @@ class WishlistItem:
     price_initial: str | None
     discount_percent: int | None
     currency: str | None
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _parse_json_assignment(html: str, marker: str) -> dict | None:
@@ -1099,7 +1092,7 @@ def main() -> int:
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_nintendo_wishlist")
     stats = RunStats()
 

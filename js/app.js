@@ -47,7 +47,7 @@ import {
 } from './prefs.js';
 import { aliasCanonicalGenre } from './genres.js';
 import { renderBulkStatusButtons, recomputeCrossStoreHidden } from './game-core.js';
-import { renderPicks, renderPicksLimitButtons } from './picks-ui.js';
+import { renderPicks, renderPicksLimitButtons, applyPicksCollapsedState } from './picks-ui.js';
 import {
   renderSummary,
   renderStoreChips,
@@ -146,11 +146,7 @@ async function bootstrap() {
   document.getElementById("genreMode").value = state.prefs.genreFilterMode;
   document.getElementById("quickWinMax").value = state.prefs.quickWinMaxHours;
   document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;
-  document.getElementById("picksContainer").classList.toggle("hidden", state.prefs.picksCollapsed);
-  document.getElementById("togglePicks").textContent = state.prefs.picksCollapsed ? "Show" : "Hide";
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'A',location:'app.js:146',message:'boot picks sync',data:{collapsed:state.prefs.picksCollapsed,containerHidden:document.getElementById('picksContainer')?.classList.contains('hidden'),btn:document.getElementById('togglePicks')?.textContent,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),initView:document.documentElement.getAttribute('data-init-view'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
+  applyPicksCollapsedState();
   // Hide duplicates is a session pref (state.sessionPrefs.crossStoreDedup) —
   // defaults on each reload via loadSessionPrefs(); never persisted.
   recomputeCrossStoreHidden();

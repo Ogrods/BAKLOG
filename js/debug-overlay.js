@@ -25,6 +25,7 @@ import { getCurtainState } from './loading-curtain.js';
 import { countOrphanPersonalKeys } from './personal-storage.js';
 import { registerPausable } from './visibility.js';
 import { readPropagationStats } from './propagation-trace.js';
+import { readChartPerfSummary } from './chart-perf.js';
 
 const STORAGE_KEY = 'baklog-debug';
 const POLL_INTERVAL_MS = 1000;
@@ -63,6 +64,7 @@ function buildOverlay() {
       <dt>fp</dt><dd data-field="fp" title=""> - </dd>
       <dt>render</dt><dd data-field="render"> - </dd>
       <dt>dash</dt><dd data-field="dash" title="full / replay / skipped (reentrant+cooldown)"> - </dd>
+      <dt>charts</dt><dd data-field="charts" title="last dashboard chart perf: total ms · janky frames · max frame gap"> - </dd>
       <dt>prop</dt><dd data-field="prop" title="M merges · T tableRenders · S skips · R fetcherReloads · D downstream · def defers · fl flush"> - </dd>
       <dt>curtain</dt><dd data-field="curtain" title="boot data-boot-loading + view overlay"> - </dd>
       <dt>errors</dt><dd data-field="errors"> - </dd>
@@ -155,6 +157,7 @@ function tick() {
   setField('fp', shortFp, { title: fp });
   setField('render', readLastRenderMs());
   setField('dash', readDashStats());
+  setField('charts', readChartPerfSummary());
   setField('prop', readPropStats());
   setField('curtain', readCurtainState());
   const errCount = getErrorCount();

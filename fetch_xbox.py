@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +19,7 @@ from fetchers._base import (
     add_no_carry_arg,
     apply_carry_forward,
     catalog_file,
+    configure_stdout,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
@@ -32,14 +32,6 @@ from xbox_client import XboxAuthError, XboxClient, XboxRateLimitError
 
 GAMES_XBOX_JSON = Path("games_xbox.json")
 HLTB_DELAY_SEC = 1.0
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _https(url: str | None) -> str | None:
@@ -132,7 +124,7 @@ def main() -> int:
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_xbox")
     stats = RunStats()
     load_dotenv()

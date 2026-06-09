@@ -6,13 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
 
+from fetchers._base import configure_stdout
 from fetchers._progress import RunStats, started
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
@@ -38,14 +38,6 @@ ITAD_GAME_SLUG_RE = re.compile(
     r"isthereanydeal\.com/game/([^/\"'>]+)/info",
     re.IGNORECASE,
 )
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _clean_blurb(raw: object) -> str | None:
@@ -1015,7 +1007,7 @@ def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:
 
 
 def main() -> int:
-    _configure_stdout()
+    configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=INPUT_PATH)
     parser.add_argument("--output", type=Path, default=OUTPUT_PATH)

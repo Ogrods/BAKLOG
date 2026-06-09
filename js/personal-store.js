@@ -168,6 +168,7 @@ export const personalStore = (() => {
         merged[key] = localPrefs[key];
       }
     }
+    merged.picksCollapsed = merged.picksCollapsed === true;
     state.prefs = merged;
     const localSeen = _loadCachedLibraryFirstSeen();
     const serverSeen = (doc.libraryFirstSeen && typeof doc.libraryFirstSeen === 'object')

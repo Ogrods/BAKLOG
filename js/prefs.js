@@ -90,6 +90,7 @@ export function loadPrefs() {
     merged.connectionNotes = {};
   }
   migrateColumnPrefs(merged);
+  merged.picksCollapsed = merged.picksCollapsed === true;
   return merged;
 }
 

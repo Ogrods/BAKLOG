@@ -40,6 +40,7 @@ from auth.secrets import profile_dir
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -77,14 +78,6 @@ HEADER_IMAGE_TYPES = (
     "DieselGameBox",
     "Featured",
 )
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _pick_image(key_images: list | None, types: tuple[str, ...]) -> str | None:
@@ -458,7 +451,7 @@ def main() -> int:
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_epic_wishlist")
     stats = RunStats()
     load_dotenv()

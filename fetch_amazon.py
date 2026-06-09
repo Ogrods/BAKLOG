@@ -31,6 +31,7 @@ from fetchers._base import (
     apply_carry_forward,
     carry_enrichment,
     catalog_file,
+    configure_stdout,
     merge_cached_row,
     write_catalog_text,
 )
@@ -46,14 +47,6 @@ LEGACY_ROW_SOURCE = "launcher"
 
 
 AMAZON_RAW_DUMP = profile_raw_dump_path("amazon_web_raw.json")
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _launcher_db_ready(sql_dir: Path | None) -> bool:
@@ -394,7 +387,7 @@ def main() -> int:
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_amazon")
     stats = RunStats()
     load_dotenv()

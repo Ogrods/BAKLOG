@@ -32,6 +32,7 @@ from fetchers._base import (
     add_no_carry_arg,
     apply_carry_forward,
     catalog_file,
+    configure_stdout,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
@@ -69,14 +70,6 @@ class LibraryItem:
     gamekey: str
     redeemed: bool | None
     steam_app_id: str | None
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _launch_humble_ctx(*, headless: bool = True):
@@ -345,7 +338,7 @@ def main() -> int:
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_humble")
     stats = RunStats()
     load_dotenv()

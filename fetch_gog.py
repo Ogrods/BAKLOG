@@ -23,6 +23,7 @@ from fetchers._base import (
     apply_carry_forward,
     carry_enrichment,
     catalog_file,
+    configure_stdout,
     merge_cached_row,
     refuse_empty_result,
     write_catalog_text,
@@ -46,15 +47,6 @@ def _needs_product_details(args, cached_row: dict | None) -> bool:
     if args.refresh or cached_row is None or args.gog_id:
         return True
     return not (cached_row.get("genres") or [])
-
-
-def _configure_stdout() -> None:
-    """Avoid UnicodeEncodeError on Windows consoles (cp1252)."""
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
@@ -469,7 +461,7 @@ def main() -> int:
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_gog")
     stats = RunStats()
     load_dotenv()

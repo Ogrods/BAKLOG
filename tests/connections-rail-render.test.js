@@ -85,6 +85,48 @@ describe('connections rail render', () => {
   });
 });
 
+describe('refreshConnections error keep-cache', () => {
+  beforeEach(() => {
+    mockProviders.list = [steamProvider];
+    document.body.innerHTML = `
+      <strong id="connHeroCount"></strong>
+      <span id="connProgressFill"></span>
+      <div id="connOnboard" hidden></div>
+      <div id="connLayout">
+        <nav id="connRail" role="listbox"></nav>
+        <div id="connPane"></div>
+      </div>`;
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('keeps the cached rail and shows an amber error when a later refresh fails', async () => {
+    const { refreshConnections } = await import('../js/connections.js');
+    const { baklogFetch } = await import('../js/api-client.js');
+
+    // First refresh succeeds and populates the in-memory snapshot.
+    await refreshConnections();
+    expect(document.querySelector('.conn-rail-item[data-provider="steam"]')).toBeTruthy();
+
+    // The next refresh fails at the network layer.
+    vi.mocked(baklogFetch).mockImplementationOnce(() => {
+      throw new Error('server down');
+    });
+    await refreshConnections();
+
+    // Cached steam row is still rendered — the snapshot is kept, pane not wiped.
+    expect(document.querySelector('.conn-rail-item[data-provider="steam"]')).toBeTruthy();
+
+    const banner = document.getElementById('connRefreshBanner');
+    expect(banner).toBeTruthy();
+    expect(banner.classList.contains('hidden')).toBe(false);
+    expect(banner.className).toContain('text-amber-400');
+    expect(banner.textContent).toMatch(/local server/i);
+  });
+});
+
 describe('connections content groups (Epic)', () => {
   beforeEach(() => {
     mockProviders.list = [

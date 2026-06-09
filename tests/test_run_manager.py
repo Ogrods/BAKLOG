@@ -697,6 +697,55 @@ def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.Monke
     assert run._finished.wait(timeout=10)
 
 
+def test_heartbeat_keeps_long_run_alive(runs_env, monkeypatch: pytest.MonkeyPatch):
+    """Positive guard for the find_fetcher_heartbeat_loops fix: a run that keeps
+    emitting stdout faster than SILENT_STALL_KILL_SEC must survive past that
+    window. This is exactly what HeartbeatTimer / run_with_heartbeat / per-item
+    progress lines do in the long fetcher + enrich loops, so the watchdog's
+    reset-on-output behavior (last_line_at = now) is what keeps healthy long
+    pulls alive. Mirrors the negative test_stall_kill_after_single_stdout_line."""
+    # Stall window (0.6s) is shorter than the total run (~1.5s) but longer than
+    # each inter-line gap (0.1s): the run only survives if every printed line
+    # resets the stall timer.
+    monkeypatch.setattr(server, "STALL_FIRST_NOTICE_SEC", 0.2)
+    monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
+    monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 0.6)
+    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 9999.0)
+    mgr, _ = runs_env
+    monkeypatch.setitem(
+        server.FETCHERS,
+        "heartbeating",
+        {
+            "label": "Heartbeating",
+            "argv": [
+                server.sys.executable,
+                "-c",
+                "import time\n"
+                "for i in range(15):\n"
+                " print('  \u00b7 still working', i, flush=True)\n"
+                " time.sleep(0.1)\n"
+                "print('done', flush=True)",
+            ],
+            "refreshArgs": [],
+            "metaKey": "heartbeating",
+            "group": "enrich",
+            "color": "#fff",
+            "requires": [],
+        },
+    )
+    run = mgr.submit("heartbeating")
+    assert run._finished.wait(timeout=20)
+    replay = run.replay_lines()
+    texts = [m.get("text", "") for m in replay]
+    assert not any("force-killing" in t for t in texts), (
+        "heartbeating run was force-killed despite emitting periodic stdout"
+    )
+    assert any("still working" in t for t in texts), "expected heartbeat lines in run log"
+    assert any("done" in t for t in texts), "expected the run to reach completion"
+    assert run.exit_code == 0
+    assert run.status == "done"
+
+
 def test_durable_queue_skips_when_key_already_done(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()

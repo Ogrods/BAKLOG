@@ -1119,6 +1119,27 @@ export function fetcherFreshness(source) {
   return { status, ageMs, count, ageLabel: humanizeAge(ageMs), iso: fetchedAt };
 }
 
+/**
+ * Whether a source should be auto-run by the "run all stale" sweep. Pure so the
+ * gating rules (notably the auth-cooldown skip) can be tested without driving
+ * the whole runAllStale pipeline. Inputs are the already-resolved dependency
+ * results for `src`.
+ */
+export function staleSweepEligible(src, {
+  freshnessStatus,
+  credentialsSatisfied,
+  hasRunState,
+  cooldownMs = 0,
+  disconnected,
+} = {}) {
+  if (freshnessStatus !== 'stale' && freshnessStatus !== 'missing') return false;
+  if (src?.missingRequirements?.length && !credentialsSatisfied) return false;
+  if (hasRunState) return false;
+  if (cooldownMs > 0) return false;
+  if (disconnected) return false;
+  return true;
+}
+
 const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
 const CLAIMS_SOURCE = { key: 'claims', metaKey: 'claims', countFn: COUNT_FNS.claims };
 
@@ -2492,15 +2513,13 @@ export const fetcherRunner = (() => {
     renderDashboardFetcherHealth();
     await loadFetcherSources(true);
     const staleKeys = fetcherSources
-      .filter(src => {
-        const { status } = fetcherFreshness(src);
-        if (status !== 'stale' && status !== 'missing') return false;
-        if (src.missingRequirements?.length && !fetcherCredentialsSatisfied(src.key)) return false;
-        if (runStateByKey.has(src.key)) return false;
-        if (authCooldownRemainingMs(src.key) > 0) return false;
-        if (isFetcherDisconnected(src.key)) return false;
-        return true;
-      })
+      .filter(src => staleSweepEligible(src, {
+        freshnessStatus: fetcherFreshness(src).status,
+        credentialsSatisfied: fetcherCredentialsSatisfied(src.key),
+        hasRunState: runStateByKey.has(src.key),
+        cooldownMs: authCooldownRemainingMs(src.key),
+        disconnected: isFetcherDisconnected(src.key),
+      }))
       .map(src => src.key);
     if (!staleKeys.length) return;
     const batchEpoch = getCancelEpoch();

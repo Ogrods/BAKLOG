@@ -7,15 +7,26 @@ import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandida
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo, cutBucketClass } from './deals.js';
-import { isBarrel, isLeveragePick, getLibrarySnapshot, topWarGame } from './sabermetrics.js';
+import { isBarrel, isLeveragePick, getLibrarySnapshot, topWarGame, metacriticScore } from './sabermetrics.js';
 import { computeSpotlightSuperlatives } from './creative-metrics.js';
 import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
-import { familyForEyebrow, spreadByFamily } from './stat-families.js';
+import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
 import { registerPausable } from './visibility.js';
 
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
   return t > 0 && (Date.now() - t) <= months * 30 * 24 * 60 * 60 * 1000;
+}
+
+function releasedBeforeYears(g, years) {
+  const t = parseReleaseForSort(g.release_date);
+  return t > 0 && (Date.now() - t) >= years * 365 * 24 * 60 * 60 * 1000;
+}
+
+/** ProtonDB tier indicating the game runs great on Steam Deck / Linux. */
+function isDeckReady(g) {
+  const t = String(g.protondb_tier || '').toLowerCase();
+  return t === 'platinum' || t === 'gold' || t === 'native';
 }
 
 function isOnSale(g) {
@@ -33,6 +44,148 @@ const RECENT_QUOTA = 5;
 // without this guard a just-seen title could reappear a slide or two later.
 // Capped to pool.length - 1 at lookup time so small libraries can't deadlock.
 export const SPOTLIGHT_NO_REPEAT_WINDOW = 25;
+
+/** Fraction of art-eligible library rows that can enter the rotating pool. */
+export const SPOTLIGHT_POOL_FRACTION = 0.5;
+/** Max share of the pool that RATING-family eyebrows may occupy. */
+export const RATING_FAMILY_CAP = 0.45;
+/** Bounded random jitter (+/-) applied to spotlight scores before pool selection. */
+export const SPOTLIGHT_SCORE_JITTER = 5;
+
+const SPOTLIGHT_RECENT_KEYS_BASE = 'baklog-spotlight-recent';
+const ACTIVE_PROFILE_LS = 'baklog-active-profile';
+
+let _scoreJitterAmount = SPOTLIGHT_SCORE_JITTER;
+
+/** Test seam: override score jitter amplitude (0 disables jitter). */
+export function setScoreJitterForTest(amount) {
+  _scoreJitterAmount = amount;
+}
+
+function spotlightRecentKeysLsKey() {
+  let pid = 'default';
+  try {
+    pid = localStorage.getItem(ACTIVE_PROFILE_LS) || 'default';
+  } catch {
+    pid = 'default';
+  }
+  return `${SPOTLIGHT_RECENT_KEYS_BASE}${pid && pid !== 'default' ? `:${pid}` : ''}`;
+}
+
+function loadSpotlightRecentKeys() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(spotlightRecentKeysLsKey());
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter(k => typeof k === 'string' && k) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSpotlightRecentKeys(keys) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(spotlightRecentKeysLsKey(), JSON.stringify(keys));
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function applyScoreJitter(tagged) {
+  if (!_scoreJitterAmount) return;
+  for (const t of tagged) {
+    const delta = (Math.random() * 2 - 1) * _scoreJitterAmount;
+    t.reason = { ...t.reason, score: t.reason.score + delta };
+  }
+}
+
+/** Dedupe tagged rows by game key (highest score wins). */
+function dedupeTaggedByGame(tagged) {
+  const byKey = new Map();
+  for (const t of tagged) {
+    const k = gameKey(t.g);
+    const prev = byKey.get(k);
+    if (!prev || t.reason.score > prev.reason.score) byKey.set(k, t);
+  }
+  return [...byKey.values()].sort((a, b) => b.reason.score - a.reason.score);
+}
+
+/**
+ * Fill the spotlight pool with round-robin pulls across stat families so one
+ * family (usually RATING) cannot dominate membership.
+ */
+function pickFamilyBalancedPool(tagged, target, ratingCapFraction) {
+  const all = dedupeTaggedByGame(tagged);
+  if (!all.length) return [];
+
+  const buckets = new Map();
+  const familyOrder = [];
+  for (const item of all) {
+    const fam = familyForEyebrow(item.reason.eyebrow);
+    if (!buckets.has(fam)) {
+      buckets.set(fam, []);
+      familyOrder.push(fam);
+    }
+    buckets.get(fam).push(item);
+  }
+
+  const ratingMax = Math.max(1, Math.round(target * ratingCapFraction));
+  const familyCounts = new Map();
+  const pickedKeys = new Set();
+  const out = [];
+  let famIdx = 0;
+  let stagnant = 0;
+  const maxStagnant = Math.max(1, familyOrder.length * 2 + 1);
+
+  while (out.length < target && stagnant < maxStagnant) {
+    if (!familyOrder.length) break;
+    const fam = familyOrder[famIdx % familyOrder.length];
+    famIdx++;
+    const bucket = buckets.get(fam);
+    if (!bucket?.length) {
+      stagnant++;
+      continue;
+    }
+    if (fam === FAMILY.RATING && (familyCounts.get(fam) || 0) >= ratingMax) {
+      stagnant++;
+      continue;
+    }
+    let picked = false;
+    while (bucket.length && !picked) {
+      const cand = bucket.shift();
+      const k = gameKey(cand.g);
+      if (pickedKeys.has(k)) continue;
+      pickedKeys.add(k);
+      familyCounts.set(fam, (familyCounts.get(fam) || 0) + 1);
+      out.push(cand);
+      picked = true;
+      stagnant = 0;
+    }
+    if (!picked) stagnant++;
+  }
+
+  if (out.length < target) {
+    for (const item of all) {
+      if (out.length >= target) break;
+      const k = gameKey(item.g);
+      if (pickedKeys.has(k)) continue;
+      const fam = familyForEyebrow(item.reason.eyebrow);
+      if (fam === FAMILY.RATING && (familyCounts.get(fam) || 0) >= ratingMax) continue;
+      pickedKeys.add(k);
+      familyCounts.set(fam, (familyCounts.get(fam) || 0) + 1);
+      out.push(item);
+    }
+  }
+
+  return out;
+}
+
+/** Tagged candidates not already in the selected pool, highest score first. */
+function taggedExtras(tagged, top) {
+  const inTop = new Set(top.map(t => gameKey(t.g)));
+  return dedupeTaggedByGame(tagged).filter(t => !inTop.has(gameKey(t.g)));
+}
 
 // Rare "stinker" easter egg: occasionally the spotlight surfaces the
 // lowest-rated game in your catalog with a tongue-in-cheek eyebrow. Same rarity
@@ -137,10 +290,9 @@ let _spotlightPool = [];
 let _spotlightCurrentKey = null;
 let _spotlightPaused = false;
 let _spotlightPausedByUser = false;
-// Keys of recently-shown slides, oldest first. Persists across pool rebuilds so
-// the no-repeat window survives dashboard re-renders. Self-capped in
-// recordSpotlightShown so it can't grow unbounded.
-let _spotlightRecentKeys = [];
+// Keys of recently-shown slides, oldest first. Persists across pool rebuilds and
+// page reloads (profile-scoped localStorage). Self-capped in recordSpotlightShown.
+let _spotlightRecentKeys = loadSpotlightRecentKeys();
 
 /** Effective no-repeat window, never larger than pool.length - 1 (avoids deadlock). */
 function spotlightNoRepeatWindow() {
@@ -164,11 +316,15 @@ function recordSpotlightShown(key) {
   if (_spotlightRecentKeys.length > SPOTLIGHT_NO_REPEAT_WINDOW * 4) {
     _spotlightRecentKeys = _spotlightRecentKeys.slice(-SPOTLIGHT_NO_REPEAT_WINDOW * 2);
   }
+  writeSpotlightRecentKeys(_spotlightRecentKeys);
 }
 
 /** Test seam: inspect / reset the no-repeat history. */
 export function getSpotlightRecentKeysForTest() { return _spotlightRecentKeys.slice(); }
-export function resetSpotlightRecentKeysForTest() { _spotlightRecentKeys = []; }
+export function resetSpotlightRecentKeysForTest() {
+  _spotlightRecentKeys = [];
+  writeSpotlightRecentKeys([]);
+}
 
 /**
  * Next auto-rotation index that skips any slide inside the no-repeat window.
@@ -387,6 +543,16 @@ function gameSpotlightReason(g, recentKeys) {
   if (g.coop_local && rating >= 70) {
     return { eyebrow: 'Couch co-op', score: rating + 4 };
   }
+  const mc = metacriticScore(g);
+  if (mc != null && mc >= 88 && rating >= 75) {
+    return { eyebrow: 'Critic darling', score: rating + 6 };
+  }
+  if (isDeckReady(g) && rating >= 75 && enough) {
+    return { eyebrow: 'Deck ready', score: rating + 2 };
+  }
+  if (releasedBeforeYears(g, 12) && rating >= 78 && enough) {
+    return { eyebrow: 'Aged classic', score: rating - 1 };
+  }
   if (hltb && hltb >= 40 && rating >= 80 && enough) {
     return { eyebrow: 'Long haul', score: rating + 1 };
   }
@@ -429,7 +595,7 @@ export function pickSpotlightGames(games) {
     return steamAppIdFromGame(g) != null;
   };
   const eligible = games.filter(hasArt);
-  const target = Math.max(60, Math.round(eligible.length * 0.35));
+  const target = Math.max(60, Math.round(eligible.length * SPOTLIGHT_POOL_FRACTION));
 
   const tagged = [];
   for (const g of eligible) {
@@ -512,8 +678,8 @@ export function pickSpotlightGames(games) {
     }
   }
 
-  tagged.sort((a, b) => b.reason.score - a.reason.score);
-  const top = tagged.slice(0, target);
+  applyScoreJitter(tagged);
+  const top = pickFamilyBalancedPool(tagged, target, RATING_FAMILY_CAP);
 
   const recentQuota = Math.min(RECENT_QUOTA, recentKeys.size);
   const recentsInTop = top.filter(t => t.reason.isRecent).length;
@@ -526,7 +692,7 @@ export function pickSpotlightGames(games) {
       }
     }
   } else if (recentsInTop < recentQuota) {
-    const extras = tagged.slice(target).filter(t => t.reason.isRecent);
+    const extras = taggedExtras(tagged, top).filter(t => t.reason.isRecent);
     const need = Math.min(recentQuota - recentsInTop, extras.length);
     for (let i = 0; i < need; i++) top.push(extras[i]);
   }
@@ -549,7 +715,7 @@ export function pickSpotlightGames(games) {
       }
     }
   } else if (replaysInTop < replayQuota) {
-    const extras = tagged.slice(target).filter(t => t.reason.isReplay);
+    const extras = taggedExtras(tagged, top).filter(t => t.reason.isReplay);
     const need = Math.min(replayQuota - replaysInTop, extras.length);
     for (let i = 0; i < need; i++) top.push(extras[i]);
   }

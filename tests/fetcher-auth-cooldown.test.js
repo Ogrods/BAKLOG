@@ -5,6 +5,7 @@ import {
   noteAuthCooldownStrike,
   authCooldownRemainingMs,
   clearAuthCooldown,
+  staleSweepEligible,
 } from '../js/fetcher-health.js';
 import { ACTIVE_PROFILE_LS, LS_FETCHER_AUTH_COOLDOWN } from '../js/profiles.js';
 
@@ -54,6 +55,42 @@ describe('chip auth cooldown lifecycle', () => {
     expect(authCooldownRemainingMs('psn')).toBeGreaterThan(0);
     clearAuthCooldown('psn');
     expect(authCooldownRemainingMs('psn')).toBe(0);
+  });
+
+  it('excludes a fetcher from the stale sweep while it is in auth cooldown', () => {
+    const src = { key: 'psn', missingRequirements: [] };
+    const base = {
+      freshnessStatus: 'stale',
+      credentialsSatisfied: true,
+      hasRunState: false,
+      disconnected: false,
+    };
+    // Eligible when no cooldown is armed.
+    expect(staleSweepEligible(src, { ...base, cooldownMs: 0 })).toBe(true);
+    // The cooldown skip wins, mirroring runAllStale's filter.
+    expect(staleSweepEligible(src, { ...base, cooldownMs: 60_000 })).toBe(false);
+  });
+
+  it('honors the other stale-sweep gates (freshness, creds, run state, disconnected)', () => {
+    const eligible = {
+      freshnessStatus: 'missing',
+      credentialsSatisfied: true,
+      hasRunState: false,
+      cooldownMs: 0,
+      disconnected: false,
+    };
+    expect(staleSweepEligible({ key: 'psn' }, eligible)).toBe(true);
+    // Fresh/recent sources are never swept.
+    expect(staleSweepEligible({ key: 'psn' }, { ...eligible, freshnessStatus: 'fresh' })).toBe(false);
+    // Missing credentials when requirements exist.
+    expect(staleSweepEligible(
+      { key: 'psn', missingRequirements: ['npsso'] },
+      { ...eligible, credentialsSatisfied: false },
+    )).toBe(false);
+    // Already running / queued.
+    expect(staleSweepEligible({ key: 'psn' }, { ...eligible, hasRunState: true })).toBe(false);
+    // Disconnected provider.
+    expect(staleSweepEligible({ key: 'psn' }, { ...eligible, disconnected: true })).toBe(false);
   });
 
   it('loads cooldowns from the active profile key after ensureProfileScopedFetcherState', async () => {

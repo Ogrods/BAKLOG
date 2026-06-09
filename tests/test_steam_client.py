@@ -22,6 +22,40 @@ def test_get_with_retry_succeeds_after_connection_errors() -> None:
     assert get.call_count == 3
 
 
+def test_get_with_retry_succeeds_after_retryable_http_status() -> None:
+    throttled = MagicMock()
+    throttled.status_code = 429
+    throttled.raise_for_status = MagicMock()
+    ok = MagicMock()
+    ok.status_code = 200
+    ok.raise_for_status = MagicMock()
+    with patch("steam_client.requests.get", side_effect=[throttled, ok]) as get:
+        with patch("steam_client.time.sleep") as sleep:
+            resp = _get_with_retry("https://store.steampowered.com/api/appdetails", {"appids": 1})
+    assert resp is ok
+    assert get.call_count == 2
+    sleep.assert_called_once()
+    # The first (429) response is retried, not raised.
+    throttled.raise_for_status.assert_not_called()
+
+
+def test_get_with_retry_raises_after_persistent_retryable_status() -> None:
+    throttled = MagicMock()
+    throttled.status_code = 503
+    throttled.raise_for_status = MagicMock(
+        side_effect=requests.HTTPError("503", response=throttled)
+    )
+    with patch("steam_client.requests.get", return_value=throttled) as get:
+        with patch("steam_client.time.sleep"):
+            with pytest.raises(requests.HTTPError):
+                _get_with_retry(
+                    "https://store.steampowered.com/api/appdetails",
+                    {"appids": 1},
+                    retries=2,
+                )
+    assert get.call_count == 2
+
+
 def test_get_with_retry_raises_after_exhausted_retries() -> None:
     with patch("steam_client.requests.get", side_effect=requests.ConnectionError("dns")) as get:
         with patch("steam_client.time.sleep"):

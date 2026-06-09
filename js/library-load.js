@@ -310,7 +310,9 @@ export { LIBRARY_STORE_JSON };
 
 export function rebuildAllGamesFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
-  const manualLibrary = allManual.filter(g => !g.wishlist);
+  const nonWishlistManual = allManual.filter(g => !g.wishlist);
+  const manualItch = nonWishlistManual.filter(g => g.store === "itch");
+  const manualLibrary = nonWishlistManual.filter(g => g.store !== "itch");
   const { steam: steamData, gog, psn, epic, amazon, nintendo, xbox, battlenet, ubisoft, itch, humble, ea } = state.libraryMeta;
   const sources = [
     (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
@@ -327,9 +329,10 @@ export function rebuildAllGamesFromMetas() {
     manualLibrary,
   ];
   state.allGames = sources.flatMap(dedupeWithinStore).map(applyCoopOverrides);
-  state.itchGames = dedupeWithinStore(
-    (itch?.games || []).map(g => normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id })),
-  ).map(applyCoopOverrides);
+  state.itchGames = dedupeWithinStore([
+    ...(itch?.games || []).map(g => normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id })),
+    ...manualItch,
+  ]).map(applyCoopOverrides);
 }
 
 export function rebuildWishlistFromMetas() {
@@ -518,11 +521,18 @@ export async function reloadGames() {
 
 export function refreshAfterManualChange() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
-  const manualLibrary = allManual.filter(g => !g.wishlist);
   const manualWishlist = allManual.filter(g => !!g.wishlist);
+  const nonWishlistManual = allManual.filter(g => !g.wishlist);
+  // Manual entries added under the itch.io platform belong in the itch tab
+  // (state.itchGames), matching where fetched store === "itch" rows live.
+  // Without this they leak into the Library catalog and never show on the itch tab.
+  const manualItch = nonWishlistManual.filter(g => g.store === "itch");
+  const manualLibrary = nonWishlistManual.filter(g => g.store !== "itch");
   const nonManualLibrary = state.allGames.filter(g => !g.manual);
   state.allGames = [...nonManualLibrary, ...dedupeWithinStore(manualLibrary).map(applyCoopOverrides)];
   const fetchedWishlist = state.wishlistGames.filter(g => !g.manual);
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
+  const fetchedItch = state.itchGames.filter(g => !g.manual);
+  state.itchGames = [...fetchedItch, ...dedupeWithinStore(manualItch).map(applyCoopOverrides)];
   void applyMergedLibrary();
 }

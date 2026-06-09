@@ -92,3 +92,53 @@ describe('checkLibraryWatches', () => {
     expect(readWatches()).toHaveLength(0);
   });
 });
+
+describe('desktop Notification branch', () => {
+  function fakeNotification(permission) {
+    const ctor = vi.fn();
+    ctor.permission = permission;
+    ctor.requestPermission = vi.fn(() => Promise.resolve('granted'));
+    return ctor;
+  }
+
+  it('requests permission on arm when permission is "default"', () => {
+    const Notif = fakeNotification('default');
+    vi.stubGlobal('Notification', Notif);
+    armLibraryWatch(TEST_WATCH);
+    expect(Notif.requestPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not request permission when already granted', () => {
+    const Notif = fakeNotification('granted');
+    vi.stubGlobal('Notification', Notif);
+    armLibraryWatch(TEST_WATCH);
+    expect(Notif.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it('posts a desktop Notification when a watch fires and permission is granted', () => {
+    const Notif = fakeNotification('granted');
+    vi.stubGlobal('Notification', Notif);
+    armLibraryWatch(TEST_WATCH);
+    state.libraryMeta.steam = { games: [{ appid: 42, name: 'Test Game Found' }] };
+
+    expect(checkLibraryWatches()).toBe(true);
+    expect(Notif).toHaveBeenCalledTimes(1);
+    const [title, opts] = Notif.mock.calls[0];
+    expect(title).toBe('BAKLOG - game added');
+    expect(opts.body).toContain('Test Game Found');
+    expect(opts.tag).toBe('baklog-library-watch');
+  });
+
+  it('does not construct a Notification when permission is not granted', () => {
+    const Notif = fakeNotification('denied');
+    vi.stubGlobal('Notification', Notif);
+    armLibraryWatch(TEST_WATCH);
+    state.libraryMeta.steam = { games: [{ appid: 42, name: 'Test Game Found' }] };
+
+    // Watch still fires (banner shows) but no OS notification is constructed.
+    expect(checkLibraryWatches()).toBe(true);
+    expect(Notif).not.toHaveBeenCalled();
+    const banner = document.getElementById('libraryWatchBanner');
+    expect(banner.classList.contains('hidden')).toBe(false);
+  });
+});

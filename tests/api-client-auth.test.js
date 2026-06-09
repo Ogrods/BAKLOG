@@ -84,6 +84,19 @@ describe('api-client auth boot guard', () => {
     expect(authGate.handleApiUnauthorized).toHaveBeenCalled();
   });
 
+  it('attaches Bearer to /cache/protondb_map.json', async () => {
+    authGate.settleAuthReady();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { dataFetch } = await import('../js/api-client.js');
+    await dataFetch('cache/protondb_map.json?t=1');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = fetchMock.mock.calls[0][1].headers;
+    expect(headers.Authorization).toBe('Bearer test-token');
+  });
+
   it('attaches Bearer to games_*.json paths without a leading slash', async () => {
     authGate.settleAuthReady();
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));

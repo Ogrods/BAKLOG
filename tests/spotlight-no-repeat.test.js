@@ -40,6 +40,7 @@ describe("spotlight no-repeat window", () => {
     let setStinkerChanceForTest;
     let setRandomPickChanceForTest;
     let setCatGameChanceForTest;
+    let setScoreJitterForTest;
     ({
       pickSpotlightGames,
       renderSpotlightHtml,
@@ -53,10 +54,12 @@ describe("spotlight no-repeat window", () => {
       setStinkerChanceForTest,
       setRandomPickChanceForTest,
       setCatGameChanceForTest,
+      setScoreJitterForTest,
     } = await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
     setRandomPickChanceForTest(0);
     setCatGameChanceForTest(0);
+    setScoreJitterForTest(0);
   });
 
   afterEach(() => {

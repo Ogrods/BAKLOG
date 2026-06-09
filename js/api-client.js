@@ -11,7 +11,7 @@ export const BAKLOG_LOCAL_HEADER = 'X-BAKLOG-Local';
 export const BAKLOG_LOCAL_HEADER_VALUE = '1';
 
 const _DATA_JSON_RE = /^\/games_[a-z0-9_]+\.json$/i;
-const _CACHE_META_RE = /^\/cache\/(hltb_map|steam_review_map|cross_store_images_meta|steam_tags_meta|fx_rates)\.json$/i;
+const _CACHE_META_RE = /^\/cache\/(hltb_map|steam_review_map|cross_store_images_meta|steam_tags_meta|protondb_map|fx_rates)\.json$/i;
 
 /** Normalize catalog paths (library-load uses ``games_steam.json`` without a leading /). */
 function pathOnly(url) {

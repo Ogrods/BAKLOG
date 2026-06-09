@@ -72,7 +72,7 @@ function showDuplicateWarn(match, onProceed) {
     onProceed();
     return;
   }
-  const where = addGameTarget === "wishlist" ? "wishlist" : "library";
+  const where = addGameTarget === "wishlist" ? "wishlist" : addGameTarget === "itch" ? "itch library" : "library";
   text.innerHTML = `This looks like <strong>${escapeHtml(duplicateMatchLabel(match, addGameTarget))}</strong> already in your ${where}.`;
   _pendingAdd = onProceed;
   box.classList.remove("hidden");

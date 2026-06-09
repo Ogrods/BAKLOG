@@ -35,6 +35,7 @@ describe("spotlight nav arrows", () => {
     state.wishlistCrossStoreHiddenKeys = new Set();
     win._dataVersion = (win._dataVersion || 0) + 1;
     let setStinkerChanceForTest;
+    let setScoreJitterForTest;
     ({
       pickSpotlightGames,
       renderSpotlightHtml,
@@ -43,8 +44,10 @@ describe("spotlight nav arrows", () => {
       stepSpotlight,
       SPOTLIGHT_FADE_MS,
       setStinkerChanceForTest,
+      setScoreJitterForTest,
     } = await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
+    setScoreJitterForTest(0);
   });
 
   afterEach(() => {

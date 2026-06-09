@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { mkProvider, steamProvider, mockProviders } = vi.hoisted(() => {
+const { mkProvider, steamProvider, mockProviders, mockBaklogFetchDefault } = vi.hoisted(() => {
   function mkProvider(key, overrides = {}) {
     return {
       key,
@@ -18,19 +18,24 @@ const { mkProvider, steamProvider, mockProviders } = vi.hoisted(() => {
     status: 'connected',
     description: 'Steam library',
   });
-  return { mkProvider, steamProvider, mockProviders: { list: [steamProvider] } };
-});
-
-vi.mock('../js/api-client.js', () => ({
-  baklogFetch: vi.fn(async (url) => {
+  const mockProviders = { list: [steamProvider] };
+  async function mockBaklogFetchDefault(url) {
     if (url === '/api/auth/status') {
       return new Response(
         JSON.stringify({ providers: mockProviders.list }),
         { status: 200 },
       );
     }
+    if (url === '/api/config') {
+      return new Response(JSON.stringify({ chromium_available: true }), { status: 200 });
+    }
     return new Response('{}', { status: 404 });
-  }),
+  }
+  return { mkProvider, steamProvider, mockProviders, mockBaklogFetchDefault };
+});
+
+vi.mock('../js/api-client.js', () => ({
+  baklogFetch: vi.fn(mockBaklogFetchDefault),
   urlWithStreamTicket: vi.fn(async (u) => u),
 }));
 
@@ -115,10 +120,7 @@ describe('refreshConnections error keep-cache', () => {
       if (url === '/api/auth/status') {
         throw new Error('server down');
       }
-      if (url === '/api/config') {
-        return new Response(JSON.stringify({ chromium_available: true }), { status: 200 });
-      }
-      return new Response('{}', { status: 404 });
+      return mockBaklogFetchDefault(url);
     });
     await refreshConnections();
 
@@ -130,6 +132,8 @@ describe('refreshConnections error keep-cache', () => {
     expect(banner.classList.contains('hidden')).toBe(false);
     expect(banner.className).toContain('text-amber-400');
     expect(banner.textContent).toMatch(/local server/i);
+
+    vi.mocked(baklogFetch).mockImplementation(mockBaklogFetchDefault);
   });
 });
 

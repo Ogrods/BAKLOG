@@ -26,7 +26,7 @@ def test_acquire_and_release_round_trip(monkeypatch, tmp_path):
         tray_lock.release_tray_lock()
         assert tray_lock.acquire_tray_lock() is True
         return
-    monkeypatch.setattr("shared.tray_lock.data_root", lambda: tmp_path)
+    monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
     assert tray_lock.acquire_tray_lock() is True
     tray_lock.release_tray_lock()
     assert tray_lock.acquire_tray_lock() is True
@@ -35,7 +35,7 @@ def test_acquire_and_release_round_trip(monkeypatch, tmp_path):
 def test_second_holder_blocked_on_posix(monkeypatch, tmp_path):
     if sys.platform == "win32":
         pytest.skip("Windows mutex test needs a second process")
-    monkeypatch.setattr("shared.tray_lock.data_root", lambda: tmp_path)
+    monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
     assert tray_lock.acquire_tray_lock() is True
     # Simulate another process holding the lock file.
     lock_path = tmp_path / ".tray.lock"

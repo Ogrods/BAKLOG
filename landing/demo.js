@@ -96,9 +96,9 @@
   const INSIGHTS = [
     "You own <strong>600</strong> games. You've played <strong>40</strong>.",
     "Every deal site tells you a game is <strong>80% off</strong>. BAKLOG tells you that you already own it on Epic.",
-    "It was always your data — BAKLOG just retrieves and reshuffles it.",
+    "It was always your data; BAKLOG just retrieves and reshuffles it.",
     "<strong>2,847h</strong> backlog at 2h/day is <strong>3.9 years</strong> to clear.",
-    "Connect a store and BAKLOG auto-fetches — fetcher chips light up as the count climbs.",
+    "Connect a store and BAKLOG auto-fetches; fetcher chips light up as the count climbs.",
     "We drop the DLC skins and soundtracks, so the count is honest games.",
     "There is no BAKLOG server to breach.",
   ];
@@ -205,7 +205,7 @@
               <span class="library-count-host" data-libcount-host title="Total games in your merged library across all connected stores">
                 <span class="dash-hero-number" id="dashHeroCount">0</span>
               </span>
-              <div class="dash-hero-sub" title="Sample subset — full app supports twelve libraries and eight wishlists">games in this sample · <span class="dash-hero-sub-count">${STATS.stores} of 12</span> stores</div>
+              <div class="dash-hero-sub" title="Sample subset: full app supports 12 libraries and 8 wishlists">games in this sample · <span class="dash-hero-sub-count">${STATS.stores} of 12</span> stores</div>
               ${buildStoreStripHtml()}
               <div class="dash-hero-tagline">
                 <span title="Finished share of library excluding skipped games"><strong>${STATS.completion}%</strong> complete</span>

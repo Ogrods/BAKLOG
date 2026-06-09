@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BAKLOG: One honest backlog across every store</title>
-  <meta name="description" content="One honest backlog across every store. Free forever to import · twelve libraries and eight wishlists · runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Open source (MIT). Optional $5/mo paid tier. Invite-only early access." />
+  <meta name="description" content="One honest backlog across every store. Free forever to import · 12 libraries and 8 wishlists · runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Open source (MIT). Optional $5/mo paid tier. Invite-only early access." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="BAKLOG" />
@@ -18,14 +18,14 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://baklog.app/" />
   <meta property="og:title" content="BAKLOG: One honest backlog across every store" />
-  <meta property="og:description" content="One honest backlog across every store. Free forever · twelve libraries and eight wishlists · runs on your machine. Watch 0 → 2,000+ games in ~90 seconds. Open source (MIT). Invite-only early access." />
+  <meta property="og:description" content="One honest backlog across every store. Free forever · 12 libraries and 8 wishlists · runs on your machine. Watch 0 → 2,000+ games in ~90 seconds. Open source (MIT). Invite-only early access." />
   <meta property="og:image" content="https://baklog.app/assets/og.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="BAKLOG: one honest backlog across every store" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="BAKLOG: One honest backlog across every store" />
-  <meta name="twitter:description" content="One honest backlog across every store. Free forever · twelve libraries and eight wishlists · runs on your machine. Watch 0 → 2,000+ games in ~90 seconds. Open source (MIT). Invite-only early access." />
+  <meta name="twitter:description" content="One honest backlog across every store. Free forever · 12 libraries and 8 wishlists · runs on your machine. Watch 0 → 2,000+ games in ~90 seconds. Open source (MIT). Invite-only early access." />
   <meta name="twitter:image" content="https://baklog.app/assets/og.png" />
   <meta name="twitter:image:alt" content="BAKLOG: one honest backlog across every store" />
 
@@ -40,7 +40,7 @@
 
   <!-- Structured data: inline. The src attribute is ignored on ld+json blocks,
        and data blocks aren't executed so CSP script-src doesn't apply to them. -->
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","codeRepository":"https://github.com/Ogrods/BAKLOG","license":"https://opensource.org/licenses/MIT","description":"One honest backlog across every store. Free forever to import; twelve libraries and eight wishlists; runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Open source (MIT). Optional $5/mo paid tier. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Paid","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","codeRepository":"https://github.com/Ogrods/BAKLOG","license":"https://opensource.org/licenses/MIT","description":"One honest backlog across every store. Free forever to import; 12 libraries and 8 wishlists; runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Open source (MIT). Optional $5/mo paid tier. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Paid","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
 
   <style>
     @font-face {
@@ -224,9 +224,12 @@
       margin: 0.55rem auto 0;
       max-width: 42ch;
       line-height: 1.5;
-      text-wrap: pretty;
+      text-wrap: balance;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
     }
+    /* Keep each separator-delimited phrase intact so the rag never orphans a
+       two-word fragment like "your machine"; breaks only fall between phrases. */
+    .hero-subhead .nb { white-space: nowrap; }
 
     /* Compact store trust strip - same SVG mask system as the app (assets/store-logos) */
     .hero-store-strip {
@@ -622,7 +625,7 @@
 
     <h1 class="wordmark">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></h1>
     <p class="hero-tagline">One honest backlog across every store.</p>
-    <p class="hero-subhead">Free forever to import &middot; twelve libraries and eight wishlists &middot; runs on your machine</p>
+    <p class="hero-subhead"><span class="nb">Free forever to import&nbsp;&middot;</span> <span class="nb">12 libraries and 8 wishlists&nbsp;&middot;</span> <span class="nb">runs on your machine</span></p>
 
     <!-- order: STORE_DISPLAY_ORDER / bizcard BIZCARD_STORES -->
     <div class="hero-store-strip" aria-hidden="true">
@@ -666,7 +669,7 @@
     <div class="wrap">
       <span class="eyebrow">The accidental library</span>
       <h2>You didn't buy 600 games. They piled up.</h2>
-      <p>Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG retrieves what you already own — opening a channel from each store straight to your machine. It was always your data; BAKLOG just retrieves and reshuffles it.</p>
+      <p>Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG retrieves what you already own, opening a channel from each store straight to your machine. It was always your data; BAKLOG just retrieves and reshuffles it.</p>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
     </div>
   </section>
@@ -677,7 +680,7 @@
       <div class="section-head">
         <span class="eyebrow">The demo is the product</span>
         <h2>This is your dashboard on day one.</h2>
-        <p>Connect your stores and watch your library count climb. This live sample uses dummy data from seven stores — the real app supports twelve libraries and eight wishlists.</p>
+        <p>Connect your stores and watch your library count climb. This live sample uses dummy data from seven stores. The real app supports 12 libraries and 8 wishlists.</p>
       </div>
       <div class="demo-mount" id="demoMount" aria-label="BAKLOG dashboard sample"></div>
       <p class="demo-cta"><a class="btn" href="#waitlist">Request an invite</a></p>
@@ -690,7 +693,7 @@
       <div class="section-head">
         <span class="eyebrow">Watch your library appear</span>
         <h2>From empty to 2,000+ games in 90 seconds.</h2>
-        <p>Retrieve, normalize, decide — no catch, no cloud vault.</p>
+        <p>Retrieve, normalize, decide. No catch, no cloud vault.</p>
       </div>
       <div class="steps">
         <div class="step">
@@ -716,8 +719,8 @@
   <!-- ============ STORE WALL ============ -->
   <section class="band logo-wall-section" id="stores">
     <div class="wrap">
-      <span class="eyebrow">Works with what you own — or start from scratch</span>
-      <h2>Twelve libraries and eight wishlists. One honest table.</h2>
+      <span class="eyebrow">Works with what you own, or start from scratch</span>
+      <h2>12 libraries and 8 wishlists. One honest table.</h2>
       <div class="logo-wall" aria-hidden="true">
         <!-- order: STORE_DISPLAY_ORDER / hero strip -->
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-label="Steam"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z"/></svg>
@@ -733,7 +736,7 @@
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-label="Ubisoft"><path d="M23.561 11.988C23.301-.304 6.954-4.89.656 6.634c.282.206.661.477.943.672a11.747 11.747 0 00-.976 3.067 11.885 11.885 0 00-.184 2.071C.439 18.818 5.621 24 12.005 24c6.385 0 11.556-5.17 11.556-11.556v-.455zm-20.27 2.06c-.152 1.246-.054 1.636-.054 1.788l-.282.098c-.108-.206-.37-.932-.488-1.908C2.163 10.308 4.7 6.96 8.57 6.33c3.544-.52 6.937 1.68 7.728 4.758l-.282.098c-.087-.087-.228-.336-.77-.878-4.281-4.281-11.002-2.32-11.956 3.74zm11.002 2.081a3.145 3.145 0 01-2.59 1.355 3.15 3.15 0 01-3.155-3.155 3.159 3.159 0 012.927-3.144c1.018-.043 1.972.51 2.416 1.398a2.58 2.58 0 01-.455 2.95c.293.205.575.4.856.595zm6.58.12c-1.669 3.782-5.106 5.766-8.77 5.712-7.034-.347-9.083-8.466-4.38-11.393l.207.206c-.076.108-.358.325-.791 1.182-.51 1.041-.672 2.081-.607 2.732.369 5.67 8.314 6.83 11.045 1.214C21.057 8.217 11.822.401 3.626 6.374l-.184-.184C5.599 2.808 9.816 1.3 13.837 2.309c6.147 1.55 9.453 7.956 7.035 13.94z"/></svg>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-label="EA"><path d="M16.635 6.162l-5.928 9.377H4.24l1.508-2.3h4.024l1.474-2.335H2.264L.79 13.239h2.156L0 17.84h12.072l4.563-7.259 1.652 2.66h-1.401l-1.473 2.299h4.347l1.473 2.3H24zm-11.461.107L3.7 8.604l9.52-.035 1.474-2.3z"/></svg>
       </div>
-      <p class="logo-wall-caption">Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App. Plus eight wishlist sources for deal radar.</p>
+      <p class="logo-wall-caption">Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App. Plus 8 wishlist sources for deal radar.</p>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
     </div>
   </section>
@@ -744,7 +747,7 @@
       <div class="section-head">
         <span class="eyebrow">What you get</span>
         <h2>Your whole library, finally&nbsp;honest.</h2>
-        <p>No cloud vault, no AI, no secret sauce — and the whole app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>. BAKLOG fetches your library from every store on your behalf, then normalizes and reshuffles it into something you can actually decide from.</p>
+        <p>No cloud vault, no AI, no secret sauce, and the whole app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>. BAKLOG fetches your library from every store on your behalf, then normalizes and reshuffles it into something you can actually decide from.</p>
       </div>
 
       <div class="features-grid">
@@ -780,13 +783,13 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
           </div>
           <h3>Free games, surfaced</h3>
-          <p><strong>Claimable Now</strong> aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard, skipping anything you already own. See <a href="#start">starting from zero</a> for Epic mobile claims and other free entry paths.</p>
+          <p><strong>Claimable Now</strong> aggregates active giveaways from Epic, GOG, Steam, Prime, and more, sourced via GamerPower, IsThereAnyDeal, and the Epic Store, right in your dashboard, skipping anything you already own. See <a href="#start">starting from zero</a> for Epic mobile claims and other free entry paths.</p>
           <ul>
             <li>Maintainer-approved feed of active giveaways (auto-discovered + hand-curated)</li>
             <li>Notification banner when new free games drop</li>
             <li>Ownership-aware: hides titles already in your library</li>
-            <li>Full games only — DLC packs, add-ons, and in-game bonuses are filtered out of the free feed</li>
-            <li>Free tier — no paywall on the feed; GamerPower attribution when applicable</li>
+            <li>Full games only: DLC packs, add-ons, and in-game bonuses are filtered out of the free feed</li>
+            <li>Free tier: no paywall on the feed; GamerPower attribution when applicable</li>
           </ul>
         </article>
 
@@ -799,7 +802,7 @@
           <ul>
             <li>Local-first; runs on your machine</li>
             <li>Credentials encrypted, never uploaded</li>
-            <li>Zero telemetry — <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>; audit every fetcher and credential path</li>
+            <li>Zero telemetry: <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>; audit every fetcher and credential path</li>
           </ul>
         </article>
 
@@ -808,15 +811,15 @@
             <h3>Paid tier</h3>
             <span class="premium-badge">Planned</span>
           </div>
-          <p>The free tier keeps everything you need to import, browse, and decide what to play next. The optional <strong>$5/mo</strong> ($50/yr) tier layers on power-user conveniences — none of today's free features ever move behind it.</p>
+          <p>The free tier keeps everything you need to import, browse, and decide what to play next. The optional <strong>$5/mo</strong> ($50/yr) tier layers on power-user conveniences. None of today's free features ever move behind it.</p>
           <ul>
-            <li>Queue every stale store at once — one click queues all your outdated libraries and they refresh back-to-back (free tier: one store at a time, on demand)</li>
+            <li>Queue every stale store at once: one click queues all your outdated libraries and they refresh back-to-back (free tier: one store at a time, on demand)</li>
             <li>Scheduled stale-store refresh without keeping the app open</li>
             <li>Cloud sync across machines</li>
             <li>No sponsored deal cards</li>
-            <li>Deep achievement/trophy sync — full on-demand re-pull (free tier: cached % only)</li>
+            <li>Deep achievement/trophy sync: full on-demand re-pull (free tier: cached % only)</li>
             <li>Deal &amp; watchlist alerts</li>
-            <li>Bonus claimables feed — the DLC, add-ons, and in-game bonuses we filter out of the free feed, surfaced just for paid members</li>
+            <li>Bonus claimables feed: the DLC, add-ons, and in-game bonuses we filter out of the free feed, surfaced just for paid members</li>
           </ul>
         </article>
 
@@ -846,7 +849,7 @@
             </tr>
             <tr>
               <th scope="row">Refresh while app is closed</th>
-              <td>—</td>
+              <td>✕</td>
               <td>✓</td>
             </tr>
             <tr>
@@ -866,7 +869,7 @@
             </tr>
             <tr>
               <th scope="row">Cloud sync</th>
-              <td>—</td>
+              <td>✕</td>
               <td>✓</td>
             </tr>
           </tbody>
@@ -882,13 +885,13 @@
       <div class="section-head">
         <span class="eyebrow">Starting from zero?</span>
         <h2>You don't need to own a thing. Start collecting today.</h2>
-        <p>You don't need an existing library on any of the twelve stores. Several have a free way in — and those pipelines fill a backlog on their own.</p>
+        <p>You don't need an existing library on any of the 12 stores. Several have a free way in, and those pipelines fill a backlog on their own.</p>
       </div>
       <div class="steps">
         <div class="step">
           <div class="num">1</div>
           <h3>Claim this week's free games</h3>
-          <p>Epic, Prime Gaming, GOG, Steam keys, and more drop free games every week. Epic's weekly freebie can be claimed straight from the Epic Games Store Mobile app on supported devices — no computer required — and the mobile store runs its own giveaways too. BAKLOG surfaces active drops in <strong>Claimable Now</strong> — a maintainer-curated feed aggregated from the Epic Store, GamerPower, and IsThereAnyDeal — right in your dashboard, so you never miss a drop.</p>
+          <p>Epic, Prime Gaming, GOG, Steam keys, and more drop free games every week. Epic's weekly freebie can be claimed straight from the Epic Games Store Mobile app on supported devices (no computer required), and the mobile store runs its own giveaways too. BAKLOG surfaces active drops in <strong>Claimable Now</strong>, a maintainer-curated feed aggregated from the Epic Store, GamerPower, and IsThereAnyDeal, right in your dashboard, so you never miss a drop.</p>
         </div>
         <div class="step">
           <div class="num">2</div>
@@ -920,11 +923,11 @@
         </article>
         <article class="card">
           <h3>vs launchers</h3>
-          <p>Playnite is an open-source launcher; Galaxy and deal sites are not. BAKLOG is the lightweight decision layer on top — also open source (MIT) — no heavy launcher hogging memory: deals with ownership context, backlog status, and wishlist radar.</p>
+          <p>Playnite is an open-source launcher; Galaxy and deal sites are not. BAKLOG is the lightweight decision layer on top, also open source (MIT), no heavy launcher hogging memory: deals with ownership context, backlog status, and wishlist radar.</p>
         </article>
         <article class="card">
           <h3>vs manual loggers</h3>
-          <p>Backloggd is manual logging. BAKLOG auto-imports twelve libraries and eight wishlist sources when you connect each store.</p>
+          <p>Backloggd is manual logging. BAKLOG auto-imports 12 libraries and 8 wishlist sources when you connect each store.</p>
         </article>
       </div>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
@@ -937,12 +940,12 @@
       <div class="section-head">
         <span class="eyebrow">Sabermetrics for your backlog</span>
         <h2>We gave your pile of shame a box score.</h2>
-        <p>Your library is data. BAKLOG turns it into a scoreboard: 300+ stats and baseball-style sabermetrics — completion AVG, backlog OPS, value-per-hour, even a WAR for your next pick. Honest enough to screenshot for the group chat.</p>
+        <p>Your library is data. BAKLOG turns it into a scoreboard: 300+ stats and baseball-style sabermetrics: completion AVG, backlog OPS, value-per-hour, even a WAR for your next pick. Honest enough to screenshot for the group chat.</p>
       </div>
       <div class="score-grid">
         <div class="score-tile"><div class="num">300+</div><div class="lbl">stats &amp; sabermetrics, from AVG to WAR</div></div>
         <div class="score-tile"><div class="num">12 + 8</div><div class="lbl">library and wishlist sources</div></div>
-        <div class="score-tile"><div class="num">100%</div><div class="lbl">on your machine — open source, nothing uploaded</div></div>
+        <div class="score-tile"><div class="num">100%</div><div class="lbl">on your machine, open source, nothing uploaded</div></div>
         <div class="score-tile"><div class="num">90 sec</div><div class="lbl">from empty to your whole library</div></div>
         <div class="score-tile"><div class="num">$0</div><div class="lbl">free forever to import your library</div></div>
         <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (paid, planned)</div></div>
@@ -956,7 +959,7 @@
     <div class="wrap">
       <span class="eyebrow">Local-first isn't marketing</span>
       <h2>There is no BAKLOG server to breach.</h2>
-      <p>Your libraries never leave your machine. There is nothing to breach, sell, or subpoena, because there is no server holding it in the first place. BAKLOG is your concierge across every store: it fetches through your own session and IP, opens a direct channel from each storefront to your machine, and never detours your data through ours. Don't take our word for it — the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">full source is on GitHub</a> (MIT). Audit every line that touches your credentials, your library JSON, and your network.</p>
+      <p>Your libraries never leave your machine. There is nothing to breach, sell, or subpoena, because there is no server holding it in the first place. BAKLOG is your concierge across every store: it fetches through your own session and IP, opens a direct channel from each storefront to your machine, and never detours your data through ours. Don't take our word for it: the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">full source is on GitHub</a> (MIT). Audit every line that touches your credentials, your library JSON, and your network.</p>
     </div>
   </section>
 
@@ -968,31 +971,31 @@
       <div class="faq" style="text-align:left">
         <details>
           <summary>Is it safe?</summary>
-          <p>Your credentials stay encrypted on your machine. Store fetches use your own browser session and your IP. There is no BAKLOG server holding your logins. The app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a> — you can read the code and verify that yourself.</p>
+          <p>Your credentials stay encrypted on your machine. Store fetches use your own browser session and your IP. There is no BAKLOG server holding your logins. The app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>. You can read the code and verify that yourself.</p>
         </details>
         <details>
           <summary>Is it open source?</summary>
-          <p>Yes. BAKLOG is released under the <a href="https://github.com/Ogrods/BAKLOG/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The full app — server, fetchers, auth, and dashboard — lives in the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">public GitHub repo</a>. No hidden builds, no closed-source telemetry layer. Optional paid features (planned) are conveniences on top of the same open codebase, not a fork of your data into our cloud.</p>
+          <p>Yes. BAKLOG is released under the <a href="https://github.com/Ogrods/BAKLOG/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The full app (server, fetchers, auth, and dashboard) lives in the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">public GitHub repo</a>. No hidden builds, no closed-source telemetry layer. Optional paid features (planned) are conveniences on top of the same open codebase, not a fork of your data into our cloud.</p>
         </details>
         <details>
           <summary>Is it free?</summary>
-          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary % (no on-demand deep re-pull). <strong>Claimable Now</strong> on the free tier surfaces full-game giveaways only — DLC packs, add-ons, and in-game bonuses are filtered out. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. The optional <strong>$5/mo</strong> paid tier ($50/yr, <strong>planned</strong>) will add queued bulk refresh (every stale store in one sweep), scheduled refresh without the app open, no sponsored deal cards, cloud sync, deep achievement/trophy sync (full re-pull), and a bonus claimables feed for those DLC and bonus drops. Nothing paywalled today stays paywalled when paid launches.</p>
+          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary % (no on-demand deep re-pull). <strong>Claimable Now</strong> on the free tier surfaces full-game giveaways only: DLC packs, add-ons, and in-game bonuses are filtered out. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. The optional <strong>$5/mo</strong> paid tier ($50/yr, <strong>planned</strong>) will add queued bulk refresh (every stale store in one sweep), scheduled refresh without the app open, no sponsored deal cards, cloud sync, deep achievement/trophy sync (full re-pull), and a bonus claimables feed for those DLC and bonus drops. Nothing paywalled today stays paywalled when paid launches.</p>
         </details>
         <details>
           <summary>What's in the paid tier?</summary>
-          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> (planned): no sponsored deal cards, cloud sync across machines, <strong>queued bulk refresh</strong> — queue every stale store and let them run back-to-back instead of babysitting one at a time, scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), deal/watchlist alerts, and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
+          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> (planned): no sponsored deal cards, cloud sync across machines, <strong>queued bulk refresh</strong> (queue every stale store and let them run back-to-back instead of babysitting one at a time), scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), deal/watchlist alerts, and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
         </details>
         <details>
           <summary>What's the difference between free and paid refresh?</summary>
-          <p>On the free tier, you refresh one store at a time — click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. The planned paid tier adds <strong>queued bulk refresh</strong>: one action queues every store that needs updating, and they run back-to-back so you can kick it off and walk away. Paid also adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). Your credentials and data still stay on your machine — only the convenience layer changes.</p>
+          <p>On the free tier, you refresh one store at a time: click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. The planned paid tier adds <strong>queued bulk refresh</strong>: one action queues every store that needs updating, and they run back-to-back so you can kick it off and walk away. Paid also adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). Your credentials and data still stay on your machine. Only the convenience layer changes.</p>
         </details>
         <details>
           <summary>Does BAKLOG show me free games to claim?</summary>
-          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard. A notification banner alerts you when new drops land. The feed is ownership-aware — it skips games you already own somewhere in your library. Included on the free tier. For Epic mobile claims and other free entry paths, see <a href="#start">starting from zero</a>.</p>
+          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more, sourced via GamerPower, IsThereAnyDeal, and the Epic Store, right in your dashboard. A notification banner alerts you when new drops land. The feed is ownership-aware: it skips games you already own somewhere in your library. Included on the free tier. For Epic mobile claims and other free entry paths, see <a href="#start">starting from zero</a>.</p>
         </details>
         <details>
-          <summary>I don't really own games yet — is BAKLOG still for me?</summary>
-          <p>Yes. You don't need a paid library to start. See <a href="#start">starting from zero</a> for free entry paths — Epic, Prime, GOG, free-to-play hits, and more. BAKLOG tracks your collection from the first claim, and <strong>Claimable Now</strong> aggregates the week's free drops so you never miss one.</p>
+          <summary>I don't really own games yet. Is BAKLOG still for me?</summary>
+          <p>Yes. You don't need a paid library to start. See <a href="#start">starting from zero</a> for free entry paths: Epic, Prime, GOG, free-to-play hits, and more. BAKLOG tracks your collection from the first claim, and <strong>Claimable Now</strong> aggregates the week's free drops so you never miss one.</p>
         </details>
         <details>
           <summary>Do I have to refresh it?</summary>

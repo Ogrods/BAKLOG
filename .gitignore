@@ -75,3 +75,18 @@ tracker.html
 preview-bootstrap.html
 IP.md
 tools/make_ads.py
+
+# Local scratch run output, audits, review artifacts (never commit)
+EVENT_AUDIT.json
+EVENT_AUDIT.md
+FREE_SURFACE_REVIEW.md
+_tail_label.txt
+pytest_*.txt
+full_pytest_run.txt
+protondb_run.txt
+review-baseline.json
+review-feed-rows.csv
+review-findings.yaml
+review-handoff.md
+review-report.json
+scripts/_diag_personal.py

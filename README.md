@@ -1,14 +1,30 @@
-# BAKLOG
+# BAKLOG&trade;
 
-**Cross-store game backlog — local-only.**
+> **One honest backlog across every store.**
 
-**Beta:** source is open under [MIT](LICENSE); the product is invite-only while we test. Request access at [baklog.app](https://baklog.app).
+![BAKLOG dashboard — KPI cards, store/status charts, and a deduped cross-store library](dashboard.png)
 
-![Dashboard preview](dashboard.png)
+**BAKLOG pulls every game you own into one local, honest table.** Connect your stores once and it imports **12 libraries and 8 wishlists** — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then helps you decide what to play next and whether that "deal" is actually worth opening. Nothing is hosted: your credentials and library JSON never leave your machine.
 
-BAKLOG helps you browse, sort, and prioritize games across **12 library sources and 8 wishlists** — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App. Nothing is hosted on the web; your credentials and library JSON stay on your machine.
+**Free forever to import · Invite-only early access.** Request access at **[baklog.app](https://baklog.app)**.
 
-**New to collecting?** You don't need an existing library on any store. Start free on Steam (free-to-play), Epic (weekly free game — claimable from the Epic Games Store Mobile app on supported devices, no PC needed), Prime Gaming (free keys), GOG (periodic giveaways), Battle.net (StarCraft), Ubisoft (Rainbow Six Siege), or itch.io (pay-what-you-want) — then let BAKLOG track your collection from day one. **Claimable Now** aggregates active giveaways from Epic, GamerPower, and IsThereAnyDeal right in your dashboard so you never miss a drop.
+**No games yet?** You don't need an existing library on any store. Start free with Epic (weekly free game — claimable from the Epic Games Store Mobile app, no PC needed), GOG (periodic giveaways), or Prime Gaming (free keys) — then let BAKLOG track your collection from day one. **Claimable Now** aggregates active giveaways from Epic, GamerPower, and IsThereAnyDeal right in your dashboard so you never miss a drop.
+
+## Watch your library appear
+
+From empty to 2,000+ games in about 90 seconds — three steps:
+
+1. **Connect** — link your stores once from the **Connections** tab. Credentials stay encrypted on your machine (OS keyring + AES-GCM fallback).
+2. **Auto-fetch on connect** — BAKLOG opens a channel to each store and brings everything you own back to one table. Fetcher chips light up as each library lands, and auto-refresh quietly updates stores older than 24h while the app is open.
+3. **Decide** — know what to play next, and whether that "deal" is actually worth opening.
+
+→ Ready to install? Jump to [**Setup**](#setup). Want the full tour first? Skim the [feature list](#features).
+
+## Screenshots
+
+[![BAKLOG dashboard — analytics, KPI cards, and charts](dashboard.png)](dashboard.png)
+
+The shot above is the real dashboard. Prefer to click around before installing? The **[interactive demo at baklog.app/#demo](https://baklog.app/#demo)** mirrors the full app UX with sample data — no install, no sign-in.
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
@@ -74,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 
 - Four tabs: **Dashboard** (Chart.js analytics, default view), **Library** (deduped cross-store), **Wishlist** (deal radar), **itch.io** (quarantined indie library)
 - Tabbed Picks panel: Top Rated, Next Up, Quick Wins, Hidden Gems, Return To, **Wishlist Deals**
-- **Dashboard tab:** KPI cards, store/status/review donuts, genre and tag charts, HLTB histogram, releases timeline, wishlist deal stats, top-rated and quick-wins lists, itch.io recap; tab switches cache table renders for snappy navigation
+- **Dashboard tab:** KPI cards, store/status/review donuts, genre and tag charts, HLTB histogram, releases timeline, wishlist deal stats, top-rated and quick-wins lists, itch.io recap; plus a rotating marquee of **300+ stats, insights & baseball-style sabermetrics** (completion AVG, backlog OPS, BV+, WAR); tab switches cache table renders for snappy navigation
 - **itch.io tab:** hides tools/soundtracks/TTRPG PDFs by default; toggle to show all owned keys
 - Status breakdown chips in the summary row (click to filter): Backlog, Next, Playing, Unfinished, Live service, Finished, Skip
 - Smart sorting with optional Priority Score column

@@ -285,6 +285,18 @@ from shared.profile_paths import (  # noqa: E402
     sponsors_path,
 )
 from shared.safe_write import safe_write_text  # noqa: E402
+from shared.server_static import (  # noqa: E402
+    LIBRARY_JSON_RE as _LIBRARY_JSON_RE,
+)
+from shared.server_static import (  # noqa: E402
+    normalize_static_path as _normalize_static_path,
+)
+from shared.server_static import (  # noqa: E402
+    resolved_static_path_allowed as _resolved_static_path_allowed,
+)
+from shared.server_static import (  # noqa: E402
+    static_class as _static_class_impl,
+)
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
@@ -2305,14 +2317,6 @@ def _stream_resume_since(handler: SimpleHTTPRequestHandler) -> int:
         except ValueError:
             pass
     return since
-
-
-from shared.server_static import (  # noqa: E402
-    LIBRARY_JSON_RE as _LIBRARY_JSON_RE,
-    normalize_static_path as _normalize_static_path,
-    resolved_static_path_allowed as _resolved_static_path_allowed,
-    static_class as _static_class_impl,
-)
 
 
 def _static_class(path_only: str) -> str:

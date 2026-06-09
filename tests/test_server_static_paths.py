@@ -38,7 +38,6 @@ def test_resolved_static_path_blocks_dotenv(tmp_path, monkeypatch: pytest.Monkey
     env_file = tmp_path / ".env"
     env_file.write_text("SECRET=1", encoding="utf-8")
     monkeypatch.setattr(server, "ROOT", tmp_path)
-    from shared.install_paths import data_root as _dr
 
     monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
     assert server._resolved_static_path_allowed(str(env_file)) is False

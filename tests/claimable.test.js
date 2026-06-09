@@ -9,6 +9,8 @@ import {
   getHiddenClaims,
   getOwnedClaims,
   diffClaims,
+  saveClaimsSnapshot,
+  loadClaimsSnapshotKeys,
   isClaimOwned,
   stripClaimTitleDecorations,
   dismissClaim,
@@ -22,11 +24,14 @@ import {
   loadClaimableNow,
   claimCoverFallback,
 } from '../js/claimable.js';
+import { buildOwnedNormNames } from '../js/deals.js';
 
 function resetState() {
   state.personal = {};
   state.allGames = [];
   state.ownedNormNames = new Set();
+  state.ownedSteamAppids = new Set();
+  state.crossStoreHiddenKeys = new Set();
   state.claimableFeed = null;
   state.claimableNow = [];
 }
@@ -106,6 +111,7 @@ describe('getVisibleClaims', () => {
 
   it('hides owned steam appid matches', () => {
     state.allGames = [{ store: 'steam', appid: 570, id: 570, name: 'Dota 2' }];
+    buildOwnedNormNames();
     const items = [{
       id: 'steam-dota',
       store: 'steam',
@@ -173,6 +179,16 @@ describe('diffClaims', () => {
     const prev = new Set();
     const { newCount } = diffClaims(prev, sampleItems);
     expect(newCount).toBe(2);
+  });
+
+  it('does not re-fire when the same game returns under a churned feed id', () => {
+    // Acknowledge the current feed, then regenerate the same games under new
+    // ids (the documented epic-*→gamerpower-* churn after dedup/enrich).
+    saveClaimsSnapshot(sampleItems);
+    const prevKeys = loadClaimsSnapshotKeys();
+    const churned = sampleItems.map(c => ({ ...c, id: `gamerpower-${c.id}` }));
+    const { newCount } = diffClaims(prevKeys, churned);
+    expect(newCount).toBe(0);
   });
 });
 

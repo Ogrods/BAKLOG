@@ -252,6 +252,69 @@ def refuse_drift_result(
     return 3
 
 
+def guard_catalog_write(
+    items: list[Any] | int,
+    *,
+    label: str,
+    output_path: Path | None,
+    allow_empty: bool = False,
+    allow_drift: bool = False,
+    threshold: float = 0.5,
+) -> int | None:
+    """Run the empty-result and drift guards as one unit.
+
+    Returns the refusal exit code (``2`` empty, ``3`` drift) or ``None`` when the
+    write may proceed. Combining both checks in a single call is what keeps a
+    fetcher from running one guard and forgetting the other (or skipping them):
+    callers route the write through :func:`write_catalog_guarded`, which always
+    consults this before touching disk.
+    """
+    empty_exit = refuse_empty_result(
+        items, label=label, allow_empty=allow_empty, output_path=output_path
+    )
+    if empty_exit is not None:
+        return empty_exit
+    return refuse_drift_result(
+        items,
+        label=label,
+        allow_drift=allow_drift,
+        output_path=output_path,
+        threshold=threshold,
+    )
+
+
+def write_catalog_guarded(
+    path: Path,
+    text: str,
+    *,
+    count: list[Any] | int,
+    label: str,
+    allow_empty: bool = False,
+    allow_drift: bool = False,
+    threshold: float = 0.5,
+) -> int:
+    """Guarded atomic catalog write.
+
+    Runs :func:`guard_catalog_write` and only writes when it passes. Returns
+    ``0`` after a successful write, or the guard's refusal exit code (``2``/``3``)
+    without writing. Because the guard runs *inside* this call, a fetcher that
+    routes its write here cannot accidentally overwrite a good catalog with an
+    empty or sharply-shrunken result.
+    """
+    refused = guard_catalog_write(
+        count,
+        label=label,
+        output_path=path,
+        allow_empty=allow_empty,
+        allow_drift=allow_drift,
+        threshold=threshold,
+    )
+    if refused is not None:
+        return refused
+    write_catalog_text(path, text)
+    return 0
+
+
 def load_existing_games(path: Path, *, id_key: str = "id") -> dict[str, dict[str, Any]]:
     path = resolve_catalog_path(path)
     if not path.exists():

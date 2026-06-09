@@ -775,10 +775,43 @@ export function alphaBucket(name) {
   return ch.toUpperCase();
 }
 
+/** gameKey → game across library + wishlist + itch catalogs. */
+let _gameKeyIndexVer = -1;
+let _gameKeyIndex = null;
+
+function buildGameKeyIndex() {
+  const index = new Map();
+  // Insertion order mirrors the previous lookup precedence (library, then itch,
+  // then wishlist): the first writer for a key wins, so set() must not clobber.
+  for (const g of state.allGames || []) {
+    const k = gameKey(g);
+    if (!index.has(k)) index.set(k, g);
+  }
+  for (const g of state.itchGames || []) {
+    const k = gameKey(g);
+    if (!index.has(k)) index.set(k, g);
+  }
+  for (const g of state.wishlistGames || []) {
+    const k = gameKey(g);
+    if (!index.has(k)) index.set(k, g);
+  }
+  return index;
+}
+
+/** Force-rebuild the gameKey index; call from library-load after a merge. */
+export function rebuildGameKeyIndex() {
+  _gameKeyIndex = buildGameKeyIndex();
+  _gameKeyIndexVer = catalogGamesFingerprint();
+  return _gameKeyIndex;
+}
+
 export function findGameByKey(key) {
-  return state.allGames.find(g => gameKey(g) === key)
-    || state.itchGames.find(g => gameKey(g) === key)
-    || state.wishlistGames.find(g => gameKey(g) === key);
+  const ver = catalogGamesFingerprint();
+  if (!_gameKeyIndex || _gameKeyIndexVer !== ver) {
+    _gameKeyIndex = buildGameKeyIndex();
+    _gameKeyIndexVer = ver;
+  }
+  return _gameKeyIndex.get(key) || null;
 }
 
 /** norm title → gameKey[] across library + wishlist + itch catalogs. */
@@ -824,6 +857,8 @@ export function getSameTitleKeys(g) {
 export function invalidateTitleKeyIndex() {
   _titleKeyIndex = null;
   _titleKeyIndexVer = -1;
+  _gameKeyIndex = null;
+  _gameKeyIndexVer = -1;
 }
 
 export function chipStatusKey(g) {

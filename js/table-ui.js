@@ -11,6 +11,7 @@ import {
   buildQueryContext,
   querySourceForView,
 } from './table-query.js';
+import { safeCoverAttrUrl, safeCoverCssUrl } from './covers.js';
 import { buildStatusSelect, STATUS_LABELS } from './row-templates.js';
 import {
   gameKey,
@@ -474,8 +475,8 @@ export function updateRowInPlace(tr, g) {
 
 function rowHeroAttrs(g) {
   const hero = coverFallbackFor(g);
-  if (!hero) return { heroClass: '', heroStyle: '' };
-  const safe = hero.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safe = safeCoverCssUrl(hero);
+  if (!safe) return { heroClass: '', heroStyle: '' };
   return {
     heroClass: ' row-has-hero',
     heroStyle: `--row-hero:url('${safe}')`,
@@ -1187,7 +1188,7 @@ function tableRowHtml(g, idx, { isWish }) {
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}${heroClass}`;
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}"${heroAttr}${cleanupTitle}>
       <td class="col-select p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} title="Select for bulk status or remove" /></td>
-      <td class="col-cover p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
+      <td class="col-cover p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${safeCoverAttrUrl(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="col-game p-2 game-name-cell">
         <div class="flex items-center gap-2">
           <div class="flex-1 min-w-0">
@@ -1223,7 +1224,7 @@ function tableRowHtml(g, idx, { isWish }) {
       <td class="col-price p-2 text-right">${priceOccupied ? `<span class="row-hero-pill">${priceHtml}</span>` : priceHtml}</td>
       <td class="col-released p-2 text-slate-300 whitespace-nowrap">${formatReleaseDate(g.release_date)}</td>
       <td class="col-lastplayed p-2 text-slate-300">${lastPlayedOccupied ? `<span class="row-hero-pill">${lastPlayedHtml}</span>` : lastPlayedHtml}</td>
-      <td class="col-genres p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
+      <td class="col-genres p-2 text-slate-400 text-xs truncate" title="${escapeAttr((g.genres || []).filter(x => !isPlatformToken(x)).join(", "))}">${escapeHtml((g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - ")}</td>
       <td class="col-notes p-2 notes-cell${psnPlatformsLineHtml(g) ? " has-psn-platforms" : ""}">
         ${psnPlatformsLineHtml(g)}
         <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1" title="Personal notes - saved automatically">${escapeHtml(p.notes || "")}</textarea>

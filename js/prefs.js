@@ -146,7 +146,15 @@ export function syncFilterDomFromState() {
 }
 
 export function savePrefs() {
-  localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
+  try {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
+  } catch (err) {
+    // Quota exhaustion / private-mode write blocks shouldn't break the UI; the
+    // server-side personal doc PUT (via personalStore.notify) remains the
+    // durable copy of prefs.
+    const quota = err && (err.name === 'QuotaExceededError' || err.code === 22);
+    console.warn(`[prefs] localStorage write failed${quota ? ' (quota exceeded)' : ''}`, err);
+  }
   personalStore.notify();
 }
 

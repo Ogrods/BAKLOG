@@ -6,6 +6,7 @@ import {
   recomputeCrossStoreHidden,
   applyCoopOverrides,
   gameKey,
+  rebuildGameKeyIndex,
 } from './game-core.js';
 import { personalStore } from './personal-store.js';
 import {
@@ -244,6 +245,7 @@ export async function finishEmptyLibraryLoad() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   invalidateTableCache();
   recomputeCrossStoreHidden();
+  rebuildGameKeyIndex();
   state.dashboardDataReady = true;
   buildOwnedNormNames();
   _prevLibraryCount = countLibraryVisible();
@@ -260,6 +262,9 @@ export async function applyMergedLibrary(mergeKey = null) {
   bumpPersonalMemo();
   invalidateTableCache();
   recomputeCrossStoreHidden();
+  // Refresh the gameKey lookup before any findGameByKey consumers run — the
+  // length-based fingerprint can't see same-size content swaps after a merge.
+  rebuildGameKeyIndex();
   state._lastNewlyAddedCount = recordLibraryFirstSeen();
   canonicalizeNotesAcrossTitles();
   applyHiddenTitleNorms({ silent: true });

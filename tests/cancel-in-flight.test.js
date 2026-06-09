@@ -1,10 +1,25 @@
 /** cancelInFlightRuns — server-truth cancel + fallback. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+function installMockEventSource() {
+  class MockEventSource {
+    constructor() {
+      this.close = vi.fn();
+    }
+    addEventListener() {}
+  }
+  global.EventSource = MockEventSource;
+}
 
 describe('cancelInFlightRuns server truth', () => {
   beforeEach(() => {
     vi.resetModules();
     document.body.innerHTML = '<div id="fetcherRunLog"></div>';
+    installMockEventSource();
+  });
+
+  afterEach(() => {
+    delete global.EventSource;
   });
 
   it('applyServerSnapshotInFlight tracks server queue without client chips', async () => {
@@ -233,13 +248,6 @@ describe('cancelInFlightRuns server truth', () => {
 
   it('409 on submit re-syncs and retries once when queue is idle', async () => {
     vi.useFakeTimers();
-    class MockEventSource {
-      constructor() {
-        this.close = vi.fn();
-      }
-      addEventListener() {}
-    }
-    global.EventSource = MockEventSource;
     let runPosts = 0;
     const fetchMock = vi.fn(async (url, init) => {
       const u = String(url);
@@ -291,6 +299,5 @@ describe('cancelInFlightRuns server truth', () => {
     );
     expect(posts).toHaveLength(2);
     vi.useRealTimers();
-    delete global.EventSource;
   });
 });

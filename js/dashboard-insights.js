@@ -109,7 +109,7 @@ export const METRIC_WEIGHT = {
   moderate: 0.5,
   cryptic: 0.15,
   /** kojima metric — MGSV codec easter egg */
-  kojima: 0.03,
+  kojima: 0.01,
 };
 
 /** @returns {Set<string>} */

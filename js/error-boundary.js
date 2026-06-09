@@ -52,14 +52,6 @@ let _bundleCtx = null; // { getFingerprint, getActiveFilterCount } — injected 
 const _errors = [];
 const _signatures = new Map(); // sig -> last seen timestamp
 
-function escapeHtml(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function makeSignature(entry) {
   const firstStackLine = (entry.stack || '').split('\n').slice(0, 2).join('|');
   return `${entry.kind}::${entry.message}::${firstStackLine}`;

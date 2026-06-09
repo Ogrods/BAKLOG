@@ -447,6 +447,29 @@ def test_build_epic_oauth_login_url_shape() -> None:
     assert "st8" in url
 
 
+def test_epic_callback_requires_state_even_when_auth_off(local_server) -> None:
+    """CSRF defense: a server-minted state is mandatory regardless of auth mode."""
+    base, _tmp = local_server
+    # Missing state — previously accepted when auth was disabled, now rejected.
+    status, _ = _request(base, "/oauth/epic/callback?code=abc123def456")
+    assert status == 400
+    # Present but unknown/forged state — rejected.
+    status2, _ = _request(base, "/oauth/epic/callback?state=forged&code=abc123def456")
+    assert status2 == 400
+
+
+def test_epic_callback_consumes_valid_state_when_auth_off(local_server) -> None:
+    base, _tmp = local_server
+    state = "epic-local-state-01"
+    server._register_epic_oauth_state(state, profile_id="default")
+    assert state in server._epic_oauth_states
+    # A valid minted state is accepted (single-use) even with auth disabled; the
+    # missing code yields 400 but the state is consumed, proving the valid path ran.
+    status, _ = _request(base, f"/oauth/epic/callback?state={state}")
+    assert status == 400
+    assert state not in server._epic_oauth_states
+
+
 def test_secrets_export_corrupt_returns_400(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
     base, secret, _tmp = auth_server
     from auth.secrets import SecretsCorruptError

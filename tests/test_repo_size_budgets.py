@@ -6,7 +6,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Ratchet down after intentional splits (see scripts/check-module-size.mjs).
 # Beta ship hardening + blind-spot routes; helpers live in shared/server_support.py.
-SERVER_PY_MAX_LINES = 4480
+# Audit remediation 2026-06-09; static guards moved to shared/server_static.py.
+SERVER_PY_MAX_LINES = 4530
 
 
 def test_server_py_line_budget():

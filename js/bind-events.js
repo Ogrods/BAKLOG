@@ -81,13 +81,8 @@ import { bindOrphanPruneUI } from './orphan-prune.js';
 import { bindHiddenPanelUI } from './hidden-panel.js';
 import { bindColumnPicker } from './column-picker.js';
 import { createGlobalKeydownHandler } from './events.js';
-import {
-  fetcherRunner,
-  renderDashboardFetcherHealth,
-  toggleLegendTips,
-  formatRefreshIntervalLabel,
-} from './fetcher-health.js';
-import { reconnectProvider } from './connections.js';
+import { bindFetcherHealthEvents } from './bind-events-fetcher.js';
+import { bindClaimableEvents } from './bind-events-claims.js';
 import {
   dashDrillCoop,
   renderDashboardWishlistStats,
@@ -127,81 +122,7 @@ export function bindEvents() {
     else if (btn.dataset.undoAction === "dismiss") hideUndoToast();
   });
 
-  document.getElementById("dashboardFetcherHealth")?.addEventListener("change", e => {
-    if (e.target.id === "fetcherHealthShowConnected") {
-      state.prefs.fetcherHealthShowConnected = e.target.checked;
-      savePrefs();
-      renderDashboardFetcherHealth();
-    } else if (e.target.id === "fetcherHealthShowStaleMissing") {
-      state.prefs.fetcherHealthShowStaleMissing = e.target.checked;
-      savePrefs();
-      renderDashboardFetcherHealth();
-    } else if (e.target.id === "itadAutoRefreshToggle") {
-      state.prefs.itadAutoRefreshDisabled = !e.target.checked;
-      const slider = document.getElementById("itadAutoRefreshInterval");
-      if (slider) slider.disabled = !e.target.checked;
-      savePrefs();
-    } else if (e.target.id === "itadAutoRefreshInterval") {
-      state.prefs.itadAutoRefreshIntervalMin = Number(e.target.value);
-      savePrefs();
-    } else if (e.target.id === "claimsAutoRefreshToggle") {
-      state.prefs.claimsAutoRefreshDisabled = !e.target.checked;
-      const slider = document.getElementById("claimsAutoRefreshInterval");
-      if (slider) slider.disabled = !e.target.checked;
-      savePrefs();
-    } else if (e.target.id === "claimsAutoRefreshInterval") {
-      state.prefs.claimsAutoRefreshIntervalMin = Number(e.target.value);
-      savePrefs();
-    } else if (e.target.id === "autoEnrichOnAddToggle") {
-      state.prefs.autoEnrichOnAdd = e.target.checked;
-      savePrefs();
-    }
-  });
-
-  document.getElementById("dashboardFetcherHealth")?.addEventListener("input", e => {
-    if (e.target.id === "itadAutoRefreshInterval") {
-      const valEl = document.getElementById("itadAutoRefreshIntervalVal");
-      if (valEl) valEl.textContent = `${e.target.value}m`;
-    } else if (e.target.id === "claimsAutoRefreshInterval") {
-      const valEl = document.getElementById("claimsAutoRefreshIntervalVal");
-      if (valEl) valEl.textContent = formatRefreshIntervalLabel(e.target.value);
-    }
-  });
-
-  document.getElementById("dashboardFetcherHealth")?.addEventListener("click", e => {
-    const legendToggle = e.target.closest("[data-role=\"fh-legend-toggle\"]");
-    if (legendToggle) {
-      e.preventDefault();
-      toggleLegendTips();
-      return;
-    }
-    const staleBtn = e.target.closest(".fh-run-stale");
-    if (staleBtn && !staleBtn.disabled) {
-      e.preventDefault();
-      fetcherRunner.runAllStale();
-      return;
-    }
-    const chip = e.target.closest(".fh-chip[data-fetcher-key]");
-    // #region agent log
-    try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'D',location:'bind-events.js:184',message:'fetcher health click',data:{chipFound:!!chip,fetcherKey:chip?.dataset.fetcherKey||null,fetcherConnect:chip?.dataset.fetcherConnect||null,disabled:chip?chip.disabled:null,status:chip?.dataset.status||null},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-    // #endregion
-    if (!chip) return;
-    if (chip.dataset.fetcherConnect) {
-      e.preventDefault();
-      // #region agent log
-      try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'bind-events.js:188',message:'chip -> reconnect branch',data:{provider:chip.dataset.fetcherConnect},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-      // #endregion
-      fetcherRunner.hideFetcherPopover();
-      reconnectProvider(chip.dataset.fetcherConnect, { autoStart: false });
-      return;
-    }
-    if (chip.disabled) return;
-    e.preventDefault();
-    // #region agent log
-    try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'A',location:'bind-events.js:194',message:'chip -> RUN branch (no nav)',data:{fetcherKey:chip.dataset.fetcherKey},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-    // #endregion
-    fetcherRunner.run(chip.dataset.fetcherKey, { refresh: e.shiftKey });
-  });
+  bindFetcherHealthEvents();
 
   const onWishlistStatsClick = (e) => {
     const card = e.target.closest("[data-action]");
@@ -241,40 +162,7 @@ export function bindEvents() {
   document.getElementById("dashboardWishlistStats")?.addEventListener("click", onWishlistStatsClick);
   document.getElementById("wishlistDealRadar")?.addEventListener("click", onWishlistStatsClick);
 
-  // Pro-only deep achievement/trophy sync: re-pull the store's achievement data.
-  document.addEventListener("baklog:deep-sync", async (e) => {
-    const store = e.detail?.store;
-    if (store !== "psn" && store !== "xbox") return;
-    await fetcherRunner.run(store, { refresh: true });
-  });
-
-  void import('./claimable.js').then((claimable) => {
-    document.getElementById('claimableNowModule')?.addEventListener('click', (e) => {
-      claimable.handleClaimableClick(e);
-    });
-    document.getElementById('claimableBanner')?.addEventListener('click', (e) => {
-      claimable.handleClaimableBannerClick(e);
-    });
-    document.getElementById('claimDetailDialog')?.addEventListener('click', (e) => {
-      const dlg = e.currentTarget;
-      if (e.target === dlg) {
-        claimable.closeClaimDetail();
-        return;
-      }
-      if (e.target.closest('[data-claim-clear]')) claimable.handleClaimableClick(e);
-    });
-    document.getElementById('claimHiddenDialog')?.addEventListener('click', (e) => {
-      const dlg = e.currentTarget;
-      if (e.target === dlg) {
-        claimable.closeHiddenClaimsModal();
-        return;
-      }
-      const restoreBtn = e.target.closest('[data-claim-restore]');
-      if (restoreBtn) {
-        claimable.restoreClaim(restoreBtn.dataset.claimRestore);
-      }
-    });
-  });
+  bindClaimableEvents();
 
   const onDashListClick = e => {
     const row = e.target.closest('[data-action="dash-list-jump"]');
@@ -305,6 +193,22 @@ export function bindEvents() {
         window.open(deal.dataset.sponsorUrl, '_blank', 'noopener,noreferrer');
       }
     }
+  });
+
+  // The sponsored/spotlight dismiss controls render as role="button" spans
+  // (they can't be real <button>s when nested inside the card <button>), so
+  // keyboard users need an explicit Enter/Space activation to match the mouse
+  // click path above.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    const dismiss = e.target.closest?.('[data-action="sponsored-dismiss"]');
+    if (!dismiss) return;
+    e.preventDefault();
+    e.stopPropagation();
+    import('./sponsored-deals.js').then(({ dismissSponsoredDeal, refreshSponsoredSurfaces }) => {
+      dismissSponsoredDeal(dismiss.dataset.sponsorId);
+      refreshSponsoredSurfaces();
+    });
   });
 
   document.getElementById("dashboardMega")?.addEventListener("click", onDashListClick);
@@ -798,39 +702,6 @@ export function bindEvents() {
     kebabMenu.classList.remove("open");
     try { await reloadGames(); } catch { alert("Could not reload library files. Run the fetch scripts (fetch_games.py, fetch_gog.py, etc.) and reload."); }
   });
-  document.getElementById("fetcherPopoverBackdrop")?.addEventListener("click", () => {
-    fetcherRunner.hideFetcherPopover();
-  });
-  document.querySelectorAll("[data-fetcher-popover-close]").forEach(btn => {
-    btn.addEventListener("click", () => fetcherRunner.hideFetcherPopover());
-  });
-  document.getElementById("fetcherRow")?.addEventListener("click", e => {
-    if (e.target.closest(".fh-chip, .fh-run-stale, .fh-toggle, .fh-log, .fh-head-actions label")) {
-      return;
-    }
-    const toggleBtn = e.target.closest("[data-role='bar-toggle']");
-    if (toggleBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      fetcherRunner.toggleFetcherPanel({ manual: true });
-      return;
-    }
-    const bar = e.target.closest("[data-role='fetcher-bar']");
-    if (bar && document.getElementById("fetcherRow")?.classList.contains("is-collapsed")) {
-      e.preventDefault();
-      fetcherRunner.showFetcherPopover();
-    }
-  });
-  document.getElementById("showFetcherLog")?.addEventListener("click", () => {
-    kebabMenu.classList.remove("open");
-    fetcherRunner.openFetcherLog();
-  });
-  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", () => {
-    fetcherRunner.openFetcherLog({ focusPanel: false });
-  });
-  document.getElementById("fetcherStatLayoutToggle")?.addEventListener("click", () => {
-    fetcherRunner.cycleStatLayout();
-  });
   kebabMenu.querySelectorAll("button, label").forEach(el => {
     el.addEventListener("click", () => kebabMenu.classList.remove("open"));
   });
@@ -856,7 +727,11 @@ export function bindEvents() {
     kebabMenu.classList.remove("open");
     try {
       const res = await fetch('/api/update-check');
-      const data = await res.json();
+      if (!res.ok) {
+        showKebabBanner(`Could not check for updates (server returned ${res.status}).`);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
       if (data.error) {
         showKebabBanner(`Could not check for updates: ${data.error}`);
         return;

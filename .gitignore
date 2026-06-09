@@ -42,8 +42,10 @@ scripts/probe_nintendo_graphql3.py
 # Scratch probes, baselines, sweep output, debug logs, IDE session files
 _tmp_*
 _baseline_*
-tmp/spotlight-after/
-tmp/spotlight-diff/
+tmp/
+count-animation-demo.html
+tracker-update-pending-*.md
+free-claims.input.json
 _sweep_output*.txt
 debug-*.log
 # Cursor IDE — commit public agent rules only; logs and internal rules stay local

@@ -57,10 +57,26 @@ KEYRING_ACCOUNT = "secrets-master"
 KEY_VERSION_LEGACY = 0
 KEY_VERSION_PROFILE = 1
 
+# Master-password KDF (scrypt). Bumped 14 -> 17 (OWASP N=2**17, r=8, p=1).
+# The cost factor used for a given store is recorded in .mpw.salt so a store
+# written with the old N still unlocks; it is transparently re-encrypted with
+# the new N on the next successful unlock (see load_doc).
+MPW_SCRYPT_N_LOG = 17
+MPW_SCRYPT_R = 8
+MPW_SCRYPT_P = 1
+MPW_LEGACY_N_LOG = 14
+# .mpw.salt layout: MPW_SALT_MAGIC + bytes([n_log]) + 16-byte salt. A bare
+# 16-byte file is a legacy salt (implies N=2**14).
+_MPW_SALT_MAGIC = b"BKMPW1\n"
+
 _lock = threading.RLock()
 _cache: dict[str, Any] | None = None
 _master_password: str | None = None
 _warned_plaintext_master_key = False
+# Set by _get_master_key (password path) when the on-disk store used an older
+# scrypt cost than MPW_SCRYPT_N_LOG; load_doc re-encrypts once after a
+# successful unlock and clears it.
+_mpw_kdf_stale = False
 
 
 def _warn_plaintext_master_key(*, action: str) -> None:
@@ -92,66 +108,227 @@ def set_master_password_override(password: str | None) -> None:
         _cache = None
 
 
-def _derive_key_from_password(password: str, salt: bytes) -> bytes:
+def _derive_key_from_password(
+    password: str,
+    salt: bytes,
+    *,
+    n_log: int = MPW_SCRYPT_N_LOG,
+    r: int = MPW_SCRYPT_R,
+    p: int = MPW_SCRYPT_P,
+) -> bytes:
+    # scrypt's default 32 MiB maxmem is exceeded at N=2**17; size it to params.
+    maxmem = 128 * (2**n_log) * r + (1 << 20)
     return scrypt(
         password.encode("utf-8"),
         salt=salt,
-        n=2**14,
-        r=8,
-        p=1,
+        n=2**n_log,
+        r=r,
+        p=p,
         dklen=32,
+        maxmem=maxmem,
     )
 
 
+def _read_mpw_kdf() -> tuple[int, bytes]:
+    """Return (n_log, salt) for the master-password KDF, creating it if absent.
+
+    A fresh salt is written with the current cost. A legacy bare-16-byte salt
+    file is reported as N=2**14 so its store still unlocks before upgrade.
+    """
+    salt_path = _auth_dir() / ".mpw.salt"
+    _ensure_dir()
+    if salt_path.exists():
+        raw = salt_path.read_bytes()
+        if raw.startswith(_MPW_SALT_MAGIC):
+            n_log = raw[len(_MPW_SALT_MAGIC)]
+            salt = raw[len(_MPW_SALT_MAGIC) + 1 : len(_MPW_SALT_MAGIC) + 1 + 16]
+            return n_log, salt
+        # Legacy: the file is the raw salt (pre-versioning) — old cost factor.
+        return MPW_LEGACY_N_LOG, raw[:16]
+    salt = os.urandom(16)
+    _write_mpw_kdf(MPW_SCRYPT_N_LOG, salt)
+    return MPW_SCRYPT_N_LOG, salt
+
+
+def _write_mpw_kdf(n_log: int, salt: bytes) -> None:
+    salt_path = _auth_dir() / ".mpw.salt"
+    _ensure_dir()
+    salt_path.write_bytes(_MPW_SALT_MAGIC + bytes([n_log]) + salt)
+    _restrict_file_permissions(salt_path)
+
+
 def _load_keyring_key() -> bytes | None:
+    # Import errors (keyring not installed) are distinct from runtime keyring
+    # failures (no backend / locked store); narrow each so we never swallow an
+    # unrelated bug as "keyring unavailable".
     try:
         import keyring
-
+        from keyring.errors import KeyringError
+    except ImportError:
+        return None
+    try:
         stored = keyring.get_password(SERVICE_NAME, KEYRING_ACCOUNT)
-        if stored:
-            return b64decode(stored.encode("ascii"))
-    except Exception:
-        pass
+    except KeyringError:
+        return None
+    if stored:
+        return b64decode(stored.encode("ascii"))
     return None
 
 
-def _save_keyring_key(key: bytes) -> None:
+def _save_keyring_key(key: bytes) -> bool:
+    """Store the master key in the OS keyring. Return True on success."""
     try:
         import keyring
-
+        from keyring.errors import KeyringError
+    except ImportError:
+        return False
+    try:
         keyring.set_password(SERVICE_NAME, KEYRING_ACCOUNT, b64encode(key).decode("ascii"))
+    except KeyringError:
+        return False
+    return True
+
+
+# Marker prefix for a DPAPI-protected master key on disk (Windows). A file
+# without this prefix is a legacy plaintext key written before DPAPI support.
+_DPAPI_MAGIC = b"BAKLOG-DPAPI1\n"
+
+
+def _dpapi_protect(data: bytes) -> bytes | None:
+    """Encrypt ``data`` with Windows DPAPI (current-user scope). None elsewhere."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class _DATA_BLOB(ctypes.Structure):
+            _fields_ = [
+                ("cbData", wintypes.DWORD),
+                ("pbData", ctypes.POINTER(ctypes.c_char)),
+            ]
+
+        crypt32 = ctypes.windll.crypt32
+        kernel32 = ctypes.windll.kernel32
+        buf = ctypes.create_string_buffer(data, len(data))
+        blob_in = _DATA_BLOB(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_char)))
+        blob_out = _DATA_BLOB()
+        # CRYPTPROTECT_UI_FORBIDDEN (0x1): never prompt; fail instead.
+        if not crypt32.CryptProtectData(
+            ctypes.byref(blob_in), None, None, None, None, 0x1, ctypes.byref(blob_out)
+        ):
+            return None
+        try:
+            return ctypes.string_at(blob_out.pbData, blob_out.cbData)
+        finally:
+            kernel32.LocalFree(blob_out.pbData)
     except Exception:
-        _warn_plaintext_master_key(action="writing")
-        _master_key_file().write_bytes(key)
+        return None
+
+
+def _dpapi_unprotect(data: bytes) -> bytes | None:
+    """Decrypt DPAPI-protected ``data``. None when DPAPI is unavailable/fails."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class _DATA_BLOB(ctypes.Structure):
+            _fields_ = [
+                ("cbData", wintypes.DWORD),
+                ("pbData", ctypes.POINTER(ctypes.c_char)),
+            ]
+
+        crypt32 = ctypes.windll.crypt32
+        kernel32 = ctypes.windll.kernel32
+        buf = ctypes.create_string_buffer(data, len(data))
+        blob_in = _DATA_BLOB(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_char)))
+        blob_out = _DATA_BLOB()
+        if not crypt32.CryptUnprotectData(
+            ctypes.byref(blob_in), None, None, None, None, 0x1, ctypes.byref(blob_out)
+        ):
+            return None
+        try:
+            return ctypes.string_at(blob_out.pbData, blob_out.cbData)
+        finally:
+            kernel32.LocalFree(blob_out.pbData)
+    except Exception:
+        return None
+
+
+def _restrict_file_permissions(path: Path) -> None:
+    """Lock a secret file down to the current user (0o600 / owner-only ACL)."""
+    if os.name == "nt":
+        try:
+            import subprocess
+
+            user = os.environ.get("USERNAME") or ""
+            if not user:
+                return
+            # Strip inheritance, then grant the current user full control only.
+            subprocess.run(
+                ["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+
+
+def _write_master_key_file(key: bytes) -> None:
+    """Persist the master key on disk, DPAPI-protected on Windows when possible."""
+    path = _master_key_file()
+    protected = _dpapi_protect(key)
+    if protected is not None:
+        path.write_bytes(_DPAPI_MAGIC + protected)
+    else:
+        path.write_bytes(key)
+    _restrict_file_permissions(path)
+
+
+def _read_master_key_file() -> bytes:
+    """Read the on-disk master key, unwrapping DPAPI protection when present."""
+    raw = _master_key_file().read_bytes()
+    if raw.startswith(_DPAPI_MAGIC):
+        unprotected = _dpapi_unprotect(raw[len(_DPAPI_MAGIC):])
+        if unprotected is None:
+            raise SecretsCorruptError(
+                "DPAPI-protected master key cannot be decrypted (wrong user/machine?)"
+            )
+        return unprotected
+    # Legacy plaintext key (pre-DPAPI). Warn so the user can rotate.
+    _warn_plaintext_master_key(action="reading")
+    return raw
 
 
 def _get_master_key() -> bytes:
+    global _mpw_kdf_stale
     if _master_password:
-        salt_path = _auth_dir() / ".mpw.salt"
-        _ensure_dir()
-        if salt_path.exists():
-            salt = salt_path.read_bytes()
-        else:
-            salt = os.urandom(16)
-            salt_path.write_bytes(salt)
-        return _derive_key_from_password(_master_password, salt)
+        n_log, salt = _read_mpw_kdf()
+        # Flag (don't act here): a store written with an older cost factor is
+        # re-encrypted by load_doc after it confirms the password is correct.
+        _mpw_kdf_stale = n_log < MPW_SCRYPT_N_LOG
+        return _derive_key_from_password(_master_password, salt, n_log=n_log)
 
     key = _load_keyring_key()
     if key:
         return key
 
     _ensure_dir()
-    mk = _master_key_file()
-    if mk.exists():
-        _warn_plaintext_master_key(action="reading")
-        return mk.read_bytes()
+    if _master_key_file().exists():
+        return _read_master_key_file()
 
     key = secrets.token_bytes(32)
-    try:
-        _save_keyring_key(key)
-    except Exception:
+    if not _save_keyring_key(key):
         _warn_plaintext_master_key(action="writing")
-        _master_key_file().write_bytes(key)
+        _write_master_key_file(key)
     return key
 
 
@@ -199,7 +376,10 @@ def _atomic_write_secrets(data: bytes) -> None:
             pass
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        tmp.write_bytes(data)
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, path)
     except Exception:
         try:
@@ -256,6 +436,21 @@ def _maybe_migrate_legacy_blob(raw: bytes, doc: dict[str, Any], profile_id: str 
     _atomic_write_secrets(_encrypt_doc(doc, profile_id))
 
 
+def _maybe_upgrade_mpw_kdf(doc: dict[str, Any]) -> None:
+    """Re-encrypt under the current scrypt cost when the store used an older one.
+
+    Only runs on the master-password path after a successful decrypt (so we
+    know the passphrase is right). Rotates to a fresh salt at MPW_SCRYPT_N_LOG,
+    then re-encrypts; ``save_doc`` re-derives the key from the just-written salt.
+    """
+    global _mpw_kdf_stale
+    if not (_master_password and _mpw_kdf_stale):
+        return
+    _mpw_kdf_stale = False
+    _write_mpw_kdf(MPW_SCRYPT_N_LOG, os.urandom(16))
+    save_doc(doc)
+
+
 def load_doc() -> dict[str, Any]:
     global _cache
     with _lock:
@@ -270,6 +465,7 @@ def load_doc() -> dict[str, Any]:
             pid = _effective_profile_id()
             _cache = _decrypt_blob(raw, pid)
             _maybe_migrate_legacy_blob(raw, _cache, pid)
+            _maybe_upgrade_mpw_kdf(_cache)
         except Exception as exc:
             raise SecretsCorruptError(
                 f"cannot read {_secrets_file()}: corrupt or wrong passphrase"

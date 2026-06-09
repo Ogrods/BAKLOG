@@ -35,9 +35,16 @@ def _is_within(base: Path, candidate: Path) -> bool:
 MAGIC = b"BAKLOGSB"
 BUNDLE_VERSION = 1
 INNER_FORMAT = 1
-SCRYPT_N_LOG = 14
+# scrypt cost. Bumped 14 -> 17 (OWASP-recommended N=2**17, r=8, p=1, ~128 MB).
+# The header records the params used per bundle (the "version marker"), so a
+# bundle exported with the old N=2**14 still decrypts — _decrypt_payload derives
+# the key with the header's params, not these constants.
+SCRYPT_N_LOG = 17
 SCRYPT_R = 8
 SCRYPT_P = 1
+# Refuse absurd cost factors from a crafted/corrupt header (memory ≈ 128*2^N*r
+# bytes) before handing them to scrypt, which would otherwise OOM the process.
+SCRYPT_N_LOG_MAX = 18
 MIN_PASSPHRASE_LEN = 8
 MAX_BUNDLE_BYTES = 100 * 1024 * 1024
 
@@ -114,14 +121,25 @@ def _validate_passphrase(passphrase: str) -> None:
         raise ValueError(f"passphrase must be at least {MIN_PASSPHRASE_LEN} characters")
 
 
-def _derive_key(passphrase: str, salt: bytes) -> bytes:
+def _derive_key(
+    passphrase: str,
+    salt: bytes,
+    *,
+    n_log: int = SCRYPT_N_LOG,
+    r: int = SCRYPT_R,
+    p: int = SCRYPT_P,
+) -> bytes:
+    # scrypt requires maxmem large enough for the chosen cost; the default
+    # 32 MiB cap is exceeded at N=2**17, so size it from the params.
+    maxmem = 128 * (2**n_log) * r + (1 << 20)
     return scrypt(
         passphrase.encode("utf-8"),
         salt=salt,
-        n=2**SCRYPT_N_LOG,
-        r=SCRYPT_R,
-        p=SCRYPT_P,
+        n=2**n_log,
+        r=r,
+        p=p,
         dklen=32,
+        maxmem=maxmem,
     )
 
 
@@ -193,11 +211,18 @@ def _decrypt_payload(blob: bytes, passphrase: str) -> dict[str, Any]:
     version = blob[len(MAGIC)]
     if version != BUNDLE_VERSION:
         raise UnsupportedVersion(f"unsupported bundle version {version}")
+    # Derive with the params this bundle was written with (header is the version
+    # marker), so bundles from before the N=2**17 bump still decrypt.
+    n_log = blob[len(MAGIC) + 1]
+    scrypt_r = blob[len(MAGIC) + 2]
+    scrypt_p = blob[len(MAGIC) + 3]
+    if not (1 <= n_log <= SCRYPT_N_LOG_MAX) or scrypt_r < 1 or scrypt_p < 1:
+        raise UnsupportedVersion(f"unsupported scrypt parameters (n_log={n_log})")
     offset = len(MAGIC) + 4
     salt = blob[offset : offset + 16]
     nonce = blob[offset + 16 : offset + 28]
     ciphertext = blob[offset + 28 :]
-    key = _derive_key(passphrase, salt)
+    key = _derive_key(passphrase, salt, n_log=n_log, r=scrypt_r, p=scrypt_p)
     try:
         plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
     except Exception as exc:
@@ -225,7 +250,10 @@ def _atomic_write_bytes(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        tmp.write_bytes(data)
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, path)
     except Exception:
         try:

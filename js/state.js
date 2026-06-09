@@ -46,6 +46,8 @@ export const state = {
   cleanupModeActive: false,
   focusedRowIndex: -1,
   ownedNormNames: new Set(),
+  /** Set of String steam appids owned in the library (claim-owned O(1) lookup). */
+  ownedSteamAppids: new Set(),
   /** gameKey -> ms epoch when this library row was first observed (0 = silent seed). */
   libraryFirstSeenByKey: {},
   filtersDrawerOpen: false,

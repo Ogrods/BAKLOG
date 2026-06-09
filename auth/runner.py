@@ -79,17 +79,6 @@ def _cookie_header(cookies: list[dict], domains: tuple[str, ...]) -> str:
     return "; ".join(parts)
 
 
-def _extract_battlenet(context) -> dict[str, str]:
-    cookies = context.cookies()
-    header = _cookie_header(cookies, (".battle.net", "battle.net"))
-    if not header:
-        raise RuntimeError("No Battle.net cookies found — finish signing in at account.battle.net")
-    from battlenet_client import probe_session
-
-    probe_session(header)
-    return {"BATTLENET_COOKIE": header}
-
-
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 
 
@@ -151,14 +140,6 @@ def _extract_battlenet_inline(page, context, session: AuthSession | None = None)
         "Could not verify a Battle.net library session — sign in at account.battle.net/games, "
         "wait until your Games list loads, then click Connect again."
     )
-
-
-def _extract_nintendo(context) -> dict[str, str]:
-    cookies = context.cookies()
-    header = _cookie_header(cookies, ("nintendo.com",))
-    if not header:
-        raise RuntimeError("No Nintendo cookies found — open ec.nintendo.com after signing in")
-    return {"NINTENDO_COOKIE": header}
 
 
 NINTENDO_ACCOUNT_URL = "https://ec.nintendo.com/my/transactions/"
@@ -366,13 +347,6 @@ def pick_gog_al_from_cookies(cookies: list[dict]) -> str:
     return ""
 
 
-def _extract_gog(context) -> dict[str, str]:
-    gog_al = pick_gog_al_from_cookies(context.cookies())
-    if not gog_al:
-        raise RuntimeError("No GOG session — sign in at gog.com")
-    return {"GOG_AL": gog_al}
-
-
 def _extract_gog_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Poll for gog-al after the user signs in — do not trust the /en homepage URL."""
     try:
@@ -417,14 +391,34 @@ def _psn_cookie(context) -> str:
     return ""
 
 
-def _validate_npsso(npsso: str) -> bool:
-    try:
-        from psn_client import validate_npsso
+PSN_CHECK_VALID = "valid"
+PSN_CHECK_INVALID = "invalid"
+PSN_CHECK_UNREACHABLE = "unreachable"
 
+
+def _check_npsso(npsso: str) -> str:
+    """Tri-state NPSSO probe: valid / invalid / unreachable.
+
+    A PsnAuthError means PSN positively rejected the token (invalid/private).
+    Any other exception (no connection, timeout, unexpected upstream error) is
+    a transient failure we report as ``unreachable`` so the connect loop keeps
+    polling instead of permanently discarding a token that may be fine.
+    """
+    try:
+        from psn_client import PsnAuthError, validate_npsso
+    except Exception:  # noqa: BLE001
+        return PSN_CHECK_UNREACHABLE
+    try:
         validate_npsso(npsso)
-        return True
-    except Exception:
-        return False
+        return PSN_CHECK_VALID
+    except PsnAuthError:
+        return PSN_CHECK_INVALID
+    except Exception:  # noqa: BLE001 — network/transport blip, not a rejected token
+        return PSN_CHECK_UNREACHABLE
+
+
+def _validate_npsso(npsso: str) -> bool:
+    return _check_npsso(npsso) == PSN_CHECK_VALID
 
 
 def _psn_on_blocked_account_page(url: str, body: str) -> bool:
@@ -483,16 +477,22 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
             last_ssocookie = now
             fresh = _fetch_npsso_background(page, context)
             if fresh and fresh not in tried_cookie:
-                if _validate_npsso(fresh):
+                result = _check_npsso(fresh)
+                if result == PSN_CHECK_VALID:
                     return {"PSN_NPSSO": fresh}
-                tried_cookie.add(fresh)
+                # Only blacklist a token PSN positively rejected — an
+                # "unreachable" result is a network blip, so keep retrying it.
+                if result == PSN_CHECK_INVALID:
+                    tried_cookie.add(fresh)
 
         # Also try the cookie directly (cheap)
         cookie_val = _psn_cookie(context)
         if cookie_val and cookie_val not in tried_cookie:
-            if _validate_npsso(cookie_val):
+            result = _check_npsso(cookie_val)
+            if result == PSN_CHECK_VALID:
                 return {"PSN_NPSSO": cookie_val}
-            tried_cookie.add(cookie_val)
+            if result == PSN_CHECK_INVALID:
+                tried_cookie.add(cookie_val)
 
         try:
             body = page.content()
@@ -1200,6 +1200,7 @@ def _extract_amazon_web(page, context, session: AuthSession | None = None) -> di
         _poll_prime_collection,
         filter_codeless_claims,
         raw_dump_path,
+        scrub_claim_codes,
     )
 
     raw_claims: list[dict[str, Any]] = []
@@ -1233,13 +1234,17 @@ def _extract_amazon_web(page, context, session: AuthSession | None = None) -> di
         if captured.get("claims_captured"):
             path = raw_dump_path()
             path.parent.mkdir(parents=True, exist_ok=True)
+            # Strip one-time redemption/activation codes before persisting: the
+            # raw dump is a plaintext fallback for the headless fetcher and must
+            # never store claim credentials.
+            safe_claims = scrub_claim_codes(raw_claims)
             path.write_text(
                 json.dumps(
                     {
                         "urls": list(COLLECTION_URLS),
-                        "raw_claim_count": len(raw_claims),
-                        "raw_claims": raw_claims,
-                        "codeless_count": len(filter_codeless_claims(raw_claims)),
+                        "raw_claim_count": len(safe_claims),
+                        "raw_claims": safe_claims,
+                        "codeless_count": len(filter_codeless_claims(safe_claims)),
                         "capture_reason": "headed_connect",
                     },
                     indent=2,
@@ -1255,26 +1260,9 @@ def _extract_amazon_web(page, context, session: AuthSession | None = None) -> di
     )
 
 
-EXTRACTORS = {
-    "battlenet": lambda page, ctx: _extract_battlenet(ctx),
-    "nintendo": lambda page, ctx: _extract_nintendo_inline(page, ctx, None),
-    "gog": lambda page, ctx: _extract_gog(ctx),
-    "psn": lambda page, ctx: _extract_psn(page, ctx),
-    "steam": lambda page, ctx: extract_steam(page, ctx),
-    "itch": lambda page, ctx: extract_itch(page, ctx),
-    "itad": lambda page, ctx: extract_itad(page, ctx),
-    "xbox": lambda page, ctx: extract_xbox(page, ctx),
-    "xbox_wishlist": lambda page, ctx: _extract_xbox_wishlist_inline(page, ctx, None),
-    "nintendo_wishlist": lambda page, ctx: _extract_nintendo_wishlist_inline(page, ctx, None),
-    "humble": lambda page, ctx: _extract_humble_inline(page, ctx, None),
-    "ubisoft": lambda page, ctx: _extract_ubisoft(page, ctx, None),
-    "ea": lambda page, ctx: _extract_ea(page, ctx, None),
-    "epic": lambda page, ctx: _extract_epic_inline(page, ctx, None),
-    "epic_wishlist": lambda page, ctx: _extract_epic_wishlist_inline(page, ctx, None),
-    "amazon_web": lambda page, ctx: _extract_amazon_web(page, ctx, None),
-}
-
-# Custom wait/extract loops — not the URL-pattern path in run_browser_auth.
+# Every browser/oauth provider is handled by a dedicated inline wait/extract
+# loop in run_browser_auth (below). This set is the authoritative whitelist of
+# supported providers — run_browser_auth rejects anything not listed here.
 INLINE_PROVIDERS = {
     "psn", "steam", "itch", "itad", "xbox", "xbox_wishlist",
     "ubisoft", "ea", "epic_wishlist", "nintendo", "nintendo_wishlist", "epic",
@@ -1284,8 +1272,7 @@ INLINE_PROVIDERS = {
 
 def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | None:
     spec = spec_for(provider)
-    extractor = EXTRACTORS.get(provider)
-    if not extractor:
+    if provider not in INLINE_PROVIDERS:
         raise RuntimeError(f"No browser extractor for {provider}")
 
     user_data = str(profile_dir(provider))
@@ -1417,36 +1404,6 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
                 creds = _extract_battlenet_inline(page, context, session)
             elif provider == "gog":
                 creds = _extract_gog_inline(page, context, session)
-            else:
-                page.goto(spec.login_url, wait_until="domcontentloaded")
-                session.emit("signed_in", {"url": page.url})
-                creds = extractor(page, context)
+            else:  # pragma: no cover — gate above guarantees an inline provider
+                raise RuntimeError(f"No inline handler for {provider}")
             return creds
-
-        page.goto(spec.login_url, wait_until="domcontentloaded")
-        pattern = re.compile(spec.success_url_pattern, re.I)
-        deadline = time.time() + SUCCESS_WAIT_SEC
-        signed_in = False
-        while time.time() < deadline:
-            url = page.url or ""
-            if pattern.search(url):
-                signed_in = True
-                break
-            if provider == "nintendo" and "login" not in url.lower():
-                try:
-                    page.goto(spec.login_url, wait_until="domcontentloaded", timeout=15000)
-                except Exception:
-                    pass
-                if pattern.search(page.url or ""):
-                    signed_in = True
-                    break
-            page.wait_for_timeout(int(POLL_SEC * 1000))
-
-        if not signed_in and provider in ("nintendo", "psn", "gog"):
-            signed_in = True
-
-        if not signed_in:
-            return None
-
-        session.emit("signed_in", {"url": page.url})
-        return extractor(page, context)

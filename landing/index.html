@@ -472,6 +472,9 @@
 
     /* How it works — equal-height cards so uneven copy stays balanced */
     .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; counter-reset: step; align-items: stretch; }
+    /* Starting from zero: long step 1 full width; steps 2–3 share the row below */
+    #start .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #start .step:first-child { grid-column: 1 / -1; }
     .step {
       position: relative;
       display: flex;
@@ -549,6 +552,7 @@
       .wrap { padding: 0 1.25rem; }
       .features-grid { grid-template-columns: 1fr; }
       .steps { grid-template-columns: 1fr; }
+      #start .steps { grid-template-columns: 1fr; }
       footer { padding: 3rem 0 3.5rem; }
       .foot-grid { flex-direction: column; }
       .foot-links { width: 100%; }

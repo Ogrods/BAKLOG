@@ -35,7 +35,7 @@ function game(overrides = {}) {
 }
 
 beforeEach(() => {
-  state.prefs = { quickWinMaxHours: 15 };
+  state.prefs = { quickWinMaxHours: 15, metricsDisabled: [] };
   state.wishlistGames = [];
   state.itchGames = [];
   window._dataVersion = 0;
@@ -78,6 +78,20 @@ describe('buildMarqueeItems', () => {
   it('uses the passed snapshot without throwing on an empty library', () => {
     const snap = getLibrarySnapshot([]);
     expect(() => buildMarqueeItems([], snap)).not.toThrow();
+  });
+
+  it('excludes disabled catalog metrics from marquee output', () => {
+    state.prefs.metricsDisabled = ['games owned', 'in backlog'];
+    const games = [
+      game({ status: 'finished', id: '1', playtime_minutes: 120, hltb_main_hours: 5 }),
+      game({ status: 'backlog', id: '2' }),
+    ];
+    const snap = getLibrarySnapshot(games);
+    const items = buildMarqueeItems(games, snap);
+    const labels = items.map((it) => it.label);
+    expect(labels).not.toContain('games owned');
+    expect(labels).not.toContain('in backlog');
+    expect(labels.length).toBeGreaterThan(0);
   });
 });
 

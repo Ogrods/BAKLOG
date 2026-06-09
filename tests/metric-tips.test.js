@@ -6,6 +6,9 @@ import {
   eyebrowVariant,
   EYEBROW_TIPS,
   EYEBROW_VARIANTS,
+  METRIC_KEYS,
+  metricKeyForLabel,
+  metricKeyForInsight,
 } from '../js/metric-tips.js';
 
 describe('marqueeTip', () => {
@@ -36,10 +39,130 @@ describe('marqueeTip', () => {
   });
 });
 
+describe('metricKeyForLabel', () => {
+  it('returns canonical METRIC_TIPS keys', () => {
+    expect(metricKeyForLabel('backlog OPS')).toBe('backlog OPS');
+    expect(metricKeyForLabel('games owned')).toBe('games owned');
+  });
+
+  it('resolves case-insensitive labels to canonical keys', () => {
+    expect(metricKeyForLabel('hidden gems')).toBe('Hidden gems');
+  });
+
+  it('resolves dynamic Mendoza label via prefix', () => {
+    expect(metricKeyForLabel('below Mendoza (78%)')).toBe('below Mendoza');
+  });
+
+  it('resolves added-in-year via prefix', () => {
+    expect(metricKeyForLabel('added in 2026')).toBe('added in');
+  });
+
+  it('maps hot/warm/cold streak labels to finish streak', () => {
+    expect(metricKeyForLabel('hot')).toBe('finish streak');
+    expect(metricKeyForLabel('warm')).toBe('finish streak');
+    expect(metricKeyForLabel('cold')).toBe('finish streak');
+  });
+
+  it('returns empty for unknown labels', () => {
+    expect(metricKeyForLabel('totally unknown metric xyz')).toBe('');
+  });
+
+  it('METRIC_KEYS matches METRIC_TIPS object keys', () => {
+    expect(METRIC_KEYS.length).toBeGreaterThan(100);
+    expect(new Set(METRIC_KEYS).size).toBe(METRIC_KEYS.length);
+  });
+
+  it('resolves new untapped-metadata marquee labels', () => {
+    const labels = [
+      'Deck-ready %',
+      'Proton platinum',
+      'borked on Linux',
+      'Proton trending up',
+      'Deck-ready backlog',
+      'platinums earned',
+      'platinum hunt',
+      'trophies earned',
+      'PS5-native %',
+      'PS4 holdouts',
+      'top tag',
+      'multiplayer share',
+      'singleplayer backlog',
+      'free itch games',
+      'itch spend',
+      'installed locally',
+      'played in last 30d',
+      'Metacritic 90+ club',
+      'upcoming wishlist',
+    ];
+    for (const label of labels) {
+      expect(metricKeyForLabel(label), label).toBe(label);
+      expect(marqueeTip(label), label).not.toBe('');
+    }
+  });
+
+  it('resolves batch-2 active-default marquee labels', () => {
+    const labels = [
+      'silver or native %',
+      'Proton low confidence',
+      'avg Proton score',
+      'bought on sale',
+      'paid itch games',
+      'avg owned Steam price',
+      'priority wishlist',
+      'wishlist added this year',
+      'wishlist stores',
+      'last seen this week',
+      'launcher installs',
+      'HLTB low confidence',
+      'co-op tagged only',
+      'partial controller',
+      'indie-tagged %',
+      'avg trophy completion',
+      'gamerscore completion %',
+      'Metacritic 80+ unplayed',
+      'biggest critic gap',
+      'early access backlog',
+      'double-dip backlog',
+      'letter coverage %',
+    ];
+    for (const label of labels) {
+      expect(metricKeyForLabel(label), label).toBeTruthy();
+      expect(marqueeTip(label), label).not.toBe('');
+    }
+  });
+});
+
+describe('metricKeyForInsight', () => {
+  it('resolves colon insights to canonical keys', () => {
+    expect(metricKeyForInsight('Mendoza line: <strong>72%</strong>')).toBe('Mendoza line');
+    expect(metricKeyForInsight('Top WAR pick: <strong>Foo</strong> · 2.1')).toBe('Top WAR pick');
+  });
+
+  it('resolves new untapped-metadata insight labels', () => {
+    expect(metricKeyForInsight('Avg Metacritic: <strong>82</strong>')).toBe('Avg Metacritic');
+    expect(metricKeyForInsight('Longest dormant: <strong>Foo</strong>')).toBe('Longest dormant');
+    expect(insightTip('Avg Metacritic: <strong>82</strong>')).toMatch(/Metacritic/i);
+    expect(metricKeyForInsight('Biggest critic gap: <strong>Foo</strong> · 25 pts')).toBe('biggest critic gap');
+  });
+
+  it('resolves pace insight without colon', () => {
+    expect(metricKeyForInsight('~<strong>4.2</strong> yrs to clear at your pace')).toBe('to clear at your pace');
+  });
+});
+
 describe('insightTip', () => {
   it('resolves Mendoza line insight from HTML', () => {
     const tip = insightTip('Mendoza line: <strong>72%</strong>');
-    expect(tip).toMatch(/median backlog/i);
+    expect(tip).toMatch(/median.*backlog/i);
+    expect(tip).toMatch(/review %/i);
+  });
+
+  it('explains WAR with review % and Mendoza definitions', () => {
+    const tip = insightTip('Top WAR pick: <strong>Foo</strong> · 2.1');
+    expect(tip).toMatch(/review %/i);
+    expect(tip).toMatch(/Mendoza/i);
+    expect(tip).toMatch(/Steam/i);
+    expect(eyebrowTip('MVP pick')).toMatch(/review %/i);
   });
 
   it('resolves colon-less pace insight', () => {

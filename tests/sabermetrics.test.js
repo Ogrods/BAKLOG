@@ -21,6 +21,55 @@ import {
   magicNumber,
   pythagoreanCompletion,
   hotColdStreak,
+  criticPlayerGap,
+  peoplesChamp,
+  extraInningsAvg,
+  backlogMortality,
+  couchReadyRate,
+  perpetualBetaCount,
+  protonReadyShare,
+  protonCount,
+  protonTrendingUp,
+  protonDeckReadyBacklog,
+  psnPlatinumsEarned,
+  psnPlatinumHunt,
+  psnTrophiesEarned,
+  ps5NativeShare,
+  ps4Holdouts,
+  topTag,
+  multiplayerTagShare,
+  singleplayerBacklogCount,
+  freeItchCount,
+  itchSpendTotal,
+  installedLocalCount,
+  recentlyPlayedCount,
+  longestDormant,
+  avgMetacritic,
+  metacriticClubCount,
+  oldestWishlist,
+  upcomingWishlistCount,
+  protonSilverNativeShare,
+  protonLowConfidenceCount,
+  avgProtonScore,
+  boughtOnSaleCount,
+  paidItchCount,
+  avgOwnedSteamPrice,
+  priorityWishlistCount,
+  wishlistAddedThisYear,
+  wishlistStoreCount,
+  lastSeenThisWeek,
+  launcherInstallCount,
+  hltbLowConfidenceCount,
+  coopTaggedOnlyCount,
+  partialControllerCount,
+  indieTaggedShare,
+  avgTrophyCompletion,
+  gamerscoreCompletionShare,
+  metacritic80UnplayedCount,
+  biggestCriticGapGame,
+  earlyAccessBacklogCount,
+  doubleDipBacklogCount,
+  letterCoverageShare,
 } from '../js/sabermetrics.js';
 
 function game(overrides = {}) {
@@ -153,5 +202,199 @@ describe('sabermetrics', () => {
       snap,
     );
     expect(bv).toBeGreaterThan(100);
+  });
+
+  it('criticPlayerGap is Steam % minus Metacritic', () => {
+    expect(criticPlayerGap(game({ steam_review_percent: 92, metacritic_score: 80 }))).toBe(12);
+    expect(criticPlayerGap(game({ steam_review_percent: 70 }))).toBeNull();
+  });
+
+  it('peoplesChamp picks largest positive critic gap', () => {
+    const games = [
+      game({ id: '1', name: 'A', steam_review_percent: 90, metacritic_score: 70 }),
+      game({ id: '2', name: 'B', steam_review_percent: 85, metacritic_score: 80 }),
+    ];
+    const champ = peoplesChamp(games);
+    expect(champ?.g.name).toBe('A');
+    expect(champ?.gap).toBe(20);
+  });
+
+  it('extraInningsAvg averages completionist minus main HLTB', () => {
+    const snap = buildLibrarySnapshot([
+      game({ hltb_main_hours: 10, hltb_completionist_hours: 25, id: '1' }),
+      game({ hltb_main_hours: 20, hltb_completionist_hours: 30, id: '2' }),
+    ]);
+    expect(extraInningsAvg(snap)).toBe(12.5);
+  });
+
+  it('backlogMortality flags backlog winning when finish-by age is high', () => {
+    const snap = buildLibrarySnapshot([
+      game({ status: 'backlog', id: '1', hltb_main_hours: 40000 }),
+    ]);
+    const m = backlogMortality(snap);
+    expect(m?.verdict).toBe('backlog');
+    expect(m?.finishByAge).toBeGreaterThan(80);
+  });
+
+  it('couchReadyRate counts full controller support', () => {
+    const snap = buildLibrarySnapshot([
+      game({ controller_support: 'full', id: '1' }),
+      game({ controller_support: 'partial', id: '2' }),
+      game({ id: '3' }),
+    ]);
+    expect(couchReadyRate(snap)).toBeCloseTo(1 / 3, 2);
+  });
+
+  it('perpetualBetaCount counts early-access titles', () => {
+    const snap = buildLibrarySnapshot([
+      game({ early_access: true, id: '1' }),
+      game({ id: '2' }),
+    ]);
+    expect(perpetualBetaCount(snap)).toBe(1);
+  });
+
+  describe('untapped metadata helpers', () => {
+    it('protonReadyShare counts platinum and gold', () => {
+      const games = [
+        game({ protondb_tier: 'platinum', id: '1' }),
+        game({ protondb_tier: 'gold', id: '2' }),
+        game({ protondb_tier: 'borked', id: '3' }),
+      ];
+      expect(protonReadyShare(games)).toBeCloseTo(2 / 3, 2);
+      expect(protonCount(games, 'platinum')).toBe(1);
+      expect(protonTrendingUp([
+        game({ protondb_tier: 'silver', protondb_trending_tier: 'gold', id: '1' }),
+      ])).toBe(1);
+    });
+
+    it('psn platinum and trophy helpers', () => {
+      const games = [
+        game({ store: 'psn', id: '1', psn_platinum_earned: true, psn_trophies_earned: 10 }),
+        game({ store: 'psn', id: '2', psn_has_platinum: true, psn_platinum_earned: false }),
+      ];
+      expect(psnPlatinumsEarned(games)).toBe(1);
+      expect(psnPlatinumHunt(games)).toBe(1);
+      expect(psnTrophiesEarned(games)).toBe(10);
+    });
+
+    it('ps5NativeShare and ps4Holdouts', () => {
+      const games = [
+        game({ store: 'psn', id: '1', psn_platforms: ['PS5'] }),
+        game({ store: 'psn', id: '2', psn_platforms: ['PS4'] }),
+      ];
+      expect(ps5NativeShare(games)).toBe(0.5);
+      expect(ps4Holdouts(games)).toBe(1);
+    });
+
+    it('tag helpers', () => {
+      const games = [
+        game({ tags: ['Singleplayer', 'Action'], id: '1', status: 'backlog' }),
+        game({ tags: ['Multi-player', 'Action'], id: '2', status: 'backlog' }),
+        game({ tags: ['Multi-player'], id: '3', status: 'finished' }),
+      ];
+      expect(topTag(games)?.tag).toBe('Action');
+      expect(multiplayerTagShare(games)).toBeCloseTo(2 / 3, 2);
+      expect(singleplayerBacklogCount(games)).toBe(1);
+    });
+
+    it('itch and install helpers', () => {
+      const games = [
+        game({ store: 'itch', id: '1', min_price: 0 }),
+        game({ store: 'itch', id: '2', min_price: 5 }),
+        game({ source: 'local', id: '3' }),
+      ];
+      expect(freeItchCount(games)).toBe(1);
+      expect(itchSpendTotal(games)).toBe(5);
+      expect(installedLocalCount(games)).toBe(1);
+    });
+
+    it('recency and metacritic helpers', () => {
+      const recent = new Date(Date.now() - 5 * 86400000).toISOString();
+      const old = new Date(Date.now() - 400 * 86400000).toISOString();
+      const games = [
+        game({ last_played: recent, playtime_minutes: 60, id: '1' }),
+        game({ last_played: old, playtime_minutes: 120, name: 'Dusty', id: '2' }),
+        game({ metacritic_score: 92, id: '3' }),
+        game({ metacritic_score: 70, id: '4' }),
+      ];
+      expect(recentlyPlayedCount(games)).toBe(1);
+      expect(longestDormant(games)?.g.name).toBe('Dusty');
+      expect(avgMetacritic(games)).toBe(81);
+      expect(metacriticClubCount(games)).toBe(1);
+    });
+
+    it('wishlist helpers prefer wishlist_added', () => {
+      const wl = [
+        { name: 'New', wishlist_added: Math.floor(Date.now() / 1000) - 86400 },
+        { name: 'Old', wishlist_added: Math.floor(Date.now() / 1000) - 86400 * 100 },
+        { name: 'Soon', release_coming_soon: true },
+      ];
+      expect(oldestWishlist(wl)?.g.name).toBe('Old');
+      expect(upcomingWishlistCount(wl)).toBe(1);
+    });
+
+    it('protonDeckReadyBacklog counts backlog platinum/gold only', () => {
+      const games = [
+        game({ protondb_tier: 'gold', id: '1', status: 'backlog' }),
+        game({ protondb_tier: 'platinum', id: '2', status: 'finished' }),
+      ];
+      expect(protonDeckReadyBacklog(games)).toBe(1);
+    });
+
+    it('batch-2 proton and pricing helpers', () => {
+      const games = [
+        game({ protondb_tier: 'silver', protondb_score: 0.8, id: '1' }),
+        game({ protondb_tier: 'gold', protondb_score: 0.9, protondb_confidence: 'inadequate', id: '2' }),
+        game({ store: 'steam', discount_percent: 50, price_amount: 19.99, id: '3' }),
+        game({ store: 'itch', min_price: 5, id: '4' }),
+      ];
+      expect(protonSilverNativeShare(games)).toBe(0.5);
+      expect(protonLowConfidenceCount(games)).toBe(1);
+      expect(avgProtonScore(games)).toBe(0.85);
+      expect(boughtOnSaleCount(games)).toBe(1);
+      expect(paidItchCount(games)).toBe(1);
+      expect(avgOwnedSteamPrice(games)).toBe(19.99);
+    });
+
+    it('batch-2 wishlist, tags, and identity helpers', () => {
+      const yearStart = Date.UTC(new Date().getFullYear(), 0, 1);
+      const wl = [
+        { name: 'A', wishlist_priority: 1, wishlist_store: 'steam', wishlist_added: Math.floor(yearStart / 1000) + 86400 },
+        { name: 'B', wishlist_store: 'gog' },
+      ];
+      expect(priorityWishlistCount(wl)).toBe(1);
+      expect(wishlistAddedThisYear(wl)).toBe(1);
+      expect(wishlistStoreCount(wl)).toBe(2);
+
+      const games = [
+        game({ name: 'Co-op Game', tags: ['Co-op'], id: '1' }),
+        game({ name: 'Indie Hit', tags: ['Indie', 'Action'], controller_support: 'partial', early_access: true, id: '2' }),
+        game({ name: 'Alpha', id: '3' }),
+        game({ name: 'Beta', id: '4' }),
+      ];
+      expect(coopTaggedOnlyCount(games)).toBe(1);
+      expect(partialControllerCount(games)).toBe(1);
+      expect(indieTaggedShare(games)).toBeCloseTo(0.5);
+      expect(earlyAccessBacklogCount(games)).toBe(1);
+      expect(letterCoverageShare(games)).toBeCloseTo(4 / 26);
+    });
+
+    it('batch-2 platform and critic gap helpers', () => {
+      const games = [
+        game({ store: 'psn', psn_trophies_earned: 50, psn_trophies_total: 100, id: '1' }),
+        game({ store: 'xbox', xbox_gamerscore_current: 500, xbox_gamerscore_total: 1000, id: '2' }),
+        game({ metacritic_score: 85, playtime_minutes: 0, steam_review_percent: 60, id: '3' }),
+        game({ metacritic_score: 70, steam_review_percent: 90, playtime_minutes: 0, id: '4' }),
+      ];
+      expect(avgTrophyCompletion(games)).toBe(0.5);
+      expect(gamerscoreCompletionShare(games)).toBe(0.5);
+      expect(metacritic80UnplayedCount(games)).toBe(1);
+      expect(biggestCriticGapGame(games)?.g.id).toBe('3');
+
+      const recent = new Date(Date.now() - 2 * 86400000).toISOString();
+      expect(lastSeenThisWeek([game({ last_seen: recent, id: '5' })])).toBe(1);
+      expect(launcherInstallCount([game({ source: 'launcher', id: '6' })])).toBe(1);
+      expect(hltbLowConfidenceCount([game({ hltb_main_hours: 10, hltb_match_confidence: 0.5, id: '7' })])).toBe(1);
+    });
   });
 });

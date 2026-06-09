@@ -6,6 +6,7 @@ describe("spotlight random pick category", () => {
   let pickSpotlightGames;
   let setStinkerChanceForTest;
   let setRandomPickChanceForTest;
+  let setScoreJitterForTest;
   let state;
 
   beforeEach(async () => {
@@ -23,10 +24,11 @@ describe("spotlight random pick category", () => {
     state.wishlistGames = [];
     state.wishlistCrossStoreHiddenKeys = new Set();
     win._dataVersion = (win._dataVersion || 0) + 1;
-    ({ pickSpotlightGames, setStinkerChanceForTest, setRandomPickChanceForTest } =
+    ({ pickSpotlightGames, setStinkerChanceForTest, setRandomPickChanceForTest, setScoreJitterForTest } =
       await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
     setRandomPickChanceForTest(1);
+    setScoreJitterForTest(0);
   });
 
   const libraryGame = (id, rating = 85) => ({

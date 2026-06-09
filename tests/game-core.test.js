@@ -29,6 +29,7 @@ import {
   storeUrlForGame,
   trophyProgressPillHtml,
   platinumBadgeHtml,
+  storeBadgeHtml,
   gamePassBadgeHtml,
   coverArtCandidates,
   landscapeArtCandidates,
@@ -617,5 +618,54 @@ describe('coverArtCandidates / landscapeArtCandidates', () => {
   it('spotlightArtCandidates still leads with hero', () => {
     const urls = spotlightArtCandidates(steamGame);
     expect(urls[0]).toBe(steamLibraryHeroUrl('12345'));
+  });
+});
+
+describe('storeBadgeHtml — cross-store pill', () => {
+  let savedOwned;
+
+  beforeEach(() => {
+    savedOwned = state.crossStoreOwnedStores;
+    state.crossStoreOwnedStores = new Map();
+  });
+
+  afterEach(() => {
+    state.crossStoreOwnedStores = savedOwned;
+  });
+
+  it('renders a multi-logo "Owned on:" pill when 2+ stores own the title', () => {
+    const g = { store: 'steam', id: 1, name: 'Death Stranding' };
+    state.crossStoreOwnedStores.set(gameKey(g), ['steam', 'psn']);
+    const html = storeBadgeHtml(g);
+    expect(html).toContain('inline-flex');
+    expect(html).toContain('title="Owned on: STEAM, PSN"');
+    // One badge per owning store.
+    expect(html.match(/store-badge /g)).toHaveLength(2);
+    expect(html).toContain('store-badge steam');
+    expect(html).toContain('store-badge psn');
+  });
+
+  it('does not render the pill when only one store is owned', () => {
+    const g = { store: 'steam', id: 2, name: 'Solo Owned' };
+    state.crossStoreOwnedStores.set(gameKey(g), ['steam']);
+    const html = storeBadgeHtml(g);
+    expect(html).not.toContain('Owned on:');
+    expect(html.match(/store-badge /g)).toHaveLength(1);
+  });
+
+  it('renders the dashed custom-outline badge for manual rows', () => {
+    const g = { store: 'steam', id: 3, name: 'My Manual Game', manual: true };
+    const html = storeBadgeHtml(g);
+    expect(html).toContain('manual');
+    expect(html).toContain('title="STEAM (custom)"');
+    expect(html).not.toContain('Owned on:');
+  });
+
+  it('falls back to a single fetched-store badge with no pill', () => {
+    const g = { store: 'gog', id: 4, name: 'Plain GOG' };
+    const html = storeBadgeHtml(g);
+    expect(html).toContain('store-badge gog');
+    expect(html).not.toContain('Owned on:');
+    expect(html).not.toContain('manual');
   });
 });

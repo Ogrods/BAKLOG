@@ -36,6 +36,7 @@ import {
   formatReleaseDate,
   itchIsGame,
   findGameByKey,
+  getSameTitleKeys,
   renderBulkStatusButtons,
   recomputeCrossStoreHidden,
   combinedPlaytime,
@@ -332,7 +333,17 @@ export function bulkSetStatus(status) {
 }
 
 function snapshotRemoveState(keys) {
-  const personalSnap = snapshotPersonalForKeys(keys);
+  // Hiding a pulled row mirrors the hidden flag across same-title keys and adds
+  // its title norm to __hidden_title_norms_v1. Capture both so undo fully
+  // reverses the hide — otherwise applyHiddenTitleNorms re-hides the row on the
+  // next merge and the "Removed N games" undo silently leaves it hidden.
+  const expanded = new Set(keys);
+  for (const key of keys) {
+    const g = findGameByKey(key);
+    if (g) for (const k of getSameTitleKeys(g)) expanded.add(k);
+  }
+  expanded.add('__hidden_title_norms_v1');
+  const personalSnap = snapshotPersonalForKeys(expanded);
   const manualSnap = [];
   for (const key of keys) {
     const g = findGameByKey(key);

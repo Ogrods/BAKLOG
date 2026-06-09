@@ -121,6 +121,29 @@ def test_personal_put_round_trip(personal_server: str):
     assert loaded["libraryFirstSeen"] == saved["libraryFirstSeen"]
 
 
+def test_personal_hidden_flag_round_trips(personal_server: str):
+    """Hiding a pulled row (personal[key].hidden) plus a custom manual entry must
+    survive a PUT -> GET cycle, since hide/remove state has no dedicated endpoint."""
+    payload = {
+        "personal": {
+            "steam:99": {"status": "backlog", "hidden": True},
+            "gog:keep": {"status": "playing", "hidden": False},
+        },
+        "prefs": {},
+        "manual": [{"store": "gog", "id": "manual-1", "name": "Custom", "manual": True}],
+        "libraryFirstSeen": {},
+    }
+    put_status, saved = _request(personal_server, "PUT", "/api/personal", payload)
+    assert put_status == 200
+    assert saved["personal"]["steam:99"]["hidden"] is True
+    assert saved["personal"]["gog:keep"]["hidden"] is False
+
+    get_status, loaded = _request(personal_server, "GET", "/api/personal")
+    assert get_status == 200
+    assert loaded["personal"]["steam:99"]["hidden"] is True
+    assert loaded["manual"][0]["id"] == "manual-1"
+
+
 def test_personal_put_invalid_payload(personal_server: str):
     status, err = _request(personal_server, "PUT", "/api/personal", {"personal": "not-an-object"})
     assert status == 400

@@ -36,10 +36,12 @@ describe('spotlight saber categories', () => {
     win._dataVersion = (win._dataVersion || 0) + 1;
 
     let setStinkerChanceForTest;
-    ({ pickSpotlightGames, setStinkerChanceForTest } = await import('../js/dashboard-spotlight.js'));
+    let setScoreJitterForTest;
+    ({ pickSpotlightGames, setStinkerChanceForTest, setScoreJitterForTest } = await import('../js/dashboard-spotlight.js'));
     ({ computeSpotlightSuperlatives } = await import('../js/creative-metrics.js'));
     ({ buildLibrarySnapshot } = await import('../js/sabermetrics.js'));
     setStinkerChanceForTest(0);
+    setScoreJitterForTest(0);
   });
 
   const artGame = (overrides = {}) => ({
@@ -134,7 +136,7 @@ describe('spotlight saber categories', () => {
     expect(pool.length).toBeGreaterThan(10);
     const barrelCount = pool.filter((g) => g._spotlightReason?.isBarrel).length;
     expect(barrelCount).toBeGreaterThan(0);
-    const targetSize = Math.min(games.length, Math.max(60, Math.round(games.length * 0.35)));
+    const targetSize = Math.min(games.length, Math.max(60, Math.round(games.length * 0.5)));
     const barrelQuota = Math.max(1, Math.round(targetSize * 0.04));
     expect(barrelCount).toBeLessThanOrEqual(barrelQuota);
     expect(barrelCount / pool.length).toBeLessThan(0.1);

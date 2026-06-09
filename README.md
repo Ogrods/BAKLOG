@@ -354,7 +354,7 @@ First Steam run may take several minutes for a large library (Store API is rate-
 | `fetch_itad.py` | Cross-store deal prices → `itad_prices.json` (wishlist by default); refreshes `cache/fx_rates.json` and converts wishlist store prices to display currency |
 | `fetch_fx.py` | Refresh FX rates only (`cache/fx_rates.json`, Frankfurter; 24h cache) |
 
-**Data attribution:** Steam Deck / Linux compatibility data is sourced from [ProtonDB](https://www.protondb.com), whose community report data is made available under the [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/). BAKLOG is not affiliated with or endorsed by ProtonDB.
+**Data attribution:** BAKLOG surfaces third-party data from [ProtonDB](https://www.protondb.com) (Steam Deck / Linux tiers, ODbL), [IsThereAnyDeal](https://isthereanydeal.com/) (deal prices), [GamerPower](https://www.gamerpower.com/) (giveaway feed), and [HowLongToBeat](https://howlongtobeat.com/) (completion hours). Full list and license notes: [IP.md](IP.md#third-party-data-attribution).
 
 ## Open the dashboard
 

@@ -2340,6 +2340,22 @@ body.bulk-bar-open { padding-bottom: 56px; }
   display: inline-flex; align-items: center; gap: 0.25rem;
   white-space: nowrap;
 }
+.drawer-footer-credits {
+  margin: 0.45rem 0 0;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(51, 65, 85, 0.55);
+  font-size: 0.58rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+.drawer-footer-credits a {
+  color: #94a3b8;
+  text-decoration: none;
+}
+.drawer-footer-credits a:hover {
+  color: #cbd5e1;
+  text-decoration: underline;
+}
 .kbd {
   display: inline-flex;
   align-items: center; justify-content: center;

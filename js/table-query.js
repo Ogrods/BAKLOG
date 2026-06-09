@@ -3,10 +3,13 @@
  */
 
 import {
-  GENRE_ALIASES,
   ITCH_NON_GAME_CLASSIFICATIONS,
   isCleanupCandidateFromParts,
 } from './state.js';
+// Genre canonicalization is single-sourced from genres.js (a worker-safe,
+// DOM-free module) so the worker/table path can never drift from the genre
+// filter chips / dashboard genre breakdown. See tests/table-query-parity.test.js.
+import { gameMatchesGenreFilters } from './genres.js';
 
 const HLTB_BUCKETS_QUERY = [
   { minExclusive: null, maxInclusive: 2 },
@@ -16,14 +19,6 @@ const HLTB_BUCKETS_QUERY = [
   { minExclusive: 20, maxInclusive: 40 },
   { minExclusive: 40, maxInclusive: null },
 ];
-
-const NON_GENRE_TOKENS = new Set([
-  'ps3', 'ps4', 'ps5', 'psp', 'ps vita', 'psvita', 'vita',
-  'xbox', 'xbox 360', 'xbox one', 'xbox series x', 'xbox series s', 'xbox series x|s', 'xbox series x/s', 'xbox series',
-  'nintendo switch', 'switch', 'wii', 'wii u', 'ds', '3ds', 'nintendo ds', 'nintendo 3ds',
-  'pc', 'windows', 'mac', 'macos', 'osx', 'linux', 'steamos',
-  'ios', 'android', 'browser', 'stadia', 'google stadia',
-]);
 
 const WORKER_THRESHOLD = 500;
 let _worker = null;
@@ -113,22 +108,7 @@ function normalizeGame(g) {
   return { ...g, store: gameStore(g), id: gameId(g) };
 }
 
-function aliasCanonicalGenre(name) {
-  return GENRE_ALIASES[name] || name;
-}
-
-function gameGenresCanonical(g) {
-  return [...new Set((g.genres || []).filter(x => !NON_GENRE_TOKENS.has(String(x || '').trim().toLowerCase())).map(aliasCanonicalGenre))];
-}
-
-function gameMatchesGenreFilters(g, genres, genreMode) {
-  const gameGenres = gameGenresCanonical(g);
-  if (!genres.length) return true;
-  if (genreMode === 'AND') return genres.every(x => gameGenres.includes(x));
-  return genres.some(x => gameGenres.includes(x));
-}
-
-function normalizeNameForDedup(name) {
+export function normalizeNameForDedup(name) {
   return String(name || '')
     .toLowerCase()
     .replace(/[\u2122\u00ae\u00a9]/g, '')
@@ -158,17 +138,17 @@ function hasPersonalEntry(personal, g) {
   return !!(personal[key] || (typeof personal[gameId(g)] === 'object' && personal[gameId(g)]));
 }
 
-function hltbMain(personal, g) {
+export function hltbMain(personal, g) {
   const p = getPersonalRecord(personal, g);
   if (p.hltb_override != null && p.hltb_override !== '') return +p.hltb_override;
   return g.hltb_main_hours;
 }
 
-function ratingValue(g) {
+export function ratingValue(g) {
   return g.steam_review_percent ?? 0;
 }
 
-function parseReleaseForSort(d) {
+export function parseReleaseForSort(d) {
   const t = Date.parse(d || '');
   return Number.isNaN(t) ? 0 : t;
 }
@@ -218,7 +198,7 @@ function normalizeRowCurrency(code) {
   return /^[A-Z]{3}$/.test(raw) ? raw : '';
 }
 
-function comparableStorePrice(g, displayCcy) {
+export function comparableStorePrice(g, displayCcy) {
   const disp = normalizeRowCurrency(displayCcy);
   if (g?.price_amount != null && Number.isFinite(Number(g.price_amount))) {
     return Number(g.price_amount);
@@ -228,13 +208,16 @@ function comparableStorePrice(g, displayCcy) {
   return parsePriceLike(g.price);
 }
 
-function getDealInfo(itadByKey, g, displayCcy) {
+export function getDealInfo(itadByKey, g, displayCcy) {
   const itad = getItadForGame(itadByKey, g);
   if (itad && itad.price != null) {
     return {
       price: itad.price,
       cut: itad.cut || 0,
-      isHistoricalLow: !!itad.is_historical_low,
+      // Mirror deals.js getDealInfo: a 1-year low counts as a historical low for
+      // the wishlist "historical low only" filter and sort, so the worker/table
+      // path agrees with the dashboard steals card.
+      isHistoricalLow: !!itad.is_historical_low || !!itad.is_historical_low_year,
     };
   }
   const steamPrice = comparableStorePrice(g, displayCcy);
@@ -245,12 +228,12 @@ function getDealInfo(itadByKey, g, displayCcy) {
   return null;
 }
 
-function isOwnedByTitle(ownedNormNames, name) {
+export function isOwnedByTitle(ownedNormNames, name) {
   const n = normalizeNameForDedup(name);
   return !!(n && ownedNormNames.has(n));
 }
 
-function passesDealFilters(ctx, g) {
+export function passesDealFilters(ctx, g) {
   const { prefs, ownedNormNames, itadByKey, displayCurrency: displayCcy } = ctx;
   if (prefs.dealHideOwned && isOwnedByTitle(ownedNormNames, g.name)) return false;
   const d = getDealInfo(itadByKey, g, displayCcy);
@@ -284,7 +267,7 @@ function rowPlaytime(ctx, g) {
   return Math.max(0, Number(g.playtime_minutes) || 0);
 }
 
-function isCleanupCandidate(ctx, g) {
+export function isCleanupCandidate(ctx, g) {
   const p = getPersonalRecord(ctx.personal, g);
   const explicitBacklog = hasPersonalEntry(ctx.personal, g) && p.status === 'backlog';
   const norm = normalizeNameForDedup(g.name);
@@ -294,25 +277,25 @@ function isCleanupCandidate(ctx, g) {
   return isCleanupCandidateFromParts({ explicitBacklog, played, rating, releaseMs });
 }
 
-function itchIsGame(g) {
+export function itchIsGame(g) {
   const c = g.classification;
   if (!c || c === 'game') return true;
   return !ITCH_NON_GAME_CLASSIFICATIONS.has(c);
 }
 
-function priorityScore(ctx, g) {
+export function priorityScore(ctx, g) {
   const review = ratingValue(g);
   const h = hltbMain(ctx.personal, g) || 20;
   return review / Math.log2(h + 2);
 }
 
-function effectiveDiscountPercent(ctx, g) {
+export function effectiveDiscountPercent(ctx, g) {
   const d = getDealInfo(ctx.itadByKey, g, ctx.displayCurrency);
   if (d) return d.cut || 0;
   return g.discount_percent || 0;
 }
 
-function effectiveSortPrice(ctx, g) {
+export function effectiveSortPrice(ctx, g) {
   const d = getDealInfo(ctx.itadByKey, g, ctx.displayCurrency);
   if (d && d.price != null) return d.price;
   return comparableStorePrice(g, ctx.displayCurrency);

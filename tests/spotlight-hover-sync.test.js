@@ -37,6 +37,7 @@ describe("spotlight hover sync after slide", () => {
     win._dataVersion = (win._dataVersion || 0) + 1;
     await import("../js/covers.js");
     let setStinkerChanceForTest;
+    let setScoreJitterForTest;
     ({
       pickSpotlightGames,
       renderSpotlightHtml,
@@ -45,8 +46,10 @@ describe("spotlight hover sync after slide", () => {
       stepSpotlight,
       SPOTLIGHT_FADE_MS,
       setStinkerChanceForTest,
+      setScoreJitterForTest,
     } = await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
+    setScoreJitterForTest(0);
   });
 
   afterEach(() => {

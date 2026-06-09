@@ -22,6 +22,7 @@ describe("spotlight cat game category", () => {
   let setStinkerChanceForTest;
   let setRandomPickChanceForTest;
   let setCatGameChanceForTest;
+  let setScoreJitterForTest;
   let state;
 
   beforeEach(async () => {
@@ -44,10 +45,12 @@ describe("spotlight cat game category", () => {
       setStinkerChanceForTest,
       setRandomPickChanceForTest,
       setCatGameChanceForTest,
+      setScoreJitterForTest,
     } = await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
     setRandomPickChanceForTest(0);
     setCatGameChanceForTest(1);
+    setScoreJitterForTest(0);
   });
 
   const libraryGame = (id, name, rating = 85) => ({

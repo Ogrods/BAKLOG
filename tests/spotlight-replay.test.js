@@ -18,8 +18,10 @@ describe("spotlight replay category", () => {
     state.personal = {};
     win._dataVersion = (win._dataVersion || 0) + 1;
     let setStinkerChanceForTest;
-    ({ pickSpotlightGames, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+    let setScoreJitterForTest;
+    ({ pickSpotlightGames, setStinkerChanceForTest, setScoreJitterForTest } = await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
+    setScoreJitterForTest(0);
   });
 
   const finishedGame = (id, rating, count = 1000) => ({
@@ -110,8 +112,10 @@ describe("spotlight recently added category", () => {
     state.prefs = {};
     win._dataVersion = (win._dataVersion || 0) + 1;
     let setStinkerChanceForTest;
-    ({ pickSpotlightGames, computeRecentSpotlightKeys, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+    let setScoreJitterForTest;
+    ({ pickSpotlightGames, computeRecentSpotlightKeys, setStinkerChanceForTest, setScoreJitterForTest } = await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
+    setScoreJitterForTest(0);
   });
 
   const libraryGame = (id, rating, count = 500) => ({
@@ -196,8 +200,10 @@ describe("spotlight expanded categories", () => {
     state.wishlistCrossStoreHiddenKeys = new Set();
     win._dataVersion = (win._dataVersion || 0) + 1;
     let setStinkerChanceForTest;
-    ({ pickSpotlightGames, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+    let setScoreJitterForTest;
+    ({ pickSpotlightGames, setStinkerChanceForTest, setScoreJitterForTest } = await import("../js/dashboard-spotlight.js"));
     setStinkerChanceForTest(0);
+    setScoreJitterForTest(0);
   });
 
   const libraryGame = (id, overrides = {}) => ({
@@ -299,6 +305,7 @@ describe("spotlight expanded categories", () => {
 describe("spotlight rare stinker easter egg", () => {
   let pickSpotlightGames;
   let setStinkerChanceForTest;
+  let setScoreJitterForTest;
   let state;
 
   beforeEach(async () => {
@@ -316,7 +323,8 @@ describe("spotlight rare stinker easter egg", () => {
     state.wishlistGames = [];
     state.wishlistCrossStoreHiddenKeys = new Set();
     win._dataVersion = (win._dataVersion || 0) + 1;
-    ({ pickSpotlightGames, setStinkerChanceForTest } = await import("../js/dashboard-spotlight.js"));
+    ({ pickSpotlightGames, setStinkerChanceForTest, setScoreJitterForTest } = await import("../js/dashboard-spotlight.js"));
+    setScoreJitterForTest(0);
   });
 
   const game = (id, rating) => ({

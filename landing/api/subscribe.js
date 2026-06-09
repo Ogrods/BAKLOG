@@ -1,8 +1,11 @@
 // Vercel serverless function: logs each waitlist signup (optional Supabase),
 // emails the founder via Resend, then sends the signer a confirmation auto-reply.
 // Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
+// Production also requires KV_REST_API_* or UPSTASH_REDIS_REST_* (distributed rate limit).
 // Optional: WELCOME_FROM (defaults to NOTIFY_FROM), WELCOME_REPLY_TO (defaults to NOTIFY_TO),
 // SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (durable waitlist log).
+
+import { checkRateLimit } from "./_rate-limit.js";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -10,32 +13,10 @@ function sanitizeEmail(raw) {
   if (typeof raw !== "string") return "";
   return raw.replace(/[\x00-\x1f\x7f]/g, "").trim();
 }
-const RATE_WINDOW_MS = 60_000;
-const RATE_MAX = 5;
-
-/** @type {Map<string, { start: number, count: number }>} */
-const rateBuckets = new Map();
-
 function clientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
   return request.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(ip) {
-  const now = Date.now();
-  let entry = rateBuckets.get(ip);
-  if (!entry || now - entry.start > RATE_WINDOW_MS) {
-    entry = { start: now, count: 0 };
-    rateBuckets.set(ip, entry);
-  }
-  entry.count += 1;
-  if (rateBuckets.size > 10_000) {
-    for (const [key, bucket] of rateBuckets) {
-      if (now - bucket.start > RATE_WINDOW_MS) rateBuckets.delete(key);
-    }
-  }
-  return entry.count > RATE_MAX;
 }
 
 async function logToSupabase({ email, ip, time }) {
@@ -117,7 +98,13 @@ export default {
       return Response.json({ error: "Method not allowed" }, { status: 405 });
     }
 
-    if (isRateLimited(clientIp(request))) {
+    const ip = clientIp(request);
+    const rate = await checkRateLimit(ip, { namespace: "subscribe" });
+    if (rate.misconfigured) {
+      console.error("subscribe: missing KV rate-limit credentials in production");
+      return Response.json({ error: "Server not configured" }, { status: 503 });
+    }
+    if (rate.limited) {
       return Response.json({ error: "Too many requests" }, {
         status: 429,
         headers: { "Retry-After": "60" },
@@ -150,7 +137,6 @@ export default {
     }
 
     const signupTime = new Date().toISOString();
-    const ip = clientIp(request);
     console.log(`waitlist_signup\t${signupTime}\t${email}`);
 
     try {

@@ -11,6 +11,8 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
 - `assets/sample/*.{webp,png}` — fictional game covers for the spotlight carousel.
 - `api/subscribe.js` — Vercel serverless function; logs signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
+- `api/_rate-limit.js` — shared distributed rate limiter (Vercel KV / Upstash) used by `subscribe.js`.
+- `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
 - `sql/waitlist.sql` — one-time Supabase table for durable signup logging.
 - `sql/bug_reports.sql` — one-time Supabase table for durable bug-report logging.
@@ -49,6 +51,23 @@ Optional durable logging (recommended):
 Run `sql/waitlist.sql` once in the Supabase SQL editor before enabling these vars. Without Supabase env vars, signups still work; they are only emailed and logged to Vercel function logs.
 
 Without the Resend trio, `/api/subscribe` returns `500 Server not configured` and the form shows a friendly error.
+
+## Rate limiting (required for production)
+
+`/api/subscribe` rate-limits by client IP (5 requests per minute). Production uses a **distributed** store so limits survive Vercel cold starts and scale-out. Without KV credentials in production, `/api/subscribe` returns `503 Server not configured`.
+
+1. Vercel project (root `landing/`) → **Storage** → **Create Database** → **KV** → connect to this project.
+2. Redeploy so Production receives the auto-injected credentials below.
+3. Smoke test: POST `/api/subscribe` six times from the same IP — the sixth should return `429 Too many requests`.
+
+| Variable | Notes |
+| --- | --- |
+| `KV_REST_API_URL` | Auto-injected when Vercel KV is linked to the project. |
+| `KV_REST_API_TOKEN` | Auto-injected when Vercel KV is linked to the project. |
+
+Alternatively, set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from a standalone Upstash Redis database.
+
+Local `vercel dev` and Vitest fall back to an in-memory limiter when KV vars are absent (with a one-time console warning). Install landing API deps once: `npm install` inside `landing/`.
 
 ## Local preview
 

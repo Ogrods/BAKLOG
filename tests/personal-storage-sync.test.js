@@ -34,6 +34,24 @@ describe('installPersonalStorageSync', () => {
     expect(state.personal).toEqual(incoming);
   });
 
+  it('does not react to manual-games storage events (manual[] is not cross-tab synced)', async () => {
+    const { manualStorageKey, loadManualGames } = await import('../js/personal-storage.js');
+    const incoming = [{ store: 'gog', id: 'manual-tab-b', name: 'Tab B', manual: true }];
+    localStorage.setItem(manualStorageKey(), JSON.stringify(incoming));
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: manualStorageKey(),
+        newValue: JSON.stringify(incoming),
+        storageArea: localStorage,
+      }),
+    );
+    // personal state is unchanged; the sync handler only watches the personal key.
+    expect(state.personal).toEqual({ 'steam:1': { status: 'backlog' } });
+    // (loadManualGames reads localStorage directly, so it sees the write, but the
+    // live in-memory catalog is not refreshed until a reload — the documented gap.)
+    expect(loadManualGames()).toHaveLength(1);
+  });
+
   it('ignores storage events while a debounced save is pending', async () => {
     const { savePersonal } = await import('../js/personal-storage.js');
     state.personal['steam:1'].status = 'next';

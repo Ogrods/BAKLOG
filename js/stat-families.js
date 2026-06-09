@@ -156,9 +156,18 @@ export function familyForEyebrow(eyebrow) {
   if (matchesAny(e, [
     'critically acclaimed', 'highly rated', 'hidden gem', 'solid pick',
     'worth a look', 'top-rated', 'well reviewed', 'guilty pleasure',
-    'rare stinker', 'stinker',
+    'rare stinker', 'stinker', 'critic darling', 'critics agree',
+    'metacritic favorite',
   ])) {
     return FAMILY.RATING;
+  }
+
+  if (matchesAny(e, ['deck ready', 'deck verified', 'runs on deck', 'linux-ready'])) {
+    return FAMILY.COMPAT;
+  }
+
+  if (matchesAny(e, ['aged classic', 'old but gold', 'retro pick', 'still kicking'])) {
+    return FAMILY.IDENTITY;
   }
 
   if (matchesAny(e, [

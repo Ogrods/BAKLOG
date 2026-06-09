@@ -27,3 +27,21 @@ export function isSafeHttpUrl(url) {
     return false;
   }
 }
+
+/**
+ * Native `title` tooltips only resolve to the nearest ancestor that has a
+ * `title`, so a checkbox's tooltip never shows when hovering the sibling label
+ * text. Copy each checkbox's `title` onto its wrapping <label> (when the label
+ * has no title of its own) so hovering anywhere on the label — text included —
+ * surfaces the same tooltip. Safe to re-run; skips labels that already have a
+ * title. Pass a subtree `root` to cover dynamically rendered checkboxes.
+ */
+export function syncCheckboxLabelTitles(root = document) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll('input[type="checkbox"][title]').forEach(box => {
+    const label = box.closest("label");
+    if (label && !label.getAttribute("title")) {
+      label.setAttribute("title", box.getAttribute("title"));
+    }
+  });
+}

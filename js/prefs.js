@@ -2,6 +2,7 @@ import { state, PREFS_KEY } from './state.js';
 import { prefsStorageKey } from './profiles.js';
 import { personalStore } from './personal-store.js';
 import { resolveCoopFilterMode } from './table-query.js';
+import { migrateColumnPrefs } from './table-columns.js';
 
 export const COOP_FILTER_LABELS = {
   any: "Any co-op",
@@ -34,7 +35,8 @@ export function syncCoopFilterSegmented() {
 export function loadPrefs() {
   const fallback = {
     picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false,
-    showScoreColumn: false, rowHeroBackdrop: false, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15,
+    columns: {}, rowHeroBackdrop: true, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15,
+    metricsDisabled: [],
     storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16,
     dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false,
     dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {},
@@ -87,6 +89,7 @@ export function loadPrefs() {
   if (!merged.connectionNotes || typeof merged.connectionNotes !== 'object' || Array.isArray(merged.connectionNotes)) {
     merged.connectionNotes = {};
   }
+  migrateColumnPrefs(merged);
   return merged;
 }
 

@@ -78,6 +78,7 @@ import { openBugReportDialog } from './bug-report.js';
 import { reportError } from './error-boundary.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
 import { bindHiddenPanelUI } from './hidden-panel.js';
+import { bindColumnPicker } from './column-picker.js';
 import { createGlobalKeydownHandler } from './events.js';
 import {
   fetcherRunner,
@@ -116,7 +117,11 @@ function closePicksIfOpen() {
 const SUMMARY_FILTER_CHIP_SELECTOR =
   ".status-chip, .summary-store-chip, .summary-stale-chip, .summary-deal-chip[data-wishlist-deal-filter], .summary-wishlist-reset";
 
+let _eventsBound = false;
+
 export function bindEvents() {
+  if (_eventsBound) return;
+  _eventsBound = true;
   initTrophyPopover();
 
   document.getElementById("undoToast")?.addEventListener("click", (e) => {
@@ -448,11 +453,6 @@ export function bindEvents() {
   }
   document.getElementById("genreMode").addEventListener("change", e => {
     applyPrefsChange({ prefs: { genreFilterMode: e.target.value } });
-  });
-  document.getElementById("showScoreColumn").addEventListener("change", e => {
-    state.prefs.showScoreColumn = e.target.checked;
-    savePrefs();
-    document.getElementById("tableWrap")?.classList.toggle("table-hide-score", !e.target.checked);
   });
   document.getElementById("rowHeroBackdrop").addEventListener("change", e => {
     state.prefs.rowHeroBackdrop = e.target.checked;
@@ -814,6 +814,7 @@ export function bindEvents() {
   bindAddGameModal();
   bindOrphanPruneUI();
   bindHiddenPanelUI();
+  bindColumnPicker();
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
   document.getElementById("exportPersonal").addEventListener("click", () => download("baklog-personal.json", JSON.stringify(state.personal, null, 2), "application/json"));

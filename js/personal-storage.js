@@ -9,6 +9,7 @@ export function manualStorageKey() {
   return profileScopedStorageKey(MANUAL_KEY);
 }
 import { personalStore, configurePersonalStore } from './personal-store.js';
+import { noteDownstreamSync } from './propagation-trace.js';
 import { createMemo } from './memo.js';
 import {
   gameKey,
@@ -89,6 +90,32 @@ export function stripLegacyTags() {
 }
 
 let _savePersonalTimer = null;
+let _storageSyncInstalled = false;
+
+export function hasPendingPersonalSave() {
+  return _savePersonalTimer != null;
+}
+
+/** Cross-tab sync: when another tab writes profile-scoped personal JSON to LS. */
+export function installPersonalStorageSync() {
+  if (_storageSyncInstalled || typeof window === 'undefined') return;
+  _storageSyncInstalled = true;
+  window.addEventListener('storage', (e) => {
+    if (e.storageArea !== localStorage) return;
+    if (e.key !== personalStorageKey()) return;
+    if (!e.newValue || hasPendingPersonalSave()) return;
+    try {
+      const parsed = JSON.parse(e.newValue);
+      if (!parsed || typeof parsed !== 'object') return;
+      state.personal = parsed;
+      bumpPersonalMemo();
+      scheduleDownstreamSync();
+    } catch {
+      /* corrupt LS payload */
+    }
+  });
+}
+
 export function savePersonal() {
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = setTimeout(() => {
@@ -225,6 +252,7 @@ let _downstreamSyncTimer = null;
 export function scheduleDownstreamSync() {
   clearTimeout(_downstreamSyncTimer);
   _downstreamSyncTimer = setTimeout(() => {
+    noteDownstreamSync();
     downstreamCallbacks.renderSummary();
     if (state.activeView === "dashboard") downstreamCallbacks.scheduleDashboardRender();
     else downstreamCallbacks.renderPicks();

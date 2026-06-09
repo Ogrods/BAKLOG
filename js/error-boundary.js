@@ -344,6 +344,7 @@ export function buildBugBundle() {
       table_fingerprint: safeFingerprint(),
       last_render_ms: typeof perf?.totalMs === 'number' ? perf.totalMs : null,
       dash_stats: dashStats ? { ...dashStats } : null,
+      propagation: win?.__baklogProp ? { ...win.__baklogProp } : null,
     },
     errors: {
       session_count: _errors.length,

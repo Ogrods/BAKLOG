@@ -702,7 +702,7 @@ export function renderBulkStatusButtons() {
 }
 
 export function tableColSpan() {
-  return state.prefs.showScoreColumn ? 14 : 13;
+  return 14;
 }
 
 export function wishlistBadgeHtml(g) {

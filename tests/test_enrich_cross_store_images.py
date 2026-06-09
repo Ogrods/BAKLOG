@@ -10,6 +10,8 @@ import pytest
 
 import enrich_cross_store_images as enrich
 
+from shared.steam_match import normalize_title
+
 ARMATUS_ROW = {
     "store": "wishlist",
     "wishlist_store": "xbox",
@@ -64,7 +66,7 @@ def test_should_process_upgrade_only_when_flag_set() -> None:
 
 
 def test_normalize_strips_trademark_symbols() -> None:
-    assert enrich.normalize("Armatus™") == "armatus"
+    assert normalize_title("Armatus™") == "armatus"
 
 
 def test_store_files_includes_wishlist_xbox_and_itch() -> None:

@@ -9,8 +9,27 @@ import { state } from './state.js';
 import { storeLogoHtml } from './store-logos.js';
 import { STORE_BRAND_COLORS } from './store-brand-colors.js';
 import { formatPlatformList } from './platform-labels.js';
+import {
+  authStatusLoaded,
+  connectedProviderCount,
+  getAuthStatusSnapshot,
+  ingestAuthStatusProviders,
+  isItchTabAvailable,
+  isProviderConnected,
+  providerForFetcher,
+  providerStatus,
+} from './connections-status.js';
 
 export { FETCHER_AUTH_PROVIDER };
+export {
+  authStatusLoaded,
+  connectedProviderCount,
+  ingestAuthStatusProviders,
+  isItchTabAvailable,
+  isProviderConnected,
+  providerForFetcher,
+  providerStatus,
+};
 
 const LOCAL_PROVIDER_FOOTER = {
   amazon: {
@@ -39,10 +58,6 @@ export function localProviderFooterCopy(providerKey, connected) {
 }
 
 let _connPopoverRelease = null;
-
-let authStatus = [];
-
-let _authStatusLoaded = false;
 
 let reconnectProviders = new Set();
 
@@ -357,8 +372,8 @@ function railSortIndex(key) {
 }
 
 function orderedProviders() {
-  const steam = authStatus.find(p => p.key === 'steam');
-  const rest = authStatus
+  const steam = getAuthStatusSnapshot().find(p => p.key === 'steam');
+  const rest = getAuthStatusSnapshot()
     .filter(p => p.key !== 'steam')
     .slice()
     .sort((a, b) => {
@@ -381,7 +396,7 @@ function railEntries() {
     if (seen.has(g)) continue;
     seen.add(g);
     const members = PROVIDER_GROUPS[g].members
-      .map(k => authStatus.find(x => x.key === k))
+      .map(k => getAuthStatusSnapshot().find(x => x.key === k))
       .filter(Boolean);
     out.push({
       key: g,
@@ -396,17 +411,17 @@ function railEntries() {
 }
 
 function ensureSelectedKey() {
-  if (authStatus.some(p => p.key === _selectedKey)) return;
+  if (getAuthStatusSnapshot().some(p => p.key === _selectedKey)) return;
   const rep = groupRepFor(_selectedKey);
   if (
     PROVIDER_GROUPS[rep]
-    && PROVIDER_GROUPS[rep].members.some(k => authStatus.some(p => p.key === k))
+    && PROVIDER_GROUPS[rep].members.some(k => getAuthStatusSnapshot().some(p => p.key === k))
   ) {
     _selectedKey = rep;
     return;
   }
-  const steam = authStatus.find(p => p.key === 'steam');
-  _selectedKey = steam?.key || authStatus[0]?.key || 'steam';
+  const steam = getAuthStatusSnapshot().find(p => p.key === 'steam');
+  _selectedKey = steam?.key || getAuthStatusSnapshot()[0]?.key || 'steam';
 }
 
 
@@ -419,7 +434,7 @@ function renderHero() {
 
   if (!countEl || !fillEl) return;
 
-  if (!authStatus.length) {
+  if (!getAuthStatusSnapshot().length) {
 
     countEl.textContent = 'Loading connections…';
 
@@ -431,7 +446,7 @@ function renderHero() {
 
   const connected = connectedProviderCount();
 
-  const total = authStatus.length;
+  const total = getAuthStatusSnapshot().length;
 
   countEl.textContent = `${connected} of ${total} connections made`;
 
@@ -447,7 +462,7 @@ function renderOnboard() {
 
   if (!el) return;
 
-  if (!authStatus.length || connectedProviderCount() > 0) {
+  if (!getAuthStatusSnapshot().length || connectedProviderCount() > 0) {
 
     el.innerHTML = '';
 
@@ -852,7 +867,7 @@ function renderConnections() {
 
   renderOnboard();
 
-  if (!authStatus.length) {
+  if (!getAuthStatusSnapshot().length) {
 
     rail.innerHTML = '';
 
@@ -882,12 +897,12 @@ function renderConnections() {
 
   if (PROVIDER_GROUPS[selKey]) {
     const members = PROVIDER_GROUPS[selKey].members
-      .map(k => authStatus.find(x => x.key === k))
+      .map(k => getAuthStatusSnapshot().find(x => x.key === k))
       .filter(Boolean);
     const note = groupConnectNote(selKey, members);
     pane.innerHTML = `${note}<div class="conn-card-stack">${members.map(buildCardHtml).join('')}</div>`;
   } else {
-    const selected = authStatus.find(p => p.key === selKey);
+    const selected = getAuthStatusSnapshot().find(p => p.key === selKey);
     pane.innerHTML = selected
       ? buildCardHtml(selected)
       : '<p class="text-sm text-slate-400">Select a provider on the left to get started.</p>';
@@ -1026,7 +1041,7 @@ function handleLayoutKeydown(ev) {
 
   const railItem = ev.target.closest('.conn-rail-item');
 
-  if (!railItem || !authStatus.length) return;
+  if (!railItem || !getAuthStatusSnapshot().length) return;
 
 
 
@@ -1556,7 +1571,7 @@ function renderReconnectBanner() {
 
   const names = [...reconnectProviders]
 
-    .map(k => authStatus.find(p => p.key === k)?.label || k)
+    .map(k => getAuthStatusSnapshot().find(p => p.key === k)?.label || k)
 
     .join(', ');
 
@@ -1670,7 +1685,7 @@ async function fetchAuthStatus() {
   _secretsCorrupt = !!data.secrets_corrupt;
   renderSecretsCorruptBanner();
   ingestAuthStatusProviders(data.providers || []);
-  return authStatus;
+  return getAuthStatusSnapshot();
 }
 
 /** True when the server secrets bundle is corrupt (see GET /api/auth/status). */
@@ -1695,34 +1710,6 @@ function renderSecretsCorruptBanner() {
     document.querySelector('.view-tab[data-view="connections"]')?.click();
   });
 }
-
-/** Cache provider rows from GET /api/auth/status (dashboard poll + refresh). */
-export function ingestAuthStatusProviders(providers) {
-  authStatus = providers || [];
-  _authStatusLoaded = true;
-  // Notify the dashboard fetcher chips so they re-render the moment a
-  // connection is made/changed, instead of waiting for the 30s poll.
-  try {
-    document.dispatchEvent(
-      new CustomEvent('baklog:auth-status', { detail: { providers: authStatus } }),
-    );
-  } catch (_) { /* no DOM (tests) */ }
-}
-
-/** Cached Connections status for a provider key, or null if unknown. */
-export function providerStatus(provider) {
-  const row = authStatus.find(p => p.key === provider);
-  return row?.status ?? null;
-}
-
-/** True once /api/auth/status has resolved at least once this session. */
-export function authStatusLoaded() {
-
-  return _authStatusLoaded;
-
-}
-
-
 
 async function openManualUrl(provider) {
 
@@ -1998,7 +1985,7 @@ async function startBrowserConnect(provider) {
   // carries over. A first-time Connect has nothing to clear.
   // Epic wishlist keeps its browser profile on reconnect — cf_clearance and
   // storefront cookies must survive or Cloudflare re-challenges every time.
-  const current = authStatus.find(x => x.key === provider)?.status;
+  const current = getAuthStatusSnapshot().find(x => x.key === provider)?.status;
   const preserveProfile = provider === 'epic_wishlist';
   const fresh = !preserveProfile && (current === 'connected' || current === 'expired');
 
@@ -2110,7 +2097,7 @@ export async function refreshConnections() {
 
     const msg = connectionStatusErrorMessage(err);
 
-    if (authStatus.length > 0) {
+    if (getAuthStatusSnapshot().length > 0) {
 
       renderConnections();
 
@@ -2259,16 +2246,6 @@ export function initConnections() {
 
 
 
-/** Map fetcher chip key -> auth provider for reconnect hints. */
-
-export function providerForFetcher(key) {
-
-  return FETCHER_AUTH_PROVIDER[key] || null;
-
-}
-
-
-
 export function noteFetcherAuthFailure(fetcherKey, logText) {
 
   const provider = providerForFetcher(fetcherKey);
@@ -2280,44 +2257,6 @@ export function noteFetcherAuthFailure(fetcherKey, logText) {
   if (authish) showReconnectBanner([provider]);
 
   return authish;
-
-}
-
-
-
-/** True when the given auth provider is currently connected (used to lift a
-
- * fetcher's auth-failure cooldown the moment the user reconnects). */
-
-export function isProviderConnected(provider) {
-
-  return authStatus.some(p => p.key === provider && p.status === 'connected');
-
-}
-
-
-
-/** Number of auth providers with status === 'connected' (onboarding / empty-state gate). */
-
-export function connectedProviderCount() {
-
-  return authStatus.filter(p => p.status === 'connected').length;
-
-}
-
-
-
-/** itch.io tab: show once API key is saved (connected/unverified) or library already loaded. */
-
-export function isItchTabAvailable() {
-
-  const row = authStatus.find(p => p.key === 'itch');
-
-  const status = row?.status;
-
-  const hasSetup = status === 'connected' || status === 'unverified';
-
-  return hasSetup || (state.itchGames || []).length > 0;
 
 }
 
@@ -2348,7 +2287,7 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
   // connect actions (e.g. Steam onboarding button).
   if (!autoStart) return;
 
-  const p = authStatus.find(x => x.key === provider);
+  const p = getAuthStatusSnapshot().find(x => x.key === provider);
 
   const kind = p?.kind || 'browser';
 

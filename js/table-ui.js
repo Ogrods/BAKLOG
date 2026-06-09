@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
 import { beginRowLoader, endRowLoader, forceHideRowLoader, isViewOverlayVisible } from './loading-curtain.js';
 import { deferTableRender, isTableDataView } from './render-gate.js';
+import { noteTableRender, noteTableRenderSkipped } from './propagation-trace.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
 import {
   collectTableParams,
@@ -70,7 +71,9 @@ import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
 import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
 import { buildTableEmptyStateHtml } from './table-empty-state.js';
-import { formatMoney, currencyMismatchTagForGame, displayCurrency } from './currency.js';
+import { formatPrice } from './table-price-format.js';
+
+export { formatPrice };
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 // dashboard-drilldown imports from table-ui already; the cycle is safe because
@@ -85,6 +88,7 @@ import {
   perfEndRun,
   perfActiveRun,
 } from './table-perf.js';
+import { applyColumnVisibility } from './table-columns.js';
 
 // === Alpha nav + scroll ===
 export function initAlphaNav() {
@@ -170,10 +174,7 @@ export function scrollToRowIndex(idx, { smooth = false } = {}) {
     if (!row) {
       const tbody = document.getElementById("tbody");
       if (tbody) {
-        const ctx = {
-          isWish: state.activeView === "wishlist",
-          showScore: !!state.prefs.showScoreColumn,
-        };
+        const ctx = { isWish: state.activeView === "wishlist" };
         const rendered = tbodyRowCount();
         if (idx + 1 - rendered > 0 && idx + 1 - rendered <= FIRST_CHUNK) {
           tbody.insertAdjacentHTML("beforeend", appendChunk(list, rendered, idx + 1, ctx));
@@ -484,46 +485,6 @@ function hltbLabel(g) {
   const e = g.hltb_main_extra_hours ?? "-";
   const c = g.hltb_completionist_hours ?? "-";
   return `${m} / ${e} / ${c}`;
-}
-
-export function formatPrice(g) {
-  const itad = getItadForGame(g);
-  if (itad?.price != null || itad?.price_str) {
-    const onSale = (itad.cut || 0) > 0;
-    const cutTxt = onSale ? ` (-${itad.cut}%)` : "";
-    const bucket = onSale ? cutBucketClass(itad.cut) : "";
-    const itadCur = itad.currency || displayCurrency();
-    const priceLabel = itad.price != null
-      ? formatMoney(itad.price, itadCur)
-      : escapeHtml(itad.price_str);
-    const priceInner = onSale
-      ? `<span class="price-cut font-semibold ${bucket}">${priceLabel}${escapeHtml(cutTxt)}</span>`
-      : priceLabel;
-    const d = getDealInfo(g);
-    const lowStar = d ? priceLowStarHtml(d) : "";
-    const dropBadge = dealDroppedBadgeHtml(g).replace(/^/, "&nbsp;");
-    const shopHtml = itad.shop ? `@ ${escapeHtml(itad.shop)}` : "";
-    const dealUrl = itad.url || (d && d.url) || null;
-    const linkOpen = dealUrl
-      ? `<a href="${escapeAttr(dealUrl)}" target="_blank" rel="noopener" class="deal-price-link flex flex-col items-end leading-tight" title="Open this deal on ${escapeAttr(itad.shop || "store")}">`
-      : `<div class="flex flex-col items-end leading-tight">`;
-    const linkClose = dealUrl ? `</a>` : `</div>`;
-    // Star sits outside the link so it never picks up the link's underline,
-    // pointer cursor, or click target. The tooltip still works on hover.
-    return `<div class="deal-price-row flex items-start justify-end gap-1">${lowStar}${linkOpen}
-      <span class="whitespace-nowrap">${priceInner}${dropBadge}</span>
-      ${shopHtml ? `<span class="text-[10px] text-slate-400 truncate w-full text-right" title="${escapeAttr(itad.shop)}">${shopHtml}</span>` : ""}
-    ${linkClose}</div>`;
-  }
-  if (!g.price && g.discount_percent == null) return " - ";
-  const base = g.price || "N/A";
-  const cut = g.discount_percent || 0;
-  const curTag = currencyMismatchTagForGame(g);
-  if (cut > 0) {
-    const bucket = cutBucketClass(cut);
-    return `<span class="price-cut font-semibold ${bucket}">${escapeHtml(base)} (-${cut}%)${curTag}</span>`;
-  }
-  return `${escapeHtml(base)}${curTag}`;
 }
 
 // === Focus helpers ===
@@ -854,7 +815,6 @@ export function tableFingerprint() {
     deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
     coop: getCoopFilterMode(),
     cleanup: !!state.cleanupModeActive,
-    score: !!state.prefs.showScoreColumn,
     dedupe: !!state.sessionPrefs.crossStoreDedup,
     ihng: !!state.sessionPrefs.itchHideNonGames,
     lib: state.allGames.length,
@@ -1184,7 +1144,7 @@ function timeSyncCoverFits(tbody) {
   return performance.now() - t0;
 }
 
-function tableRowHtml(g, idx, { isWish, showScore }) {
+function tableRowHtml(g, idx, { isWish }) {
   const p = getPersonal(g);
   const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
   const hiddenGem = isHiddenGem(g);
@@ -1198,11 +1158,17 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
   const cleanupTitle = cleanup ? ' title="Cleanup candidate: tagged backlog, 0h, rated under 60%, 2+ yrs old"' : '';
   const { heroClass, heroStyle } = rowHeroAttrs(g);
   const heroAttr = heroStyle ? ` style="${heroStyle}"` : '';
+  const hltbTxt = hltbLabel(g);
+  const hltbEmpty = hltbTxt.replace(/[-\s/]/g, "") === "";
+  const priceHtml = formatPrice(g);
+  const priceOccupied = priceHtml.trim() !== "-";
+  const lastPlayedHtml = formatDate(g.last_played);
+  const lastPlayedOccupied = lastPlayedHtml.trim() !== "-";
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}${heroClass}`;
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}"${heroAttr}${cleanupTitle}>
-      <td class="p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} title="Select for bulk status or remove" /></td>
-      <td class="p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
-      <td class="p-2 game-name-cell">
+      <td class="col-select p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} title="Select for bulk status or remove" /></td>
+      <td class="col-cover p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
+      <td class="col-game p-2 game-name-cell">
         <div class="flex items-center gap-2">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 min-w-0">
@@ -1226,19 +1192,19 @@ function tableRowHtml(g, idx, { isWish, showScore }) {
           </div>
         </div>
       </td>
-      ${isWish ? `<td class="p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="p-2">${buildStatusSelect(key, p.status)}</td>`}
-      <td class="col-score p-2 text-right" title="Priority score: Steam rating ÷ log₂(HLTB main + 2)">${priorityScore(g).toFixed(1)}</td>
+      ${isWish ? `<td class="col-status p-2">${wishlistStatusSelectHtml(g, p)}</td>` : `<td class="col-status p-2">${buildStatusSelect(key, p.status)}</td>`}
+      <td class="col-score p-2 text-right" title="Priority score = Steam review % ÷ log₂(HLTB main hours + 2), so well-rated, shorter games rank highest. Games with no HLTB time assume 20 hours.">${priorityScore(g).toFixed(1)}</td>
       <td class="col-played p-2 text-right text-slate-300"${combinedPlaytimeTooltip(g) ? ` title="${escapeAttr(combinedPlaytimeTooltip(g))}"` : ""}>${formatHours(combinedPlaytime(g))}</td>
-      <td class="p-2 text-right">
-        <button data-hltb-edit="${escapeAttr(key)}" class="px-2 py-1 rounded text-xs" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbLabel(g)}</button>
+      <td class="col-hltb p-2 text-right">
+        <button data-hltb-edit="${escapeAttr(key)}" class="px-2 py-1 rounded text-xs${hltbEmpty ? " hltb-empty" : ""}" style="cursor: pointer" title="Open HowLongToBeat (Shift+click to override main hours)">${hltbTxt}</button>
       </td>
-      <td class="p-2 text-right" title="${g.steam_review_percent != null ? `Steam review: ${g.steam_review_percent}%` : 'No Steam review data'}">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - "}</td>
-      <td class="p-2 text-right text-slate-300" title="${g.metacritic_score != null ? `Metacritic: ${g.metacritic_score}` : 'No Metacritic score'}">${g.metacritic_score != null ? g.metacritic_score : " - "}</td>
-      <td class="p-2 text-right">${formatPrice(g)}</td>
-      <td class="p-2 text-slate-300">${formatReleaseDate(g.release_date)}</td>
-      <td class="col-lastplayed p-2 text-slate-300">${formatDate(g.last_played)}</td>
-      <td class="p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
-      <td class="p-2 notes-cell${psnPlatformsLineHtml(g) ? " has-psn-platforms" : ""}">
+      <td class="col-steam p-2 text-right" title="${g.steam_review_percent != null ? `Steam review: ${g.steam_review_percent}%` : 'No Steam review data'}">${g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - "}</td>
+      <td class="col-mc p-2 text-right text-slate-300" title="${g.metacritic_score != null ? `Metacritic: ${g.metacritic_score}` : 'No Metacritic score'}">${g.metacritic_score != null ? g.metacritic_score : " - "}</td>
+      <td class="col-price p-2 text-right">${priceOccupied ? `<span class="row-hero-pill">${priceHtml}</span>` : priceHtml}</td>
+      <td class="col-released p-2 text-slate-300 whitespace-nowrap">${formatReleaseDate(g.release_date)}</td>
+      <td class="col-lastplayed p-2 text-slate-300">${lastPlayedOccupied ? `<span class="row-hero-pill">${lastPlayedHtml}</span>` : lastPlayedHtml}</td>
+      <td class="col-genres p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
+      <td class="col-notes p-2 notes-cell${psnPlatformsLineHtml(g) ? " has-psn-platforms" : ""}">
         ${psnPlatformsLineHtml(g)}
         <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1" title="Personal notes - saved automatically">${escapeHtml(p.notes || "")}</textarea>
       </td>
@@ -1256,8 +1222,7 @@ function paintTableBody(list, opts = {}) {
     if (shell) window.scrollTo({ top: shell.offsetTop - 8, behavior: "auto" });
   }
   const isWish = state.activeView === "wishlist";
-  const showScore = !!state.prefs.showScoreColumn;
-  const ctx = { isWish, showScore };
+  const ctx = { isWish };
 
   if (!list.length) {
     _virtualList = null;
@@ -1434,8 +1399,10 @@ export async function renderTable(opts) {
     if (isTablePerfEnabled()) {
       console.log('[baklog-perf] renderTable skipped (fingerprint cache hit)', { view: state.activeView, fpLen: fp.length });
     }
+    noteTableRenderSkipped();
     return;
   }
+  noteTableRender();
   const loaderToken = drillIn ? 0 : beginRowLoader();
   try {
   // drillIn uses the view overlay; in-tab filter/sort uses the row pill only
@@ -1490,13 +1457,10 @@ export async function renderTable(opts) {
   state._visibleListView = state.activeView;
 
   perfMark(perfRun, 'chrome:start');
-  const showScore = !!state.prefs.showScoreColumn;
   const isWish = state.activeView === "wishlist";
   const wrap = document.getElementById("tableWrap");
   syncTablePhoneLayout();
-  wrap?.classList.toggle("table-hide-score", !showScore);
-  wrap?.classList.toggle("table-hide-playtime", isWish);
-  wrap?.classList.toggle("table-hide-lastplayed", isWish);
+  applyColumnVisibility(state.activeView);
   const statusHdr = document.getElementById("statusHeader");
   if (statusHdr) {
     const label = isWish ? "Tracking" : "Status";

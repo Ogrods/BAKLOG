@@ -96,6 +96,15 @@
     </div>
   </div>
   <div class="app-shell max-w-[1600px] mx-auto p-4 md:p-6">
+    <!-- Printed report header. Hidden on screen via .print-only; revealed only
+         in @media print (app.css). Static by design — no JS required. To show
+         live context (profile, date, visible-row count), app code can set
+         textContent on .print-masthead-meta before window.print(). -->
+    <div id="printMasthead" class="print-only" aria-hidden="true">
+      <p class="print-masthead-title">BAKLOG</p>
+      <p class="print-masthead-sub">Cross-store game backlog report</p>
+      <p class="print-masthead-meta"></p>
+    </div>
     <div id="migrationBanner" class="migration-banner hidden" role="status" aria-live="polite"></div>
     <div id="undoToast" class="hidden" role="status" aria-live="polite"></div>
     <div id="itadAlertBanner" class="migration-banner itad-alert-banner hidden" role="status" aria-live="polite"></div>
@@ -391,6 +400,13 @@
         </button>
         <button id="pickForMe" class="bg-amber-700 hover:bg-amber-600 px-3 py-2 rounded text-sm whitespace-nowrap" title="Pick a random visible game · Shift+click widens to non-backlog / all wishlist">Pick for me</button>
         <button id="addGameBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded text-sm whitespace-nowrap" title="Manually add a game">+ Add game</button>
+        <button type="button" id="openColumnsBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm inline-flex items-center justify-center" title="Show / hide columns" aria-label="Columns">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+            <rect x="1" y="2" width="2" height="12" rx="0.5" />
+            <rect x="7" y="2" width="2" height="12" rx="0.5" />
+            <rect x="13" y="2" width="2" height="12" rx="0.5" />
+          </svg>
+        </button>
         <div class="relative">
           <button type="button" id="kebabBtn" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded text-sm" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" title="More library actions and exports">⋯</button>
           <div id="kebabMenu" class="absolute right-0 top-full mt-1 z-30 min-w-[180px] bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 text-sm">
@@ -405,10 +421,6 @@
             <button type="button" id="exportNotesOnly" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export only personal notes as JSON">Export notes only</button>
             <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy top 20 backlog games as Markdown to clipboard">Copy top 20 backlog (Markdown)</button>
             <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer" title="Import personal data JSON (statuses, notes)">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
-            <div class="kebab-divider" role="separator"></div>
-            <div class="kebab-group-label">Maintenance</div>
-            <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Find stored statuses/notes whose game is no longer in any catalog (uninstalled, store disconnected, etc.)">Clean up unknown games…</button>
-            <button type="button" id="showFetcherLog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reopen the fetcher console (helpful if you closed it during a run)">Show fetcher log</button>
             <div class="kebab-divider" role="separator"></div>
             <div class="kebab-group-label">Help</div>
             <button type="button" id="reportBug" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Review and optionally send a sanitized bug report (errors + app context). Nothing is sent until you confirm in the dialog.">Report a bug…</button>
@@ -488,25 +500,25 @@
     <div id="tableWrap" class="rounded-lg border border-slate-700">
       <table class="w-full text-sm games-table">
         <colgroup>
-          <col style="width:36px" />
-          <col style="width:60px" />
+          <col class="col-select" style="width:36px" />
+          <col class="col-cover" style="width:60px" />
           <col class="col-game" style="width:100%" />
-          <col style="width:120px" />
+          <col class="col-status" style="width:120px" />
           <col class="col-score" style="width:60px" />
           <col class="col-played" style="width:64px" />
-          <col style="width:112px" />
-          <col style="width:76px" />
-          <col style="width:52px" />
-          <col style="width:200px" />
-          <col style="width:96px" />
-          <col class="col-lastplayed" style="width:96px" />
-          <col style="width:128px" />
-          <col style="width:160px" />
+          <col class="col-hltb" style="width:112px" />
+          <col class="col-steam" style="width:76px" />
+          <col class="col-mc" style="width:52px" />
+          <col class="col-price" style="width:138px" />
+          <col class="col-released" style="width:120px" />
+          <col class="col-lastplayed" style="width:112px" />
+          <col class="col-genres" style="width:128px" />
+          <col class="col-notes" style="width:160px" />
         </colgroup>
         <thead class="bg-slate-800 text-slate-300">
           <tr>
-            <th class="p-2"><label class="sr-only" for="selectAllVisible">Select all visible rows</label><input type="checkbox" id="selectAllVisible" title="Select or clear all visible rows" /></th>
-            <th class="p-2" scope="col">
+            <th class="col-select p-2"><label class="sr-only" for="selectAllVisible">Select all visible rows</label><input type="checkbox" id="selectAllVisible" title="Select or clear all visible rows" /></th>
+            <th class="col-cover p-2" scope="col">
               <span class="sr-only">Cover art</span>
               <button id="backToTopCover" type="button" title="Back to top" aria-label="Back to top">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -514,18 +526,18 @@
                 </svg>
               </button>
             </th>
-            <th data-sort="name" class="p-2 text-left" title="Click to sort; click again to reverse">Game</th>
-            <th id="statusHeader" data-sort="status" class="p-2 text-left" title="Click to sort; click again to reverse">Status</th>
+            <th data-sort="name" class="col-game p-2 text-left" title="Click to sort; click again to reverse">Game</th>
+            <th id="statusHeader" data-sort="status" class="col-status p-2 text-left" title="Click to sort; click again to reverse">Status</th>
             <th id="scoreHeader" data-sort="priority_score" class="col-score p-2 text-right" title="Click to sort; click again to reverse">Score</th>
             <th data-sort="playtime_minutes" class="col-played p-2 text-right" title="Click to sort; click again to reverse">Played</th>
-            <th data-sort="hltb_main_hours" class="p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
-            <th data-sort="steam_review_percent" class="p-2 text-right" title="Click to sort; click again to reverse">Steam %</th>
-            <th data-sort="metacritic_score" class="p-2 text-right" title="Click to sort; click again to reverse">MC</th>
-            <th id="priceHeader" data-sort="deal_price" class="p-2 text-right" title="Click: sort by current price (low → high) · Shift-click: sort by discount % (biggest sale first)">Price</th>
-            <th data-sort="release_date" class="p-2 text-left" title="Click to sort; click again to reverse">Released</th>
+            <th data-sort="hltb_main_hours" class="col-hltb p-2 text-right" title="Main / Main+Extra / 100%">HLTB M/E/C</th>
+            <th data-sort="steam_review_percent" class="col-steam p-2 text-right" title="Click to sort; click again to reverse">Steam %</th>
+            <th data-sort="metacritic_score" class="col-mc p-2 text-right" title="Metacritic critic score (out of 100). Click to sort; click again to reverse">MC</th>
+            <th id="priceHeader" data-sort="deal_price" class="col-price p-2 text-right" title="Click: sort by current price (low → high) · Shift-click: sort by discount % (biggest sale first)">Price</th>
+            <th data-sort="release_date" class="col-released p-2 text-left" title="Click to sort; click again to reverse">Released</th>
             <th data-sort="last_played" class="col-lastplayed p-2 text-left" title="Click to sort; click again to reverse">Last played</th>
-            <th class="p-2 text-left">Genres</th>
-            <th class="p-2 text-left">Notes</th>
+            <th class="col-genres p-2 text-left">Genres</th>
+            <th class="col-notes p-2 text-left">Notes</th>
           </tr>
         </thead>
         <tbody id="tbody" class="divide-y divide-slate-700"></tbody>
@@ -719,11 +731,7 @@
       <details id="displayToolsSection" class="drawer-tools-section">
         <summary class="drawer-tools-summary">Display &amp; tools</summary>
         <div class="drawer-tools-body space-y-2">
-          <button type="button" id="cleanupModeBtn" class="bg-orange-800 hover:bg-orange-700 px-3 py-2 rounded text-sm whitespace-nowrap w-full text-left" aria-pressed="false" title="Surfaces obvious candidates to mark as Skip: backlog games you've never played, rated under 60%, released 2+ years ago. Pair with bulk select to clear them out fast.">Cleanup mode</button>
-          <label class="flex items-center gap-2 text-xs text-slate-300">
-            <input id="showScoreColumn" type="checkbox" title="Show priority score column (rating ÷ log₂ HLTB)" />
-            Show score column
-          </label>
+          <button type="button" id="cleanupModeBtn" class="bg-orange-800 hover:bg-orange-700 px-3 py-2 rounded text-sm whitespace-nowrap inline-block text-left" aria-pressed="false" title="Surfaces obvious candidates to mark as Skip: backlog games you've never played, rated under 60%, released 2+ years ago. Pair with bulk select to clear them out fast.">Cleanup mode</button>
           <label class="flex items-center gap-2 text-xs text-slate-300">
             <input id="rowHeroBackdrop" type="checkbox" title="Show landscape art on the focused row, fading in from the right" />
             Active-row art
@@ -871,6 +879,25 @@
       <div class="border-t border-slate-700 p-3 flex items-center justify-end gap-2 text-sm">
         <button type="button" id="hiddenPanelCancel" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Close</button>
         <button type="button" id="hiddenPanelRestoreAll" class="px-3 py-1.5 rounded bg-cyan-800 hover:bg-cyan-700 text-white">Restore all</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column picker modal -->
+  <div id="columnsModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+    <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-md max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="columnsModalTitle">
+      <div class="flex items-center justify-between border-b border-slate-700 p-3">
+        <h3 id="columnsModalTitle" class="text-lg font-semibold text-slate-100">Columns</h3>
+        <button id="columnsModalClose" type="button" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
+      </div>
+      <p class="px-3 pt-2 text-xs text-slate-400">Show or hide columns for the current view. Game, Status, and the row checkbox always stay visible.</p>
+      <div id="columnsList" class="overflow-y-auto p-3 flex-1"></div>
+      <div class="border-t border-slate-700 p-3 flex items-center justify-between gap-2 text-sm">
+        <div class="flex gap-2">
+          <button type="button" id="columnsShowAllBtn" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Show all</button>
+          <button type="button" id="columnsResetBtn" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Reset to defaults</button>
+        </div>
+        <button type="button" id="columnsModalCancel" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Close</button>
       </div>
     </div>
   </div>

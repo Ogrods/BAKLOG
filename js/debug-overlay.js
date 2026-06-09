@@ -24,6 +24,7 @@ import { openBugReportDialog } from './bug-report.js';
 import { getCurtainState } from './loading-curtain.js';
 import { countOrphanPersonalKeys } from './personal-storage.js';
 import { registerPausable } from './visibility.js';
+import { readPropagationStats } from './propagation-trace.js';
 
 const STORAGE_KEY = 'baklog-debug';
 const POLL_INTERVAL_MS = 1000;
@@ -62,6 +63,7 @@ function buildOverlay() {
       <dt>fp</dt><dd data-field="fp" title=""> - </dd>
       <dt>render</dt><dd data-field="render"> - </dd>
       <dt>dash</dt><dd data-field="dash" title="full / replay / skipped (reentrant+cooldown)"> - </dd>
+      <dt>prop</dt><dd data-field="prop" title="M merges · T tableRenders · S skips · R fetcherReloads · D downstream · def defers · fl flush"> - </dd>
       <dt>curtain</dt><dd data-field="curtain" title="boot data-boot-loading + view overlay"> - </dd>
       <dt>errors</dt><dd data-field="errors"> - </dd>
       <dt>orphans</dt><dd data-field="orphans" title="state.personal keys with no matching game in any catalog. Surfaced read-only; clean up via kebab → Clean up unknown games."> - </dd>
@@ -153,6 +155,7 @@ function tick() {
   setField('fp', shortFp, { title: fp });
   setField('render', readLastRenderMs());
   setField('dash', readDashStats());
+  setField('prop', readPropStats());
   setField('curtain', readCurtainState());
   const errCount = getErrorCount();
   setField('errors', errCount > 0 ? `${errCount} (see window.__baklogErrors)` : '0');
@@ -178,6 +181,22 @@ function readOrphanCount() {
  * suppressed (re-entrant + auto-replay blocked — boot schedules should bump
  * skippedAutoReplay, not R).
  */
+function readPropStats() {
+  const p = readPropagationStats();
+  if (!p) return ' - ';
+  const key = p.lastMergeKey || p.lastFetcherKey;
+  return [
+    `M:${p.merges}`,
+    `T:${p.tableRenders}`,
+    `S:${p.tableSkips}`,
+    `R:${p.fetcherReloads ?? 0}`,
+    `D:${p.downstreamSyncs ?? 0}`,
+    `def:${p.deferredDefers ?? 0}`,
+    `fl:${p.deferredFlushes ?? 0}`,
+    key ? `· ${key}` : '',
+  ].filter(Boolean).join(' ');
+}
+
 function readDashStats() {
   const s = (typeof window !== "undefined" && window.__baklogDash?.stats) || null;
   if (!s) return " - ";

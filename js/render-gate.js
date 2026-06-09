@@ -3,6 +3,7 @@
  */
 
 import { state } from './state.js';
+import { noteDeferredDefer } from './propagation-trace.js';
 
 const TABLE_VIEWS = new Set(['library', 'wishlist', 'itch']);
 
@@ -16,14 +17,17 @@ export function isTableDataView(view) {
 
 export function deferTableRender() {
   _deferredTable = true;
+  noteDeferredDefer();
 }
 
 export function deferPicksRender() {
   _deferredPicks = true;
+  noteDeferredDefer();
 }
 
 export function deferSummaryRender() {
   _deferredSummary = true;
+  noteDeferredDefer();
 }
 
 export function consumeDeferredRenders() {

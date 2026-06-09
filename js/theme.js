@@ -36,7 +36,9 @@ export function getColorTheme() {
   }
 }
 
-export const THEME_CHANGE_EVENT = 'baklog:themechange';
+import { BAKLOG_THEME_CHANGE } from './custom-events.js';
+
+export const THEME_CHANGE_EVENT = BAKLOG_THEME_CHANGE;
 
 export function setColorTheme(theme) {
   const t = THEMES.includes(theme) ? theme : 'default';

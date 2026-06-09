@@ -24,7 +24,7 @@ function resetState() {
     dealHideOwned: false,
     dealMinDiscount: 0,
     dealMaxPrice: 100,
-    showScoreColumn: false,
+    columns: {},
     coopFilterMode: 'off',
   };
   state.cleanupModeActive = false;

@@ -75,6 +75,11 @@ WISHLIST_META_KEY_BY_FETCHER: dict[str, str] = {
 
 ENRICH_FETCHER_KEYS = frozenset({"hltb", "steamReviews", "steamCovers", "steamTags", "protondb"})
 
+# Enrich scripts that mutate wishlist JSON on disk — others only touch library
+# catalogs (see enrich_*.py STORE_FILES). reloadAfterFetcher uses this to skip
+# reloadAllWishlistStoreFiles when unnecessary.
+ENRICH_RELOAD_WISHLIST_KEYS = frozenset({"hltb", "steamCovers"})
+
 
 def load_manifest(path: Path | None = None) -> dict[str, Any]:
     p = path or MANIFEST_PATH
@@ -154,6 +159,7 @@ def export_js_registry(out_path: Path | None = None) -> None:
         "wishlistFetcherJson": WISHLIST_JSON_BY_KEY,
         "wishlistFetcherMetaKey": WISHLIST_META_KEY_BY_FETCHER,
         "enrichFetcherKeys": sorted(ENRICH_FETCHER_KEYS),
+        "enrichReloadWishlistKeys": sorted(ENRICH_RELOAD_WISHLIST_KEYS),
         "authProviderByKey": AUTH_PROVIDER_BY_KEY,
     }
     lines = [
@@ -167,6 +173,8 @@ def export_js_registry(out_path: Path | None = None) -> None:
         f"export const WISHLIST_FETCHER_META_KEY = {json.dumps(payload['wishlistFetcherMetaKey'], indent=2)};",
         "",
         f"export const ENRICH_FETCHER_KEYS = new Set({json.dumps(payload['enrichFetcherKeys'])});",
+        "",
+        f"export const ENRICH_RELOAD_WISHLIST_KEYS = new Set({json.dumps(payload['enrichReloadWishlistKeys'])});",
         "",
         f"export const FETCHER_AUTH_PROVIDER = {json.dumps(payload['authProviderByKey'], indent=2)};",
         "",

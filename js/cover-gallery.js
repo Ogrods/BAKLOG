@@ -53,13 +53,21 @@ function syncOrientToggle(btn) {
   btn.setAttribute('aria-pressed', landscape ? 'true' : 'false');
   btn.title = landscape ? 'Show cover art' : 'Show landscape art';
   btn.setAttribute('aria-label', btn.title);
-  btn.innerHTML = landscape ? ORIENT_ICON_COVER : ORIENT_ICON_LANDSCAPE;
+  const icon = landscape ? ORIENT_ICON_COVER : ORIENT_ICON_LANDSCAPE;
+  const label = landscape ? 'Portrait' : 'Landscape';
+  btn.innerHTML = `${icon}<span class="cover-gallery-orient-label">${label}</span>`;
 }
 
 function artCandidatesForMode(game) {
   return galleryMode === 'landscape'
     ? landscapeArtCandidates(game)
     : coverArtCandidates(game);
+}
+
+/** Portrait and landscape chains can share fallbacks — hide orient when only one unique URL. */
+function hasOrientChoice(game) {
+  const urls = new Set([...coverArtCandidates(game), ...landscapeArtCandidates(game)]);
+  return urls.size > 1;
 }
 
 function ensureDialog() {
@@ -70,7 +78,6 @@ function ensureDialog() {
   dialog.innerHTML = `
     <div class="cover-gallery-shell">
       <button type="button" class="cover-gallery-close" aria-label="Close cover gallery" title="Close">×</button>
-      <button type="button" class="cover-gallery-orient-toggle" aria-pressed="false" aria-label="Show landscape art" title="Show landscape art">${ORIENT_ICON_LANDSCAPE}</button>
       <button type="button" class="cover-gallery-nav-btn cover-gallery-nav-prev" data-gallery-nav="prev" aria-label="Previous cover" title="Previous">‹</button>
       <div class="cover-gallery-stage">
         <div class="cover-gallery-frame">
@@ -79,6 +86,7 @@ function ensureDialog() {
         <div class="cover-gallery-caption">
           <span class="cover-gallery-badge"></span>
           <span class="cover-gallery-name"></span>
+          <button type="button" class="cover-gallery-orient-toggle" aria-pressed="false" aria-label="Show landscape art" title="Show landscape art">${ORIENT_ICON_LANDSCAPE}<span class="cover-gallery-orient-label">Landscape</span></button>
         </div>
       </div>
       <button type="button" class="cover-gallery-nav-btn cover-gallery-nav-next" data-gallery-nav="next" aria-label="Next cover" title="Next">›</button>
@@ -91,7 +99,10 @@ function ensureDialog() {
   const img = dialog.querySelector('.cover-gallery-img');
 
   closeBtn?.addEventListener('click', () => closeCoverGallery());
-  orientBtn?.addEventListener('click', () => {
+  orientBtn?.addEventListener('click', (e) => {
+    // Stop the backdrop close handler: syncOrientToggle replaces this button's
+    // innerHTML, detaching e.target so its closest() lookup would miss.
+    e.stopPropagation();
     galleryMode = galleryMode === 'landscape' ? 'cover' : 'landscape';
     persistGalleryMode();
     syncOrientToggle(orientBtn);
@@ -182,6 +193,7 @@ function renderSlide(index) {
   const nameEl = dlg.querySelector('.cover-gallery-name');
   const prevBtn = dlg.querySelector('[data-gallery-nav="prev"]');
   const nextBtn = dlg.querySelector('[data-gallery-nav="next"]');
+  const orientBtn = dlg.querySelector('.cover-gallery-orient-toggle');
 
   if (!(img instanceof HTMLImageElement)) return;
 
@@ -204,6 +216,12 @@ function renderSlide(index) {
   const multi = galleryList.length > 1;
   if (prevBtn instanceof HTMLButtonElement) prevBtn.disabled = !multi;
   if (nextBtn instanceof HTMLButtonElement) nextBtn.disabled = !multi;
+
+  if (orientBtn instanceof HTMLButtonElement) {
+    const showOrient = hasOrientChoice(game);
+    orientBtn.hidden = !showOrient;
+    if (showOrient) syncOrientToggle(orientBtn);
+  }
 
   dlg.setAttribute('aria-label', `${game.name || 'Game'} cover gallery`);
 }

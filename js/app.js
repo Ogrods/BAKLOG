@@ -9,6 +9,7 @@ import { state } from './state.js';
 // before any module emits row HTML that references them inline.
 import './covers.js';
 import { installGlobalErrorHandler, registerBugBundleContext, reportError } from './error-boundary.js';
+import { initScrollLock } from './scroll-lock.js';
 
 // Install the global error + unhandled-rejection listeners as early as
 // possible — before any other module-level code runs in this file — so that
@@ -27,7 +28,7 @@ import {
   initDashboard,
   scheduleDashboardRender,
 } from './dashboard.js';
-import { escapeHtml } from './dom-util.js';
+import { escapeHtml, syncCheckboxLabelTitles } from './dom-util.js';
 import {
   loadPersonal,
   loadLibraryFirstSeen,
@@ -35,6 +36,7 @@ import {
   stripLegacyTags,
   seedPreHiddenDefaults,
   configureDownstreamSync,
+  installPersonalStorageSync,
 } from './personal-storage.js';
 import {
   loadPrefs,
@@ -69,6 +71,7 @@ import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
 import { suppressChartStaggerForBoot, resizeRibbonCharts } from './dashboard-charts.js';
 import { prewarmTableQueryForView, tableFingerprint } from './table-ui.js';
+import { applyColumnVisibility } from './table-columns.js';
 import { initBugReportDialog } from './bug-report.js';
 
 // Personal-storage's setPersonal triggers a downstream render of
@@ -103,9 +106,11 @@ function hydrateState() {
   state.sessionPrefs = loadSessionPrefs();
   state.libraryFirstSeenByKey = loadLibraryFirstSeen();
   setBootCurtainLabel(state.prefs.activeView);
+  installPersonalStorageSync();
 }
 
 async function bootstrap() {
+  initScrollLock();
   await initAuthGate();
   ensureProfileScopedFetcherState();
   const tBoot = typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -134,13 +139,10 @@ async function bootstrap() {
   savePrefs();
   bindEvents();
   await initProfiles();
-  document.getElementById("showScoreColumn").checked = !!state.prefs.showScoreColumn;
   document.getElementById("rowHeroBackdrop").checked = !!state.prefs.rowHeroBackdrop;
-  const tableWrap = document.getElementById("tableWrap");
-  tableWrap?.classList.toggle("table-hide-score", !state.prefs.showScoreColumn);
   document.body.classList.toggle("row-hero-on", !!state.prefs.rowHeroBackdrop);
-  tableWrap?.classList.toggle("table-hide-playtime", state.activeView === "wishlist");
-  tableWrap?.classList.toggle("table-hide-lastplayed", state.activeView === "wishlist");
+  syncCheckboxLabelTitles();
+  applyColumnVisibility(state.activeView);
   document.getElementById("genreMode").value = state.prefs.genreFilterMode;
   document.getElementById("quickWinMax").value = state.prefs.quickWinMaxHours;
   document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;

@@ -11,6 +11,7 @@ import server
 from fetchers.registry import (
     AUTH_PROVIDER_BY_KEY,
     ENRICH_FETCHER_KEYS,
+    ENRICH_RELOAD_WISHLIST_KEYS,
     LIBRARY_JSON_BY_KEY,
     MANIFEST_PATH,
     WISHLIST_JSON_BY_KEY,
@@ -183,6 +184,32 @@ def _parse_js_const_set(name: str, text: str) -> set[str]:
     return set(json.loads(match.group(1)))
 
 
+ENRICH_CACHE_LOADERS: dict[str, str] = {
+    "hltb": "loadHltbCache",
+    "steamReviews": "loadSteamReviewCache",
+    "steamCovers": "loadSteamCoversMeta",
+    "steamTags": "loadSteamTagsMeta",
+    "protondb": "loadProtondbCache",
+}
+
+
+def test_reload_after_fetcher_calls_enrich_cache_loaders() -> None:
+    """Each enrich fetcher must reload its cache meta after SSE done."""
+    text = (ROOT / "js" / "library-load.js").read_text(encoding="utf-8")
+    branch = re.search(
+        r"ENRICH_FETCHER_KEYS\.has\(key\)\)\s*\{([\s\S]*?)\} else if \(key === 'claims'\)",
+        text,
+    )
+    assert branch, "enrich branch missing in reloadAfterFetcher"
+    body = branch.group(1)
+    for key in ENRICH_FETCHER_KEYS:
+        fn = ENRICH_CACHE_LOADERS[key]
+        assert f'if (key === "{key}")' in body or f"if (key === '{key}')" in body, (
+            f"{key}: no per-key branch in enrich reload"
+        )
+        assert f"await {fn}()" in body, f"{key}: {fn}() not awaited in enrich branch"
+
+
 def test_committed_fetcher_registry_js_matches_python() -> None:
     """Committed js/fetcher-registry.js must match fetchers/registry.py maps."""
     js_text = (ROOT / "js" / "fetcher-registry.js").read_text(encoding="utf-8")
@@ -190,4 +217,5 @@ def test_committed_fetcher_registry_js_matches_python() -> None:
     assert _parse_js_const_object("WISHLIST_FETCHER_JSON", js_text) == WISHLIST_JSON_BY_KEY
     assert _parse_js_const_object("WISHLIST_FETCHER_META_KEY", js_text) == WISHLIST_META_KEY_BY_FETCHER
     assert _parse_js_const_set("ENRICH_FETCHER_KEYS", js_text) == set(ENRICH_FETCHER_KEYS)
+    assert _parse_js_const_set("ENRICH_RELOAD_WISHLIST_KEYS", js_text) == set(ENRICH_RELOAD_WISHLIST_KEYS)
     assert _parse_js_const_object("FETCHER_AUTH_PROVIDER", js_text) == AUTH_PROVIDER_BY_KEY

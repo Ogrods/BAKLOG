@@ -7,6 +7,7 @@ import {
   isTableDataView,
 } from './render-gate.js';
 import { cancelAllLibraryCountAnimations } from './library-count-animation.js';
+import { noteDeferredFlush } from './propagation-trace.js';
 import {
   state,
   GENRE_CHIP_COLLAPSE_AT,
@@ -376,8 +377,9 @@ export function updateGenreChipsCollapse() {
 }
 
 export async function flushDeferredRenders() {
-  const flags = consumeDeferredRenders();
   if (!isTableDataView(state.activeView)) return;
+  const flags = consumeDeferredRenders();
+  noteDeferredFlush(flags);
   const tasks = [];
   if (flags.table) tasks.push(renderTable({ force: true }));
   if (flags.summary) renderSummary();

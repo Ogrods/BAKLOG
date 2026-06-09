@@ -1156,6 +1156,11 @@ button[disabled] { cursor: not-allowed; }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Checkboxes follow the active theme accent. */
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
 /* Range sliders (min rating, max length, deal filters, quick-win hours) follow
    the active theme accent for the knob/track and use a pointer cursor. */
 input[type="range"] {
@@ -1594,27 +1599,26 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Inline labeled pill in the caption row (was a subtle corner icon button). */
 .cover-gallery-orient-toggle {
-  position: absolute;
-  top: -0.25rem;
-  left: -0.25rem;
-  z-index: 2;
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
-  color: var(--text-mute);
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
+  gap: 0.375rem;
+  padding: 0.3rem 0.7rem;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  color: var(--text-dim);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
   backdrop-filter: blur(2px);
   border: 1px solid var(--border-subtle);
 }
 .cover-gallery-orient-toggle:hover {
   color: var(--text-bright);
   background: color-mix(in srgb, var(--bg-hover) 90%, transparent);
+  border-color: var(--text-mute);
 }
 .cover-gallery-orient-toggle[aria-pressed="true"] {
   color: var(--accent-bright, var(--accent));
@@ -1631,6 +1635,10 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   width: 1rem;
   height: 1rem;
   display: block;
+  flex-shrink: 0;
+}
+.cover-gallery-orient-label {
+  white-space: nowrap;
 }
 .cover-gallery-nav-btn {
   flex-shrink: 0;
@@ -1696,10 +1704,6 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   .cover-gallery-close {
     top: 0.35rem;
     right: 0.35rem;
-  }
-  .cover-gallery-orient-toggle {
-    top: 0.35rem;
-    left: 0.35rem;
   }
 }
 
@@ -2097,11 +2101,26 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   background: var(--bg-hover);
   border-color: var(--text-mute);
 }
+/* No card behind an empty HLTB stat; hover still reveals it's clickable. */
+[data-hltb-edit].hltb-empty {
+  background: transparent;
+  border-color: transparent;
+}
+[data-hltb-edit].hltb-empty:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-mute);
+}
 .notes-input {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--text);
   transition: background 0.12s ease, border-color 0.12s ease;
+}
+/* Only show the field's card when it's focused or actually holds text. */
+.notes-input:focus,
+.notes-input:not(:placeholder-shown) {
+  background: var(--bg-elev);
+  border-color: var(--border);
 }
 .notes-input::placeholder { color: var(--text-mute); }
 .notes-input:hover { border-color: var(--text-mute); }
@@ -2126,14 +2145,26 @@ body.row-hero-on .games-table tbody tr.row-focused.row-has-hero::after {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.28;
+  opacity: 0.45;
   background: var(--row-hero) right center / cover no-repeat;
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 25%, rgba(0,0,0,0.32) 58%, #000 88%);
-  mask-image: linear-gradient(to right, transparent 0%, transparent 25%, rgba(0,0,0,0.32) 58%, #000 88%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 12%, rgba(0,0,0,0.5) 42%, #000 70%);
+  mask-image: linear-gradient(to right, transparent 0%, transparent 12%, rgba(0,0,0,0.5) 42%, #000 70%);
 }
 body.row-hero-on .games-table tbody tr.row-focused.row-has-hero > td {
   position: relative;
   z-index: 1;
+}
+/* Backing card so occupied stats stay readable over the row art — matches the
+   HLTB pill (var(--bg-elev) + var(--border), rounded). Wraps just the text so
+   the card flexes to its content (see .row-hero-pill in tableRowHtml). */
+body.row-hero-on .games-table tbody tr.row-focused.row-has-hero .row-hero-pill {
+  display: inline-block;
+  position: relative;
+  z-index: 1;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 2px 6px;
 }
 tr.row-flash { animation: row-flash-pulse 2s ease-out; }
 @keyframes row-flash-pulse {
@@ -4873,12 +4904,96 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+.table-hide-cover .col-cover { display: none; }
+.table-hide-cover col.col-cover { width: 0; }
 .table-hide-score .col-score { display: none; }
 .table-hide-score col.col-score { width: 0; }
-.table-hide-playtime .col-played { display: none; }
-.table-hide-playtime col.col-played { width: 0; }
+.table-hide-played .col-played { display: none; }
+.table-hide-played col.col-played { width: 0; }
+.table-hide-hltb .col-hltb { display: none; }
+.table-hide-hltb col.col-hltb { width: 0; }
+.table-hide-steam .col-steam { display: none; }
+.table-hide-steam col.col-steam { width: 0; }
+.table-hide-mc .col-mc { display: none; }
+.table-hide-mc col.col-mc { width: 0; }
+.table-hide-price .col-price { display: none; }
+.table-hide-price col.col-price { width: 0; }
+.table-hide-released .col-released { display: none; }
+.table-hide-released col.col-released { width: 0; }
 .table-hide-lastplayed .col-lastplayed { display: none; }
 .table-hide-lastplayed col.col-lastplayed { width: 0; }
+.table-hide-genres .col-genres { display: none; }
+.table-hide-genres col.col-genres { width: 0; }
+.table-hide-notes .col-notes { display: none; }
+.table-hide-notes col.col-notes { width: 0; }
+.columns-picker-row input { flex-shrink: 0; }
+
+/* Columns (|||) + kebab (⋯) toolbar buttons: identical square size so they
+   match each other and the toolbar row height. */
+#openColumnsBtn,
+#kebabBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.375rem;
+  height: 2.375rem;
+  padding: 0;
+  line-height: 1;
+}
+#kebabBtn { font-size: 1.125rem; }
+
+/* Filters + Pick for me (orange) + Add game (green): same height as the icon
+   buttons (keep their text width). */
+#openFiltersBtn,
+#pickForMe,
+#addGameBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.375rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+}
+
+/* === Column picker modal: follow the active theme + compact two-column grid === */
+/* Center + constrain the panel without relying on Tailwind utilities that get
+   purged from tailwind.css (max-w-md was dropped, leaving the panel full-width). */
+#columnsModal { align-items: center; justify-content: center; }
+#columnsModal > [role="dialog"] {
+  width: 100%;
+  max-width: 30rem;
+  margin: auto;
+}
+#columnsModal .bg-slate-800 { background: var(--bg-panel); }
+#columnsModal .bg-slate-700 { background: var(--bg-elev); }
+#columnsModal .hover\:bg-slate-600:hover,
+#columnsModal .hover\:bg-slate-700:hover { background: var(--bg-hover); }
+#columnsModal .border-slate-600 { border-color: var(--border); }
+#columnsModal .border-slate-700 { border-color: var(--border-subtle); }
+#columnsModal .text-slate-100 { color: var(--text-bright); }
+#columnsModal .text-slate-200 { color: var(--text); }
+#columnsModal .text-slate-300 { color: var(--text-dim); }
+#columnsModal .text-slate-400 { color: var(--text-mute); }
+#columnsModal .hover\:text-slate-100:hover { color: var(--text-bright); }
+
+/* Multi-column (not grid) so checkboxes read top-to-bottom down the first
+   column, then continue down the second — i.e. in order as you go down. */
+#columnsList {
+  column-count: 2;
+  column-gap: 0.75rem;
+}
+.columns-picker-row {
+  display: flex;
+  break-inside: avoid;
+  color: var(--text);
+}
+.columns-picker-row:hover { background: var(--bg-hover) !important; }
+.columns-picker-row span { color: var(--text); }
+
+@media (max-width: 420px) {
+  #columnsList { column-count: 1; }
+}
 
 /* Phone library: priority columns as card rows (no horizontal scroll). */
 #tableWrap.table-phone {
@@ -7317,4 +7432,323 @@ body {
 .fh-stat-value,
 .fh-stat-label {
   cursor: default;
+}
+
+/* Print-only elements (e.g. report masthead) are hidden on screen and revealed
+   inside @media print below. Keep this rule outside the media query so the
+   element never flashes during normal use. */
+.print-only {
+  display: none;
+}
+
+/* ==========================================================================
+   PRINT STYLESHEET (BAKLOG)
+   --------------------------------------------------------------------------
+   No deliberate print artifact is targeted today — this is a general-purpose,
+   defensive stylesheet so *any* on-screen view (library table, dashboard,
+   picks, wishlist, connections) prints as a clean, ink-light, paginated
+   document regardless of the active dark theme.
+
+   Why this lives at the end of app.css: it ships in both dev (raw app.css) and
+   the esbuild bundle with zero build/HTML wiring, and being last lets the
+   !important resets below override all six html[data-theme] palettes (notably
+   `html[data-theme] body { background }`) without specificity gymnastics.
+
+   Inactive views are already display:none (Tailwind .hidden), so print captures
+   exactly the view currently on screen — the intended default behavior.
+   Sections: 1) page setup  2) ink reset  3) hide chrome  4) layout unlock
+   5) games table  6) cards & charts  7) typography & links  8) masthead.
+   ========================================================================== */
+@media print {
+  /* --- 1. Page setup ----------------------------------------------------- */
+  @page {
+    margin: 14mm;
+  }
+
+  /* --- 2. Ink / color reset (theme-proof) -------------------------------- */
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+  }
+
+  /* Strip the dark UI down to ink on paper: no panel fills, gradients, glows,
+     shadows, or motion. Force text to solid black, including theme wordmarks
+     that paint with `-webkit-text-fill-color: transparent` + background-clip. */
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    color: #111 !important;
+    -webkit-text-fill-color: #111 !important;
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  p,
+  li,
+  blockquote {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* --- 3. Hide non-content chrome ---------------------------------------- */
+  .skip-link,
+  #authGateOverlay,
+  .auth-gate-overlay,
+  #viewLoadingOverlay,
+  .app-view-overlay,
+  #bootLoadingOverlay,
+  #rowLoadingOverlay,
+  .row-loading-overlay,
+  .migration-banner,
+  .baklog-error-toast,
+  #undoToast,
+  #itadAlertBanner,
+  #claimableBanner,
+  #libraryWatchBanner,
+  #authReconnectBanner,
+  #authSecretsBanner,
+  #bootErrorBanner,
+  .app-header-nav-wrap,
+  .app-header-actions,
+  .fetcher-popover,
+  .fetcher-popover-backdrop,
+  .profile-menu-panel,
+  #search,
+  #openFiltersBtn,
+  #pickForMe,
+  #addGameBtn,
+  #kebabBtn,
+  #kebabMenu,
+  #activeFilterPills,
+  #togglePicks,
+  .pick-tab,
+  #picksLimitGroup,
+  #quickWinMaxWrap,
+  #pickMeta,
+  #bulkBar,
+  #alphaNavWrap,
+  #backToTop,
+  #backToTopCover,
+  #filterDrawer,
+  #filterDrawerBackdrop,
+  .conn-kebab-btn,
+  .conn-kebab-menu,
+  .conn-popover,
+  .conn-popover-backdrop,
+  .conn-hero-actions,
+  #profileManageModal,
+  #orphanPruneModal,
+  #hiddenPanelModal,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  input[type="search"],
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="file"],
+  /* Drop the two widest, lowest-value columns so the 14-col table fits paper:
+     selection checkbox (col 1) and cover-art thumbnail (col 2). */
+  .games-table thead th:nth-child(1),
+  .games-table thead th:nth-child(2),
+  .games-table tbody td:nth-child(1),
+  .games-table tbody td:nth-child(2) {
+    display: none !important;
+  }
+
+  /* Form controls that DO carry print-relevant data (status <select>, HLTB
+     <button>, notes <textarea>) are flattened to plain text instead of hidden,
+     so their value/label still prints without a control chrome box. */
+  select,
+  textarea,
+  button {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #111 !important;
+    font: inherit !important;
+    resize: none !important;
+    box-shadow: none !important;
+    -webkit-text-fill-color: #111 !important;
+  }
+  textarea {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    width: 100% !important;
+  }
+
+  /* --- 4. Layout unlock (so the whole view paginates, not one viewport) --- */
+  .app-shell {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Release scroll containers + fixed/sticky panes so all rows/cards flow onto
+     subsequent pages instead of being clipped to the screen height. */
+  #tableShell,
+  #tableWrap,
+  [class*="overflow-y-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-auto"] {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+  #tableShell,
+  #tableWrap {
+    position: static !important;
+    border: none !important;
+  }
+
+  /* --- 5. Games table (primary printable artifact) ----------------------- */
+  .games-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: auto !important;
+    font-size: 9pt !important;
+  }
+  /* Repeat the column header on every printed page; un-stick it so it tiles
+     correctly as a table-header-group rather than overlapping rows. */
+  .games-table thead {
+    display: table-header-group !important;
+  }
+  .games-table thead th {
+    position: static !important;
+    background: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    border-bottom: 1.5px solid #888 !important;
+    font-weight: 700 !important;
+  }
+  .games-table tfoot {
+    display: table-footer-group !important;
+  }
+  /* Never split a game across a page boundary. */
+  .games-table tr,
+  .games-table td,
+  .games-table th {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .games-table th,
+  .games-table td {
+    border: 1px solid #ccc !important;
+    padding: 3px 5px !important;
+    vertical-align: top !important;
+  }
+  /* Let long free-text columns wrap instead of clipping with ellipsis. */
+  .games-table .game-name-cell,
+  .games-table .notes-cell,
+  .games-table td.truncate {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word !important;
+  }
+  .games-table .notes-input {
+    color: #333 !important;
+  }
+  /* Hide the virtual scroller's spacer rows — they exist only for on-screen
+     windowing and would otherwise print as tall blank gaps. */
+  .games-table .virtual-spacer {
+    display: none !important;
+  }
+
+  /* Keep small status/store chips legible as outlined tags (survives B/W and
+     economy color modes since they no longer rely on a colored fill). */
+  .store-badge,
+  .wishlist-badge,
+  .has-notes-dot,
+  #summary > * {
+    border: 1px solid #bbb !important;
+    border-radius: 3px !important;
+    padding: 0 4px !important;
+    color: #111 !important;
+  }
+
+  /* --- 6. Cards & charts (dashboard / picks / connections) --------------- */
+  .dash-card,
+  .pick-card,
+  #picksGrid > *,
+  .conn-card,
+  .dash-mega,
+  .dash-picks-versus,
+  .dash-recent-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+  }
+  /* Chart.js renders to <canvas>; keep it (raster prints fine) but cap height
+     and never split it. To suppress charts entirely, change to display:none. */
+  canvas {
+    max-width: 100% !important;
+    max-height: 320px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* --- 7. Typography & links -------------------------------------------- */
+  body {
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+  }
+  h1, h2, h3, h4 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+  /* Reveal destination URLs for real content links so a printout is useful
+     offline. Suppressed for in-app nav/buttons and non-navigational hrefs so
+     it stays tasteful (no `(#)` / `(javascript:…)` noise). */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.82em;
+    color: #555 !important;
+    word-break: break-all;
+  }
+  .app-header a[href^="http"]::after,
+  a.view-tab[href^="http"]::after,
+  a[href^="#"]::after,
+  a[href^="javascript:"]::after {
+    content: "" !important;
+  }
+
+  /* --- 8. Print report masthead ----------------------------------------- */
+  #printMasthead.print-only {
+    display: block !important;
+    margin: 0 0 10mm !important;
+    padding-bottom: 4mm !important;
+    border-bottom: 2px solid #111 !important;
+  }
+  #printMasthead .print-masthead-title {
+    font-size: 22pt !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.12em !important;
+    margin: 0 !important;
+  }
+  #printMasthead .print-masthead-sub {
+    font-size: 10pt !important;
+    color: #444 !important;
+    margin: 2px 0 0 !important;
+  }
+  #printMasthead .print-masthead-meta {
+    font-size: 9pt !important;
+    color: #555 !important;
+    margin-top: 4px !important;
+  }
 }

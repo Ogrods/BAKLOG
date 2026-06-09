@@ -27,117 +27,74 @@ import {
 import { markClaimsPendingAutoRun } from './claimable.js';
 import { savePrefs } from './prefs.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
+import {
+  authCooldownDurationMs,
+  authCooldownLabel,
+  authCooldownRemainingMs as cooldownRemainingMs,
+  clearAuthCooldown,
+  configureFetcherCooldown,
+  initAuthCooldowns,
+  noteAuthCooldownStrike,
+} from './fetcher-cooldown.js';
+import {
+  AUTO_STALE_AGE_MS,
+  AUTO_STALE_STAGGER_MS,
+  autoStaleLastRunKey,
+  claimsAutoRefreshIntervalMs,
+  CLAIMS_AUTO_REFRESH_INTERVAL_MS,
+  claimsLastAutoRunKey,
+  ITAD_AUTO_QUIET_HOUR_END,
+  ITAD_AUTO_REFRESH_INTERVAL_MS,
+  itadAutoRefreshIntervalMs,
+  itadLastAutoRunKey,
+  maybeAutoEnrichNewAdditions,
+  maybeAutoFetchOnConnect,
+  maybeAutoFetchStale24h,
+  maybeAutoRefreshClaims,
+  maybeAutoRefreshItad,
+  wireFetcherAutoRefresh,
+} from './fetcher-auto-refresh.js';
+import {
+  consumeItadAutoRunFlag,
+  fetcherSources,
+  fetchSuccessLabels,
+  lastRunFailedByKey,
+  legendTipsOpen,
+  markItadPendingAutoRun,
+  setFetcherRunner,
+  setFetcherSources,
+  setLegendTipsOpen,
+} from './fetcher-health-shared.js';
+import {
+  ensureAgeTicker,
+  isFastAgeTickActive,
+  refreshChipAgesInPlace,
+  startFastAgeTick,
+  stopAgeTicker,
+  stopFastAgeTick,
+  wireFetcherChips,
+} from './fetcher-chips.js';
+
+export { authCooldownDurationMs, clearAuthCooldown, noteAuthCooldownStrike };
 
 // ---------------------------------------------------------------------------
-// Chip-level auth-failure backoff
+// Chip-level auth-failure backoff (see fetcher-cooldown.js)
 // ---------------------------------------------------------------------------
-// When a fetcher run ends in an auth-ish failure (401/403, expired cookie,
-// rejected sign-in) we cool that chip down so automatic refreshes and the user
-// can't hammer a provider that needs reconnecting — the root cause of the
-// earlier request flood. Consecutive failures escalate 5m -> 15m -> 60m. The
-// cooldown clears on the next successful run, when the timer expires, or the
-// moment the mapped provider shows "connected" in Connections (so reconnecting
-// never leaves the chip stuck disabled).
-const AUTH_COOLDOWN_STEPS_MS = [5 * 60_000, 15 * 60_000, 60 * 60_000];
-
-function authCooldownLsKey() {
-  return profileScopedStorageKey(LS_FETCHER_AUTH_COOLDOWN);
-}
-
-/** Escalating cooldown duration for the Nth consecutive auth failure (1-based). */
-export function authCooldownDurationMs(strikes) {
-  const i = Math.min(Math.max(strikes, 1), AUTH_COOLDOWN_STEPS_MS.length) - 1;
-  return AUTH_COOLDOWN_STEPS_MS[i];
-}
-
-function loadAuthCooldowns() {
-  const m = new Map();
-  try {
-    const raw = JSON.parse(localStorage.getItem(authCooldownLsKey()) || '{}');
-    const now = Date.now();
-    for (const [k, v] of Object.entries(raw)) {
-      if (v && typeof v.until === 'number' && v.until > now) {
-        m.set(k, { until: v.until, strikes: Number(v.strikes) || 1 });
-      }
-    }
-  } catch (_) { /* corrupt or unavailable storage — start clean */ }
-  return m;
-}
-
-let authCooldowns = new Map();
 let _profileScopedFetcherStateReady = false;
 
 /** Load profile-scoped LS after auth/profile id is known (call post-initAuthGate). */
 export function ensureProfileScopedFetcherState() {
   if (_profileScopedFetcherStateReady) return;
   _profileScopedFetcherStateReady = true;
-  authCooldowns = loadAuthCooldowns();
+  initAuthCooldowns();
   reconnectDismissed = loadReconnectDismissedSet();
-  if (authCooldowns.size) setTimeout(() => scheduleAuthCooldownTick(), 0);
-}
-
-function persistAuthCooldowns() {
-  try {
-    const obj = {};
-    for (const [k, v] of authCooldowns) obj[k] = v;
-    localStorage.setItem(authCooldownLsKey(), JSON.stringify(obj));
-  } catch (_) { /* storage unavailable — in-memory map still enforces */ }
-}
-
-/** Record one auth failure for a fetcher key and (re)arm the escalating cooldown. */
-export function noteAuthCooldownStrike(key) {
-  ensureProfileScopedFetcherState();
-  const strikes = Math.min((authCooldowns.get(key)?.strikes || 0) + 1, AUTH_COOLDOWN_STEPS_MS.length);
-  authCooldowns.set(key, { until: Date.now() + authCooldownDurationMs(strikes), strikes });
-  persistAuthCooldowns();
-  scheduleAuthCooldownTick();
-  if (strikes >= AUTH_COOLDOWN_STEPS_MS.length && !fetcherCredentialsSatisfied(key)) {
-    const provider = connectProviderForFetcher(key) || FETCHER_AUTH_PROVIDER[key];
-    if (provider) markReconnectRequired(provider);
-  }
-}
-
-let authCooldownTimer = null;
-/** Re-render the chip strip when the soonest cooldown expires so a chip
- *  re-enables on its own even with no run in flight. */
-function scheduleAuthCooldownTick() {
-  if (authCooldownTimer) { clearTimeout(authCooldownTimer); authCooldownTimer = null; }
-  let soonest = Infinity;
-  for (const c of authCooldowns.values()) soonest = Math.min(soonest, c.until);
-  if (!Number.isFinite(soonest)) return;
-  const delay = Math.max(0, soonest - Date.now()) + 250;
-  authCooldownTimer = setTimeout(() => {
-    authCooldownTimer = null;
-    for (const [k, c] of authCooldowns) { if (c.until <= Date.now()) authCooldowns.delete(k); }
-    persistAuthCooldowns();
-    try { renderDashboardFetcherHealth(); } catch (_) { /* not mounted */ }
-    scheduleAuthCooldownTick();
-  }, delay);
-}
-
-export function clearAuthCooldown(key) {
-  if (authCooldowns.delete(key)) persistAuthCooldowns();
 }
 
 /** Remaining cooldown for a fetcher key in ms, or 0. Self-heals on expiry or
  *  when the mapped provider is reconnected. */
 export function authCooldownRemainingMs(key) {
   ensureProfileScopedFetcherState();
-  const c = authCooldowns.get(key);
-  if (!c) return 0;
-  if (fetcherProviders(key).some(p => isProviderConnected(p))) {
-    clearAuthCooldown(key);
-    return 0;
-  }
-  const rem = c.until - Date.now();
-  if (rem <= 0) { clearAuthCooldown(key); return 0; }
-  return rem;
-}
-
-/** Short label for a cooldown badge, e.g. "auth 5m" / "auth 1h". */
-function authCooldownLabel(ms) {
-  const mins = Math.max(1, Math.ceil(ms / 60_000));
-  return mins >= 60 ? `auth ${Math.round(mins / 60)}h` : `auth ${mins}m`;
+  return cooldownRemainingMs(key, (k) => fetcherProviders(k).some(p => isProviderConnected(p)));
 }
 
 /** Dual-source library fetchers: any connected sibling satisfies chip gates. */
@@ -436,31 +393,23 @@ const STALE_OVERRIDES = {
   itad: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
   claims: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
 };
-export function itadLastAutoRunKey() {
-  return profileScopedStorageKey(LS_ITAD_LAST_AUTO_RUN);
-}
-
-export function claimsLastAutoRunKey() {
-  return profileScopedStorageKey(LS_CLAIMS_LAST_AUTO_RUN);
-}
-export const ITAD_AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
-export const ITAD_AUTO_QUIET_HOUR_END = 7;
-
-/** User-configured ITAD auto-refresh interval (15–60 min) from prefs. */
-export function itadAutoRefreshIntervalMs() {
-  const min = Number(state.prefs?.itadAutoRefreshIntervalMin);
-  if (!Number.isFinite(min)) return ITAD_AUTO_REFRESH_INTERVAL_MS;
-  return Math.min(60, Math.max(15, min)) * 60_000;
-}
-
-export const CLAIMS_AUTO_REFRESH_INTERVAL_MS = 120 * 60_000;
-
-/** User-configured free-claims auto-refresh interval (30–360 min) from prefs. */
-export function claimsAutoRefreshIntervalMs() {
-  const min = Number(state.prefs?.claimsAutoRefreshIntervalMin);
-  if (!Number.isFinite(min)) return CLAIMS_AUTO_REFRESH_INTERVAL_MS;
-  return Math.min(360, Math.max(30, min)) * 60_000;
-}
+export {
+  itadLastAutoRunKey,
+  claimsLastAutoRunKey,
+  ITAD_AUTO_REFRESH_INTERVAL_MS,
+  ITAD_AUTO_QUIET_HOUR_END,
+  itadAutoRefreshIntervalMs,
+  CLAIMS_AUTO_REFRESH_INTERVAL_MS,
+  claimsAutoRefreshIntervalMs,
+  AUTO_STALE_AGE_MS,
+  AUTO_STALE_STAGGER_MS,
+  autoStaleLastRunKey,
+  maybeAutoRefreshItad,
+  maybeAutoRefreshClaims,
+  maybeAutoFetchOnConnect,
+  maybeAutoFetchStale24h,
+  maybeAutoEnrichNewAdditions,
+};
 
 /** Compact label for an interval in minutes, e.g. 45 → "45m", 120 → "2h", 90 → "1h 30m". */
 export function formatRefreshIntervalLabel(min) {
@@ -490,13 +439,7 @@ export function diffItadDeals(prev, next) {
   return { newSales, newHistoricalLows };
 }
 
-let itadPendingAutoRun = false;
-
-export function consumeItadAutoRunFlag() {
-  const v = itadPendingAutoRun;
-  itadPendingAutoRun = false;
-  return v;
-}
+export { consumeItadAutoRunFlag };
 
 /** Map server run status to dashboard chip state. */
 export function serverChipState(status) {
@@ -857,7 +800,6 @@ function coverageTooltipLine(key) {
   return line;
 }
 
-let fetcherSources = [];
 let reloadGamesFn = async () => {};
 let reloadAfterFetcherFn = null;
 let runStaleCooldownUntil = 0;
@@ -888,7 +830,7 @@ export async function loadFetcherSources(force = false) {
     const res = await baklogFetch('/api/fetchers');
     if (res.ok) {
       const data = await res.json();
-      fetcherSources = (data.fetchers || []).map(entry => ({
+      setFetcherSources((data.fetchers || []).map(entry => ({
         key: entry.key,
         label: entry.label,
         group: entry.group || 'library',
@@ -901,7 +843,7 @@ export async function loadFetcherSources(force = false) {
         supportsRefresh: !!(entry.supports_refresh || refreshByKey[entry.key]),
         available: entry.available !== false,
         platforms: entry.platforms || [],
-      }));
+      })));
       return fetcherSources;
     }
   } catch (_) {}
@@ -910,7 +852,7 @@ export async function loadFetcherSources(force = false) {
     const res = await fetch('fetchers/manifest.json');
     if (res.ok) {
       const data = await res.json();
-      fetcherSources = (data.fetchers || []).map(entry => ({
+      setFetcherSources((data.fetchers || []).map(entry => ({
         key: entry.key,
         label: entry.label,
         group: entry.group || 'library',
@@ -921,7 +863,7 @@ export async function loadFetcherSources(force = false) {
         requires: entry.requires || [],
         missingRequirements: [],
         supportsRefresh: !!refreshByKey[entry.key],
-      }));
+      })));
     }
   } catch (_) {}
   return fetcherSources;
@@ -1180,334 +1122,43 @@ export function fetcherFreshness(source) {
 const ITAD_SOURCE = { key: 'itad', metaKey: 'itad', countFn: COUNT_FNS.itad };
 const CLAIMS_SOURCE = { key: 'claims', metaKey: 'claims', countFn: COUNT_FNS.claims };
 
-/** Auto-queue ITAD when prices are older than 60min (7am–midnight local). */
-/** Chip stays in failed styling until the next successful run (not just ~10s runState). */
-const lastRunFailedByKey = new Map();
-/** Labels of fetchers that finished OK since the pill was last cleared. */
-const fetchSuccessLabels = new Set();
-
-// ---------------------------------------------------------------------------
-// Cosmetic chip-age ticker (in-place text only — never re-renders dashboard)
-// ---------------------------------------------------------------------------
-const AGE_TICK_MS = 60_000;
-const FAST_AGE_TICK_MS = 1_000;
-const FAST_AGE_WINDOW_MS = 60_000;
-
-let ageTickTimer = null;
-let fastTickTimer = null;
-let fastTickRemaining = 0;
-
-/** Cosmetic age label from logged fetched_at (clamped, no local counter). */
-function cosmeticAgeLabel(src) {
-  const { ageMs, ageLabel } = fetcherFreshness(src);
-  if (!Number.isFinite(ageMs)) return ageLabel;
-  return humanizeAge(Math.max(0, ageMs));
+function autoRefreshDeps() {
+  return {
+    itadSource: ITAD_SOURCE,
+    claimsSource: CLAIMS_SOURCE,
+    isFetcherDisconnected,
+    fetcherFreshness,
+    fetcherCredentialsSatisfied,
+    authCooldownRemainingMs,
+    isFetcherReconnectRequired,
+    loadFetcherSources,
+  };
 }
 
-/** True when the chip is showing a plain relative age (not run/reconnect/cooldown/etc.). */
-function chipShowsPlainAge(src, deps = {}) {
-  const stateFor = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
-  if (stateFor(src.key)) return false;
-  if (isFetcherReconnectRequired(src.key)) return false;
-  if (authCooldownRemainingMs(src.key) > 0) return false;
-  if (lastRunFailedByKey.has(src.key)) return false;
-  const { status } = fetcherFreshness(src);
-  if (status === 'missing') return false;
-  return true;
-}
+wireFetcherAutoRefresh({
+  itadSource: ITAD_SOURCE,
+  claimsSource: CLAIMS_SOURCE,
+  fetcherFreshness,
+  isFetcherDisconnected,
+  fetcherCredentialsSatisfied,
+  authCooldownRemainingMs,
+  isFetcherReconnectRequired,
+});
 
-/**
- * Patch .fh-chip-age text from logged fetched_at. No innerHTML, no chart/dashboard render.
- * @returns {boolean} false when the panel is gone (caller should stop its timer).
- */
-export function refreshChipAgesInPlace(deps = {}) {
-  return tickRefreshChipAges(deps);
-}
-
-function tickRefreshChipAges(deps = {}) {
-  if (typeof document !== 'undefined' && document.hidden) return true;
-  const slot = document.getElementById('dashboardFetcherHealth');
-  if (!slot) return false;
-  const sources = deps.sources ?? fetcherSources;
-  for (const src of sources) {
-    if (!chipShowsPlainAge(src, deps)) continue;
-    const chip = slot.querySelector(`.fh-chip[data-fetcher-key="${src.key}"]`);
-    const ageSpan = chip?.querySelector('.fh-chip-age');
-    if (!ageSpan) continue;
-    const label = cosmeticAgeLabel(src);
-    if (ageSpan.textContent !== label) ageSpan.textContent = label;
-  }
-  return true;
-}
-
-export function stopAgeTicker() {
-  if (ageTickTimer) clearInterval(ageTickTimer);
-  ageTickTimer = null;
-}
-
-export function ensureAgeTicker() {
-  if (ageTickTimer) return;
-  ageTickTimer = setInterval(() => {
-    if (!tickRefreshChipAges()) stopAgeTicker();
-  }, AGE_TICK_MS);
-}
-
-export function stopFastAgeTick() {
-  if (fastTickTimer) clearInterval(fastTickTimer);
-  fastTickTimer = null;
-  fastTickRemaining = 0;
-}
-
-/** Whether the post-fetch 1s age ticker is active (for tests / diagnostics). */
-export function isFastAgeTickActive() {
-  return fastTickTimer != null;
-}
-
-/** 1s cosmetic updates for the first minute after a fetch lands (seconds band). */
-export function startFastAgeTick() {
-  const ticks = Math.ceil(FAST_AGE_WINDOW_MS / FAST_AGE_TICK_MS);
-  fastTickRemaining = Math.max(fastTickRemaining, ticks);
-  if (fastTickTimer) return;
-  fastTickTimer = setInterval(() => {
-    const cont = tickRefreshChipAges();
-    fastTickRemaining -= 1;
-    if (!cont || fastTickRemaining <= 0) stopFastAgeTick();
-  }, FAST_AGE_TICK_MS);
-}
-
-if (typeof document !== 'undefined' && !document.__baklogFetcherAgeVisListener) {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      try { tickRefreshChipAges(); } catch (_) { /* panel not mounted */ }
-    }
-  });
-  document.__baklogFetcherAgeVisListener = true;
-}
-
-export function maybeAutoRefreshItad(deps = {}) {
-  // Auto-refresh keeps running while the page is hidden (minimized / unfocused
-  // window) so a backgrounded dashboard still refreshes; subject to browser
-  // background-timer throttling. It does NOT run when the app is fully closed.
-  if (state.prefs.itadAutoRefreshDisabled) return false;
-  if (isFetcherDisconnected('itad')) return false;
-  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
-  if (!isApiAvailableFn()) return false;
-  const getHour = deps.getHour ?? (() => new Date().getHours());
-  if (getHour() < ITAD_AUTO_QUIET_HOUR_END) return false;
-  const stateForFn = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
-  if (stateForFn('itad')) return false;
-  const fresh = fetcherFreshness(ITAD_SOURCE);
-  const intervalMs = itadAutoRefreshIntervalMs();
-  if (fresh.ageMs < intervalMs) return false;
-  const now = deps.now ?? Date.now();
-  const lastRun = deps.getLastRun
-    ?? (() => Number(localStorage.getItem(itadLastAutoRunKey()) || 0));
-  if (now - lastRun() < intervalMs) return false;
-  const setLastRun = deps.setLastRun
-    ?? (t => localStorage.setItem(itadLastAutoRunKey(), String(t)));
-  setLastRun(now);
-  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
-  runFn('itad', { auto: true });
-  return true;
-}
-
-export function maybeAutoRefreshClaims(deps = {}) {
-  // Continues while the page is hidden (minimized / unfocused); see
-  // maybeAutoRefreshItad for the caveat. Not run when the app is fully closed.
-  if (state.prefs.claimsAutoRefreshDisabled) return false;
-  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
-  if (!isApiAvailableFn()) return false;
-  const stateForFn = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
-  if (stateForFn('claims')) return false;
-  const fresh = fetcherFreshness(CLAIMS_SOURCE);
-  const intervalMs = claimsAutoRefreshIntervalMs();
-  if (fresh.ageMs < intervalMs) return false;
-  const now = deps.now ?? Date.now();
-  const lastRun = deps.getLastRun
-    ?? (() => Number(localStorage.getItem(claimsLastAutoRunKey()) || 0));
-  if (now - lastRun() < intervalMs) return false;
-  const setLastRun = deps.setLastRun
-    ?? (t => localStorage.setItem(claimsLastAutoRunKey(), String(t)));
-  setLastRun(now);
-  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
-  runFn('claims', { auto: true });
-  return true;
-}
-
-export const AUTO_STALE_AGE_MS = 24 * 60 * 60 * 1000;
-export const AUTO_STALE_STAGGER_MS = 30 * 60 * 1000;
-
-export function autoStaleLastRunKey() {
-  return profileScopedStorageKey(LS_AUTO_STALE_LAST_RUN);
-}
-
-/** After a store connects, open the fetcher log and run only that provider's
- *  corresponding (primary) fetcher — the library for store sign-ins, the
- *  wishlist for dedicated wishlist sign-ins. The relative wishlist/library and
- *  any enrich keys are left to the stale-24h refresh + auto-enrich passes. */
-export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {
-  if (state.prefs.autoFetchOnConnect === false) return false;
-  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
-  if (!isApiAvailableFn()) return false;
-
-  const loadFn = deps.loadFetcherSources ?? (async () => loadFetcherSources(true));
-  await loadFn();
-
-  const sources = deps.sources ?? fetcherSources;
-  const keys = (fetcherKeys || []).filter((key) => sources.some((s) => s.key === key));
-  if (!keys.length) return false;
-
-  const openLogFn = deps.openFetcherLog ?? (() => fetcherRunner.openFetcherLog({ focusPanel: false }));
-  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
-  const waitFn = deps.waitForQueueSlot ?? ((o) => fetcherRunner.waitForQueueSlot(o));
-  const getCancelEpochFn = deps.getCancelEpoch ?? (() => fetcherRunner.getCancelEpoch());
-
-  openLogFn();
-  const primaryKey = keys[0];
-  if (typeof document !== 'undefined') {
-    requestAnimationFrame(() => {
-      document.querySelector(
-        `#dashboardFetcherHealth .fh-chip[data-fetcher-key="${primaryKey}"]`,
-      )?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
-  }
-
-  const batchEpoch = getCancelEpochFn();
-  await waitFn({ batchEpoch });
-  if (getCancelEpochFn() === batchEpoch) {
-    await runFn(primaryKey, { auto: true });
-  }
-  return true;
-}
-
-/** Quietly refresh the stalest store fetcher older than 24h (one per stagger window). */
-export function maybeAutoFetchStale24h(deps = {}) {
-  if (state.prefs.autoFetchStale24h !== true) return false;
-  // Runs while the page is hidden (minimized / unfocused window) too. Browser
-  // background-timer throttling may slow the cadence; full background refresh
-  // while the app is closed is the paid server-side scheduler, not this loop.
-  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
-  if (!isApiAvailableFn()) return false;
-  const inFlightFn = deps.inFlightCount ?? (() => fetcherRunner.inFlightCount());
-  if (inFlightFn() > 0) return false;
-
-  const now = deps.now ?? Date.now();
-  const getLastRun = deps.getLastRun
-    ?? (() => Number(localStorage.getItem(autoStaleLastRunKey()) || 0));
-  if (now - getLastRun() < AUTO_STALE_STAGGER_MS) return false;
-
-  const sources = deps.sources ?? fetcherSources;
-  const freshnessFn = deps.fetcherFreshness ?? fetcherFreshness;
-  const credsFn = deps.fetcherCredentialsSatisfied ?? fetcherCredentialsSatisfied;
-  const stateForFn = deps.stateFor ?? ((k) => fetcherRunner.stateFor(k));
-  const cooldownFn = deps.authCooldownRemainingMs ?? authCooldownRemainingMs;
-  const disconnectedFn = deps.isFetcherDisconnected ?? isFetcherDisconnected;
-  const reconnectFn = deps.isFetcherReconnectRequired ?? isFetcherReconnectRequired;
-
-  const candidates = sources.filter((src) => {
-    if (src.key === 'itad') return false;
-    if (!FETCHER_AUTH_PROVIDER[src.key]) return false;
-    const { ageMs } = freshnessFn(src);
-    if (ageMs < AUTO_STALE_AGE_MS) return false;
-    if (src.missingRequirements?.length && !credsFn(src.key)) return false;
-    if (stateForFn(src.key)) return false;
-    if (cooldownFn(src.key) > 0) return false;
-    if (disconnectedFn(src.key)) return false;
-    if (reconnectFn(src.key)) return false;
-    return true;
-  });
-
-  if (!candidates.length) return false;
-
-  candidates.sort((a, b) => freshnessFn(b).ageMs - freshnessFn(a).ageMs);
-  const pick = candidates[0];
-
-  const setLastRun = deps.setLastRun
-    ?? ((t) => localStorage.setItem(autoStaleLastRunKey(), String(t)));
-  setLastRun(now);
-  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
-  runFn(pick.key, { auto: true });
-  return true;
-}
-
-let autoEnrichCooldownUntil = 0;
-const AUTO_ENRICH_COOLDOWN_MS = 3000;
-
-/** Queue enrichers after a library fetch that added new titles (opt-out pref). */
-export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
-  if (state.prefs.autoEnrichOnAdd === false) return false;
-  if (!newCount || newCount <= 0) return false;
-  const now = deps.now ?? Date.now();
-  if (now < autoEnrichCooldownUntil) return false;
-  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner.isApiAvailable());
-  if (!isApiAvailableFn()) return false;
-
-  autoEnrichCooldownUntil = now + AUTO_ENRICH_COOLDOWN_MS;
-
-  const loadSourcesFn = deps.loadFetcherSources ?? (() => loadFetcherSources(true));
-  await loadSourcesFn();
-
-  const sources = deps.sources ?? fetcherSources;
-  const stateForFn = deps.stateFor ?? (k => fetcherRunner.stateFor(k));
-  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner.run(k, opts));
-  const waitSlotFn =
-    deps.waitForQueueSlot ?? (() => fetcherRunner.waitForQueueSlot({ batchEpoch }));
-  const credsOkFn = deps.fetcherCredentialsSatisfied ?? fetcherCredentialsSatisfied;
-  const cooldownFn = deps.authCooldownRemainingMs ?? authCooldownRemainingMs;
-  const disconnectedFn = deps.isFetcherDisconnected ?? isFetcherDisconnected;
-
-  const keysToRun = ENRICH_ORDER.filter(key => {
-    const src = sources.find(s => s.key === key);
-    if (!src) return false;
-    if (src.missingRequirements?.length && !credsOkFn(src.key)) return false;
-    if (stateForFn(key)) return false;
-    if (cooldownFn(key) > 0) return false;
-    if (disconnectedFn(key)) return false;
-    return true;
-  });
-
-  if (!keysToRun.length) return false;
-
-  const appendLineFn = deps.appendLine;
-  if (appendLineFn) {
-    appendLineFn(`[auto-enrich: ${newCount} new game(s) - queuing ${keysToRun.length} enricher(s)]`, 'meta');
-  }
-
-  const cancelEpochFn = deps.getCancelEpoch ?? (() => fetcherRunner.getCancelEpoch());
-  const batchEpoch = cancelEpochFn();
-
-  for (const key of keysToRun) {
-    if (cancelEpochFn() !== batchEpoch) {
-      if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
-      break;
-    }
-    try {
-      await waitSlotFn();
-      if (cancelEpochFn() !== batchEpoch) {
-        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
-        break;
-      }
-      await runFn(key, { auto: true });
-    } catch (err) {
-      if (err?.message === 'cancelled') {
-        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
-      } else if (appendLineFn) {
-        appendLineFn(`[auto-enrich aborted: ${err}]`, 'stderr');
-      }
-      break;
-    }
-  }
-  return true;
-}
+export {
+  refreshChipAgesInPlace,
+  stopAgeTicker,
+  ensureAgeTicker,
+  stopFastAgeTick,
+  isFastAgeTickActive,
+  startFastAgeTick,
+};
 
 const STAT_LAYOUT_KEY = 'baklog-fetcher-stat-layout';
 const STAT_LAYOUTS = ['compact', 'landscape'];
 
-/** Survives innerHTML rebuilds — native <details> would re-collapse every render. */
-let legendTipsOpen = false;
-
 export function toggleLegendTips() {
-  legendTipsOpen = !legendTipsOpen;
+  setLegendTipsOpen(!legendTipsOpen);
   renderDashboardFetcherHealth();
 }
 
@@ -2755,7 +2406,7 @@ export const fetcherRunner = (() => {
     }
 
     if (auto && key === 'itad') {
-      itadPendingAutoRun = true;
+      markItadPendingAutoRun();
     } else if (auto && key === 'claims') {
       markClaimsPendingAutoRun();
     } else {
@@ -3160,18 +2811,18 @@ export const fetcherRunner = (() => {
     // running while the window is minimized/unfocused (best-effort, subject to
     // browser background-timer throttling).
     await syncFromServer();
-    maybeAutoRefreshItad();
-    maybeAutoRefreshClaims();
-    maybeAutoFetchStale24h();
+    maybeAutoRefreshItad(autoRefreshDeps());
+    maybeAutoRefreshClaims(autoRefreshDeps());
+    maybeAutoFetchStale24h(autoRefreshDeps());
   }
 
   function startDashboardPolling() {
     _dashboardPollWanted = true;
     if (pollTimer || !isApiAvailable()) return;
     void syncFromServer().then(() => {
-      maybeAutoRefreshItad();
-      maybeAutoRefreshClaims();
-      maybeAutoFetchStale24h();
+      maybeAutoRefreshItad(autoRefreshDeps());
+      maybeAutoRefreshClaims(autoRefreshDeps());
+      maybeAutoFetchStale24h(autoRefreshDeps());
     });
     pollTimer = setInterval(() => { void _runDashboardPollTick(); }, 30_000);
   }
@@ -3293,6 +2944,16 @@ export const fetcherRunner = (() => {
     cycleStatLayout,
   };
 })();
+
+setFetcherRunner(fetcherRunner);
+configureFetcherCooldown({
+  onCooldownExpire: () => {
+    try { renderDashboardFetcherHealth(); } catch (_) { /* not mounted */ }
+  },
+  onMaxStrikes: (_key, provider) => markReconnectRequired(provider),
+  credentialsSatisfied: fetcherCredentialsSatisfied,
+  connectProvider: connectProviderForFetcher,
+});
 
 function isSourceConnected(row) {
   return row.status !== 'missing'
@@ -3732,3 +3393,15 @@ export function renderDashboardFetcherHealth() {
     document.querySelector('[data-role="bar-toggle"]')?.focus();
   }
 }
+
+wireFetcherChips({
+  fetcherRunner,
+  fetcherFreshness,
+  humanizeAge,
+  authCooldownRemainingMs,
+  isFetcherReconnectRequired,
+  lastRunFailedByKey,
+  setLegendTipsOpen,
+  cycleStatLayout,
+  renderDashboardFetcherHealth,
+});

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +19,7 @@ from fetchers._base import (
     add_no_carry_arg,
     apply_carry_forward,
     catalog_file,
+    configure_stdout,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
@@ -37,14 +37,6 @@ UBISOFT_RAW_DUMP = profile_raw_dump_path("ubisoft_raw.json")
 HLTB_DELAY_SEC = 1.0
 
 _TM_CHARS = "".maketrans({"®": "", "™": "", "©": ""})
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _clean_name(raw: str) -> str:
@@ -287,7 +279,7 @@ def main() -> int:
         help=f"Also write the raw API response to {UBISOFT_RAW_DUMP} for debugging.",
     )
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_ubisoft")
     stats = RunStats()
     load_dotenv()

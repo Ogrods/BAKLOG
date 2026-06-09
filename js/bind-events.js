@@ -43,6 +43,7 @@ import {
   renderPicks,
   normalizePicksLimit,
   renderPicksLimitButtons,
+  applyPicksCollapsedState,
 } from './picks-ui.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
 import { openCoverGallery } from './cover-gallery.js';
@@ -103,15 +104,10 @@ import {
  * No-op when picks is already collapsed.
  */
 function closePicksIfOpen() {
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'C',location:'bind-events.js:100',message:'closePicksIfOpen entry',data:{earlyReturn:!!state.prefs.picksCollapsed,collapsed:state.prefs.picksCollapsed,containerHidden:document.getElementById('picksContainer')?.classList.contains('hidden'),btn:document.getElementById('togglePicks')?.textContent,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  if (state.prefs.picksCollapsed) return;
+  if (state.prefs.picksCollapsed === true) return;
   state.prefs.picksCollapsed = true;
   savePrefs();
-  document.getElementById("picksContainer")?.classList.add("hidden");
-  const toggle = document.getElementById("togglePicks");
-  if (toggle) toggle.textContent = "Show";
+  applyPicksCollapsedState();
 }
 
 const SUMMARY_FILTER_CHIP_SELECTOR =
@@ -480,13 +476,9 @@ export function bindEvents() {
     renderPicks();
   });
   document.getElementById("togglePicks").addEventListener("click", () => {
-    state.prefs.picksCollapsed = !state.prefs.picksCollapsed;
+    state.prefs.picksCollapsed = !(state.prefs.picksCollapsed === true);
     savePrefs();
-    document.getElementById("picksContainer").classList.toggle("hidden", state.prefs.picksCollapsed);
-    document.getElementById("togglePicks").textContent = state.prefs.picksCollapsed ? "Show" : "Hide";
-    // #region agent log
-    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b7a6f'},body:JSON.stringify({sessionId:'4b7a6f',hypothesisId:'B',location:'bind-events.js:460',message:'toggle click',data:{collapsed:state.prefs.picksCollapsed,containerHidden:document.getElementById('picksContainer')?.classList.contains('hidden'),btn:document.getElementById('togglePicks')?.textContent,sectionHidden:document.getElementById('picksSection')?.classList.contains('hidden'),initView:document.documentElement.getAttribute('data-init-view'),activeView:state.activeView},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+    applyPicksCollapsedState();
     if (!state.prefs.picksCollapsed) renderPicks();
   });
   document.querySelectorAll(".pick-tab").forEach(btn => {
@@ -818,17 +810,6 @@ export function bindEvents() {
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
   document.getElementById("exportPersonal").addEventListener("click", () => download("baklog-personal.json", JSON.stringify(state.personal, null, 2), "application/json"));
-  document.getElementById("exportNotesOnly")?.addEventListener("click", () => {
-    const rows = [];
-    for (const [key, rec] of Object.entries(state.personal)) {
-      if (key.startsWith("__")) continue;
-      const notes = String(rec?.notes || "").trim();
-      if (!notes) continue;
-      const g = findGameByKey(key);
-      rows.push({ key, name: g?.name || key, notes });
-    }
-    download("baklog-notes-only.json", JSON.stringify(rows, null, 2), "application/json");
-  });
   document.getElementById("reportBug")?.addEventListener("click", () => {
     openBugReportDialog();
   });

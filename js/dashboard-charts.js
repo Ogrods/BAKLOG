@@ -12,6 +12,8 @@ import { prefersReducedMotion } from './motion.js';
 // Click handlers route into drilldown helpers. One-way import; drilldown
 // does not import this module.
 import { dashDrillStore, dashDrillStatus, dashDrillStoreStatus, dashSetReleaseYear, dashDrillHltbBucket, dashDrillMinRating, dashDrillGenre, dashFinishDrillToLibrary } from './dashboard-drilldown.js';
+import { isSurfaceAnimating } from './library-count-animation.js';
+import { notifyChartRenderIdle, perfMarkChartBuilt } from './chart-perf.js';
 
 export const dashboardCharts = {};
 const pendingChartRenders = new Map();
@@ -39,11 +41,91 @@ function accentRgba(alpha, varName = '--accent') {
 }
 let chartLazyObserver = null;
 
-const CHART_STAGGER_MS = 120;
+/** Per-frame budget for lazy chart drain — paint multiple charts per frame when cheap. */
+const CHART_FRAME_BUDGET_MS = 12;
 const chartRenderQueue = [];
 let chartRenderTimer = null;
 let lastChartRenderAt = 0;
 let _chartStaggerSuppressedUntil = 0;
+let _chartIdleNotified = false;
+
+/** Top-to-bottom entrance cascade: chart id → visual row (0 = hero ribbon). */
+const ENTRANCE_ROWS = {
+  chartStoreDonut: 0,
+  chartStatusDonut: 0,
+  chartReviewDonut: 0,
+  chartGenresBar: 1,
+  chartBacklogStore: 1,
+  chartHltbHist: 2,
+  chartReleases: 3,
+  chartScatter: 4,
+};
+
+/** Slight left-to-right overlap within the hero ribbon donut row. */
+const RIBBON_DONUT_STAGGER = {
+  chartStoreDonut: 0,
+  chartStatusDonut: 80,
+  chartReviewDonut: 160,
+};
+
+/** Nominal entrance duration per row — used to derive cumulative start offsets. */
+const ROW_DURATIONS = [800, 700, 850, 450, 1000];
+const ENTRANCE_OVERLAP_MS = 150;
+const ROW_OFFSETS = (() => {
+  const offsets = [];
+  let cursor = 0;
+  for (let i = 0; i < ROW_DURATIONS.length; i++) {
+    offsets[i] = cursor;
+    if (i < ROW_DURATIONS.length - 1) {
+      cursor += ROW_DURATIONS[i] - ENTRANCE_OVERLAP_MS;
+    }
+  }
+  return offsets;
+})();
+
+let _entranceStart = 0;
+let _entranceActive = false;
+
+function armChartEntrance() {
+  _entranceStart = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  _entranceActive = !prefersReducedMotion();
+}
+
+function addDelay(existing, addMs) {
+  if (!addMs) return existing;
+  if (typeof existing === "function") {
+    return (ctx) => {
+      const base = existing(ctx);
+      return (typeof base === "number" ? base : 0) + addMs;
+    };
+  }
+  if (typeof existing === "number") return existing + addMs;
+  return addMs;
+}
+
+function applyEntranceDelay(config, delayMs) {
+  if (!delayMs || !config.options) return;
+  const opts = config.options;
+  if (!opts.animation) opts.animation = {};
+  opts.animation.delay = addDelay(opts.animation.delay, delayMs);
+  if (!opts.animations) opts.animations = {};
+  for (const key of Object.keys(opts.animations)) {
+    const anim = opts.animations[key];
+    if (anim && typeof anim === "object") {
+      anim.delay = addDelay(anim.delay, delayMs);
+    }
+  }
+}
+
+function entranceDelayFor(id) {
+  if (!_entranceActive) return 0;
+  const row = ENTRANCE_ROWS[id];
+  if (row == null) return 0;
+  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const rowDelay = Math.max(0, (ROW_OFFSETS[row] ?? 0) - (now - _entranceStart));
+  const donutStagger = RIBBON_DONUT_STAGGER[id] ?? 0;
+  return rowDelay + donutStagger;
+}
 
 /** Batch lazy chart paints when the boot curtain reveals the dashboard (log: stagger queue caused 6×120ms pop-in). */
 export function suppressChartStaggerForBoot(ms = 900) {
@@ -60,23 +142,37 @@ export function resizeRibbonCharts() {
   }
 }
 
+function maybeNotifyChartRenderIdle() {
+  if (_chartIdleNotified) return;
+  // Only wait for the active stagger/drain queue. Below-the-fold charts sit in
+  // pendingChartRenders until scrolled into view, which on a tall dashboard
+  // never happens during the render window — they must not keep the perf run
+  // (and its frame monitor) open forever.
+  if (chartRenderQueue.length) return;
+  _chartIdleNotified = true;
+  notifyChartRenderIdle();
+}
+
 function drainChartRenderQueue() {
   chartRenderTimer = null;
-  if (!chartRenderQueue.length) return;
-  const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
-  const sinceLast = now - lastChartRenderAt;
-  if (sinceLast < CHART_STAGGER_MS) {
-    chartRenderTimer = setTimeout(drainChartRenderQueue, CHART_STAGGER_MS - sinceLast);
+  if (!chartRenderQueue.length) {
+    maybeNotifyChartRenderIdle();
     return;
   }
-  const job = chartRenderQueue.shift();
-  if (job) {
-    lastChartRenderAt = now;
-    try { job(); } catch (err) { console.error("Lazy chart render failed:", err); }
+  const frameStart = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  while (chartRenderQueue.length) {
+    const job = chartRenderQueue.shift();
+    if (job) {
+      lastChartRenderAt = (typeof performance !== "undefined" ? performance.now() : Date.now());
+      try { job(); } catch (err) { console.error("Lazy chart render failed:", err); }
+    }
+    const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - frameStart;
+    if (chartRenderQueue.length && elapsed >= CHART_FRAME_BUDGET_MS) {
+      chartRenderTimer = requestAnimationFrame(drainChartRenderQueue);
+      return;
+    }
   }
-  if (chartRenderQueue.length) {
-    chartRenderTimer = setTimeout(drainChartRenderQueue, CHART_STAGGER_MS);
-  }
+  maybeNotifyChartRenderIdle();
 }
 
 function scheduleStaggeredChartRender(fn) {
@@ -86,8 +182,9 @@ function scheduleStaggeredChartRender(fn) {
     return;
   }
   chartRenderQueue.push(fn);
+  _chartIdleNotified = false;
   if (chartRenderTimer == null) {
-    chartRenderTimer = setTimeout(drainChartRenderQueue, 0);
+    chartRenderTimer = requestAnimationFrame(drainChartRenderQueue);
   }
 }
 
@@ -151,6 +248,12 @@ export function destroyDashboardCharts() {
     chartRenderTimer = null;
   }
   lastChartRenderAt = 0;
+  _chartIdleNotified = false;
+}
+
+/** Reset perf idle gate at the start of each dashboard chart render pass. */
+export function resetChartRenderIdleGate() {
+  _chartIdleNotified = false;
 }
 
 /** Replay the entrance animation on live charts without rebuilding them. */
@@ -166,9 +269,18 @@ export function replayDashboardChartAnimations({ ribbonOnly = false } = {}) {
   }
 }
 
-function dashChartOptions(extra = {}) {
+function heroCountAnimating() {
+  const node = document.getElementById('dashHeroCount');
+  return !!(node && isSurfaceAnimating(node));
+}
+
+function dashChartOptions(extra = {}, { ribbonChart = false } = {}) {
   const { animations: extraAnim, animation: extraAnimation, ...rest } = extra;
   const reduced = prefersReducedMotion();
+  const deferRibbon = ribbonChart && heroCountAnimating();
+  const animBlock = reduced || deferRibbon
+    ? { duration: 0 }
+    : (extraAnimation != null ? extraAnimation : undefined);
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -176,12 +288,10 @@ function dashChartOptions(extra = {}) {
     // re-layout after it settles (mirrors the landing demo donut precaution).
     resizeDelay: 200,
     plugins: { legend: { labels: { color: "#ffffff", boxWidth: 12 } } },
-    ...(reduced || extraAnimation != null ? {
-      animation: reduced ? { duration: 0 } : extraAnimation,
-    } : {}),
+    ...(animBlock != null ? { animation: animBlock } : {}),
     animations: {
       resize: { duration: 0 },
-      ...(reduced ? {} : extraAnim),
+      ...(reduced || deferRibbon ? {} : extraAnim),
     },
     ...rest,
   };
@@ -227,13 +337,30 @@ function donutLegendHighlight() {
   };
 }
 
-function setDashboardChart(id, config) {
+function applyChartConfig(chart, id, config, { animationMode = 'default' } = {}) {
+  chart.data.labels = config.data.labels;
+  chart.data.datasets = config.data.datasets;
+  if (config._baklogBarLabels) chart._baklogBarLabels = config._baklogBarLabels;
+  if (config._baklogEraYears) chart._baklogEraYears = config._baklogEraYears;
+  if (config._baklogScatterPts) chart._baklogScatterPts = config._baklogScatterPts;
+  if (config._baklogDecadeStats) chart._baklogDecadeStats = config._baklogDecadeStats;
+  if (config.options) {
+    const { plugins: _p, ...restOpts } = config.options;
+    Object.assign(chart.options, restOpts);
+    if (config.options.plugins) {
+      chart.options.plugins = { ...chart.options.plugins, ...config.options.plugins };
+    }
+  }
+  try {
+    chart.update(animationMode);
+  } catch (_) { /* disposed */ }
+  perfMarkChartBuilt(id);
+}
+
+function setDashboardChart(id, config, { forceRebuild = false } = {}) {
   const canvas = document.getElementById(id);
   if (!canvas || typeof Chart === "undefined") return;
-  if (dashboardCharts[id]) {
-    dashboardCharts[id].destroy();
-    delete dashboardCharts[id];
-  }
+
   const build = () => {
     if (!document.body.contains(canvas)) return;
     // Chart.js responsive init reads the canvas's parent box; a chart built while
@@ -243,7 +370,24 @@ function setDashboardChart(id, config) {
       ensureChartObserver()?.observe(canvas);
       return;
     }
+    const existing = dashboardCharts[id];
+    if (!forceRebuild && existing && existing.config?.type === config.type) {
+      applyChartConfig(existing, id, config, { animationMode: 'none' });
+      return;
+    }
+    if (dashboardCharts[id]) {
+      try { dashboardCharts[id].destroy(); } catch (_) { /* noop */ }
+      delete dashboardCharts[id];
+    }
+    const entranceDelay = entranceDelayFor(id);
+    if (entranceDelay) applyEntranceDelay(config, entranceDelay);
     dashboardCharts[id] = new Chart(canvas, config);
+    const ch = dashboardCharts[id];
+    if (config._baklogBarLabels) ch._baklogBarLabels = config._baklogBarLabels;
+    if (config._baklogEraYears) ch._baklogEraYears = config._baklogEraYears;
+    if (config._baklogScatterPts) ch._baklogScatterPts = config._baklogScatterPts;
+    if (config._baklogDecadeStats) ch._baklogDecadeStats = config._baklogDecadeStats;
+    perfMarkChartBuilt(id);
   };
   const observer = ensureChartObserver();
   if (!observer) {
@@ -301,26 +445,182 @@ function findEraBandAtPixel(chart, x) {
   return null;
 }
 
-function buildDecadeStats(games) {
+function finalizeDecadeStats(decadeAcc) {
   const stats = new Map();
-  ERA_BANDS.forEach(era => {
-    const eraGames = games.filter(g => {
-      const y = parseReleaseYear(g.release_date);
-      return y != null && y >= era.start && y <= era.end;
+  for (const [start, acc] of decadeAcc) {
+    if (!acc.count) continue;
+    stats.set(start, {
+      era: acc.era,
+      count: acc.count,
+      avgRating: acc.ratingN ? Math.round(acc.ratingSum / acc.ratingN) : null,
+      avgHours: acc.hoursN ? (acc.hoursSum / acc.hoursN).toFixed(1) : null,
+      topName: acc.topName,
     });
-    if (!eraGames.length) return;
-    const ratings = eraGames.map(g => ratingValue(g)).filter(n => n > 0);
-    const hours = eraGames.map(g => hltbMain(g)).filter(n => n != null && n > 0);
-    const top = eraGames.slice().sort((a, b) => ratingValue(b) - ratingValue(a))[0];
-    stats.set(era.start, {
+  }
+  return stats;
+}
+
+/** One library walk for every dashboard chart bucket + hero rating/store tallies. */
+export function computeDashboardAggregates(games) {
+  const storeCounts = {};
+  const statusCounts = {};
+  STATUS_CHIP_DEFS.forEach(d => { statusCounts[d.key] = 0; });
+  const genreCounts = {};
+  const backlogByStore = { backlog: {}, finished: {} };
+  const storeSet = new Set();
+  const bucketCounts = [0, 0, 0, 0, 0, 0];
+  const reviewBuckets = {
+    "Overwhelmingly Positive": 0, "Very Positive": 0, "Mostly Positive": 0,
+    "Mixed": 0, "Mostly Negative": 0, "Negative": 0, "Unreviewed": 0,
+  };
+  const yearCounts = {};
+  const scatterPts = [];
+  let backlogCount = 0;
+  let ratedSum = 0;
+  let ratedCount = 0;
+  const decadeAcc = new Map();
+  ERA_BANDS.forEach(era => {
+    decadeAcc.set(era.start, {
       era,
-      count: eraGames.length,
-      avgRating: ratings.length ? Math.round(ratings.reduce((s, n) => s + n, 0) / ratings.length) : null,
-      avgHours: hours.length ? (hours.reduce((s, n) => s + n, 0) / hours.length).toFixed(1) : null,
-      topName: top?.name || null,
+      count: 0,
+      ratingSum: 0,
+      ratingN: 0,
+      hoursSum: 0,
+      hoursN: 0,
+      topRating: -1,
+      topName: null,
     });
   });
-  return stats;
+
+  for (const g of games) {
+    const norm = normalizeGame(g);
+    const store = norm.store;
+    storeCounts[store] = (storeCounts[store] || 0) + 1;
+    storeSet.add(store);
+
+    const statusKey = chipStatusKey(g);
+    statusCounts[statusKey] = (statusCounts[statusKey] || 0) + 1;
+
+    const personal = getPersonal(g);
+    const st = personal.status;
+    if (st === 'backlog') backlogCount++;
+
+    for (const c of gameGenresCanonical(g)) {
+      genreCounts[c] = (genreCounts[c] || 0) + 1;
+    }
+
+    const hrs = hltbMain(g);
+    const hrsVal = hrs || 0;
+    if (st === 'backlog' || st === 'finished') {
+      if (!backlogByStore.backlog[store]) backlogByStore.backlog[store] = 0;
+      if (!backlogByStore.finished[store]) backlogByStore.finished[store] = 0;
+      if (st === 'backlog') backlogByStore.backlog[store] += hrsVal;
+      else backlogByStore.finished[store] += hrsVal;
+    }
+    if (st === 'backlog' && hrs != null) {
+      if (hrs <= 2) bucketCounts[0]++;
+      else if (hrs <= 5) bucketCounts[1]++;
+      else if (hrs <= 10) bucketCounts[2]++;
+      else if (hrs <= 20) bucketCounts[3]++;
+      else if (hrs <= 40) bucketCounts[4]++;
+      else bucketCounts[5]++;
+    }
+
+    const d = g.steam_review_desc;
+    if (d && reviewBuckets[d] !== undefined) reviewBuckets[d]++;
+    else if (ratingValue(g) > 0) reviewBuckets.Mixed++;
+    else reviewBuckets.Unreviewed++;
+
+    const rating = ratingValue(g);
+    if (rating > 0) {
+      ratedSum += rating;
+      ratedCount++;
+    }
+
+    const y = parseReleaseYear(g.release_date);
+    if (y != null) {
+      if (y >= 1990) yearCounts[y] = (yearCounts[y] || 0) + 1;
+      for (const era of ERA_BANDS) {
+        if (y < era.start || y > era.end) continue;
+        const acc = decadeAcc.get(era.start);
+        acc.count++;
+        if (rating > 0) {
+          acc.ratingSum += rating;
+          acc.ratingN++;
+          if (rating > acc.topRating) {
+            acc.topRating = rating;
+            acc.topName = g.name;
+          }
+        }
+        if (hrs != null && hrs > 0) {
+          acc.hoursSum += hrs;
+          acc.hoursN++;
+        }
+        break;
+      }
+    }
+
+    if (rating > 0 && hrs != null && hrs > 0) {
+      scatterPts.push({
+        x: hrs,
+        y: rating,
+        label: g.name,
+        key: gameKey(g),
+        status: st || 'backlog',
+        cover: sanitizeCoverUrl(g.header_image) || libraryCoverFor(g),
+      });
+    }
+  }
+
+  const storeEntries = Object.entries(storeCounts).sort((a, b) => b[1] - a[1]);
+  const statusEntries = STATUS_CHIP_DEFS.filter(d => statusCounts[d.key] > 0 && (d.key !== "__none__" || statusCounts[d.key] > 0));
+  const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const stores = [...storeSet];
+  const sortedStores = stores.sort((a, b) => {
+    const totalA = (backlogByStore.backlog[a] || 0) + (backlogByStore.finished[a] || 0);
+    const totalB = (backlogByStore.backlog[b] || 0) + (backlogByStore.finished[b] || 0);
+    return totalB - totalA;
+  });
+  const revEntries = Object.entries(reviewBuckets).filter(([, n]) => n > 0);
+  const presentYears = Object.keys(yearCounts).map(Number).sort((a, b) => a - b);
+  const years = [];
+  if (presentYears.length) {
+    for (let yr = presentYears[0]; yr <= presentYears[presentYears.length - 1]; yr++) {
+      years.push(String(yr));
+    }
+  }
+  const trendData = years.map(yr => yearCounts[yr] || 0);
+  const rolling = years.map((_, i) => {
+    const lo = Math.max(0, i - 1);
+    const hi = Math.min(years.length - 1, i + 1);
+    let sum = 0, n = 0;
+    for (let j = lo; j <= hi; j++) { sum += trendData[j]; n++; }
+    return n > 0 ? sum / n : 0;
+  });
+  const decadeStats = finalizeDecadeStats(decadeAcc);
+
+  return {
+    storeCounts,
+    storeEntries,
+    statusCounts,
+    statusEntries,
+    topGenres,
+    sortedStores,
+    backlogByStore,
+    bucketCounts,
+    reviewBuckets,
+    revEntries,
+    years,
+    trendData,
+    rolling,
+    decadeStats,
+    scatterPts,
+    backlogCount,
+    ratedSum,
+    ratedCount,
+    avgRating: ratedCount ? Math.round(ratedSum / ratedCount) : null,
+    total: games.length,
+  };
 }
 
 function updateEraTooltip(chart, labelHit, decadeStats, evt) {
@@ -361,18 +661,19 @@ function makeEraBandsPlugin(yearLabels) {
   return {
     id: "eraBands",
     beforeDatasetsDraw(chart) {
+      const labels = chart._baklogEraYears || yearLabels;
       const { ctx, chartArea, scales } = chart;
       const xs = scales.x;
-      if (!xs || yearLabels.length === 0) return;
-      const halfBar = yearLabels.length > 1
+      if (!xs || labels.length === 0) return;
+      const halfBar = labels.length > 1
         ? Math.abs(xs.getPixelForTick(1) - xs.getPixelForTick(0)) / 2
         : (chartArea.right - chartArea.left) / 2;
       ctx.save();
       chart._eraHits = [];
       ERA_BANDS.forEach(era => {
         let firstIdx = -1, lastIdx = -1;
-        for (let i = 0; i < yearLabels.length; i++) {
-          const y = +yearLabels[i];
+        for (let i = 0; i < labels.length; i++) {
+          const y = +labels[i];
           if (y >= era.start && y <= era.end) {
             if (firstIdx === -1) firstIdx = i;
             lastIdx = i;
@@ -416,6 +717,7 @@ function makeBarEndLabelsPlugin(getLabelForBarIndex) {
   return {
     id: "barEndLabels",
     afterDatasetsDraw(chart) {
+      const getter = chart._baklogBarLabels || getLabelForBarIndex;
       const { ctx, data } = chart;
       const lastIdx = data.datasets.length - 1;
       const meta = chart.getDatasetMeta(lastIdx);
@@ -426,7 +728,7 @@ function makeBarEndLabelsPlugin(getLabelForBarIndex) {
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       meta.data.forEach((bar, i) => {
-        const text = getLabelForBarIndex(i);
+        const text = getter(i);
         if (text == null || text === "") return;
         ctx.fillText(String(text), bar.x + 6, bar.y);
       });
@@ -797,13 +1099,16 @@ function showScatterCursorTooltip(chart, hits, canvasX, canvasY) {
   tip.classList.add('is-visible');
 }
 
-export function renderDashboardCharts(games) {
-  const storeCounts = {};
-  games.forEach(g => {
-    const s = normalizeGame(g).store;
-    storeCounts[s] = (storeCounts[s] || 0) + 1;
-  });
-  const storeEntries = Object.entries(storeCounts).sort((a, b) => b[1] - a[1]);
+export function renderDashboardCharts(games, aggIn) {
+  armChartEntrance();
+  const agg = aggIn || computeDashboardAggregates(games);
+  const {
+    storeEntries, statusEntries, topGenres, sortedStores, backlogByStore,
+    bucketCounts, reviewBuckets, revEntries, years, trendData, rolling,
+    decadeStats, scatterPts, backlogCount, total,
+  } = agg;
+  const storeBrandColors = sortedStores.map(s => dashStoreColor(s));
+
   setDashboardChart("chartStoreDonut", {
     type: "doughnut",
     data: {
@@ -816,18 +1121,14 @@ export function renderDashboardCharts(games) {
         if (!elements.length) return;
         dashDrillStore(storeEntries[elements[0].index][0]);
       },
-    }),
+    }, { ribbonChart: true }),
   });
 
-  const statusCounts = {};
-  STATUS_CHIP_DEFS.forEach(d => { statusCounts[d.key] = 0; });
-  games.forEach(g => { statusCounts[chipStatusKey(g)]++; });
-  const statusEntries = STATUS_CHIP_DEFS.filter(d => statusCounts[d.key] > 0 && (d.key !== "__none__" || statusCounts[d.key] > 0));
   setDashboardChart("chartStatusDonut", {
     type: "doughnut",
     data: {
       labels: statusEntries.map(d => d.label),
-      datasets: [{ data: statusEntries.map(d => statusCounts[d.key]), backgroundColor: statusEntries.map(d => DASH_STATUS_COLORS[d.key]), borderWidth: 0 }],
+      datasets: [{ data: statusEntries.map(d => agg.statusCounts[d.key]), backgroundColor: statusEntries.map(d => DASH_STATUS_COLORS[d.key]), borderWidth: 0 }],
     },
     options: dashChartOptions({
       plugins: { legend: donutLegendHighlight() },
@@ -835,14 +1136,10 @@ export function renderDashboardCharts(games) {
         if (!elements.length) return;
         dashDrillStatus(statusEntries[elements[0].index].key);
       },
-    }),
+    }, { ribbonChart: true }),
   });
 
-  const genreCounts = {};
-  games.forEach(g => gameGenresCanonical(g).forEach(c => {
-    genreCounts[c] = (genreCounts[c] || 0) + 1;
-  }));
-  const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const genresBarLabels = i => topGenres[i]?.[1];
   setDashboardChart("chartGenresBar", {
     type: "bar",
     data: {
@@ -860,25 +1157,15 @@ export function renderDashboardCharts(games) {
       scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { display: false } } },
       onClick(_evt, elements) { if (elements.length) dashDrillGenre(topGenres[elements[0].index][0]); },
     }),
-    plugins: [makeBarEndLabelsPlugin(i => topGenres[i]?.[1])],
+    _baklogBarLabels: genresBarLabels,
+    plugins: [makeBarEndLabelsPlugin(genresBarLabels)],
   });
 
-  const stores = [...new Set(games.map(g => normalizeGame(g).store))];
-  const backlogByStore = { backlog: {}, finished: {} };
-  stores.forEach(s => { backlogByStore.backlog[s] = 0; backlogByStore.finished[s] = 0; });
-  games.forEach(g => {
-    const st = getPersonal(g).status;
-    const store = normalizeGame(g).store;
-    const hrs = hltbMain(g) || 0;
-    if (st === "backlog") backlogByStore.backlog[store] += hrs;
-    else if (st === "finished") backlogByStore.finished[store] += hrs;
-  });
-  const sortedStores = stores.sort((a, b) => {
-    const totalA = (backlogByStore.backlog[a] || 0) + (backlogByStore.finished[a] || 0);
-    const totalB = (backlogByStore.backlog[b] || 0) + (backlogByStore.finished[b] || 0);
-    return totalB - totalA;
-  });
-  const storeBrandColors = sortedStores.map(s => dashStoreColor(s));
+  const backlogStoreLabels = i => {
+    const s = sortedStores[i];
+    const t = Math.round((backlogByStore.backlog[s] || 0) + (backlogByStore.finished[s] || 0));
+    return t > 0 ? formatNum(t) : "";
+  };
   setDashboardChart("chartBacklogStore", {
     type: "bar",
     data: {
@@ -909,27 +1196,16 @@ export function renderDashboardCharts(games) {
         dashDrillStoreStatus(store, status);
       },
     }),
-    plugins: [makeBarEndLabelsPlugin(i => {
-      const s = sortedStores[i];
-      const total = Math.round((backlogByStore.backlog[s] || 0) + (backlogByStore.finished[s] || 0));
-      return total > 0 ? formatNum(total) : "";
-    })],
+    _baklogBarLabels: backlogStoreLabels,
+    plugins: [makeBarEndLabelsPlugin(backlogStoreLabels)],
   });
 
   const buckets = ["0–2h", "2–5h", "5–10h", "10–20h", "20–40h", "40h+"];
-  const bucketCounts = [0, 0, 0, 0, 0, 0];
-  games.filter(g => getPersonal(g).status === "backlog").forEach(g => {
-    const h = hltbMain(g);
-    if (h == null) return;
-    if (h <= 2) bucketCounts[0]++;
-    else if (h <= 5) bucketCounts[1]++;
-    else if (h <= 10) bucketCounts[2]++;
-    else if (h <= 20) bucketCounts[3]++;
-    else if (h <= 40) bucketCounts[4]++;
-    else bucketCounts[5]++;
-  });
   const hltbBucketColors = ["#22c55e", "#84cc16", "#eab308", "#f59e0b", "#ef4444", "#b91c1c"];
   const hltbBarDuration = 600;
+  const hltbBarEntrance = (ctx) => ctx.type === "data" && ctx.mode === "default";
+  const hltbBarDurationFn = (ctx) => (hltbBarEntrance(ctx) ? hltbBarDuration : 0);
+  const hltbBarEasingFn = (ctx) => (hltbBarEntrance(ctx) ? "easeOutBack" : "linear");
   // Slight left-to-right stagger: each bar starts a touch after the one to its left.
   const hltbBarDelay = (ctx) =>
     ctx.type === "data" && ctx.mode === "default" ? ctx.dataIndex * 60 : 0;
@@ -939,9 +1215,9 @@ export function renderDashboardCharts(games) {
     options: dashChartOptions({
       // easeOutBack overshoots the final height a hair then settles — a slight
       // bounce as each bar hits the top. Delay creates the left-to-right cascade.
-      animation: { duration: hltbBarDuration, easing: "easeOutBack", delay: hltbBarDelay },
+      animation: { duration: hltbBarDurationFn, easing: hltbBarEasingFn, delay: hltbBarDelay },
       animations: {
-        y: { type: "number", duration: hltbBarDuration, easing: "easeOutBack", delay: hltbBarDelay },
+        y: { type: "number", duration: hltbBarDurationFn, easing: hltbBarEasingFn, delay: hltbBarDelay },
       },
       plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }, y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } } },
@@ -952,17 +1228,6 @@ export function renderDashboardCharts(games) {
     }),
   });
 
-  const reviewBuckets = {
-    "Overwhelmingly Positive": 0, "Very Positive": 0, "Mostly Positive": 0,
-    "Mixed": 0, "Mostly Negative": 0, "Negative": 0, "Unreviewed": 0,
-  };
-  games.forEach(g => {
-    const d = g.steam_review_desc;
-    if (d && reviewBuckets[d] !== undefined) reviewBuckets[d]++;
-    else if (ratingValue(g) > 0) reviewBuckets.Mixed++;
-    else reviewBuckets.Unreviewed++;
-  });
-  const revEntries = Object.entries(reviewBuckets).filter(([, n]) => n > 0);
   setDashboardChart("chartReviewDonut", {
     type: "doughnut",
     data: {
@@ -978,10 +1243,9 @@ export function renderDashboardCharts(games) {
         if (minRating == null) return;
         dashDrillMinRating(minRating);
       },
-    }),
+    }, { ribbonChart: true }),
   });
 
-  const total = games.length;
   const topStore = storeEntries[0] || [null, 0];
   const storePct = total ? Math.round(topStore[1] / total * 100) : 0;
   const storeHeadlineEl = document.getElementById('ribbonStoreHeadline');
@@ -994,7 +1258,6 @@ export function renderDashboardCharts(games) {
       : '';
   }
 
-  const backlogCount = games.filter(g => getPersonal(g).status === 'backlog').length;
   const statusHeadlineEl = document.getElementById('ribbonStatusHeadline');
   if (statusHeadlineEl) {
     statusHeadlineEl.innerHTML = `<strong>${escapeHtml(formatNum(backlogCount))}</strong> in backlog`;
@@ -1015,32 +1278,6 @@ export function renderDashboardCharts(games) {
     reviewHeadlineEl.title = `${positivePct}% of rated games are Mostly Positive or better`;
   }
 
-  const yearCounts = {};
-  games.forEach(g => {
-    // Use the shared robust parser (handles "Feb 11, 2026", "1998", ISO, etc.)
-    // — the old release_date.slice(0,4) only kept ISO-prefixed dates, dropping
-    // the vast majority of Steam titles and truncating the axis to ~2001.
-    const y = parseReleaseYear(g.release_date);
-    if (y != null && y >= 1990) yearCounts[y] = (yearCounts[y] || 0) + 1;
-  });
-  // Continuous year axis (fill gaps with 0) so the timeline and era bands span
-  // every year from the oldest release through the newest — no compression.
-  const presentYears = Object.keys(yearCounts).map(Number).sort((a, b) => a - b);
-  const years = [];
-  if (presentYears.length) {
-    for (let y = presentYears[0]; y <= presentYears[presentYears.length - 1]; y++) {
-      years.push(String(y));
-    }
-  }
-  const trendData = years.map(y => yearCounts[y] || 0);
-  const rolling = years.map((_, i) => {
-    const lo = Math.max(0, i - 1);
-    const hi = Math.min(years.length - 1, i + 1);
-    let sum = 0, n = 0;
-    for (let j = lo; j <= hi; j++) { sum += trendData[j]; n++; }
-    return n > 0 ? sum / n : 0;
-  });
-  const decadeStats = buildDecadeStats(games);
   setDashboardChart("chartReleases", {
     type: "line",
     data: {
@@ -1120,7 +1357,7 @@ export function renderDashboardCharts(games) {
       onHover(evt, _els, chart) {
         const labelHit = findEraLabelHit(chart, evt.x, evt.y);
         chart._eraHover = labelHit?.era ?? null;
-        updateEraTooltip(chart, labelHit, decadeStats, evt);
+        updateEraTooltip(chart, labelHit, chart._baklogDecadeStats || decadeStats, evt);
         if (labelHit) chart.tooltip?.setActiveElements([], { x: 0, y: 0 });
       },
       onClick(evt, els, chart) {
@@ -1132,6 +1369,8 @@ export function renderDashboardCharts(games) {
         if (bandHit) dashSetReleaseYear(`${bandHit.era.start}s`);
       },
     }),
+    _baklogEraYears: years,
+    _baklogDecadeStats: decadeStats,
     plugins: [makeEraBandsPlugin(years)],
   });
   const releasesCanvas = document.getElementById("chartReleases");
@@ -1146,27 +1385,23 @@ export function renderDashboardCharts(games) {
     });
   }
 
-  const scatterPts = games.filter(g => ratingValue(g) > 0 && hltbMain(g) != null && hltbMain(g) > 0).map(g => ({
-    x: hltbMain(g),
-    y: ratingValue(g),
-    label: g.name,
-    key: gameKey(g),
-    status: (getPersonal(g).status) || 'backlog',
-    cover: sanitizeCoverUrl(g.header_image) || libraryCoverFor(g),
-  }));
   const scatterClusterPlugin = {
     id: 'scatterCluster',
     afterLayout(chart) {
+      const pts = chart._baklogScatterPts;
       const xs = chart.scales?.x;
       const ys = chart.scales?.y;
-      if (!xs || !ys) return;
-      const px = new Array(scatterPts.length);
-      const py = new Array(scatterPts.length);
-      for (let i = 0; i < scatterPts.length; i++) {
-        px[i] = xs.getPixelForValue(scatterPts[i].x);
-        py[i] = ys.getPixelForValue(scatterPts[i].y);
+      if (!pts?.length || !xs || !ys) return;
+      const layoutKey = `${chart.width}x${chart.height}-${xs.min}-${xs.max}-${ys.min}-${ys.max}-${pts.length}`;
+      if (chart._scatterLayoutKey === layoutKey && chart._scatterGrid) return;
+      chart._scatterLayoutKey = layoutKey;
+      const px = new Array(pts.length);
+      const py = new Array(pts.length);
+      for (let i = 0; i < pts.length; i++) {
+        px[i] = xs.getPixelForValue(pts[i].x);
+        py[i] = ys.getPixelForValue(pts[i].y);
       }
-      chart._scatterPts = scatterPts;
+      chart._scatterPts = pts;
       chart._scatterPxX = px;
       chart._scatterPxY = py;
       const grid = buildScatterSpatialGrid(px, py);
@@ -1301,7 +1536,9 @@ export function renderDashboardCharts(games) {
         hideScatterCursorTooltip();
       },
     }),
+    _baklogScatterPts: scatterPts,
     plugins: [scatterClusterPlugin],
   });
   renderScatterList([]);
+  maybeNotifyChartRenderIdle();
 }

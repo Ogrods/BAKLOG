@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +25,7 @@ from auth import mark_invalid, resolve_env
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -46,14 +46,6 @@ _SKIP_CLASSIFICATIONS = frozenset(
         "VIRTUAL_CURRENCY",
     }
 )
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _build_row(entry: PsnWishlistEntry, hltb: dict | None) -> dict:
@@ -110,7 +102,7 @@ def main() -> int:
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_psn_wishlist")
     stats = RunStats()
 

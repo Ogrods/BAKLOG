@@ -6,25 +6,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from datetime import UTC, datetime
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from fetchers._base import configure_stdout
 from fetchers._progress import RunStats, started
 from shared.profile_paths import free_claims_path
 from shared.safe_write import safe_write_text
 
 DEFAULT_URL = "https://baklog.app/free-claims.json"
 USER_AGENT = "BAKLOG-fetch_free_claims/1.0"
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _fetch_url(url: str, *, timeout: int = 30) -> dict:
@@ -41,7 +33,7 @@ def _fetch_url(url: str, *, timeout: int = 30) -> dict:
 
 
 def main() -> int:
-    _configure_stdout()
+    configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--url",

@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +21,7 @@ from fetchers._base import (
     add_no_carry_arg,
     apply_carry_forward,
     catalog_file,
+    configure_stdout,
     merge_cached_row,
     refuse_drift_result,
     refuse_empty_result,
@@ -68,14 +68,6 @@ SKIP_TITLE_PATTERNS = re.compile(
     r"add-on content bundle|funds)\b",
     re.I,
 )
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _clean_name(raw: str) -> str:
@@ -211,7 +203,7 @@ def main() -> int:
         help=f"Write capture diagnostics to {fetch_debug_json()}",
     )
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_nintendo")
     stats = RunStats()
     load_dotenv()

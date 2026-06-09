@@ -3,7 +3,6 @@
 
 import argparse
 import json
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +14,7 @@ from auth import mark_invalid, resolve_env
 from fetchers._base import (
     STEAM_CREDENTIALS_HINT,
     add_allow_empty_arg,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -26,14 +26,6 @@ from steam_client import SteamClient
 
 GAMES_WISHLIST_JSON = Path("games_wishlist.json")
 HLTB_DELAY_SEC = 1.0
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def fetch_wishlist_items(api_key: str, steam_id: str) -> list[dict]:
@@ -54,7 +46,7 @@ def main() -> int:
     parser.add_argument("--skip-hltb", action="store_true")
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_wishlist")
     stats = RunStats()
     load_dotenv()

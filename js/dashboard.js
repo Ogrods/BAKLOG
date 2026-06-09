@@ -17,10 +17,25 @@ import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, countUpDurationForDelta, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
-import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboardCharts, resetScatterListView, setRibbonChartsResponsive, suppressChartStaggerForBoot } from './dashboard-charts.js';
+import {
+  computeDashboardAggregates,
+  destroyDashboardCharts,
+  replayDashboardChartAnimations,
+  renderDashboardCharts,
+  resetChartRenderIdleGate,
+  resetScatterListView,
+  setRibbonChartsResponsive,
+  suppressChartStaggerForBoot,
+} from './dashboard-charts.js';
+import {
+  perfBeginRun,
+  perfMark,
+  perfMeasure,
+  startFrameMonitor,
+} from './chart-perf.js';
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
-import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
+import { buildInsightPool, buildMarqueeItems, buildMegaLibraryContext, renderMarqueeHtml, renderMarqueeTrackInner, applyMarqueeSpeed, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
 import { commitRenderedMetrics } from './metrics-rendered.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
@@ -56,6 +71,9 @@ let _dashRenderedFingerprint = "";
 const _dashLastCounters = {};
 let _marqueeItemsKey = "";
 let _marqueeSpeedDisconnect = null;
+let _megaArtifactsKey = "";
+/** @type {{ insightPool: unknown[], marqueeItems: unknown[], spotlightPool: object[] } | null} */
+let _megaArtifactsCache = null;
 
 // Entrance animations may only replay when switchView('dashboard') sets the
 // token and calls renderDashboard({ replay: true }). Bootstrap schedules and
@@ -108,17 +126,42 @@ export function dashboardFingerprint() {
   });
 }
 
-function computeMegaHeroStats(games, snap) {
+/** Dashboard fingerprint minus theme — mega insight/marquee/spotlight don't depend on accent. */
+function megaContentFingerprint() {
+  try {
+    const fp = JSON.parse(dashboardFingerprint());
+    delete fp.th;
+    return JSON.stringify(fp);
+  } catch (_) {
+    return dashboardFingerprint();
+  }
+}
+
+function buildMegaArtifacts(games, snap) {
+  const key = megaContentFingerprint();
+  if (key === _megaArtifactsKey && _megaArtifactsCache) return _megaArtifactsCache;
+  const megaCtx = buildMegaLibraryContext(games);
+  _megaArtifactsCache = {
+    insightPool: buildInsightPool(games, snap, megaCtx),
+    marqueeItems: buildMarqueeItems(games, snap, megaCtx),
+    spotlightPool: pickSpotlightGames(games, snap),
+  };
+  _megaArtifactsKey = key;
+  return _megaArtifactsCache;
+}
+
+function computeMegaHeroStats(games, snap, agg) {
   const backlogHrs = snap.backlogHrs;
   const playedHrs = snap.playedHrs;
   const completion = snap.nonSkip ? Math.round(snap.completionRate * 100) : 0;
-  const rated = games.filter(g => ratingValue(g) > 0);
-  const avgRating = rated.length ? Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length) : " - ";
+  const avgRating = agg?.avgRating != null ? agg.avgRating : " - ";
   const wlDeals = state.wishlistGames.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
-  const storeCountMap = {};
-  for (const g of games) {
-    const s = normalizeGame(g).store;
-    storeCountMap[s] = (storeCountMap[s] || 0) + 1;
+  const storeCountMap = agg?.storeCounts ? { ...agg.storeCounts } : {};
+  if (!agg?.storeCounts) {
+    for (const g of games) {
+      const s = normalizeGame(g).store;
+      storeCountMap[s] = (storeCountMap[s] || 0) + 1;
+    }
   }
   const itchGames = (state.itchGames || []).filter(itchIsGame);
   if (itchGames.length) storeCountMap.itch = (storeCountMap.itch || 0) + itchGames.length;
@@ -208,7 +251,7 @@ function wireMarqueeSpeed(rootEl) {
   _marqueeSpeedDisconnect = observeMarqueeSpeed(rootEl || document.getElementById('dashboardMega'));
 }
 
-function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap) {
+function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap, insightPool) {
   const el = document.getElementById("dashboardMega");
   if (!el) return;
   el.className = spotlight ? 'dash-mega dash-mega--has-spotlight' : 'dash-mega';
@@ -241,31 +284,41 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
   if (marqueeKey !== _marqueeItemsKey) {
     _marqueeItemsKey = marqueeKey;
     const marquee = document.getElementById('dashboardMarquee');
-    if (marquee) marquee.outerHTML = renderMarqueeHtml(marqueeItems);
-    else {
+    const track = marquee?.querySelector('.dash-marquee-track');
+    if (track) {
+      // Update the chips in place. Replacing the whole element (outerHTML) would
+      // recreate .dash-marquee-track and restart its CSS scroll animation from
+      // translateX(0) — a visible snap/"chug" on every data refresh. Keeping the
+      // element keeps the animation running; the existing ResizeObserver
+      // re-measures the new width for constant px/s (we also nudge it directly).
+      track.innerHTML = renderMarqueeTrackInner(marqueeItems);
+      applyMarqueeSpeed(el);
+    } else if (marquee) {
+      marquee.outerHTML = renderMarqueeHtml(marqueeItems);
+      wireMarqueeSpeed(el);
+    } else {
       const divider = el.querySelector('.dash-mega-divider');
       divider?.insertAdjacentHTML('beforebegin', renderMarqueeHtml(marqueeItems));
+      wireMarqueeSpeed(el);
     }
-    wireMarqueeSpeed(el);
   }
-  startInsightRotation(buildInsightPool(games, snap));
+  startInsightRotation(insightPool);
   commitRenderedMetrics();
   startSpotlightRotation(spotlightPool);
 }
 
-function renderDashboardMega(games, snap) {
-  const stats = computeMegaHeroStats(games, snap);
+function renderDashboardMega(games, snap, agg) {
+  const stats = computeMegaHeroStats(games, snap, agg);
   const el = document.getElementById("dashboardMega");
   if (!el) return;
 
-  const spotlightPool = pickSpotlightGames(games);
+  const { insightPool, marqueeItems, spotlightPool } = buildMegaArtifacts(games, snap);
   const spotlight = spotlightPool[0] || null;
   if (spotlight) setSpotlightCurrentKey(gameKey(spotlight));
   else setSpotlightCurrentKey(null);
-  const marqueeItems = buildMarqueeItems(games, snap);
 
   if (_dashMegaShellBuilt && document.getElementById('dashHeroCount')) {
-    updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap);
+    updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marqueeItems, snap, insightPool);
     return;
   }
 
@@ -325,7 +378,7 @@ function renderDashboardMega(games, snap) {
 
   applyMegaHeroCounters(stats);
   primeSpotlightArt(document.getElementById('dashboardSpotlight'));
-  startInsightRotation(buildInsightPool(games, snap));
+  startInsightRotation(insightPool);
   commitRenderedMetrics();
   startSpotlightRotation(spotlightPool);
   wireMarqueeSpeed(el);
@@ -433,26 +486,46 @@ export async function renderDashboard(opts = {}) {
   }
 
   _dashRenderInFlight = true;
+  const perfRun = perfBeginRun({ gameCount: dashboardLibraryGames().length, path: opts.force ? 'force' : 'full' });
+  if (perfRun) startFrameMonitor(perfRun);
   try {
     // Lazy lower charts can appear seconds after sync render; boot-only stagger
     // suppression expired before they painted (log: 120ms gaps + 1.6s to scatter).
     suppressChartStaggerForBoot(1200);
-    destroyDashboardCharts();
+    const megaInPlace = _dashMegaShellBuilt && document.getElementById('dashHeroCount');
+    if (megaInPlace) {
+      resetChartRenderIdleGate();
+    } else {
+      destroyDashboardCharts();
+    }
     Chart.defaults.color = "#94a3b8";
     Chart.defaults.borderColor = "#334155";
     const games = dashboardLibraryGames();
     const snap = getLibrarySnapshot(games);
+    const agg = computeDashboardAggregates(games);
+    if (perfRun) {
+      perfMark(perfRun, 'aggregate:done');
+      perfMeasure(perfRun, 'aggregate', 'run:start');
+    }
     renderDashboardFetcherHealth();
     try {
-      renderDashboardMega(games, snap);
+      renderDashboardMega(games, snap, agg);
     } catch (err) {
       console.error("Dashboard mega error:", err);
     }
+    if (perfRun) {
+      perfMark(perfRun, 'mega:done');
+      perfMeasure(perfRun, 'mega', 'aggregate:done');
+    }
     renderDashboardItchRecap();
     try {
-      renderDashboardCharts(games);
+      renderDashboardCharts(games, agg);
     } catch (err) {
       console.error("Dashboard charts error:", err);
+    }
+    if (perfRun) {
+      perfMark(perfRun, 'charts:done');
+      perfMeasure(perfRun, 'chartsBuild', 'mega:done');
     }
     const fpAfterCharts = dashboardFingerprint();
     runWhenIdle(() => {

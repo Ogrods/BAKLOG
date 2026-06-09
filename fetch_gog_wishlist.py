@@ -12,7 +12,6 @@ wishlist, so you can deal-radar across stores in one place.
 
 import argparse
 import json
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +23,7 @@ from auth import mark_invalid, resolve_env
 from auth.session_probe import probe_gog_session
 from fetchers._base import (
     add_allow_empty_arg,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -37,14 +37,6 @@ GAMES_WISHLIST_GOG_JSON = Path("games_wishlist_gog.json")
 GOG_API_BASE = "https://api.gog.com"
 GOG_PRODUCT_DELAY_SEC = 0.4
 HLTB_DELAY_SEC = 1.0
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
@@ -228,7 +220,7 @@ def main() -> int:
     parser.add_argument("--hltb", action="store_true", help="Look up HLTB hours (slow)")
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_gog_wishlist")
     stats = RunStats()
     load_dotenv()

@@ -223,31 +223,100 @@ function median(nums) {
   return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
 }
 
+/**
+ * One library walk: per-game derived fields + status buckets for mega hero builders.
+ * Shared by buildInsightPool / buildMarqueeItems so refresh doesn't re-filter ~20×.
+ */
+export function buildMegaLibraryContext(games) {
+  const backlog = [];
+  const playing = [];
+  const unfinished = [];
+  const next = [];
+  const finished = [];
+  const touched = [];
+  const rated = [];
+  const tracked = [];
+  const hltbVals = [];
+  const genreHrs = {};
+  let playedMinTotal = 0;
+  let backlogHrs = 0;
+
+  for (const g of games) {
+    const st = getPersonal(g).status || 'backlog';
+    const playMin = combinedPlaytime(g);
+    const rating = ratingValue(g);
+    const hltb = hltbMain(g);
+    const row = { g, st, playMin, rating, hltb };
+
+    switch (st) {
+      case 'backlog': backlog.push(row); break;
+      case 'playing': playing.push(row); break;
+      case 'unfinished': unfinished.push(row); break;
+      case 'next': next.push(row); break;
+      case 'finished': finished.push(row); break;
+      default: break;
+    }
+    if (playMin > 0) {
+      touched.push(row);
+      playedMinTotal += playMin;
+    }
+    if (rating > 0) rated.push(row);
+    if (g.trophy_progress != null) tracked.push(row);
+    if (st === 'backlog') {
+      if (hltb != null && hltb > 0) {
+        hltbVals.push(hltb);
+        backlogHrs += hltb;
+      }
+      for (const gen of gameGenresCanonical(g)) {
+        genreHrs[gen] = (genreHrs[gen] || 0) + (hltb || 0);
+      }
+    }
+  }
+
+  return {
+    total: games.length,
+    backlog, playing, unfinished, next, finished, touched, rated, tracked,
+    hltbVals, genreHrs, playedMinTotal, playedHrs: playedMinTotal / 60, backlogHrs,
+  };
+}
+
+function gamesFromMegaCtx(ctx, bucket) {
+  return ctx[bucket].map((r) => r.g);
+}
+
 /** @returns {{ html: string, weight: number }[]} */
-export function buildInsightPool(games, snapIn) {
+export function buildInsightPool(games, snapIn, ctxIn) {
   const entries = [];
   const add = (html, weight = METRIC_WEIGHT.friendly) => entries.push({ html, weight });
-  const backlog = games.filter(g => getPersonal(g).status === 'backlog');
+  const backlog = ctxIn ? gamesFromMegaCtx(ctxIn, 'backlog') : games.filter(g => getPersonal(g).status === 'backlog');
   const maxHrs = state.prefs.quickWinMaxHours || 15;
 
-  const genreHrs = {};
-  backlog.forEach(g => {
-    gameGenresCanonical(g).forEach(gen => {
-      genreHrs[gen] = (genreHrs[gen] || 0) + (hltbMain(g) || 0);
+  const genreHrs = ctxIn?.genreHrs || {};
+  if (!ctxIn) {
+    backlog.forEach(g => {
+      gameGenresCanonical(g).forEach(gen => {
+        genreHrs[gen] = (genreHrs[gen] || 0) + (hltbMain(g) || 0);
+      });
     });
-  });
+  }
   const topGenre = Object.entries(genreHrs).sort((a, b) => b[1] - a[1])[0];
   if (topGenre && topGenre[1] > 0) {
     add(`Biggest backlog: <strong>${escapeHtml(topGenre[0])}</strong> · ${escapeHtml(formatNum(Math.round(topGenre[1])))}h`);
   }
 
-  const byPlay = [...games].filter(g => combinedPlaytime(g) > 0).sort((a, b) => combinedPlaytime(b) - combinedPlaytime(a));
+  const topPlayedRow = ctxIn?.touched.length
+    ? [...ctxIn.touched].sort((a, b) => b.playMin - a.playMin)[0]
+    : null;
+  const byPlay = topPlayedRow
+    ? [topPlayedRow.g]
+    : [...games].filter(g => combinedPlaytime(g) > 0).sort((a, b) => combinedPlaytime(b) - combinedPlaytime(a));
   if (byPlay[0]) {
-    const hrs = Math.round(combinedPlaytime(byPlay[0]) / 60);
+    const mins = topPlayedRow ? topPlayedRow.playMin : combinedPlaytime(byPlay[0]);
+    const hrs = Math.round(mins / 60);
     add(`Most played: <strong>${escapeHtml(byPlay[0].name)}</strong> · ${escapeHtml(formatNum(hrs))}h`);
   }
 
-  const hltbVals = backlog.map(g => hltbMain(g)).filter(h => h != null && h > 0);
+  const hltbVals = ctxIn ? ctxIn.hltbVals : backlog.map(g => hltbMain(g)).filter(h => h != null && h > 0);
   if (hltbVals.length) {
     const avg = Math.round(hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length);
     add(`Avg HLTB main: <strong>${escapeHtml(formatNum(avg))}h</strong>`);
@@ -269,9 +338,11 @@ export function buildInsightPool(games, snapIn) {
     add(`Top deal: <strong>${escapeHtml(top.name)}</strong> · ${coloredCutHtml(cut)}`);
   }
 
-  const rated = games.filter(g => ratingValue(g) > 0);
+  const rated = ctxIn ? gamesFromMegaCtx(ctxIn, 'rated') : games.filter(g => ratingValue(g) > 0);
   if (rated.length) {
-    const avg = Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length);
+    const avg = ctxIn
+      ? Math.round(ctxIn.rated.reduce((s, r) => s + r.rating, 0) / ctxIn.rated.length)
+      : Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length);
     add(`Average review: <strong>${avg}%</strong>`);
   }
 
@@ -283,7 +354,7 @@ export function buildInsightPool(games, snapIn) {
     add(`Newest add: <strong>${escapeHtml(withDate[0].g.name)}</strong>`);
   }
 
-  const playedHrs = games.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
+  const playedHrs = ctxIn ? ctxIn.playedHrs : games.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
   if (games.length) {
     const ratio = (playedHrs / games.length).toFixed(1);
     add(`Hours per game: <strong>${ratio}h</strong>`);
@@ -302,7 +373,7 @@ export function buildInsightPool(games, snapIn) {
   const mendoza = Math.round(snap.mendozaLine);
   add(`Mendoza line: <strong>${mendoza}%</strong>`, METRIC_WEIGHT.moderate);
 
-  const tracked = games.filter(g => g.trophy_progress != null);
+  const tracked = ctxIn ? gamesFromMegaCtx(ctxIn, 'tracked') : games.filter(g => g.trophy_progress != null);
   const closest = tracked.length
     ? [...tracked].sort((a, b) => b.trophy_progress - a.trophy_progress)[0]
     : null;
@@ -396,23 +467,23 @@ function coloredCutHtml(cut, { signed = true, className = 'dash-insight-cut' } =
   return `<strong class="${className} ${cutBucketClass(cut)}">${escapeHtml(label)}</strong>`;
 }
 
-export function buildMarqueeItems(games, snapIn) {
+export function buildMarqueeItems(games, snapIn, ctxIn) {
   const maxHrs = state.prefs.quickWinMaxHours || 15;
   const status = (g) => getPersonal(g).status || 'backlog';
   const playMin = (g) => combinedPlaytime(g);
   const rating = (g) => ratingValue(g);
   const hltb = (g) => hltbMain(g);
 
-  const total = games.length;
-  const backlog = games.filter(g => status(g) === 'backlog');
-  const playing = games.filter(g => status(g) === 'playing');
-  const unfinished = games.filter(g => status(g) === 'unfinished');
-  const next = games.filter(g => status(g) === 'next');
-  const finished = games.filter(g => status(g) === 'finished');
-  const touched = games.filter(g => playMin(g) > 0);
-  const playedHrs = games.reduce((s, g) => s + playMin(g), 0) / 60;
-  const backlogHrs = backlog.reduce((s, g) => s + (hltb(g) || 0), 0);
-  const ratedGames = games.filter(g => rating(g) > 0);
+  const total = ctxIn ? ctxIn.total : games.length;
+  const backlog = ctxIn ? gamesFromMegaCtx(ctxIn, 'backlog') : games.filter(g => status(g) === 'backlog');
+  const playing = ctxIn ? gamesFromMegaCtx(ctxIn, 'playing') : games.filter(g => status(g) === 'playing');
+  const unfinished = ctxIn ? gamesFromMegaCtx(ctxIn, 'unfinished') : games.filter(g => status(g) === 'unfinished');
+  const next = ctxIn ? gamesFromMegaCtx(ctxIn, 'next') : games.filter(g => status(g) === 'next');
+  const finished = ctxIn ? gamesFromMegaCtx(ctxIn, 'finished') : games.filter(g => status(g) === 'finished');
+  const touched = ctxIn ? gamesFromMegaCtx(ctxIn, 'touched') : games.filter(g => playMin(g) > 0);
+  const playedHrs = ctxIn ? ctxIn.playedHrs : games.reduce((s, g) => s + playMin(g), 0) / 60;
+  const backlogHrs = ctxIn ? ctxIn.backlogHrs : backlog.reduce((s, g) => s + (hltb(g) || 0), 0);
+  const ratedGames = ctxIn ? gamesFromMegaCtx(ctxIn, 'rated') : games.filter(g => rating(g) > 0);
 
   const wl = state.wishlistGames || [];
   const onSale = wl.filter(g => {
@@ -463,12 +534,18 @@ export function buildMarqueeItems(games, snapIn) {
     const avgSession = Math.round(playedHrs / touched.length);
     if (avgSession > 0) push('~', 'is-amber', `${avgSession}h`, 'avg time per played game');
   }
-  const mostPlayed = [...games].sort((a, b) => playMin(b) - playMin(a))[0];
-  if (mostPlayed && playMin(mostPlayed) > 0) {
-    push('^', 'is-rose', `${mostPlayed.name} · ${formatNum(Math.round(playMin(mostPlayed) / 60))}h`, 'most-played');
+  const topMarqueePlayed = ctxIn?.touched.length
+    ? [...ctxIn.touched].sort((a, b) => b.playMin - a.playMin)[0]
+    : null;
+  const mostPlayed = topMarqueePlayed?.g || [...games].sort((a, b) => playMin(b) - playMin(a))[0];
+  if (mostPlayed) {
+    const mins = topMarqueePlayed ? topMarqueePlayed.playMin : playMin(mostPlayed);
+    if (mins > 0) {
+      push('^', 'is-rose', `${mostPlayed.name} · ${formatNum(Math.round(mins / 60))}h`, 'most-played');
+    }
   }
 
-  const hltbVals = backlog.map(hltb).filter(h => h != null && h > 0);
+  const hltbVals = ctxIn ? ctxIn.hltbVals : backlog.map(hltb).filter(h => h != null && h > 0);
   if (hltbVals.length) {
     const avg = Math.round(hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length);
     push('~', 'is-amber', `${formatNum(avg)}h`, 'avg backlog main');
@@ -515,7 +592,7 @@ export function buildMarqueeItems(games, snapIn) {
     push('~', 'is-amber', `${ratedPct}%`, 'of library rated');
   }
 
-  const tracked = games.filter(g => g.trophy_progress != null);
+  const tracked = ctxIn ? gamesFromMegaCtx(ctxIn, 'tracked') : games.filter(g => g.trophy_progress != null);
   if (tracked.length) {
     const avgTrophy = Math.round(tracked.reduce((s, g) => s + g.trophy_progress, 0) / tracked.length);
     push('~', 'is-amber', `${avgTrophy}%`, 'avg achievement completion');
@@ -1110,7 +1187,8 @@ export function buildMarqueeItems(games, snapIn) {
   return spreadByFamily(applyMetricWeights(enabledItems), it => it.family, { wrap: true });
 }
 
-export function renderMarqueeHtml(items) {
+/** Inner HTML for `.dash-marquee-track`: one copy of the chips, twice (seamless loop). */
+export function renderMarqueeTrackInner(items) {
   if (!items.length) return '';
   const itemHtml = items.map(it => {
     const chipTip = marqueeTip(it.label);
@@ -1123,17 +1201,28 @@ export function renderMarqueeHtml(items) {
       <span class="dash-marquee-label">${escapeHtml(it.label)}</span>
     </span>`;
   }).join('');
+  return `${itemHtml}${itemHtml}`;
+}
+
+export function renderMarqueeHtml(items) {
+  if (!items.length) return '';
   return `
     <div class="dash-marquee" id="dashboardMarquee" aria-hidden="true">
-      <div class="dash-marquee-track">${itemHtml}${itemHtml}</div>
+      <div class="dash-marquee-track">${renderMarqueeTrackInner(items)}</div>
     </div>`;
 }
 
+function insightListsEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 export function startInsightRotation(insights) {
-  stopInsightRotation();
   const el = document.getElementById('dashboardInsight');
   const entries = normalizeInsightEntries(insights);
   if (!el || !entries.length) {
+    stopInsightRotation();
     if (el) {
       el.innerHTML = '';
       el.classList.remove('is-visible');
@@ -1145,6 +1234,10 @@ export function startInsightRotation(insights) {
   let htmlList = weighted.map(e => e.html);
   htmlList = filterInsightsOneLine(el, htmlList);
   htmlList = spreadByFamily(htmlList, familyForInsight, { wrap: true });
+  if (htmlList.length && _insightTimer && insightListsEqual(htmlList, _lastInsights)) {
+    return;
+  }
+  stopInsightRotation();
   _lastInsights = htmlList;
   if (!htmlList.length) {
     el.innerHTML = '';

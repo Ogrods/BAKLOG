@@ -29,6 +29,7 @@ from auth.secrets import profile_dir
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -80,14 +81,6 @@ def _humble_wishlist_cache() -> Path:
 
 def dump_json() -> Path:
     return _humble_wishlist_cache() / "wishlist_dump.json"
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _price_from_lookup(obj: dict) -> tuple[str | None, str | None, int | None, str | None]:
@@ -309,7 +302,7 @@ def main() -> int:
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_humble_wishlist")
     stats = RunStats()
     load_dotenv()

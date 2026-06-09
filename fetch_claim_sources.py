@@ -5,13 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
 
-from fetchers._base import refuse_empty_result
+from fetchers._base import configure_stdout, refuse_empty_result
 from fetchers._progress import RunStats, started
 from shared.free_claims_sources import (
     EPIC_FREE_GAMES_URL,
@@ -29,14 +28,6 @@ from shared.safe_write import safe_write_text
 OUTPUT_PATH = Path("curated/free_claims.auto.json")
 USER_AGENT = "BAKLOG-fetch_claim_sources/1.0"
 REQUEST_TIMEOUT = 30
-
-
-def _configure_stdout() -> None:
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _fetch_json(url: str) -> dict | list:
@@ -141,7 +132,7 @@ def _load_existing_items(output: Path) -> tuple[dict[str, dict], int]:
 
 
 def main() -> int:
-    _configure_stdout()
+    configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=OUTPUT_PATH)
     parser.add_argument(

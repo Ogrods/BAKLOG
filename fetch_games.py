@@ -3,7 +3,6 @@
 
 import argparse
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,6 +16,7 @@ from fetchers._base import (
     add_no_carry_arg,
     apply_carry_forward,
     catalog_file,
+    configure_stdout,
     refuse_drift_result,
     refuse_empty_result,
     row_key_by_appid,
@@ -29,15 +29,6 @@ from steam_metadata import coop_flags_from_categories, enrichment_from_appdetail
 
 GAMES_STEAM_JSON = Path("games_steam.json")
 HLTB_DELAY_SEC = 1.0
-
-
-def _configure_stdout() -> None:
-    """Avoid UnicodeEncodeError on Windows consoles (cp1252)."""
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError):
-            pass
 
 
 def _finalize_steam_row(row: dict) -> dict:
@@ -223,7 +214,7 @@ def main() -> int:
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     args = parser.parse_args()
-    _configure_stdout()
+    configure_stdout()
     t0 = started("fetch_games")
     stats = RunStats()
 

@@ -586,7 +586,7 @@ function gameSpotlightReason(g, recentKeys) {
   return null;
 }
 
-export function pickSpotlightGames(games) {
+export function pickSpotlightGames(games, snapIn) {
   const recentKeys = computeRecentSpotlightKeys(games);
   const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
   const hasArt = g => {
@@ -635,7 +635,7 @@ export function pickSpotlightGames(games) {
     });
   tagged.push(...wishlistOnSale);
 
-  const snap = getLibrarySnapshot(games);
+  const snap = snapIn || getLibrarySnapshot(games);
   const saberPicks = computeSpotlightSuperlatives(eligible, snap);
   const mvp = topWarGame(snap);
   if (mvp?.g && hasArt(mvp.g)) {

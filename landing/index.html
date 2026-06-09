@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BAKLOG: One honest backlog across every store</title>
-  <meta name="description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists across Steam, Epic, GOG, PSN, Xbox, Amazon, itch &amp; more. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
+  <meta name="description" content="One honest backlog across every store. Free forever to import · twelve libraries and eight wishlists · runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Open source (MIT). Optional $5/mo paid tier. Invite-only early access." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="BAKLOG" />
@@ -18,14 +18,14 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:url" content="https://baklog.app/" />
   <meta property="og:title" content="BAKLOG: One honest backlog across every store" />
-  <meta property="og:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
+  <meta property="og:description" content="One honest backlog across every store. Free forever · twelve libraries and eight wishlists · runs on your machine. Watch 0 → 2,000+ games in ~90 seconds. Open source (MIT). Invite-only early access." />
   <meta property="og:image" content="https://baklog.app/assets/og.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="BAKLOG: one honest backlog across every store" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="BAKLOG: One honest backlog across every store" />
-  <meta name="twitter:description" content="Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import · $5/mo optional paid tier. Invite-only early access." />
+  <meta name="twitter:description" content="One honest backlog across every store. Free forever · twelve libraries and eight wishlists · runs on your machine. Watch 0 → 2,000+ games in ~90 seconds. Open source (MIT). Invite-only early access." />
   <meta name="twitter:image" content="https://baklog.app/assets/og.png" />
   <meta name="twitter:image:alt" content="BAKLOG: one honest backlog across every store" />
 
@@ -40,7 +40,7 @@
 
   <!-- Structured data: inline. The src attribute is ignored on ld+json blocks,
        and data blocks aren't executed so CSP script-src doesn't apply to them. -->
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","description":"Lightweight local-first dashboard: 12 libraries + 8 wishlists. Auto-fetch on connect. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now: free-game feed aggregated from Epic, GamerPower, and IsThereAnyDeal. Free forever to import; optional $5/mo paid tier. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Paid","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","codeRepository":"https://github.com/Ogrods/BAKLOG","license":"https://opensource.org/licenses/MIT","description":"One honest backlog across every store. Free forever to import; twelve libraries and eight wishlists; runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Open source (MIT). Optional $5/mo paid tier. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Paid","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
 
   <style>
     @font-face {
@@ -208,32 +208,22 @@
       margin-left: 0.05em;
     }
 
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      margin: clamp(1rem, 2.5vw, 1.5rem) 0 0;
-      padding: 0.4rem 0.85rem;
-      font-family: var(--font-display);
-      font-size: 0.68rem;
-      font-weight: 600;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--accent-muted);
-      background: var(--accent-subtle);
-      border: 1px solid var(--accent-border);
-      border-radius: 999px;
-      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.09s both;
-    }
-    .hero-badge svg { flex-shrink: 0; color: var(--accent); }
-
     .hero-tagline {
       font-family: var(--font-display);
-      font-weight: 500;
-      font-size: clamp(1rem, 2.6vw, 1.5rem);
+      font-weight: 600;
+      font-size: clamp(1.35rem, 3.2vw, 2rem);
       color: var(--text-bright);
-      margin: 1.1rem auto 0;
+      margin: clamp(1rem, 2.5vw, 1.35rem) auto 0;
       max-width: 22ch;
+      text-wrap: pretty;
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.09s both;
+    }
+    .hero-subhead {
+      font-size: clamp(0.88rem, 2vw, 1.05rem);
+      color: var(--text-mute);
+      margin: 0.55rem auto 0;
+      max-width: 42ch;
+      line-height: 1.5;
       text-wrap: pretty;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
     }
@@ -245,9 +235,9 @@
       justify-content: center;
       align-items: center;
       gap: 6px 7px;
-      margin: 0.85rem auto 0;
+      margin: 1.1rem auto 0;
       max-width: min(100%, 22rem);
-      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.21s both;
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
     }
     .hero-store {
       display: inline-flex;
@@ -277,9 +267,9 @@
       letter-spacing: 0.03em;
       color: var(--text-mute);
       opacity: 0.88;
-      max-width: 32ch;
-      text-wrap: balance;
-      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
+      max-width: none;
+      white-space: nowrap;
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.19s both;
     }
     .hero-store-caption a {
       color: inherit;
@@ -294,7 +284,7 @@
       margin: 1.65rem auto 0;
       width: 100%;
       max-width: 460px;
-      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.21s both;
     }
 
     .waitlist-row {
@@ -469,6 +459,7 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
+    .tier-compare thead th:not(:first-child) { text-align: center; }
     .tier-compare tbody th { font-weight: 500; color: var(--text); }
     .tier-compare tbody td { color: var(--text-mute); text-align: center; }
     .tier-compare .premium-badge { font-size: 0.6rem; vertical-align: middle; margin-left: 0.25rem; }
@@ -510,21 +501,25 @@
 
     /* Footer */
     footer { padding: 3.5rem 0 4rem; border-top: 1px solid var(--border-subtle); }
-    .foot-grid { display: flex; flex-wrap: wrap; gap: 2rem; align-items: center; justify-content: space-between; }
+    .foot-grid { display: flex; flex-wrap: wrap; gap: 2.5rem 3rem; align-items: flex-start; justify-content: space-between; }
     .foot-brand { display: flex; align-items: center; gap: 0.7rem; }
     .foot-brand svg { width: 30px; height: 30px; }
     .foot-brand .name { font-family: var(--font-display); font-weight: 700; color: #fff; letter-spacing: 0.14em; font-size: 1.05rem; }
-    .foot-meta { color: var(--text-mute); font-size: 0.85rem; text-align: right; }
-    .foot-meta strong { color: var(--text); font-weight: 600; }
-    .foot-invite { margin: 0.35rem 0 0; }
-    .foot-invite a { font-weight: 600; }
+    .foot-brand-col { max-width: 28ch; }
+    .foot-tagline, .foot-pricing { color: var(--text-mute); font-size: 0.85rem; margin: 0.85rem 0 0; line-height: 1.5; text-wrap: pretty; }
+    .foot-tagline strong { color: var(--text); font-weight: 600; }
+    .foot-pricing { margin-top: 0.5rem; }
+    .foot-links { display: grid; grid-template-columns: repeat(2, auto); gap: 2rem 3.5rem; }
+    .foot-col h4 { margin: 0 0 0.65rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); }
+    .foot-col a { display: block; font-size: 0.9rem; line-height: 1.45; font-weight: 600; padding: 0.15rem 0; }
+    .foot-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem 1.5rem; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-mute); }
+    .foot-legal, .foot-trademark { margin: 0; }
 
     @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
     /* Short viewports: compress hero before internal scroll kicks in */
     @media (max-height: 720px) {
       .hero-inner { padding: 2rem 1.25rem; }
-      .hero-badge { margin-top: 0.75rem; }
       .hero-tagline { margin-top: 0.85rem; }
       .hero-store-strip { margin-top: 0.55rem; }
       .hero-store-caption { margin-top: 0.3rem; }
@@ -538,7 +533,7 @@
         font-size: clamp(2rem, 8vw, 3.5rem);
         margin-top: clamp(-2rem, -3.5vw, -0.75rem);
       }
-      .hero-tagline { font-size: clamp(1rem, 2.8vw, 1.35rem); margin-top: 0.55rem; }
+      .hero-tagline { font-size: clamp(1.15rem, 2.8vw, 1.5rem); margin-top: 0.55rem; }
       .hero-store { width: 18px; height: 18px; }
       .hero-store-caption { font-size: 0.68rem; }
       .waitlist { margin-top: 0.85rem; }
@@ -552,13 +547,14 @@
       .features-grid { grid-template-columns: 1fr; }
       .steps { grid-template-columns: 1fr; }
       footer { padding: 3rem 0 3.5rem; }
+      .foot-grid { flex-direction: column; }
+      .foot-links { width: 100%; }
       /* Pull the wordmark a touch closer to the logo mark on phones. */
       .wordmark { margin-top: clamp(-4rem, -7vw, -1.75rem); }
     }
 
     @media (max-width: 400px) {
       .hero-inner { padding-left: 1rem; padding-right: 1rem; }
-      .hero-badge { letter-spacing: 0.1em; }
       .hero-store-strip { gap: 5px 6px; max-width: 100%; }
       .hero-store { width: 20px; height: 20px; }
       .hero-store-caption { font-size: 0.68rem; max-width: 100%; }
@@ -567,7 +563,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .hero-mark, .wordmark, .hero-badge, .hero-tagline, .hero-store-strip, .hero-store-caption, .waitlist { animation: none; }
+      .hero-mark, .wordmark, .hero-tagline, .hero-subhead, .hero-store-strip, .hero-store-caption, .waitlist { animation: none; }
       .card, .btn { transition: none; }
     }
 
@@ -590,13 +586,14 @@
       }
       .btn { width: 100%; min-height: 48px; border-radius: 12px; }
       .foot-grid { flex-direction: column; align-items: flex-start; }
-      .foot-meta { text-align: left; }
-      .foot-invite a {
+      .foot-links { grid-template-columns: repeat(2, 1fr); gap: 1.5rem 2rem; }
+      .foot-col a {
         display: inline-flex;
         align-items: center;
         min-height: 44px;
         padding: 0.25rem 0;
       }
+      .foot-bottom { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -624,11 +621,8 @@
     </span>
 
     <h1 class="wordmark">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></h1>
-    <p class="hero-badge">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-      Free forever to import &middot; Invite-only early access
-    </p>
     <p class="hero-tagline">One honest backlog across every store.</p>
+    <p class="hero-subhead">Free forever to import &middot; twelve libraries and eight wishlists &middot; runs on your machine</p>
 
     <!-- order: STORE_DISPLAY_ORDER / bizcard BIZCARD_STORES -->
     <div class="hero-store-strip" aria-hidden="true">
@@ -646,7 +640,7 @@
       <span class="hero-store" style="--store-bg:#f05556;--store-glyph:url('assets/store-logos/ea.svg')"><span class="hero-store-glyph"></span></span>
     </div>
 
-    <p class="hero-store-caption">No games yet? Start free with Epic, GOG, or&nbsp;Prime — Epic's weekly free game is claimable from your phone.</p>
+    <p class="hero-store-caption">No games yet? Start free with Epic, GOG, or&nbsp;Prime.</p>
 
     <form class="waitlist" id="waitlist" novalidate>
       <div class="waitlist-row">
@@ -657,7 +651,7 @@
       <div class="form-reassure">
         <p class="form-secure">
           <svg class="secure-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <strong>100% secure.</strong> No telemetry, ever &middot; invite-only, your place is reserved on request.
+          <strong>100% secure.</strong> No telemetry &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">Open source (MIT)</a> &middot; Invite-only, your place is reserved on request.
         </p>
       </div>
       <p class="form-msg" id="formMsg" role="status" aria-live="polite"></p>
@@ -667,52 +661,52 @@
 
   <main id="main">
 
+  <!-- ============ PROBLEM ============ -->
+  <section class="band problem" id="what">
+    <div class="wrap">
+      <span class="eyebrow">The accidental library</span>
+      <h2>You didn't buy 600 games. They piled up.</h2>
+      <p>Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG retrieves what you already own — opening a channel from each store straight to your machine. It was always your data; BAKLOG just retrieves and reshuffles it.</p>
+      <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
+    </div>
+  </section>
+
   <!-- ============ INTERACTIVE DEMO ============ -->
   <section class="band demo-section" id="demo">
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">The demo is the product</span>
         <h2>This is your dashboard on day one.</h2>
-        <p>Connect your stores and watch your real library count climb automatically. This is a live sample with dummy data.</p>
+        <p>Connect your stores and watch your library count climb. This live sample uses dummy data from seven stores — the real app supports twelve libraries and eight wishlists.</p>
       </div>
       <div class="demo-mount" id="demoMount" aria-label="BAKLOG dashboard sample"></div>
       <p class="demo-cta"><a class="btn" href="#waitlist">Request an invite</a></p>
     </div>
   </section>
 
-  <!-- ============ PROBLEM ============ -->
-  <section class="band problem" id="what">
-    <div class="wrap">
-      <span class="eyebrow">The accidental library</span>
-      <h2>You didn't buy 600 games. They piled up.</h2>
-      <p>Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG goes and gets it, opening a channel from each store straight to your machine. It was always your data; BAKLOG just retrieves it.</p>
-      <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
-    </div>
-  </section>
-
-  <!-- ============ START FROM ZERO ============ -->
-  <section class="band" id="start">
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="band" id="how">
     <div class="wrap">
       <div class="section-head">
-        <span class="eyebrow">Starting from zero?</span>
-        <h2>You don't need to own a thing. Start collecting today.</h2>
-        <p>You don't need an existing library on any of the twelve stores. Several have a free way in - and those pipelines fill a backlog on their own.</p>
+        <span class="eyebrow">Watch your library appear</span>
+        <h2>From empty to 2,000+ games in 90 seconds.</h2>
+        <p>Retrieve, normalize, decide — no catch, no cloud vault.</p>
       </div>
       <div class="steps">
         <div class="step">
           <div class="num">1</div>
-          <h3>Claim this week's free games</h3>
-          <p>Epic, Prime Gaming, GOG, Steam keys, and more drop free games every week. Epic's weekly freebie can be claimed straight from the Epic Games Store Mobile app on supported devices — no computer required — and the mobile store runs its own giveaways too. BAKLOG surfaces active drops in <strong>Claimable Now</strong> — a maintainer-curated feed aggregated from the Epic Store, GamerPower, and IsThereAnyDeal — right in your dashboard, so you never miss a drop.</p>
+          <h3>Connect</h3>
+          <p>Link your stores once. Credentials stay encrypted on your machine.</p>
         </div>
         <div class="step">
           <div class="num">2</div>
-          <h3>Or just play something free</h3>
-          <p>Steam free-to-play hits, StarCraft on Battle.net, Rainbow Six Siege on Ubisoft, or pay-what-you-want indies on itch.io.</p>
+          <h3>Auto-fetch on connect</h3>
+          <p>BAKLOG opens a channel to each store and brings everything you own back to one honest table. Fetcher chips light up as each library lands. Auto-refresh in Connections quietly updates stores older than 24h while the app is open (on by default).</p>
         </div>
         <div class="step">
           <div class="num">3</div>
-          <h3>Point BAKLOG at it</h3>
-          <p>Connect once and your new collection counts itself from day one.</p>
+          <h3>Decide</h3>
+          <p>Know what to play next, and whether that "deal" is actually worth opening.</p>
         </div>
       </div>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
@@ -722,7 +716,7 @@
   <!-- ============ STORE WALL ============ -->
   <section class="band logo-wall-section" id="stores">
     <div class="wrap">
-      <span class="eyebrow">Works with what you own - or start from scratch</span>
+      <span class="eyebrow">Works with what you own — or start from scratch</span>
       <h2>Twelve libraries and eight wishlists. One honest table.</h2>
       <div class="logo-wall" aria-hidden="true">
         <!-- order: STORE_DISPLAY_ORDER / hero strip -->
@@ -750,7 +744,7 @@
       <div class="section-head">
         <span class="eyebrow">What you get</span>
         <h2>Your whole library, finally&nbsp;honest.</h2>
-        <p>No cloud vault, no AI, no secret sauce. BAKLOG fetches your library from every store on your behalf, then normalizes and reshuffles it into something you can actually decide from.</p>
+        <p>No cloud vault, no AI, no secret sauce — and the whole app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>. BAKLOG fetches your library from every store on your behalf, then normalizes and reshuffles it into something you can actually decide from.</p>
       </div>
 
       <div class="features-grid">
@@ -775,7 +769,7 @@
           <h3>Deal radar that knows what you own</h3>
           <p>Every other tracker tells you something is on sale. BAKLOG tells you whether the sale is worth opening.</p>
           <ul>
-            <li>Prices fused with your real library</li>
+            <li>Prices fused with your honest library</li>
             <li>Wishlist radar in your currency</li>
             <li>Stops you re-buying what you have</li>
           </ul>
@@ -786,10 +780,9 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
           </div>
           <h3>Free games, surfaced</h3>
-          <p><strong>Claimable Now</strong> aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard, skipping anything you already own. Epic's weekly free game is claimable from the Epic Games Store Mobile app on supported devices — no PC needed.</p>
+          <p><strong>Claimable Now</strong> aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard, skipping anything you already own. See <a href="#start">starting from zero</a> for Epic mobile claims and other free entry paths.</p>
           <ul>
             <li>Maintainer-approved feed of active giveaways (auto-discovered + hand-curated)</li>
-            <li>Epic Games Store Mobile runs its own giveaways — claim from your phone, count on your PC</li>
             <li>Notification banner when new free games drop</li>
             <li>Ownership-aware: hides titles already in your library</li>
             <li>Full games only — DLC packs, add-ons, and in-game bonuses are filtered out of the free feed</li>
@@ -806,7 +799,7 @@
           <ul>
             <li>Local-first; runs on your machine</li>
             <li>Credentials encrypted, never uploaded</li>
-            <li>Zero telemetry. MIT-licensed.</li>
+            <li>Zero telemetry — <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>; audit every fetcher and credential path</li>
           </ul>
         </article>
 
@@ -883,48 +876,29 @@
     </div>
   </section>
 
-  <!-- ============ BOX SCORE ============ -->
-  <section class="band">
+  <!-- ============ START FROM ZERO ============ -->
+  <section class="band" id="start">
     <div class="wrap">
       <div class="section-head">
-        <span class="eyebrow">Sabermetrics for your backlog</span>
-        <h2>We gave your pile of shame a box score.</h2>
-        <p>Your library is data. BAKLOG turns it into a scoreboard: 300+ stats and baseball-style sabermetrics — completion AVG, backlog OPS, value-per-hour, even a WAR for your next pick. Honest enough to screenshot for the group chat.</p>
-      </div>
-      <div class="score-grid">
-        <div class="score-tile"><div class="num">300+</div><div class="lbl">stats &amp; sabermetrics, from AVG to WAR</div></div>
-        <div class="score-tile"><div class="num">12 + 8</div><div class="lbl">library and wishlist sources</div></div>
-        <div class="score-tile"><div class="num">100%</div><div class="lbl">on your machine, nothing uploaded</div></div>
-        <div class="score-tile"><div class="num">90 sec</div><div class="lbl">from empty to your whole library</div></div>
-        <div class="score-tile"><div class="num">$0</div><div class="lbl">free forever to import your library</div></div>
-        <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (paid, planned)</div></div>
-      </div>
-      <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
-    </div>
-  </section>
-
-  <!-- ============ HOW IT WORKS ============ -->
-  <section class="band">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">Watch your library appear</span>
-        <h2>From empty to 2,000+ games in 90 seconds.</h2>
+        <span class="eyebrow">Starting from zero?</span>
+        <h2>You don't need to own a thing. Start collecting today.</h2>
+        <p>You don't need an existing library on any of the twelve stores. Several have a free way in — and those pipelines fill a backlog on their own.</p>
       </div>
       <div class="steps">
         <div class="step">
           <div class="num">1</div>
-          <h3>Connect</h3>
-          <p>Link your stores once. Credentials stay encrypted on your machine.</p>
+          <h3>Claim this week's free games</h3>
+          <p>Epic, Prime Gaming, GOG, Steam keys, and more drop free games every week. Epic's weekly freebie can be claimed straight from the Epic Games Store Mobile app on supported devices — no computer required — and the mobile store runs its own giveaways too. BAKLOG surfaces active drops in <strong>Claimable Now</strong> — a maintainer-curated feed aggregated from the Epic Store, GamerPower, and IsThereAnyDeal — right in your dashboard, so you never miss a drop.</p>
         </div>
         <div class="step">
           <div class="num">2</div>
-          <h3>Auto-fetch on connect</h3>
-          <p>BAKLOG opens a channel to each store and brings everything you own back to one honest table. Fetcher chips light up as each library lands. Auto-refresh in Connections quietly updates stores older than 24h while the app is open (on by default).</p>
+          <h3>Or just play something free</h3>
+          <p>Steam free-to-play hits, StarCraft on Battle.net, Rainbow Six Siege on Ubisoft, or pay-what-you-want indies on itch.io.</p>
         </div>
         <div class="step">
           <div class="num">3</div>
-          <h3>Decide</h3>
-          <p>Know what to play next, and whether that "deal" is actually worth opening.</p>
+          <h3>Point BAKLOG at it</h3>
+          <p>Connect once and your new collection counts itself from day one.</p>
         </div>
       </div>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
@@ -946,7 +920,7 @@
         </article>
         <article class="card">
           <h3>vs launchers</h3>
-          <p>Playnite and Galaxy are launchers. BAKLOG is the lightweight decision layer on top, no heavy launcher hogging memory: deals with ownership context, backlog status, and wishlist radar.</p>
+          <p>Playnite is an open-source launcher; Galaxy and deal sites are not. BAKLOG is the lightweight decision layer on top — also open source (MIT) — no heavy launcher hogging memory: deals with ownership context, backlog status, and wishlist radar.</p>
         </article>
         <article class="card">
           <h3>vs manual loggers</h3>
@@ -957,12 +931,32 @@
     </div>
   </section>
 
+  <!-- ============ BOX SCORE ============ -->
+  <section class="band">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Sabermetrics for your backlog</span>
+        <h2>We gave your pile of shame a box score.</h2>
+        <p>Your library is data. BAKLOG turns it into a scoreboard: 300+ stats and baseball-style sabermetrics — completion AVG, backlog OPS, value-per-hour, even a WAR for your next pick. Honest enough to screenshot for the group chat.</p>
+      </div>
+      <div class="score-grid">
+        <div class="score-tile"><div class="num">300+</div><div class="lbl">stats &amp; sabermetrics, from AVG to WAR</div></div>
+        <div class="score-tile"><div class="num">12 + 8</div><div class="lbl">library and wishlist sources</div></div>
+        <div class="score-tile"><div class="num">100%</div><div class="lbl">on your machine — open source, nothing uploaded</div></div>
+        <div class="score-tile"><div class="num">90 sec</div><div class="lbl">from empty to your whole library</div></div>
+        <div class="score-tile"><div class="num">$0</div><div class="lbl">free forever to import your library</div></div>
+        <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (paid, planned)</div></div>
+      </div>
+      <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
+    </div>
+  </section>
+
   <!-- ============ TRUST ============ -->
   <section class="band trust">
     <div class="wrap">
       <span class="eyebrow">Local-first isn't marketing</span>
       <h2>There is no BAKLOG server to breach.</h2>
-      <p>Your libraries never leave your machine. There is nothing to breach, sell, or subpoena, because there is no server holding it in the first place. BAKLOG is your concierge across every store: it fetches through your own session and IP, opens a direct channel from each storefront to your machine, and never detours your data through ours.</p>
+      <p>Your libraries never leave your machine. There is nothing to breach, sell, or subpoena, because there is no server holding it in the first place. BAKLOG is your concierge across every store: it fetches through your own session and IP, opens a direct channel from each storefront to your machine, and never detours your data through ours. Don't take our word for it — the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">full source is on GitHub</a> (MIT). Audit every line that touches your credentials, your library JSON, and your network.</p>
     </div>
   </section>
 
@@ -974,7 +968,11 @@
       <div class="faq" style="text-align:left">
         <details>
           <summary>Is it safe?</summary>
-          <p>Your credentials stay encrypted on your machine. Store fetches use your own browser session and your IP. There is no BAKLOG server holding your logins.</p>
+          <p>Your credentials stay encrypted on your machine. Store fetches use your own browser session and your IP. There is no BAKLOG server holding your logins. The app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a> — you can read the code and verify that yourself.</p>
+        </details>
+        <details>
+          <summary>Is it open source?</summary>
+          <p>Yes. BAKLOG is released under the <a href="https://github.com/Ogrods/BAKLOG/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The full app — server, fetchers, auth, and dashboard — lives in the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">public GitHub repo</a>. No hidden builds, no closed-source telemetry layer. Optional paid features (planned) are conveniences on top of the same open codebase, not a fork of your data into our cloud.</p>
         </details>
         <details>
           <summary>Is it free?</summary>
@@ -990,11 +988,11 @@
         </details>
         <details>
           <summary>Does BAKLOG show me free games to claim?</summary>
-          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard. Epic's weekly free game can be claimed from the Epic Games Store Mobile app on supported devices — no computer required — and the mobile store runs its own giveaways too. A notification banner alerts you when new drops land. The feed is ownership-aware — it skips games you already own somewhere in your library. Included on the free tier.</p>
+          <p>Yes. <strong>Claimable Now</strong> is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more — sourced via GamerPower, IsThereAnyDeal, and the Epic Store — right in your dashboard. A notification banner alerts you when new drops land. The feed is ownership-aware — it skips games you already own somewhere in your library. Included on the free tier. For Epic mobile claims and other free entry paths, see <a href="#start">starting from zero</a>.</p>
         </details>
         <details>
-          <summary>I don't really own games yet - is BAKLOG still for me?</summary>
-          <p>Yes. You don't need a paid library to start. Steam free-to-play, Epic's weekly free game (claimable from the Epic Games Store Mobile app on supported devices — no PC needed), Prime Gaming key drops, GOG's periodic giveaways, StarCraft on Battle.net, Rainbow Six Siege on Ubisoft, and pay-what-you-want itch.io indies are all free entry points. BAKLOG tracks your collection from the first claim — and <strong>Claimable Now</strong> aggregates the week's free drops from Epic, GamerPower, and IsThereAnyDeal so you never miss one.</p>
+          <summary>I don't really own games yet — is BAKLOG still for me?</summary>
+          <p>Yes. You don't need a paid library to start. See <a href="#start">starting from zero</a> for free entry paths — Epic, Prime, GOG, free-to-play hits, and more. BAKLOG tracks your collection from the first claim, and <strong>Claimable Now</strong> aggregates the week's free drops so you never miss one.</p>
         </details>
         <details>
           <summary>Do I have to refresh it?</summary>
@@ -1002,7 +1000,7 @@
         </details>
         <details>
           <summary>Why is my count different from what the store shows?</summary>
-          <p>Stores pad your library with things that aren't games: DLC skins, soundtracks, wallpapers, betas, and store apps. BAKLOG filters those out automatically so the number you see is real games, not shelf clutter. That filter is built-in and you never have to manage it. Separately, you can hide any game you just don't want to see and restore it later from the Hidden games panel.</p>
+          <p>Stores pad your library with things that aren't games: DLC skins, soundtracks, wallpapers, betas, and store apps. BAKLOG filters those out automatically so the number you see is honest games, not shelf clutter. That filter is built-in and you never have to manage it. Separately, you can hide any game you just don't want to see and restore it later from the Hidden games panel.</p>
         </details>
         <details>
           <summary>Isn't scraping against the rules?</summary>
@@ -1034,33 +1032,51 @@
 
   <!-- ============ FOOTER ============ -->
   <footer>
-    <div class="wrap foot-grid">
-      <div class="foot-brand">
-        <svg viewBox="0 0 100 100" role="img" aria-label="BAKLOG">
-          <defs>
-            <mask id="knobs-foot" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
-              <rect width="100" height="100" fill="#fff"/>
-              <circle cx="14" cy="64" r="8" fill="#000"/>
-              <circle cx="64" cy="64" r="8" fill="#000"/>
-              <circle cx="39" cy="36" r="8" fill="#000"/>
-            </mask>
-          </defs>
-          <g fill="#ffffff" mask="url(#knobs-foot)">
-            <rect x="2"  y="52" width="46" height="24" rx="12" ry="12"/>
-            <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
-            <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
-          </g>
-        </svg>
-        <span class="name">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></span>
+    <div class="wrap">
+      <div class="foot-grid">
+        <div class="foot-brand-col">
+          <div class="foot-brand">
+            <svg viewBox="0 0 100 100" role="img" aria-label="BAKLOG">
+              <defs>
+                <mask id="knobs-foot" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+                  <rect width="100" height="100" fill="#fff"/>
+                  <circle cx="14" cy="64" r="8" fill="#000"/>
+                  <circle cx="64" cy="64" r="8" fill="#000"/>
+                  <circle cx="39" cy="36" r="8" fill="#000"/>
+                </mask>
+              </defs>
+              <g fill="#ffffff" mask="url(#knobs-foot)">
+                <rect x="2"  y="52" width="46" height="24" rx="12" ry="12"/>
+                <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
+                <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
+              </g>
+            </svg>
+            <span class="name">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></span>
+          </div>
+          <p class="foot-tagline"><strong>baklog.app</strong>. One honest backlog across every store.</p>
+          <p class="foot-pricing">Free forever to import &middot; $5/mo optional &middot; Invite-only early access. Invites go out in small waves.</p>
+        </div>
+        <nav class="foot-links" aria-label="Footer">
+          <div class="foot-col">
+            <h4>Community</h4>
+            <!-- Discord + GitHub: keep in sync with shared/community.json + index.html kebab menu -->
+            <a href="#waitlist">Request an invite</a>
+            <a href="https://discord.gg/baklog" target="_blank" rel="noopener noreferrer">Discord</a>
+            <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="mailto:dan@baklog.app">dan@baklog.app</a>
+          </div>
+          <div class="foot-col">
+            <h4>Data sources</h4>
+            <a href="https://www.protondb.com/" target="_blank" rel="noopener noreferrer">ProtonDB</a>
+            <a href="https://isthereanydeal.com/" target="_blank" rel="noopener noreferrer">IsThereAnyDeal</a>
+            <a href="https://www.gamerpower.com/" target="_blank" rel="noopener noreferrer">GamerPower</a>
+            <a href="https://howlongtobeat.com/" target="_blank" rel="noopener noreferrer">HowLongToBeat</a>
+          </div>
+        </nav>
       </div>
-      <div class="foot-meta">
-        <strong>baklog.app</strong>. One honest backlog across every store.<br />
-        Free forever to import &middot; $5/mo optional &middot; Invite-only early access. Invites go out in small waves.<br />
-        <!-- Discord invite: keep in sync with shared/community.json + index.html kebab menu -->
-        <p class="foot-invite"><a href="#waitlist">Request an invite</a> &middot; <a href="https://discord.gg/baklog" target="_blank" rel="noopener noreferrer">Discord</a> &middot; <a href="mailto:dan@baklog.app">dan@baklog.app</a></p>
-        Local-first &middot; No telemetry &middot; MIT &middot; &copy; <span id="year"></span> BAKLOG<br />
-        Data via <a href="https://www.protondb.com/" target="_blank" rel="noopener noreferrer">ProtonDB</a> &middot; <a href="https://isthereanydeal.com/" target="_blank" rel="noopener noreferrer">IsThereAnyDeal</a> &middot; <a href="https://www.gamerpower.com/" target="_blank" rel="noopener noreferrer">GamerPower</a> &middot; <a href="https://howlongtobeat.com/" target="_blank" rel="noopener noreferrer">HowLongToBeat</a><br />
-        BAKLOG&trade; is a trademark of its owner
+      <div class="foot-bottom">
+        <p class="foot-legal">Local-first &middot; No telemetry &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">Open source (MIT)</a> &middot; &copy; <span id="year"></span> BAKLOG</p>
+        <p class="foot-trademark">BAKLOG&trade; is a trademark of its owner</p>
       </div>
     </div>
   </footer>

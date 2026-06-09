@@ -1140,7 +1140,7 @@ def _reader_loop(
 
 
 def _ensure_persistent_session_prefs(profile: Path) -> None:
-    """Make the launched profile keep session cookies across runs.
+    """Make the launched profile keep session cookies and offer to save passwords.
 
     OAuth/login popups (Microsoft, Google, etc.) frequently set *session*
     cookies — no Expires/Max-Age — which Chrome keeps in memory and drops on
@@ -1148,6 +1148,15 @@ def _ensure_persistent_session_prefs(profile: Path) -> None:
     (``session.restore_on_startup = 1``). Persistent cookies already survive via
     ``--user-data-dir``; this closes the gap for session-cookie sign-ins so a
     Connect window stays logged in between sessions.
+
+    We also explicitly enable Chrome's built-in password manager
+    (``credentials_enable_service`` / ``profile.password_manager_enabled``) so the
+    "Save password?" bubble appears and the saved credential is reused on the next
+    sign-in. Those prefs default to on for a normal browser, but a profile we seed
+    programmatically and drive over CDP otherwise behaves as if password saving is
+    off; setting them keeps the login windows acting like a real browser. Saved
+    passwords live in the profile's ``Login Data`` DB, which already persists via
+    ``--user-data-dir``.
 
     Merges into ``Default/Preferences`` (created on first run by Chrome) without
     clobbering anything else, and marks a clean prior exit so Chrome doesn't show
@@ -1176,7 +1185,12 @@ def _ensure_persistent_session_prefs(profile: Path) -> None:
             profile_node = {}
         profile_node["exit_type"] = "Normal"
         profile_node["exited_cleanly"] = True
+        # Offer to save passwords and auto-fill them on the next sign-in.
+        profile_node["password_manager_enabled"] = True
         prefs["profile"] = profile_node
+        # Modern key that actually gates the "Save password?" bubble.
+        prefs["credentials_enable_service"] = True
+        prefs["credentials_enable_autosignin"] = True
         prefs_path.write_text(json.dumps(prefs), encoding="utf-8")
     except OSError:
         pass

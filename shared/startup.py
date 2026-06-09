@@ -126,6 +126,50 @@ def _win_disable() -> None:
         pass
 
 
+def _win_run_command() -> str | None:
+    try:
+        import winreg
+    except ImportError:
+        return None
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, _RUN_KEY, 0, winreg.KEY_READ
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, _RUN_VALUE)
+            return str(value) if value else None
+    except OSError:
+        return None
+
+
+def _parse_win_run_target(cmd: str) -> Path | None:
+    text = cmd.strip()
+    if not text:
+        return None
+    if text.startswith('"'):
+        end = text.find('"', 1)
+        if end > 0:
+            return Path(text[1:end])
+    parts = text.split()
+    return Path(parts[0]) if parts else None
+
+
+def reconcile_startup() -> bool:
+    """Drop a stale Windows login-startup entry when its target exe is missing."""
+    if sys.platform != "win32":
+        return False
+    try:
+        cmd = _win_run_command()
+        if not cmd:
+            return False
+        target = _parse_win_run_target(cmd)
+        if target is None or target.is_file():
+            return False
+        _win_disable()
+        return True
+    except Exception:
+        return False
+
+
 # --- macOS ---
 
 

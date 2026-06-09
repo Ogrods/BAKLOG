@@ -33,7 +33,7 @@ import {
   perfMeasure,
   startFrameMonitor,
 } from './chart-perf.js';
-import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
+import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap, renderDashboardSponsoredPick } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, buildMegaLibraryContext, renderMarqueeHtml, renderMarqueeTrackInner, applyMarqueeSpeed, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
 import { commitRenderedMetrics } from './metrics-rendered.js';
@@ -546,6 +546,11 @@ export async function renderDashboard(opts = {}) {
       } catch (err) {
         console.error("Dashboard recent additions error:", err);
       }
+      try {
+        renderDashboardSponsoredPick();
+      } catch (err) {
+        console.error("Dashboard sponsored pick error:", err);
+      }
     });
     _dashRenderedFingerprint = fp;
     _dashRenderStats.full++;
@@ -563,6 +568,12 @@ export function cancelScheduledDashboardRender() {
   clearTimeout(_dashboardRenderTimer);
   _dashboardRenderTimer = null;
   _dashboardRenderPending = false;
+}
+
+export function refreshSpotlightAfterSponsorChange() {
+  _megaArtifactsKey = "";
+  _megaArtifactsCache = null;
+  if (state.activeView === "dashboard") scheduleDashboardRender();
 }
 
 export function scheduleDashboardRender() {

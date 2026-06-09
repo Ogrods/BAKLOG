@@ -12,7 +12,6 @@ block_cipher = None
 
 datas = [
     (str(root / "index.html"), "."),
-    (str(root / "tracker.html"), "."),
     (str(root / "app.css"), "."),
     (str(root / "tailwind.css"), "."),
     (str(root / "favicon.svg"), "."),
@@ -47,6 +46,12 @@ hiddenimports = [
     "fetch_nintendo_wishlist",
     "fetch_humble_wishlist",
     "fetch_fx",
+    "fetch_free_claims",
+    "enrich_hltb",
+    "enrich_steam_reviews",
+    "enrich_cross_store_images",
+    "enrich_steam_tags",
+    "enrich_protondb",
     "auth",
     "auth.cdp_browser",
     "auth.manager",

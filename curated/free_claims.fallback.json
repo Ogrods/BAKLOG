@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-09T02:04:36.505777+00:00",
+  "generated_at": "2026-06-09T06:48:23.835623+00:00",
   "items": [
     {
       "id": "itad-9dcfdf2b0b35",
@@ -123,6 +123,19 @@
       "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
       "ends_at": null,
       "source": "gamerpower"
+    },
+    {
+      "id": "itad-6d00ffeb0fdc",
+      "store": "itch",
+      "title": "Another World Adventures",
+      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Another World Adventures",
+      "ends_at": null,
+      "steam_appid": 3445980,
+      "review_percent": 50,
+      "source": "itad"
     },
     {
       "id": "itad-7a69412dd110",

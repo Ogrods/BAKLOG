@@ -203,13 +203,28 @@ async function bootstrap() {
     await initConnections();
     const available = await fetcherRunner.probeApi();
     if (!available) return;
+    try {
+      const cfgRes = await fetch('/api/config');
+      if (cfgRes.ok) {
+        const cfg = await cfgRes.json();
+        if (cfg.running_from_temp) {
+          const banner = document.getElementById('bootErrorBanner');
+          if (banner) {
+            banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">BAKLOG is running from a temporary folder. Unzip it to Desktop or Documents before connecting stores, or your data may be lost.</span></div>';
+            banner.classList.remove('hidden');
+          }
+        }
+      }
+    } catch {
+      /* non-fatal */
+    }
     await fetcherRunner.syncFromServer();
     if (state.activeView === "dashboard") fetcherRunner.startDashboardPolling();
   }
   const reloadPromise = reloadGames().catch(async () => {
     const banner = document.getElementById("bootErrorBanner");
     if (banner) {
-      banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">No library data found. Run fetch scripts (<code class="bg-slate-700 px-1 rounded">fetch_games.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_gog.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_wishlist.py</code>, <code class="bg-slate-700 px-1 rounded">fetch_itad.py</code>, …), then reload.</span></div>';
+      banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">No library data yet. Open <strong>Connections</strong>, connect a store, and your games will appear here.</span></div>';
       banner.classList.remove("hidden");
     }
     await finishEmptyLibraryLoad();

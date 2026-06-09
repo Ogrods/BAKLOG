@@ -1,5 +1,5 @@
-# Build a distributable folder for BAKLOG.
-# Run from repo root after: pip install -r requirements.txt
+# Build a distributable folder for BAKLOG (portable .venv copy).
+# Prefer packaging/build_windows.ps1 (PyInstaller BAKLOG.exe) for beta testers.
 # Connections sign-in requires Google Chrome or Microsoft Edge on the target machine.
 #
 # Usage:
@@ -33,13 +33,67 @@ $Out = Join-Path $Root "dist\baklog"
 if (Test-Path $Out) { Remove-Item -Recurse -Force $Out }
 New-Item -ItemType Directory -Path $Out | Out-Null
 
-Write-Host "Copying application files..."
-$Exclude = @('.git', '.venv', 'venv', 'node_modules', 'dist', '__pycache__', 'cache', 'data', '.env')
-Get-ChildItem -Path $Root -Force | Where-Object {
-    $Exclude -notcontains $_.Name
-} | ForEach-Object {
-    Copy-Item -Recurse -Force $_.FullName (Join-Path $Out $_.Name)
+# Copy from git archive when possible (tracked files only — no profiles/, games_*.json, etc.).
+$ArchiveZip = Join-Path $env:TEMP "baklog-portable-src.zip"
+$UsedGitArchive = $false
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    Push-Location $Root
+    try {
+        & git archive HEAD -o $ArchiveZip 2>$null
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $ArchiveZip)) {
+            Expand-Archive -Path $ArchiveZip -DestinationPath $Out -Force
+            $UsedGitArchive = $true
+            Write-Host "Copied tracked files via git archive (personal data excluded by .gitignore)."
+        }
+    } finally {
+        Pop-Location
+        if (Test-Path $ArchiveZip) { Remove-Item -Force $ArchiveZip }
+    }
 }
+
+if (-not $UsedGitArchive) {
+    Write-Warning "git archive unavailable — falling back to denylist copy (verify output before shipping)."
+    $Exclude = @(
+        '.git', '.venv', 'venv', 'node_modules', 'dist', '__pycache__', 'cache', 'data', '.env',
+        'profiles', 'admin', 'docs', 'marketing', 'audit', 'landing', 'tracker.html',
+        'IP.md', 'EVENT_AUDIT.md', 'EVENT_AUDIT.json', 'review-handoff.md', 'FREE_SURFACE_REVIEW.md',
+        '.env.imported', 'itad_prices.json', 'free_claims.json', 'refresh.log', '.cursor',
+        'build', 'lighthouse', '.pytest_cache', '.ruff_cache', 'steam_backlog.egg-info'
+    )
+    Get-ChildItem -Path $Root -Force | Where-Object {
+        $name = $_.Name
+        if ($Exclude -contains $name) { return $false }
+        if ($name -like 'games_*.json') { return $false }
+        if ($name -like 'games_wishlist_*.json') { return $false }
+        if ($name -like 'debug-*.log') { return $false }
+        if ($name -like '.cursor*') { return $false }
+        return $true
+    } | ForEach-Object {
+        Copy-Item -Recurse -Force $_.FullName (Join-Path $Out $_.Name)
+    }
+}
+
+function Assert-NoShipLeaks {
+    param([string]$Dir)
+    $leaks = @()
+    Get-ChildItem -Path $Dir -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        $rel = $_.FullName.Substring($Dir.Length).TrimStart('\', '/')
+        if ($_.Name -eq 'secrets.bin') { $leaks += "secrets.bin at $rel" }
+        if ($rel -match '\\cache\\auth\\profiles\\' -or $rel -match '/cache/auth/profiles/') {
+            $leaks += "CDP session profile at $rel"
+        }
+        if ($_.Name -like 'games_*.json' -and $rel -notmatch '\\tests\\' -and $rel -notmatch '/tests/') {
+            $leaks += "library JSON at $rel"
+        }
+        if ($_.Name -eq 'tracker.html') { $leaks += "internal tracker.html at $rel" }
+    }
+    if ($leaks.Count -gt 0) {
+        Write-Error ("Build output contains data that must not ship to testers:`n" + ($leaks -join "`n"))
+    }
+}
+
+Write-Host "Verifying output contains no credentials or personal catalog data..."
+Assert-NoShipLeaks -Dir $Out
 
 Write-Host "Creating portable venv in output..."
 $OutPython = Join-Path $Out ".venv\Scripts\python.exe"

@@ -182,9 +182,6 @@ function fetcherKeysForProvider(provider) {
  *  sticky failed/cooldown chip state so chips recover without a fresh run. */
 function clearFailedStateForReconnectedProvider(provider) {
   for (const key of fetcherKeysForProvider(provider)) {
-    // #region agent log
-    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'B',location:'fetcher-health.js:228',message:'clearFailedStateForReconnectedProvider',data:{provider,key,wasFailed:lastRunFailedByKey.has(key)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     lastRunFailedByKey.delete(key);
     clearAuthCooldown(key);
   }
@@ -2144,9 +2141,6 @@ export const fetcherRunner = (() => {
         } else if (hist.status === 'cancelled') {
           markChipState(key, null);
         } else {
-          // #region agent log
-          fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'D',location:'fetcher-health.js:2419',message:'reconcile snapshot marks failed',data:{key,status:hist.status,exit_code:hist.exit_code,hasPersistFailed:lastRunFailedByKey.has(key)},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           markChipState(key, 'failed');
         }
         if (hist.id) clearLastSeq(hist.id);
@@ -2613,9 +2607,6 @@ export const fetcherRunner = (() => {
         const data = JSON.parse(evt.data);
         const cancelled = data.status === 'cancelled';
         const ok = data.status === 'done' && data.exit_code === 0;
-        // #region agent log
-        fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'A',location:'fetcher-health.js:2885',message:'done SSE event',data:{key,status:data.status,exit_code:data.exit_code,failure_kind:data.failure_kind,ok,cancelled},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const duration = data.started_at && data.ended_at
           ? `${(data.ended_at - data.started_at).toFixed(1)}s`
           : '';
@@ -2688,9 +2679,6 @@ export const fetcherRunner = (() => {
         }
         if (finished) {
           const ok = finished.status === 'done' && finished.exit_code === 0;
-          // #region agent log
-          fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'C',location:'fetcher-health.js:2957',message:'onerror recovery finished run',data:{key,status:finished.status,exit_code:finished.exit_code,failure_kind:finished.failure_kind,ok},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           logEvent('info', `[${src.label}: stream dropped after exit ${finished.exit_code}]`);
           if (liveRunId === runId) setStatus(ok ? 'done' : 'failed');
           if (ok && finished.id !== _lastAppliedDoneRunId) {
@@ -3186,11 +3174,6 @@ export function renderDashboardFetcherHealth() {
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
     const displayStatus = runState
       || (persistFailed ? 'failed' : (needsReconnect ? 'reconnect' : status));
-    // #region agent log
-    if (src.key === 'ubisoft' || src.key === 'wishlistUbisoft') {
-      fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'22a93e'},body:JSON.stringify({sessionId:'22a93e',hypothesisId:'E',location:'fetcher-health.js:3442',message:'ubisoft chip render',data:{key:src.key,displayStatus,runState,persistFailed,needsReconnect,disconnected,inAuthCooldown,freshnessStatus:status,hasFailedKey:lastRunFailedByKey.has(src.key)},timestamp:Date.now()})}).catch(()=>{});
-    }
-    // #endregion
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0
       && !fetcherCredentialsSatisfied(src.key);
@@ -3259,6 +3242,11 @@ export function renderDashboardFetcherHealth() {
     const connectAttr = navProvider
       ? ` data-fetcher-connect="${escapeAttr(navProvider)}"`
       : '';
+    // #region agent log
+    if (src.key === 'battlenet' && (persistFailed || displayStatus === 'failed' || needsReconnect || disconnected || inAuthCooldown)) {
+      try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'A',location:'fetcher-health.js:3242',message:'battlenet chip render (failed-ish)',data:{navProvider:navProvider||null,lastRunFailed:lastRunFailedByKey.has(src.key),needsReconnect,disconnected,inAuthCooldown,disabled,status,displayStatus},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
+    }
+    // #endregion
     const chipAriaLabel = `${chipLabel}, ${countStr}, ${ageText || status}`;
     const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(chipAriaLabel)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>

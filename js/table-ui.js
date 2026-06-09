@@ -55,6 +55,7 @@ import {
 } from './deals.js';
 import { isPlatformToken } from './genres.js';
 import { syncCoverFits } from './covers.js';
+import { getEligibleSponsors, sponsoredTableRowHtml } from './sponsored-deals.js';
 import {
   getPersonal,
   setPersonal,
@@ -1113,11 +1114,19 @@ function tbodyRowCount() {
   return document.getElementById("tbody")?.querySelectorAll("tr[data-row-index]").length || 0;
 }
 
+const SPONSORED_TABLE_SLOT = 5;
+
 function appendChunk(list, start, end, ctx) {
   const run = perfActiveRun();
   const t0 = run ? performance.now() : 0;
   const out = [];
-  for (let i = start; i < end; i++) out.push(tableRowHtml(list[i], i, ctx));
+  const tableAd = SPONSORED_TABLE_SLOT >= start && SPONSORED_TABLE_SLOT < end
+    ? getEligibleSponsors('table')[0]
+    : null;
+  for (let i = start; i < end; i++) {
+    if (tableAd && i === SPONSORED_TABLE_SLOT) out.push(sponsoredTableRowHtml(tableAd, ctx));
+    out.push(tableRowHtml(list[i], i, ctx));
+  }
   const html = out.join("");
   if (run) {
     run._lastChunkHtmlMs = performance.now() - t0;

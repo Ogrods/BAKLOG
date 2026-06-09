@@ -220,24 +220,36 @@ class NintendoClient:
             "Reconnect Nintendo in Connections, then run the fetcher again."
         )
 
-    def _fetch_via_direct_graphql(self, context) -> list[dict[str, Any]]:
-        """Fallback: session idToken + Savanna persisted query via profile cookies."""
-        collected: list[dict[str, Any]] = []
-        seen_ids: set[str] = set()
+    def _graphql_batch_len(self, payload: dict[str, Any]) -> int:
+        batch = (
+            payload.get("data", {})
+            .get("account", {})
+            .get("transactionHistories", {})
+            .get("transactionHistories")
+        )
+        return len(batch) if isinstance(batch, list) else 0
+
+    def _fetch_via_direct_graphql(
+        self,
+        context,
+        collected: list[dict[str, Any]],
+        seen_ids: set[str],
+    ) -> int:
+        """Page Savanna GraphQL via session idToken; merge into shared collected."""
         probe = probe_session_id_token(
             context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS
         )
         if not probe.get("ok"):
-            return collected
+            return 0
 
         session_resp = context.request.get(SESSION_URL, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS)
         try:
             session_body = json.loads(session_resp.text())
         except (ValueError, TypeError):
-            return collected
+            return 0
         id_token = session_body.get("idToken")
         if not id_token:
-            return collected
+            return 0
 
         headers = {
             "Accept": "application/json",
@@ -247,6 +259,7 @@ class NintendoClient:
             "User-Agent": self._user_agent,
             "Authorization": f"Bearer {id_token}",
         }
+        rows_before = len(collected)
         page_num = 1
         for _ in range(200):
             variables = json.dumps({"page": page_num, "limit": PAGE_SIZE}, separators=(",", ":"))
@@ -269,12 +282,15 @@ class NintendoClient:
                 payload = json.loads(resp.text())
             except (ValueError, TypeError):
                 break
-            added = _merge_graphql_payload(payload, collected, seen_ids)
-            if added == 0:
+            batch_len = self._graphql_batch_len(payload)
+            _merge_graphql_payload(payload, collected, seen_ids)
+            # Stop on an empty API page — not when every row was already captured
+            # from the UI path (added==0 but batch_len>0).
+            if batch_len == 0:
                 break
             page_num += 1
             time.sleep(0.3)
-        return collected
+        return len(collected) - rows_before
 
     def _write_debug(self, debug: dict[str, Any]) -> None:
         if not self._dump_debug_path:
@@ -352,9 +368,9 @@ class NintendoClient:
             except Exception:
                 pass
 
-            if not collected:
-                collected.extend(self._fetch_via_direct_graphql(context))
-                debug["direct_fallback_rows"] = len(collected)
+            debug["direct_fallback_rows"] = self._fetch_via_direct_graphql(
+                context, collected, seen_ids
+            )
 
             if not collected:
                 html = ""

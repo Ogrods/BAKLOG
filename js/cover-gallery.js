@@ -47,6 +47,10 @@ function persistGalleryMode() {
 const ORIENT_ICON_COVER = `<svg viewBox="0 0 20 20" aria-hidden="true" class="cover-gallery-orient-icon"><rect x="6" y="3" width="8" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
 const ORIENT_ICON_LANDSCAPE = `<svg viewBox="0 0 20 20" aria-hidden="true" class="cover-gallery-orient-icon"><rect x="2" y="6" width="16" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
 
+const ICON_CLOSE = `<svg viewBox="0 0 24 24" aria-hidden="true" class="cover-gallery-btn-icon"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+const ICON_CHEVRON_PREV = `<svg viewBox="0 0 24 24" aria-hidden="true" class="cover-gallery-btn-icon"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_CHEVRON_NEXT = `<svg viewBox="0 0 24 24" aria-hidden="true" class="cover-gallery-btn-icon"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 function syncOrientToggle(btn) {
   if (!(btn instanceof HTMLButtonElement)) return;
   const landscape = galleryMode === 'landscape';
@@ -77,8 +81,8 @@ function ensureDialog() {
   dialog.setAttribute('aria-label', 'Cover gallery');
   dialog.innerHTML = `
     <div class="cover-gallery-shell">
-      <button type="button" class="cover-gallery-close" aria-label="Close cover gallery" title="Close">×</button>
-      <button type="button" class="cover-gallery-nav-btn cover-gallery-nav-prev" data-gallery-nav="prev" aria-label="Previous cover" title="Previous">‹</button>
+      <button type="button" class="cover-gallery-close" aria-label="Close cover gallery" title="Close">${ICON_CLOSE}</button>
+      <button type="button" class="cover-gallery-nav-btn cover-gallery-nav-prev" data-gallery-nav="prev" aria-label="Previous cover" title="Previous">${ICON_CHEVRON_PREV}</button>
       <div class="cover-gallery-stage">
         <div class="cover-gallery-frame">
           <img class="cover-gallery-img" alt="" decoding="async" />
@@ -89,7 +93,7 @@ function ensureDialog() {
           <button type="button" class="cover-gallery-orient-toggle" aria-pressed="false" aria-label="Show landscape art" title="Show landscape art">${ORIENT_ICON_LANDSCAPE}<span class="cover-gallery-orient-label">Landscape</span></button>
         </div>
       </div>
-      <button type="button" class="cover-gallery-nav-btn cover-gallery-nav-next" data-gallery-nav="next" aria-label="Next cover" title="Next">›</button>
+      <button type="button" class="cover-gallery-nav-btn cover-gallery-nav-next" data-gallery-nav="next" aria-label="Next cover" title="Next">${ICON_CHEVRON_NEXT}</button>
     </div>`;
 
   const closeBtn = dialog.querySelector('.cover-gallery-close');

@@ -19,6 +19,10 @@ STEAM_CREDENTIALS_HINT = (
     "Open Connections → Steam → Connect (sign in to capture your API key and SteamID)."
 )
 
+STEAM_PRIVATE_PROFILE_HINT = (
+    "Steam returned 0 games — set Steam Profile → Privacy → Game details to Public, then retry."
+)
+
 
 def catalog_file(path: Path) -> Path:
     """Resolved on-disk path for a catalog JSON under the active profile."""

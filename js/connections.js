@@ -31,6 +31,8 @@ export {
   providerStatus,
 };
 
+let _chromiumAvailable = true;
+
 const LOCAL_PROVIDER_FOOTER = {
   amazon: {
     connected: 'Auto-detected from Amazon Games launcher',
@@ -2077,16 +2079,46 @@ async function startBrowserConnect(provider) {
 
 
 
+async function refreshBrowserPreflight() {
+  try {
+    const res = await baklogFetch('/api/config');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (typeof data.chromium_available === 'boolean') {
+      _chromiumAvailable = data.chromium_available;
+    }
+  } catch {
+    // Older servers omit chromium_available — assume available.
+  }
+}
+
+function renderBrowserWarn() {
+  const el = document.getElementById('connBrowserWarn');
+  if (!el) return;
+  if (_chromiumAvailable) {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `
+    <div class="migration-banner-body">
+      <span class="text-amber-400">Google Chrome or Microsoft Edge is required for store sign-in. Install one, then click Connect.</span>
+    </div>`;
+}
+
 export async function refreshConnections() {
 
   _connRefreshInFlight = true;
   try {
 
+    await refreshBrowserPreflight();
     await fetchAuthStatus();
 
     clearConnRefreshError();
 
     renderConnections();
+    renderBrowserWarn();
 
     renderReconnectBanner();
 
@@ -2269,6 +2301,10 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
 
   _selectedKey = groupRepFor(provider);
 
+  // #region agent log
+  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'connections.js:2302',message:'reconnectProvider entry',data:{provider,selectedKey:_selectedKey,tabExists:!!document.querySelector('.view-tab[data-view="connections"]'),inSnapshot:getAuthStatusSnapshot().some(x=>x.key===provider)},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
+  // #endregion
+
   document.querySelector('.view-tab[data-view="connections"]')?.click();
 
   try {
@@ -2280,6 +2316,10 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
     renderConnections();
 
   }
+
+  // #region agent log
+  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'connections.js:2314',message:'reconnectProvider after refresh',data:{selectedKey:_selectedKey,activeView:(typeof state!=='undefined'&&state)?state.activeView:null,cardPresent:!!document.querySelector('.conn-card')},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
+  // #endregion
 
   // When navigating in from a dashboard chip/affordance we only want to tab
   // over to the right card so the user can choose - never auto-open a sign-in

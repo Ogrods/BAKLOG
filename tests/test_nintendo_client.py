@@ -231,6 +231,90 @@ def test_empty_capture_raises_capture_error_not_auth(monkeypatch, tmp_path) -> N
         client.fetch_all_transactions()
 
 
+def test_direct_graphql_continues_past_duplicate_page(monkeypatch) -> None:
+    """When UI already captured page 1, direct GraphQL must not stop on added==0."""
+    page_one = {
+        "data": {
+            "account": {
+                "transactionHistories": {
+                    "transactionHistories": [
+                        {
+                            "title": "Iconoclasts",
+                            "datetime": "2025-09-05T12:00:00-07:00",
+                            "transactionId": 51988550814,
+                            "labelPlatform": "HAC",
+                            "itemType": "APPLICATION",
+                            "transactionType": "PURCHASE",
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    page_two = {
+        "data": {
+            "account": {
+                "transactionHistories": {
+                    "transactionHistories": [
+                        {
+                            "title": "Wargroove",
+                            "datetime": "2025-08-01T12:00:00-07:00",
+                            "transactionId": 51999999999,
+                            "labelPlatform": "HAC",
+                            "itemType": "APPLICATION",
+                            "transactionType": "PURCHASE",
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    empty_page = {
+        "data": {
+            "account": {
+                "transactionHistories": {"transactionHistories": []}
+            }
+        }
+    }
+
+    graphql_calls = {"n": 0}
+
+    def fake_get(url: str, headers=None, timeout: float = 30) -> MagicMock:
+        _ = headers, timeout
+        body = MagicMock()
+        if "session" in url:
+            body.status = 200
+            body.text = lambda: json.dumps({"idToken": "tok"})
+            return body
+        if "graphql" in url:
+            graphql_calls["n"] += 1
+            body.status = 200
+            if graphql_calls["n"] == 1:
+                body.text = lambda: json.dumps(page_one)
+            elif graphql_calls["n"] == 2:
+                body.text = lambda: json.dumps(page_two)
+            else:
+                body.text = lambda: json.dumps(empty_page)
+            return body
+        body.status = 404
+        body.text = lambda: "{}"
+        return body
+
+    collected = list(page_one["data"]["account"]["transactionHistories"]["transactionHistories"])
+    seen_ids = {"51988550814"}
+
+    monkeypatch.setattr("nintendo_client.time.sleep", lambda _s: None)
+    client = NintendoClient()
+    context = MagicMock()
+    context.request.get = fake_get
+
+    added = client._fetch_via_direct_graphql(context, collected, seen_ids)
+    assert added == 1
+    assert len(collected) == 2
+    assert collected[1]["title"] == "Wargroove"
+    assert graphql_calls["n"] == 3
+
+
 def test_probe_session_id_token() -> None:
     def fake_get(url: str, timeout: float = 30) -> MagicMock:
         _ = timeout

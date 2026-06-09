@@ -21,6 +21,7 @@ import {
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { syncCoverFits } from './covers.js';
+import { sponsoredPickSlotHtml } from './sponsored-deals.js';
 
 export function pickCardHtml(g) {
   const key = gameKey(g);
@@ -200,11 +201,12 @@ export function renderPicks() {
   const rendererTag = tab === "wishlistDeals" ? "deal" : "pick";
   if (data.length) {
     const slice = data.slice(0, limit);
+    const sponsoredHtml = sponsoredPickSlotHtml();
     const newKeys = slice.map(g => gameKey(g));
     const existingCards = Array.from(picksGrid.querySelectorAll(".pick-card"));
     const existingKeys = existingCards.map(c => c.dataset.gameKey || "");
     const sameRenderer = picksGrid.dataset.renderer === rendererTag;
-    let canIncremental = sameRenderer && existingKeys.length > 0;
+    let canIncremental = sameRenderer && existingKeys.length > 0 && !sponsoredHtml;
     if (canIncremental) {
       const overlap = Math.min(existingKeys.length, newKeys.length);
       for (let i = 0; i < overlap; i++) {
@@ -220,7 +222,9 @@ export function renderPicks() {
         syncCoverFits(picksGrid);
       }
     } else {
-      picksGrid.innerHTML = slice.map(renderCard).join("");
+      const parts = slice.map(renderCard);
+      if (sponsoredHtml) parts.splice(Math.min(1, parts.length), 0, sponsoredHtml);
+      picksGrid.innerHTML = parts.join("");
       picksGrid.dataset.renderer = rendererTag;
       syncCoverFits(picksGrid);
     }

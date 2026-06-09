@@ -10,7 +10,80 @@
       "cta": "Join the waitlist",
       "url": "https://baklog.app/#waitlist",
       "cover": "",
+      "placements": "deal-rail",
       "priority": 0,
+      "enabled": true
+    },
+    {
+      "id": "ad-spotlight-hero-emberfall",
+      "kind": "sponsor",
+      "title": "Emberfall",
+      "tagline": "Critically acclaimed open-world adventure",
+      "cta": "View deal",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "/assets/ads-sample/hero-emberfall.webp",
+      "placements": "spotlight",
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "id": "ad-spotlight-cover-ironveil",
+      "kind": "sponsor",
+      "title": "Ironveil",
+      "tagline": "Couch co-op dungeon crawler",
+      "cta": "View deal",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "/assets/ads-sample/cover-ironveil.webp",
+      "placements": "spotlight",
+      "priority": 2,
+      "enabled": true
+    },
+    {
+      "id": "ad-picks-rustbloom",
+      "kind": "sponsor",
+      "title": "Rustbloom",
+      "tagline": "On sale now — 80% off",
+      "cta": "Grab it",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "/assets/ads-sample/hero-rustbloom.webp",
+      "placements": "picks",
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "id": "ad-table-encore",
+      "kind": "sponsor",
+      "title": "Encore",
+      "tagline": "Replay-worthy roguelike — weekend-sized",
+      "cta": "Learn more",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "/assets/ads-sample/cover-encore.webp",
+      "placements": "table",
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "id": "ad-dash-picks-dawnbanner",
+      "kind": "sponsor",
+      "title": "Dawnbanner",
+      "tagline": "Trending tactical RPG",
+      "cta": "View deal",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "/assets/ads-sample/hero-dawnbanner.webp",
+      "placements": "dash-picks",
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "id": "ad-claimable-hollowmaw",
+      "kind": "sponsor",
+      "title": "Hollowmaw",
+      "tagline": "Hidden gem horror adventure",
+      "cta": "View deal",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "/assets/ads-sample/cover-hollowmaw.webp",
+      "placements": "claimable",
+      "priority": 1,
       "enabled": true
     }
   ]

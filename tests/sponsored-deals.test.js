@@ -10,8 +10,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getEligibleSponsoredDeal,
+  getEligibleSponsors,
+  itemPlacements,
+  sponsorCoverUrl,
   sponsoredDealCardHtml,
   sponsoredDealSlotHtml,
+  sponsoredPickCardHtml,
+  sponsorToSpotlightGame,
   dismissSponsoredDeal,
 } from '../js/sponsored-deals.js';
 import * as authGate from '../js/auth-gate.js';
@@ -110,6 +115,59 @@ describe('sponsoredDealCardHtml', () => {
     const html = sponsoredDealCardHtml(sponsor({ title: '<img src=x onerror=alert(1)>' }));
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img');
+  });
+});
+
+describe('getEligibleSponsors', () => {
+  it('filters by placement', () => {
+    state.sponsoredDeals = [
+      sponsor({ id: 'rail', placements: 'deal-rail' }),
+      sponsor({ id: 'spot', placements: 'spotlight', title: 'Spot Ad' }),
+    ];
+    expect(getEligibleSponsors('deal-rail').map(x => x.id)).toEqual(['rail']);
+    expect(getEligibleSponsors('spotlight').map(x => x.id)).toEqual(['spot']);
+  });
+
+  it('defaults missing placements to deal-rail', () => {
+    state.sponsoredDeals = [sponsor({ id: 'rail' })];
+    expect(itemPlacements(state.sponsoredDeals[0])).toEqual(['deal-rail']);
+    expect(getEligibleSponsors('picks')).toEqual([]);
+  });
+});
+
+describe('sponsorCoverUrl', () => {
+  it('accepts same-origin paths', () => {
+    expect(sponsorCoverUrl('/assets/ads-sample/hero.webp')).toBe('/assets/ads-sample/hero.webp');
+  });
+
+  it('rejects unsafe paths', () => {
+    expect(sponsorCoverUrl('//evil.example/x.png')).toBe('');
+  });
+});
+
+describe('sponsoredPickCardHtml', () => {
+  it('renders cover from same-origin path', () => {
+    const html = sponsoredPickCardHtml(sponsor({
+      cover: '/assets/ads-sample/cover.webp',
+      placements: 'picks',
+    }));
+    expect(html).toContain('/assets/ads-sample/cover.webp');
+    expect(html).toContain('sponsored-pick-card');
+  });
+});
+
+describe('sponsorToSpotlightGame', () => {
+  it('maps feed item to spotlight slide with ad metadata', () => {
+    const slide = sponsorToSpotlightGame(sponsor({
+      id: 'ad1',
+      title: 'Emberfall',
+      cover: '/assets/ads-sample/hero.webp',
+      placements: 'spotlight',
+    }));
+    expect(slide.name).toBe('Emberfall');
+    expect(slide.header_image).toBe('/assets/ads-sample/hero.webp');
+    expect(slide._spotlightAd.id).toBe('ad1');
+    expect(slide._spotlightReason.eyebrow).toBe('Sponsored');
   });
 });
 

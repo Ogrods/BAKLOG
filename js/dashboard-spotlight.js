@@ -12,6 +12,7 @@ import { computeSpotlightSuperlatives } from './creative-metrics.js';
 import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
 import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
 import { registerPausable } from './visibility.js';
+import { getEligibleSponsors, sponsorToSpotlightGame } from './sponsored-deals.js';
 
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
@@ -804,6 +805,13 @@ export function pickSpotlightGames(games, snapIn) {
       }));
     }
   }
+
+  const spotlightAds = getEligibleSponsors('spotlight').map(sponsorToSpotlightGame);
+  for (let i = 0; i < spotlightAds.length; i++) {
+    const insertAt = Math.min((i + 1) * 3, pool.length);
+    pool.splice(insertAt, 0, spotlightAds[i]);
+  }
+
   return pool;
 }
 
@@ -867,11 +875,20 @@ export function spotlightInnerHtml(g) {
       ...(secondaryStat ? [secondaryStat] : []),
       escapeHtml(statusLabel),
     ];
+  const ad = g._spotlightAd;
+  const adBadge = ad
+    ? `<span class="sponsored-badge dash-spotlight-sponsored-badge" title="${escapeAttr(ad.disclosure === 'House' ? 'House promotion from BAKLOG' : 'Paid placement')}">${escapeHtml(ad.disclosure)}</span>`
+    : '';
+  const adDismiss = ad && ad.id
+    ? `<span class="sponsored-deal-dismiss dash-spotlight-dismiss" role="button" tabindex="0" data-action="sponsored-dismiss" data-sponsor-id="${escapeAttr(ad.id)}" title="Dismiss this slot" aria-label="Dismiss sponsored slot">&times;</span>`
+    : '';
   return `
     <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
     <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="eager" fetchpriority="high" decoding="async" width="1920" height="620" data-name="${escapeAttr(g.name)}" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
     <div class="dash-spotlight-sheen" aria-hidden="true"></div>
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
+    ${adBadge}
+    ${adDismiss}
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
@@ -889,9 +906,19 @@ function spotlightNavHtml() {
 
 export function renderSpotlightHtml(g) {
   const key = gameKey(g);
+  const ad = g._spotlightAd;
+  const action = ad ? 'sponsored-deal' : 'dash-list-jump';
+  const keyAttr = ad ? '' : ` data-key="${escapeAttr(key)}"`;
+  const sponsorAttrs = ad
+    ? ` data-sponsor-id="${escapeAttr(ad.id)}" data-sponsor-url="${escapeAttr(ad.url || '')}"`
+    : '';
+  const title = ad
+    ? escapeAttr(g.name)
+    : `Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}`;
+  const adClass = ad ? ' dash-spotlight--ad' : '';
   return `<div class="dash-spotlight-wrap" id="dashboardSpotlightWrap" role="group" aria-roledescription="carousel">
     <span class="sr-only dash-spotlight-live" id="dashboardSpotlightLive" aria-live="polite"></span>
-    <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-action="dash-list-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}">
+    <button type="button" class="dash-spotlight${adClass}" id="dashboardSpotlight" data-action="${action}"${keyAttr}${sponsorAttrs} title="${title}">
       ${spotlightInnerHtml(g)}
     </button>
     ${spotlightNavHtml()}

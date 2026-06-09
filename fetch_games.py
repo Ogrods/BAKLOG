@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid, resolve_env
 from fetchers._base import (
     STEAM_CREDENTIALS_HINT,
+    STEAM_PRIVATE_PROFILE_HINT,
     add_allow_empty_arg,
     add_no_carry_arg,
     apply_carry_forward,
@@ -213,7 +215,7 @@ def main() -> int:
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:])
     configure_stdout()
     t0 = started("fetch_games")
     stats = RunStats()
@@ -242,6 +244,8 @@ def main() -> int:
     print(f"Found {len(owned_games)} entries in library.")
 
     if not args.appid:
+        if not owned_games:
+            stats.warn(STEAM_PRIVATE_PROFILE_HINT)
         empty_exit = refuse_empty_result(
             owned_games,
             label="Steam owned-games API",

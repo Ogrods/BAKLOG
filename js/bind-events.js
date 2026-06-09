@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { isSafeHttpUrl } from './dom-util.js';
+import { escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import {
   gameKey,
   findGameByKey,
@@ -182,15 +182,24 @@ export function bindEvents() {
       return;
     }
     const chip = e.target.closest(".fh-chip[data-fetcher-key]");
+    // #region agent log
+    try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'D',location:'bind-events.js:184',message:'fetcher health click',data:{chipFound:!!chip,fetcherKey:chip?.dataset.fetcherKey||null,fetcherConnect:chip?.dataset.fetcherConnect||null,disabled:chip?chip.disabled:null,status:chip?.dataset.status||null},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
+    // #endregion
     if (!chip) return;
     if (chip.dataset.fetcherConnect) {
       e.preventDefault();
+      // #region agent log
+      try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'bind-events.js:188',message:'chip -> reconnect branch',data:{provider:chip.dataset.fetcherConnect},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
+      // #endregion
       fetcherRunner.hideFetcherPopover();
       reconnectProvider(chip.dataset.fetcherConnect, { autoStart: false });
       return;
     }
     if (chip.disabled) return;
     e.preventDefault();
+    // #region agent log
+    try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'A',location:'bind-events.js:194',message:'chip -> RUN branch (no nav)',data:{fetcherKey:chip.dataset.fetcherKey},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
+    // #endregion
     fetcherRunner.run(chip.dataset.fetcherKey, { refresh: e.shiftKey });
   });
 
@@ -211,9 +220,9 @@ export function bindEvents() {
     }
     if (action === "sponsored-dismiss") {
       e.stopPropagation();
-      import('./sponsored-deals.js').then(({ dismissSponsoredDeal }) => {
+      import('./sponsored-deals.js').then(({ dismissSponsoredDeal, refreshSponsoredSurfaces }) => {
         dismissSponsoredDeal(card.dataset.sponsorId);
-        renderDashboardWishlistStats();
+        refreshSponsoredSurfaces();
       });
       return;
     }
@@ -276,6 +285,28 @@ export function bindEvents() {
   document.getElementById("dashPicksVersusCard")?.addEventListener("click", onDashListClick);
   document.getElementById("dashRecentAdditions")?.addEventListener("click", onDashListClick);
   document.getElementById("dashItchRecap")?.addEventListener("click", onDashListClick);
+  document.addEventListener('click', (e) => {
+    const inDealRail = e.target.closest('#dashboardWishlistStats, #wishlistDealRadar');
+    const dismiss = e.target.closest('[data-action="sponsored-dismiss"]');
+    if (dismiss && !inDealRail) {
+      e.preventDefault();
+      e.stopPropagation();
+      import('./sponsored-deals.js').then(({ dismissSponsoredDeal, refreshSponsoredSurfaces }) => {
+        dismissSponsoredDeal(dismiss.dataset.sponsorId);
+        refreshSponsoredSurfaces();
+      });
+      return;
+    }
+    const deal = e.target.closest('[data-action="sponsored-deal"]');
+    if (deal && !inDealRail) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isSafeHttpUrl(deal.dataset.sponsorUrl)) {
+        window.open(deal.dataset.sponsorUrl, '_blank', 'noopener,noreferrer');
+      }
+    }
+  });
+
   document.getElementById("dashboardMega")?.addEventListener("click", onDashListClick);
 
   const handleCoopActivate = (e) => {
@@ -810,8 +841,47 @@ export function bindEvents() {
   document.getElementById("exportCsv").addEventListener("click", exportCsv);
   document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
   document.getElementById("exportPersonal").addEventListener("click", () => download("baklog-personal.json", JSON.stringify(state.personal, null, 2), "application/json"));
+  function showKebabBanner(message, { error = false } = {}) {
+    const banner = document.getElementById('bootErrorBanner');
+    if (!banner) return;
+    const tone = error ? 'text-red-400' : 'text-amber-400';
+    banner.innerHTML = `<div class="migration-banner-body"><span class="${tone}">${escapeHtml(message)}</span></div>`;
+    banner.classList.remove('hidden');
+  }
+
   document.getElementById("reportBug")?.addEventListener("click", () => {
     openBugReportDialog();
+  });
+  document.getElementById("checkUpdates")?.addEventListener("click", async () => {
+    kebabMenu.classList.remove("open");
+    try {
+      const res = await fetch('/api/update-check');
+      const data = await res.json();
+      if (data.error) {
+        showKebabBanner(`Could not check for updates: ${data.error}`);
+        return;
+      }
+      if (data.update_available) {
+        const url = data.url ? ` Download: ${data.url}` : '';
+        showKebabBanner(`Update available: v${data.latest} (you have v${data.current}).${url}`);
+        return;
+      }
+      showKebabBanner(`You're on the latest release (v${data.current}).`);
+    } catch (err) {
+      showKebabBanner(`Update check failed: ${err?.message || err}`, { error: true });
+    }
+  });
+  document.getElementById("copyDiagnostics")?.addEventListener("click", async () => {
+    kebabMenu.classList.remove("open");
+    try {
+      const res = await fetch('/api/diagnostics');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Diagnostics request failed');
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      showKebabBanner('Diagnostics copied to clipboard.');
+    } catch (err) {
+      showKebabBanner(`Copy diagnostics failed: ${err?.message || err}`, { error: true });
+    }
   });
   document.getElementById("joinDiscord")?.addEventListener("click", () => {
     kebabMenu.classList.remove("open");

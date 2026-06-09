@@ -4,11 +4,11 @@
 
 ![BAKLOG dashboard — KPI cards, store/status charts, and a deduped cross-store library](dashboard.png)
 
-**BAKLOG pulls every game you own into one local, honest table.** Connect your stores once and it imports **12 libraries and 8 wishlists** — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then helps you decide what to play next and whether that "deal" is actually worth opening. Nothing is hosted: your credentials and library JSON never leave your machine.
+**BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Nothing is hosted: your credentials and library JSON never leave your machine.
 
-**Free forever to import · Invite-only early access.** Request access at **[baklog.app](https://baklog.app)**.
+**Open source (MIT)** — [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Invite-only early access.** Request access at **[baklog.app](https://baklog.app)**.
 
-**No games yet?** You don't need an existing library on any store. Start free with Epic (weekly free game — claimable from the Epic Games Store Mobile app, no PC needed), GOG (periodic giveaways), or Prime Gaming (free keys) — then let BAKLOG track your collection from day one. **Claimable Now** aggregates active giveaways from Epic, GamerPower, and IsThereAnyDeal right in your dashboard so you never miss a drop.
+**No games yet?** You don't need an existing library on any store. Start free with Epic, GOG, or Prime Gaming — see [baklog.app/#start](https://baklog.app/#start) for free entry paths and **Claimable Now** (Epic, GamerPower, IsThereAnyDeal) so you never miss a drop.
 
 ## Watch your library appear
 
@@ -28,7 +28,7 @@ The shot above is the real dashboard. Prefer to click around before installing? 
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
-See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves your machine) and [SECURITY.md](SECURITY.md) for the threat model (TL;DR: there is no server to breach). Released under the [MIT license](LICENSE).
+See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves your machine) and [SECURITY.md](SECURITY.md) for the threat model (TL;DR: there is no server to breach). The full app is open source under the [MIT license](LICENSE) — server, fetchers, auth, and dashboard in the [public repo](https://github.com/Ogrods/BAKLOG).
 
 ## Supported platforms
 
@@ -410,7 +410,7 @@ top-right corner. From the toast, kebab menu (**Report a bug…**), or
   notes, library JSON, and credentials are never included (see
   [PRIVACY.md](PRIVACY.md#error-logs-and-bug-reporting) for the full whitelist).
 - **Copy bug bundle** — same payload to your clipboard with no network request.
-  Paste into a [new GitHub issue](https://github.com/Ogrods/steam-backlog/issues/new)
+  Paste into a [new GitHub issue](https://github.com/Ogrods/BAKLOG/issues/new)
   if you prefer.
 - **Errors only** — copies just the error array, without app context.
 - **Details** — expand the stack trace inline.
@@ -435,13 +435,14 @@ production, set `window.__BAKLOG_REPORT_ENDPOINT` or the
 - **Discord** — [Join the community](https://discord.gg/baklog) for beta chat,
   `#bug-reports`, and `#feature-requests`. No app data is piped to Discord;
   use **Report a bug…** or paste a **Copy bug bundle** when filing bugs.
-- **GitHub** — [Open an issue](https://github.com/Ogrods/steam-backlog/issues/new)
-  for reproducible bugs and feature requests (long-term record).
+- **GitHub** — [Source code](https://github.com/Ogrods/BAKLOG) (MIT) and
+  [open an issue](https://github.com/Ogrods/BAKLOG/issues/new) for reproducible
+  bugs and feature requests (long-term record).
 - **Email** — [dan@baklog.app](mailto:dan@baklog.app) for invite or support
   questions.
 
-Discord invite URL is canonical in
-[`shared/community.json`](shared/community.json) — keep it in sync with the
+Discord invite and GitHub repo URLs are canonical in
+[`shared/community.json`](shared/community.json) — keep them in sync with the
 landing footer and app kebab menu.
 
 ### Personal data storage

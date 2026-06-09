@@ -7,7 +7,7 @@ import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverF
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
-import { sponsoredDealSlotHtml } from './sponsored-deals.js';
+import { sponsoredDealSlotHtml, getEligibleSponsors, sponsoredDashPicksCardHtml } from './sponsored-deals.js';
 import { focusGame } from './table-ui.js';
 import { DASH_STORE_LABELS, DASH_STORE_COLORS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
 // Itch click routing uses dashDrillItchGenre from the drilldown module.
@@ -176,6 +176,19 @@ export function applyItchVisibility() {
   const has = (state.itchGames || []).length > 0;
   row?.classList.toggle("no-itch", !has);
   card?.classList.toggle("hidden", !has);
+}
+
+export function renderDashboardSponsoredPick() {
+  const slot = document.getElementById('dashboardSponsoredPick');
+  if (!slot) return;
+  const item = getEligibleSponsors('dash-picks')[0];
+  if (!item) {
+    slot.classList.add('hidden');
+    slot.innerHTML = '';
+    return;
+  }
+  slot.classList.remove('hidden');
+  slot.innerHTML = sponsoredDashPicksCardHtml(item);
 }
 
 export function renderDashboardPicksVersus(games) {

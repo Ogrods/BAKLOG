@@ -423,6 +423,45 @@ def test_sponsors_put_validation(admin_server: tuple[str, Path]) -> None:
     assert "url must start with http" in str(data.get("error", ""))
 
 
+def test_sponsors_put_rejects_bad_cover(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "PUT",
+        "/api/internal/sponsors",
+        body={"items": [{"id": "sp1", "title": "Ad", "cover": "//evil.example/x.png"}]},
+    )
+    assert code == 400
+    assert "cover must be" in str(data.get("error", ""))
+
+
+def test_sponsors_put_accepts_cover_and_placements(
+    admin_server: tuple[str, Path], tmp_path: Path
+) -> None:
+    base, _ = admin_server
+    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path.parent.mkdir(parents=True, exist_ok=True)
+    sponsors_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    payload = {
+        "items": [
+            {
+                "id": "ad-hero",
+                "kind": "sponsor",
+                "title": "Emberfall",
+                "url": "https://example.com/deal",
+                "cover": "/assets/ads-sample/hero-emberfall.webp",
+                "placements": "spotlight, picks",
+                "enabled": True,
+            }
+        ]
+    }
+    code, data = _request(base, "PUT", "/api/internal/sponsors", body=payload)
+    assert code == 200
+    saved = json.loads(sponsors_path.read_text(encoding="utf-8"))
+    assert saved["items"][0]["cover"] == "/assets/ads-sample/hero-emberfall.webp"
+    assert saved["items"][0]["placements"] == "spotlight, picks"
+
+
 def test_sponsors_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path) -> None:
     base, _ = admin_server
     sponsors_path = tmp_path / "curated" / "sponsors.json"

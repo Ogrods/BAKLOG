@@ -853,6 +853,30 @@ def _validate_sponsors_payload(doc: dict[str, Any]) -> str | None:
             k = str(kind).strip().lower()
             if k not in ("house", "sponsor"):
                 return f"items[{i}] kind must be house or sponsor"
+        cover = item.get("cover")
+        if cover is not None and str(cover).strip():
+            c = str(cover).strip()
+            if not (
+                c.startswith("http://")
+                or c.startswith("https://")
+                or (c.startswith("/") and not c.startswith("//"))
+            ):
+                return f"items[{i}] cover must be http(s) URL or same-origin path"
+        placements = item.get("placements")
+        if placements is not None and placements != "":
+            raw = placements if isinstance(placements, list) else str(placements).split(",")
+            valid = {
+                "deal-rail",
+                "spotlight",
+                "picks",
+                "table",
+                "dash-picks",
+                "claimable",
+            }
+            for p in raw:
+                name = str(p).strip().lower()
+                if name and name not in valid:
+                    return f"items[{i}] placements contains unknown value: {name}"
     return None
 
 
@@ -2264,6 +2288,8 @@ def _static_class(path_only: str) -> str:
     """Classify a non-API path: public | data | deny."""
     clean = _normalize_static_path(path_only)
     parts = [p for p in clean.split("/") if p]
+    if clean in ("/tracker.html", "tracker.html"):
+        return "deny"
     if parts and parts[0] == "admin":
         if not ADMIN_ENABLED:
             return "deny"
@@ -2426,7 +2452,7 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
     path = _api_path(handler)
     if not path.startswith("/api/"):
         return True
-    if path == "/api/config":
+    if path in ("/api/config", "/api/update-check", "/api/diagnostics"):
         return True
     if ADMIN_ENABLED and _is_admin_exempt_api(path):
         return True
@@ -2618,6 +2644,9 @@ class Handler(SimpleHTTPRequestHandler):
         path = _api_path(self)
         if path == "/api/config":
             self._handle_config_get()
+            return
+        if path in ("/api/update-check", "/api/diagnostics"):
+            self._handle_support_get(path)
             return
         if path.startswith("/oauth/epic/callback"):
             self._handle_epic_oauth_callback()
@@ -2894,7 +2923,29 @@ class Handler(SimpleHTTPRequestHandler):
         # Entitlement: signed JWT claim (when a bearer is sent) wins, else the
         # local license file / BAKLOG_PLAN override. Defaults to "free".
         config["plan"] = current_plan(self.headers.get("Authorization"))
+        config["frozen"] = is_frozen()
+        config["version"] = _app_version()
+        config["chromium_available"] = _chromium_available()
+        from shared.server_support import is_running_from_temp_dir
+
+        config["running_from_temp"] = is_running_from_temp_dir(ROOT)
         _send_json(self, HTTPStatus.OK, config)
+
+    def _handle_support_get(self, path: str) -> None:
+        from shared.server_support import build_diagnostics_payload, build_update_check_payload
+
+        if path == "/api/update-check":
+            _send_json(self, HTTPStatus.OK, build_update_check_payload(_app_version()))
+            return
+        _send_json(
+            self,
+            HTTPStatus.OK,
+            build_diagnostics_payload(
+                data_root=ROOT,
+                version=_app_version(),
+                load_run_history=_load_run_history,
+            ),
+        )
 
     def _handle_fetchers(self) -> None:
         try:
@@ -4266,6 +4317,68 @@ class BaklogDevServer(ThreadingHTTPServer):
     allow_reuse_address = False
 
 
+def _app_version() -> str:
+    try:
+        import tomllib
+
+        raw = (bundle_root() / "pyproject.toml").read_text(encoding="utf-8")
+        return str(tomllib.loads(raw).get("project", {}).get("version", "0.0.0"))
+    except Exception:
+        return "0.0.0"
+
+
+def _chromium_available() -> bool:
+    try:
+        from auth.cdp_browser import find_chromium_executable
+
+        find_chromium_executable()
+        return True
+    except Exception:
+        return False
+
+
+def _check_data_dir_writable() -> None:
+    """Fail fast with a clear message if the data dir is read-only (e.g. a frozen
+    build unzipped into Program Files). Testers unzip portable builds; a read-only
+    location otherwise produces confusing silent write failures later."""
+    target = ROOT
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+        probe = target / ".baklog_write_test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError:
+        msg = (
+            f"BAKLOG cannot write to its data folder:\n  {target}\n"
+            "Move BAKLOG to a writable location (e.g. Desktop or Documents), "
+            "or set BAKLOG_DATA_DIR to a writable folder."
+        )
+        print(msg, file=sys.stderr, flush=True)
+        raise SystemExit(1) from None
+
+
+def _maybe_open_browser() -> None:
+    if os.environ.get("BAKLOG_NO_BROWSER", "").strip().lower() in ("1", "true", "yes"):
+        return
+    if not is_frozen():
+        return
+    try:
+        import webbrowser
+
+        webbrowser.open(f"http://{HOST}:{PORT}/")
+    except Exception:
+        pass
+
+
+def _frozen_pause_before_exit(code: int = 1) -> None:
+    if not is_frozen() or code == 0:
+        return
+    try:
+        input("Press Enter to close...")
+    except EOFError:
+        pass
+
+
 def main() -> None:
     global _DEV_HTTPD
     atexit.register(_shutdown_server)
@@ -4287,6 +4400,10 @@ def main() -> None:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_exit)
 
+    _check_data_dir_writable()
+    from shared.server_support import run_boot_checks
+
+    run_boot_checks(ROOT)
     _exit_if_dev_server_busy()
     MANAGER._reap_orphan_processes()
     _start_background_scheduler()
@@ -4314,6 +4431,12 @@ def main() -> None:
                 f"(now {get_active_profile_id()!r}). Per-run fetchers still pin their own profile.",
                 flush=True,
             )
+        if not _chromium_available():
+            print(
+                "NOTE: Google Chrome or Microsoft Edge is required for Connections sign-in.",
+                flush=True,
+            )
+        _maybe_open_browser()
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
@@ -4325,4 +4448,14 @@ if __name__ == "__main__":
         from baklog_fetcher_dispatch import run_fetcher
 
         raise SystemExit(run_fetcher(sys.argv[2], sys.argv[3:]))
-    main()
+    try:
+        main()
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else (1 if exc.code else 0)
+        if code:
+            _frozen_pause_before_exit(code)
+        raise
+    except Exception as exc:
+        print(f"\nBAKLOG failed to start: {exc}", file=sys.stderr, flush=True)
+        _frozen_pause_before_exit(1)
+        raise SystemExit(1) from exc

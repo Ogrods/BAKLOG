@@ -22,6 +22,44 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- Beta blind-spot hardening: warn when the frozen exe runs from a temp/zip-extract
+  folder (`running_from_temp` in `/api/config` + boot banner); self-heal stale
+  Windows login-autostart registry entries on boot; opt-in `GET /api/update-check`
+  and kebab **Check for updates**; scrubbed `GET /api/diagnostics` + kebab **Copy
+  diagnostics**; `STEAM_PRIVATE_PROFILE_HINT` when Steam returns 0 games with
+  valid credentials (private Game details).
+
+### Changed
+
+- Marketing: open-source (MIT) claim threaded through landing page (hero, trust,
+  FAQ, footer, structured data) and README; canonical GitHub repo URL added to
+  `shared/community.json`.
+
+## [0.7.0] - 2026-06-08
+
+### Added
+
+- **Beta ship hardening** — PyInstaller `BAKLOG.exe` is the recommended tester bundle: auto-opens the browser on start, pauses the console on fatal errors (frozen builds), ships `BETA-README.txt` + `Start BAKLOG.bat`, and emits a SHA-256 checksum for the release zip (`packaging/build_windows.ps1`).
+- **`GET /api/config` runtime fields** — `version`, `frozen`, and `chromium_available` for bug bundles and Connections preflight.
+- **Packaging drift test** — `tests/test_packaging_manifest.py` asserts every `fetchers/manifest.json` script appears in `packaging/baklog.spec` `hiddenimports`.
+
+### Changed
+
+- **Portable build script** — `scripts/build_installer.ps1` prefers `git archive` (tracked files only) and fails the build if `secrets.bin`, CDP session profiles, or `games_*.json` leak into output.
+- **Connections preflight** — amber banner when Chrome/Edge is missing (`connBrowserWarn` + `chromium_available` from config).
+- **Empty-library boot banner** — points testers to Connections instead of `fetch_games.py`.
+
+### Fixed
+
+- **PyInstaller fetcher imports** — `fetch_free_claims` and all five enrichers added to `hiddenimports` (auto-enrich no longer crashes frozen builds).
+- **Private tracker leak** — `tracker.html` removed from `baklog.spec` and denied by `server.py` static gate.
+- **Debug agent-log POSTs** — removed leftover `#region agent log` blocks from `js/fetcher-health.js` and `js/claimable.js`.
+- **Frozen port reclaim** — `pid_is_python_server` now also matches a stuck `BAKLOG.exe` (not just `python`), so a second launch can reclaim an orphaned frozen instance on port 8765 (`shared/dev_server_pids.py`).
+- **Read-only data dir** — `server.py` fails fast with a clear "move to a writable location / set `BAKLOG_DATA_DIR`" message instead of silent write failures when a frozen build runs from a read-only folder.
+- **`fetch_games` test** — `fetch_games.py` imports `sys` so `test_fetch_games_network.py` can patch `argv` (was `AttributeError: module 'fetch_games' has no attribute 'sys'`).
+
 ### Changed
 
 - **Deep sync gated behind paid tier** — removed the unapproved daily free-allowance/credits meter (`js/achievement-meter.js` deleted). The trophy popover **Deep sync** button (PSN/Xbox full achievement/trophy re-pull) now renders only when `isPro()` is true; free tier keeps cached completion % only. Landing FAQ, tier-compare table, and README aligned to "cached % only" vs "full re-pull".

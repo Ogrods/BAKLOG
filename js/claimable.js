@@ -7,6 +7,7 @@ import { switchView } from './filters-ui.js';
 import { claimsSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
 import { syncCoverFits } from './covers.js';
+import { getEligibleSponsors, sponsoredClaimCardHtml } from './sponsored-deals.js';
 import {
   stripClaimTitleDecorations,
   dedupeClaims,
@@ -79,9 +80,6 @@ export function dismissClaim(id) {
     for (const k of dedupKeys) state.personal.__dismissedClaimKeys[k] = now;
   }
   savePersonal();
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d5fafb'},body:JSON.stringify({sessionId:'d5fafb',hypothesisId:'B',location:'claimable.js:dismissClaim',message:'dismiss claim stored',data:{id,claimFound:!!claim,dedupKeys,storedKeys:Object.keys(state.personal.__dismissedClaimKeys||{}),storedIds:Object.keys(state.personal.__dismissedClaims||{})},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   pruneDismissedClaims(state.claimableFeed?.items || []);
   applyVisibleClaims();
   renderClaimableModule();
@@ -135,9 +133,6 @@ function pruneDismissedClaims(feedItems) {
       changed = true;
     }
   }
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d5fafb'},body:JSON.stringify({sessionId:'d5fafb',hypothesisId:'C',location:'claimable.js:pruneDismissedClaims',message:'prune dismissed against feed',data:{changed,feedItemCount:feedItems.length,feedIdSample:[...feedIds].slice(0,6),feedKeySample:[...feedKeys].slice(0,6),remainingIds:Object.keys(dismissed),remainingKeys:Object.keys(dismissedKeys)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (changed) {
     state.personal.__dismissedClaims = dismissed;
     state.personal.__dismissedClaimKeys = dismissedKeys;
@@ -243,9 +238,6 @@ export function diffClaims(prevIds, items) {
   for (const c of visible) {
     if (!prevIds.has(c.id)) { newCount += 1; newOnes.push({ id: c.id, title: c.title, keys: claimDedupKeys(c) }); }
   }
-  // #region agent log
-  if (newCount > 0) fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d5fafb'},body:JSON.stringify({sessionId:'d5fafb',hypothesisId:'A',location:'claimable.js:diffClaims',message:'diffClaims found new claims vs snapshot',data:{newCount,prevIds:[...prevIds],visibleIds:visible.map(c=>c.id),newOnes},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return { newCount, visible };
 }
 
@@ -263,9 +255,6 @@ function loadClaimsSnapshotIds() {
 export function saveClaimsSnapshot(items) {
   const visible = getVisibleClaims(items);
   const ids = visible.map(c => c.id);
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d5fafb'},body:JSON.stringify({sessionId:'d5fafb',hypothesisId:'A',location:'claimable.js:saveClaimsSnapshot',message:'snapshot saved',data:{savedIds:ids,savedKeys:visible.map(c=>claimDedupKeys(c)),ownedReady:!!state.ownedNormNames},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   try {
     localStorage.setItem(claimsSnapshotStorageKey(), JSON.stringify({
       saved_at: Date.now(),
@@ -459,9 +448,6 @@ export function renderClaimableModule() {
   const claims = state.claimableNow;
   const hiddenCount = getHiddenClaims(feedItems).length;
   const ownedCount = getOwnedClaims(feedItems).length;
-  // #region agent log
-  if (show) { const _dk=dismissedClaimKeysMap(); const _di=dismissedClaimsMap(); const _leak=claims.filter(c=>claimDedupKeys(c).some(k=>_dk[k])||_di[c.id]).map(c=>({id:c.id,title:c.title,keys:claimDedupKeys(c)})); fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d5fafb'},body:JSON.stringify({sessionId:'d5fafb',hypothesisId:'B',location:'claimable.js:renderClaimableModule',message:'render wishlist claims module',data:{shownIds:claims.map(c=>c.id),shownTitles:claims.map(c=>c.title),hiddenCount,ownedCount,dismissedKeys:Object.keys(_dk),dismissedIds:Object.keys(_di),snapshotIds:[...loadClaimsSnapshotIds()],leakedDismissedButShown:_leak},timestamp:Date.now()})}).catch(()=>{}); }
-  // #endregion
   const hide = !show || (!claims.length && !hiddenCount && !ownedCount);
   if (hide) {
     mount.classList.add('hidden');
@@ -469,19 +455,18 @@ export function renderClaimableModule() {
     return;
   }
   mount.classList.remove('hidden');
-  mount.innerHTML = claimableModuleMarkup(claims, {
+  const sponsoredItem = getEligibleSponsors('claimable')[0];
+  const sponsoredHtml = sponsoredItem ? sponsoredClaimCardHtml(sponsoredItem) : '';
+  mount.innerHTML = sponsoredHtml + claimableModuleMarkup(claims, {
     visibleCount: _claimsVisibleCount,
     attribution: state.claimableFeed?.attribution,
     showHiddenButtonHtml: showHiddenClaimsButtonHtml(hiddenCount + ownedCount),
   });
-  if (claims.length) syncCoverFits(mount);
+  if (claims.length || sponsoredHtml) syncCoverFits(mount);
 }
 
 export function showClaimableBanner(newCount) {
   const el = document.getElementById('claimableBanner');
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d5fafb'},body:JSON.stringify({sessionId:'d5fafb',hypothesisId:'A',location:'claimable.js:showClaimableBanner',message:'banner shown',data:{newCount,hasEl:!!el},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!el || !newCount) return;
   const n = newCount;
   el.innerHTML = `

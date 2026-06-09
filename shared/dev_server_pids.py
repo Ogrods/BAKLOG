@@ -59,8 +59,9 @@ def terminate_pid(pid: int) -> None:
 
 
 def pid_is_python_server(pid: int) -> bool:
-    """Best-effort confirm pid is a live Python process running this server,
-    so reclaim never kills an unrelated process that reused the pid."""
+    """Best-effort confirm pid is a live BAKLOG server process (dev python.exe or
+    a frozen BAKLOG.exe) so reclaim never kills an unrelated process that reused
+    the pid. Frozen tester builds run as ``BAKLOG.exe``, not ``python``."""
     if not pid_alive(pid):
         return False
     if sys.platform != "win32":
@@ -74,7 +75,8 @@ def pid_is_python_server(pid: int) -> bool:
             check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-        return "python" in (out.stdout or "").lower()
+        name = (out.stdout or "").lower()
+        return "python" in name or "baklog" in name
     except (OSError, subprocess.TimeoutExpired):
         return False
 

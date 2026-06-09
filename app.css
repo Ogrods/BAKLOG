@@ -1574,8 +1574,7 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   z-index: 2;
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   color: var(--text-mute);
-  font-size: 1.25rem;
-  line-height: 1;
+  line-height: 0;
   width: 2rem;
   height: 2rem;
   border-radius: 999px;
@@ -1583,10 +1582,13 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* The × glyph sits high in its line box; pad the top to optically center it. */
-  padding: 2px 0 0;
+  padding: 0;
   backdrop-filter: blur(2px);
   border: 1px solid var(--border-subtle);
+}
+.cover-gallery-close .cover-gallery-btn-icon {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 .cover-gallery-close:hover {
   color: var(--text-bright);
@@ -1648,8 +1650,7 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.375rem;
-  line-height: 1;
+  line-height: 0;
   color: #cbd5e1;
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   border: 1px solid var(--border-subtle);
@@ -1657,6 +1658,10 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   padding: 0;
   user-select: none;
   backdrop-filter: blur(2px);
+}
+.cover-gallery-nav-btn .cover-gallery-btn-icon {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 .cover-gallery-nav-btn:hover:not(:disabled) {
   color: #f1f5f9;
@@ -2907,6 +2912,56 @@ html[data-theme="ember"] .brand-logo-mark {
   z-index: 3;
 }
 .sponsored-deal-dismiss:hover { color: rgb(226 232 240); background: rgba(148, 163, 184, 0.15); }
+.sponsored-badge--inline { position: static; }
+.dash-spotlight-sponsored-badge {
+  top: 0.65rem;
+  right: 0.75rem;
+  bottom: auto;
+}
+.dash-spotlight-dismiss {
+  top: 0.35rem;
+  right: 2.5rem;
+}
+.dash-spotlight--ad { cursor: pointer; }
+.sponsored-pick-card { cursor: pointer; position: relative; }
+.sponsored-pick-badge {
+  top: 0.4rem;
+  left: 0.4rem;
+  right: auto;
+  bottom: auto;
+  font-size: 0.5rem;
+  padding: 0.05rem 0.35rem;
+}
+.sponsored-pick-card .sponsored-deal-dismiss { top: 0.25rem; right: 0.4rem; width: 1.1rem; height: 1.1rem; }
+.sponsored-table-row td { background: rgba(245, 158, 11, 0.06); border-top: 1px solid rgba(245, 158, 11, 0.2); border-bottom: 1px solid rgba(245, 158, 11, 0.2); }
+.sponsored-table-body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+.sponsored-table-badge { position: static; flex-shrink: 0; }
+.sponsored-table-title { font-weight: 600; color: rgb(241 245 249); }
+.sponsored-table-tagline { font-size: 0.75rem; color: rgb(148 163 184); margin-left: 0.5rem; }
+.sponsored-dash-picks-card { position: relative; }
+.sponsored-dash-picks-body {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.sponsored-claim-card { position: relative; }
+.sponsored-claim-body { position: relative; cursor: pointer; border: none; background: transparent; color: inherit; }
+.dash-picks-row:has(.dash-sponsored-pick-slot:not(.hidden)) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.dash-picks-row.no-itch:has(.dash-sponsored-pick-slot:not(.hidden)) .dash-picks-versus {
+  grid-column: span 2;
+}
 .dash-card.hidden { display: none; }
 /* Dashboard card headings follow the active theme (override Tailwind text-slate-*) */
 .dash-card > h3,

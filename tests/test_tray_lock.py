@@ -36,9 +36,9 @@ def test_second_holder_blocked_on_posix(monkeypatch, tmp_path):
     if sys.platform == "win32":
         pytest.skip("Windows mutex test needs a second process")
     monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
-    assert tray_lock.acquire_tray_lock() is True
-    # Simulate another process holding the lock file.
     lock_path = tmp_path / ".tray.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    # Simulate another process holding the lock before we try to acquire.
     other = lock_path.open("w", encoding="utf-8")
     import fcntl
 
@@ -48,3 +48,4 @@ def test_second_holder_blocked_on_posix(monkeypatch, tmp_path):
     finally:
         fcntl.flock(other.fileno(), fcntl.LOCK_UN)
         other.close()
+        tray_lock.release_tray_lock()

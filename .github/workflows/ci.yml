@@ -153,3 +153,6 @@ jobs:
 
       - name: Check bundle size budget
         run: npm run check:bundle-size
+
+      - name: Check dist integrity
+        run: npm run check:dist-integrity

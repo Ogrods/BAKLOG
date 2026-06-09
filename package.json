@@ -20,7 +20,8 @@
     "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/module/index.js --bundle --format=esm --outfile=js/vendor/supabase-js.mjs",
     "lint": "eslint js/",
     "check:module-size": "node scripts/check-module-size.mjs",
-    "check:bundle-size": "node scripts/check-bundle-size.mjs"
+    "check:bundle-size": "node scripts/check-bundle-size.mjs",
+    "check:dist-integrity": "node scripts/check-dist-integrity.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

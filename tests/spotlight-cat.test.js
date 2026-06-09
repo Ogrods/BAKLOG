@@ -2,6 +2,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
 
+vi.mock("../js/deals.js", () => ({
+  getDealInfo: vi.fn(() => null),
+  dealScore: vi.fn(() => 0),
+  isStealDeal: vi.fn(() => false),
+  cutBucketClass: vi.fn(() => "cut-low"),
+  computeWishlistWoba: vi.fn(() => null),
+  isCleanupCandidate: vi.fn(() => false),
+  parsePriceLike: vi.fn((v) => {
+    if (v == null) return null;
+    if (typeof v === "number") return v;
+    const m = String(v).match(/-?\d+(?:\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }),
+}));
+
 describe("spotlight cat game category", () => {
   let pickSpotlightGames;
   let setStinkerChanceForTest;
@@ -121,6 +136,12 @@ describe("cat games marquee stat", () => {
       cutBucketClass: vi.fn(() => "cut-low"),
       computeWishlistWoba: vi.fn(() => null),
       isCleanupCandidate: vi.fn(() => false),
+      parsePriceLike: vi.fn((v) => {
+        if (v == null) return null;
+        if (typeof v === "number") return v;
+        const m = String(v).match(/-?\d+(?:\.\d+)?/);
+        return m ? parseFloat(m[0]) : null;
+      }),
     }));
   });
 

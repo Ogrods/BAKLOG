@@ -268,6 +268,11 @@
     -webkit-mask-image: var(--spotlight-wrapper-mask);
     mask-image: var(--spotlight-wrapper-mask);
   }
+  /* Full-width textblock sits above spotlight host; pass pointer events through
+     so portrait tilt works on the top half of the cover. */
+  .dash-mega--has-spotlight .dash-hero-textblock { pointer-events: none; }
+  .dash-mega--has-spotlight .dash-hero-textblock [title],
+  .dash-mega--has-spotlight .dash-hero-textblock .store-logo { pointer-events: auto; }
 }
 .dash-spotlight {
   position: absolute;

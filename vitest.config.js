@@ -7,9 +7,11 @@ import { defineConfig } from 'vitest/config';
 const adminPresent = existsSync('admin/run-console.js');
 const adminOnlyTests = [
   'tests/admin-claims-workspace.test.js',
+  'tests/admin-metrics-prefs.test.js',
   'tests/admin-pacific-dates.test.js',
   'tests/admin-run-console-lifecycle.test.js',
   'tests/admin-run-console.test.js',
+  'tests/giveaway-strip-parity.test.js',
 ];
 
 export default defineConfig({

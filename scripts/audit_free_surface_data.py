@@ -33,7 +33,6 @@ from shared.profile_paths import (
     itad_path,
     personal_backup_dir,
     personal_path,
-    profile_root,
 )
 
 AUTO_PATH = ROOT / "curated" / "free_claims.auto.json"

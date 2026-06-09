@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 import enrich_cross_store_images as enrich
-
 from shared.steam_match import normalize_title
 
 ARMATUS_ROW = {

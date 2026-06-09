@@ -110,9 +110,15 @@ describe('refreshConnections error keep-cache', () => {
     await refreshConnections();
     expect(document.querySelector('.conn-rail-item[data-provider="steam"]')).toBeTruthy();
 
-    // The next refresh fails at the network layer.
-    vi.mocked(baklogFetch).mockImplementationOnce(() => {
-      throw new Error('server down');
+    // The next refresh fails at the auth-status fetch (config preflight runs first).
+    vi.mocked(baklogFetch).mockImplementation(async (url) => {
+      if (url === '/api/auth/status') {
+        throw new Error('server down');
+      }
+      if (url === '/api/config') {
+        return new Response(JSON.stringify({ chromium_available: true }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
     });
     await refreshConnections();
 

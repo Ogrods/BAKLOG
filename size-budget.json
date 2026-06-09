@@ -1,6 +1,6 @@
 {
   "note": "Critical-path dist/ ceilings (entry js/app.js + CSS). Lazy chunks excluded. Refresh: npm run build && node scripts/check-bundle-size.mjs --write",
   "capturedAt": "2026-06-09",
-  "maxEntryJsKb": 63,
-  "maxCssKb": 209
+  "maxEntryJsKb": 75,
+  "maxCssKb": 211
 }

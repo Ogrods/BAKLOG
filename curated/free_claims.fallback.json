@@ -1,44 +1,22 @@
 {
-  "generated_at": "2026-06-08T20:10:46.473271+00:00",
+  "generated_at": "2026-06-09T02:04:36.505777+00:00",
   "items": [
     {
-      "id": "epic-rogue-waters-9764d6",
-      "store": "epic",
-      "title": "Rogue Waters",
-      "claim_url": "https://store.epicgames.com/en-US/p/rogue-waters-9764d6",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-06-11T15:00:00Z",
-      "steam_appid": 1691190,
-      "review_percent": 76,
-      "source": "epic"
-    },
-    {
-      "id": "epic-songs-of-conquest",
-      "store": "epic",
-      "title": "Songs of Conquest",
-      "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-06-11T15:00:00Z",
-      "steam_appid": 867210,
-      "review_percent": 86,
-      "source": "epic"
-    },
-    {
-      "id": "gamerpower-3673",
-      "store": "epic",
-      "title": "Relaxing Simulator",
-      "claim_url": "https://www.gamerpower.com/open/relaxing-simulator-epic-games-giveaway",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2965380/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Just relax and grab Relaxing Simulator for free on the Epic Games Store for the ultimate relaxing experience!",
-      "ends_at": "2026-06-14T23:59:00Z",
-      "steam_appid": 2965380,
-      "review_percent": 89,
-      "source": "gamerpower"
+      "id": "itad-9dcfdf2b0b35",
+      "store": "steam",
+      "title": "Remothered: Tormented Fathers",
+      "claim_url": "https://isthereanydeal.com/giveaways/16245/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/633360/library_600x900_2x.jpg",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Indie"
+      ],
+      "blurb": "Remothered: Tormented Fathers",
+      "ends_at": null,
+      "steam_appid": 633360,
+      "review_percent": 74,
+      "source": "itad"
     },
     {
       "id": "gamerpower-3671",
@@ -81,19 +59,6 @@
       "ends_at": "2026-06-14T23:59:00Z",
       "steam_appid": 858710,
       "review_percent": 92,
-      "source": "gamerpower"
-    },
-    {
-      "id": "gamerpower-3272",
-      "store": "indiegala",
-      "title": "The Brave Little Cloud",
-      "claim_url": "https://www.gamerpower.com/open/the-brave-little-cloud-pc-giveaway",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Save the world… as a cloud. Download The Brave Little Cloud for free on IndieGala! The Brave Little Cloud is a 2D platformer where you play as a small cloud on a quest to battle evil.",
-      "ends_at": null,
-      "steam_appid": 2635070,
-      "review_percent": 97,
       "source": "gamerpower"
     },
     {
@@ -160,6 +125,19 @@
       "source": "gamerpower"
     },
     {
+      "id": "itad-7a69412dd110",
+      "store": "epic",
+      "title": "Relaxing Simulator",
+      "claim_url": "https://isthereanydeal.com/giveaways/16247/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2965380/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Relaxing Simulator",
+      "ends_at": null,
+      "steam_appid": 2965380,
+      "review_percent": 89,
+      "source": "itad"
+    },
+    {
       "id": "itad-b07aac9ebd26",
       "store": "epic",
       "title": "Wytchwood",
@@ -173,6 +151,32 @@
       "source": "itad"
     },
     {
+      "id": "itad-073a56345192",
+      "store": "epic",
+      "title": "Songs of Conquest",
+      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Songs of Conquest",
+      "ends_at": null,
+      "steam_appid": 867210,
+      "review_percent": 86,
+      "source": "itad"
+    },
+    {
+      "id": "itad-0c69ed1f1bd8",
+      "store": "epic",
+      "title": "Rogue Waters",
+      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Rogue Waters",
+      "ends_at": null,
+      "steam_appid": 1691190,
+      "review_percent": 76,
+      "source": "itad"
+    },
+    {
       "id": "itad-0d4598c53ffe",
       "store": "indiegala",
       "title": "Mr.Brocco & Co",
@@ -183,6 +187,19 @@
       "ends_at": null,
       "steam_appid": 2074560,
       "review_percent": 83,
+      "source": "itad"
+    },
+    {
+      "id": "itad-dd5b5b16e035",
+      "store": "indiegala",
+      "title": "The Brave Little Cloud",
+      "claim_url": "https://isthereanydeal.com/giveaways/16143/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "The Brave Little Cloud",
+      "ends_at": null,
+      "steam_appid": 2635070,
+      "review_percent": 97,
       "source": "itad"
     },
     {
@@ -207,36 +224,6 @@
       "ends_at": null,
       "steam_appid": 973000,
       "review_percent": 78,
-      "source": "itad"
-    },
-    {
-      "id": "gamerpower-3672",
-      "store": "gog",
-      "title": "Remothered: Broken Porcelain",
-      "claim_url": "https://www.gamerpower.com/open/remothered-broken-porcelain-gog-giveaway",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1142390/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Download Remothered: Broken Porcelain for free via GOG! Remothered: Broken Porcelain is a realistic survival game with stealth gameplay. Check it out!",
-      "ends_at": "2026-06-08T23:59:00Z",
-      "steam_appid": 1142390,
-      "review_percent": 60,
-      "source": "gamerpower"
-    },
-    {
-      "id": "itad-9dcfdf2b0b35",
-      "store": "steam",
-      "title": "Remothered: Tormented Fathers",
-      "claim_url": "https://isthereanydeal.com/giveaways/16245/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/633360/library_600x900_2x.jpg",
-      "genres": [
-        "Action",
-        "Adventure",
-        "Indie"
-      ],
-      "blurb": "Remothered: Tormented Fathers",
-      "ends_at": null,
-      "steam_appid": 633360,
-      "review_percent": 74,
       "source": "itad"
     }
   ],

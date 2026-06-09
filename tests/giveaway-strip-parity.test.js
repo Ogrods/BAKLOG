@@ -2,7 +2,7 @@
  * Cross-implementation parity for giveaway-title stripping.
  *
  * The same regex chain lives in three places and must stay in sync:
- *   - js/claimable.js            stripClaimTitleDecorations
+ *   - js/claim-card.js            stripClaimTitleDecorations (re-exported by claimable.js)
  *   - admin/claims-workspace.js  stripClaimTitleDecorations
  *   - shared/steam_match.py      strip_giveaway_decorations  (checked in pytest)
  *

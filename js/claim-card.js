@@ -6,6 +6,17 @@
  *
  * Nothing here touches `state` or the DOM; callers own visibility/ownership/
  * dismissal decisions and pass in the already-resolved claim list.
+ *
+ * Dedup semantics (intentional asymmetry with Python):
+ * - `dedupeClaims` here collapses cross-source copies by appid/title for the
+ *   user-facing wishlist module (lower CLAIM_SOURCE_RANK wins).
+ * - `shared/free_claims_sources.dedup_claim_items_by_id` dedupes by feed id
+ *   only and keeps cross-source title dupes so the admin console can DUPE-stamp.
+ *
+ * Sync pairs (update together):
+ * - stripClaimTitleDecorations ↔ shared/steam_match.strip_giveaway_decorations
+ * - CLAIM_SOURCE_RANK ↔ shared/free_claims_sources.SOURCE_PRECEDENCE
+ * - sanitizeBlurb ↔ build_free_claims._clean_blurb
  */
 import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
 import { normalizeNameForDedup } from './game-core.js';
@@ -66,6 +77,7 @@ export function sortClaims(list) {
  * URLs + "expires on … | go to giveaway" boilerplate). Escaping it for display
  * leaks that markup/URL as visible text, so strip tags, decode the handful of
  * entities ITAD emits, and drop the giveaway boilerplate before rendering.
+ * Sync pair: build_free_claims._clean_blurb (published feed uses the Python copy).
  */
 export function sanitizeBlurb(raw) {
   if (!raw) return '';
@@ -234,6 +246,75 @@ export function claimRowHtml(claim) {
       <button type="button" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded border border-slate-600" data-claim-clear="${escapeAttr(claim.id)}">Clear</button>
     </span>
   </div>`;
+}
+
+/** Shared row for hidden/owned modals — pass `actionHtml` for Restore button or owned tag. */
+export function claimHiddenRowHtml(claim, { actionHtml = '', rowClass = '' } = {}) {
+  const title = escapeHtml(claim.title || 'Free game');
+  const store = claim.store || 'other';
+  const cover = claimCoverUrl(claim);
+  const ends = formatEndsAt(claim.ends_at);
+  const endsHtml = ends ? `Ends ${escapeHtml(ends)}` : '—';
+  const ls = cover ? window.coverLandscapeAttr(cover) : '';
+  const coverHtml = cover
+    ? `<img class="claim-hidden-row-cover${ls}" src="${escapeAttr(cover)}" alt="" loading="lazy" onload="window.markLandscape(this)" />`
+    : `<span class="claim-hidden-row-cover claim-hero-cover-fallback" aria-hidden="true"></span>`;
+  const extraClass = rowClass ? ` ${rowClass}` : '';
+  return `<div class="claim-hidden-row${extraClass}"${claim.id ? ` data-claim-id="${escapeAttr(claim.id)}"` : ''}>
+    <span class="claim-hidden-row-cover-wrap cover-wrap${ls}">${coverHtml}</span>
+    <span class="claim-hidden-row-meta min-w-0 flex-1">
+      <span class="claim-hidden-row-title truncate">${title}</span>
+      <span class="claim-hidden-row-badges flex flex-wrap items-center gap-1.5 mt-0.5">
+        ${storeLogoHtml(store, { size: 'sm', title: storeDisplayName(store) })}
+        ${claimSourceHtml(claim.source)}
+        <span class="text-xs text-slate-500">${endsHtml}</span>
+      </span>
+    </span>
+    ${actionHtml}
+  </div>`;
+}
+
+/** Detail dialog panel markup (caller opens the dialog and assigns innerHTML). */
+export function claimDetailPanelHtml(claim, {
+  owned = false,
+  attribution = null,
+} = {}) {
+  const ends = formatEndsAt(claim.ends_at);
+  const coverUrl = claimCoverUrl(claim);
+  const cover = coverUrl
+    ? `<img src="${escapeAttr(coverUrl)}" data-fallback="${escapeAttr(claimCoverFallback(claim))}" data-name="${escapeAttr(claim.title || '')}" alt="" class="claim-detail-cover" onerror="window.coverFallback(this)" />`
+    : '';
+  const reviewPct = reviewPercentValue(claim);
+  const review = reviewPct != null ? `${reviewPct}% Steam reviews` : '';
+  const blurbText = sanitizeBlurb(claim.blurb);
+  const blurb = blurbText ? `<p class="claim-detail-blurb">${escapeHtml(blurbText)}</p>` : '';
+  const endsHtml = ends
+    ? `<span class="claim-detail-ends">Ends ${escapeHtml(ends)}</span>`
+    : '';
+  const claimable = !owned && isSafeHttpUrl(claim.claim_url);
+  const claimBtn = owned
+    ? `<p class="claim-detail-owned">Already in your library.</p>`
+    : (claimable
+      ? `<a href="${escapeAttr(claim.claim_url)}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn">Claim free →</a>`
+      : `<p class="claim-detail-owned">Claim link unavailable.</p>`);
+  return `<form method="dialog" class="claim-detail-panel">
+      <div class="claim-detail-header">
+        <h2 class="claim-detail-title">${escapeHtml(claim.title || 'Free game')}</h2>
+        <button type="submit" class="claim-detail-close" aria-label="Close">×</button>
+      </div>
+      ${cover}
+      <div class="claim-detail-badges">
+        ${storeLogoHtml(claim.store, { size: 'sm' })}
+        <span class="deal-cut-badge deal-cut-huge claim-cut-fire">100% off</span>
+        ${claimSourceHtml(claim.source, { tag: 'a' })}
+        ${endsHtml}
+        ${review ? `<span class="claim-detail-review">${escapeHtml(review)}</span>` : ''}
+      </div>
+      ${blurb}
+      ${claimBtn}
+      ${claimAttributionHtml(attribution)}
+      <button type="button" class="claim-detail-clear" data-claim-clear="${escapeAttr(claim.id)}">Clear from notifications</button>
+    </form>`;
 }
 
 /**

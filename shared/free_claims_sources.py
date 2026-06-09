@@ -21,6 +21,9 @@ GAMERPOWER_ATTRIBUTION = "GamerPower.com"
 ITAD_SKIP_KEYWORDS = ("bundle", "beta", "dlc", "loot", " key")
 
 SOURCE_PRECEDENCE = {"epic": 0, "gamerpower": 1, "itad": 2}
+# User-facing dedup (js/claim-card.js dedupeClaims) collapses by appid/title.
+# dedup_claim_items_by_id below dedupes by feed id only and keeps cross-source
+# title dupes so the admin console can DUPE-stamp them before publish approval.
 
 # Fields written by build_free_claims enrichment and carried across auto-feed fetches.
 CLAIM_ENRICH_FIELDS = ("header_image", "review_percent", "steam_appid", "genres", "blurb")

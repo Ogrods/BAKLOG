@@ -11,6 +11,15 @@ import pytest
 import build_free_claims as bfc
 
 
+def test_clean_blurb_strips_urls_and_boilerplate() -> None:
+    raw = (
+        '<a href="https://isthereanydeal.com/g/portal2/info/">Portal 2</a> '
+        "expires on Jun 10 | go to giveaway"
+    )
+    assert bfc._clean_blurb(raw) == "Portal 2"
+    assert bfc._clean_blurb("title https://example.com/x extra") == "title extra"
+
+
 def test_load_approved_ids_missing_file(tmp_path: Path) -> None:
     assert bfc._load_approved_ids(tmp_path / "missing.json") == set()
 

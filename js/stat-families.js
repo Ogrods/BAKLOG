@@ -10,6 +10,7 @@ export const FAMILY = {
   SABER: 'saber',
   IDENTITY: 'identity',
   ACTIVITY: 'activity',
+  COMPAT: 'compat',
   WILDCARD: 'wildcard',
 };
 
@@ -37,9 +38,17 @@ export function familyForLabel(label) {
   if (!l) return uniqueFamily(l);
 
   if (matchesAny(l, [
+    'proton', 'deck-ready', 'borked on linux', 'deck ready',
+    'silver or native', 'avg proton',
+  ])) {
+    return FAMILY.COMPAT;
+  }
+
+  if (matchesAny(l, [
     'trophy', 'achievement', 'gamerscore', 'platinum', '100%', '100 %',
     'completionist', 'mastered', 'one push from', 'closest to 100', 'closest platinum',
-    'fully completed', 'avg achievement',
+    'fully completed', 'avg achievement', 'platinums earned', 'platinum hunt', 'trophies earned',
+    'avg trophy completion', 'gamerscore completion',
   ])) {
     return FAMILY.COMPLETION;
   }
@@ -57,7 +66,8 @@ export function familyForLabel(label) {
   if (matchesAny(l, [
     'review', 'rated', 'mendoza', 'hidden gem', 'top-rated', 'top rated',
     'unplayed', 'league avg', 'luck-adjusted', 'luck adjusted', 'guilty pleasure',
-    'critically', 'comfort genre', 'blind spot',
+    'critically', 'comfort genre', 'blind spot', 'metacritic',
+    'metacritic 80+', 'biggest critic gap',
   ])) {
     return FAMILY.RATING;
   }
@@ -65,7 +75,9 @@ export function familyForLabel(label) {
   if (matchesAny(l, [
     'sale', 'deal', 'discount', 'cut', 'steal', 'msrp', 'wishlist value', 'savings',
     'historical low', 'whale', 'cheap thrill', 'clutch pick', 'got away', 'patience pays',
-    'dollar', 'price', 'free, never',
+    'dollar', 'price', 'free, never', 'itch spend', 'free itch', 'upcoming wishlist',
+    'bought on sale', 'paid itch', 'avg owned steam', 'priority wishlist',
+    'wishlist added this year', 'wishlist stores',
   ])) {
     return FAMILY.DEALS;
   }
@@ -75,7 +87,10 @@ export function familyForLabel(label) {
     'completed', 'games touched', 'in progress', 'queued next', 'left unfinished',
     'completion (excl', 'ever touched', 'co-op ready', 'priority flagged',
     'unique developers', 'unique genres', 'games per store', 'free, never launched',
-    'cleanup candidates', 'clutch picks', 'net adds', 'added in',
+    'cleanup candidates', 'clutch picks', 'net adds', 'added in', 'installed locally',
+    'multiplayer share', 'singleplayer backlog',
+    'co-op tagged', 'partial controller', 'indie-tagged', 'early access backlog',
+    'double-dip backlog', 'hltb low confidence', 'launcher installs',
   ])) {
     return FAMILY.COUNTS;
   }
@@ -85,7 +100,10 @@ export function familyForLabel(label) {
     'bv+', 'genre+', 'store+', 'win shares', 'pythagorean', 'power-speed',
     'quick-win speed', 'finish streak', 'hoard rate', 'quality start',
     'completion avg', 'start rate', 'abandon rate', 'closer power', 'rookie finish',
-    'veteran finish', 'below mendoza',
+    'veteran finish', 'below mendoza', 'critic gap', "people's champ", "critics' darling",
+    'overrated index', 'perpetual beta', 'couch-ready', 'aging curve', 'day-one player',
+    'extra innings', "subscriber's dividend", 'double dips', 'cost per finish', 'sunk cost',
+    'will you die first',
   ])) {
     return FAMILY.SABER;
   }
@@ -94,7 +112,8 @@ export function familyForLabel(label) {
     'top genre', 'top decade', 'top developer', 'top publisher', 'top store',
     'biggest store', 'oldest in library', 'newest release', 'oldest unplayed',
     'newest add', 'missing a', 'missing a–z', 'taste era', 'finished vs backlog era',
-    'one-hit dev', 'monogamy', 'playtime in', 'diagnosis', 'a-z',
+    'one-hit dev', 'monogamy', 'playtime in', 'diagnosis', 'a-z', 'top tag',
+    'ps5-native', 'ps4 holdouts', 'letter coverage',
   ])) {
     return FAMILY.IDENTITY;
   }
@@ -102,6 +121,7 @@ export function familyForLabel(label) {
   if (matchesAny(l, [
     'most-played', 'most played', 'add velocity', 'newest add', 'added in',
     'net adds', 'finish streak', 'all-time played', 'avg time per played',
+    'played in last', 'longest dormant', 'last seen this week',
   ])) {
     return FAMILY.ACTIVITY;
   }
@@ -184,11 +204,14 @@ export function familyForInsight(html) {
   if (matchesAny(lead, ['closest to 100', 'finish rate', 'pythagorean'])) {
     return lead.toLowerCase().includes('pythagorean') ? FAMILY.SABER : FAMILY.COMPLETION;
   }
-  if (matchesAny(plain, ['mendoza', 'ops', 'pythagorean', 'diagnosis'])) {
-    if (matchesAny(plain, ['mendoza', 'pythagorean', 'ops', 'diagnosis'])) return FAMILY.SABER;
+  if (matchesAny(plain, ['mendoza', 'ops', 'pythagorean', 'diagnosis', 'critic gap', 'will you die first', "people's champ", 'double dips', 'extra innings'])) {
+    if (matchesAny(plain, ['mendoza', 'pythagorean', 'ops', 'diagnosis', 'critic gap', 'will you die first', "people's champ", 'double dips', 'extra innings'])) return FAMILY.SABER;
   }
-  if (matchesAny(lead, ['average review', 'hidden gems', 'quick wins'])) {
+  if (matchesAny(lead, ['average review', 'hidden gems', 'quick wins', 'avg metacritic'])) {
     return FAMILY.RATING;
+  }
+  if (matchesAny(lead, ['longest dormant'])) {
+    return FAMILY.ACTIVITY;
   }
   if (matchesAny(lead, ['top deal', 'whale', 'guilty pleasure', 'one that got away', 'clutch pick'])) {
     return FAMILY.DEALS;

@@ -17,7 +17,7 @@ import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo, dealScore } from './deals.js';
 import { formatMoney, displayCurrency } from './currency.js';
-import { hoardRate } from './sabermetrics.js';
+import { hoardRate, oldestWishlist } from './sabermetrics.js';
 
 const MS_PER_DAY = 86400000;
 const PLAYFUL_BASE_AGE = 30;
@@ -335,12 +335,9 @@ export function computeCreativeMetrics(games, snap) {
     out.gotAway = { name: top.name, cut };
   }
 
-  const wlDated = wl
-    .map(g => ({ g, d: g.added_at || '', days: daysSince(g.added_at) }))
-    .filter(x => x.days != null)
-    .sort((a, b) => b.days - a.days);
-  if (wlDated[0]) {
-    out.wishlistAge = { name: wlDated[0].g.name, days: wlDated[0].days };
+  const wlOldest = oldestWishlist(wl);
+  if (wlOldest) {
+    out.wishlistAge = { name: wlOldest.g.name, days: wlOldest.days };
   }
 
   if (snap.oldestFirstPlayedMs != null) {

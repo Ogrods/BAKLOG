@@ -21,6 +21,7 @@ import { destroyDashboardCharts, replayDashboardChartAnimations, renderDashboard
 import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, renderMarqueeHtml, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
+import { commitRenderedMetrics } from './metrics-rendered.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
 import { THEME_CHANGE_EVENT } from './theme.js';
@@ -248,6 +249,7 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
     wireMarqueeSpeed(el);
   }
   startInsightRotation(buildInsightPool(games, snap));
+  commitRenderedMetrics();
   startSpotlightRotation(spotlightPool);
 }
 
@@ -324,6 +326,7 @@ function renderDashboardMega(games, snap) {
   applyMegaHeroCounters(stats);
   primeSpotlightArt(document.getElementById('dashboardSpotlight'));
   startInsightRotation(buildInsightPool(games, snap));
+  commitRenderedMetrics();
   startSpotlightRotation(spotlightPool);
   wireMarqueeSpeed(el);
 }

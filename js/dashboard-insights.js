@@ -40,9 +40,66 @@ import {
   agingCurveBuckets,
   luckAdjustedRating,
   isLeveragePick,
+  avgCriticGap,
+  peoplesChamp,
+  criticsDarling,
+  overratedLeader,
+  perpetualBetaCount,
+  couchReadyRate,
+  acquireToPlayDaysAvg,
+  dayOnePlayerCount,
+  extraInningsAvg,
+  gamePassCount,
+  doubleDipCount,
+  costPerFinish,
+  sunkCostUnplayed,
+  backlogMortality,
+  protonReadyShare,
+  protonCount,
+  protonTrendingUp,
+  protonDeckReadyBacklog,
+  psnPlatinumsEarned,
+  psnPlatinumHunt,
+  psnTrophiesEarned,
+  ps5NativeShare,
+  ps4Holdouts,
+  topTag,
+  multiplayerTagShare,
+  singleplayerBacklogCount,
+  freeItchCount,
+  itchSpendTotal,
+  installedLocalCount,
+  recentlyPlayedCount,
+  longestDormant,
+  avgMetacritic,
+  metacriticClubCount,
+  upcomingWishlistCount,
+  protonSilverNativeShare,
+  protonLowConfidenceCount,
+  avgProtonScore,
+  boughtOnSaleCount,
+  paidItchCount,
+  avgOwnedSteamPrice,
+  priorityWishlistCount,
+  wishlistAddedThisYear,
+  wishlistStoreCount,
+  lastSeenThisWeek,
+  launcherInstallCount,
+  hltbLowConfidenceCount,
+  coopTaggedOnlyCount,
+  partialControllerCount,
+  indieTaggedShare,
+  avgTrophyCompletion,
+  gamerscoreCompletionShare,
+  metacritic80UnplayedCount,
+  biggestCriticGapGame,
+  earlyAccessBacklogCount,
+  doubleDipBacklogCount,
+  letterCoverageShare,
 } from './sabermetrics.js';
 import { appendCreativeInsights, appendCreativeMarqueeChips } from './creative-metrics.js';
-import { marqueeTip, insightTip } from './metric-tips.js';
+import { marqueeTip, insightTip, metricKeyForLabel, metricKeyForInsight } from './metric-tips.js';
+import { noteMarqueeMetricKeys, noteInsightMetricKeys } from './metrics-rendered.js';
 import { familyForInsight, familyForLabel, spreadByFamily } from './stat-families.js';
 
 /** Sabermetric marquee/pill appearance weights (session-stable RNG). */
@@ -54,6 +111,27 @@ export const METRIC_WEIGHT = {
   /** kojima metric — MGSV codec easter egg */
   kojima: 0.03,
 };
+
+/** @returns {Set<string>} */
+function disabledMetricSet() {
+  const arr = state.prefs.metricsDisabled;
+  if (!Array.isArray(arr)) return new Set();
+  return new Set(arr.filter((k) => typeof k === 'string' && k));
+}
+
+/** @param {string} label */
+function isMarqueeMetricEnabled(label) {
+  const key = metricKeyForLabel(label);
+  if (!key) return true;
+  return !disabledMetricSet().has(key);
+}
+
+/** @param {string} html */
+function isInsightMetricEnabled(html) {
+  const key = metricKeyForInsight(html);
+  if (!key) return true;
+  return !disabledMetricSet().has(key);
+}
 
 const METRIC_SEED_KEY = '__baklogMetricSeed';
 
@@ -266,9 +344,45 @@ export function buildInsightPool(games, snapIn) {
     add(`Pythagorean: <strong>${label}</strong>`, METRIC_WEIGHT.cryptic);
   }
 
+  const champ = peoplesChamp(games);
+  if (champ) {
+    add(`People's champ: <strong>${escapeHtml(champ.g.name)}</strong> · +${champ.gap} vs critics`, METRIC_WEIGHT.moderate);
+  }
+  const extraInn = extraInningsAvg(snap);
+  if (extraInn != null) {
+    add(`Extra innings: <strong>${formatNum(extraInn)}h</strong> avg beyond main`, METRIC_WEIGHT.moderate);
+  }
+  const dDips = doubleDipCount();
+  if (dDips != null) {
+    add(`Double dips: <strong>${formatNum(dDips)}</strong> titles on 2+ stores`, METRIC_WEIGHT.moderate);
+  }
+  const mortality = backlogMortality(snap);
+  if (mortality) {
+    const who = mortality.verdict === 'backlog' ? 'Backlog wins' : 'You might make it';
+    add(`Will you die first? <strong>${who}</strong> · finish by age ${mortality.finishByAge}`, METRIC_WEIGHT.cryptic);
+  }
+  const criticGapAvg = avgCriticGap(games);
+  if (criticGapAvg != null) {
+    add(`Critic gap: <strong>${criticGapAvg} pts</strong> avg |Steam − Metacritic|`, METRIC_WEIGHT.moderate);
+  }
+
+  const avgMc = avgMetacritic(games);
+  if (avgMc != null) {
+    add(`Avg Metacritic: <strong>${avgMc}</strong>`, METRIC_WEIGHT.normal);
+  }
+  const dormant = longestDormant(games);
+  if (dormant) {
+    add(`Longest dormant: <strong>${escapeHtml(dormant.g.name)}</strong>`, METRIC_WEIGHT.moderate);
+  }
+  const gapLeader = biggestCriticGapGame(games);
+  if (gapLeader) {
+    add(`Biggest critic gap: <strong>${escapeHtml(gapLeader.g.name)}</strong> · ${gapLeader.gap} pts`, METRIC_WEIGHT.moderate);
+  }
+
   appendCreativeInsights(entries, games, snap, METRIC_WEIGHT);
 
-  return entries;
+  noteInsightMetricKeys(entries.map((e) => metricKeyForInsight(e.html)));
+  return entries.filter((e) => isInsightMetricEnabled(e.html));
 }
 
 function formatDollarMarquee(n) {
@@ -745,6 +859,244 @@ export function buildMarqueeItems(games, snapIn) {
     push('>', '', formatNum(snap.psnSessionTotal), 'PSN sessions total');
   }
 
+  const criticGapAvg = avgCriticGap(games);
+  if (criticGapAvg != null) {
+    push('~', 'is-amber', `${criticGapAvg} pts`, 'critic gap (avg)', null, { weight: W.moderate });
+  }
+  const champ = peoplesChamp(games);
+  if (champ) {
+    push('*', 'is-violet', `${champ.g.name} · +${champ.gap}`, "people's champ", null, { weight: W.moderate });
+  }
+  const darling = criticsDarling(games);
+  if (darling) {
+    push('*', 'is-amber', `${darling.g.name} · ${darling.score}`, "critics' darling", null, { weight: W.moderate });
+  }
+  const overrated = overratedLeader(games);
+  if (overrated) {
+    push('^', 'is-rose', `${overrated.g.name} · ${overrated.gap}`, 'overrated index', null, { weight: W.cryptic });
+  }
+  const betaCount = perpetualBetaCount(snap);
+  if (betaCount != null) {
+    push('^', 'is-rose', formatNum(betaCount), 'perpetual beta', null, { weight: W.moderate });
+  }
+  const couch = couchReadyRate(snap);
+  if (couch != null) {
+    push('>', '', formatPct100(couch), 'couch-ready %', null, { weight: W.friendly });
+  }
+  const agingDays = acquireToPlayDaysAvg(snap);
+  if (agingDays != null) {
+    push('~', 'is-amber', `${formatNum(agingDays)}d`, 'aging curve', null, { weight: W.moderate });
+  }
+  const dayOne = dayOnePlayerCount(snap);
+  if (dayOne != null) {
+    push('+', 'is-emerald', formatNum(dayOne), 'day-one player', null, { weight: W.friendly });
+  }
+  const extraInn = extraInningsAvg(snap);
+  if (extraInn != null) {
+    push('~', 'is-amber', `${formatNum(extraInn)}h`, 'extra innings', null, { weight: W.moderate });
+  }
+  const gpCount = gamePassCount(snap);
+  if (gpCount != null) {
+    push('*', 'is-violet', formatNum(gpCount), "subscriber's dividend", null, { weight: W.friendly });
+  }
+  const dDips = doubleDipCount();
+  if (dDips != null) {
+    push('>', '', formatNum(dDips), 'double dips', null, { weight: W.moderate });
+  }
+  const cpf = costPerFinish(snap);
+  if (cpf != null) {
+    push('#', 'is-violet', formatDollarMarquee(cpf), 'cost per finish', null, { weight: W.moderate });
+  }
+  const sunk = sunkCostUnplayed(snap);
+  if (sunk != null) {
+    push('#', 'is-violet', formatDollarMarquee(sunk), 'sunk cost', null, { weight: W.moderate });
+  }
+  const mortality = backlogMortality(snap);
+  if (mortality) {
+    const who = mortality.verdict === 'backlog' ? 'Backlog wins' : 'You might';
+    push('^', mortality.verdict === 'backlog' ? 'is-rose' : 'is-emerald', `${who} · age ${mortality.finishByAge}`, 'will you die first?', null, { weight: W.cryptic });
+  }
+
+  const deckReady = protonReadyShare(games);
+  if (deckReady != null) {
+    push('>', '', `${Math.round(deckReady * 100)}%`, 'Deck-ready %', null, { weight: W.normal });
+  }
+  const protonPlat = protonCount(games, 'platinum');
+  if (protonPlat != null) {
+    push('+', 'is-emerald', formatNum(protonPlat), 'Proton platinum', null, { weight: W.normal });
+  }
+  const borked = protonCount(games, 'borked');
+  if (borked != null) {
+    push('^', 'is-rose', formatNum(borked), 'borked on Linux', null, { weight: W.moderate });
+  }
+  const trendingUp = protonTrendingUp(games);
+  if (trendingUp != null) {
+    push('*', 'is-violet', formatNum(trendingUp), 'Proton trending up', null, { weight: W.cryptic });
+  }
+  const deckBacklog = protonDeckReadyBacklog(games, status);
+  if (deckBacklog != null) {
+    push('~', 'is-amber', formatNum(deckBacklog), 'Deck-ready backlog', null, { weight: W.moderate });
+  }
+
+  const platEarned = psnPlatinumsEarned(games);
+  if (platEarned != null) {
+    push('+', 'is-emerald', formatNum(platEarned), 'platinums earned', null, { weight: W.normal });
+  }
+  const platHunt = psnPlatinumHunt(games);
+  if (platHunt != null) {
+    push('*', 'is-amber', formatNum(platHunt), 'platinum hunt', null, { weight: W.moderate });
+  }
+  const troEarned = psnTrophiesEarned(games);
+  if (troEarned != null) {
+    push('>', '', formatNum(troEarned), 'trophies earned', null, { weight: W.normal });
+  }
+
+  const ps5Share = ps5NativeShare(games);
+  if (ps5Share != null) {
+    push('>', '', `${Math.round(ps5Share * 100)}%`, 'PS5-native %', null, { weight: W.moderate });
+  }
+  const ps4Only = ps4Holdouts(games);
+  if (ps4Only != null) {
+    push('^', 'is-rose', formatNum(ps4Only), 'PS4 holdouts', null, { weight: W.cryptic });
+  }
+
+  const tagTop = topTag(games);
+  if (tagTop) {
+    push('>', '', `${tagTop.tag} · ${formatNum(tagTop.count)}`, 'top tag', null, { weight: W.normal });
+  }
+  const mpShare = multiplayerTagShare(games);
+  if (mpShare != null) {
+    push('>', '', `${Math.round(mpShare * 100)}%`, 'multiplayer share', null, { weight: W.normal });
+  }
+  const spBacklog = singleplayerBacklogCount(games, status);
+  if (spBacklog != null) {
+    push('~', 'is-amber', formatNum(spBacklog), 'singleplayer backlog', null, { weight: W.moderate });
+  }
+
+  const freeItch = freeItchCount(games);
+  if (freeItch != null) {
+    push('+', 'is-emerald', formatNum(freeItch), 'free itch games', null, { weight: W.normal });
+  }
+  const itchSpend = itchSpendTotal(games);
+  if (itchSpend != null) {
+    push('#', 'is-violet', formatDollarMarquee(itchSpend), 'itch spend', null, { weight: W.moderate });
+  }
+
+  const installed = installedLocalCount(games);
+  if (installed != null) {
+    push('>', '', formatNum(installed), 'installed locally', null, { weight: W.normal });
+  }
+  const recent30 = recentlyPlayedCount(games);
+  if (recent30 != null) {
+    push('*', 'is-violet', formatNum(recent30), 'played in last 30d', null, { weight: W.normal });
+  }
+
+  const mcClub = metacriticClubCount(games);
+  if (mcClub != null) {
+    push('+', 'is-emerald', formatNum(mcClub), 'Metacritic 90+ club', null, { weight: W.moderate });
+  }
+
+  const upcomingWl = upcomingWishlistCount(wl);
+  if (upcomingWl != null) {
+    push('*', 'is-amber', formatNum(upcomingWl), 'upcoming wishlist', null, { weight: W.moderate });
+  }
+
+  const silverNative = protonSilverNativeShare(games);
+  if (silverNative != null) {
+    push('>', '', `${Math.round(silverNative * 100)}%`, 'silver or native %', null, { weight: W.moderate });
+  }
+  const protonLowConf = protonLowConfidenceCount(games);
+  if (protonLowConf != null) {
+    push('^', 'is-rose', formatNum(protonLowConf), 'Proton low confidence', null, { weight: W.moderate });
+  }
+  const avgProton = avgProtonScore(games);
+  if (avgProton != null) {
+    push('~', 'is-amber', String(avgProton), 'avg Proton score', null, { weight: W.cryptic });
+  }
+
+  const onSaleOwned = boughtOnSaleCount(games);
+  if (onSaleOwned != null) {
+    push('#', 'is-violet', formatNum(onSaleOwned), 'bought on sale', null, { weight: W.moderate });
+  }
+  const paidItch = paidItchCount(games);
+  if (paidItch != null) {
+    push('#', 'is-violet', formatNum(paidItch), 'paid itch games', null, { weight: W.normal });
+  }
+  const avgSteamPrice = avgOwnedSteamPrice(games);
+  if (avgSteamPrice != null) {
+    push('#', 'is-violet', formatDollarMarquee(avgSteamPrice), 'avg owned Steam price', null, { weight: W.moderate });
+  }
+
+  const prioWl = priorityWishlistCount(wl);
+  if (prioWl != null) {
+    push('*', 'is-violet', formatNum(prioWl), 'priority wishlist', null, { weight: W.moderate });
+  }
+  const wlThisYear = wishlistAddedThisYear(wl);
+  if (wlThisYear != null) {
+    push('+', 'is-emerald', formatNum(wlThisYear), 'wishlist added this year', null, { weight: W.normal });
+  }
+  const wlStores = wishlistStoreCount(wl);
+  if (wlStores != null) {
+    push('>', '', formatNum(wlStores), 'wishlist stores', null, { weight: W.normal });
+  }
+
+  const seenWeek = lastSeenThisWeek(games);
+  if (seenWeek != null) {
+    push('*', 'is-violet', formatNum(seenWeek), 'last seen this week', null, { weight: W.normal });
+  }
+  const launcher = launcherInstallCount(games);
+  if (launcher != null) {
+    push('>', '', formatNum(launcher), 'launcher installs', null, { weight: W.normal });
+  }
+  const hltbLo = hltbLowConfidenceCount(games);
+  if (hltbLo != null) {
+    push('^', 'is-rose', formatNum(hltbLo), 'HLTB low confidence', null, { weight: W.moderate });
+  }
+
+  const coopTagOnly = coopTaggedOnlyCount(games);
+  if (coopTagOnly != null) {
+    push('~', 'is-amber', formatNum(coopTagOnly), 'co-op tagged only', null, { weight: W.cryptic });
+  }
+  const partialPad = partialControllerCount(games);
+  if (partialPad != null) {
+    push('>', '', formatNum(partialPad), 'partial controller', null, { weight: W.moderate });
+  }
+  const indieShare = indieTaggedShare(games);
+  if (indieShare != null) {
+    push('>', '', `${Math.round(indieShare * 100)}%`, 'indie-tagged %', null, { weight: W.normal });
+  }
+
+  const troComp = avgTrophyCompletion(games);
+  if (troComp != null) {
+    push('~', 'is-amber', `${Math.round(troComp * 100)}%`, 'avg trophy completion', null, { weight: W.normal });
+  }
+  const gsComp = gamerscoreCompletionShare(games);
+  if (gsComp != null) {
+    push('~', 'is-amber', `${Math.round(gsComp * 100)}%`, 'gamerscore completion %', null, { weight: W.normal });
+  }
+
+  const mc80Unplayed = metacritic80UnplayedCount(games);
+  if (mc80Unplayed != null) {
+    push('*', 'is-amber', formatNum(mc80Unplayed), 'Metacritic 80+ unplayed', null, { weight: W.moderate });
+  }
+  const gapGame = biggestCriticGapGame(games);
+  if (gapGame) {
+    push('^', 'is-rose', `${gapGame.g.name} · ${gapGame.gap} pts`, 'biggest critic gap', null, { weight: W.moderate });
+  }
+
+  const eaBacklog = earlyAccessBacklogCount(games, status);
+  if (eaBacklog != null) {
+    push('^', 'is-rose', formatNum(eaBacklog), 'early access backlog', null, { weight: W.moderate });
+  }
+  const dipBacklog = doubleDipBacklogCount(games, status);
+  if (dipBacklog != null) {
+    push('>', '', formatNum(dipBacklog), 'double-dip backlog', null, { weight: W.moderate });
+  }
+  const letterCov = letterCoverageShare(games);
+  if (letterCov != null) {
+    push('?', 'is-violet', `${Math.round(letterCov * 100)}%`, 'letter coverage %', null, { weight: W.friendly });
+  }
+
   appendCreativeMarqueeChips(push, games, snap, METRIC_WEIGHT);
 
   // kojima metric — super-rare MGSV codec easter egg
@@ -753,7 +1105,9 @@ export function buildMarqueeItems(games, snapIn) {
     iconTitle: 'kojima',
   });
 
-  return spreadByFamily(applyMetricWeights(items), it => it.family, { wrap: true });
+  noteMarqueeMetricKeys(items.map((it) => metricKeyForLabel(it.label)));
+  const enabledItems = items.filter((it) => isMarqueeMetricEnabled(it.label));
+  return spreadByFamily(applyMetricWeights(enabledItems), it => it.family, { wrap: true });
 }
 
 export function renderMarqueeHtml(items) {

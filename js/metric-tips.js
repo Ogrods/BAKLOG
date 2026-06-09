@@ -1,6 +1,10 @@
 // Tooltip copy for dashboard marquee chips and rotating insights.
 // Sabermetrics entries include the calculation; regular metrics are plain-language.
 
+/** Review % = store rating; Mendoza = median backlog review % (replacement level). */
+const WAR_FORMULA_EXPLAIN =
+  'Review % = store rating (e.g. Steam positive %). Mendoza line = median review % of your backlog — replacement-level. WAR = (review % − Mendoza) ÷ 10 + length/deal bonuses.';
+
 /** @type {Record<string, string>} */
 export const METRIC_TIPS = {
   // Library counts
@@ -67,7 +71,7 @@ export const METRIC_TIPS = {
   'backlog pace (median HLTB)': 'Median HLTB main hours across backlog - typical commitment per pick.',
   'hoard rate (never touched)': 'Share of library with zero playtime (never launched).',
   'quality start rate': 'Share of played games where playtime ≥ 40% of HLTB main (a real session).',
-  'top WAR': 'Highest WAR among backlog/next/playing: (rating − Mendoza)/10 + length/deal bonuses.',
+  'top WAR': `Highest WAR among backlog/next/playing. ${WAR_FORMULA_EXPLAIN}`,
   'cleanup candidates': 'Games flagged as cleanup candidates (low rating, no playtime, etc.).',
   'clutch picks': 'Backlog games that are leverage picks: ≥80% rated, on sale, ≤15h.',
   'finish streak': 'Hot/warm/cold from recent finishes: hot = 3+ recent, cold = none or stale.',
@@ -121,6 +125,89 @@ export const METRIC_TIPS = {
   'PSN library tenure': 'Years since your earliest recorded PSN first_played date.',
   'session grinder': 'High session count relative to hours played (short repeat launches).',
 
+  // New-data sabermetrics (Metacritic, acquired_at, early access, controller, HLTB depth, Game Pass, cross-store)
+  'critic gap (avg)': 'Mean |Steam review % − Metacritic| across games with both scores.',
+  "people's champ": 'Owned title with the biggest positive critic gap (players rate higher than critics).',
+  "critics' darling": 'Highest Metacritic score among owned games you have never launched.',
+  'overrated index': 'Owned title where critics scored highest vs players (biggest negative gap).',
+  'perpetual beta': 'Early-access titles still in your library.',
+  'couch-ready %': 'Share of library with full controller support (Steam enrichment).',
+  'aging curve': 'Average days from acquired_at to first recorded play session.',
+  'day-one player': 'Games you launched within 24 hours of acquiring.',
+  'extra innings': 'Average HLTB completionist − main gap (optional content beyond the main story).',
+  "subscriber's dividend": 'Titles playable via Xbox Game Pass or EA Play (game_pass flag).',
+  'double dips': 'Same game owned on two or more storefronts (cross-store dedup).',
+  'cost per finish': 'Total library MSRP (priced rows) ÷ games marked finished.',
+  'sunk cost': 'Sum of MSRP for owned games with zero playtime.',
+  'will you die first?': 'If backlog clear-by age (2h/day pace) exceeds life expectancy, the backlog wins.',
+
+  // ProtonDB / Steam Deck (ProtonDB data ODbL)
+  'Deck-ready %': 'Share of ProtonDB-rated games that run great on Linux/Steam Deck (platinum or gold tier).',
+  'Proton platinum': 'Games ProtonDB rates platinum — run flawlessly on Linux/Deck out of the box.',
+  'borked on Linux': "Games ProtonDB rates borked — currently won't run on Linux/Steam Deck.",
+  'Proton trending up': 'Games whose recent ProtonDB reports trend better than their overall tier.',
+  'Deck-ready backlog': 'Backlog games you can comfortably play on Steam Deck now (Proton platinum or gold).',
+
+  // PSN platinum & platform
+  'platinums earned': "PlayStation platinum trophies you've earned across your library.",
+  'platinum hunt': "Owned PSN games with a platinum trophy you haven't earned yet.",
+  'trophies earned': 'Total PlayStation trophies earned across your PSN library.',
+  'PS5-native %': 'Share of your PlayStation library that runs natively on PS5.',
+  'PS4 holdouts': 'PSN titles that are PS4-only — no native PS5 version in your library.',
+
+  // Steam tags
+  'top tag': 'The Steam community tag that appears on the most games in your library.',
+  'multiplayer share': 'Share of tagged games tagged multiplayer, co-op, PvP, or online.',
+  'singleplayer backlog': 'Backlog games tagged single-player — solo experiences waiting.',
+
+  // itch / install / recency
+  'free itch games': 'itch.io titles in your library with zero minimum price.',
+  'itch spend': 'Total minimum price of paid itch.io games you own.',
+  'installed locally': 'Games detected as installed locally on this machine (launcher scan).',
+  'played in last 30d': "Games you've launched in the past 30 days.",
+  'Longest dormant': "The game you once played but haven't touched for the longest stretch.",
+  'upcoming wishlist': "Wishlist items that haven't released yet (coming soon).",
+
+  // Metacritic expansion
+  'Avg Metacritic': 'Average Metacritic critic score across games that have one.',
+  'Metacritic 90+ club': 'Owned games with a Metacritic critic score of 90 or above.',
+  'Metacritic 80+ unplayed': 'Owned games with Metacritic ≥ 80 and zero playtime.',
+  'biggest critic gap': 'Owned title with the largest gap between Steam review % and Metacritic score.',
+
+  // ProtonDB batch 2
+  'silver or native %': 'Share of ProtonDB-rated games at silver or native tier (good Linux/Deck compatibility).',
+  'Proton low confidence': 'ProtonDB-rated games where confidence is inadequate — thin report data.',
+  'avg Proton score': 'Mean ProtonDB score across rated games in your library.',
+
+  // Pricing batch 2
+  'bought on sale': 'Steam games in your library purchased with a discount (discount_percent > 0).',
+  'paid itch games': 'itch.io titles you own with a non-zero minimum price.',
+  'avg owned Steam price': 'Average purchase/list price across priced Steam games you own.',
+
+  // Wishlist batch 2
+  'priority wishlist': 'Wishlist items with a non-zero priority rank.',
+  'wishlist added this year': 'Wishlist items added since January 1 of the current year.',
+  'wishlist stores': 'Distinct storefronts represented on your wishlist.',
+
+  // Play / install batch 2
+  'last seen this week': 'Games launched or seen locally in the past 7 days.',
+  'launcher installs': 'Games detected as installed via the local launcher scan.',
+  'HLTB low confidence': 'Games with an HLTB match but sub-perfect match confidence.',
+
+  // Tags / platform batch 2
+  'co-op tagged only': 'Games tagged co-op/multiplayer but without coop_online or coop_local flags.',
+  'partial controller': 'Games with partial (not full) controller support.',
+  'indie-tagged %': 'Share of tagged games that carry the Indie community tag.',
+
+  // PSN / Xbox batch 2
+  'avg trophy completion': 'Mean trophy completion % across PSN games with trophy totals.',
+  'gamerscore completion %': 'Your earned Xbox gamerscore ÷ total available across Xbox library.',
+
+  // Identity batch 2
+  'early access backlog': 'Backlog games still marked early access on their store.',
+  'double-dip backlog': 'Backlog titles you own on two or more storefronts.',
+  'letter coverage %': 'Share of A–Z title initials present in your library (26 = full alphabet).',
+
   // Creative metrics (marquee)
   'comfort genre': 'Genre with the most finished games - where you actually deliver.',
   'blind spot genre': 'Genre with many owned titles but few or no finishes.',
@@ -137,8 +224,14 @@ export const METRIC_TIPS = {
   'missing A–Z letters': 'Letters missing from the A–Z of game title initials in your library.',
   'backlog in work-weeks': 'Backlog HLTB hours expressed in 40-hour work-weeks.',
   'at historical low now': 'Wishlist items currently at an all-time or yearly low.',
-  'oldest wishlist': 'Wishlist item waiting the longest.',
+  'oldest wishlist': 'Wishlist item waiting the longest (by wishlist_added or added_at date).',
   'gay character: you, the player.': 'Rare MGSV codec easter egg — you are the gay character.',
+
+  // Dynamic marquee labels (prefix-matched at runtime)
+  'below Mendoza': 'Backlog games whose store review % is below the Mendoza line (median backlog review %).',
+  'added in': 'Games added to the library during this calendar year.',
+  'net adds in': 'Adds minus finishes this year (net library growth).',
+  'playtime in': 'Share of all playtime spent in this one game (monogamy).',
 
   // Insight-only concepts (leading text before colon)
   'Biggest backlog': 'Genre with the most backlog HLTB hours stacked up.',
@@ -152,10 +245,11 @@ export const METRIC_TIPS = {
   'Quick wins ready': 'Backlog games ≥75% rated with HLTB ≤ quick-win max hours.',
   'Hidden gems': '90%+ rated, enough reviews, zero playtime.',
   'Clutch pick': 'Best leverage pick: strong rating, on sale, short HLTB.',
-  'Mendoza line': 'Replacement level = median backlog rating; WAR is measured against this baseline.',
+  'Mendoza line':
+    'Mendoza line = median store review % across your backlog — replacement-level. WAR scores how far above or below this baseline each pick sits.',
   'Closest to 100%': 'Tracked game nearest full trophy completion.',
   'Finish rate': 'Completion average: finished ÷ (finished + unfinished), shown as .XXX.',
-  'Top WAR pick': 'Highest-WAR active pick: (rating − Mendoza)/10 + length/deal bonuses.',
+  'Top WAR pick': `Your highest-WAR active pick (backlog/next/playing). ${WAR_FORMULA_EXPLAIN}`,
   Pythagorean: 'Hours-based expected completion vs actual finish rate; over/underperforming label.',
   'Backlog diagnosis': 'Creative snapshot of backlog health (collector, finisher, hoarder, etc.).',
   'Shelf warmer': 'Owned game sitting longest without meaningful progress.',
@@ -165,7 +259,15 @@ export const METRIC_TIPS = {
   'One-hit dev': 'Developer with many owned games but zero finishes.',
   'One that got away': 'Wishlist deal you may have missed.',
   'Backlog =': 'Backlog HLTB hours expressed in standard work-weeks.',
+  "People's champ": 'Owned title with the biggest positive critic gap (players > critics).',
+  'Extra innings': 'Average completionist − main HLTB hours across games with both estimates.',
+  'Double dips': 'Count of titles you own on two or more storefronts.',
+  'Will you die first?': 'Backlog clear-by age at 2h/day vs a playful life expectancy — who wins?',
+  'Critic gap': 'Mean |Steam review % − Metacritic| across rated library rows.',
 };
+
+/** Canonical metric ids for the admin Metrics tab and dashboard disable filter. */
+export const METRIC_KEYS = Object.freeze(Object.keys(METRIC_TIPS));
 
 /**
  * Tooltip copy for the rotating hero spotlight eyebrows. Keyed by the exact
@@ -197,7 +299,7 @@ export const EYEBROW_TIPS = {
   'Fast finish': '≤4h to beat - knock it out fast.',
   'Worth a look': 'Rated 70%+ - a reasonable option from the backlog.',
   // Saber / creative superlatives
-  'MVP pick': 'Highest WAR among active picks: (rating − Mendoza)/10 plus length & deal bonuses.',
+  'MVP pick': `Highest WAR among active picks. ${WAR_FORMULA_EXPLAIN}`,
   Completionist: 'Earned every trophy/achievement - 100% complete.',
   Whale: 'The priciest game (by MSRP) you own but have never launched.',
   'Gathering dust': 'The game that has sat unplayed on your shelf the longest.',
@@ -283,10 +385,10 @@ export function eyebrowTip(eyebrow) {
 }
 
 const PREFIX_TIPS = [
-  { prefix: 'below Mendoza', tip: 'Backlog games rated below the Mendoza line (median backlog rating).' },
-  { prefix: 'added in', tip: 'Games added to the library during this calendar year.' },
-  { prefix: 'net adds in', tip: 'Adds minus finishes this year (net library growth).' },
-  { prefix: 'playtime in', tip: 'Share of all playtime spent in this one game (monogamy).' },
+  { prefix: 'below Mendoza', key: 'below Mendoza' },
+  { prefix: 'added in', key: 'added in' },
+  { prefix: 'net adds in', key: 'net adds in' },
+  { prefix: 'playtime in', key: 'playtime in' },
 ];
 
 function normalizeLabel(label) {
@@ -297,22 +399,37 @@ function normalizeLabel(label) {
   return s;
 }
 
-/** Case-insensitive fallback for METRIC_TIPS keys (e.g. marquee chip "hidden gems" vs "Hidden gems"). */
-const METRIC_TIPS_LOWER = Object.fromEntries(
-  Object.entries(METRIC_TIPS).map(([k, v]) => [k.toLowerCase(), v]),
+/** Case-insensitive label → canonical METRIC_TIPS key. */
+const METRIC_KEY_LOWER = Object.fromEntries(
+  METRIC_KEYS.map((k) => [k.toLowerCase(), k]),
 );
 
-function tipFromMap(label) {
+/**
+ * Resolve a display label to its canonical METRIC_TIPS key, or '' if unknown.
+ * @param {string} label
+ * @returns {string}
+ */
+export function metricKeyForLabel(label) {
   if (!label) return '';
-  const exact = METRIC_TIPS[label];
-  if (exact) return exact;
+  if (METRIC_TIPS[label]) return label;
   const norm = normalizeLabel(label);
-  if (METRIC_TIPS[norm]) return METRIC_TIPS[norm];
+  if (METRIC_TIPS[norm]) return norm;
   const lower = label.toLowerCase();
-  if (METRIC_TIPS_LOWER[lower]) return METRIC_TIPS_LOWER[lower];
+  if (METRIC_KEY_LOWER[lower]) return METRIC_KEY_LOWER[lower];
   const normLower = norm.toLowerCase();
-  if (METRIC_TIPS_LOWER[normLower]) return METRIC_TIPS_LOWER[normLower];
+  if (METRIC_KEY_LOWER[normLower]) return METRIC_KEY_LOWER[normLower];
+  for (const { prefix, key } of PREFIX_TIPS) {
+    if (label.startsWith(prefix) || norm.startsWith(prefix)) return key;
+  }
+  if (label === 'hot' || label === 'warm' || label === 'cold') {
+    return 'finish streak';
+  }
   return '';
+}
+
+function tipFromMap(label) {
+  const key = metricKeyForLabel(label);
+  return key ? METRIC_TIPS[key] : '';
 }
 
 /**
@@ -323,13 +440,6 @@ export function marqueeTip(label) {
   if (!label) return '';
   const fromMap = tipFromMap(label);
   if (fromMap) return fromMap;
-  const norm = normalizeLabel(label);
-  for (const { prefix, tip } of PREFIX_TIPS) {
-    if (label.startsWith(prefix) || norm.startsWith(prefix)) return tip;
-  }
-  if (label === 'hot' || label === 'warm' || label === 'cold') {
-    return METRIC_TIPS['finish streak'];
-  }
   return '';
 }
 
@@ -338,6 +448,36 @@ function stripHtml(html) {
     .replace(/<[^>]+>/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Resolve insight ticker HTML to its canonical METRIC_TIPS key, or '' if unknown.
+ * @param {string} html
+ * @returns {string}
+ */
+export function metricKeyForInsight(html) {
+  const text = stripHtml(html);
+  if (!text) return '';
+  const colon = text.indexOf(':');
+  const concept = colon >= 0 ? text.slice(0, colon).trim() : text;
+  const fromMap = metricKeyForLabel(concept) || metricKeyForLabel(text);
+  if (fromMap) return fromMap;
+  if (text.includes('yrs to clear at your pace') || text.includes('to clear at your pace')) {
+    return metricKeyForLabel('to clear at your pace');
+  }
+  if (text.includes('work-weeks') || text.startsWith('Backlog =')) {
+    return metricKeyForLabel('Backlog =');
+  }
+  if (text.startsWith('Finish backlog by age')) {
+    return '';
+  }
+  if (text.startsWith('~') && text.includes('yrs to clear')) {
+    return metricKeyForLabel('to clear at your pace');
+  }
+  if (text.includes('still untouched') || text.startsWith('Added')) {
+    return metricKeyForLabel('Added');
+  }
+  return metricKeyForLabel(concept);
 }
 
 /**
@@ -351,9 +491,6 @@ export function insightTip(html) {
   const concept = colon >= 0 ? text.slice(0, colon).trim() : text;
   const fromMap = tipFromMap(concept) || tipFromMap(text);
   if (fromMap) return fromMap;
-  for (const { prefix, tip } of PREFIX_TIPS) {
-    if (concept.startsWith(prefix) || text.startsWith(prefix)) return tip;
-  }
   if (text.includes('yrs to clear at your pace') || text.includes('to clear at your pace')) {
     return METRIC_TIPS['to clear at your pace'];
   }

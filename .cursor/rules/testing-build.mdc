@@ -20,6 +20,9 @@ alwaysApply: false
 
 ```powershell
 npm test
+npm run lint                    # ESLint weight guardrails (warnings)
+npm run check:module-size       # js/*.js line cap (3800)
+npm run check:bundle-size       # requires npm run build first
 ```
 
 - Config: `vitest.config.js`

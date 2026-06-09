@@ -120,6 +120,12 @@ jobs:
       - name: Run vitest
         run: npm test
 
+      - name: Check JS module size budget
+        run: npm run check:module-size
+
+      - name: Lint JavaScript (weight guardrails)
+        run: npm run lint
+
   frontend-build:
     name: Frontend build (esbuild)
     runs-on: ubuntu-latest
@@ -144,3 +150,6 @@ jobs:
 
       - name: Verify manifest
         run: node -e "const m=require('./dist/manifest.json'); if(!m['js/app.js']||!m['app.css']) process.exit(1)"
+
+      - name: Check bundle size budget
+        run: npm run check:bundle-size

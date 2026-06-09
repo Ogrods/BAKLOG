@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 _BUILT_MANIFEST_CACHE: dict | None = None
+_BUILT_MANIFEST_MTIME: float | None = None
 
 
 def is_frozen() -> bool:
@@ -52,16 +53,21 @@ def serve_built_frontend() -> bool:
 
 def load_built_manifest() -> dict:
     """Parsed dist/manifest.json; empty dict when not serving built frontend."""
-    global _BUILT_MANIFEST_CACHE
+    global _BUILT_MANIFEST_CACHE, _BUILT_MANIFEST_MTIME
     if not serve_built_frontend():
         return {}
-    if _BUILT_MANIFEST_CACHE is None:
-        try:
-            _BUILT_MANIFEST_CACHE = json.loads(
-                built_manifest_path().read_text(encoding="utf-8")
-            )
-        except (OSError, json.JSONDecodeError):
-            _BUILT_MANIFEST_CACHE = {}
+    path = built_manifest_path()
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return {}
+    if _BUILT_MANIFEST_CACHE is not None and _BUILT_MANIFEST_MTIME == mtime:
+        return _BUILT_MANIFEST_CACHE
+    try:
+        _BUILT_MANIFEST_CACHE = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        _BUILT_MANIFEST_CACHE = {}
+    _BUILT_MANIFEST_MTIME = mtime
     return _BUILT_MANIFEST_CACHE
 
 

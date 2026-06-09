@@ -71,6 +71,7 @@ from shared.dev_server_pids import (
 )
 from shared.install_paths import (
     built_immutable_assets,
+    built_manifest_path,
     bundle_root,
     data_root,
     is_frozen,
@@ -2540,14 +2541,25 @@ def _run_accessible(run: Run | None) -> Run | None:
 
 
 _BUILT_INDEX_HTML_CACHE: str | None = None
+_BUILT_INDEX_MANIFEST_MTIME: float | None = None
+
+
+def _built_index_manifest_mtime() -> float | None:
+    try:
+        return built_manifest_path().stat().st_mtime
+    except OSError:
+        return None
 
 
 def _built_index_html() -> str | None:
     """index.html with hashed dist/ asset URLs when serving built frontend."""
-    global _BUILT_INDEX_HTML_CACHE
+    global _BUILT_INDEX_HTML_CACHE, _BUILT_INDEX_MANIFEST_MTIME
     if not serve_built_frontend():
         return None
-    if _BUILT_INDEX_HTML_CACHE is not None:
+    mtime = _built_index_manifest_mtime()
+    if mtime is None:
+        return None
+    if _BUILT_INDEX_HTML_CACHE is not None and _BUILT_INDEX_MANIFEST_MTIME == mtime:
         return _BUILT_INDEX_HTML_CACHE
     manifest = load_built_manifest()
     entry = manifest.get("js/app.js")
@@ -2559,6 +2571,7 @@ def _built_index_html() -> str | None:
     html = html.replace('href="tailwind.css"', f'href="dist/{tailwind}"', 1)
     html = html.replace('href="app.css"', f'href="dist/{app_css}"', 1)
     html = html.replace('src="js/app.js"', f'src="dist/{entry}"', 1)
+    _BUILT_INDEX_MANIFEST_MTIME = mtime
     _BUILT_INDEX_HTML_CACHE = html
     return html
 

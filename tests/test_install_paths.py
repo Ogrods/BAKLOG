@@ -27,8 +27,24 @@ def test_serve_built_false_without_manifest(monkeypatch, tmp_path):
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
     monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
     install_paths._BUILT_MANIFEST_CACHE = None
+    install_paths._BUILT_MANIFEST_MTIME = None
     assert install_paths.serve_built_frontend() is False
     assert install_paths.load_built_manifest() == {}
+
+
+def test_manifest_cache_invalidates_on_mtime_change(monkeypatch, tmp_path):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    manifest = dist / "manifest.json"
+    manifest.write_text('{"js/app.js":"js/app-OLD.js"}', encoding="utf-8")
+    monkeypatch.setenv("BAKLOG_SERVE_BUILT", "1")
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
+    monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
+    install_paths._BUILT_MANIFEST_CACHE = None
+    install_paths._BUILT_MANIFEST_MTIME = None
+    assert install_paths.load_built_manifest()["js/app.js"] == "js/app-OLD.js"
+    manifest.write_text('{"js/app.js":"js/app-NEW.js"}', encoding="utf-8")
+    assert install_paths.load_built_manifest()["js/app.js"] == "js/app-NEW.js"
 
 
 def test_serve_built_true_with_flag_and_manifest(monkeypatch, tmp_path):
@@ -42,6 +58,7 @@ def test_serve_built_true_with_flag_and_manifest(monkeypatch, tmp_path):
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
     monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
     install_paths._BUILT_MANIFEST_CACHE = None
+    install_paths._BUILT_MANIFEST_MTIME = None
     assert install_paths.serve_built_frontend() is True
     manifest = install_paths.load_built_manifest()
     assert manifest["app.css"] == "app.abc.css"

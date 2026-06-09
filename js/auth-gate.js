@@ -8,7 +8,13 @@ import { stopBootTipRotation } from './tips.js';
 // Loaded lazily inside initAuthGate so merely importing this module (e.g. via
 // api-client.js in unit tests) never triggers the remote esm.sh fetch, and the
 // network request only happens when account auth is actually enabled.
-const SUPABASE_MODULE = './vendor/supabase-js.mjs';
+/** Dev: js/vendor; built chunks live under dist/js/chunks/ so use /dist/vendor. */
+function supabaseModuleUrl() {
+  if (import.meta.url.includes('/dist/js/')) {
+    return '/dist/vendor/supabase-js.mjs';
+  }
+  return './vendor/supabase-js.mjs';
+}
 
 let _config = null;
 let _supabase = null;
@@ -248,7 +254,7 @@ export async function initAuthGate() {
     return new Promise(() => {}); // unrecoverable without config; stay gated
   }
 
-  const { createClient } = await import(SUPABASE_MODULE);
+  const { createClient } = await import(supabaseModuleUrl());
   _supabase = createClient(url, key, {
     auth: {
       persistSession: true,

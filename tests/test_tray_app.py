@@ -66,14 +66,21 @@ def test_controller_start_spawns_and_waits(monkeypatch):
     calls: list[list[str]] = []
     port_seq = iter([False, False, True])
 
+    class LiveProc:
+        args = ()
+        pid = 4242
+        returncode = None
+
+        def poll(self):
+            return None
+
+        def communicate(self, timeout=None):
+            return (b"", b"")
+
     def fake_popen(argv, **kwargs):
         calls.append(argv)
-        proc = MagicMock(spec=tray_app.subprocess.Popen)
-        proc.poll.return_value = None
+        proc = LiveProc()
         proc.args = argv
-        proc.pid = 4242
-        proc.returncode = None
-        proc.communicate.return_value = (b"", b"")
         return proc
 
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: next(port_seq, True))
@@ -85,14 +92,21 @@ def test_controller_start_spawns_and_waits(monkeypatch):
 
 
 def test_controller_start_fails_when_child_exits_early(monkeypatch):
+    class DeadProc:
+        returncode = 1
+        pid = 4242
+
+        def __init__(self, argv):
+            self.args = argv
+
+        def poll(self):
+            return 1
+
+        def communicate(self, timeout=None):
+            return (b"", b"")
+
     def fake_popen(*args, **kwargs):
-        proc = MagicMock(spec=tray_app.subprocess.Popen)
-        proc.poll.return_value = 1
-        proc.args = args[0] if args else []
-        proc.pid = 4242
-        proc.returncode = 1
-        proc.communicate.return_value = (b"", b"")
-        return proc
+        return DeadProc(args[0] if args else [])
 
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
     monkeypatch.setattr(tray_app.subprocess, "Popen", fake_popen)

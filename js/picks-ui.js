@@ -11,6 +11,7 @@ import {
   libraryCoverFor,
   earlyAccessRibbonHtml,
 } from './game-core.js';
+import { safeCoverAttrUrl } from './covers.js';
 import { storeLogoHtml } from './store-logos.js';
 import {
   getDealInfo,
@@ -35,7 +36,7 @@ export function pickCardHtml(g) {
     <div class="pick-card relative rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
       <span class="pick-store">${storeLogoHtml(store, { size: 'sm' })}</span>
       <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
-        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${safeCoverAttrUrl(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
@@ -68,7 +69,7 @@ export function dealCardHtml(g) {
     <div class="pick-card relative rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
       <span class="pick-store" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLogoHtml(wishlistTarget, { size: 'sm' })}</span>
       <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
-        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${safeCoverAttrUrl(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>

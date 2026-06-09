@@ -405,14 +405,27 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
     if missing:
         raise ValueError(f"missing required fields: {', '.join(missing)}")
     if provider == "itch":
-        from auth.api_keys import validate_itch_key
+        from auth.api_keys import KEY_UNREACHABLE, KEY_VALID, validate_itch_key
 
-        if not validate_itch_key(cleaned["ITCH_API_KEY"]):
+        # A network blip must not look like a rejected key — surface a
+        # "try again" message and leave the provider's stored state untouched
+        # (we only mark_connected on a confirmed-valid key below).
+        result = validate_itch_key(cleaned["ITCH_API_KEY"])
+        if result == KEY_UNREACHABLE:
+            raise ValueError(
+                "Couldn't reach itch.io to verify this key — check your connection and try again."
+            )
+        if result != KEY_VALID:
             raise ValueError("itch.io rejected this API key — copy a fresh key from your API keys page")
     if provider == "itad":
-        from auth.api_keys import validate_itad_key
+        from auth.api_keys import KEY_UNREACHABLE, KEY_VALID, validate_itad_key
 
-        if not validate_itad_key(cleaned["ITAD_API_KEY"]):
+        result = validate_itad_key(cleaned["ITAD_API_KEY"])
+        if result == KEY_UNREACHABLE:
+            raise ValueError(
+                "Couldn't reach IsThereAnyDeal to verify this key — check your connection and try again."
+            )
+        if result != KEY_VALID:
             raise ValueError(
                 "ITAD rejected this API key — copy the API key UUID from isthereanydeal.com/apps/my/"
             )

@@ -36,6 +36,23 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Marketing: open-source (MIT) claim threaded through landing page (hero, trust,
   FAQ, footer, structured data) and README; canonical GitHub repo URL added to
   `shared/community.json`.
+- **Audit remediation (2026-06-09)** — static path guards moved to
+  `shared/server_static.py` (decode + casefold + realpath containment); app shell
+  `/` resolves `index.html` on Python 3.13+; cover URLs routed through escaped
+  `safeCoverAttrUrl` / `safeCoverCssUrl`; secrets master-key fallback hardened
+  (DPAPI/keychain, narrow except); Amazon raw-claims scrub third-party codes;
+  CDP `--remote-allow-origins` scoped; Epic OAuth callback always requires
+  server-minted state; landing `report.js` / `subscribe.js` rate limits + body
+  caps; API body limits and log redaction gaps closed; `findGameByKey` indexed;
+  localStorage quota guards; pre-push leak-scan hook; README/PRIVACY hosted-surface
+  copy reconciled.
+
+### Fixed
+
+- **App shell 404 with Supabase auth** — `GET /` returned 404 because Python
+  3.13 `translate_path` no longer maps directory requests to `index.html`.
+- **Vitest unhandled rejection** — `cancel-in-flight.test.js` now stubs
+  `EventSource` for fetcher SSE subscribe paths.
 
 ## [0.7.0] - 2026-06-08
 

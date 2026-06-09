@@ -5,6 +5,11 @@ import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 import { formatPlatformList } from './platform-labels.js';
 import {
+  LOG_PANEL_CHROME_HTML,
+  LOG_EMPTY_MESSAGE,
+  logCollapseLabel,
+} from './fetcher-health-log.js';
+import {
   noteFetcherAuthFailure,
   isProviderConnected,
   FETCHER_AUTH_PROVIDER,
@@ -1878,7 +1883,7 @@ export const fetcherRunner = (() => {
     const collapsed = isLogBodyCollapsed();
     btn.classList.toggle('is-collapsed', collapsed);
     btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    const label = collapsed ? 'Expand log panel' : 'Collapse log panel';
+    const label = logCollapseLabel(collapsed);
     btn.title = label;
     btn.setAttribute('aria-label', label);
   }
@@ -1901,19 +1906,7 @@ export const fetcherRunner = (() => {
     const panel = logPanel();
     if (!panel) return null;
     if (panel.dataset.built) return panel;
-    panel.innerHTML = `
-      <div class="fh-log-head">
-        <div class="fh-log-headings">
-          <span class="fh-log-title" data-role="title">Fetcher log</span>
-          <span class="fh-log-status" data-role="status" aria-live="polite">idle</span>
-        </div>
-        <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel" title="Stop all queued and running fetchers (Shift+click: force reset queue)">Cancel</button>
-        <button type="button" class="fh-log-btn" data-role="clear" title="Clear log output (does not stop running fetchers)">Clear</button>
-        <button type="button" class="fh-log-btn fh-log-toggle" data-role="close" aria-expanded="true" aria-label="Collapse log panel" title="Collapse log panel"><span class="fh-log-toggle-icon" aria-hidden="true">&#9662;</span></button>
-      </div>
-      <div class="fh-log-body" data-role="body"></div>
-      <button type="button" class="fh-log-jump hidden" data-role="jump" aria-label="Jump to latest line" title="Jump to latest">&darr;</button>
-    `;
+    panel.innerHTML = LOG_PANEL_CHROME_HTML;
     panel.dataset.built = '1';
     syncLogCollapseButton();
     panel.addEventListener('click', e => {
@@ -1957,7 +1950,7 @@ export const fetcherRunner = (() => {
     if (body && !body.children.length) {
       const empty = document.createElement('div');
       empty.className = 'fh-log-empty';
-      empty.textContent = 'No fetcher activity yet. Run a fetcher from the chips above to populate.';
+      empty.textContent = LOG_EMPTY_MESSAGE;
       body.appendChild(empty);
       followTail = true;
       clearFollowTailIdleTimer();
@@ -3242,11 +3235,6 @@ export function renderDashboardFetcherHealth() {
     const connectAttr = navProvider
       ? ` data-fetcher-connect="${escapeAttr(navProvider)}"`
       : '';
-    // #region agent log
-    if (src.key === 'battlenet' && (persistFailed || displayStatus === 'failed' || needsReconnect || disconnected || inAuthCooldown)) {
-      try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'A',location:'fetcher-health.js:3242',message:'battlenet chip render (failed-ish)',data:{navProvider:navProvider||null,lastRunFailed:lastRunFailedByKey.has(src.key),needsReconnect,disconnected,inAuthCooldown,disabled,status,displayStatus},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-    }
-    // #endregion
     const chipAriaLabel = `${chipLabel}, ${countStr}, ${ageText || status}`;
     const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(chipAriaLabel)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">
       <span class="fh-chip-dot"></span>

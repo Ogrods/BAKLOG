@@ -1,4 +1,4 @@
-import { escapeAttr } from './table-query.js';
+import { escapeAttr } from './dom-util.js';
 
 export const STATUS_LABELS = {
   backlog: 'Backlog',

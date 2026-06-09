@@ -3,14 +3,41 @@
 from __future__ import annotations
 
 from amazon_web_client import (
+    _CODE_FIELD_NAMES,
     _capture_claims_from_response,
     _drain_claim_candidates,
     claim_to_record,
     extract_claims_list,
     filter_codeless_claims,
     is_codeless_claim,
+    scrub_claim_codes,
     try_parse_claims_from_text,
 )
+
+
+def test_scrub_claim_codes_removes_credential_fields():
+    claims = [
+        {
+            "itemTitle": "Game",
+            "itemId": "id-1",
+            "redemptionCode": "AAAA-BBBB",
+            "gameCode": "CCCC",
+            "claimCode": "DDDD",
+            "activationCode": "EEEE",
+            "code": "FFFF",
+        }
+    ]
+    out = scrub_claim_codes(claims)
+    assert out[0]["itemTitle"] == "Game"
+    assert out[0]["itemId"] == "id-1"
+    for field in _CODE_FIELD_NAMES:
+        assert field not in out[0]
+    # The input claim must not be mutated in place.
+    assert claims[0]["redemptionCode"] == "AAAA-BBBB"
+
+
+def test_scrub_claim_codes_passes_through_non_dicts():
+    assert scrub_claim_codes([{"itemId": "x"}, "junk", 5]) == [{"itemId": "x"}, "junk", 5]
 
 
 class _FakeResponse:

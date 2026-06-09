@@ -134,24 +134,39 @@ _sse_connections = 0
 _sse_lock = threading.Lock()
 
 _BAKLOG_LOCAL_HEADER = "X-BAKLOG-Local"
-_BAKLOG_IMPORT_PASSPHRASE_HEADER = "X-BAKLOG-Import-Passphrase"
-_LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "[::1]"})
+# Canonical (unbracketed, port-stripped) loopback hostnames. IPv6 is stored as
+# bare "::1" because urlparse().hostname returns it without brackets; the Host
+# header path strips brackets/port via _normalize_host before comparing.
+_LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
 # Epic OAuth state -> (expiry_monotonic, profile_id).
 # Production Epic Connect uses Playwright + authorizationCode paste (auth/runner.py);
 # this map is only populated if something calls _register_epic_oauth_state (legacy redirect flow).
 _epic_oauth_states: dict[str, tuple[float, str]] = {}
+_epic_oauth_states_lock = threading.Lock()
 _stream_tickets: dict[str, tuple[str, float]] = {}
 _stream_tickets_lock = threading.Lock()
 _STREAM_TICKET_TTL_SEC = 30.0
 _LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(Cookie:\s*)([^\s]+)", re.I), r"\1[redacted]"),
-    (re.compile(r"(set-cookie:\s*)(.+)", re.I), r"\1[redacted]"),
+    # Cookie / Set-Cookie values run to end-of-line (they may contain spaces,
+    # `;`, `=`); anchoring to EOL keeps a stray token from leaking past the
+    # first whitespace.
+    (re.compile(r"(Cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
+    (re.compile(r"(set-cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
     (re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*)[\"']?[\w\-]+", re.I), r"\1[redacted]"),
     (re.compile(r"([?&]ticket=)[^&\s]+", re.I), r"\1[redacted]"),
     (re.compile(r"(NPSSO[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Ubi_v1[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(refresh_token[=:\s\"']+)[\w\-\.]+", re.I), r"\1[redacted]"),
+    # Portable-bundle / secrets-export passphrase in any key=value form.
+    (re.compile(r"(passphrase[\"']?\s*[=:]\s*)[\"']?[^\s\"'&,}]+", re.I), r"\1[redacted]"),
+    # Per-store credential tokens that can surface in fetcher debug output.
+    (re.compile(r"(GOG_AL[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(EPIC_AUTH_CODE[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(EA_BEARER_TOKEN[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(XBL_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(UBISOFT_SESSION_ID[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(STEAM_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Authorization:\s*)(?!Bearer\s)([^\s,]+)", re.I), r"\1[redacted]"),
 ]
 
@@ -163,6 +178,13 @@ def _redact_log_line(text: str) -> str:
     return out
 
 
+def _prune_expired_epic_oauth_states() -> None:
+    now = time.monotonic()
+    expired = [k for k, (exp, _) in _epic_oauth_states.items() if exp < now]
+    for k in expired:
+        _epic_oauth_states.pop(k, None)
+
+
 def _register_epic_oauth_state(
     state: str,
     profile_id: str | None = None,
@@ -172,18 +194,22 @@ def _register_epic_oauth_state(
     from shared.profile_paths import get_active_profile_id
 
     pid = profile_id or get_active_profile_id()
-    _epic_oauth_states[state] = (time.monotonic() + ttl_sec, pid)
+    with _epic_oauth_states_lock:
+        _prune_expired_epic_oauth_states()
+        _epic_oauth_states[state] = (time.monotonic() + ttl_sec, pid)
 
 
-def _consume_epic_oauth_state(state: str | None, *, require_state: bool = False) -> str | None:
-    """Return bound profile_id when state is valid; None when rejected."""
+def _consume_epic_oauth_state(state: str | None) -> str | None:
+    """Return bound profile_id when state is valid; None when rejected.
+
+    A valid, single-use, server-minted state is always required (CSRF defense)
+    regardless of whether Supabase auth is enabled. There is no fallback path
+    that accepts a missing state.
+    """
     if not state:
-        if require_state:
-            return None
-        from shared.profile_paths import get_active_profile_id
-
-        return get_active_profile_id()
-    entry = _epic_oauth_states.pop(state, None)
+        return None
+    with _epic_oauth_states_lock:
+        entry = _epic_oauth_states.pop(state, None)
     if not entry:
         return None
     expires, profile_id = entry
@@ -520,9 +546,6 @@ def _python_executable() -> str:
         except (OSError, subprocess.TimeoutExpired):
             pass
     return exe
-
-
-MANIFEST_FILE = bundle_root() / "fetchers" / "manifest.json"
 
 
 def _load_fetchers() -> dict[str, dict[str, Any]]:
@@ -2171,10 +2194,27 @@ def _header_hostname(value: str | None) -> str | None:
     return host or None
 
 
+def _normalize_host(raw: str | None) -> str:
+    """Lowercased hostname with IPv6 brackets and any :port stripped.
+
+    Handles ``127.0.0.1:8765``, ``localhost``, bracketed IPv6 ``[::1]:8765`` /
+    ``[::1]``, and a bare ``::1`` — so loopback detection works for IPv6 too,
+    not just ``split(':')[0]`` which mangles ``[::1]`` into ``[``.
+    """
+    if not raw:
+        return ""
+    host = raw.strip()
+    if host.startswith("["):
+        end = host.find("]")
+        return (host[1:end] if end != -1 else host[1:]).lower()
+    # A bare IPv6 literal (>1 colon, no bracket/port form we can split safely).
+    if host.count(":") > 1:
+        return host.lower()
+    return host.split(":", 1)[0].lower()
+
+
 def _request_host_is_local(handler: SimpleHTTPRequestHandler) -> bool:
-    host_header = handler.headers.get("Host", "")
-    hostname = host_header.split(":")[0].strip().lower()
-    return hostname in _LOCAL_HOSTNAMES
+    return _normalize_host(handler.headers.get("Host", "")) in _LOCAL_HOSTNAMES
 
 
 def _origin_is_local(handler: SimpleHTTPRequestHandler) -> bool:
@@ -2267,52 +2307,20 @@ def _stream_resume_since(handler: SimpleHTTPRequestHandler) -> int:
     return since
 
 
-# Known catalog / cache-meta files the dashboard probes on boot. When a store or
-# enrichment fetcher hasn't run yet the file simply doesn't exist — return an
-# empty stub instead of 404 so the browser console stays clean on first load.
-_LIBRARY_JSON_RE = re.compile(r"^/games_[a-z0-9_]+\.json$", re.I)
+from shared.server_static import (  # noqa: E402
+    LIBRARY_JSON_RE as _LIBRARY_JSON_RE,
+    normalize_static_path as _normalize_static_path,
+    resolved_static_path_allowed as _resolved_static_path_allowed,
+    static_class as _static_class_impl,
+)
+
+
+def _static_class(path_only: str) -> str:
+    return _static_class_impl(path_only, admin_enabled=ADMIN_ENABLED)
 
 
 def _path_only(handler: SimpleHTTPRequestHandler) -> str:
     return handler.path.split("?", 1)[0]
-
-
-def _normalize_static_path(path_only: str) -> str:
-    clean = path_only.split("?", 1)[0]
-    if not clean.startswith("/"):
-        clean = "/" + clean.lstrip("/")
-    return clean
-
-
-def _static_class(path_only: str) -> str:
-    """Classify a non-API path: public | data | deny."""
-    clean = _normalize_static_path(path_only)
-    parts = [p for p in clean.split("/") if p]
-    if clean in ("/tracker.html", "tracker.html"):
-        return "deny"
-    if parts and parts[0] == "admin":
-        if not ADMIN_ENABLED:
-            return "deny"
-        return "public"
-    if any(p.startswith(".") for p in parts):
-        return "deny"
-    if parts and parts[0] == "profiles":
-        return "deny"
-    if parts and parts[0] == "data":
-        return "deny"
-    if len(parts) >= 2 and parts[0] == "cache":
-        if parts[1] == "auth":
-            return "deny"
-        if parts[1] in PROFILE_CACHE_JSON_FILES:
-            return "data"
-        return "deny"
-    if _LIBRARY_JSON_RE.match(clean) or clean.lower() in (
-        "/itad_prices.json",
-        "/free_claims.json",
-        "/sponsors.json",
-    ):
-        return "data"
-    return "public"
 
 
 def _send_auth_required(handler: SimpleHTTPRequestHandler) -> None:
@@ -2421,15 +2429,19 @@ def _maybe_serve_empty_cache_meta_json(handler: SimpleHTTPRequestHandler, path: 
     return True
 
 
-def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] | None, str | None]:
+def _read_json_body(
+    handler: SimpleHTTPRequestHandler,
+    *,
+    max_bytes: int = PERSONAL_MAX_BYTES,
+) -> tuple[dict[str, Any] | None, str | None]:
     try:
         length = int(handler.headers.get("Content-Length") or 0)
     except ValueError:
         return None, "invalid Content-Length"
     if length <= 0:
         return None, "empty body"
-    if length > PERSONAL_MAX_BYTES:
-        return None, f"body too large ({length} > {PERSONAL_MAX_BYTES})"
+    if length > max_bytes:
+        return None, f"body too large ({length} > {max_bytes})"
     try:
         raw = handler.rfile.read(length).decode("utf-8")
         payload = json.loads(raw)
@@ -2438,6 +2450,33 @@ def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] |
     if not isinstance(payload, dict):
         return None, "payload must be a JSON object"
     return payload, None
+
+
+# Small JSON bodies for credential/control endpoints (master password, secrets
+# export/import metadata). The encrypted secrets bundle itself rides in the
+# import body, so that one endpoint uses a larger, bundle-sized cap below.
+_AUTH_JSON_MAX_BYTES = 64 * 1024
+# Bundle base64 (~4/3 inflation over the 100 MB ciphertext cap) plus JSON
+# framing. Replaces the previous unbounded read on the import endpoint.
+_SECRETS_IMPORT_MAX_BYTES = 160 * 1024 * 1024
+
+
+def _api_error(
+    handler: SimpleHTTPRequestHandler,
+    status: int,
+    code: str,
+    exc: BaseException | None = None,
+) -> None:
+    """Log the underlying exception server-side (redacted) and return a generic
+    ``{"error": code}`` to the client. Keeps stack details / secret-bearing
+    messages out of HTTP responses while preserving local debuggability."""
+    if exc is not None:
+        try:
+            detail = _redact_log_line(f"{type(exc).__name__}: {exc}")
+        except Exception:  # noqa: BLE001 - never let logging crash the handler
+            detail = type(exc).__name__
+        print(f"[api] {code}: {detail}", file=sys.stderr, flush=True)
+    _send_json(handler, status, {"error": code})
 
 
 def _api_path(handler: SimpleHTTPRequestHandler) -> str:
@@ -2604,27 +2643,32 @@ class Handler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path: str) -> str:
         """Serve catalog and cache JSON from the active profile root (legacy or profiles/<id>/)."""
-        clean = path.split("?", 1)[0].lstrip("/")
-        if _static_class("/" + clean) == "deny":
+        norm = _normalize_static_path(path.split("?", 1)[0])
+        clean = norm.lstrip("/")
+        if _static_class(norm) == "deny":
             return str(profile_root() / ".profile_static_blocked" / clean)
         if clean.startswith("profiles/"):
             # Block direct static access to another profile's tree (use top-level paths).
             return str(profile_root() / ".profile_static_blocked" / clean)
-        if _LIBRARY_JSON_RE.match("/" + clean) or clean in (
-            "itad_prices.json",
-            "free_claims.json",
-            "sponsors.json",
+        if _LIBRARY_JSON_RE.match(norm) or norm.lower() in (
+            "/itad_prices.json",
+            "/free_claims.json",
+            "/sponsors.json",
         ):
-            if clean == "itad_prices.json":
+            leaf = clean.split("/")[-1]
+            if leaf == "itad_prices.json":
                 disk = catalog_path("itad_prices.json")
-            elif clean == "free_claims.json":
+            elif leaf == "free_claims.json":
                 disk = free_claims_path()
-            elif clean == "sponsors.json":
+            elif leaf == "sponsors.json":
                 disk = sponsors_path()
             else:
-                disk = catalog_path(clean)
+                disk = catalog_path(leaf)
             if disk.is_file():
-                return str(disk)
+                resolved = str(disk)
+                if _resolved_static_path_allowed(resolved):
+                    return resolved
+                return str(profile_root() / ".profile_static_blocked" / clean)
         if clean.startswith("cache/"):
             name = clean.split("/", 1)[1]
             if name in PROFILE_CACHE_JSON_FILES:
@@ -2632,8 +2676,23 @@ class Handler(SimpleHTTPRequestHandler):
                 # (default) layout this is repo-root cache; for profiles/<id>/ it
                 # is the profile cache. A missing file 404s instead of leaking the
                 # default profile's enrichment data into another profile's chips.
-                return str(cache_json_path(name))
-        return super().translate_path(path)
+                resolved = str(cache_json_path(name))
+                if _resolved_static_path_allowed(resolved):
+                    return resolved
+                return str(profile_root() / ".profile_static_blocked" / clean)
+        resolved = super().translate_path(path)
+        # Python 3.13+ translate_path returns a trailing-slash directory for "/"
+        # instead of resolving index.html; map that here so the app shell loads.
+        resolved_path = Path(resolved)
+        if resolved_path.is_dir():
+            for leaf in ("index.html", "index.htm"):
+                index = resolved_path / leaf
+                if index.is_file():
+                    resolved = str(index)
+                    break
+        if not _resolved_static_path_allowed(resolved):
+            return str(profile_root() / ".profile_static_blocked" / clean)
+        return resolved
 
     def _begin_request(self) -> None:
         clear_request_profile_id()
@@ -3356,7 +3415,7 @@ class Handler(SimpleHTTPRequestHandler):
                 data["accountAuth"] = True
             _send_json(self, HTTPStatus.OK, data)
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "profiles_get_failed", exc)
 
     def _handle_profiles_create(self) -> None:
         if _profile_admin_blocked():
@@ -3550,7 +3609,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
             return
         except Exception as exc:  # noqa: BLE001 - the file is small, anything is unexpected here
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"load failed: {exc!r}"})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "personal_load_failed", exc)
             return
         _send_json(self, HTTPStatus.OK, doc)
 
@@ -3601,7 +3660,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
         except OSError as exc:
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"write failed: {exc!r}"})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "personal_write_failed", exc)
             return
         _send_json(self, HTTPStatus.OK, doc)
 
@@ -3734,7 +3793,7 @@ class Handler(SimpleHTTPRequestHandler):
                 },
             )
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_status_failed", exc)
 
     def _handle_auth_open_url(self, provider: str) -> None:
         try:
@@ -3747,7 +3806,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_open_url_failed", exc)
 
     def _handle_auth_start(self, provider: str) -> None:
         try:
@@ -3762,7 +3821,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_start_failed", exc)
 
     def _public_callback_url(self, path: str) -> str:
         """Build an absolute URL to ``path`` from the request Host (tunnel-aware)."""
@@ -3783,7 +3842,7 @@ class Handler(SimpleHTTPRequestHandler):
             url = build_epic_oauth_login_url(redirect_uri, state)
             _send_json(self, HTTPStatus.OK, {"url": url, "state": state})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "epic_oauth_url_failed", exc)
 
     def _handle_auth_disconnect(self, provider: str) -> None:
         try:
@@ -3794,7 +3853,7 @@ class Handler(SimpleHTTPRequestHandler):
         except KeyError:
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_disconnect_failed", exc)
 
     def _handle_auth_enable(self, provider: str) -> None:
         try:
@@ -3807,7 +3866,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_enable_failed", exc)
 
     def _handle_auth_credentials(self, provider: str) -> None:
         try:
@@ -3837,25 +3896,35 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "credentials_failed", exc)
 
     def _handle_auth_master_password(self) -> None:
+        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
+        if err == "empty body":
+            payload = {}
+        elif err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
-            payload = json.loads(raw)
             from auth.manager import set_master_password
 
             set_master_password(payload.get("password"))
             _send_json(self, HTTPStatus.OK, {"ok": True})
-        except Exception as exc:  # noqa: BLE001
+        except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "master_password_failed", exc)
 
     def _handle_auth_secrets_export(self) -> None:
+        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
+        if err == "empty body":
+            payload = {}
+        elif err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
-            payload = json.loads(raw)
             from auth.bundle import BundleError, BundleTooLarge, bundle_filename, export_bundle
 
             passphrase = (payload.get("passphrase") or "").strip()
@@ -3886,34 +3955,31 @@ class Handler(SimpleHTTPRequestHandler):
                     {"error": str(exc), "code": "secrets_corrupt"},
                 )
                 return
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "export_failed", exc)
 
     def _handle_auth_secrets_import(self) -> None:
         import base64
-        from urllib.parse import parse_qs, urlparse
 
+        # JSON-only: {"passphrase": str, "blob": base64}. The legacy
+        # octet-stream + ?passphrase= query-string fallback is removed — a
+        # passphrase in the URL leaks into request logs / browser history.
+        payload, err = _read_json_body(self, max_bytes=_SECRETS_IMPORT_MAX_BYTES)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length) if length else b""
-            ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
-            if ctype == "application/json":
-                payload = json.loads(raw.decode("utf-8") if raw else "{}")
-                if not isinstance(payload, dict):
-                    raise ValueError("import body must be a JSON object")
-                passphrase = str(payload.get("passphrase") or "")
-                blob_b64 = payload.get("blob")
-                if isinstance(blob_b64, str):
+            passphrase = str(payload.get("passphrase") or "")
+            blob_b64 = payload.get("blob")
+            if isinstance(blob_b64, str):
+                try:
+                    # binascii.Error subclasses ValueError, so this catch covers
+                    # malformed base64 too.
                     blob = base64.b64decode(blob_b64, validate=True)
-                else:
-                    blob = b""
+                except ValueError as exc:
+                    raise ValueError("blob is not valid base64") from exc
             else:
-                parsed = urlparse(self.path)
-                params = parse_qs(parsed.query)
-                passphrase = (
-                    self.headers.get(_BAKLOG_IMPORT_PASSPHRASE_HEADER)
-                    or (params.get("passphrase") or [""])[0]
-                )
-                blob = raw
+                blob = b""
             from auth.bundle import (
                 BadMagic,
                 BadPassphrase,
@@ -3935,19 +4001,18 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "invalid_passphrase"})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "import_failed", exc)
 
     def _handle_epic_oauth_callback(self) -> None:
         from urllib.parse import parse_qs, urlparse
-
-        from shared.supabase_auth import auth_enabled
 
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
         code = (params.get("code") or [None])[0]
         state = (params.get("state") or [None])[0]
-        require_state = auth_enabled()
-        if require_state and not state:
+        # Always require a server-minted state (CSRF defense), even when Supabase
+        # auth is disabled for local use.
+        if not state:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             body = b"<html><body><p>Missing OAuth state.</p></body></html>"
@@ -3955,7 +4020,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        profile_id = _consume_epic_oauth_state(state, require_state=require_state)
+        profile_id = _consume_epic_oauth_state(state)
         if profile_id is None:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "text/html; charset=utf-8")

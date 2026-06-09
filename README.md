@@ -28,7 +28,7 @@ The shot above is the real dashboard. Prefer to click around before installing? 
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
-See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: nothing leaves your machine) and [SECURITY.md](SECURITY.md) for the threat model (TL;DR: there is no server to breach). The full app is open source under the [MIT license](LICENSE) — server, fetchers, auth, and dashboard in the [public repo](https://github.com/Ogrods/BAKLOG).
+See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: your library and credentials stay on your machine; the local app does not phone home) and [SECURITY.md](SECURITY.md) for the threat model. The marketing site at [baklog.app](https://baklog.app) has a separate waitlist and optional bug-report endpoint — see PRIVACY.md § Hosted surfaces. The full app is open source under the [MIT license](LICENSE) — server, fetchers, auth, and dashboard in the [public repo](https://github.com/Ogrods/BAKLOG).
 
 ## Supported platforms
 
@@ -354,7 +354,7 @@ First Steam run may take several minutes for a large library (Store API is rate-
 | `fetch_itad.py` | Cross-store deal prices → `itad_prices.json` (wishlist by default); refreshes `cache/fx_rates.json` and converts wishlist store prices to display currency |
 | `fetch_fx.py` | Refresh FX rates only (`cache/fx_rates.json`, Frankfurter; 24h cache) |
 
-**Data attribution:** BAKLOG surfaces third-party data from [ProtonDB](https://www.protondb.com) (Steam Deck / Linux tiers, ODbL), [IsThereAnyDeal](https://isthereanydeal.com/) (deal prices), [GamerPower](https://www.gamerpower.com/) (giveaway feed), and [HowLongToBeat](https://howlongtobeat.com/) (completion hours). Full list and license notes: [IP.md](IP.md#third-party-data-attribution).
+**Data attribution:** BAKLOG surfaces third-party data from [ProtonDB](https://www.protondb.com) (Steam Deck / Linux tiers, ODbL), [IsThereAnyDeal](https://isthereanydeal.com/) (deal prices), [GamerPower](https://www.gamerpower.com/) (giveaway feed), and [HowLongToBeat](https://howlongtobeat.com/) (completion hours). Store logos and trademarks belong to their respective owners; BAKLOG is not affiliated with Valve, Epic, GOG, or other storefronts.
 
 ## Open the dashboard
 

@@ -156,8 +156,15 @@ export function isClaimOwned(claim) {
   let appidMatched = false;
   if (appid != null) {
     const sid = String(appid);
-    if (state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)) appidMatched = true;
-    else if (state.allGames.some(g => gameKey(g) === `steam:${sid}`)) appidMatched = true;
+    const ownedAppids = state.ownedSteamAppids;
+    if (ownedAppids instanceof Set) {
+      // O(1) lookup against the precomputed set (buildOwnedNormNames).
+      appidMatched = ownedAppids.has(sid);
+    } else {
+      // Fallback for the brief boot window before the set is built.
+      appidMatched = state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)
+        || state.allGames.some(g => gameKey(g) === `steam:${sid}`);
+    }
   }
   const norms = claimTitleNorms(claim.title);
   const titleMatched = norms.some(n => state.ownedNormNames?.has(n));
@@ -231,22 +238,29 @@ export function getOwnedClaims(items) {
   return sortClaims(dedupeClaims(filtered));
 }
 
-export function diffClaims(prevIds, items) {
+export function diffClaims(prevKeys, items) {
   const visible = getVisibleClaims(items);
   let newCount = 0;
-  const newOnes = [];
   for (const c of visible) {
-    if (!prevIds.has(c.id)) { newCount += 1; newOnes.push({ id: c.id, title: c.title, keys: claimDedupKeys(c) }); }
+    // A claim is "new" only when neither its volatile feed id nor any of its
+    // stable dedup keys was in the last acknowledged snapshot. Feed ids churn
+    // between regenerations (epic-*→gamerpower-* after dedup/enrich), so an
+    // id-only comparison reports already-acknowledged games as new and re-fires
+    // the banner; the dedup-key match keeps an acknowledged claim acknowledged.
+    const acknowledged = prevKeys.has(c.id) || claimDedupKeys(c).some(k => prevKeys.has(k));
+    if (!acknowledged) newCount += 1;
   }
   return { newCount, visible };
 }
 
-function loadClaimsSnapshotIds() {
+export function loadClaimsSnapshotKeys() {
   try {
     const raw = localStorage.getItem(claimsSnapshotStorageKey());
     if (!raw) return new Set();
-    const ids = JSON.parse(raw)?.ids;
-    return new Set(Array.isArray(ids) ? ids : []);
+    const parsed = JSON.parse(raw);
+    const ids = Array.isArray(parsed?.ids) ? parsed.ids : [];
+    const keys = Array.isArray(parsed?.keys) ? parsed.keys : [];
+    return new Set([...ids, ...keys]);
   } catch {
     return new Set();
   }
@@ -255,10 +269,15 @@ function loadClaimsSnapshotIds() {
 export function saveClaimsSnapshot(items) {
   const visible = getVisibleClaims(items);
   const ids = visible.map(c => c.id);
+  // Persist stable dedup keys (appid/title) alongside the volatile ids so a
+  // later feed regeneration that re-keys the same game (id churn) still matches
+  // the acknowledged snapshot and does not re-trigger the new-claims banner.
+  const keys = [...new Set(visible.flatMap(c => claimDedupKeys(c)))];
   try {
     localStorage.setItem(claimsSnapshotStorageKey(), JSON.stringify({
       saved_at: Date.now(),
       ids,
+      keys,
     }));
   } catch (_) { /* quota */ }
 }
@@ -484,8 +503,8 @@ export function showClaimableBanner(newCount) {
 export function updateClaimableBanner() {
   const el = document.getElementById('claimableBanner');
   if (!el || el.classList.contains('hidden')) return;
-  const prevIds = loadClaimsSnapshotIds();
-  const { newCount } = diffClaims(prevIds, state.claimableFeed?.items || []);
+  const prevKeys = loadClaimsSnapshotKeys();
+  const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
   if (newCount <= 0) el.classList.add('hidden');
 }
 
@@ -616,10 +635,10 @@ export function startClaimableReadOnlyPolling(intervalMs = 15 * 60_000) {
   if (_readOnlyPollTimer) return;
   _readOnlyPollTimer = setInterval(async () => {
     if (document.visibilityState !== 'visible') return;
-    const prevIds = loadClaimsSnapshotIds();
+    const prevKeys = loadClaimsSnapshotKeys();
     try {
       await loadClaimableNow({ preferHosted: true });
-      const { newCount } = diffClaims(prevIds, state.claimableFeed?.items || []);
+      const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
       if (newCount > 0) showClaimableBanner(newCount);
       saveClaimsSnapshot(state.claimableFeed?.items || []);
       refreshClaimableUi();

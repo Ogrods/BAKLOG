@@ -1,7 +1,7 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
 import { isAccountAuthMode, isPro } from './auth-gate.js';
 import { isPageHidden, registerPausable } from './visibility.js';
-import { escapeAttr, escapeHtml } from './dom-util.js';
+import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
 import { savePrefs } from './prefs.js';
@@ -1783,6 +1783,14 @@ async function startEpicBrowserOAuth() {
 
   }
 
+  if (!isSafeHttpUrl(data.url)) {
+
+    if (log) log.textContent = 'Epic returned an unexpected sign-in URL; aborting.';
+
+    return;
+
+  }
+
   window.open(data.url, '_blank', 'noopener');
 
   startPostConnectFastPoll();
@@ -2301,10 +2309,6 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
 
   _selectedKey = groupRepFor(provider);
 
-  // #region agent log
-  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'connections.js:2302',message:'reconnectProvider entry',data:{provider,selectedKey:_selectedKey,tabExists:!!document.querySelector('.view-tab[data-view="connections"]'),inSnapshot:getAuthStatusSnapshot().some(x=>x.key===provider)},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-  // #endregion
-
   document.querySelector('.view-tab[data-view="connections"]')?.click();
 
   try {
@@ -2316,10 +2320,6 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
     renderConnections();
 
   }
-
-  // #region agent log
-  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'connections.js:2314',message:'reconnectProvider after refresh',data:{selectedKey:_selectedKey,activeView:(typeof state!=='undefined'&&state)?state.activeView:null,cardPresent:!!document.querySelector('.conn-card')},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-  // #endregion
 
   // When navigating in from a dashboard chip/affordance we only want to tab
   // over to the right card so the user can choose - never auto-open a sign-in

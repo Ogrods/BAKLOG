@@ -70,6 +70,12 @@ def test_controller_start_spawns_and_waits(monkeypatch):
         def poll(self):
             return None
 
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
     def fake_popen(argv, **kwargs):
         calls.append(argv)
         return FakeProc()
@@ -85,6 +91,12 @@ def test_controller_start_fails_when_child_exits_early(monkeypatch):
     class DeadProc:
         def poll(self):
             return 1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
 
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
     monkeypatch.setattr(tray_app.subprocess, "Popen", lambda *a, **k: DeadProc())

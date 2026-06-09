@@ -7,6 +7,7 @@ import { state } from '../js/state.js';
 import {
   getVisibleClaims,
   getHiddenClaims,
+  getOwnedClaims,
   diffClaims,
   isClaimOwned,
   stripClaimTitleDecorations,
@@ -228,6 +229,20 @@ describe('dismissClaim', () => {
     dismissClaim('gog-bar');
     expect(state.personal.__dismissedClaims['gog-bar']).toBeTypeOf('number');
     expect(getVisibleClaims(sampleItems).map(c => c.id)).toEqual(['epic-foo']);
+  });
+});
+
+describe('getOwnedClaims', () => {
+  it('excludes expired games even when owned', () => {
+    state.allGames = [{ store: 'steam', appid: 1, title: 'Old Freebie' }];
+    state.ownedNormNames = new Set(['old freebie']);
+    expect(getOwnedClaims(sampleItems).map(c => c.id)).toEqual([]);
+  });
+
+  it('includes owned games with a future end date', () => {
+    state.allGames = [{ store: 'steam', appid: 99, title: 'Bar Game' }];
+    state.ownedNormNames = new Set(['bar game']);
+    expect(getOwnedClaims(sampleItems).map(c => c.id)).toEqual(['gog-bar']);
   });
 });
 

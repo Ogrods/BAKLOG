@@ -1,0 +1,14 @@
+[
+  {
+    "input": "<a href=\"https://isthereanydeal.com/g/portal2/info/\">Portal 2</a> expires on Jun 10 | go to giveaway",
+    "expected": "Portal 2"
+  },
+  {
+    "input": "Some game https://isthereanydeal.com/g/foo/info/ trailing url",
+    "expected": "Some game trailing url"
+  },
+  {
+    "input": "unknown expiry | go to giveaway",
+    "expected": ""
+  }
+]

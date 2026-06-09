@@ -1,6 +1,6 @@
 """Shared Steam title matching helpers (storesearch selection, giveaway title cleanup).
 
-Sync pair: strip_giveaway_decorations ↔ js/claimable.js stripClaimTitleDecorations
+Sync pair: strip_giveaway_decorations ↔ js/claim-card.js stripClaimTitleDecorations
 """
 
 from __future__ import annotations

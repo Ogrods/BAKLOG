@@ -51,7 +51,8 @@ def _configure_stdout() -> None:
 def _clean_blurb(raw: object) -> str | None:
     """ITAD blurbs embed raw HTML (anchor tags + literal giveaway URLs + an
     "expires on … | go to giveaway" suffix). Strip the markup so the published
-    feed never leaks URLs as visible text in the dashboard."""
+    feed never leaks URLs as visible text in the dashboard.
+    Sync pair: js/claim-card.js sanitizeBlurb."""
     if not raw:
         return None
     text = re.sub(r"<[^>]*>", " ", str(raw))
@@ -64,6 +65,7 @@ def _clean_blurb(raw: object) -> str | None:
         text,
         flags=re.IGNORECASE,
     )
+    text = re.sub(r"https?://\S+", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
     return text or None
 

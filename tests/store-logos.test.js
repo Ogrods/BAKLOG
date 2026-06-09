@@ -82,7 +82,7 @@ describe('rail glyph optical offsets', () => {
 
   it('emits a y-offset var when a store needs vertical nudging', () => {
     const rail = storeLogoHtml('amazon', { size: 'sm', className: 'conn-rail-badge' });
-    expect(rail).toContain('--store-badge-offset-x:0.5px');
+    expect(rail).toContain('--store-badge-offset-x:-0.5px');
     expect(rail).toContain('--store-badge-offset-y:-0.5px');
   });
 

@@ -52,7 +52,6 @@ def acquire_tray_lock() -> bool:
     else:
         import fcntl
         import os
-        from pathlib import Path
 
         from shared.install_paths import data_root
 

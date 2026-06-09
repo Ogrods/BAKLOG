@@ -264,6 +264,7 @@ describe("buildBugBundle shape", () => {
       "dash_stats",
       "data_version",
       "last_render_ms",
+      "propagation",
       "table_fingerprint",
       "view",
     ]);

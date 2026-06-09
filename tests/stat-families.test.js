@@ -12,6 +12,12 @@ vi.mock('../js/deals.js', () => ({
   cutBucketClass: vi.fn(() => 'cut-low'),
   computeWishlistWoba: vi.fn(() => null),
   isCleanupCandidate: vi.fn(() => false),
+  parsePriceLike: vi.fn((v) => {
+    if (v == null) return null;
+    if (typeof v === 'number') return v;
+    const m = String(v).match(/-?\d+(?:\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }),
 }));
 
 import { state } from '../js/state.js';

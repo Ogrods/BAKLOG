@@ -20,6 +20,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tray_app
 
 
+class _PopenStub:
+    """Minimal subprocess.Popen stand-in for ServerController tests."""
+
+    pid = 4242
+
+    def poll(self):
+        return None
+
+    def communicate(self, input=None, timeout=None):
+        return (b"", b"")
+
+    def wait(self, timeout=None):
+        return 0
+
+    def terminate(self):
+        pass
+
+    def kill(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
 def test_server_url_uses_host_and_port():
     assert tray_app.server_url() == f"http://{tray_app.HOST}:{tray_app.PORT}/"
 
@@ -66,37 +93,22 @@ def test_controller_start_spawns_and_waits(monkeypatch):
     calls: list[list[str]] = []
     port_seq = iter([False, False, True])
 
-    class FakeProc:
-        def poll(self):
-            return None
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
     def fake_popen(argv, **kwargs):
         calls.append(argv)
-        return FakeProc()
+        return _PopenStub()
 
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: next(port_seq, True))
     monkeypatch.setattr(tray_app.subprocess, "Popen", fake_popen)
     ctl = tray_app.ServerController()
     assert ctl.start(wait_secs=1.0) is True
     assert len(calls) == 1
+    ctl.proc = None
 
 
 def test_controller_start_fails_when_child_exits_early(monkeypatch):
-    class DeadProc:
+    class DeadProc(_PopenStub):
         def poll(self):
             return 1
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
 
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
     monkeypatch.setattr(tray_app.subprocess, "Popen", lambda *a, **k: DeadProc())

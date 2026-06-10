@@ -1561,7 +1561,10 @@ export function showReconnectBanner(providers) {
 
 }
 
-
+export function clearReconnectBanner(provider) {
+  if (!provider) return;
+  if (reconnectProviders.delete(provider)) renderReconnectBanner();
+}
 
 function renderReconnectBanner() {
 

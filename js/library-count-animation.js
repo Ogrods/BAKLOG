@@ -13,8 +13,10 @@
 
 import { state } from './state.js';
 import { prefersReducedMotion } from './motion.js';
-import { countUpDurationForDelta, easeInOutCubic } from './dashboard-shared.js';
+import { easeInOutCubic } from './dashboard-shared.js';
 
+// Match landing mega-hero demo (`landing/demo.js` COUNT_ROLL_MS).
+const COUNT_ROLL_MS = 1000;
 const POPUP_SPAWN_INTERVAL_MS = 70;
 const POPUP_LIFETIME_MS = 700;
 const POPUP_CAP = 10;
@@ -156,8 +158,7 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
     return;
   }
 
-  const delta = Math.abs(safeTo - safeFrom);
-  const durationMs = opts.durationMs ? Math.max(120, opts.durationMs) : countUpDurationForDelta(delta);
+  const durationMs = Math.max(120, opts.durationMs || COUNT_ROLL_MS);
   const wantPopups = opts.popups !== false && safeTo > safeFrom;
   const host = wantPopups ? ensureHost(node) : null;
 

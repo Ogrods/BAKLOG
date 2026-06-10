@@ -11,6 +11,7 @@ import {
   libraryCoverFor,
   earlyAccessRibbonHtml,
 } from './game-core.js';
+import { safeCoverAttrUrl } from './covers.js';
 import { storeLogoHtml } from './store-logos.js';
 import {
   getDealInfo,
@@ -21,7 +22,7 @@ import {
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { syncCoverFits } from './covers.js';
-import { sponsoredPickSlotHtml } from './sponsored-deals.js';
+import { sponsoredPickSlotHtml, sponsoredDealPickSlotHtml, pickLocationForView, houseLocationForView, renderHouseLocationSlot } from './sponsored-deals.js';
 
 export function pickCardHtml(g) {
   const key = gameKey(g);
@@ -35,7 +36,7 @@ export function pickCardHtml(g) {
     <div class="pick-card relative rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
       <span class="pick-store">${storeLogoHtml(store, { size: 'sm' })}</span>
       <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
-        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${safeCoverAttrUrl(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
@@ -68,7 +69,7 @@ export function dealCardHtml(g) {
     <div class="pick-card relative rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" data-pick-context="wishlist" title="${escapeAttr(g.name)}${cutLabel ? ` · ${cutLabel}` : ""}${shop ? ` @ ${shop}` : ""}">
       <span class="pick-store" title="Wishlist · ${wishlistTarget.toUpperCase()}">${storeLogoHtml(wishlistTarget, { size: 'sm' })}</span>
       <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
-        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
+        <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${safeCoverAttrUrl(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
         ${earlyAccessRibbonHtml(g)}
       </div>
       <div class="text-xs text-slate-200 mt-1 truncate font-medium">${escapeHtml(g.name)}</div>
@@ -105,11 +106,10 @@ export function renderPicksLimitButtons() {
 }
 
 export function updatePicksChrome() {
-  // Quick-Wins slider only makes sense alongside the Quick Wins picks tab,
-  // which is library-only. Hide the wrapper on wishlist/itch so the picks
-  // bar stays tidy.
-  const hideQuick = state.activeView === "wishlist" || state.activeView === "itch";
-  document.getElementById("quickWinMaxWrap")?.classList.toggle("hidden", hideQuick);
+  // The Quick-Wins slider only makes sense on the Quick Wins picks tab,
+  // so only reveal it when that tab is active.
+  const showQuick = effectivePicksTab() === "quickWins";
+  document.getElementById("quickWinMaxWrap")?.classList.toggle("hidden", !showQuick);
 }
 
 /** Sync #picksContainer visibility and #togglePicks label to picksCollapsed. */
@@ -187,7 +187,19 @@ export function renderPicks() {
   }
   if (pickView === "itch" && tab !== "topRated") data = backlogRated;
   const limit = state.prefs.picksLimit || 16;
-  const countLabel = `${Math.min(data.length, limit)} of ${data.length}`;
+  const pickLoc = tab === 'wishlistDeals'
+    ? pickLocationForView(pickView === 'wishlist' ? 'wishlist' : 'deals', 'pick')
+    : pickLocationForView(pickView, 'pick');
+  const sponsoredHtml = tab === 'wishlistDeals'
+    ? sponsoredDealPickSlotHtml(pickLoc)
+    : sponsoredPickSlotHtml(pickLoc);
+  const sponsorSlot = !!sponsoredHtml;
+  // The sponsored slot occupies one grid cell, so drop one real card to keep the
+  // grid at exactly `limit` tiles — otherwise the extra card wraps to a new row.
+  const cardBudget = sponsorSlot ? Math.max(1, limit - 1) : limit;
+  const shownDeals = Math.min(data.length, cardBudget);
+  const shownTiles = Math.min(limit, shownDeals + (sponsorSlot ? 1 : 0));
+  const countLabel = `${shownTiles} of ${data.length}`;
   document.getElementById("pickMeta").textContent = countLabel;
   const renderCard = tab === "wishlistDeals" ? dealCardHtml : pickCardHtml;
   const emptyMsg = tab === "wishlistDeals"
@@ -200,13 +212,29 @@ export function renderPicks() {
   const picksGrid = document.getElementById("picksGrid");
   const rendererTag = tab === "wishlistDeals" ? "deal" : "pick";
   if (data.length) {
-    const slice = data.slice(0, limit);
-    const sponsoredHtml = sponsoredPickSlotHtml();
+    const slice = data.slice(0, cardBudget);
     const newKeys = slice.map(g => gameKey(g));
-    const existingCards = Array.from(picksGrid.querySelectorAll(".pick-card"));
+    const existingCards = Array.from(
+      picksGrid.querySelectorAll(".pick-card:not(.sponsored-pick-card)"),
+    );
     const existingKeys = existingCards.map(c => c.dataset.gameKey || "");
     const sameRenderer = picksGrid.dataset.renderer === rendererTag;
-    let canIncremental = sameRenderer && existingKeys.length > 0 && !sponsoredHtml;
+    const hasSponsorNode = !!picksGrid.querySelector(".sponsored-pick-card");
+    let handled = false;
+    // Sponsor was dismissed: drop the ad tile and append the pick that was
+    // budgeted out — without rebuilding the whole grid (avoids cover re-fetch flash).
+    if (sameRenderer && !sponsorSlot && hasSponsorNode && existingKeys.length === limit - 1) {
+      const expectedKeys = data.slice(0, limit - 1).map(g => gameKey(g));
+      const keysMatch = expectedKeys.every((k, i) => existingKeys[i] === k);
+      if (keysMatch && data.length >= limit) {
+        picksGrid.querySelector(".sponsored-pick-card")?.remove();
+        picksGrid.insertAdjacentHTML("beforeend", renderCard(data[limit - 1]));
+        document.getElementById("pickMeta").textContent = `${limit} of ${data.length}`;
+        syncCoverFits(picksGrid);
+        handled = true;
+      }
+    }
+    let canIncremental = !handled && sameRenderer && existingKeys.length > 0 && !sponsorSlot && !hasSponsorNode;
     if (canIncremental) {
       const overlap = Math.min(existingKeys.length, newKeys.length);
       for (let i = 0; i < overlap; i++) {
@@ -221,7 +249,7 @@ export function renderPicks() {
         picksGrid.insertAdjacentHTML("beforeend", tail);
         syncCoverFits(picksGrid);
       }
-    } else {
+    } else if (!handled) {
       const parts = slice.map(renderCard);
       if (sponsoredHtml) parts.splice(Math.min(1, parts.length), 0, sponsoredHtml);
       picksGrid.innerHTML = parts.join("");
@@ -239,4 +267,18 @@ export function renderPicks() {
   });
   updatePicksChrome();
   renderPicksLimitButtons();
+  renderViewHouseSlot();
+}
+
+/** Single house promo below picks / deal radar (library stripe, itch stripe, wishlist banner). */
+export function renderViewHouseSlot() {
+  const slot = document.getElementById('viewHouseSlot');
+  if (!slot) return;
+  const view = state.activeView;
+  if (view === 'dashboard' || view === 'connections') {
+    slot.classList.add('hidden');
+    slot.innerHTML = '';
+    return;
+  }
+  renderHouseLocationSlot(houseLocationForView(view), 'viewHouseSlot');
 }

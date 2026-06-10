@@ -19,12 +19,13 @@ function validBundle() {
   };
 }
 
-function makeRequest(body, { ip = "10.0.0.1", method = "POST", contentLength } = {}) {
+function makeRequest(body, { ip = "10.0.0.1", method = "POST", contentLength, origin = "https://baklog.app" } = {}) {
   const text = typeof body === "string" ? body : JSON.stringify(body);
   const headers = new Headers({
     "Content-Type": "application/json",
     "x-forwarded-for": ip,
   });
+  if (origin != null) headers.set("Origin", origin);
   if (contentLength != null) {
     headers.set("content-length", String(contentLength));
   }
@@ -52,6 +53,31 @@ describe("landing/api/report.js", () => {
   afterEach(() => {
     delete global.fetch;
     for (const key of ENV_KEYS) delete process.env[key];
+  });
+
+  it("rejects requests with no Origin header", async () => {
+    const res = await handleReport(makeRequest({ bundle: validBundle() }, { origin: null }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "Origin not allowed" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects requests from a foreign Origin", async () => {
+    const res = await handleReport(makeRequest({ bundle: validBundle() }, { origin: "https://evil.example" }));
+    expect(res.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("omits reply_to when contact is not a valid email", async () => {
+    const res = await handleReport(makeRequest({
+      bundle: validBundle(),
+      contact: "not an email",
+    }, { ip: "10.0.0.51" }));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, opts] = fetchMock.mock.calls[0];
+    const payload = JSON.parse(opts.body);
+    expect(payload.reply_to).toBeUndefined();
   });
 
   it("returns ok for honeypot submissions without sending email", async () => {

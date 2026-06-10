@@ -29,7 +29,7 @@ export const BAKLOG_EVENT_REGISTRY = {
     name: BAKLOG_DEEP_SYNC,
     target: 'document',
     emitters: ['js/trophy-popover.js'],
-    listeners: ['js/bind-events.js'],
+    listeners: ['js/bind-events-fetcher.js'],
   },
   [BAKLOG_THEME_CHANGE]: {
     name: BAKLOG_THEME_CHANGE,

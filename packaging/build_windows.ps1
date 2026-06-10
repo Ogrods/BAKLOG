@@ -1,5 +1,5 @@
 # Build BAKLOG Windows onedir bundle with PyInstaller.
-# Run from repo root. Requires: pip install pyinstaller
+# Run from repo root. Requires: pip install pyinstaller, Node 22+ for frontend build.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
@@ -15,14 +15,32 @@ if (Test-Path $VenvPython) {
     $Python = "python"
 }
 
-Write-Host "Installing dependencies..."
+Write-Host "Installing Python dependencies..."
 & $Python -m pip install -r requirements.txt
 & $Python -m pip install pyinstaller
 
-Write-Host "Building BAKLOG.exe (onedir)..."
-& $Python -m PyInstaller packaging/baklog.spec --noconfirm
+Write-Host "Building production frontend (esbuild dist/)..."
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    Write-Error "npm not found — install Node.js 22+ before building the frozen bundle"
+}
+npm ci
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+npm run vendor:supabase
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+npm run build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+npm run check:dist-integrity
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$OutDir = Join-Path $Root "dist\BAKLOG"
+$ReleaseDir = Join-Path $Root "release"
+if (-not (Test-Path $ReleaseDir)) {
+    New-Item -ItemType Directory -Path $ReleaseDir | Out-Null
+}
+
+Write-Host "Building BAKLOG.exe (onedir)..."
+& $Python -m PyInstaller packaging/baklog.spec --noconfirm --distpath $ReleaseDir
+
+$OutDir = Join-Path $ReleaseDir "BAKLOG"
 $Exe = Join-Path $OutDir "BAKLOG.exe"
 if (-not (Test-Path $Exe)) {
     Write-Error "Build failed: $Exe not found"
@@ -48,12 +66,12 @@ if (Test-Path $PyProject) {
 }
 
 $ZipName = "BAKLOG-v$Version-win64.zip"
-$ZipPath = Join-Path $Root "dist\$ZipName"
+$ZipPath = Join-Path $ReleaseDir $ZipName
 if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
 Compress-Archive -Path $OutDir -DestinationPath $ZipPath -Force
 
 $Hash = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLower()
-$HashFile = Join-Path $Root "dist\BAKLOG-v$Version-win64.sha256"
+$HashFile = Join-Path $ReleaseDir "BAKLOG-v$Version-win64.sha256"
 "$Hash  $ZipName" | Set-Content -Encoding ASCII -NoNewline $HashFile
 
 Write-Host ""

@@ -33,7 +33,7 @@ from fetchers._base import (
     catalog_file,
     configure_stdout,
     merge_cached_row,
-    write_catalog_text,
+    write_catalog_guarded,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from hltb_client import HltbClient
@@ -516,7 +516,24 @@ def main() -> int:
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-    write_catalog_text(GAMES_AMAZON_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
+    # Route the write through the shared guard. Per-source drift was already
+    # enforced above (refuse_amazon_source_drift), so the file-level drift guard
+    # is disabled here — the union file legitimately grows/shrinks across two
+    # sources — but the empty guard still protects the merged catalog. A
+    # genuinely empty signed-in Prime collection is allowed through.
+    guard_allow_empty = args.allow_empty or (
+        source == "web" and web_outcome_kind == "signed_in_empty"
+    )
+    refused = write_catalog_guarded(
+        GAMES_AMAZON_JSON,
+        json.dumps(payload, indent=2, ensure_ascii=False),
+        count=games_out,
+        label="Amazon library",
+        allow_empty=guard_allow_empty,
+        allow_drift=True,
+    )
+    if refused:
+        return stats.finish("fetch_amazon", t0, exit_code=refused)
     if source == "web":
         mark_connected(AMAZON_WEB_PROFILE, {"AMAZON_WEB_PROFILE": "ready"})
     print(f"\nWrote {len(games_out)} games to {GAMES_AMAZON_JSON}.", flush=True)

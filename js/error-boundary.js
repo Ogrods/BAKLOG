@@ -52,14 +52,6 @@ let _bundleCtx = null; // { getFingerprint, getActiveFilterCount } — injected 
 const _errors = [];
 const _signatures = new Map(); // sig -> last seen timestamp
 
-function escapeHtml(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function makeSignature(entry) {
   const firstStackLine = (entry.stack || '').split('\n').slice(0, 2).join('|');
   return `${entry.kind}::${entry.message}::${firstStackLine}`;
@@ -108,14 +100,51 @@ function isIgnoredError(entry) {
 }
 
 /**
+ * Lazy-chunk fetch failure — the esbuild `dist/` bundle was rebuilt (new chunk
+ * hashes) while this tab stayed open, so a hashed chunk URL the running build
+ * references via `import('./x.js')` no longer exists on disk. It's not a code
+ * bug; the fix is to reload onto the fresh build (see reloadForStaleChunkOnce).
+ */
+function isStaleChunkError(entry) {
+  const msg = String(entry?.message || '');
+  return /Failed to (?:fetch|load) dynamically imported module|error loading dynamically imported module|Importing a module script failed/i.test(msg);
+}
+
+const STALE_CHUNK_RELOAD_KEY = 'baklog-stale-chunk-reload';
+const STALE_CHUNK_RELOAD_WINDOW_MS = 30_000;
+
+/**
+ * Reload the tab once onto the freshly-built bundle. Guarded by a sessionStorage
+ * timestamp so a chunk that is genuinely missing (still 404s after the reload)
+ * surfaces as a real error instead of trapping the tab in a reload loop.
+ * @returns {boolean} true if a reload was scheduled (caller should swallow the error)
+ */
+function reloadForStaleChunkOnce() {
+  if (typeof window === 'undefined') return false;
+  let last = 0;
+  try { last = Number(window.sessionStorage?.getItem(STALE_CHUNK_RELOAD_KEY)) || 0; } catch (_) { /* disabled storage */ }
+  if (Date.now() - last < STALE_CHUNK_RELOAD_WINDOW_MS) return false;
+  try { window.sessionStorage?.setItem(STALE_CHUNK_RELOAD_KEY, String(Date.now())); } catch (_) { /* best-effort */ }
+  window.setTimeout(() => { try { window.location.reload(); } catch (_) { /* noop */ } }, 150);
+  return true;
+}
+
+/**
  * Historical entries to drop when rehydrating localStorage (fixed bugs / ignored noise).
  * New captures for non-ignored messages are unaffected so regressions still surface.
  */
 function isStalePersistedError(entry) {
   if (isIgnoredError(entry)) return true;
+  // Transient stale-build artifacts — a reload clears them, so they shouldn't
+  // linger in bug bundles as if they were live defects.
+  if (isStaleChunkError(entry)) return true;
   const msg = String(entry?.message || '');
   return msg === 'authStatus is not defined'
-    || msg === 'enableLocalProvider is not defined';
+    || msg === 'enableLocalProvider is not defined'
+    || msg === 'lastBarSummary is not defined'
+    || msg === 'eff is not defined'
+    || msg === 'cancelGlobalFetcherTailThrottle is not defined'
+    || msg === 'itadPendingAutoRun is not defined';
 }
 
 function prunePersistedRing() {
@@ -517,6 +546,11 @@ function copyTextToClipboard(text, btn) {
 
 function record(entry) {
   if (isIgnoredError(entry)) return;
+  // A lazily-imported chunk 404'd because dist/ was rebuilt under this open tab.
+  // Recover by reloading onto the fresh build rather than alarming the user. If
+  // we already reloaded recently and it's still failing, fall through so the
+  // genuine failure surfaces.
+  if (isStaleChunkError(entry) && reloadForStaleChunkOnce()) return;
   const sig = makeSignature(entry);
   if (shouldDedupe(entry)) {
     bumpRepeatsForSignature(sig);

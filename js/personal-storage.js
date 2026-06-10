@@ -116,10 +116,25 @@ export function installPersonalStorageSync() {
   });
 }
 
+/**
+ * Best-effort localStorage write. Quota exhaustion / private-mode blocks are
+ * logged but never thrown — the server personal-doc PUT (via personalStore
+ * subscribers) is the durable copy, so a failed local cache write must not
+ * crash a save path.
+ */
+function safeLocalSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    const quota = err && (err.name === 'QuotaExceededError' || err.code === 22);
+    console.warn(`[personal] localStorage write failed${quota ? ' (quota exceeded)' : ''}`, err);
+  }
+}
+
 export function savePersonal() {
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = setTimeout(() => {
-    localStorage.setItem(personalStorageKey(), JSON.stringify(state.personal));
+    safeLocalSet(personalStorageKey(), JSON.stringify(state.personal));
     personalStore.notify();
   }, 250);
 }
@@ -128,7 +143,7 @@ export function flushSavePersonal() {
   if (!_savePersonalTimer) return;
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = null;
-  localStorage.setItem(personalStorageKey(), JSON.stringify(state.personal));
+  safeLocalSet(personalStorageKey(), JSON.stringify(state.personal));
   personalStore.notify();
 }
 
@@ -143,7 +158,7 @@ export function loadManualGames() {
 }
 
 export function saveManualGames(list) {
-  localStorage.setItem(manualStorageKey(), JSON.stringify(list));
+  safeLocalSet(manualStorageKey(), JSON.stringify(list));
   personalStore.notify();
 }
 

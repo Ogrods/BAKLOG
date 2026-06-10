@@ -20,6 +20,10 @@ function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+function rmrf(target) {
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
 function writeHashedFile(srcBytes, logicalName, ext) {
   const hash = sha256Short(srcBytes);
   const base = logicalName.replace(/\.[^.]+$/, '');
@@ -40,6 +44,10 @@ function copyDir(src, dest) {
 }
 
 async function buildCss() {
+  // Drop stale hashed CSS so dist keeps only the current build's outputs.
+  for (const ent of fs.readdirSync(distDir)) {
+    if (ent.endsWith('.css')) rmrf(path.join(distDir, ent));
+  }
   const manifest = {};
   for (const logical of ['tailwind.css', 'app.css']) {
     const entry = path.join(root, logical);
@@ -61,6 +69,9 @@ async function buildCss() {
 
 async function buildJs() {
   const jsOutDir = path.join(distDir, 'js');
+  // Wipe prior JS so stale app entries/chunks can't be picked up by the disk
+  // scan below (which would otherwise serve old code, e.g. a stale supabase URL).
+  rmrf(jsOutDir);
   ensureDir(jsOutDir);
   const result = await esbuild.build({
     entryPoints: [path.join(root, 'js/app.js')],
@@ -129,6 +140,23 @@ async function buildJs() {
   return manifest;
 }
 
+async function buildWorker() {
+  const outPath = path.join(distDir, 'js', 'table-query.worker.js');
+  ensureDir(path.dirname(outPath));
+  await esbuild.build({
+    entryPoints: [path.join(root, 'js/table-query.worker.js')],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    target: ['es2020'],
+    minify: true,
+    outfile: outPath,
+    logLevel: 'silent',
+  });
+  console.log('  js/table-query.worker.js -> dist/js/table-query.worker.js');
+  return { 'js/table-query.worker.js': 'js/table-query.worker.js' };
+}
+
 async function main() {
   const args = new Set(process.argv.slice(2));
   const cssOnly = args.has('--css-only');
@@ -157,10 +185,18 @@ async function main() {
   if (!cssOnly) {
     console.log('Bundling JS -> dist/');
     Object.assign(manifest, await buildJs());
+    Object.assign(manifest, await buildWorker());
     const vendorSrc = path.join(root, 'js/vendor');
     if (fs.existsSync(vendorSrc)) {
       copyDir(vendorSrc, path.join(distDir, 'vendor'));
       console.log('  copied js/vendor -> dist/vendor');
+    }
+  }
+  if (!jsOnly) {
+    const assetsSrc = path.join(root, 'assets');
+    if (fs.existsSync(assetsSrc)) {
+      copyDir(assetsSrc, path.join(distDir, 'assets'));
+      console.log('  copied assets -> dist/assets');
     }
   }
 

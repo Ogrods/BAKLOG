@@ -6,6 +6,7 @@ import {
   recomputeCrossStoreHidden,
   applyCoopOverrides,
   gameKey,
+  rebuildGameKeyIndex,
 } from './game-core.js';
 import { personalStore } from './personal-store.js';
 import {
@@ -48,12 +49,12 @@ import {
   loadClaimableNow,
   consumeClaimsAutoRunFlag,
   diffClaims,
+  loadClaimsSnapshotKeys,
   showClaimableBanner,
   saveClaimsSnapshot,
   refreshClaimableUi,
 } from './claimable.js';
 import { loadSponsoredDeals } from './sponsored-deals.js';
-import { claimsSnapshotStorageKey } from './profiles.js';
 import { fireLibraryCountFlash } from './library-count-animation.js';
 import { itadSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
@@ -244,6 +245,7 @@ export async function finishEmptyLibraryLoad() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   invalidateTableCache();
   recomputeCrossStoreHidden();
+  rebuildGameKeyIndex();
   state.dashboardDataReady = true;
   buildOwnedNormNames();
   _prevLibraryCount = countLibraryVisible();
@@ -260,6 +262,9 @@ export async function applyMergedLibrary(mergeKey = null) {
   bumpPersonalMemo();
   invalidateTableCache();
   recomputeCrossStoreHidden();
+  // Refresh the gameKey lookup before any findGameByKey consumers run — the
+  // length-based fingerprint can't see same-size content swaps after a merge.
+  rebuildGameKeyIndex();
   state._lastNewlyAddedCount = recordLibraryFirstSeen();
   canonicalizeNotesAcrossTitles();
   applyHiddenTitleNorms({ silent: true });
@@ -406,13 +411,9 @@ export async function reloadAfterFetcher(key) {
     if (key === "protondb") await loadProtondbCache();
   } else if (key === 'claims') {
     const wasAuto = consumeClaimsAutoRunFlag();
-    let prevIds = new Set();
-    try {
-      const raw = localStorage.getItem(claimsSnapshotStorageKey());
-      if (raw) prevIds = new Set(JSON.parse(raw)?.ids || []);
-    } catch (_) { /* ignore */ }
+    const prevKeys = loadClaimsSnapshotKeys();
     await loadClaimableNow();
-    const { newCount } = diffClaims(prevIds, state.claimableFeed?.items || []);
+    const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
     if (wasAuto && newCount > 0) showClaimableBanner(newCount);
     saveClaimsSnapshot(state.claimableFeed?.items || []);
     refreshClaimableUi();

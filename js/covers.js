@@ -4,7 +4,21 @@
 // `syncCoverFits` for callers that need to re-prime cached images.
 
 import { sanitizeCoverUrl, spotlightCropForAspect } from "./game-core.js";
-import { escapeAttr } from "./dom-util.js";
+import { escapeAttr, isSafeHttpUrl } from "./dom-util.js";
+
+/** Cover URL safe for HTML src= attributes (escaped + http/https only). */
+export function safeCoverAttrUrl(url) {
+  const cover = String(url || "").trim();
+  if (!cover || !isSafeHttpUrl(cover)) return "";
+  return escapeAttr(cover);
+}
+
+/** Cover URL safe inside CSS url('...') (http/https only; escapes quotes/backslashes). */
+export function safeCoverCssUrl(url) {
+  const cover = String(url || "").trim();
+  if (!cover || !isSafeHttpUrl(cover)) return "";
+  return cover.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
 
 // Full HTML escape (text + attribute) for values interpolated into placeholder
 // markup built via outerHTML. Game names (and the initials derived from them)

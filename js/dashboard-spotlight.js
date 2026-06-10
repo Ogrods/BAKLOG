@@ -12,7 +12,7 @@ import { computeSpotlightSuperlatives } from './creative-metrics.js';
 import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
 import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
 import { registerPausable } from './visibility.js';
-import { getEligibleSponsors, sponsorToSpotlightGame } from './sponsored-deals.js';
+import { getAdsForLocation, sponsorToSpotlightGame } from './sponsored-deals.js';
 
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
@@ -806,7 +806,7 @@ export function pickSpotlightGames(games, snapIn) {
     }
   }
 
-  const spotlightAds = getEligibleSponsors('spotlight').map(sponsorToSpotlightGame);
+  const spotlightAds = getAdsForLocation('dash-spotlight', { count: 3 }).map(sponsorToSpotlightGame);
   for (let i = 0; i < spotlightAds.length; i++) {
     const insertAt = Math.min((i + 1) * 3, pool.length);
     pool.splice(insertAt, 0, spotlightAds[i]);
@@ -875,20 +875,14 @@ export function spotlightInnerHtml(g) {
       ...(secondaryStat ? [secondaryStat] : []),
       escapeHtml(statusLabel),
     ];
-  const ad = g._spotlightAd;
-  const adBadge = ad
-    ? `<span class="sponsored-badge dash-spotlight-sponsored-badge" title="${escapeAttr(ad.disclosure === 'House' ? 'House promotion from BAKLOG' : 'Paid placement')}">${escapeHtml(ad.disclosure)}</span>`
-    : '';
-  const adDismiss = ad && ad.id
-    ? `<span class="sponsored-deal-dismiss dash-spotlight-dismiss" role="button" tabindex="0" data-action="sponsored-dismiss" data-sponsor-id="${escapeAttr(ad.id)}" title="Dismiss this slot" aria-label="Dismiss sponsored slot">&times;</span>`
-    : '';
+  // Sponsored spotlights carry their disclosure in the eyebrow ("Sponsored"),
+  // so no separate badge pill is shown; they're skippable via the rotation nav
+  // rather than dismissible, so no close affordance either.
   return `
     <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
     <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="eager" fetchpriority="high" decoding="async" width="1920" height="620" data-name="${escapeAttr(g.name)}" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
     <div class="dash-spotlight-sheen" aria-hidden="true"></div>
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
-    ${adBadge}
-    ${adDismiss}
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
@@ -1017,7 +1011,22 @@ function applySpotlightSlide(el, next) {
   el._spotlightTiltReset?.();
   el.innerHTML = spotlightInnerHtml(next);
   el.dataset.key = gameKey(next);
-  el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
+  // Keep the click action, sponsor attrs, title, and ad styling in sync with the
+  // rotated-in slide (mirrors renderSpotlightHtml). Sponsored slides open the ad
+  // URL and have no "jump to … in library" tooltip — their title is just the name.
+  const ad = next._spotlightAd;
+  el.classList.toggle('dash-spotlight--ad', !!ad);
+  if (ad) {
+    el.dataset.action = 'sponsored-deal';
+    el.dataset.sponsorId = ad.id;
+    el.dataset.sponsorUrl = ad.url || '';
+    el.title = next.name;
+  } else {
+    el.dataset.action = 'dash-list-jump';
+    delete el.dataset.sponsorId;
+    delete el.dataset.sponsorUrl;
+    el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
+  }
   el.classList.remove('is-fading');
   primeSpotlightArt(el);
   _spotlightCurrentKey = gameKey(next);

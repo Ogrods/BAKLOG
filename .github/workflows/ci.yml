@@ -43,7 +43,7 @@ jobs:
   python-windows:
     name: Python (Windows)
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -153,3 +153,6 @@ jobs:
 
       - name: Check bundle size budget
         run: npm run check:bundle-size
+
+      - name: Check dist integrity
+        run: npm run check:dist-integrity

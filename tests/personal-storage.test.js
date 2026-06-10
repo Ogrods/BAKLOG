@@ -4,7 +4,7 @@
  * stripLegacyTags is the single migration that drops them on first boot.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
 import { state } from '../js/state.js';
 import {
   setPersonal,
@@ -16,6 +16,9 @@ import {
   countOrphanPersonalKeys,
   prunePersonalKeys,
   stripLegacyTags,
+  flushSavePersonal,
+  savePersonal,
+  saveManualGames,
 } from '../js/personal-storage.js';
 import { gameKey } from '../js/game-core.js';
 
@@ -30,6 +33,27 @@ beforeEach(() => {
   state.itchGames = [];
   state.prefs = {};
   window._dataVersion = 0;
+});
+
+describe('localStorage quota handling', () => {
+  it('flushSavePersonal and saveManualGames swallow quota errors and warn', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      const err = new Error('quota');
+      err.name = 'QuotaExceededError';
+      throw err;
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      state.personal = { 'steam:1': { status: 'backlog' } };
+      savePersonal();
+      expect(() => flushSavePersonal()).not.toThrow();
+      expect(() => saveManualGames([{ store: 'manual', id: 'x', name: 'X' }])).not.toThrow();
+      expect(warn).toHaveBeenCalledTimes(2);
+    } finally {
+      setItemSpy.mockRestore();
+      warn.mockRestore();
+    }
+  });
 });
 
 describe('setPersonal — notes', () => {

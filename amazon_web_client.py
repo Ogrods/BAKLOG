@@ -309,6 +309,24 @@ def extract_claims_list(payload: Any) -> list[dict[str, Any]] | None:
     return None
 
 
+def scrub_claim_codes(claims: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return shallow copies of ``claims`` with redemption/activation code fields
+    removed.
+
+    Raw Amazon claim payloads can carry one-time redemption/game/claim/activation
+    codes (see ``_CODE_FIELD_NAMES``). Those are credentials and must never be
+    written to the on-disk raw dump used as a headless fetcher fallback.
+    """
+    cleaned: list[dict[str, Any]] = []
+    for claim in claims:
+        if not isinstance(claim, dict):
+            cleaned.append(claim)
+            continue
+        copy = {k: v for k, v in claim.items() if k not in _CODE_FIELD_NAMES}
+        cleaned.append(copy)
+    return cleaned
+
+
 def _has_redemption_code(claim: dict[str, Any]) -> bool:
     for key in _CODE_FIELD_NAMES:
         val = claim.get(key)

@@ -1291,6 +1291,9 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .store-badge--word:not(.conn-rail-badge):not(.store-badge--md):not(.store-badge--lg) .store-badge-word {
   transform: translate(1px, -2px);
 }
+/* Spotlight card badge: nudge the "gog" wordmark 1px left + 1px down vs the
+   default sm placement for optical centering in the hero meta row. */
+.dash-spotlight-store.store-badge--word .store-badge-word { transform: translate(0, 1px); }
 /* Small library/row badges: PlayStation glyph reads slightly left at 16px. */
 .store-badge.psn:not(.conn-rail-badge):not(.store-badge--md):not(.store-badge--lg) .store-badge-glyph {
   transform: translate(1px, 0);
@@ -1323,7 +1326,7 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .summary-store-chip-logo { display: inline-flex; align-items: center; }
 .summary-store-chip-label { line-height: 1; }
 .pick-store .store-badge { position: absolute; top: 6px; right: 6px; z-index: 2; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
-.dash-spotlight-meta .dash-spotlight-store { vertical-align: middle; margin-right: 2px; }
+.dash-spotlight-meta .dash-spotlight-store { vertical-align: middle; margin-right: 2px; position: relative; top: -2px; }
 .dash-hero-stores {
   margin-top: 10px;
   position: relative;
@@ -1404,6 +1407,11 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 }
 .claim-cut-fire {
   animation: dealHugePulse 1.8s ease-in-out infinite;
+}
+.claim-pro-badge {
+  background: rgba(168, 85, 247, 0.22);
+  color: #d8b4fe;
+  border-color: rgba(192, 132, 252, 0.45);
 }
 .claimable-banner {
   border-left-color: #f97316;
@@ -2821,22 +2829,24 @@ html[data-theme="ember"] .app-header-brand h1 {
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
-/* Header logo mark: recolored to the theme accent via mask (white SVG = alpha
-   shape). Midnight (OLED) keeps it pure white for the black-on-white look. */
+/* Header logo mark — inline SVG with transparent knob cutouts (same mask
+   technique as landing/index.html hero mark). CSS mask-image on the old white
+   SVG dropped the inner circles and rendered solid pills. */
 .brand-logo-mark {
-  display: inline-block;
+  display: inline-flex;
   height: 30px;
-  aspect-ratio: 96 / 52;
-  background-color: var(--accent);
-  -webkit-mask: url(assets/baklog-logo-white.svg) no-repeat center / contain;
-  mask: url(assets/baklog-logo-white.svg) no-repeat center / contain;
+  flex-shrink: 0;
+  color: var(--accent);
 }
-html[data-theme="default"] .brand-logo-mark { background-color: #fff; }
-html[data-theme="dark"] .brand-logo-mark { background-color: #fff; }
-html[data-theme="ember"] .brand-logo-mark {
-  background-color: transparent;
-  background-image: var(--brand-grad);
+.brand-logo-mark svg {
+  display: block;
+  height: 100%;
+  width: auto;
 }
+.brand-logo-pills { fill: currentColor; }
+html[data-theme="default"] .brand-logo-mark,
+html[data-theme="dark"] .brand-logo-mark { color: #fff; }
+html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 /* Map leftover sky Tailwind utilities to the theme accent so blue links,
    toggles, and badges follow the palette. The BAKLOG wordmark keeps white
    via the higher-specificity rule above. (app.css loads after tailwind.css.) */
@@ -2895,6 +2905,115 @@ html[data-theme="ember"] .brand-logo-mark {
 .sponsored-deal-tagline { font-size: 0.75rem; color: rgb(148 163 184); line-height: 1.3; }
 .sponsored-deal-cta { font-size: 0.75rem; font-weight: 600; color: #f59e0b; margin-top: 0.15rem; }
 .sponsored-deal-house .sponsored-deal-cta { color: #38bdf8; }
+/* Full-width house promo banner — fills the whole deal-radar row instead of a
+   1/3-width card. House blue (vs amber) since it's our own promo, never a paid slot.
+   Layout: brand block | three info columns (fill the middle) | CTA. */
+.sponsored-deal-banner { cursor: pointer; overflow: hidden; grid-column: 1 / -1; }
+.sponsored-deal-banner.deal-rail-card::before { background: #38bdf8; }
+.sponsored-deal-banner--green.deal-rail-card::before { background: #10b981; }
+.sponsored-deal-banner--green .house-banner-mark { color: #10b981; }
+.sponsored-deal-banner--green .house-banner-feature-title { color: #34d399; }
+.sponsored-deal-banner--green .house-banner-cta { background: #10b981; }
+.sponsored-deal-banner--green:hover .house-banner-cta { background: #34d399; }
+.sponsored-deal-banner--green .sponsored-deal-house .sponsored-badge { color: #34d399; border-color: rgba(52, 211, 153, 0.5); }
+/* Pro tier upsell banner — dashboard only. Violet/gold accent so it reads
+   distinct from emerald deal cards and the blue house waitlist banner. */
+.sponsored-deal-pro.deal-rail-card::before { background: linear-gradient(90deg, #a78bfa, #fbbf24); }
+.sponsored-deal-pro .house-banner-mark { color: #a78bfa; }
+.sponsored-deal-pro .sponsored-badge { color: #fbbf24; border-color: rgba(251, 191, 36, 0.5); }
+.sponsored-deal-pro .house-banner-feature-title { color: #c4b5fd; }
+.sponsored-deal-pro .house-banner-price {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fbbf24;
+  margin: 0;
+  line-height: 1.3;
+}
+.sponsored-deal-pro .house-banner-cta {
+  color: #0b1220;
+  background: #a78bfa;
+}
+.sponsored-deal-pro:hover .house-banner-cta { background: #c4b5fd; }
+.house-banner-grid {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+.house-banner-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex: 0 0 auto;
+  max-width: 16rem;
+}
+.house-banner-mark {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  color: #38bdf8;
+}
+.house-banner-mark svg { width: 100%; height: 100%; }
+.house-banner-copy { display: flex; flex-direction: column; gap: 0.2rem; }
+.house-banner-head { display: flex; align-items: center; gap: 0.5rem; }
+.house-banner-title { font-size: 1.05rem; font-weight: 700; color: var(--text-bright); line-height: 1.2; }
+.house-banner-tagline { font-size: 0.78rem; color: rgb(148 163 184); line-height: 1.35; margin: 0; }
+.house-banner-features {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 1.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0 0.5rem;
+  border-left: 1px solid var(--border);
+}
+.house-banner-feature {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.house-banner-feature-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+.house-banner-feature-desc {
+  font-size: 0.72rem;
+  color: rgb(148 163 184);
+  line-height: 1.35;
+}
+.house-banner-cta {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0b1220;
+  background: #38bdf8;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.sponsored-deal-banner:hover .house-banner-cta { background: #7dd3fc; }
+@media (max-width: 900px) {
+  .house-banner-grid { flex-wrap: wrap; }
+  .house-banner-features {
+    flex-basis: 100%;
+    order: 3;
+    padding: 0.75rem 0 0;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  .house-banner-cta { margin-left: auto; }
+}
+@media (max-width: 640px) {
+  .house-banner-features { flex-direction: column; gap: 0.6rem; }
+  .house-banner-brand { max-width: none; flex: 1 1 100%; }
+  .house-banner-cta { width: 100%; text-align: center; margin-left: 0; }
+}
 .sponsored-deal-dismiss {
   position: absolute;
   top: 0.35rem;
@@ -2912,28 +3031,83 @@ html[data-theme="ember"] .brand-logo-mark {
   z-index: 3;
 }
 .sponsored-deal-dismiss:hover { color: rgb(226 232 240); background: rgba(148, 163, 184, 0.15); }
+.sponsored-deal-banner .sponsored-deal-dismiss { top: 50%; transform: translateY(-50%); }
+/* Compact house stripe below library / itch picks rows */
+.house-stripe-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.house-stripe-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+.house-stripe-card--lib::before { background: linear-gradient(180deg, #f59e0b, #d97706); }
+.house-stripe-card--itch::before { background: linear-gradient(180deg, #a78bfa, #7c3aed); }
+.house-stripe-mark {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  color: #f59e0b;
+}
+.house-stripe-card--itch .house-stripe-mark { color: #a78bfa; }
+.house-stripe-mark svg { width: 100%; height: 100%; }
+.house-stripe-copy { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.house-stripe-title { font-weight: 700; color: var(--text-bright); line-height: 1.25; }
+.house-stripe-tagline { font-size: 0.78rem; color: rgb(148 163 184); line-height: 1.35; }
+.house-stripe-cta {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0b1220;
+  background: #f59e0b;
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  white-space: nowrap;
+}
+.house-stripe-card--itch .house-stripe-cta { background: #a78bfa; }
+.house-stripe-card:hover .house-stripe-cta { filter: brightness(1.08); }
+.house-stripe-card .sponsored-deal-dismiss { top: 0.35rem; right: 0.5rem; }
+.dash-house-slot:not(.hidden),
+.view-house-slot:not(.hidden) { display: block; }
 .sponsored-badge--inline { position: static; }
-.dash-spotlight-sponsored-badge {
-  top: 0.65rem;
-  right: 0.75rem;
-  bottom: auto;
-}
-.dash-spotlight-dismiss {
-  top: 0.35rem;
-  right: 2.5rem;
-}
 .dash-spotlight--ad { cursor: pointer; }
 .sponsored-pick-card { cursor: pointer; position: relative; }
 .sponsored-pick-badge {
-  top: 0.4rem;
-  left: 0.4rem;
-  right: auto;
-  bottom: auto;
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
   font-size: 0.5rem;
   padding: 0.05rem 0.35rem;
 }
 .sponsored-pick-card .sponsored-deal-dismiss { top: 0.25rem; right: 0.4rem; width: 1.1rem; height: 1.1rem; }
+.sponsored-table-row { cursor: pointer; }
 .sponsored-table-row td { background: rgba(245, 158, 11, 0.06); border-top: 1px solid rgba(245, 158, 11, 0.2); border-bottom: 1px solid rgba(245, 158, 11, 0.2); }
+.sponsored-table-row:hover td { background: rgba(245, 158, 11, 0.1); }
+.sponsored-table-name {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.sponsored-table-name:focus-visible { outline: 2px solid rgba(245, 158, 11, 0.7); outline-offset: 2px; border-radius: 0.25rem; }
 .sponsored-table-body {
   position: relative;
   display: flex;
@@ -2946,16 +3120,422 @@ html[data-theme="ember"] .brand-logo-mark {
 .sponsored-table-badge { position: static; flex-shrink: 0; }
 .sponsored-table-title { font-weight: 600; color: rgb(241 245 249); }
 .sponsored-table-tagline { font-size: 0.75rem; color: rgb(148 163 184); margin-left: 0.5rem; }
-.sponsored-dash-picks-card { position: relative; }
-.sponsored-dash-picks-body {
-  position: relative;
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  cursor: pointer;
+.sponsored-table-tagline-row { font-size: 0.75rem; color: rgb(148 163 184); line-height: 1.2; }
+.sponsored-table-status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgb(252 211 77);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 0.35rem;
+  padding: 1px 0.5rem;
 }
-.sponsored-claim-card { position: relative; }
-.sponsored-claim-body { position: relative; cursor: pointer; border: none; background: transparent; color: inherit; }
+.sponsored-table-deal-pill {
+  display: inline-block;
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: rgb(134 239 172);
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 0.25rem;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.sponsored-table-notes { position: relative; }
+.sponsored-table-notes .sponsored-deal-dismiss {
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* === Full "feature card" sponsor ad (dash-picks slot) =====================
+   Cover art bleeds in from the right and fades right-to-left into the card
+   background (mirrors the dashboard spotlight fade), while the title, stat
+   sub-cards, and sponsor details sit on a clean background on the left. */
+.sponsored-feature-card {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  isolation: isolate;
+  min-height: 280px;
+  /* The whole card is the click target (button). Reset button chrome so the
+     dash-card surface shows through. */
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  border-color: color-mix(in srgb, #f59e0b 35%, var(--border-subtle));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #f59e0b 12%, transparent),
+    0 14px 32px -20px color-mix(in srgb, #f59e0b 45%, transparent);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.sponsored-feature-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: #f59e0b;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  z-index: 5;
+}
+.sponsored-feature-card:hover {
+  border-color: color-mix(in srgb, #f59e0b 55%, var(--border-subtle));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #f59e0b 22%, transparent),
+    0 18px 40px -18px color-mix(in srgb, #f59e0b 55%, transparent);
+  transform: translateY(-1px);
+}
+.sponsored-feature-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sponsored-feature-card.no-art { padding: 1rem; }
+.sponsored-feature-art,
+.sponsored-feature-art-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+.sponsored-feature-art-bg {
+  object-position: center;
+  filter: blur(26px) brightness(0.55) saturate(1.25);
+  opacity: 0.5;
+  transform: scale(1.14);
+  z-index: 0;
+}
+/* Sharp cover anchored to the right; its own mask softens the left edge so the
+   feathering reads even before the gradient overlay tints the text zone. */
+.sponsored-feature-art {
+  left: auto;
+  right: 0;
+  width: 72%;
+  object-position: 100% 35%;
+  z-index: 1;
+  transition: filter 0.5s ease;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 40%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 40%);
+  animation: sponsoredFeatureArtZoom 14s ease-out forwards;
+}
+@keyframes sponsoredFeatureArtZoom {
+  from { transform: scale(1) translateZ(0); }
+  to { transform: scale(1.06) translateZ(0); }
+}
+.sponsored-feature-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 0%,
+    var(--bg-panel) 30%,
+    color-mix(in srgb, var(--bg-panel) 72%, transparent) 58%,
+    transparent 100%
+  );
+}
+.sponsored-feature-card:hover .sponsored-feature-art {
+  filter: brightness(1.1);
+}
+.sponsored-feature-body {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem;
+  min-height: 100%;
+  background: transparent;
+  border: 0;
+  color: inherit;
+}
+.sponsored-feature-head { display: flex; align-items: center; gap: 0.5rem; }
+.sponsored-feature-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.sponsored-feature-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text-bright);
+  text-shadow: 0 2px 8px color-mix(in srgb, var(--bg) 55%, transparent);
+}
+.sponsored-feature-blurb {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: rgb(203 213 225);
+  max-width: 26ch;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.sponsored-feature-priceline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-top: 0.1rem;
+}
+.sponsored-feature-cut {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #0b1220;
+  background: #4ade80;
+  border-radius: 0.3rem;
+  padding: 1px 6px;
+}
+.sponsored-feature-sale { font-size: 1rem; font-weight: 700; color: var(--text-bright); }
+.sponsored-feature-was {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgb(148 163 184);
+  text-decoration: line-through;
+  text-decoration-color: rgb(100 116 139);
+}
+.sponsored-feature-panel {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  gap: 0.45rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--bg-elev) 82%, var(--bg-panel));
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
+}
+.sponsored-feature-stats {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+.sponsored-feature-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 8.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--bg-panel) 75%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+}
+.sponsored-feature-stat-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  line-height: 1;
+}
+.sponsored-feature-stat-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(148 163 184);
+}
+.sponsored-feature-stat.is-rating .sponsored-feature-stat-value { color: #4ade80; }
+.sponsored-feature-stat.is-mc .sponsored-feature-stat-value { color: var(--accent-muted); }
+.sponsored-feature-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-top: 0.1rem;
+  font-size: 0.7rem;
+  color: rgb(148 163 184);
+}
+.sponsored-feature-genre {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elev) 58%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+.sponsored-feature-by::before { content: "by "; opacity: 0.65; }
+.sponsored-feature-cta {
+  margin-top: auto;
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0b1220;
+  background: #f59e0b;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  transition: background 0.15s ease;
+}
+.sponsored-feature-card:hover .sponsored-feature-cta { background: #fbbf24; }
+/* Disclosure badge + dismiss share the top-right corner, above art/fade layers,
+   so they never overlap the CTA on banner or compact claimable cards. */
+.sponsored-feature-card .sponsored-badge--inline {
+  position: absolute;
+  top: 0.5rem;
+  bottom: auto;
+  right: 2.15rem;
+  transform: none;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  height: 1.25rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.sponsored-feature-card .sponsored-deal-dismiss {
+  top: 0.5rem;
+  right: 0.45rem;
+  transform: none;
+  z-index: 4;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: rgb(226 232 240);
+  background: rgba(2, 6, 23, 0.6);
+}
+.sponsored-feature-card .sponsored-deal-dismiss:hover {
+  color: #fff;
+  background: rgba(2, 6, 23, 0.85);
+}
+@media (max-width: 640px) {
+  .sponsored-feature-blurb { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sponsored-feature-art {
+    transition: none;
+    animation: none;
+  }
+  .sponsored-feature-card {
+    transition: none;
+  }
+  .sponsored-feature-card:hover {
+    transform: none;
+  }
+  .sponsored-feature-card:hover .sponsored-feature-art { filter: none; }
+}
+/* === Portrait-cover variant of the feature ad ============================
+   Box art with a tall (2:3) aspect is shown as a contained poster sitting in a
+   left column beside the copy, instead of the landscape right-to-left bleed +
+   fade (which would crop a portrait cover to a sliver). */
+.sponsored-feature-card--portrait { min-height: 0; }
+.sponsored-feature-layout {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 0.85rem;
+  padding: 1rem;
+  min-height: 100%;
+}
+.sponsored-feature-poster {
+  flex: 0 0 auto;
+  width: 5.5rem;
+  align-self: flex-start;
+}
+.sponsored-feature-poster-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.65);
+}
+.sponsored-feature-card--portrait .sponsored-feature-body {
+  padding: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sponsored-feature-card--portrait .sponsored-feature-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sponsored-feature-card--portrait .sponsored-feature-stat { min-width: 0; }
+.sponsored-feature-card--portrait .sponsored-feature-blurb { max-width: none; }
+/* === Full-width banner variant of the feature ad ==========================
+   Same art/fade aesthetic as the dash-picks feature card, but laid out as a
+   short horizontal strip (placement: dash-feature-banner) so it can wedge
+   between dashboard charts. */
+.dash-feature-banner-slot { display: block; }
+.sponsored-feature-card--banner { min-height: 0; }
+.sponsored-feature-card--banner .sponsored-feature-art {
+  width: 52%;
+  object-position: 100% 40%;
+}
+.sponsored-feature-card--banner .sponsored-feature-fade {
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 0%,
+    var(--bg-panel) 26%,
+    color-mix(in srgb, var(--bg-panel) 70%, transparent) 56%,
+    transparent 100%
+  );
+}
+.sponsored-feature-card--banner .sponsored-feature-body {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.5rem;
+  padding: 1.5rem 5.5rem 1.1rem 1.1rem;
+  min-height: 0;
+}
+.sponsored-feature-card--banner .sponsored-feature-head {
+  position: absolute;
+  top: 0.6rem;
+  left: 1.1rem;
+  z-index: 4;
+}
+.sponsored-feature-card--banner .sponsored-feature-hero {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.sponsored-feature-card--banner .sponsored-feature-blurb { max-width: 48ch; }
+.sponsored-feature-card--banner .sponsored-feature-panel { align-self: center; }
+.sponsored-feature-card--banner .sponsored-feature-stats {
+  grid-template-columns: repeat(4, minmax(3.4rem, auto));
+}
+.sponsored-feature-card--banner .sponsored-feature-stat { min-width: 0; }
+.sponsored-feature-card--banner .sponsored-feature-detail {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.sponsored-feature-card--banner .sponsored-feature-cta {
+  margin-top: 0;
+  margin-left: auto;
+  align-self: center;
+}
+@media (max-width: 760px) {
+  .sponsored-feature-card--banner .sponsored-feature-art { width: 100%; }
+  .sponsored-feature-card--banner .sponsored-feature-cta { margin-left: 0; }
+}
+/* Claimable-area sponsored ads: up to three content-rich feature cards laid out
+   as an equal-width row (each ~1/3) above the Claimable Now card stacked beneath
+   them inside #claimableNowModule. Cards wrap to full width on narrow screens. */
+.sponsored-claim-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.sponsored-claim-feature {
+  flex: 1 1 0;
+  min-width: 16rem;
+}
+.sponsored-claim-feature .sponsored-feature-card {
+  min-height: 0;
+  height: 100%;
+}
+/* All claimable feature cards share the compact 2×2 stat grid for their info
+   block, so the landscape/hero card (e.g. Tidewright) matches the portrait
+   cards instead of stacking the four stats in a single column. */
+.sponsored-claim-feature .sponsored-feature-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sponsored-claim-feature .sponsored-feature-stat { min-width: 0; }
+@media (max-width: 767px) {
+  .sponsored-claim-feature { flex-basis: 100%; }
+}
 .dash-picks-row:has(.dash-sponsored-pick-slot:not(.hidden)) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -3713,6 +4293,10 @@ html[data-theme="ember"] .brand-logo-mark {
   margin-bottom: 6px;
   position: relative;
   z-index: 1;
+  /* Decorative label: it's a full-width block that overlaps the right-side
+     spotlight nav controls. Let clicks fall through so the nav stays usable. */
+  pointer-events: none;
+  width: fit-content;
 }
 .dash-hero-number {
   font-size: clamp(48px, 7vw, 84px);
@@ -4662,6 +5246,18 @@ html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before 
 .coop-pick-name-wrap .store-badge { flex-shrink: 0; }
 .coop-pick-name { font-size: 0.78rem; color: #f1f5f9; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .coop-pick-rating { font-size: 0.75rem; font-weight: 700; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.sponsored-coop-row { position: relative; padding-right: 1.4rem !important; }
+.sponsored-coop-row .sponsored-coop-badge { position: static; flex-shrink: 0; }
+.sponsored-coop-row .coop-pick-rating { margin-right: 0.1rem; }
+.sponsored-coop-row .sponsored-deal-dismiss {
+  position: absolute;
+  top: 50%;
+  right: 0.1rem;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.85rem;
+}
 .coop-picks-empty { font-size: 0.72rem; color: #64748b; font-style: italic; padding: 0.2rem 0.35rem; }
 .coop-connector {
   display: flex;
@@ -5499,6 +6095,18 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   background: #34d399;
   box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
   flex-shrink: 0;
+}
+.sponsored-versus-row { padding-right: 1.5rem !important; }
+.sponsored-versus-row .sponsored-versus-badge { position: static; flex-shrink: 0; }
+.sponsored-versus-row .sponsored-versus-score { margin-right: 0.1rem; }
+.sponsored-versus-row .sponsored-deal-dismiss {
+  position: absolute;
+  top: 50%;
+  right: 0.1rem;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.85rem;
 }
 .dash-versus-row,
 .dash-recent-row {

@@ -103,14 +103,33 @@ class EpicClient:
                 time.sleep(REQUEST_DELAY_SEC - elapsed)
             self._last_request = time.time()
 
+    # Provider key under which the long-lived refresh token is stored in the
+    # encrypted secrets blob (auth/secrets.py). Keeping it out of a plaintext
+    # session.json on disk is the whole point of moving here.
+    _SECRETS_PROVIDER = "epic_session"
+
     def _save_session(self) -> None:
-        self._session_file.write_text(
-            json.dumps(
-                {"refresh_token": self._refresh_token, "account_id": self._account_id},
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
+        blob = {"refresh_token": self._refresh_token, "account_id": self._account_id}
+        try:
+            from auth import secrets as _secrets
+
+            _secrets.set_provider_blob(self._SECRETS_PROVIDER, blob)
+            self._purge_plaintext_session()
+            return
+        except Exception as exc:  # noqa: BLE001 - keep Epic working without keyring
+            print(f"  epic session: secrets store unavailable ({exc}); using local file")
+        # Resilience fallback only — e.g. no OS keyring available.
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        self._session_file.write_text(json.dumps(blob, indent=2), encoding="utf-8")
+
+    def _purge_plaintext_session(self) -> None:
+        """Delete any plaintext session.json once the token lives in secrets."""
+        for path in (self._session_file, _legacy_epic_cache_dir() / "session.json"):
+            try:
+                if path.is_file():
+                    path.unlink()
+            except OSError:
+                pass
 
     def _migrate_legacy_session(self) -> None:
         legacy = _legacy_epic_cache_dir() / "session.json"
@@ -118,7 +137,7 @@ class EpicClient:
             self._cache_dir.mkdir(parents=True, exist_ok=True)
             self._session_file.write_bytes(legacy.read_bytes())
 
-    def _load_session(self) -> dict | None:
+    def _read_plaintext_session(self) -> dict | None:
         self._migrate_legacy_session()
         if not self._session_file.exists():
             return None
@@ -126,6 +145,35 @@ class EpicClient:
             return json.loads(self._session_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return None
+
+    def _load_session(self) -> dict | None:
+        # Prefer the encrypted secrets store.
+        try:
+            from auth import secrets as _secrets
+
+            blob = _secrets.get_provider_blob(self._SECRETS_PROVIDER)
+            if blob.get("refresh_token"):
+                return blob
+        except Exception:  # noqa: BLE001 - fall through to plaintext migration
+            pass
+        # One-time migration: lift a legacy/plaintext session into the secrets
+        # store, then remove the plaintext copy.
+        data = self._read_plaintext_session()
+        if data and data.get("refresh_token"):
+            try:
+                from auth import secrets as _secrets
+
+                _secrets.set_provider_blob(
+                    self._SECRETS_PROVIDER,
+                    {
+                        "refresh_token": data.get("refresh_token"),
+                        "account_id": data.get("account_id"),
+                    },
+                )
+                self._purge_plaintext_session()
+            except Exception:  # noqa: BLE001 - migration is best-effort
+                pass
+        return data
 
     def _request_token(self, params: dict) -> dict:
         self._throttle()

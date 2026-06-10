@@ -1,10 +1,25 @@
 /** cancelInFlightRuns — server-truth cancel + fallback. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+function installMockEventSource() {
+  class MockEventSource {
+    constructor() {
+      this.close = vi.fn();
+    }
+    addEventListener() {}
+  }
+  global.EventSource = MockEventSource;
+}
 
 describe('cancelInFlightRuns server truth', () => {
   beforeEach(() => {
     vi.resetModules();
     document.body.innerHTML = '<div id="fetcherRunLog"></div>';
+    installMockEventSource();
+  });
+
+  afterEach(() => {
+    delete global.EventSource;
   });
 
   it('applyServerSnapshotInFlight tracks server queue without client chips', async () => {
@@ -16,6 +31,32 @@ describe('cancelInFlightRuns server truth', () => {
     });
     expect(fetcherRunner.getLastServerInFlight()).toBe(true);
     fetcherRunner.applyServerSnapshotInFlight({ active: null, queue: [], history: [] });
+    expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+  });
+
+  it('clears stale queue-full after a run ends on the client', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (String(url).includes('/api/runs')) {
+        return {
+          ok: true,
+          json: async () => ({ active: null, queue: [], history: [] }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'n1', key: 'nintendo', status: 'running' },
+      queue: [],
+      history: [],
+    });
+    fetcherRunner.markChipStateForTest('nintendo', 'running', 'n1');
+    expect(fetcherRunner.isQueueFull()).toBe(true);
+    fetcherRunner.markChipStateForTest('nintendo', null);
+    await vi.waitFor(() => {
+      expect(fetcherRunner.isQueueFull()).toBe(false);
+    });
     expect(fetcherRunner.getLastServerInFlight()).toBe(false);
   });
 
@@ -233,13 +274,6 @@ describe('cancelInFlightRuns server truth', () => {
 
   it('409 on submit re-syncs and retries once when queue is idle', async () => {
     vi.useFakeTimers();
-    class MockEventSource {
-      constructor() {
-        this.close = vi.fn();
-      }
-      addEventListener() {}
-    }
-    global.EventSource = MockEventSource;
     let runPosts = 0;
     const fetchMock = vi.fn(async (url, init) => {
       const u = String(url);
@@ -291,6 +325,67 @@ describe('cancelInFlightRuns server truth', () => {
     );
     expect(posts).toHaveLength(2);
     vi.useRealTimers();
-    delete global.EventSource;
+  });
+
+  it('claims auto-run backs off silently while an internal job holds the run slot', async () => {
+    let runPosts = 0;
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'claims',
+              label: 'Free',
+              metaKey: 'claims',
+              group: 'prices',
+              color: '#f97316',
+              cmd: 'fetch_free_claims.py',
+              available: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/runs') && method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({ active: null, queue: [], history: [] }),
+        };
+      }
+      if (u.includes('/api/run/claims') && method === 'POST') {
+        runPosts += 1;
+        return { ok: true, status: 202, json: async () => ({ run_id: 'claims-run' }) };
+      }
+      if (u.includes('/api/auth/status')) {
+        return { ok: true, json: async () => ({ providers: {} }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner, loadFetcherSources } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    await loadFetcherSources(true);
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'build-1', key: 'buildClaims', status: 'running' },
+      queue: [],
+      history: [],
+    });
+    expect(fetcherRunner.isQueueFull()).toBe(true);
+    await fetcherRunner.run('claims', { auto: true });
+    fetcherRunner.flushLinesNow();
+    const postsWhileBusy = fetchMock.mock.calls.filter(
+      c => String(c[0]).includes('/api/run/claims') && (c[1]?.method || 'GET').toUpperCase() === 'POST',
+    );
+    expect(postsWhileBusy).toHaveLength(0);
+    const panel = document.getElementById('fetcherRunLog');
+    const body = panel?.querySelector('[data-role="body"]');
+    expect(body?.textContent || '').not.toMatch(/queue full|re-syncing queue/i);
+
+    fetcherRunner.applyServerSnapshotInFlight({ active: null, queue: [], history: [] });
+    expect(fetcherRunner.isQueueFull()).toBe(false);
+    await fetcherRunner.run('claims', { auto: true });
+    expect(runPosts).toBe(1);
   });
 });

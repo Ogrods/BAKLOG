@@ -31,13 +31,14 @@ npm run check:bundle-size       # requires npm run build first
 ## Full suite
 
 ```powershell
-.\scripts\test-all.ps1   # pytest + JS (CI parity)
+.\scripts\test-all.ps1           # pytest + JS
+.\scripts\test-all.ps1 -Full   # + module-size, lint, build, bundle, dist-integrity (CI parity)
 ```
 
 ## Frontend build (optional)
 
 ```powershell
-npm run build   # esbuild → dist/; server auto-serves when dist/manifest.json exists
+npm run build   # esbuild → dist/; serve with BAKLOG_SERVE_BUILT=1 (frozen exe auto-serves when dist/ is bundled)
 ```
 
 - Source: `scripts/build-frontend.mjs`

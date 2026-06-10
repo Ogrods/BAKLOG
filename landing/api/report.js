@@ -1,37 +1,20 @@
 // Vercel serverless function: accepts opt-in bug reports from the local app,
 // logs to Supabase (optional), emails the founder via Resend.
 // Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
+// Production also requires KV_REST_API_* or UPSTASH_REDIS_REST_* (distributed rate limit).
 // Optional: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (durable bug_reports log).
 
-const RATE_WINDOW_MS = 60_000;
-const RATE_MAX = 5;
+import { checkRateLimit } from "./_rate-limit.js";
+
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_CONTACT_LEN = 320;
 const MAX_NOTE_LEN = 2000;
-
-/** @type {Map<string, { start: number, count: number }>} */
-const rateBuckets = new Map();
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 function clientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
   return request.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(ip) {
-  const now = Date.now();
-  let entry = rateBuckets.get(ip);
-  if (!entry || now - entry.start > RATE_WINDOW_MS) {
-    entry = { start: now, count: 0 };
-    rateBuckets.set(ip, entry);
-  }
-  entry.count += 1;
-  if (rateBuckets.size > 10_000) {
-    for (const [key, bucket] of rateBuckets) {
-      if (now - bucket.start > RATE_WINDOW_MS) rateBuckets.delete(key);
-    }
-  }
-  return entry.count > RATE_MAX;
 }
 
 function isAllowedOrigin(origin) {
@@ -155,13 +138,20 @@ export default {
       return jsonResponse({ error: "Method not allowed" }, 405, request);
     }
 
+    // Require a recognized Origin (baklog.app or localhost). A missing or foreign
+    // Origin is rejected outright — this endpoint only serves the local app.
     const origin = request.headers.get("Origin") || "";
-    if (origin && !isAllowedOrigin(origin)) {
+    if (!isAllowedOrigin(origin)) {
       return jsonResponse({ error: "Origin not allowed" }, 403, request);
     }
 
     const ip = clientIp(request);
-    if (isRateLimited(ip)) {
+    const rate = await checkRateLimit(ip, { namespace: "report" });
+    if (rate.misconfigured) {
+      console.error("report: missing KV rate-limit credentials in production");
+      return jsonResponse({ error: "Server not configured" }, 503, request);
+    }
+    if (rate.limited) {
       return jsonResponse({ error: "Too many requests" }, 429, request, { "Retry-After": "60" });
     }
 
@@ -198,6 +188,10 @@ export default {
 
     const contact = sanitizeText(body.contact, MAX_CONTACT_LEN);
     const note = sanitizeText(body.note, MAX_NOTE_LEN);
+    // Only echo the contact into Resend's reply_to when it's a syntactically
+    // valid email; otherwise free-text would let a submitter inject a bogus
+    // reply address (and Resend rejects malformed reply_to outright).
+    const replyTo = EMAIL_RE.test(contact) ? contact : undefined;
 
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.NOTIFY_FROM;
@@ -239,7 +233,7 @@ export default {
       await sendEmail(apiKey, {
         from,
         to,
-        reply_to: contact || undefined,
+        reply_to: replyTo,
         subject,
         text: textSummary,
       });

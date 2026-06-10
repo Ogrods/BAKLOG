@@ -36,6 +36,58 @@ def test_load_approved_ids_ignores_bad_file(tmp_path: Path) -> None:
     assert bfc._load_approved_ids(path) == set()
 
 
+def test_load_premium_only_ids_reads_list(tmp_path: Path) -> None:
+    path = tmp_path / "approved.json"
+    path.write_text(
+        json.dumps({"ids": ["a"], "premium_only_ids": ["a", "b"]}),
+        encoding="utf-8",
+    )
+    assert bfc._load_premium_only_ids(path) == {"a", "b"}
+
+
+def test_apply_premium_only_stamps_and_clears() -> None:
+    items = [
+        {"id": "auto-a", "store": "steam", "title": "A", "claim_url": "https://a"},
+        {"id": "manual-b", "store": "epic", "title": "B", "claim_url": "https://b", "premium_only": True},
+        {"id": "free-c", "store": "gog", "title": "C", "claim_url": "https://c", "premium_only": True},
+    ]
+    bfc._apply_premium_only(
+        items,
+        premium_only_ids={"auto-a"},
+        manual_items=[{"id": "manual-b", "premium_only": True}],
+    )
+    assert items[0].get("premium_only") is True
+    assert items[1].get("premium_only") is True
+    assert "premium_only" not in items[2]
+
+
+def test_preview_publish_items_stamps_premium_only() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[{
+            "id": "manual-pro",
+            "store": "steam",
+            "title": "Manual Pro",
+            "claim_url": "https://example.com/manual",
+            "premium_only": True,
+        }],
+        auto_items_all=[{
+            "id": "auto-pro",
+            "store": "epic",
+            "title": "Auto Pro",
+            "claim_url": "https://example.com/auto",
+        }],
+        approved_ids={"auto-pro"},
+        premium_only_ids={"auto-pro"},
+        now=now,
+    )
+    by_id = {it["id"]: it for it in items}
+    assert by_id["auto-pro"].get("premium_only") is True
+    assert by_id["manual-pro"].get("premium_only") is True
+
+
 def test_infer_store_from_text_maps_itchio_giveaways() -> None:
     assert bfc._infer_store_from_text(
         "other",
@@ -303,6 +355,96 @@ def test_build_applies_field_overrides(
     assert item["title"] == "Edited Title"
     assert item["claim_url"] == "https://store.epicgames.com/en-US/p/edited"
     assert item["ends_at"] == "2099-06-01T12:00:00Z"
+
+
+def test_field_override_extends_ends_at_before_expiry_prune(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+
+    input_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-old",
+                        "store": "epic",
+                        "title": "Extended Game",
+                        "claim_url": "https://store.epicgames.com/en-US/p/old",
+                        "ends_at": "2020-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps(
+            {
+                "ids": ["epic-old"],
+                "field_overrides": {
+                    "epic-old": {"ends_at": "2099-06-01T12:00:00Z"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None: {
+            "id": raw["id"],
+            "store": raw["store"],
+            "title": raw["title"],
+            "claim_url": raw["claim_url"],
+            "ends_at": raw.get("ends_at"),
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert {item["id"] for item in built["items"]} == {"epic-old"}
+    approved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert approved["ids"] == ["epic-old"]
+
+
+def test_rekey_approved_state_migrates_stale_id_to_current_feed_id() -> None:
+    auto_items = [
+        {
+            "id": "gamerpower-new",
+            "store": "steam",
+            "title": "Tell Me Why",
+            "claim_url": "https://x",
+            "steam_appid": 1180660,
+            "source": "gamerpower",
+        }
+    ]
+    ids, store, fields, premium = bfc.rekey_approved_state(
+        ids=["itad-old"],
+        store_overrides={"itad-old": "steam"},
+        field_overrides={"itad-old": {"title": "Tell Me Why"}},
+        premium_only_ids={"itad-old"},
+        auto_items_all=auto_items,
+        prior_rows_by_id={},
+    )
+    assert ids == ["gamerpower-new"]
+    assert store["gamerpower-new"] == "steam"
+    assert fields["gamerpower-new"]["title"] == "Tell Me Why"
+    assert premium == {"gamerpower-new"}
 
 
 def test_build_prunes_expired_approved_and_manual_items(
@@ -604,6 +746,91 @@ def test_enrich_item_uses_verified_portrait_when_available(
     out = bfc._enrich_item(raw, [0.0])
 
     assert out["header_image"] == bfc._steam_portrait_cover(1180660)
+
+
+def test_enrich_item_skips_network_when_fully_enriched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portrait = bfc._steam_portrait_cover(620)
+    raw = {
+        "id": "steam-620",
+        "store": "steam",
+        "title": "Portal 2",
+        "claim_url": "https://store.steampowered.com/app/620",
+        "steam_appid": 620,
+        "header_image": portrait,
+        "review_percent": 98,
+        "genres": ["Action", "Adventure"],
+    }
+    details_calls: list[int] = []
+    portrait_calls: list[int] = []
+    review_calls: list[int] = []
+
+    monkeypatch.setattr(
+        bfc,
+        "_steam_app_details",
+        lambda appid, lc: details_calls.append(appid) or None,
+    )
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: portrait_calls.append(appid) or portrait,
+    )
+    monkeypatch.setattr(
+        bfc,
+        "_steam_review_percent",
+        lambda appid, lc: review_calls.append(appid) or 98,
+    )
+
+    out = bfc._enrich_item(raw, [0.0])
+
+    assert out["steam_appid"] == 620
+    assert out["review_percent"] == 98
+    assert out["header_image"] == portrait
+    assert out["genres"] == ["Action", "Adventure"]
+    assert details_calls == []
+    assert portrait_calls == []
+    assert review_calls == []
+
+
+def test_enrich_item_fetches_review_when_portrait_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    portrait = bfc._steam_portrait_cover(620)
+    raw = {
+        "id": "steam-620",
+        "store": "steam",
+        "title": "Portal 2",
+        "claim_url": "https://store.steampowered.com/app/620",
+        "steam_appid": 620,
+        "header_image": portrait,
+        "genres": ["Action"],
+    }
+    details_calls: list[int] = []
+    portrait_calls: list[int] = []
+
+    monkeypatch.setattr(
+        bfc,
+        "_steam_app_details",
+        lambda appid, lc: details_calls.append(appid)
+        or {
+            "name": "Portal 2",
+            "header_image": "https://cdn.example/portal2.jpg",
+            "genres": [{"description": "Action"}],
+        },
+    )
+    monkeypatch.setattr(bfc, "_steam_review_percent", lambda appid, lc: 95)
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: portrait_calls.append(appid) or portrait,
+    )
+
+    out = bfc._enrich_item(raw, [0.0])
+
+    assert out["review_percent"] == 95
+    assert details_calls == [620]
+    assert portrait_calls == []
 
 
 def test_enrich_item_borrows_cover_from_sibling_source(

@@ -14,6 +14,14 @@ if TYPE_CHECKING:
 POLL_SEC = 0.5
 SUCCESS_WAIT_SEC = 300
 
+# Tri-state result for API-key checks so callers can tell a genuinely rejected
+# key apart from a transient network failure (no connection, timeout, 5xx).
+# Marking a provider "expired" on a network blip wrongly nags the user to
+# re-sign-in; an "unreachable" result lets the UI say "try again" instead.
+KEY_VALID = "valid"
+KEY_INVALID = "invalid"
+KEY_UNREACHABLE = "unreachable"
+
 STEAM_LOGIN_URL = "https://steamcommunity.com/login/home/?goto=dev%2Fapikey"
 STEAM_APIKEY_URL = "https://steamcommunity.com/dev/apikey"
 ITCH_KEYS_URL = "https://itch.io/user/settings/api-keys"
@@ -200,21 +208,32 @@ def _scrape_keys_dom(page, *, pattern_hint: str = r"(?:API\s*Key|apikey|access[_
     return []
 
 
-def validate_itch_key(key: str) -> bool:
+def validate_itch_key(key: str) -> str:
+    """Check an itch.io API key. Returns KEY_VALID / KEY_INVALID / KEY_UNREACHABLE.
+
+    A connection error, timeout, or 5xx is reported as ``KEY_UNREACHABLE`` so
+    callers never treat a network blip as a rejected key.
+    """
     import requests
 
     token = (key or "").strip()
     if not token:
-        return False
+        return KEY_INVALID
     try:
         resp = requests.get(f"https://itch.io/api/1/{token}/me", timeout=15)
-        return resp.status_code == 200
-    except Exception:
-        return False
+    except requests.RequestException:
+        return KEY_UNREACHABLE
+    except Exception:  # noqa: BLE001 — defensive: any transport hiccup is "unreachable"
+        return KEY_UNREACHABLE
+    if resp.status_code == 200:
+        return KEY_VALID
+    if resp.status_code >= 500:
+        return KEY_UNREACHABLE
+    return KEY_INVALID
 
 
 def _validate_itch(creds: dict[str, str]) -> bool:
-    return validate_itch_key(creds.get("ITCH_API_KEY", ""))
+    return validate_itch_key(creds.get("ITCH_API_KEY", "")) == KEY_VALID
 
 
 def extract_itch(page, context, session: AuthSession | None = None) -> dict[str, str]:
@@ -303,26 +322,36 @@ def _itad_register_app(page) -> None:
         pass
 
 
-def validate_itad_key(key: str) -> bool:
-    """Light validation — call any ITAD endpoint that requires a key."""
+def validate_itad_key(key: str) -> str:
+    """Check an ITAD API key. Returns KEY_VALID / KEY_INVALID / KEY_UNREACHABLE.
+
+    A connection error, timeout, or 5xx is reported as ``KEY_UNREACHABLE`` so
+    callers never treat a network blip as a rejected key.
+    """
     import requests
 
     token = (key or "").strip()
     if not token:
-        return False
+        return KEY_INVALID
     try:
         resp = requests.get(
             "https://api.isthereanydeal.com/games/lookup/v1",
             params={"key": token, "title": "Portal"},
             timeout=15,
         )
-        return resp.status_code == 200
-    except Exception:
-        return False
+    except requests.RequestException:
+        return KEY_UNREACHABLE
+    except Exception:  # noqa: BLE001 — defensive: any transport hiccup is "unreachable"
+        return KEY_UNREACHABLE
+    if resp.status_code == 200:
+        return KEY_VALID
+    if resp.status_code >= 500:
+        return KEY_UNREACHABLE
+    return KEY_INVALID
 
 
 def _validate_itad(creds: dict[str, str]) -> bool:
-    return validate_itad_key(creds.get("ITAD_API_KEY", ""))
+    return validate_itad_key(creds.get("ITAD_API_KEY", "")) == KEY_VALID
 
 
 def _scrape_itad_uuids(page) -> list[str]:

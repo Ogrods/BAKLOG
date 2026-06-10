@@ -13,15 +13,29 @@ JSON and Connections secrets locally; only the login handshake talks to Supabase
 Nothing else leaves your machine except direct calls you make to the storefronts
 and enrichment services listed below.
 
-Last updated: 2026-06-05.
+Last updated: 2026-06-09.
+
+## Hosted surfaces (baklog.app)
+
+These are optional and separate from the local dashboard:
+
+| Surface | What it collects | When |
+|---------|------------------|------|
+| Waitlist (`/api/subscribe`) | Email you submit | You opt in on the landing page |
+| Bug report (`/api/report`) | Whitelisted diagnostic bundle you paste/send | You click **Send report** in the app |
+| Free claims feed (`free-claims.json`) | Public curated giveaway metadata (no personal data) | App polls when you open Claimable Now |
+
+The local app does **not** upload your library or credentials to these endpoints.
 
 ## TL;DR
 
 - Everything is stored locally on your computer.
 - BAKLOG talks to each storefront on your behalf using the credentials you
   provide. Each storefront sees its own normal API/scrape traffic from you.
-- We have no servers, so we cannot collect data even if we wanted to. The
-  authors never receive your library, wishlist, notes, or credentials.
+- The **local app** has no remote backend for your library: the authors never
+  receive your catalog, notes, or credentials automatically.
+- The **baklog.app** marketing site is separate (waitlist email, optional bug
+  reports you send, public free-claims feed) — see **Hosted surfaces** below.
 - Backups of your personal data and fetched libraries are written locally and
   not transmitted anywhere.
 

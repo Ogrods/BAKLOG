@@ -60,6 +60,7 @@ vi.mock('../js/connections.js', () => ({
   isProviderConnected: vi.fn(() => false),
   noteFetcherAuthFailure: vi.fn(() => false),
   showReconnectBanner: vi.fn(),
+  clearReconnectBanner: vi.fn(),
   authStatusLoaded: () => connMock.loaded,
   providerStatus: (p) => connMock.statuses[p] ?? null,
   ingestAuthStatusProviders: vi.fn(),

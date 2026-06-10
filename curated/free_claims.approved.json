@@ -1,58 +1,60 @@
 {
   "ids": [
-    "gamerpower-3671",
-    "gamerpower-3266",
-    "gamerpower-3096",
-    "gamerpower-3446",
-    "gamerpower-2204",
-    "itad-b07aac9ebd26",
-    "itad-0c69ed1f1bd8",
-    "itad-073a56345192",
     "gamerpower-1604",
+    "gamerpower-2204",
+    "gamerpower-2386",
+    "gamerpower-3096",
+    "gamerpower-3266",
+    "gamerpower-3446",
+    "gamerpower-3665",
+    "gamerpower-3671",
+    "gamerpower-3676",
+    "itad-073a56345192",
+    "itad-0c69ed1f1bd8",
+    "itad-0d4598c53ffe",
     "itad-1b0433806065",
+    "itad-6d00ffeb0fdc",
+    "itad-7a69412dd110",
+    "itad-b07aac9ebd26",
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
-    "gamerpower-2386",
-    "gamerpower-3665",
-    "itad-0d4598c53ffe",
-    "itad-7a69412dd110",
-    "itad-6d00ffeb0fdc"
+    "itad-f0cffe659c19"
   ],
   "store_overrides": {
-    "gamerpower-3671": "indiegala",
     "gamerpower-3266": "indiegala",
     "gamerpower-3446": "indiegala",
+    "gamerpower-3671": "indiegala",
+    "itad-0d4598c53ffe": "indiegala",
     "itad-1b0433806065": "indiegala",
-    "itad-dd5b5b16e035": "indiegala",
-    "itad-0d4598c53ffe": "indiegala"
+    "itad-dd5b5b16e035": "indiegala"
   },
   "field_overrides": {
-    "gamerpower-3671": {
-      "title": "Flufftopia"
-    },
-    "gamerpower-3266": {
-      "title": "Carlos the Taco"
-    },
-    "gamerpower-3096": {
-      "title": "Madness Inside"
-    },
-    "gamerpower-3446": {
-      "title": "GigaBash"
+    "gamerpower-1604": {
+      "title": "Dora Diginoid"
     },
     "gamerpower-2204": {
       "title": "Dual Chroma: Academy Carols"
     },
-    "itad-1b0433806065": {
-      "title": "Die Young: Prologue"
+    "gamerpower-2386": {
+      "title": "Tell Me Why"
     },
-    "itad-de23882e1f39": {
-      "title": "Smiley Dusty"
+    "gamerpower-3096": {
+      "title": "Madness Inside"
     },
-    "itad-b07aac9ebd26": {
-      "title": "Wytchwood"
+    "gamerpower-3266": {
+      "title": "Carlos the Taco"
     },
-    "itad-dd5b5b16e035": {
-      "title": "The Brave Little Cloud"
+    "gamerpower-3446": {
+      "title": "GigaBash"
+    },
+    "gamerpower-3665": {
+      "title": "Gravity Circuit"
+    },
+    "gamerpower-3671": {
+      "title": "Flufftopia"
+    },
+    "gamerpower-3676": {
+      "title": "Dire Echo"
     },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
@@ -60,60 +62,31 @@
     "itad-0c69ed1f1bd8": {
       "title": "Rogue Waters"
     },
-    "gamerpower-1604": {
-      "title": "Dora Diginoid"
-    },
-    "itad-7a69412dd110": {
-      "title": "Relaxing Simulator"
-    },
     "itad-0d4598c53ffe": {
       "title": "Mr.Brocco & Co"
     },
-    "gamerpower-2386": {
-      "title": "Tell Me Why"
-    },
-    "gamerpower-3665": {
-      "title": "Gravity Circuit"
+    "itad-1b0433806065": {
+      "title": "Die Young: Prologue"
     },
     "itad-6d00ffeb0fdc": {
       "title": "Another World Adventures",
       "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures"
     },
-    "gamerpower-3673": {
+    "itad-7a69412dd110": {
       "title": "Relaxing Simulator"
     },
-    "gamerpower-3668": {
-      "title": "Songs of Conquest"
+    "itad-b07aac9ebd26": {
+      "title": "Wytchwood"
     },
-    "gamerpower-3667": {
-      "title": "Rogue Waters"
-    },
-    "gamerpower-3287": {
-      "title": "Mr.Brocco And Co"
-    },
-    "gamerpower-3272": {
+    "itad-dd5b5b16e035": {
       "title": "The Brave Little Cloud"
     },
-    "itad-50a2b5b1d7a6": {
-      "title": "Tell Me Why"
+    "itad-de23882e1f39": {
+      "title": "Smiley Dusty"
     },
-    "itad-047270155013": {
-      "title": "Gravity Circuit"
-    },
-    "itad-78f8867f4481": {
-      "title": "World of Warships x Azur Lane - Quest for AL Avrora -"
-    },
-    "itad-239f10d33b17": {
-      "title": "MONGIL: STAR DIVE free"
-    },
-    "itad-48cfa4ebeae5": {
-      "title": "RAVEN II"
-    },
-    "itad-98730029b14b": {
-      "title": "Carlos the Taco -"
-    },
-    "itad-d85d5bb4128d": {
-      "title": "Madness Inside"
+    "itad-f0cffe659c19": {
+      "title": "Blacklist Mafia",
+      "claim_url": "https://freebies.indiegala.com/blacklist-mafia"
     }
   },
   "dismissed": [
@@ -132,6 +105,7 @@
     "epic-rogue-waters-9764d6",
     "gamerpower-3272",
     "itad-50a2b5b1d7a6",
-    "itad-047270155013"
+    "itad-047270155013",
+    "gamerpower-3279"
   ]
 }

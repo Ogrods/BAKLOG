@@ -57,6 +57,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from shared.built_frontend import (
+    is_immutable_built_asset as _is_immutable_built_asset,
+)
+from shared.built_frontend import (
+    maybe_serve_built_index as _maybe_serve_built_index,
+)
 from shared.dev_server_pids import (
     pid_alive as _pid_alive,
 )
@@ -70,7 +76,6 @@ from shared.dev_server_pids import (
     terminate_pid as _terminate_pid,
 )
 from shared.install_paths import (
-    built_immutable_assets,
     bundle_root,
     data_root,
     is_frozen,
@@ -78,6 +83,20 @@ from shared.install_paths import (
     serve_built_frontend,
     static_root,
 )
+
+
+def _warn_built_manifest_version_mismatch() -> None:
+    if not serve_built_frontend():
+        return
+    manifest = load_built_manifest()
+    built_ver = str(manifest.get("version") or "").strip()
+    app_ver = _app_version()
+    if built_ver and built_ver != app_ver:
+        print(
+            f"WARNING: dist/manifest.json version {built_ver} != app {app_ver} "
+            f"— run npm run build before testing packaged frontend",
+            flush=True,
+        )
 
 ROOT = data_root()
 
@@ -134,24 +153,39 @@ _sse_connections = 0
 _sse_lock = threading.Lock()
 
 _BAKLOG_LOCAL_HEADER = "X-BAKLOG-Local"
-_BAKLOG_IMPORT_PASSPHRASE_HEADER = "X-BAKLOG-Import-Passphrase"
-_LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "[::1]"})
+# Canonical (unbracketed, port-stripped) loopback hostnames. IPv6 is stored as
+# bare "::1" because urlparse().hostname returns it without brackets; the Host
+# header path strips brackets/port via _normalize_host before comparing.
+_LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
 # Epic OAuth state -> (expiry_monotonic, profile_id).
 # Production Epic Connect uses Playwright + authorizationCode paste (auth/runner.py);
 # this map is only populated if something calls _register_epic_oauth_state (legacy redirect flow).
 _epic_oauth_states: dict[str, tuple[float, str]] = {}
+_epic_oauth_states_lock = threading.Lock()
 _stream_tickets: dict[str, tuple[str, float]] = {}
 _stream_tickets_lock = threading.Lock()
 _STREAM_TICKET_TTL_SEC = 30.0
 _LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(Cookie:\s*)([^\s]+)", re.I), r"\1[redacted]"),
-    (re.compile(r"(set-cookie:\s*)(.+)", re.I), r"\1[redacted]"),
+    # Cookie / Set-Cookie values run to end-of-line (they may contain spaces,
+    # `;`, `=`); anchoring to EOL keeps a stray token from leaking past the
+    # first whitespace.
+    (re.compile(r"(Cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
+    (re.compile(r"(set-cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
     (re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*)[\"']?[\w\-]+", re.I), r"\1[redacted]"),
     (re.compile(r"([?&]ticket=)[^&\s]+", re.I), r"\1[redacted]"),
     (re.compile(r"(NPSSO[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Ubi_v1[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(refresh_token[=:\s\"']+)[\w\-\.]+", re.I), r"\1[redacted]"),
+    # Portable-bundle / secrets-export passphrase in any key=value form.
+    (re.compile(r"(passphrase[\"']?\s*[=:]\s*)[\"']?[^\s\"'&,}]+", re.I), r"\1[redacted]"),
+    # Per-store credential tokens that can surface in fetcher debug output.
+    (re.compile(r"(GOG_AL[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(EPIC_AUTH_CODE[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(EA_BEARER_TOKEN[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(XBL_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(UBISOFT_SESSION_ID[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(STEAM_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Authorization:\s*)(?!Bearer\s)([^\s,]+)", re.I), r"\1[redacted]"),
 ]
 
@@ -163,6 +197,13 @@ def _redact_log_line(text: str) -> str:
     return out
 
 
+def _prune_expired_epic_oauth_states() -> None:
+    now = time.monotonic()
+    expired = [k for k, (exp, _) in _epic_oauth_states.items() if exp < now]
+    for k in expired:
+        _epic_oauth_states.pop(k, None)
+
+
 def _register_epic_oauth_state(
     state: str,
     profile_id: str | None = None,
@@ -172,18 +213,22 @@ def _register_epic_oauth_state(
     from shared.profile_paths import get_active_profile_id
 
     pid = profile_id or get_active_profile_id()
-    _epic_oauth_states[state] = (time.monotonic() + ttl_sec, pid)
+    with _epic_oauth_states_lock:
+        _prune_expired_epic_oauth_states()
+        _epic_oauth_states[state] = (time.monotonic() + ttl_sec, pid)
 
 
-def _consume_epic_oauth_state(state: str | None, *, require_state: bool = False) -> str | None:
-    """Return bound profile_id when state is valid; None when rejected."""
+def _consume_epic_oauth_state(state: str | None) -> str | None:
+    """Return bound profile_id when state is valid; None when rejected.
+
+    A valid, single-use, server-minted state is always required (CSRF defense)
+    regardless of whether Supabase auth is enabled. There is no fallback path
+    that accepts a missing state.
+    """
     if not state:
-        if require_state:
-            return None
-        from shared.profile_paths import get_active_profile_id
-
-        return get_active_profile_id()
-    entry = _epic_oauth_states.pop(state, None)
+        return None
+    with _epic_oauth_states_lock:
+        entry = _epic_oauth_states.pop(state, None)
     if not entry:
         return None
     expires, profile_id = entry
@@ -259,6 +304,19 @@ from shared.profile_paths import (  # noqa: E402
     sponsors_path,
 )
 from shared.safe_write import safe_write_text  # noqa: E402
+from shared.server_static import (  # noqa: E402
+    LIBRARY_JSON_RE as _LIBRARY_JSON_RE,
+)
+from shared.server_static import (  # noqa: E402
+    normalize_static_path as _normalize_static_path,
+)
+from shared.server_static import (  # noqa: E402
+    resolved_static_path_allowed as _resolved_static_path_allowed,
+)
+from shared.server_static import (  # noqa: E402
+    static_class as _static_class_impl,
+)
+from shared.sponsors_validate import validate_sponsors_payload  # noqa: E402
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
@@ -522,9 +580,6 @@ def _python_executable() -> str:
     return exe
 
 
-MANIFEST_FILE = bundle_root() / "fetchers" / "manifest.json"
-
-
 def _load_fetchers() -> dict[str, dict[str, Any]]:
     """Build the fetcher registry from fetchers/manifest.json."""
     try:
@@ -783,6 +838,9 @@ def _validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
                 return f"items[{i}] missing {field}"
         if not _is_safe_http_url(str(item.get("claim_url") or "")):
             return f"items[{i}] claim_url must start with http:// or https://"
+        premium_only = item.get("premium_only")
+        if premium_only is not None and not isinstance(premium_only, bool):
+            return f"items[{i}] premium_only must be a boolean"
     return None
 
 
@@ -824,59 +882,13 @@ def _validate_approved_payload(doc: dict[str, Any]) -> str | None:
         for i, item_id in enumerate(dismissed):
             if not str(item_id or "").strip():
                 return f"dismissed[{i}] must be a non-empty string"
-    return None
-
-
-def _validate_sponsors_payload(doc: dict[str, Any]) -> str | None:
-    items = doc.get("items")
-    if not isinstance(items, list):
-        return "items must be a list"
-    for i, item in enumerate(items):
-        if not isinstance(item, dict):
-            return f"items[{i}] must be an object"
-        for field in ("id", "title"):
-            if not str(item.get(field) or "").strip():
-                return f"items[{i}] missing {field}"
-        url = item.get("url")
-        if url is not None and str(url).strip():
-            u = str(url).strip()
-            if not (u.startswith("http://") or u.startswith("https://")):
-                return f"items[{i}] url must start with http:// or https://"
-        priority = item.get("priority")
-        if priority is not None and not isinstance(priority, (int, float)):
-            return f"items[{i}] priority must be numeric"
-        enabled = item.get("enabled")
-        if enabled is not None and not isinstance(enabled, bool):
-            return f"items[{i}] enabled must be boolean"
-        kind = item.get("kind")
-        if kind is not None and str(kind).strip():
-            k = str(kind).strip().lower()
-            if k not in ("house", "sponsor"):
-                return f"items[{i}] kind must be house or sponsor"
-        cover = item.get("cover")
-        if cover is not None and str(cover).strip():
-            c = str(cover).strip()
-            if not (
-                c.startswith("http://")
-                or c.startswith("https://")
-                or (c.startswith("/") and not c.startswith("//"))
-            ):
-                return f"items[{i}] cover must be http(s) URL or same-origin path"
-        placements = item.get("placements")
-        if placements is not None and placements != "":
-            raw = placements if isinstance(placements, list) else str(placements).split(",")
-            valid = {
-                "deal-rail",
-                "spotlight",
-                "picks",
-                "table",
-                "dash-picks",
-                "claimable",
-            }
-            for p in raw:
-                name = str(p).strip().lower()
-                if name and name not in valid:
-                    return f"items[{i}] placements contains unknown value: {name}"
+    premium_only_ids = doc.get("premium_only_ids")
+    if premium_only_ids is not None:
+        if not isinstance(premium_only_ids, list):
+            return "premium_only_ids must be a list"
+        for i, item_id in enumerate(premium_only_ids):
+            if not str(item_id or "").strip():
+                return f"premium_only_ids[{i}] must be a non-empty string"
     return None
 
 
@@ -2171,10 +2183,27 @@ def _header_hostname(value: str | None) -> str | None:
     return host or None
 
 
+def _normalize_host(raw: str | None) -> str:
+    """Lowercased hostname with IPv6 brackets and any :port stripped.
+
+    Handles ``127.0.0.1:8765``, ``localhost``, bracketed IPv6 ``[::1]:8765`` /
+    ``[::1]``, and a bare ``::1`` — so loopback detection works for IPv6 too,
+    not just ``split(':')[0]`` which mangles ``[::1]`` into ``[``.
+    """
+    if not raw:
+        return ""
+    host = raw.strip()
+    if host.startswith("["):
+        end = host.find("]")
+        return (host[1:end] if end != -1 else host[1:]).lower()
+    # A bare IPv6 literal (>1 colon, no bracket/port form we can split safely).
+    if host.count(":") > 1:
+        return host.lower()
+    return host.split(":", 1)[0].lower()
+
+
 def _request_host_is_local(handler: SimpleHTTPRequestHandler) -> bool:
-    host_header = handler.headers.get("Host", "")
-    hostname = host_header.split(":")[0].strip().lower()
-    return hostname in _LOCAL_HOSTNAMES
+    return _normalize_host(handler.headers.get("Host", "")) in _LOCAL_HOSTNAMES
 
 
 def _origin_is_local(handler: SimpleHTTPRequestHandler) -> bool:
@@ -2267,52 +2296,12 @@ def _stream_resume_since(handler: SimpleHTTPRequestHandler) -> int:
     return since
 
 
-# Known catalog / cache-meta files the dashboard probes on boot. When a store or
-# enrichment fetcher hasn't run yet the file simply doesn't exist — return an
-# empty stub instead of 404 so the browser console stays clean on first load.
-_LIBRARY_JSON_RE = re.compile(r"^/games_[a-z0-9_]+\.json$", re.I)
+def _static_class(path_only: str) -> str:
+    return _static_class_impl(path_only, admin_enabled=ADMIN_ENABLED)
 
 
 def _path_only(handler: SimpleHTTPRequestHandler) -> str:
     return handler.path.split("?", 1)[0]
-
-
-def _normalize_static_path(path_only: str) -> str:
-    clean = path_only.split("?", 1)[0]
-    if not clean.startswith("/"):
-        clean = "/" + clean.lstrip("/")
-    return clean
-
-
-def _static_class(path_only: str) -> str:
-    """Classify a non-API path: public | data | deny."""
-    clean = _normalize_static_path(path_only)
-    parts = [p for p in clean.split("/") if p]
-    if clean in ("/tracker.html", "tracker.html"):
-        return "deny"
-    if parts and parts[0] == "admin":
-        if not ADMIN_ENABLED:
-            return "deny"
-        return "public"
-    if any(p.startswith(".") for p in parts):
-        return "deny"
-    if parts and parts[0] == "profiles":
-        return "deny"
-    if parts and parts[0] == "data":
-        return "deny"
-    if len(parts) >= 2 and parts[0] == "cache":
-        if parts[1] == "auth":
-            return "deny"
-        if parts[1] in PROFILE_CACHE_JSON_FILES:
-            return "data"
-        return "deny"
-    if _LIBRARY_JSON_RE.match(clean) or clean.lower() in (
-        "/itad_prices.json",
-        "/free_claims.json",
-        "/sponsors.json",
-    ):
-        return "data"
-    return "public"
 
 
 def _send_auth_required(handler: SimpleHTTPRequestHandler) -> None:
@@ -2421,15 +2410,19 @@ def _maybe_serve_empty_cache_meta_json(handler: SimpleHTTPRequestHandler, path: 
     return True
 
 
-def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] | None, str | None]:
+def _read_json_body(
+    handler: SimpleHTTPRequestHandler,
+    *,
+    max_bytes: int = PERSONAL_MAX_BYTES,
+) -> tuple[dict[str, Any] | None, str | None]:
     try:
         length = int(handler.headers.get("Content-Length") or 0)
     except ValueError:
         return None, "invalid Content-Length"
     if length <= 0:
         return None, "empty body"
-    if length > PERSONAL_MAX_BYTES:
-        return None, f"body too large ({length} > {PERSONAL_MAX_BYTES})"
+    if length > max_bytes:
+        return None, f"body too large ({length} > {max_bytes})"
     try:
         raw = handler.rfile.read(length).decode("utf-8")
         payload = json.loads(raw)
@@ -2438,6 +2431,33 @@ def _read_json_body(handler: SimpleHTTPRequestHandler) -> tuple[dict[str, Any] |
     if not isinstance(payload, dict):
         return None, "payload must be a JSON object"
     return payload, None
+
+
+# Small JSON bodies for credential/control endpoints (master password, secrets
+# export/import metadata). The encrypted secrets bundle itself rides in the
+# import body, so that one endpoint uses a larger, bundle-sized cap below.
+_AUTH_JSON_MAX_BYTES = 64 * 1024
+# Bundle base64 (~4/3 inflation over the 100 MB ciphertext cap) plus JSON
+# framing. Replaces the previous unbounded read on the import endpoint.
+_SECRETS_IMPORT_MAX_BYTES = 160 * 1024 * 1024
+
+
+def _api_error(
+    handler: SimpleHTTPRequestHandler,
+    status: int,
+    code: str,
+    exc: BaseException | None = None,
+) -> None:
+    """Log the underlying exception server-side (redacted) and return a generic
+    ``{"error": code}`` to the client. Keeps stack details / secret-bearing
+    messages out of HTTP responses while preserving local debuggability."""
+    if exc is not None:
+        try:
+            detail = _redact_log_line(f"{type(exc).__name__}: {exc}")
+        except Exception:  # noqa: BLE001 - never let logging crash the handler
+            detail = type(exc).__name__
+        print(f"[api] {code}: {detail}", file=sys.stderr, flush=True)
+    _send_json(handler, status, {"error": code})
 
 
 def _api_path(handler: SimpleHTTPRequestHandler) -> str:
@@ -2496,60 +2516,6 @@ def _run_accessible(run: Run | None) -> Run | None:
     return None
 
 
-_BUILT_INDEX_HTML_CACHE: str | None = None
-
-
-def _built_index_html() -> str | None:
-    """index.html with hashed dist/ asset URLs when serving built frontend."""
-    global _BUILT_INDEX_HTML_CACHE
-    if not serve_built_frontend():
-        return None
-    if _BUILT_INDEX_HTML_CACHE is not None:
-        return _BUILT_INDEX_HTML_CACHE
-    manifest = load_built_manifest()
-    entry = manifest.get("js/app.js")
-    tailwind = manifest.get("tailwind.css")
-    app_css = manifest.get("app.css")
-    if not entry or not tailwind or not app_css:
-        return None
-    html = (bundle_root() / "index.html").read_text(encoding="utf-8")
-    html = html.replace('href="tailwind.css"', f'href="dist/{tailwind}"', 1)
-    html = html.replace('href="app.css"', f'href="dist/{app_css}"', 1)
-    html = html.replace('src="js/app.js"', f'src="dist/{entry}"', 1)
-    _BUILT_INDEX_HTML_CACHE = html
-    return html
-
-
-def _is_immutable_built_asset(path_only: str) -> bool:
-    clean = path_only.lstrip("/").replace("\\", "/")
-    if not clean.startswith("dist/"):
-        return False
-    rel = clean[len("dist/") :]
-    immutable = built_immutable_assets()
-    if rel in immutable:
-        return True
-    if rel.startswith("js/chunks/") and rel in immutable:
-        return True
-    # Any file under dist/js/ with a content hash in the name.
-    return bool(re.search(r"\.[a-f0-9]{8}\.", rel))
-
-
-def _maybe_serve_built_index(handler: SimpleHTTPRequestHandler, path_only: str) -> bool:
-    if path_only not in ("/", "/index.html"):
-        return False
-    html = _built_index_html()
-    if html is None:
-        return False
-    body = html.encode("utf-8")
-    handler.send_response(HTTPStatus.OK)
-    handler.send_header("Content-Type", "text/html; charset=utf-8")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Cache-Control", "no-store")
-    handler.end_headers()
-    handler.wfile.write(body)
-    return True
-
-
 class Handler(SimpleHTTPRequestHandler):
     def handle(self) -> None:
         try:
@@ -2596,7 +2562,11 @@ class Handler(SimpleHTTPRequestHandler):
     def end_headers(self) -> None:
         path = self.path.split("?", 1)[0]
         path_lower = path.lower()
-        if serve_built_frontend() and _is_immutable_built_asset(path):
+        if (
+            is_frozen()
+            and serve_built_frontend()
+            and _is_immutable_built_asset(path)
+        ):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         elif path_lower.endswith(self._NO_CACHE_SUFFIXES) or path_lower in ("/", ""):
             self.send_header("Cache-Control", "no-store")
@@ -2604,27 +2574,32 @@ class Handler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path: str) -> str:
         """Serve catalog and cache JSON from the active profile root (legacy or profiles/<id>/)."""
-        clean = path.split("?", 1)[0].lstrip("/")
-        if _static_class("/" + clean) == "deny":
+        norm = _normalize_static_path(path.split("?", 1)[0])
+        clean = norm.lstrip("/")
+        if _static_class(norm) == "deny":
             return str(profile_root() / ".profile_static_blocked" / clean)
         if clean.startswith("profiles/"):
             # Block direct static access to another profile's tree (use top-level paths).
             return str(profile_root() / ".profile_static_blocked" / clean)
-        if _LIBRARY_JSON_RE.match("/" + clean) or clean in (
-            "itad_prices.json",
-            "free_claims.json",
-            "sponsors.json",
+        if _LIBRARY_JSON_RE.match(norm) or norm.lower() in (
+            "/itad_prices.json",
+            "/free_claims.json",
+            "/sponsors.json",
         ):
-            if clean == "itad_prices.json":
+            leaf = clean.split("/")[-1]
+            if leaf == "itad_prices.json":
                 disk = catalog_path("itad_prices.json")
-            elif clean == "free_claims.json":
+            elif leaf == "free_claims.json":
                 disk = free_claims_path()
-            elif clean == "sponsors.json":
+            elif leaf == "sponsors.json":
                 disk = sponsors_path()
             else:
-                disk = catalog_path(clean)
+                disk = catalog_path(leaf)
             if disk.is_file():
-                return str(disk)
+                resolved = str(disk)
+                if _resolved_static_path_allowed(resolved):
+                    return resolved
+                return str(profile_root() / ".profile_static_blocked" / clean)
         if clean.startswith("cache/"):
             name = clean.split("/", 1)[1]
             if name in PROFILE_CACHE_JSON_FILES:
@@ -2632,8 +2607,23 @@ class Handler(SimpleHTTPRequestHandler):
                 # (default) layout this is repo-root cache; for profiles/<id>/ it
                 # is the profile cache. A missing file 404s instead of leaking the
                 # default profile's enrichment data into another profile's chips.
-                return str(cache_json_path(name))
-        return super().translate_path(path)
+                resolved = str(cache_json_path(name))
+                if _resolved_static_path_allowed(resolved):
+                    return resolved
+                return str(profile_root() / ".profile_static_blocked" / clean)
+        resolved = super().translate_path(path)
+        # Python 3.13+ translate_path returns a trailing-slash directory for "/"
+        # instead of resolving index.html; map that here so the app shell loads.
+        resolved_path = Path(resolved)
+        if resolved_path.is_dir():
+            for leaf in ("index.html", "index.htm"):
+                index = resolved_path / leaf
+                if index.is_file():
+                    resolved = str(index)
+                    break
+        if not _resolved_static_path_allowed(resolved):
+            return str(profile_root() / ".profile_static_blocked" / clean)
+        return resolved
 
     def _begin_request(self) -> None:
         clear_request_profile_id()
@@ -3102,6 +3092,10 @@ class Handler(SimpleHTTPRequestHandler):
         if dismissed is not None and not isinstance(dismissed, list):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "dismissed must be a list"})
             return
+        premium_only = payload.get("premium_only_ids")
+        if premium_only is not None and not isinstance(premium_only, list):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "premium_only_ids must be a list"})
+            return
 
         root = data_root()
         if manual_items is None:
@@ -3125,6 +3119,10 @@ class Handler(SimpleHTTPRequestHandler):
         if dismissed is None:
             approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
             dismissed = approved_doc.get("dismissed") or []
+        premium_only_ids_payload = payload.get("premium_only_ids")
+        if premium_only_ids_payload is None:
+            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
+            premium_only_ids_payload = approved_doc.get("premium_only_ids") or []
 
         if not isinstance(store_overrides, dict):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "store_overrides must be an object"})
@@ -3159,6 +3157,11 @@ class Handler(SimpleHTTPRequestHandler):
             for item_id in (dismissed or [])
             if str(item_id).strip()
         }
+        premium_only_ids = {
+            str(item_id).strip()
+            for item_id in (premium_only_ids_payload or [])
+            if str(item_id).strip()
+        }
 
         built_doc = _read_optional_json(root / FREE_CLAIMS_BUILT_PATH) or {}
         live_items = [
@@ -3177,6 +3180,7 @@ class Handler(SimpleHTTPRequestHandler):
             },
             dismissed_ids=dismissed_ids,
             live_items=live_items,
+            premium_only_ids=premium_only_ids,
         )
         # Mirror build_free_claims.py: the published feed carries the GamerPower
         # attribution credit whenever a GamerPower-sourced item is present, so the
@@ -3209,6 +3213,9 @@ class Handler(SimpleHTTPRequestHandler):
         dismissed = approved_doc.get("dismissed")
         if not isinstance(dismissed, list):
             dismissed = []
+        premium_only_ids = approved_doc.get("premium_only_ids")
+        if not isinstance(premium_only_ids, list):
+            premium_only_ids = []
         _send_json(
             self,
             HTTPStatus.OK,
@@ -3219,6 +3226,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "store_overrides": store_overrides,
                 "field_overrides": field_overrides,
                 "dismissed": dismissed,
+                "premium_only_ids": premium_only_ids,
                 "built": _read_optional_json(root / FREE_CLAIMS_BUILT_PATH),
             },
         )
@@ -3254,50 +3262,26 @@ class Handler(SimpleHTTPRequestHandler):
         if validation_err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
             return
-        ids = [str(item_id).strip() for item_id in payload.get("ids") or [] if str(item_id).strip()]
-        id_set = set(ids)
-        overrides: dict[str, str] = {}
-        for key, val in (payload.get("store_overrides") or {}).items():
-            k = str(key).strip()
-            v = str(val or "").strip().lower()
-            if k and v and k in id_set:
-                overrides[k] = v
-        field_overrides_out: dict[str, dict[str, str]] = {}
-        allowed_fields = {"title", "claim_url", "ends_at"}
-        for key, val in (payload.get("field_overrides") or {}).items():
-            k = str(key).strip()
-            if not k or not isinstance(val, dict):
-                continue
-            cleaned: dict[str, str] = {}
-            for field, field_val in val.items():
-                if field not in allowed_fields:
-                    continue
-                text = str(field_val or "").strip()
-                if text:
-                    cleaned[field] = text
-            if cleaned:
-                field_overrides_out[k] = cleaned
-        dismissed: list[str] = []
-        seen_dismissed: set[str] = set()
-        for item_id in payload.get("dismissed") or []:
-            d = str(item_id).strip()
-            if d and d not in id_set and d not in seen_dismissed:
-                dismissed.append(d)
-                seen_dismissed.add(d)
-        out: dict[str, Any] = {"ids": ids}
-        if overrides:
-            out["store_overrides"] = overrides
-        if field_overrides_out:
-            out["field_overrides"] = field_overrides_out
-        if dismissed:
-            out["dismissed"] = dismissed
+        from build_free_claims import parse_approved_put_payload, prepare_approved_document
+
+        parsed = parse_approved_put_payload(payload)
+        root = data_root()
+        auto_doc = _read_optional_json(root / FREE_CLAIMS_AUTO_PATH) or {}
+        auto_items = [it for it in (auto_doc.get("items") or []) if isinstance(it, dict)]
+        built_doc = _read_optional_json(root / FREE_CLAIMS_BUILT_PATH) or {}
+        prior_rows = {
+            str(it.get("id") or "").strip(): it
+            for it in (built_doc.get("items") or [])
+            if isinstance(it, dict) and str(it.get("id") or "").strip()
+        }
+        out = prepare_approved_document(**parsed, auto_items=auto_items, prior_rows_by_id=prior_rows)
         out_path = data_root() / FREE_CLAIMS_APPROVED_PATH
         out_path.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(
             out_path,
             json.dumps(out, indent=2, ensure_ascii=False),
         )
-        _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(ids)})
+        _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(out.get("ids") or [])})
 
     def _handle_internal_sponsors_get(self) -> None:
         root = data_root()
@@ -3315,7 +3299,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
             return
         assert payload is not None
-        validation_err = _validate_sponsors_payload(payload)
+        validation_err = validate_sponsors_payload(payload)
         if validation_err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
             return
@@ -3328,7 +3312,11 @@ class Handler(SimpleHTTPRequestHandler):
             out_path,
             json.dumps(payload, indent=2, ensure_ascii=False),
         )
-        _send_json(self, HTTPStatus.OK, {"ok": True, "items": len(payload.get("items") or [])})
+        if payload.get("version") == 2:
+            count = len(payload.get("ads") or {})
+        else:
+            count = len(payload.get("items") or [])
+        _send_json(self, HTTPStatus.OK, {"ok": True, "items": count, "ads": count})
 
     @staticmethod
     def _parse_run_submit_path(rest: str) -> tuple[str, bool]:
@@ -3356,7 +3344,7 @@ class Handler(SimpleHTTPRequestHandler):
                 data["accountAuth"] = True
             _send_json(self, HTTPStatus.OK, data)
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "profiles_get_failed", exc)
 
     def _handle_profiles_create(self) -> None:
         if _profile_admin_blocked():
@@ -3550,7 +3538,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
             return
         except Exception as exc:  # noqa: BLE001 - the file is small, anything is unexpected here
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"load failed: {exc!r}"})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "personal_load_failed", exc)
             return
         _send_json(self, HTTPStatus.OK, doc)
 
@@ -3601,7 +3589,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
         except OSError as exc:
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"write failed: {exc!r}"})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "personal_write_failed", exc)
             return
         _send_json(self, HTTPStatus.OK, doc)
 
@@ -3734,7 +3722,7 @@ class Handler(SimpleHTTPRequestHandler):
                 },
             )
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_status_failed", exc)
 
     def _handle_auth_open_url(self, provider: str) -> None:
         try:
@@ -3747,7 +3735,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_open_url_failed", exc)
 
     def _handle_auth_start(self, provider: str) -> None:
         try:
@@ -3762,7 +3750,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_start_failed", exc)
 
     def _public_callback_url(self, path: str) -> str:
         """Build an absolute URL to ``path`` from the request Host (tunnel-aware)."""
@@ -3783,7 +3771,7 @@ class Handler(SimpleHTTPRequestHandler):
             url = build_epic_oauth_login_url(redirect_uri, state)
             _send_json(self, HTTPStatus.OK, {"url": url, "state": state})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "epic_oauth_url_failed", exc)
 
     def _handle_auth_disconnect(self, provider: str) -> None:
         try:
@@ -3794,7 +3782,7 @@ class Handler(SimpleHTTPRequestHandler):
         except KeyError:
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_disconnect_failed", exc)
 
     def _handle_auth_enable(self, provider: str) -> None:
         try:
@@ -3807,7 +3795,7 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_enable_failed", exc)
 
     def _handle_auth_credentials(self, provider: str) -> None:
         try:
@@ -3837,25 +3825,35 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "credentials_failed", exc)
 
     def _handle_auth_master_password(self) -> None:
+        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
+        if err == "empty body":
+            payload = {}
+        elif err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
-            payload = json.loads(raw)
             from auth.manager import set_master_password
 
             set_master_password(payload.get("password"))
             _send_json(self, HTTPStatus.OK, {"ok": True})
-        except Exception as exc:  # noqa: BLE001
+        except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "master_password_failed", exc)
 
     def _handle_auth_secrets_export(self) -> None:
+        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
+        if err == "empty body":
+            payload = {}
+        elif err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
-            payload = json.loads(raw)
             from auth.bundle import BundleError, BundleTooLarge, bundle_filename, export_bundle
 
             passphrase = (payload.get("passphrase") or "").strip()
@@ -3886,34 +3884,31 @@ class Handler(SimpleHTTPRequestHandler):
                     {"error": str(exc), "code": "secrets_corrupt"},
                 )
                 return
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "export_failed", exc)
 
     def _handle_auth_secrets_import(self) -> None:
         import base64
-        from urllib.parse import parse_qs, urlparse
 
+        # JSON-only: {"passphrase": str, "blob": base64}. The legacy
+        # octet-stream + ?passphrase= query-string fallback is removed — a
+        # passphrase in the URL leaks into request logs / browser history.
+        payload, err = _read_json_body(self, max_bytes=_SECRETS_IMPORT_MAX_BYTES)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length) if length else b""
-            ctype = (self.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
-            if ctype == "application/json":
-                payload = json.loads(raw.decode("utf-8") if raw else "{}")
-                if not isinstance(payload, dict):
-                    raise ValueError("import body must be a JSON object")
-                passphrase = str(payload.get("passphrase") or "")
-                blob_b64 = payload.get("blob")
-                if isinstance(blob_b64, str):
+            passphrase = str(payload.get("passphrase") or "")
+            blob_b64 = payload.get("blob")
+            if isinstance(blob_b64, str):
+                try:
+                    # binascii.Error subclasses ValueError, so this catch covers
+                    # malformed base64 too.
                     blob = base64.b64decode(blob_b64, validate=True)
-                else:
-                    blob = b""
+                except ValueError as exc:
+                    raise ValueError("blob is not valid base64") from exc
             else:
-                parsed = urlparse(self.path)
-                params = parse_qs(parsed.query)
-                passphrase = (
-                    self.headers.get(_BAKLOG_IMPORT_PASSPHRASE_HEADER)
-                    or (params.get("passphrase") or [""])[0]
-                )
-                blob = raw
+                blob = b""
             from auth.bundle import (
                 BadMagic,
                 BadPassphrase,
@@ -3935,19 +3930,18 @@ class Handler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "invalid_passphrase"})
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "import_failed", exc)
 
     def _handle_epic_oauth_callback(self) -> None:
         from urllib.parse import parse_qs, urlparse
-
-        from shared.supabase_auth import auth_enabled
 
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
         code = (params.get("code") or [None])[0]
         state = (params.get("state") or [None])[0]
-        require_state = auth_enabled()
-        if require_state and not state:
+        # Always require a server-minted state (CSRF defense), even when Supabase
+        # auth is disabled for local use.
+        if not state:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             body = b"<html><body><p>Missing OAuth state.</p></body></html>"
@@ -3955,7 +3949,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        profile_id = _consume_epic_oauth_state(state, require_state=require_state)
+        profile_id = _consume_epic_oauth_state(state)
         if profile_id is None:
             self.send_response(HTTPStatus.BAD_REQUEST)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -4418,7 +4412,14 @@ def main() -> None:
         _write_pid_file()
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")
         if serve_built_frontend():
-            print("Frontend: built dist/ assets (immutable cache on hashed files)")
+            if is_frozen():
+                print("Frontend: built dist/ assets (immutable cache on hashed files)")
+            else:
+                print(
+                    "Frontend: built dist/ JS + live source CSS "
+                    "(no cache — reload picks up app.css edits)"
+                )
+            _warn_built_manifest_version_mismatch()
         else:
             print("Frontend: raw ESM (set BAKLOG_SERVE_BUILT=1 after npm run build)")
         print(f"Python for fetchers: {_python_executable()}")

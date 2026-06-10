@@ -11,6 +11,7 @@ import {
   buildQueryContext,
   querySourceForView,
 } from './table-query.js';
+import { safeCoverAttrUrl, safeCoverCssUrl } from './covers.js';
 import { buildStatusSelect, STATUS_LABELS } from './row-templates.js';
 import {
   gameKey,
@@ -55,7 +56,7 @@ import {
 } from './deals.js';
 import { isPlatformToken } from './genres.js';
 import { syncCoverFits } from './covers.js';
-import { getEligibleSponsors, sponsoredTableRowHtml } from './sponsored-deals.js';
+import { getAdsForLocation, pickLocationForView, sponsoredTableRowHtml } from './sponsored-deals.js';
 import {
   getPersonal,
   setPersonal,
@@ -76,7 +77,7 @@ import { buildTableEmptyStateHtml } from './table-empty-state.js';
 import { formatPrice } from './table-price-format.js';
 
 export { formatPrice };
-import { renderPicks } from './picks-ui.js';
+import { renderPicks, effectivePicksTab } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 // dashboard-drilldown imports from table-ui already; the cycle is safe because
 // both sides only invoke each other's functions inside click-time bodies.
@@ -474,8 +475,8 @@ export function updateRowInPlace(tr, g) {
 
 function rowHeroAttrs(g) {
   const hero = coverFallbackFor(g);
-  if (!hero) return { heroClass: '', heroStyle: '' };
-  const safe = hero.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const safe = safeCoverCssUrl(hero);
+  if (!safe) return { heroClass: '', heroStyle: '' };
   return {
     heroClass: ' row-has-hero',
     heroStyle: `--row-hero:url('${safe}')`,
@@ -1116,15 +1117,37 @@ function tbodyRowCount() {
 
 const SPONSORED_TABLE_SLOT = 5;
 
+/**
+ * Drop the sponsored table row immediately on dismiss — avoids waiting for a
+ * full renderTable() query + virtual repaint (~200ms+ on large libraries).
+ */
+export function syncSponsoredTableAfterDismiss() {
+  document.getElementById('tbody')?.querySelector('.sponsored-table-row')?.remove();
+  if (_virtualList) {
+    _virtualWindow = { start: -1, end: -1 };
+    _virtualWindowList = null;
+  }
+}
+
+function resolveTableRowLocation() {
+  const view = state.activeView === 'wishlist' ? 'wishlist'
+    : (state.activeView === 'itch' ? 'itch' : 'library');
+  if (effectivePicksTab() === 'wishlistDeals' && view === 'library') {
+    return pickLocationForView('deals', 'row');
+  }
+  return pickLocationForView(view, 'row');
+}
+
 function appendChunk(list, start, end, ctx) {
   const run = perfActiveRun();
   const t0 = run ? performance.now() : 0;
   const out = [];
+  const rowLoc = resolveTableRowLocation();
   const tableAd = SPONSORED_TABLE_SLOT >= start && SPONSORED_TABLE_SLOT < end
-    ? getEligibleSponsors('table')[0]
+    ? getAdsForLocation(rowLoc)[0]
     : null;
   for (let i = start; i < end; i++) {
-    if (tableAd && i === SPONSORED_TABLE_SLOT) out.push(sponsoredTableRowHtml(tableAd, ctx));
+    if (tableAd && i === SPONSORED_TABLE_SLOT) out.push(sponsoredTableRowHtml(tableAd, { ...ctx, locationKey: rowLoc }));
     out.push(tableRowHtml(list[i], i, ctx));
   }
   const html = out.join("");
@@ -1187,7 +1210,7 @@ function tableRowHtml(g, idx, { isWish }) {
   const cls = `${rowClass(g, lowConf)}${cleanup ? " cleanup-candidate" : ""}${selected ? " row-selected" : ""}${focused ? " row-focused" : ""}${heroClass}`;
   return `<tr data-row-key="${escapeAttr(key)}" data-row-index="${idx}" class="${cls}"${heroAttr}${cleanupTitle}>
       <td class="col-select p-2 text-center"><input type="checkbox" class="row-select rounded" data-game-key="${escapeAttr(key)}" ${selected ? "checked" : ""} title="Select for bulk status or remove" /></td>
-      <td class="col-cover p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${cover}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
+      <td class="col-cover p-2"><span class="cover-wrap${window.coverLandscapeAttr(cover)}"><img class="cover${window.coverLandscapeAttr(cover)}" src="${safeCoverAttrUrl(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" aria-hidden="true" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />${earlyAccessRibbonHtml(g, { label: "EA" })}</span></td>
       <td class="col-game p-2 game-name-cell">
         <div class="flex items-center gap-2">
           <div class="flex-1 min-w-0">
@@ -1223,7 +1246,7 @@ function tableRowHtml(g, idx, { isWish }) {
       <td class="col-price p-2 text-right">${priceOccupied ? `<span class="row-hero-pill">${priceHtml}</span>` : priceHtml}</td>
       <td class="col-released p-2 text-slate-300 whitespace-nowrap">${formatReleaseDate(g.release_date)}</td>
       <td class="col-lastplayed p-2 text-slate-300">${lastPlayedOccupied ? `<span class="row-hero-pill">${lastPlayedHtml}</span>` : lastPlayedHtml}</td>
-      <td class="col-genres p-2 text-slate-400 text-xs truncate" title="${(g.genres || []).filter(x => !isPlatformToken(x)).join(", ")}">${(g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - "}</td>
+      <td class="col-genres p-2 text-slate-400 text-xs truncate" title="${escapeAttr((g.genres || []).filter(x => !isPlatformToken(x)).join(", "))}">${escapeHtml((g.genres || []).filter(x => !isPlatformToken(x)).slice(0, 2).join(", ") || " - ")}</td>
       <td class="col-notes p-2 notes-cell${psnPlatformsLineHtml(g) ? " has-psn-platforms" : ""}">
         ${psnPlatformsLineHtml(g)}
         <textarea data-game-key="${escapeAttr(key)}" data-field="notes" placeholder="Notes..." rows="3" class="notes-input rounded text-xs w-full px-2 py-1" title="Personal notes - saved automatically">${escapeHtml(p.notes || "")}</textarea>
@@ -1274,6 +1297,14 @@ function paintTableBody(list, opts = {}) {
   }
 
   const anchorIdx = typeof opts.anchorIndex === "number" ? opts.anchorIndex : -1;
+  // Forced re-renders (e.g. sponsored-row dismiss) reuse the same list ref and
+  // scroll position, so computeVirtualRange returns an unchanged window and
+  // paintVirtualSlice would early-return — bust the window cache so the slice
+  // always repaints.
+  if (opts.bustVirtualCache) {
+    _virtualWindow = { start: -1, end: -1 };
+    _virtualWindowList = null;
+  }
   _virtualList = list;
   _virtualCtx = ctx;
   ensureVirtualScrollBound();
@@ -1519,10 +1550,11 @@ export async function renderTable(opts) {
   paintTableBody(list, {
     resetScroll: !!opts?.resetScroll && anchorIndex == null,
     anchorIndex,
+    bustVirtualCache: force,
   });
   if (list.length > 0 && !isTablePainted(list)) {
     console.warn("[renderTable] tbody empty after paint, retrying sync");
-    paintTableBody(list, { anchorIndex });
+    paintTableBody(list, { anchorIndex, bustVirtualCache: force });
   }
   perfMeasure(perfRun, 'paint:body', 'paint:start', {
     tbodyRows: tbodyRowCount(),

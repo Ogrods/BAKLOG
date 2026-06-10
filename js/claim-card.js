@@ -51,9 +51,19 @@ export function claimDedupKey(c) {
 
 /** Collapse the same game arriving from multiple sources to one row. */
 export function dedupeClaims(list) {
+  const titleToAppid = new Map();
+  for (const c of list) {
+    if (c.steam_appid == null || c.steam_appid === '') continue;
+    const titleNorm = normalizeNameForDedup(stripClaimTitleDecorations(c.title || ''));
+    if (titleNorm) titleToAppid.set(titleNorm, c.steam_appid);
+  }
   const best = new Map();
   for (const c of list) {
-    const key = claimDedupKey(c);
+    let key = claimDedupKey(c);
+    if (key.startsWith('title:') && (c.steam_appid == null || c.steam_appid === '')) {
+      const appid = titleToAppid.get(key.slice(6));
+      if (appid != null) key = `appid:${appid}`;
+    }
     const cur = best.get(key);
     if (!cur) { best.set(key, c); continue; }
     const rank = CLAIM_SOURCE_RANK[String(c.source || '').toLowerCase()] ?? 99;
@@ -157,6 +167,11 @@ export function claimAttributionHtml(attribution) {
   return `<p class="claim-attribution">Giveaway data via ${parts.join(' · ')} and ${itad}</p>`;
 }
 
+function claimPremiumBadgeHtml(claim) {
+  if (!claim?.premium_only) return '';
+  return '<span class="claim-pro-badge deal-cut-badge" title="Pro-only bonus drop">Pro</span>';
+}
+
 export function claimCardHtml(claim) {
   const title = escapeHtml(claim.title || 'Free game');
   const store = claim.store || 'other';
@@ -189,6 +204,7 @@ export function claimCardHtml(claim) {
         </div>
         <div class="deal-hero-badges flex flex-wrap items-center gap-1.5 mt-1">
           <span class="deal-cut-badge deal-cut-huge claim-cut-fire">100% off</span>
+          ${claimPremiumBadgeHtml(claim)}
           ${storeLogoHtml(store, { size: 'sm', title: storeDisplayName(store) })}
           ${claimSourceHtml(claim.source)}
           ${endsHtml}
@@ -234,6 +250,7 @@ export function claimRowHtml(claim) {
     <span class="claim-cell-cover cover-wrap claim-row-cover-wrap${ls}">${coverHtml}</span>
     <span class="claim-cell-title">
       <span class="claim-row-title truncate">${title}</span>
+      ${claimPremiumBadgeHtml(claim)}
       <span class="claim-cell-store">${storeLogoHtml(store, { size: 'sm', title: storeDisplayName(store) })}</span>
       ${claimSourceHtml(claim.source)}
     </span>
@@ -330,6 +347,7 @@ export function claimableModuleMarkup(claims, {
   visibleCount = Infinity,
   attribution = null,
   showHiddenButtonHtml = '',
+  allowHero = true,
 } = {}) {
   const list = Array.isArray(claims) ? claims : [];
   const showHiddenBtn = showHiddenButtonHtml || '';
@@ -346,7 +364,10 @@ export function claimableModuleMarkup(claims, {
       ${attributionHtml}
     </section>`;
   }
-  if (list.length === 1) {
+  // The inflated hero card is reserved for a feed that *loaded* with a single
+  // claim. When a list of several is whittled down to one by dismissals, callers
+  // pass allowHero:false so the survivor stays a row instead of snapping big.
+  if (list.length === 1 && allowHero) {
     return `<section class="claimable-now-module space-y-3" aria-label="Claimable Now">
       ${claimCardHtml(list[0])}
       ${showHiddenBtn}

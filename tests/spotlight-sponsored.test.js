@@ -19,7 +19,7 @@ function artGame(name, art) {
 }
 
 beforeEach(() => {
-  state.prefs = { hideSponsoredDeals: false };
+  state.prefs = {};
   state.personal = {};
   state.ownedNormNames = new Set();
   state.wishlistGames = [];

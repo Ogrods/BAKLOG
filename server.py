@@ -57,6 +57,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from shared.built_frontend import (
+    is_immutable_built_asset as _is_immutable_built_asset,
+)
+from shared.built_frontend import (
+    maybe_serve_built_index as _maybe_serve_built_index,
+)
 from shared.dev_server_pids import (
     pid_alive as _pid_alive,
 )
@@ -70,8 +76,6 @@ from shared.dev_server_pids import (
     terminate_pid as _terminate_pid,
 )
 from shared.install_paths import (
-    built_immutable_assets,
-    built_manifest_path,
     bundle_root,
     data_root,
     is_frozen,
@@ -79,6 +83,20 @@ from shared.install_paths import (
     serve_built_frontend,
     static_root,
 )
+
+
+def _warn_built_manifest_version_mismatch() -> None:
+    if not serve_built_frontend():
+        return
+    manifest = load_built_manifest()
+    built_ver = str(manifest.get("version") or "").strip()
+    app_ver = _app_version()
+    if built_ver and built_ver != app_ver:
+        print(
+            f"WARNING: dist/manifest.json version {built_ver} != app {app_ver} "
+            f"— run npm run build before testing packaged frontend",
+            flush=True,
+        )
 
 ROOT = data_root()
 
@@ -819,6 +837,9 @@ def _validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
                 return f"items[{i}] missing {field}"
         if not _is_safe_http_url(str(item.get("claim_url") or "")):
             return f"items[{i}] claim_url must start with http:// or https://"
+        premium_only = item.get("premium_only")
+        if premium_only is not None and not isinstance(premium_only, bool):
+            return f"items[{i}] premium_only must be a boolean"
     return None
 
 
@@ -860,6 +881,13 @@ def _validate_approved_payload(doc: dict[str, Any]) -> str | None:
         for i, item_id in enumerate(dismissed):
             if not str(item_id or "").strip():
                 return f"dismissed[{i}] must be a non-empty string"
+    premium_only_ids = doc.get("premium_only_ids")
+    if premium_only_ids is not None:
+        if not isinstance(premium_only_ids, list):
+            return "premium_only_ids must be a list"
+        for i, item_id in enumerate(premium_only_ids):
+            if not str(item_id or "").strip():
+                return f"premium_only_ids[{i}] must be a non-empty string"
     return None
 
 
@@ -890,6 +918,11 @@ def _validate_sponsors_payload(doc: dict[str, Any]) -> str | None:
             if k not in ("house", "sponsor"):
                 return f"items[{i}] kind must be house or sponsor"
         cover = item.get("cover")
+        # Cover aspect ratio is placement-dependent (guidance only; not enforced):
+        #   picks / table / dash-picks / dash-versus / claimable -> portrait ~2:3 box art so the
+        #     ad fills the .pick-cover tile and matches sibling pick cards. Landscape
+        #     art is only letterboxed (markLandscape) and looks worse here.
+        #   spotlight / deal-rail -> landscape hero art (fills the wide hero slot).
         if cover is not None and str(cover).strip():
             c = str(cover).strip()
             if not (
@@ -903,10 +936,15 @@ def _validate_sponsors_payload(doc: dict[str, Any]) -> str | None:
             raw = placements if isinstance(placements, list) else str(placements).split(",")
             valid = {
                 "deal-rail",
+                "dash-deal-rail",
                 "spotlight",
                 "picks",
                 "table",
                 "dash-picks",
+                "dash-feature-banner",
+                "dash-versus",
+                "coop-online",
+                "coop-couch",
                 "claimable",
             }
             for p in raw:
@@ -2540,72 +2578,6 @@ def _run_accessible(run: Run | None) -> Run | None:
     return None
 
 
-_BUILT_INDEX_HTML_CACHE: str | None = None
-_BUILT_INDEX_MANIFEST_MTIME: float | None = None
-
-
-def _built_index_manifest_mtime() -> float | None:
-    try:
-        return built_manifest_path().stat().st_mtime
-    except OSError:
-        return None
-
-
-def _built_index_html() -> str | None:
-    """index.html with hashed dist/ asset URLs when serving built frontend."""
-    global _BUILT_INDEX_HTML_CACHE, _BUILT_INDEX_MANIFEST_MTIME
-    if not serve_built_frontend():
-        return None
-    mtime = _built_index_manifest_mtime()
-    if mtime is None:
-        return None
-    if _BUILT_INDEX_HTML_CACHE is not None and _BUILT_INDEX_MANIFEST_MTIME == mtime:
-        return _BUILT_INDEX_HTML_CACHE
-    manifest = load_built_manifest()
-    entry = manifest.get("js/app.js")
-    tailwind = manifest.get("tailwind.css")
-    app_css = manifest.get("app.css")
-    if not entry or not tailwind or not app_css:
-        return None
-    html = (bundle_root() / "index.html").read_text(encoding="utf-8")
-    html = html.replace('href="tailwind.css"', f'href="dist/{tailwind}"', 1)
-    html = html.replace('href="app.css"', f'href="dist/{app_css}"', 1)
-    html = html.replace('src="js/app.js"', f'src="dist/{entry}"', 1)
-    _BUILT_INDEX_MANIFEST_MTIME = mtime
-    _BUILT_INDEX_HTML_CACHE = html
-    return html
-
-
-def _is_immutable_built_asset(path_only: str) -> bool:
-    clean = path_only.lstrip("/").replace("\\", "/")
-    if not clean.startswith("dist/"):
-        return False
-    rel = clean[len("dist/") :]
-    immutable = built_immutable_assets()
-    if rel in immutable:
-        return True
-    if rel.startswith("js/chunks/") and rel in immutable:
-        return True
-    # Any file under dist/js/ with a content hash in the name.
-    return bool(re.search(r"\.[a-f0-9]{8}\.", rel))
-
-
-def _maybe_serve_built_index(handler: SimpleHTTPRequestHandler, path_only: str) -> bool:
-    if path_only not in ("/", "/index.html"):
-        return False
-    html = _built_index_html()
-    if html is None:
-        return False
-    body = html.encode("utf-8")
-    handler.send_response(HTTPStatus.OK)
-    handler.send_header("Content-Type", "text/html; charset=utf-8")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Cache-Control", "no-store")
-    handler.end_headers()
-    handler.wfile.write(body)
-    return True
-
-
 class Handler(SimpleHTTPRequestHandler):
     def handle(self) -> None:
         try:
@@ -2652,7 +2624,11 @@ class Handler(SimpleHTTPRequestHandler):
     def end_headers(self) -> None:
         path = self.path.split("?", 1)[0]
         path_lower = path.lower()
-        if serve_built_frontend() and _is_immutable_built_asset(path):
+        if (
+            is_frozen()
+            and serve_built_frontend()
+            and _is_immutable_built_asset(path)
+        ):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         elif path_lower.endswith(self._NO_CACHE_SUFFIXES) or path_lower in ("/", ""):
             self.send_header("Cache-Control", "no-store")
@@ -3178,6 +3154,10 @@ class Handler(SimpleHTTPRequestHandler):
         if dismissed is not None and not isinstance(dismissed, list):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "dismissed must be a list"})
             return
+        premium_only = payload.get("premium_only_ids")
+        if premium_only is not None and not isinstance(premium_only, list):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "premium_only_ids must be a list"})
+            return
 
         root = data_root()
         if manual_items is None:
@@ -3201,6 +3181,10 @@ class Handler(SimpleHTTPRequestHandler):
         if dismissed is None:
             approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
             dismissed = approved_doc.get("dismissed") or []
+        premium_only_ids_payload = payload.get("premium_only_ids")
+        if premium_only_ids_payload is None:
+            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
+            premium_only_ids_payload = approved_doc.get("premium_only_ids") or []
 
         if not isinstance(store_overrides, dict):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "store_overrides must be an object"})
@@ -3235,6 +3219,11 @@ class Handler(SimpleHTTPRequestHandler):
             for item_id in (dismissed or [])
             if str(item_id).strip()
         }
+        premium_only_ids = {
+            str(item_id).strip()
+            for item_id in (premium_only_ids_payload or [])
+            if str(item_id).strip()
+        }
 
         built_doc = _read_optional_json(root / FREE_CLAIMS_BUILT_PATH) or {}
         live_items = [
@@ -3253,6 +3242,7 @@ class Handler(SimpleHTTPRequestHandler):
             },
             dismissed_ids=dismissed_ids,
             live_items=live_items,
+            premium_only_ids=premium_only_ids,
         )
         # Mirror build_free_claims.py: the published feed carries the GamerPower
         # attribution credit whenever a GamerPower-sourced item is present, so the
@@ -3285,6 +3275,9 @@ class Handler(SimpleHTTPRequestHandler):
         dismissed = approved_doc.get("dismissed")
         if not isinstance(dismissed, list):
             dismissed = []
+        premium_only_ids = approved_doc.get("premium_only_ids")
+        if not isinstance(premium_only_ids, list):
+            premium_only_ids = []
         _send_json(
             self,
             HTTPStatus.OK,
@@ -3295,6 +3288,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "store_overrides": store_overrides,
                 "field_overrides": field_overrides,
                 "dismissed": dismissed,
+                "premium_only_ids": premium_only_ids,
                 "built": _read_optional_json(root / FREE_CLAIMS_BUILT_PATH),
             },
         )
@@ -3330,50 +3324,26 @@ class Handler(SimpleHTTPRequestHandler):
         if validation_err:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
             return
-        ids = [str(item_id).strip() for item_id in payload.get("ids") or [] if str(item_id).strip()]
-        id_set = set(ids)
-        overrides: dict[str, str] = {}
-        for key, val in (payload.get("store_overrides") or {}).items():
-            k = str(key).strip()
-            v = str(val or "").strip().lower()
-            if k and v and k in id_set:
-                overrides[k] = v
-        field_overrides_out: dict[str, dict[str, str]] = {}
-        allowed_fields = {"title", "claim_url", "ends_at"}
-        for key, val in (payload.get("field_overrides") or {}).items():
-            k = str(key).strip()
-            if not k or not isinstance(val, dict):
-                continue
-            cleaned: dict[str, str] = {}
-            for field, field_val in val.items():
-                if field not in allowed_fields:
-                    continue
-                text = str(field_val or "").strip()
-                if text:
-                    cleaned[field] = text
-            if cleaned:
-                field_overrides_out[k] = cleaned
-        dismissed: list[str] = []
-        seen_dismissed: set[str] = set()
-        for item_id in payload.get("dismissed") or []:
-            d = str(item_id).strip()
-            if d and d not in id_set and d not in seen_dismissed:
-                dismissed.append(d)
-                seen_dismissed.add(d)
-        out: dict[str, Any] = {"ids": ids}
-        if overrides:
-            out["store_overrides"] = overrides
-        if field_overrides_out:
-            out["field_overrides"] = field_overrides_out
-        if dismissed:
-            out["dismissed"] = dismissed
+        from build_free_claims import parse_approved_put_payload, prepare_approved_document
+
+        parsed = parse_approved_put_payload(payload)
+        root = data_root()
+        auto_doc = _read_optional_json(root / FREE_CLAIMS_AUTO_PATH) or {}
+        auto_items = [it for it in (auto_doc.get("items") or []) if isinstance(it, dict)]
+        built_doc = _read_optional_json(root / FREE_CLAIMS_BUILT_PATH) or {}
+        prior_rows = {
+            str(it.get("id") or "").strip(): it
+            for it in (built_doc.get("items") or [])
+            if isinstance(it, dict) and str(it.get("id") or "").strip()
+        }
+        out = prepare_approved_document(**parsed, auto_items=auto_items, prior_rows_by_id=prior_rows)
         out_path = data_root() / FREE_CLAIMS_APPROVED_PATH
         out_path.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(
             out_path,
             json.dumps(out, indent=2, ensure_ascii=False),
         )
-        _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(ids)})
+        _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(out.get("ids") or [])})
 
     def _handle_internal_sponsors_get(self) -> None:
         root = data_root()
@@ -4500,7 +4470,14 @@ def main() -> None:
         _write_pid_file()
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")
         if serve_built_frontend():
-            print("Frontend: built dist/ assets (immutable cache on hashed files)")
+            if is_frozen():
+                print("Frontend: built dist/ assets (immutable cache on hashed files)")
+            else:
+                print(
+                    "Frontend: built dist/ JS + live source CSS "
+                    "(no cache — reload picks up app.css edits)"
+                )
+            _warn_built_manifest_version_mismatch()
         else:
             print("Frontend: raw ESM (set BAKLOG_SERVE_BUILT=1 after npm run build)")
         print(f"Python for fetchers: {_python_executable()}")

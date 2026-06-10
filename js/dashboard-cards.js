@@ -7,7 +7,7 @@ import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverF
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
-import { sponsoredDealSlotHtml, getEligibleSponsors, sponsoredDashPicksCardHtml } from './sponsored-deals.js';
+import { sponsoredDealSlotHtml, proPromoSlotHtml, getEligibleSponsors, sponsoredDashPicksCardHtml, sponsoredFeatureBannerHtml, sponsoredVersusRowHtml, getVersusColumnAds, sponsoredCoopPickRowHtml } from './sponsored-deals.js';
 import { focusGame } from './table-ui.js';
 import { DASH_STORE_LABELS, DASH_STORE_COLORS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
 // Itch click routing uses dashDrillItchGenre from the drilldown module.
@@ -66,6 +66,50 @@ function formatAddedAgo(ts) {
   return `${Math.floor(d / 30)}mo ago`;
 }
 
+/** Filtered + rating-sorted unplayed co-op candidates for one side. */
+function coopPickPool(list) {
+  const failedCoop = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
+  return list
+    .filter(g => getPersonal(g).status !== "finished" && combinedPlaytime(g) === 0)
+    .filter(g => ratingValue(g) > 0 && hasEnoughReviews(g))
+    .filter(g => !!(g.library_image || g.header_image) && !failedCoop.has(gameKey(g)))
+    .sort((a, b) => ratingValue(b) - ratingValue(a));
+}
+
+/** Markup for one real co-op pick row. */
+function coopPickRowHtml(g) {
+  const cover = libraryCoverFor(g);
+  const key = gameKey(g);
+  return `<button type="button" class="coop-pick-row" data-action="coop-pick-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in Library">
+            <img class="coop-pick-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
+            <span class="coop-pick-name-wrap"><span class="coop-pick-name">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span>
+            <span class="coop-pick-rating">${ratingValue(g)}%</span>
+          </button>`;
+}
+
+/**
+ * Surgically replace a dismissed co-op sponsored row with the game it displaced
+ * (the side's 3rd-rated pick), without rebuilding the whole card — so covers and
+ * the rest of the card never reload/re-animate. Returns true when handled.
+ */
+export function replaceCoopSponsorRow(sponsorId, games) {
+  const el = document.getElementById("dashboardCoopSpotlight");
+  if (!el || !sponsorId) return false;
+  const adRow = [...el.querySelectorAll(".sponsored-coop-row")]
+    .find(r => r.dataset.sponsorId === sponsorId);
+  if (!adRow) return false;
+  const list = adRow.closest(".coop-side-online")
+    ? games.filter(g => g.coop_online)
+    : adRow.closest(".coop-side-local")
+      ? games.filter(g => g.coop_local)
+      : null;
+  if (!list) return false;
+  const displaced = coopPickPool(list)[2] || null;
+  if (displaced) adRow.outerHTML = coopPickRowHtml(displaced);
+  else adRow.remove();
+  return true;
+}
+
 export function renderDashboardCoopSpotlight(games) {
   const el = document.getElementById("dashboardCoopSpotlight");
   if (!el) return;
@@ -85,31 +129,21 @@ export function renderDashboardCoopSpotlight(games) {
     return;
   }
 
-  const sideHtml = (list, { sideClass, title, drillArgs }) => {
+  const sideHtml = (list, { sideClass, title, drillArgs, placement }) => {
     const backlog = list.filter(g => getPersonal(g).status === "backlog").length;
     const finished = list.filter(g => getPersonal(g).status === "finished").length;
     const hltbValues = list.map(g => hltbMain(g)).filter(h => h != null && h > 0);
     const avgHltb = hltbValues.length
       ? Math.round(hltbValues.reduce((s, h) => s + h, 0) / hltbValues.length)
       : null;
-    const failedCoop = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
-    const picks = list
-      .filter(g => getPersonal(g).status !== "finished" && combinedPlaytime(g) === 0)
-      .filter(g => ratingValue(g) > 0 && hasEnoughReviews(g))
-      .filter(g => !!(g.library_image || g.header_image) && !failedCoop.has(gameKey(g)))
-      .sort((a, b) => ratingValue(b) - ratingValue(a))
-      .slice(0, 3);
-    const picksHtml = picks.length
-      ? picks.map(g => {
-          const cover = libraryCoverFor(g);
-          const key = gameKey(g);
-          return `<button type="button" class="coop-pick-row" data-action="coop-pick-jump" data-key="${escapeAttr(key)}" title="Jump to ${escapeAttr(g.name)} in Library">
-            <img class="coop-pick-cover" src="${escapeAttr(cover)}" alt="" loading="lazy" onerror="window.coverFallback(this)" />
-            <span class="coop-pick-name-wrap"><span class="coop-pick-name">${escapeHtml(g.name)}</span>${storeBadgeHtml(g)}</span>
-            <span class="coop-pick-rating">${ratingValue(g)}%</span>
-          </button>`;
-        }).join("")
-      : '<div class="coop-picks-empty">All started or finished - nothing unplayed.</div>';
+    const pickPool = coopPickPool(list);
+    const ad = placement ? getEligibleSponsors(placement)[0] : null;
+    const shown = pickPool.slice(0, ad ? 2 : 3);
+    const emptyMsg = '<div class="coop-picks-empty">All started or finished - nothing unplayed.</div>';
+    let picksHtml = shown.length
+      ? shown.map(coopPickRowHtml).join("")
+      : (ad ? "" : emptyMsg);
+    if (ad) picksHtml += sponsoredCoopPickRowHtml(ad);
     const drillJson = escapeAttr(JSON.stringify(drillArgs));
     return `
       <div class="coop-side ${sideClass}" role="button" tabindex="0" data-action="coop-drill" data-drill="${drillJson}" title="Filter the library by ${escapeAttr(title)}">
@@ -163,9 +197,9 @@ export function renderDashboardCoopSpotlight(games) {
       <div class="coop-spotlight-sub" title="Steam co-op categories · click a column to filter the library">Steam co-op signal · click a side to filter the library</div>
     </div>
     <div class="coop-versus">
-      ${sideHtml(onlineGames, { sideClass: "coop-side-online", title: "Online co-op", drillArgs: { online: true, local: false } })}
+      ${sideHtml(onlineGames, { sideClass: "coop-side-online", title: "Online co-op", drillArgs: { online: true, local: false }, placement: 'coop-online' })}
       ${connector}
-      ${sideHtml(localGames, { sideClass: "coop-side-local", title: "Couch co-op", drillArgs: { online: false, local: true } })}
+      ${sideHtml(localGames, { sideClass: "coop-side-local", title: "Couch co-op", drillArgs: { online: false, local: true }, placement: 'coop-couch' })}
     </div>
   `;
 }
@@ -189,6 +223,19 @@ export function renderDashboardSponsoredPick() {
   }
   slot.classList.remove('hidden');
   slot.innerHTML = sponsoredDashPicksCardHtml(item);
+}
+
+export function renderDashboardFeatureBanner() {
+  const slot = document.getElementById('dashboardFeatureBanner');
+  if (!slot) return;
+  const item = getEligibleSponsors('dash-feature-banner')[0];
+  if (!item) {
+    slot.classList.add('hidden');
+    slot.innerHTML = '';
+    return;
+  }
+  slot.classList.remove('hidden');
+  slot.innerHTML = sponsoredFeatureBannerHtml(item);
 }
 
 export function renderDashboardPicksVersus(games) {
@@ -219,8 +266,11 @@ export function renderDashboardPicksVersus(games) {
   const maxPicks = hasItch ? 5 : 10;
   const balanced = Math.min(ratedAll.length, fastAll.length, maxPicks);
   const sliceCount = balanced > 0 ? balanced : Math.min(Math.max(ratedAll.length, fastAll.length), maxPicks);
-  const rated = ratedAll.slice(0, sliceCount);
-  const fast = fastAll.slice(0, sliceCount);
+  // Ad displaces the last slot: sliceCount-1 real games + ad = sliceCount rows; dismiss
+  // restores the displaced game at index sliceCount-1.
+  const { rated: ratedAd, fast: fastAd } = getVersusColumnAds();
+  const rated = ratedAll.slice(0, ratedAd ? Math.max(0, sliceCount - 1) : sliceCount);
+  const fast = fastAll.slice(0, fastAd ? Math.max(0, sliceCount - 1) : sliceCount);
 
   const ratedKeys = new Set(rated.map(g => gameKey(g)));
   const fastKeys = new Set(fast.map(g => gameKey(g)));
@@ -238,14 +288,18 @@ export function renderDashboardPicksVersus(games) {
   const ratedEl = document.getElementById("dashVersusRated");
   const fastEl = document.getElementById("dashVersusFast");
   if (ratedEl) {
-    ratedEl.innerHTML = rated.length
+    let html = rated.length
       ? rated.map(g => row(g, gg => `${ratingValue(gg)}%`, "dash-versus-row--rated")).join("")
       : empty;
+    if (ratedAd) html += sponsoredVersusRowHtml(ratedAd, { metric: 'rating' });
+    ratedEl.innerHTML = html;
   }
   if (fastEl) {
-    fastEl.innerHTML = fast.length
+    let html = fast.length
       ? fast.map(g => row(g, gg => `${hltbMain(gg) || "?"}h`, "dash-versus-row--fast")).join("")
       : empty;
+    if (fastAd) html += sponsoredVersusRowHtml(fastAd, { metric: 'hltb' });
+    fastEl.innerHTML = html;
   }
 
   const badge = document.getElementById("dashVersusBadge");
@@ -304,7 +358,11 @@ export function renderDashboardRecentAdditions(games) {
   }).join('');
 }
 
-export function buildWishlistStatsHtml() {
+function dealRailAdSlotHtml(slot = 'wishlist') {
+  return slot === 'dashboard' ? proPromoSlotHtml() : sponsoredDealSlotHtml();
+}
+
+export function buildWishlistStatsHtml(slot = 'wishlist') {
   const wl = state.wishlistGames;
   if (!wl.length) {
     return [
@@ -319,7 +377,7 @@ export function buildWishlistStatsHtml() {
         cuts: [],
       }),
       dealStealsCardHtml([]),
-      sponsoredDealSlotHtml(),
+      dealRailAdSlotHtml(slot),
     ].join("");
   }
 
@@ -363,18 +421,20 @@ export function buildWishlistStatsHtml() {
       cuts,
     }),
     dealStealsCardHtml(steals),
-    sponsoredDealSlotHtml(),
+    dealRailAdSlotHtml(slot),
   ].join("");
 }
 
 export function renderDashboardWishlistStats() {
   // Re-used by both the dashboard mega-grid and the standalone wishlist deal
-  // radar shown above the table on the Wishlist view. Iterating over all
-  // matching targets keeps a single source of truth for the markup + math.
+  // radar shown above the table on the Wishlist view. The three organic deal
+  // cards share one builder; only the 4th ad slot varies per target.
   const targets = document.querySelectorAll(".dash-wishlist-stats-target");
   if (!targets.length) return;
-  const html = buildWishlistStatsHtml();
-  for (const el of targets) el.innerHTML = html;
+  for (const el of targets) {
+    const slot = el.id === 'dashboardWishlistStats' ? 'dashboard' : 'wishlist';
+    el.innerHTML = buildWishlistStatsHtml(slot);
+  }
 }
 
 function itchBreakdownRows(entries, fillClass, action) {

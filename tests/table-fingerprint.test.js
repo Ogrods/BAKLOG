@@ -5,7 +5,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { state } from '../js/state.js';
 import { loadSessionPrefs } from '../js/prefs.js';
-import { tableFingerprint } from '../js/table-ui.js';
+import { syncSponsoredTableAfterDismiss, tableFingerprint } from '../js/table-ui.js';
 
 function resetState() {
   state.activeView = 'library';
@@ -85,5 +85,19 @@ describe('tableFingerprint', () => {
     const b2 = tableFingerprint();
     window._dataVersion = 3;
     expect(tableFingerprint()).not.toBe(b2);
+  });
+});
+
+describe('syncSponsoredTableAfterDismiss', () => {
+  it('removes the sponsored table row without a full renderTable()', () => {
+    document.body.innerHTML = `
+      <table><tbody id="tbody">
+        <tr data-row-index="0"><td>Game A</td></tr>
+        <tr class="sponsored-table-row"><td>Encore ad</td></tr>
+        <tr data-row-index="1"><td>Game B</td></tr>
+      </tbody></table>`;
+    syncSponsoredTableAfterDismiss();
+    expect(document.querySelector('.sponsored-table-row')).toBeNull();
+    expect(document.querySelectorAll('#tbody tr').length).toBe(2);
   });
 });

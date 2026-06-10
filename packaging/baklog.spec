@@ -12,10 +12,8 @@ block_cipher = None
 
 datas = [
     (str(root / "index.html"), "."),
-    (str(root / "app.css"), "."),
-    (str(root / "tailwind.css"), "."),
     (str(root / "favicon.svg"), "."),
-    (str(root / "js"), "js"),
+    (str(root / "dist"), "dist"),
     (str(root / "assets"), "assets"),
     (str(root / "vendor"), "vendor"),
     (str(root / "fetchers" / "manifest.json"), "fetchers"),
@@ -59,6 +57,7 @@ hiddenimports = [
     "fetchers",
     "fetchers.registry",
     "shared.install_paths",
+    "shared.built_frontend",
     "keyring.backends.Windows",
     "cryptography.hazmat.primitives.ciphers.aead",
 ]

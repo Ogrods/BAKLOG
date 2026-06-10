@@ -38,6 +38,7 @@ import {
   sortedGames,
   cancelPendingScrollTarget,
   initTablePhoneLayout,
+  syncSponsoredTableAfterDismiss,
 } from './table-ui.js';
 import {
   renderPicks,
@@ -46,6 +47,8 @@ import {
   applyPicksCollapsedState,
 } from './picks-ui.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
+import { recordSponsoredClick } from './anon-metrics.js';
+import { dismissSponsoredDeal, refreshSponsoredSurfaces } from './sponsored-deals.js';
 import { openCoverGallery } from './cover-gallery.js';
 import { initTrophyPopover } from './trophy-popover.js';
 import {
@@ -110,6 +113,15 @@ const SUMMARY_FILTER_CHIP_SELECTOR =
 
 let _eventsBound = false;
 
+function handleSponsoredDismiss(dismissEl) {
+  const id = dismissEl.dataset.sponsorId;
+  dismissSponsoredDeal(id);
+  if (dismissEl.closest('.sponsored-table-row')) {
+    syncSponsoredTableAfterDismiss();
+  }
+  refreshSponsoredSurfaces(id);
+}
+
 export function bindEvents() {
   if (_eventsBound) return;
   _eventsBound = true;
@@ -140,14 +152,13 @@ export function bindEvents() {
       return;
     }
     if (action === "sponsored-dismiss") {
+      e.preventDefault();
       e.stopPropagation();
-      import('./sponsored-deals.js').then(({ dismissSponsoredDeal, refreshSponsoredSurfaces }) => {
-        dismissSponsoredDeal(card.dataset.sponsorId);
-        refreshSponsoredSurfaces();
-      });
+      handleSponsoredDismiss(card);
       return;
     }
     if (action === "sponsored-deal") {
+      if (!card.dataset.sponsorHouse) recordSponsoredClick(card.dataset.sponsorId);
       if (isSafeHttpUrl(card.dataset.sponsorUrl)) window.open(card.dataset.sponsorUrl, "_blank", "noopener,noreferrer");
       return;
     }
@@ -179,16 +190,14 @@ export function bindEvents() {
     if (dismiss && !inDealRail) {
       e.preventDefault();
       e.stopPropagation();
-      import('./sponsored-deals.js').then(({ dismissSponsoredDeal, refreshSponsoredSurfaces }) => {
-        dismissSponsoredDeal(dismiss.dataset.sponsorId);
-        refreshSponsoredSurfaces();
-      });
+      handleSponsoredDismiss(dismiss);
       return;
     }
     const deal = e.target.closest('[data-action="sponsored-deal"]');
     if (deal && !inDealRail) {
       e.preventDefault();
       e.stopPropagation();
+      if (!deal.dataset.sponsorHouse) recordSponsoredClick(deal.dataset.sponsorId);
       if (isSafeHttpUrl(deal.dataset.sponsorUrl)) {
         window.open(deal.dataset.sponsorUrl, '_blank', 'noopener,noreferrer');
       }
@@ -205,10 +214,7 @@ export function bindEvents() {
     if (!dismiss) return;
     e.preventDefault();
     e.stopPropagation();
-    import('./sponsored-deals.js').then(({ dismissSponsoredDeal, refreshSponsoredSurfaces }) => {
-      dismissSponsoredDeal(dismiss.dataset.sponsorId);
-      refreshSponsoredSurfaces();
-    });
+    handleSponsoredDismiss(dismiss);
   });
 
   document.getElementById("dashboardMega")?.addEventListener("click", onDashListClick);
@@ -387,6 +393,7 @@ export function bindEvents() {
   });
   document.getElementById("rowHeroBackdrop").addEventListener("change", e => {
     state.prefs.rowHeroBackdrop = e.target.checked;
+    state.prefs.rowHeroBackdropDefaulted = true;
     savePrefs();
     document.body.classList.toggle("row-hero-on", e.target.checked);
     if (e.target.checked) warmVisibleRowHeroes();
@@ -666,6 +673,10 @@ export function bindEvents() {
   });
   document.addEventListener("click", e => {
     const card = e.target.closest(".pick-card");
+    if (!card) return;
+    // #region agent log
+    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'427a43'},body:JSON.stringify({sessionId:'427a43',location:'bind-events.js:pick-card-click',message:'pick card click handler',data:{gameKey:card.dataset.gameKey||null,isSponsored:card.classList.contains('sponsored-pick-card'),fromDismiss:!!e.target.closest('[data-action="sponsored-dismiss"]'),activeView:state.activeView},timestamp:Date.now(),hypothesisId:'A,E'})}).catch(()=>{});
+    // #endregion
     if (card) focusGame(card.dataset.gameKey);
   });
   document.addEventListener("keydown", createGlobalKeydownHandler({

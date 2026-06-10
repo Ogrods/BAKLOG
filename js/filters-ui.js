@@ -478,9 +478,9 @@ export function updateViewChrome(options) {
   applyItchTabVisibility();
   updateWishlistDrawerVisibility();
   updatePickTabsVisibility();
-  // Quick-Wins slider visibility lives in picks-ui via updatePicksChrome;
-  // import lazily here so we avoid a top-level cycle with picks-ui.
-  document.getElementById("quickWinMaxWrap")?.classList.toggle("hidden", isWish || isItch);
+  // Quick-Wins slider visibility (only shown on the Quick Wins tab) lives in
+  // picks-ui via updatePicksChrome; import lazily to avoid a top-level cycle.
+  void import('./picks-ui.js').then(m => m.updatePicksChrome());
   document.getElementById("picksSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("toolbarSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("tableShell")?.classList.toggle("hidden", hideTableUi);

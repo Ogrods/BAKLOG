@@ -2,7 +2,18 @@
  * Tests for js/claimable.js — free claimable feed filtering and diff.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+
+const isProMock = vi.hoisted(() => vi.fn(() => false));
+
+vi.mock('../js/auth-gate.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    isPro: () => isProMock(),
+  };
+});
+
 import { state } from '../js/state.js';
 import {
   getVisibleClaims,
@@ -25,6 +36,8 @@ import {
   claimCoverFallback,
 } from '../js/claimable.js';
 import { buildOwnedNormNames } from '../js/deals.js';
+import { claimsSnapshotStorageKey } from '../js/profiles.js';
+import * as apiClient from '../js/api-client.js';
 
 function resetState() {
   state.personal = {};
@@ -87,14 +100,30 @@ describe('pickNewerFeed', () => {
     expect(feedGeneratedAt({ fetched_at: '2026-06-02T00:00:00Z' })).toBe(Date.parse('2026-06-02T00:00:00Z'));
   });
 
-  it('prefers fresher fetched_at over stale generated_at on profile feeds', () => {
+  it('prefers newer generated_at over a freshly downloaded stale hosted profile feed', () => {
     const profile = {
-      generated_at: '2026-06-08T09:07:44.166264+00:00',
+      generated_at: '2026-06-09T06:48:23.835623+00:00',
+      fetched_at: '2026-06-10T01:44:47.709221+00:00',
+      items: [{ id: 'stale', store: 'epic', title: 'Stale', claim_url: 'https://example.com/a' }],
+    };
+    const bundled = {
+      generated_at: '2026-06-10T01:37:22.394789+00:00',
+      items: [
+        { id: 'fresh1', store: 'epic', title: 'Fresh1', claim_url: 'https://example.com/b' },
+        { id: 'fresh2', store: 'steam', title: 'Fresh2', claim_url: 'https://example.com/c' },
+      ],
+    };
+    expect(pickNewerFeed(profile, bundled)?.items?.length).toBe(2);
+    expect(feedGeneratedAt(profile)).toBe(Date.parse(profile.generated_at));
+  });
+
+  it('falls back to fetched_at when generated_at is missing', () => {
+    const profile = {
       fetched_at: '2026-06-08T17:39:06.835602+00:00',
       items: [{ id: 'profile', store: 'epic', title: 'Profile', claim_url: 'https://example.com/p' }],
     };
     const bundled = {
-      generated_at: '2026-06-08T17:31:14.766880+00:00',
+      generated_at: '2026-06-08T09:07:44.166264+00:00',
       items: [{ id: 'bundled', store: 'epic', title: 'Bundled', claim_url: 'https://example.com/b' }],
     };
     expect(pickNewerFeed(profile, bundled)?.items?.[0]?.id).toBe('profile');
@@ -103,6 +132,10 @@ describe('pickNewerFeed', () => {
 });
 
 describe('getVisibleClaims', () => {
+  beforeEach(() => {
+    isProMock.mockReturnValue(false);
+  });
+
   it('filters expired and dismissed items', () => {
     state.personal.__dismissedClaims = { 'epic-foo': Date.now() };
     const visible = getVisibleClaims(sampleItems);
@@ -120,6 +153,36 @@ describe('getVisibleClaims', () => {
       steam_appid: 570,
     }];
     expect(getVisibleClaims(items)).toHaveLength(0);
+  });
+
+  it('hides premium_only items for free tier', () => {
+    const items = [
+      ...sampleItems,
+      {
+        id: 'bonus-dlc',
+        store: 'steam',
+        title: 'Bonus DLC Pack',
+        claim_url: 'https://example.com/bonus',
+        premium_only: true,
+      },
+    ];
+    isProMock.mockReturnValue(false);
+    expect(getVisibleClaims(items).map((c) => c.id)).toEqual(['gog-bar', 'epic-foo']);
+  });
+
+  it('shows premium_only items for pro tier', () => {
+    const items = [
+      ...sampleItems,
+      {
+        id: 'bonus-dlc',
+        store: 'steam',
+        title: 'Bonus DLC Pack',
+        claim_url: 'https://example.com/bonus',
+        premium_only: true,
+      },
+    ];
+    isProMock.mockReturnValue(true);
+    expect(getVisibleClaims(items).map((c) => c.id)).toContain('bonus-dlc');
   });
 });
 
@@ -189,6 +252,16 @@ describe('diffClaims', () => {
     const churned = sampleItems.map(c => ({ ...c, id: `gamerpower-${c.id}` }));
     const { newCount } = diffClaims(prevKeys, churned);
     expect(newCount).toBe(0);
+  });
+});
+
+describe('saveClaimsSnapshot', () => {
+  it('does not write an empty snapshot when the feed is empty', () => {
+    const key = claimsSnapshotStorageKey();
+    localStorage.setItem(key, JSON.stringify({ saved_at: 1, ids: ['keep-me'], keys: ['id:keep-me'] }));
+    saveClaimsSnapshot([]);
+    const raw = localStorage.getItem(key);
+    expect(JSON.parse(raw).ids).toEqual(['keep-me']);
   });
 });
 
@@ -344,24 +417,154 @@ describe('dismissals survive feed id churn', () => {
 
 describe('dismissed claims survive an empty/failed feed load', () => {
   it('does not wipe dismissals when every claim source fails at boot', async () => {
-    const realFetch = globalThis.fetch;
     state.personal.__dismissedClaims = {
-      'gamerpower-1604': 1,
-      'itad-de23882e1f39': 2,
+      'gamerpower-1604': Date.now(),
+      'itad-de23882e1f39': Date.now(),
     };
-    // Simulate a boot where the feed is unavailable (transient failure /
-    // mid-regeneration). Let debug-log POSTs through to the ingest server.
-    globalThis.fetch = (url, init) => {
-      if (String(url).includes('/ingest/')) return realFetch(url, init);
-      return Promise.reject(new Error('network down'));
-    };
-    try {
-      await loadClaimableNow();
-    } finally {
-      globalThis.fetch = realFetch;
-    }
+    vi.spyOn(apiClient, 'dataFetch').mockRejectedValue(new Error('network down'));
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down'));
+    await loadClaimableNow();
     expect(Object.keys(state.personal.__dismissedClaims).sort())
       .toEqual(['gamerpower-1604', 'itad-de23882e1f39']);
+  });
+});
+
+describe('dismissed claims survive partial feed churn on fetch', () => {
+  const targetClaim = {
+    id: 'gamerpower-3676',
+    store: 'epic',
+    title: 'Target Game',
+    claim_url: 'https://example.com/target',
+  };
+  const otherClaim = {
+    id: 'other-1',
+    store: 'steam',
+    title: 'Other Game',
+    claim_url: 'https://example.com/other',
+  };
+
+  function mockLocalFeed(doc) {
+    vi.spyOn(apiClient, 'dataFetch').mockImplementation(async (url) => {
+      const path = String(url).split('?')[0];
+      if (path.endsWith('free_claims.json')) {
+        return { ok: true, json: async () => doc };
+      }
+      return { ok: false };
+    });
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down'));
+  }
+
+  it('keeps a hidden claim hidden after fetch briefly omits it then restores it', async () => {
+    const fullFeed = {
+      generated_at: '2026-06-10T02:28:16.129220+00:00',
+      items: [targetClaim, otherClaim],
+    };
+    const partialFeed = {
+      generated_at: '2026-06-10T02:29:00.000000+00:00',
+      items: [otherClaim],
+    };
+
+    state.claimableFeed = fullFeed;
+    state.claimableNow = fullFeed.items;
+    dismissClaim('gamerpower-3676');
+
+    mockLocalFeed(partialFeed);
+    await loadClaimableNow();
+    expect(state.personal.__dismissedClaims['gamerpower-3676']).toBeTypeOf('number');
+
+    mockLocalFeed(fullFeed);
+    await loadClaimableNow();
+    expect(getVisibleClaims(state.claimableFeed.items).map(c => c.id)).not.toContain('gamerpower-3676');
+    expect(getHiddenClaims(state.claimableFeed.items).map(c => c.id)).toContain('gamerpower-3676');
+  });
+
+  it('keeps a hidden claim hidden after id churn when the game briefly drops from the feed', async () => {
+    const epicClaim = {
+      id: 'epic-foo',
+      store: 'epic',
+      title: 'Foo Game',
+      claim_url: 'https://example.com/foo',
+    };
+    const churnedClaim = {
+      id: 'gamerpower-foo',
+      store: 'epic',
+      title: 'Foo Game',
+      claim_url: 'https://example.com/foo2',
+    };
+    const partialFeed = {
+      generated_at: '2026-06-10T02:29:00.000000+00:00',
+      items: [otherClaim],
+    };
+    const churnedFeed = {
+      generated_at: '2026-06-10T02:30:00.000000+00:00',
+      items: [churnedClaim, otherClaim],
+    };
+
+    state.claimableFeed = { items: [epicClaim, otherClaim] };
+    state.claimableNow = state.claimableFeed.items;
+    dismissClaim('epic-foo');
+
+    mockLocalFeed(partialFeed);
+    await loadClaimableNow();
+
+    mockLocalFeed(churnedFeed);
+    await loadClaimableNow();
+    expect(getVisibleClaims(state.claimableFeed.items).map(c => c.id)).not.toContain('gamerpower-foo');
+    expect(getHiddenClaims(state.claimableFeed.items).map(c => c.id)).toContain('gamerpower-foo');
+  });
+
+  it('prunes dismissals older than the TTL but keeps recent ones', () => {
+    const staleTs = Date.now() - (91 * 24 * 60 * 60 * 1000);
+    state.personal.__dismissedClaims = {
+      'stale-claim': staleTs,
+      'epic-foo': Date.now(),
+    };
+    state.personal.__dismissedClaimKeys = {
+      'title:stale game': staleTs,
+      'title:foo game': Date.now(),
+    };
+    state.claimableFeed = { items: sampleItems };
+    dismissClaim('gog-bar');
+    expect(state.personal.__dismissedClaims['stale-claim']).toBeUndefined();
+    expect(state.personal.__dismissedClaims['epic-foo']).toBeTypeOf('number');
+    expect(state.personal.__dismissedClaimKeys['title:stale game']).toBeUndefined();
+    expect(state.personal.__dismissedClaimKeys['title:foo game']).toBeTypeOf('number');
+  });
+
+  it('keeps legacy non-numeric dismissal timestamps', () => {
+    state.personal.__dismissedClaims = { 'gamerpower-1604': 0, 'itad-de23882e1f39': 'legacy' };
+    state.claimableFeed = { items: sampleItems };
+    dismissClaim('gog-bar');
+    expect(state.personal.__dismissedClaims['gamerpower-1604']).toBe(0);
+    expect(state.personal.__dismissedClaims['itad-de23882e1f39']).toBe('legacy');
+  });
+
+  it('backfills stable dedup keys for an id-only dismissal when the feed loads', async () => {
+    const ts = Date.now();
+    // Legacy / orphan-pruned data: dismissal stored against the volatile id only.
+    state.personal.__dismissedClaims = { 'gamerpower-3676': ts };
+
+    mockLocalFeed({ generated_at: '2026-06-10T02:28:16Z', items: [targetClaim] });
+    await loadClaimableNow();
+
+    // The claim's stable key is now backfilled from the surviving id entry.
+    expect(state.personal.__dismissedClaimKeys['title:target game']).toBe(ts);
+    expect(getHiddenClaims(state.claimableFeed.items).map(c => c.id)).toContain('gamerpower-3676');
+  });
+
+  it('keeps an id-only dismissal hidden across id churn after the backfill', async () => {
+    state.personal.__dismissedClaims = { 'gamerpower-3676': Date.now() };
+
+    mockLocalFeed({ generated_at: '2026-06-10T02:28:16Z', items: [targetClaim] });
+    await loadClaimableNow();
+
+    // Same game returns under a different source id after a feed regeneration.
+    const churned = { ...targetClaim, id: 'epic-target' };
+    mockLocalFeed({ generated_at: '2026-06-10T02:40:00Z', items: [churned] });
+    await loadClaimableNow();
+
+    expect(getVisibleClaims(state.claimableFeed.items).map(c => c.id)).not.toContain('epic-target');
+    expect(getHiddenClaims(state.claimableFeed.items).map(c => c.id)).toContain('epic-target');
   });
 });
 

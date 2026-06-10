@@ -34,6 +34,9 @@ function showOverlay() {
   const shell = tableShell();
   const ov = overlayEl();
   if (!ov || !shell || _visible) return;
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'427a43'},body:JSON.stringify({sessionId:'427a43',location:'row-loader.js:showOverlay',message:'row loading curtain shown',data:{activeView:typeof document!=='undefined'?document.documentElement?.getAttribute('data-active-view'):null},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   _visible = true;
   _shownAt = nowMs();
   shell.setAttribute('aria-busy', 'true');

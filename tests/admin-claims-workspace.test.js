@@ -13,7 +13,10 @@ import {
   dupeStampIdSet,
   filterClaimsItems,
   groupDuplicates,
+  looksLikeBonusClaim,
   missingPublishFields,
+  normTitleKey,
+  pendingNeedsPublishEnrichment,
   slugManualId,
   sortClaimsItems,
   stripClaimTitleDecorations,
@@ -118,6 +121,60 @@ describe('claimRowStatus', () => {
     );
     expect(st.publishState).toBe('will_publish');
     expect(st.publishable).toBe(true);
+  });
+
+  it('treats key-matched rows as selected when id differs', () => {
+    const approvedKeys = new Set(['title:rogue waters']);
+    const st = claimRowStatus(
+      {
+        id: 'gamerpower-new',
+        store: 'epic',
+        title: 'Rogue Waters',
+        claim_url: 'https://x',
+        ends_at: '2026-12-01T00:00:00Z',
+      },
+      { now, approvedIds: new Set(['itad-old']), approvedKeys, isAuto: true },
+    );
+    expect(st.publishState).toBe('will_publish');
+  });
+});
+
+describe('normTitleKey', () => {
+  it('matches Python norm_title ampersand handling', () => {
+    expect(normTitleKey('Mr.Brocco & Co')).toBe('mr brocco and co');
+  });
+});
+
+describe('pendingNeedsPublishEnrichment', () => {
+  it('returns true when pending row lacks cover and live row is also bare', () => {
+    const pending = [{ id: 'gp-1', store: 'steam', title: 'Foo', claim_url: 'https://x' }];
+    const live = [{ id: 'gp-1', store: 'steam', title: 'Foo', claim_url: 'https://x' }];
+    expect(pendingNeedsPublishEnrichment(pending, live)).toBe(true);
+  });
+
+  it('returns false when enriched epic row has no steam_appid', () => {
+    const pending = [{
+      id: 'epic-1',
+      store: 'epic',
+      title: 'Some Game',
+      claim_url: 'https://epic.com/free',
+      header_image: 'https://cdn.example/cover.jpg',
+      review_percent: 87,
+    }];
+    expect(pendingNeedsPublishEnrichment(pending, pending)).toBe(false);
+  });
+
+  it('returns false when live row carries enrichment for id-matched pending row', () => {
+    const pending = [{ id: 'epic-1', store: 'epic', title: 'Some Game', claim_url: 'https://epic.com/free' }];
+    const live = [{
+      id: 'epic-1',
+      store: 'epic',
+      title: 'Some Game',
+      claim_url: 'https://epic.com/free',
+      header_image: 'https://cdn.example/cover.jpg',
+      review_percent: 87,
+    }];
+    expect(pendingNeedsPublishEnrichment(pending, live)).toBe(false);
   });
 });
 
@@ -327,10 +384,48 @@ describe('computeOverviewStats', () => {
       { id: '2', title: 'B', store: 'epic', claim_url: 'y', ends_at: '2026-05-01T00:00:00Z' },
       { id: '3', title: 'C', store: 'gog', claim_url: 'z' },
     ];
-    const stats = computeOverviewStats(items, new Set(['1', '2']), now);
+    const stats = computeOverviewStats(items, new Set(['1', '2']), new Set(), [], now);
     expect(stats.total).toBe(3);
     expect(stats.selected).toBe(2);
     expect(stats.expired).toBe(1);
     expect(stats.expiring).toBe(1);
+  });
+
+  it('counts pro-only rows from auto and manual pools', () => {
+    const now = Date.parse('2026-06-08T12:00:00Z');
+    const items = [
+      { id: '1', title: 'A', store: 'steam', claim_url: 'x' },
+      { id: '2', title: 'B', store: 'epic', claim_url: 'y' },
+    ];
+    const stats = computeOverviewStats(
+      items,
+      new Set(['1', '2']),
+      new Set(['2']),
+      [{ premium_only: true }],
+      now,
+    );
+    expect(stats.proOnly).toBe(2);
+  });
+});
+
+describe('looksLikeBonusClaim', () => {
+  it('flags likely DLC/bonus titles', () => {
+    expect(looksLikeBonusClaim('Skins Pack DLC Giveaway')).toBe(true);
+    expect(looksLikeBonusClaim('Tell Me Why')).toBe(false);
+  });
+});
+
+describe('filterClaimsItems premium_only', () => {
+  it('filters to pro-only flagged rows', () => {
+    const items = [
+      { id: '1', title: 'Game', store: 'steam', claim_url: 'x' },
+      { id: '2', title: 'DLC Pack', store: 'steam', claim_url: 'y' },
+    ];
+    const filtered = filterClaimsItems(items, {
+      status: 'premium_only',
+      approvedIds: new Set(['1', '2']),
+      premiumOnlyIds: new Set(['2']),
+    });
+    expect(filtered.map((it) => it.id)).toEqual(['2']);
   });
 });

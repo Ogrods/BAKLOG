@@ -33,7 +33,7 @@ import {
   perfMeasure,
   startFrameMonitor,
 } from './chart-perf.js';
-import { renderDashboardCoopSpotlight, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap, renderDashboardSponsoredPick } from './dashboard-cards.js';
+import { renderDashboardCoopSpotlight, replaceCoopSponsorRow, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap, renderDashboardSponsoredPick, renderDashboardFeatureBanner } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, buildMegaLibraryContext, renderMarqueeHtml, renderMarqueeTrackInner, applyMarqueeSpeed, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
 import { commitRenderedMetrics } from './metrics-rendered.js';
@@ -551,6 +551,11 @@ export async function renderDashboard(opts = {}) {
       } catch (err) {
         console.error("Dashboard sponsored pick error:", err);
       }
+      try {
+        renderDashboardFeatureBanner();
+      } catch (err) {
+        console.error("Dashboard feature banner error:", err);
+      }
     });
     _dashRenderedFingerprint = fp;
     _dashRenderStats.full++;
@@ -574,6 +579,21 @@ export function refreshSpotlightAfterSponsorChange() {
   _megaArtifactsKey = "";
   _megaArtifactsCache = null;
   if (state.activeView === "dashboard") scheduleDashboardRender();
+}
+
+export function refreshPicksVersusAfterSponsorChange() {
+  if (state.activeView !== "dashboard") return;
+  renderDashboardPicksVersus(dashboardLibraryGames());
+}
+
+export function refreshCoopSpotlightAfterSponsorChange(sponsorId) {
+  if (state.activeView !== "dashboard") return;
+  const games = dashboardLibraryGames();
+  // Swap just the dismissed ad row for the game it displaced so the rest of the
+  // card (covers, counts, the other side) never reloads/re-animates. Only fall
+  // back to a full re-render when there's no specific row to surgically replace.
+  if (sponsorId && replaceCoopSponsorRow(sponsorId, games)) return;
+  renderDashboardCoopSpotlight(games);
 }
 
 export function scheduleDashboardRender() {

@@ -349,24 +349,36 @@ def _enrich_item(
         appid = _resolve_steam_appid_by_title(title, last_call, blurb=raw.get("blurb"))
 
     if appid:
-        details = _steam_app_details(appid, last_call)
+        header_str = str(header or "").strip()
+        needs_details = (
+            review is None
+            or not header_str
+            or (store in ("steam", "") and not genres)
+        )
+        needs_portrait = _cover_quality(header_str) < 4
+
         real_header = None
-        if details:
-            if store in ("steam", ""):
-                store = store or "steam"
-                title = title or (details.get("name") or "").strip()
-            if not genres and store in ("steam", ""):
-                genres = [
-                    g.get("description")
-                    for g in (details.get("genres") or [])
-                    if g.get("description")
-                ]
-            if review is None:
-                review = _steam_review_percent(appid, last_call)
-            raw_header = (details.get("header_image") or "").strip()
-            if raw_header:
-                real_header = raw_header
-        verified_portrait = _verified_portrait_cover(appid, last_call)
+        if needs_details:
+            details = _steam_app_details(appid, last_call)
+            if details:
+                if store in ("steam", ""):
+                    store = store or "steam"
+                    title = title or (details.get("name") or "").strip()
+                if not genres and store in ("steam", ""):
+                    genres = [
+                        g.get("description")
+                        for g in (details.get("genres") or [])
+                        if g.get("description")
+                    ]
+                if review is None:
+                    review = _steam_review_percent(appid, last_call)
+                raw_header = (details.get("header_image") or "").strip()
+                if raw_header:
+                    real_header = raw_header
+
+        verified_portrait = None
+        if needs_portrait:
+            verified_portrait = _verified_portrait_cover(appid, last_call)
         header = verified_portrait or real_header or header
 
     item_id = (raw.get("id") or "").strip() or _slug_id(store, title, appid)
@@ -486,6 +498,46 @@ def _load_dismissed_ids(path: Path) -> set[str]:
     if not isinstance(dismissed, list):
         return set()
     return {str(item_id).strip() for item_id in dismissed if str(item_id).strip()}
+
+
+def _load_premium_only_ids(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    premium_only = doc.get("premium_only_ids") or []
+    if not isinstance(premium_only, list):
+        return set()
+    return {str(item_id).strip() for item_id in premium_only if str(item_id).strip()}
+
+
+def _manual_premium_only_ids(manual_items: list[dict]) -> set[str]:
+    out: set[str] = set()
+    for item in manual_items:
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("id") or "").strip()
+        if item_id and item.get("premium_only") is True:
+            out.add(item_id)
+    return out
+
+
+def _apply_premium_only(
+    items: list[dict],
+    *,
+    premium_only_ids: set[str],
+    manual_items: list[dict],
+) -> None:
+    """Stamp or clear premium_only on published rows from approval + manual flags."""
+    manual_premium = _manual_premium_only_ids(manual_items)
+    for item in items:
+        item_id = str(item.get("id") or "").strip()
+        if item_id in premium_only_ids or item_id in manual_premium:
+            item["premium_only"] = True
+        else:
+            item.pop("premium_only", None)
 
 
 def _load_store_overrides(path: Path) -> dict[str, str]:
@@ -688,6 +740,23 @@ def _apply_field_overrides(
             item[field] = value
 
 
+def _effective_ends_at(
+    item: dict,
+    *,
+    field_overrides: dict[str, dict[str, str]] | None = None,
+    field_overrides_by_key: dict[str, dict[str, str]] | None = None,
+) -> object:
+    """ends_at after admin field overrides (used before expiry filtering/prune)."""
+    overrides = _lookup_field_overrides(
+        item,
+        field_overrides=field_overrides or {},
+        field_overrides_by_key=field_overrides_by_key or {},
+    )
+    if overrides and "ends_at" in overrides:
+        return overrides["ends_at"]
+    return item.get("ends_at")
+
+
 def _select_approved_auto_items(
     auto_items_all: list[dict],
     *,
@@ -695,6 +764,8 @@ def _select_approved_auto_items(
     approved_keys: set[str],
     now: datetime,
     dismissed_ids: set[str] | None = None,
+    field_overrides: dict[str, dict[str, str]] | None = None,
+    field_overrides_by_key: dict[str, dict[str, str]] | None = None,
 ) -> tuple[list[dict], set[str]]:
     """Return live approved auto rows and expired approved ids eligible for pruning."""
     dismissed_ids = dismissed_ids or set()
@@ -712,7 +783,12 @@ def _select_approved_auto_items(
             approved_keys=approved_keys,
         ):
             continue
-        if _is_expired(item.get("ends_at"), now):
+        ends_at = _effective_ends_at(
+            item,
+            field_overrides=field_overrides,
+            field_overrides_by_key=field_overrides_by_key,
+        )
+        if _is_expired(ends_at, now):
             if item_id in approved_ids:
                 expired_approved_ids.add(item_id)
             continue
@@ -844,6 +920,7 @@ def preview_publish_items(
     field_overrides: dict[str, dict[str, str]] | None = None,
     dismissed_ids: set[str] | None = None,
     live_items: list[dict] | None = None,
+    premium_only_ids: set[str] | None = None,
     now: datetime | None = None,
 ) -> list[dict]:
     """Dry-run merge + prune for admin preview (no disk writes, no Steam API)."""
@@ -866,6 +943,8 @@ def preview_publish_items(
         approved_keys=approved_keys,
         now=now,
         dismissed_ids=dismissed_ids,
+        field_overrides=field_overrides,
+        field_overrides_by_key=field_by_key,
     )
 
     if store_overrides or store_by_key:
@@ -912,6 +991,11 @@ def preview_publish_items(
         now=now,
     )
     items.extend(carried)
+    _apply_premium_only(
+        items,
+        premium_only_ids=premium_only_ids or set(),
+        manual_items=manual_items,
+    )
     return items
 
 
@@ -980,6 +1064,156 @@ def merge_enriched_items_into_auto_feed(
     return updated
 
 
+def rekey_approved_state(
+    *,
+    ids: list[str],
+    store_overrides: dict[str, str],
+    field_overrides: dict[str, dict[str, str]],
+    premium_only_ids: set[str],
+    auto_items_all: list[dict],
+    prior_rows_by_id: dict[str, dict] | None = None,
+) -> tuple[list[str], dict[str, str], dict[str, dict[str, str]], set[str]]:
+    """Migrate approved ids/overrides when a game re-keys across feed id churn."""
+    prior_rows_by_id = prior_rows_by_id or {}
+    auto_by_id = _auto_items_by_id(auto_items_all)
+    key_to_auto_id: dict[str, str] = {}
+    for row in auto_items_all:
+        if not isinstance(row, dict):
+            continue
+        row_id = str(row.get("id") or "").strip()
+        if not row_id:
+            continue
+        for key in claim_match_keys(row):
+            key_to_auto_id.setdefault(key, row_id)
+
+    new_ids: list[str] = []
+    seen_ids: set[str] = set()
+    new_store: dict[str, str] = {}
+    new_field: dict[str, dict[str, str]] = {}
+    new_premium: set[str] = set()
+
+    def migrate_maps(old_id: str, new_id: str) -> None:
+        if old_id in store_overrides and new_id not in new_store:
+            new_store[new_id] = store_overrides[old_id]
+        if old_id in field_overrides and new_id not in new_field:
+            new_field[new_id] = dict(field_overrides[old_id])
+        if old_id in premium_only_ids:
+            new_premium.add(new_id)
+
+    for item_id in ids:
+        old_id = str(item_id).strip()
+        if not old_id:
+            continue
+        new_id = old_id
+        if old_id not in auto_by_id:
+            keys = _keys_for_approved_id(
+                old_id,
+                auto_by_id=auto_by_id,
+                field_overrides=field_overrides,
+            )
+            if not keys and old_id in prior_rows_by_id:
+                keys = claim_match_keys(prior_rows_by_id[old_id])
+            resolved = None
+            for key in keys:
+                resolved = key_to_auto_id.get(key)
+                if resolved:
+                    break
+            if resolved:
+                new_id = resolved
+            elif auto_items_all and old_id not in prior_rows_by_id:
+                continue
+        if new_id in seen_ids:
+            migrate_maps(old_id, new_id)
+            continue
+        seen_ids.add(new_id)
+        new_ids.append(new_id)
+        migrate_maps(old_id, new_id)
+
+    return new_ids, new_store, new_field, new_premium
+
+
+def parse_approved_put_payload(payload: dict) -> dict:
+    """Normalize admin approved PUT body into prepare_approved_document kwargs."""
+    ids = [str(item_id).strip() for item_id in payload.get("ids") or [] if str(item_id).strip()]
+    id_set = set(ids)
+    store_overrides: dict[str, str] = {}
+    for key, val in (payload.get("store_overrides") or {}).items():
+        k = str(key).strip()
+        v = str(val or "").strip().lower()
+        if k and v:
+            store_overrides[k] = v
+    field_overrides: dict[str, dict[str, str]] = {}
+    allowed_fields = {"title", "claim_url", "ends_at"}
+    for key, val in (payload.get("field_overrides") or {}).items():
+        k = str(key).strip()
+        if not k or not isinstance(val, dict):
+            continue
+        cleaned: dict[str, str] = {}
+        for field, field_val in val.items():
+            if field not in allowed_fields:
+                continue
+            text = str(field_val or "").strip()
+            if text:
+                cleaned[field] = text
+        if cleaned:
+            field_overrides[k] = cleaned
+    dismissed: list[str] = []
+    seen_dismissed: set[str] = set()
+    for item_id in payload.get("dismissed") or []:
+        d = str(item_id).strip()
+        if d and d not in id_set and d not in seen_dismissed:
+            dismissed.append(d)
+            seen_dismissed.add(d)
+    premium_only_ids: set[str] = set()
+    for item_id in payload.get("premium_only_ids") or []:
+        p = str(item_id).strip()
+        if p:
+            premium_only_ids.add(p)
+    return {
+        "ids": ids,
+        "store_overrides": store_overrides,
+        "field_overrides": field_overrides,
+        "premium_only_ids": premium_only_ids,
+        "dismissed": dismissed,
+    }
+
+
+def prepare_approved_document(
+    *,
+    ids: list[str],
+    store_overrides: dict[str, str],
+    field_overrides: dict[str, dict[str, str]],
+    premium_only_ids: set[str],
+    dismissed: list[str],
+    auto_items: list[dict],
+    prior_rows_by_id: dict[str, dict] | None = None,
+) -> dict:
+    """Re-key approved state and shape the on-disk approved.json document."""
+    rekeyed_ids, store, fields, premium = rekey_approved_state(
+        ids=ids,
+        store_overrides=store_overrides,
+        field_overrides=field_overrides,
+        premium_only_ids=premium_only_ids,
+        auto_items_all=auto_items,
+        prior_rows_by_id=prior_rows_by_id,
+    )
+    id_set = set(rekeyed_ids)
+    store = {k: v for k, v in store.items() if k in id_set}
+    premium_list = sorted(p for p in premium if p in id_set)
+    merged_fields = dict(field_overrides)
+    merged_fields.update(fields)
+    out: dict = {"ids": rekeyed_ids}
+    if store:
+        out["store_overrides"] = store
+    if merged_fields:
+        out["field_overrides"] = merged_fields
+    if dismissed:
+        out["dismissed"] = dismissed
+    if premium_list:
+        out["premium_only_ids"] = premium_list
+    return out
+
+
 def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:
     if not expired_ids or not path.is_file():
         return 0
@@ -1040,14 +1274,53 @@ def main() -> int:
     auto_items_all = _load_auto_items(AUTO_PATH)
     approved_ids = _load_approved_ids(APPROVED_PATH)
     dismissed_ids = _load_dismissed_ids(APPROVED_PATH)
+    premium_only_ids = _load_premium_only_ids(APPROVED_PATH)
     store_overrides = _load_store_overrides(APPROVED_PATH)
     field_overrides = _load_field_overrides(APPROVED_PATH)
+    orig_store_overrides = dict(store_overrides)
+    orig_field_overrides = {k: dict(v) for k, v in field_overrides.items()}
+    orig_premium_only_ids = set(premium_only_ids)
+    orig_approved_ids = set(approved_ids)
     # Snapshot the previously published rows BEFORE we overwrite the output, so an
     # approved claim that briefly drops out of the source feed can be carried
     # forward instead of silently vanishing.
     prior_published_rows = _load_prior_published_rows(
         [args.output, FALLBACK_PATH, free_claims_path()]
     )
+    rekeyed_ids, store_overrides, field_overrides, premium_only_ids = rekey_approved_state(
+        ids=sorted(approved_ids),
+        store_overrides=store_overrides,
+        field_overrides=field_overrides,
+        premium_only_ids=premium_only_ids,
+        auto_items_all=auto_items_all,
+        prior_rows_by_id=prior_published_rows,
+    )
+    approved_ids = set(rekeyed_ids)
+    approved_changed = (
+        approved_ids != orig_approved_ids
+        or store_overrides != orig_store_overrides
+        or field_overrides != orig_field_overrides
+        or premium_only_ids != orig_premium_only_ids
+    )
+    if not args.dry_run and approved_changed and APPROVED_PATH.is_file():
+        try:
+            appr_doc = json.loads(APPROVED_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            appr_doc = {}
+        appr_doc["ids"] = rekeyed_ids
+        if store_overrides:
+            appr_doc["store_overrides"] = store_overrides
+        else:
+            appr_doc.pop("store_overrides", None)
+        if field_overrides:
+            appr_doc["field_overrides"] = field_overrides
+        else:
+            appr_doc.pop("field_overrides", None)
+        if premium_only_ids:
+            appr_doc["premium_only_ids"] = sorted(premium_only_ids)
+        else:
+            appr_doc.pop("premium_only_ids", None)
+        safe_write_text(APPROVED_PATH, json.dumps(appr_doc, indent=2, ensure_ascii=False))
     now = datetime.now(UTC)
     auto_by_id = _auto_items_by_id(auto_items_all)
     approved_keys = _resolve_approved_keys(approved_ids, auto_items_all, field_overrides)
@@ -1063,6 +1336,8 @@ def main() -> int:
         approved_keys=approved_keys,
         now=now,
         dismissed_ids=dismissed_ids,
+        field_overrides=field_overrides,
+        field_overrides_by_key=field_by_key,
     )
     if store_overrides or store_by_key:
         _apply_store_overrides(
@@ -1118,6 +1393,12 @@ def main() -> int:
             f"source feed: {', '.join(str(c.get('id')) for c in carried)}"
         )
         items.extend(carried)
+
+    _apply_premium_only(
+        items,
+        premium_only_ids=premium_only_ids,
+        manual_items=manual_items,
+    )
 
     generated_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)

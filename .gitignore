@@ -65,6 +65,7 @@ dist/*
 !dist/.gitkeep
 dist/BAKLOG/
 dist/BAKLOG.exe
+release/
 
 .vercel
 

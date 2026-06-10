@@ -17,15 +17,14 @@ export const TIPS = [
   "Just bought a game? API connections can often take up to 24 hours to show it.",
   "Co-op data (online, couch, campaign) is hard to pin down. Spot something off? Let us know.",
   "There's more than one back-to-top button.",
+  "Buying through our affiliate links costs you nothing extra and helps keep BAKLOG running.",
   "Leaving your spotlight running helps us accrue ad revenue around the clock!",
-  "Can't afford to chip in? We get it - just leave your spotlight running and the ad revenue keeps us going.",
 ];
 
 // The spotlight/ad-revenue tips share a single rotation slot: they appear at the
 // same frequency as any other tip, alternating which message shows each time.
 export const AD_TIPS = [
   "Leaving your spotlight running helps us accrue ad revenue around the clock!",
-  "Can't afford to chip in? We get it - just leave your spotlight running and the ad revenue keeps us going.",
 ];
 const AD_SLOT = "\u0000ad-slot";
 const SELECT_POOL = [...TIPS.filter(t => !AD_TIPS.includes(t)), AD_SLOT];

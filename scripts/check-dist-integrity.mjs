@@ -15,6 +15,15 @@ if (!fs.existsSync(manifestPath)) {
 }
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const pkgVersion = JSON.parse(
+  fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
+).version;
+if (manifest.version && manifest.version !== pkgVersion) {
+  console.error(
+    `dist/manifest.json version ${manifest.version} != package.json ${pkgVersion} — run npm run build`,
+  );
+  process.exit(1);
+}
 const errors = [];
 
 for (const [key, val] of Object.entries(manifest)) {

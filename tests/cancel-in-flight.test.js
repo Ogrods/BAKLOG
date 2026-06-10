@@ -300,4 +300,66 @@ describe('cancelInFlightRuns server truth', () => {
     expect(posts).toHaveLength(2);
     vi.useRealTimers();
   });
+
+  it('claims auto-run backs off silently while an internal job holds the run slot', async () => {
+    let runPosts = 0;
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'claims',
+              label: 'Free',
+              metaKey: 'claims',
+              group: 'prices',
+              color: '#f97316',
+              cmd: 'fetch_free_claims.py',
+              available: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/runs') && method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({ active: null, queue: [], history: [] }),
+        };
+      }
+      if (u.includes('/api/run/claims') && method === 'POST') {
+        runPosts += 1;
+        return { ok: true, status: 202, json: async () => ({ run_id: 'claims-run' }) };
+      }
+      if (u.includes('/api/auth/status')) {
+        return { ok: true, json: async () => ({ providers: {} }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner, loadFetcherSources } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    await loadFetcherSources(true);
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'build-1', key: 'buildClaims', status: 'running' },
+      queue: [],
+      history: [],
+    });
+    expect(fetcherRunner.isQueueFull()).toBe(true);
+    await fetcherRunner.run('claims', { auto: true });
+    fetcherRunner.flushLinesNow();
+    const postsWhileBusy = fetchMock.mock.calls.filter(
+      c => String(c[0]).includes('/api/run/claims') && (c[1]?.method || 'GET').toUpperCase() === 'POST',
+    );
+    expect(postsWhileBusy).toHaveLength(0);
+    const panel = document.getElementById('fetcherRunLog');
+    const body = panel?.querySelector('[data-role="body"]');
+    expect(body?.textContent || '').not.toMatch(/queue full|re-syncing queue/i);
+
+    fetcherRunner.applyServerSnapshotInFlight({ active: null, queue: [], history: [] });
+    expect(fetcherRunner.isQueueFull()).toBe(false);
+    await fetcherRunner.run('claims', { auto: true });
+    expect(runPosts).toBe(1);
+  });
 });

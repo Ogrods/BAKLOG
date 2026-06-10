@@ -1830,7 +1830,7 @@ export const fetcherRunner = (() => {
     return runStateByKey.size;
   }
   function isQueueFull() {
-    return inFlightCount() >= MAX_IN_FLIGHT;
+    return inFlightCount() >= MAX_IN_FLIGHT || lastServerInFlight;
   }
   function waitForQueueSlot({ batchEpoch } = {}) {
     if (batchEpoch !== undefined && getCancelEpoch() !== batchEpoch) {
@@ -2396,12 +2396,14 @@ export const fetcherRunner = (() => {
     // Without this guard a fast double-click could land two POSTs before the
     // server's lock saw the first one as pending.
     if (isQueueFull()) {
-      ensurePanel(src);
-      logEvent(
-        'info',
-        `[${src.label}: queue full - a fetch is already running]`,
-      );
-      if (!auto) scrollPopoverModule('console');
+      if (!auto) {
+        ensurePanel(src);
+        logEvent(
+          'info',
+          `[${src.label}: queue full - a fetch is already running]`,
+        );
+        scrollPopoverModule('console');
+      }
       return false;
     }
     if (refresh && !src.supportsRefresh) {

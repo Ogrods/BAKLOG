@@ -172,6 +172,52 @@ describe("error-boundary ignored noise", () => {
   });
 });
 
+describe("error-boundary stale-chunk recovery", () => {
+  beforeEach(() => {
+    installWindow();
+    _resetForTests();
+    installGlobalErrorHandler();
+  });
+  afterEach(() => { teardownWindow(); });
+
+  it("swallows a stale dynamic-import failure and schedules a reload instead of toasting", () => {
+    const err = new Error(
+      "Failed to fetch dynamically imported module: http://127.0.0.1:8765/dist/js/chunks/sponsored-deals-Y7ODCHBG.js",
+    );
+    err.name = "TypeError";
+    reportError(err);
+    expect(getCapturedErrors().length).toBe(0);
+    expect(window.localStorage.getItem("baklog-error-log")).toBeNull();
+    // Reload guard timestamp is recorded so a second failure won't loop.
+    expect(window.sessionStorage.getItem("baklog-stale-chunk-reload")).not.toBeNull();
+  });
+
+  it("surfaces the failure when a reload already happened in the guard window", () => {
+    // Simulate: we just reloaded, but the chunk is genuinely still missing.
+    window.sessionStorage.setItem("baklog-stale-chunk-reload", String(Date.now()));
+    reportError(new Error("Failed to fetch dynamically imported module: /dist/js/chunks/x-ABC.js"));
+    expect(getCapturedErrors().length).toBe(1);
+  });
+
+  it("prunes stale-chunk + now-fixed errors from the persisted ring on install", () => {
+    const seeded = JSON.stringify([
+      { kind: "unhandledrejection", time: 1, message: "Failed to fetch dynamically imported module: /dist/js/chunks/sponsored-deals-Y7ODCHBG.js", stack: "", source: "", lineno: 0, colno: 0, name: "TypeError" },
+      { kind: "unhandledrejection", time: 2, message: "eff is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
+      { kind: "unhandledrejection", time: 3, message: "lastBarSummary is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
+      { kind: "error", time: 4, message: "cancelGlobalFetcherTailThrottle is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
+      { kind: "unhandledrejection", time: 5, message: "itadPendingAutoRun is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
+      { kind: "reported", time: 6, message: "still relevant", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
+    ]);
+    installWindow({ localStorageRaw: seeded });
+    _resetForTests();
+    window.localStorage.setItem("baklog-error-log", seeded);
+    installGlobalErrorHandler();
+    const bundle = buildBugBundle();
+    expect(bundle.errors.persisted.length).toBe(1);
+    expect(bundle.errors.persisted[0].message).toBe("still relevant");
+  });
+});
+
 describe("buildBugBundle shape", () => {
   beforeEach(() => {
     installWindow({ versionMeta: "9.9.9-test" });

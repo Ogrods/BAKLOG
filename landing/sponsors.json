@@ -1,4 +1,6 @@
 {
+  "version": 1,
+  "generated_at": null,
   "items": [
     {
       "id": "ad-spotlight-hero-emberfall",
@@ -70,29 +72,6 @@
       "release_year": 2025,
       "discount": 35,
       "price_base": 29.99
-    },
-    {
-      "id": "ad-feature-banner-emberfall",
-      "kind": "sponsor",
-      "title": "Emberfall",
-      "tagline": "Forge your legend in a dying world. A sprawling open-world action RPG where every ember you rekindle reshapes the map.",
-      "cta": "View the deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/hero-emberfall.webp",
-      "placements": "dash-feature-banner",
-      "priority": 1,
-      "enabled": true,
-      "network": "Cinderpeak Games",
-      "genres": [
-        "Action RPG",
-        "Open World"
-      ],
-      "steam_review_percent": 96,
-      "metacritic_score": 91,
-      "hltb_hours": 45,
-      "release_year": 2025,
-      "discount": 40,
-      "price_base": 39.99
     },
     {
       "id": "ad-dash-versus-dawnbanner",

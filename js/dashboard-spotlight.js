@@ -876,8 +876,9 @@ export function spotlightInnerHtml(g) {
       escapeHtml(statusLabel),
     ];
   const ad = g._spotlightAd;
-  const adBadge = ad
-    ? `<span class="sponsored-badge dash-spotlight-sponsored-badge" title="${escapeAttr(ad.disclosure === 'House' ? 'House promotion from BAKLOG' : 'Paid placement')}">${escapeHtml(ad.disclosure)}</span>`
+  const adIsHouse = String(ad?.kind || '').toLowerCase() === 'house';
+  const adBadge = ad && !adIsHouse
+    ? `<span class="sponsored-badge dash-spotlight-sponsored-badge" title="${escapeAttr('Paid placement')}">${escapeHtml(ad.disclosure)}</span>`
     : '';
   const adDismiss = ad && ad.id
     ? `<span class="sponsored-deal-dismiss dash-spotlight-dismiss" role="button" tabindex="0" data-action="sponsored-dismiss" data-sponsor-id="${escapeAttr(ad.id)}" title="Dismiss this slot" aria-label="Dismiss sponsored slot">&times;</span>`

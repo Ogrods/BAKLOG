@@ -51,8 +51,8 @@ CLAIMS_PREFS_KEYS = (
     "claimsAutoRefreshDisabled",
     "itadAutoRefreshIntervalMin",
     "itadAutoRefreshDisabled",
-    "hideSponsoredDeals",
     "autoFetchStale24h",
+    "shareAnonStats",
 )
 
 

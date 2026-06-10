@@ -3,6 +3,8 @@ import { displayCurrency, normalizeCurrencyCode } from './currency.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
 import {
   gameKey,
+  gameId,
+  gameStore,
   normalizeGame,
   normalizeNameForDedup,
   ratingValue,
@@ -281,10 +283,24 @@ export function dealStealsCardHtml(steals) {
 
 export function buildOwnedNormNames() {
   state.ownedNormNames = new Set();
+  state.ownedSteamAppids = new Set();
   for (const g of state.allGames) {
     if (state.crossStoreHiddenKeys.has(gameKey(g))) continue;
     const n = normalizeNameForDedup(g.name);
     if (n) state.ownedNormNames.add(n);
+    // Precompute owned Steam appids so isClaimOwned() is an O(1) lookup instead
+    // of scanning state.allGames per claim (the Claimable Now clear-lag path
+    // calls it ~5× per claim per dismiss). Mirror both appid resolutions used
+    // by isClaimOwned: g.appid??g.id for explicit steam rows, and gameId(g)
+    // (id-first) for the gameKey('steam:<id>') match.
+    if (g.store === 'steam') {
+      const a = g.appid ?? g.id;
+      if (a != null && a !== '') state.ownedSteamAppids.add(String(a));
+    }
+    if (gameStore(g) === 'steam') {
+      const gid = gameId(g);
+      if (gid != null && gid !== '') state.ownedSteamAppids.add(String(gid));
+    }
   }
 }
 

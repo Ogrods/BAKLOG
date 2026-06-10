@@ -8,10 +8,23 @@
 import { checkRateLimit } from "./_rate-limit.js";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const MAX_BODY_BYTES = 8 * 1024;
 
 function sanitizeEmail(raw) {
   if (typeof raw !== "string") return "";
   return raw.replace(/[\x00-\x1f\x7f]/g, "").trim();
+}
+
+// Never write raw signup emails to the platform logs. A short SHA-256 prefix is
+// enough to correlate duplicate submissions without storing PII in plaintext.
+async function emailLogTag(email) {
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
+    const hex = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+    return `sha256:${hex.slice(0, 8)}`;
+  } catch {
+    return "sha256:unknown";
+  }
 }
 function clientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -111,6 +124,11 @@ export default {
       });
     }
 
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > MAX_BODY_BYTES) {
+      return Response.json({ error: "Payload too large" }, { status: 413 });
+    }
+
     let body;
     try {
       body = await request.json();
@@ -137,7 +155,7 @@ export default {
     }
 
     const signupTime = new Date().toISOString();
-    console.log(`waitlist_signup\t${signupTime}\t${email}`);
+    console.log(`waitlist_signup\t${signupTime}\t${await emailLogTag(email)}`);
 
     try {
       await logToSupabase({ email, ip, time: signupTime });

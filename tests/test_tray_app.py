@@ -11,7 +11,7 @@ import socket
 import sys
 import time
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -66,39 +66,41 @@ def test_controller_start_spawns_and_waits(monkeypatch):
     calls: list[list[str]] = []
     port_seq = iter([False, False, True])
 
+    proc = MagicMock()
+    proc.poll.return_value = None
+    proc.pid = 4242
+    proc.returncode = None
+    proc.communicate.return_value = (b"", b"")
+
     def fake_popen(argv, **kwargs):
         calls.append(argv)
-        proc = MagicMock(spec=tray_app.subprocess.Popen)
-        proc.poll.return_value = None
         proc.args = argv
-        proc.pid = 4242
-        proc.returncode = None
-        proc.communicate.return_value = (b"", b"")
         return proc
 
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: next(port_seq, True))
-    monkeypatch.setattr(tray_app.subprocess, "Popen", fake_popen)
-    ctl = tray_app.ServerController()
-    assert ctl.start(wait_secs=1.0) is True
-    assert len(calls) == 1
-    ctl.proc = None
+    with patch.object(tray_app.subprocess, "Popen", fake_popen):
+        ctl = tray_app.ServerController()
+        assert ctl.start(wait_secs=1.0) is True
+        assert len(calls) == 1
+        ctl.proc = None
 
 
 def test_controller_start_fails_when_child_exits_early(monkeypatch):
+    proc = MagicMock()
+    proc.poll.return_value = 1
+    proc.pid = 4242
+    proc.returncode = 1
+    proc.communicate.return_value = (b"", b"")
+
     def fake_popen(*args, **kwargs):
-        proc = MagicMock(spec=tray_app.subprocess.Popen)
-        proc.poll.return_value = 1
         proc.args = args[0] if args else []
-        proc.pid = 4242
-        proc.returncode = 1
-        proc.communicate.return_value = (b"", b"")
         return proc
 
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
-    monkeypatch.setattr(tray_app.subprocess, "Popen", fake_popen)
-    ctl = tray_app.ServerController()
-    assert ctl.start(wait_secs=0.5) is False
-    assert ctl.proc is None
+    with patch.object(tray_app.subprocess, "Popen", fake_popen):
+        ctl = tray_app.ServerController()
+        assert ctl.start(wait_secs=0.5) is False
+        assert ctl.proc is None
 
 
 def test_controller_stop_requests_graceful_shutdown(monkeypatch):

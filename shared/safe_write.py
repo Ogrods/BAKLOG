@@ -80,15 +80,21 @@ def rotate_backup(
 
 
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Write ``text`` to ``path`` via tmp file + os.replace.
+    """Write ``text`` to ``path`` via tmp file + fsync + os.replace.
 
     Either the new file is fully on disk or the previous file is untouched.
+    The temp file is flushed and ``os.fsync``'d before the rename so a power
+    loss right after the replace can't leave a zero-length / truncated file
+    (the metadata-only rename otherwise outraces the data hitting the platter).
     The temp file is named ``<path>.tmp`` and is cleaned up on failure.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        tmp.write_text(text, encoding=encoding)
+        with open(tmp, "w", encoding=encoding) as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, path)
     except Exception:
         try:

@@ -91,6 +91,10 @@ export const personalStore = (() => {
     'picksCollapsed',
     'picksLimit',
     'viewSorts',
+    // Server doc can lag behind loadPrefs()'s on-by-default migration; stale
+    // rowHeroBackdrop:false must not undo the local toggle/migration each boot.
+    'rowHeroBackdrop',
+    'rowHeroBackdropDefaulted',
   ];
 
   function _nonBacklogCount(personalObj) {
@@ -113,9 +117,38 @@ export const personalStore = (() => {
     return false;
   }
 
+  // Claim dismissals (__dismissedClaims / __dismissedClaimKeys) are timestamp
+  // maps, not per-game records. A dismissal saved locally after the last
+  // successful server PUT would be lost under the shallow "__ key, server wins"
+  // rule, so the cleared claim reappears on the next reload. Union both sides
+  // instead, keeping the newer numeric timestamp when a key exists on both
+  // (non-numeric legacy values are preserved if that's all we have).
+  const DISMISSAL_MAP_KEYS = new Set(['__dismissedClaims', '__dismissedClaimKeys']);
+
+  function _mergeDismissalMaps(baseMap, incomingMap) {
+    const base = baseMap && typeof baseMap === 'object' && !Array.isArray(baseMap) ? baseMap : {};
+    const incoming = incomingMap && typeof incomingMap === 'object' && !Array.isArray(incomingMap) ? incomingMap : {};
+    const out = { ...base };
+    for (const [key, ts] of Object.entries(incoming)) {
+      if (!(key in out)) { out[key] = ts; continue; }
+      const a = Number(out[key]);
+      const b = Number(ts);
+      if (Number.isFinite(a) && Number.isFinite(b)) {
+        if (b > a) out[key] = ts;
+      } else if (!Number.isFinite(a) && Number.isFinite(b)) {
+        out[key] = ts;
+      }
+    }
+    return out;
+  }
+
   function _mergePersonalPreferMeaningful(basePersonal, incomingPersonal) {
     const out = { ...(basePersonal || {}) };
     for (const [key, rec] of Object.entries(incomingPersonal || {})) {
+      if (DISMISSAL_MAP_KEYS.has(key)) {
+        out[key] = _mergeDismissalMaps(out[key], rec);
+        continue;
+      }
       if (String(key).startsWith('__')) {
         if (!(key in out)) out[key] = rec;
         continue;

@@ -1,9 +1,10 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
 import { isAccountAuthMode, isPro } from './auth-gate.js';
 import { isPageHidden, registerPausable } from './visibility.js';
-import { escapeAttr, escapeHtml } from './dom-util.js';
+import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
+import { startMetrics, stopMetrics } from './anon-metrics.js';
 import { savePrefs } from './prefs.js';
 import { state } from './state.js';
 import { storeLogoHtml } from './store-logos.js';
@@ -837,8 +838,10 @@ function restoreConnNoteFocus(focusState, root) {
 function renderConnPrefs() {
   const onConnect = document.getElementById('autoFetchOnConnectToggle');
   const stale24h = document.getElementById('autoFetchStale24hToggle');
+  const shareStats = document.getElementById('shareAnonStatsToggle');
   if (onConnect) onConnect.checked = state.prefs.autoFetchOnConnect !== false;
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
+  if (shareStats) shareStats.checked = state.prefs.shareAnonStats === true;
 
   const note = document.getElementById('bgRefreshPlanNote');
   if (note) {
@@ -1139,6 +1142,11 @@ function wireGridEvents() {
     } else if (ev.target.id === 'autoFetchStale24hToggle') {
       state.prefs.autoFetchStale24h = ev.target.checked;
       savePrefs();
+    } else if (ev.target.id === 'shareAnonStatsToggle') {
+      state.prefs.shareAnonStats = ev.target.checked;
+      savePrefs();
+      if (ev.target.checked) startMetrics();
+      else stopMetrics();
     }
   });
 
@@ -1553,7 +1561,10 @@ export function showReconnectBanner(providers) {
 
 }
 
-
+export function clearReconnectBanner(provider) {
+  if (!provider) return;
+  if (reconnectProviders.delete(provider)) renderReconnectBanner();
+}
 
 function renderReconnectBanner() {
 
@@ -1778,6 +1789,14 @@ async function startEpicBrowserOAuth() {
   if (!res.ok || !data.url) {
 
     if (log) log.textContent = data.error || `Could not start Epic sign-in (${res.status})`;
+
+    return;
+
+  }
+
+  if (!isSafeHttpUrl(data.url)) {
+
+    if (log) log.textContent = 'Epic returned an unexpected sign-in URL; aborting.';
 
     return;
 
@@ -2301,10 +2320,6 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
 
   _selectedKey = groupRepFor(provider);
 
-  // #region agent log
-  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'connections.js:2302',message:'reconnectProvider entry',data:{provider,selectedKey:_selectedKey,tabExists:!!document.querySelector('.view-tab[data-view="connections"]'),inSnapshot:getAuthStatusSnapshot().some(x=>x.key===provider)},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-  // #endregion
-
   document.querySelector('.view-tab[data-view="connections"]')?.click();
 
   try {
@@ -2316,10 +2331,6 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
     renderConnections();
 
   }
-
-  // #region agent log
-  try { fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1b04bd'},body:JSON.stringify({sessionId:'1b04bd',hypothesisId:'B',location:'connections.js:2314',message:'reconnectProvider after refresh',data:{selectedKey:_selectedKey,activeView:(typeof state!=='undefined'&&state)?state.activeView:null,cardPresent:!!document.querySelector('.conn-card')},timestamp:Date.now()})}).catch(()=>{}); } catch(_) {}
-  // #endregion
 
   // When navigating in from a dashboard chip/affordance we only want to tab
   // over to the right card so the user can choose - never auto-open a sign-in

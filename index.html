@@ -115,7 +115,28 @@
     <header class="app-header mb-4">
       <div class="app-header-row flex flex-wrap items-center gap-x-4 gap-y-2">
         <div id="brandMark" class="app-header-brand flex items-center gap-2 shrink-0" title="BAKLOG - cross-store backlog; data stays on this device">
-          <span class="brand-logo-mark shrink-0" aria-hidden="true"></span>
+          <span class="brand-logo-mark shrink-0" aria-hidden="true">
+            <svg viewBox="2 24 96 52" role="img" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient id="brandMarkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#fbbf24"/>
+                  <stop offset="55%" stop-color="#f97316"/>
+                  <stop offset="100%" stop-color="#e2502a"/>
+                </linearGradient>
+                <mask id="brandKnobs" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+                  <rect width="100" height="100" fill="#fff"/>
+                  <circle cx="14" cy="64" r="8" fill="#000"/>
+                  <circle cx="64" cy="64" r="8" fill="#000"/>
+                  <circle cx="39" cy="36" r="8" fill="#000"/>
+                </mask>
+              </defs>
+              <g class="brand-logo-pills" mask="url(#brandKnobs)">
+                <rect x="2" y="52" width="46" height="24" rx="12" ry="12"/>
+                <rect x="52" y="52" width="46" height="24" rx="12" ry="12"/>
+                <rect x="27" y="24" width="46" height="24" rx="12" ry="12"/>
+              </g>
+            </svg>
+          </span>
           <h1 class="brand-wordmark text-2xl md:text-3xl font-bold text-sky-400 tracking-wider leading-none whitespace-nowrap m-0">BAKLOG</h1>
           <span class="brand-beta" aria-label="Beta">Beta</span>
         </div>
@@ -195,8 +216,8 @@
           "Just bought a game? API connections can often take up to 24 hours to show it.",
           "Co-op data (online, couch, campaign) is hard to pin down. Spot something off? Let us know.",
           "There's more than one back-to-top button.",
+          "Buying through our affiliate links costs you nothing extra and helps keep BAKLOG running.",
           "Leaving your spotlight running helps us accrue ad revenue around the clock!",
-          "Can't afford to chip in? We get it - just leave your spotlight running and the ad revenue keeps us going.",
         ];
         var el = document.getElementById("bootLoadingTip");
         if (el && tips.length) {
@@ -232,6 +253,10 @@
         <label class="fh-toggle" title="While BAKLOG is open - including minimized or unfocused - quietly refresh any store whose data is older than 24 hours, one store at a time (~30 min apart). Does not run while fully closed.">
           <input id="autoFetchStale24hToggle" type="checkbox" class="rounded" checked />
           Auto-refresh stores older than 24h
+        </label>
+        <label class="fh-toggle" title="Send anonymous aggregate counts (active sessions, sponsored-slot impressions and clicks) to help fund BAKLOG. No library data, no per-game telemetry, nothing about you leaves your machine beyond these totals. Off by default.">
+          <input id="shareAnonStatsToggle" type="checkbox" class="rounded" />
+          Share anonymous usage counts (helps fund BAKLOG)
         </label>
         <p id="bgRefreshPlanNote" class="conn-prefs-note" hidden></p>
       </div>
@@ -372,18 +397,20 @@
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems" data-pick-view="library" title="High-rated backlog games with few Steam reviews">Hidden Gems</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo" data-pick-view="library" title="Started but unfinished - pick up where you left off">Return To</button>
         <button class="pick-tab px-2 py-1 rounded border border-emerald-700/60 text-xs text-emerald-300" data-tab="wishlistDeals" data-pick-view="wishlist" title="Best deals on your wishlist (ITAD + Steam)">Wishlist Deals</button>
-        <span class="text-xs text-slate-300 ml-auto flex items-center gap-1">Show:
-          <span id="picksLimitGroup" class="inline-flex rounded border border-slate-600 overflow-hidden" role="group" aria-label="Number of picks to show">
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="16" title="Show 16 pick cards">16</button>
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="24" title="Show 24 pick cards">24</button>
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="48" title="Show 48 pick cards">48</button>
-            <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700" data-limit="96" title="Show 96 pick cards">96</button>
+        <div class="ml-auto flex flex-wrap items-center gap-2">
+          <label id="quickWinMaxWrap" class="text-xs text-slate-300">Quick-win max hours:
+            <input id="quickWinMax" type="range" min="2" max="40" value="15" class="align-middle w-24" title="Max HLTB hours counted as a quick win" />
+            <span id="quickWinMaxVal" class="inline-block text-right tabular-nums" style="min-width:2ch">15</span>
+          </label>
+          <span class="text-xs text-slate-300 flex items-center gap-1">Show:
+            <span id="picksLimitGroup" class="inline-flex rounded border border-slate-600 overflow-hidden" role="group" aria-label="Number of picks to show">
+              <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="16" title="Show 16 pick cards">16</button>
+              <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="24" title="Show 24 pick cards">24</button>
+              <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700 border-r border-slate-600" data-limit="48" title="Show 48 pick cards">48</button>
+              <button type="button" class="picks-limit-btn px-2 py-0.5 text-xs bg-slate-700" data-limit="96" title="Show 96 pick cards">96</button>
+            </span>
           </span>
-        </span>
-        <label id="quickWinMaxWrap" class="text-xs text-slate-300">Quick-win max hours:
-          <input id="quickWinMax" type="range" min="2" max="40" value="15" class="align-middle w-24" title="Max HLTB hours counted as a quick win" />
-          <span id="quickWinMaxVal" class="inline-block text-right tabular-nums" style="min-width:2ch">15</span>
-        </label>
+        </div>
         <span id="pickMeta" class="text-xs text-slate-400"></span>
       </div>
       <div id="picksContainer" class="p-3">
@@ -392,6 +419,7 @@
     </section>
 
     <div id="wishlistDealRadar" class="dash-wishlist-stats-target hidden grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4"></div>
+    <div id="viewHouseSlot" class="view-house-slot dash-house-slot hidden mb-4"></div>
 
     <section id="toolbarSection" class="bg-slate-800 rounded-lg p-3 mb-4 space-y-2">
       <div class="toolbar-row flex flex-wrap gap-2 items-center">
@@ -461,10 +489,12 @@
           </div>
         </div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB length (backlog)</h3><div class="dash-chart-wrap"><canvas id="chartHltbHist"></canvas></div></div>
+        <div id="dashboardFeatureBanner" class="dash-feature-banner-slot hidden"></div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Releases by year <span class="text-xs font-normal text-slate-400">area + 3-yr rolling average</span></h3><div class="dash-chart-wrap tall"><canvas id="chartReleases"></canvas><div id="chartReleasesEraTooltip" class="dash-era-tooltip" hidden></div></div></div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB vs Steam rating</h3><div class="dash-chart-wrap tall"><canvas id="chartScatter"></canvas><div id="chartScatterTooltip" class="dash-scatter-cursor-tip" hidden></div></div><div id="chartScatterList" class="dash-scatter-list" role="region" aria-label="Scatter cluster inspector" aria-expanded="false"></div></div>
         <div id="dashboardCoopSpotlight" class="dash-card"></div>
         <div id="dashboardWishlistStats" class="dash-wishlist-stats-target grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+        <div id="dashboardHouseSlot" class="dash-house-slot hidden mb-4"></div>
         <div id="dashboardPicksRow" class="dash-picks-row no-itch">
           <div id="dashboardSponsoredPick" class="dash-sponsored-pick-slot hidden"></div>
           <div class="dash-card dash-picks-versus" id="dashPicksVersusCard">

@@ -112,6 +112,19 @@ def collect_claims(
     return deduped, counts
 
 
+def _load_prior_source_counts(output: Path) -> dict[str, int]:
+    if not output.is_file():
+        return {}
+    try:
+        doc = json.loads(output.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    raw = doc.get("sources") or {}
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): int(v) for k, v in raw.items() if str(k).strip()}
+
+
 def _load_existing_items(output: Path) -> tuple[dict[str, dict], int]:
     """Return ({id: row}, total_row_count) from a prior auto feed, if present."""
     existing_by_id: dict[str, dict] = {}
@@ -129,6 +142,20 @@ def _load_existing_items(output: Path) -> tuple[dict[str, dict], int]:
             if row_id:
                 existing_by_id[row_id] = row
     return existing_by_id, count
+
+
+def _stamp_first_seen(
+    items: list[dict],
+    existing_by_id: dict[str, dict],
+    fetched_at: str,
+) -> None:
+    """Set per-item first_seen: preserve the oldest stamp, else stamp this fetch."""
+    for item in items:
+        item_id = str(item.get("id") or "").strip()
+        prior = item.get("first_seen")
+        if not prior and item_id:
+            prior = (existing_by_id.get(item_id) or {}).get("first_seen")
+        item["first_seen"] = prior or fetched_at
 
 
 def main() -> int:
@@ -163,6 +190,7 @@ def main() -> int:
         sources = {args.source}
 
     items, counts = collect_claims(sources, stats=stats)
+    fetched_at = datetime.now(UTC).isoformat()
 
     existing_by_id, prior_count = _load_existing_items(args.output)
     if existing_by_id:
@@ -170,6 +198,29 @@ def main() -> int:
             carry_claim_enrichment(item, existing_by_id.get(str(item.get("id") or "").strip()))
             for item in items
         ]
+        # A source that raised (network/parse hiccup) is absent from `counts`,
+        # unlike a source that genuinely returned 0 (key present, value 0). When
+        # at least one other source succeeded, carry that failed source's prior
+        # rows forward so a transient single-source outage doesn't silently wipe
+        # its claims from the feed (and the admin editor). Mirrors the published
+        # feed carry-forward in build_free_claims.py.
+        failed_sources = {s for s in sources if s not in counts}
+        if failed_sources and counts:
+            present_ids = {str(it.get("id") or "").strip() for it in items}
+            carried = [
+                row
+                for row in existing_by_id.values()
+                if str(row.get("source") or "") in failed_sources
+                and str(row.get("id") or "").strip() not in present_ids
+            ]
+            if carried:
+                stats.warn(
+                    f"carried forward {len(carried)} item(s) from failed source(s): "
+                    f"{', '.join(sorted(failed_sources))}"
+                )
+                items.extend(carried)
+
+    _stamp_first_seen(items, existing_by_id, fetched_at)
 
     # Refuse to clobber a good feed with nothing (e.g. every source failed) —
     # mirrors the library fetcher exit-2 contract.
@@ -181,6 +232,21 @@ def main() -> int:
     )
     if code is not None:
         return stats.finish("fetch_claim_sources", t0, exit_code=code)
+
+    prior_sources = set(_load_prior_source_counts(args.output).keys())
+    vanished_sources = prior_sources - set(counts.keys())
+    if vanished_sources:
+        present_sources = {str(it.get("source") or "").strip() for it in items if isinstance(it, dict)}
+        unrecovered = vanished_sources - present_sources
+        for src in sorted(vanished_sources):
+            stats.warn(f"source {src} absent from fetch counts (was in prior feed)")
+        if unrecovered and not args.allow_drift:
+            stats.error(
+                f"source(s) disappeared from fetch with no recovered rows: "
+                f"{', '.join(sorted(unrecovered))}. "
+                "Re-run with --allow-drift if this drop is real."
+            )
+            return stats.finish("fetch_claim_sources", t0, exit_code=3)
 
     # Refuse a suspicious shrink vs the prior feed (partial source outage) so a
     # half-collected run can't silently halve the published claims (exit 3).
@@ -194,7 +260,6 @@ def main() -> int:
             )
             return stats.finish("fetch_claim_sources", t0, exit_code=3)
 
-    fetched_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
     payload = {
         "fetched_at": fetched_at,

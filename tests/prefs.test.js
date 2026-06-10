@@ -2,7 +2,7 @@
  * Tests for js/prefs.js — persisted prefs load/migrate and per-view sort.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
 import { state, PREFS_KEY } from '../js/state.js';
 import { prefsStorageKey } from '../js/profiles.js';
 import {
@@ -10,6 +10,7 @@ import {
   loadSessionPrefs,
   getSavedSortForView,
   persistCurrentSort,
+  savePrefs,
   VIEW_SORT_DEFAULTS,
 } from '../js/prefs.js';
 
@@ -19,6 +20,31 @@ beforeEach(() => {
   state.activeView = 'library';
   state.sortKey = 'name';
   state.sortDir = 1;
+});
+
+describe('savePrefs quota handling', () => {
+  let setItemSpy;
+  let warn;
+
+  beforeEach(() => {
+    setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      const err = new Error('quota');
+      err.name = 'QuotaExceededError';
+      throw err;
+    });
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    setItemSpy.mockRestore();
+    warn.mockRestore();
+  });
+
+  it('does not throw when localStorage write exceeds quota', () => {
+    state.prefs = { picksLimit: 8 };
+    expect(() => savePrefs()).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+  });
 });
 
 describe('loadPrefs', () => {
@@ -82,6 +108,21 @@ describe('loadPrefs', () => {
     expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(25);
     localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 'nope' }));
     expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(15);
+  });
+
+  it('flips legacy rowHeroBackdrop=false on once for users predating the default', () => {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ rowHeroBackdrop: false }));
+    const p = loadPrefs();
+    expect(p.rowHeroBackdrop).toBe(true);
+    expect(p.rowHeroBackdropDefaulted).toBe(true);
+  });
+
+  it('respects a deliberate rowHeroBackdrop=false once the marker is set', () => {
+    localStorage.setItem(
+      prefsStorageKey(),
+      JSON.stringify({ rowHeroBackdrop: false, rowHeroBackdropDefaulted: true }),
+    );
+    expect(loadPrefs().rowHeroBackdrop).toBe(false);
   });
 
   it('clamps claimsAutoRefreshIntervalMin to 30-360 and snaps to step 30', () => {

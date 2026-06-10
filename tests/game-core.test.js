@@ -35,6 +35,9 @@ import {
   landscapeArtCandidates,
   spotlightArtCandidates,
   steamLibraryHeroUrl,
+  findGameByKey,
+  rebuildGameKeyIndex,
+  invalidateTitleKeyIndex,
 } from '../js/game-core.js';
 import { state } from '../js/state.js';
 
@@ -243,6 +246,65 @@ describe('recomputeCrossStoreHidden — hidden keys', () => {
     ];
     recomputeCrossStoreHidden();
     expect(state.crossStoreHiddenKeys.size).toBe(0);
+  });
+});
+
+describe('findGameByKey (versioned index)', () => {
+  let savedAllGames;
+  let savedWishlistGames;
+  let savedItchGames;
+
+  beforeEach(() => {
+    savedAllGames = state.allGames;
+    savedWishlistGames = state.wishlistGames;
+    savedItchGames = state.itchGames;
+    state.allGames = [];
+    state.wishlistGames = [];
+    state.itchGames = [];
+    invalidateTitleKeyIndex();
+  });
+
+  afterEach(() => {
+    state.allGames = savedAllGames;
+    state.wishlistGames = savedWishlistGames;
+    state.itchGames = savedItchGames;
+    invalidateTitleKeyIndex();
+  });
+
+  it('looks up games across library, wishlist, and itch catalogs', () => {
+    state.allGames = [{ store: 'steam', id: 1, name: 'A' }];
+    state.wishlistGames = [{ store: 'wishlist', id: 'w1', name: 'B' }];
+    state.itchGames = [{ store: 'itch', id: 'i1', name: 'C' }];
+    expect(findGameByKey('steam:1')?.name).toBe('A');
+    expect(findGameByKey('wishlist:w1')?.name).toBe('B');
+    expect(findGameByKey('itch:i1')?.name).toBe('C');
+    expect(findGameByKey('steam:999')).toBe(null);
+  });
+
+  it('library copy wins over wishlist/itch for the same key', () => {
+    state.allGames = [{ store: 'steam', id: 5, name: 'Library Copy' }];
+    state.wishlistGames = [{ store: 'steam', id: 5, name: 'Wishlist Copy' }];
+    expect(findGameByKey('steam:5')?.name).toBe('Library Copy');
+  });
+
+  it('refreshes automatically when the catalog length fingerprint changes', () => {
+    state.allGames = [{ store: 'steam', id: 1, name: 'A' }];
+    expect(findGameByKey('steam:1')?.name).toBe('A');
+    state.allGames = [
+      { store: 'steam', id: 1, name: 'A' },
+      { store: 'steam', id: 2, name: 'D' },
+    ];
+    expect(findGameByKey('steam:2')?.name).toBe('D');
+  });
+
+  it('rebuildGameKeyIndex picks up same-length content swaps', () => {
+    state.allGames = [{ store: 'steam', id: 1, name: 'Old' }];
+    expect(findGameByKey('steam:1')?.name).toBe('Old');
+    // Same length: the fingerprint alone wouldn't notice the replacement.
+    state.allGames = [{ store: 'steam', id: 7, name: 'New' }];
+    rebuildGameKeyIndex();
+    expect(findGameByKey('steam:7')?.name).toBe('New');
+    expect(findGameByKey('steam:1')).toBe(null);
   });
 });
 

@@ -219,6 +219,35 @@ describe('personalStore.prepareForProfileSwitch', () => {
     });
   });
 
+  it('keeps local rowHeroBackdrop over stale server false on init', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url === '/api/personal') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: { rowHeroBackdrop: false },
+              manual: [],
+            }),
+          };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    state.prefs = {
+      activeView: 'library',
+      rowHeroBackdrop: true,
+      rowHeroBackdropDefaulted: true,
+    };
+    await personalStore.init();
+    expect(state.prefs.rowHeroBackdrop).toBe(true);
+    expect(state.prefs.rowHeroBackdropDefaulted).toBe(true);
+  });
+
   it('treats libraryFirstSeen-only server doc as meaningful (applies without migration)', async () => {
     vi.stubGlobal(
       'fetch',
@@ -244,5 +273,49 @@ describe('personalStore.prepareForProfileSwitch', () => {
     expect(result.pendingMigration).toBeNull();
     expect(result.migrated).toBe(true);
     expect(state.libraryFirstSeenByKey).toEqual({ 'steam:9': 9000 });
+  });
+
+  it('unions local + server claim dismissals on init instead of letting server win', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: {
+                __dismissedClaims: { 'epic-foo': 1000, 'shared': 1000 },
+                __dismissedClaimKeys: { 'title:foo': 1000 },
+              },
+              prefs: {},
+              manual: [],
+            }),
+          };
+        }
+        if (url === '/api/personal' && opts?.method === 'PUT') {
+          return { ok: true, json: async () => JSON.parse(opts.body) };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    // Local dismissals saved after the last server PUT (e.g. cleared this session).
+    state.personal = {
+      __dismissedClaims: { 'gog-bar': 2000, 'shared': 3000 },
+      __dismissedClaimKeys: { 'title:bar': 2000 },
+    };
+    await personalStore.init();
+
+    expect(state.personal.__dismissedClaims).toEqual({
+      'epic-foo': 1000,
+      'gog-bar': 2000,
+      // Shared key keeps the newer timestamp from local.
+      'shared': 3000,
+    });
+    expect(state.personal.__dismissedClaimKeys).toEqual({
+      'title:foo': 1000,
+      'title:bar': 2000,
+    });
   });
 });

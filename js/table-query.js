@@ -23,6 +23,7 @@ const HLTB_BUCKETS_QUERY = [
 const WORKER_THRESHOLD = 500;
 let _worker = null;
 let _workerGen = 0;
+let _workerFailed = false;
 
 export function escapeAttr(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -452,12 +453,29 @@ export function queryGames(payload) {
   return filtered;
 }
 
+/** Dev: sibling js/; built chunks live under dist/js/chunks/ so use fixed dist/js path. */
+function tableQueryWorkerUrl() {
+  if (import.meta.url.includes('/dist/js/')) {
+    return '/dist/js/table-query.worker.js';
+  }
+  return new URL('./table-query.worker.js', import.meta.url);
+}
+
+function invalidateWorker() {
+  _worker = null;
+  _workerFailed = true;
+}
+
 function getWorker() {
+  if (_workerFailed) return null;
   if (_worker) return _worker;
   try {
-    _worker = new Worker(new URL('./table-query.worker.js', import.meta.url), { type: 'module' });
+    _worker = new Worker(tableQueryWorkerUrl(), { type: 'module' });
+    _worker.addEventListener('error', () => {
+      invalidateWorker();
+    }, { once: true });
   } catch {
-    _worker = null;
+    invalidateWorker();
   }
   return _worker;
 }
@@ -482,7 +500,7 @@ export function queryGamesAsync(state, params) {
       playedTitleNorms: [...state.playedTitleNorms],
     },
   };
-  if (source.length < WORKER_THRESHOLD) {
+  if (source.length < WORKER_THRESHOLD || _workerFailed) {
     return Promise.resolve(queryGames({
       source,
       ctx: {
@@ -511,6 +529,7 @@ export function queryGamesAsync(state, params) {
     const onError = (err) => {
       worker.removeEventListener('message', onMessage);
       worker.removeEventListener('error', onError);
+      invalidateWorker();
       reject(err);
     };
     worker.addEventListener('message', onMessage);

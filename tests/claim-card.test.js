@@ -62,6 +62,14 @@ describe('claimableModuleMarkup', () => {
     expect(html).not.toContain('claim-attribution');
   });
 
+  it('keeps a lone claim as a row (not the hero) when allowHero is false', () => {
+    const claim = { id: 'epic-foo', store: 'epic', title: 'Foo', claim_url: 'https://e/x', source: 'epic', header_image: 'https://cdn/x.jpg' };
+    expect(claimableModuleMarkup([claim])).toContain('claim-hero-card');
+    const collapsed = claimableModuleMarkup([claim], { allowHero: false });
+    expect(collapsed).not.toContain('claim-hero-card');
+    expect(collapsed).toContain('claim-rows');
+  });
+
   it('caps visible rows and shows a "+N more" toggle', () => {
     const items = Array.from({ length: 7 }, (_, i) => ({
       id: `c${i}`, store: 'epic', title: `Game ${i}`, claim_url: `https://e/${i}`,
@@ -108,6 +116,15 @@ describe('dedupe + sort (getVisibleClaims internals)', () => {
       { id: 'b', store: 'steam', title: 'Game', claim_url: 'https://s/b', steam_appid: 42, source: 'epic' },
     ];
     expect(dedupeClaims(items)).toHaveLength(1);
+  });
+
+  it('collapses title-only row when a sibling carries the same steam_appid', () => {
+    const items = [
+      { id: 'a', store: 'steam', title: 'Portal 2', claim_url: 'https://s/a', steam_appid: 620, source: 'epic' },
+      { id: 'b', store: 'steam', title: 'Portal 2 (Steam) Giveaway', claim_url: 'https://s/b', source: 'gamerpower' },
+    ];
+    expect(dedupeClaims(items)).toHaveLength(1);
+    expect(dedupeClaims(items)[0].source).toBe('epic');
   });
 
   it('sorts by ends_at then title', () => {

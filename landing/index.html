@@ -33,7 +33,9 @@
   <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/space-grotesk-latin.woff2" />
   <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/dm-sans-latin.woff2" />
   <link rel="stylesheet" href="demo.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <!-- Self-hosted Chart.js (pinned 4.4.1) — no third-party CDN dependency or
+       supply-chain exposure. Update by re-downloading the same version. -->
+  <script src="vendor/chart.umd.min.js" defer></script>
   <script src="marquee-speed.js" defer></script>
   <script src="demo.js" defer></script>
   <script src="main.js" defer></script>

@@ -40,7 +40,7 @@ export function loadPrefs() {
     storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16,
     dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false,
     dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {},
-    hideSponsoredDeals: false,
+    shareAnonStats: false,
     fetcherHealthShowConnected: true, fetcherHealthShowStaleMissing: true,
     autoEnrichOnAdd: true, coopFilterMode: "off", fetcherCollapsed: true,
     itadAutoRefreshIntervalMin: 15,
@@ -69,6 +69,7 @@ export function loadPrefs() {
   // Migrated to state.sessionPrefs (never persists). If old persisted values
   // are found, drop them so they don't pollute future saves.
   delete merged.crossStoreDedup;
+  delete merged.hideSponsoredDeals;
   delete merged.itchHideNonGames;
   delete merged.tagFilters;
   delete merged.tagFilterMode;
@@ -88,6 +89,11 @@ export function loadPrefs() {
   }
   if (!merged.connectionNotes || typeof merged.connectionNotes !== 'object' || Array.isArray(merged.connectionNotes)) {
     merged.connectionNotes = {};
+  }
+  // One-time flip for users whose prefs predate the on-by-default change.
+  if (!merged.rowHeroBackdropDefaulted) {
+    merged.rowHeroBackdrop = true;
+    merged.rowHeroBackdropDefaulted = true;
   }
   migrateColumnPrefs(merged);
   merged.picksCollapsed = merged.picksCollapsed === true;
@@ -146,7 +152,15 @@ export function syncFilterDomFromState() {
 }
 
 export function savePrefs() {
-  localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
+  try {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
+  } catch (err) {
+    // Quota exhaustion / private-mode write blocks shouldn't break the UI; the
+    // server-side personal doc PUT (via personalStore.notify) remains the
+    // durable copy of prefs.
+    const quota = err && (err.name === 'QuotaExceededError' || err.code === 22);
+    console.warn(`[prefs] localStorage write failed${quota ? ' (quota exceeded)' : ''}`, err);
+  }
   personalStore.notify();
 }
 

@@ -7,7 +7,8 @@ import { switchView } from './filters-ui.js';
 import { claimsSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
 import { syncCoverFits } from './covers.js';
-import { getEligibleSponsors, sponsoredClaimCardHtml } from './sponsored-deals.js';
+import { getAdsForLocation, sponsoredClaimCardHtml } from './sponsored-deals.js';
+import { isPro } from './auth-gate.js';
 import {
   stripClaimTitleDecorations,
   dedupeClaims,
@@ -30,9 +31,16 @@ export {
 export const CLAIMS_HOSTED_URL = 'https://baklog.app/free-claims.json';
 const FALLBACK_PATH = 'curated/free_claims.fallback.json';
 const MAX_VISIBLE = 5;
+// Dismissals are kept indefinitely unless stale — never prune because a claim
+// is absent from the current feed snapshot (feed sources flap and ids churn).
+const DISMISSAL_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 let _claimsVisibleCount = MAX_VISIBLE;
 let _readOnlyPollTimer = null;
+// The big hero card is only for a feed that loaded with a single claim. Once the
+// user dismisses any claim from a longer list, the last survivor must stay a row
+// rather than inflating into the hero card. Reset whenever a fresh feed loads.
+let _claimDismissedSinceLoad = false;
 
 export function getClaimsEndpoint() {
   return (document.querySelector('meta[name="baklog-claims-endpoint"]')?.content)
@@ -70,6 +78,7 @@ function isClaimDismissed(c) {
 
 export function dismissClaim(id) {
   if (!id) return;
+  _claimDismissedSinceLoad = true;
   if (!state.personal.__dismissedClaims) state.personal.__dismissedClaims = {};
   state.personal.__dismissedClaims[id] = Date.now();
   const claim = findClaimById(id);
@@ -80,7 +89,7 @@ export function dismissClaim(id) {
     for (const k of dedupKeys) state.personal.__dismissedClaimKeys[k] = now;
   }
   savePersonal();
-  pruneDismissedClaims(state.claimableFeed?.items || []);
+  pruneDismissedClaims();
   applyVisibleClaims();
   renderClaimableModule();
   updateClaimableBanner();
@@ -111,24 +120,21 @@ export function restoreClaim(id) {
   else openHiddenClaimsModal();
 }
 
-function pruneDismissedClaims(feedItems) {
-  // An empty feed is indistinguishable from a failed / mid-regeneration load,
-  // so never prune against it — doing so would wipe every dismissal whenever the
-  // claims feed is briefly unavailable at boot (the cleared-overnight bug).
-  if (!feedItems || feedItems.length === 0) return;
-  const feedIds = new Set(feedItems.map(c => c?.id).filter(Boolean));
-  const feedKeys = new Set(feedItems.flatMap(c => claimDedupKeys(c)).filter(Boolean));
+function pruneDismissedClaims() {
+  const cutoff = Date.now() - DISMISSAL_TTL_MS;
   let changed = false;
   const dismissed = dismissedClaimsMap();
-  for (const id of Object.keys(dismissed)) {
-    if (!feedIds.has(id)) {
+  for (const [id, ts] of Object.entries(dismissed)) {
+    const n = Number(ts);
+    if (Number.isFinite(n) && n > 0 && n < cutoff) {
       delete dismissed[id];
       changed = true;
     }
   }
   const dismissedKeys = dismissedClaimKeysMap();
-  for (const k of Object.keys(dismissedKeys)) {
-    if (!feedKeys.has(k)) {
+  for (const [k, ts] of Object.entries(dismissedKeys)) {
+    const n = Number(ts);
+    if (Number.isFinite(n) && n > 0 && n < cutoff) {
       delete dismissedKeys[k];
       changed = true;
     }
@@ -156,8 +162,15 @@ export function isClaimOwned(claim) {
   let appidMatched = false;
   if (appid != null) {
     const sid = String(appid);
-    if (state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)) appidMatched = true;
-    else if (state.allGames.some(g => gameKey(g) === `steam:${sid}`)) appidMatched = true;
+    const ownedAppids = state.ownedSteamAppids;
+    if (ownedAppids instanceof Set) {
+      // O(1) lookup against the precomputed set (buildOwnedNormNames).
+      appidMatched = ownedAppids.has(sid);
+    } else {
+      // Fallback for the brief boot window before the set is built.
+      appidMatched = state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)
+        || state.allGames.some(g => gameKey(g) === `steam:${sid}`);
+    }
   }
   const norms = claimTitleNorms(claim.title);
   const titleMatched = norms.some(n => state.ownedNormNames?.has(n));
@@ -202,9 +215,11 @@ function isClaimEligible(c, now = Date.now()) {
 
 export function getVisibleClaims(items) {
   const now = Date.now();
+  const pro = isPro();
   const filtered = (items || []).filter((c) => {
     if (!isClaimEligible(c, now)) return false;
     if (isClaimDismissed(c)) return false;
+    if (c.premium_only && !pro) return false;
     return true;
   });
   return sortClaims(dedupeClaims(filtered));
@@ -212,9 +227,11 @@ export function getVisibleClaims(items) {
 
 export function getHiddenClaims(items) {
   const now = Date.now();
+  const pro = isPro();
   const filtered = (items || []).filter((c) => {
     if (!isClaimEligible(c, now)) return false;
     if (!isClaimDismissed(c)) return false;
+    if (c.premium_only && !pro) return false;
     return true;
   });
   return sortClaims(dedupeClaims(filtered));
@@ -231,34 +248,47 @@ export function getOwnedClaims(items) {
   return sortClaims(dedupeClaims(filtered));
 }
 
-export function diffClaims(prevIds, items) {
+export function diffClaims(prevKeys, items) {
   const visible = getVisibleClaims(items);
   let newCount = 0;
-  const newOnes = [];
   for (const c of visible) {
-    if (!prevIds.has(c.id)) { newCount += 1; newOnes.push({ id: c.id, title: c.title, keys: claimDedupKeys(c) }); }
+    // A claim is "new" only when neither its volatile feed id nor any of its
+    // stable dedup keys was in the last acknowledged snapshot. Feed ids churn
+    // between regenerations (epic-*→gamerpower-* after dedup/enrich), so an
+    // id-only comparison reports already-acknowledged games as new and re-fires
+    // the banner; the dedup-key match keeps an acknowledged claim acknowledged.
+    const acknowledged = prevKeys.has(c.id) || claimDedupKeys(c).some(k => prevKeys.has(k));
+    if (!acknowledged) newCount += 1;
   }
   return { newCount, visible };
 }
 
-function loadClaimsSnapshotIds() {
+export function loadClaimsSnapshotKeys() {
   try {
     const raw = localStorage.getItem(claimsSnapshotStorageKey());
     if (!raw) return new Set();
-    const ids = JSON.parse(raw)?.ids;
-    return new Set(Array.isArray(ids) ? ids : []);
+    const parsed = JSON.parse(raw);
+    const ids = Array.isArray(parsed?.ids) ? parsed.ids : [];
+    const keys = Array.isArray(parsed?.keys) ? parsed.keys : [];
+    return new Set([...ids, ...keys]);
   } catch {
     return new Set();
   }
 }
 
 export function saveClaimsSnapshot(items) {
+  if (!items?.length) return;
   const visible = getVisibleClaims(items);
   const ids = visible.map(c => c.id);
+  // Persist stable dedup keys (appid/title) alongside the volatile ids so a
+  // later feed regeneration that re-keys the same game (id churn) still matches
+  // the acknowledged snapshot and does not re-trigger the new-claims banner.
+  const keys = [...new Set(visible.flatMap(c => claimDedupKeys(c)))];
   try {
     localStorage.setItem(claimsSnapshotStorageKey(), JSON.stringify({
       saved_at: Date.now(),
       ids,
+      keys,
     }));
   } catch (_) { /* quota */ }
 }
@@ -280,15 +310,17 @@ async function loadBundledFallback() {
   }
 }
 
-/** Newest timestamp on a feed doc (profile fetcher stamps fetched_at; bundled uses generated_at). */
+/** Content freshness for feed comparison — generated_at only (when the feed was built).
+
+Profile fetcher copies hosted generated_at and stamps fetched_at at download time.
+Using max(generated_at, fetched_at) made a just-downloaded stale hosted feed beat a
+newer bundled fallback, dropping claims that only exist in the local build.
+*/
 export function feedGeneratedAt(doc) {
   const gen = Date.parse(doc?.generated_at || '');
+  if (Number.isFinite(gen)) return gen;
   const fetched = Date.parse(doc?.fetched_at || '');
-  const ts = [
-    Number.isFinite(gen) ? gen : 0,
-    Number.isFinite(fetched) ? fetched : 0,
-  ];
-  return Math.max(...ts);
+  return Number.isFinite(fetched) ? fetched : 0;
 }
 
 /** Prefer the feed with the newer generated_at when both have items. */
@@ -300,13 +332,48 @@ export function pickNewerFeed(primary, secondary) {
   return feedGeneratedAt(b) > feedGeneratedAt(a) ? b : a;
 }
 
+// Repair dismissals that were stored against only a volatile feed id (legacy
+// data, or keys lost to a prior orphan-prune run). For every dismissed id that
+// still matches a claim in the current feed, backfill the claim's stable dedup
+// keys (appid: / title:) so the dismissal survives a future id churn even though
+// the id-only entry alone would not.
+function reconcileDismissedClaimKeys(feedItems) {
+  const items = feedItems || [];
+  if (!items.length) return;
+  const idMap = dismissedClaimsMap();
+  if (!Object.keys(idMap).length) return;
+  let changed = false;
+  const keyMap = state.personal.__dismissedClaimKeys
+    && typeof state.personal.__dismissedClaimKeys === 'object'
+    && !Array.isArray(state.personal.__dismissedClaimKeys)
+    ? state.personal.__dismissedClaimKeys
+    : {};
+  for (const c of items) {
+    if (!c?.id || idMap[c.id] == null) continue;
+    for (const k of claimDedupKeys(c)) {
+      if (keyMap[k] == null) {
+        keyMap[k] = idMap[c.id];
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    state.personal.__dismissedClaimKeys = keyMap;
+    savePersonal();
+  }
+}
+
 function applyFeedDoc(doc, source = 'unknown') {
   state.claimableFeed = doc && typeof doc === 'object' ? doc : null;
   state.libraryMeta.claims = state.claimableFeed;
-  pruneDismissedClaims(state.claimableFeed?.items || []);
+  pruneDismissedClaims();
+  reconcileDismissedClaimKeys(state.claimableFeed?.items || []);
   // A fresh feed resets the "show more" expansion so a stale, inflated slice
   // can't carry over after claims expire or the feed shrinks.
   _claimsVisibleCount = MAX_VISIBLE;
+  // A fresh feed is a new "load", so the hero card is allowed again when it
+  // happens to carry a single claim.
+  _claimDismissedSinceLoad = false;
   applyVisibleClaims();
 }
 
@@ -455,12 +522,15 @@ export function renderClaimableModule() {
     return;
   }
   mount.classList.remove('hidden');
-  const sponsoredItem = getEligibleSponsors('claimable')[0];
-  const sponsoredHtml = sponsoredItem ? sponsoredClaimCardHtml(sponsoredItem) : '';
+  const sponsoredItems = getAdsForLocation('claim-cards', { count: 3 });
+  const sponsoredHtml = sponsoredItems.length
+    ? `<div class="sponsored-claim-row">${sponsoredItems.map(sponsoredClaimCardHtml).join('')}</div>`
+    : '';
   mount.innerHTML = sponsoredHtml + claimableModuleMarkup(claims, {
     visibleCount: _claimsVisibleCount,
     attribution: state.claimableFeed?.attribution,
     showHiddenButtonHtml: showHiddenClaimsButtonHtml(hiddenCount + ownedCount),
+    allowHero: !_claimDismissedSinceLoad,
   });
   if (claims.length || sponsoredHtml) syncCoverFits(mount);
 }
@@ -484,8 +554,8 @@ export function showClaimableBanner(newCount) {
 export function updateClaimableBanner() {
   const el = document.getElementById('claimableBanner');
   if (!el || el.classList.contains('hidden')) return;
-  const prevIds = loadClaimsSnapshotIds();
-  const { newCount } = diffClaims(prevIds, state.claimableFeed?.items || []);
+  const prevKeys = loadClaimsSnapshotKeys();
+  const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
   if (newCount <= 0) el.classList.add('hidden');
 }
 
@@ -616,10 +686,10 @@ export function startClaimableReadOnlyPolling(intervalMs = 15 * 60_000) {
   if (_readOnlyPollTimer) return;
   _readOnlyPollTimer = setInterval(async () => {
     if (document.visibilityState !== 'visible') return;
-    const prevIds = loadClaimsSnapshotIds();
+    const prevKeys = loadClaimsSnapshotKeys();
     try {
       await loadClaimableNow({ preferHosted: true });
-      const { newCount } = diffClaims(prevIds, state.claimableFeed?.items || []);
+      const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
       if (newCount > 0) showClaimableBanner(newCount);
       saveClaimsSnapshot(state.claimableFeed?.items || []);
       refreshClaimableUi();

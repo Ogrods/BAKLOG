@@ -1224,8 +1224,10 @@ def launch_persistent_profile(
         f"--user-data-dir={profile}",
         f"--remote-debugging-port={port}",
         # Required since Chrome 111: without this, the CDP WebSocket handshake is
-        # rejected with 403 Forbidden and Connections cannot attach.
-        "--remote-allow-origins=*",
+        # rejected with 403 Forbidden and Connections cannot attach. Scope to the
+        # local loopback origins we actually connect from (comma-separated, one
+        # flag per Chrome docs) instead of the wildcard "*".
+        "--remote-allow-origins=http://127.0.0.1,http://localhost,http://[::1]",
         "--no-first-run",
         "--no-default-browser-check",
         # Omit --disable-blink-features=AutomationControlled: Chrome/Edge show a
@@ -1277,7 +1279,11 @@ def launch_persistent_profile(
         raise _browser_launch_error("Browser did not start CDP debugging endpoint in time.")
 
     try:
-        ws = websocket.create_connection(ws_url, timeout=60)
+        # Chrome 111+ exact-matches the handshake Origin against
+        # --remote-allow-origins. websocket-client would otherwise send
+        # http://127.0.0.1:<dynamic-port>, which the scoped (port-less) allow
+        # list rejects; pin the Origin to the loopback origin we whitelisted.
+        ws = websocket.create_connection(ws_url, timeout=60, origin="http://127.0.0.1")
     except Exception as exc:
         proc.kill()
         raise _cdp_websocket_error(exc) from exc
@@ -1310,11 +1316,11 @@ def launch_persistent_profile(
 
     # Attach existing page targets (new ones are attached via _on_target_created).
     targets = _fetch_json(f"http://127.0.0.1:{port}/json/list", timeout=5)
-    for t in targets:
-        if t.get("type") == "page":
-            page = context._attach_page(t["id"])
-            if page not in context.pages:
-                context.pages.append(page)
+    page_targets = [t for t in targets if t.get("type") == "page"]
+    for t in page_targets:
+        page = context._attach_page(t["id"])
+        if page not in context.pages:
+            context.pages.append(page)
 
     if not context.pages:
         context.new_page()

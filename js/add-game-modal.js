@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { escapeHtml } from './dom-util.js';
+import { safeCoverAttrUrl } from './covers.js';
 import {
   loadManualGames,
   saveManualGames,
@@ -276,7 +277,7 @@ export function bindAddGameModal() {
       statusEl.textContent = `Pick a match to import:`;
       resultsEl.innerHTML = matches.map(m => `
         <button class="add-game-match w-full text-left flex gap-3 items-center bg-slate-700 hover:bg-slate-600 rounded p-2" data-appid="${m.id}">
-          <img src="${m.tiny_image || ''}" alt="" class="w-20 h-10 object-cover rounded bg-slate-800" onerror="this.style.visibility='hidden'" />
+          <img src="${safeCoverAttrUrl(m.tiny_image)}" alt="" class="w-20 h-10 object-cover rounded bg-slate-800" onerror="this.style.visibility='hidden'" />
           <div class="flex-1 min-w-0">
             <div class="text-sm text-slate-100 truncate">${escapeHtml(m.name)}</div>
             <div class="text-xs text-slate-400">App ${m.id}${m.price ? ` · ${escapeHtml(m.price.final_formatted || '')}` : ""}</div>

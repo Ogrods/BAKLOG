@@ -17,13 +17,15 @@ const ENV_KEYS = [
   "VERCEL_ENV",
 ];
 
-function makeRequest(body, { ip = "10.0.0.1", method = "POST" } = {}) {
+function makeRequest(body, { ip = "10.0.0.1", method = "POST", contentLength } = {}) {
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    "x-forwarded-for": ip,
+  });
+  if (contentLength != null) headers.set("content-length", String(contentLength));
   return {
     method,
-    headers: new Headers({
-      "Content-Type": "application/json",
-      "x-forwarded-for": ip,
-    }),
+    headers,
     json: async () => body,
   };
 }
@@ -59,6 +61,16 @@ describe("landing/api/subscribe.js", () => {
     }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized Content-Length with 413", async () => {
+    const res = await handleSubscribe(makeRequest(
+      { email: "tester@example.com" },
+      { ip: "10.0.0.61", contentLength: 9000 },
+    ));
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "Payload too large" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

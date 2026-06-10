@@ -1,17 +1,22 @@
 #!/bin/sh
-# Auto-sync gitignored internal docs to baklog-internal before public push.
+# Leak scan + auto-sync gitignored internal docs to baklog-internal before public push.
 # Enable once: git config core.hooksPath scripts/hooks
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-PS1="$REPO_ROOT/scripts/hooks/pre-push-internal.ps1"
+LEAK_PS1="$REPO_ROOT/scripts/hooks/pre-push-leakcheck.ps1"
+SYNC_PS1="$REPO_ROOT/scripts/hooks/pre-push-internal.ps1"
 
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PS1"
-elif command -v powershell >/dev/null 2>&1; then
-  powershell -NoProfile -ExecutionPolicy Bypass -File "$PS1"
-else
-  echo "[pre-push] PowerShell not found — skipping internal sync." >&2
-  exit 0
-fi
+run_ps1() {
+  if command -v pwsh >/dev/null 2>&1; then
+    pwsh -NoProfile -ExecutionPolicy Bypass -File "$1"
+  elif command -v powershell >/dev/null 2>&1; then
+    powershell -NoProfile -ExecutionPolicy Bypass -File "$1"
+  else
+    echo "[pre-push] PowerShell not found — skipping $1." >&2
+    return 0
+  fi
+}
 
+run_ps1 "$LEAK_PS1" || exit $?
+run_ps1 "$SYNC_PS1"
 exit $?

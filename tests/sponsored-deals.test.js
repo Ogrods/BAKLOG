@@ -12,6 +12,8 @@ import {
   getEligibleSponsoredDeal,
   getEligibleSponsors,
   getAdsForLocation,
+  getSpotlightHouseAds,
+  setSpotlightHouseAdsForTest,
   itemPlacements,
   sponsorCoverUrl,
   sponsoredDealCardHtml,
@@ -25,6 +27,7 @@ import {
   dismissSponsoredDeal,
   placementsForDismissRefresh,
   __resetDismissedSponsorsForTest,
+  __resetSpotlightHouseAdsForTest,
   __resetLocationCursorsForTest,
   __setSponsorsForTest,
   __migrateV1ForTest,
@@ -90,6 +93,7 @@ beforeEach(() => {
   state.personal = {};
   state.ownedNormNames = new Set();
   __resetDismissedSponsorsForTest();
+  __resetSpotlightHouseAdsForTest();
   __resetLocationCursorsForTest();
   __setSponsorsForTest({ version: 2, ads: {}, locations: {} });
 });
@@ -385,6 +389,54 @@ describe('sponsorToSpotlightGame', () => {
     expect(slide.header_image).toBe('/assets/ads-sample/hero.webp');
     expect(slide._spotlightAd.id).toBe('ad1');
     expect(slide._spotlightReason.eyebrow).toBe('Sponsored');
+    expect(slide._spotlightArtMode).toBe('');
+  });
+
+  it('carries art_mode logo + cta and a BAKLOG Pro eyebrow for house slides', () => {
+    const slide = sponsorToSpotlightGame({
+      id: 'house-spotlight-pro-logo',
+      kind: 'house',
+      title: 'BAKLOG Pro',
+      tagline: 'Leveled up',
+      cta: "See what's planned",
+      url: 'https://baklog.app/',
+      art_mode: 'logo',
+    });
+    expect(slide._spotlightArtMode).toBe('logo');
+    expect(slide._spotlightAd.artMode).toBe('logo');
+    expect(slide._spotlightAd.cta).toBe("See what's planned");
+    expect(slide._spotlightReason.eyebrow).toBe('BAKLOG Pro');
+  });
+});
+
+describe('getSpotlightHouseAds', () => {
+  beforeEach(() => {
+    setSpotlightHouseAdsForTest(true);
+  });
+
+  it('returns the 3 permanent Pro slides with the large-logo slide first', () => {
+    const ads = getSpotlightHouseAds();
+    expect(ads.map(a => a.id)).toEqual([
+      'house-spotlight-pro-logo',
+      'house-spotlight-pro-sync',
+      'house-spotlight-pro-noads',
+    ]);
+    expect(ads[0].art_mode).toBe('logo');
+  });
+
+  it('falls back to defaults even when the feed omits them', () => {
+    __setSponsorsForTest(v2Doc({ x: sponsor({ id: 'x', title: 'X' }) }, { 'lib-pick': ['x'] }));
+    expect(getSpotlightHouseAds().map(a => a.id)).toEqual([
+      'house-spotlight-pro-logo',
+      'house-spotlight-pro-sync',
+      'house-spotlight-pro-noads',
+    ]);
+  });
+
+  it('returns nothing for Pro subscribers', () => {
+    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    expect(getSpotlightHouseAds()).toEqual([]);
+    spy.mockRestore();
   });
 });
 
@@ -453,7 +505,7 @@ describe('renderHouseLocationSlot', () => {
 });
 
 describe('house promo dismiss', () => {
-  it('omits dismiss on the full-width house banner and library stripe', () => {
+  it('renders a dismiss on closeable house banner and stripe (dismissible: true)', () => {
     const banner = houseDealBannerHtml(HOUSE_DEAL_ITEM, { accent: 'green' });
     expect(banner).toContain('sponsored-deal-banner--green');
     const stripe = houseStripeCardHtml({
@@ -462,6 +514,27 @@ describe('house promo dismiss', () => {
       title: 'You own 600 games. You\'ve played 40.',
       tagline: 'One honest backlog across every store.',
       cta: 'Start free',
+      url: 'https://baklog.app/',
+      dismissible: true,
+    });
+    expect(banner).toContain('sponsored-dismiss');
+    expect(stripe).toContain('sponsored-dismiss');
+  });
+
+  it('omits dismiss on permanent house promos (no dismissible flag)', () => {
+    const banner = houseDealBannerHtml({
+      id: 'house-permanent',
+      kind: 'house',
+      title: 'Permanent promo',
+      tagline: 'No close affordance.',
+      cta: 'Learn more',
+      url: 'https://baklog.app/',
+    });
+    const stripe = houseStripeCardHtml({
+      id: 'house-permanent',
+      kind: 'house',
+      title: 'Permanent promo',
+      cta: 'Learn more',
       url: 'https://baklog.app/',
     });
     expect(banner).not.toContain('sponsored-dismiss');
@@ -476,7 +549,7 @@ describe('sponsoredDealSlotHtml', () => {
     expect(html).toContain('sponsored-deal-house');
     expect(html).toContain('Back BAKLOG');
     expect(html).toContain('data-sponsor-house="1"');
-    expect(html).not.toContain('sponsored-dismiss');
+    expect(html).toContain('sponsored-dismiss');
   });
 
   it('returns empty string when dismissed', () => {
@@ -610,7 +683,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['local-ad']));
-    expect(state.sponsoredDeals).toHaveLength(5);
+    expect(state.sponsoredDeals).toHaveLength(8);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -629,7 +702,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['remote-ad']));
-    expect(state.sponsoredDeals).toHaveLength(5);
+    expect(state.sponsoredDeals).toHaveLength(8);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       SPONSORS_HOSTED_URL,
       expect.objectContaining({ cache: 'no-store' }),
@@ -651,7 +724,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['bundled-ad']));
-    expect(state.sponsoredDeals).toHaveLength(5);
+    expect(state.sponsoredDeals).toHaveLength(8);
   });
 
   it('respects window.__BAKLOG_SPONSORS_ENDPOINT override', async () => {

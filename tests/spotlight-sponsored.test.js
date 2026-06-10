@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pickSpotlightGames, renderSpotlightHtml } from '../js/dashboard-spotlight.js';
-import { __setSponsorsForTest } from '../js/sponsored-deals.js';
+import { __setSponsorsForTest, setSpotlightHouseAdsForTest } from '../js/sponsored-deals.js';
 import { state } from '../js/state.js';
 
 function artGame(name, art) {
@@ -20,6 +20,7 @@ function artGame(name, art) {
 }
 
 beforeEach(() => {
+  setSpotlightHouseAdsForTest(true);
   state.prefs = {};
   state.personal = {};
   state.ownedNormNames = new Set();
@@ -45,9 +46,34 @@ describe('spotlight sponsored slides', () => {
   it('injects sponsored slides into the rotation pool', () => {
     const games = [artGame('Real Game', 'https://cdn.example/hero.jpg')];
     const pool = pickSpotlightGames(games);
-    const ad = pool.find(g => g._spotlightAd);
-    expect(ad).toBeTruthy();
-    expect(ad.name).toBe('Emberfall');
+    // Paid sponsor from the feed is injected.
+    expect(pool.some(g => g._spotlightAd && g.name === 'Emberfall')).toBe(true);
+  });
+
+  it('pins the large-logo Pro slide first and guarantees the 3 permanent Pro slides', () => {
+    const games = [artGame('Real Game', 'https://cdn.example/hero.jpg')];
+    const pool = pickSpotlightGames(games);
+    expect(pool[0]._spotlightArtMode).toBe('logo');
+    expect(pool[0]._spotlightAd?.id).toBe('house-spotlight-pro-logo');
+    const ids = pool.map(g => g._spotlightAd?.id);
+    expect(ids).toContain('house-spotlight-pro-sync');
+    expect(ids).toContain('house-spotlight-pro-noads');
+  });
+
+  it('renders the large-logo layout (BAKLOG mark, no cover img)', () => {
+    const slide = {
+      store: 'sponsored',
+      id: 'house-spotlight-pro-logo',
+      name: 'BAKLOG Pro',
+      _spotlightArtMode: 'logo',
+      _spotlightReason: { eyebrow: 'BAKLOG Pro', score: 50, metaParts: ['Leveled up'] },
+      _spotlightAd: { id: 'house-spotlight-pro-logo', url: 'https://baklog.app/', cta: "See what's planned", artMode: 'logo' },
+    };
+    const html = renderSpotlightHtml(slide);
+    expect(html).toContain('has-logo-art');
+    expect(html).toContain('dash-spotlight-logo-mark');
+    expect(html).toContain('dash-spotlight-logo-cta');
+    expect(html).not.toContain('class="dash-spotlight-art"');
   });
 
   it('renders sponsored disclosure and click action on spotlight ad', () => {

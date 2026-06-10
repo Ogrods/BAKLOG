@@ -46,6 +46,13 @@ def _validate_sponsor_creative(ad_id: str, item: Any) -> str | None:
     enabled = item.get("enabled")
     if enabled is not None and not isinstance(enabled, bool):
         return f"ads[{ad_id}] enabled must be boolean"
+    dismissible = item.get("dismissible")
+    if dismissible is not None and not isinstance(dismissible, bool):
+        return f"ads[{ad_id}] dismissible must be boolean"
+    art_mode = item.get("art_mode")
+    if art_mode is not None and str(art_mode).strip():
+        if str(art_mode).strip().lower() not in ("cover", "logo"):
+            return f"ads[{ad_id}] art_mode must be cover or logo"
     kind = item.get("kind")
     if kind is not None and str(kind).strip():
         k = str(kind).strip().lower()

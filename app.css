@@ -4502,6 +4502,57 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
 .dash-spotlight.is-lowres-art:hover .dash-spotlight-art-bg.is-loaded {
   animation-play-state: paused;
 }
+/* Large-logo Pro spotlight: brand backdrop + centered BAKLOG mark instead of
+   cover art. Used by house creatives flagged art_mode: "logo". */
+.dash-spotlight.has-logo-art {
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--accent) 26%, var(--bg-elev)) 0%,
+    color-mix(in srgb, var(--bg-elev) 88%, var(--accent) 12%) 48%,
+    var(--bg) 100%);
+}
+.dash-spotlight-logo-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 130% at 30% 35%,
+    color-mix(in srgb, var(--accent) 34%, transparent) 0%,
+    transparent 60%);
+}
+.dash-spotlight-logo-mark {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 30%;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-bright));
+}
+.dash-spotlight-logo-mark svg {
+  width: 44%;
+  max-width: 210px;
+  height: auto;
+  opacity: 0.95;
+  filter: drop-shadow(0 6px 22px color-mix(in srgb, var(--accent) 45%, transparent));
+  animation: spotlightHeroZoom 14s ease-out forwards;
+}
+.dash-spotlight.has-logo-art:hover .dash-spotlight-logo-mark svg { animation-play-state: paused; }
+.dash-spotlight-logo-cta {
+  margin-top: 4px;
+  align-self: flex-end;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 3px 10px;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.dash-spotlight.is-fading.has-logo-art .dash-spotlight-logo-mark,
+.dash-spotlight.is-fading.has-logo-art .dash-spotlight-logo-backdrop { opacity: 0; transition: opacity 0.3s ease; }
 @keyframes spotlightHeroZoom {
   from { transform: scale(1) translateZ(0); }
   to { transform: scale(1.06) translateZ(0); }

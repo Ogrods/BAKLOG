@@ -30,7 +30,6 @@ describe('AD_LOCATIONS sync pairs', () => {
     readFileSync('shared/sponsors_validate.py', 'utf8'),
     'SPONSOR_AD_LOCATIONS',
   );
-  const adminKeys = extractAdminAdLocations(readFileSync('admin/admin.js', 'utf8'));
   const migratorKeys = extractMigratorLocationKeys(readFileSync('scripts/migrate_sponsors_v2.py', 'utf8'));
 
   it('has 22 location keys in js/sponsored-deals.js', () => {
@@ -41,8 +40,8 @@ describe('AD_LOCATIONS sync pairs', () => {
     expect(sorted(serverKeys)).toEqual(sorted(AD_LOCATIONS));
   });
 
-  it('matches admin/admin.js AD_LOCATIONS', () => {
-    if (!existsSync('admin/admin.js')) return;
+  it.skipIf(!existsSync('admin/admin.js'))('matches admin/admin.js AD_LOCATIONS', () => {
+    const adminKeys = extractAdminAdLocations(readFileSync('admin/admin.js', 'utf8'));
     expect(sorted(adminKeys)).toEqual(sorted(AD_LOCATIONS));
   });
 

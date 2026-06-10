@@ -30,7 +30,7 @@ def server_mod(monkeypatch, tmp_path):
     import shared.install_paths as ip
 
     ip._BUILT_MANIFEST_CACHE = None
-    ip._BUILT_MANIFEST_MTIME = None
+    ip._BUILT_MANIFEST_MTIME_NS = None
     import shared.built_frontend as bf
 
     bf.invalidate_built_index_cache()
@@ -61,7 +61,7 @@ def test_built_index_html_rewrites_css_when_frozen(server_mod, tmp_path, monkeyp
     monkeypatch.setattr(bf, "bundle_root", lambda: tmp_path)
     bf.invalidate_built_index_cache()
     ip._BUILT_MANIFEST_CACHE = None
-    ip._BUILT_MANIFEST_MTIME = None
+    ip._BUILT_MANIFEST_MTIME_NS = None
 
     html = built_index_html()
     assert html is not None
@@ -84,7 +84,7 @@ def test_built_index_invalidates_when_manifest_changes(server_mod, tmp_path):
     import shared.install_paths as ip
 
     ip._BUILT_MANIFEST_CACHE = None
-    ip._BUILT_MANIFEST_MTIME = None
+    ip._BUILT_MANIFEST_MTIME_NS = None
     import shared.built_frontend as bf
 
     bf.invalidate_built_index_cache()

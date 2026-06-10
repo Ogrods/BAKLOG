@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 
 from shared import install_paths
@@ -27,7 +29,7 @@ def test_serve_built_false_without_manifest(monkeypatch, tmp_path):
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
     monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
     install_paths._BUILT_MANIFEST_CACHE = None
-    install_paths._BUILT_MANIFEST_MTIME = None
+    install_paths._BUILT_MANIFEST_MTIME_NS = None
     assert install_paths.serve_built_frontend() is False
     assert install_paths.load_built_manifest() == {}
 
@@ -41,9 +43,11 @@ def test_manifest_cache_invalidates_on_mtime_change(monkeypatch, tmp_path):
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
     monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
     install_paths._BUILT_MANIFEST_CACHE = None
-    install_paths._BUILT_MANIFEST_MTIME = None
+    install_paths._BUILT_MANIFEST_MTIME_NS = None
     assert install_paths.load_built_manifest()["js/app.js"] == "js/app-OLD.js"
     manifest.write_text('{"js/app.js":"js/app-NEW.js"}', encoding="utf-8")
+    # Windows runners can expose coarse st_mtime; bump explicitly so invalidation is observable.
+    os.utime(manifest, (time.time() + 1, time.time() + 1))
     assert install_paths.load_built_manifest()["js/app.js"] == "js/app-NEW.js"
 
 
@@ -58,7 +62,7 @@ def test_serve_built_true_with_flag_and_manifest(monkeypatch, tmp_path):
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
     monkeypatch.setattr(install_paths, "bundle_root", lambda: tmp_path)
     install_paths._BUILT_MANIFEST_CACHE = None
-    install_paths._BUILT_MANIFEST_MTIME = None
+    install_paths._BUILT_MANIFEST_MTIME_NS = None
     assert install_paths.serve_built_frontend() is True
     manifest = install_paths.load_built_manifest()
     assert manifest["app.css"] == "app.abc.css"

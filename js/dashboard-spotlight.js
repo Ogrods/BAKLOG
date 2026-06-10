@@ -12,7 +12,7 @@ import { computeSpotlightSuperlatives } from './creative-metrics.js';
 import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
 import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
 import { registerPausable } from './visibility.js';
-import { getAdsForLocation, sponsorToSpotlightGame } from './sponsored-deals.js';
+import { getAdsForLocation, getSpotlightHouseAds, sponsorToSpotlightGame, spotlightLogoMarkHtml } from './sponsored-deals.js';
 
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
@@ -806,10 +806,30 @@ export function pickSpotlightGames(games, snapIn) {
     }
   }
 
+  // Best-effort paid sponsor spotlights from the feed (round-robin, dismissible).
   const spotlightAds = getAdsForLocation('dash-spotlight', { count: 3 }).map(sponsorToSpotlightGame);
   for (let i = 0; i < spotlightAds.length; i++) {
     const insertAt = Math.min((i + 1) * 3, pool.length);
     pool.splice(insertAt, 0, spotlightAds[i]);
+  }
+
+  // Permanent Pro house spotlights: always present in the rotation, removed only
+  // for Pro (getSpotlightHouseAds returns [] when isPro()). The large-logo slide
+  // is pinned first on the initial dashboard load so the spotlight opens on the
+  // brand/Pro pitch; on later rebuilds it stays in rotation without snapping back
+  // to the front (the preserve-current-slide logic above keeps its place).
+  const houseAds = getSpotlightHouseAds().map(sponsorToSpotlightGame);
+  if (houseAds.length) {
+    const [logoAd, ...restAds] = houseAds;
+    const positions = [4, 8, 12];
+    restAds.forEach((ad, i) => {
+      pool.splice(Math.min(positions[i] ?? pool.length, pool.length), 0, ad);
+    });
+    if (!_spotlightCurrentKey) {
+      pool.unshift(logoAd);
+    } else {
+      pool.splice(Math.min(2, pool.length), 0, logoAd);
+    }
   }
 
   return pool;
@@ -850,7 +870,28 @@ function spotlightSecondaryStat(g) {
   return null;
 }
 
+// Large-logo dashboard spotlight slide: the BAKLOG mark on a brand backdrop with
+// the Pro pitch, used for house creatives flagged art_mode: "logo". No cover art
+// (so no art-fit/onload), no dismiss — it is permanent until the user upgrades.
+function spotlightLogoInnerHtml(g) {
+  const eyebrow = g._spotlightReason?.eyebrow || 'BAKLOG Pro';
+  const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
+  const tagline = g._spotlightReason?.metaParts?.[0] || '';
+  const cta = g._spotlightAd?.cta || '';
+  return `
+    <div class="dash-spotlight-logo-backdrop" aria-hidden="true"></div>
+    <div class="dash-spotlight-logo-mark" aria-hidden="true">${spotlightLogoMarkHtml()}</div>
+    <div class="dash-spotlight-gradient" aria-hidden="true"></div>
+    <div class="dash-spotlight-body">
+      <span class="dash-spotlight-eyebrow">${escapeHtml(displayEyebrow)}</span>
+      <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
+      <span class="dash-spotlight-meta">${tagline}</span>
+      ${cta ? `<span class="dash-spotlight-logo-cta">${escapeHtml(cta)} &rarr;</span>` : ''}
+    </div>`;
+}
+
 export function spotlightInnerHtml(g) {
+  if (g._spotlightArtMode === 'logo') return spotlightLogoInnerHtml(g);
   const candidates = spotlightArtCandidates(g);
   const art = candidates[0] || "";
   const candidateAttr = escapeAttr(candidates.join("|"));
@@ -910,9 +951,10 @@ export function renderSpotlightHtml(g) {
     ? escapeAttr(g.name)
     : `Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}`;
   const adClass = ad ? ' dash-spotlight--ad' : '';
+  const logoClass = g._spotlightArtMode === 'logo' ? ' has-logo-art' : '';
   return `<div class="dash-spotlight-wrap" id="dashboardSpotlightWrap" role="group" aria-roledescription="carousel">
     <span class="sr-only dash-spotlight-live" id="dashboardSpotlightLive" aria-live="polite"></span>
-    <button type="button" class="dash-spotlight${adClass}" id="dashboardSpotlight" data-action="${action}"${keyAttr}${sponsorAttrs} title="${title}">
+    <button type="button" class="dash-spotlight${adClass}${logoClass}" id="dashboardSpotlight" data-action="${action}"${keyAttr}${sponsorAttrs} title="${title}">
       ${spotlightInnerHtml(g)}
     </button>
     ${spotlightNavHtml()}
@@ -1006,10 +1048,11 @@ function wireSpotlightControls(wrap) {
 }
 
 function applySpotlightSlide(el, next) {
-  el.classList.remove('has-portrait-art', 'has-art-placeholder', 'is-lowres-art');
+  el.classList.remove('has-portrait-art', 'has-art-placeholder', 'is-lowres-art', 'has-logo-art');
   el.classList.remove('is-tilting');
   el._spotlightTiltReset?.();
   el.innerHTML = spotlightInnerHtml(next);
+  el.classList.toggle('has-logo-art', next._spotlightArtMode === 'logo');
   el.dataset.key = gameKey(next);
   // Keep the click action, sponsor attrs, title, and ad styling in sync with the
   // rotated-in slide (mirrors renderSpotlightHtml). Sponsored slides open the ad

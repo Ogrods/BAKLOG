@@ -3,17 +3,24 @@
  *
  * Honest by design: every sponsored slot carries a visible "Sponsored" (or
  * "House") disclosure, is ownership-aware (a slot whose `match_title` you
- * already own is skipped), and can be dismissed. The slot is part of the free
- * tier; the paid (pro) tier removes it via the server-resolved entitlement
- * (`isPro()`). There is no free-tier ad opt-out — paying is the only way to
- * remove sponsored slots.
+ * already own is skipped). The paid (pro) tier removes every slot via the
+ * server-resolved entitlement (`isPro()`).
+ *
+ * Closeable vs permanent: paid sponsor cards always carry a dismiss (X), and
+ * house promos opt in with `dismissible: true`. Permanent house promos (the
+ * dash Pro upsell + the three Pro spotlight slides) have no dismiss affordance
+ * and are only removed by upgrading to Pro. All dismissals are session-scoped
+ * (in-memory) so closed slots return on the next launch — paying is the only
+ * durable way to remove slots.
  *
  * Feed shape v2 (sponsors.json / curated/sponsors.json):
- *   { version: 2, generated_at, ads: { id: { kind, title, ... } },
+ *   { version: 2, generated_at, ads: { id: { kind, title, dismissible?, art_mode?, ... } },
  *     locations: { "lib-pick": ["ad-id", ...], ... } }
  *   Each physical slot is a location key; ads cycle round-robin per location
  *   (cursor persisted in localStorage across reloads).
  *   kind: "house" -> no badge; anything else -> "Sponsored".
+ *   dismissible: house promos opt in to a close (X); sponsors are always closeable.
+ *   art_mode: "logo" renders the BAKLOG mark in the dash-spotlight (no cover art).
  */
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
@@ -229,6 +236,10 @@ const V1_PLACEMENT_MAP = {
   'dash-deal-rail': ['dash-house'],
 };
 
+// Permanent (Pro-only removal): house-pro-promo + the three house-spotlight-pro-*
+// creatives. Closeable (dismissible: true, session-scoped): support / backlog /
+// privacy house promos. Sync pair: HOUSE_DEFAULTS ↔ curated/sponsors.json +
+// scripts/migrate_sponsors_v2.py HOUSE_DEFAULTS.
 const HOUSE_DEFAULTS = {
   'house-support-baklog': {
     kind: 'house',
@@ -237,6 +248,7 @@ const HOUSE_DEFAULTS = {
     cta: 'Join the waitlist',
     url: 'https://baklog.app/#waitlist',
     cover: '',
+    dismissible: true,
     enabled: true,
   },
   'house-pro-promo': {
@@ -255,6 +267,7 @@ const HOUSE_DEFAULTS = {
     cta: 'Start free',
     url: 'https://baklog.app/',
     cover: '',
+    dismissible: true,
     enabled: true,
   },
   'house-itch-privacy': {
@@ -264,9 +277,63 @@ const HOUSE_DEFAULTS = {
     cta: 'Learn more',
     url: 'https://baklog.app/',
     cover: '',
+    dismissible: true,
+    enabled: true,
+  },
+  'house-spotlight-pro-logo': {
+    kind: 'house',
+    title: 'BAKLOG Pro',
+    tagline: 'One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo, planned.',
+    cta: "See what's planned",
+    url: 'https://baklog.app/',
+    cover: '',
+    art_mode: 'logo',
+    enabled: true,
+  },
+  'house-spotlight-pro-sync': {
+    kind: 'house',
+    title: 'Sync every machine',
+    tagline: 'BAKLOG Pro keeps your library and personal data aligned across machines — no manual exports.',
+    cta: "$5/mo — see what's planned",
+    url: 'https://baklog.app/',
+    cover: '',
+    enabled: true,
+  },
+  'house-spotlight-pro-noads': {
+    kind: 'house',
+    title: 'Fewer distractions',
+    tagline: 'BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo, planned.',
+    cta: "$5/mo — see what's planned",
+    url: 'https://baklog.app/',
+    cover: '',
     enabled: true,
   },
 };
+
+/** Test-only: guaranteed Pro spotlight slides default off under Vitest (game-pool tests). */
+const IN_VITEST = typeof process !== 'undefined' && process.env.VITEST;
+/** @type {boolean | null} null = auto (off in Vitest, on in app) */
+let _spotlightHouseAdsForceForTest = null;
+export function setSpotlightHouseAdsForTest(enabled) {
+  _spotlightHouseAdsForceForTest = enabled !== false;
+}
+export function __resetSpotlightHouseAdsForTest() {
+  _spotlightHouseAdsForceForTest = null;
+}
+function spotlightHouseAdsLive() {
+  if (isPro()) return false;
+  if (_spotlightHouseAdsForceForTest != null) return _spotlightHouseAdsForceForTest;
+  return !IN_VITEST;
+}
+
+// The permanent Pro spotlight slides, in display order. The large-logo slide is
+// first so the dashboard opens on the brand/Pro pitch. Always present in the
+// spotlight rotation for free users; removed entirely for Pro (isPro()).
+const SPOTLIGHT_PRO_AD_IDS = [
+  'house-spotlight-pro-logo',
+  'house-spotlight-pro-sync',
+  'house-spotlight-pro-noads',
+];
 
 function placementsForMigration(item) {
   const raw = item?.placements;
@@ -437,6 +504,15 @@ function sponsorDismissHtml(item) {
 }
 
 /**
+ * Dismiss control for house promos. House slots are permanent by default
+ * (only Pro removes them); they opt in to a session-scoped close with
+ * `dismissible: true` in the feed/defaults.
+ */
+function houseDismissHtml(item) {
+  return item?.dismissible ? sponsorDismissHtml(item) : '';
+}
+
+/**
  * Disclosure pill for a slot. House promos are BAKLOG's own branded content,
  * so they carry no badge; only genuine paid placements show "Sponsored".
  */
@@ -469,6 +545,25 @@ export function getAdsForLocation(locationKey, { count = 1 } = {}) {
   const out = [];
   for (let i = 0; i < want; i++) {
     out.push(eligible[(start + i) % eligible.length]);
+  }
+  return out;
+}
+
+/**
+ * Permanent Pro house creatives for the dashboard spotlight, in display order
+ * (large-logo slide first). These are guaranteed-present spotlight slides that
+ * pump the Pro tier and carry no dismiss; only Pro removes them. Resolved from
+ * the feed when present, falling back to HOUSE_DEFAULTS so they always show.
+ * @returns {object[]} feed-shaped ad items (empty for Pro users)
+ */
+export function getSpotlightHouseAds() {
+  if (!spotlightHouseAdsLive()) return [];
+  const out = [];
+  for (const id of SPOTLIGHT_PRO_AD_IDS) {
+    const item = resolveAd(id) || (HOUSE_DEFAULTS[id] ? { ...HOUSE_DEFAULTS[id], id } : null);
+    if (!item || item.enabled === false) continue;
+    if (isDismissed(id)) continue;
+    out.push(item);
   }
   return out;
 }
@@ -529,6 +624,11 @@ function baklogBannerMarkHtml(maskId) {
 </svg>`;
 }
 
+/** Large BAKLOG mark for the logo-layout dashboard spotlight slide. */
+export function spotlightLogoMarkHtml() {
+  return baklogBannerMarkHtml('spotlightProMark');
+}
+
 // Promo columns for the house banner — info-rich pitch pulled from the landing
 // copy so the in-app message stays in sync with baklog.app. Each fills one of
 // the three feature columns that span the full-width deal-radar row.
@@ -581,6 +681,7 @@ export const HOUSE_DEAL_ITEM = {
   tagline: 'Local-first, no server to breach. Help fund development.',
   cta: 'Join the waitlist',
   url: 'https://baklog.app/#waitlist',
+  dismissible: true,
 };
 
 /** Hard-coded dashboard Pro upsell (not driven by sponsors.json). */
@@ -632,6 +733,7 @@ export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
       <ul class="house-banner-features">${features}</ul>
       <span class="house-banner-cta">${escapeHtml(cta)} &rarr;</span>
     </div>
+    ${houseDismissHtml(item)}
   </button>`;
 }
 
@@ -709,6 +811,7 @@ export function houseStripeCardHtml(item, { variant = 'lib' } = {}) {
       ${item.tagline ? `<span class="house-stripe-tagline">${escapeHtml(item.tagline)}</span>` : ''}
     </span>
     <span class="house-stripe-cta">${escapeHtml(cta)} &rarr;</span>
+    ${houseDismissHtml(item)}
   </button>`;
 }
 
@@ -1117,14 +1220,16 @@ export function sponsorToSpotlightGame(item) {
   const isHouse = String(item?.kind || '').toLowerCase() === 'house';
   const disclosure = sponsorDisclosure(item);
   const tagline = item.tagline ? escapeHtml(item.tagline) : '';
+  const artMode = String(item.art_mode || '').toLowerCase() === 'logo' ? 'logo' : '';
   return {
     store: 'sponsored',
     id: item.id,
     name: item.title,
     header_image: cover,
     library_image: cover,
+    _spotlightArtMode: artMode,
     _spotlightReason: {
-      eyebrow: isHouse ? 'Featured' : disclosure,
+      eyebrow: isHouse ? 'BAKLOG Pro' : disclosure,
       score: 100 - (item.priority ?? 50),
       metaParts: tagline ? [tagline] : [],
       isSponsored: true,
@@ -1134,6 +1239,8 @@ export function sponsorToSpotlightGame(item) {
       url: item.url,
       disclosure,
       kind: item.kind,
+      cta: item.cta || '',
+      artMode,
     },
   };
 }

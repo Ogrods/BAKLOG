@@ -22,6 +22,9 @@ PLACEMENT_TO_LOCATIONS: dict[str, list[str]] = {
     "dash-deal-rail": ["dash-house"],
 }
 
+# Sync pair: keep aligned with js/sponsored-deals.js HOUSE_DEFAULTS +
+# curated/sponsors.json. dismissible: closeable (session-scoped) house promos;
+# the Pro promo + house-spotlight-pro-* slides are permanent (Pro-only removal).
 HOUSE_DEFAULTS = {
     "house-support-baklog": {
         "kind": "house",
@@ -30,6 +33,7 @@ HOUSE_DEFAULTS = {
         "cta": "Join the waitlist",
         "url": "https://baklog.app/#waitlist",
         "cover": "",
+        "dismissible": True,
         "enabled": True,
     },
     "house-pro-promo": {
@@ -51,6 +55,7 @@ HOUSE_DEFAULTS = {
         "cta": "Start free",
         "url": "https://baklog.app/",
         "cover": "",
+        "dismissible": True,
         "enabled": True,
     },
     "house-itch-privacy": {
@@ -58,6 +63,38 @@ HOUSE_DEFAULTS = {
         "title": "Every store, one list",
         "tagline": "There is no BAKLOG server to breach. Your libraries stay on your machine.",
         "cta": "Learn more",
+        "url": "https://baklog.app/",
+        "cover": "",
+        "dismissible": True,
+        "enabled": True,
+    },
+    "house-spotlight-pro-logo": {
+        "kind": "house",
+        "title": "BAKLOG Pro",
+        "tagline": "One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo, planned.",
+        "cta": "See what's planned",
+        "url": "https://baklog.app/",
+        "cover": "",
+        "art_mode": "logo",
+        "enabled": True,
+    },
+    "house-spotlight-pro-sync": {
+        "kind": "house",
+        "title": "Sync every machine",
+        "tagline": (
+            "BAKLOG Pro keeps your library and personal data aligned across machines "
+            "— no manual exports."
+        ),
+        "cta": "$5/mo — see what's planned",
+        "url": "https://baklog.app/",
+        "cover": "",
+        "enabled": True,
+    },
+    "house-spotlight-pro-noads": {
+        "kind": "house",
+        "title": "Fewer distractions",
+        "tagline": "BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo, planned.",
+        "cta": "$5/mo — see what's planned",
         "url": "https://baklog.app/",
         "cover": "",
         "enabled": True,

@@ -14,6 +14,7 @@ import {
   isProviderConnected,
   FETCHER_AUTH_PROVIDER,
   showReconnectBanner,
+  clearReconnectBanner,
   authStatusLoaded,
   providerStatus,
   ingestAuthStatusProviders,
@@ -230,6 +231,7 @@ function applyAuthStatusProviderEffects(providers) {
       const transitionedToConnected = prev !== undefined && prev !== 'connected';
       const hadReconnectFlag = reconnectRequiredByProvider.has(p.key);
       clearReconnectRequired(p.key);
+      clearReconnectBanner(p.key);
       if (transitionedToConnected || hadReconnectFlag) {
         clearFailedStateForReconnectedProvider(p.key);
       }
@@ -1365,7 +1367,7 @@ export const fetcherRunner = (() => {
     if (runStateByKey.size === 0 && sourcesByRunId.size === 0) return;
     inFlightPollTimer = setInterval(() => {
       syncFromServer().catch(() => {});
-      if (runStateByKey.size === 0 && sourcesByRunId.size === 0 && !lastServerInFlight) {
+      if (runStateByKey.size === 0 && sourcesByRunId.size === 0) {
         clearInterval(inFlightPollTimer);
         inFlightPollTimer = null;
       }
@@ -2623,7 +2625,10 @@ export const fetcherRunner = (() => {
           }
           clearAuthCooldown(key);
           const provider = FETCHER_AUTH_PROVIDER[key];
-          if (provider) clearReconnectRequired(provider);
+          if (provider) {
+            clearReconnectRequired(provider);
+            clearReconnectBanner(provider);
+          }
           fetchSuccessLabels.add(src.label || key);
           markChipState(key, null);
         } else if (cancelled) {

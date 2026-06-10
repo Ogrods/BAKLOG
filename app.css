@@ -2910,6 +2910,12 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
    Layout: brand block | three info columns (fill the middle) | CTA. */
 .sponsored-deal-banner { cursor: pointer; overflow: hidden; grid-column: 1 / -1; }
 .sponsored-deal-banner.deal-rail-card::before { background: #38bdf8; }
+.sponsored-deal-banner--green.deal-rail-card::before { background: #10b981; }
+.sponsored-deal-banner--green .house-banner-mark { color: #10b981; }
+.sponsored-deal-banner--green .house-banner-feature-title { color: #34d399; }
+.sponsored-deal-banner--green .house-banner-cta { background: #10b981; }
+.sponsored-deal-banner--green:hover .house-banner-cta { background: #34d399; }
+.sponsored-deal-banner--green .sponsored-deal-house .sponsored-badge { color: #34d399; border-color: rgba(52, 211, 153, 0.5); }
 /* Pro tier upsell banner — dashboard only. Violet/gold accent so it reads
    distinct from emerald deal cards and the blue house waitlist banner. */
 .sponsored-deal-pro.deal-rail-card::before { background: linear-gradient(90deg, #a78bfa, #fbbf24); }
@@ -3026,22 +3032,57 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 }
 .sponsored-deal-dismiss:hover { color: rgb(226 232 240); background: rgba(148, 163, 184, 0.15); }
 .sponsored-deal-banner .sponsored-deal-dismiss { top: 50%; transform: translateY(-50%); }
+/* Compact house stripe below library / itch picks rows */
+.house-stripe-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.house-stripe-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+.house-stripe-card--lib::before { background: linear-gradient(180deg, #f59e0b, #d97706); }
+.house-stripe-card--itch::before { background: linear-gradient(180deg, #a78bfa, #7c3aed); }
+.house-stripe-mark {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  color: #f59e0b;
+}
+.house-stripe-card--itch .house-stripe-mark { color: #a78bfa; }
+.house-stripe-mark svg { width: 100%; height: 100%; }
+.house-stripe-copy { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.house-stripe-title { font-weight: 700; color: var(--text-bright); line-height: 1.25; }
+.house-stripe-tagline { font-size: 0.78rem; color: rgb(148 163 184); line-height: 1.35; }
+.house-stripe-cta {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0b1220;
+  background: #f59e0b;
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  white-space: nowrap;
+}
+.house-stripe-card--itch .house-stripe-cta { background: #a78bfa; }
+.house-stripe-card:hover .house-stripe-cta { filter: brightness(1.08); }
+.house-stripe-card .sponsored-deal-dismiss { top: 0.35rem; right: 0.5rem; }
+.dash-house-slot:not(.hidden),
+.view-house-slot:not(.hidden) { display: block; }
 .sponsored-badge--inline { position: static; }
-/* Badge + dismiss live in the top-LEFT corner: the rotation nav owns the
-   top-right and the slide body owns the bottom-right, so the top-left is the
-   only collision-free corner. Dismiss is anchored first (fixed width); the
-   variable-width badge sits to its right. */
-.dash-spotlight-dismiss {
-  top: 0.35rem;
-  left: 0.5rem;
-  right: auto;
-}
-.dash-spotlight-sponsored-badge {
-  top: 0.5rem;
-  left: 2.1rem;
-  right: auto;
-  bottom: auto;
-}
 .dash-spotlight--ad { cursor: pointer; }
 .sponsored-pick-card { cursor: pointer; position: relative; }
 .sponsored-pick-badge {

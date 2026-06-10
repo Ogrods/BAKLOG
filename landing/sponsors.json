@@ -1,65 +1,50 @@
 {
-  "version": 1,
+  "version": 2,
   "generated_at": null,
-  "items": [
-    {
-      "id": "ad-spotlight-hero-emberfall",
+  "ads": {
+    "ad-spotlight-hero-emberfall": {
       "kind": "sponsor",
       "title": "Emberfall",
       "tagline": "Critically acclaimed open-world adventure",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-emberfall.webp",
-      "placements": "spotlight",
-      "priority": 1,
       "enabled": true
     },
-    {
-      "id": "ad-spotlight-cover-ironveil",
+    "ad-spotlight-cover-ironveil": {
       "kind": "sponsor",
       "title": "Ironveil",
       "tagline": "Couch co-op dungeon crawler",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "placements": "spotlight",
-      "priority": 2,
       "enabled": true
     },
-    {
-      "id": "ad-picks-ironveil",
+    "ad-picks-ironveil": {
       "kind": "sponsor",
       "title": "Ironveil",
       "tagline": "On sale now — 80% off",
       "cta": "Grab it",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "placements": "picks",
-      "priority": 1,
       "enabled": true
     },
-    {
-      "id": "ad-table-encore",
+    "ad-table-encore": {
       "kind": "sponsor",
       "title": "Encore",
       "tagline": "Replay-worthy roguelike — weekend-sized",
       "cta": "Learn more",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-encore.webp",
-      "placements": "table",
-      "priority": 1,
       "enabled": true
     },
-    {
-      "id": "ad-dash-picks-dawnbanner",
+    "ad-dash-picks-dawnbanner": {
       "kind": "sponsor",
       "title": "Dawnbanner",
       "tagline": "Lead a band of exiles across a sundered kingdom in this turn-based tactical RPG. Build your banner, win the war.",
       "cta": "View the deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "placements": "dash-picks",
-      "priority": 1,
       "enabled": true,
       "network": "Lantern Forge Studios",
       "genres": [
@@ -73,60 +58,67 @@
       "discount": 35,
       "price_base": 29.99
     },
-    {
-      "id": "ad-dash-versus-dawnbanner",
+    "ad-feature-banner-emberfall": {
+      "kind": "sponsor",
+      "title": "Emberfall",
+      "tagline": "Forge your legend in a dying world. A sprawling open-world action RPG where every ember you rekindle reshapes the map.",
+      "cta": "View the deal",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "/assets/ads-sample/hero-emberfall.webp",
+      "enabled": true,
+      "network": "Cinderpeak Games",
+      "genres": [
+        "Action RPG",
+        "Open World"
+      ],
+      "steam_review_percent": 96,
+      "metacritic_score": 91,
+      "hltb_hours": 45,
+      "release_year": 2025,
+      "discount": 40,
+      "price_base": 39.99
+    },
+    "ad-dash-versus-dawnbanner": {
       "kind": "sponsor",
       "title": "Dawnbanner",
       "tagline": "Trending tactical RPG",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "placements": "dash-versus",
-      "priority": 1,
       "enabled": true,
       "steam_review_percent": 94
     },
-    {
-      "id": "ad-dash-versus-zephyr",
+    "ad-dash-versus-zephyr": {
       "kind": "sponsor",
       "title": "Zephyr Edge",
       "tagline": "Blistering arcade racer",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-zephyr-edge.webp",
-      "placements": "dash-versus",
-      "priority": 2,
       "enabled": true,
       "hltb_hours": 7
     },
-    {
-      "id": "ad-coop-online-zephyr",
+    "ad-coop-online-zephyr": {
       "kind": "sponsor",
       "title": "Zephyr Edge",
       "tagline": "Blistering arcade racer",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-zephyr-edge.webp",
-      "placements": "coop-online",
-      "priority": 1,
       "enabled": true,
       "steam_review_percent": 96
     },
-    {
-      "id": "ad-coop-couch-ironveil",
+    "ad-coop-couch-ironveil": {
       "kind": "sponsor",
       "title": "Ironveil",
       "tagline": "Couch co-op dungeon crawler",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "placements": "coop-couch",
-      "priority": 1,
       "enabled": true,
       "steam_review_percent": 93
     },
-    {
-      "id": "ad-claimable-hollowmaw",
+    "ad-claimable-hollowmaw": {
       "kind": "sponsor",
       "title": "Hollowmaw",
       "tagline": "Hidden gem horror adventure",
@@ -134,8 +126,6 @@
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-hollowmaw.webp",
       "portrait": true,
-      "placements": "claimable",
-      "priority": 1,
       "enabled": true,
       "network": "Gravewax Interactive",
       "genres": [
@@ -149,8 +139,7 @@
       "discount": 60,
       "price_base": 19.99
     },
-    {
-      "id": "ad-claimable-apex-velocity",
+    "ad-claimable-apex-velocity": {
       "kind": "sponsor",
       "title": "Apex Velocity",
       "tagline": "Blistering arcade racer — drift through neon cities",
@@ -158,8 +147,6 @@
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-apex-velocity.webp",
       "portrait": true,
-      "placements": "claimable",
-      "priority": 2,
       "enabled": true,
       "network": "Velocity Interactive",
       "genres": [
@@ -173,16 +160,13 @@
       "discount": 50,
       "price_base": 24.99
     },
-    {
-      "id": "ad-claimable-tidewright",
+    "ad-claimable-tidewright": {
       "kind": "sponsor",
       "title": "Tidewright",
       "tagline": "Bend the tides to raise a sunken world",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-tidewright.webp",
-      "placements": "claimable",
-      "priority": 3,
       "enabled": true,
       "network": "Saltmarsh Studio",
       "genres": [
@@ -195,6 +179,114 @@
       "release_year": 2025,
       "discount": 30,
       "price_base": 29.99
+    },
+    "house-support-baklog": {
+      "kind": "house",
+      "title": "Back BAKLOG",
+      "tagline": "Local-first, no server to breach. Help fund development.",
+      "cta": "Join the waitlist",
+      "url": "https://baklog.app/#waitlist",
+      "cover": "",
+      "enabled": true
+    },
+    "house-pro-promo": {
+      "kind": "house",
+      "title": "Power-user conveniences",
+      "tagline": "Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.",
+      "cta": "$5/mo — see what's planned",
+      "url": "https://baklog.app/",
+      "cover": "",
+      "enabled": true
+    },
+    "house-lib-backlog": {
+      "kind": "house",
+      "title": "You own 600 games. You've played 40.",
+      "tagline": "One honest backlog across every store. Free, private, Steam-ready.",
+      "cta": "Start free",
+      "url": "https://baklog.app/",
+      "cover": "",
+      "enabled": true
+    },
+    "house-itch-privacy": {
+      "kind": "house",
+      "title": "Every store, one list",
+      "tagline": "There is no BAKLOG server to breach. Your libraries stay on your machine.",
+      "cta": "Learn more",
+      "url": "https://baklog.app/",
+      "cover": "",
+      "enabled": true
     }
-  ]
+  },
+  "locations": {
+    "dash-spotlight": [
+      "ad-spotlight-hero-emberfall",
+      "ad-spotlight-cover-ironveil"
+    ],
+    "dash-feature-banner": [
+      "ad-feature-banner-emberfall"
+    ],
+    "dash-coop-online": [
+      "ad-coop-online-zephyr"
+    ],
+    "dash-coop-couch": [
+      "ad-coop-couch-ironveil"
+    ],
+    "dash-versus-rated": [
+      "ad-dash-versus-dawnbanner"
+    ],
+    "dash-versus-fast": [
+      "ad-dash-versus-zephyr"
+    ],
+    "dash-pick": [
+      "ad-dash-picks-dawnbanner"
+    ],
+    "dash-house": [
+      "house-pro-promo"
+    ],
+    "lib-pick": [
+      "ad-picks-ironveil"
+    ],
+    "lib-row": [
+      "ad-table-encore"
+    ],
+    "lib-house": [
+      "house-lib-backlog"
+    ],
+    "wish-pick": [
+      "ad-picks-ironveil"
+    ],
+    "wish-row": [
+      "ad-table-encore"
+    ],
+    "wish-house": [
+      "house-support-baklog"
+    ],
+    "wish-deal-hero": [
+      "ad-feature-banner-emberfall"
+    ],
+    "wish-deal-portrait": [
+      "ad-dash-versus-zephyr",
+      "ad-spotlight-cover-ironveil"
+    ],
+    "deals-pick": [
+      "ad-picks-ironveil"
+    ],
+    "deals-row": [
+      "ad-table-encore"
+    ],
+    "itch-pick": [
+      "ad-picks-ironveil"
+    ],
+    "itch-row": [
+      "ad-table-encore"
+    ],
+    "itch-house": [
+      "house-itch-privacy"
+    ],
+    "claim-cards": [
+      "ad-claimable-hollowmaw",
+      "ad-claimable-apex-velocity",
+      "ad-claimable-tidewright"
+    ]
+  }
 }

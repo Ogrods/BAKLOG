@@ -87,35 +87,37 @@ describe('dashboard picks row', () => {
     const authGate = await import('../js/auth-gate.js');
     vi.spyOn(authGate, 'isPro').mockReturnValue(false);
     const { renderDashboardPicksVersus } = await import('../js/dashboard-cards.js');
-    state.sponsoredDeals = [
-      {
-        id: 'ad-dash-rated',
-        kind: 'sponsor',
-        title: 'Dawnbanner',
-        tagline: 'Trending tactical RPG',
-        cta: 'View deal',
-        url: 'https://example.com/dawn',
-        cover: '/assets/ads-sample/hero-dawnbanner.webp',
-        placements: 'dash-versus',
-        priority: 1,
-        enabled: true,
-        steam_review_percent: 94,
-        hltb_hours: 32,
+    const { __setSponsorsForTest } = await import('../js/sponsored-deals.js');
+    __setSponsorsForTest({
+      version: 2,
+      ads: {
+        'ad-dash-rated': {
+          kind: 'sponsor',
+          title: 'Dawnbanner',
+          tagline: 'Trending tactical RPG',
+          cta: 'View deal',
+          url: 'https://example.com/dawn',
+          cover: '/assets/ads-sample/hero-dawnbanner.webp',
+          enabled: true,
+          steam_review_percent: 94,
+          hltb_hours: 32,
+        },
+        'ad-dash-fast': {
+          kind: 'house',
+          title: 'Emberfall',
+          tagline: 'Open-world adventure',
+          cta: 'View deal',
+          url: 'https://example.com/ember',
+          cover: '/assets/ads-sample/cover-encore.webp',
+          enabled: true,
+          hltb_hours: 10,
+        },
       },
-      {
-        id: 'ad-dash-fast',
-        kind: 'house',
-        title: 'Emberfall',
-        tagline: 'Open-world adventure',
-        cta: 'View deal',
-        url: 'https://example.com/ember',
-        cover: '/assets/ads-sample/cover-encore.webp',
-        placements: 'dash-versus',
-        priority: 2,
-        enabled: true,
-        hltb_hours: 10,
+      locations: {
+        'dash-versus-rated': ['ad-dash-rated'],
+        'dash-versus-fast': ['ad-dash-fast'],
       },
-    ];
+    });
     const games = [
       backlogGame('Alpha Game', 'a', { rating: 95, hltb: 6 }),
       backlogGame('Beta Game', 'b', { rating: 88, hltb: 12 }),
@@ -152,10 +154,18 @@ describe('dashboard picks row', () => {
     state.personal = Object.fromEntries(
       Array.from({ length: 7 }, (_, i) => [`steam:g${i}`, { status: 'backlog' }]),
     );
-    state.sponsoredDeals = [
-      { id: 'ad-dash-rated', kind: 'sponsor', title: 'Dawnbanner', tagline: 't', cta: 'c', url: 'https://example.com/d', cover: '/a.webp', placements: 'dash-versus', priority: 1, enabled: true },
-      { id: 'ad-dash-fast', kind: 'house', title: 'Emberfall', tagline: 't', cta: 'c', url: 'https://example.com/e', cover: '/b.webp', placements: 'dash-versus', priority: 2, enabled: true },
-    ];
+    const { __setSponsorsForTest } = await import('../js/sponsored-deals.js');
+    __setSponsorsForTest({
+      version: 2,
+      ads: {
+        'ad-dash-rated': { kind: 'sponsor', title: 'Dawnbanner', tagline: 't', cta: 'c', url: 'https://example.com/d', cover: '/a.webp', enabled: true },
+        'ad-dash-fast': { kind: 'house', title: 'Emberfall', tagline: 't', cta: 'c', url: 'https://example.com/e', cover: '/b.webp', enabled: true },
+      },
+      locations: {
+        'dash-versus-rated': ['ad-dash-rated'],
+        'dash-versus-fast': ['ad-dash-fast'],
+      },
+    });
     const games = Array.from({ length: 7 }, (_, i) =>
       backlogGame(`Game ${i}`, `g${i}`, { rating: 99 - i, hltb: i + 1 }),
     );

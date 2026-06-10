@@ -452,14 +452,18 @@ export function scheduleTableRerender() {
 export function updateWishlistDrawerVisibility() {
   const section = document.getElementById("wishlistDealsSection");
   if (section) section.classList.toggle("hidden", state.activeView !== "wishlist");
+  const showWishlistDeals = state.activeView === "wishlist" && state.dashboardDataReady;
   const radar = document.getElementById("wishlistDealRadar");
   if (radar) {
     // Wait for the library/wishlist data to land before showing the radar so
     // it never flashes the "No wishlist data — run fetch_wishlist.py" message
     // on reload (mirrors the dashboardDataReady gate the dashboard uses).
-    const showRadar = state.activeView === "wishlist" && state.dashboardDataReady;
-    radar.classList.toggle("hidden", !showRadar);
-    if (showRadar) renderDashboardWishlistStats();
+    radar.classList.toggle("hidden", !showWishlistDeals);
+    if (showWishlistDeals) renderDashboardWishlistStats();
+  }
+  const wishHouse = document.getElementById("wishlistHouseSlot");
+  if (wishHouse) {
+    wishHouse.classList.toggle("hidden", !showWishlistDeals);
   }
   void import('./claimable.js').then(m => m.renderClaimableModule());
 }
@@ -480,7 +484,10 @@ export function updateViewChrome(options) {
   updatePickTabsVisibility();
   // Quick-Wins slider visibility (only shown on the Quick Wins tab) lives in
   // picks-ui via updatePicksChrome; import lazily to avoid a top-level cycle.
-  void import('./picks-ui.js').then(m => m.updatePicksChrome());
+  void import('./picks-ui.js').then(m => {
+    m.updatePicksChrome();
+    m.renderViewHouseSlot?.();
+  });
   document.getElementById("picksSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("toolbarSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("tableShell")?.classList.toggle("hidden", hideTableUi);

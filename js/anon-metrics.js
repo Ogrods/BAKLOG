@@ -59,18 +59,24 @@ export function noteSponsoredImpression(placement, sponsorId) {
   recordMetric('impression', { placement, sponsorId });
 }
 
-export function recordSponsoredClick(sponsorId) {
-  if (!sponsorId) return;
-  const item = (state.sponsoredDeals || []).find(it => it.id === sponsorId);
-  const placement = item ? (itemPlacements(item)[0] || '') : '';
-  recordMetric('click', { placement, sponsorId });
+function firstLocationForAdId(adId) {
+  for (const [loc, ids] of Object.entries(state.adLocations || {})) {
+    if (Array.isArray(ids) && ids.includes(adId)) return loc;
+  }
+  const item = (state.sponsoredDeals || []).find(it => it.id === adId);
+  if (item) {
+    const raw = item?.placements;
+    if (raw == null || raw === '') return 'wish-house';
+    const list = Array.isArray(raw) ? raw : String(raw).split(',');
+    return list.map(s => String(s).trim().toLowerCase()).filter(Boolean)[0] || '';
+  }
+  return '';
 }
 
-function itemPlacements(item) {
-  const raw = item?.placements;
-  if (raw == null || raw === '') return ['deal-rail'];
-  const list = Array.isArray(raw) ? raw : String(raw).split(',');
-  return list.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+export function recordSponsoredClick(sponsorId) {
+  if (!sponsorId) return;
+  const placement = firstLocationForAdId(sponsorId);
+  recordMetric('click', { placement, sponsorId });
 }
 
 export async function flushMetrics() {

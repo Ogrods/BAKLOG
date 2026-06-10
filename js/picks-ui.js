@@ -22,7 +22,7 @@ import {
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { syncCoverFits } from './covers.js';
-import { sponsoredPickSlotHtml, sponsoredDealPickSlotHtml } from './sponsored-deals.js';
+import { sponsoredPickSlotHtml, sponsoredDealPickSlotHtml, pickLocationForView, houseLocationForView, renderHouseLocationSlot } from './sponsored-deals.js';
 
 export function pickCardHtml(g) {
   const key = gameKey(g);
@@ -187,9 +187,12 @@ export function renderPicks() {
   }
   if (pickView === "itch" && tab !== "topRated") data = backlogRated;
   const limit = state.prefs.picksLimit || 16;
+  const pickLoc = tab === 'wishlistDeals'
+    ? pickLocationForView(pickView === 'wishlist' ? 'wishlist' : 'deals', 'pick')
+    : pickLocationForView(pickView, 'pick');
   const sponsoredHtml = tab === 'wishlistDeals'
-    ? sponsoredDealPickSlotHtml()
-    : sponsoredPickSlotHtml();
+    ? sponsoredDealPickSlotHtml(pickLoc)
+    : sponsoredPickSlotHtml(pickLoc);
   const sponsorSlot = !!sponsoredHtml;
   // The sponsored slot occupies one grid cell, so drop one real card to keep the
   // grid at exactly `limit` tiles — otherwise the extra card wraps to a new row.
@@ -231,9 +234,6 @@ export function renderPicks() {
         handled = true;
       }
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'427a43'},body:JSON.stringify({sessionId:'427a43',location:'picks-ui.js:renderPicks',message:'renderPicks path',data:{handled,sponsorSlot,hasSponsorNode,sameRenderer,existingCount:existingKeys.length,cardBudget},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     let canIncremental = !handled && sameRenderer && existingKeys.length > 0 && !sponsorSlot && !hasSponsorNode;
     if (canIncremental) {
       const overlap = Math.min(existingKeys.length, newKeys.length);
@@ -267,4 +267,18 @@ export function renderPicks() {
   });
   updatePicksChrome();
   renderPicksLimitButtons();
+  renderViewHouseSlot();
+}
+
+/** Single house promo below picks / deal radar (library stripe, itch stripe, wishlist banner). */
+export function renderViewHouseSlot() {
+  const slot = document.getElementById('viewHouseSlot');
+  if (!slot) return;
+  const view = state.activeView;
+  if (view === 'dashboard' || view === 'connections') {
+    slot.classList.add('hidden');
+    slot.innerHTML = '';
+    return;
+  }
+  renderHouseLocationSlot(houseLocationForView(view), 'viewHouseSlot');
 }

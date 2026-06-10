@@ -7,7 +7,16 @@ import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverF
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
-import { sponsoredDealSlotHtml, proPromoSlotHtml, getEligibleSponsors, sponsoredDashPicksCardHtml, sponsoredFeatureBannerHtml, sponsoredVersusRowHtml, getVersusColumnAds, sponsoredCoopPickRowHtml } from './sponsored-deals.js';
+import {
+  sponsoredDealCardHtml,
+  getAdsForLocation,
+  sponsoredDashPicksCardHtml,
+  sponsoredFeatureBannerHtml,
+  sponsoredVersusRowHtml,
+  getVersusColumnAds,
+  sponsoredCoopPickRowHtml,
+  renderHouseLocationSlot,
+} from './sponsored-deals.js';
 import { focusGame } from './table-ui.js';
 import { DASH_STORE_LABELS, DASH_STORE_COLORS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
 // Itch click routing uses dashDrillItchGenre from the drilldown module.
@@ -137,13 +146,13 @@ export function renderDashboardCoopSpotlight(games) {
       ? Math.round(hltbValues.reduce((s, h) => s + h, 0) / hltbValues.length)
       : null;
     const pickPool = coopPickPool(list);
-    const ad = placement ? getEligibleSponsors(placement)[0] : null;
+    const ad = placement ? getAdsForLocation(placement)[0] : null;
     const shown = pickPool.slice(0, ad ? 2 : 3);
     const emptyMsg = '<div class="coop-picks-empty">All started or finished - nothing unplayed.</div>';
     let picksHtml = shown.length
       ? shown.map(coopPickRowHtml).join("")
       : (ad ? "" : emptyMsg);
-    if (ad) picksHtml += sponsoredCoopPickRowHtml(ad);
+    if (ad) picksHtml += sponsoredCoopPickRowHtml(ad, placement);
     const drillJson = escapeAttr(JSON.stringify(drillArgs));
     return `
       <div class="coop-side ${sideClass}" role="button" tabindex="0" data-action="coop-drill" data-drill="${drillJson}" title="Filter the library by ${escapeAttr(title)}">
@@ -197,9 +206,9 @@ export function renderDashboardCoopSpotlight(games) {
       <div class="coop-spotlight-sub" title="Steam co-op categories · click a column to filter the library">Steam co-op signal · click a side to filter the library</div>
     </div>
     <div class="coop-versus">
-      ${sideHtml(onlineGames, { sideClass: "coop-side-online", title: "Online co-op", drillArgs: { online: true, local: false }, placement: 'coop-online' })}
+      ${sideHtml(onlineGames, { sideClass: "coop-side-online", title: "Online co-op", drillArgs: { online: true, local: false }, placement: 'dash-coop-online' })}
       ${connector}
-      ${sideHtml(localGames, { sideClass: "coop-side-local", title: "Couch co-op", drillArgs: { online: false, local: true }, placement: 'coop-couch' })}
+      ${sideHtml(localGames, { sideClass: "coop-side-local", title: "Couch co-op", drillArgs: { online: false, local: true }, placement: 'dash-coop-couch' })}
     </div>
   `;
 }
@@ -215,7 +224,7 @@ export function applyItchVisibility() {
 export function renderDashboardSponsoredPick() {
   const slot = document.getElementById('dashboardSponsoredPick');
   if (!slot) return;
-  const item = getEligibleSponsors('dash-picks')[0];
+  const item = getAdsForLocation('dash-pick')[0];
   if (!item) {
     slot.classList.add('hidden');
     slot.innerHTML = '';
@@ -228,7 +237,7 @@ export function renderDashboardSponsoredPick() {
 export function renderDashboardFeatureBanner() {
   const slot = document.getElementById('dashboardFeatureBanner');
   if (!slot) return;
-  const item = getEligibleSponsors('dash-feature-banner')[0];
+  const item = getAdsForLocation('dash-feature-banner')[0];
   if (!item) {
     slot.classList.add('hidden');
     slot.innerHTML = '';
@@ -291,14 +300,14 @@ export function renderDashboardPicksVersus(games) {
     let html = rated.length
       ? rated.map(g => row(g, gg => `${ratingValue(gg)}%`, "dash-versus-row--rated")).join("")
       : empty;
-    if (ratedAd) html += sponsoredVersusRowHtml(ratedAd, { metric: 'rating' });
+    if (ratedAd) html += sponsoredVersusRowHtml(ratedAd, { metric: 'rating', locationKey: 'dash-versus-rated' });
     ratedEl.innerHTML = html;
   }
   if (fastEl) {
     let html = fast.length
       ? fast.map(g => row(g, gg => `${hltbMain(gg) || "?"}h`, "dash-versus-row--fast")).join("")
       : empty;
-    if (fastAd) html += sponsoredVersusRowHtml(fastAd, { metric: 'hltb' });
+    if (fastAd) html += sponsoredVersusRowHtml(fastAd, { metric: 'hltb', locationKey: 'dash-versus-fast' });
     fastEl.innerHTML = html;
   }
 
@@ -359,13 +368,25 @@ export function renderDashboardRecentAdditions(games) {
 }
 
 function dealRailAdSlotHtml(slot = 'wishlist') {
-  return slot === 'dashboard' ? proPromoSlotHtml() : sponsoredDealSlotHtml();
+  if (slot === 'dashboard') return '';
+  const item = getAdsForLocation('wish-deal-hero')[0];
+  return item ? sponsoredDealCardHtml(item) : '';
+}
+
+function wishlistPortraitAdsHtml() {
+  return getAdsForLocation('wish-deal-portrait', { count: 2 })
+    .map(item => sponsoredDealCardHtml(item))
+    .join('');
+}
+
+export function renderDashboardHouseSlot() {
+  renderHouseLocationSlot('dash-house', 'dashboardHouseSlot');
 }
 
 export function buildWishlistStatsHtml(slot = 'wishlist') {
   const wl = state.wishlistGames;
   if (!wl.length) {
-    return [
+    const cards = [
       dealHeroEmptyHtml({ noWishlist: true }),
       dealSaleScoreboardCardHtml({
         onSaleCount: 0,
@@ -378,7 +399,12 @@ export function buildWishlistStatsHtml(slot = 'wishlist') {
       }),
       dealStealsCardHtml([]),
       dealRailAdSlotHtml(slot),
-    ].join("");
+    ];
+    if (slot === 'wishlist') {
+      const portraits = wishlistPortraitAdsHtml();
+      if (portraits) cards.push(portraits);
+    }
+    return cards.join('');
   }
 
   const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
@@ -409,7 +435,7 @@ export function buildWishlistStatsHtml(slot = 'wishlist') {
   const avgCut = onSale.length ? Math.round(cutSum / onSale.length) : 0;
   const steals = wl.filter(isStealDeal);
 
-  return [
+  const cards = [
     topDeal ? dealHeroCardHtml(topDeal) : dealHeroEmptyHtml(),
     dealSaleScoreboardCardHtml({
       onSaleCount: onSale.length,
@@ -422,7 +448,12 @@ export function buildWishlistStatsHtml(slot = 'wishlist') {
     }),
     dealStealsCardHtml(steals),
     dealRailAdSlotHtml(slot),
-  ].join("");
+  ];
+  if (slot === 'wishlist') {
+    const portraits = wishlistPortraitAdsHtml();
+    if (portraits) cards.push(portraits);
+  }
+  return cards.join('');
 }
 
 export function renderDashboardWishlistStats() {
@@ -435,6 +466,7 @@ export function renderDashboardWishlistStats() {
     const slot = el.id === 'dashboardWishlistStats' ? 'dashboard' : 'wishlist';
     el.innerHTML = buildWishlistStatsHtml(slot);
   }
+  renderDashboardHouseSlot();
 }
 
 function itchBreakdownRows(entries, fillClass, action) {

@@ -31,39 +31,59 @@ describe('dashboard co-op sponsored picks', () => {
       Array.from({ length: 6 }, (_, i) => [`steam:o${i}`, { status: 'backlog' }])
         .concat(Array.from({ length: 6 }, (_, i) => [`steam:c${i}`, { status: 'backlog' }])),
     );
-    state.sponsoredDeals = [
-      {
-        id: 'ad-coop-online-zephyr',
-        kind: 'sponsor',
-        title: 'Zephyr Edge',
-        tagline: 'Blistering arcade racer',
-        cta: 'View deal',
-        url: 'https://example.com/z',
-        cover: '/assets/ads-sample/cover-zephyr-edge.webp',
-        placements: 'coop-online',
-        priority: 1,
-        enabled: true,
-        steam_review_percent: 96,
+    const { __setSponsorsForTest } = await import('../js/sponsored-deals.js');
+    __setSponsorsForTest({
+      version: 2,
+      ads: {
+        'ad-coop-online-zephyr': {
+          kind: 'sponsor',
+          title: 'Zephyr Edge',
+          tagline: 'Blistering arcade racer',
+          cta: 'View deal',
+          url: 'https://example.com/z',
+          cover: '/assets/ads-sample/cover-zephyr-edge.webp',
+          enabled: true,
+          steam_review_percent: 96,
+        },
+        'ad-coop-couch-ironveil': {
+          kind: 'sponsor',
+          title: 'Ironveil',
+          tagline: 'Couch co-op dungeon crawler',
+          cta: 'View deal',
+          url: 'https://example.com/i',
+          cover: '/assets/ads-sample/cover-ironveil.webp',
+          enabled: true,
+          steam_review_percent: 93,
+        },
       },
-      {
-        id: 'ad-coop-couch-ironveil',
-        kind: 'sponsor',
-        title: 'Ironveil',
-        tagline: 'Couch co-op dungeon crawler',
-        cta: 'View deal',
-        url: 'https://example.com/i',
-        cover: '/assets/ads-sample/cover-ironveil.webp',
-        placements: 'coop-couch',
-        priority: 1,
-        enabled: true,
-        steam_review_percent: 93,
+      locations: {
+        'dash-coop-online': ['ad-coop-online-zephyr'],
+        'dash-coop-couch': ['ad-coop-couch-ironveil'],
       },
-    ];
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('records couch impressions under dash-coop-couch (not online)', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    vi.spyOn(authGate, 'isPro').mockReturnValue(false);
+    const anonMetrics = await import('../js/anon-metrics.js');
+    const impSpy = vi.spyOn(anonMetrics, 'noteSponsoredImpression');
+    const { renderDashboardCoopSpotlight } = await import('../js/dashboard-cards.js');
+    const onlineGames = Array.from({ length: 4 }, (_, i) =>
+      coopGame(`Online ${i}`, `o${i}`, { rating: 98 - i, online: true, local: false }),
+    );
+    const couchGames = Array.from({ length: 4 }, (_, i) =>
+      coopGame(`Couch ${i}`, `c${i}`, { rating: 97 - i, online: false, local: true }),
+    );
+    renderDashboardCoopSpotlight([...onlineGames, ...couchGames]);
+    expect(impSpy).toHaveBeenCalledWith('dash-coop-online', 'ad-coop-online-zephyr');
+    expect(impSpy).toHaveBeenCalledWith('dash-coop-couch', 'ad-coop-couch-ironveil');
+    impSpy.mockRestore();
   });
 
   it('shows Zephyr on Online co-op and Ironveil on Couch co-op as the last pick', async () => {

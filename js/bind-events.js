@@ -674,10 +674,7 @@ export function bindEvents() {
   document.addEventListener("click", e => {
     const card = e.target.closest(".pick-card");
     if (!card) return;
-    // #region agent log
-    fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'427a43'},body:JSON.stringify({sessionId:'427a43',location:'bind-events.js:pick-card-click',message:'pick card click handler',data:{gameKey:card.dataset.gameKey||null,isSponsored:card.classList.contains('sponsored-pick-card'),fromDismiss:!!e.target.closest('[data-action="sponsored-dismiss"]'),activeView:state.activeView},timestamp:Date.now(),hypothesisId:'A,E'})}).catch(()=>{});
-    // #endregion
-    if (card) focusGame(card.dataset.gameKey);
+    focusGame(card.dataset.gameKey);
   });
   document.addEventListener("keydown", createGlobalKeydownHandler({
     canUndo,

@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getEligibleSponsoredDeal,
   getEligibleSponsors,
+  getAdsForLocation,
   itemPlacements,
   sponsorCoverUrl,
   sponsoredDealCardHtml,
@@ -24,10 +25,16 @@ import {
   dismissSponsoredDeal,
   placementsForDismissRefresh,
   __resetDismissedSponsorsForTest,
+  __resetLocationCursorsForTest,
+  __setSponsorsForTest,
+  __migrateV1ForTest,
   loadSponsoredDeals,
+  renderHouseLocationSlot,
   SPONSORS_HOSTED_URL,
   SPONSOR_PLACEMENTS,
   HOUSE_DEAL_ITEM,
+  houseDealBannerHtml,
+  houseStripeCardHtml,
 } from '../js/sponsored-deals.js';
 import { buildWishlistStatsHtml } from '../js/dashboard-cards.js';
 import * as authGate from '../js/auth-gate.js';
@@ -36,7 +43,7 @@ import * as apiClient from '../js/api-client.js';
 import { state } from '../js/state.js';
 
 function sponsor(overrides = {}) {
-  return {
+  const { id, ...rest } = {
     id: 'sp1',
     kind: 'sponsor',
     title: 'Cool Game',
@@ -46,6 +53,21 @@ function sponsor(overrides = {}) {
     enabled: true,
     ...overrides,
   };
+  return { id, ...rest };
+}
+
+function v2Doc(adsById, locations) {
+  const ads = {};
+  for (const [id, fields] of Object.entries(adsById)) {
+    const { id: _drop, ...rest } = sponsor({ id, ...fields });
+    ads[id] = rest;
+  }
+  return { version: 2, ads, locations };
+}
+
+function wireWishHouse(item = HOUSE_DEAL_ITEM) {
+  const { id, ...rest } = item;
+  __setSponsorsForTest(v2Doc({ [id]: rest }, { 'wish-house': [id] }));
 }
 
 function proPromoItem(overrides = {}) {
@@ -67,47 +89,57 @@ beforeEach(() => {
   state.prefs = {};
   state.personal = {};
   state.ownedNormNames = new Set();
-  state.sponsoredDeals = [];
   __resetDismissedSponsorsForTest();
+  __resetLocationCursorsForTest();
+  __setSponsorsForTest({ version: 2, ads: {}, locations: {} });
 });
 
 afterEach(() => {
   state.sponsoredDeals = [];
+  state.sponsoredAds = {};
+  state.adLocations = {};
   state.personal = {};
 });
 
 describe('getEligibleSponsoredDeal', () => {
-  it('returns the highest-priority enabled slot', () => {
-    state.sponsoredDeals = [
-      sponsor({ id: 'low', priority: 5 }),
-      sponsor({ id: 'high', priority: 1 }),
-    ];
+  it('returns the first eligible ad at the wish-deal-hero location', () => {
+    __setSponsorsForTest(v2Doc(
+      { low: sponsor({ id: 'low', title: 'Low' }), high: sponsor({ id: 'high', title: 'High' }) },
+      { 'wish-deal-hero': ['high', 'low'] },
+    ));
     expect(getEligibleSponsoredDeal().id).toBe('high');
   });
 
   it('skips disabled slots', () => {
-    state.sponsoredDeals = [sponsor({ enabled: false })];
+    __setSponsorsForTest(v2Doc(
+      { sp1: sponsor({ enabled: false }) },
+      { 'wish-deal-hero': ['sp1'] },
+    ));
     expect(getEligibleSponsoredDeal()).toBeNull();
   });
 
   it('returns null for the paid (pro) entitlement', () => {
     const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
-    state.sponsoredDeals = [sponsor()];
+    __setSponsorsForTest(v2Doc({ sp1: sponsor() }, { 'wish-deal-hero': ['sp1'] }));
     expect(getEligibleSponsoredDeal()).toBeNull();
     spy.mockRestore();
   });
 
   it('skips a slot for a game the user already owns', () => {
-    state.sponsoredDeals = [sponsor({ match_title: 'Cool Game' })];
+    __setSponsorsForTest(v2Doc(
+      { sp1: sponsor({ match_title: 'Cool Game' }) },
+      { 'wish-deal-hero': ['sp1'] },
+    ));
     state.ownedNormNames = new Set(['cool game']);
     expect(getEligibleSponsoredDeal()).toBeNull();
   });
 
   it('backfills with the next ad when the top slot is for an owned game', () => {
-    state.sponsoredDeals = [
-      sponsor({ id: 'owned', match_title: 'Cool Game', priority: 1 }),
-      sponsor({ id: 'next', title: 'Next Game', priority: 2 }),
-    ];
+    __setSponsorsForTest(v2Doc(
+      { owned: sponsor({ id: 'owned', match_title: 'Cool Game', title: 'Owned' }),
+        next: sponsor({ id: 'next', title: 'Next Game' }) },
+      { 'wish-deal-hero': ['owned', 'next'] },
+    ));
     state.ownedNormNames = new Set(['cool game']);
     expect(getEligibleSponsoredDeal().id).toBe('next');
   });
@@ -115,14 +147,14 @@ describe('getEligibleSponsoredDeal', () => {
   it('honors the date window', () => {
     const future = new Date(Date.now() + 86400000).toISOString();
     const past = new Date(Date.now() - 86400000).toISOString();
-    state.sponsoredDeals = [sponsor({ starts: future })];
+    __setSponsorsForTest(v2Doc({ sp1: sponsor({ starts: future }) }, { 'wish-deal-hero': ['sp1'] }));
     expect(getEligibleSponsoredDeal()).toBeNull();
-    state.sponsoredDeals = [sponsor({ ends: past })];
+    __setSponsorsForTest(v2Doc({ sp1: sponsor({ ends: past }) }, { 'wish-deal-hero': ['sp1'] }));
     expect(getEligibleSponsoredDeal()).toBeNull();
   });
 
   it('excludes dismissed slots', () => {
-    state.sponsoredDeals = [sponsor({ id: 'sp1' })];
+    __setSponsorsForTest(v2Doc({ sp1: sponsor({ id: 'sp1' }) }, { 'wish-deal-hero': ['sp1'] }));
     dismissSponsoredDeal('sp1');
     expect(getEligibleSponsoredDeal()).toBeNull();
   });
@@ -151,19 +183,49 @@ describe('sponsoredDealCardHtml', () => {
 });
 
 describe('getEligibleSponsors', () => {
-  it('filters by placement', () => {
-    state.sponsoredDeals = [
-      sponsor({ id: 'rail', placements: 'deal-rail' }),
-      sponsor({ id: 'spot', placements: 'spotlight', title: 'Spot Ad' }),
-    ];
+  it('filters by legacy placement via location mapping', () => {
+    __setSponsorsForTest(v2Doc(
+      { rail: sponsor({ id: 'rail', title: 'Rail' }), spot: sponsor({ id: 'spot', title: 'Spot Ad' }) },
+      { 'wish-house': ['rail'], 'dash-spotlight': ['spot'] },
+    ));
     expect(getEligibleSponsors('deal-rail').map(x => x.id)).toEqual(['rail']);
     expect(getEligibleSponsors('spotlight').map(x => x.id)).toEqual(['spot']);
   });
 
-  it('defaults missing placements to deal-rail', () => {
-    state.sponsoredDeals = [sponsor({ id: 'rail' })];
-    expect(itemPlacements(state.sponsoredDeals[0])).toEqual(['deal-rail']);
+  it('defaults missing placements to lib-pick for itemPlacements helper', () => {
+    const item = sponsor({ id: 'rail' });
+    expect(itemPlacements(item)).toEqual(['lib-pick']);
     expect(getEligibleSponsors('picks')).toEqual([]);
+  });
+});
+
+describe('getAdsForLocation round-robin', () => {
+  it('persists and advances the per-location cursor', () => {
+    __setSponsorsForTest(v2Doc(
+      { a: sponsor({ id: 'a', title: 'A' }), b: sponsor({ id: 'b', title: 'B' }) },
+      { 'lib-pick': ['a', 'b'] },
+    ));
+    expect(getAdsForLocation('lib-pick')[0].id).toBe('a');
+    const cursors = JSON.parse(localStorage.getItem('baklog-ad-cursors') || '{}');
+    expect(cursors['lib-pick']).toBe(1);
+    expect(getAdsForLocation('lib-pick')[0].id).toBe('a');
+  });
+
+  it('resumes from a persisted cursor on a fresh session', () => {
+    __setSponsorsForTest(v2Doc(
+      { a: sponsor({ id: 'a', title: 'A' }), b: sponsor({ id: 'b', title: 'B' }) },
+      { 'lib-pick': ['a', 'b'] },
+    ));
+    localStorage.setItem('baklog-ad-cursors', JSON.stringify({ 'lib-pick': 1 }));
+    expect(getAdsForLocation('lib-pick')[0].id).toBe('b');
+  });
+
+  it('returns up to three claim-cards', () => {
+    __setSponsorsForTest(v2Doc(
+      { a: sponsor({ id: 'a' }), b: sponsor({ id: 'b' }), c: sponsor({ id: 'c' }), d: sponsor({ id: 'd' }) },
+      { 'claim-cards': ['a', 'b', 'c', 'd'] },
+    ));
+    expect(getAdsForLocation('claim-cards', { count: 3 }).map(x => x.id)).toEqual(['a', 'b', 'c']);
   });
 });
 
@@ -326,20 +388,105 @@ describe('sponsorToSpotlightGame', () => {
   });
 });
 
+describe('v1 migration', () => {
+  it('maps deal-rail to wish-deal-hero and seeds house slots', () => {
+    const out = __migrateV1ForTest({
+      items: [
+        { id: 'rail-ad', title: 'Rail Ad', placements: 'deal-rail', kind: 'sponsor' },
+        { id: 'dash-rail', title: 'Dash Rail', placements: 'dash-deal-rail', kind: 'house' },
+      ],
+    });
+    expect(out.locations['wish-deal-hero']).toContain('rail-ad');
+    expect(out.locations['dash-house']).toContain('dash-rail');
+    expect(out.locations['wish-house']).toContain('house-support-baklog');
+  });
+
+  it('defaults empty placements to deal-rail → wish-deal-hero', () => {
+    const out = __migrateV1ForTest({ items: [{ id: 'orphan', title: 'Orphan' }] });
+    expect(out.locations['wish-deal-hero']).toContain('orphan');
+  });
+});
+
+describe('native v2 load', () => {
+  it('hydrates state.adLocations from a v2 doc', () => {
+    __setSponsorsForTest(v2Doc(
+      { x: sponsor({ id: 'x', title: 'X' }) },
+      { 'lib-pick': ['x'], 'wish-deal-hero': ['x'] },
+    ));
+    expect(state.adLocations['lib-pick']).toEqual(['x']);
+    expect(state.adLocations['wish-deal-hero']).toEqual(['x']);
+    expect(state.sponsoredAds.x.title).toBe('X');
+  });
+});
+
+describe('renderHouseLocationSlot', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="dashHouse"></div><div id="wishHouse"></div>';
+  });
+
+  it('uses Pro upsell markup for house kind at dash-house', () => {
+    __setSponsorsForTest(v2Doc(
+      { pro: { kind: 'house', title: 'Pro slot', tagline: 'Upsell', cta: 'Go', url: 'https://baklog.app/' } },
+      { 'dash-house': ['pro'] },
+    ));
+    renderHouseLocationSlot('dash-house', 'dashHouse');
+    expect(document.getElementById('dashHouse').innerHTML).toContain('sponsored-deal-pro');
+  });
+
+  it('uses sponsored deal card for sponsor kind at dash-house', () => {
+    __setSponsorsForTest(v2Doc(
+      { sp: sponsor({ id: 'sp', title: 'Sponsor Dash', kind: 'sponsor' }) },
+      { 'dash-house': ['sp'] },
+    ));
+    renderHouseLocationSlot('dash-house', 'dashHouse');
+    const html = document.getElementById('dashHouse').innerHTML;
+    expect(html).toContain('Sponsor Dash');
+    expect(html).not.toContain('sponsored-deal-pro');
+    expect(html).toContain('sponsored-badge');
+  });
+
+  it('applies green accent on wish-house', () => {
+    wireWishHouse();
+    renderHouseLocationSlot('wish-house', 'wishHouse');
+    expect(document.getElementById('wishHouse').innerHTML).toContain('sponsored-deal-banner--green');
+  });
+});
+
+describe('house promo dismiss', () => {
+  it('omits dismiss on the full-width house banner and library stripe', () => {
+    const banner = houseDealBannerHtml(HOUSE_DEAL_ITEM, { accent: 'green' });
+    expect(banner).toContain('sponsored-deal-banner--green');
+    const stripe = houseStripeCardHtml({
+      id: 'house-lib-backlog',
+      kind: 'house',
+      title: 'You own 600 games. You\'ve played 40.',
+      tagline: 'One honest backlog across every store.',
+      cta: 'Start free',
+      url: 'https://baklog.app/',
+    });
+    expect(banner).not.toContain('sponsored-dismiss');
+    expect(stripe).not.toContain('sponsored-dismiss');
+  });
+});
+
 describe('sponsoredDealSlotHtml', () => {
-  it('renders the hard-coded Back BAKLOG house banner', () => {
+  it('renders the Back BAKLOG house banner from wish-house', () => {
+    wireWishHouse();
     const html = sponsoredDealSlotHtml();
     expect(html).toContain('sponsored-deal-house');
     expect(html).toContain('Back BAKLOG');
     expect(html).toContain('data-sponsor-house="1"');
+    expect(html).not.toContain('sponsored-dismiss');
   });
 
   it('returns empty string when dismissed', () => {
+    wireWishHouse();
     dismissSponsoredDeal(HOUSE_DEAL_ITEM.id);
     expect(sponsoredDealSlotHtml()).toBe('');
   });
 
   it('returns empty string for Pro subscribers', () => {
+    wireWishHouse();
     const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
     expect(sponsoredDealSlotHtml()).toBe('');
     spy.mockRestore();
@@ -385,40 +532,43 @@ describe('proPromoSlotHtml', () => {
 });
 
 describe('buildWishlistStatsHtml ad slot variants', () => {
-  it('uses the Pro banner on the dashboard slot', () => {
+  it('leaves the dashboard deal-rail 4th slot empty (Pro moves to dash-house)', () => {
     state.wishlistGames = [];
     const html = buildWishlistStatsHtml('dashboard');
-    expect(html).toContain('sponsored-deal-pro');
-    expect(html).toContain('Power-user conveniences');
+    expect(html).not.toContain('sponsored-deal-pro');
     expect(html).not.toContain('Join the waitlist');
   });
 
-  it('uses the hard-coded house banner on the wishlist slot', () => {
+  it('uses wish-deal-hero sponsor in the wishlist deal rail when assigned', () => {
     state.wishlistGames = [];
+    __setSponsorsForTest(v2Doc(
+      { hero: sponsor({ id: 'hero', title: 'Hero Deal', kind: 'sponsor' }) },
+      { 'wish-deal-hero': ['hero'] },
+    ));
     const html = buildWishlistStatsHtml('wishlist');
-    expect(html).toContain('sponsored-deal-house');
-    expect(html).toContain('Join the waitlist');
+    expect(html).toContain('Hero Deal');
     expect(html).not.toContain('sponsored-deal-pro');
   });
 });
 
 describe('placementsForDismissRefresh', () => {
-  it('returns only the dismissed item placements', () => {
-    state.sponsoredDeals = [
-      sponsor({ id: 'picks-ad', placements: 'picks' }),
-      sponsor({ id: 'rail-ad', placements: 'deal-rail', title: 'Rail' }),
-    ];
-    expect(placementsForDismissRefresh('picks-ad')).toEqual(['picks']);
-    expect(placementsForDismissRefresh('rail-ad')).toEqual(['deal-rail']);
+  it('returns only the dismissed item locations', () => {
+    __setSponsorsForTest(v2Doc(
+      { 'picks-ad': sponsor({ id: 'picks-ad' }), 'rail-ad': sponsor({ id: 'rail-ad', title: 'Rail' }) },
+      { 'lib-pick': ['picks-ad'], 'wish-house': ['rail-ad'] },
+    ));
+    expect(placementsForDismissRefresh('picks-ad')).toEqual(['lib-pick']);
+    expect(placementsForDismissRefresh('rail-ad')).toEqual(['wish-house']);
   });
 
-  it('returns all placements when sponsor id is unknown', () => {
-    state.sponsoredDeals = [sponsor({ id: 'known' })];
+  it('returns all locations when sponsor id is unknown', () => {
+    __setSponsorsForTest(v2Doc({ known: sponsor({ id: 'known' }) }, { 'lib-pick': ['known'] }));
     expect(placementsForDismissRefresh('missing')).toEqual([...SPONSOR_PLACEMENTS]);
   });
 
-  it('maps hard-coded house banner id to deal-rail', () => {
-    expect(placementsForDismissRefresh(HOUSE_DEAL_ITEM.id)).toEqual(['deal-rail']);
+  it('maps house banner id to wish-house when assigned', () => {
+    wireWishHouse();
+    expect(placementsForDismissRefresh(HOUSE_DEAL_ITEM.id)).toEqual(['wish-house']);
   });
 });
 
@@ -433,8 +583,8 @@ describe('house banner telemetry', () => {
 });
 
 describe('SPONSOR_PLACEMENTS', () => {
-  it('includes dash-deal-rail for the dashboard Pro upsell slot', () => {
-    expect(SPONSOR_PLACEMENTS).toContain('dash-deal-rail');
+  it('includes dash-house for the dashboard Pro upsell slot', () => {
+    expect(SPONSOR_PLACEMENTS).toContain('dash-house');
   });
 });
 
@@ -459,7 +609,8 @@ describe('loadSponsoredDeals', () => {
 
     await loadSponsoredDeals();
 
-    expect(state.sponsoredDeals.map(x => x.id)).toEqual(['local-ad']);
+    expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['local-ad']));
+    expect(state.sponsoredDeals).toHaveLength(5);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -477,7 +628,8 @@ describe('loadSponsoredDeals', () => {
 
     await loadSponsoredDeals();
 
-    expect(state.sponsoredDeals.map(x => x.id)).toEqual(['remote-ad']);
+    expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['remote-ad']));
+    expect(state.sponsoredDeals).toHaveLength(5);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       SPONSORS_HOSTED_URL,
       expect.objectContaining({ cache: 'no-store' }),
@@ -498,7 +650,8 @@ describe('loadSponsoredDeals', () => {
 
     await loadSponsoredDeals();
 
-    expect(state.sponsoredDeals.map(x => x.id)).toEqual(['bundled-ad']);
+    expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['bundled-ad']));
+    expect(state.sponsoredDeals).toHaveLength(5);
   });
 
   it('respects window.__BAKLOG_SPONSORS_ENDPOINT override', async () => {

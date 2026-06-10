@@ -7,7 +7,7 @@ import { switchView } from './filters-ui.js';
 import { claimsSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
 import { syncCoverFits } from './covers.js';
-import { getEligibleSponsors, sponsoredClaimCardHtml } from './sponsored-deals.js';
+import { getAdsForLocation, sponsoredClaimCardHtml } from './sponsored-deals.js';
 import { isPro } from './auth-gate.js';
 import {
   stripClaimTitleDecorations,
@@ -522,7 +522,7 @@ export function renderClaimableModule() {
     return;
   }
   mount.classList.remove('hidden');
-  const sponsoredItems = getEligibleSponsors('claimable').slice(0, 3);
+  const sponsoredItems = getAdsForLocation('claim-cards', { count: 3 });
   const sponsoredHtml = sponsoredItems.length
     ? `<div class="sponsored-claim-row">${sponsoredItems.map(sponsoredClaimCardHtml).join('')}</div>`
     : '';

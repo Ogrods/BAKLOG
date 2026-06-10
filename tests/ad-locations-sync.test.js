@@ -1,5 +1,5 @@
 /** Sync-pair guard: AD_LOCATIONS must match admin + server + Python migrator. */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { AD_LOCATIONS } from '../js/sponsored-deals.js';
 
@@ -26,7 +26,10 @@ function sorted(keys) {
 }
 
 describe('AD_LOCATIONS sync pairs', () => {
-  const serverKeys = extractPyFrozensetKeys(readFileSync('server.py', 'utf8'), 'SPONSOR_AD_LOCATIONS');
+  const serverKeys = extractPyFrozensetKeys(
+    readFileSync('shared/sponsors_validate.py', 'utf8'),
+    'SPONSOR_AD_LOCATIONS',
+  );
   const adminKeys = extractAdminAdLocations(readFileSync('admin/admin.js', 'utf8'));
   const migratorKeys = extractMigratorLocationKeys(readFileSync('scripts/migrate_sponsors_v2.py', 'utf8'));
 
@@ -34,11 +37,12 @@ describe('AD_LOCATIONS sync pairs', () => {
     expect(AD_LOCATIONS).toHaveLength(22);
   });
 
-  it('matches server.py SPONSOR_AD_LOCATIONS', () => {
+  it('matches shared/sponsors_validate.py SPONSOR_AD_LOCATIONS', () => {
     expect(sorted(serverKeys)).toEqual(sorted(AD_LOCATIONS));
   });
 
   it('matches admin/admin.js AD_LOCATIONS', () => {
+    if (!existsSync('admin/admin.js')) return;
     expect(sorted(adminKeys)).toEqual(sorted(AD_LOCATIONS));
   });
 

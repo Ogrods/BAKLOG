@@ -35,7 +35,10 @@ HOUSE_DEFAULTS = {
     "house-pro-promo": {
         "kind": "house",
         "title": "Power-user conveniences",
-        "tagline": "Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.",
+        "tagline": (
+            "Nothing you use today moves behind paywall. "
+            "The optional tier layers on bulk refresh, sync, and fewer distractions."
+        ),
         "cta": "$5/mo — see what's planned",
         "url": "https://baklog.app/",
         "cover": "",

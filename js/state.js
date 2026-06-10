@@ -40,6 +40,10 @@ export const state = {
   itadPriceDroppedKeys: new Set(),
   /** Disclosed sponsored/house deal slots (loaded from sponsors.json). */
   sponsoredDeals: [],
+  /** v2 feed: id -> creative */
+  sponsoredAds: {},
+  /** v2 feed: location key -> ordered ad ids */
+  adLocations: {},
   dashboardDataReady: false,
   activeView: 'dashboard',
   selectedKeys: new Set(),

@@ -144,6 +144,20 @@ def _load_existing_items(output: Path) -> tuple[dict[str, dict], int]:
     return existing_by_id, count
 
 
+def _stamp_first_seen(
+    items: list[dict],
+    existing_by_id: dict[str, dict],
+    fetched_at: str,
+) -> None:
+    """Set per-item first_seen: preserve the oldest stamp, else stamp this fetch."""
+    for item in items:
+        item_id = str(item.get("id") or "").strip()
+        prior = item.get("first_seen")
+        if not prior and item_id:
+            prior = (existing_by_id.get(item_id) or {}).get("first_seen")
+        item["first_seen"] = prior or fetched_at
+
+
 def main() -> int:
     configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -176,6 +190,7 @@ def main() -> int:
         sources = {args.source}
 
     items, counts = collect_claims(sources, stats=stats)
+    fetched_at = datetime.now(UTC).isoformat()
 
     existing_by_id, prior_count = _load_existing_items(args.output)
     if existing_by_id:
@@ -204,6 +219,8 @@ def main() -> int:
                     f"{', '.join(sorted(failed_sources))}"
                 )
                 items.extend(carried)
+
+    _stamp_first_seen(items, existing_by_id, fetched_at)
 
     # Refuse to clobber a good feed with nothing (e.g. every source failed) —
     # mirrors the library fetcher exit-2 contract.
@@ -243,7 +260,6 @@ def main() -> int:
             )
             return stats.finish("fetch_claim_sources", t0, exit_code=3)
 
-    fetched_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
     payload = {
         "fetched_at": fetched_at,

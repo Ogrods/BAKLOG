@@ -56,7 +56,7 @@ import {
 } from './deals.js';
 import { isPlatformToken } from './genres.js';
 import { syncCoverFits } from './covers.js';
-import { getEligibleSponsors, sponsoredTableRowHtml } from './sponsored-deals.js';
+import { getAdsForLocation, pickLocationForView, sponsoredTableRowHtml } from './sponsored-deals.js';
 import {
   getPersonal,
   setPersonal,
@@ -77,7 +77,7 @@ import { buildTableEmptyStateHtml } from './table-empty-state.js';
 import { formatPrice } from './table-price-format.js';
 
 export { formatPrice };
-import { renderPicks } from './picks-ui.js';
+import { renderPicks, effectivePicksTab } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
 // dashboard-drilldown imports from table-ui already; the cycle is safe because
 // both sides only invoke each other's functions inside click-time bodies.
@@ -703,9 +703,6 @@ function isToolbarScrollReady() {
 }
 
 export function focusGame(key) {
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'427a43'},body:JSON.stringify({sessionId:'427a43',location:'table-ui.js:focusGame',message:'focusGame called',data:{key:key??null,activeView:state.activeView},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
   state.pickedKey = key;
   const targetIsWishlist = String(key).startsWith("wishlist:");
   const targetIsItch = String(key).startsWith("itch:");
@@ -1132,15 +1129,25 @@ export function syncSponsoredTableAfterDismiss() {
   }
 }
 
+function resolveTableRowLocation() {
+  const view = state.activeView === 'wishlist' ? 'wishlist'
+    : (state.activeView === 'itch' ? 'itch' : 'library');
+  if (effectivePicksTab() === 'wishlistDeals' && view === 'library') {
+    return pickLocationForView('deals', 'row');
+  }
+  return pickLocationForView(view, 'row');
+}
+
 function appendChunk(list, start, end, ctx) {
   const run = perfActiveRun();
   const t0 = run ? performance.now() : 0;
   const out = [];
+  const rowLoc = resolveTableRowLocation();
   const tableAd = SPONSORED_TABLE_SLOT >= start && SPONSORED_TABLE_SLOT < end
-    ? getEligibleSponsors('table')[0]
+    ? getAdsForLocation(rowLoc)[0]
     : null;
   for (let i = start; i < end; i++) {
-    if (tableAd && i === SPONSORED_TABLE_SLOT) out.push(sponsoredTableRowHtml(tableAd, ctx));
+    if (tableAd && i === SPONSORED_TABLE_SLOT) out.push(sponsoredTableRowHtml(tableAd, { ...ctx, locationKey: rowLoc }));
     out.push(tableRowHtml(list[i], i, ctx));
   }
   const html = out.join("");

@@ -8,12 +8,12 @@
  * (`isPro()`). There is no free-tier ad opt-out — paying is the only way to
  * remove sponsored slots.
  *
- * Feed shape (sponsors.json / curated/sponsors.json):
- *   { version, generated_at, items: [{ id, kind, title, tagline, cta, url,
- *     cover?, match_title?, priority?, enabled?, starts?, ends?, placements? }] }
- *   kind: "house" -> "House" disclosure; anything else -> "Sponsored".
- *   placements: comma string or list — deal-rail, dash-deal-rail, spotlight, picks, table,
- *     dash-picks, dash-versus, coop-online, coop-couch, claimable (default deal-rail).
+ * Feed shape v2 (sponsors.json / curated/sponsors.json):
+ *   { version: 2, generated_at, ads: { id: { kind, title, ... } },
+ *     locations: { "lib-pick": ["ad-id", ...], ... } }
+ *   Each physical slot is a location key; ads cycle round-robin per location
+ *   (cursor persisted in localStorage across reloads).
+ *   kind: "house" -> no badge; anything else -> "Sponsored".
  */
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
@@ -34,21 +34,69 @@ export function getSponsorsEndpoint() {
     || SPONSORS_HOSTED_URL;
 }
 
-export const SPONSOR_PLACEMENTS = [
-  'deal-rail',
-  'dash-deal-rail',
-  'spotlight',
-  'picks',
-  'table',
-  'dash-picks',
+/** Sync pair: AD_LOCATIONS ↔ admin/admin.js AD_LOCATIONS */
+export const AD_LOCATIONS = [
+  'dash-spotlight',
   'dash-feature-banner',
-  'dash-versus',
-  'coop-online',
-  'coop-couch',
-  'claimable',
+  'dash-coop-online',
+  'dash-coop-couch',
+  'dash-versus-rated',
+  'dash-versus-fast',
+  'dash-pick',
+  'dash-house',
+  'lib-pick',
+  'lib-row',
+  'lib-house',
+  'wish-pick',
+  'wish-row',
+  'wish-deal-hero',
+  'wish-deal-portrait',
+  'wish-house',
+  'deals-pick',
+  'deals-row',
+  'itch-pick',
+  'itch-row',
+  'itch-house',
+  'claim-cards',
 ];
 
-const SPONSOR_PLACEMENT_SET = new Set(SPONSOR_PLACEMENTS);
+export const LOCATION_GROUPS = [
+  { label: 'Dashboard', keys: ['dash-spotlight', 'dash-feature-banner', 'dash-coop-online', 'dash-coop-couch', 'dash-versus-rated', 'dash-versus-fast', 'dash-pick', 'dash-house'] },
+  { label: 'Library', keys: ['lib-pick', 'lib-row', 'lib-house'] },
+  { label: 'Wishlist', keys: ['wish-pick', 'wish-row', 'wish-deal-hero', 'wish-deal-portrait', 'wish-house'] },
+  { label: 'Deals tab', keys: ['deals-pick', 'deals-row'] },
+  { label: 'Itch', keys: ['itch-pick', 'itch-row', 'itch-house'] },
+  { label: 'Claimable Now', keys: ['claim-cards'] },
+];
+
+/** Per-location max ads shown at once (admin hint + render cap). */
+export const LOCATION_CAPACITY = {
+  'claim-cards': 3,
+  'wish-deal-portrait': 2,
+};
+
+const AD_LOCATION_SET = new Set(AD_LOCATIONS);
+
+/** @deprecated use AD_LOCATIONS — kept for tests migrating off placement strings */
+export const SPONSOR_PLACEMENTS = AD_LOCATIONS;
+
+const CURSOR_STORAGE_KEY = 'baklog-ad-cursors';
+/** @type {Map<string, { start: number, eligibleLen: number }>} */
+const sessionLocationPicks = new Map();
+
+const LEGACY_PLACEMENT_TO_LOCATION = {
+  'deal-rail': 'wish-house',
+  'dash-deal-rail': 'dash-house',
+  spotlight: 'dash-spotlight',
+  picks: 'lib-pick',
+  table: 'lib-row',
+  'dash-picks': 'dash-pick',
+  'dash-feature-banner': 'dash-feature-banner',
+  'dash-versus': 'dash-versus-rated',
+  'coop-online': 'dash-coop-online',
+  'coop-couch': 'dash-coop-couch',
+  claimable: 'claim-cards',
+};
 
 // Session-scoped: dismissals live only in memory so a page refresh (a fresh
 // module import) restores every sponsored slot. Ads should reappear each
@@ -67,6 +115,81 @@ function isDismissed(id) {
 /** Test-only: clear session dismissals between vitest cases. */
 export function __resetDismissedSponsorsForTest() {
   dismissedThisSession.clear();
+  sessionLocationPicks.clear();
+  try { localStorage.removeItem(CURSOR_STORAGE_KEY); } catch (_) { /* noop */ }
+}
+
+export function __resetLocationCursorsForTest() {
+  sessionLocationPicks.clear();
+  try { localStorage.removeItem(CURSOR_STORAGE_KEY); } catch (_) { /* noop */ }
+}
+
+/** Test helper: apply v1 items[] or v2 doc into state. */
+export function __setSponsorsForTest(doc) {
+  if (Array.isArray(doc)) applySponsorsDoc({ items: doc });
+  else applySponsorsDoc(doc || {});
+}
+
+/** Test-only: exercise v1→v2 migration without loading feeds. */
+export function __migrateV1ForTest(doc) {
+  return migrateV1ToV2(doc || {});
+}
+
+function readCursors() {
+  try {
+    const raw = localStorage.getItem(CURSOR_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function writeCursors(cursors) {
+  try {
+    localStorage.setItem(CURSOR_STORAGE_KEY, JSON.stringify(cursors));
+  } catch (_) { /* noop */ }
+}
+
+function advanceCursorForLocation(locationKey, eligibleLen) {
+  if (!eligibleLen) return 0;
+  const cursors = readCursors();
+  const cur = Number(cursors[locationKey]) || 0;
+  const idx = cur % eligibleLen;
+  cursors[locationKey] = cur + 1;
+  writeCursors(cursors);
+  return idx;
+}
+
+function sessionStartForLocation(locationKey, eligibleLen) {
+  if (!sessionLocationPicks.has(locationKey)) {
+    sessionLocationPicks.set(locationKey, {
+      start: advanceCursorForLocation(locationKey, eligibleLen),
+      eligibleLen,
+    });
+  }
+  return sessionLocationPicks.get(locationKey).start;
+}
+
+export function pickLocationForView(view, kind = 'pick') {
+  const v = String(view || 'library').toLowerCase();
+  if (kind === 'row') {
+    if (v === 'wishlist') return 'wish-row';
+    if (v === 'itch') return 'itch-row';
+    if (v === 'deals') return 'deals-row';
+    return 'lib-row';
+  }
+  if (v === 'wishlist') return 'wish-pick';
+  if (v === 'itch') return 'itch-pick';
+  if (v === 'deals') return 'deals-pick';
+  return 'lib-pick';
+}
+
+export function houseLocationForView(view) {
+  const v = String(view || 'library').toLowerCase();
+  if (v === 'dashboard') return 'dash-house';
+  if (v === 'wishlist') return 'wish-house';
+  if (v === 'itch') return 'itch-house';
+  return 'lib-house';
 }
 
 function withinWindow(item, now = Date.now()) {
@@ -92,6 +215,144 @@ function normalizeSponsorsItems(doc) {
   return items.filter(it => it && typeof it === 'object' && it.id && it.title);
 }
 
+/** Sync pair: placementMap + HOUSE_DEFAULTS ↔ admin/admin.js migrateSponsorsV1 + scripts/migrate_sponsors_v2.py */
+const V1_PLACEMENT_MAP = {
+  spotlight: ['dash-spotlight'],
+  'dash-feature-banner': ['dash-feature-banner'],
+  'coop-online': ['dash-coop-online'],
+  'coop-couch': ['dash-coop-couch'],
+  'dash-picks': ['dash-pick'],
+  picks: ['lib-pick', 'wish-pick', 'deals-pick', 'itch-pick'],
+  table: ['lib-row', 'wish-row', 'deals-row', 'itch-row'],
+  claimable: ['claim-cards'],
+  'deal-rail': ['wish-deal-hero'],
+  'dash-deal-rail': ['dash-house'],
+};
+
+const HOUSE_DEFAULTS = {
+  'house-support-baklog': {
+    kind: 'house',
+    title: 'Back BAKLOG',
+    tagline: 'Local-first, no server to breach. Help fund development.',
+    cta: 'Join the waitlist',
+    url: 'https://baklog.app/#waitlist',
+    cover: '',
+    enabled: true,
+  },
+  'house-pro-promo': {
+    kind: 'house',
+    title: 'Power-user conveniences',
+    tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
+    cta: "$5/mo — see what's planned",
+    url: 'https://baklog.app/',
+    cover: '',
+    enabled: true,
+  },
+  'house-lib-backlog': {
+    kind: 'house',
+    title: 'You own 600 games. You\'ve played 40.',
+    tagline: 'One honest backlog across every store. Free, private, Steam-ready.',
+    cta: 'Start free',
+    url: 'https://baklog.app/',
+    cover: '',
+    enabled: true,
+  },
+  'house-itch-privacy': {
+    kind: 'house',
+    title: 'Every store, one list',
+    tagline: 'There is no BAKLOG server to breach. Your libraries stay on your machine.',
+    cta: 'Learn more',
+    url: 'https://baklog.app/',
+    cover: '',
+    enabled: true,
+  },
+};
+
+function placementsForMigration(item) {
+  const raw = item?.placements;
+  if (raw == null || raw === '') return ['deal-rail'];
+  const list = Array.isArray(raw) ? raw : String(raw).split(',');
+  return list.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+}
+
+function seedHouseDefaults(ads, locations) {
+  for (const [hid, creative] of Object.entries(HOUSE_DEFAULTS)) {
+    if (!ads[hid]) ads[hid] = creative;
+  }
+  const houseLocs = {
+    'dash-house': 'house-pro-promo',
+    'wish-house': 'house-support-baklog',
+    'lib-house': 'house-lib-backlog',
+    'itch-house': 'house-itch-privacy',
+  };
+  for (const [loc, hid] of Object.entries(houseLocs)) {
+    if (!locations[loc]?.length && ads[hid]) locations[loc] = [hid];
+  }
+}
+
+function migrateV1ToV2(doc) {
+  const items = normalizeSponsorsItems(doc);
+  const ads = {};
+  const locations = Object.fromEntries(AD_LOCATIONS.map(k => [k, []]));
+  const versus = [];
+  for (const item of items) {
+    const id = item.id;
+    const { placements, priority, ...rest } = item;
+    ads[id] = rest;
+    for (const p of placementsForMigration(item)) {
+      if (p === 'dash-versus') {
+        versus.push({ priority: priority ?? 99, id });
+        continue;
+      }
+      for (const loc of V1_PLACEMENT_MAP[p] || []) {
+        if (!locations[loc].includes(id)) locations[loc].push(id);
+      }
+    }
+  }
+  versus.sort((a, b) => a.priority - b.priority);
+  if (versus[0]) locations['dash-versus-rated'].push(versus[0].id);
+  if (versus[1]) locations['dash-versus-fast'].push(versus[1].id);
+  seedHouseDefaults(ads, locations);
+  return {
+    version: 2,
+    generated_at: doc?.generated_at ?? null,
+    ads,
+    locations: Object.fromEntries(Object.entries(locations).filter(([, v]) => v.length)),
+  };
+}
+
+function applySponsorsDoc(doc) {
+  const v2 = doc?.version === 2 ? doc : migrateV1ToV2(doc || {});
+  const adsMap = v2.ads && typeof v2.ads === 'object' ? v2.ads : {};
+  const locMap = v2.locations && typeof v2.locations === 'object' ? v2.locations : {};
+  state.sponsoredAds = adsMap;
+  state.adLocations = locMap;
+  const flat = [];
+  for (const [id, creative] of Object.entries(adsMap)) {
+    if (!creative || typeof creative !== 'object') continue;
+    flat.push({ ...creative, id });
+  }
+  state.sponsoredDeals = flat;
+  return flat;
+}
+
+function resolveAd(id) {
+  const creative = state.sponsoredAds?.[id];
+  if (!creative || typeof creative !== 'object') return null;
+  return { ...creative, id };
+}
+
+function isEligibleAd(item, now = Date.now()) {
+  if (!item || item.enabled === false) return false;
+  if (isDismissed(item.id)) return false;
+  if (!withinWindow(item, now)) return false;
+  if (item.match_title) {
+    const norm = normalizeNameForDedup(item.match_title);
+    if (norm && (isOwnedByTitle(item.match_title) || state.ownedNormNames?.has(norm))) return false;
+  }
+  return true;
+}
+
 async function fetchHostedSponsors() {
   const url = getSponsorsEndpoint();
   const controller = new AbortController();
@@ -107,29 +368,38 @@ async function fetchHostedSponsors() {
   }
 }
 
+function docHasSponsors(doc) {
+  if (!doc || typeof doc !== 'object') return false;
+  if (doc.version === 2) {
+    return Object.keys(doc.ads || {}).length > 0;
+  }
+  return Array.isArray(doc.items) && doc.items.length > 0;
+}
+
 export async function loadSponsoredDeals() {
   let doc = await fetchJson(SPONSORS_LOCAL_PATH);
-  if (doc?.items?.length) {
-    state.sponsoredDeals = normalizeSponsorsItems(doc);
-    return state.sponsoredDeals;
-  }
+  if (docHasSponsors(doc)) return applySponsorsDoc(doc);
   doc = await fetchHostedSponsors();
-  if (doc?.items?.length) {
-    state.sponsoredDeals = normalizeSponsorsItems(doc);
-    return state.sponsoredDeals;
-  }
+  if (docHasSponsors(doc)) return applySponsorsDoc(doc);
   doc = await fetchJson(SPONSORS_FALLBACK_PATH);
-  state.sponsoredDeals = normalizeSponsorsItems(doc);
-  return state.sponsoredDeals;
+  return applySponsorsDoc(doc);
 }
 
 export function itemPlacements(item) {
   const raw = item?.placements;
-  if (raw == null || raw === '') return ['deal-rail'];
+  if (raw == null || raw === '') return ['lib-pick'];
   const list = Array.isArray(raw) ? raw : String(raw).split(',');
-  const parsed = list.map(s => String(s).trim().toLowerCase()).filter(Boolean);
-  const valid = parsed.filter(p => SPONSOR_PLACEMENT_SET.has(p));
-  return valid.length ? valid : ['deal-rail'];
+  return list.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+}
+
+/** Locations that reference this ad id (v2 feed). */
+export function locationsForAdId(adId) {
+  if (!adId) return [];
+  const out = [];
+  for (const [loc, ids] of Object.entries(state.adLocations || {})) {
+    if (Array.isArray(ids) && ids.includes(adId)) out.push(loc);
+  }
+  return out;
 }
 
 export function sponsorCoverUrl(cover) {
@@ -177,31 +447,44 @@ function sponsorBadgeHtml(item, extraClass = '') {
 }
 
 /**
- * Eligible sponsored items for a placement, sorted by priority (lower first).
+ * Eligible ads for a fixed location, cycling round-robin once per app load.
+ * @param {string} locationKey
+ * @param {{ count?: number }} [opts]
  */
-export function getEligibleSponsors(placement) {
+export function getAdsForLocation(locationKey, { count = 1 } = {}) {
   if (isPro()) return [];
-  const want = String(placement || 'deal-rail').toLowerCase();
+  const key = String(locationKey || '').toLowerCase();
+  if (!AD_LOCATION_SET.has(key)) return [];
+  const ids = state.adLocations?.[key] || [];
   const now = Date.now();
-  const eligible = (state.sponsoredDeals || []).filter(item => {
-    if (item.enabled === false) return false;
-    if (isDismissed(item.id)) return false;
-    if (!withinWindow(item, now)) return false;
-    if (!itemPlacements(item).includes(want)) return false;
-    if (item.match_title) {
-      const norm = normalizeNameForDedup(item.match_title);
-      if (norm && (isOwnedByTitle(item.match_title) || state.ownedNormNames?.has(norm))) return false;
-    }
-    return true;
-  });
-  eligible.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
-  return eligible;
+  const eligible = [];
+  for (const id of ids) {
+    const item = resolveAd(id);
+    if (item && isEligibleAd(item, now)) eligible.push(item);
+  }
+  if (!eligible.length) return [];
+  const cap = LOCATION_CAPACITY[key] ?? count;
+  const want = Math.min(count, cap, eligible.length);
+  const start = sessionStartForLocation(key, eligible.length);
+  const out = [];
+  for (let i = 0; i < want; i++) {
+    out.push(eligible[(start + i) % eligible.length]);
+  }
+  return out;
 }
 
-/** Highest-priority eligible deal-rail slot, or null. */
+/**
+ * @deprecated use getAdsForLocation — maps legacy placement strings to a location.
+ */
+export function getEligibleSponsors(placement) {
+  const loc = LEGACY_PLACEMENT_TO_LOCATION[String(placement || '').toLowerCase()] || placement;
+  const count = loc === 'claim-cards' ? 3 : (LOCATION_CAPACITY[loc] ?? 1);
+  return getAdsForLocation(loc, { count });
+}
+
+/** First eligible wish-deal-hero slot, or null. */
 export function getEligibleSponsoredDeal() {
-  const list = getEligibleSponsors('deal-rail');
-  return list[0] || null;
+  return getAdsForLocation('wish-deal-hero')[0] || null;
 }
 
 /**
@@ -215,25 +498,13 @@ export function getEligibleSponsoredDeal() {
 export function getVersusColumnAds() {
   const empty = { rated: null, fast: null, ratedReserved: false, fastReserved: false };
   if (isPro()) return empty;
-  const now = Date.now();
-  const candidates = (state.sponsoredDeals || []).filter(item => {
-    if (item.enabled === false) return false;
-    if (!withinWindow(item, now)) return false;
-    if (!itemPlacements(item).includes('dash-versus')) return false;
-    if (item.match_title) {
-      const norm = normalizeNameForDedup(item.match_title);
-      if (norm && (isOwnedByTitle(item.match_title) || state.ownedNormNames?.has(norm))) return false;
-    }
-    return true;
-  });
-  candidates.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
-  const ratedItem = candidates[0] || null;
-  const fastItem = candidates[1] || null;
+  const ratedIds = state.adLocations?.['dash-versus-rated'] || [];
+  const fastIds = state.adLocations?.['dash-versus-fast'] || [];
   return {
-    rated: ratedItem && !isDismissed(ratedItem.id) ? ratedItem : null,
-    fast: fastItem && !isDismissed(fastItem.id) ? fastItem : null,
-    ratedReserved: !!ratedItem,
-    fastReserved: !!fastItem,
+    rated: getAdsForLocation('dash-versus-rated')[0] || null,
+    fast: getAdsForLocation('dash-versus-fast')[0] || null,
+    ratedReserved: ratedIds.length > 0,
+    fastReserved: fastIds.length > 0,
   };
 }
 
@@ -328,10 +599,11 @@ export const PRO_PROMO_ITEM = {
  * instead of the compact 1/3-width sponsor card. Internal layout: brand block
  * on the left, three info columns filling the middle, CTA on the right.
  */
-export function houseDealBannerHtml(item) {
+export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
   if (!item) return '';
   const discTitle = sponsorDiscTitle(item);
   const cta = item.cta || 'Learn more';
+  const accentCls = accent === 'green' ? ' sponsored-deal-banner--green' : '';
   const tagline = item.tagline
     ? `<p class="house-banner-tagline">${escapeHtml(item.tagline)}</p>`
     : '';
@@ -342,7 +614,7 @@ export function houseDealBannerHtml(item) {
       </li>`)
     .join('');
   return `<button type="button"
-    class="dash-card deal-rail-card sponsored-deal-card sponsored-deal-house sponsored-deal-banner text-left w-full"
+    class="dash-card deal-rail-card sponsored-deal-card sponsored-deal-house sponsored-deal-banner${accentCls} text-left w-full"
     ${sponsorActionAttrs(item)}
     title="${escapeAttr(discTitle)}">
     <div class="house-banner-grid">
@@ -360,7 +632,6 @@ export function houseDealBannerHtml(item) {
       <ul class="house-banner-features">${features}</ul>
       <span class="house-banner-cta">${escapeHtml(cta)} &rarr;</span>
     </div>
-    ${sponsorDismissHtml(item)}
   </button>`;
 }
 
@@ -415,10 +686,55 @@ export function proPromoBannerHtml(item) {
   </button>`;
 }
 
-/** Markup for the hard-coded dash-deal-rail Pro upsell, or "" when none should show. */
+/** Markup for the dashboard house slot (dash-house — Pro upsell). */
 export function proPromoSlotHtml() {
   if (isPro()) return '';
-  return proPromoBannerHtml(PRO_PROMO_ITEM);
+  const item = getAdsForLocation('dash-house')[0] || PRO_PROMO_ITEM;
+  return proPromoBannerHtml(item);
+}
+
+/** Compact house stripe below picks (library / itch). */
+export function houseStripeCardHtml(item, { variant = 'lib' } = {}) {
+  if (!item) return '';
+  const discTitle = sponsorDiscTitle(item);
+  const cta = item.cta || 'Learn more';
+  const variantCls = variant === 'itch' ? ' house-stripe-card--itch' : ' house-stripe-card--lib';
+  return `<button type="button"
+    class="house-stripe-card${variantCls}${sponsorHouseClass(item)} text-left w-full"
+    ${sponsorActionAttrs(item)}
+    title="${escapeAttr(discTitle)}">
+    <span class="house-stripe-mark" aria-hidden="true">${baklogBannerMarkHtml(`houseStripe-${item.id || variant}`)}</span>
+    <span class="house-stripe-copy min-w-0 flex-1">
+      <span class="house-stripe-title">${escapeHtml(item.title)}</span>
+      ${item.tagline ? `<span class="house-stripe-tagline">${escapeHtml(item.tagline)}</span>` : ''}
+    </span>
+    <span class="house-stripe-cta">${escapeHtml(cta)} &rarr;</span>
+  </button>`;
+}
+
+export function renderHouseLocationSlot(locationKey, slotElId, { variant } = {}) {
+  const el = document.getElementById(slotElId);
+  if (!el) return;
+  const item = getAdsForLocation(locationKey)[0];
+  if (!item) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  noteSponsoredImpression(locationKey, item.id);
+  el.classList.remove('hidden');
+  if (locationKey === 'wish-house') {
+    el.innerHTML = houseDealBannerHtml(item, { accent: 'green' });
+    return;
+  }
+  if (locationKey === 'dash-house') {
+    const kind = String(item.kind || '').toLowerCase();
+    el.innerHTML = kind === 'house'
+      ? proPromoBannerHtml(item)
+      : sponsoredDealCardHtml(item);
+    return;
+  }
+  el.innerHTML = houseStripeCardHtml(item, { variant: variant || (locationKey.startsWith('itch') ? 'itch' : 'lib') });
 }
 
 export function sponsoredDealCardHtml(item) {
@@ -453,10 +769,11 @@ export function sponsoredDealCardHtml(item) {
   </button>`;
 }
 
-/** Markup for the hard-coded wishlist deal-rail house banner, or "" when hidden. */
+/** Markup for the wishlist house banner (wish-house location), green accent. */
 export function sponsoredDealSlotHtml() {
-  if (isPro() || isDismissed(HOUSE_DEAL_ITEM.id)) return '';
-  return houseDealBannerHtml(HOUSE_DEAL_ITEM);
+  const item = getAdsForLocation('wish-house')[0];
+  if (!item) return '';
+  return houseDealBannerHtml(item, { accent: 'green' });
 }
 
 export function sponsoredPickCardHtml(item) {
@@ -488,8 +805,9 @@ export function sponsoredPickCardHtml(item) {
   </button>`;
 }
 
-export function sponsoredPickSlotHtml() {
-  const item = getEligibleSponsors('picks')[0];
+export function sponsoredPickSlotHtml(locationKey = 'lib-pick') {
+  const item = getAdsForLocation(locationKey)[0];
+  if (item) noteSponsoredImpression(locationKey, item.id);
   return item ? sponsoredPickCardHtml(item) : '';
 }
 
@@ -535,9 +853,9 @@ export function sponsoredDealPickCardHtml(item) {
   </button>`;
 }
 
-export function sponsoredDealPickSlotHtml() {
-  const item = getEligibleSponsors('picks')[0];
-  if (item) noteSponsoredImpression('picks', item.id);
+export function sponsoredDealPickSlotHtml(locationKey = 'wish-pick') {
+  const item = getAdsForLocation(locationKey)[0];
+  if (item) noteSponsoredImpression(locationKey, item.id);
   return item ? sponsoredDealPickCardHtml(item) : '';
 }
 
@@ -580,9 +898,9 @@ function sponsorFakeStats(item) {
 
 const SP_DASH = '<span class="text-slate-600">-</span>';
 
-export function sponsoredTableRowHtml(item, { isWish } = {}) {
+export function sponsoredTableRowHtml(item, { isWish, locationKey = 'lib-row' } = {}) {
   if (!item) return '';
-  noteSponsoredImpression('table', item.id);
+  noteSponsoredImpression(locationKey, item.id);
   const discTitle = sponsorDiscTitle(item);
   const coverUrl = sponsorCoverUrl(item.cover);
   const coverHtml = coverUrl
@@ -625,9 +943,9 @@ export function sponsoredTableRowHtml(item, { isWish } = {}) {
 }
 
 /** Mimics dash-versus-row inside the "What to play next" card columns. */
-export function sponsoredVersusRowHtml(item, { metric = 'rating' } = {}) {
+export function sponsoredVersusRowHtml(item, { metric = 'rating', locationKey = 'dash-versus-rated' } = {}) {
   if (!item) return '';
-  noteSponsoredImpression('dash-versus', item.id);
+  noteSponsoredImpression(locationKey, item.id);
   const discTitle = sponsorDiscTitle(item);
   const coverUrl = sponsorCoverUrl(item.cover);
   const coverHtml = coverUrl
@@ -653,9 +971,9 @@ export function sponsoredVersusRowHtml(item, { metric = 'rating' } = {}) {
 }
 
 /** Mimics coop-pick-row inside the Co-op spotlight card pick lists. */
-export function sponsoredCoopPickRowHtml(item) {
+export function sponsoredCoopPickRowHtml(item, locationKey = 'dash-coop-online') {
   if (!item) return '';
-  noteSponsoredImpression(itemPlacements(item)[0] || 'coop-online', item.id);
+  noteSponsoredImpression(locationKey, item.id);
   const discTitle = sponsorDiscTitle(item);
   const coverUrl = sponsorCoverUrl(item.cover);
   const coverHtml = coverUrl
@@ -765,7 +1083,7 @@ function sponsoredFeatureAdHtml(item, { banner = false } = {}) {
 /** Full "card ad" for the dashboard dash-picks slot (tall layout). */
 export function sponsoredDashPicksCardHtml(item) {
   if (!item) return '';
-  noteSponsoredImpression('dash-picks', item.id);
+  noteSponsoredImpression('dash-pick', item.id);
   return sponsoredFeatureAdHtml(item, { banner: false });
 }
 
@@ -788,13 +1106,13 @@ export function sponsoredFeatureBannerHtml(item) {
  */
 export function sponsoredClaimCardHtml(item) {
   if (!item) return '';
-  noteSponsoredImpression('claimable', item.id);
+  noteSponsoredImpression('claim-cards', item.id);
   return `<div class="sponsored-claim-feature">${sponsoredFeatureAdHtml(item)}</div>`;
 }
 
 /** Synthetic spotlight slide from a sponsor feed item. */
 export function sponsorToSpotlightGame(item) {
-  if (item?.id) noteSponsoredImpression('spotlight', item.id);
+  if (item?.id) noteSponsoredImpression('dash-spotlight', item.id);
   const cover = sponsorCoverUrl(item.cover);
   const isHouse = String(item?.kind || '').toLowerCase() === 'house';
   const disclosure = sponsorDisclosure(item);
@@ -820,51 +1138,65 @@ export function sponsorToSpotlightGame(item) {
   };
 }
 
-/** Placements to re-render after dismissing a sponsor (all surfaces when id unknown). */
+/** Location keys to re-render after dismissing a sponsor. */
+export function locationsForDismissRefresh(sponsorId) {
+  if (!sponsorId) return [...AD_LOCATIONS];
+  const locs = locationsForAdId(sponsorId);
+  return locs.length ? locs : [...AD_LOCATIONS];
+}
+
+/** @deprecated */
 export function placementsForDismissRefresh(sponsorId) {
-  if (!sponsorId) return [...SPONSOR_PLACEMENTS];
-  if (sponsorId === HOUSE_DEAL_ITEM.id) return ['deal-rail'];
-  const item = (state.sponsoredDeals || []).find(it => it.id === sponsorId);
-  if (!item) return [...SPONSOR_PLACEMENTS];
-  return itemPlacements(item);
+  return locationsForDismissRefresh(sponsorId);
+}
+
+function refreshJobsForLocation(loc, sponsorId) {
+  const jobs = [];
+  if (loc.startsWith('dash-') && loc !== 'dash-house') {
+    if (loc === 'dash-spotlight') {
+      jobs.push(import('./dashboard.js').then(m => m.refreshSpotlightAfterSponsorChange?.()));
+    } else if (loc === 'dash-versus-rated' || loc === 'dash-versus-fast') {
+      jobs.push(import('./dashboard.js').then(m => m.refreshPicksVersusAfterSponsorChange?.()));
+    } else if (loc === 'dash-coop-online' || loc === 'dash-coop-couch') {
+      jobs.push(import('./dashboard.js').then(m => m.refreshCoopSpotlightAfterSponsorChange?.(sponsorId)));
+    } else {
+      jobs.push(import('./dashboard-cards.js').then(m => {
+        if (loc === 'dash-pick') m.renderDashboardSponsoredPick?.();
+        if (loc === 'dash-feature-banner') m.renderDashboardFeatureBanner?.();
+      }));
+    }
+  }
+  if (loc === 'dash-house' || loc === 'wish-house' || loc.startsWith('wish-deal')) {
+    jobs.push(import('./dashboard-cards.js').then(m => m.renderDashboardWishlistStats()));
+  }
+  if (loc === 'dash-house') {
+    jobs.push(import('./dashboard-cards.js').then(m => m.renderDashboardHouseSlot?.()));
+  }
+  if (loc === 'lib-house' || loc === 'itch-house' || loc === 'wish-house') {
+    jobs.push(import('./picks-ui.js').then(m => m.renderViewHouseSlot?.()));
+  }
+  if ((loc.endsWith('-pick') || loc.endsWith('-row')) && !loc.includes('versus')) {
+    if (loc.endsWith('-pick')) jobs.push(import('./picks-ui.js').then(m => m.renderPicks()));
+    if (loc.endsWith('-row')) {
+      jobs.push(import('./table-ui.js').then(m => {
+        if (state.activeView === 'library' || state.activeView === 'wishlist' || state.activeView === 'itch') {
+          return m.renderTable({ force: true });
+        }
+      }));
+    }
+  }
+  if (loc === 'claim-cards') {
+    jobs.push(import('./claimable.js').then(m => m.renderClaimableModule()));
+  }
+  return jobs;
 }
 
 /** Re-render only the surfaces that showed the dismissed sponsor. */
 export function refreshSponsoredSurfaces(sponsorId) {
-  const placements = new Set(placementsForDismissRefresh(sponsorId));
+  const locations = new Set(locationsForDismissRefresh(sponsorId));
   const jobs = [];
-  if (placements.has('deal-rail') || placements.has('dash-deal-rail') || placements.has('dash-picks') || placements.has('dash-feature-banner')) {
-    jobs.push(import('./dashboard-cards.js').then(m => {
-      if (placements.has('deal-rail') || placements.has('dash-deal-rail')) {
-        m.renderDashboardWishlistStats();
-      }
-      if (placements.has('dash-picks')) m.renderDashboardSponsoredPick?.();
-      if (placements.has('dash-feature-banner')) m.renderDashboardFeatureBanner?.();
-    }));
-  }
-  if (placements.has('picks')) {
-    jobs.push(import('./picks-ui.js').then(m => m.renderPicks()));
-  }
-  if (placements.has('claimable')) {
-    jobs.push(import('./claimable.js').then(m => m.renderClaimableModule()));
-  }
-  if (placements.has('table')) {
-    jobs.push(import('./table-ui.js').then(m => {
-      // Click handler already removed the row synchronously; idempotent fallback
-      // for programmatic dismiss + bust virtual-window cache (no full re-query).
-      if (state.activeView === 'library' || state.activeView === 'wishlist') {
-        m.syncSponsoredTableAfterDismiss();
-      }
-    }));
-  }
-  if (placements.has('spotlight')) {
-    jobs.push(import('./dashboard.js').then(m => m.refreshSpotlightAfterSponsorChange?.()));
-  }
-  if (placements.has('dash-versus')) {
-    jobs.push(import('./dashboard.js').then(m => m.refreshPicksVersusAfterSponsorChange?.()));
-  }
-  if (placements.has('coop-online') || placements.has('coop-couch')) {
-    jobs.push(import('./dashboard.js').then(m => m.refreshCoopSpotlightAfterSponsorChange?.(sponsorId)));
+  for (const loc of locations) {
+    jobs.push(...refreshJobsForLocation(loc, sponsorId));
   }
   return Promise.all(jobs);
 }

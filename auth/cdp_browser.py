@@ -1316,11 +1316,11 @@ def launch_persistent_profile(
 
     # Attach existing page targets (new ones are attached via _on_target_created).
     targets = _fetch_json(f"http://127.0.0.1:{port}/json/list", timeout=5)
-    for t in targets:
-        if t.get("type") == "page":
-            page = context._attach_page(t["id"])
-            if page not in context.pages:
-                context.pages.append(page)
+    page_targets = [t for t in targets if t.get("type") == "page"]
+    for t in page_targets:
+        page = context._attach_page(t["id"])
+        if page not in context.pages:
+            context.pages.append(page)
 
     if not context.pages:
         context.new_page()

@@ -399,6 +399,9 @@ def _enrich_item(
     source = raw.get("source")
     if source:
         out["source"] = source
+    first_seen = raw.get("first_seen")
+    if first_seen:
+        out["first_seen"] = first_seen
     return out
 
 
@@ -908,6 +911,9 @@ def _enrich_item_light(
     source = raw.get("source")
     if source:
         out["source"] = source
+    first_seen = raw.get("first_seen")
+    if first_seen:
+        out["first_seen"] = first_seen
     return out
 
 

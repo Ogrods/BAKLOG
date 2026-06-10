@@ -100,9 +100,6 @@ export function liftBootCurtain(startedAt, opts = {}) {
 
 /** Table-shell scrim during uncached tab switches. */
 export function showViewOverlay(view) {
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'427a43'},body:JSON.stringify({sessionId:'427a43',location:'loading-curtain.js:showViewOverlay',message:'view loading curtain shown',data:{view},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
   const label = LOADING_LABELS[view] || LOADING_LABELS.library;
   const ov = document.getElementById("viewLoadingOverlay");
   const lbl = document.getElementById("viewLoadingLabel");

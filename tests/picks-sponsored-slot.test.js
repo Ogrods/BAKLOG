@@ -5,7 +5,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { state } from '../js/state.js';
 import { renderPicks } from '../js/picks-ui.js';
-import { dismissSponsoredDeal, __resetDismissedSponsorsForTest } from '../js/sponsored-deals.js';
+import { dismissSponsoredDeal, __resetDismissedSponsorsForTest, __setSponsorsForTest } from '../js/sponsored-deals.js';
 import * as authGate from '../js/auth-gate.js';
 
 function setupPicksDom() {
@@ -46,17 +46,20 @@ beforeEach(() => {
     quickWinMaxHours: 15,
   };
   state.activeView = 'wishlist';
-  state.sponsoredDeals = [{
-    id: 'ad-picks-test',
-    kind: 'sponsor',
-    title: 'Rustbloom',
-    tagline: 'On sale',
-    cta: 'Grab it',
-    url: 'https://example.com/deal',
-    placements: 'picks',
-    enabled: true,
-    priority: 1,
-  }];
+  __setSponsorsForTest({
+    version: 2,
+    ads: {
+      'ad-picks-test': {
+        kind: 'sponsor',
+        title: 'Rustbloom',
+        tagline: 'On sale',
+        cta: 'Grab it',
+        url: 'https://example.com/deal',
+        enabled: true,
+      },
+    },
+    locations: { 'wish-pick': ['ad-picks-test'] },
+  });
   state.wishlistGames = Array.from({ length: 20 }, (_, i) => wishlistDeal(`Game ${i + 1}`, 10 + i, 40));
   state.itadByKey = Object.fromEntries(
     state.wishlistGames.map(g => [g._itadKey, { price: g._price, cut: g._cut, shop: 'Steam' }]),
@@ -84,7 +87,7 @@ describe('renderPicks sponsored slot', () => {
   });
 
   it('renders picksLimit deal cards when no sponsor is eligible', () => {
-    state.sponsoredDeals = [];
+    __setSponsorsForTest({ version: 2, ads: {}, locations: {} });
     renderPicks();
     const grid = document.getElementById('picksGrid');
     expect(grid.children.length).toBe(16);

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from fetch_claim_sources import _stamp_first_seen
 from shared.free_claims_sources import (
     carry_claim_enrichment,
     claim_match_keys,
@@ -261,3 +262,17 @@ def test_carry_claim_enrichment_does_not_clobber_fresh_cover() -> None:
     existing = {"id": "gamerpower-1", "header_image": "https://cdn.example/old.jpg"}
     out = carry_claim_enrichment(fresh, existing)
     assert out["header_image"] == "https://www.gamerpower.com/new.jpg"
+
+
+def test_stamp_first_seen_preserves_existing_and_stamps_new() -> None:
+    fetched_at = "2026-06-10T12:00:00+00:00"
+    existing_by_id = {
+        "steam-keep": {"id": "steam-keep", "first_seen": "2026-06-01T08:00:00+00:00"},
+    }
+    items = [
+        {"id": "steam-keep", "title": "Keep Me"},
+        {"id": "epic-new", "title": "Fresh Drop"},
+    ]
+    _stamp_first_seen(items, existing_by_id, fetched_at)
+    assert items[0]["first_seen"] == "2026-06-01T08:00:00+00:00"
+    assert items[1]["first_seen"] == fetched_at

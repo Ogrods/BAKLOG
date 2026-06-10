@@ -76,16 +76,14 @@ describe('noteSponsoredImpression', () => {
 describe('recordSponsoredClick', () => {
   it('records click with placement from feed item', async () => {
     state.prefs.shareAnonStats = true;
-    state.sponsoredDeals = [{
-      id: 'ad1',
-      title: 'Game',
-      placements: 'claimable',
-    }];
+    state.sponsoredAds = { ad1: { title: 'Game', kind: 'sponsor' } };
+    state.adLocations = { 'claim-cards': ['ad1'] };
+    state.sponsoredDeals = [{ id: 'ad1', title: 'Game' }];
     recordSponsoredClick('ad1');
     await flushMetrics();
     const body = JSON.parse(fetch.mock.calls[0][1].body);
     expect(body.events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'click', placement: 'claimable', sponsor_id: 'ad1', n: 1 }),
+      expect.objectContaining({ type: 'click', placement: 'claim-cards', sponsor_id: 'ad1', n: 1 }),
     ]));
   });
 });

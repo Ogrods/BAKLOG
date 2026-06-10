@@ -581,6 +581,46 @@ def test_sponsors_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path
     assert saved["items"][0]["title"] == "Back BAKLOG"
 
 
+def test_sponsors_put_accepts_v2_schema(
+    admin_server: tuple[str, Path], tmp_path: Path
+) -> None:
+    base, _ = admin_server
+    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path.parent.mkdir(parents=True, exist_ok=True)
+    sponsors_path.write_text(json.dumps({"version": 2, "ads": {}, "locations": {}}), encoding="utf-8")
+    payload = {
+        "version": 2,
+        "ads": {
+            "ad-hero": {
+                "kind": "sponsor",
+                "title": "Emberfall",
+                "url": "https://example.com/deal",
+                "cover": "/assets/ads-sample/hero-emberfall.webp",
+                "enabled": True,
+            }
+        },
+        "locations": {"dash-spotlight": ["ad-hero"], "lib-pick": ["ad-hero"]},
+    }
+    code, data = _request(base, "PUT", "/api/internal/sponsors", body=payload)
+    assert code == 200
+    assert data.get("ads") == 1
+    saved = json.loads(sponsors_path.read_text(encoding="utf-8"))
+    assert saved["version"] == 2
+    assert saved["locations"]["dash-spotlight"] == ["ad-hero"]
+
+
+def test_sponsors_put_rejects_unknown_location(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    payload = {
+        "version": 2,
+        "ads": {"ad1": {"title": "Ad", "kind": "sponsor"}},
+        "locations": {"not-a-real-slot": ["ad1"]},
+    }
+    code, data = _request(base, "PUT", "/api/internal/sponsors", body=payload)
+    assert code == 400
+    assert "unknown key" in str(data.get("error", ""))
+
+
 def test_sponsors_get_returns_input(admin_server: tuple[str, Path], tmp_path: Path) -> None:
     base, _ = admin_server
     sponsors_path = tmp_path / "curated" / "sponsors.json"

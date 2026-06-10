@@ -292,6 +292,33 @@ describe('sortClaimsItems', () => {
     );
     expect(sorted[0].title).toBe('Alpha');
   });
+
+  it('sorts newest by first_seen descending', () => {
+    const sorted = sortClaimsItems(
+      [
+        { id: 'steam-older', first_seen: '2026-06-01T12:00:00+00:00' },
+        { id: 'epic-newer', first_seen: '2026-06-10T08:00:00+00:00' },
+        { id: 'gog-middle', first_seen: '2026-06-05T00:00:00+00:00' },
+      ],
+      'newest',
+    );
+    expect(sorted.map((row) => row.id)).toEqual([
+      'epic-newer',
+      'gog-middle',
+      'steam-older',
+    ]);
+  });
+
+  it('falls back to id when first_seen is missing', () => {
+    const sorted = sortClaimsItems(
+      [
+        { id: 'amazon-a' },
+        { id: 'steam-z' },
+      ],
+      'newest',
+    );
+    expect(sorted.map((row) => row.id)).toEqual(['steam-z', 'amazon-a']);
+  });
 });
 
 describe('publishDiffFieldChanges', () => {

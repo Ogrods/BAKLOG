@@ -34,6 +34,32 @@ describe('cancelInFlightRuns server truth', () => {
     expect(fetcherRunner.getLastServerInFlight()).toBe(false);
   });
 
+  it('clears stale queue-full after a run ends on the client', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (String(url).includes('/api/runs')) {
+        return {
+          ok: true,
+          json: async () => ({ active: null, queue: [], history: [] }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'n1', key: 'nintendo', status: 'running' },
+      queue: [],
+      history: [],
+    });
+    fetcherRunner.markChipStateForTest('nintendo', 'running', 'n1');
+    expect(fetcherRunner.isQueueFull()).toBe(true);
+    fetcherRunner.markChipStateForTest('nintendo', null);
+    await vi.waitFor(() => {
+      expect(fetcherRunner.isQueueFull()).toBe(false);
+    });
+    expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+  });
+
   it('calls bulk cancel then per-run fallback when bulk fails', async () => {
     let runsPoll = 0;
     const fetchMock = vi.fn(async (url, init) => {

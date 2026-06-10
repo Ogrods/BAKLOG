@@ -394,6 +394,74 @@ def test_free_claims_approved_put_dismissed_validation(
     assert "dismissed[1]" in str(data.get("error", ""))
 
 
+def test_free_claims_get_returns_premium_only_ids(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    approved_path.parent.mkdir(parents=True, exist_ok=True)
+    approved_path.write_text(
+        json.dumps({"ids": ["epic-a"], "premium_only_ids": ["epic-a"]}),
+        encoding="utf-8",
+    )
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    assert data.get("premium_only_ids") == ["epic-a"]
+
+
+def test_free_claims_approved_put_writes_premium_only_ids(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    payload = {
+        "ids": ["epic-approved", "gamerpower-42"],
+        "premium_only_ids": ["epic-approved", "gamerpower-42", "not-approved"],
+    }
+    code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body=payload)
+    assert code == 200
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert saved["premium_only_ids"] == ["epic-approved", "gamerpower-42"]
+
+
+def test_free_claims_approved_put_premium_only_validation(
+    admin_server: tuple[str, Path],
+) -> None:
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "PUT",
+        "/api/internal/free-claims/approved",
+        body={"ids": ["epic-a"], "premium_only_ids": ["ok", ""]},
+    )
+    assert code == 400
+    assert "premium_only_ids[1]" in str(data.get("error", ""))
+
+
+def test_free_claims_preview_stamps_premium_only(
+    admin_server: tuple[str, Path],
+) -> None:
+    base, _ = admin_server
+    payload = {
+        "manual_items": [],
+        "auto_items": [{
+            "id": "auto-pro",
+            "store": "steam",
+            "title": "Bonus DLC",
+            "claim_url": "https://example.com/bonus",
+        }],
+        "approved_ids": ["auto-pro"],
+        "premium_only_ids": ["auto-pro"],
+    }
+    code, data = _request(base, "POST", "/api/internal/free-claims/preview", body=payload)
+    assert code == 200
+    items = data.get("items") or []
+    assert len(items) == 1
+    assert items[0].get("premium_only") is True
+
+
 def test_free_claims_approved_put_field_overrides_validation(
     admin_server: tuple[str, Path],
 ) -> None:
@@ -460,6 +528,31 @@ def test_sponsors_put_accepts_cover_and_placements(
     saved = json.loads(sponsors_path.read_text(encoding="utf-8"))
     assert saved["items"][0]["cover"] == "/assets/ads-sample/hero-emberfall.webp"
     assert saved["items"][0]["placements"] == "spotlight, picks"
+
+
+def test_sponsors_put_accepts_dash_deal_rail_placement(
+    admin_server: tuple[str, Path], tmp_path: Path
+) -> None:
+    base, _ = admin_server
+    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path.parent.mkdir(parents=True, exist_ok=True)
+    sponsors_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    payload = {
+        "items": [
+            {
+                "id": "house-pro-promo",
+                "kind": "house",
+                "title": "Power-user conveniences",
+                "url": "https://baklog.app/",
+                "placements": "dash-deal-rail",
+                "enabled": True,
+            }
+        ]
+    }
+    code, data = _request(base, "PUT", "/api/internal/sponsors", body=payload)
+    assert code == 200
+    saved = json.loads(sponsors_path.read_text(encoding="utf-8"))
+    assert saved["items"][0]["placements"] == "dash-deal-rail"
 
 
 def test_sponsors_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path) -> None:

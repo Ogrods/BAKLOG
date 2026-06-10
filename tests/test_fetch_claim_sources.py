@@ -86,6 +86,94 @@ def test_first_run_no_prior_writes(monkeypatch, out_path):
     assert out_path.exists()
 
 
+def test_failed_source_carries_prior_rows_forward(monkeypatch, out_path):
+    """When a source raises (absent from counts), keep its prior rows if others succeeded."""
+    _write_prior(out_path, 0)
+    prior = {
+        "items": [
+            _claim("gamerpower-old", "gamerpower"),
+            _claim("itad-old", "itad"),
+        ]
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+
+    fresh = [_claim("itad-new", "itad")]
+
+    def fake_collect(sources, **kw):
+        # gamerpower missing from counts => simulated exception path
+        return fresh, {"itad": 1}
+
+    monkeypatch.setattr(fcs, "collect_claims", fake_collect)
+    monkeypatch.setattr(
+        sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)]
+    )
+    code = fcs.main()
+    assert code == 0
+    doc = json.loads(out_path.read_text(encoding="utf-8"))
+    ids = {row["id"] for row in doc["items"]}
+    assert ids == {"itad-new", "gamerpower-old"}
+
+
+def test_genuine_zero_source_not_carried_forward(monkeypatch, out_path):
+    """A source that returns 0 (key present) must not resurrect prior rows."""
+    prior = {"items": [_claim("gamerpower-old", "gamerpower")]}
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+
+    def fake_collect(sources, **kw):
+        return [_claim("itad-new", "itad")], {"gamerpower": 0, "itad": 1, "epic": 0}
+
+    monkeypatch.setattr(fcs, "collect_claims", fake_collect)
+    monkeypatch.setattr(
+        sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)]
+    )
+    code = fcs.main()
+    assert code == 0
+    doc = json.loads(out_path.read_text(encoding="utf-8"))
+    ids = {row["id"] for row in doc["items"]}
+    assert ids == {"itad-new"}
+
+
+def test_vanished_source_refuses_exit_3_without_allow_drift(monkeypatch, out_path):
+    prior = {
+        "sources": {"gamerpower": 5, "itad": 2},
+        "items": [_claim("itad-old", "itad")],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+
+    def fake_collect(sources, **kw):
+        return [_claim("itad-new", "itad")], {"itad": 1}
+
+    monkeypatch.setattr(fcs, "collect_claims", fake_collect)
+    monkeypatch.setattr(sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)])
+    code = fcs.main()
+    assert code == 3
+    doc = json.loads(out_path.read_text(encoding="utf-8"))
+    assert len(doc["items"]) == 1
+
+
+def test_vanished_source_allowed_when_rows_carried_forward(monkeypatch, out_path):
+    prior = {
+        "sources": {"gamerpower": 1, "itad": 1},
+        "items": [
+            _claim("gamerpower-old", "gamerpower"),
+            _claim("itad-old", "itad"),
+        ],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+
+    def fake_collect(sources, **kw):
+        return [_claim("itad-new", "itad")], {"itad": 1}
+
+    monkeypatch.setattr(fcs, "collect_claims", fake_collect)
+    monkeypatch.setattr(sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)])
+    code = fcs.main()
+    assert code == 0
+    doc = json.loads(out_path.read_text(encoding="utf-8"))
+    ids = {row["id"] for row in doc["items"]}
+    assert "gamerpower-old" in ids
+    assert "itad-new" in ids
+
+
 def test_collect_claims_keeps_cross_source_same_title(monkeypatch):
     def fake_epic(**kw):
         return [

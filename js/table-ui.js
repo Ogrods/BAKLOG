@@ -703,6 +703,9 @@ function isToolbarScrollReady() {
 }
 
 export function focusGame(key) {
+  // #region agent log
+  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'427a43'},body:JSON.stringify({sessionId:'427a43',location:'table-ui.js:focusGame',message:'focusGame called',data:{key:key??null,activeView:state.activeView},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   state.pickedKey = key;
   const targetIsWishlist = String(key).startsWith("wishlist:");
   const targetIsItch = String(key).startsWith("itch:");
@@ -1117,6 +1120,18 @@ function tbodyRowCount() {
 
 const SPONSORED_TABLE_SLOT = 5;
 
+/**
+ * Drop the sponsored table row immediately on dismiss — avoids waiting for a
+ * full renderTable() query + virtual repaint (~200ms+ on large libraries).
+ */
+export function syncSponsoredTableAfterDismiss() {
+  document.getElementById('tbody')?.querySelector('.sponsored-table-row')?.remove();
+  if (_virtualList) {
+    _virtualWindow = { start: -1, end: -1 };
+    _virtualWindowList = null;
+  }
+}
+
 function appendChunk(list, start, end, ctx) {
   const run = perfActiveRun();
   const t0 = run ? performance.now() : 0;
@@ -1275,6 +1290,14 @@ function paintTableBody(list, opts = {}) {
   }
 
   const anchorIdx = typeof opts.anchorIndex === "number" ? opts.anchorIndex : -1;
+  // Forced re-renders (e.g. sponsored-row dismiss) reuse the same list ref and
+  // scroll position, so computeVirtualRange returns an unchanged window and
+  // paintVirtualSlice would early-return — bust the window cache so the slice
+  // always repaints.
+  if (opts.bustVirtualCache) {
+    _virtualWindow = { start: -1, end: -1 };
+    _virtualWindowList = null;
+  }
   _virtualList = list;
   _virtualCtx = ctx;
   ensureVirtualScrollBound();
@@ -1520,10 +1543,11 @@ export async function renderTable(opts) {
   paintTableBody(list, {
     resetScroll: !!opts?.resetScroll && anchorIndex == null,
     anchorIndex,
+    bustVirtualCache: force,
   });
   if (list.length > 0 && !isTablePainted(list)) {
     console.warn("[renderTable] tbody empty after paint, retrying sync");
-    paintTableBody(list, { anchorIndex });
+    paintTableBody(list, { anchorIndex, bustVirtualCache: force });
   }
   perfMeasure(perfRun, 'paint:body', 'paint:start', {
     tbodyRows: tbodyRowCount(),

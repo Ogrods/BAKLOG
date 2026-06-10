@@ -45,7 +45,11 @@ def _env_serve_built() -> bool:
 
 
 def serve_built_frontend() -> bool:
-    """True when dist/manifest.json exists and built assets should be served."""
+    """True when dist/manifest.json exists and built mode is enabled.
+
+    Dev requires BAKLOG_SERVE_BUILT=1; frozen PyInstaller builds auto-serve when
+    dist/manifest.json is bundled beside index.html.
+    """
     if not built_manifest_path().is_file():
         return False
     return is_frozen() or _env_serve_built()

@@ -14,6 +14,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `api/_rate-limit.js` — shared distributed rate limiter (Vercel KV / Upstash) used by `subscribe.js`.
 - `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
+- `api/metrics.js` — Vercel serverless function; receives opt-in anonymous aggregate metrics from the local app (session counts + sponsored-slot impressions/clicks). Optional Supabase log via `sql/aggregate_metrics.sql`.
 - `sql/waitlist.sql` — one-time Supabase table for durable signup logging.
 - `sql/bug_reports.sql` — one-time Supabase table for durable bug-report logging.
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
@@ -21,6 +22,8 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `favicon.svg` — white BAKLOG mark.
 - `apple-touch-icon.png` — 180×180 home-screen icon (`../tools/make_apple_touch_icon.py`).
 - `404.html` — branded not-found page (Vercel serves automatically).
+- `free-claims.json` — built by `build_free_claims.py` at repo root; hosted feed for Claimable Now.
+- `sponsors.json` — sponsored/house deal slots for the local app; sync from `curated/sponsors.json` before deploy.
 - `vercel.json` — CSP, security + cache headers, clean URLs.
 
 ## Deploy to Vercel
@@ -105,6 +108,65 @@ The local app and read-only mode pull a maintainer-curated list of free giveaway
 3. Commit and deploy `landing/` (or copy `landing/free-claims.json` to production).
 
 Other machines pull the hosted feed via **Prices → Free** or `python fetch_free_claims.py` (also in `refresh.ps1` / `refresh.sh` after ITAD).
+
+## Sponsored deal feed (`sponsors.json`)
+
+The local app loads disclosed sponsored/house deal slots from `https://baklog.app/sponsors.json` when the profile has no local override. Offline or when the hosted feed is unreachable, the bundled `curated/sponsors.json` in the app package is the last-known-good fallback.
+
+**Resolution order in the app:** profile `sponsors.json` (admin/local override) → hosted `sponsors.json` → bundled `curated/sponsors.json`.
+
+### Maintainer workflow
+
+1. Edit campaigns in `curated/sponsors.json` at the repo root, or via the admin console (`BAKLOG_ADMIN=1` → `/api/internal/sponsors`).
+2. Copy the same file to `landing/sponsors.json` (keep them in sync before deploy):
+
+   ```sh
+   cp curated/sponsors.json landing/sponsors.json
+   ```
+
+3. Commit and deploy `landing/` so Vercel serves the updated feed (~10 min CDN TTL via `vercel.json`).
+
+Feed schema:
+
+```json
+{
+  "version": 1,
+  "generated_at": "2026-06-09T00:00:00Z",
+  "items": [{
+    "id": "aff-fanatical-weekend",
+    "kind": "sponsor",
+    "title": "Weekend Sale",
+    "tagline": "Up to 90% off",
+    "cta": "Shop deals",
+    "url": "https://www.fanatical.com/?ref=YOUR_TAG",
+    "cover": "/assets/ads-sample/cover-encore.webp",
+    "placements": "picks",
+    "priority": 2,
+    "enabled": true,
+    "starts": "2026-06-09T00:00:00Z",
+    "ends": "2026-06-16T00:00:00Z",
+    "network": "fanatical"
+  }]
+}
+```
+
+- `kind: "house"` → **House** disclosure (BAKLOG promos). Anything else → **Sponsored** (affiliate or paid placement).
+- `placements`: `deal-rail`, `dash-deal-rail`, `spotlight`, `picks`, `table`, `dash-picks`, `dash-versus`, `coop-online`, `coop-couch`, `claimable` (comma string or array).
+- `match_title`: skip the slot when the user already owns that game.
+- `network`: optional bookkeeping field (ignored by the app; useful for your records).
+- Affiliate programs with tagged outbound URLs (Humble Partner, Fanatical, GOG, ITAD) need no extra app code — clicks open `url` via the existing sponsored-deal handler. Steam has no affiliate program.
+
+No per-user impression or click tracking is sent from the app unless the user opts in (see below); affiliate networks attribute revenue from the tagged URL only.
+
+## Opt-in aggregate metrics (`/api/metrics`)
+
+Users can optionally enable **Share anonymous usage counts** in the app (Connections → automatic fetch preferences). When enabled, the app POSTs batched anonymous totals to `https://baklog.app/api/metrics` every ~5 minutes and on tab close:
+
+- `session_start` — one per app launch (active-user proxy)
+- `impression` — sponsored-slot views (deduped per placement per session)
+- `click` — sponsored-slot outbound clicks
+
+**Nothing is sent when the toggle is off** (default). No IP is stored server-side; payloads carry only `app_version`, an opaque per-launch `session_id`, and event counts. Optional durable logging: run `sql/aggregate_metrics.sql` in Supabase and set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (same as `/api/report`). Production rate limiting uses the same Vercel KV / Upstash credentials as `/api/subscribe` (namespace `metrics`).
 
 ## Regenerate share / touch icons
 

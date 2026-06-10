@@ -4,6 +4,7 @@ import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
+import { startMetrics, stopMetrics } from './anon-metrics.js';
 import { savePrefs } from './prefs.js';
 import { state } from './state.js';
 import { storeLogoHtml } from './store-logos.js';
@@ -837,8 +838,10 @@ function restoreConnNoteFocus(focusState, root) {
 function renderConnPrefs() {
   const onConnect = document.getElementById('autoFetchOnConnectToggle');
   const stale24h = document.getElementById('autoFetchStale24hToggle');
+  const shareStats = document.getElementById('shareAnonStatsToggle');
   if (onConnect) onConnect.checked = state.prefs.autoFetchOnConnect !== false;
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
+  if (shareStats) shareStats.checked = state.prefs.shareAnonStats === true;
 
   const note = document.getElementById('bgRefreshPlanNote');
   if (note) {
@@ -1139,6 +1142,11 @@ function wireGridEvents() {
     } else if (ev.target.id === 'autoFetchStale24hToggle') {
       state.prefs.autoFetchStale24h = ev.target.checked;
       savePrefs();
+    } else if (ev.target.id === 'shareAnonStatsToggle') {
+      state.prefs.shareAnonStats = ev.target.checked;
+      savePrefs();
+      if (ev.target.checked) startMetrics();
+      else stopMetrics();
     }
   });
 

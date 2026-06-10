@@ -22,6 +22,7 @@ import {
   configureFetcherHealth,
   ensureProfileScopedFetcherState,
 } from './fetcher-health.js';
+import { startMetrics } from './anon-metrics.js';
 import { initAuthGate } from './auth-gate.js';
 import { initConnections, isItchTabAvailable } from './connections.js';
 import {
@@ -138,6 +139,7 @@ async function bootstrap() {
   syncViewTabAria(state.activeView);
   savePrefs();
   bindEvents();
+  if (state.prefs.shareAnonStats) startMetrics();
   await initProfiles();
   document.getElementById("rowHeroBackdrop").checked = !!state.prefs.rowHeroBackdrop;
   document.body.classList.toggle("row-hero-on", !!state.prefs.rowHeroBackdrop);

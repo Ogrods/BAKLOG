@@ -110,6 +110,21 @@ describe('loadPrefs', () => {
     expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(15);
   });
 
+  it('flips legacy rowHeroBackdrop=false on once for users predating the default', () => {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ rowHeroBackdrop: false }));
+    const p = loadPrefs();
+    expect(p.rowHeroBackdrop).toBe(true);
+    expect(p.rowHeroBackdropDefaulted).toBe(true);
+  });
+
+  it('respects a deliberate rowHeroBackdrop=false once the marker is set', () => {
+    localStorage.setItem(
+      prefsStorageKey(),
+      JSON.stringify({ rowHeroBackdrop: false, rowHeroBackdropDefaulted: true }),
+    );
+    expect(loadPrefs().rowHeroBackdrop).toBe(false);
+  });
+
   it('clamps claimsAutoRefreshIntervalMin to 30-360 and snaps to step 30', () => {
     expect(loadPrefs().claimsAutoRefreshIntervalMin).toBe(120);
     localStorage.setItem(prefsStorageKey(), JSON.stringify({ claimsAutoRefreshIntervalMin: 10 }));

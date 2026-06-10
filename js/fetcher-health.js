@@ -2344,6 +2344,14 @@ export const fetcherRunner = (() => {
     else if (runStateByKey.size === 0) {
       stopInFlightPolling();
       revertFetcherLayoutIfIdle();
+      // Client chip cleared — re-check server truth so stale lastServerInFlight
+      // does not keep isQueueFull() latched after a run ends locally.
+      void fetchRunsSnapshot()
+        .then((snap) => {
+          if (snap) applyServerSnapshotInFlight(snap);
+          updateCancelButton();
+        })
+        .catch(() => {});
     }
     updateFetcherBar();
   }

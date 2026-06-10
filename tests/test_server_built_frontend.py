@@ -51,9 +51,9 @@ def test_built_index_html_rewrites_js_only_in_dev(server_mod):
 
 
 def test_built_index_html_rewrites_css_when_frozen(server_mod, tmp_path, monkeypatch):
-    from shared.built_frontend import built_index_html
     import shared.built_frontend as bf
     import shared.install_paths as ip
+    from shared.built_frontend import built_index_html
 
     monkeypatch.setattr(ip, "is_frozen", lambda: True)
     monkeypatch.setattr(ip, "bundle_root", lambda: tmp_path)

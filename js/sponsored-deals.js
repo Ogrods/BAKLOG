@@ -317,6 +317,18 @@ const HOUSE_DEFAULTS = {
     scheme: 'emerald',
     enabled: true,
   },
+  'house-spotlight-library': {
+    kind: 'house',
+    title: 'It\'s just your library',
+    slogan: 'It\'s not a godsend, it\'s just your library.',
+    tagline: 'Every game you already own, deduped across every store into one honest backlog. Free and local-first.',
+    cta: 'Start free',
+    url: 'https://baklog.app/',
+    cover: '',
+    art_mode: 'logo',
+    scheme: 'sapphire',
+    enabled: true,
+  },
 };
 
 /** Test-only: guaranteed Pro spotlight slides default off under Vitest (game-pool tests). */
@@ -342,6 +354,7 @@ const SPOTLIGHT_PRO_AD_IDS = [
   'house-spotlight-pro-logo',
   'house-spotlight-pro-sync',
   'house-spotlight-pro-noads',
+  'house-spotlight-library',
 ];
 
 function placementsForMigration(item) {

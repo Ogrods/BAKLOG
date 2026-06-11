@@ -484,12 +484,13 @@ describe('getSpotlightHouseAds', () => {
     setSpotlightHouseAdsForTest(true);
   });
 
-  it('returns the 3 permanent Pro slides with the large-logo slide first', () => {
+  it('returns the permanent spotlight slides with the large-logo slide first', () => {
     const ads = getSpotlightHouseAds();
     expect(ads.map(a => a.id)).toEqual([
       'house-spotlight-pro-logo',
       'house-spotlight-pro-sync',
       'house-spotlight-pro-noads',
+      'house-spotlight-library',
     ]);
     expect(ads[0].art_mode).toBe('logo');
   });
@@ -500,6 +501,7 @@ describe('getSpotlightHouseAds', () => {
       'house-spotlight-pro-logo',
       'house-spotlight-pro-sync',
       'house-spotlight-pro-noads',
+      'house-spotlight-library',
     ]);
   });
 
@@ -753,7 +755,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['local-ad']));
-    expect(state.sponsoredDeals).toHaveLength(8);
+    expect(state.sponsoredDeals).toHaveLength(9);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -772,7 +774,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['remote-ad']));
-    expect(state.sponsoredDeals).toHaveLength(8);
+    expect(state.sponsoredDeals).toHaveLength(9);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       SPONSORS_HOSTED_URL,
       expect.objectContaining({ cache: 'no-store' }),
@@ -794,7 +796,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['bundled-ad']));
-    expect(state.sponsoredDeals).toHaveLength(8);
+    expect(state.sponsoredDeals).toHaveLength(9);
   });
 
   it('respects window.__BAKLOG_SPONSORS_ENDPOINT override', async () => {

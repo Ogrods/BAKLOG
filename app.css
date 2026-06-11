@@ -6110,15 +6110,6 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   border: 1px solid color-mix(in srgb, var(--brand-itch, #fa5c5c) 55%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-itch, #fa5c5c) 18%, transparent);
 }
-/* Not connected yet: dim the card to read as inactive, but keep the pink border. */
-.dash-card-itch--inactive {
-  opacity: 0.72;
-  filter: saturate(0.9);
-}
-.dash-card-itch--inactive:hover {
-  opacity: 1;
-  filter: none;
-}
 .dash-itch-recap { color: #cbd5e1; line-height: 1.5; display: flex; flex-direction: column; gap: 0.65rem; flex: 1; min-height: 0; padding: 0 18px 16px; }
 .itch-card-rail {
   height: 4px;
@@ -6167,7 +6158,27 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   line-height: 1.45;
 }
 .itch-onboard-affiliate { color: #fca5a5; }
-.itch-onboard-cta { align-self: flex-start; margin-top: 0.15rem; }
+.itch-onboard-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+.itch-onboard-cta { align-self: flex-start; }
+.itch-onboard-cta--primary {
+  background: color-mix(in srgb, var(--brand-itch, #fa5c5c) 22%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--brand-itch, #fa5c5c) 55%, var(--border-subtle));
+  color: #fecaca;
+  text-decoration: none;
+}
+.itch-onboard-cta--primary:hover {
+  background: color-mix(in srgb, var(--brand-itch, #fa5c5c) 32%, var(--bg-elev));
+  color: #fff;
+}
+.itch-onboard-cta--secondary {
+  opacity: 0.92;
+}
 .itch-value-block { display: flex; flex-direction: column; gap: 0.35rem; }
 .itch-value-grid {
   display: grid;

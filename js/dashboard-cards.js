@@ -4,7 +4,7 @@
 import { state, STATUS_CHIP_DEFS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
 import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey, combinedPlaytime, storeBadgeHtml, formatDollar } from './game-core.js';
-import { hasLiveAffiliates } from './affiliate.js';
+import { affiliateUrl, hasLiveAffiliates } from './affiliate.js';
 import { freeItchCount, paidItchCount, itchSpendTotal } from './sabermetrics.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
@@ -26,8 +26,6 @@ import { DASH_STORE_LABELS, DASH_STORE_COLORS } from './dashboard-shared.js';
 import { dashDrillItchGenre } from './dashboard-drilldown.js';
 import { dashboardCharts } from './dashboard-charts.js';
 import { computeRecentAdditions } from './dashboard-spotlight.js';
-import { isItchTabAvailable, connectedProviderCount } from './connections-status.js';
-
 const ITCH_HERO_MIN_RATING = 80;
 const ITCH_HERO_MAX = 30;
 
@@ -216,22 +214,10 @@ export function renderDashboardCoopSpotlight(games) {
   `;
 }
 
-/**
- * itch recap card visibility + affiliate dimming.
- * - Hidden only on a truly-empty new profile (no data, nothing connected) so a
- *   brand-new dashboard isn't cluttered by an affiliate promo.
- * - Dimmed (inactive) when itch itself isn't set up yet — the onboarding state —
- *   while keeping the permanent pink affiliate border.
- */
+/** itch recap card is always visible on the picks row (onboarding when library is empty). */
 export function applyItchVisibility() {
   document.getElementById("dashboardPicksRow")?.classList.remove("no-itch");
-  const card = document.getElementById("dashItchCard");
-  if (!card) return;
-  const itchActive = isItchTabAvailable();
-  const hasAnyData = (state.games || []).length > 0 || (state.itchGames || []).length > 0;
-  const trulyEmpty = !itchActive && !hasAnyData && connectedProviderCount() === 0;
-  card.classList.toggle("hidden", trulyEmpty);
-  card.classList.toggle("dash-card-itch--inactive", !itchActive);
+  document.getElementById("dashItchCard")?.classList.remove("hidden");
 }
 
 export function renderDashboardSponsoredPick() {
@@ -495,11 +481,15 @@ function itchOnboardingHtml() {
   const affiliateNote = hasLiveAffiliates()
     ? `<p class="itch-onboard-affiliate">BAKLOG is an itch.io affiliate - your purchases help keep the app free.</p>`
     : "";
+  const browseUrl = affiliateUrl('https://itch.io/games/free');
   return `<div class="itch-onboarding">
-    <div class="itch-onboard-lead">Start earning free games today</div>
-    <p class="itch-onboard-copy">Connect itch.io on Connections and run the itch fetcher to sync your library, ratings, and indie picks here.</p>
+    <div class="itch-onboard-lead">Start collecting free games on itch.io</div>
+    <p class="itch-onboard-copy">Create a free itch.io account, claim indie games, and build a library. Connect here when you are ready to sync your collection into BAKLOG.</p>
     ${affiliateNote}
-    <button type="button" class="summary-jump-chip itch-onboard-cta" data-jump-view="connections" title="Open Connections to add your itch.io key">Connect itch.io →</button>
+    <div class="itch-onboard-actions">
+      <a class="summary-jump-chip itch-onboard-cta itch-onboard-cta--primary" href="${escapeAttr(browseUrl)}" target="_blank" rel="noopener noreferrer" title="Browse free games on itch.io">Browse free games on itch.io →</a>
+      <button type="button" class="summary-jump-chip itch-onboard-cta itch-onboard-cta--secondary" data-jump-view="connections" title="Open Connections to add your itch.io key">Already have itch? Connect it →</button>
+    </div>
   </div>`;
 }
 

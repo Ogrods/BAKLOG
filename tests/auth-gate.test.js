@@ -3,25 +3,32 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const supabaseMock = vi.hoisted(() => {
   let session = null;
   let authListener = null;
+  let getSessionResult = null;
+  const signOut = vi.fn(async () => { session = null; });
+  const client = {
+    auth: {
+      getSession: vi.fn(async () => getSessionResult ?? { data: { session }, error: null }),
+      signInWithPassword: vi.fn(async () => ({ data: { session }, error: null })),
+      signOut,
+      refreshSession: vi.fn(async () => ({ data: { session }, error: null })),
+      onAuthStateChange: vi.fn((cb) => {
+        authListener = cb;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      }),
+    },
+  };
   return {
-    createClient: vi.fn(() => ({
-      auth: {
-        getSession: vi.fn(async () => ({ data: { session } })),
-        signInWithPassword: vi.fn(async () => ({ data: { session }, error: null })),
-        signOut: vi.fn(async () => { session = null; }),
-        refreshSession: vi.fn(async () => ({ data: { session }, error: null })),
-        onAuthStateChange: vi.fn((cb) => {
-          authListener = cb;
-          return { data: { subscription: { unsubscribe: vi.fn() } } };
-        }),
-      },
-    })),
-    setSession(s) { session = s; },
+    createClient: vi.fn(() => client),
+    client,
+    setSession(s) { session = s; getSessionResult = null; },
+    setGetSessionResult(r) { getSessionResult = r; },
     getSession() { return session; },
     fireAuthChange(next) { authListener?.('SIGNED_IN', next); },
     reset() {
       session = null;
       authListener = null;
+      getSessionResult = null;
+      signOut.mockClear();
     },
   };
 });
@@ -65,6 +72,21 @@ describe('auth-gate', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetModules();
+  });
+
+  it('initAuthGate clears stale refresh token and shows sign-in', async () => {
+    supabaseMock.setGetSessionResult({
+      data: { session: null },
+      error: { message: 'Invalid Refresh Token: Refresh Token Not Found' },
+    });
+    const { initAuthGate } = await import('../js/auth-gate.js');
+    const boot = initAuthGate();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(supabaseMock.client.auth.signOut).toHaveBeenCalled();
+    const ov = document.getElementById('authGateOverlay');
+    expect(ov.hidden).toBe(false);
+    expect(document.documentElement.hasAttribute('data-auth-required')).toBe(true);
+    await expect(Promise.race([boot, Promise.resolve('pending')])).resolves.toBe('pending');
   });
 
   it('initAuthGate hides overlay when session is valid', async () => {

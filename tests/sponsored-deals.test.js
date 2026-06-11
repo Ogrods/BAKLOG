@@ -12,6 +12,7 @@ import {
   getEligibleSponsoredDeal,
   getEligibleSponsors,
   getAdsForLocation,
+  rotateLocationAd,
   getSpotlightHouseAds,
   setSpotlightHouseAdsForTest,
   itemPlacements,
@@ -224,6 +225,20 @@ describe('getAdsForLocation round-robin', () => {
     ));
     localStorage.setItem('baklog-ad-cursors', JSON.stringify({ 'lib-pick': 1 }));
     expect(getAdsForLocation('lib-pick')[0].id).toBe('b');
+  });
+
+  it('rotateLocationAd advances to the next ad within a session', () => {
+    __setSponsorsForTest(v2Doc(
+      { a: sponsor({ id: 'a', title: 'A' }), b: sponsor({ id: 'b', title: 'B' }) },
+      { 'lib-row': ['a', 'b'] },
+    ));
+    expect(getAdsForLocation('lib-row')[0].id).toBe('a');
+    // Without a rotate, the session pick stays pinned to 'a'.
+    expect(getAdsForLocation('lib-row')[0].id).toBe('a');
+    rotateLocationAd('lib-row');
+    expect(getAdsForLocation('lib-row')[0].id).toBe('b');
+    rotateLocationAd('lib-row');
+    expect(getAdsForLocation('lib-row')[0].id).toBe('a');
   });
 
   it('returns up to three claim-cards', () => {

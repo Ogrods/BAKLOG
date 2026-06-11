@@ -178,6 +178,18 @@ function sessionStartForLocation(locationKey, eligibleLen) {
   return sessionLocationPicks.get(locationKey).start;
 }
 
+/**
+ * Drop the cached session pick for a location so the next getAdsForLocation()
+ * advances the round-robin cursor to the next eligible creative. Used by the
+ * table so each drill-in / filter shows a fresh row ad instead of pinning the
+ * same one for the whole session.
+ * @param {string} locationKey
+ */
+export function rotateLocationAd(locationKey) {
+  const key = String(locationKey || '').toLowerCase();
+  if (key) sessionLocationPicks.delete(key);
+}
+
 export function pickLocationForView(view, kind = 'pick') {
   const v = String(view || 'library').toLowerCase();
   if (kind === 'row') {

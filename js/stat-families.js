@@ -109,7 +109,7 @@ export function familyForLabel(label) {
   }
 
   if (matchesAny(l, [
-    'top genre', 'top decade', 'top developer', 'top publisher', 'top store',
+    'top genre', 'top decade', 'top developer', 'favorite developer', 'top publisher', 'top store',
     'biggest store', 'oldest in library', 'newest release', 'oldest unplayed',
     'newest add', 'missing a', 'missing a–z', 'taste era', 'finished vs backlog era',
     'one-hit dev', 'monogamy', 'playtime in', 'diagnosis', 'a-z', 'top tag',

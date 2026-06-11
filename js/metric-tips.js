@@ -237,6 +237,7 @@ export const METRIC_TIPS = {
   // Insight-only concepts (leading text before colon)
   'Biggest backlog': 'Genre with the most backlog HLTB hours stacked up.',
   'Most played': 'Game with the highest combined playtime.',
+  'Favorite developer': 'The developer with the most games in your library.',
   'Avg HLTB main': 'Average main-story HLTB hours across backlog games.',
   'Longest unplayed': 'Longest HLTB backlog game you have never played.',
   'Top deal': 'Wishlist item with the best deal score right now.',

@@ -11,10 +11,12 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import {
   claimableModuleMarkup,
   claimCardHtml,
+  claimDetailPanelHtml,
   dedupeClaims,
   sortClaims,
   sanitizeBlurb,
 } from '../js/claim-card.js';
+import { AFFILIATE_CREDENTIALS } from '../js/affiliate.js';
 
 beforeAll(() => {
   // covers.js (not imported here) normally installs these globals; the markup
@@ -78,6 +80,40 @@ describe('claimableModuleMarkup', () => {
     const html = claimableModuleMarkup(items, { visibleCount: 5 });
     expect(html).toContain('data-claim-show-more');
     expect(html).toContain('+2 more');
+  });
+});
+
+describe('claimDetailPanelHtml affiliate tagging', () => {
+  const itchClaim = {
+    id: 'itch-demo',
+    store: 'itch',
+    title: 'Another World Adventures',
+    claim_url: 'https://s-xavier-uy.itch.io/another-world-adventures',
+    source: 'itad',
+  };
+
+  it('tags itch.io claim links when the affiliate program is live', () => {
+    const prev = AFFILIATE_CREDENTIALS.itch;
+    AFFILIATE_CREDENTIALS.itch = 'eob7ZQcpthHDp';
+    try {
+      const html = claimDetailPanelHtml(itchClaim);
+      expect(html).toContain('ac=eob7ZQcpthHDp');
+      expect(html).not.toContain(`href="${itchClaim.claim_url}"`);
+    } finally {
+      AFFILIATE_CREDENTIALS.itch = prev;
+    }
+  });
+
+  it('leaves claim links raw when the affiliate program is off', () => {
+    const prev = AFFILIATE_CREDENTIALS.itch;
+    AFFILIATE_CREDENTIALS.itch = '';
+    try {
+      const html = claimDetailPanelHtml(itchClaim);
+      expect(html).toContain(`href="${itchClaim.claim_url}"`);
+      expect(html).not.toContain('ac=');
+    } finally {
+      AFFILIATE_CREDENTIALS.itch = prev;
+    }
   });
 });
 

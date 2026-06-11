@@ -9,6 +9,7 @@ import { dataFetch } from './api-client.js';
 import { syncCoverFits } from './covers.js';
 import { getAdsForLocation, sponsoredClaimCardHtml } from './sponsored-deals.js';
 import { isPro } from './auth-gate.js';
+import { affiliateUrl } from './affiliate.js';
 import {
   stripClaimTitleDecorations,
   dedupeClaims,
@@ -616,7 +617,7 @@ export function handleClaimableClick(e) {
     const id = goBtn.dataset.claimGo;
     const claim = (state.claimableFeed?.items || []).find(c => c.id === id)
       || state.claimableNow.find(c => c.id === id);
-    if (isSafeHttpUrl(claim?.claim_url)) window.open(claim.claim_url, '_blank', 'noopener,noreferrer');
+    if (isSafeHttpUrl(claim?.claim_url)) window.open(affiliateUrl(claim.claim_url), '_blank', 'noopener,noreferrer');
     return true;
   }
   const card = e.target.closest('[data-claim-id]');

@@ -212,7 +212,11 @@ export function recordLibraryFirstSeen() {
   const effectiveSeeded = seeded && !mapWasEmpty;
   let changed = false;
   let newlyStamped = 0;
-  for (const g of state.allGames) {
+  // itch games live in state.itchGames (their own tab), not state.allGames.
+  // Stamp them too so itch additions get a first-seen timestamp and can
+  // surface in recents / the +N added flash instead of vanishing silently.
+  const itchGames = Array.isArray(state.itchGames) ? state.itchGames : [];
+  for (const g of [...state.allGames, ...itchGames]) {
     const key = gameKey(g);
     if (key in state.libraryFirstSeenByKey) continue;
     state.libraryFirstSeenByKey[key] = effectiveSeeded ? Date.now() : 0;

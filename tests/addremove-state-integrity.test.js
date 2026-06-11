@@ -63,6 +63,53 @@ describe('manual[] vs personal{} vs hidden', () => {
   });
 });
 
+describe('add-to-library: itch platform routing + first-seen (Step 1 regression)', () => {
+  let state;
+  let storage;
+  let libraryLoad;
+  let gameKey;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    localStorage.clear();
+    const ps = await import('../js/personal-store.js');
+    vi.spyOn(ps.personalStore, 'notify').mockImplementation(() => {});
+    ({ state } = await import('../js/state.js'));
+    storage = await import('../js/personal-storage.js');
+    libraryLoad = await import('../js/library-load.js');
+    ({ gameKey } = await import('../js/game-core.js'));
+    state.personal = {};
+    state.allGames = [];
+    state.itchGames = [];
+    state.wishlistGames = [];
+    state.libraryMeta = {};
+    state.prefs = { librarySeenSeeded: false };
+    state.libraryFirstSeenByKey = {};
+    window._dataVersion = 0;
+  });
+
+  it('a game added under the itch platform lands in state.itchGames, not the library catalog', () => {
+    storage.addManualGame({ store: 'itch', id: 'manual-zed', name: 'Zed', manual: true, playtime_minutes: 0 });
+    libraryLoad.rebuildAllGamesFromMetas();
+    expect(state.itchGames.some(g => g.id === 'manual-zed')).toBe(true);
+    expect(state.allGames.some(g => g.id === 'manual-zed')).toBe(false);
+  });
+
+  it('an itch add gets a first-seen stamp so it is not invisible in recents', () => {
+    // First boot seeds the existing library baseline (steam:1 -> 0).
+    state.allGames = [{ store: 'steam', id: '1', name: 'Owned' }];
+    libraryLoad.recordLibraryFirstSeen();
+    // The user then adds a game under the itch platform.
+    storage.addManualGame({ store: 'itch', id: 'manual-zed', name: 'Zed', manual: true, playtime_minutes: 0 });
+    libraryLoad.rebuildAllGamesFromMetas();
+    const stamped = libraryLoad.recordLibraryFirstSeen();
+    const itchGame = state.itchGames.find(g => g.id === 'manual-zed');
+    expect(itchGame).toBeDefined();
+    expect(stamped).toBe(1);
+    expect(state.libraryFirstSeenByKey[gameKey(itchGame)]).toBeGreaterThan(0);
+  });
+});
+
 describe('multi-tab sync boundary', () => {
   let state;
   let storage;

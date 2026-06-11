@@ -10,6 +10,7 @@ import {
   coverFallbackFor,
   libraryCoverFor,
   earlyAccessRibbonHtml,
+  parseLastPlayedMs,
 } from './game-core.js';
 import { safeCoverAttrUrl } from './covers.js';
 import { storeLogoHtml } from './store-logos.js';
@@ -156,8 +157,8 @@ export function renderPicks() {
   const returnTo = visible
     .filter(g => getPersonal(g).status === "unfinished")
     .sort((a, b) => {
-      const la = a.last_played ? Date.parse(a.last_played) : 0;
-      const lb = b.last_played ? Date.parse(b.last_played) : 0;
+      const la = parseLastPlayedMs(a);
+      const lb = parseLastPlayedMs(b);
       if (lb !== la) return lb - la;
       return ratingValue(b) - ratingValue(a);
     });

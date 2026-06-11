@@ -3,7 +3,7 @@
 
 import { state } from './state.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, formatDollar, normalizeGame } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, parseLastPlayedMs, formatDollar, normalizeGame } from './game-core.js';
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo, cutBucketClass } from './deals.js';
@@ -423,15 +423,6 @@ function parseAddedAtMs(g) {
   if (!raw) return 0;
   const ms = Date.parse(raw);
   return Number.isFinite(ms) ? ms : 0;
-}
-
-function parseLastPlayedMs(g) {
-  const lp = g.last_played;
-  if (lp == null || lp === '') return 0;
-  const n = Number(lp);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  // Steam rtime_last_played is epoch seconds; values already in ms stay valid.
-  return n < 1e12 ? n * 1000 : n;
 }
 
 /** Sort key for backfill rows (baseline games without first-seen > 0). */

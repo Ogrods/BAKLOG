@@ -23,10 +23,13 @@ import { savePrefs } from './prefs.js';
 
 export const PRO_WELCOME_STORAGE_KEY = 'baklog-pro-welcome';
 
+const PRO_BANNER_MONTHLY = 'assets/baklog-pro-polar.png';
+const PRO_BANNER_YEARLY = 'assets/baklog-pro-polar-yearly.png';
+
 let proViewWired = false;
 let checkoutSuccessPending = false;
 let licenseActivating = false;
-let selectedProPlan = 'monthly';
+let selectedProPlan = 'yearly';
 
 /** True while checkout return or license activation is still in flight (before reload). */
 export function isProActivationPending() {
@@ -78,6 +81,15 @@ function successBannerHtml() {
     <p class="pro-view-success-title">Payment received</p>
     <p class="pro-view-success-lead">Finish activation below - hosted accounts refresh automatically; local installs paste the license key from your Polar receipt.</p>
   </div>`;
+}
+
+function proHeroBannerSrc(plan) {
+  return plan === 'yearly' ? PRO_BANNER_YEARLY : PRO_BANNER_MONTHLY;
+}
+
+function proHeroBannerHtml(plan) {
+  const src = escapeAttr(proHeroBannerSrc(plan));
+  return `<img class="pro-view-hero-banner" data-pro-hero-banner src="${src}" alt="BAKLOG Pro - one honest backlog across every store" width="1200" height="630" loading="lazy" decoding="async" />`;
 }
 
 function proFeaturesListHtml({ compact = false } = {}) {
@@ -191,10 +203,11 @@ function proActiveHtml() {
 }
 
 function proPitchHtml({ showSuccess = false } = {}) {
+  const planClass = selectedProPlan === 'yearly' ? 'pro-view-funnel--yearly' : 'pro-view-funnel--monthly';
   return `${showSuccess ? successBannerHtml() : ''}
-    <div class="pro-view-funnel" role="region" aria-label="BAKLOG Pro">
+    <div class="pro-view-funnel ${planClass}" role="region" aria-label="BAKLOG Pro">
       <header class="pro-view-hero">
-        <p class="pro-view-eyebrow">${escapeHtml(PRO_PROMO.label)}</p>
+        ${proHeroBannerHtml(selectedProPlan)}
         <h1 class="pro-view-headline">${escapeHtml(PRO_PROMO.title)}</h1>
         <p class="pro-view-subhead">${escapeHtml(PRO_PROMO.tagline)}</p>
       </header>
@@ -223,6 +236,13 @@ function applyProPlanToggle(root, plan) {
   if (checkout) {
     checkout.href = selectedProPlan === 'yearly' ? yearly : monthly;
     checkout.textContent = selectedProPlan === 'yearly' ? PRO_PROMO.ctaYearly : PRO_PROMO.cta;
+  }
+  const banner = root.querySelector('[data-pro-hero-banner]');
+  if (banner) banner.src = proHeroBannerSrc(selectedProPlan);
+  const funnel = root.querySelector('.pro-view-funnel');
+  if (funnel) {
+    funnel.classList.toggle('pro-view-funnel--yearly', selectedProPlan === 'yearly');
+    funnel.classList.toggle('pro-view-funnel--monthly', selectedProPlan === 'monthly');
   }
 }
 

@@ -29,6 +29,7 @@ import {
   canonicalizeNotesAcrossTitles,
   applyHiddenTitleNorms,
   filterOutHidden,
+  filterCounted,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { invalidateTableCache } from './table-ui.js';
@@ -235,8 +236,10 @@ export function recordLibraryFirstSeen() {
 }
 
 function countLibraryVisible() {
-  return filterOutHidden(
-    state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))),
+  return filterCounted(
+    filterOutHidden(
+      state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))),
+    ),
   ).length;
 }
 function countWishlistVisible() {

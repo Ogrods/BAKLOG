@@ -6,6 +6,7 @@
 import { baklogFetch } from './api-client.js';
 import {
   getAccountEmail,
+  getAccountProfileId,
   isAccountAuthMode,
   isPro,
   licenseActivationEnabled,
@@ -13,7 +14,7 @@ import {
   refreshAccountPlan,
 } from './auth-gate.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
-import { PRO_CHECKOUT_MONTHLY, PRO_CHECKOUT_YEARLY } from './pro-checkout.js';
+import { PRO_CHECKOUT_MONTHLY, PRO_CHECKOUT_YEARLY, buildProCheckoutUrl } from './pro-checkout.js';
 import { PRO_PROMO, isProPromoSponsorId } from './sponsored-deals.js';
 import { switchView } from './filters-ui.js';
 import { state } from './state.js';
@@ -27,7 +28,12 @@ let checkoutSuccessPending = false;
 function proCheckoutLink(kind) {
   const urls = proCheckoutUrls();
   const fromConfig = kind === 'yearly' ? urls.yearly : urls.monthly;
-  return fromConfig || (kind === 'yearly' ? PRO_CHECKOUT_YEARLY : PRO_CHECKOUT_MONTHLY);
+  const base = fromConfig || (kind === 'yearly' ? PRO_CHECKOUT_YEARLY : PRO_CHECKOUT_MONTHLY);
+  if (!isAccountAuthMode()) return base;
+  return buildProCheckoutUrl(base, {
+    email: getAccountEmail(),
+    externalId: getAccountProfileId(),
+  });
 }
 
 function setProStatus(message, ok) {

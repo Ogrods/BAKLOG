@@ -1215,7 +1215,9 @@ export function renderMarqueeTrackInner(items) {
       <span class="dash-marquee-label">${escapeHtml(it.label)}</span>
     </span>`;
   }).join('');
-  return `${itemHtml}${itemHtml}`;
+  // Two identical copies so the -50% scroll loops seamlessly. Wrapping each copy
+  // lets the static (too-few-chips) path hide the duplicate and center the rest.
+  return `<span class="dash-marquee-copy">${itemHtml}</span><span class="dash-marquee-copy" aria-hidden="true">${itemHtml}</span>`;
 }
 
 export function renderMarqueeHtml(items) {

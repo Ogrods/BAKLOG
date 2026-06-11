@@ -127,4 +127,43 @@ describe('applyMarqueeSpeed', () => {
 
     expect(track.style.getPropertyValue('--marquee-duration')).toBe('');
   });
+
+  it('marks the marquee static when one copy does not fill the bar', () => {
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="dash-marquee">
+        <div class="dash-marquee-track"><span class="dash-marquee-copy">a</span><span class="dash-marquee-copy" aria-hidden="true">a</span></div>
+      </div>`;
+    const marquee = root.querySelector('.dash-marquee');
+    const copy = root.querySelector('.dash-marquee-copy');
+    Object.defineProperty(copy, 'scrollWidth', { value: 200, configurable: true });
+    Object.defineProperty(marquee, 'clientWidth', { value: 800, configurable: true });
+
+    applyMarqueeSpeed(root);
+
+    expect(marquee.classList.contains('dash-marquee--static')).toBe(true);
+    expect(root.querySelector('.dash-marquee-track').style.getPropertyValue('--marquee-duration')).toBe('');
+  });
+
+  it('animates (not static) when the chips overflow the bar', () => {
+    document.documentElement.style.setProperty('--marquee-px-per-sec', String(MARQUEE_PX_PER_SEC));
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="dash-marquee">
+        <div class="dash-marquee-track"><span class="dash-marquee-copy">a</span><span class="dash-marquee-copy" aria-hidden="true">a</span></div>
+      </div>`;
+    const marquee = root.querySelector('.dash-marquee');
+    const copy = root.querySelector('.dash-marquee-copy');
+    Object.defineProperty(copy, 'scrollWidth', { value: 1000, configurable: true });
+    Object.defineProperty(marquee, 'clientWidth', { value: 800, configurable: true });
+
+    applyMarqueeSpeed(root);
+
+    expect(marquee.classList.contains('dash-marquee--static')).toBe(false);
+    expect(root.querySelector('.dash-marquee-track').style.getPropertyValue('--marquee-duration')).toBe(`${1000 / MARQUEE_PX_PER_SEC}s`);
+  });
+
+  it('renderMarqueeHtml returns empty string for no items (no broken marquee)', () => {
+    expect(renderMarqueeHtml([])).toBe('');
+  });
 });

@@ -14,10 +14,23 @@ function scopeEl(rootEl) {
 
 /** Set --marquee-duration from measured track width for constant px/s. */
 export function applyMarqueeSpeed(rootEl = document) {
-  const track = scopeEl(rootEl).querySelector('.dash-marquee-track');
+  const scope = scopeEl(rootEl);
+  const track = scope.querySelector('.dash-marquee-track');
   if (!track) return;
-  const copyWidth = track.scrollWidth / 2;
+  const firstCopy = track.querySelector('.dash-marquee-copy');
+  const copyWidth = firstCopy ? firstCopy.scrollWidth : track.scrollWidth / 2;
   if (!copyWidth) return;
+  // One copy must fill the bar for the -50% loop to be seamless. When the chips
+  // don't fill it (sparse/empty data), animating leaves a visible gap/jump — so
+  // mark the marquee static (centered, no scroll) instead.
+  const marquee = scope.querySelector('.dash-marquee');
+  const containerWidth = marquee ? marquee.clientWidth : 0;
+  const fits = containerWidth > 0 && copyWidth <= containerWidth;
+  if (marquee) marquee.classList.toggle('dash-marquee--static', fits);
+  if (fits) {
+    track.style.removeProperty('--marquee-duration');
+    return;
+  }
   track.style.setProperty('--marquee-duration', `${copyWidth / pxPerSec()}s`);
 }
 

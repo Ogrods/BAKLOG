@@ -312,6 +312,11 @@ export const EYEBROW_TIPS = {
   'Rare stinker': 'Rare easter egg: the single lowest-rated game in your whole catalog.',
   'Random pick': 'Dealer\u2019s choice: one title pulled at random from your library.',
   'Cat game': 'A game with "cat" in the title. A rare treat for cat people.',
+  // Discovery fallbacks
+  'Supposedly perfect': 'A flawless 100% review score, but on fewer than 50 reviews - take the perfection with a grain of salt.',
+  Unreviewed: 'No review score yet - an unrated pick sitting in your backlog.',
+  Unplayed: 'Never launched - 0h on the clock, still waiting to be started.',
+  'Total mystery': 'No review, no HLTB estimate, and never played - a complete blank slate.',
 };
 
 /**
@@ -355,6 +360,10 @@ export const EYEBROW_VARIANTS = {
   'Rare stinker': ['Rare stinker', 'Certified stinker', 'Bottom tier', 'The worst'],
   'Random pick': ['Random pick', 'Dealer\u2019s choice', 'Wild card', 'Lucky dip'],
   'Cat game': ['Cat game', 'Here, kitty', 'Meow', 'Cat content'],
+  'Supposedly perfect': ['Supposedly perfect', 'Allegedly flawless', 'Too perfect', 'Flawless?'],
+  Unreviewed: ['Unreviewed', 'No reviews', 'Unrated', 'No score'],
+  Unplayed: ['Unplayed', 'Never played', 'Not started', 'Zero hours'],
+  'Total mystery': ['Total mystery', 'Complete unknown', 'Blank slate', 'No data'],
 };
 
 /** @param {string} s */

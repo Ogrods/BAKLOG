@@ -28,6 +28,11 @@ const FRAMED_LOW_RATED_EYEBROWS = new Set([
   'Gathering dust',
   'Time capsule',
   'Whale',
+  // Discovery fallbacks for low-signal backlog titles (spotlight-discovery).
+  'Supposedly perfect',
+  'Unreviewed',
+  'Unplayed',
+  'Total mystery',
 ]);
 
 const NORMAL_MIN_RATING = 70;

@@ -3636,6 +3636,11 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   gap: 0.75rem; flex-wrap: wrap;
 }
 .migration-banner-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.pro-welcome-banner {
+  border-color: color-mix(in srgb, var(--accent, #38bdf8) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent, #38bdf8) 8%, var(--bg-elev));
+}
+.pro-welcome-banner strong { color: var(--accent); }
 .library-watch-banner.library-watch-found {
   border-color: rgba(34, 197, 94, 0.45);
   background: rgba(22, 101, 52, 0.2);

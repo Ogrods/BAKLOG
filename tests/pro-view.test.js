@@ -109,11 +109,12 @@ describe('post-checkout return', () => {
     authGate.refreshAccountPlan.mockResolvedValue('pro');
     const reload = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload });
-    const { markCheckoutSuccessPending, handleCheckoutSuccessReturn } = await import('../js/pro-view.js');
+    const { PRO_WELCOME_STORAGE_KEY, markCheckoutSuccessPending, handleCheckoutSuccessReturn } = await import('../js/pro-view.js');
     markCheckoutSuccessPending();
     await handleCheckoutSuccessReturn();
     expect(authGate.refreshAccountPlan).toHaveBeenCalled();
     expect(document.getElementById('proViewStatus').textContent).toContain('Pro is active');
+    expect(sessionStorage.getItem(PRO_WELCOME_STORAGE_KEY)).toBe('1');
     vi.advanceTimersByTime(500);
     expect(reload).toHaveBeenCalled();
   });
@@ -138,5 +139,47 @@ describe('post-checkout return', () => {
     await handleCheckoutSuccessReturn();
     expect(document.getElementById('proViewStatus').textContent).toContain('license key');
     expect(focusSpy).toHaveBeenCalled();
+  });
+});
+
+describe('Pro activation UX', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    sessionStorage.clear();
+    document.body.innerHTML = `
+      <button type="button" class="view-tab" data-view="pro"></button>
+      <div id="proWelcomeBanner" class="migration-banner pro-welcome-banner hidden"></div>`;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    sessionStorage.clear();
+  });
+
+  it('applyProTabVisibility keeps Pro tab visible during checkout pending even when isPro', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.isPro.mockReturnValue(true);
+    const { state } = await import('../js/state.js');
+    state.activeView = 'pro';
+    const { markCheckoutSuccessPending, applyProTabVisibility } = await import('../js/pro-view.js');
+    markCheckoutSuccessPending();
+    applyProTabVisibility();
+    const tab = document.querySelector('.view-tab[data-view="pro"]');
+    expect(tab.classList.contains('hidden')).toBe(false);
+  });
+
+  it('showProWelcomeBanner renders once when flag is set and user is Pro', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.isPro.mockReturnValue(true);
+    const { PRO_WELCOME_STORAGE_KEY, showProWelcomeBanner } = await import('../js/pro-view.js');
+    sessionStorage.setItem(PRO_WELCOME_STORAGE_KEY, '1');
+    showProWelcomeBanner();
+    const banner = document.getElementById('proWelcomeBanner');
+    expect(banner.classList.contains('hidden')).toBe(false);
+    expect(banner.textContent).toContain("You're on Pro");
+    expect(sessionStorage.getItem(PRO_WELCOME_STORAGE_KEY)).toBeNull();
+    banner.querySelector('.pro-welcome-dismiss')?.click();
+    expect(banner.classList.contains('hidden')).toBe(true);
   });
 });

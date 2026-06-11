@@ -6,6 +6,7 @@ vi.mock('../js/personal-storage.js', () => ({
 
 import { state } from '../js/state.js';
 import {
+  adultGameCount,
   buildLibrarySnapshot,
   getLibrarySnapshot,
   invalidateLibrarySnapshot,
@@ -377,6 +378,14 @@ describe('sabermetrics', () => {
       expect(indieTaggedShare(games)).toBeCloseTo(0.5);
       expect(earlyAccessBacklogCount(games)).toBe(1);
       expect(letterCoverageShare(games)).toBeCloseTo(4 / 26);
+
+      const adult = [
+        game({ name: 'Lewd Quest', genres: ['Sexual Content', 'RPG'], id: 'a1' }),
+        game({ name: 'NSFW Tag', tags: ['NSFW'], id: 'a2' }),
+        game({ name: 'Wholesome', genres: ['Puzzle'], tags: ['Casual'], id: 'a3' }),
+      ];
+      expect(adultGameCount(adult)).toBe(2);
+      expect(adultGameCount([game({ name: 'Clean', id: 'c1' })])).toBeNull();
     });
 
     it('batch-2 platform and critic gap helpers', () => {

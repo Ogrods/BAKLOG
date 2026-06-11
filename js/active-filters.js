@@ -35,7 +35,6 @@ export function collectActiveFilters() {
   for (const g of state.prefs.genreFilters || []) pills.push({ kind: "genre", value: g, label: g });
   if (sp.unplayedOnly) pills.push({ kind: "unplayed", value: "1", label: "Unplayed only" });
   if (sp.earlyAccessOnly) pills.push({ kind: "earlyAccess", value: "1", label: "Early Access only" });
-  if (sp.gamePassOnly) pills.push({ kind: "gamePass", value: "1", label: "Game Pass only" });
   if (sp.staleOnly) pills.push({ kind: "stale", value: "1", label: "Stale sync only" });
   const coopMode = getCoopFilterMode();
   if (coopMode !== "off") {

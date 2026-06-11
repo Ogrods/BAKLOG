@@ -213,7 +213,6 @@ export function removeActiveFilter(kind, value) {
     case "status":          return applyPrefsChange({ sessionPrefs: { statusFilter: "" } });
     case "unplayed":        return applyPrefsChange({ sessionPrefs: { unplayedOnly: false } });
     case "earlyAccess":     return applyPrefsChange({ sessionPrefs: { earlyAccessOnly: false } });
-    case "gamePass":        return applyPrefsChange({ sessionPrefs: { gamePassOnly: false } });
     case "stale":           return applyPrefsChange({ sessionPrefs: { staleOnly: false } });
     case "minRating":       return applyPrefsChange({ sessionPrefs: { minRating: 0 } });
     case "maxHours":        return applyPrefsChange({ sessionPrefs: { maxHours: 200 } });
@@ -296,7 +295,6 @@ export function clearAllFilters() {
         statusFilter: "",
         unplayedOnly: false,
         earlyAccessOnly: false,
-        gamePassOnly: false,
         staleOnly: false,
         minRating: 0,
         maxHours: 200,
@@ -512,7 +510,6 @@ export function updateViewChrome(options) {
   }
   document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn || isProView);
   document.getElementById("displayToolsSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn || isProView);
-  document.getElementById("gamePassSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn || isProView);
   document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isItch || isDash || isConn || isProView);
   document.getElementById("coopSection")?.classList.toggle("hidden", isItch || isDash || isConn || isProView);
   if (isDash && !options?.skipDashboardSchedule) scheduleDashboardRender();

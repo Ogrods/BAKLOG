@@ -592,11 +592,6 @@ export function extraInningsAvg(snap) {
   return Math.round((gaps.reduce((s, h) => s + h, 0) / gaps.length) * 10) / 10;
 }
 
-export function gamePassCount(snap) {
-  const n = snap.games.filter(g => g.game_pass === true).length;
-  return n > 0 ? n : null;
-}
-
 /** Games owned on 2+ stores (cross-store dedup map). */
 export function doubleDipCount() {
   const map = state.crossStoreOwnedStores;

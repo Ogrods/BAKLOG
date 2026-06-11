@@ -30,7 +30,6 @@ import {
   trophyProgressPillHtml,
   platinumBadgeHtml,
   storeBadgeHtml,
-  gamePassBadgeHtml,
   coverArtCandidates,
   landscapeArtCandidates,
   spotlightArtCandidates,
@@ -626,18 +625,6 @@ describe('trophyProgressPillHtml', () => {
     });
     expect(html).toContain('data-tro-cur="12"');
     expect(html).toContain('data-tro-total="33"');
-  });
-});
-
-describe('gamePassBadgeHtml', () => {
-  it('renders GP pill for subscription rows', () => {
-    const html = gamePassBadgeHtml({ store: 'xbox', id: '1', game_pass: true });
-    expect(html).toContain('game-pass-pill');
-    expect(html).toContain('GP');
-  });
-
-  it('returns empty for non-subscription rows', () => {
-    expect(gamePassBadgeHtml({ store: 'steam', id: 1 })).toBe('');
   });
 });
 

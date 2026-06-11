@@ -109,7 +109,6 @@ export function loadSessionPrefs() {
     statusFilter: "",
     unplayedOnly: false,
     earlyAccessOnly: false,
-    gamePassOnly: false,
     minRating: 0,
     maxHours: 200,
   };
@@ -140,7 +139,6 @@ export function syncFilterDomFromState() {
   setVal("statusFilter", s.statusFilter || "");
   setChecked("unplayedOnly", s.unplayedOnly);
   setChecked("earlyAccessOnly", s.earlyAccessOnly);
-  setChecked("gamePassOnly", s.gamePassOnly);
   const minR = s.minRating || 0;
   setVal("minRating", minR);
   const minRVal = document.getElementById("minRatingVal");

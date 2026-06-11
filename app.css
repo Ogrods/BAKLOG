@@ -875,7 +875,6 @@ button[disabled] { cursor: not-allowed; }
 .store-badge,
 .pick-store,
 .ea-pill,
-.game-pass-pill,
 .ea-ribbon,
 .coop-pill,
 .deal-cut-badge,
@@ -986,19 +985,6 @@ button[disabled] { cursor: not-allowed; }
 }
 .coop-pill-online { background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%); color: #06141f; }
 .coop-pill-local { background: linear-gradient(180deg, #34d399 0%, #047857 100%); color: #052017; }
-.game-pass-pill {
-  display: inline-flex; align-items: center;
-  background: linear-gradient(180deg, #9ae6b4 0%, #38a169 100%);
-  color: #052e16;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 3px;
-  line-height: 1.4;
-  flex-shrink: 0;
-}
 .plat-badge {
   display: inline-flex; align-items: center;
   background: linear-gradient(180deg, #e8eef5 0%, #9eb4cc 55%, #6b7f96 100%);

@@ -552,12 +552,37 @@ export function syncViewTabAria(view) {
   });
 }
 
-/** Quarantine itch.io nav until the user has set up itch (API key) or already has itch data. */
+/**
+ * Smooth-scroll the dashboard itch card into view with a brief highlight pulse.
+ *
+ * The card lives at the bottom of the picks row and is rendered asynchronously
+ * after switchView('dashboard'), so retry on rAF until it exists.
+ */
+export function scrollToItchCard() {
+  const attempt = (tries) => {
+    const card = document.getElementById("dashItchCard");
+    if (!card) {
+      if (tries > 0) requestAnimationFrame(() => attempt(tries - 1));
+      return;
+    }
+    if (typeof card.scrollIntoView === "function") {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    card.classList.add("itch-card-jump-pulse");
+    setTimeout(() => card.classList.remove("itch-card-jump-pulse"), 1600);
+  };
+  attempt(30);
+}
+
+/**
+ * Keep the itch.io nav tab visible at all times. When itch isn't set up, mark
+ * the tab so clicks jump to the dashboard itch card instead of the itch view.
+ */
 export function applyItchTabVisibility() {
   const tab = document.querySelector('.view-tab[data-view="itch"]');
   if (!tab) return;
   const available = isItchTabAvailable();
-  tab.classList.toggle("hidden", !available);
+  tab.classList.toggle("itch-tab-jump", !available);
   // Fail open during boot: until auth status is fetched and the library has
   // loaded, authStatus/itchGames are empty, so a hard refresh on itch would
   // always bounce to dashboard. Only redirect once we truly know.
@@ -566,6 +591,7 @@ export function applyItchTabVisibility() {
     switchView("dashboard");
     state.prefs.activeView = "dashboard";
     savePrefs();
+    scrollToItchCard();
   }
 }
 

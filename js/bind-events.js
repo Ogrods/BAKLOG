@@ -65,6 +65,7 @@ import {
   renderWishlistStoreChips,
   renderGenreChips,
   switchView,
+  scrollToItchCard,
   exportCsv,
   exportTopBacklogMarkdown,
   download,
@@ -72,6 +73,7 @@ import {
   clearAllFilters,
   showItchNonGamesFromEmptyState,
 } from './filters-ui.js';
+import { isItchTabAvailable } from './connections.js';
 import {
   getDealInfo,
   syncDealFilterControls,
@@ -585,8 +587,15 @@ export function bindEvents() {
   });
   document.querySelectorAll(".view-tab").forEach(btn => {
     btn.addEventListener("click", () => {
-      const view = btn.dataset.view || "library";
-      if (view === state.activeView) return;
+      let view = btn.dataset.view || "library";
+      // itch tab with no itch account: jump to the dashboard itch card instead
+      // of opening the (quarantined) itch view.
+      const jumpToItchCard = view === "itch" && !isItchTabAvailable();
+      if (jumpToItchCard) view = "dashboard";
+      if (view === state.activeView) {
+        if (jumpToItchCard) scrollToItchCard();
+        return;
+      }
       // Top-tab clicks (never drill-ins, never the dashboard drill helpers)
       // should land the user at the top of the page so they see the header,
       // summary, then picks, then table. Scroll BEFORE switchView so the
@@ -601,6 +610,7 @@ export function bindEvents() {
       }
       window.scrollTo(0, 0);
       switchView(view);
+      if (jumpToItchCard) scrollToItchCard();
     });
   });
   document.getElementById("cleanupModeBtn").addEventListener("click", () => {

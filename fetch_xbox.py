@@ -64,12 +64,8 @@ def _build_row(title: dict, hltb: dict | None) -> dict:
     tid = str(title.get("titleId") or title.get("modernTitleId") or "")
     ach = title.get("achievement") or {}
     hist = title.get("titleHistory") or {}
-    gp = title.get("gamePass") or {}
     image = _https(title.get("displayImage"))
     tags: list[str] = []
-    is_gp = bool(gp.get("isGamePass"))
-    if is_gp:
-        tags.append("game-pass")
     devices = title.get("devices") or []
     if devices:
         tags.extend(str(d).lower() for d in devices)
@@ -103,7 +99,6 @@ def _build_row(title: dict, hltb: dict | None) -> dict:
         "currency": None,
         "xbox_gamerscore_current": ach.get("currentGamerscore"),
         "xbox_gamerscore_total": ach.get("totalGamerscore"),
-        "game_pass": is_gp,
     }
     if hltb:
         row.update(

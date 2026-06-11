@@ -102,7 +102,7 @@ export function familyForLabel(label) {
     'completion avg', 'start rate', 'abandon rate', 'closer power', 'rookie finish',
     'veteran finish', 'below mendoza', 'critic gap', "people's champ", "critics' darling",
     'overrated index', 'perpetual beta', 'couch-ready', 'aging curve', 'day-one player',
-    'extra innings', "subscriber's dividend", 'double dips', 'cost per finish', 'sunk cost',
+    'extra innings', 'double dips', 'cost per finish', 'sunk cost',
     'will you die first',
   ])) {
     return FAMILY.SABER;

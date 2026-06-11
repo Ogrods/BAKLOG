@@ -36,13 +36,16 @@ describe('renderProView', () => {
     document.body.innerHTML = '<div id="proContainer"><div id="proViewRoot"></div></div>';
   });
 
-  it('renders conversion funnel with toggle, six perks, and license field', async () => {
+  it('renders conversion funnel with hero banner, toggle, six perks, and license field', async () => {
     const { renderProView } = await import('../js/pro-view.js');
     renderProView();
     const root = document.getElementById('proViewRoot');
     expect(root.innerHTML).toContain(PRO_PROMO.title);
-    expect(root.innerHTML).toContain('Get Pro - $5/mo');
+    expect(root.innerHTML).toContain('Get Pro - $50/yr');
     expect(root.innerHTML).toContain('buy.polar.sh');
+    expect(root.querySelector('[data-pro-hero-banner]')).toBeTruthy();
+    expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-polar-yearly');
+    expect(root.querySelector('.pro-view-funnel--yearly')).toBeTruthy();
     expect(root.querySelector('[data-pro-plan="monthly"]')).toBeTruthy();
     expect(root.querySelector('[data-pro-plan="yearly"]')).toBeTruthy();
     expect(root.querySelector('[data-pro-checkout]')).toBeTruthy();
@@ -52,13 +55,26 @@ describe('renderProView', () => {
     expect(root.querySelector('[data-pro-license-form]')).toBeTruthy();
   });
 
-  it('switches checkout label when yearly plan is selected', async () => {
+  it('shows license field and refresh even when license activation is disabled in config', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.licenseActivationEnabled.mockReturnValue(false);
+    const { renderProView } = await import('../js/pro-view.js');
+    renderProView();
+    const root = document.getElementById('proViewRoot');
+    expect(root.querySelector('[data-pro-license-form]')).toBeTruthy();
+    expect(root.querySelector('[data-pro-refresh]')).toBeTruthy();
+    expect(root.innerHTML).not.toContain('BAKLOG_POLAR_ORG_ID');
+  });
+
+  it('switches checkout label and hero banner when monthly plan is selected', async () => {
     const { renderProView, wireProView } = await import('../js/pro-view.js');
     wireProView();
     renderProView();
     const root = document.getElementById('proViewRoot');
-    root.querySelector('[data-pro-plan="yearly"]')?.click();
-    expect(root.querySelector('[data-pro-checkout]')?.textContent).toContain('$50/yr');
+    root.querySelector('[data-pro-plan="monthly"]')?.click();
+    expect(root.querySelector('[data-pro-checkout]')?.textContent).toContain('$5/mo');
+    expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-polar.png');
+    expect(root.querySelector('.pro-view-funnel--monthly')).toBeTruthy();
   });
 
   it('shows active state for Pro users', async () => {

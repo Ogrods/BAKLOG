@@ -65,10 +65,13 @@ When multiple Cursor agents work at once, **one agent = one git worktree = one s
 **Worktrees** — give each concurrent agent its own folder:
 
 ```powershell
-git worktree add ..\baklog-pro feat/pro
-git worktree add ..\baklog-spotlight feat/spotlight-discovery
-git worktree list   # dashboard of who is where
+.\scripts\new-worktree.ps1 feat/pro                 # -> ..\baklog-pro on feat/pro
+.\scripts\new-worktree.ps1 feat/spotlight-discovery # rejects bare names; feat/|fix/|chore/ only
+git worktree list                                   # dashboard of who is where
+.\scripts\close-worktree.ps1 feat/pro               # after squash-merge: remove + delete local/remote + prune
 ```
+
+The helpers enforce the branch-naming scheme and junction `.venv` + `node_modules` into the new folder so it is usable immediately. Raw equivalent: `git worktree add ..\baklog-pro feat/pro`.
 
 **Merge hygiene** — squash-merge PRs to `main`, then delete the local branch and `git push origin --delete <branch>`. Run `git fetch --prune` after cleanup. Tag or bundle before destructive branch deletes (`git tag backup/<branch>-YYYY-MM-DD <branch>`; `git bundle create ..\baklog-backups\pre-reset.bundle --all`).
 

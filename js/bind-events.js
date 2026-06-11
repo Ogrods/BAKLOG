@@ -39,6 +39,7 @@ import {
   cancelPendingScrollTarget,
   initTablePhoneLayout,
   syncSponsoredTableAfterDismiss,
+  syncRowCountLabel,
 } from './table-ui.js';
 import {
   renderPicks,
@@ -560,6 +561,11 @@ export function bindEvents() {
     const g = findGameByKey(t.dataset.gameKey);
     if (!g) return;
     const field = t.dataset.field;
+    if (field === "count_in_total") {
+      setPersonal(g, "exclude_from_count", !t.checked);
+      syncRowCountLabel();
+      return;
+    }
     setPersonal(g, field, t.value);
     const tr = t.closest("tr");
     if (tr) {

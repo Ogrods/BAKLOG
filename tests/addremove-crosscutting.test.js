@@ -13,7 +13,7 @@ import {
   recomputeCrossStoreHidden,
   gameKey,
 } from '../js/game-core.js';
-import { setGameHidden, addManualGame, removeManualGame } from '../js/personal-storage.js';
+import { setGameHidden, addManualGame, removeManualGame, setPersonal } from '../js/personal-storage.js';
 import { refreshAfterManualChange } from '../js/library-load.js';
 import { formatRowCountText } from '../js/table-ui.js';
 import {
@@ -106,6 +106,46 @@ describe('row-count denominators', () => {
     refreshAfterManualChange();
     recomputeCrossStoreHidden();
     expect(formatRowCountText('library', [])).toBe('Showing 0 of 0 games');
+  });
+});
+
+describe('manual count toggle', () => {
+  it('count-off removes a manual item from the "of Y" denominator and dashboard total; toggling back restores it', () => {
+    state.allGames = [solo];
+    recomputeCrossStoreHidden();
+    expect(formatRowCountText('library', [solo])).toBe('Showing 1 of 1 games');
+    expect(dashboardLibraryGames()).toHaveLength(1);
+
+    const manual = { store: 'steam', id: 'manual-c', name: 'Counted', manual: true, playtime_minutes: 0 };
+    addManualGame(manual);
+    refreshAfterManualChange();
+    recomputeCrossStoreHidden();
+    const withManual = state.allGames;
+    const manualRow = withManual.find(g => g.id === 'manual-c');
+    expect(manualRow).toBeTruthy();
+    expect(formatRowCountText('library', withManual)).toBe('Showing 2 of 2 games');
+    expect(dashboardLibraryGames()).toHaveLength(2);
+
+    // Toggle the manual item out of the headline count (Count checkbox off).
+    setPersonal(manualRow, 'exclude_from_count', true, { silent: true });
+    expect(formatRowCountText('library', withManual)).toBe('Showing 1 of 1 games');
+    const counted = dashboardLibraryGames();
+    expect(counted).toHaveLength(1);
+    expect(counted.some(g => gameKey(g) === gameKey(manualRow))).toBe(false);
+
+    // Toggling back restores it to both the denominator and the dashboard total.
+    setPersonal(manualRow, 'exclude_from_count', false, { silent: true });
+    expect(formatRowCountText('library', withManual)).toBe('Showing 2 of 2 games');
+    expect(dashboardLibraryGames()).toHaveLength(2);
+  });
+
+  it('count-off only affects manual rows, never fetched store games', () => {
+    state.allGames = [solo];
+    recomputeCrossStoreHidden();
+    // Fetched rows never carry exclude_from_count, so the count helper is a no-op.
+    setPersonal(solo, 'exclude_from_count', true, { silent: true });
+    setPersonal(solo, 'exclude_from_count', false, { silent: true });
+    expect(formatRowCountText('library', [solo])).toBe('Showing 1 of 1 games');
   });
 });
 

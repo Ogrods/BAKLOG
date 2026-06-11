@@ -183,8 +183,8 @@ configurePersonalStore({
   setManualGames: (list) => { manualGames = list; },
 });
 
-const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null };
-const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null });
+const PERSONAL_DEFAULT = { status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null, exclude_from_count: false };
+const PERSONAL_EMPTY = Object.freeze({ status: "backlog", notes: "", priority: 0, hltb_override: null, hidden: false, started_at: null, finished_at: null, exclude_from_count: false });
 
 const META_KEYS = new Set([
   "__migrated_v3",
@@ -209,6 +209,7 @@ function normalizePersonalRecord(found) {
     hidden: found.hidden === true,
     started_at: found.started_at ?? null,
     finished_at: found.finished_at ?? null,
+    exclude_from_count: found.exclude_from_count === true,
   };
 }
 
@@ -527,6 +528,32 @@ export function isGameHidden(g) {
 
 export function filterOutHidden(list) {
   return list.filter(g => !isGameHidden(g));
+}
+
+/** Whether a game contributes to the headline library total. Only manual rows
+ *  can opt out (via the per-row Count toggle); fetched store rows never set
+ *  exclude_from_count, so this is always true for them. */
+export function countsInLibraryTotal(g) {
+  return getPersonal(g).exclude_from_count !== true;
+}
+
+export function filterCounted(list) {
+  return list.filter(countsInLibraryTotal);
+}
+
+/** Visible, counted library size: drops cross-store dupes, user-hidden rows,
+ *  and manual rows toggled out of the count. Single source of truth for the
+ *  "of Y" denominators and headline totals. */
+export function countedLibraryDenominator() {
+  let n = 0;
+  for (const g of state.allGames) {
+    if (state.crossStoreHiddenKeys.has(gameKey(g))) continue;
+    const p = getPersonal(g);
+    if (p.hidden === true) continue;
+    if (p.exclude_from_count === true) continue;
+    n++;
+  }
+  return n;
 }
 
 /** One-shot: seed pre-hidden defaults from former fetcher denylists. */

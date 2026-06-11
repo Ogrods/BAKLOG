@@ -67,8 +67,9 @@ import {
   loadManualGames,
   saveManualGames,
   setGameHidden,
-  countUserHiddenLibrary,
   countUserHiddenWishlist,
+  countsInLibraryTotal,
+  countedLibraryDenominator,
 } from './personal-storage.js';
 import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
@@ -1225,6 +1226,7 @@ function tableRowHtml(g, idx, { isWish }) {
             </div>
             <div class="row-meta mt-1 flex items-center gap-1.5 flex-wrap">
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
+              ${g.manual && state.activeView === "library" ? `<label class="row-count-toggle text-xs text-slate-400 inline-flex items-center gap-1" title="Count this item in the library total"><input type="checkbox" class="rounded" data-game-key="${escapeAttr(key)}" data-field="count_in_total" ${countsInLibraryTotal(g) ? "checked" : ""} /> Count</label>` : ""}
               ${staleBadgeHtml(g)}
               ${coopPillsHtml(g)}
               ${state.activeView === "wishlist" ? "" : trophyProgressPillHtml(g)}
@@ -1382,7 +1384,7 @@ export function formatRowCountText(view, list) {
     const suffix = state.sessionPrefs.itchHideNonGames && gamesOnly !== total ? ` (${gamesOnly} games of ${total} items)` : "";
     base = `Itch.io: ${rows.length} of ${state.itchGames.length}${suffix}`;
   } else {
-    base = `Showing ${rows.length} of ${Math.max(0, state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))).length - countUserHiddenLibrary())} games`;
+    base = `Showing ${rows.filter(countsInLibraryTotal).length} of ${countedLibraryDenominator()} games`;
   }
   const extra = state.cleanupModeActive && view === "library" ? " · cleanup mode" : "";
   return base + extra;
@@ -1393,9 +1395,9 @@ export function renderRowCountEl(el, view, list) {
   if (!el) return;
   const rows = list || [];
   if (view === "library") {
-    const total = Math.max(0, state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))).length - countUserHiddenLibrary());
+    const total = countedLibraryDenominator();
     const extra = state.cleanupModeActive ? " · cleanup mode" : "";
-    el.innerHTML = `Showing <span class="library-count-host" data-libcount-host><span data-count-target="rowcount-library">${rows.length}</span></span> of ${total} games${escapeHtml(extra)}`;
+    el.innerHTML = `Showing <span class="library-count-host" data-libcount-host><span data-count-target="rowcount-library">${rows.filter(countsInLibraryTotal).length}</span></span> of ${total} games${escapeHtml(extra)}`;
     return;
   }
   if (view === "wishlist") {

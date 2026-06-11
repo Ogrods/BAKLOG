@@ -34,6 +34,21 @@ let _plan = 'free';
 let _licenseActivation = false;
 let _proCheckout = { monthly: '', yearly: '' };
 
+const DEBUG_PRO_STORAGE_KEY = 'baklog-debug-pro';
+
+/** Dev-only Pro override: `?pro=1` or localStorage `baklog-debug-pro=1`. */
+export function isDebugProEnabled() {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (localStorage.getItem(DEBUG_PRO_STORAGE_KEY) === '1') return true;
+  } catch (_) { /* private mode */ }
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.has('pro') && q.get('pro') !== '0') return true;
+  } catch (_) { /* file:// */ }
+  return false;
+}
+
 export function isAccountAuthMode() {
   return !!_authRequired;
 }
@@ -44,11 +59,13 @@ export function isLocalProfilesEnabled() {
 
 /** Effective plan from GET /api/config ("free" | "pro"). */
 export function getPlan() {
+  if (isDebugProEnabled()) return 'pro';
   return _plan;
 }
 
 /** True for the paid tier (server-side background refresh, etc.). */
 export function isPro() {
+  if (isDebugProEnabled()) return true;
   return _plan === 'pro';
 }
 

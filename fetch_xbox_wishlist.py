@@ -199,33 +199,51 @@ def _index_products(state: dict) -> dict[str, dict]:
 
 
 def _pick_image(product: dict) -> str | None:
-    """Prefer a poster/box-art image; xbox.com ships a few size variants."""
+    """Prefer a poster/box-art image; xbox.com ships a few size variants.
+
+    The catalog ``images`` field arrives in two shapes: a *list* of
+    ``{url, purpose, width}`` dicts (older shape), or — current xbox.com SSR —
+    a *dict keyed by purpose*, e.g.
+    ``{"poster": {url,width,height}, "boxArt": {...}, "superHeroArt": {...}}``.
+    Only the list shape used to be handled, so every row came back image-less
+    and fell through to (often dead) Steam-search covers. Handle both, and
+    prefer the vertical ``poster`` so the library cover keeps a 2:3 aspect.
+    """
     images = product.get("images") or product.get("Images")
-    candidates: list[tuple[int, str]] = []
+    img_list: list[dict] = []
     if isinstance(images, list):
-        for img in images:
-            if not isinstance(img, dict):
-                continue
-            url = img.get("url") or img.get("Url") or img.get("uri")
-            purpose = (img.get("purpose") or img.get("imagePurpose") or "").lower()
-            width = img.get("width") or img.get("Width") or 0
-            try:
-                width = int(width)
-            except (TypeError, ValueError):
-                width = 0
-            if not url:
-                continue
-            # Posters / box art first
-            rank = 0
-            if "boxart" in purpose or "poster" in purpose:
-                rank = 100
-            elif "tile" in purpose:
-                rank = 50
-            elif "logo" in purpose:
-                rank = 10
-            else:
-                rank = 20
-            candidates.append((rank * 1000 + min(width, 1000), url))
+        img_list = [i for i in images if isinstance(i, dict)]
+    elif isinstance(images, dict):
+        for purpose_key, val in images.items():
+            if isinstance(val, dict):
+                img_list.append({**val, "purpose": val.get("purpose") or purpose_key})
+
+    candidates: list[tuple[int, str]] = []
+    for img in img_list:
+        url = img.get("url") or img.get("Url") or img.get("uri")
+        purpose = (img.get("purpose") or img.get("imagePurpose") or "").lower()
+        width = img.get("width") or img.get("Width") or 0
+        try:
+            width = int(width)
+        except (TypeError, ValueError):
+            width = 0
+        if not url:
+            continue
+        # Vertical poster first (matches the 2:3 library cover), then box art,
+        # then tiles / wide hero art / logos.
+        if "poster" in purpose:
+            rank = 110
+        elif "boxart" in purpose:
+            rank = 100
+        elif "tile" in purpose:
+            rank = 50
+        elif "hero" in purpose:
+            rank = 40
+        elif "logo" in purpose:
+            rank = 10
+        else:
+            rank = 20
+        candidates.append((rank * 1000 + min(width, 1000), url))
     if candidates:
         candidates.sort(reverse=True)
         return _https(candidates[0][1])

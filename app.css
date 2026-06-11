@@ -5074,16 +5074,33 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
 .dash-marquee-track {
   --marquee-duration: 180s;
   display: inline-flex;
-  gap: 28px;
+  gap: 0;
   white-space: nowrap;
   animation: dashMarquee var(--marquee-duration) linear infinite;
   will-change: transform;
+}
+/* Each copy carries the chip spacing plus a trailing gap so the loop seam
+   (copy1 -> copy2) is spaced identically to the internal chip gaps. */
+.dash-marquee-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  padding-right: 28px;
 }
 .dash-marquee:hover .dash-marquee-track { animation-play-state: paused; }
 @keyframes dashMarquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
+/* Too few chips to fill the bar (sparse/empty data): center them and stop the
+   scroll so the seamless loop never leaves a visible gap or jump. */
+.dash-marquee--static .dash-marquee-track {
+  animation: none;
+  width: 100%;
+  justify-content: center;
+}
+.dash-marquee--static .dash-marquee-copy { padding-right: 0; }
+.dash-marquee--static .dash-marquee-copy[aria-hidden="true"] { display: none; }
 .dash-marquee-item {
   display: inline-flex;
   align-items: center;

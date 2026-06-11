@@ -268,7 +268,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Move faster. Cut the noise.',
     tagline: 'Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.',
-    cta: 'Get Pro — $5/mo',
+    cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     enabled: true,
@@ -277,7 +277,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'You own 600 games. You\'ve played 40.',
     tagline: 'One honest backlog across every store. Private, Steam-ready.',
-    cta: 'Get Pro — $5/mo',
+    cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     dismissible: true,
@@ -297,7 +297,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'BAKLOG Pro',
     slogan: 'One honest backlog across every store.',
-    tagline: 'One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo.',
+    tagline: 'One honest backlog, leveled up. Bulk refresh, cloud sync, no ads - $5/mo.',
     cta: 'Get Pro',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -308,9 +308,9 @@ const HOUSE_DEFAULTS = {
   'house-spotlight-pro-sync': {
     kind: 'house',
     title: 'Sync every machine',
-    slogan: 'Keep your library and personal data aligned across machines — no manual exports.',
-    tagline: 'BAKLOG Pro keeps your library and personal data aligned across machines — no manual exports.',
-    cta: 'Get Pro — $5/mo',
+    slogan: 'Keep your library and personal data aligned across machines - no manual exports.',
+    tagline: 'BAKLOG Pro keeps your library and personal data aligned across machines - no manual exports.',
+    cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     art_mode: 'logo',
@@ -322,7 +322,7 @@ const HOUSE_DEFAULTS = {
     title: 'Fewer distractions',
     slogan: 'Paid tier drops sponsored deal slots so your deal radar stays yours.',
     tagline: 'BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo.',
-    cta: 'Get Pro — $5/mo',
+    cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     art_mode: 'logo',
@@ -334,7 +334,7 @@ const HOUSE_DEFAULTS = {
     title: 'It\'s just your library',
     slogan: 'It\'s not a godsend, it\'s just your library.',
     tagline: 'Every game you already own, deduped across every store into one honest backlog. Local-first.',
-    cta: 'Get Pro — $5/mo',
+    cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     art_mode: 'logo',
@@ -689,10 +689,10 @@ export const PRO_PROMO = {
   title: 'Move faster. Cut the noise.',
   price: '$5/mo ($50/yr)',
   tagline: 'Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.',
-  cta: 'Get Pro — $5/mo',
-  ctaYearly: 'Get Pro — $50/yr',
+  cta: 'Get Pro - $5/mo',
+  ctaYearly: 'Get Pro - $50/yr',
   url: PRO_CHECKOUT_MONTHLY,
-  founderNote: 'Back the roadmap — lock in $50/yr while Pro is early.',
+  founderNote: 'Back the roadmap - lock in $50/yr while Pro is early.',
   features: [
     {
       title: 'Queued bulk refresh',
@@ -727,16 +727,16 @@ export const PRO_PROMO = {
   ],
   tierCompare: [
     { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores' },
-    { feature: 'Refresh while app is closed', free: '—', pro: '✓' },
+    { feature: 'Refresh while app is closed', free: '-', pro: '✓' },
     { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
-    { feature: 'Cloud sync', free: '—', pro: '✓' },
+    { feature: 'Cloud sync', free: '-', pro: '✓' },
     { feature: 'Bonus claimables feed', free: 'Full games only', pro: '✓ + DLC/bonus drops' },
   ],
   trustPoints: [
-    'Local-first — your library stays on your machine',
-    'Open source (MIT) — audit every fetcher path',
-    'Polar.sh Merchant of Record — cancel anytime',
+    'Local-first - your library stays on your machine',
+    'Open source (MIT) - audit every fetcher path',
+    'Polar.sh Merchant of Record - cancel anytime',
     'Zero telemetry unless you opt in',
   ],
 };
@@ -828,7 +828,7 @@ export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
 export function proPromoBannerHtml(item) {
   if (isPro()) return '';
   if (!item) return '';
-  const discTitle = 'House promotion from BAKLOG — optional paid tier';
+  const discTitle = 'House promotion from BAKLOG - optional paid tier';
   const title = item.title || PRO_PROMO.title;
   const taglineText = item.tagline ?? PRO_PROMO.tagline;
   const cta = item.cta || PRO_PROMO.cta;

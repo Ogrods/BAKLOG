@@ -493,7 +493,7 @@ function itchBrandRailHtml() {
 
 function itchOnboardingHtml() {
   const affiliateNote = hasLiveAffiliates()
-    ? `<p class="itch-onboard-affiliate">BAKLOG is an itch.io affiliate — your purchases help keep the app free.</p>`
+    ? `<p class="itch-onboard-affiliate">BAKLOG is an itch.io affiliate - your purchases help keep the app free.</p>`
     : "";
   return `<div class="itch-onboarding">
     <div class="itch-onboard-lead">Start earning free games today</div>
@@ -507,7 +507,7 @@ function itchValueBlockHtml(gamesOnly) {
   const free = freeItchCount(gamesOnly) ?? 0;
   const paid = paidItchCount(gamesOnly) ?? 0;
   const spend = itchSpendTotal(gamesOnly);
-  const spendLabel = spend != null ? formatDollar(spend) : "—";
+  const spendLabel = spend != null ? formatDollar(spend) : "-";
   return `<div class="itch-value-block" title="Free vs paid itch.io videogames by minimum list price">
     <div class="itch-distribution-label">Library value</div>
     <div class="itch-value-grid">

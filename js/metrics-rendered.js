@@ -5,7 +5,7 @@
 // preserved. The admin Metrics tab just reads the result — no button needed.
 
 import { state } from './state.js';
-import { METRIC_KEYS, metricKeyForLabel, metricKeyForInsight } from './metric-tips.js';
+import { METRIC_KEYS, metricKeyForInsight } from './metric-tips.js';
 import { savePrefs } from './prefs.js';
 import { mergeUntappedBatchSeed } from './metrics-untapped-batch.js';
 
@@ -81,20 +81,47 @@ export function noteInsightMetricKeys(keys) {
   _insightKeys = [...new Set([...keys].filter(Boolean))];
 }
 
-/** Re-note keys when mega artifacts are served from cache (builders did not run). */
-export function noteRenderedKeysFromArtifacts(marqueeItems, insightPool) {
-  if (marqueeItems?.length) {
-    noteMarqueeMetricKeys(marqueeItems.map((it) => metricKeyForLabel(it.label)));
+/** Snapshot pre-disable keys noted by builders (for mega-artifact cache). */
+export function snapshotNotedMetricKeys() {
+  return {
+    marqueeMetricKeys: [..._marqueeKeys],
+    insightMetricKeys: [..._insightKeys],
+  };
+}
+
+/**
+ * Restore noted keys from cached mega artifacts. Never derive marquee keys from
+ * post-filter visible chips — that re-poisons metricsDisabled on cache hits.
+ * @param {{ marqueeMetricKeys?: string[], insightMetricKeys?: string[], insightPool?: unknown[] }} artifacts
+ */
+export function restoreNotedMetricKeysFromArtifacts(artifacts) {
+  if (!artifacts) return;
+  if (artifacts.marqueeMetricKeys?.length) {
+    noteMarqueeMetricKeys(artifacts.marqueeMetricKeys);
   }
-  if (insightPool?.length) {
-    noteInsightMetricKeys(insightPool.map((e) => metricKeyForInsight(typeof e === 'string' ? e : e.html)));
+  if (artifacts.insightMetricKeys?.length) {
+    noteInsightMetricKeys(artifacts.insightMetricKeys);
+  } else if (artifacts.insightPool?.length) {
+    noteInsightMetricKeys(artifacts.insightPool.map((e) => metricKeyForInsight(typeof e === 'string' ? e : e.html)));
   }
+}
+
+/** True when a huge disabled set meets a tiny rendered union (cache re-poison). */
+export function isImplausibleDisabledBloat(currentDisabled, renderedUnion) {
+  const catalogSize = METRIC_KEYS.length;
+  if (!catalogSize || !Array.isArray(currentDisabled) || !currentDisabled.length) return false;
+  if (currentDisabled.length / catalogSize <= 0.8) return false;
+  const unionLen = Array.isArray(renderedUnion) ? renderedUnion.length : 0;
+  return unionLen > 0 && unionLen < 15;
 }
 
 function applyAutoDisabled(rendered, previousRendered) {
   try {
     let current = Array.isArray(state.prefs?.metricsDisabled) ? state.prefs.metricsDisabled : [];
     current = mergeUntappedBatchSeed(current);
+    if (isImplausibleDisabledBloat(current, rendered)) {
+      current = [];
+    }
     const next = computeAutoDisabled(METRIC_KEYS, rendered, current, previousRendered);
     const curSet = new Set(current);
     const changed = next.length !== current.length || next.some((k) => !curSet.has(k));

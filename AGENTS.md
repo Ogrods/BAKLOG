@@ -56,6 +56,24 @@ processes" at quit). To clean up after a messy session: `stop_baklog.py` (gracef
 `POST /api/shutdown`, then force-kills any server/tray still on port 8765 and
 clears `.baklog_server.pid`).
 
+## Parallel agents (git hygiene)
+
+When multiple Cursor agents work at once, **one agent = one git worktree = one single-purpose branch**. Never share an uncommitted working tree across agents.
+
+**Branch naming** — always prefix: `feat/`, `fix/`, or `chore/`. Ban bare names like `pro-debug-url`. One concern per branch; do not stack unrelated commits (e.g. Pro funnel + spotlight discovery + dev flags on one branch).
+
+**Worktrees** — give each concurrent agent its own folder:
+
+```powershell
+git worktree add ..\baklog-pro feat/pro
+git worktree add ..\baklog-spotlight feat/spotlight-discovery
+git worktree list   # dashboard of who is where
+```
+
+**Merge hygiene** — squash-merge PRs to `main`, then delete the local branch and `git push origin --delete <branch>`. Run `git fetch --prune` after cleanup. Tag or bundle before destructive branch deletes (`git tag backup/<branch>-YYYY-MM-DD <branch>`; `git bundle create ..\baklog-backups\pre-reset.bundle --all`).
+
+**Tracker handoff** — edit `tracker.html` in the private `baklog-internal` clone directly. Do not create `tracker-update-*.md` scratch files in the public repo.
+
 ## Progress tracker
 
 Canonical progress lives in **`tracker.html`** (private, gitignored). On completing a meaningful task, update the relevant `PHASES` / findings entry with `[DONE]` or `[RESOLVED]` and a dated note — do not create a separate `PROGRESS.md`. See `docs/WORKFLOW.md` and `.cursor/rules/internal-workflow.mdc` in the maintainer clone.

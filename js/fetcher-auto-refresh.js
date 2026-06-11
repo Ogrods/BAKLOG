@@ -218,9 +218,9 @@ export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner?.run(k, opts));
   const waitSlotFn =
     deps.waitForQueueSlot ?? (() => fetcherRunner?.waitForQueueSlot({ batchEpoch }));
-  const credsOkFn = deps.fetcherCredentialsSatisfied;
-  const cooldownFn = deps.authCooldownRemainingMs;
-  const disconnectedFn = deps.isFetcherDisconnected;
+  const credsOkFn = deps.fetcherCredentialsSatisfied ?? wired.fetcherCredentialsSatisfied;
+  const cooldownFn = deps.authCooldownRemainingMs ?? wired.authCooldownRemainingMs;
+  const disconnectedFn = deps.isFetcherDisconnected ?? wired.isFetcherDisconnected;
 
   const keysToRun = ENRICH_ORDER.filter(key => {
     const src = sources.find(s => s.key === key);

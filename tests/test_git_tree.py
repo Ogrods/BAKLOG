@@ -70,7 +70,10 @@ def test_render_fragment_escapes_script_close(monkeypatch):
         "current": "main",
         "dirty": False,
         "dirty_count": 0,
-        "branches": [{"name": "main", "sha": "abc", "subject": "</script> hack", "date": "", "upstream": "", "ahead": 0, "behind": 0, "current": True}],
+        "branches": [{
+            "name": "main", "sha": "abc", "subject": "</script> hack",
+            "date": "", "upstream": "", "ahead": 0, "behind": 0, "current": True,
+        }],
         "remotes": [],
         "commits": [],
         "graph_text": "",

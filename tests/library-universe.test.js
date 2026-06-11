@@ -21,4 +21,37 @@ describe('libraryGamesBase itch universe', () => {
     state.personal = {};
     expect(dashboardLibraryGames()).toHaveLength(1);
   });
+
+  it('dashboardLibraryGames excludes itch non-games (physical_game, assets, etc.)', async () => {
+    const { state } = await import('../js/state.js');
+    const { dashboardLibraryGames } = await import('../js/dashboard-shared.js');
+    state.allGames = [];
+    state.itchGames = [
+      {
+        name: 'Real Game',
+        store: 'itch',
+        id: 'itch-game',
+        classification: 'game',
+        header_image: 'https://example.com/g.jpg',
+      },
+      {
+        name: 'Physical Copy',
+        store: 'itch',
+        id: 'itch-physical',
+        classification: 'physical_game',
+        header_image: 'https://example.com/p.jpg',
+      },
+      {
+        name: 'Asset Pack',
+        store: 'itch',
+        id: 'itch-assets',
+        classification: 'assets',
+        header_image: 'https://example.com/a.jpg',
+      },
+    ];
+    state.crossStoreHiddenKeys = new Set();
+    state.personal = {};
+    expect(dashboardLibraryGames()).toHaveLength(1);
+    expect(dashboardLibraryGames()[0].name).toBe('Real Game');
+  });
 });

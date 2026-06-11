@@ -129,6 +129,21 @@ describe('maybeAutoEnrichNewAdditions', () => {
     expect(appendLine).toHaveBeenCalledWith('[auto-enrich aborted: cancelled]', 'meta');
   });
 
+  it('uses wired auth helpers when deps omit credential/cooldown/disconnect fns', async () => {
+    const runFn = vi.fn().mockResolvedValue(undefined);
+    const ok = await maybeAutoEnrichNewAdditions(2, {
+      isApiAvailable: () => true,
+      now: Date.now() + 60_000,
+      runFn,
+      waitForQueueSlot: async () => {},
+      loadFetcherSources: async () => {},
+      sources: enrichSources,
+      stateFor: () => null,
+    });
+    expect(ok).toBe(true);
+    expect(runFn).toHaveBeenCalled();
+  });
+
   it('stops when waitForQueueSlot rejects cancelled', async () => {
     const runFn = vi.fn();
     await maybeAutoEnrichNewAdditions(1, {

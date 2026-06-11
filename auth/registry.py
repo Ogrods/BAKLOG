@@ -204,9 +204,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         label="Xbox",
         kind="browser",
         description=(
-            "Your Xbox play history (every title you've launched on Xbox network). "
-            "Game Pass titles you've played are tagged \u2014 we don't pull the broader "
-            "Game Pass catalog."
+            "Your Xbox play history (every title you've launched on Xbox network)."
         ),
         env_keys=("XBL_API_KEY",),
         form_fields=(
@@ -224,7 +222,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Stuck on the Microsoft login? Click \u201cSign in another way\u201d and have it email you a "
             "one-time code \u2014 no password or authenticator needed.",
             "Already have a key? Paste it in the field below instead of signing in.",
-            "Pulls titles you've actually launched on Xbox network, not the full Game Pass catalog.",
+            "Pulls titles you've actually launched on Xbox network.",
         ),
     ),
     "xbox_wishlist": ProviderSpec(

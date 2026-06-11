@@ -788,7 +788,8 @@ def _xbox_signed_in_state(context, page=None) -> dict | None:
         try:
             url = (page.url or "").lower()
             if "xbox.com" in url:
-                state = _parse_xbox_preloaded_state(page.content())
+                _html = page.content()
+                state = _parse_xbox_preloaded_state(_html)
                 if state:
                     user = state.get("user") or {}
                     if not user.get("isSignedIn"):
@@ -832,6 +833,12 @@ def _xbox_capture_wishlist_api(page, sniffer, *, timeout_s: float = 12.0) -> Non
         page.wait_for_timeout(500)
 
 
+def _xbox_wishlist_connect_creds(sniffer) -> dict[str, str]:
+    creds = {"XBOX_WISHLIST_PROFILE": "ready"}
+    creds.update(sniffer.creds())
+    return creds
+
+
 def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
     """Open xbox.com/wishlist, wait for MSA sign-in (detected via SSR HTML),
     then capture the Emerald wishlist API token for headless replay. The
@@ -852,6 +859,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
+    last_ssr_refresh = 0.0
     while time.time() < deadline:
         url = (page.url or "").lower()
         on_login = (
@@ -860,19 +868,53 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
             or "signin" in url
             or "account.microsoft" in url
         )
+        # MSA hands the session back via xbox.com/auth/msa?action=loggedin#code=...
+        # (or an oauth20 redirect). The SPA must process that code to set the
+        # signed-in cookies; navigating away here aborts the exchange and the
+        # session never completes — so treat it like login: wait, do not refresh.
+        on_handoff = (
+            "/auth/msa" in url
+            or "action=loggedin" in url
+            or "#code=" in url
+            or "oauth20" in url
+        )
+        on_wishlist = "wishlist" in url
+        token_ready = bool(sniffer.token)
+        if token_ready and on_wishlist and not on_login:
+            if session:
+                session.emit(
+                    "waiting_for_user",
+                    {"message": "Signed in \u2014 capturing your wishlist session..."},
+                )
+            sniffer.dump()
+            return _xbox_wishlist_connect_creds(sniffer)
         # xbox.com bakes __PRELOADED_STATE__ into the HTML at load time and
-        # never refreshes it client-side, and a cookie-only HTTP GET returns a
-        # signed-out payload. So once the user is back on xbox.com we must
-        # re-navigate to pull a fresh SSR that reflects the new MSA cookies.
-        # Never navigate while they're mid-login on a Microsoft page.
-        if not on_login and "xbox.com" in url:
-            try:
-                page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=15000)
-                page.wait_for_timeout(1200)
-            except Exception:  # noqa: BLE001
-                pass
+        # never refreshes it client-side. After MSA sign-in we may need one
+        # refresh to pull SSR that reflects the new cookies — but once the user
+        # is on /wishlist, stop hammering reloads or the Emerald API never fires.
+        if not on_login and not on_handoff and "xbox.com" in url:
+            now = time.time()
+            need_refresh = not on_wishlist or (
+                not token_ready and now - last_ssr_refresh >= 8.0
+            )
+            if need_refresh:
+                last_ssr_refresh = now
+                try:
+                    page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=15000)
+                    page.wait_for_timeout(2500)
+                except Exception:  # noqa: BLE001
+                    pass
 
         state = _xbox_signed_in_state(context, page)
+        token_ready = bool(sniffer.token)
+        if token_ready and on_wishlist and not on_login:
+            if session:
+                session.emit(
+                    "waiting_for_user",
+                    {"message": "Signed in \u2014 capturing your wishlist session..."},
+                )
+            sniffer.dump()
+            return _xbox_wishlist_connect_creds(sniffer)
         if state is not None:
             if session:
                 session.emit(
@@ -881,9 +923,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
                 )
             _xbox_capture_wishlist_api(page, sniffer)
             sniffer.dump()
-            creds = {"XBOX_WISHLIST_PROFILE": "ready"}
-            creds.update(sniffer.creds())
-            return creds
+            return _xbox_wishlist_connect_creds(sniffer)
 
         now = time.time()
         if session and now - last_msg > 8:

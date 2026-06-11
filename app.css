@@ -3613,9 +3613,6 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 .dash-picks-row:has(.dash-sponsored-pick-slot:not(.hidden)) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.dash-picks-row.no-itch:has(.dash-sponsored-pick-slot:not(.hidden)) .dash-picks-versus {
-  grid-column: span 2;
-}
 .dash-card.hidden { display: none; }
 /* Dashboard card headings follow the active theme (override Tailwind text-slate-*) */
 .dash-card > h3,
@@ -6081,7 +6078,87 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   user-select: none;
 }
 .has-notes-dot:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text-bright, #f0f9ff); }
-.dash-itch-recap { color: #cbd5e1; line-height: 1.5; display: flex; flex-direction: column; gap: 0.65rem; flex: 1; min-height: 0; }
+.dash-card-itch {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.dash-itch-recap { color: #cbd5e1; line-height: 1.5; display: flex; flex-direction: column; gap: 0.65rem; flex: 1; min-height: 0; padding: 0 18px 16px; }
+.itch-card-rail {
+  height: 4px;
+  background: var(--brand-itch, #fa5c5c);
+  flex-shrink: 0;
+}
+.itch-card-rail--affiliate {
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 18px;
+  background: color-mix(in srgb, var(--brand-itch, #fa5c5c) 22%, var(--bg-elev));
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-itch, #fa5c5c) 45%, transparent);
+}
+.itch-card-rail-brand {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fecaca;
+}
+.itch-card-rail-copy {
+  font-size: 0.62rem;
+  color: #fca5a5;
+  text-align: right;
+}
+.itch-card-title { margin: 0.75rem 0 0; }
+.itch-onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.35rem 0 0.25rem;
+}
+.itch-onboard-lead {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+.itch-onboard-copy,
+.itch-onboard-affiliate {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+.itch-onboard-affiliate { color: #fca5a5; }
+.itch-onboard-cta { align-self: flex-start; margin-top: 0.15rem; }
+.itch-value-block { display: flex; flex-direction: column; gap: 0.35rem; }
+.itch-value-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.itch-value-stat {
+  background: color-mix(in srgb, var(--brand-itch, #fa5c5c) 8%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--brand-itch, #fa5c5c) 25%, var(--border-subtle));
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+}
+.itch-value-label {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+.itch-value-num {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+.itch-value-spend { color: #fecaca; }
+.itch-stat-strip { margin-top: 0.1rem; }
 .dash-itch-recap strong { color: #ffffff; font-weight: 600; }
 .dash-itch-recap .dash-itch-muted { color: #94a3b8; font-size: 0.75rem; margin-top: 0.35rem; }
 .itch-distribution { display: flex; flex-direction: column; gap: 0.3rem; flex: 0 0 auto; }
@@ -6192,33 +6269,20 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .dash-picks-row .dash-picks-versus,
 .dash-picks-row .dash-card-itch,
 .dash-picks-row .dash-recent-card { grid-column: span 1; }
-.dash-picks-row.no-itch .dash-picks-versus { grid-column: span 2; }
-.dash-picks-row.no-itch .dash-recent-card { grid-column: span 1; }
-/* itch present: order columns Versus | Recently added | itch (itch on the right) */
-.dash-picks-row:not(.no-itch) .dash-picks-versus { order: 1; }
-.dash-picks-row:not(.no-itch) .dash-recent-card { order: 2; }
-.dash-picks-row:not(.no-itch) .dash-card-itch { order: 3; }
-/* itch present: stack Best rated over Fastest in the versus card */
-.dash-picks-row:not(.no-itch) .dash-versus-grid {
+/* Versus | Recently added | itch (itch on the right) */
+.dash-picks-row .dash-picks-versus { order: 1; }
+.dash-picks-row .dash-recent-card { order: 2; }
+.dash-picks-row .dash-card-itch { order: 3; }
+/* Stack Best rated over Fastest in the versus card */
+.dash-picks-row .dash-versus-grid {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr auto 1fr;
   gap: 12px;
 }
-.dash-picks-row:not(.no-itch) .dash-versus-divider {
+.dash-picks-row .dash-versus-divider {
   width: 100%;
   height: 1px;
   min-height: 1px;
-}
-/* itch absent: side-by-side rated | fastest inside the 2/3 versus card */
-.dash-picks-row.no-itch .dash-versus-grid {
-  grid-template-columns: 1fr 1px 1fr;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 16px;
-}
-.dash-picks-row.no-itch .dash-versus-divider {
-  width: auto;
-  height: auto;
-  min-height: 0;
 }
 #dashRecentCard {
   display: flex;
@@ -6238,8 +6302,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 }
 .dash-recent-age { flex-shrink: 0; font-size: 12px; }
 @media (max-width: 900px) {
-  .dash-picks-row,
-  .dash-picks-row.no-itch { grid-template-columns: 1fr; }
+  .dash-picks-row { grid-template-columns: 1fr; }
   .dash-picks-row .dash-picks-versus,
   .dash-picks-row .dash-card-itch,
   .dash-picks-row .dash-recent-card { grid-column: auto; }

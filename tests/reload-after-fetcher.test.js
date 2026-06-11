@@ -74,6 +74,21 @@ describe('reloadAfterFetcher source routing', () => {
       /reloadAfterFetcher\(key\)[\s\S]*await applyMergedLibrary\(\)/,
     );
   });
+
+  it('gates the library count flash on genuinely-new keys, not raw visible delta', () => {
+    // Regression: un-hide / dedup / wishlist->library bumps libNow by 1 without
+    // a real acquisition; the celebratory burst must not fire (nothing lands in
+    // "Recently added"). Flash requires _lastNewlyAddedCount > 0.
+    const fn = LIBRARY_LOAD_SRC.match(
+      /export async function applyMergedLibrary\([\s\S]*?\n\}/,
+    );
+    expect(fn, 'applyMergedLibrary').toBeTruthy();
+    const body = fn[0];
+    expect(body).toMatch(
+      /libNow > libPrev && newlyAdded > 0[\s\S]*fireLibraryCountFlash\('library'/,
+    );
+    expect(body).toContain('state._lastNewlyAddedCount ?? 0');
+  });
 });
 
 describe('manifest key coverage', () => {

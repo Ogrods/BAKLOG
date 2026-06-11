@@ -38,6 +38,10 @@ def default_epic_cache_dir() -> Path:
 
 OAUTH_URL = "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token"
 LIBRARY_URL = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items"
+PLAYTIME_ALL_URL = (
+    "https://library-service.live.use1a.on.epicgames.com"
+    "/library/api/public/playtime/account/{account_id}/all"
+)
 CATALOG_HOST = "catalog-public-service-prod06.ol.epicgames.com"
 LOGIN_URL = (
     "https://www.epicgames.com/id/api/redirect"
@@ -250,6 +254,40 @@ class EpicClient:
             if not cursor:
                 break
         return records
+
+    def get_playtime(self) -> dict[str, int]:
+        """Total tracked playtime per artifact (appName), in seconds.
+
+        Epic's library service tracks playtime keyed by ``artifactId`` which
+        matches the entitlement ``appName``. Returns {} on any failure so a
+        missing/empty playtime feed never breaks the library fetch.
+        """
+        if not self._account_id:
+            return {}
+        self._throttle()
+        try:
+            resp = self.session.get(
+                PLAYTIME_ALL_URL.format(account_id=self._account_id),
+                headers=self._auth_headers(),
+                timeout=30,
+            )
+            if resp.status_code == 401:
+                raise EpicAuthError("Playtime 401: access token expired")
+            resp.raise_for_status()
+            data = resp.json()
+        except EpicAuthError:
+            raise
+        except Exception:
+            return {}
+        out: dict[str, int] = {}
+        for row in data if isinstance(data, list) else []:
+            if not isinstance(row, dict):
+                continue
+            artifact = row.get("artifactId")
+            total = row.get("totalTime")
+            if artifact and isinstance(total, (int, float)) and total > 0:
+                out[str(artifact)] = int(total)
+        return out
 
     def get_catalog_item(
         self, namespace: str, catalog_id: str, country: str = "US", locale: str = "en-US"

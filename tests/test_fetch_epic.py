@@ -141,3 +141,48 @@ def test_needs_catalog_fetch_for_non_game_cached_row() -> None:
         }
     }
     assert _needs_catalog_fetch(rec, existing, _args())
+
+
+class _PlaytimeResp:
+    status_code = 200
+
+    def __init__(self, payload: object) -> None:
+        self._payload = payload
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> object:
+        return self._payload
+
+
+def _playtime_client(payload: object, account_id: str | None = "acc"):
+    from epic_client import EpicClient
+
+    client = object.__new__(EpicClient)
+    client._account_id = account_id
+    client._access_token = "tok"
+    client._throttle = lambda: None  # type: ignore[method-assign]
+
+    class _Sess:
+        def get(self, *a, **k):
+            return _PlaytimeResp(payload)
+
+    client.session = _Sess()
+    return client
+
+
+def test_get_playtime_parses_and_filters_zero_and_junk() -> None:
+    client = _playtime_client([
+        {"artifactId": "a", "totalTime": 3600},
+        {"artifactId": "b", "totalTime": 0},
+        {"artifactId": "c"},
+        {"noId": True},
+        "junk",
+    ])
+    assert client.get_playtime() == {"a": 3600}
+
+
+def test_get_playtime_without_account_returns_empty() -> None:
+    client = _playtime_client([{"artifactId": "a", "totalTime": 99}], account_id=None)
+    assert client.get_playtime() == {}

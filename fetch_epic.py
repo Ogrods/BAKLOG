@@ -439,6 +439,17 @@ def main() -> int:
         flush=True,
     )
 
+    # Epic tracks playtime per artifact (== entitlement appName), separate from
+    # the library/catalog feed. Pull it once; non-fatal if the feed is empty or
+    # unavailable so a playtime hiccup never blocks the library refresh.
+    playtime_by_artifact: dict[str, int] = {}
+    try:
+        playtime_by_artifact = client.get_playtime()
+    except EpicAuthError as e:
+        stats.warn(f"playtime: {e}")
+    if playtime_by_artifact:
+        print(f"  playtime tracked for {len(playtime_by_artifact)} titles", flush=True)
+
     empty_exit = refuse_empty_result(
         apps,
         label="Epic library",
@@ -494,6 +505,25 @@ def main() -> int:
         print(f"  catalog hits: {len(catalog)}/{len(apps_needing_catalog)}")
     elif catalog_skipped:
         print(f"  catalog: all {catalog_skipped} entitlements reused from cache (no API calls)", flush=True)
+
+    # Sum playtime seconds per (namespace, title) so editions/DLC entitlements
+    # that collapse into one library row (e.g. cross-edition Fortnite) report
+    # their combined time — mirrors the PSN cross-gen playtime fix.
+    playtime_sec_by_key: dict[tuple[str, str], int] = {}
+    if playtime_by_artifact:
+        for rec in apps:
+            secs = playtime_by_artifact.get(str(rec.get("appName")))
+            if not secs:
+                continue
+            ns = str(rec.get("namespace"))
+            item = catalog.get((ns, str(rec.get("catalogItemId"))))
+            nm = (
+                (item or {}).get("title")
+                or rec.get("sandboxName")
+                or rec.get("appName")
+                or str(rec.get("catalogItemId"))
+            ).strip().lower()
+            playtime_sec_by_key[(ns, nm)] = playtime_sec_by_key.get((ns, nm), 0) + int(secs)
 
     hltb_client = HltbClient()
     games_out: list[dict] = []
@@ -597,6 +627,16 @@ def main() -> int:
         key_fn=row_key_by_id,
         no_carry=args.no_carry,
     )
+
+    if playtime_sec_by_key:
+        playtime_applied = 0
+        for g in games_out:
+            key = (str(g.get("epic_namespace")), (g.get("name") or "").strip().lower())
+            secs = playtime_sec_by_key.get(key)
+            if secs:
+                g["playtime_minutes"] = int(round(secs / 60))
+                playtime_applied += 1
+        print(f"  applied playtime to {playtime_applied} games", flush=True)
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

@@ -48,7 +48,8 @@ import {
 } from './picks-ui.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
 import { recordSponsoredClick } from './anon-metrics.js';
-import { dismissSponsoredDeal, refreshSponsoredSurfaces } from './sponsored-deals.js';
+import { dismissSponsoredDeal, isProPromoSponsorId, refreshSponsoredSurfaces } from './sponsored-deals.js';
+import { goToProView } from './pro-view.js';
 import { openCoverGallery } from './cover-gallery.js';
 import { initTrophyPopover } from './trophy-popover.js';
 import {
@@ -159,6 +160,10 @@ export function bindEvents() {
     }
     if (action === "sponsored-deal") {
       if (!card.dataset.sponsorHouse) recordSponsoredClick(card.dataset.sponsorId);
+      if (isProPromoSponsorId(card.dataset.sponsorId)) {
+        goToProView();
+        return;
+      }
       if (isSafeHttpUrl(card.dataset.sponsorUrl)) window.open(card.dataset.sponsorUrl, "_blank", "noopener,noreferrer");
       return;
     }

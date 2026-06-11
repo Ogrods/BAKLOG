@@ -106,6 +106,17 @@ export const personalStore = (() => {
     return n;
   }
 
+  function _dismissalEntryCount(personalObj) {
+    const p = personalObj || {};
+    const ids = (p.__dismissedClaims && typeof p.__dismissedClaims === 'object' && !Array.isArray(p.__dismissedClaims))
+      ? p.__dismissedClaims
+      : {};
+    const keys = (p.__dismissedClaimKeys && typeof p.__dismissedClaimKeys === 'object' && !Array.isArray(p.__dismissedClaimKeys))
+      ? p.__dismissedClaimKeys
+      : {};
+    return Object.keys(ids).length + Object.keys(keys).length;
+  }
+
   function _isMeaningfulPersonalRecord(rec) {
     if (!rec || typeof rec !== 'object') return false;
     const st = rec.status || 'backlog';
@@ -230,17 +241,20 @@ export const personalStore = (() => {
 
     if (serverHas) {
       let personal = serverDoc.personal || {};
-      const serverNonBacklog = _nonBacklogCount(personal);
       if (localHas) {
         personal = _mergePersonalPreferMeaningful(personal, localSnapBeforeProbe.personal);
       }
       if (legacyPersonal) {
         personal = _mergePersonalPreferMeaningful(personal, legacyPersonal);
       }
-      const merged = _nonBacklogCount(personal) > serverNonBacklog;
+      const serverPersonal = serverDoc.personal || {};
+      const serverDismissCount = _dismissalEntryCount(serverPersonal);
+      const mergedDismissCount = _dismissalEntryCount(personal);
+      const merged = _nonBacklogCount(personal) > _nonBacklogCount(serverPersonal);
+      const dismissGrew = mergedDismissCount > serverDismissCount;
       applyServerDoc({ ...serverDoc, personal });
       initComplete = true;
-      if (merged) {
+      if (merged || dismissGrew) {
         dirty = true;
         clearTimeout(pushTimer);
         pushTimer = setTimeout(flush, PUSH_DEBOUNCE_MS);

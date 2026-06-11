@@ -11,6 +11,7 @@ import { getPersonal, hasPersonalEntry } from './personal-storage.js';
 import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
 import { formatMoney, displayCurrency } from './currency.js';
 import { storeLogoHtml, storeLetter } from './store-logos.js';
+import { affiliateUrl } from './affiliate.js';
 
 export { storeLetter };
 
@@ -484,7 +485,12 @@ export function isGenericStoreUrl(url) {
   return GENERIC_STORE_URLS.has(u) || u === "https://gaming.amazon.com/home";
 }
 
-export function storeUrlForGame(g) {
+function tagStoreUrl(url) {
+  if (!url) return url;
+  return affiliateUrl(url);
+}
+
+function rawStoreUrlForGame(g) {
   const ng = normalizeGame(g);
   let url = (ng.store_url || "").trim();
   if (ng.store === "gog" && url.startsWith("/")) {
@@ -560,6 +566,10 @@ export function storeUrlForGame(g) {
     return `https://www.ea.com/search?q=${encodeURIComponent(ng.name || "")}`;
   }
   return url && url.startsWith("http") && !isGenericStoreUrl(url) ? url : null;
+}
+
+export function storeUrlForGame(g) {
+  return tagStoreUrl(rawStoreUrlForGame(g));
 }
 
 export function storeLinkHtml(g, className, labelHtml) {

@@ -3,7 +3,7 @@
 
 /** Review % = store rating; Mendoza = median backlog review % (replacement level). */
 const WAR_FORMULA_EXPLAIN =
-  'Review % = store rating (e.g. Steam positive %). Mendoza line = median review % of your backlog — replacement-level. WAR = (review % − Mendoza) ÷ 10 + length/deal bonuses.';
+  'Review % = store rating (e.g. Steam positive %). Mendoza line = median review % of your backlog - replacement-level. WAR = (review % − Mendoza) ÷ 10 + length/deal bonuses.';
 
 /** @type {Record<string, string>} */
 export const METRIC_TIPS = {
@@ -143,8 +143,8 @@ export const METRIC_TIPS = {
 
   // ProtonDB / Steam Deck (ProtonDB data ODbL)
   'Deck-ready %': 'Share of ProtonDB-rated games that run great on Linux/Steam Deck (platinum or gold tier).',
-  'Proton platinum': 'Games ProtonDB rates platinum — run flawlessly on Linux/Deck out of the box.',
-  'borked on Linux': "Games ProtonDB rates borked — currently won't run on Linux/Steam Deck.",
+  'Proton platinum': 'Games ProtonDB rates platinum - run flawlessly on Linux/Deck out of the box.',
+  'borked on Linux': "Games ProtonDB rates borked - currently won't run on Linux/Steam Deck.",
   'Proton trending up': 'Games whose recent ProtonDB reports trend better than their overall tier.',
   'Deck-ready backlog': 'Backlog games you can comfortably play on Steam Deck now (Proton platinum or gold).',
 
@@ -153,12 +153,12 @@ export const METRIC_TIPS = {
   'platinum hunt': "Owned PSN games with a platinum trophy you haven't earned yet.",
   'trophies earned': 'Total PlayStation trophies earned across your PSN library.',
   'PS5-native %': 'Share of your PlayStation library that runs natively on PS5.',
-  'PS4 holdouts': 'PSN titles that are PS4-only — no native PS5 version in your library.',
+  'PS4 holdouts': 'PSN titles that are PS4-only - no native PS5 version in your library.',
 
   // Steam tags
   'top tag': 'The Steam community tag that appears on the most games in your library.',
   'multiplayer share': 'Share of tagged games tagged multiplayer, co-op, PvP, or online.',
-  'singleplayer backlog': 'Backlog games tagged single-player — solo experiences waiting.',
+  'singleplayer backlog': 'Backlog games tagged single-player - solo experiences waiting.',
 
   // itch / install / recency
   'free itch games': 'itch.io titles in your library with zero minimum price.',
@@ -176,7 +176,7 @@ export const METRIC_TIPS = {
 
   // ProtonDB batch 2
   'silver or native %': 'Share of ProtonDB-rated games at silver or native tier (good Linux/Deck compatibility).',
-  'Proton low confidence': 'ProtonDB-rated games where confidence is inadequate — thin report data.',
+  'Proton low confidence': 'ProtonDB-rated games where confidence is inadequate - thin report data.',
   'avg Proton score': 'Mean ProtonDB score across rated games in your library.',
 
   // Pricing batch 2
@@ -225,7 +225,7 @@ export const METRIC_TIPS = {
   'backlog in work-weeks': 'Backlog HLTB hours expressed in 40-hour work-weeks.',
   'at historical low now': 'Wishlist items currently at an all-time or yearly low.',
   'oldest wishlist': 'Wishlist item waiting the longest (by wishlist_added or added_at date).',
-  'gay character: you, the player.': 'Rare MGSV codec easter egg — you are the gay character.',
+  'gay character: you, the player.': 'Rare MGSV codec easter egg - you are the gay character.',
 
   // Dynamic marquee labels (prefix-matched at runtime)
   'below Mendoza': 'Backlog games whose store review % is below the Mendoza line (median backlog review %).',
@@ -246,7 +246,7 @@ export const METRIC_TIPS = {
   'Hidden gems': '90%+ rated, enough reviews, zero playtime.',
   'Clutch pick': 'Best leverage pick: strong rating, on sale, short HLTB.',
   'Mendoza line':
-    'Mendoza line = median store review % across your backlog — replacement-level. WAR scores how far above or below this baseline each pick sits.',
+    'Mendoza line = median store review % across your backlog - replacement-level. WAR scores how far above or below this baseline each pick sits.',
   'Closest to 100%': 'Tracked game nearest full trophy completion.',
   'Finish rate': 'Completion average: finished ÷ (finished + unfinished), shown as .XXX.',
   'Top WAR pick': `Your highest-WAR active pick (backlog/next/playing). ${WAR_FORMULA_EXPLAIN}`,
@@ -262,7 +262,7 @@ export const METRIC_TIPS = {
   "People's champ": 'Owned title with the biggest positive critic gap (players > critics).',
   'Extra innings': 'Average completionist − main HLTB hours across games with both estimates.',
   'Double dips': 'Count of titles you own on two or more storefronts.',
-  'Will you die first?': 'Backlog clear-by age at 2h/day vs a playful life expectancy — who wins?',
+  'Will you die first?': 'Backlog clear-by age at 2h/day vs a playful life expectancy - who wins?',
   'Critic gap': 'Mean |Steam review % − Metacritic| across rated library rows.',
 };
 

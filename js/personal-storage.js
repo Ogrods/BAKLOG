@@ -57,6 +57,7 @@ export function migrateV3() {
   const next = {};
   for (const [k, v] of Object.entries(state.personal)) {
     if (k === "__migrated_v3") continue;
+    if (String(k).startsWith('__')) { next[k] = v; continue; }
     if (String(k).includes(":")) next[k] = v;
     else next[`steam:${k}`] = v;
   }

@@ -2761,6 +2761,9 @@ class Handler(SimpleHTTPRequestHandler):
             ):
                 self._handle_stream_ticket_mint()
                 return
+        if path == "/api/license/activate":
+            self._handle_license_activate()
+            return
         if not _require_api_auth(self):
             return
         if path == "/api/auth/stream-ticket":
@@ -2906,13 +2909,18 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---- handlers ----------------------------------------------------------
     def _handle_config_get(self) -> None:
-        from shared.entitlement import current_plan
-        from shared.supabase_auth import public_auth_config
+        from shared.entitlement import current_plan, maybe_refresh_local_license
+        from shared.polar_license import polar_configured
+        from shared.pro_checkout import public_checkout_urls
+        from shared.supabase_auth import auth_enabled, public_auth_config
 
+        maybe_refresh_local_license()
         config = dict(public_auth_config())
         # Entitlement: signed JWT claim (when a bearer is sent) wins, else the
         # local license file / BAKLOG_PLAN override. Defaults to "free".
         config["plan"] = current_plan(self.headers.get("Authorization"))
+        config["licenseActivation"] = polar_configured() and not auth_enabled()
+        config["proCheckout"] = public_checkout_urls()
         config["frozen"] = is_frozen()
         config["version"] = _app_version()
         config["chromium_available"] = _chromium_available()
@@ -3677,6 +3685,23 @@ class Handler(SimpleHTTPRequestHandler):
         threading.Thread(
             target=_trigger_dev_shutdown, name="dev-shutdown", daemon=True
         ).start()
+
+    def _handle_license_activate(self) -> None:
+        """Validate a Polar license key and persist license.json (pure-local mode)."""
+        from shared.entitlement import activate_local_license_key, current_plan
+
+        payload, err = _read_json_body(self)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        raw_key = payload.get("key") if isinstance(payload, dict) else ""
+        ok, message = activate_local_license_key(str(raw_key or ""))
+        status = HTTPStatus.OK if ok else HTTPStatus.BAD_REQUEST
+        _send_json(
+            self,
+            status,
+            {"ok": ok, "message": message, "plan": current_plan(None)},
+        )
 
     def _handle_auth_session_get(self) -> None:
         """Lightweight account session probe (JWT + bound profile + plan)."""

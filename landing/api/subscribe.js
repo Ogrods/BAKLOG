@@ -78,7 +78,7 @@ You're on the list. BAKLOG is in invite-only beta and we're onboarding in small 
 A quick refresher on what you signed up for:
 - One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App.
 - Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.
-- Free forever to import your library (optional $5/mo paid tier planned: no sponsored deal cards, cloud sync, and more).
+- Free forever to import your library (optional $5/mo Pro tier: no sponsored deal cards, cloud sync, and more).
 - Auto-fetches when you connect a store (fetcher chips light up as your library lands).
 
 No action needed right now - just keep an eye on your inbox.
@@ -96,7 +96,7 @@ const CONFIRM_HTML = `<!doctype html>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
         <li>One honest backlog across every store - Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App.</li>
         <li>Local-first: it runs on your machine. Your credentials never leave your device and there is no BAKLOG server holding your data.</li>
-        <li>Free forever to import your library (optional $5/mo paid tier planned: no sponsored deal cards, cloud sync, and more).</li>
+        <li>Free forever to import your library (optional $5/mo Pro tier: no sponsored deal cards, cloud sync, and more).</li>
         <li>Auto-fetches when you connect a store (fetcher chips light up as your library lands).</li>
       </ul>
       <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">No action needed right now - just keep an eye on your inbox.</p>

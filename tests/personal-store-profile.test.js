@@ -318,4 +318,41 @@ describe('personalStore.prepareForProfileSwitch', () => {
       'title:bar': 2000,
     });
   });
+
+  it('PUTs merged dismissals to server when boot union grows dismissal maps', async () => {
+    const puts = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: {},
+              manual: [],
+            }),
+          };
+        }
+        if (url === '/api/personal' && opts?.method === 'PUT') {
+          puts.push(JSON.parse(opts.body));
+          return { ok: true, json: async () => JSON.parse(opts.body) };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    state.personal = {
+      game1: { status: 'backlog' },
+      __dismissedClaims: { 'gog-bar': 2000 },
+      __dismissedClaimKeys: { 'title:bar': 2000 },
+    };
+    await personalStore.init();
+    await personalStore.flush();
+
+    expect(puts.length).toBeGreaterThan(0);
+    expect(puts[0].personal.__dismissedClaims).toEqual({ 'gog-bar': 2000 });
+    expect(puts[0].personal.__dismissedClaimKeys).toEqual({ 'title:bar': 2000 });
+  });
 });

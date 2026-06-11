@@ -21,6 +21,7 @@
 import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
 import { normalizeNameForDedup } from './game-core.js';
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
+import { affiliateUrl } from './affiliate.js';
 
 /** Strip giveaway/store boilerplate from auto-sourced claim titles before ownership match. */
 export function stripClaimTitleDecorations(title) {
@@ -309,10 +310,11 @@ export function claimDetailPanelHtml(claim, {
     ? `<span class="claim-detail-ends">Ends ${escapeHtml(ends)}</span>`
     : '';
   const claimable = !owned && isSafeHttpUrl(claim.claim_url);
+  const claimHref = claimable ? affiliateUrl(claim.claim_url) : '';
   const claimBtn = owned
     ? `<p class="claim-detail-owned">Already in your library.</p>`
     : (claimable
-      ? `<a href="${escapeAttr(claim.claim_url)}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn">Claim free →</a>`
+      ? `<a href="${escapeAttr(claimHref)}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn">Claim free →</a>`
       : `<p class="claim-detail-owned">Claim link unavailable.</p>`);
   return `<form method="dialog" class="claim-detail-panel">
       <div class="claim-detail-header">

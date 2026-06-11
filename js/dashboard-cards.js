@@ -3,7 +3,9 @@
 
 import { state, STATUS_CHIP_DEFS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey, combinedPlaytime, storeBadgeHtml } from './game-core.js';
+import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey, combinedPlaytime, storeBadgeHtml, formatDollar } from './game-core.js';
+import { hasLiveAffiliates } from './affiliate.js';
+import { freeItchCount, paidItchCount, itchSpendTotal } from './sabermetrics.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
@@ -18,7 +20,7 @@ import {
   renderHouseLocationSlot,
 } from './sponsored-deals.js';
 import { focusGame } from './table-ui.js';
-import { DASH_STORE_LABELS, DASH_STORE_COLORS, ITCH_CLASS_LABELS } from './dashboard-shared.js';
+import { DASH_STORE_LABELS, DASH_STORE_COLORS } from './dashboard-shared.js';
 // Itch click routing uses dashDrillItchGenre from the drilldown module.
 // dashboard-drilldown does NOT import this module; the cycle stays one-way.
 import { dashDrillItchGenre } from './dashboard-drilldown.js';
@@ -213,12 +215,10 @@ export function renderDashboardCoopSpotlight(games) {
   `;
 }
 
+/** itch recap card is always visible on the picks row (onboarding when library is empty). */
 export function applyItchVisibility() {
-  const row = document.getElementById("dashboardPicksRow");
-  const card = document.getElementById("dashItchCard");
-  const has = (state.itchGames || []).length > 0;
-  row?.classList.toggle("no-itch", !has);
-  card?.classList.toggle("hidden", !has);
+  document.getElementById("dashboardPicksRow")?.classList.remove("no-itch");
+  document.getElementById("dashItchCard")?.classList.remove("hidden");
 }
 
 export function renderDashboardSponsoredPick() {
@@ -271,8 +271,7 @@ export function renderDashboardPicksVersus(games) {
       return ratingValue(b) - ratingValue(a);
     });
 
-  const hasItch = (state.itchGames || []).length > 0;
-  const maxPicks = hasItch ? 5 : 10;
+  const maxPicks = 5;
   const balanced = Math.min(ratedAll.length, fastAll.length, maxPicks);
   const sliceCount = balanced > 0 ? balanced : Math.min(Math.max(ratedAll.length, fastAll.length), maxPicks);
   // Ad displaces the last slot: sliceCount-1 real games + ad = sliceCount rows; dismiss
@@ -469,6 +468,69 @@ export function renderDashboardWishlistStats() {
   renderDashboardHouseSlot();
 }
 
+function itchBrandRailHtml() {
+  if (hasLiveAffiliates()) {
+    return `<div class="itch-card-rail itch-card-rail--affiliate" role="note">
+      <span class="itch-card-rail-brand">itch.io</span>
+      <span class="itch-card-rail-copy">Affiliate · purchases help support BAKLOG</span>
+    </div>`;
+  }
+  return `<div class="itch-card-rail" aria-hidden="true"></div>`;
+}
+
+function itchOnboardingHtml() {
+  const affiliateNote = hasLiveAffiliates()
+    ? `<p class="itch-onboard-affiliate">BAKLOG is an itch.io affiliate — your purchases help keep the app free.</p>`
+    : "";
+  return `<div class="itch-onboarding">
+    <div class="itch-onboard-lead">Start earning free games today</div>
+    <p class="itch-onboard-copy">Connect itch.io on Connections and run the itch fetcher to sync your library, ratings, and indie picks here.</p>
+    ${affiliateNote}
+    <button type="button" class="summary-jump-chip itch-onboard-cta" data-jump-view="connections" title="Open Connections to add your itch.io key">Connect itch.io →</button>
+  </div>`;
+}
+
+function itchValueBlockHtml(gamesOnly) {
+  const free = freeItchCount(gamesOnly) ?? 0;
+  const paid = paidItchCount(gamesOnly) ?? 0;
+  const spend = itchSpendTotal(gamesOnly);
+  const spendLabel = spend != null ? formatDollar(spend) : "—";
+  return `<div class="itch-value-block" title="Free vs paid itch.io videogames by minimum list price">
+    <div class="itch-distribution-label">Library value</div>
+    <div class="itch-value-grid">
+      <div class="itch-value-stat" title="itch.io videogames with zero minimum price">
+        <div class="itch-value-label">Free</div>
+        <div class="itch-value-num">${formatNum(free)}</div>
+      </div>
+      <div class="itch-value-stat" title="itch.io videogames you paid for">
+        <div class="itch-value-label">Paid</div>
+        <div class="itch-value-num">${formatNum(paid)}</div>
+      </div>
+      <div class="itch-value-stat" title="Sum of minimum prices for paid itch.io videogames">
+        <div class="itch-value-label">Spend</div>
+        <div class="itch-value-num itch-value-spend">${escapeHtml(spendLabel)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function itchStatStripHtml({ videogames, total, backlogged, rated }) {
+  return `<div class="sale-scoreboard itch-stat-strip">
+    <div class="sale-stat" title="itch.io items classified as videogames">
+      <div class="sale-stat-label">Videogames</div>
+      <div class="sale-stat-value">${formatNum(videogames)}<span class="sale-stat-suffix"> / ${formatNum(total)}</span></div>
+    </div>
+    <div class="sale-stat" title="itch.io videogames marked backlog">
+      <div class="sale-stat-label">Backlog</div>
+      <div class="sale-stat-value ${backlogged ? "" : "sale-stat-muted"}">${backlogged ? formatNum(backlogged) : " - "}</div>
+    </div>
+    <div class="sale-stat" title="itch.io videogames with a community rating">
+      <div class="sale-stat-label">Rated</div>
+      <div class="sale-stat-value ${rated ? "" : "sale-stat-muted"}">${rated ? formatNum(rated) : " - "}</div>
+    </div>
+  </div>`;
+}
+
 function itchBreakdownRows(entries, fillClass, action) {
   const max = Math.max(...entries.map(([, n]) => n), 1);
   return entries.map(([value, count, label]) => {
@@ -563,10 +625,12 @@ export function renderDashboardItchRecap() {
     delete dashboardCharts.chartItchStatus;
   }
 
-  const total = state.itchGames.length;
   applyItchVisibility();
+  const total = state.itchGames.length;
   if (!total) {
-    el.innerHTML = `<p class="text-sm text-slate-400">No itch.io data yet - add your itch.io key on Connections and run the itch fetcher.</p>`;
+    el.innerHTML = `${itchBrandRailHtml()}
+      <h3 class="itch-card-title text-sm font-semibold text-slate-200">itch.io library</h3>
+      ${itchOnboardingHtml()}`;
     return;
   }
 
@@ -613,22 +677,6 @@ export function renderDashboardItchRecap() {
   else itchHeroIndex = 0;
   const heroHtml = videogames ? renderItchHeroHtml(heroCandidates) : "";
 
-  const classCounts = {};
-  state.itchGames.forEach(g => {
-    const cls = g.classification || "game";
-    classCounts[cls] = (classCounts[cls] || 0) + 1;
-  });
-  const classEntries = Object.entries(classCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([cls, count]) => [cls, count, ITCH_CLASS_LABELS[cls] || cls]);
-  const classHtml = classEntries.length
-    ? `<div class="itch-breakdown">
-        <div class="itch-distribution-label" title="itch.io item types (game, tool, soundtrack, etc.)">What's in your library</div>
-        <div class="itch-breakdown-list">${itchBreakdownRows(classEntries, "itch-bar-class", null)}</div>
-      </div>`
-    : "";
-
   const genreCounts = {};
   gamesOnly.forEach(g => {
     gameGenresCanonical(g).forEach(genre => {
@@ -646,24 +694,15 @@ export function renderDashboardItchRecap() {
       </div>`
     : "";
 
+  const valueHtml = videogames ? itchValueBlockHtml(gamesOnly) : "";
+
   el.innerHTML = `
-    <div class="sale-scoreboard">
-      <div class="sale-stat" title="itch.io items classified as videogames">
-        <div class="sale-stat-label">Videogames</div>
-        <div class="sale-stat-value">${formatNum(videogames)}<span class="sale-stat-suffix"> / ${formatNum(total)}</span></div>
-      </div>
-      <div class="sale-stat" title="itch.io videogames marked backlog">
-        <div class="sale-stat-label">Backlog</div>
-        <div class="sale-stat-value ${backlogged ? "" : "sale-stat-muted"}">${backlogged ? formatNum(backlogged) : " - "}</div>
-      </div>
-      <div class="sale-stat" title="itch.io videogames with a community rating">
-        <div class="sale-stat-label">Rated</div>
-        <div class="sale-stat-value ${rated ? "" : "sale-stat-muted"}">${rated ? formatNum(rated) : " - "}</div>
-      </div>
-    </div>
-    ${segHtml}
+    ${itchBrandRailHtml()}
+    <h3 class="itch-card-title text-sm font-semibold text-slate-200">itch.io library</h3>
     ${heroHtml}
-    ${classHtml}
+    ${itchStatStripHtml({ videogames, total, backlogged, rated })}
+    ${valueHtml}
+    ${segHtml}
     ${genreHtml}
     <div class="itch-footer">
       <button type="button" class="summary-jump-chip px-2 py-1 rounded text-xs cursor-pointer" data-jump-view="itch" title="Switch to the itch.io library tab">Open itch.io tab →</button>

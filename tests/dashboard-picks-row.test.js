@@ -33,7 +33,9 @@ describe('dashboard picks row', () => {
           <div id="dashVersusFast" class="dash-versus-list"></div>
           <span id="dashVersusBadge" class="hidden"></span>
         </div>
-        <div id="dashItchCard" class="dash-card-itch"></div>
+        <div id="dashItchCard" class="dash-card-itch">
+          <div id="dashItchRecap" class="dash-itch-recap"></div>
+        </div>
         <div id="dashRecentCard" class="dash-recent-card">
           <div id="dashRecentAdditions" class="dash-recent-list"></div>
         </div>
@@ -55,32 +57,57 @@ describe('dashboard picks row', () => {
     vi.restoreAllMocks();
   });
 
-  it('ships index.html with itch hidden by default until library data exists', () => {
+  it('ships index.html with itch card always visible on the picks row', () => {
     const picksRow = INDEX_HTML.match(/<div[^>]*id="dashboardPicksRow"[^>]*>/)?.[0] ?? '';
     const itchCard = INDEX_HTML.match(/<div[^>]*id="dashItchCard"[^>]*>/)?.[0] ?? '';
     const itchTab = INDEX_HTML.match(/<button[^>]*data-view="itch"[^>]*>/)?.[0] ?? '';
-    expect(picksRow).toMatch(/\bno-itch\b/);
-    expect(itchCard).toMatch(/\bhidden\b/);
+    expect(picksRow).not.toMatch(/\bno-itch\b/);
+    expect(itchCard).not.toMatch(/\bhidden\b/);
     expect(itchTab).toMatch(/\bhidden\b/);
   });
 
-  it('shows recents card and no-itch when itch library is empty', () => {
+  it('keeps itch card visible when itch library is empty', () => {
     applyItchVisibility();
     const row = document.getElementById('dashboardPicksRow');
     const itch = document.getElementById('dashItchCard');
     const recent = document.getElementById('dashRecentCard');
-    expect(row.classList.contains('no-itch')).toBe(true);
-    expect(itch.classList.contains('hidden')).toBe(true);
+    expect(row.classList.contains('no-itch')).toBe(false);
+    expect(itch.classList.contains('hidden')).toBe(false);
     expect(recent.classList.contains('hidden')).toBe(false);
   });
 
-  it('removes no-itch and shows itch card when itch data exists', () => {
+  it('still keeps itch card visible when itch data exists', () => {
     state.itchGames = [{ store: 'itch', id: 'a', name: 'Demo' }];
     applyItchVisibility();
     const row = document.getElementById('dashboardPicksRow');
     const itch = document.getElementById('dashItchCard');
     expect(row.classList.contains('no-itch')).toBe(false);
     expect(itch.classList.contains('hidden')).toBe(false);
+  });
+
+  it('renders onboarding copy when itch library is empty', async () => {
+    const { renderDashboardItchRecap } = await import('../js/dashboard-cards.js');
+    document.getElementById('dashItchRecap').innerHTML = '';
+    renderDashboardItchRecap();
+    const recap = document.getElementById('dashItchRecap');
+    expect(recap.textContent).toContain('Start earning free games today');
+    expect(recap.textContent).toContain('Connect itch.io');
+    expect(recap.querySelector('.itch-card-rail')).toBeTruthy();
+    expect(recap.querySelector('[data-jump-view="connections"]')).toBeTruthy();
+  });
+
+  it('renders library value block when itch videogames exist', async () => {
+    const { renderDashboardItchRecap } = await import('../js/dashboard-cards.js');
+    state.itchGames = [
+      { store: 'itch', id: '1', name: 'Freebie', classification: 'game', min_price: 0 },
+      { store: 'itch', id: '2', name: 'Paid', classification: 'game', min_price: 4.99 },
+    ];
+    state.personal = {};
+    document.getElementById('dashItchRecap').innerHTML = '';
+    renderDashboardItchRecap();
+    const recap = document.getElementById('dashItchRecap');
+    expect(recap.querySelector('.itch-value-block')).toBeTruthy();
+    expect(recap.textContent).toContain('Library value');
   });
 
   it('appends two distinct sponsored rows to rated and fast columns', async () => {

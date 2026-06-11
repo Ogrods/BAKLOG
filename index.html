@@ -97,7 +97,7 @@
   </div>
   <div class="app-shell max-w-[1600px] mx-auto p-4 md:p-6">
     <!-- Printed report header. Hidden on screen via .print-only; revealed only
-         in @media print (app.css). Static by design — no JS required. To show
+         in @media print (app.css). Static by design - no JS required. To show
          live context (profile, date, visible-row count), app code can set
          textContent on .print-masthead-meta before window.print(). -->
     <div id="printMasthead" class="print-only" aria-hidden="true">
@@ -201,24 +201,83 @@
     </div>
     <script>
       // Seed a random boot tip at body-parse time so the hint paints on the
-      // first frame (before the module bundle loads). Keep in sync with TIPS
-      // in js/tips.js — same pattern as the valid-views map in <head>.
+      // first frame (before the module bundle loads). Keep in sync with ALL_TIPS
+      // (flattened TIP_GROUPS + SUPPORT_GROUPS) in js/tips.js - same pattern as
+      // the valid-views map in <head>. Rare easter-egg tips are intentionally
+      // excluded here so they stay rare.
       (function () {
         var tips = [
+          "BAKLOG shines on a wider screen - give it room to stretch out.",
+          "BAKLOG loves elbow room - open it on a wider screen for the full view.",
+          "Got a wide screen? BAKLOG uses every pixel of it.",
           "Watch your spotlight for anything you want to recategorize.",
-          "Own a physical copy? Add it manually - add whatever you want.",
+          "Something in the spotlight feel mislabeled? Click through and fix it.",
+          "The dashboard spotlight cycles your games - a quick way to spot ones to recategorize.",
+          "Own a physical copy? Add it manually - track whatever you want.",
+          "Got a game off-store or on disc? Use + Add game to include it.",
+          "BAKLOG tracks more than store libraries - add any game by hand.",
           "See a Humble icon but no other store? It may be a DRM-free download from Humble, or a key to redeem elsewhere.",
+          "A lone Humble badge can mean a DRM-free download or a key for another store.",
           "Sort by time played to see what you actually play, then recategorize from there.",
+          "Order by playtime to separate the games you finish from the ones you forget.",
           "Press / to jump straight to the search box.",
-          "Press B, N, P, or F to set a status on the highlighted row.",
-          "Ctrl+Z undoes your last status change.",
+          "Hit / anywhere to focus search instantly.",
+          "Highlight a row, then press B, N, P, U, L, F, or S to set its status.",
+          "Status in one keystroke: B Backlog, N Next, P Playing, U Unfinished, L Live, F Finished, S Skip.",
+          "Ctrl+Z undoes your last bulk status change or removal.",
+          "Made a bulk edit you regret? Ctrl+Z brings it back.",
           "Turn on Hide duplicates to collapse the same game across stores.",
+          "Own a game on two stores? Hide duplicates merges it into one row.",
           "Click any dashboard chart to drill into those exact games.",
-          "Just bought a game? API connections can often take up to 24 hours to show it.",
+          "Every dashboard chart is a filter - click a slice to see those games.",
+          "Just bought a game? Store APIs can take up to 24 hours to show it.",
+          "New purchase not showing yet? Connections can lag up to a day behind the store.",
           "Co-op data (online, couch, campaign) is hard to pin down. Spot something off? Let us know.",
+          "See a wrong co-op tag? Report it from the menu so we can fix it.",
           "There's more than one back-to-top button.",
+          "Scrolled deep? Two different back-to-top buttons can whisk you up.",
+          "Shift+click the Price header to sort by biggest discount first.",
+          "Want the steepest sales up top? Shift+click the Price column.",
+          "Use the A-Z rail on the right edge to jump through a long library.",
+          "Long backlog? The alphabet rail on the right jumps you to any letter.",
+          "Click a game's cover to browse alternate cover and landscape art.",
+          "Don't love a cover? Click it to pick from other art.",
+          "Open Columns to reveal hidden stats like Score and Metacritic.",
+          "Missing a column? The Columns button shows Score, Metacritic, and more.",
+          "Can't decide? Hit Pick for me for a random game from your backlog.",
+          "Shift+click Pick for me to pull from everything, not just your backlog.",
+          "Click a status or store chip above the table to filter instantly.",
+          "The chips above your library are one-click filters - combine them freely.",
+          "Cleanup mode surfaces old, low-rated games you never played - easy to skip.",
+          "Trim the backlog: Cleanup mode finds stale, unplayed, low-rated entries.",
+          "Change your look from the profile menu - Midnight, Synthwave, Terminal, and more.",
+          "Prefer OLED black? Try the Midnight theme in the profile menu.",
+          "Keep separate libraries with profiles - switch them from the header menu.",
+          "Share a PC? Give each person their own BAKLOG profile.",
+          "Check the Wishlist tab for Claimable Now - free games before they're gone.",
+          "Free games rotate fast - the Claimable Now feed flags them on your Wishlist.",
+          "The Fetcher log in the header runs a sync and shows what's fresh or stale.",
+          "Catalog feeling old? Open the Fetcher log to refresh a specific store.",
+          "Turn on auto-refresh in Connections to keep stores current while BAKLOG is open.",
+          "Leave BAKLOG open and it can quietly refresh stores older than a day.",
+          "Add a note to any row - a yellow dot marks games you've annotated.",
+          "Jot a reminder on any game; annotated rows get a little yellow dot.",
+          "Export visible rows to CSV, or copy your top 20 backlog as Markdown, from the menu.",
+          "Want your list elsewhere? Export CSV or copy your top backlog as Markdown.",
+          "Leaving BAKLOG open on the dashboard keeps the spotlight rotating - and helps fund the free tier.",
+          "Keep BAKLOG open on the dashboard and the spotlight's sponsored slides help keep the lights on.",
           "Buying through our affiliate links costs you nothing extra and helps keep BAKLOG running.",
-          "Leaving your spotlight running helps us accrue ad revenue around the clock!",
+          "Deal links use affiliate URLs when available - same price for you, a little support for us.",
+          "See a labeled Sponsored deal you like? Clicking it funds the free tier - no pressure.",
+          "Sponsored cards are clearly marked and optional, but a click helps keep BAKLOG free.",
+          "BAKLOG Pro (planned, $5/mo) adds sync and bulk refresh - and nothing free today moves behind it.",
+          "Want fewer sponsored slots? BAKLOG Pro is the planned no-ads path.",
+          "Not in the beta yet? Request an invite at baklog.app - we onboard in small waves.",
+          "Know someone who'd love BAKLOG? Send them to baklog.app to grab an invite.",
+          "Want to help without spending? Toggle Share anonymous usage counts in Connections.",
+          "Sharing anonymous usage counts (off by default) helps fund BAKLOG - no library data leaves your machine.",
+          "Hit a bug? Report it from the menu - nothing is sent until you confirm.",
+          "Join the Discord to swap tips with other testers and the maintainer.",
         ];
         var el = document.getElementById("bootLoadingTip");
         if (el && tips.length) {
@@ -603,7 +662,7 @@
       var tableWrap = document.getElementById('tableWrap');
       if (!btn && !coverBtn) return;
       var jumpTop = function () {
-        // Instant jump — smooth-scrolling a 1700-row table forces a paint per
+        // Instant jump - smooth-scrolling a 1700-row table forces a paint per
         // animation frame and stalls for seconds. Snap to top instead.
         window.scrollTo(0, 0);
       };
@@ -614,7 +673,7 @@
         }
         if (coverBtn && tableWrap) {
           // The cover-art button rides the sticky table header: it only shows
-          // while the header is actually pinned to the viewport top — i.e. the
+          // while the header is actually pinned to the viewport top - i.e. the
           // table has scrolled up past the top edge but is still in view.
           var r = tableWrap.getBoundingClientRect();
           var stuck = r.top <= 0 && r.bottom > 80;

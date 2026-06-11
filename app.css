@@ -411,6 +411,11 @@ html[data-init-view="pro"] .view-tab[data-view="pro"] {
   --accent-border: rgba(56, 189, 248, 0.45);
   --accent-muted: #7dd3fc;
   --header-control-h: 34px;
+  /* Brand lockup: negative gap that reclaims the empty band the square logo SVG
+     bakes in below the bricks so the wordmark tucks under the mark. Matches the
+     landing hero (.wordmark margin) — global token, reuse for any mark+wordmark
+     lockup. */
+  --brand-lockup-gap: clamp(-3.5rem, -5vw, -1rem);
 
   /* Store brand primaries — keep in sync with js/store-brand-colors.js */
   --brand-steam: #1b2838;
@@ -3105,6 +3110,67 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 .sponsored-table-row { cursor: pointer; }
 .sponsored-table-row td { background: rgba(245, 158, 11, 0.06); border-top: 1px solid rgba(245, 158, 11, 0.2); border-bottom: 1px solid rgba(245, 158, 11, 0.2); }
 .sponsored-table-row:hover td { background: rgba(245, 158, 11, 0.1); }
+.sponsored-table-row--house td {
+  background: rgba(56, 189, 248, 0.06);
+  border-top: 1px solid rgba(56, 189, 248, 0.22);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.22);
+}
+.sponsored-table-row--house:hover td { background: rgba(56, 189, 248, 0.1); }
+.house-table-mark {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  color: #38bdf8;
+}
+.house-table-mark svg { width: 100%; height: 100%; }
+.house-table-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  padding-right: 1.5rem;
+}
+.house-table-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+.house-table-kicker {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #38bdf8;
+}
+.house-table-title {
+  font-weight: 600;
+  color: rgb(241 245 249);
+  line-height: 1.25;
+}
+.house-table-tagline {
+  font-size: 0.75rem;
+  color: rgb(148 163 184);
+  line-height: 1.35;
+}
+.house-table-cta {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0f172a;
+  background: #38bdf8;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.7rem;
+  white-space: nowrap;
+}
+.sponsored-table-row--house:hover .house-table-cta { filter: brightness(1.08); }
+.sponsored-table-row--house .sponsored-deal-dismiss {
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+}
 .sponsored-table-name {
   position: relative;
   display: flex;
@@ -4510,45 +4576,86 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
 .dash-spotlight.is-lowres-art:hover .dash-spotlight-art-bg.is-loaded {
   animation-play-state: paused;
 }
-/* Large-logo Pro spotlight: brand backdrop + centered BAKLOG mark instead of
-   cover art. Used by house creatives flagged art_mode: "logo". */
+/* Large-logo Pro spotlight: BAKLOG mark + wordmark lockup centered on the card
+   (same focal point as portrait cover hover modules); bright scheme key-art
+   feathers to transparent at both edges; compact pitch card sits bottom-right.
+   Premium schemes set --accent / --spot-grad / --spot-glow (theme-independent). */
 .dash-spotlight.has-logo-art {
-  background: linear-gradient(120deg,
-    color-mix(in srgb, var(--accent) 26%, var(--bg-elev)) 0%,
-    color-mix(in srgb, var(--bg-elev) 88%, var(--accent) 12%) 48%,
-    var(--bg) 100%);
+  background: transparent;
 }
+/* Bright scheme panel masked so the left edge dissolves to transparent; right
+   edge stays solid (no right fade). */
 .dash-spotlight-logo-backdrop {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(120% 130% at 30% 35%,
-    color-mix(in srgb, var(--accent) 34%, transparent) 0%,
-    transparent 60%);
+  background:
+    radial-gradient(120% 150% at 50% 45%,
+      color-mix(in srgb, var(--spot-glow, var(--accent)) 60%, transparent) 0%,
+      transparent 62%),
+    var(--spot-grad, linear-gradient(120deg,
+      color-mix(in srgb, var(--accent) 55%, var(--bg)) 0%,
+      color-mix(in srgb, var(--accent) 22%, var(--bg)) 55%,
+      var(--bg) 100%));
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 100%);
 }
-.dash-spotlight-logo-mark {
+/* No right-edge fade on logo slides. */
+.dash-spotlight.has-logo-art .dash-spotlight-gradient {
+  background: none;
+}
+/* Centered on the card midpoint (matches portrait cover sheen / hover module). */
+.dash-spotlight-logo-lockup {
   position: absolute;
   inset: 0;
   z-index: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-right: 30%;
+  gap: 0;
+  /* Bottom padding shifts the centered lockup upward in the card. */
+  padding: 0 clamp(16px, 4%, 48px) clamp(28px, 10%, 72px);
   pointer-events: none;
-  color: color-mix(in srgb, var(--accent) 78%, var(--text-bright));
+}
+.dash-spotlight-logo-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  /* No line-box gap under the SVG (mirrors landing .hero-mark-wrap). */
+  line-height: 0;
 }
 .dash-spotlight-logo-mark svg {
-  width: 44%;
-  max-width: 210px;
+  /* Almost the rendered width of the BAKLOG wordmark below it. */
+  width: clamp(250px, 50%, 430px);
+  max-width: none;
   height: auto;
-  opacity: 0.95;
-  filter: drop-shadow(0 6px 22px color-mix(in srgb, var(--accent) 45%, transparent));
+  opacity: 0.98;
+  filter: drop-shadow(0 8px 26px color-mix(in srgb, var(--spot-glow, var(--accent)) 55%, transparent));
   animation: spotlightHeroZoom 14s ease-out forwards;
 }
+.dash-spotlight-wordmark {
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  font-size: clamp(34px, 6vw, 56px);
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 14px color-mix(in srgb, var(--spot-ink, var(--bg)) 60%, transparent);
+  /* Tuck the wordmark under the mark using the global lockup gap (matches the
+     landing hero). */
+  margin-top: var(--brand-lockup-gap);
+}
 .dash-spotlight.has-logo-art:hover .dash-spotlight-logo-mark svg { animation-play-state: paused; }
+.dash-spotlight-slogan {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  text-shadow: 0 1px 6px color-mix(in srgb, var(--spot-ink, var(--bg)) 60%, transparent);
+}
 .dash-spotlight-logo-cta {
-  margin-top: 4px;
+  margin-top: 2px;
   align-self: flex-end;
   font-size: 11px;
   font-weight: 700;
@@ -4559,8 +4666,30 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   padding: 3px 10px;
   box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 40%, transparent);
 }
-.dash-spotlight.is-fading.has-logo-art .dash-spotlight-logo-mark,
+.dash-spotlight.is-fading.has-logo-art .dash-spotlight-logo-lockup,
 .dash-spotlight.is-fading.has-logo-art .dash-spotlight-logo-backdrop { opacity: 0; transition: opacity 0.3s ease; }
+
+/* Premium spotlight palettes (theme-independent). Sync pair:
+   js/sponsored-deals.js SPOTLIGHT_PREMIUM_SCHEMES + HOUSE_DEFAULTS scheme keys. */
+.dash-spotlight--scheme-ember {
+  --accent: #fb923c;
+  --spot-ink: #160b04;
+  --spot-glow: #f97316;
+  --spot-grad: linear-gradient(120deg, #fbbf24 0%, #f97316 55%, #e2502a 100%);
+}
+.dash-spotlight--scheme-sapphire {
+  --accent: #818cf8;
+  --spot-ink: #070b1c;
+  --spot-glow: #6366f1;
+  --spot-grad: linear-gradient(120deg, #38bdf8 0%, #6366f1 55%, #4338ca 100%);
+}
+/* Emerald — matches the deals green palette (#10b981 / #34d399 / #6ee7b7). */
+.dash-spotlight--scheme-emerald {
+  --accent: #34d399;
+  --spot-ink: #04130d;
+  --spot-glow: #10b981;
+  --spot-grad: linear-gradient(120deg, #6ee7b7 0%, #34d399 55%, #059669 100%);
+}
 @keyframes spotlightHeroZoom {
   from { transform: scale(1) translateZ(0); }
   to { transform: scale(1.06) translateZ(0); }
@@ -4850,6 +4979,23 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   backdrop-filter: blur(2px);
   transition: opacity 0.3s ease;
 }
+/* Logo slides: compact pitch card bottom-right (beats base .dash-spotlight-body). */
+.dash-spotlight.has-logo-art .dash-spotlight-body {
+  max-width: min(300px, 44%);
+  gap: 2px;
+  padding: 6px 10px;
+}
+.dash-spotlight.has-logo-art .dash-spotlight-slogan {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.dash-spotlight.has-logo-art .dash-spotlight-meta {
+  font-size: 10px;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
 .dash-spotlight-eyebrow {
   font-size: 10px;
   letter-spacing: 0.18em;
@@ -5075,6 +5221,29 @@ html.ui-resizing .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before 
   }
   .dash-spotlight-body .dash-spotlight-title,
   .dash-spotlight-body .dash-spotlight-meta { text-align: left; }
+  .dash-spotlight.has-logo-art .dash-spotlight-body {
+    left: 16px;
+    right: 16px;
+    max-width: none;
+    text-align: left;
+    align-items: flex-start;
+  }
+  .dash-spotlight.has-logo-art .dash-spotlight-logo-cta { align-self: flex-start; }
+  .dash-spotlight-logo-lockup {
+    inset: 0;
+    padding: 0 16px;
+    justify-content: center;
+    align-items: center;
+  }
+  .dash-spotlight-logo-mark svg { width: clamp(120px, 32vw, 200px); }
+  .dash-spotlight.has-logo-art .dash-spotlight-gradient {
+    background: linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--bg) 75%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 35%, transparent) 40%,
+      transparent 72%
+    );
+  }
   .dash-mega .dash-hero-number,
   .dash-mega .dash-hero-sub,
   .dash-mega .dash-hero-tagline,

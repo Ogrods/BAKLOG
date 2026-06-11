@@ -71,32 +71,40 @@ HOUSE_DEFAULTS = {
     "house-spotlight-pro-logo": {
         "kind": "house",
         "title": "BAKLOG Pro",
+        "slogan": "One honest backlog across every store.",
         "tagline": "One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo.",
         "cta": "Get Pro",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "art_mode": "logo",
+        "scheme": "ember",
         "enabled": True,
     },
     "house-spotlight-pro-sync": {
         "kind": "house",
         "title": "Sync every machine",
-        "tagline": (
-            "BAKLOG Pro keeps your library and personal data aligned across machines "
+        "slogan": (
+            "Keep your library and personal data aligned across machines "
             "— no manual exports."
         ),
+        "tagline": "BAKLOG Pro keeps your library and personal data aligned across machines — no manual exports.",
         "cta": "Get Pro — $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
+        "art_mode": "logo",
+        "scheme": "sapphire",
         "enabled": True,
     },
     "house-spotlight-pro-noads": {
         "kind": "house",
         "title": "Fewer distractions",
+        "slogan": "Paid tier drops sponsored deal slots so your deal radar stays yours.",
         "tagline": "BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo.",
         "cta": "Get Pro — $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
+        "art_mode": "logo",
+        "scheme": "emerald",
         "enabled": True,
     },
 }

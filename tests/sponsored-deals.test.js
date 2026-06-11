@@ -38,6 +38,8 @@ import {
   HOUSE_DEAL_ITEM,
   houseDealBannerHtml,
   houseStripeCardHtml,
+  houseTableRowHtml,
+  sponsoredTableRowHtml,
 } from '../js/sponsored-deals.js';
 import { buildWishlistStatsHtml } from '../js/dashboard-cards.js';
 import * as authGate from '../js/auth-gate.js';
@@ -243,6 +245,49 @@ describe('sponsorCoverUrl', () => {
   });
 });
 
+describe('house table row', () => {
+  const houseRow = (overrides = {}) => ({
+    id: 'house-table-every-store',
+    kind: 'house',
+    title: 'Every store, one backlog',
+    tagline: 'Steam, Epic, GOG and more - deduped into one honest list.',
+    cta: 'Start free',
+    url: 'https://baklog.app/',
+    dismissible: true,
+    enabled: true,
+    ...overrides,
+  });
+
+  it('renders a branded house row without faux game stats', () => {
+    const html = houseTableRowHtml(houseRow());
+    expect(html).toContain('sponsored-table-row--house');
+    expect(html).toContain('sponsored-deal-house');
+    expect(html).toContain('From BAKLOG');
+    expect(html).toContain('Every store, one backlog');
+    expect(html).toContain('Start free');
+    expect(html).toContain('data-sponsor-house="1"');
+    expect(html).not.toContain('>Sponsored<');
+    expect(html).not.toContain('sponsored-table-deal-pill');
+    expect(html).not.toContain('sponsored-table-status-pill');
+  });
+
+  it('includes dismiss when dismissible is true', () => {
+    const html = houseTableRowHtml(houseRow({ dismissible: true }));
+    expect(html).toContain('data-action="sponsored-dismiss"');
+  });
+
+  it('omits dismiss on permanent house rows', () => {
+    const html = houseTableRowHtml(houseRow({ dismissible: false }));
+    expect(html).not.toContain('sponsored-dismiss');
+  });
+
+  it('routes kind house through sponsoredTableRowHtml', () => {
+    const html = sponsoredTableRowHtml(houseRow());
+    expect(html).toContain('sponsored-table-row--house');
+    expect(html).not.toContain('sponsored-table-deal-pill');
+  });
+});
+
 describe('sponsoredPickCardHtml', () => {
   it('renders cover from same-origin path', () => {
     const html = sponsoredPickCardHtml(sponsor({
@@ -406,6 +451,31 @@ describe('sponsorToSpotlightGame', () => {
     expect(slide._spotlightAd.artMode).toBe('logo');
     expect(slide._spotlightAd.cta).toBe("See what's planned");
     expect(slide._spotlightReason.eyebrow).toBe('BAKLOG Pro');
+  });
+
+  it('propagates a known premium scheme + slogan and drops unknown schemes', () => {
+    const slide = sponsorToSpotlightGame({
+      id: 'house-spotlight-pro-logo',
+      kind: 'house',
+      title: 'BAKLOG Pro',
+      slogan: 'One honest backlog across every store.',
+      cta: "See what's planned",
+      url: 'https://baklog.app/',
+      art_mode: 'logo',
+      scheme: 'ember',
+    });
+    expect(slide._spotlightAd.scheme).toBe('ember');
+    expect(slide._spotlightAd.slogan).toBe('One honest backlog across every store.');
+    expect(slide._spotlightReason.slogan).toBe('One honest backlog across every store.');
+
+    const unknown = sponsorToSpotlightGame({
+      id: 'x',
+      kind: 'house',
+      title: 'X',
+      art_mode: 'logo',
+      scheme: 'rainbow',
+    });
+    expect(unknown._spotlightAd.scheme).toBe('');
   });
 });
 

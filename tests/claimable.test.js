@@ -253,6 +253,15 @@ describe('diffClaims', () => {
     const { newCount } = diffClaims(prevKeys, churned);
     expect(newCount).toBe(0);
   });
+
+  it('does not count dismissed claims as new', () => {
+    state.personal.__dismissedClaims = { 'epic-foo': Date.now() };
+    state.personal.__dismissedClaimKeys = { 'title:foo game': Date.now() };
+    const prev = new Set();
+    const { newCount, visible } = diffClaims(prev, sampleItems);
+    expect(visible.map(c => c.id)).toEqual(['gog-bar']);
+    expect(newCount).toBe(1);
+  });
 });
 
 describe('saveClaimsSnapshot', () => {
@@ -513,7 +522,7 @@ describe('dismissed claims survive partial feed churn on fetch', () => {
     expect(getHiddenClaims(state.claimableFeed.items).map(c => c.id)).toContain('gamerpower-foo');
   });
 
-  it('prunes dismissals older than the TTL but keeps recent ones', () => {
+  it('never prunes dismissals by age', () => {
     const staleTs = Date.now() - (91 * 24 * 60 * 60 * 1000);
     state.personal.__dismissedClaims = {
       'stale-claim': staleTs,
@@ -525,9 +534,9 @@ describe('dismissed claims survive partial feed churn on fetch', () => {
     };
     state.claimableFeed = { items: sampleItems };
     dismissClaim('gog-bar');
-    expect(state.personal.__dismissedClaims['stale-claim']).toBeUndefined();
+    expect(state.personal.__dismissedClaims['stale-claim']).toBe(staleTs);
     expect(state.personal.__dismissedClaims['epic-foo']).toBeTypeOf('number');
-    expect(state.personal.__dismissedClaimKeys['title:stale game']).toBeUndefined();
+    expect(state.personal.__dismissedClaimKeys['title:stale game']).toBe(staleTs);
     expect(state.personal.__dismissedClaimKeys['title:foo game']).toBeTypeOf('number');
   });
 

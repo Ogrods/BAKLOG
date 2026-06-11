@@ -344,7 +344,7 @@ function historicalLowTooltip(d, kind) {
     ? "Lowest price in the past year"
     : "Lowest recorded price (all-time)";
   if (amount != null && Number.isFinite(Number(amount))) {
-    return `${label} — was ${formatDollar(Number(amount))}`;
+    return `${label} - was ${formatDollar(Number(amount))}`;
   }
   return label;
 }

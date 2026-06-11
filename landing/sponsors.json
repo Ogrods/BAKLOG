@@ -23,7 +23,7 @@
     "ad-picks-ironveil": {
       "kind": "sponsor",
       "title": "Ironveil",
-      "tagline": "On sale now — 80% off",
+      "tagline": "On sale now - 80% off",
       "cta": "Grab it",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
@@ -32,7 +32,7 @@
     "ad-table-encore": {
       "kind": "sponsor",
       "title": "Encore",
-      "tagline": "Replay-worthy roguelike — weekend-sized",
+      "tagline": "Replay-worthy roguelike - weekend-sized",
       "cta": "Learn more",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-encore.webp",
@@ -142,7 +142,7 @@
     "ad-claimable-apex-velocity": {
       "kind": "sponsor",
       "title": "Apex Velocity",
-      "tagline": "Blistering arcade racer — drift through neon cities",
+      "tagline": "Blistering arcade racer - drift through neon cities",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-apex-velocity.webp",

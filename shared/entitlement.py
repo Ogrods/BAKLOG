@@ -44,6 +44,8 @@ _PRO_ALIASES = ("pro", "paid", "premium")
 # background work (the scheduler). ``(epoch_seconds, plan)``.
 _LAST_AUTH_PLAN: tuple[float, str] | None = None
 _AUTH_PLAN_TTL_SEC = 24 * 60 * 60
+_LICENSE_REFRESH_AT: float = 0.0
+_LICENSE_REFRESH_INTERVAL_SEC = 60 * 60
 
 
 def _env_plan() -> str | None:
@@ -63,17 +65,99 @@ def license_path() -> Path:
     return data_root() / "license.json"
 
 
-def _local_license_plan() -> str | None:
+def read_license_document() -> dict | None:
     try:
         doc = json.loads(license_path().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if not isinstance(doc, dict):
+    return doc if isinstance(doc, dict) else None
+
+
+def write_license_document(doc: dict) -> None:
+    path = license_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def _local_license_plan() -> str | None:
+    doc = read_license_document()
+    if not doc:
         return None
     plan = doc.get("plan")
     if isinstance(plan, str) and plan.strip().lower() in _PRO_ALIASES:
         return PLAN_PRO
     return None
+
+
+def maybe_refresh_local_license(*, force: bool = False) -> None:
+    """Re-validate a stored Polar license key (pure-local mode only)."""
+    global _LICENSE_REFRESH_AT
+    if _auth_enabled():
+        return
+    try:
+        from shared.polar_license import polar_configured, validate_license_key
+    except Exception:  # noqa: BLE001
+        return
+    if not polar_configured():
+        return
+    doc = read_license_document()
+    if not doc:
+        return
+    stored_key = doc.get("key")
+    if not isinstance(stored_key, str) or not stored_key.strip():
+        return
+    now = time.time()
+    if not force and now - _LICENSE_REFRESH_AT < _LICENSE_REFRESH_INTERVAL_SEC:
+        return
+    _LICENSE_REFRESH_AT = now
+    result = validate_license_key(stored_key)
+    if result.get("ok"):
+        write_license_document(
+            {
+                **doc,
+                "plan": PLAN_PRO,
+                "key": stored_key.strip(),
+                "validated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+        )
+        return
+    write_license_document(
+        {
+            "plan": PLAN_FREE,
+            "key": stored_key.strip(),
+            "validated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+    )
+
+
+def activate_local_license_key(key: str) -> tuple[bool, str]:
+    """Validate a Polar license key and persist it for pure-local Pro."""
+    if _auth_enabled():
+        return False, "License keys are for local-only installs. Sign in to use account Pro."
+    try:
+        from shared.polar_license import polar_configured, validate_license_key
+    except Exception as exc:  # noqa: BLE001
+        return False, f"License activation unavailable ({exc})"
+    if not polar_configured():
+        return False, "Set BAKLOG_POLAR_ORG_ID on the server to enable license activation."
+    cleaned = (key or "").strip()
+    if not cleaned:
+        return False, "Enter your license key."
+    result = validate_license_key(cleaned)
+    if not result.get("ok"):
+        return False, result.get("error") or "Invalid or expired license key."
+    write_license_document(
+        {
+            "plan": PLAN_PRO,
+            "key": cleaned,
+            "validated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+    )
+    global _LICENSE_REFRESH_AT
+    _LICENSE_REFRESH_AT = time.time()
+    return True, "BAKLOG Pro activated on this machine."
 
 
 def _auth_enabled() -> bool:
@@ -126,10 +210,11 @@ def current_plan(authorization: str | None = None) -> str:
         return PLAN_FREE
 
     # Pure-local honor system: BAKLOG_PLAN dev override, then editable
-    # license.json (MIT, no anti-tamper).
+    # license.json (MIT, no anti-tamper). Re-check Polar when a key is stored.
     env = _env_plan()
     if env is not None:
         return env
+    maybe_refresh_local_license()
     if _local_license_plan() == PLAN_PRO:
         return PLAN_PRO
 

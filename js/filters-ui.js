@@ -473,9 +473,10 @@ export function updateViewChrome(options) {
   const isItch = state.activeView === "itch";
   const isDash = state.activeView === "dashboard";
   const isConn = state.activeView === "connections";
+  const isProView = state.activeView === "pro";
   const deferChrome = !!options?.deferTableChrome;
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
-  const hideTableUi = isDash || isConn || deferChrome;
+  const hideTableUi = isDash || isConn || isProView || deferChrome;
   // Keep the FOUC guard in sync so its !important rules don't outlive the
   // initial view. Once the user switches views, the attribute matches reality.
   document.documentElement.setAttribute("data-init-view", state.activeView);
@@ -493,14 +494,15 @@ export function updateViewChrome(options) {
   document.getElementById("tableShell")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("rowCount")?.classList.toggle("hidden", hideTableUi);
   if (!hideTableUi) syncRowCountLabel();
-  document.getElementById("summary")?.classList.toggle("hidden", isConn || deferChrome);
-  document.getElementById("alphaNavWrap")?.classList.toggle("dashboard-hidden", isDash || isConn);
+  document.getElementById("summary")?.classList.toggle("hidden", isConn || isProView || deferChrome);
+  document.getElementById("alphaNavWrap")?.classList.toggle("dashboard-hidden", isDash || isConn || isProView);
   document.getElementById("dashboardContainer")?.classList.toggle("hidden", !isDash);
   document.getElementById("connectionsContainer")?.classList.toggle("hidden", !isConn);
+  document.getElementById("proContainer")?.classList.toggle("hidden", !isProView);
   document.getElementById("libraryStatusSection")?.classList.add("hidden");
   document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
   // Cross-store dedup applies to library and wishlist (not itch — single store).
-  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isItch || isDash || isConn || deferChrome);
+  document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isItch || isDash || isConn || isProView || deferChrome);
   document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish || deferChrome);
   const dedupHint = document.getElementById("crossStoreDedupHint");
   if (dedupHint) {
@@ -508,11 +510,11 @@ export function updateViewChrome(options) {
       ? "Hides the same title listed on multiple wishlist stores. Store priority matches Library."
       : "Filter by store using the chips at the top of the page.";
   }
-  document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
-  document.getElementById("displayToolsSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
-  document.getElementById("gamePassSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn);
-  document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isItch || isDash || isConn);
-  document.getElementById("coopSection")?.classList.toggle("hidden", isItch || isDash || isConn);
+  document.getElementById("libraryMiscSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn || isProView);
+  document.getElementById("displayToolsSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn || isProView);
+  document.getElementById("gamePassSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn || isProView);
+  document.getElementById("earlyAccessSection")?.classList.toggle("hidden", isItch || isDash || isConn || isProView);
+  document.getElementById("coopSection")?.classList.toggle("hidden", isItch || isDash || isConn || isProView);
   if (isDash && !options?.skipDashboardSchedule) scheduleDashboardRender();
   else {
     // Keep charts built so a later return-to-dashboard can replay their
@@ -520,6 +522,14 @@ export function updateViewChrome(options) {
     stopDashboardRotations();
   }
   if (isConn) refreshConnections();
+  if (isProView) {
+    void import('./pro-view.js').then((m) => {
+      m.applyProTabVisibility();
+      m.renderProView();
+    });
+  } else {
+    void import('./pro-view.js').then((m) => m.applyProTabVisibility());
+  }
   renderBulkStatusButtons();
   if (!drillIn && !deferChrome) renderSummary();
 }
@@ -644,6 +654,10 @@ export function switchView(view) {
       fetcherRunner.stopDashboardPolling();
       startConnectionsPolling();
       refreshConnections();
+    } else if (view === "pro") {
+      fetcherRunner.stopDashboardPolling();
+      stopConnectionsPolling();
+      void import('./pro-view.js').then((m) => m.renderProView());
     } else {
       fetcherRunner.stopDashboardPolling();
       stopConnectionsPolling();

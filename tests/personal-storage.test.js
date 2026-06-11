@@ -16,6 +16,7 @@ import {
   countOrphanPersonalKeys,
   prunePersonalKeys,
   stripLegacyTags,
+  migrateV3,
   flushSavePersonal,
   savePersonal,
   saveManualGames,
@@ -229,5 +230,20 @@ describe('stripLegacyTags', () => {
     };
     stripLegacyTags();
     expect(stripLegacyTags()).toBe(false);
+  });
+});
+
+describe('migrateV3', () => {
+  it('preserves __-prefixed meta keys including claim dismissals', () => {
+    state.personal = {
+      12345: { status: 'backlog' },
+      __dismissedClaims: { 'epic-foo': 1000 },
+      __dismissedClaimKeys: { 'title:foo': 1000 },
+    };
+    migrateV3();
+    expect(state.personal['steam:12345']).toEqual({ status: 'backlog' });
+    expect(state.personal.__dismissedClaims).toEqual({ 'epic-foo': 1000 });
+    expect(state.personal.__dismissedClaimKeys).toEqual({ 'title:foo': 1000 });
+    expect(state.personal.__migrated_v3).toBe(true);
   });
 });

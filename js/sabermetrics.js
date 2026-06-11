@@ -469,12 +469,12 @@ export function topWarGame(snap) {
 }
 
 export function formatRate(pct, digits = 3) {
-  if (pct == null || Number.isNaN(pct)) return '—';
+  if (pct == null || Number.isNaN(pct)) return '-';
   return pct.toFixed(digits).replace(/^0\./, '.');
 }
 
 export function formatPct100(pct, digits = 0) {
-  if (pct == null || Number.isNaN(pct)) return '—';
+  if (pct == null || Number.isNaN(pct)) return '-';
   return `${(pct * 100).toFixed(digits)}%`;
 }
 

@@ -96,6 +96,7 @@ import {
   earlyAccessBacklogCount,
   doubleDipBacklogCount,
   letterCoverageShare,
+  adultGameCount,
 } from './sabermetrics.js';
 import { appendCreativeInsights, appendCreativeMarqueeChips } from './creative-metrics.js';
 import { marqueeTip, insightTip, metricKeyForLabel, metricKeyForInsight } from './metric-tips.js';
@@ -860,6 +861,9 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
   if (topGenre) push('*', 'is-amber', `${topGenre[0]} · ${formatNum(topGenre[1])}`, 'top genre');
   const uniqueGenres = Object.keys(genreCounts).length;
   if (uniqueGenres > 1) push('>', '', formatNum(uniqueGenres), 'unique genres');
+
+  const adultGames = adultGameCount(games);
+  if (adultGames != null) push('*', 'is-rose', formatNum(adultGames), 'adult games', null, { weight: W.cryptic });
 
   const storeCounts = {};
   for (const g of games) {

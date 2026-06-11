@@ -1095,6 +1095,22 @@ export function doubleDipBacklogCount(games, statusOf) {
   return n > 0 ? n : null;
 }
 
+// Best-effort adult-content signal. No store exposes a clean NSFW flag in our
+// data, so we scan the genres/tags Steam + itch already give us (Steam surfaces
+// "Sexual Content"/"Nudity"/"NSFW" as store genres; itch tags carry adult/hentai
+// /eroge markers). This under-counts titles with no enrichment but never needs a
+// new fetch. Refine ADULT_SIGNAL as coverage gaps surface.
+const ADULT_SIGNAL = /\b(?:adult only|adult|nsfw|sexual content|nudity|hentai|eroge|erotic|porn)\b/i;
+
+/** Count of owned games flagged adult via existing genres/tags (heuristic). */
+export function adultGameCount(games) {
+  const n = (games || []).filter(g => {
+    const fields = [...(g.genres || []), ...(g.tags || [])];
+    return fields.some(f => ADULT_SIGNAL.test(String(f)));
+  }).length;
+  return n > 0 ? n : null;
+}
+
 /** Share of A–Z title initials present in the library (26 = full alphabet). */
 export function letterCoverageShare(games) {
   const list = games || [];

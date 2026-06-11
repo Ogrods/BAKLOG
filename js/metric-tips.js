@@ -110,6 +110,7 @@ export const METRIC_TIPS = {
   'unique developers': 'Count of distinct developers in the library.',
   'top genre': 'Genre tag appearing on the most games.',
   'unique genres': 'Count of distinct genre tags.',
+  'adult games': 'Owned games flagged adult via existing Steam/itch genres or tags (heuristic; under-counts unenriched titles).',
   'cat games': 'Games with "cat" anywhere in the title (substring match).',
   'biggest store': 'Storefront with the most owned games.',
   'games per store avg': 'Total games ÷ number of stores.',

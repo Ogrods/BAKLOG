@@ -90,7 +90,7 @@ export function familyForLabel(label) {
     'cleanup candidates', 'clutch picks', 'net adds', 'added in', 'installed locally',
     'multiplayer share', 'singleplayer backlog',
     'co-op tagged', 'partial controller', 'indie-tagged', 'early access backlog',
-    'double-dip backlog', 'hltb low confidence', 'launcher installs',
+    'double-dip backlog', 'hltb low confidence', 'launcher installs', 'adult games',
   ])) {
     return FAMILY.COUNTS;
   }

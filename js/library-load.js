@@ -30,6 +30,7 @@ import {
   applyHiddenTitleNorms,
   filterOutHidden,
   filterCounted,
+  libraryGamesBase,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { invalidateTableCache } from './table-ui.js';
@@ -236,11 +237,7 @@ export function recordLibraryFirstSeen() {
 }
 
 function countLibraryVisible() {
-  return filterCounted(
-    filterOutHidden(
-      state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))),
-    ),
-  ).length;
+  return filterCounted(libraryGamesBase()).length;
 }
 function countWishlistVisible() {
   return state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g))).length;

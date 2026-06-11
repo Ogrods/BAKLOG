@@ -526,7 +526,7 @@ function sponsorHouseClass(item) {
   return String(item?.kind || '').toLowerCase() === 'house' ? ' sponsored-deal-house' : '';
 }
 
-function sponsorActionAttrs(item, { house } = {}) {
+export function sponsorActionAttrs(item, { house } = {}) {
   const url = isSafeHttpUrl(item.url) ? escapeAttr(item.url) : '';
   const isHouse = house ?? String(item?.kind || '').toLowerCase() === 'house';
   const houseAttr = isHouse ? ' data-sponsor-house="1"' : '';
@@ -724,14 +724,22 @@ export const PRO_PROMO = {
       desc: 'DLC, add-ons, and in-game bonuses filtered out of the free feed, surfaced for Pro.',
       icon: '🎁',
     },
+    {
+      title: 'Deal/watchlist alerts',
+      desc: 'Get notified when wishlist titles hit your target price or go on sale.',
+      icon: '🔔',
+    },
   ],
   tierCompare: [
+    { feature: 'Import & browse all stores', free: '✓', pro: '✓' },
     { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores' },
+    { feature: 'Auto-refresh while app is open', free: '✓ (one store / ~30 min)', pro: '✓' },
     { feature: 'Refresh while app is closed', free: '-', pro: '✓' },
+    { feature: 'Claimable Now (full games)', free: '✓', pro: '✓ + bonus DLC/bonus feed' },
     { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
     { feature: 'Cloud sync', free: '-', pro: '✓' },
-    { feature: 'Bonus claimables feed', free: 'Full games only', pro: '✓ + DLC/bonus drops' },
+    { feature: 'Deal/watchlist alerts', free: '-', pro: '✓' },
   ],
   trustPoints: [
     'Local-first - your library stays on your machine',

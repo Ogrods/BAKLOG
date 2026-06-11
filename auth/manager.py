@@ -516,6 +516,7 @@ def clear_browser_session(provider: str) -> None:
         session = epic_cache_dir() / "session.json"
         if session.exists():
             session.unlink(missing_ok=True)
+        delete_provider_blob("epic_session")
 
 
 def disconnect(provider: str) -> None:

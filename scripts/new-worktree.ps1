@@ -75,6 +75,7 @@ if (-not $NoLink) {
     } elseif (Test-Path $srcVenv) {
         Write-Host "--- Linking .venv (junction) ---" -ForegroundColor Cyan
         New-Item -ItemType Junction -Path $dstVenv -Value $srcVenv | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Failed to create .venv junction" }
     } else {
         Write-Host "No .venv to link (run: py -3.13 -m venv .venv; .\.venv\Scripts\pip install -e '.[dev]')" -ForegroundColor Yellow
     }
@@ -85,6 +86,7 @@ if (-not $NoLink) {
     if (Test-Path $srcNode) {
         Write-Host "--- Linking node_modules (junction) ---" -ForegroundColor Cyan
         New-Item -ItemType Junction -Path $dstNode -Value $srcNode | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Failed to create node_modules junction" }
     }
 }
 

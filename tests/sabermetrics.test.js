@@ -397,6 +397,7 @@ describe('sabermetrics', () => {
       ];
       expect(adultGameCount(adult)).toBe(2);
       expect(adultGameCount([game({ name: 'Clean', id: 'c1' })])).toBeNull();
+      expect(adultGameCount([game({ name: 'Adult Swim Comedy', genres: ['Adult Swim'], id: 'swim' })])).toBeNull();
     });
 
     it('batch-2 platform and critic gap helpers', () => {

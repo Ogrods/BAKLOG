@@ -13,7 +13,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from epic_client import LOGIN_URL, EpicAuthError, EpicClient, default_epic_cache_dir
+from epic_client import LOGIN_URL, EpicAuthError, EpicCorrectiveActionError, EpicClient, default_epic_cache_dir
 from fetchers._authoritative import EPIC
 from fetchers._base import (
     add_allow_empty_arg,
@@ -420,6 +420,11 @@ def main() -> int:
         print("Logging in to Epic...")
         client.login()
         print(f"  account {client.account_id}")
+    except EpicCorrectiveActionError as e:
+        mark_invalid("epic", error=str(e))
+        stats.error(str(e))
+        print(f"Epic privacy-policy action required: {e}", flush=True)
+        return stats.finish("fetch_epic", t0, exit_code=EXIT_CODE_AUTH)
     except EpicAuthError as e:
         mark_invalid("epic", error=str(e))
         stats.error(str(e))

@@ -317,7 +317,7 @@ export const EYEBROW_TIPS = {
   // Discovery fallbacks
   'Supposedly perfect': 'A flawless 100% review score, but on fewer than 50 reviews - take the perfection with a grain of salt.',
   Unreviewed: 'No review score yet - an unrated pick sitting in your backlog.',
-  Unplayed: 'Never launched - 0h on the clock, still waiting to be started.',
+  Unplayed: 'Rated but not started - zero playtime and no stronger spotlight tag matched.',
   'Total mystery': 'No review, no HLTB estimate, and never played - a complete blank slate.',
 };
 

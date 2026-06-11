@@ -12,7 +12,7 @@ import { computeSpotlightSuperlatives } from './creative-metrics.js';
 import * as MetricTips from './metric-tips.js';
 import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
 import { registerPausable } from './visibility.js';
-import { getAdsForLocation, getSpotlightHouseAds, sponsorToSpotlightGame, spotlightLogoMarkHtml, SPOTLIGHT_PREMIUM_SCHEMES } from './sponsored-deals.js';
+import { getAdsForLocation, getSpotlightHouseAds, sponsorToSpotlightGame, spotlightLogoMarkHtml, SPOTLIGHT_PREMIUM_SCHEMES, sponsorActionAttrs } from './sponsored-deals.js';
 
 // Namespace import avoids link-time failure if metric-tips.js is stale/truncated
 // (data maps may load while named function exports are missing).
@@ -489,7 +489,7 @@ export function computeRecentAdditions(games, cap = 10) {
   return out;
 }
 
-function gameSpotlightReason(g, recentKeys) {
+export function gameSpotlightReason(g, recentKeys) {
   const rating = ratingValue(g);
   const hltb = hltbMain(g);
   const personal = getPersonal(g);
@@ -536,7 +536,7 @@ function gameSpotlightReason(g, recentKeys) {
   // so the perfection deserves a grain of salt. Checked before Barrel/Quick win
   // so a suspicious perfect score isn't masked by a routine elite-short tag.
   const reviewCount = g.steam_review_count || 0;
-  if (rating >= 100 && reviewCount > 0 && reviewCount < 50) {
+  if (rating >= 100 && reviewCount >= 0 && reviewCount < 50) {
     return { eyebrow: 'Supposedly perfect', score: rating - 2 };
   }
   if (isBarrel(g)) {
@@ -994,9 +994,7 @@ export function renderSpotlightHtml(g) {
   const ad = g._spotlightAd;
   const action = ad ? 'sponsored-deal' : 'dash-list-jump';
   const keyAttr = ad ? '' : ` data-key="${escapeAttr(key)}"`;
-  const sponsorAttrs = ad
-    ? ` data-sponsor-id="${escapeAttr(ad.id)}" data-sponsor-url="${escapeAttr(ad.url || '')}"`
-    : '';
+  const sponsorAttrs = ad ? ` ${sponsorActionAttrs(ad)}` : '';
   const title = ad
     ? escapeAttr(g.name)
     : `Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}`;

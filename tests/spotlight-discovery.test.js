@@ -126,4 +126,15 @@ describe('spotlight discovery categories', () => {
     expect(eyebrowsFor([g])).toContain('Supposedly perfect');
     expect(eyebrowsFor([g])).not.toContain('Hidden gem');
   });
+
+  it('tags flawless-but-unreviewed games as Supposedly perfect', () => {
+    const g = artGame({
+      name: 'Perfect Unknown',
+      steam_review_percent: 100,
+      steam_review_count: 0,
+      hltb_main_hours: 15,
+    });
+    expect(eyebrowsFor([g])).toContain('Supposedly perfect');
+    expect(eyebrowsFor([g])).not.toContain('Hidden gem');
+  });
 });

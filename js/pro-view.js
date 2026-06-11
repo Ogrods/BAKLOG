@@ -21,8 +21,6 @@ import { switchView } from './filters-ui.js';
 import { state } from './state.js';
 import { savePrefs } from './prefs.js';
 
-export { isProPromoSponsorId };
-
 export const PRO_WELCOME_STORAGE_KEY = 'baklog-pro-welcome';
 
 let proViewWired = false;

@@ -355,4 +355,53 @@ describe('personalStore.prepareForProfileSwitch', () => {
     expect(puts[0].personal.__dismissedClaims).toEqual({ 'gog-bar': 2000 });
     expect(puts[0].personal.__dismissedClaimKeys).toEqual({ 'title:bar': 2000 });
   });
+
+  it('keeps exclude_from_count-only records through server merge', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: {},
+              manual: [],
+            }),
+          };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+    const { personalStore, state } = await loadStore();
+    state.personal = { game1: { status: 'backlog', exclude_from_count: true } };
+    await personalStore.init();
+    expect(state.personal.game1.exclude_from_count).toBe(true);
+  });
+
+  it('first-seen merge keeps the newer local timestamp', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url === '/api/personal') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: {},
+              prefs: {},
+              manual: [],
+              libraryFirstSeen: { 'steam:1': 1000 },
+            }),
+          };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+    localStorage.setItem('baklog-library-first-seen-default', JSON.stringify({ 'steam:1': 5000 }));
+    const { personalStore, state } = await loadStore();
+    const { libraryFirstSeenStorageKey } = await import('../js/profiles.js');
+    localStorage.setItem(libraryFirstSeenStorageKey(), JSON.stringify({ 'steam:1': 5000 }));
+    await personalStore.init();
+    expect(state.libraryFirstSeenByKey['steam:1']).toBe(5000);
+  });
 });

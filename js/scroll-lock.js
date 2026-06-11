@@ -17,7 +17,37 @@ const MODAL_SELECTOR = '[aria-modal="true"], dialog';
 let _observer = null;
 let _rafId = 0;
 let _locked = false;
-const _saved = { htmlOverflow: '', bodyPaddingRight: '' };
+const _saved = { htmlOverflow: '', htmlScrollbarGutter: '', bodyPaddingRight: '' };
+let _cachedScrollbarWidth = null;
+
+function htmlUsesStableScrollbarGutter() {
+  const sg = getComputedStyle(document.documentElement).scrollbarGutter || '';
+  return sg.includes('stable');
+}
+
+/** Classic scrollbar width probe (works when scrollbar-gutter: stable masks the gap). */
+function measureScrollbarWidth() {
+  if (_cachedScrollbarWidth != null) return _cachedScrollbarWidth;
+  const outer = document.createElement('div');
+  outer.style.cssText = 'visibility:hidden;overflow:scroll;width:100px;height:100px;position:absolute;top:-9999px;';
+  const inner = document.createElement('div');
+  inner.style.height = '200px';
+  outer.appendChild(inner);
+  document.body.appendChild(outer);
+  const w = outer.offsetWidth - outer.clientWidth;
+  document.body.removeChild(outer);
+  _cachedScrollbarWidth = Math.max(0, w);
+  return _cachedScrollbarWidth;
+}
+
+/** Body padding when locking — skip when html already uses scrollbar-gutter: stable. */
+function scrollbarCompensationPx() {
+  if (htmlUsesStableScrollbarGutter()) return 0;
+  const html = document.documentElement;
+  const gap = window.innerWidth - html.clientWidth;
+  if (gap > 0) return gap;
+  return measureScrollbarWidth();
+}
 
 function supportsModalPseudo() {
   try {
@@ -61,16 +91,21 @@ function applyLock(shouldLock) {
   const html = document.documentElement;
   const body = document.body;
   if (shouldLock) {
-    const scrollbarGap = window.innerWidth - html.clientWidth;
+    const stableGutter = htmlUsesStableScrollbarGutter();
+    const measuredGap = window.innerWidth - html.clientWidth;
+    const compensation = scrollbarCompensationPx();
     _saved.htmlOverflow = html.style.overflow;
+    _saved.htmlScrollbarGutter = html.style.scrollbarGutter;
     _saved.bodyPaddingRight = body.style.paddingRight;
     html.style.overflow = 'hidden';
-    if (scrollbarGap > 0) {
+    if (stableGutter) html.style.scrollbarGutter = 'stable';
+    if (compensation > 0) {
       const current = parseFloat(getComputedStyle(body).paddingRight) || 0;
-      body.style.paddingRight = `${current + scrollbarGap}px`;
+      body.style.paddingRight = `${current + compensation}px`;
     }
   } else {
     html.style.overflow = _saved.htmlOverflow;
+    html.style.scrollbarGutter = _saved.htmlScrollbarGutter;
     body.style.paddingRight = _saved.bodyPaddingRight;
   }
   _locked = shouldLock;

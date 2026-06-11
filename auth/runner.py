@@ -274,6 +274,25 @@ def _epic_code_from_text(text: str) -> str:
     return m.group(1) if m else ""
 
 
+def _epic_error_from_text(text: str) -> dict[str, str] | None:
+    """Detect Epic's corrective-action gate in a redirect body (HTML-wrapped JSON safe)."""
+    from epic_client import corrective_action_in_text
+
+    return corrective_action_in_text(text or "")
+
+
+EPIC_CORRECTIVE_ACTION_HINT = (
+    "Epic needs you to accept its privacy policy. Accept the privacy policy / "
+    "complete the prompt in the sign-in window, then we'll finish connecting "
+    "automatically."
+)
+EPIC_CORRECTIVE_ACTION_ERROR = (
+    "Epic needs you to accept its privacy policy. In the Epic sign-in window, "
+    "accept the privacy policy / complete the prompt, then refresh the page and "
+    "click Connect again."
+)
+
+
 def _extract_epic_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Sign in to Epic in the managed window, then auto-capture + exchange the code.
 
@@ -302,22 +321,42 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
             except Exception:
                 body = ""
             code = _epic_code_from_text(body)
+            html = ""
             if not code:
                 try:
-                    code = _epic_code_from_text(main.content())
+                    html = main.content()
                 except Exception:
-                    code = ""
+                    html = ""
+                code = _epic_code_from_text(html)
             if code:
-                from epic_client import EpicAuthError, EpicClient, default_epic_cache_dir
+                from epic_client import (
+                    EpicAuthError,
+                    EpicClient,
+                    EpicCorrectiveActionError,
+                    default_epic_cache_dir,
+                )
 
                 try:
                     EpicClient(auth_code=code, cache_dir=default_epic_cache_dir()).login()
+                except EpicCorrectiveActionError as exc:
+                    raise RuntimeError(EPIC_CORRECTIVE_ACTION_ERROR) from exc
                 except EpicAuthError as exc:
                     raise RuntimeError(
                         f"Epic rejected the captured code ({exc}). Refresh the Epic page so a new "
                         "code appears, or paste the authorizationCode into the fallback field below."
                     ) from exc
                 return {"EPIC_AUTH_CODE": code}
+
+            # No code yet: if Epic is showing its corrective-action gate (e.g.
+            # privacy-policy acceptance), guide the user to complete it and keep
+            # polling instead of silently timing out.
+            if _epic_error_from_text(body) or _epic_error_from_text(html):
+                now = time.time()
+                if session and now - last_hint > 8:
+                    last_hint = now
+                    session.emit("waiting_for_user", {"message": EPIC_CORRECTIVE_ACTION_HINT})
+                page.wait_for_timeout(int(POLL_SEC * 1000))
+                continue
 
         now = time.time()
         if session and now - last_hint > 10:

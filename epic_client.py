@@ -18,6 +18,7 @@ tools like legendary; they grant access only when paired with a real user code.
 
 import base64
 import json
+import re
 import threading
 import time
 from pathlib import Path
@@ -84,6 +85,73 @@ REQUEST_DELAY_SEC = 0.12
 
 class EpicAuthError(Exception):
     """Authorization code missing/expired or refresh token rejected."""
+
+
+class EpicCorrectiveActionError(EpicAuthError):
+    """Epic blocked the OAuth exchange behind an in-browser gate.
+
+    Epic returns ``errors.com.epicgames.oauth.corrective_action_required`` (e.g.
+    ``correctiveAction=PRIVACY_POLICY_ACCEPTANCE``) when the account must complete
+    a prompt in the sign-in window before a code/token will be issued. We never
+    call Epic's continuation endpoint ourselves — the user finishes the gate in
+    the managed browser and retries.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        corrective_action: str | None = None,
+        continuation: str | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.corrective_action = corrective_action
+        self.continuation = continuation
+        self.error_code = error_code
+
+
+def epic_error_fields(text: str) -> dict[str, str]:
+    """Best-effort parse of Epic's OAuth error body into its key fields.
+
+    Handles raw JSON and HTML-wrapped JSON (e.g. ``document.body.innerText`` from
+    the redirect page). Returns ``errorCode``/``message``/``correctiveAction``/
+    ``continuation`` with empty strings for anything absent.
+    """
+    out = {"errorCode": "", "message": "", "correctiveAction": "", "continuation": ""}
+    if not text:
+        return out
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        data = None
+    if isinstance(data, dict):
+        out["errorCode"] = str(data.get("errorCode") or "")
+        out["message"] = str(data.get("message") or "")
+        meta = data.get("metadata")
+        if isinstance(meta, dict):
+            out["correctiveAction"] = str(meta.get("correctiveAction") or "")
+            out["continuation"] = str(meta.get("continuation") or "")
+        return out
+    for field in ("errorCode", "message", "correctiveAction", "continuation"):
+        m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', text)
+        if m:
+            out[field] = m.group(1)
+    return out
+
+
+def is_corrective_action(fields: dict[str, str]) -> bool:
+    """True when parsed Epic error fields indicate a corrective-action gate."""
+    return (
+        "corrective_action_required" in (fields.get("errorCode") or "")
+        or bool(fields.get("correctiveAction"))
+    )
+
+
+def corrective_action_in_text(text: str) -> dict[str, str] | None:
+    """Return corrective-action fields if ``text`` contains the gate, else None."""
+    fields = epic_error_fields(text)
+    return fields if is_corrective_action(fields) else None
 
 
 class EpicClient:
@@ -192,10 +260,18 @@ class EpicClient:
             timeout=30,
         )
         if resp.status_code >= 400:
-            try:
-                err = resp.json().get("errorCode", resp.text[:200])
-            except json.JSONDecodeError:
-                err = resp.text[:200]
+            fields = epic_error_fields(resp.text or "")
+            if is_corrective_action(fields):
+                action = fields.get("correctiveAction") or "corrective_action_required"
+                raise EpicCorrectiveActionError(
+                    f"Epic requires you to complete '{action}' before continuing. "
+                    "Accept Epic's privacy policy in the sign-in window, then refresh "
+                    "and reconnect.",
+                    corrective_action=fields.get("correctiveAction") or None,
+                    continuation=fields.get("continuation") or None,
+                    error_code=fields.get("errorCode") or None,
+                )
+            err = fields.get("errorCode") or (resp.text[:200] if resp.text else "")
             raise EpicAuthError(f"OAuth {resp.status_code}: {err}")
         return resp.json()
 

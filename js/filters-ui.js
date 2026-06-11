@@ -37,7 +37,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { gameGenresCanonical, aliasCanonicalGenre } from './genres.js';
-import { getPersonal, filterOutHidden } from './personal-storage.js';
+import { getPersonal, filterOutHidden, filterCounted } from './personal-storage.js';
 import {
   savePrefs,
   applySavedSortForView,
@@ -768,7 +768,8 @@ export function renderSummary() {
       ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
     return;
   }
-  const visible = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
+  const visibleAll = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
+  const visible = filterCounted(visibleAll);
   const storeLabels = {
     steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic",
     amazon: "Amazon", xbox: "Xbox", battlenet: "Battle.net",
@@ -782,7 +783,7 @@ export function renderSummary() {
       count: k === "itch" ? state.itchGames.filter(itchIsGame).length : state.allGames.filter(g => normalizeGame(g).store === k).length,
     }))
     .sort((a, b) => storeDisplayRank(a.key) - storeDisplayRank(b.key));
-  const hiddenCount = state.allGames.length - visible.length;
+  const hiddenCount = state.allGames.length - visibleAll.length;
   const staleCount = state.allGames.filter(g => g.stale).length;
   const staleActive = !!state.sessionPrefs.staleOnly;
   const sourceCount = storeCounts.filter(s => s.count > 0).length;

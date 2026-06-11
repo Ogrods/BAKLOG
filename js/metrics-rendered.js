@@ -5,7 +5,7 @@
 // preserved. The admin Metrics tab just reads the result — no button needed.
 
 import { state } from './state.js';
-import { METRIC_KEYS } from './metric-tips.js';
+import { METRIC_KEYS, metricKeyForLabel, metricKeyForInsight } from './metric-tips.js';
 import { savePrefs } from './prefs.js';
 import { mergeUntappedBatchSeed } from './metrics-untapped-batch.js';
 
@@ -48,17 +48,22 @@ function writeRenderedMetricKeys(keys) {
 /**
  * Effective disabled set for "no-data metrics go to Unused", preserving the
  * user's manual hides of metrics that DO have data.
- * disabled = (currentDisabled ∩ rendered) ∪ (catalog − rendered)
+ * disabled = (catalog − rendered) ∪ manualHides
+ * manualHides = currentDisabled ∩ rendered ∩ previousRendered
+ * (only re-keep a hide when the metric had data last commit — not when a sparse
+ * render pass auto-disabled it because it was missing from rendered).
  * @param {string[]} catalogKeys
  * @param {string[]} renderedKeys
  * @param {string[]} currentDisabled
+ * @param {string[]} [previousRenderedKeys]
  * @returns {string[]}
  */
-export function computeAutoDisabled(catalogKeys, renderedKeys, currentDisabled = []) {
+export function computeAutoDisabled(catalogKeys, renderedKeys, currentDisabled = [], previousRenderedKeys = []) {
   const rendered = new Set(renderedKeys);
-  const preserved = currentDisabled.filter((k) => rendered.has(k));
+  const previousRendered = new Set(previousRenderedKeys);
   const noData = catalogKeys.filter((k) => !rendered.has(k));
-  return [...new Set([...preserved, ...noData])];
+  const manualHides = currentDisabled.filter((k) => rendered.has(k) && previousRendered.has(k));
+  return [...new Set([...noData, ...manualHides])];
 }
 
 // Per-render-pass key buckets. Builders note their pre-disable keys here; the
@@ -76,11 +81,21 @@ export function noteInsightMetricKeys(keys) {
   _insightKeys = [...new Set([...keys].filter(Boolean))];
 }
 
-function applyAutoDisabled(rendered) {
+/** Re-note keys when mega artifacts are served from cache (builders did not run). */
+export function noteRenderedKeysFromArtifacts(marqueeItems, insightPool) {
+  if (marqueeItems?.length) {
+    noteMarqueeMetricKeys(marqueeItems.map((it) => metricKeyForLabel(it.label)));
+  }
+  if (insightPool?.length) {
+    noteInsightMetricKeys(insightPool.map((e) => metricKeyForInsight(typeof e === 'string' ? e : e.html)));
+  }
+}
+
+function applyAutoDisabled(rendered, previousRendered) {
   try {
     let current = Array.isArray(state.prefs?.metricsDisabled) ? state.prefs.metricsDisabled : [];
     current = mergeUntappedBatchSeed(current);
-    const next = computeAutoDisabled(METRIC_KEYS, rendered, current);
+    const next = computeAutoDisabled(METRIC_KEYS, rendered, current, previousRendered);
     const curSet = new Set(current);
     const changed = next.length !== current.length || next.some((k) => !curSet.has(k));
     if (changed) {
@@ -100,6 +115,7 @@ function applyAutoDisabled(rendered) {
 export function commitRenderedMetrics() {
   const union = [...new Set([..._marqueeKeys, ..._insightKeys])];
   if (!union.length) return;
+  const previousRendered = loadRenderedMetricKeys();
+  applyAutoDisabled(union, previousRendered);
   writeRenderedMetricKeys(union);
-  applyAutoDisabled(union);
 }

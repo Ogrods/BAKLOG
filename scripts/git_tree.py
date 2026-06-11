@@ -328,10 +328,34 @@ def _render_script() -> str:
       ' &middot; regen: <code>.\\.venv\\Scripts\\python.exe scripts\\git_tree.py</code></div>';
   mount.appendChild(header);
 
+  // --- usage instructions ---
+  var howto = document.createElement("details");
+  howto.className = "gt-howto";
+  howto.open = true;
+  howto.innerHTML =
+    "<summary>How to use this page</summary>" +
+    '<div class="gt-howto-body">' +
+      "<p>This page is a static snapshot \u2014 it does <strong>not</strong> update on its own. " +
+      "Re-run the script, then refresh the browser tab.</p>" +
+      "<ol>" +
+        "<li><strong>Regenerate the snapshot</strong> (from the repo root, Windows):<br>" +
+          "<code>.\\.venv\\Scripts\\python.exe scripts\\git_tree.py</code></li>" +
+        "<li><strong>Refresh this page</strong> in your browser: " +
+          "<kbd>F5</kbd> (or <kbd>Ctrl</kbd>+<kbd>R</kbd>; " +
+          "<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> to hard-refresh).</li>" +
+      "</ol>" +
+      "<p class=\"gt-howto-note\">Options: <code>--fragment</code> prints the inner HTML for embedding in " +
+      "<code>tracker.html</code>; <code>-o &lt;path&gt;</code> writes to a custom file. " +
+      "PR badges require the <code>gh</code> CLI installed and authenticated.</p>" +
+    "</div>";
+  mount.appendChild(howto);
+
   if (!data.prs || data.prs.available === false) {
     var note = document.createElement("div");
     note.className = "gt-ghnote";
-    note.textContent = "PR data unavailable (gh CLI not installed or not authenticated) \u2014 branch tree shown without PR badges.";
+    note.textContent =
+      "PR data unavailable (gh CLI not installed or not authenticated) " +
+      "\u2014 branch tree shown without PR badges.";
     mount.appendChild(note);
   }
 
@@ -361,7 +385,11 @@ def _render_script() -> str:
       '<td class="gt-vs">' + bars + "</td>" +
       '<td class="gt-subj" title="' + esc(b.subject) + '"><code>' + esc(b.sha) + "</code> " + esc(b.subject) + "</td>" +
       "<td>" + esc(ago(b.date)) + "</td>" +
-      "<td>" + (b.upstream ? '<span class="gt-dim">' + esc(b.upstream) + "</span>" : '<span class="gt-warn">none</span>') + "</td>" +
+      "<td>" + (
+        b.upstream
+          ? '<span class="gt-dim">' + esc(b.upstream) + "</span>"
+          : '<span class="gt-warn">none</span>'
+      ) + "</td>" +
       "<td>" + prCell + "</td>";
     tbody.appendChild(tr);
   });
@@ -551,6 +579,31 @@ code, pre {{ font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; }
   background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3);
   color: #fbbf24; border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; font-size: 13px;
 }}
+.gt-howto {{
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: 12px; padding: 4px 20px; margin-bottom: 18px;
+}}
+.gt-howto > summary {{
+  cursor: pointer; color: var(--text-bright); font-weight: 600;
+  padding: 12px 0; list-style: none;
+}}
+.gt-howto > summary::-webkit-details-marker {{ display: none; }}
+.gt-howto > summary::before {{ content: "\\25B8  "; color: var(--accent); }}
+.gt-howto[open] > summary::before {{ content: "\\25BE  "; }}
+.gt-howto-body {{ padding-bottom: 14px; color: var(--text); }}
+.gt-howto-body p {{ margin: 8px 0; }}
+.gt-howto-body ol {{ margin: 8px 0; padding-left: 22px; }}
+.gt-howto-body li {{ margin: 6px 0; }}
+.gt-howto-body code {{
+  background: #0b1120; border: 1px solid var(--border-subtle); border-radius: 6px;
+  padding: 1px 7px; color: var(--accent); font-size: 12.5px;
+}}
+.gt-howto-body kbd {{
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px;
+  padding: 1px 6px; font-size: 12px; font-family: inherit; color: var(--text-bright);
+  box-shadow: 0 1px 0 var(--border);
+}}
+.gt-howto-note {{ color: var(--text-mute); font-size: 13px; }}
 .gt-table {{
   width: 100%; border-collapse: collapse; margin-bottom: 26px;
   background: var(--bg-panel); border-radius: 12px; overflow: hidden;
@@ -574,7 +627,10 @@ code, pre {{ font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; }
   background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600;
 }}
 .gt-pr-draft {{ background: var(--bg-elev); color: var(--text-mute); }}
-.gt-h2 {{ font-size: 15px; color: var(--text-mute); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 8px; }}
+.gt-h2 {{
+  font-size: 15px; color: var(--text-mute); text-transform: uppercase;
+  letter-spacing: .04em; margin: 0 0 8px;
+}}
 .gt-graph-wrap {{
   background: var(--bg-panel); border: 1px solid var(--border-subtle);
   border-radius: 12px; padding: 8px 4px; overflow-x: auto;

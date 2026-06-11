@@ -291,8 +291,14 @@ export async function applyMergedLibrary(mergeKey = null) {
 
   // Fire after the render so popup hosts exist in the DOM. Wrapped in
   // try/catch — this is pure polish; never let it break a real merge.
+  // Gate the library burst on genuinely-new keys (recordLibraryFirstSeen),
+  // not the raw visible-count delta: un-hiding a game, a cross-store dedup
+  // change, or a wishlist->library move all bump libNow by 1 without adding a
+  // real acquisition, which would flash a celebratory +1 that never shows up
+  // in "Recently added".
   try {
-    if (libPrev != null && libNow > libPrev) {
+    const newlyAdded = state._lastNewlyAddedCount ?? 0;
+    if (libPrev != null && libNow > libPrev && newlyAdded > 0) {
       fireLibraryCountFlash('library', libPrev, libNow);
     }
     if (wlPrev != null && wlNow > wlPrev) {

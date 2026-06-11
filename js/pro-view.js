@@ -22,9 +22,31 @@ import { savePrefs } from './prefs.js';
 
 export { isProPromoSponsorId };
 
+export const PRO_WELCOME_STORAGE_KEY = 'baklog-pro-welcome';
+
 let proViewWired = false;
 let checkoutSuccessPending = false;
+let licenseActivating = false;
 let selectedProPlan = 'monthly';
+
+/** True while checkout return or license activation is still in flight (before reload). */
+export function isProActivationPending() {
+  return checkoutSuccessPending || licenseActivating;
+}
+
+function clearActivationPending() {
+  checkoutSuccessPending = false;
+  licenseActivating = false;
+}
+
+function completeProActivation({ message = 'Pro is active — reloading…', reloadMs = 500 } = {}) {
+  try {
+    sessionStorage.setItem(PRO_WELCOME_STORAGE_KEY, '1');
+  } catch (_) { /* private mode */ }
+  clearActivationPending();
+  setProStatus(message, true);
+  window.setTimeout(() => location.reload(), reloadMs);
+}
 
 function proCheckoutLink(kind) {
   const urls = proCheckoutUrls();
@@ -214,9 +236,10 @@ export function renderProView({ showSuccess = false } = {}) {
 export function applyProTabVisibility() {
   const tab = document.querySelector('.view-tab[data-view="pro"]');
   if (!tab) return;
-  const show = !isPro();
+  const pending = isProActivationPending();
+  const show = !isPro() || pending;
   tab.classList.toggle('hidden', !show);
-  if (!show && state.activeView === 'pro') {
+  if (!show && !pending && state.activeView === 'pro') {
     switchView('dashboard');
     state.prefs.activeView = 'dashboard';
     savePrefs();
@@ -224,8 +247,36 @@ export function applyProTabVisibility() {
 }
 
 export function goToProView() {
-  if (isPro()) return;
+  if (isPro() && !isProActivationPending()) return;
   switchView('pro');
+}
+
+/** One-time post-reload confirmation after Pro activation (sessionStorage flag). */
+export function showProWelcomeBanner() {
+  let flagged = false;
+  try {
+    flagged = sessionStorage.getItem(PRO_WELCOME_STORAGE_KEY) === '1';
+  } catch (_) { /* private mode */ }
+  if (!flagged || !isPro()) return;
+  const host = document.getElementById('proWelcomeBanner');
+  if (!host) return;
+  try {
+    sessionStorage.removeItem(PRO_WELCOME_STORAGE_KEY);
+  } catch (_) { /* private mode */ }
+  host.innerHTML = `<div class="migration-banner-body">
+      <div>
+        <strong>You&apos;re on Pro.</strong>
+        Sponsored deal slots are off. Perks apply on this machine.
+      </div>
+      <div class="migration-banner-actions">
+        <button type="button" class="pro-welcome-dismiss bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Dismiss</button>
+      </div>
+    </div>`;
+  host.classList.remove('hidden');
+  host.querySelector('.pro-welcome-dismiss')?.addEventListener('click', () => {
+    host.classList.add('hidden');
+    host.innerHTML = '';
+  });
 }
 
 export function markCheckoutSuccessPending() {
@@ -265,6 +316,7 @@ async function submitProLicense(form) {
   }
   const btn = form.querySelector('button[type="submit"]');
   if (btn) btn.disabled = true;
+  licenseActivating = true;
   setProStatus('Validating with Polar…', true);
   try {
     const res = await baklogFetch('/api/license/activate', {
@@ -274,15 +326,19 @@ async function submitProLicense(form) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
+      licenseActivating = false;
       setProStatus(data.message || data.error || 'Activation failed.', false);
       return;
     }
-    setProStatus(data.message || 'BAKLOG Pro activated.', true);
-    window.setTimeout(() => location.reload(), 600);
+    completeProActivation({
+      message: data.message || 'BAKLOG Pro activated — reloading…',
+      reloadMs: 600,
+    });
   } catch {
+    licenseActivating = false;
     setProStatus('Could not reach the local server.', false);
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn && !licenseActivating) btn.disabled = false;
   }
 }
 
@@ -293,9 +349,7 @@ export async function handleCheckoutSuccessReturn() {
     setProStatus('Checking your account…', true);
     const plan = await refreshAccountPlan();
     if (plan === 'pro') {
-      checkoutSuccessPending = false;
-      setProStatus('Pro is active — reloading…', true);
-      window.setTimeout(() => location.reload(), 500);
+      completeProActivation();
       return;
     }
     setProStatus('Payment received. Pro may take a moment — click Refresh Pro status, or paste your license key below.', false);
@@ -350,8 +404,7 @@ export function wireProView() {
     setProStatus('Checking your account…', true);
     const plan = await refreshAccountPlan();
     if (plan === 'pro') {
-      setProStatus('Pro is active — reloading…', true);
-      window.setTimeout(() => location.reload(), 400);
+      completeProActivation({ reloadMs: 400 });
       return;
     }
     setProStatus('Not Pro yet. Finish checkout with your account email, then try again.', false);

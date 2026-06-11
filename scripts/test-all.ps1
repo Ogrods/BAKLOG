@@ -6,6 +6,10 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
+Write-Host "==> ruff"
+python -m ruff check .
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "==> pytest"
 python -m pytest -q
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

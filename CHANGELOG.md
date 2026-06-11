@@ -49,6 +49,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- **Dashboard marquee stuck at two chips after hard reload** — boot’s second
+  `scheduleDashboardRender` could cache-hit a sparse marquee built under stale
+  `metricsDisabled` and re-poison metric keys from filtered chips. Mega-artifact
+  fingerprint now includes `metricsDisabled`, cache stores pre-filter
+  `marqueeMetricKeys`, and a corruption guard heals implausibly bloated disabled
+  sets (`js/dashboard.js`, `js/metrics-rendered.js`).
 - **App shell 404 with Supabase auth** — `GET /` returned 404 because Python
   3.13 `translate_path` no longer maps directory requests to `index.html`.
 - **Vitest unhandled rejection** — `cancel-in-flight.test.js` now stubs

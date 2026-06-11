@@ -104,7 +104,7 @@ export const METRIC_TIPS = {
   'newest release owned': 'Owned game with the latest release year.',
   'top decade': 'Decade with the most owned releases.',
   'oldest unplayed': 'Oldest release-year backlog game still unplayed.',
-  'newest add': 'Most recently added game by added_at date.',
+  'newest add': 'Most recently added game (by added date, or when it first appeared in your library).',
   'top developer': 'Developer with the most owned titles.',
   'top publisher': 'Publisher with the most owned titles.',
   'unique developers': 'Count of distinct developers in the library.',

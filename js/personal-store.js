@@ -95,7 +95,25 @@ export const personalStore = (() => {
     // rowHeroBackdrop:false must not undo the local toggle/migration each boot.
     'rowHeroBackdrop',
     'rowHeroBackdropDefaulted',
+    // Local-only seed flag: a stale server copy must not re-arm the one-shot
+    // first-seen seed, which would flood "Recently added" on the next boot.
+    'librarySeenSeeded',
   ];
+
+  // Merge first-seen maps. The server doc is normally authoritative, but a
+  // stale/reset server map can carry `0` (placeholder seed) for a key the
+  // local cache already stamped with a real timestamp. Never let a server `0`
+  // (or non-numeric junk) clobber a real local timestamp.
+  function _mergeFirstSeen(localSeen, serverSeen) {
+    const out = { ...localSeen };
+    for (const [key, sv] of Object.entries(serverSeen || {})) {
+      const sn = Number(sv);
+      const ln = Number(out[key]);
+      if ((!Number.isFinite(sn) || sn <= 0) && Number.isFinite(ln) && ln > 0) continue;
+      out[key] = sv;
+    }
+    return out;
+  }
 
   function _nonBacklogCount(personalObj) {
     let n = 0;
@@ -218,7 +236,7 @@ export const personalStore = (() => {
     const serverSeen = (doc.libraryFirstSeen && typeof doc.libraryFirstSeen === 'object')
       ? doc.libraryFirstSeen
       : {};
-    state.libraryFirstSeenByKey = { ...localSeen, ...serverSeen };
+    state.libraryFirstSeenByKey = _mergeFirstSeen(localSeen, serverSeen);
     const manual = Array.isArray(doc.manual) ? doc.manual : [];
     localStorage.setItem(personalStorageKey(), JSON.stringify(state.personal));
     localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));

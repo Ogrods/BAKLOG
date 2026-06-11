@@ -324,6 +324,17 @@ describe('sabermetrics', () => {
       expect(metacriticClubCount(games)).toBe(1);
     });
 
+    it('counts Steam epoch-seconds last_played, not just ISO strings', () => {
+      const recentSec = Math.floor((Date.now() - 5 * 86400000) / 1000);
+      const oldSec = Math.floor((Date.now() - 400 * 86400000) / 1000);
+      const games = [
+        game({ id: '1', last_played: recentSec, playtime_minutes: 60 }),
+        game({ id: '2', name: 'Dusty', last_played: oldSec, playtime_minutes: 120 }),
+      ];
+      expect(recentlyPlayedCount(games)).toBe(1);
+      expect(longestDormant(games)?.g.name).toBe('Dusty');
+    });
+
     it('wishlist helpers prefer wishlist_added', () => {
       const wl = [
         { name: 'New', wishlist_added: Math.floor(Date.now() / 1000) - 86400 },

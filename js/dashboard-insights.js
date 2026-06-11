@@ -838,14 +838,27 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     if (oldUnplayed) push('^', 'is-rose', `${oldUnplayed.g.name} · ${oldUnplayed.y}`, 'oldest unplayed');
   }
 
+  // Fetchers never set added_at (only manual adds do); fall back to the
+  // library first-seen stamp so "newest add" / "added in {year}" reflect every
+  // store, not just custom entries.
+  const effectiveAddedMs = (g) => {
+    const t = Date.parse(String(g.added_at || ''));
+    if (Number.isFinite(t)) return t;
+    const seen = (state.libraryFirstSeenByKey || {})[gameKey(g)];
+    const n = Number(seen);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
   const withAddDate = games
-    .map(g => ({ g, d: g.added_at || '' }))
-    .filter(x => x.d)
-    .sort((a, b) => b.d.localeCompare(a.d));
+    .map(g => ({ g, ms: effectiveAddedMs(g) }))
+    .filter(x => x.ms != null)
+    .sort((a, b) => b.ms - a.ms);
   if (withAddDate[0]) push('*', 'is-violet', withAddDate[0].g.name, 'newest add');
 
   const thisYear = new Date().getFullYear();
-  const addedThisYear = games.filter(g => (g.added_at || '').startsWith(String(thisYear))).length;
+  const addedThisYear = games.filter(g => {
+    const ms = effectiveAddedMs(g);
+    return ms != null && new Date(ms).getFullYear() === thisYear;
+  }).length;
   if (addedThisYear) push('+', 'is-emerald', formatNum(addedThisYear), `added in ${thisYear}`);
 
   const devCounts = {};

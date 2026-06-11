@@ -82,6 +82,19 @@ describe('computeRecentAdditions', () => {
     expect(result[3]._addedAt).toBeNull();
   });
 
+  it('backfills using ISO last_played dates, not only epoch seconds', () => {
+    // The spotlight last_played parser used to ignore ISO strings (Number(ISO)
+    // is NaN), so an ISO-dated row sorted as "no signal". The shared parser
+    // now handles both, so the recently-played ISO row leads the backfill.
+    const games = [
+      game('a', 'Alpha', { release_date: '2010-01-01' }),
+      game('b', 'Bravo', { last_played: new Date('2024-06-01T00:00:00.000Z').toISOString() }),
+    ];
+    for (const g of games) state.libraryFirstSeenByKey[gameKey(g)] = 0;
+    const result = computeRecentAdditions(games, 10);
+    expect(result.map(g => g.id)).toEqual(['b', 'a']);
+  });
+
   it('prefers tracked first-seen over backfill proxies', () => {
     const tracked = game('t', 'Tracked', { last_played: 1 });
     const manual = game('m', 'Manual', { added_at: '2025-01-01T00:00:00.000Z' });

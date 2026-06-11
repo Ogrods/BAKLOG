@@ -18,6 +18,7 @@ import {
   getSameTitleKeys,
   getTitleKeyIndex,
   normalizeNameForDedup,
+  itchIsGame,
 } from './game-core.js';
 import { PRE_HIDDEN_KEYS, getPreHiddenFallback } from './hidden-defaults.js';
 
@@ -543,7 +544,7 @@ export function filterCounted(list) {
 
 /** Main catalog + itch tab games, minus cross-store dupes and user-hidden rows. */
 export function libraryGamesBase() {
-  const itch = Array.isArray(state.itchGames) ? state.itchGames : [];
+  const itch = (Array.isArray(state.itchGames) ? state.itchGames : []).filter(itchIsGame);
   const main = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
   const seen = new Set();
   const out = [];

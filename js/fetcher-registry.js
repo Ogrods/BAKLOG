@@ -65,3 +65,5 @@ export const FETCHER_AUTH_PROVIDER = {
   "wishlistHumble": "humble",
   "itad": "itad"
 };
+
+export const NO_AUTO_FETCH_KEYS = new Set(["amazon", "gog"]);

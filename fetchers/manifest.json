@@ -22,7 +22,8 @@
       "args": ["--skip-hltb"],
       "refreshArgs": ["--refresh"],
       "metaKey": "gog",
-      "color": "#6d28d9"
+      "color": "#6d28d9",
+      "autoFetch": false
     },
     {
       "key": "psn",
@@ -46,7 +47,7 @@
       "color": "#64748b",
       "requires": [{ "env": "EPIC_AUTH_CODE", "note": "OAuth auth code — run fetch_epic.py --auth-help" }]
     },
-    { "key": "amazon", "label": "Amazon", "group": "library", "script": "fetch_amazon.py", "args": ["--skip-hltb"], "metaKey": "amazon", "color": "#c2410c" },
+    { "key": "amazon", "label": "Amazon", "group": "library", "script": "fetch_amazon.py", "args": ["--skip-hltb"], "metaKey": "amazon", "color": "#c2410c", "autoFetch": false },
     {
       "key": "xbox",
       "label": "Xbox",

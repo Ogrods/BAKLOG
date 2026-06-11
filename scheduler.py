@@ -159,6 +159,8 @@ class BackgroundScheduler:
         for key, spec in self._fetchers.items():
             if spec.get("group") != "library":
                 continue
+            if spec.get("autoFetch") is False:
+                continue  # local launcher (GOG Galaxy, Amazon) — needs the app open
             if not platform_supported(spec.get("platforms")):
                 continue
             if self._missing_requirements(spec.get("requires") or []):

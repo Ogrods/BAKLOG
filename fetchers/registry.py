@@ -151,6 +151,20 @@ def _script_flags(script: str) -> set[str]:
     return flags
 
 
+def no_auto_fetch_keys(path: Path | None = None) -> list[str]:
+    """Fetcher keys marked autoFetch:false (local launchers — need the app open).
+
+    Launcher-backed sources (GOG Galaxy, Amazon Games) scan a locally installed
+    client, so they can't refresh unattended like web/API stores. Auto-refresh
+    (browser loop + background scheduler) skips them.
+    """
+    return sorted(
+        e["key"]
+        for e in manifest_entries(path)
+        if e.get("key") and e.get("autoFetch") is False
+    )
+
+
 def export_js_registry(out_path: Path | None = None) -> None:
     """Write js/fetcher-registry.js for the browser bundle."""
     out = out_path or bundle_root() / "js" / "fetcher-registry.js"
@@ -161,6 +175,7 @@ def export_js_registry(out_path: Path | None = None) -> None:
         "enrichFetcherKeys": sorted(ENRICH_FETCHER_KEYS),
         "enrichReloadWishlistKeys": sorted(ENRICH_RELOAD_WISHLIST_KEYS),
         "authProviderByKey": AUTH_PROVIDER_BY_KEY,
+        "noAutoFetchKeys": no_auto_fetch_keys(),
     }
     lines = [
         "// Generated from fetchers/registry.py — keep in sync with manifest maps.",
@@ -177,6 +192,8 @@ def export_js_registry(out_path: Path | None = None) -> None:
         f"export const ENRICH_RELOAD_WISHLIST_KEYS = new Set({json.dumps(payload['enrichReloadWishlistKeys'])});",
         "",
         f"export const FETCHER_AUTH_PROVIDER = {json.dumps(payload['authProviderByKey'], indent=2)};",
+        "",
+        f"export const NO_AUTO_FETCH_KEYS = new Set({json.dumps(payload['noAutoFetchKeys'])});",
         "",
     ]
     out.write_text("\n".join(lines), encoding="utf-8")

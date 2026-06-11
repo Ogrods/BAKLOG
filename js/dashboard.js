@@ -36,7 +36,7 @@ import {
 import { renderDashboardCoopSpotlight, replaceCoopSponsorRow, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap, renderDashboardSponsoredPick, renderDashboardFeatureBanner } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, buildMegaLibraryContext, renderMarqueeHtml, renderMarqueeTrackInner, applyMarqueeSpeed, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
-import { commitRenderedMetrics, noteRenderedKeysFromArtifacts } from './metrics-rendered.js';
+import { commitRenderedMetrics, restoreNotedMetricKeysFromArtifacts, snapshotNotedMetricKeys } from './metrics-rendered.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
 import { THEME_CHANGE_EVENT } from './theme.js';
@@ -72,7 +72,7 @@ const _dashLastCounters = {};
 let _marqueeItemsKey = "";
 let _marqueeSpeedDisconnect = null;
 let _megaArtifactsKey = "";
-/** @type {{ insightPool: unknown[], marqueeItems: unknown[], spotlightPool: object[] } | null} */
+/** @type {{ insightPool: unknown[], marqueeItems: unknown[], spotlightPool: object[], marqueeMetricKeys?: string[], insightMetricKeys?: string[] } | null} */
 let _megaArtifactsCache = null;
 
 // Entrance animations may only replay when switchView('dashboard') sets the
@@ -131,6 +131,8 @@ function megaContentFingerprint() {
   try {
     const fp = JSON.parse(dashboardFingerprint());
     delete fp.th;
+    const md = state.prefs?.metricsDisabled;
+    fp.md = Array.isArray(md) && md.length ? [...md].sort().join('\0') : '';
     return JSON.stringify(fp);
   } catch (_) {
     return dashboardFingerprint();
@@ -140,14 +142,19 @@ function megaContentFingerprint() {
 function buildMegaArtifacts(games, snap) {
   const key = megaContentFingerprint();
   if (key === _megaArtifactsKey && _megaArtifactsCache) {
-    noteRenderedKeysFromArtifacts(_megaArtifactsCache.marqueeItems, _megaArtifactsCache.insightPool);
+    restoreNotedMetricKeysFromArtifacts(_megaArtifactsCache);
     return _megaArtifactsCache;
   }
   const megaCtx = buildMegaLibraryContext(games);
+  const insightPool = buildInsightPool(games, snap, megaCtx);
+  const marqueeItems = buildMarqueeItems(games, snap, megaCtx);
+  const { marqueeMetricKeys, insightMetricKeys } = snapshotNotedMetricKeys();
   _megaArtifactsCache = {
-    insightPool: buildInsightPool(games, snap, megaCtx),
-    marqueeItems: buildMarqueeItems(games, snap, megaCtx),
+    insightPool,
+    marqueeItems,
     spotlightPool: pickSpotlightGames(games, snap),
+    marqueeMetricKeys,
+    insightMetricKeys,
   };
   _megaArtifactsKey = key;
   return _megaArtifactsCache;

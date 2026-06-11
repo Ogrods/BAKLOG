@@ -92,6 +92,15 @@ describe('affiliateUrl', () => {
     expect(affiliateUrl(creator)).toBe(creator);
   });
 
+  it('tags itch free-claim and fetcher store_url shapes', () => {
+    AFFILIATE_CREDENTIALS.itch = 'eob7ZQcpthHDp';
+    const claim = affiliateUrl('https://s-xavier-uy.itch.io/another-world-adventures');
+    expect(new URL(claim).searchParams.get('ac')).toBe('eob7ZQcpthHDp');
+
+    const local = affiliateUrl('https://dev.itch.io/local-game');
+    expect(new URL(local).searchParams.get('ac')).toBe('eob7ZQcpthHDp');
+  });
+
   it('wraps URL in deeplink template when a {url} template is pasted in', () => {
     AFFILIATE_CREDENTIALS.gog = 'https://track.example.com/?dest={url}';
     const url = 'https://www.gog.com/en/game/bar';

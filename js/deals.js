@@ -19,6 +19,7 @@ import {
 import { isPlatformToken } from './genres.js';
 import { savePrefs } from './prefs.js';
 import { refreshFilterUI, switchView } from './filters-ui.js';
+import { affiliateUrl } from './affiliate.js';
 
 /** Cut-depth modifier class — emerald default, big-gradient for 50%+,
  *  amber→red→pink gradient for 75%+. Matches the pre-CSS-extract project. */
@@ -477,7 +478,7 @@ export function getDealInfo(g) {
       cut,
       isHistoricalLow: false,
       shop: "Steam",
-      url: g.store_url || null,
+      url: g.store_url ? affiliateUrl(g.store_url) : null,
     };
   }
   return null;

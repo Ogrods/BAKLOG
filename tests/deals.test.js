@@ -4,6 +4,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 import { state } from '../js/state.js';
+import { AFFILIATE_CREDENTIALS } from '../js/affiliate.js';
 import {
   parsePriceLike,
   getDealInfo,
@@ -116,6 +117,23 @@ describe('getDealInfo', () => {
 
   it('returns null when no pricing', () => {
     expect(getDealInfo({ ...baseGame, price: null, discount_percent: 0 })).toBeNull();
+  });
+
+  it('tags itch.io fallback store_url when affiliate is live', () => {
+    const prev = AFFILIATE_CREDENTIALS.itch;
+    AFFILIATE_CREDENTIALS.itch = 'eob7ZQcpthHDp';
+    try {
+      const g = {
+        ...baseGame,
+        price: '$4.99',
+        discount_percent: 20,
+        store_url: 'https://dev.itch.io/sale-game',
+      };
+      const d = getDealInfo(g);
+      expect(d?.url).toContain('ac=eob7ZQcpthHDp');
+    } finally {
+      AFFILIATE_CREDENTIALS.itch = prev;
+    }
   });
 });
 

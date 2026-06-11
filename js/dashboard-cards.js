@@ -59,9 +59,9 @@ function resolveItchHeroOrder(freshCandidates) {
 
 /** Relative "added" label from first-seen timestamp (mirrors fetcher humanizeAge thresholds). */
 function formatAddedAgo(ts) {
-  if (!ts) return '—';
+  if (!ts) return '-';
   const ms = Date.now() - ts;
-  if (!Number.isFinite(ms) || ms < 0) return '—';
+  if (!Number.isFinite(ms) || ms < 0) return '-';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);

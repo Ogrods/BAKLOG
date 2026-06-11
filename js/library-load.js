@@ -507,7 +507,6 @@ export async function reloadGames() {
   rebuildWishlistFromMetas();
   await Promise.all([
     loadItadPrices(),
-    loadClaimableNow(),
     loadSponsoredDeals(),
     loadHltbCache(),
     loadSteamReviewCache(),
@@ -515,8 +514,12 @@ export async function reloadGames() {
     loadSteamTagsMeta(),
     loadProtondbCache(),
   ]);
-  saveClaimsSnapshot(state.claimableFeed?.items || []);
   await applyMergedLibrary();
+  // Load claimables after buildOwnedNormNames() so owned-library games are
+  // filtered on the first paint, not briefly shown until merge completes.
+  await loadClaimableNow();
+  saveClaimsSnapshot(state.claimableFeed?.items || []);
+  if (state.activeView === 'wishlist') refreshClaimableUi();
   void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
 }
 

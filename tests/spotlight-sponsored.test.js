@@ -60,20 +60,38 @@ describe('spotlight sponsored slides', () => {
     expect(ids).toContain('house-spotlight-pro-noads');
   });
 
-  it('renders the large-logo layout (BAKLOG mark, no cover img)', () => {
+  it('renders the large-logo layout (BAKLOG mark + wordmark, slogan, scheme, no cover img)', () => {
     const slide = {
       store: 'sponsored',
       id: 'house-spotlight-pro-logo',
       name: 'BAKLOG Pro',
       _spotlightArtMode: 'logo',
-      _spotlightReason: { eyebrow: 'BAKLOG Pro', score: 50, metaParts: ['Leveled up'] },
-      _spotlightAd: { id: 'house-spotlight-pro-logo', url: 'https://baklog.app/', cta: "See what's planned", artMode: 'logo' },
+      _spotlightReason: { eyebrow: 'BAKLOG Pro', score: 50, metaParts: ['Leveled up'], slogan: 'One honest backlog across every store.' },
+      _spotlightAd: { id: 'house-spotlight-pro-logo', url: 'https://baklog.app/', cta: "See what's planned", artMode: 'logo', scheme: 'ember', slogan: 'One honest backlog across every store.' },
     };
     const html = renderSpotlightHtml(slide);
     expect(html).toContain('has-logo-art');
+    expect(html).toContain('dash-spotlight--scheme-ember');
     expect(html).toContain('dash-spotlight-logo-mark');
+    expect(html).toContain('dash-spotlight-wordmark');
+    expect(html).toContain('dash-spotlight-slogan');
+    expect(html).toContain('One honest backlog across every store.');
     expect(html).toContain('dash-spotlight-logo-cta');
     expect(html).not.toContain('class="dash-spotlight-art"');
+  });
+
+  it('does not emit a scheme class for non-logo sponsored slides', () => {
+    const slide = {
+      store: 'sponsored',
+      id: 'ad-spot',
+      name: 'Emberfall',
+      header_image: '/assets/ads-sample/hero-emberfall.webp',
+      _spotlightArtMode: '',
+      _spotlightReason: { eyebrow: 'Sponsored', score: 50, metaParts: [] },
+      _spotlightAd: { id: 'ad-spot', url: 'https://example.com/ad', cta: '', artMode: '', scheme: 'ember' },
+    };
+    const html = renderSpotlightHtml(slide);
+    expect(html).not.toContain('dash-spotlight--scheme-');
   });
 
   it('renders sponsored disclosure and click action on spotlight ad', () => {

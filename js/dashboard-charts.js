@@ -834,9 +834,6 @@ function hitsAtScatterClick(chart, canvasX, canvasY) {
   const px = chart._scatterPxX;
   const py = chart._scatterPxY;
   const grid = chart._scatterGrid;
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'808f3b'},body:JSON.stringify({sessionId:'808f3b',hypothesisId:'A,C',location:'dashboard-charts.js:hitsAtScatterClick',message:'hit-test entry',data:{hasPts:!!pts,ptsLen:pts?pts.length:0,hasPx:!!px,hasPy:!!py,hasGrid:!!grid,gridSize:grid?grid.size:0,canvasX,canvasY,samplePx:px?px[0]:null,samplePy:py?py[0]:null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!pts || !px || !py || !grid) return [];
   const r2 = SCATTER_HIT_RADIUS_PX * SCATTER_HIT_RADIUS_PX;
   const cell = SCATTER_CELL_PX;
@@ -882,9 +879,6 @@ function runScatterHover(evt, chart) {
   const cy = evt.y ?? (evt.native?.offsetY ?? 0);
   const hits = hitsAtScatterClick(chart, cx, cy);
   const key = scatterHitsKey(hits);
-  // #region agent log
-  fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'808f3b'},body:JSON.stringify({sessionId:'808f3b',hypothesisId:'C,E',location:'dashboard-charts.js:runScatterHover',message:'hover hit-test',data:{cx,cy,hits:hits.length,key,grouping:hits.length>=2},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (key === _scatterHoverLastKey) return;
   _scatterHoverLastKey = key;
   if (hits.length >= 2) {
@@ -1418,9 +1412,6 @@ export function renderDashboardCharts(games, aggIn) {
       const grid = buildScatterSpatialGrid(px, py);
       chart._scatterGrid = grid;
       chart._scatterClusterCounts = countScatterClusters(px, py, grid);
-      // #region agent log
-      fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'808f3b'},body:JSON.stringify({sessionId:'808f3b',hypothesisId:'A,D',location:'dashboard-charts.js:scatterCluster.afterLayout',message:'grid built',data:{ptsLen:pts.length,gridSize:grid.size,width:chart.width,height:chart.height,clustered:chart._scatterClusterCounts.filter(c=>c>0).length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     },
   };
   const scatterAnimReduced = prefersReducedMotion();
@@ -1525,18 +1516,12 @@ export function renderDashboardCharts(games, aggIn) {
       },
       onHover(evt, _elements, chart) {
         if (!evt) return;
-        // #region agent log
-        fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'808f3b'},body:JSON.stringify({sessionId:'808f3b',hypothesisId:'B',location:'dashboard-charts.js:onHover',message:'scatter onHover fired',data:{nativeType:evt.native?.type,x:evt.x,y:evt.y},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         scheduleScatterHover(evt, chart);
       },
       onClick(evt, _elements, chart) {
         const cx = evt.x ?? (evt.native?.offsetX ?? 0);
         const cy = evt.y ?? (evt.native?.offsetY ?? 0);
         const hits = hitsAtScatterClick(chart, cx, cy);
-        // #region agent log
-        fetch('http://127.0.0.1:7320/ingest/eeb58a78-e0c0-4118-a652-385a89407500',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'808f3b'},body:JSON.stringify({sessionId:'808f3b',hypothesisId:'B,E',location:'dashboard-charts.js:onClick',message:'scatter onClick fired',data:{cx,cy,hits:hits.length,frozen:_scatterListFrozen},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         if (!hits.length) {
           if (_scatterListFrozen) collapseScatterList();
           return;

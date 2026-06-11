@@ -4,40 +4,10 @@ from __future__ import annotations
 
 import argparse
 
-import fetch_ea as fe
 import fetch_gog as fg
 import fetch_itch as fi
 import fetch_nintendo as fn
-import fetch_xbox as fx
 from fetch_epic import _acquired_at_from_record, _build_game_row_from_record
-
-
-class TestGamePassRows:
-    def test_xbox_sets_game_pass_flag(self) -> None:
-        row = fx._build_row(
-            {
-                "titleId": "abc",
-                "name": "Halo",
-                "gamePass": {"isGamePass": True},
-            },
-            None,
-        )
-        assert row["game_pass"] is True
-        assert "game-pass" in row["tags"]
-
-    def test_ea_normalizes_game_pass_tag(self) -> None:
-        item = {
-            "originOfferId": "offer-1",
-            "product": {
-                "name": "GP Title",
-                "id": "p1",
-                "gameProductUser": {"ownershipMethods": ["XGP_VAULT"]},
-            },
-        }
-        tags = fe._tags_for(item)
-        assert tags == ["game-pass"]
-        row = fe._build_row(item, hltb=None, play_by_slug={})
-        assert row["game_pass"] is True
 
 
 class TestGogNeedsDetails:

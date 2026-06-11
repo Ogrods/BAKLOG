@@ -160,8 +160,6 @@ def _tags_for(item: dict) -> list[str]:
     tags: list[str] = []
     if methods & EA_PLAY_OWNERSHIP and not (methods & REAL_OWNERSHIP):
         tags.append("ea_play")
-    if methods & XGP_ONLY:
-        tags.append("game-pass")
     return tags
 
 
@@ -224,7 +222,6 @@ def _build_row(
         "release_date": None,
         "genres": [],
         "tags": _tags_for(item),
-        "game_pass": bool(_ownership_methods(item) & XGP_ONLY),
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,

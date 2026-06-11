@@ -1,5 +1,5 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
-import { isPro } from './auth-gate.js';
+import { isAccountAuthMode, isPro } from './auth-gate.js';
 import { renderConnectionsProLink } from './pro-view.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';

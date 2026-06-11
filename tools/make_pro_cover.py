@@ -216,7 +216,6 @@ def main(yearly: bool = False):
 
     # --- Logo lockup: mark + wordmark on one baseline ---
     mark_scale = (150 * SS) / MARK_VH
-    mark_w_full = MARK_VW * mark_scale
     wm_track = grotesk_big.size * TRACKING_EM
     wm_w = text_w(grotesk_big, WORDMARK, wm_track)
     wm_bb = d.textbbox((0, 0), "BAKLOG", font=grotesk_big)
@@ -245,7 +244,6 @@ def main(yearly: bool = False):
     badge_x = wm_x + wm_w + 28 * SS
     badge_y = mark_oy + (mh - badge_h) / 2
     badge = Image.new("RGBA", (int(badge_w), int(badge_h)), (0, 0, 0, 0))
-    bd = ImageDraw.Draw(badge)
     bgrad = Image.new("RGB", (int(badge_w), int(badge_h)))
     bp = bgrad.load()
     for yy in range(int(badge_h)):

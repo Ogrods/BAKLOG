@@ -41,7 +41,7 @@ describe('renderProView', () => {
     renderProView();
     const root = document.getElementById('proViewRoot');
     expect(root.innerHTML).toContain(PRO_PROMO.title);
-    expect(root.innerHTML).toContain('Get Pro — $5/mo');
+    expect(root.innerHTML).toContain('Get Pro - $5/mo');
     expect(root.innerHTML).toContain('buy.polar.sh');
     expect(root.querySelector('[data-pro-plan="monthly"]')).toBeTruthy();
     expect(root.querySelector('[data-pro-plan="yearly"]')).toBeTruthy();

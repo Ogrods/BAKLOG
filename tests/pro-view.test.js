@@ -55,6 +55,17 @@ describe('renderProView', () => {
     expect(root.querySelector('[data-pro-license-form]')).toBeTruthy();
   });
 
+  it('shows license field and refresh even when license activation is disabled in config', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.licenseActivationEnabled.mockReturnValue(false);
+    const { renderProView } = await import('../js/pro-view.js');
+    renderProView();
+    const root = document.getElementById('proViewRoot');
+    expect(root.querySelector('[data-pro-license-form]')).toBeTruthy();
+    expect(root.querySelector('[data-pro-refresh]')).toBeTruthy();
+    expect(root.innerHTML).not.toContain('BAKLOG_POLAR_ORG_ID');
+  });
+
   it('switches checkout label and hero banner when monthly plan is selected', async () => {
     const { renderProView, wireProView } = await import('../js/pro-view.js');
     wireProView();

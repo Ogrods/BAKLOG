@@ -141,7 +141,7 @@ def activate_local_license_key(key: str) -> tuple[bool, str]:
     except Exception as exc:  # noqa: BLE001
         return False, f"License activation unavailable ({exc})"
     if not polar_configured():
-        return False, "Set BAKLOG_POLAR_ORG_ID on the server to enable license activation."
+        return False, "License activation isn't available right now. Try again later or contact support."
     cleaned = (key or "").strip()
     if not cleaned:
         return False, "Enter your license key."

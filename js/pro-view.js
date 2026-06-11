@@ -10,7 +10,6 @@ import {
   getAccountProfileId,
   isAccountAuthMode,
   isPro,
-  licenseActivationEnabled,
   proCheckoutUrls,
   refreshAccountPlan,
 } from './auth-gate.js';
@@ -172,24 +171,20 @@ function proActivationHtml() {
         </div>
       </div>`;
   }
-  if (licenseActivationEnabled()) {
-    return `
-      <div class="pro-view-activate">
-        <h3 class="pro-view-section-title">Activate with your license key</h3>
-        <p class="pro-view-note">Subscribe above, then paste the <code>BAKLOG-XXXX</code> license key from your Polar receipt. Validation runs against Polar from this machine only.</p>
-        <form class="pro-view-license" data-pro-license-form>
-          <label class="pro-view-license-label" for="proViewLicenseKey">License key</label>
-          <div class="pro-view-license-row">
-            <input id="proViewLicenseKey" class="pro-view-license-input" type="text" name="license_key" placeholder="BAKLOG-XXXX-XXXX" autocomplete="off" spellcheck="false" />
-            <button type="submit" class="pro-view-btn">Activate</button>
-          </div>
-        </form>
-      </div>`;
-  }
   return `
     <div class="pro-view-activate">
       <h3 class="pro-view-section-title">After checkout</h3>
-      <p class="pro-view-note">Subscribe above, then paste your license key here. Set <code>BAKLOG_POLAR_ORG_ID</code> on the server to enable activation.</p>
+      <p class="pro-view-note">Subscribe above, then paste the <code>BAKLOG-XXXX</code> license key from your Polar receipt.</p>
+      <form class="pro-view-license" data-pro-license-form>
+        <label class="pro-view-license-label" for="proViewLicenseKey">License key</label>
+        <div class="pro-view-license-row">
+          <input id="proViewLicenseKey" class="pro-view-license-input" type="text" name="license_key" placeholder="BAKLOG-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="pro-view-btn">Activate</button>
+        </div>
+      </form>
+      <div class="pro-view-actions">
+        <button type="button" class="pro-view-btn pro-view-btn--ghost" data-pro-refresh>Refresh Pro status</button>
+      </div>
     </div>`;
 }
 

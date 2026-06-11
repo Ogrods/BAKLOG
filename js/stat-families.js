@@ -197,6 +197,17 @@ export function familyForEyebrow(eyebrow) {
     return FAMILY.WILDCARD;
   }
 
+  // Discovery fallbacks (low/no-signal backlog picks).
+  if (matchesAny(e, ['supposedly perfect', 'unreviewed'])) {
+    return FAMILY.RATING;
+  }
+  if (matchesAny(e, ['unplayed'])) {
+    return FAMILY.ACTIVITY;
+  }
+  if (matchesAny(e, ['total mystery', 'complete unknown', 'blank slate', 'no data'])) {
+    return FAMILY.IDENTITY;
+  }
+
   return familyForLabel(e);
 }
 

@@ -30,7 +30,6 @@ import {
   staleBadgeHtml,
   earlyAccessRibbonHtml,
   earlyAccessPillHtml,
-  gamePassBadgeHtml,
   priorityScore,
   formatHours,
   formatDate,
@@ -925,8 +924,27 @@ export function initTablePhoneLayout() {
 }
 let _paintGen = 0;
 const FIRST_CHUNK = 50;
-/** Must match .games-table tbody tr { height } in app.css */
+/** CSS sets .games-table tbody tr { height: 76px }, but on a table row `height`
+ *  is a minimum: borders/padding push the real painted row taller (~82px). The
+ *  virtual-scroll spacer math must use the ACTUAL rendered height or the top
+ *  spacer drifts (start * delta) and the slice repaint shifts content on scroll
+ *  end. ROW_HEIGHT is the bootstrap default; _rowHeightPx is refined from a real
+ *  painted row and used everywhere the math runs. */
 const ROW_HEIGHT = 76;
+let _rowHeightPx = ROW_HEIGHT;
+
+/** Measured (or default) row height used for all virtual-scroll geometry. */
+function rowHeightPx() {
+  return _rowHeightPx;
+}
+
+/** Refresh the cached row height from a freshly painted data row. */
+function refreshMeasuredRowHeight(tbody) {
+  const row = tbody?.querySelector('tr[data-row-index]');
+  if (!row) return;
+  const h = row.getBoundingClientRect().height;
+  if (h > 0 && Math.abs(h - _rowHeightPx) >= 0.5) _rowHeightPx = h;
+}
 export const TABLE_COLSPAN = 14;
 const VIRTUAL_OVERSCAN = 20;
 let _virtualList = null;
@@ -997,7 +1015,8 @@ function getRow0DocY() {
 }
 
 function scrollTopForRowCenter(idx) {
-  const rowCenterY = getRow0DocY() + idx * ROW_HEIGHT + ROW_HEIGHT / 2;
+  const rh = rowHeightPx();
+  const rowCenterY = getRow0DocY() + idx * rh + rh / 2;
   return Math.max(0, rowCenterY - window.innerHeight * 0.42);
 }
 
@@ -1008,7 +1027,8 @@ function scrollToVirtualRowIndex(idx, { behavior = "auto" } = {}) {
 }
 
 function computeVirtualRange(listLen, preferIdx = null) {
-  const minRows = Math.ceil(window.innerHeight / ROW_HEIGHT) + VIRTUAL_OVERSCAN * 2;
+  const rh = rowHeightPx();
+  const minRows = Math.ceil(window.innerHeight / rh) + VIRTUAL_OVERSCAN * 2;
   let start;
   let end;
   if (preferIdx != null && preferIdx >= 0) {
@@ -1017,8 +1037,8 @@ function computeVirtualRange(listLen, preferIdx = null) {
   } else {
     const scrollY = window.scrollY || document.documentElement.scrollTop;
     const row0 = getRow0DocY();
-    start = Math.max(0, Math.floor((scrollY - row0) / ROW_HEIGHT) - VIRTUAL_OVERSCAN);
-    end = Math.min(listLen, Math.ceil((scrollY + window.innerHeight - row0) / ROW_HEIGHT) + VIRTUAL_OVERSCAN);
+    start = Math.max(0, Math.floor((scrollY - row0) / rh) - VIRTUAL_OVERSCAN);
+    end = Math.min(listLen, Math.ceil((scrollY + window.innerHeight - row0) / rh) + VIRTUAL_OVERSCAN);
   }
   if (end - start < minRows) {
     end = Math.min(listLen, start + minRows);
@@ -1096,12 +1116,14 @@ function paintVirtualSlice(start, end) {
   _virtualWindowList = list;
   const run = perfActiveRun();
   const t0 = run ? performance.now() : 0;
-  const topH = start * ROW_HEIGHT;
-  const botH = (list.length - end) * ROW_HEIGHT;
+  const rh = rowHeightPx();
+  const topH = start * rh;
+  const botH = (list.length - end) * rh;
   tbody.innerHTML =
     virtualSpacerHtml("top", topH) +
     appendChunk(list, start, end, ctx) +
     virtualSpacerHtml("bottom", botH);
+  refreshMeasuredRowHeight(tbody);
   if (run) {
     run._lastChunkRange = { start, end, count: end - start };
     run._lastChunkHtmlMs = performance.now() - t0;
@@ -1237,7 +1259,6 @@ function tableRowHtml(g, idx, { isWish }) {
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             ${earlyAccessPillHtml(g)}
-            ${gamePassBadgeHtml(g)}
             ${hiddenGem ? '<span class="text-purple-400 shrink-0" style="cursor: default" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
           </div>
         </div>

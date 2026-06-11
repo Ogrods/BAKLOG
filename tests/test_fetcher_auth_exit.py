@@ -39,17 +39,36 @@ AUTH_EXIT_SCRIPTS_GENERIC = [
 ]
 
 
+def _auth_error_finish_exit_codes(text: str) -> list[str]:
+    """Exit codes from AuthError handlers that return stats.finish (ignores warn-only paths)."""
+    codes: list[str] = []
+    for m in re.finditer(r"^(\s*)except\s+\w*AuthError\b[^:]*:", text, re.MULTILINE):
+        body_prefix = m.group(1) + "    "
+        body_lines: list[str] = []
+        for line in text[m.end():].splitlines():
+            if not line.strip():
+                if body_lines:
+                    body_lines.append(line)
+                continue
+            if line.startswith(body_prefix):
+                body_lines.append(line)
+                continue
+            break
+        chunk = "\n".join(body_lines)
+        if "return stats.finish" not in chunk:
+            continue
+        finish = re.search(r"return\s+stats\.finish\([^)]*exit_code=(\w+)", chunk)
+        if finish:
+            codes.append(finish.group(1))
+    return codes
+
+
 @pytest.mark.parametrize("script", AUTH_EXIT_SCRIPTS)
 def test_auth_error_branches_use_exit_code_4(script: str) -> None:
     text = (ROOT / script).read_text(encoding="utf-8")
     assert "EXIT_CODE_AUTH" in text, f"{script} must import EXIT_CODE_AUTH"
     assert "mark_invalid" in text, f"{script} must call mark_invalid on auth failure"
-    # Every AuthError except block should finish with exit_code=EXIT_CODE_AUTH.
-    blocks = re.findall(
-        r"except\s+\w*AuthError[^:]*:.*?return\s+stats\.finish\([^)]*exit_code=(\w+)",
-        text,
-        flags=re.DOTALL,
-    )
+    blocks = _auth_error_finish_exit_codes(text)
     assert blocks, f"{script} has no AuthError -> stats.finish exit path"
     assert all(code == "EXIT_CODE_AUTH" for code in blocks), (
         f"{script} AuthError branches must use exit_code=EXIT_CODE_AUTH, got {blocks}"

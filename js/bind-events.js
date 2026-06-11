@@ -203,6 +203,10 @@ export function bindEvents() {
       e.preventDefault();
       e.stopPropagation();
       if (!deal.dataset.sponsorHouse) recordSponsoredClick(deal.dataset.sponsorId);
+      if (isProPromoSponsorId(deal.dataset.sponsorId)) {
+        goToProView();
+        return;
+      }
       if (isSafeHttpUrl(deal.dataset.sponsorUrl)) {
         window.open(deal.dataset.sponsorUrl, '_blank', 'noopener,noreferrer');
       }

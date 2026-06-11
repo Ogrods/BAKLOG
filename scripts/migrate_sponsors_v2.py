@@ -107,6 +107,21 @@ HOUSE_DEFAULTS = {
         "scheme": "emerald",
         "enabled": True,
     },
+    "house-spotlight-library": {
+        "kind": "house",
+        "title": "It's just your library",
+        "slogan": "It's not a godsend, it's just your library.",
+        "tagline": (
+            "Every game you already own, deduped across every store "
+            "into one honest backlog. Free and local-first."
+        ),
+        "cta": "Start free",
+        "url": "https://baklog.app/",
+        "cover": "",
+        "art_mode": "logo",
+        "scheme": "sapphire",
+        "enabled": True,
+    },
 }
 
 

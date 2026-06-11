@@ -75,6 +75,7 @@ docs/
 audit/
 admin/
 tracker.html
+tracker-git.html
 preview-bootstrap.html
 IP.md
 tools/make_ads.py

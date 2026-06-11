@@ -317,6 +317,16 @@ export function buildInsightPool(games, snapIn, ctxIn) {
     add(`Most played: <strong>${escapeHtml(byPlay[0].name)}</strong> · ${escapeHtml(formatNum(hrs))}h`);
   }
 
+  const devCounts = {};
+  for (const g of games) {
+    const ng = normalizeGame(g);
+    (ng.developers || g.developers || []).forEach(d => { if (d) devCounts[d] = (devCounts[d] || 0) + 1; });
+  }
+  const favDev = Object.entries(devCounts).sort((a, b) => b[1] - a[1])[0];
+  if (favDev && favDev[1] > 1) {
+    add(`Favorite developer: <strong>${escapeHtml(favDev[0])}</strong> · ${escapeHtml(formatNum(favDev[1]))} games`, METRIC_WEIGHT.moderate);
+  }
+
   const hltbVals = ctxIn ? ctxIn.hltbVals : backlog.map(g => hltbMain(g)).filter(h => h != null && h > 0);
   if (hltbVals.length) {
     const avg = Math.round(hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length);

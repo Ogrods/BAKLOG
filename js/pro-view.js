@@ -40,7 +40,7 @@ function clearActivationPending() {
   licenseActivating = false;
 }
 
-function completeProActivation({ message = 'Pro is active — reloading…', reloadMs = 500 } = {}) {
+function completeProActivation({ message = 'Pro is active - reloading…', reloadMs = 500 } = {}) {
   try {
     sessionStorage.setItem(PRO_WELCOME_STORAGE_KEY, '1');
   } catch (_) { /* private mode */ }
@@ -78,7 +78,7 @@ function setProStatus(message, ok) {
 function successBannerHtml() {
   return `<div class="pro-view-success" role="status">
     <p class="pro-view-success-title">Payment received</p>
-    <p class="pro-view-success-lead">Finish activation below — hosted accounts refresh automatically; local installs paste the license key from your Polar receipt.</p>
+    <p class="pro-view-success-lead">Finish activation below - hosted accounts refresh automatically; local installs paste the license key from your Polar receipt.</p>
   </div>`;
 }
 
@@ -87,7 +87,7 @@ function proFeaturesListHtml({ compact = false } = {}) {
     .map((f) => {
       const icon = f.icon ? `<span class="pro-view-perk-icon" aria-hidden="true">${escapeHtml(f.icon)}</span>` : '';
       if (compact) {
-        return `<li><strong>${escapeHtml(f.title)}</strong> — ${escapeHtml(f.desc)}</li>`;
+        return `<li><strong>${escapeHtml(f.title)}</strong> - ${escapeHtml(f.desc)}</li>`;
       }
       return `<li class="pro-view-perk">
         ${icon}
@@ -156,7 +156,7 @@ function proActivationHtml() {
     return `
       <div class="pro-view-activate">
         <h3 class="pro-view-section-title">After checkout</h3>
-        <p class="pro-view-note">${emailNote} After payment, click refresh — or sign out and back in.</p>
+        <p class="pro-view-note">${emailNote} After payment, click refresh - or sign out and back in.</p>
         <div class="pro-view-actions">
           <button type="button" class="pro-view-btn pro-view-btn--ghost" data-pro-refresh>Refresh Pro status</button>
         </div>
@@ -187,7 +187,7 @@ function proActiveHtml() {
   return `<div class="pro-view-card pro-view-card--active" role="region" aria-label="BAKLOG Pro">
     <p class="pro-view-eyebrow">${escapeHtml(PRO_PROMO.label)}</p>
     <h2 class="pro-view-title">You&apos;re on Pro</h2>
-    <p class="pro-view-lead">Sponsored deal slots are off. Perks roll out on the same open codebase — more conveniences land over time.</p>
+    <p class="pro-view-lead">Sponsored deal slots are off. Perks roll out on the same open codebase - more conveniences land over time.</p>
     <ul class="pro-view-features">${proFeaturesListHtml({ compact: true })}</ul>
   </div>`;
 }
@@ -337,7 +337,7 @@ async function submitProLicense(form) {
       return;
     }
     completeProActivation({
-      message: data.message || 'BAKLOG Pro activated — reloading…',
+      message: data.message || 'BAKLOG Pro activated - reloading…',
       reloadMs: 600,
     });
   } catch {
@@ -358,7 +358,7 @@ export async function handleCheckoutSuccessReturn() {
       completeProActivation();
       return;
     }
-    setProStatus('Payment received. Pro may take a moment — click Refresh Pro status, or paste your license key below.', false);
+    setProStatus('Payment received. Pro may take a moment - click Refresh Pro status, or paste your license key below.', false);
     return;
   }
   setProStatus('Paste the license key from your Polar receipt email to finish activation.', true);
@@ -376,7 +376,7 @@ export function renderConnectionsProLink() {
   el.hidden = false;
   el.innerHTML = `<div class="conn-pro-card conn-pro-card--link" role="region" aria-label="BAKLOG Pro">
     <p class="conn-pro-title">${escapeHtml(PRO_PROMO.label)}</p>
-    <p class="conn-pro-lead">${escapeHtml(PRO_PROMO.title)} — ${escapeHtml(PRO_PROMO.price)}.</p>
+    <p class="conn-pro-lead">${escapeHtml(PRO_PROMO.title)} - ${escapeHtml(PRO_PROMO.price)}.</p>
     <button type="button" class="conn-pro-btn" data-goto-pro-view>View plans &amp; activate</button>
   </div>`;
 }

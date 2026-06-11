@@ -172,10 +172,13 @@ async function main() {
     }
   }
 
+  // Preserve prior keys (needed for partial --css-only / --js-only rebuilds),
+  // but always re-stamp builtAt/version last so a version bump can't be shadowed
+  // by a stale prior manifest (else check:dist-integrity fails forever).
   const manifest = {
+    ...prior,
     builtAt: new Date().toISOString(),
     version: JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version,
-    ...prior,
   };
 
   if (!jsOnly) {

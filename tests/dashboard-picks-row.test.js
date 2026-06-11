@@ -66,23 +66,36 @@ describe('dashboard picks row', () => {
     expect(itchTab).toMatch(/\bhidden\b/);
   });
 
-  it('keeps itch card visible when itch library is empty', () => {
+  it('hides the itch card on a truly-empty new profile', async () => {
+    const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
+    setAuthStatusSnapshot([]);
+    state.itchGames = [];
+    state.games = [];
     applyItchVisibility();
-    const row = document.getElementById('dashboardPicksRow');
     const itch = document.getElementById('dashItchCard');
-    const recent = document.getElementById('dashRecentCard');
-    expect(row.classList.contains('no-itch')).toBe(false);
-    expect(itch.classList.contains('hidden')).toBe(false);
-    expect(recent.classList.contains('hidden')).toBe(false);
+    expect(itch.classList.contains('hidden')).toBe(true);
   });
 
-  it('still keeps itch card visible when itch data exists', () => {
+  it('shows the itch card dimmed when something else is connected but itch is not', async () => {
+    const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
+    setAuthStatusSnapshot([{ key: 'steam', status: 'connected' }]);
+    state.itchGames = [];
+    applyItchVisibility();
+    const itch = document.getElementById('dashItchCard');
+    expect(itch.classList.contains('hidden')).toBe(false);
+    expect(itch.classList.contains('dash-card-itch--inactive')).toBe(true);
+  });
+
+  it('shows the itch card active (not dimmed) when itch data exists', async () => {
+    const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
+    setAuthStatusSnapshot([]);
     state.itchGames = [{ store: 'itch', id: 'a', name: 'Demo' }];
     applyItchVisibility();
     const row = document.getElementById('dashboardPicksRow');
     const itch = document.getElementById('dashItchCard');
     expect(row.classList.contains('no-itch')).toBe(false);
     expect(itch.classList.contains('hidden')).toBe(false);
+    expect(itch.classList.contains('dash-card-itch--inactive')).toBe(false);
   });
 
   it('renders onboarding copy when itch library is empty', async () => {

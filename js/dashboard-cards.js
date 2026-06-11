@@ -26,6 +26,7 @@ import { DASH_STORE_LABELS, DASH_STORE_COLORS } from './dashboard-shared.js';
 import { dashDrillItchGenre } from './dashboard-drilldown.js';
 import { dashboardCharts } from './dashboard-charts.js';
 import { computeRecentAdditions } from './dashboard-spotlight.js';
+import { isItchTabAvailable, connectedProviderCount } from './connections-status.js';
 
 const ITCH_HERO_MIN_RATING = 80;
 const ITCH_HERO_MAX = 30;
@@ -215,10 +216,22 @@ export function renderDashboardCoopSpotlight(games) {
   `;
 }
 
-/** itch recap card is always visible on the picks row (onboarding when library is empty). */
+/**
+ * itch recap card visibility + affiliate dimming.
+ * - Hidden only on a truly-empty new profile (no data, nothing connected) so a
+ *   brand-new dashboard isn't cluttered by an affiliate promo.
+ * - Dimmed (inactive) when itch itself isn't set up yet — the onboarding state —
+ *   while keeping the permanent pink affiliate border.
+ */
 export function applyItchVisibility() {
   document.getElementById("dashboardPicksRow")?.classList.remove("no-itch");
-  document.getElementById("dashItchCard")?.classList.remove("hidden");
+  const card = document.getElementById("dashItchCard");
+  if (!card) return;
+  const itchActive = isItchTabAvailable();
+  const hasAnyData = (state.games || []).length > 0 || (state.itchGames || []).length > 0;
+  const trulyEmpty = !itchActive && !hasAnyData && connectedProviderCount() === 0;
+  card.classList.toggle("hidden", trulyEmpty);
+  card.classList.toggle("dash-card-itch--inactive", !itchActive);
 }
 
 export function renderDashboardSponsoredPick() {

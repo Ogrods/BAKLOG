@@ -109,3 +109,16 @@ def test_runner_helper_detects_corrective_body() -> None:
     assert runner._epic_error_from_text(json.dumps(CORRECTIVE_PAYLOAD)) is not None
     assert runner._epic_error_from_text(json.dumps({"authorizationCode": "abc123def456"})) is None
     assert runner._epic_error_from_text("") is None
+
+
+def test_login_refresh_reraises_corrective_action(tmp_path: Path, monkeypatch) -> None:
+    client = EpicClient(cache_dir=tmp_path, auth_code="unused")
+    client._load_session = lambda: {"refresh_token": "rtok"}  # type: ignore[method-assign]
+    client._request_token = lambda _data: (_ for _ in ()).throw(  # type: ignore[method-assign]
+        EpicCorrectiveActionError(
+            "Epic privacy policy acceptance required",
+            corrective_action="PRIVACY_POLICY_ACCEPTANCE",
+        )
+    )
+    with pytest.raises(EpicCorrectiveActionError):
+        client.login()

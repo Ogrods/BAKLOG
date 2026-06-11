@@ -1095,13 +1095,22 @@ export function doubleDipBacklogCount(games, statusOf) {
 // "Sexual Content"/"Nudity"/"NSFW" as store genres; itch tags carry adult/hentai
 // /eroge markers). This under-counts titles with no enrichment but never needs a
 // new fetch. Refine ADULT_SIGNAL as coverage gaps surface.
-const ADULT_SIGNAL = /\b(?:adult only|adult|nsfw|sexual content|nudity|hentai|eroge|erotic|porn)\b/i;
+const ADULT_SIGNAL = /\b(?:adult only|nsfw|sexual content|nudity|hentai|eroge|erotic|porn)\b/i;
+const ADULT_WORD = /\badult\b/i;
+const ADULT_SWIM = /\badult swim\b/i;
+
+function fieldIsAdultSignal(field) {
+  const s = String(field);
+  if (ADULT_SIGNAL.test(s)) return true;
+  if (ADULT_WORD.test(s) && !ADULT_SWIM.test(s)) return true;
+  return false;
+}
 
 /** Count of owned games flagged adult via existing genres/tags (heuristic). */
 export function adultGameCount(games) {
   const n = (games || []).filter(g => {
     const fields = [...(g.genres || []), ...(g.tags || [])];
-    return fields.some(f => ADULT_SIGNAL.test(String(f)));
+    return fields.some(fieldIsAdultSignal);
   }).length;
   return n > 0 ? n : null;
 }

@@ -12,7 +12,7 @@ import { state } from './state.js';
 import { escapeHtml, formatNum } from './dom-util.js';
 import { renderDashboardFetcherHealth } from './fetcher-health.js';
 import { gameKey, hltbMain, ratingValue, normalizeGame, combinedPlaytime, itchIsGame } from './game-core.js';
-import { getPersonal, countsInLibraryTotal } from './personal-storage.js';
+import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, countUpDurationForDelta, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
@@ -163,13 +163,11 @@ function computeMegaHeroStats(games, snap, agg) {
       storeCountMap[s] = (storeCountMap[s] || 0) + 1;
     }
   }
-  const itchGames = (state.itchGames || []).filter(itchIsGame).filter(countsInLibraryTotal);
-  if (itchGames.length) storeCountMap.itch = (storeCountMap.itch || 0) + itchGames.length;
   const storeKeys = sortStoresByDisplayOrder(Object.keys(storeCountMap));
   const stores = storeKeys.length;
   const years = backlogHrs > 0 ? (backlogHrs / (2 * 365)).toFixed(1) : "0";
   return {
-    total: games.length + itchGames.length,
+    total: games.length,
     backlogHrs,
     playedHrs,
     completion,

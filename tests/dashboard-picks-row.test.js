@@ -63,7 +63,7 @@ describe('dashboard picks row', () => {
     const itchTab = INDEX_HTML.match(/<button[^>]*data-view="itch"[^>]*>/)?.[0] ?? '';
     expect(picksRow).not.toMatch(/\bno-itch\b/);
     expect(itchCard).not.toMatch(/\bhidden\b/);
-    expect(itchTab).toMatch(/\bhidden\b/);
+    expect(itchTab).not.toMatch(/\bhidden\b/);
   });
 
   it('shows the itch card on a truly-empty new profile', async () => {

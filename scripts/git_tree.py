@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import html
 import json
 import shutil
 import subprocess
@@ -85,8 +86,8 @@ def parse_branch_row(line: str) -> dict[str, Any] | None:
     if not line:
         return None
     fields = line.split(_UNIT)
-    # name, sha, upstream, committerdate, subject, author
-    fields += [""] * (6 - len(fields))
+    # name, sha, upstream, committerdate, subject
+    fields += [""] * (5 - len(fields))
     name = fields[0].strip()
     if not name:
         return None
@@ -96,7 +97,6 @@ def parse_branch_row(line: str) -> dict[str, Any] | None:
         "upstream": fields[2].strip(),
         "date": fields[3].strip(),
         "subject": fields[4].strip(),
-        "author": fields[5].strip(),
     }
 
 
@@ -108,7 +108,6 @@ def collect_branches(base: str, current: str) -> list[dict[str, Any]]:
             "%(upstream:short)",
             "%(committerdate:iso8601)",
             "%(contents:subject)",
-            "%(authorname)",
         ]
     )
     rows: list[dict[str, Any]] = []
@@ -131,36 +130,9 @@ def collect_branches(base: str, current: str) -> list[dict[str, Any]]:
     return rows
 
 
-def collect_remotes() -> list[dict[str, Any]]:
-    fmt = _UNIT.join(
-        [
-            "%(refname:short)",
-            "%(objectname:short)",
-            "%(committerdate:iso8601)",
-            "%(contents:subject)",
-        ]
-    )
-    out: list[dict[str, Any]] = []
-    for line in git("for-each-ref", f"--format={fmt}", "refs/remotes").splitlines():
-        fields = line.split(_UNIT)
-        fields += [""] * (4 - len(fields))
-        name = fields[0].strip()
-        if not name or name.endswith("/HEAD"):
-            continue
-        out.append(
-            {
-                "name": name,
-                "sha": fields[1].strip(),
-                "date": fields[2].strip(),
-                "subject": fields[3].strip(),
-            }
-        )
-    return out
-
-
 def collect_commits(limit: int = MAX_COMMITS) -> list[dict[str, Any]]:
     """Structured commits (newest first) for the SVG graph renderer."""
-    fmt = _UNIT.join(["%h", "%p", "%D", "%s", "%an", "%aI"])
+    fmt = _UNIT.join(["%h", "%p", "%D", "%s", "%aI"])
     raw = git(
         "log",
         "--all",
@@ -173,7 +145,7 @@ def collect_commits(limit: int = MAX_COMMITS) -> list[dict[str, Any]]:
         if not line:
             continue
         fields = line.split(_UNIT)
-        fields += [""] * (6 - len(fields))
+        fields += [""] * (5 - len(fields))
         parents = [p for p in fields[1].split() if p]
         refs = [r.strip() for r in fields[2].split(",") if r.strip()]
         commits.append(
@@ -182,8 +154,7 @@ def collect_commits(limit: int = MAX_COMMITS) -> list[dict[str, Any]]:
                 "parents": parents,
                 "refs": refs,
                 "subject": fields[3].strip(),
-                "author": fields[4].strip(),
-                "date": fields[5].strip(),
+                "date": fields[4].strip(),
             }
         )
     return commits
@@ -254,7 +225,6 @@ def build_snapshot() -> dict[str, Any]:
         "dirty": bool(dirty_lines),
         "dirty_count": len(dirty_lines),
         "branches": collect_branches(base, current),
-        "remotes": collect_remotes(),
         "commits": collect_commits(),
         "graph_text": collect_graph_text(),
         "prs": collect_prs(),
@@ -287,7 +257,8 @@ def _render_script() -> str:
                  "#f87171","#60a5fa","#4ade80","#fb923c","#c084fc"];
   function esc(s) {
     return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function ago(iso) {
     if (!iso) return "";
@@ -531,8 +502,8 @@ def _render_script() -> str:
 
 def render_fragment(snapshot: dict[str, Any]) -> str:
     payload = json.dumps(snapshot, ensure_ascii=False).replace("</", "<\\/")
-    return _FRAGMENT_TEMPLATE.replace("__DATA__", payload).replace(
-        "__SCRIPT__", _render_script()
+    return _FRAGMENT_TEMPLATE.replace("__SCRIPT__", _render_script()).replace(
+        "__DATA__", payload
     )
 
 
@@ -543,7 +514,7 @@ def render_html(snapshot: dict[str, Any]) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{snapshot.get("repo", "repo")} — git family tree</title>
+<title>{html.escape(str(snapshot.get("repo", "repo")))} - git family tree</title>
 <style>
 :root {{
   --bg: #0f172a; --bg-panel: #1e293b; --bg-elev: #334155;
@@ -571,7 +542,7 @@ code, pre {{ font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; }
   display: inline-block; padding: 2px 10px; border-radius: 999px;
   font-size: 12px; font-weight: 600;
 }}
-.gt-pill {{ background: var(--bg-elev); color: var(--text-dim); }}
+.gt-pill {{ background: var(--bg-elev); color: var(--text-mute); }}
 .gt-badge-cur {{ background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }}
 .gt-badge-ok {{ background: rgba(52, 211, 153, 0.18); color: #34d399; }}
 .gt-badge-warn {{ background: rgba(251, 191, 36, 0.18); color: #fbbf24; }}
@@ -645,7 +616,7 @@ code, pre {{ font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; }
 .gt-fallback summary {{ cursor: pointer; color: var(--text-mute); padding: 6px 0; }}
 .gt-fallback pre {{
   background: #0b1120; border: 1px solid var(--border-subtle); border-radius: 8px;
-  padding: 12px; overflow-x: auto; font-size: 12px; color: var(--text-dim);
+  padding: 12px; overflow-x: auto; font-size: 12px; color: var(--text-mute);
 }}
 </style>
 </head>

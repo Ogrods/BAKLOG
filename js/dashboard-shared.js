@@ -3,7 +3,7 @@
 
 import { state } from './state.js';
 import { gameKey } from './game-core.js';
-import { filterOutHidden, filterCounted } from './personal-storage.js';
+import { filterOutHidden, filterCounted, libraryGamesBase } from './personal-storage.js';
 import { prefersReducedMotion } from './motion.js';
 import { isPageHidden } from './visibility.js';
 import { STORE_BRAND_COLORS } from './store-brand-colors.js';
@@ -135,5 +135,5 @@ export function animateCount(el, from, to, format, durationMs = 900, opts = {}) 
 }
 
 export function dashboardLibraryGames() {
-  return filterCounted(filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)))));
+  return filterCounted(libraryGamesBase());
 }

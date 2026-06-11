@@ -36,9 +36,20 @@ let _proCheckout = { monthly: '', yearly: '' };
 
 const DEBUG_PRO_STORAGE_KEY = 'baklog-debug-pro';
 
-/** Dev-only Pro override: `?pro=1` or localStorage `baklog-debug-pro=1`. */
-export function isDebugProEnabled() {
+/** True when running on a local dev host (127.0.0.1 / localhost). */
+function isLocalDevHost() {
   if (typeof window === 'undefined') return false;
+  try {
+    const host = (location.hostname || '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Dev-only Pro override: `?pro=1` or localStorage `baklog-debug-pro=1` on localhost only. */
+export function isDebugProEnabled() {
+  if (!isLocalDevHost()) return false;
   try {
     if (localStorage.getItem(DEBUG_PRO_STORAGE_KEY) === '1') return true;
   } catch (_) { /* private mode */ }

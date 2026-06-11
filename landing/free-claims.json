@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-10T02:28:16.129220+00:00",
+  "generated_at": "2026-06-11T23:08:29.203734+00:00",
   "items": [
     {
       "id": "itad-9dcfdf2b0b35",
@@ -19,17 +19,169 @@
       "source": "itad"
     },
     {
+      "id": "epic-warhammer-40k-speed-freeks-12879c",
+      "store": "epic",
+      "title": "Warhammer 40K Speed Freeks",
+      "claim_url": "https://store.epicgames.com/en-US/p/warhammer-40k-speed-freeks-12879c",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/a1af14251fb748fc9bda63bfc260f933/warhammer-40k-speed-freeks-1k4pq.jpg",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-06-18T15:00:00Z",
+      "source": "epic",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3684",
+      "store": "steam",
+      "title": "Eets",
+      "claim_url": "https://www.gamerpower.com/open/eets-steam-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/6100/b97e6e9de18d08941c872fc73abae7c2dc91ccfe/header.jpg?t=1781207036",
+      "genres": [
+        "Casual",
+        "Indie",
+        "Strategy"
+      ],
+      "blurb": "Claim Eets for free on Steam until June 15! Eets is a 2D puzzle game, something like Lemmings meets The Incredible Machine.",
+      "ends_at": "2026-06-15T23:59:00Z",
+      "steam_appid": 6100,
+      "review_percent": 59,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3682",
+      "store": "steam",
+      "title": "The Red Lantern",
+      "claim_url": "https://www.gamerpower.com/open/the-red-lantern-steam-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1053710/library_600x900_2x.jpg",
+      "genres": [
+        "Adventure",
+        "Casual",
+        "Indie",
+        "RPG"
+      ],
+      "blurb": "This giveaway is for the dog lovers! Grab The Red Lantern for free on Steam until June 18! The Red Lantern is a 3d first person dog sledding game with very positive reviews. Don´t miss it!",
+      "ends_at": "2026-06-18T23:59:00Z",
+      "steam_appid": 1053710,
+      "review_percent": 82,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3680",
+      "store": "epic",
+      "title": "The Ouroboros King",
+      "claim_url": "https://www.gamerpower.com/open/the-ouroboros-king-epic-games-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2096510/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Checkmate your boredom! Download The Ouroboros King without any cost via Epic Games Store! The Ouroboros King combines chess with the replayability of roguelikes. Check it out!",
+      "ends_at": "2026-06-18T23:59:00Z",
+      "steam_appid": 2096510,
+      "review_percent": 81,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3679",
+      "store": "steam",
+      "title": "Happy's Humble Burger Farm",
+      "claim_url": "https://www.gamerpower.com/open/happy-s-humble-burger-farm-steam-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1433340/library_600x900_2x.jpg",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Indie",
+        "Simulation"
+      ],
+      "blurb": "Start grilling patties today with this giveaway! Grab Happy’s Humble Burger Farm for free on Steam until June 15. Happy’s Humble Burger Farm is a first-person sim game about serving customers and maintaining a restaurant. Don´t miss it!",
+      "ends_at": "2026-06-15T23:59:00Z",
+      "steam_appid": 1433340,
+      "review_percent": 92,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3678",
+      "store": "itch",
+      "title": "MicroCrawl",
+      "claim_url": "https://www.gamerpower.com/open/microcrawl-itch-io-giveaway",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2250400/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "80s Nostalgia! Get MicroCrawl for free on itch.io! MicroCrawl is a small 2D point-and-click adventure game with a first-person perspective that evokes memories of old-school dungeon crawlers from the 80s.",
+      "ends_at": "2026-06-13T23:59:00Z",
+      "steam_appid": 2250400,
+      "review_percent": 91,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3677",
+      "store": "itch",
+      "title": "Not A Customer",
+      "claim_url": "https://www.gamerpower.com/open/not-a-customer-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4747110/f8247728e4974286b897788cecda406069ab2068/header.jpg?t=1781116480",
+      "genres": [],
+      "blurb": "Download Not A Customer for free on itch.io. Not A Customer is a 3d first person grocery store sim game with old school Playstation 1 graphics. Check it out!",
+      "ends_at": "2026-06-14T23:59:00Z",
+      "steam_appid": 4747110,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3548",
+      "store": "itch",
+      "title": "Static Voice",
+      "claim_url": "https://www.gamerpower.com/open/static-voice-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4207170/5b734a735246cf374806d41ec31076c84772566a/header.jpg?t=1776267157",
+      "genres": [],
+      "blurb": "Claim Static Voice for free on Itch.io! Static Voice is a first-person survival game where you play as a resident of an old Soviet apartment block.",
+      "ends_at": "2026-06-19T23:59:00Z",
+      "steam_appid": 4207170,
+      "review_percent": 93,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3553",
+      "store": "itch",
+      "title": "Sleep Demon",
+      "claim_url": "https://www.gamerpower.com/open/sleep-demon-itchio-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4465030/d04ad74487b126388fee536474bcb258c642239c/header.jpg?t=1773513774",
+      "genres": [],
+      "blurb": "Download Sleep Demon for free on Itch.io until June 14, a indie single player walking simulator game about sleep paralysis.",
+      "ends_at": "2026-06-14T23:59:00Z",
+      "steam_appid": 4465030,
+      "review_percent": 83,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3477",
+      "store": "itch",
+      "title": "CALLUS",
+      "claim_url": "https://www.gamerpower.com/open/callus-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4258330/6bdf7e7240b40e22c54c407ebe860b7397c53fd8/header.jpg?t=1781111625",
+      "genres": [],
+      "blurb": "Want to go for a walk? Grab CALLUS for free on itch.io! Callus is a small indie psychological walking simulator with realistic gameplay.",
+      "ends_at": "2026-06-15T23:59:00Z",
+      "steam_appid": 4258330,
+      "review_percent": 76,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
       "id": "gamerpower-3676",
       "store": "itch",
       "title": "Dire Echo",
       "claim_url": "https://www.gamerpower.com/open/dire-echo-itchio-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3743180/05c22cf5ef7893b5dd61c756ce94e5d5ebfb3d53/header.jpg?t=1780936347",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a27eafa35794.jpg",
       "genres": [],
       "blurb": "Explore deep space with this giveaway. Get Dire Echo for free on itch.io, a 3d sci-fi first-person exploration game featuring impressive visuals.",
       "ends_at": "2026-06-11T23:59:00Z",
       "steam_appid": 3743180,
       "review_percent": 75,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3671",
@@ -40,7 +192,8 @@
       "genres": [],
       "blurb": "Flufftopia is free on itch.io until June 14th 2026. Flufftopia is a small clicker game with a story. Check it out!",
       "ends_at": "2026-06-14T23:59:00Z",
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-2386",
@@ -56,7 +209,8 @@
       "ends_at": "2026-07-01T23:59:59Z",
       "steam_appid": 1180660,
       "review_percent": 82,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3665",
@@ -72,7 +226,8 @@
       "ends_at": "2026-06-14T23:59:00Z",
       "steam_appid": 858710,
       "review_percent": 92,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3266",
@@ -85,7 +240,8 @@
       "ends_at": null,
       "steam_appid": 2081930,
       "review_percent": 85,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3096",
@@ -98,7 +254,8 @@
       "ends_at": "2026-08-01T23:59:59Z",
       "steam_appid": 3102000,
       "review_percent": 76,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3446",
@@ -111,7 +268,8 @@
       "ends_at": null,
       "steam_appid": 1546400,
       "review_percent": 94,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-2204",
@@ -124,7 +282,8 @@
       "ends_at": null,
       "steam_appid": 2299730,
       "review_percent": 86,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-1604",
@@ -135,7 +294,22 @@
       "genres": [],
       "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
       "ends_at": null,
-      "source": "gamerpower"
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "itad-330faa9821bf",
+      "store": "epic",
+      "title": "Guild of Dungeoneering Ultimate Edition",
+      "claim_url": "https://isthereanydeal.com/giveaways/16262/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/317820/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Guild of Dungeoneering Ultimate Edition",
+      "ends_at": null,
+      "steam_appid": 317820,
+      "review_percent": 77,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "itad-f0cffe659c19",
@@ -148,7 +322,8 @@
       "ends_at": null,
       "steam_appid": 2800500,
       "review_percent": 82,
-      "source": "itad"
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "itad-6d00ffeb0fdc",
@@ -161,7 +336,8 @@
       "ends_at": null,
       "steam_appid": 3445980,
       "review_percent": 50,
-      "source": "itad"
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "itad-7a69412dd110",
@@ -174,6 +350,74 @@
       "ends_at": null,
       "steam_appid": 2965380,
       "review_percent": 89,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "itad-0d4598c53ffe",
+      "store": "indiegala",
+      "title": "Mr.Brocco & Co",
+      "claim_url": "https://isthereanydeal.com/giveaways/16196/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Mr.Brocco & Co",
+      "ends_at": null,
+      "steam_appid": 2074560,
+      "review_percent": 83,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "itad-dd5b5b16e035",
+      "store": "indiegala",
+      "title": "The Brave Little Cloud",
+      "claim_url": "https://isthereanydeal.com/giveaways/16143/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "The Brave Little Cloud",
+      "ends_at": null,
+      "steam_appid": 2635070,
+      "review_percent": 97,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "itad-de23882e1f39",
+      "store": "itch",
+      "title": "Smiley Dusty",
+      "claim_url": "https://isthereanydeal.com/giveaways/15746/",
+      "header_image": null,
+      "genres": [],
+      "blurb": "Smiley Dusty",
+      "ends_at": null,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "itad-1b0433806065",
+      "store": "indiegala",
+      "title": "Die Young: Prologue",
+      "claim_url": "https://isthereanydeal.com/giveaways/7433/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
+      "genres": [],
+      "blurb": "Die Young: Prologue",
+      "ends_at": null,
+      "steam_appid": 973000,
+      "review_percent": 78,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "itad-0c69ed1f1bd8",
+      "store": "epic",
+      "title": "Rogue Waters",
+      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Rogue Waters",
+      "ends_at": null,
+      "steam_appid": 1691190,
+      "review_percent": 76,
       "source": "itad"
     },
     {
@@ -200,69 +444,6 @@
       "ends_at": null,
       "steam_appid": 867210,
       "review_percent": 86,
-      "source": "itad"
-    },
-    {
-      "id": "itad-0c69ed1f1bd8",
-      "store": "epic",
-      "title": "Rogue Waters",
-      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Rogue Waters",
-      "ends_at": null,
-      "steam_appid": 1691190,
-      "review_percent": 76,
-      "source": "itad"
-    },
-    {
-      "id": "itad-0d4598c53ffe",
-      "store": "indiegala",
-      "title": "Mr.Brocco & Co",
-      "claim_url": "https://isthereanydeal.com/giveaways/16196/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Mr.Brocco & Co",
-      "ends_at": null,
-      "steam_appid": 2074560,
-      "review_percent": 83,
-      "source": "itad"
-    },
-    {
-      "id": "itad-dd5b5b16e035",
-      "store": "indiegala",
-      "title": "The Brave Little Cloud",
-      "claim_url": "https://isthereanydeal.com/giveaways/16143/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "The Brave Little Cloud",
-      "ends_at": null,
-      "steam_appid": 2635070,
-      "review_percent": 97,
-      "source": "itad"
-    },
-    {
-      "id": "itad-de23882e1f39",
-      "store": "itch",
-      "title": "Smiley Dusty",
-      "claim_url": "https://isthereanydeal.com/giveaways/15746/",
-      "header_image": null,
-      "genres": [],
-      "blurb": "Smiley Dusty",
-      "ends_at": null,
-      "source": "itad"
-    },
-    {
-      "id": "itad-1b0433806065",
-      "store": "indiegala",
-      "title": "Die Young: Prologue",
-      "claim_url": "https://isthereanydeal.com/giveaways/7433/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
-      "genres": [],
-      "blurb": "Die Young: Prologue",
-      "ends_at": null,
-      "steam_appid": 973000,
-      "review_percent": 78,
       "source": "itad"
     }
   ],

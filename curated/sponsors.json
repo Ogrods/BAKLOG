@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": null,
+  "generated_at": "2026-06-11T22:51:53.976Z",
   "ads": {
     "ad-spotlight-hero-emberfall": {
       "kind": "sponsor",
@@ -44,7 +44,6 @@
       "tagline": "Steam, Epic, GOG and more — deduped into one honest list. Free and local-first.",
       "cta": "Start free",
       "url": "https://baklog.app/",
-      "dismissible": true,
       "enabled": true
     },
     "ad-dash-picks-dawnbanner": {

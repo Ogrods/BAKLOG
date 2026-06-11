@@ -1,6 +1,7 @@
 /**
  * BAKLOG Pro purchase splash — dedicated view tab (#pro).
  * Checkout URLs sync with shared/pro_checkout.py + js/pro-checkout.js.
+ * Copy sync pair: PRO_PROMO in js/sponsored-deals.js ↔ landing/index.html paid tier.
  */
 
 import { baklogFetch } from './api-client.js';
@@ -23,6 +24,7 @@ export { isProPromoSponsorId };
 
 let proViewWired = false;
 let checkoutSuccessPending = false;
+let selectedProPlan = 'monthly';
 
 function proCheckoutLink(kind) {
   const urls = proCheckoutUrls();
@@ -52,68 +54,150 @@ function successBannerHtml() {
   </div>`;
 }
 
-function proActiveHtml() {
-  return `<div class="pro-view-card pro-view-card--active" role="region" aria-label="BAKLOG Pro">
-    <p class="pro-view-eyebrow">BAKLOG Pro</p>
-    <h2 class="pro-view-title">You&apos;re on Pro</h2>
-    <p class="pro-view-lead">Sponsored deal slots are off. Perks roll out on the same open codebase — more conveniences land over time.</p>
-    <ul class="pro-view-features">${PRO_PROMO.features.map(f => `<li><strong>${escapeHtml(f.title)}</strong> — ${escapeHtml(f.desc)}</li>`).join('')}</ul>
+function proFeaturesListHtml({ compact = false } = {}) {
+  return PRO_PROMO.features
+    .map((f) => {
+      const icon = f.icon ? `<span class="pro-view-perk-icon" aria-hidden="true">${escapeHtml(f.icon)}</span>` : '';
+      if (compact) {
+        return `<li><strong>${escapeHtml(f.title)}</strong> — ${escapeHtml(f.desc)}</li>`;
+      }
+      return `<li class="pro-view-perk">
+        ${icon}
+        <div class="pro-view-perk-body">
+          <strong>${escapeHtml(f.title)}</strong>
+          <span>${escapeHtml(f.desc)}</span>
+        </div>
+      </li>`;
+    })
+    .join('');
+}
+
+function proCompareHtml() {
+  const head = `<thead><tr>
+    <th scope="col"></th>
+    <th scope="col">Free</th>
+    <th scope="col">Pro</th>
+  </tr></thead>`;
+  const rows = PRO_PROMO.tierCompare
+    .map((row) => `<tr>
+      <th scope="row">${escapeHtml(row.feature)}</th>
+      <td>${escapeHtml(row.free)}</td>
+      <td>${escapeHtml(row.pro)}</td>
+    </tr>`)
+    .join('');
+  return `<div class="pro-view-compare-wrap">
+    <h3 class="pro-view-section-title">What stays free vs what Pro adds</h3>
+    <p class="pro-view-compare-lead">Import, browse, and decide what to play next stay on the free tier. Pro layers on power-user conveniences.</p>
+    <table class="pro-view-compare" aria-label="Free vs Pro">${head}<tbody>${rows}</tbody></table>
   </div>`;
 }
 
-function proPitchHtml({ showSuccess = false } = {}) {
+function proTrustHtml() {
+  const items = PRO_PROMO.trustPoints
+    .map((point) => `<li>${escapeHtml(point)}</li>`)
+    .join('');
+  return `<div class="pro-view-trust" role="note" aria-label="Trust and privacy">
+    <ul class="pro-view-trust-list">${items}</ul>
+  </div>`;
+}
+
+function proPricingHtml() {
   const monthly = escapeAttr(proCheckoutLink('monthly'));
   const yearly = escapeAttr(proCheckoutLink('yearly'));
-  const features = PRO_PROMO.features
-    .map(f => `<li><strong>${escapeHtml(f.title)}</strong><span>${escapeHtml(f.desc)}</span></li>`)
-    .join('');
+  const monthlyPressed = selectedProPlan === 'monthly' ? 'true' : 'false';
+  const yearlyPressed = selectedProPlan === 'yearly' ? 'true' : 'false';
+  const checkoutHref = selectedProPlan === 'yearly' ? yearly : monthly;
+  const checkoutLabel = selectedProPlan === 'yearly' ? PRO_PROMO.ctaYearly : PRO_PROMO.cta;
 
-  let activationBlock = '';
+  return `<div class="pro-view-pricing">
+    <div class="pro-view-toggle" role="group" aria-label="Billing interval">
+      <button type="button" class="pro-view-toggle-btn${selectedProPlan === 'monthly' ? ' is-active' : ''}" data-pro-plan="monthly" aria-pressed="${monthlyPressed}">Monthly · $5/mo</button>
+      <button type="button" class="pro-view-toggle-btn${selectedProPlan === 'yearly' ? ' is-active' : ''}" data-pro-plan="yearly" aria-pressed="${yearlyPressed}">Yearly · $50/yr <span class="pro-view-save">Save $10</span></button>
+    </div>
+    <a class="pro-view-btn pro-view-btn--primary" data-pro-checkout href="${checkoutHref}" target="_blank" rel="noopener noreferrer">${escapeHtml(checkoutLabel)}</a>
+    <p class="pro-view-founder">${escapeHtml(PRO_PROMO.founderNote)}</p>
+  </div>`;
+}
+
+function proActivationHtml() {
   if (isAccountAuthMode()) {
     const email = getAccountEmail();
     const emailNote = email
       ? `Checkout with <strong>${escapeHtml(email)}</strong> so Pro links to this account.`
       : 'Use the same email as your BAKLOG account at checkout.';
-    activationBlock = `
-      <p class="pro-view-note">${emailNote} After payment, click refresh — or sign out and back in.</p>
-      <div class="pro-view-actions">
-        <a class="pro-view-btn" href="${monthly}" target="_blank" rel="noopener noreferrer">Get Pro — $5/mo</a>
-        <a class="pro-view-btn pro-view-btn--ghost" href="${yearly}" target="_blank" rel="noopener noreferrer">$50/yr (save $10)</a>
-        <button type="button" class="pro-view-btn pro-view-btn--ghost" data-pro-refresh>Refresh Pro status</button>
-      </div>`;
-  } else if (licenseActivationEnabled()) {
-    activationBlock = `
-      <p class="pro-view-note">Subscribe, then paste the <code>BAKLOG-XXXX</code> license key from your Polar receipt. Validation runs against Polar from this machine only.</p>
-      <div class="pro-view-actions">
-        <a class="pro-view-btn" href="${monthly}" target="_blank" rel="noopener noreferrer">Get Pro — $5/mo</a>
-        <a class="pro-view-btn pro-view-btn--ghost" href="${yearly}" target="_blank" rel="noopener noreferrer">$50/yr (save $10)</a>
-      </div>
-      <form class="pro-view-license" data-pro-license-form>
-        <label class="pro-view-license-label" for="proViewLicenseKey">License key</label>
-        <div class="pro-view-license-row">
-          <input id="proViewLicenseKey" class="pro-view-license-input" type="text" name="license_key" placeholder="BAKLOG-XXXX-XXXX" autocomplete="off" spellcheck="false" />
-          <button type="submit" class="pro-view-btn">Activate</button>
+    return `
+      <div class="pro-view-activate">
+        <h3 class="pro-view-section-title">After checkout</h3>
+        <p class="pro-view-note">${emailNote} After payment, click refresh — or sign out and back in.</p>
+        <div class="pro-view-actions">
+          <button type="button" class="pro-view-btn pro-view-btn--ghost" data-pro-refresh>Refresh Pro status</button>
         </div>
-      </form>`;
-  } else {
-    activationBlock = `
-      <p class="pro-view-note">Subscribe on Polar, then paste your license key here. Set <code>BAKLOG_POLAR_ORG_ID</code> on the server to enable activation.</p>
-      <div class="pro-view-actions">
-        <a class="pro-view-btn" href="${monthly}" target="_blank" rel="noopener noreferrer">Get Pro — $5/mo</a>
-        <a class="pro-view-btn pro-view-btn--ghost" href="${yearly}" target="_blank" rel="noopener noreferrer">$50/yr (save $10)</a>
       </div>`;
   }
+  if (licenseActivationEnabled()) {
+    return `
+      <div class="pro-view-activate">
+        <h3 class="pro-view-section-title">Activate with your license key</h3>
+        <p class="pro-view-note">Subscribe above, then paste the <code>BAKLOG-XXXX</code> license key from your Polar receipt. Validation runs against Polar from this machine only.</p>
+        <form class="pro-view-license" data-pro-license-form>
+          <label class="pro-view-license-label" for="proViewLicenseKey">License key</label>
+          <div class="pro-view-license-row">
+            <input id="proViewLicenseKey" class="pro-view-license-input" type="text" name="license_key" placeholder="BAKLOG-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+            <button type="submit" class="pro-view-btn">Activate</button>
+          </div>
+        </form>
+      </div>`;
+  }
+  return `
+    <div class="pro-view-activate">
+      <h3 class="pro-view-section-title">After checkout</h3>
+      <p class="pro-view-note">Subscribe above, then paste your license key here. Set <code>BAKLOG_POLAR_ORG_ID</code> on the server to enable activation.</p>
+    </div>`;
+}
 
+function proActiveHtml() {
+  return `<div class="pro-view-card pro-view-card--active" role="region" aria-label="BAKLOG Pro">
+    <p class="pro-view-eyebrow">${escapeHtml(PRO_PROMO.label)}</p>
+    <h2 class="pro-view-title">You&apos;re on Pro</h2>
+    <p class="pro-view-lead">Sponsored deal slots are off. Perks roll out on the same open codebase — more conveniences land over time.</p>
+    <ul class="pro-view-features">${proFeaturesListHtml({ compact: true })}</ul>
+  </div>`;
+}
+
+function proPitchHtml({ showSuccess = false } = {}) {
   return `${showSuccess ? successBannerHtml() : ''}
-    <div class="pro-view-card" role="region" aria-label="BAKLOG Pro">
-      <p class="pro-view-eyebrow">${escapeHtml(PRO_PROMO.label)}</p>
-      <h2 class="pro-view-title">${escapeHtml(PRO_PROMO.title)}</h2>
-      <p class="pro-view-price">${escapeHtml(PRO_PROMO.price)}</p>
-      <p class="pro-view-lead">${escapeHtml(PRO_PROMO.tagline)}</p>
-      <ul class="pro-view-features">${features}</ul>
-      ${activationBlock}
+    <div class="pro-view-funnel" role="region" aria-label="BAKLOG Pro">
+      <header class="pro-view-hero">
+        <p class="pro-view-eyebrow">${escapeHtml(PRO_PROMO.label)}</p>
+        <h1 class="pro-view-headline">${escapeHtml(PRO_PROMO.title)}</h1>
+        <p class="pro-view-subhead">${escapeHtml(PRO_PROMO.tagline)}</p>
+      </header>
+      ${proPricingHtml()}
+      <section class="pro-view-perks" aria-label="Pro features">
+        <h3 class="pro-view-section-title">Everything in Pro</h3>
+        <ul class="pro-view-perk-grid">${proFeaturesListHtml()}</ul>
+      </section>
+      ${proCompareHtml()}
+      ${proTrustHtml()}
+      ${proActivationHtml()}
       <p id="proViewStatus" class="pro-view-status" hidden></p>
     </div>`;
+}
+
+function applyProPlanToggle(root, plan) {
+  selectedProPlan = plan === 'yearly' ? 'yearly' : 'monthly';
+  const monthly = proCheckoutLink('monthly');
+  const yearly = proCheckoutLink('yearly');
+  root.querySelectorAll('[data-pro-plan]').forEach((btn) => {
+    const active = btn.dataset.proPlan === selectedProPlan;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  const checkout = root.querySelector('[data-pro-checkout]');
+  if (checkout) {
+    checkout.href = selectedProPlan === 'yearly' ? yearly : monthly;
+    checkout.textContent = selectedProPlan === 'yearly' ? PRO_PROMO.ctaYearly : PRO_PROMO.cta;
+  }
 }
 
 export function renderProView({ showSuccess = false } = {}) {
@@ -124,6 +208,7 @@ export function renderProView({ showSuccess = false } = {}) {
     return;
   }
   el.innerHTML = proPitchHtml({ showSuccess: showSuccess || checkoutSuccessPending });
+  applyProPlanToggle(el, selectedProPlan);
 }
 
 export function applyProTabVisibility() {
@@ -230,8 +315,8 @@ export function renderConnectionsProLink() {
   }
   el.hidden = false;
   el.innerHTML = `<div class="conn-pro-card conn-pro-card--link" role="region" aria-label="BAKLOG Pro">
-    <p class="conn-pro-title">BAKLOG Pro</p>
-    <p class="conn-pro-lead">Power-user conveniences — bulk refresh, cloud sync, no sponsored cards. $5/mo or $50/yr.</p>
+    <p class="conn-pro-title">${escapeHtml(PRO_PROMO.label)}</p>
+    <p class="conn-pro-lead">${escapeHtml(PRO_PROMO.title)} — ${escapeHtml(PRO_PROMO.price)}.</p>
     <button type="button" class="conn-pro-btn" data-goto-pro-view>View plans &amp; activate</button>
   </div>`;
 }
@@ -248,6 +333,12 @@ export function wireProView() {
     submitProLicense(form);
   });
   root.addEventListener('click', async (ev) => {
+    const planBtn = ev.target.closest('[data-pro-plan]');
+    if (planBtn) {
+      ev.preventDefault();
+      applyProPlanToggle(document.getElementById('proViewRoot'), planBtn.dataset.proPlan);
+      return;
+    }
     if (ev.target.closest('[data-goto-pro-view]')) {
       ev.preventDefault();
       goToProView();

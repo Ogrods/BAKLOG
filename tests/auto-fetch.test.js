@@ -259,9 +259,11 @@ describe('maybeAutoFetchStale24h', () => {
     expect(runFn).not.toHaveBeenCalled();
   });
 
-  it('picks the stalest eligible store fetcher', () => {
+  it('picks the stalest eligible store fetcher, skipping local launchers', () => {
     const runFn = vi.fn();
     const setLastRun = vi.fn();
+    // gog is the stalest but is a local launcher (autoFetch:false), so the next
+    // stalest web store (steam) wins instead.
     const freshness = (src) => ({
       ageMs: src.key === 'gog' ? AUTO_STALE_AGE_MS + 50_000 : AUTO_STALE_AGE_MS + 10_000,
     });
@@ -281,8 +283,31 @@ describe('maybeAutoFetchStale24h', () => {
       runFn,
     });
     expect(ok).toBe(true);
-    expect(runFn).toHaveBeenCalledWith('gog', { auto: true });
+    expect(runFn).toHaveBeenCalledWith('steam', { auto: true });
     expect(setLastRun).toHaveBeenCalled();
+  });
+
+  it('does not auto-fetch a local launcher even when it is the only stale store', () => {
+    const runFn = vi.fn();
+    const ok = maybeAutoFetchStale24h({
+      isApiAvailable: () => true,
+      inFlightCount: () => 0,
+      now: Date.now(),
+      getLastRun: () => 0,
+      setLastRun: vi.fn(),
+      sources: [
+        { key: 'gog', label: 'GOG', group: 'library', metaKey: 'gog', missingRequirements: [] },
+      ],
+      fetcherFreshness: () => ({ ageMs: AUTO_STALE_AGE_MS + 99_999 }),
+      fetcherCredentialsSatisfied: () => true,
+      stateFor: () => null,
+      authCooldownRemainingMs: () => 0,
+      isFetcherDisconnected: () => false,
+      isFetcherReconnectRequired: () => false,
+      runFn,
+    });
+    expect(ok).toBe(false);
+    expect(runFn).not.toHaveBeenCalled();
   });
 
   it('still runs while the page is hidden (minimized/unfocused window)', () => {

@@ -56,7 +56,7 @@ import {
 } from './deals.js';
 import { isPlatformToken } from './genres.js';
 import { syncCoverFits } from './covers.js';
-import { getAdsForLocation, pickLocationForView, sponsoredTableRowHtml } from './sponsored-deals.js';
+import { getAdsForLocation, pickLocationForView, rotateLocationAd, sponsoredTableRowHtml } from './sponsored-deals.js';
 import {
   getPersonal,
   setPersonal,
@@ -1143,11 +1143,16 @@ function appendChunk(list, start, end, ctx) {
   const t0 = run ? performance.now() : 0;
   const out = [];
   const rowLoc = resolveTableRowLocation();
-  const tableAd = SPONSORED_TABLE_SLOT >= start && SPONSORED_TABLE_SLOT < end
+  // Anchor the ad to the fixed slot, but on short (drilled) lists fall back to
+  // the last row so the row ad still appears instead of being dropped because
+  // index 5 was never rendered.
+  const total = list.length;
+  const slot = total > SPONSORED_TABLE_SLOT ? SPONSORED_TABLE_SLOT : Math.max(0, total - 1);
+  const tableAd = total > 0 && slot >= start && slot < end
     ? getAdsForLocation(rowLoc)[0]
     : null;
   for (let i = start; i < end; i++) {
-    if (tableAd && i === SPONSORED_TABLE_SLOT) out.push(sponsoredTableRowHtml(tableAd, { ...ctx, locationKey: rowLoc }));
+    if (tableAd && i === slot) out.push(sponsoredTableRowHtml(tableAd, { ...ctx, locationKey: rowLoc }));
     out.push(tableRowHtml(list[i], i, ctx));
   }
   const html = out.join("");
@@ -1454,6 +1459,10 @@ export async function renderTable(opts) {
     return;
   }
   noteTableRender();
+  // Rotate the row ad on each real (re)render — drill-ins, filters, sorts — so
+  // it isn't pinned to one creative all session. Scroll re-renders go through
+  // the virtual-window path (not renderTable), so this never flickers mid-scroll.
+  rotateLocationAd(resolveTableRowLocation());
   const loaderToken = drillIn ? 0 : beginRowLoader();
   try {
   // drillIn uses the view overlay; in-tab filter/sort uses the row pill only

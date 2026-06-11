@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BAKLOG email signature preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 32px 20px 64px;
+    }
+    h1 { margin: 0 0 8px; font-size: 22px; font-weight: 700; }
+    .intro { margin: 0 0 28px; color: #64748b; font-size: 14px; max-width: 640px; line-height: 1.5; }
+    .panel {
+      max-width: 640px;
+      margin-bottom: 24px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+    }
+    .panel-head {
+      background: #0f172a;
+      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 10px 18px;
+    }
+    .panel-body { background: #fff; padding: 28px 24px; }
+    .gmail-mock {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px 18px;
+      background: #fff;
+    }
+    .fake-body {
+      color: #334155;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .note { margin-top: 12px; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+    pre {
+      margin: 0;
+      padding: 14px 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <h1>BAKLOG email signature preview</h1>
+  <p class="intro">
+    Full lockup (mark + wordmark) on white. For Gmail, paste the HTML below after deploying
+    <code>landing/</code> so the logo loads from
+    <code>https://baklog.app/assets/email-logo.png</code>.
+  </p>
+
+  <div class="panel">
+    <div class="panel-head">Signature on white (recommended)</div>
+    <div class="panel-body">
+      <div class="gmail-mock">
+        <div class="fake-body">
+          Hi, thanks for reaching out about BAKLOG.<br><br>
+          Happy to chat more whenever works for you.<br><br>
+          Best,
+        </div>
+        <table cellpadding="0" cellspacing="0" border="0" style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;font-size:14px;line-height:1.5;">
+          <tr>
+            <td style="vertical-align:top;">
+              <img src="/landing/assets/email-logo.png" width="220" height="62" alt="BAKLOG" style="display:block;margin-bottom:12px;">
+              <div style="font-weight:700;color:#0f172a;">Dan Ogrodnik</div>
+              <div style="color:#64748b;font-size:13px;">Founder</div>
+              <div style="margin-top:6px;font-size:13px;">
+                <a href="mailto:dan@baklog.app" style="color:#0284c7;text-decoration:none;">dan@baklog.app</a>
+                <span style="color:#cbd5e1;">&nbsp;&middot;&nbsp;</span>
+                <a href="https://baklog.app" style="color:#0284c7;text-decoration:none;">baklog.app</a>
+              </div>
+              <div style="margin-top:8px;color:#94a3b8;font-size:12px;font-style:italic;">One honest backlog across every store.</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <p class="note">Lockup is 640&times;180 PNG with transparent background. Display at 220px wide in email clients.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Paste into Gmail (Settings &gt; Signature)</div>
+    <div class="panel-body">
+      <pre id="gmail-snippet">&lt;table cellpadding="0" cellspacing="0" border="0" style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;font-size:14px;line-height:1.5;"&gt;
+  &lt;tr&gt;
+    &lt;td style="vertical-align:top;"&gt;
+      &lt;img src="https://baklog.app/assets/email-logo.png" width="220" height="62" alt="BAKLOG" style="display:block;margin-bottom:12px;"&gt;
+      &lt;div style="font-weight:700;color:#0f172a;"&gt;Dan Ogrodnik&lt;/div&gt;
+      &lt;div style="color:#64748b;font-size:13px;"&gt;Founder&lt;/div&gt;
+      &lt;div style="margin-top:6px;font-size:13px;"&gt;
+        &lt;a href="mailto:dan@baklog.app" style="color:#0284c7;text-decoration:none;"&gt;dan@baklog.app&lt;/a&gt;
+        &lt;span style="color:#cbd5e1;"&gt;&amp;nbsp;&amp;middot;&amp;nbsp;&lt;/span&gt;
+        &lt;a href="https://baklog.app" style="color:#0284c7;text-decoration:none;"&gt;baklog.app&lt;/a&gt;
+      &lt;/div&gt;
+      &lt;div style="margin-top:8px;color:#94a3b8;font-size:12px;font-style:italic;"&gt;One honest backlog across every store.&lt;/div&gt;
+    &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;</pre>
+    </div>
+  </div>
+</body>
+</html>

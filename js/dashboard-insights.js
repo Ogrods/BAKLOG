@@ -49,7 +49,6 @@ import {
   acquireToPlayDaysAvg,
   dayOnePlayerCount,
   extraInningsAvg,
-  gamePassCount,
   doubleDipCount,
   costPerFinish,
   sunkCostUnplayed,
@@ -998,10 +997,6 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
   const extraInn = extraInningsAvg(snap);
   if (extraInn != null) {
     push('~', 'is-amber', `${formatNum(extraInn)}h`, 'extra innings', null, { weight: W.moderate });
-  }
-  const gpCount = gamePassCount(snap);
-  if (gpCount != null) {
-    push('*', 'is-violet', formatNum(gpCount), "subscriber's dividend", null, { weight: W.friendly });
   }
   const dDips = doubleDipCount();
   if (dDips != null) {

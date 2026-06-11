@@ -314,7 +314,6 @@ export function bindEvents() {
     statusFilter:     el => ({ key: "statusFilter",    val: el.value }),
     unplayedOnly:     el => ({ key: "unplayedOnly",    val: !!el.checked }),
     earlyAccessOnly:  el => ({ key: "earlyAccessOnly", val: !!el.checked }),
-    gamePassOnly:     el => ({ key: "gamePassOnly", val: !!el.checked }),
     minRating:        el => ({ key: "minRating",       val: +el.value || 0 }),
     maxHours:         el => ({ key: "maxHours",        val: +el.value || 0 }),
   };

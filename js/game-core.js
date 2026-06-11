@@ -5,7 +5,7 @@ import {
   isCleanupCandidateFromParts,
 } from './state.js';
 import { escapeHtml, escapeAttr } from './dom-util.js';
-import { isEarlyAccess, isGamePass } from './table-query.js';
+import { isEarlyAccess } from './table-query.js';
 import { STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { getPersonal, hasPersonalEntry } from './personal-storage.js';
 import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
@@ -614,12 +614,6 @@ export function earlyAccessRibbonHtml(g, { label = "EARLY ACCESS" } = {}) {
 
 export function earlyAccessPillHtml(g) {
   return isEarlyAccess(g) ? '<span class="ea-pill" title="Early Access">EA</span>' : "";
-}
-
-export function gamePassBadgeHtml(g) {
-  return isGamePass(g)
-    ? '<span class="game-pass-pill" title="Xbox Game Pass or EA Play via subscription">GP</span>'
-    : "";
 }
 
 export function coopPillsHtml(g) {

@@ -92,6 +92,27 @@ def image_urls(appid: int) -> tuple[str, str]:
     )
 
 
+def image_url_ok(url: str) -> bool:
+    """True only when the Steam CDN actually serves an image at ``url``.
+
+    Steam returns a 200-less ``text/html`` 404 stub for apps whose store art
+    isn't published yet (coming-soon / unreleased titles such as wishlist
+    pre-orders). Writing those steamstatic URLs blind made the enricher claim
+    success while the row rendered a broken/blank cover — so verify before use.
+    """
+    if not url:
+        return False
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=10, stream=True)
+        try:
+            ctype = (r.headers.get("Content-Type") or "").lower()
+            return r.status_code == 200 and ctype.startswith("image")
+        finally:
+            r.close()
+    except Exception:
+        return False
+
+
 def needs_images(g: dict) -> bool:
     lib = g.get("library_image") or ""
     hdr = g.get("header_image") or ""
@@ -120,10 +141,25 @@ def needs_lowres_upgrade(g: dict) -> bool:
     return True
 
 
+def is_steam_search_steamstatic(g: dict) -> bool:
+    """A row already enriched from Steam search with a steamstatic image.
+
+    These can hold a dead 404 URL when the matched app was unreleased at
+    enrich time; we revalidate them once (cached) so stale broken covers heal.
+    """
+    if g.get("image_source") not in ("steam_search", "steam_search_upgrade"):
+        return False
+    lib = g.get("library_image") or ""
+    hdr = g.get("header_image") or ""
+    return is_steamstatic_url(lib) or is_steamstatic_url(hdr)
+
+
 def should_process(g: dict, *, upgrade_lowres: bool) -> bool:
     if needs_images(g):
         return True
     if upgrade_lowres and needs_lowres_upgrade(g):
+        return True
+    if is_steam_search_steamstatic(g):
         return True
     return False
 
@@ -163,17 +199,23 @@ def main() -> int:
     # so a re-click doesn't waste a Steam search hit on Hearthstone again.
     no_steam_match: set[str] = set(meta.get("no_steam_match", []))
     lowres_checked: set[str] = set(meta.get("lowres_checked", []))
+    # Rows whose existing steam_search steamstatic cover we've confirmed is live
+    # (HTTP 200 image). Skips re-checking the same good URL every run.
+    steam_validated: set[str] = set(meta.get("steam_validated", []))
     if args.retry_misses:
         print(f"--retry-misses: clearing {len(no_steam_match)} cached non-matches", flush=True)
         no_steam_match.clear()
         print(f"--retry-misses: clearing {len(lowres_checked)} cached low-res checks", flush=True)
         lowres_checked.clear()
+        print(f"--retry-misses: clearing {len(steam_validated)} cached cover validations", flush=True)
+        steam_validated.clear()
     cache_lock = Lock()
 
     def process(g: dict, store: str) -> dict | None:
         missing = needs_images(g)
         upgrading = args.upgrade_lowres and needs_lowres_upgrade(g)
-        if not missing and not upgrading:
+        revalidating = not missing and not upgrading and is_steam_search_steamstatic(g)
+        if not missing and not upgrading and not revalidating:
             return None
         key = f"{store}:{g.get('id')}"
         with cache_lock:
@@ -181,6 +223,27 @@ def main() -> int:
                 return None
             if upgrading and key in lowres_checked:
                 return None
+            if revalidating and key in steam_validated:
+                return None
+
+        # Heal stale rows: a previously written steam_search cover may now be a
+        # dead 404 (matched while the app was unreleased). Confirm it still
+        # serves an image; if so cache it, else clear it so the broken cover
+        # stops rendering and the row can re-enrich later.
+        if revalidating:
+            if image_url_ok(g.get("library_image") or ""):
+                with cache_lock:
+                    steam_validated.add(key)
+                return None
+            cleared = dict(g)
+            cleared["header_image"] = None
+            cleared["library_image"] = None
+            cleared["steam_appid"] = None
+            cleared["image_source"] = None
+            with cache_lock:
+                no_steam_match.add(key)
+            return cleared
+
         appid = g.get("steam_appid")
         if not appid:
             appid = steam_search_appid(g.get("name", ""))
@@ -191,6 +254,15 @@ def main() -> int:
                     lowres_checked.add(key)
             return None
         header, library = image_urls(appid)
+        # Only assign art that the CDN actually serves. Unreleased / coming-soon
+        # apps resolve to a Steam appid but 404 on their image URLs, which used
+        # to be written blindly and rendered as a blank cover.
+        if not image_url_ok(library):
+            with cache_lock:
+                no_steam_match.add(key)
+                if upgrading:
+                    lowres_checked.add(key)
+            return None
         g = dict(g)
         g["header_image"] = header
         g["library_image"] = library
@@ -199,6 +271,7 @@ def main() -> int:
         with cache_lock:
             if upgrading:
                 lowres_checked.add(key)
+            steam_validated.add(key)
         return g
 
     for rel, store, row_filter in STORE_FILES:
@@ -265,6 +338,7 @@ def main() -> int:
                 "last_updated": updated,
                 "no_steam_match": sorted(no_steam_match),
                 "lowres_checked": sorted(lowres_checked),
+                "steam_validated": sorted(steam_validated),
             },
             indent=2,
         ),

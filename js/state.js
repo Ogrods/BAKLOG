@@ -78,7 +78,6 @@ export const state = {
     statusFilter: "",
     unplayedOnly: false,
     earlyAccessOnly: false,
-    gamePassOnly: false,
     staleOnly: false,
     minRating: 0,
     maxHours: 200,

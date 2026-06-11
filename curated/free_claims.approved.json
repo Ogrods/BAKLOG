@@ -1,18 +1,29 @@
 {
   "ids": [
+    "epic-warhammer-40k-speed-freeks-12879c",
     "gamerpower-1604",
     "gamerpower-2204",
     "gamerpower-2386",
     "gamerpower-3096",
     "gamerpower-3266",
     "gamerpower-3446",
+    "gamerpower-3477",
+    "gamerpower-3548",
+    "gamerpower-3553",
     "gamerpower-3665",
     "gamerpower-3671",
     "gamerpower-3676",
+    "gamerpower-3677",
+    "gamerpower-3678",
+    "gamerpower-3679",
+    "gamerpower-3680",
+    "gamerpower-3682",
+    "gamerpower-3684",
     "itad-073a56345192",
     "itad-0c69ed1f1bd8",
     "itad-0d4598c53ffe",
     "itad-1b0433806065",
+    "itad-330faa9821bf",
     "itad-6d00ffeb0fdc",
     "itad-7a69412dd110",
     "itad-b07aac9ebd26",
@@ -47,6 +58,15 @@
     "gamerpower-3446": {
       "title": "GigaBash"
     },
+    "gamerpower-3477": {
+      "title": "CALLUS"
+    },
+    "gamerpower-3548": {
+      "title": "Static Voice"
+    },
+    "gamerpower-3553": {
+      "title": "Sleep Demon"
+    },
     "gamerpower-3665": {
       "title": "Gravity Circuit"
     },
@@ -55,6 +75,24 @@
     },
     "gamerpower-3676": {
       "title": "Dire Echo"
+    },
+    "gamerpower-3677": {
+      "title": "Not A Customer"
+    },
+    "gamerpower-3678": {
+      "title": "MicroCrawl"
+    },
+    "gamerpower-3679": {
+      "title": "Happy's Humble Burger Farm"
+    },
+    "gamerpower-3680": {
+      "title": "The Ouroboros King"
+    },
+    "gamerpower-3682": {
+      "title": "The Red Lantern"
+    },
+    "gamerpower-3684": {
+      "title": "Eets"
     },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
@@ -68,9 +106,12 @@
     "itad-1b0433806065": {
       "title": "Die Young: Prologue"
     },
+    "itad-330faa9821bf": {
+      "title": "Guild of Dungeoneering Ultimate Edition"
+    },
     "itad-6d00ffeb0fdc": {
-      "title": "Another World Adventures",
-      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures"
+      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
+      "title": "Another World Adventures"
     },
     "itad-7a69412dd110": {
       "title": "Relaxing Simulator"
@@ -85,8 +126,8 @@
       "title": "Smiley Dusty"
     },
     "itad-f0cffe659c19": {
-      "title": "Blacklist Mafia",
-      "claim_url": "https://freebies.indiegala.com/blacklist-mafia"
+      "claim_url": "https://freebies.indiegala.com/blacklist-mafia",
+      "title": "Blacklist Mafia"
     }
   },
   "dismissed": [
@@ -106,6 +147,13 @@
     "gamerpower-3272",
     "itad-50a2b5b1d7a6",
     "itad-047270155013",
-    "gamerpower-3279"
+    "gamerpower-3279",
+    "itad-8738c881d524",
+    "epic-the-ouroboros-king-e1d547",
+    "itad-d2d983178b48",
+    "itad-caf022eee569",
+    "itad-8ca7cd481f36",
+    "gamerpower-3681",
+    "itad-0d845ad1210c"
   ]
 }

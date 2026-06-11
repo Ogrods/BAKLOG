@@ -126,7 +126,7 @@ export const METRIC_TIPS = {
   'PSN library tenure': 'Years since your earliest recorded PSN first_played date.',
   'session grinder': 'High session count relative to hours played (short repeat launches).',
 
-  // New-data sabermetrics (Metacritic, acquired_at, early access, controller, HLTB depth, Game Pass, cross-store)
+  // New-data sabermetrics (Metacritic, acquired_at, early access, controller, HLTB depth, cross-store)
   'critic gap (avg)': 'Mean |Steam review % − Metacritic| across games with both scores.',
   "people's champ": 'Owned title with the biggest positive critic gap (players rate higher than critics).',
   "critics' darling": 'Highest Metacritic score among owned games you have never launched.',
@@ -136,7 +136,6 @@ export const METRIC_TIPS = {
   'aging curve': 'Average days from acquired_at to first recorded play session.',
   'day-one player': 'Games you launched within 24 hours of acquiring.',
   'extra innings': 'Average HLTB completionist − main gap (optional content beyond the main story).',
-  "subscriber's dividend": 'Titles playable via Xbox Game Pass or EA Play (game_pass flag).',
   'double dips': 'Same game owned on two or more storefronts (cross-store dedup).',
   'cost per finish': 'Total library MSRP (priced rows) ÷ games marked finished.',
   'sunk cost': 'Sum of MSRP for owned games with zero playtime.',

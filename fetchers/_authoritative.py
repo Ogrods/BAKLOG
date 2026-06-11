@@ -61,7 +61,6 @@ XBOX = library_authoritative(
     "trophy_progress",
     "xbox_gamerscore_current",
     "xbox_gamerscore_total",
-    "game_pass",
 )
 BATTLENET = library_authoritative("battlenet_id")
 UBISOFT = library_authoritative("ubisoft_id")
@@ -71,4 +70,4 @@ HUMBLE = library_authoritative(
     "humble_gamekey",
     "humble_steam_app_id",
 )
-EA = library_authoritative("ea_id", "ea_offer_id", "ea_game_slug", "game_pass")
+EA = library_authoritative("ea_id", "ea_offer_id", "ea_game_slug")

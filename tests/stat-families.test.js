@@ -79,6 +79,15 @@ describe('family classifiers', () => {
     expect(familyForEyebrow('Almost mastered')).toBe(FAMILY.COMPLETION);
     expect(familyForEyebrow('Completionist')).toBe(FAMILY.COMPLETION);
   });
+
+  it('classifies discovery spotlight eyebrows outside wildcard', () => {
+    expect(familyForEyebrow('Supposedly perfect')).toBe(FAMILY.RATING);
+    expect(familyForEyebrow('Unreviewed')).toBe(FAMILY.RATING);
+    expect(familyForEyebrow('Unplayed')).toBe(FAMILY.ACTIVITY);
+    expect(familyForEyebrow('Total mystery')).toBe(FAMILY.IDENTITY);
+    expect(familyForEyebrow('Total mystery')).not.toBe(FAMILY.WILDCARD);
+    expect(familyForEyebrow('Random pick')).toBe(FAMILY.WILDCARD);
+  });
 });
 
 describe('spreadByFamily', () => {

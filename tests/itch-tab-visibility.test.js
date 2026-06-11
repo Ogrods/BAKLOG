@@ -81,19 +81,22 @@ describe('applyItchTabVisibility', () => {
     state.dashboardDataReady = false;
   });
 
-  it('hides the itch tab when itch is not set up', async () => {
+  it('keeps the itch tab visible but marks it for the dashboard jump when itch is not set up', async () => {
     mockAuthStatus([]);
     await refreshConnections();
     applyItchTabVisibility();
     const tab = document.querySelector('.view-tab[data-view="itch"]');
-    expect(tab.classList.contains('hidden')).toBe(true);
+    expect(tab.classList.contains('hidden')).toBe(false);
+    expect(tab.classList.contains('itch-tab-jump')).toBe(true);
   });
 
-  it('shows the itch tab after itch is connected', async () => {
+  it('clears the jump marker after itch is connected', async () => {
     mockAuthStatus([{ key: 'itch', status: 'connected' }]);
     await refreshConnections();
+    applyItchTabVisibility();
     const tab = document.querySelector('.view-tab[data-view="itch"]');
     expect(tab.classList.contains('hidden')).toBe(false);
+    expect(tab.classList.contains('itch-tab-jump')).toBe(false);
   });
 
   it('does not redirect away from itch during boot before data is known', async () => {

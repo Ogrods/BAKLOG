@@ -163,6 +163,7 @@ describe('recordLibraryFirstSeen', () => {
     ({ gameKey } = await import('../js/game-core.js'));
     state.prefs = { librarySeenSeeded: false };
     state.libraryFirstSeenByKey = {};
+    state.itchGames = [];
     state.allGames = [
       { store: 'steam', id: '1', name: 'A' },
       { store: 'steam', id: '2', name: 'B' },
@@ -182,6 +183,15 @@ describe('recordLibraryFirstSeen', () => {
     const n = recordLibraryFirstSeen();
     expect(n).toBe(1);
     expect(state.libraryFirstSeenByKey[gameKey({ store: 'gog', id: '9', name: 'New' })]).toBeGreaterThan(0);
+  });
+
+  it('stamps itch games (state.itchGames) so itch adds are not invisible in recents', () => {
+    recordLibraryFirstSeen();
+    const itch = { store: 'itch', id: 'manual-zed', name: 'Zed', manual: true };
+    state.itchGames = [itch];
+    const n = recordLibraryFirstSeen();
+    expect(n).toBe(1);
+    expect(state.libraryFirstSeenByKey[gameKey(itch)]).toBeGreaterThan(0);
   });
 
   it('re-seeds as baseline when the map is empty but seeded flag is true (desync)', () => {

@@ -745,6 +745,25 @@ export function parseReleaseForSort(d) {
   return isNaN(t) ? 0 : t;
 }
 
+/**
+ * Parse a `last_played` value into epoch milliseconds. Stores disagree on the
+ * format: Steam emits `rtime_last_played` as epoch SECONDS, some caches store
+ * epoch milliseconds, and manual/other paths use ISO date strings. Returns 0
+ * when missing or unparseable so callers can treat it as "never played".
+ */
+export function parseLastPlayedMs(g) {
+  const lp = g?.last_played;
+  if (lp == null || lp === "") return 0;
+  const n = Number(lp);
+  if (Number.isFinite(n)) {
+    if (n <= 0) return 0;
+    // Values below ~1e12 are epoch seconds (year ~33658 otherwise); scale up.
+    return n < 1e12 ? n * 1000 : n;
+  }
+  const t = Date.parse(String(lp));
+  return Number.isFinite(t) ? t : 0;
+}
+
 export function formatReleaseDate(d) {
   if (!d) return " - ";
   const s = String(d).trim();

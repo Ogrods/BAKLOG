@@ -2,7 +2,7 @@
 // Pure functions; snapshot built once per dashboard render and reused.
 
 import { state } from './state.js';
-import { gameKey, hltbMain, ratingValue, hasEnoughReviews, combinedPlaytime, normalizeGame, firstPlayedAt, playSessionCount } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, hasEnoughReviews, combinedPlaytime, normalizeGame, firstPlayedAt, playSessionCount, parseLastPlayedMs } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo, computeWishlistWoba, isCleanupCandidate, parsePriceLike } from './deals.js';
 
@@ -348,13 +348,12 @@ export function gamerscoreEfficiency(snap) {
 
 export function hotColdStreak(snap) {
   const finished = snap.games
-    .filter(g => (getPersonal(g).status || '') === 'finished' && g.last_played)
-    .sort((a, b) => String(b.last_played).localeCompare(String(a.last_played)));
+    .filter(g => (getPersonal(g).status || '') === 'finished' && parseLastPlayedMs(g) > 0)
+    .sort((a, b) => parseLastPlayedMs(b) - parseLastPlayedMs(a));
   if (!finished.length) return 'cold';
   if (finished.length < 2) return 'warm';
-  const latest = finished[0].last_played;
-  const t = Date.parse(String(latest));
-  if (Number.isFinite(t) && (Date.now() - t) > 90 * 86400000) return 'cold';
+  const t = parseLastPlayedMs(finished[0]);
+  if (t > 0 && (Date.now() - t) > 90 * 86400000) return 'cold';
   return finished.length >= 3 ? 'hot' : 'warm';
 }
 
@@ -820,10 +819,8 @@ export function recentlyPlayedCount(games, days = 30) {
   const cutoff = Date.now() - days * MS_PER_DAY;
   let n = 0;
   for (const g of games || []) {
-    const lp = g.last_played;
-    if (!lp) continue;
-    const t = Date.parse(String(lp));
-    if (Number.isFinite(t) && t >= cutoff) n++;
+    const t = parseLastPlayedMs(g);
+    if (t > 0 && t >= cutoff) n++;
   }
   return n > 0 ? n : null;
 }
@@ -834,10 +831,8 @@ export function longestDormant(games) {
   let oldest = Infinity;
   for (const g of games || []) {
     if (combinedPlaytime(g) <= 0) continue;
-    const lp = g.last_played;
-    if (!lp) continue;
-    const t = Date.parse(String(lp));
-    if (!Number.isFinite(t) || t >= oldest) continue;
+    const t = parseLastPlayedMs(g);
+    if (t <= 0 || t >= oldest) continue;
     oldest = t;
     best = g;
   }

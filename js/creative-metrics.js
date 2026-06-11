@@ -12,6 +12,7 @@ import {
   combinedPlaytime,
   firstPlayedAt,
   playSessionCount,
+  parseLastPlayedMs,
 } from './game-core.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
@@ -63,16 +64,25 @@ function finishesLast12Months(games) {
   const cutoff = Date.now() - 365 * MS_PER_DAY;
   return games.filter(g => {
     if (statusOf(g) !== 'finished') return false;
-    const lp = g.last_played;
-    if (!lp) return false;
-    const t = Date.parse(String(lp));
-    return !Number.isNaN(t) && t >= cutoff;
+    const t = parseLastPlayedMs(g);
+    return t > 0 && t >= cutoff;
   }).length;
 }
 
+/** Effective add timestamp (ms): manual `added_at`, else library first-seen. */
+function addedAtMs(g) {
+  const t = Date.parse(String(g.added_at || ''));
+  if (Number.isFinite(t)) return t;
+  const seen = firstSeenAt(g);
+  return seen > 0 ? seen : null;
+}
+
 function addedThisYearCount(games) {
-  const y = String(new Date().getFullYear());
-  return games.filter(g => (g.added_at || '').startsWith(y)).length;
+  const y = new Date().getFullYear();
+  return games.filter(g => {
+    const ms = addedAtMs(g);
+    return ms != null && new Date(ms).getFullYear() === y;
+  }).length;
 }
 
 /** @param {object[]} games @param {object} snap */

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from shared.free_claims_sources import (
     ITAD_GIVEAWAYS_RSS,
     carry_claim_enrichment,
     dedup_claim_items_by_id,
+    norm_title,
     parse_epic_payload,
     parse_gamerpower_payload,
     parse_itad_rss,
@@ -28,6 +30,12 @@ from shared.safe_write import safe_write_text
 OUTPUT_PATH = Path("curated/free_claims.auto.json")
 USER_AGENT = "BAKLOG-fetch_claim_sources/1.0"
 REQUEST_TIMEOUT = 30
+DEBUG_CLAIMS = os.environ.get("BAKLOG_DEBUG_CLAIMS") == "1"
+
+
+def _debug_claims(msg: str) -> None:
+    if DEBUG_CLAIMS:
+        print(f"  [claims-debug] {msg}", flush=True)
 
 
 def _fetch_json(url: str) -> dict | list:
@@ -109,6 +117,22 @@ def collect_claims(
                 stats.warn(f"ITAD source skipped: {exc}")
 
     deduped = dedup_claim_items_by_id(collected)
+    if DEBUG_CLAIMS:
+        _debug_claims(f"per-source counts: {counts or {}}")
+        _debug_claims(f"collected before id-dedup: {len(collected)}")
+        _debug_claims(f"after dedup_claim_items_by_id: {len(deduped)}")
+        title_keys: dict[str, list[str]] = {}
+        for item in deduped:
+            title = norm_title(item.get("title"))
+            if not title:
+                continue
+            title_keys.setdefault(title, []).append(str(item.get("id") or ""))
+        dup_titles = {k: v for k, v in title_keys.items() if len(v) > 1}
+        if dup_titles:
+            _debug_claims(
+                f"title collisions (kept for admin DUPE stamp): "
+                f"{len(dup_titles)} title(s), e.g. {list(dup_titles.items())[:3]}"
+            )
     return deduped, counts
 
 

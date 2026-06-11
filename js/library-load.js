@@ -33,6 +33,7 @@ import {
   libraryGamesBase,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
+import { isDebugEnabled } from './debug-overlay.js';
 import { invalidateTableCache } from './table-ui.js';
 import {
   refreshFilterUI,
@@ -214,6 +215,7 @@ export function recordLibraryFirstSeen() {
   const effectiveSeeded = seeded && !mapWasEmpty;
   let changed = false;
   let newlyStamped = 0;
+  const debugNewKeys = isDebugEnabled() && effectiveSeeded ? [] : null;
   // itch games live in state.itchGames (their own tab), not state.allGames.
   // Stamp them too so itch additions get a first-seen timestamp and can
   // surface in recents / the +N added flash instead of vanishing silently.
@@ -223,7 +225,20 @@ export function recordLibraryFirstSeen() {
     if (key in state.libraryFirstSeenByKey) continue;
     state.libraryFirstSeenByKey[key] = effectiveSeeded ? Date.now() : 0;
     changed = true;
-    if (effectiveSeeded) newlyStamped += 1;
+    if (effectiveSeeded) {
+      newlyStamped += 1;
+      debugNewKeys?.push(key);
+    }
+  }
+  if (isDebugEnabled()) {
+    console.debug('[baklog-recents] recordLibraryFirstSeen', {
+      mapWasEmpty,
+      seeded,
+      effectiveSeeded,
+      totalKeys: Object.keys(state.libraryFirstSeenByKey).length,
+      newlyStamped,
+      newlyStampedKeys: debugNewKeys ?? [],
+    });
   }
   if (!state.prefs.librarySeenSeeded) {
     state.prefs.librarySeenSeeded = true;

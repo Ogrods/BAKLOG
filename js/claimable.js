@@ -10,6 +10,7 @@ import { syncCoverFits } from './covers.js';
 import { getAdsForLocation, sponsoredClaimCardHtml } from './sponsored-deals.js';
 import { isPro } from './auth-gate.js';
 import { affiliateUrl } from './affiliate.js';
+import { isDebugEnabled } from './debug-overlay.js';
 import {
   stripClaimTitleDecorations,
   dedupeClaims,
@@ -134,27 +135,65 @@ function claimTitleNorms(title) {
   return [...norms];
 }
 
-export function isClaimOwned(claim) {
-  if (!claim) return false;
+function claimOwnedReason(claim) {
+  if (!claim) return null;
   const appid = claim.steam_appid;
-  let appidMatched = false;
   if (appid != null) {
     const sid = String(appid);
     const ownedAppids = state.ownedSteamAppids;
     if (ownedAppids instanceof Set) {
-      // O(1) lookup against the precomputed set (buildOwnedNormNames).
-      appidMatched = ownedAppids.has(sid);
+      if (ownedAppids.has(sid)) return 'owned-by-appid';
     } else {
-      // Fallback for the brief boot window before the set is built.
-      appidMatched = state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)
+      const appidMatched = state.allGames.some(g => g.store === 'steam' && String(g.appid ?? g.id) === sid)
         || state.allGames.some(g => gameKey(g) === `steam:${sid}`);
+      if (appidMatched) return 'owned-by-appid';
     }
   }
   const norms = claimTitleNorms(claim.title);
-  const titleMatched = norms.some(n => state.ownedNormNames?.has(n));
-  if (appidMatched) return true;
-  if (titleMatched) return true;
-  return false;
+  if (norms.some(n => state.ownedNormNames?.has(n))) return 'owned-by-title';
+  return null;
+}
+
+export function isClaimOwned(claim) {
+  return claimOwnedReason(claim) != null;
+}
+
+/** Debug-only: why a feed row is visible, hidden, or filtered out. */
+export function claimDispositionReason(c, now = Date.now(), pro = isPro()) {
+  if (!isClaimFeedItemValid(c)) return 'invalid';
+  if (isClaimExpired(c, now)) return 'expired';
+  const owned = claimOwnedReason(c);
+  if (owned) return owned;
+  if (isClaimDismissed(c)) return 'dismissed';
+  if (c.premium_only && !pro) return 'premium-gated';
+  return 'eligible';
+}
+
+function logClaimsFeedDebug(doc, source) {
+  if (!isDebugEnabled()) return;
+  const items = doc?.items || [];
+  console.debug('[baklog-claims] feed loaded', {
+    source,
+    generated_at: doc?.generated_at ?? null,
+    fetched_at: doc?.fetched_at ?? null,
+    total: items.length,
+    visible: state.claimableNow?.length ?? 0,
+    owned: getOwnedClaims(items).length,
+    dismissed: getHiddenClaims(items).length,
+  });
+}
+
+function logClaimsDispositionDebug(items) {
+  if (!isDebugEnabled()) return;
+  const now = Date.now();
+  const pro = isPro();
+  console.debug('[baklog-claims] dispositions', (items || []).map((c) => ({
+    id: c.id,
+    store: c.store,
+    source: c.source,
+    title: c.title,
+    disposition: claimDispositionReason(c, now, pro),
+  })));
 }
 
 // Every stable identity a claim can be matched on. A claim's appid is filled in
@@ -353,11 +392,13 @@ function applyFeedDoc(doc, source = 'unknown') {
   // happens to carry a single claim.
   _claimDismissedSinceLoad = false;
   applyVisibleClaims();
+  logClaimsFeedDebug(state.claimableFeed, source);
 }
 
 function applyVisibleClaims() {
   const items = state.claimableFeed?.items || [];
   state.claimableNow = getVisibleClaims(items);
+  logClaimsDispositionDebug(items);
 }
 
 async function loadLocalClaimsFile() {
@@ -617,7 +658,20 @@ export function handleClaimableClick(e) {
     const id = goBtn.dataset.claimGo;
     const claim = (state.claimableFeed?.items || []).find(c => c.id === id)
       || state.claimableNow.find(c => c.id === id);
-    if (isSafeHttpUrl(claim?.claim_url)) window.open(affiliateUrl(claim.claim_url), '_blank', 'noopener,noreferrer');
+    if (isSafeHttpUrl(claim?.claim_url)) {
+      const outbound = affiliateUrl(claim.claim_url);
+      if (isDebugEnabled()) {
+        console.debug('[baklog-claims] claim open', {
+          id: claim.id,
+          store: claim.store,
+          source: claim.source,
+          claim_url: claim.claim_url,
+          affiliateApplied: outbound !== claim.claim_url,
+          outbound,
+        });
+      }
+      window.open(outbound, '_blank', 'noopener,noreferrer');
+    }
     return true;
   }
   const card = e.target.closest('[data-claim-id]');

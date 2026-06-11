@@ -560,7 +560,7 @@
         <div id="dashboardCoopSpotlight" class="dash-card"></div>
         <div id="dashboardWishlistStats" class="dash-wishlist-stats-target grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
         <div id="dashboardHouseSlot" class="dash-house-slot hidden mb-4"></div>
-        <div id="dashboardPicksRow" class="dash-picks-row no-itch">
+        <div id="dashboardPicksRow" class="dash-picks-row">
           <div id="dashboardSponsoredPick" class="dash-sponsored-pick-slot hidden"></div>
           <div class="dash-card dash-picks-versus" id="dashPicksVersusCard">
             <div class="dash-versus-head">
@@ -579,9 +579,8 @@
               </div>
             </div>
           </div>
-          <div class="dash-card dash-card-itch hidden" id="dashItchCard">
-            <h3 class="text-sm font-semibold text-slate-200 mb-2">itch.io library</h3>
-            <div id="dashItchRecap" class="dash-itch-recap text-sm"></div>
+          <div class="dash-card dash-card-itch" id="dashItchCard">
+            <div id="dashItchRecap" class="dash-itch-recap text-sm" role="region" aria-label="itch.io library"></div>
           </div>
           <div class="dash-card dash-recent-card" id="dashRecentCard">
             <h3 class="text-sm font-semibold text-slate-200 mb-2">Recently added</h3>

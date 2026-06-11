@@ -187,6 +187,24 @@ function applySession(session) {
   }
 }
 
+/** Supabase refresh failures that mean local storage is stale — clear and re-prompt. */
+function isStaleRefreshTokenError(error) {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return msg.includes('refresh token') || msg.includes('invalid refresh');
+}
+
+/** Drop a dead Supabase session from localStorage so auto-refresh stops retrying. */
+async function clearStaleAuthSession() {
+  if (!_supabase) return;
+  try {
+    await _supabase.auth.signOut();
+  } catch {
+    /* best-effort */
+  }
+  _accessToken = null;
+  _accountProfileId = '';
+}
+
 /** Verify the current bearer is accepted by server.py before boot continues. */
 async function probeServerToken() {
   if (!_accessToken) return false;
@@ -327,15 +345,14 @@ export async function initAuthGate() {
 
   bindSignInForm();
 
-  const { data: { session } } = await _supabase.auth.getSession();
-  if (session && (await ensureServerReadySession(session))) {
+  const { data: { session }, error: sessionError } = await _supabase.auth.getSession();
+  if (sessionError && isStaleRefreshTokenError(sessionError)) {
+    await clearStaleAuthSession();
+  } else if (session && (await ensureServerReadySession(session))) {
     markAuthReady();
     return;
-  }
-  if (session) {
-    await _supabase.auth.signOut();
-    _accessToken = null;
-    _accountProfileId = '';
+  } else if (session) {
+    await clearStaleAuthSession();
   }
 
   _authedPromise = new Promise((resolve) => { _resolveAuthed = resolve; });
@@ -373,7 +390,12 @@ export async function refreshAccessToken() {
   _refreshInFlight = (async () => {
     try {
       const { data, error } = await _supabase.auth.refreshSession();
-      if (error || !data.session) return null;
+      if (error) {
+        if (isStaleRefreshTokenError(error)) await clearStaleAuthSession();
+        applySession(null);
+        return null;
+      }
+      if (!data.session) return null;
       applySession(data.session);
       if (!(await probeServerToken())) {
         applySession(null);

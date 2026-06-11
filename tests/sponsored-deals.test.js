@@ -80,8 +80,8 @@ function proPromoItem(overrides = {}) {
     banner: 'pro',
     title: 'Power-user conveniences',
     tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
-    cta: "$5/mo — see what's planned",
-    url: 'https://baklog.app/',
+    cta: 'Get Pro — $5/mo',
+    url: 'https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw',
     placements: 'dash-deal-rail',
     enabled: true,
     ...overrides,
@@ -573,7 +573,7 @@ describe('proPromoBannerHtml', () => {
     expect(html).toContain('BAKLOG Pro');
     expect(html).toContain('Queued bulk refresh');
     expect(html).toContain('$5/mo');
-    expect(html).toContain('https://baklog.app/');
+    expect(html).toContain('buy.polar.sh/polar_cl_');
     expect(html).not.toContain('sponsored-dismiss');
   });
 

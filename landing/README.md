@@ -53,6 +53,20 @@ Optional durable logging (recommended):
 
 Run `sql/waitlist.sql` once in the Supabase SQL editor before enabling these vars. Without Supabase env vars, signups still work; they are only emailed and logged to Vercel function logs.
 
+### BAKLOG Pro (Polar webhook)
+
+`api/polar-webhook.js` receives Polar subscription webhooks and writes `app_metadata.plan` on the buyer's Supabase user (hosted-auth installs). Pure-local buyers use the license key from Polar + `POST /api/license/activate` on the local server instead.
+
+| Variable | Notes |
+| --- | --- |
+| `POLAR_WEBHOOK_SECRET` | Signing secret from Polar → Settings → Webhooks (endpoint URL: `https://baklog.app/api/polar-webhook`). |
+| `SUPABASE_URL` | Same Supabase project as BAKLOG auth. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **service_role** key (server-only). |
+
+Run `sql/polar_entitlement.sql` once in the Supabase SQL editor (`get_user_id_by_email` RPC). Polar events handled: `subscription.active`, `subscription.updated`, `subscription.revoked`, `order.paid`, `order.refunded`. Buyer match: Polar `customer.external_id` (Supabase user id) when present, else email via the RPC.
+
+Local app: set `BAKLOG_POLAR_ORG_ID` to your Polar organization id (Settings → General) so `POST /api/license/activate` can validate license keys against Polar.
+
 Without the Resend trio, `/api/subscribe` returns `500 Server not configured` and the form shows a friendly error.
 
 ## Rate limiting (required for production)

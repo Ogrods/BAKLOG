@@ -470,8 +470,27 @@
     .tier-compare tbody th { font-weight: 500; color: var(--text); }
     .tier-compare tbody td { color: var(--text-mute); text-align: center; }
     .tier-compare .premium-badge { font-size: 0.6rem; vertical-align: middle; margin-left: 0.25rem; }
+    .pro-checkout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+    .pro-checkout .btn { width: auto; min-width: 10rem; }
+    .pro-checkout .btn--secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      box-shadow: none;
+    }
+    .pro-checkout .btn--secondary:hover {
+      color: #04121f;
+      background: var(--accent);
+      box-shadow: 0 10px 26px rgba(56, 189, 248, 0.42);
+    }
     @media (max-width: 599px) {
       .tier-compare { display: block; overflow-x: auto; }
+      .pro-checkout .btn { width: 100%; }
     }
 
     /* How it works — equal-height cards so uneven copy stays balanced */
@@ -817,7 +836,7 @@
         <article class="card card--premium">
           <div class="card-head">
             <h3>Paid tier</h3>
-            <span class="premium-badge">Planned</span>
+            <span class="premium-badge">Pro</span>
           </div>
           <p>The free tier keeps everything you need to import, browse, and decide what to play next. The optional <strong>$5/mo</strong> ($50/yr) tier layers on power-user conveniences. None of today's free features ever move behind it.</p>
           <ul>
@@ -829,6 +848,10 @@
             <li>Deal &amp; watchlist alerts</li>
             <li>Bonus claimables feed: the DLC, add-ons, and in-game bonuses we filter out of the free feed, surfaced just for paid members</li>
           </ul>
+          <div class="pro-checkout">
+            <a class="btn" href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Get Pro — $5/mo</a>
+            <a class="btn btn--secondary" href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">$50/yr (save $10)</a>
+          </div>
         </article>
 
         <table class="tier-compare" aria-label="Free vs paid tier">
@@ -836,7 +859,7 @@
             <tr>
               <th></th>
               <th>Free</th>
-              <th>Paid <span class="premium-badge">Planned</span></th>
+              <th>Paid <span class="premium-badge">Pro</span></th>
             </tr>
           </thead>
           <tbody>
@@ -956,7 +979,7 @@
         <div class="score-tile"><div class="num">100%</div><div class="lbl">on your machine, open source, nothing uploaded</div></div>
         <div class="score-tile"><div class="num">90 sec</div><div class="lbl">from empty to your whole library</div></div>
         <div class="score-tile"><div class="num">$0</div><div class="lbl">free forever to import your library</div></div>
-        <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (paid, planned)</div></div>
+        <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (Pro)</div></div>
       </div>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
     </div>
@@ -983,19 +1006,19 @@
         </details>
         <details>
           <summary>Is it open source?</summary>
-          <p>Yes. BAKLOG is released under the <a href="https://github.com/Ogrods/BAKLOG/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The full app (server, fetchers, auth, and dashboard) lives in the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">public GitHub repo</a>. No hidden builds, no closed-source telemetry layer. Optional paid features (planned) are conveniences on top of the same open codebase, not a fork of your data into our cloud.</p>
+          <p>Yes. BAKLOG is released under the <a href="https://github.com/Ogrods/BAKLOG/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The full app (server, fetchers, auth, and dashboard) lives in the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">public GitHub repo</a>. No hidden builds, no closed-source telemetry layer. Optional paid features are conveniences on top of the same open codebase, not a fork of your data into our cloud.</p>
         </details>
         <details>
           <summary>Is it free?</summary>
-          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary % (no on-demand deep re-pull). <strong>Claimable Now</strong> on the free tier surfaces full-game giveaways only: DLC packs, add-ons, and in-game bonuses are filtered out. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. The optional <strong>$5/mo</strong> paid tier ($50/yr, <strong>planned</strong>) will add queued bulk refresh (every stale store in one sweep), scheduled refresh without the app open, no sponsored deal cards, cloud sync, deep achievement/trophy sync (full re-pull), and a bonus claimables feed for those DLC and bonus drops. Nothing paywalled today stays paywalled when paid launches.</p>
+          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary % (no on-demand deep re-pull). <strong>Claimable Now</strong> on the free tier surfaces full-game giveaways only: DLC packs, add-ons, and in-game bonuses are filtered out. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. The optional <strong>$5/mo</strong> paid tier ($50/yr) adds queued bulk refresh (every stale store in one sweep), scheduled refresh without the app open, no sponsored deal cards, cloud sync, deep achievement/trophy sync (full re-pull), and a bonus claimables feed for those DLC and bonus drops. Perks roll out on the same open codebase — see the <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Pro checkout</a> for what's live vs coming. Nothing you use free today moves behind paywall.</p>
         </details>
         <details>
           <summary>What's in the paid tier?</summary>
-          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> (planned): no sponsored deal cards, cloud sync across machines, <strong>queued bulk refresh</strong> (queue every stale store and let them run back-to-back instead of babysitting one at a time), scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), deal/watchlist alerts, and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
+          <p><strong>$5/mo</strong> or <strong>$50/yr</strong>: no sponsored deal cards, cloud sync across machines, <strong>queued bulk refresh</strong> (queue every stale store and let them run back-to-back instead of babysitting one at a time), scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), deal/watchlist alerts, and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Subscribe monthly</a> or <a href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">yearly</a>. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
         </details>
         <details>
           <summary>What's the difference between free and paid refresh?</summary>
-          <p>On the free tier, you refresh one store at a time: click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. The planned paid tier adds <strong>queued bulk refresh</strong>: one action queues every store that needs updating, and they run back-to-back so you can kick it off and walk away. Paid also adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). Your credentials and data still stay on your machine. Only the convenience layer changes.</p>
+          <p>On the free tier, you refresh one store at a time: click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. Pro adds <strong>queued bulk refresh</strong>: one action queues every store that needs updating, and they run back-to-back so you can kick it off and walk away. Pro also adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). Your credentials and data still stay on your machine. Only the convenience layer changes.</p>
         </details>
         <details>
           <summary>Does BAKLOG show me free games to claim?</summary>

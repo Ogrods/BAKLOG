@@ -31,6 +31,8 @@ let _authHandling = null;
 let _accountProfileId = '';
 let _localProfiles = false;
 let _plan = 'free';
+let _licenseActivation = false;
+let _proCheckout = { monthly: '', yearly: '' };
 
 export function isAccountAuthMode() {
   return !!_authRequired;
@@ -112,6 +114,49 @@ function setAuthError(msg) {
     el.textContent = '';
     el.classList.add('hidden');
   }
+}
+
+function applyConfigEntitlement(config) {
+  if (!config || typeof config !== 'object') return;
+  if (typeof config.plan === 'string' && config.plan) _plan = config.plan;
+  _licenseActivation = !!config.licenseActivation;
+  const checkout = config.proCheckout;
+  _proCheckout = {
+    monthly: checkout?.monthly || '',
+    yearly: checkout?.yearly || '',
+  };
+}
+
+export function licenseActivationEnabled() {
+  return _licenseActivation;
+}
+
+export function proCheckoutUrls() {
+  return { ..._proCheckout };
+}
+
+/** Re-read plan from the server (JWT session probe or /api/config). */
+export async function refreshAccountPlan() {
+  try {
+    if (_authRequired && _accessToken) {
+      const res = await fetch('/api/auth/session', {
+        headers: { Authorization: `Bearer ${_accessToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.plan === 'string' && data.plan) {
+          _plan = data.plan;
+          return _plan;
+        }
+      }
+    }
+    const headers = _accessToken ? { Authorization: `Bearer ${_accessToken}` } : undefined;
+    const res = await fetch('/api/config', headers ? { headers } : undefined);
+    if (res.ok) applyConfigEntitlement(await res.json());
+  } catch {
+    /* keep last known plan */
+  }
+  return _plan;
 }
 
 function applySession(session) {
@@ -239,7 +284,7 @@ export async function initAuthGate() {
   }
   _authRequired = !!_config.authRequired;
   _localProfiles = !!_config.localProfiles;
-  _plan = (typeof _config.plan === 'string' && _config.plan) || 'free';
+  applyConfigEntitlement(_config);
   if (!_authRequired) {
     setOverlayVisible(false);
     markAuthReady();

@@ -1,5 +1,6 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
-import { isAccountAuthMode, isPro } from './auth-gate.js';
+import { isPro } from './auth-gate.js';
+import { renderConnectionsProLink } from './pro-view.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
@@ -869,6 +870,8 @@ function renderConnections() {
   renderHero();
 
   renderConnPrefs();
+
+  renderConnectionsProLink();
 
   renderOnboard();
 

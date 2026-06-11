@@ -43,8 +43,8 @@ HOUSE_DEFAULTS = {
             "Nothing you use today moves behind paywall. "
             "The optional tier layers on bulk refresh, sync, and fewer distractions."
         ),
-        "cta": "$5/mo — see what's planned",
-        "url": "https://baklog.app/",
+        "cta": "Get Pro — $5/mo",
+        "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "enabled": True,
     },
@@ -71,9 +71,9 @@ HOUSE_DEFAULTS = {
     "house-spotlight-pro-logo": {
         "kind": "house",
         "title": "BAKLOG Pro",
-        "tagline": "One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo, planned.",
-        "cta": "See what's planned",
-        "url": "https://baklog.app/",
+        "tagline": "One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo.",
+        "cta": "Get Pro",
+        "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "art_mode": "logo",
         "enabled": True,
@@ -85,17 +85,17 @@ HOUSE_DEFAULTS = {
             "BAKLOG Pro keeps your library and personal data aligned across machines "
             "— no manual exports."
         ),
-        "cta": "$5/mo — see what's planned",
-        "url": "https://baklog.app/",
+        "cta": "Get Pro — $5/mo",
+        "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "enabled": True,
     },
     "house-spotlight-pro-noads": {
         "kind": "house",
         "title": "Fewer distractions",
-        "tagline": "BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo, planned.",
-        "cta": "$5/mo — see what's planned",
-        "url": "https://baklog.app/",
+        "tagline": "BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo.",
+        "cta": "Get Pro — $5/mo",
+        "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "enabled": True,
     },

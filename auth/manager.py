@@ -430,7 +430,12 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
                 "ITAD rejected this API key — copy the API key UUID from isthereanydeal.com/apps/my/"
             )
     if provider == "epic":
-        from epic_client import EpicAuthError, EpicClient, default_epic_cache_dir
+        from epic_client import (
+            EpicAuthError,
+            EpicClient,
+            EpicCorrectiveActionError,
+            default_epic_cache_dir,
+        )
 
         code = cleaned["EPIC_AUTH_CODE"].strip()
         if len(code) < 16 or not re.fullmatch(r"[A-Za-z0-9_\-]+", code):
@@ -441,6 +446,12 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
         try:
             client = EpicClient(auth_code=code, cache_dir=default_epic_cache_dir())
             client.login()
+        except EpicCorrectiveActionError as e:
+            raise ValueError(
+                "Epic needs you to accept its privacy policy. In the Epic sign-in "
+                "window, accept the privacy policy / complete the prompt, then refresh "
+                "the page and paste a fresh authorizationCode here."
+            ) from e
         except EpicAuthError as e:
             msg = str(e)
             if "OAuth 400" in msg or "invalid_grant" in msg or "expired" in msg.lower():

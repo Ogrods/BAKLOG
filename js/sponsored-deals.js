@@ -312,7 +312,7 @@ const HOUSE_DEFAULTS = {
 };
 
 /** Test-only: guaranteed Pro spotlight slides default off under Vitest (game-pool tests). */
-const IN_VITEST = typeof process !== 'undefined' && process.env.VITEST;
+const IN_VITEST = typeof import.meta !== 'undefined' && !!import.meta.env?.VITEST;
 /** @type {boolean | null} null = auto (off in Vitest, on in app) */
 let _spotlightHouseAdsForceForTest = null;
 export function setSpotlightHouseAdsForTest(enabled) {

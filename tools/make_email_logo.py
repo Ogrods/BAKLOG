@@ -129,7 +129,6 @@ def main():
     mark_h = MARK_VH * mark_scale
 
     content_w = mark_w + MARK_WORD_GAP + text_w
-    content_h = max(mark_h, text_h)
     ox = PAD + (W - 2 * PAD - content_w) / 2
     mark_ox = ox
     mark_oy = PAD + (inner_h - mark_h) / 2

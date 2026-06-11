@@ -13,7 +13,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from epic_client import LOGIN_URL, EpicAuthError, EpicCorrectiveActionError, EpicClient, default_epic_cache_dir
+from epic_client import LOGIN_URL, EpicAuthError, EpicClient, EpicCorrectiveActionError, default_epic_cache_dir
 from fetchers._authoritative import EPIC
 from fetchers._base import (
     add_allow_empty_arg,

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import time
 from datetime import UTC, datetime
@@ -38,6 +39,12 @@ ITAD_GAME_SLUG_RE = re.compile(
     r"isthereanydeal\.com/game/([^/\"'>]+)/info",
     re.IGNORECASE,
 )
+DEBUG_CLAIMS = os.environ.get("BAKLOG_DEBUG_CLAIMS") == "1"
+
+
+def _debug_claims(msg: str) -> None:
+    if DEBUG_CLAIMS:
+        print(f"  [claims-debug] {msg}", flush=True)
 
 
 def _clean_blurb(raw: object) -> str | None:
@@ -1278,6 +1285,12 @@ def main() -> int:
         return stats.finish("build_free_claims", t0, exit_code=1)
 
     auto_items_all = _load_auto_items(AUTO_PATH)
+    if DEBUG_CLAIMS:
+        by_source: dict[str, int] = {}
+        for row in auto_items_all:
+            src = str(row.get("source") or "unknown")
+            by_source[src] = by_source.get(src, 0) + 1
+        _debug_claims(f"auto feed: {len(auto_items_all)} item(s) by source {by_source}")
     approved_ids = _load_approved_ids(APPROVED_PATH)
     dismissed_ids = _load_dismissed_ids(APPROVED_PATH)
     premium_only_ids = _load_premium_only_ids(APPROVED_PATH)
@@ -1367,6 +1380,11 @@ def main() -> int:
         stats.warn(
             f"auto feed: {len(auto_items)} approved of {len(auto_items_all)} available"
         )
+    if DEBUG_CLAIMS:
+        _debug_claims(
+            f"approved selection: {len(auto_items)} of {len(auto_items_all)} auto; "
+            f"dismissed={len(dismissed_ids)} expired_approved={len(expired_approved_ids)}"
+        )
     raw_items = merge_manual_and_auto(manual_items, auto_items)
     if auto_items:
         stats.warn(f"merged {len(auto_items)} auto item(s); {len(raw_items)} total before enrich")
@@ -1398,6 +1416,10 @@ def main() -> int:
             f"carried forward {len(carried)} approved claim(s) missing from the "
             f"source feed: {', '.join(str(c.get('id')) for c in carried)}"
         )
+        if DEBUG_CLAIMS:
+            _debug_claims(
+                f"carry-forward ids: {', '.join(str(c.get('id')) for c in carried)}"
+            )
         items.extend(carried)
 
     _apply_premium_only(
@@ -1422,6 +1444,22 @@ def main() -> int:
     }
     if has_gamerpower:
         profile_payload["attribution"] = [GAMERPOWER_ATTRIBUTION]
+    if DEBUG_CLAIMS:
+        pub_by_source: dict[str, int] = {}
+        for row in items:
+            src = str(row.get("source") or "unknown")
+            pub_by_source[src] = pub_by_source.get(src, 0) + 1
+        title_keys: dict[str, list[str]] = {}
+        for row in items:
+            title = norm_title(row.get("title"))
+            if not title:
+                continue
+            title_keys.setdefault(title, []).append(str(row.get("id") or ""))
+        dup_titles = sum(1 for ids in title_keys.values() if len(ids) > 1)
+        _debug_claims(
+            f"publish: {len(items)} item(s) by source {pub_by_source}; "
+            f"title collisions={dup_titles}"
+        )
     text = json.dumps(payload, indent=2, ensure_ascii=False)
     profile_text = json.dumps(profile_payload, indent=2, ensure_ascii=False)
 

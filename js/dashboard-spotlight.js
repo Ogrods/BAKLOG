@@ -13,6 +13,7 @@ import * as MetricTips from './metric-tips.js';
 import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
 import { registerPausable } from './visibility.js';
 import { getAdsForLocation, getSpotlightHouseAds, sponsorToSpotlightGame, spotlightLogoMarkHtml, SPOTLIGHT_PREMIUM_SCHEMES, sponsorActionAttrs } from './sponsored-deals.js';
+import { isDebugEnabled } from './debug-overlay.js';
 
 // Namespace import avoids link-time failure if metric-tips.js is stale/truncated
 // (data maps may load while named function exports are missing).
@@ -459,6 +460,7 @@ export function computeRecentAdditions(games, cap = 10) {
   const seen = state.libraryFirstSeenByKey || {};
   const picked = new Set();
   const out = [];
+  const debugEntries = isDebugEnabled() ? [] : null;
 
   const tracked = games
     .map(g => ({ g, at: seen[gameKey(g)] ?? 0 }))
@@ -471,6 +473,7 @@ export function computeRecentAdditions(games, cap = 10) {
     if (picked.has(key)) continue;
     picked.add(key);
     out.push({ ...e.g, _addedAt: e.at });
+    debugEntries?.push({ name: e.g.name, _addedAt: e.at, source: 'tracked' });
   }
 
   if (out.length < cap) {
@@ -482,8 +485,23 @@ export function computeRecentAdditions(games, cap = 10) {
       if (out.length >= cap) break;
       const key = gameKey(e.g);
       picked.add(key);
-      out.push({ ...e.g, _addedAt: displayAddedAtForRecent(e.g, 0) });
+      const addedAt = displayAddedAtForRecent(e.g, 0);
+      out.push({ ...e.g, _addedAt: addedAt });
+      debugEntries?.push({ name: e.g.name, _addedAt: addedAt, source: 'backfill' });
     }
+  }
+
+  if (debugEntries) {
+    const trackedInCard = debugEntries.filter((e) => e.source === 'tracked').length;
+    const backfillInCard = debugEntries.length - trackedInCard;
+    console.debug('[baklog-recents] computeRecentAdditions', {
+      inputCount: games.length,
+      cap,
+      trackedPool: tracked.length,
+      trackedInCard,
+      backfillInCard,
+      entries: debugEntries,
+    });
   }
 
   return out;

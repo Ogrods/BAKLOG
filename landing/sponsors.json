@@ -23,7 +23,7 @@
     "ad-picks-ironveil": {
       "kind": "sponsor",
       "title": "Ironveil",
-      "tagline": "On sale now - 80% off",
+      "tagline": "On sale now — 80% off",
       "cta": "Grab it",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
@@ -32,10 +32,19 @@
     "ad-table-encore": {
       "kind": "sponsor",
       "title": "Encore",
-      "tagline": "Replay-worthy roguelike - weekend-sized",
+      "tagline": "Replay-worthy roguelike — weekend-sized",
       "cta": "Learn more",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-encore.webp",
+      "enabled": true
+    },
+    "house-table-every-store": {
+      "kind": "house",
+      "title": "Every store, one backlog",
+      "tagline": "Steam, Epic, GOG and more — deduped into one honest list. Free and local-first.",
+      "cta": "Start free",
+      "url": "https://baklog.app/",
+      "dismissible": true,
       "enabled": true
     },
     "ad-dash-picks-dawnbanner": {
@@ -142,7 +151,7 @@
     "ad-claimable-apex-velocity": {
       "kind": "sponsor",
       "title": "Apex Velocity",
-      "tagline": "Blistering arcade racer - drift through neon cities",
+      "tagline": "Blistering arcade racer — drift through neon cities",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-apex-velocity.webp",
@@ -187,6 +196,7 @@
       "cta": "Join the waitlist",
       "url": "https://baklog.app/#waitlist",
       "cover": "",
+      "dismissible": true,
       "enabled": true
     },
     "house-pro-promo": {
@@ -205,6 +215,7 @@
       "cta": "Start free",
       "url": "https://baklog.app/",
       "cover": "",
+      "dismissible": true,
       "enabled": true
     },
     "house-itch-privacy": {
@@ -214,6 +225,55 @@
       "cta": "Learn more",
       "url": "https://baklog.app/",
       "cover": "",
+      "dismissible": true,
+      "enabled": true
+    },
+    "house-spotlight-pro-logo": {
+      "kind": "house",
+      "title": "BAKLOG Pro",
+      "slogan": "One honest backlog across every store.",
+      "tagline": "One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo.",
+      "cta": "Get Pro",
+      "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
+      "cover": "",
+      "art_mode": "logo",
+      "scheme": "ember",
+      "enabled": true
+    },
+    "house-spotlight-pro-sync": {
+      "kind": "house",
+      "title": "Sync every machine",
+      "slogan": "Keep your library and personal data aligned across machines — no manual exports.",
+      "tagline": "BAKLOG Pro keeps your library and personal data aligned across machines — no manual exports.",
+      "cta": "Get Pro — $5/mo",
+      "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
+      "cover": "",
+      "art_mode": "logo",
+      "scheme": "sapphire",
+      "enabled": true
+    },
+    "house-spotlight-pro-noads": {
+      "kind": "house",
+      "title": "Fewer distractions",
+      "slogan": "Paid tier drops sponsored deal slots so your deal radar stays yours.",
+      "tagline": "BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo.",
+      "cta": "Get Pro — $5/mo",
+      "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
+      "cover": "",
+      "art_mode": "logo",
+      "scheme": "emerald",
+      "enabled": true
+    },
+    "house-spotlight-library": {
+      "kind": "house",
+      "title": "It's just your library",
+      "slogan": "It's not a godsend, it's just your library.",
+      "tagline": "Every game you already own, deduped across every store into one honest backlog. Free and local-first.",
+      "cta": "Start free",
+      "url": "https://baklog.app/",
+      "cover": "",
+      "art_mode": "logo",
+      "scheme": "sapphire",
       "enabled": true
     }
   },
@@ -247,7 +307,8 @@
       "ad-picks-ironveil"
     ],
     "lib-row": [
-      "ad-table-encore"
+      "ad-table-encore",
+      "house-table-every-store"
     ],
     "lib-house": [
       "house-lib-backlog"
@@ -256,7 +317,8 @@
       "ad-picks-ironveil"
     ],
     "wish-row": [
-      "ad-table-encore"
+      "ad-table-encore",
+      "house-table-every-store"
     ],
     "wish-house": [
       "house-support-baklog"
@@ -272,13 +334,15 @@
       "ad-picks-ironveil"
     ],
     "deals-row": [
-      "ad-table-encore"
+      "ad-table-encore",
+      "house-table-every-store"
     ],
     "itch-pick": [
       "ad-picks-ironveil"
     ],
     "itch-row": [
-      "ad-table-encore"
+      "ad-table-encore",
+      "house-table-every-store"
     ],
     "itch-house": [
       "house-itch-privacy"

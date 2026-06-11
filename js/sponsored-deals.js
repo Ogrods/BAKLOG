@@ -254,8 +254,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-pro-promo': {
     kind: 'house',
-    title: 'Power-user conveniences',
-    tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
+    title: 'Move faster. Cut the noise.',
+    tagline: 'Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.',
     cta: 'Get Pro — $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -264,9 +264,9 @@ const HOUSE_DEFAULTS = {
   'house-lib-backlog': {
     kind: 'house',
     title: 'You own 600 games. You\'ve played 40.',
-    tagline: 'One honest backlog across every store. Free, private, Steam-ready.',
-    cta: 'Start free',
-    url: 'https://baklog.app/',
+    tagline: 'One honest backlog across every store. Private, Steam-ready.',
+    cta: 'Get Pro — $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     dismissible: true,
     enabled: true,
@@ -321,9 +321,9 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'It\'s just your library',
     slogan: 'It\'s not a godsend, it\'s just your library.',
-    tagline: 'Every game you already own, deduped across every store into one honest backlog. Free and local-first.',
-    cta: 'Start free',
-    url: 'https://baklog.app/',
+    tagline: 'Every game you already own, deduped across every store into one honest backlog. Local-first.',
+    cta: 'Get Pro — $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     art_mode: 'logo',
     scheme: 'sapphire',
@@ -674,24 +674,58 @@ const HOUSE_BANNER_FEATURES = [
 // Sync pair: PRO_PROMO ↔ landing/index.html paid tier + FAQ pricing answers.
 export const PRO_PROMO = {
   label: 'BAKLOG Pro',
-  title: 'Power-user conveniences',
+  title: 'Move faster. Cut the noise.',
   price: '$5/mo ($50/yr)',
-  tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
+  tagline: 'Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.',
   cta: 'Get Pro — $5/mo',
+  ctaYearly: 'Get Pro — $50/yr',
   url: PRO_CHECKOUT_MONTHLY,
+  founderNote: 'Back the roadmap — lock in $50/yr while Pro is early.',
   features: [
     {
       title: 'Queued bulk refresh',
       desc: 'Queue every stale store at once and let them refresh back-to-back instead of one at a time.',
+      icon: '⚡',
     },
     {
-      title: 'Cloud sync',
-      desc: 'Keep your library and personal data aligned across machines without manual exports.',
+      title: 'Scheduled refresh',
+      desc: 'Stale-store refresh runs even when the app is closed (tray or OS scheduler).',
+      icon: '⏱',
     },
     {
       title: 'No sponsored cards',
       desc: 'Paid tier drops sponsored deal slots so your deal radar stays yours.',
+      icon: '✦',
     },
+    {
+      title: 'Cloud sync',
+      desc: 'Keep your library and personal data aligned across machines without manual exports.',
+      icon: '☁',
+    },
+    {
+      title: 'Deep achievement sync',
+      desc: 'Full on-demand trophy/achievement re-pull (free tier shows cached % only).',
+      icon: '🏆',
+    },
+    {
+      title: 'Bonus claimables feed',
+      desc: 'DLC, add-ons, and in-game bonuses filtered out of the free feed, surfaced for Pro.',
+      icon: '🎁',
+    },
+  ],
+  tierCompare: [
+    { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores' },
+    { feature: 'Refresh while app is closed', free: '—', pro: '✓' },
+    { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
+    { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
+    { feature: 'Cloud sync', free: '—', pro: '✓' },
+    { feature: 'Bonus claimables feed', free: 'Full games only', pro: '✓ + DLC/bonus drops' },
+  ],
+  trustPoints: [
+    'Local-first — your library stays on your machine',
+    'Open source (MIT) — audit every fetcher path',
+    'Polar.sh Merchant of Record — cancel anytime',
+    'Zero telemetry unless you opt in',
   ],
 };
 
@@ -700,6 +734,8 @@ const PRO_PROMO_SPONSOR_IDS = new Set([
   'house-spotlight-pro-logo',
   'house-spotlight-pro-sync',
   'house-spotlight-pro-noads',
+  'house-lib-backlog',
+  'house-spotlight-library',
 ]);
 
 /** True for in-app house promos that should open the Pro view tab (not Polar directly). */

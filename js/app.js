@@ -79,6 +79,7 @@ import {
   consumeCheckoutQuery,
   consumeProHash,
   handleCheckoutSuccessReturn,
+  showProWelcomeBanner,
   wireProView,
 } from './pro-view.js';
 
@@ -155,6 +156,7 @@ async function bootstrap() {
   bindEvents();
   wireProView();
   applyProTabVisibility();
+  showProWelcomeBanner();
   if (state.prefs.shareAnonStats) startMetrics();
   await initProfiles();
   document.getElementById("rowHeroBackdrop").checked = !!state.prefs.rowHeroBackdrop;

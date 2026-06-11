@@ -2,7 +2,7 @@
  * Auto-refresh scheduling: ITAD, claims, stale-24h, connect, enrich.
  */
 import { markClaimsPendingAutoRun } from './claimable.js';
-import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
+import { FETCHER_AUTH_PROVIDER, NO_AUTO_FETCH_KEYS } from './fetcher-registry.js';
 import { fetcherRunner, fetcherSources } from './fetcher-health-shared.js';
 import {
   LS_AUTO_STALE_LAST_RUN,
@@ -170,6 +170,9 @@ export function maybeAutoFetchStale24h(deps = {}) {
 
   const candidates = sources.filter((src) => {
     if (src.key === 'itad') return false;
+    // Local launchers (GOG Galaxy, Amazon) can't refresh unattended — only
+    // web/API stores auto-fetch. See fetchers/manifest.json autoFetch:false.
+    if (NO_AUTO_FETCH_KEYS.has(src.key)) return false;
     if (!FETCHER_AUTH_PROVIDER[src.key]) return false;
     const { ageMs } = freshnessFn(src);
     if (ageMs < AUTO_STALE_AGE_MS) return false;

@@ -174,6 +174,38 @@ def test_skips_fetcher_on_auth_cooldown(monkeypatch):
     assert mgr.submitted == []
 
 
+def test_skips_auto_fetch_disabled_launcher(monkeypatch):
+    # A local launcher (autoFetch:false) is the stalest store but must never be
+    # enqueued by the background scheduler; the fresh web store is not stale.
+    monkeypatch.setattr(
+        sched,
+        "_catalog_age_sec",
+        lambda mk, pid, now: {
+            "amazon": sched.DEFAULT_STALE_AGE_SEC + 9999,
+            "steam": 10,
+        }.get(mk, 10),
+    )
+    fetchers = {
+        "steam": {"group": "library", "metaKey": "steam", "requires": [], "platforms": []},
+        "amazon": {
+            "group": "library",
+            "metaKey": "amazon",
+            "requires": [],
+            "platforms": [],
+            "autoFetch": False,
+        },
+    }
+    mgr = FakeManager()
+    s = sched.BackgroundScheduler(
+        manager=mgr,
+        fetchers=fetchers,
+        missing_requirements=lambda reqs: list(reqs),
+        is_pro_fn=lambda: True,
+    )
+    assert s.tick(now=time.time()) is None
+    assert mgr.submitted == []
+
+
 def test_enrichers_and_prices_never_eligible(monkeypatch):
     _set_ages(
         monkeypatch,

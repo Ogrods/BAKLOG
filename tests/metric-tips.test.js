@@ -148,6 +148,14 @@ describe('metricKeyForInsight', () => {
   it('resolves pace insight without colon', () => {
     expect(metricKeyForInsight('~<strong>4.2</strong> yrs to clear at your pace')).toBe('to clear at your pace');
   });
+
+  it('resolves previously-untooltipped insight pills via concept aliases', () => {
+    expect(metricKeyForInsight('Playing since <strong>2015</strong>: <strong>Foo</strong>')).toBe('first PSN session');
+    expect(metricKeyForInsight('Most sessions: <strong>Foo</strong> · 42')).toBe('most PSN sessions');
+    expect(metricKeyForInsight('PSN sessions: <strong>120</strong> total')).toBe('PSN sessions total');
+    expect(metricKeyForInsight('PSN tenure: <strong>6.3</strong> yrs since first session')).toBe('PSN library tenure');
+    expect(metricKeyForInsight('Will you die first? <strong>Backlog wins</strong> · finish by age 80')).toBe('Will you die first?');
+  });
 });
 
 describe('insightTip', () => {
@@ -178,6 +186,21 @@ describe('insightTip', () => {
 
   it('returns empty for unknown insight', () => {
     expect(insightTip('Unknown nonsense metric: <strong>1</strong>')).toBe('');
+  });
+
+  it('gives every insight pill a tooltip (no empty inspiration pills)', () => {
+    const insights = [
+      'Playing since <strong>2015</strong>: <strong>Foo</strong>',
+      'Most sessions: <strong>Foo</strong> · 42',
+      'PSN sessions: <strong>120</strong> total',
+      'PSN tenure: <strong>6.3</strong> yrs since first session',
+      'Will you die first? <strong>Backlog wins</strong> · finish by age 80',
+    ];
+    for (const html of insights) {
+      expect(insightTip(html), html).not.toBe('');
+    }
+    expect(insightTip('Playing since <strong>2015</strong>: <strong>Foo</strong>')).toMatch(/PSN|first_played|earliest/i);
+    expect(insightTip('Will you die first? <strong>Backlog wins</strong> · finish by age 80')).toMatch(/backlog|life expectancy/i);
   });
 });
 

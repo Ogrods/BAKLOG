@@ -408,6 +408,34 @@ const PREFIX_TIPS = [
   { prefix: 'playtime in', key: 'playtime in' },
 ];
 
+/**
+ * Insight-pill concepts whose extracted text never matches a METRIC_TIPS key
+ * (year/value suffixes, no colon, or near-duplicate wording). Each maps to a
+ * semantically exact existing key so the pill still gets a tooltip without
+ * minting a new metric id (keeps the admin Metrics catalog sync pair intact).
+ * Matched against the stripped insight text by prefix.
+ */
+const INSIGHT_CONCEPT_ALIASES = [
+  { prefix: 'Playing since', key: 'first PSN session' },
+  { prefix: 'Most sessions', key: 'most PSN sessions' },
+  { prefix: 'PSN sessions', key: 'PSN sessions total' },
+  { prefix: 'PSN tenure', key: 'PSN library tenure' },
+  { prefix: 'Will you die first?', key: 'Will you die first?' },
+];
+
+/**
+ * Resolve an insight's stripped text to a canonical key via the alias table.
+ * @param {string} text
+ * @returns {string}
+ */
+function insightAliasKey(text) {
+  if (!text) return '';
+  for (const { prefix, key } of INSIGHT_CONCEPT_ALIASES) {
+    if (text.startsWith(prefix)) return key;
+  }
+  return '';
+}
+
 function normalizeLabel(label) {
   if (!label) return '';
   let s = String(label).trim();
@@ -494,6 +522,8 @@ export function metricKeyForInsight(html) {
   if (text.includes('still untouched') || text.startsWith('Added')) {
     return metricKeyForLabel('Added');
   }
+  const alias = insightAliasKey(text);
+  if (alias) return metricKeyForLabel(alias);
   return metricKeyForLabel(concept);
 }
 
@@ -523,5 +553,7 @@ export function insightTip(html) {
   if (text.includes('still untouched') || text.startsWith('Added')) {
     return METRIC_TIPS['Added'];
   }
+  const alias = insightAliasKey(text);
+  if (alias && METRIC_TIPS[alias]) return METRIC_TIPS[alias];
   return marqueeTip(concept);
 }

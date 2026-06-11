@@ -275,10 +275,11 @@ export function renderViewHouseSlot() {
   const slot = document.getElementById('viewHouseSlot');
   if (!slot) return;
   const view = state.activeView;
-  if (view === 'dashboard' || view === 'connections') {
+  if (view === 'dashboard' || view === 'connections' || view === 'pro') {
     slot.classList.add('hidden');
     slot.innerHTML = '';
     return;
   }
+  slot.classList.remove('hidden');
   renderHouseLocationSlot(houseLocationForView(view), 'viewHouseSlot');
 }

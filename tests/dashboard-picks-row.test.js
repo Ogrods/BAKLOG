@@ -66,27 +66,28 @@ describe('dashboard picks row', () => {
     expect(itchTab).toMatch(/\bhidden\b/);
   });
 
-  it('hides the itch card on a truly-empty new profile', async () => {
+  it('shows the itch card on a truly-empty new profile', async () => {
     const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     setAuthStatusSnapshot([]);
     state.itchGames = [];
     state.games = [];
     applyItchVisibility();
     const itch = document.getElementById('dashItchCard');
-    expect(itch.classList.contains('hidden')).toBe(true);
+    expect(itch.classList.contains('hidden')).toBe(false);
+    expect(itch.classList.contains('dash-card-itch--inactive')).toBe(false);
   });
 
-  it('shows the itch card dimmed when something else is connected but itch is not', async () => {
+  it('shows the itch card full-strength when something else is connected but itch is not', async () => {
     const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     setAuthStatusSnapshot([{ key: 'steam', status: 'connected' }]);
     state.itchGames = [];
     applyItchVisibility();
     const itch = document.getElementById('dashItchCard');
     expect(itch.classList.contains('hidden')).toBe(false);
-    expect(itch.classList.contains('dash-card-itch--inactive')).toBe(true);
+    expect(itch.classList.contains('dash-card-itch--inactive')).toBe(false);
   });
 
-  it('shows the itch card active (not dimmed) when itch data exists', async () => {
+  it('shows the itch card when itch data exists', async () => {
     const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     setAuthStatusSnapshot([]);
     state.itchGames = [{ store: 'itch', id: 'a', name: 'Demo' }];
@@ -103,10 +104,11 @@ describe('dashboard picks row', () => {
     document.getElementById('dashItchRecap').innerHTML = '';
     renderDashboardItchRecap();
     const recap = document.getElementById('dashItchRecap');
-    expect(recap.textContent).toContain('Start earning free games today');
-    expect(recap.textContent).toContain('Connect itch.io');
+    expect(recap.textContent).toContain('Start collecting free games on itch.io');
+    expect(recap.textContent).toContain('Already have itch?');
     expect(recap.querySelector('.itch-card-rail')).toBeTruthy();
     expect(recap.querySelector('[data-jump-view="connections"]')).toBeTruthy();
+    expect(recap.querySelector('.itch-onboard-cta--primary')?.getAttribute('href')).toContain('itch.io/games/free');
   });
 
   it('renders library value block when itch videogames exist', async () => {

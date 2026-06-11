@@ -541,19 +541,26 @@ export function filterCounted(list) {
   return list.filter(countsInLibraryTotal);
 }
 
+/** Main catalog + itch tab games, minus cross-store dupes and user-hidden rows. */
+export function libraryGamesBase() {
+  const itch = Array.isArray(state.itchGames) ? state.itchGames : [];
+  const main = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
+  const seen = new Set();
+  const out = [];
+  for (const g of [...main, ...itch]) {
+    const k = gameKey(g);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(g);
+  }
+  return filterOutHidden(out);
+}
+
 /** Visible, counted library size: drops cross-store dupes, user-hidden rows,
  *  and manual rows toggled out of the count. Single source of truth for the
  *  "of Y" denominators and headline totals. */
 export function countedLibraryDenominator() {
-  let n = 0;
-  for (const g of state.allGames) {
-    if (state.crossStoreHiddenKeys.has(gameKey(g))) continue;
-    const p = getPersonal(g);
-    if (p.hidden === true) continue;
-    if (p.exclude_from_count === true) continue;
-    n++;
-  }
-  return n;
+  return filterCounted(libraryGamesBase()).length;
 }
 
 /** One-shot: seed pre-hidden defaults from former fetcher denylists. */

@@ -582,6 +582,7 @@ export function applyItchTabVisibility() {
   const tab = document.querySelector('.view-tab[data-view="itch"]');
   if (!tab) return;
   const available = isItchTabAvailable();
+  tab.classList.remove("hidden");
   tab.classList.toggle("itch-tab-jump", !available);
   // Fail open during boot: until auth status is fetched and the library has
   // loaded, authStatus/itchGames are empty, so a hard refresh on itch would

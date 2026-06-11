@@ -148,11 +148,18 @@ describe('auth-gate', () => {
     expect(document.getElementById('authGateError').textContent).toBe('');
   });
 
-  it('isPro returns true when ?pro=1 is in the URL', async () => {
-    vi.stubGlobal('location', { ...window.location, search: '?pro=1' });
+  it('isPro returns true when ?pro=1 is in the URL on localhost', async () => {
+    vi.stubGlobal('location', { ...window.location, hostname: '127.0.0.1', search: '?pro=1' });
     const { isPro, getPlan } = await import('../js/auth-gate.js');
     expect(isPro()).toBe(true);
     expect(getPlan()).toBe('pro');
+  });
+
+  it('isPro ignores ?pro=1 off localhost', async () => {
+    vi.stubGlobal('location', { ...window.location, hostname: 'baklog.app', search: '?pro=1' });
+    const { isPro, getPlan } = await import('../js/auth-gate.js');
+    expect(isPro()).toBe(false);
+    expect(getPlan()).not.toBe('pro');
   });
 
   it('isPro returns true when baklog-debug-pro is set in localStorage', async () => {

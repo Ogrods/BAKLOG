@@ -110,6 +110,10 @@ export const personalStore = (() => {
       const sn = Number(sv);
       const ln = Number(out[key]);
       if ((!Number.isFinite(sn) || sn <= 0) && Number.isFinite(ln) && ln > 0) continue;
+      if (Number.isFinite(sn) && sn > 0 && Number.isFinite(ln) && ln > 0) {
+        out[key] = sn >= ln ? sv : out[key];
+        continue;
+      }
       out[key] = sv;
     }
     return out;
@@ -143,6 +147,7 @@ export const personalStore = (() => {
     if (rec.hltb_override != null && rec.hltb_override !== '') return true;
     if (rec.hidden === true) return true;
     if (rec.priority) return true;
+    if (rec.exclude_from_count === true) return true;
     return false;
   }
 
@@ -203,6 +208,8 @@ export const personalStore = (() => {
         merged.hltb_override = rec.hltb_override;
       }
       if (rec.hidden === true) merged.hidden = true;
+      if (rec.exclude_from_count === true) merged.exclude_from_count = true;
+      if (rec.exclude_from_count === false) merged.exclude_from_count = false;
       out[key] = merged;
     }
     return out;

@@ -95,6 +95,18 @@ import {
   renderDashboardWishlistStats,
 } from './dashboard.js';
 
+function handleSponsoredDealClick(el) {
+  if (!el) return;
+  if (!el.dataset.sponsorHouse) recordSponsoredClick(el.dataset.sponsorId);
+  if (isProPromoSponsorId(el.dataset.sponsorId)) {
+    goToProView();
+    return;
+  }
+  if (isSafeHttpUrl(el.dataset.sponsorUrl)) {
+    window.open(el.dataset.sponsorUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+
 /**
  * Collapse the picks panel if it's currently expanded.
  *
@@ -162,12 +174,7 @@ export function bindEvents() {
       return;
     }
     if (action === "sponsored-deal") {
-      if (!card.dataset.sponsorHouse) recordSponsoredClick(card.dataset.sponsorId);
-      if (isProPromoSponsorId(card.dataset.sponsorId)) {
-        goToProView();
-        return;
-      }
-      if (isSafeHttpUrl(card.dataset.sponsorUrl)) window.open(card.dataset.sponsorUrl, "_blank", "noopener,noreferrer");
+      handleSponsoredDealClick(card);
       return;
     }
     if (action === "deal-on-sale") {
@@ -205,14 +212,7 @@ export function bindEvents() {
     if (deal && !inDealRail) {
       e.preventDefault();
       e.stopPropagation();
-      if (!deal.dataset.sponsorHouse) recordSponsoredClick(deal.dataset.sponsorId);
-      if (isProPromoSponsorId(deal.dataset.sponsorId)) {
-        goToProView();
-        return;
-      }
-      if (isSafeHttpUrl(deal.dataset.sponsorUrl)) {
-        window.open(deal.dataset.sponsorUrl, '_blank', 'noopener,noreferrer');
-      }
+      handleSponsoredDealClick(deal);
     }
   });
 

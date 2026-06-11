@@ -731,3 +731,15 @@ describe('storeBadgeHtml — cross-store pill', () => {
     expect(html).not.toContain('manual');
   });
 });
+
+describe('parseLastPlayedMs', () => {
+  it('treats epoch seconds and milliseconds', async () => {
+    const { parseLastPlayedMs } = await import('../js/game-core.js');
+    expect(parseLastPlayedMs({ last_played: 1_700_000_000 })).toBe(1_700_000_000_000);
+    expect(parseLastPlayedMs({ last_played: 1_700_000_000_000 })).toBe(1_700_000_000_000);
+    expect(parseLastPlayedMs({ last_played: '2024-01-15T12:00:00Z' })).toBe(
+      Date.parse('2024-01-15T12:00:00Z'),
+    );
+    expect(parseLastPlayedMs({})).toBe(0);
+  });
+});

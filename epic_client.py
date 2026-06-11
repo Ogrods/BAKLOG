@@ -285,6 +285,8 @@ class EpicClient:
                 )
                 self._apply_tokens(data)
                 return
+            except EpicCorrectiveActionError:
+                raise
             except EpicAuthError as e:
                 print(f"  refresh token rejected ({e}); falling back to auth code")
 

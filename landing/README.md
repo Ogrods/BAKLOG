@@ -67,6 +67,12 @@ Run `sql/polar_entitlement.sql` once in the Supabase SQL editor (`get_user_id_by
 
 Local app: set `BAKLOG_POLAR_ORG_ID` to your Polar organization id (Settings → General) so `POST /api/license/activate` can validate license keys against Polar.
 
+**Checkout link success URL (both monthly and yearly links):** set Polar → Checkout Links → Success URL to:
+
+`http://127.0.0.1:8765/?checkout=success&checkout_id={CHECKOUT_ID}`
+
+After payment, Polar redirects back to the local app, which opens the **Pro** tab with activation instructions. Hosted-auth users click **Refresh Pro status** once the webhook has run; pure-local users paste the `BAKLOG-XXXX` license key from the Polar receipt.
+
 Without the Resend trio, `/api/subscribe` returns `500 Server not configured` and the form shows a friendly error.
 
 ## Rate limiting (required for production)

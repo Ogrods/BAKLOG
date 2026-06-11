@@ -125,4 +125,19 @@ describe('auth-gate', () => {
     await signOutAccount({ intentional: true });
     expect(document.getElementById('authGateError').textContent).toBe('');
   });
+
+  it('isPro returns true when ?pro=1 is in the URL', async () => {
+    vi.stubGlobal('location', { ...window.location, search: '?pro=1' });
+    const { isPro, getPlan } = await import('../js/auth-gate.js');
+    expect(isPro()).toBe(true);
+    expect(getPlan()).toBe('pro');
+  });
+
+  it('isPro returns true when baklog-debug-pro is set in localStorage', async () => {
+    localStorage.setItem('baklog-debug-pro', '1');
+    const { isPro, getPlan } = await import('../js/auth-gate.js');
+    expect(isPro()).toBe(true);
+    expect(getPlan()).toBe('pro');
+    localStorage.removeItem('baklog-debug-pro');
+  });
 });

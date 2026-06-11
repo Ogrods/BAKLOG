@@ -541,6 +541,13 @@ function gameSpotlightReason(g, recentKeys) {
   if (isLeveragePick(g)) {
     return { eyebrow: 'Clutch deal', score: rating + 12, isLeverage: true };
   }
+  // "Supposedly perfect" — a flawless 100% score on a thin sample (<50 reviews),
+  // so the perfection deserves a grain of salt. Checked before Barrel/Quick win
+  // so a suspicious perfect score isn't masked by a routine elite-short tag.
+  const reviewCount = g.steam_review_count || 0;
+  if (rating >= 100 && reviewCount > 0 && reviewCount < 50) {
+    return { eyebrow: 'Supposedly perfect', score: rating - 2 };
+  }
   if (isBarrel(g)) {
     return { eyebrow: 'Barrel', score: rating + 6, isBarrel: true };
   }
@@ -595,6 +602,21 @@ function gameSpotlightReason(g, recentKeys) {
   }
   if (rating >= 70) {
     return { eyebrow: 'Worth a look', score: rating - 10 };
+  }
+  // Discovery fallbacks for backlog titles that earned no rating-driven category
+  // above. Ordered most-specific first so a blank-slate game reads as one rather
+  // than picking up a partial label.
+  const noRating = rating <= 0;
+  const noHltb = !hltb;
+  const neverPlayed = playtime <= 0;
+  if (noRating && noHltb && neverPlayed) {
+    return { eyebrow: 'Total mystery', score: 42 };
+  }
+  if (noRating) {
+    return { eyebrow: 'Unreviewed', score: 40 };
+  }
+  if (neverPlayed) {
+    return { eyebrow: 'Unplayed', score: 38 };
   }
   return null;
 }

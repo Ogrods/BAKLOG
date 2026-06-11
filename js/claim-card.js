@@ -240,8 +240,8 @@ export function claimRowHtml(claim) {
   const cover = claimCoverUrl(claim);
   const ends = formatEndsAt(claim.ends_at);
   const reviewPct = reviewPercentValue(claim);
-  const review = reviewPct != null ? `${reviewPct}%` : '—';
-  const endsHtml = ends ? `Ends ${escapeHtml(ends)}` : '—';
+  const review = reviewPct != null ? `${reviewPct}%` : '-';
+  const endsHtml = ends ? `Ends ${escapeHtml(ends)}` : '-';
   const ls = cover ? window.coverLandscapeAttr(cover) : '';
   const coverHtml = cover
     ? `<img class="claim-row-cover${ls}" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(claimCoverFallback(claim))}" data-name="${escapeAttr(claim.title || '')}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />`
@@ -271,7 +271,7 @@ export function claimHiddenRowHtml(claim, { actionHtml = '', rowClass = '' } = {
   const store = claim.store || 'other';
   const cover = claimCoverUrl(claim);
   const ends = formatEndsAt(claim.ends_at);
-  const endsHtml = ends ? `Ends ${escapeHtml(ends)}` : '—';
+  const endsHtml = ends ? `Ends ${escapeHtml(ends)}` : '-';
   const ls = cover ? window.coverLandscapeAttr(cover) : '';
   const coverHtml = cover
     ? `<img class="claim-hidden-row-cover${ls}" src="${escapeAttr(cover)}" alt="" loading="lazy" onload="window.markLandscape(this)" />`

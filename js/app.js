@@ -114,6 +114,11 @@ async function bootstrap() {
   initScrollLock();
   await initAuthGate();
   ensureProfileScopedFetcherState();
+  // Must run before personalStore.init() so snapshotLocal() captures
+  // localStorage dismissals (__dismissedClaims / __dismissedClaimKeys) for
+  // merge with the server doc. Without this, state.personal stays {} and
+  // prior dismissals are lost whenever the server copy is empty or stale.
+  hydrateState();
   const tBoot = typeof performance !== "undefined" ? performance.now() : Date.now();
   // Dashboard now uses direct ES imports for its dependencies (game-core,
   // deals, genres, personal-storage, prefs, filters-ui, table-ui). The

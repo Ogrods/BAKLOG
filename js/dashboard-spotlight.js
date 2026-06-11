@@ -9,10 +9,22 @@ import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getDealInfo, cutBucketClass } from './deals.js';
 import { isBarrel, isLeveragePick, getLibrarySnapshot, topWarGame, metacriticScore } from './sabermetrics.js';
 import { computeSpotlightSuperlatives } from './creative-metrics.js';
-import { eyebrowTip, eyebrowVariant } from './metric-tips.js';
+import * as MetricTips from './metric-tips.js';
 import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
 import { registerPausable } from './visibility.js';
-import { getAdsForLocation, getSpotlightHouseAds, sponsorToSpotlightGame, spotlightLogoMarkHtml } from './sponsored-deals.js';
+import { getAdsForLocation, getSpotlightHouseAds, sponsorToSpotlightGame, spotlightLogoMarkHtml, SPOTLIGHT_PREMIUM_SCHEMES } from './sponsored-deals.js';
+
+// Namespace import avoids link-time failure if metric-tips.js is stale/truncated
+// (data maps may load while named function exports are missing).
+const eyebrowTip = MetricTips.eyebrowTip ?? ((eyebrow) => {
+  if (!eyebrow) return '';
+  return MetricTips.EYEBROW_TIPS?.[eyebrow] || '';
+});
+const eyebrowVariant = MetricTips.eyebrowVariant ?? ((canonical) => {
+  if (!canonical) return '';
+  const variants = MetricTips.EYEBROW_VARIANTS?.[canonical];
+  return variants?.[0] || canonical;
+});
 
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
@@ -870,22 +882,47 @@ function spotlightSecondaryStat(g) {
   return null;
 }
 
-// Large-logo dashboard spotlight slide: the BAKLOG mark on a brand backdrop with
-// the Pro pitch, used for house creatives flagged art_mode: "logo". No cover art
-// (so no art-fit/onload), no dismiss — it is permanent until the user upgrades.
+// Large-logo dashboard spotlight slide: the BAKLOG mark + wordmark on a premium
+// brand backdrop with the Pro pitch, used for house creatives flagged art_mode:
+// "logo". No cover art (so no art-fit/onload), no dismiss — permanent until Pro.
+function spotlightSchemeSuffix(scheme) {
+  const s = String(scheme || '').toLowerCase();
+  return SPOTLIGHT_PREMIUM_SCHEMES.includes(s) ? ` dash-spotlight--scheme-${s}` : '';
+}
+
+function syncSpotlightSchemeClasses(el, scheme) {
+  for (const s of SPOTLIGHT_PREMIUM_SCHEMES) {
+    el.classList.remove(`dash-spotlight--scheme-${s}`);
+  }
+  const key = String(scheme || '').toLowerCase();
+  if (SPOTLIGHT_PREMIUM_SCHEMES.includes(key)) {
+    el.classList.add(`dash-spotlight--scheme-${key}`);
+  }
+}
+
 function spotlightLogoInnerHtml(g) {
   const eyebrow = g._spotlightReason?.eyebrow || 'BAKLOG Pro';
   const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
   const tagline = g._spotlightReason?.metaParts?.[0] || '';
+  const slogan = g._spotlightAd?.slogan || g._spotlightReason?.slogan || '';
   const cta = g._spotlightAd?.cta || '';
+  const sloganHtml = slogan
+    ? `<span class="dash-spotlight-slogan">${escapeHtml(slogan)}</span>`
+    : '';
+  const metaHtml = tagline
+    ? `<span class="dash-spotlight-meta">${tagline}</span>`
+    : '';
   return `
     <div class="dash-spotlight-logo-backdrop" aria-hidden="true"></div>
-    <div class="dash-spotlight-logo-mark" aria-hidden="true">${spotlightLogoMarkHtml()}</div>
+    <div class="dash-spotlight-logo-lockup" aria-hidden="true">
+      <div class="dash-spotlight-logo-mark">${spotlightLogoMarkHtml()}</div>
+      <span class="dash-spotlight-wordmark">BAKLOG</span>
+    </div>
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow">${escapeHtml(displayEyebrow)}</span>
-      <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
-      <span class="dash-spotlight-meta">${tagline}</span>
+      ${sloganHtml}
+      ${metaHtml}
       ${cta ? `<span class="dash-spotlight-logo-cta">${escapeHtml(cta)} &rarr;</span>` : ''}
     </div>`;
 }
@@ -952,9 +989,10 @@ export function renderSpotlightHtml(g) {
     : `Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}`;
   const adClass = ad ? ' dash-spotlight--ad' : '';
   const logoClass = g._spotlightArtMode === 'logo' ? ' has-logo-art' : '';
+  const schemeClass = g._spotlightArtMode === 'logo' ? spotlightSchemeSuffix(ad?.scheme) : '';
   return `<div class="dash-spotlight-wrap" id="dashboardSpotlightWrap" role="group" aria-roledescription="carousel">
     <span class="sr-only dash-spotlight-live" id="dashboardSpotlightLive" aria-live="polite"></span>
-    <button type="button" class="dash-spotlight${adClass}${logoClass}" id="dashboardSpotlight" data-action="${action}"${keyAttr}${sponsorAttrs} title="${title}">
+    <button type="button" class="dash-spotlight${adClass}${logoClass}${schemeClass}" id="dashboardSpotlight" data-action="${action}"${keyAttr}${sponsorAttrs} title="${title}">
       ${spotlightInnerHtml(g)}
     </button>
     ${spotlightNavHtml()}
@@ -1053,6 +1091,7 @@ function applySpotlightSlide(el, next) {
   el._spotlightTiltReset?.();
   el.innerHTML = spotlightInnerHtml(next);
   el.classList.toggle('has-logo-art', next._spotlightArtMode === 'logo');
+  syncSpotlightSchemeClasses(el, next._spotlightArtMode === 'logo' ? next._spotlightAd?.scheme : '');
   el.dataset.key = gameKey(next);
   // Keep the click action, sponsor attrs, title, and ad styling in sync with the
   // rotated-in slide (mirrors renderSpotlightHtml). Sponsored slides open the ad

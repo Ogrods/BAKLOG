@@ -31,9 +31,8 @@ export {
 export const CLAIMS_HOSTED_URL = 'https://baklog.app/free-claims.json';
 const FALLBACK_PATH = 'curated/free_claims.fallback.json';
 const MAX_VISIBLE = 5;
-// Dismissals are kept indefinitely unless stale — never prune because a claim
-// is absent from the current feed snapshot (feed sources flap and ids churn).
-const DISMISSAL_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+// Dismissals persist until the user restores them from the hidden-claims menu.
+// Never auto-prune by age or feed absence — feed ids churn and sources flap.
 
 let _claimsVisibleCount = MAX_VISIBLE;
 let _readOnlyPollTimer = null;
@@ -121,29 +120,7 @@ export function restoreClaim(id) {
 }
 
 function pruneDismissedClaims() {
-  const cutoff = Date.now() - DISMISSAL_TTL_MS;
-  let changed = false;
-  const dismissed = dismissedClaimsMap();
-  for (const [id, ts] of Object.entries(dismissed)) {
-    const n = Number(ts);
-    if (Number.isFinite(n) && n > 0 && n < cutoff) {
-      delete dismissed[id];
-      changed = true;
-    }
-  }
-  const dismissedKeys = dismissedClaimKeysMap();
-  for (const [k, ts] of Object.entries(dismissedKeys)) {
-    const n = Number(ts);
-    if (Number.isFinite(n) && n > 0 && n < cutoff) {
-      delete dismissedKeys[k];
-      changed = true;
-    }
-  }
-  if (changed) {
-    state.personal.__dismissedClaims = dismissed;
-    state.personal.__dismissedClaimKeys = dismissedKeys;
-    savePersonal();
-  }
+  // Intentionally no-op: cleared claims stay hidden until restored via the menu.
 }
 
 function claimTitleNorms(title) {

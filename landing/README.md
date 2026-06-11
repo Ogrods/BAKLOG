@@ -154,9 +154,54 @@ Feed schema:
 - `placements`: `deal-rail`, `dash-deal-rail`, `spotlight`, `picks`, `table`, `dash-picks`, `dash-versus`, `coop-online`, `coop-couch`, `claimable` (comma string or array).
 - `match_title`: skip the slot when the user already owns that game.
 - `network`: optional bookkeeping field (ignored by the app; useful for your records).
-- Affiliate programs with tagged outbound URLs (Humble Partner, Fanatical, GOG, ITAD) need no extra app code — clicks open `url` via the existing sponsored-deal handler. Steam has no affiliate program.
+- Steam has no affiliate program.
+
+### Affiliate monetization (two paths)
+
+**1. Sponsored feed (high-commission marketplaces)** — Fanatical, Green Man Gaming, and similar shops that only appear as ITAD *deal* links are monetized here. Add a creative with your tagged affiliate URL; clicks open `url` via the existing sponsored-deal handler (no extra app code). Example v2 creative:
+
+```json
+{
+  "ads": {
+    "aff-fanatical-weekend": {
+      "kind": "sponsor",
+      "title": "Fanatical Weekend Sale",
+      "tagline": "Up to 90% off PC keys",
+      "cta": "Shop deals",
+      "url": "https://www.fanatical.com/?ref=YOUR_TAG",
+      "cover": "/assets/ads-sample/cover-encore.webp",
+      "enabled": true,
+      "starts": "2026-06-09T00:00:00Z",
+      "ends": "2026-06-16T00:00:00Z",
+      "network": "fanatical"
+    }
+  },
+  "locations": {
+    "wish-pick": ["aff-fanatical-weekend"],
+    "dash-pick": ["aff-fanatical-weekend"]
+  }
+}
+```
+
+Copy `curated/sponsors.json` → `landing/sponsors.json` and deploy.
+
+**2. Store-page links (`js/affiliate.js`)** — When you open a game on its *library store* (GOG, Epic, Humble rows), BAKLOG builds the URL in `storeUrlForGame` and may append your tag. Edit `AFFILIATE_RULES` in `js/affiliate.js`: fill `value` (param mode) or `template` (deeplink mode with `{url}`), set `enabled: true`. Rules ship disabled so links are untouched until you enroll.
+
+**ITAD deal links are NOT tagged** — wishlist "best deal" URLs are `next.isthereanydeal.com` redirects that already carry ITAD's affiliate tag; the ITAD API ToS forbids altering them.
 
 No per-user impression or click tracking is sent from the app unless the user opts in (see below); affiliate networks attribute revenue from the tagged URL only.
+
+### Affiliate signup checklist
+
+| Program | Enroll via | What you get | Where it goes | Terms (verify on signup) |
+|---------|------------|--------------|---------------|--------------------------|
+| **GOG** | affiliate@gog.com + [AdTraction](https://adtraction.com) | Deeplink template or `af.gog.com` branded link | `js/affiliate.js` GOG rule `template` **and/or** sponsor creative `url` | 6% net, 7-day cookie |
+| **Epic** | [Support-A-Creator](https://sac.epicgames.com/overview) | Creator tag | `js/affiliate.js` Epic rule `value` (`epic_creator_id`) | 5% min, $100 payout floor |
+| **Humble** | [Impact](https://impact.com) | Deeplink template | `js/affiliate.js` Humble rule `template` **and/or** sponsor creative | ~5.6%+, 30-day |
+| **Fanatical** | CJ Affiliate / Awin | `?ref=` tag or deeplink | **Sponsor feed only** (`curated/sponsors.json`) | Up to 5%, 30-day |
+| **Green Man Gaming** | Awin | Deeplink template | **Sponsor feed only** | 5% new / 2% returning |
+| **Gamesplanet** | partners@gamesplanet.com | `?ref=` tag | **Sponsor feed only** (gated ~4k followers) | 5–10% |
+| **ITAD** | Contact ITAD re: official app / partner status | Revenue share on organic deal clicks | N/A today — only legit path to ITAD redirect revenue | API ToS invites contact |
 
 ## Opt-in aggregate metrics (`/api/metrics`)
 

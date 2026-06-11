@@ -255,7 +255,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Power-user conveniences',
     tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
-    cta: "$5/mo — see what's planned",
+    cta: "$5/mo - see what's planned",
     url: 'https://baklog.app/',
     cover: '',
     enabled: true,
@@ -283,29 +283,37 @@ const HOUSE_DEFAULTS = {
   'house-spotlight-pro-logo': {
     kind: 'house',
     title: 'BAKLOG Pro',
-    tagline: 'One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo, planned.',
+    slogan: 'One honest backlog across every store.',
+    tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
     cta: "See what's planned",
     url: 'https://baklog.app/',
     cover: '',
     art_mode: 'logo',
+    scheme: 'ember',
     enabled: true,
   },
   'house-spotlight-pro-sync': {
     kind: 'house',
     title: 'Sync every machine',
-    tagline: 'BAKLOG Pro keeps your library and personal data aligned across machines — no manual exports.',
-    cta: "$5/mo — see what's planned",
+    slogan: 'Keep your library and personal data aligned across machines - no manual exports.',
+    tagline: 'BAKLOG Pro cloud sync - $5/mo, planned.',
+    cta: "$5/mo - see what's planned",
     url: 'https://baklog.app/',
     cover: '',
+    art_mode: 'logo',
+    scheme: 'sapphire',
     enabled: true,
   },
   'house-spotlight-pro-noads': {
     kind: 'house',
     title: 'Fewer distractions',
-    tagline: 'BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo, planned.',
-    cta: "$5/mo — see what's planned",
+    slogan: 'Paid tier drops sponsored deal slots so your deal radar stays yours.',
+    tagline: 'BAKLOG Pro - no sponsored slots. $5/mo, planned.',
+    cta: "$5/mo - see what's planned",
     url: 'https://baklog.app/',
     cover: '',
+    art_mode: 'logo',
+    scheme: 'emerald',
     enabled: true,
   },
 };
@@ -485,7 +493,7 @@ function sponsorDiscTitle(item) {
   const isHouse = String(item?.kind || '').toLowerCase() === 'house';
   return isHouse
     ? 'House promotion from BAKLOG (not a paid placement)'
-    : 'Paid placement. Disclosed sponsored slot — funds the free tier.';
+    : 'Paid placement. Disclosed sponsored slot - funds the free tier.';
 }
 
 function sponsorHouseClass(item) {
@@ -644,7 +652,7 @@ const HOUSE_BANNER_FEATURES = [
   },
   {
     title: 'Open & honest',
-    desc: 'No telemetry. Full source on GitHub (MIT) — audit every line.',
+    desc: 'No telemetry. Full source on GitHub (MIT) - audit every line.',
   },
 ];
 
@@ -653,9 +661,9 @@ const HOUSE_BANNER_FEATURES = [
 const PRO_PROMO = {
   label: 'BAKLOG Pro',
   title: 'Power-user conveniences',
-  price: '$5/mo ($50/yr) — planned',
+  price: '$5/mo ($50/yr) - planned',
   tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
-  cta: "$5/mo — see what's planned",
+  cta: "$5/mo - see what's planned",
   url: 'https://baklog.app/',
   features: [
     {
@@ -746,7 +754,7 @@ export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
 export function proPromoBannerHtml(item) {
   if (isPro()) return '';
   if (!item) return '';
-  const discTitle = 'House promotion from BAKLOG — optional paid tier (planned)';
+  const discTitle = 'House promotion from BAKLOG - optional paid tier (planned)';
   const title = item.title || PRO_PROMO.title;
   const taglineText = item.tagline ?? PRO_PROMO.tagline;
   const cta = item.cta || PRO_PROMO.cta;
@@ -1001,8 +1009,42 @@ function sponsorFakeStats(item) {
 
 const SP_DASH = '<span class="text-slate-600">-</span>';
 
+/** BAKLOG-branded table row (no faux game stats or Deal pill). */
+export function houseTableRowHtml(item, { locationKey = 'lib-row' } = {}) {
+  if (!item) return '';
+  noteSponsoredImpression(locationKey, item.id);
+  const discTitle = sponsorDiscTitle(item);
+  const cta = item.cta || 'Learn more';
+  const coverUrl = sponsorCoverUrl(item.cover);
+  const coverCell = coverUrl
+    ? `<span class="cover-wrap"><img class="cover" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'" /></span>`
+    : `<span class="house-table-mark" aria-hidden="true">${baklogBannerMarkHtml(`houseRow-${item.id || 'house'}`)}</span>`;
+  const tagline = item.tagline
+    ? `<span class="house-table-tagline">${escapeHtml(item.tagline)}</span>`
+    : '';
+  return `<tr class="sponsored-table-row sponsored-table-row--house sponsored-deal-house" data-sponsored-row="1"
+    ${sponsorActionAttrs(item)} title="${escapeAttr(discTitle)}">
+    <td class="col-select p-2 text-center" aria-hidden="true"></td>
+    <td class="col-cover p-2">${coverCell}</td>
+    <td class="col-house-promo p-2" colspan="12">
+      <span class="house-table-strip">
+        <span class="house-table-copy min-w-0">
+          <span class="house-table-kicker">From BAKLOG</span>
+          <span class="house-table-title">${escapeHtml(item.title)}</span>
+          ${tagline}
+        </span>
+        <span class="house-table-cta">${escapeHtml(cta)} &rarr;</span>
+        ${houseDismissHtml(item)}
+      </span>
+    </td>
+  </tr>`;
+}
+
 export function sponsoredTableRowHtml(item, { isWish, locationKey = 'lib-row' } = {}) {
   if (!item) return '';
+  if (String(item.kind || '').toLowerCase() === 'house') {
+    return houseTableRowHtml(item, { locationKey });
+  }
   noteSponsoredImpression(locationKey, item.id);
   const discTitle = sponsorDiscTitle(item);
   const coverUrl = sponsorCoverUrl(item.cover);
@@ -1213,6 +1255,9 @@ export function sponsoredClaimCardHtml(item) {
   return `<div class="sponsored-claim-feature">${sponsoredFeatureAdHtml(item)}</div>`;
 }
 
+/** Premium spotlight color schemes (theme-independent). Sync pair: app.css .dash-spotlight--scheme-* */
+export const SPOTLIGHT_PREMIUM_SCHEMES = ['ember', 'sapphire', 'emerald'];
+
 /** Synthetic spotlight slide from a sponsor feed item. */
 export function sponsorToSpotlightGame(item) {
   if (item?.id) noteSponsoredImpression('dash-spotlight', item.id);
@@ -1221,6 +1266,9 @@ export function sponsorToSpotlightGame(item) {
   const disclosure = sponsorDisclosure(item);
   const tagline = item.tagline ? escapeHtml(item.tagline) : '';
   const artMode = String(item.art_mode || '').toLowerCase() === 'logo' ? 'logo' : '';
+  const schemeRaw = String(item.scheme || '').toLowerCase();
+  const scheme = SPOTLIGHT_PREMIUM_SCHEMES.includes(schemeRaw) ? schemeRaw : '';
+  const slogan = item.slogan ? String(item.slogan) : '';
   return {
     store: 'sponsored',
     id: item.id,
@@ -1232,6 +1280,7 @@ export function sponsorToSpotlightGame(item) {
       eyebrow: isHouse ? 'BAKLOG Pro' : disclosure,
       score: 100 - (item.priority ?? 50),
       metaParts: tagline ? [tagline] : [],
+      slogan,
       isSponsored: true,
     },
     _spotlightAd: {
@@ -1241,6 +1290,8 @@ export function sponsorToSpotlightGame(item) {
       kind: item.kind,
       cta: item.cta || '',
       artMode,
+      scheme,
+      slogan,
     },
   };
 }

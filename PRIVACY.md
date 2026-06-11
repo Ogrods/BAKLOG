@@ -250,8 +250,11 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
 - No telemetry, analytics, or silent crash reports — including the error
   log: it stays in your browser until *you* copy it or explicitly send it via
   **Send report** in the consent dialog.
-- No third-party ad/affiliate scripts (the deal links go straight to the store
-  via ITAD).
+- No third-party ad/affiliate **scripts** — outbound links may carry an
+  affiliate tag when the maintainer is enrolled (store-page links BAKLOG builds
+  itself; disclosed Sponsored slots). No per-user click tracking unless you opt
+  in (Connections). Wishlist deal links from IsThereAnyDeal use ITAD's own
+  redirect URLs and are left unchanged (ITAD API terms).
 - No project-owned cloud service.
 - No automatic sync between machines — use the portable secrets bundle
   (Connections → Export bundle…) if you move to a new PC.

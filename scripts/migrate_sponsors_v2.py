@@ -38,10 +38,10 @@ HOUSE_DEFAULTS = {
     },
     "house-pro-promo": {
         "kind": "house",
-        "title": "Power-user conveniences",
+        "title": "Move faster. Cut the noise.",
         "tagline": (
-            "Nothing you use today moves behind paywall. "
-            "The optional tier layers on bulk refresh, sync, and fewer distractions."
+            "Queue every stale store, sync across machines, and drop sponsored deal cards. "
+            "Nothing you use today moves behind paywall."
         ),
         "cta": "Get Pro — $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
@@ -51,9 +51,9 @@ HOUSE_DEFAULTS = {
     "house-lib-backlog": {
         "kind": "house",
         "title": "You own 600 games. You've played 40.",
-        "tagline": "One honest backlog across every store. Free, private, Steam-ready.",
-        "cta": "Start free",
-        "url": "https://baklog.app/",
+        "tagline": "One honest backlog across every store. Private, Steam-ready.",
+        "cta": "Get Pro — $5/mo",
+        "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "dismissible": True,
         "enabled": True,
@@ -113,10 +113,10 @@ HOUSE_DEFAULTS = {
         "slogan": "It's not a godsend, it's just your library.",
         "tagline": (
             "Every game you already own, deduped across every store "
-            "into one honest backlog. Free and local-first."
+            "into one honest backlog. Local-first."
         ),
-        "cta": "Start free",
-        "url": "https://baklog.app/",
+        "cta": "Get Pro — $5/mo",
+        "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "art_mode": "logo",
         "scheme": "sapphire",

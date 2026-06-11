@@ -74,6 +74,13 @@ import { suppressChartStaggerForBoot, resizeRibbonCharts } from './dashboard-cha
 import { prewarmTableQueryForView, tableFingerprint } from './table-ui.js';
 import { applyColumnVisibility } from './table-columns.js';
 import { initBugReportDialog } from './bug-report.js';
+import {
+  applyProTabVisibility,
+  consumeCheckoutQuery,
+  consumeProHash,
+  handleCheckoutSuccessReturn,
+  wireProView,
+} from './pro-view.js';
 
 // Personal-storage's setPersonal triggers a downstream render of
 // summary/picks/dashboard. Those callbacks live in filters-ui/picks-ui/
@@ -113,6 +120,8 @@ function hydrateState() {
 async function bootstrap() {
   initScrollLock();
   await initAuthGate();
+  const checkoutReturn = consumeCheckoutQuery();
+  if (!checkoutReturn) consumeProHash();
   ensureProfileScopedFetcherState();
   const tBoot = typeof performance !== "undefined" ? performance.now() : Date.now();
   // Dashboard now uses direct ES imports for its dependencies (game-core,
@@ -131,7 +140,7 @@ async function bootstrap() {
   stripLegacyTags();
   seedPreHiddenDefaults();
   state.prefs.genreFilters = (state.prefs.genreFilters || []).map(aliasCanonicalGenre);
-  const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch", "connections"]);
+  const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch", "connections", "pro"]);
   if (VALID_VIEWS.has(state.prefs.activeView)) {
     state.activeView = state.prefs.activeView;
   }
@@ -139,6 +148,8 @@ async function bootstrap() {
   syncViewTabAria(state.activeView);
   savePrefs();
   bindEvents();
+  wireProView();
+  applyProTabVisibility();
   if (state.prefs.shareAnonStats) startMetrics();
   await initProfiles();
   document.getElementById("rowHeroBackdrop").checked = !!state.prefs.rowHeroBackdrop;
@@ -263,6 +274,8 @@ async function bootstrap() {
           console.warn("[bootstrap] Chart.js load failed", err);
           reportError(err, { source: "ensureChartJs", kind: "bootstrap" });
         });
+    } else if (state.activeView === "pro") {
+      void handleCheckoutSuccessReturn();
     } else {
       scheduleIdlePrewarm();
     }

@@ -27,7 +27,7 @@
           var p = JSON.parse(raw);
           if (p && typeof p.activeView === 'string') view = p.activeView;
         }
-        var valid = { dashboard: 1, library: 1, wishlist: 1, itch: 1, connections: 1 };
+        var valid = { dashboard: 1, library: 1, wishlist: 1, itch: 1, connections: 1, pro: 1 };
         if (!valid[view]) view = 'dashboard';
         document.documentElement.setAttribute('data-init-view', view);
         var theme = localStorage.getItem('baklog-color-theme') || 'default';
@@ -147,6 +147,7 @@
             <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="wishlist" title="Wishlist games and deal filters">Wishlist</button>
             <button type="button" class="view-tab hidden px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch" title="itch.io library">itch.io</button>
             <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections" title="Connect stores and manage API keys / OAuth">Connections</button>
+            <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="pro" title="BAKLOG Pro — upgrade and activate">Pro</button>
           </nav>
         </div>
         <span class="app-header-tagline text-[11px] hidden sm:inline self-center" title="All data is stored locally - nothing is uploaded by default">Cross-store backlog · local-only</span>
@@ -226,6 +227,10 @@
       })();
     </script>
 
+    <section id="proContainer" class="hidden mb-4">
+      <div id="proViewRoot" class="pro-view-root"></div>
+    </section>
+
     <section id="connectionsContainer" class="hidden mb-4">
       <div class="conn-hero">
         <div class="conn-hero-text">
@@ -261,6 +266,7 @@
         <p id="bgRefreshPlanNote" class="conn-prefs-note" hidden></p>
       </div>
       </div>
+      <div id="connProPanel" class="conn-pro-panel" hidden></div>
       <div id="connOnboard" hidden></div>
       <div id="connBrowserWarn" class="migration-banner hidden mb-3" role="status" aria-live="polite"></div>
       <div id="connLayout">

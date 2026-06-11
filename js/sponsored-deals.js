@@ -29,6 +29,7 @@ import { isOwnedByTitle } from './deals.js';
 import { dataFetch } from './api-client.js';
 import { isPro } from './auth-gate.js';
 import { noteSponsoredImpression } from './anon-metrics.js';
+import { PRO_CHECKOUT_MONTHLY, PRO_CHECKOUT_YEARLY } from './pro-checkout.js';
 
 const SPONSORS_LOCAL_PATH = 'sponsors.json';
 const SPONSORS_FALLBACK_PATH = 'curated/sponsors.json';
@@ -255,8 +256,8 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Power-user conveniences',
     tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
-    cta: "$5/mo — see what's planned",
-    url: 'https://baklog.app/',
+    cta: 'Get Pro — $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     enabled: true,
   },
@@ -283,9 +284,9 @@ const HOUSE_DEFAULTS = {
   'house-spotlight-pro-logo': {
     kind: 'house',
     title: 'BAKLOG Pro',
-    tagline: 'One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo, planned.',
-    cta: "See what's planned",
-    url: 'https://baklog.app/',
+    tagline: 'One honest backlog, leveled up. Bulk refresh, cloud sync, no ads — $5/mo.',
+    cta: 'Get Pro',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     art_mode: 'logo',
     enabled: true,
@@ -294,17 +295,17 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Sync every machine',
     tagline: 'BAKLOG Pro keeps your library and personal data aligned across machines — no manual exports.',
-    cta: "$5/mo — see what's planned",
-    url: 'https://baklog.app/',
+    cta: 'Get Pro — $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     enabled: true,
   },
   'house-spotlight-pro-noads': {
     kind: 'house',
     title: 'Fewer distractions',
-    tagline: 'BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo, planned.',
-    cta: "$5/mo — see what's planned",
-    url: 'https://baklog.app/',
+    tagline: 'BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo.',
+    cta: 'Get Pro — $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     enabled: true,
   },
@@ -650,13 +651,13 @@ const HOUSE_BANNER_FEATURES = [
 
 // Homepage Pro upsell — pulled from landing/index.html paid-tier copy.
 // Sync pair: PRO_PROMO ↔ landing/index.html paid tier + FAQ pricing answers.
-const PRO_PROMO = {
+export const PRO_PROMO = {
   label: 'BAKLOG Pro',
   title: 'Power-user conveniences',
-  price: '$5/mo ($50/yr) — planned',
+  price: '$5/mo ($50/yr)',
   tagline: 'Nothing you use today moves behind paywall. The optional tier layers on bulk refresh, sync, and fewer distractions.',
-  cta: "$5/mo — see what's planned",
-  url: 'https://baklog.app/',
+  cta: 'Get Pro — $5/mo',
+  url: PRO_CHECKOUT_MONTHLY,
   features: [
     {
       title: 'Queued bulk refresh',
@@ -672,6 +673,18 @@ const PRO_PROMO = {
     },
   ],
 };
+
+const PRO_PROMO_SPONSOR_IDS = new Set([
+  'house-pro-promo',
+  'house-spotlight-pro-logo',
+  'house-spotlight-pro-sync',
+  'house-spotlight-pro-noads',
+]);
+
+/** True for in-app house promos that should open the Pro view tab (not Polar directly). */
+export function isProPromoSponsorId(id) {
+  return PRO_PROMO_SPONSOR_IDS.has(String(id || '').trim());
+}
 
 /** Hard-coded wishlist deal-rail house banner (not driven by sponsors.json). */
 export const HOUSE_DEAL_ITEM = {
@@ -746,7 +759,7 @@ export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
 export function proPromoBannerHtml(item) {
   if (isPro()) return '';
   if (!item) return '';
-  const discTitle = 'House promotion from BAKLOG — optional paid tier (planned)';
+  const discTitle = 'House promotion from BAKLOG — optional paid tier';
   const title = item.title || PRO_PROMO.title;
   const taglineText = item.tagline ?? PRO_PROMO.tagline;
   const cta = item.cta || PRO_PROMO.cta;
@@ -775,7 +788,6 @@ export function proPromoBannerHtml(item) {
         <div class="house-banner-copy min-w-0">
           <div class="house-banner-head">
             <span class="dash-kpi-label">${escapeHtml(PRO_PROMO.label)}</span>
-            <span class="sponsored-badge sponsored-badge--inline" title="${escapeAttr(discTitle)}">Planned</span>
           </div>
           <div class="house-banner-title">${escapeHtml(title)}</div>
           ${price}

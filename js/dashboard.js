@@ -36,7 +36,7 @@ import {
 import { renderDashboardCoopSpotlight, replaceCoopSponsorRow, renderDashboardPicksVersus, renderDashboardRecentAdditions, renderDashboardWishlistStats, renderDashboardItchRecap, renderDashboardSponsoredPick, renderDashboardFeatureBanner } from './dashboard-cards.js';
 import { pickSpotlightGames, renderSpotlightHtml, syncSpotlightInMega, primeSpotlightArt, startSpotlightRotation, stopSpotlightRotation, getSpotlightPool, setSpotlightCurrentKey } from './dashboard-spotlight.js';
 import { buildInsightPool, buildMarqueeItems, buildMegaLibraryContext, renderMarqueeHtml, renderMarqueeTrackInner, applyMarqueeSpeed, startInsightRotation, stopInsightRotation, observeMarqueeSpeed } from './dashboard-insights.js';
-import { commitRenderedMetrics } from './metrics-rendered.js';
+import { commitRenderedMetrics, noteRenderedKeysFromArtifacts } from './metrics-rendered.js';
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
 import { THEME_CHANGE_EVENT } from './theme.js';
@@ -139,7 +139,10 @@ function megaContentFingerprint() {
 
 function buildMegaArtifacts(games, snap) {
   const key = megaContentFingerprint();
-  if (key === _megaArtifactsKey && _megaArtifactsCache) return _megaArtifactsCache;
+  if (key === _megaArtifactsKey && _megaArtifactsCache) {
+    noteRenderedKeysFromArtifacts(_megaArtifactsCache.marqueeItems, _megaArtifactsCache.insightPool);
+    return _megaArtifactsCache;
+  }
   const megaCtx = buildMegaLibraryContext(games);
   _megaArtifactsCache = {
     insightPool: buildInsightPool(games, snap, megaCtx),

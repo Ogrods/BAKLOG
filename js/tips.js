@@ -82,7 +82,6 @@ export const TIP_GROUPS = [
   ],
   [
     "Click a game's cover to browse alternate cover and landscape art.",
-    "Don't love a cover? Click it to pick from other art.",
   ],
   [
     "Open Columns to reveal hidden stats like Score and Metacritic.",

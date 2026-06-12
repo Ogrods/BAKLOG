@@ -12,7 +12,6 @@
     "gamerpower-3553",
     "gamerpower-3665",
     "gamerpower-3671",
-    "gamerpower-3676",
     "gamerpower-3677",
     "gamerpower-3678",
     "gamerpower-3679",
@@ -73,9 +72,6 @@
     "gamerpower-3671": {
       "title": "Flufftopia"
     },
-    "gamerpower-3676": {
-      "title": "Dire Echo"
-    },
     "gamerpower-3677": {
       "title": "Not A Customer"
     },
@@ -110,8 +106,8 @@
       "title": "Guild of Dungeoneering Ultimate Edition"
     },
     "itad-6d00ffeb0fdc": {
-      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
-      "title": "Another World Adventures"
+      "title": "Another World Adventures",
+      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures"
     },
     "itad-7a69412dd110": {
       "title": "Relaxing Simulator"
@@ -126,8 +122,8 @@
       "title": "Smiley Dusty"
     },
     "itad-f0cffe659c19": {
-      "claim_url": "https://freebies.indiegala.com/blacklist-mafia",
-      "title": "Blacklist Mafia"
+      "title": "Blacklist Mafia",
+      "claim_url": "https://freebies.indiegala.com/blacklist-mafia"
     }
   },
   "dismissed": [
@@ -154,6 +150,7 @@
     "itad-caf022eee569",
     "itad-8ca7cd481f36",
     "gamerpower-3681",
-    "itad-0d845ad1210c"
+    "itad-0d845ad1210c",
+    "gamerpower-3676"
   ]
 }

@@ -334,7 +334,12 @@ export const personalStore = (() => {
         });
         if (!res.ok) {
           if (res.status === 409) {
-            console.warn('[personalStore] save rejected: server active profile changed');
+            const detail = await res.text().catch(() => '');
+            if (detail.includes('empty overwrite')) {
+              console.warn('[personalStore] save rejected: refusing empty overwrite');
+            } else {
+              console.warn('[personalStore] save rejected: server active profile changed');
+            }
           } else {
             console.warn('[personalStore] PUT failed', res.status, await res.text().catch(() => ''));
           }
@@ -354,6 +359,7 @@ export const personalStore = (() => {
 
   async function flush() {
     if (apiAvailable !== true) return;
+    if (!initComplete) return;
     if (inFlight) {
       try { await inFlight; } catch (_) {}
     }
@@ -361,17 +367,20 @@ export const personalStore = (() => {
     dirty = false;
     pushTimer = null;
     const snap = snapshotLocal();
+    if (!isMeaningful(snap)) return;
     const ok = await putPayload(snap);
     if (!ok) dirty = true;
   }
 
   function flushSync() {
     if (apiAvailable !== true) return;
+    if (!initComplete) return;
     if (!dirty && !pushTimer) return;
     clearTimeout(pushTimer);
     pushTimer = null;
     dirty = false;
     const snap = snapshotLocal();
+    if (!isMeaningful(snap)) return;
     const body = JSON.stringify(snap);
     try {
       const headers = {

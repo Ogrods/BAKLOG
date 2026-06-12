@@ -838,6 +838,62 @@ def test_enrich_item_skips_network_when_fully_enriched(
     assert review_calls == []
 
 
+def test_enrich_item_publish_skips_portrait_upgrade_for_reviewed_gp_thumb(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw = {
+        "id": "gamerpower-3684",
+        "store": "steam",
+        "title": "Eets (Steam) Giveaway",
+        "claim_url": "https://www.gamerpower.com/open/eets-steam-giveaway",
+        "steam_appid": 6100,
+        "header_image": "https://www.gamerpower.com/offers/1b/6a2aebf9e069c.jpg",
+        "review_percent": 59,
+        "genres": ["Casual", "Indie", "Strategy"],
+    }
+    portrait_calls: list[int] = []
+
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: portrait_calls.append(appid) or bfc._steam_portrait_cover(appid),
+    )
+
+    out = bfc._enrich_item(raw, [0.0], upgrade_covers=False)
+
+    assert out["review_percent"] == 59
+    assert out["header_image"] == raw["header_image"]
+    assert portrait_calls == []
+
+
+def test_enrich_item_upgrade_covers_still_verifies_portrait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw = {
+        "id": "gamerpower-3684",
+        "store": "steam",
+        "title": "Eets (Steam) Giveaway",
+        "claim_url": "https://www.gamerpower.com/open/eets-steam-giveaway",
+        "steam_appid": 6100,
+        "header_image": "https://www.gamerpower.com/offers/1b/6a2aebf9e069c.jpg",
+        "review_percent": 59,
+        "genres": ["Casual", "Indie", "Strategy"],
+    }
+    portrait = bfc._steam_portrait_cover(6100)
+    portrait_calls: list[int] = []
+
+    monkeypatch.setattr(
+        bfc,
+        "_verified_portrait_cover",
+        lambda appid, lc: portrait_calls.append(appid) or portrait,
+    )
+
+    out = bfc._enrich_item(raw, [0.0], upgrade_covers=True)
+
+    assert portrait_calls == [6100]
+    assert out["header_image"] == portrait
+
+
 def test_enrich_item_fetches_review_when_portrait_present(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

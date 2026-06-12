@@ -319,6 +319,12 @@ describe('claimSourceHtml', () => {
   it('is case-insensitive on the source key', () => {
     expect(claimSourceHtml('EPIC')).toContain('via Epic');
   });
+
+  it('bakes the Epic creator code into the linked Epic source badge', () => {
+    const html = claimSourceHtml('epic', { tag: 'a' });
+    expect(html).toContain('epic_creator_id=BAKLOG');
+    expect(html).toContain('store.epicgames.com');
+  });
 });
 
 describe('dismissClaim', () => {

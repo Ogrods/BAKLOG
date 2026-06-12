@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-06-11T22:51:53.976Z",
+  "generated_at": "2026-06-12T17:41:06.036Z",
   "ads": {
     "ad-spotlight-hero-emberfall": {
       "kind": "sponsor",
@@ -195,7 +195,6 @@
       "cta": "Join the waitlist",
       "url": "https://baklog.app/#waitlist",
       "cover": "",
-      "dismissible": true,
       "enabled": true
     },
     "house-pro-promo": {
@@ -214,7 +213,6 @@
       "cta": "Get Pro — $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
-      "dismissible": true,
       "enabled": true
     },
     "house-itch-privacy": {
@@ -224,7 +222,6 @@
       "cta": "Learn more",
       "url": "https://baklog.app/",
       "cover": "",
-      "dismissible": true,
       "enabled": true
     },
     "house-spotlight-pro-logo": {

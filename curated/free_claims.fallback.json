@@ -1,6 +1,23 @@
 {
-  "generated_at": "2026-06-11T23:08:29.203734+00:00",
+  "generated_at": "2026-06-12T17:28:43.068342+00:00",
   "items": [
+    {
+      "id": "steam-wild-terra-2-new-lands",
+      "store": "steam",
+      "title": "Wild Terra 2: New Lands",
+      "claim_url": "https://store.steampowered.com/app/1134700/Wild_Terra_2_New_Lands/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1134700/library_600x900_2x.jpg",
+      "genres": [
+        "Action",
+        "Indie",
+        "Massively Multiplayer",
+        "RPG"
+      ],
+      "blurb": null,
+      "ends_at": "2026-06-15T17:00:00Z",
+      "steam_appid": 1134700,
+      "review_percent": 52
+    },
     {
       "id": "itad-9dcfdf2b0b35",
       "store": "steam",
@@ -35,7 +52,7 @@
       "store": "steam",
       "title": "Eets",
       "claim_url": "https://www.gamerpower.com/open/eets-steam-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/6100/b97e6e9de18d08941c872fc73abae7c2dc91ccfe/header.jpg?t=1781207036",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a2aebf9e069c.jpg",
       "genres": [
         "Casual",
         "Indie",
@@ -132,7 +149,7 @@
       "store": "itch",
       "title": "Static Voice",
       "claim_url": "https://www.gamerpower.com/open/static-voice-itch-io-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4207170/5b734a735246cf374806d41ec31076c84772566a/header.jpg?t=1776267157",
+      "header_image": "https://www.gamerpower.com/offers/1b/69c5a81a64b29.jpg",
       "genres": [],
       "blurb": "Claim Static Voice for free on Itch.io! Static Voice is a first-person survival game where you play as a resident of an old Soviet apartment block.",
       "ends_at": "2026-06-19T23:59:00Z",
@@ -146,7 +163,7 @@
       "store": "itch",
       "title": "Sleep Demon",
       "claim_url": "https://www.gamerpower.com/open/sleep-demon-itchio-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4465030/d04ad74487b126388fee536474bcb258c642239c/header.jpg?t=1773513774",
+      "header_image": "https://www.gamerpower.com/offers/1b/69ca788f5d0d4.jpg",
       "genres": [],
       "blurb": "Download Sleep Demon for free on Itch.io until June 14, a indie single player walking simulator game about sleep paralysis.",
       "ends_at": "2026-06-14T23:59:00Z",
@@ -160,26 +177,12 @@
       "store": "itch",
       "title": "CALLUS",
       "claim_url": "https://www.gamerpower.com/open/callus-itch-io-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4258330/6bdf7e7240b40e22c54c407ebe860b7397c53fd8/header.jpg?t=1781111625",
+      "header_image": "https://www.gamerpower.com/offers/1b/697cea97b5a63.jpg",
       "genres": [],
       "blurb": "Want to go for a walk? Grab CALLUS for free on itch.io! Callus is a small indie psychological walking simulator with realistic gameplay.",
       "ends_at": "2026-06-15T23:59:00Z",
       "steam_appid": 4258330,
       "review_percent": 76,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3676",
-      "store": "itch",
-      "title": "Dire Echo",
-      "claim_url": "https://www.gamerpower.com/open/dire-echo-itchio-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a27eafa35794.jpg",
-      "genres": [],
-      "blurb": "Explore deep space with this giveaway. Get Dire Echo for free on itch.io, a 3d sci-fi first-person exploration game featuring impressive visuals.",
-      "ends_at": "2026-06-11T23:59:00Z",
-      "steam_appid": 3743180,
-      "review_percent": 75,
       "source": "gamerpower",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -237,7 +240,7 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2081930/library_600x900_2x.jpg",
       "genres": [],
       "blurb": "Become the Taco! Finally, a free game made for taco fans! Download Carlos the Taco for free on IndieGala. Carlos the Taco is a 2D platformer set in Mexico where you play as a taco!",
-      "ends_at": null,
+      "ends_at": "2026-06-25T22:48:59Z",
       "steam_appid": 2081930,
       "review_percent": 85,
       "source": "gamerpower",
@@ -265,7 +268,7 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1546400/library_600x900_2x.jpg",
       "genres": [],
       "blurb": "Score GigaBash for free via Stove and claim your place as king among Titans! GigaBash is a multiplayer arena brawler with gigantic film-inspired kaiju and fully destructible environments.",
-      "ends_at": null,
+      "ends_at": "2026-06-25T22:48:59Z",
       "steam_appid": 1546400,
       "review_percent": 94,
       "source": "gamerpower",
@@ -279,7 +282,7 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2299730/library_600x900_2x.jpg",
       "genres": [],
       "blurb": "Grab Dual Chroma: Academy Carols for free on itch.io! Dual Chroma: Academy Carols is a slice-of-life Visual Novel. Check it out, If you are a fan of this type of game!",
-      "ends_at": null,
+      "ends_at": "2026-06-25T22:48:59Z",
       "steam_appid": 2299730,
       "review_percent": 86,
       "source": "gamerpower",
@@ -293,7 +296,7 @@
       "header_image": "https://www.gamerpower.com/offers/1b/62dec9fa9312b.jpg",
       "genres": [],
       "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
-      "ends_at": null,
+      "ends_at": "2026-06-25T22:48:59Z",
       "source": "gamerpower",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -408,19 +411,6 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "itad-0c69ed1f1bd8",
-      "store": "epic",
-      "title": "Rogue Waters",
-      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Rogue Waters",
-      "ends_at": null,
-      "steam_appid": 1691190,
-      "review_percent": 76,
-      "source": "itad"
-    },
-    {
       "id": "itad-b07aac9ebd26",
       "store": "epic",
       "title": "Wytchwood",
@@ -444,6 +434,19 @@
       "ends_at": null,
       "steam_appid": 867210,
       "review_percent": 86,
+      "source": "itad"
+    },
+    {
+      "id": "itad-0c69ed1f1bd8",
+      "store": "epic",
+      "title": "Rogue Waters",
+      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Rogue Waters",
+      "ends_at": null,
+      "steam_appid": 1691190,
+      "review_percent": 76,
       "source": "itad"
     }
   ],

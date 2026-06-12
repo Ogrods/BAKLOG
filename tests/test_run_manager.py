@@ -837,6 +837,17 @@ def test_has_runs_for_profile(runs_env) -> None:
     assert mgr.has_runs_for_profile("missing") is False
 
 
+def test_has_runs_for_profile_includes_active_not_in_pending(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    active = server.Run("demo", runs_dir=runs_dir, profile_id="work")
+    active.status = "running"
+    with mgr._lock:
+        mgr._active = active
+        mgr._runs_by_id[active.id] = active
+    assert mgr.has_runs_for_profile("work") is True
+    assert mgr.has_runs_for_profile("play") is False
+
+
 def test_cancel_all_and_wait_finishes_queued(runs_env) -> None:
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)
@@ -860,6 +871,19 @@ def test_cancel_all_and_wait_reports_stragglers(runs_env) -> None:
     assert result["stragglers"]
     assert result["stragglers"][0]["id"] == run.id
     assert not run._finished.is_set()
+
+
+def test_cancel_all_and_wait_includes_active_not_in_pending(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    active = server.Run("demo", runs_dir=runs_dir)
+    active.status = "running"
+    with mgr._lock:
+        mgr._active = active
+        mgr._runs_by_id[active.id] = active
+    result = mgr.cancel_all_and_wait(timeout=5.0)
+    assert active.id in {s["id"] for s in result["cancelled"]}
+    assert result["stragglers"] == []
+    assert active._finished.is_set()
 
 
 def test_shutdown_cancels_in_flight_run(runs_env, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -941,3 +965,84 @@ def test_execute_runs_from_repo_root_for_nondefault_profile(
 
     assert captured["cwd"] == str(server.ROOT)
     assert captured["argv"][1] == str(server.ROOT / "fetch_games.py")
+
+
+@pytest.fixture()
+def internal_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(
+        server.INTERNAL_JOBS,
+        "buildClaims",
+        {
+            "label": "Build free claims feed",
+            "script": "build_free_claims.py",
+            "group": "claims",
+            "args": [],
+            "options": {},
+        },
+    )
+    monkeypatch.setitem(
+        server.INTERNAL_JOBS,
+        "claimSources",
+        {
+            "label": "Fetch claim sources",
+            "script": "fetch_claim_sources.py",
+            "group": "claims",
+            "args": [],
+            "options": {},
+        },
+    )
+
+
+def test_internal_lane_parallel_to_fetcher(runs_env, internal_jobs) -> None:
+    mgr, runs_dir = runs_env
+    running = server.Run("demo", runs_dir=runs_dir)
+    running.status = "running"
+    with mgr._lock:
+        mgr._pending.append(running)
+        mgr._runs_by_id[running.id] = running
+        mgr._active = running
+
+    internal = mgr.submit_internal("buildClaims")
+
+    assert internal._internal
+    snap = mgr.snapshot()
+    assert snap["active"]["key"] == "demo"
+    assert snap["queue"] == []
+
+
+def test_fetcher_lane_parallel_to_internal(runs_env, internal_jobs) -> None:
+    mgr, runs_dir = runs_env
+    internal = server.Run(
+        "buildClaims",
+        runs_dir=runs_dir,
+        internal=True,
+    )
+    internal.status = "running"
+    with mgr._lock:
+        mgr._pending.append(internal)
+        mgr._runs_by_id[internal.id] = internal
+        mgr._internal_active = internal
+
+    fetcher = mgr.submit("demo")
+
+    assert not fetcher._internal
+    snap = mgr.snapshot()
+    assert snap["internal_active"]["key"] == "buildClaims"
+    assert snap["active"]["key"] == "demo"
+
+
+def test_internal_lane_still_serializes_among_itself(runs_env, internal_jobs) -> None:
+    mgr, runs_dir = runs_env
+    running = server.Run(
+        "buildClaims",
+        runs_dir=runs_dir,
+        internal=True,
+    )
+    running.status = "running"
+    with mgr._lock:
+        mgr._pending.append(running)
+        mgr._runs_by_id[running.id] = running
+        mgr._internal_active = running
+
+    with pytest.raises(ValueError, match="admin job"):
+        mgr.submit_internal("claimSources")

@@ -67,7 +67,7 @@ import { reloadGames, reloadAfterFetcher, finishEmptyLibraryLoad } from './libra
 import { initLibraryWatches } from './library-watch.js';
 import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
-import { initProfiles } from './profiles.js';
+import { ensureActiveProfileResolved, initProfiles } from './profiles.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
 import { suppressChartStaggerForBoot, resizeRibbonCharts } from './dashboard-charts.js';
@@ -121,6 +121,7 @@ function hydrateState() {
 async function bootstrap() {
   initScrollLock();
   await initAuthGate();
+  await ensureActiveProfileResolved();
   const checkoutReturn = consumeCheckoutQuery();
   if (!checkoutReturn) consumeProHash();
   ensureProfileScopedFetcherState();

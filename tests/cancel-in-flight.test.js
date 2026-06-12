@@ -327,7 +327,42 @@ describe('cancelInFlightRuns server truth', () => {
     vi.useRealTimers();
   });
 
-  it('claims auto-run backs off silently while an internal job holds the run slot', async () => {
+  it('waitForQueueSlot polls /api/runs and unblocks when the fetcher lane frees', async () => {
+    let runsGets = 0;
+    const fetchMock = vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        runsGets += 1;
+        const busy = runsGets < 2;
+        return {
+          ok: true,
+          json: async () => ({
+            active: busy ? { id: 'r1', key: 'steam', status: 'running' } : null,
+            queue: [],
+            history: [],
+          }),
+        };
+      }
+      if (u.includes('/api/config')) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'r1', key: 'steam', status: 'running' },
+      queue: [],
+      history: [],
+    });
+    expect(fetcherRunner.isQueueFull()).toBe(true);
+    await fetcherRunner.waitForQueueSlot();
+    expect(runsGets).toBeGreaterThanOrEqual(1);
+    expect(fetcherRunner.isQueueFull()).toBe(false);
+  });
+
+  it('claims auto-run proceeds while an internal job holds the internal lane', async () => {
     let runPosts = 0;
     const fetchMock = vi.fn(async (url, init) => {
       const u = String(url);
@@ -351,7 +386,13 @@ describe('cancelInFlightRuns server truth', () => {
       if (u.includes('/api/runs') && method === 'GET') {
         return {
           ok: true,
-          json: async () => ({ active: null, queue: [], history: [] }),
+          json: async () => ({
+            active: null,
+            queue: [],
+            internal_active: { id: 'build-1', key: 'buildClaims', status: 'running' },
+            internal_queue: [],
+            history: [],
+          }),
         };
       }
       if (u.includes('/api/run/claims') && method === 'POST') {
@@ -368,22 +409,12 @@ describe('cancelInFlightRuns server truth', () => {
     await fetcherRunner.probeApi(true);
     await loadFetcherSources(true);
     fetcherRunner.applyServerSnapshotInFlight({
-      active: { id: 'build-1', key: 'buildClaims', status: 'running' },
+      active: null,
       queue: [],
+      internal_active: { id: 'build-1', key: 'buildClaims', status: 'running' },
+      internal_queue: [],
       history: [],
     });
-    expect(fetcherRunner.isQueueFull()).toBe(true);
-    await fetcherRunner.run('claims', { auto: true });
-    fetcherRunner.flushLinesNow();
-    const postsWhileBusy = fetchMock.mock.calls.filter(
-      c => String(c[0]).includes('/api/run/claims') && (c[1]?.method || 'GET').toUpperCase() === 'POST',
-    );
-    expect(postsWhileBusy).toHaveLength(0);
-    const panel = document.getElementById('fetcherRunLog');
-    const body = panel?.querySelector('[data-role="body"]');
-    expect(body?.textContent || '').not.toMatch(/queue full|re-syncing queue/i);
-
-    fetcherRunner.applyServerSnapshotInFlight({ active: null, queue: [], history: [] });
     expect(fetcherRunner.isQueueFull()).toBe(false);
     await fetcherRunner.run('claims', { auto: true });
     expect(runPosts).toBe(1);

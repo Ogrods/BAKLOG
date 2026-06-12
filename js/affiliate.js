@@ -6,8 +6,9 @@
  * them. High-commission marketplaces that only appear as ITAD deal shops
  * (Fanatical, GMG, etc.) are monetized via the Sponsored feed instead.
  *
- * Call sites: storeUrlForGame (game-core.js), free-claim outbound links
- * (claim-card.js, claimable.js), and wishlist fallback deal URLs (deals.js).
+ * Call sites: storeUrlForGame (game-core.js), free-claim outbound links and
+ * the "via Epic" source badge (claim-card.js), the claim-go handler
+ * (claimable.js), and wishlist fallback deal URLs (deals.js).
  * Help/settings links (itch.io/login, API keys page) are intentionally raw.
  */
 

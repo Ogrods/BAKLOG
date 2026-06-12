@@ -9,6 +9,7 @@ import pytest
 import auth.secrets as secrets
 from auth.manager import (
     _provider_state,
+    _with_profile_secrets,
     enable_local,
     seed_new_profile_auth_defaults,
 )
@@ -55,20 +56,9 @@ def test_itch_local_requires_enabled_even_when_butler_db_present(
 def test_seed_new_profile_auth_defaults_disables_itch_local(tmp_path: Path) -> None:
     profile_id = "work"
     seed_new_profile_auth_defaults(profile_id)
-    saved = (
-        secrets.AUTH_DIR,
-        secrets.SECRETS_FILE,
-        secrets.MASTER_KEY_FILE,
-        secrets._cache,
-    )
-    target = profile_paths.auth_dir(profile_id=profile_id)
-    secrets.AUTH_DIR = target
-    secrets.SECRETS_FILE = target / "secrets.bin"
-    secrets.MASTER_KEY_FILE = target / ".master_key"
-    secrets._cache = None
-    try:
+    # Read back through the same profile-scoped context the seed write used, so
+    # the HKDF subkey is derived for "work" (not the active profile).
+    with _with_profile_secrets(profile_id):
         blob = get_provider_blob("itch_local")
         assert blob.get("disabled") is True
         assert "enabled" not in blob
-    finally:
-        secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache = saved

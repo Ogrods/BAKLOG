@@ -36,7 +36,14 @@ def personal_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         thread.join(timeout=5)
 
 
-def _request(base: str, method: str, path: str, body: dict | None = None) -> tuple[int, dict]:
+def _request(
+    base: str,
+    method: str,
+    path: str,
+    body: dict | None = None,
+    *,
+    extra_headers: dict[str, str] | None = None,
+) -> tuple[int, dict]:
     data = None
     headers = {}
     if body is not None:
@@ -44,6 +51,8 @@ def _request(base: str, method: str, path: str, body: dict | None = None) -> tup
         headers["Content-Type"] = "application/json"
     if method != "GET":
         headers[server._BAKLOG_LOCAL_HEADER] = "1"
+    if extra_headers:
+        headers.update(extra_headers)
     req = urllib.request.Request(f"{base}{path}", data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -98,6 +107,46 @@ def test_personal_get_empty_doc(personal_server: str):
     assert doc["manual"] == []
     assert doc["libraryFirstSeen"] == {}
     assert doc["schema_version"] == 1
+
+
+def test_personal_put_rejects_empty_overwrite_of_meaningful_doc(personal_server: str) -> None:
+    seed = {
+        "personal": {"steam:1": {"status": "backlog"}},
+        "prefs": {},
+        "manual": [],
+        "libraryFirstSeen": {},
+    }
+    put_status, _ = _request(personal_server, "PUT", "/api/personal", seed)
+    assert put_status == 200
+
+    empty = {"personal": {}, "prefs": {}, "manual": [], "libraryFirstSeen": {}}
+    status, err = _request(personal_server, "PUT", "/api/personal", empty)
+    assert status == 409
+    assert err.get("error") == "refusing empty overwrite"
+
+    _, loaded = _request(personal_server, "GET", "/api/personal")
+    assert loaded["personal"] == seed["personal"]
+
+
+def test_personal_put_allows_empty_overwrite_with_opt_in_header(personal_server: str) -> None:
+    seed = {
+        "personal": {"steam:1": {"status": "backlog"}},
+        "prefs": {},
+        "manual": [],
+        "libraryFirstSeen": {},
+    }
+    _request(personal_server, "PUT", "/api/personal", seed)
+
+    empty = {"personal": {}, "prefs": {}, "manual": [], "libraryFirstSeen": {}}
+    status, saved = _request(
+        personal_server,
+        "PUT",
+        "/api/personal",
+        empty,
+        extra_headers={server._BAKLOG_ALLOW_EMPTY_HEADER: "1"},
+    )
+    assert status == 200
+    assert saved["personal"] == {}
 
 
 def test_personal_put_round_trip(personal_server: str):

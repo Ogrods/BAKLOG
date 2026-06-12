@@ -1834,6 +1834,7 @@ export const fetcherRunner = (() => {
   function isQueueFull() {
     return inFlightCount() >= MAX_IN_FLIGHT || lastServerInFlight;
   }
+  const WAIT_QUEUE_SNAPSHOT_POLL_MS = 2000;
   function waitForQueueSlot({ batchEpoch } = {}) {
     if (batchEpoch !== undefined && getCancelEpoch() !== batchEpoch) {
       return Promise.reject(new Error('cancelled'));
@@ -1841,7 +1842,9 @@ export const fetcherRunner = (() => {
     if (cancelInFlight) return Promise.reject(new Error('cancelled'));
     if (!isQueueFull()) return Promise.resolve();
     const start = Date.now();
+    let lastSnapPoll = 0;
     return new Promise((resolve, reject) => {
+      const schedule = (delay) => setTimeout(tick, delay);
       const tick = () => {
         if (cancelInFlight) {
           reject(new Error('cancelled'));
@@ -1859,7 +1862,19 @@ export const fetcherRunner = (() => {
           reject(new Error('queue wait timeout'));
           return;
         }
-        setTimeout(tick, 200);
+        const now = Date.now();
+        if (isApiAvailable() && now - lastSnapPoll >= WAIT_QUEUE_SNAPSHOT_POLL_MS) {
+          lastSnapPoll = now;
+          void fetchRunsSnapshot({ force: true })
+            .then((snap) => {
+              if (snap) applyServerSnapshotInFlight(snap);
+              if (!isQueueFull()) resolve();
+              else schedule(200);
+            })
+            .catch(() => schedule(200));
+          return;
+        }
+        schedule(200);
       };
       tick();
     });
@@ -3210,7 +3225,7 @@ export function renderDashboardFetcherHealth() {
           configHint ? `Note:${configHint}` : '',
           'Server is offline - start `python server.py` to run fetchers from the UI.',
         ].filter(Boolean);
-    const queueFullElsewhere = fetcherRunner.inFlightCount() >= 1 && !runState;
+    const queueFullElsewhere = fetcherRunner.isQueueFull() && !runState;
     if (queueFullElsewhere) {
       titleLines.push('Queue full - a fetch is already running. Wait for it to finish.');
     }

@@ -10,7 +10,7 @@ Endpoints:
     GET  /api/runs                 -> {active, queue, history}
     POST /api/run/<key>            -> {run_id, status}    (queues a fetcher)
     POST /api/run/<run_id>/cancel  -> cancel one queued or running fetcher
-    POST /api/runs/cancel          -> cancel all in-flight fetchers (active + queue)
+    POST /api/runs/cancel          -> cancel in-flight runs; ?lane=fetcher|internal scopes a lane, ?force=1 resets
     GET  /api/stream/<run_id>      -> SSE: status / line / done events (?since=N or Last-Event-ID for resume)
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
@@ -1001,6 +1001,16 @@ def _write_active_runs(runs: list[dict[str, Any]]) -> None:
         _write_json_atomic(ACTIVE_RUNS_FILE, {"runs": runs})
 
 
+def _filter_runs_by_lane(runs: list[Run], lane: str | None) -> list[Run]:
+    """Restrict a run list to one lane. lane="fetcher" drops internal (admin)
+    runs; lane="internal" keeps only them; None passes everything through."""
+    if lane == "fetcher":
+        return [r for r in runs if not r._internal]
+    if lane == "internal":
+        return [r for r in runs if r._internal]
+    return list(runs)
+
+
 def _load_durable_queue() -> list[dict[str, Any]]:
     with _runs_file_lock:
         data = _read_json_file(QUEUE_FILE, {"runs": []})
@@ -1846,8 +1856,17 @@ class RunManager:
         else:
             self._complete_cancel_after_kill(run)
 
-    def cancel_all(self, *, profile_id: str | None = None) -> list[dict[str, Any]]:
-        """Cancel every queued or running fetcher (active + next in queue). Returns immediately."""
+    def cancel_all(
+        self,
+        *,
+        profile_id: str | None = None,
+        lane: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Cancel queued/running runs. lane="fetcher"/"internal" scopes to one lane.
+
+        The dashboard passes lane="fetcher" so its Cancel button never kills an
+        admin job (buildClaims/claimSources) running in the internal lane.
+        """
         with self._lock:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
@@ -1859,6 +1878,7 @@ class RunManager:
                     and active not in targets
                 ):
                     targets.append(active)
+        targets = _filter_runs_by_lane(targets, lane)
         if profile_id is not None:
             targets = [r for r in targets if r.profile_id == profile_id]
         all_pids: list[int] = []
@@ -1887,8 +1907,17 @@ class RunManager:
             self._schedule_cancel_completion(run)
         return summaries
 
-    def force_reset(self, *, profile_id: str | None = None) -> dict[str, Any]:
-        """Kill all tracked PIDs, clear queue state, finalize every in-flight run."""
+    def force_reset(
+        self,
+        *,
+        profile_id: str | None = None,
+        lane: str | None = None,
+    ) -> dict[str, Any]:
+        """Kill tracked PIDs, clear queue state, finalize in-flight runs.
+
+        lane="fetcher"/"internal" scopes the reset to a single lane so the
+        dashboard force-reset leaves admin (internal) jobs untouched.
+        """
         with self._lock:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
@@ -1900,16 +1929,18 @@ class RunManager:
                     and active not in targets
                 ):
                     targets.append(active)
+        targets = _filter_runs_by_lane(targets, lane)
         if profile_id is not None:
             targets = [r for r in targets if r.profile_id == profile_id]
         all_pids: list[int] = []
-        for entry in _read_active_runs():
-            pid = int(entry.get("pid") or 0)
-            if pid <= 0:
-                continue
-            if profile_id is not None and str(entry.get("profile_id") or "") != str(profile_id):
-                continue
-            all_pids.append(pid)
+        if lane is None:
+            for entry in _read_active_runs():
+                pid = int(entry.get("pid") or 0)
+                if pid <= 0:
+                    continue
+                if profile_id is not None and str(entry.get("profile_id") or "") != str(profile_id):
+                    continue
+                all_pids.append(pid)
         for run in targets:
             run.cancelled = True
             with run._lock:
@@ -1918,17 +1949,35 @@ class RunManager:
                     run.exit_code = -1
                     run.ended_at = time.time()
             all_pids.extend(self._collect_pids_for_run(run, []))
-        for drain in (self._queue, self._internal_queue):
+        target_ids = {run.id for run in targets}
+        drains: list[queue.Queue] = []
+        if lane in (None, "fetcher"):
+            drains.append(self._queue)
+        if lane in (None, "internal"):
+            drains.append(self._internal_queue)
+        for drain in drains:
             while True:
                 try:
                     drain.get_nowait()
                 except queue.Empty:
                     break
         with self._lock:
-            self._pending.clear()
-            self._active = None
-            self._internal_active = None
-        _write_active_runs([])
+            if lane is None:
+                self._pending.clear()
+                self._active = None
+                self._internal_active = None
+            else:
+                self._pending = [r for r in self._pending if r not in targets]
+                if lane == "fetcher":
+                    self._active = None
+                elif lane == "internal":
+                    self._internal_active = None
+        if lane is None:
+            _write_active_runs([])
+        else:
+            _write_active_runs(
+                [e for e in _read_active_runs() if e.get("id") not in target_ids]
+            )
         _save_durable_queue([])
         if all_pids:
             _kill_pids_async(list(dict.fromkeys(all_pids)))
@@ -3815,15 +3864,19 @@ class Handler(SimpleHTTPRequestHandler):
         qs = parse_qs(parsed.query)
         force_vals = qs.get("force", ["0"])
         force = force_vals[0].lower() in ("1", "true", "yes")
+        lane = (qs.get("lane", [""])[0] or "").strip().lower() or None
+        if lane not in (None, "fetcher", "internal"):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"invalid lane: {lane}"})
+            return
         scope_pid = None
         if auth_enabled():
             scope_pid = _bind_request_user(self)
             if scope_pid is None:
                 return
         if force:
-            payload = MANAGER.force_reset(profile_id=scope_pid)
+            payload = MANAGER.force_reset(profile_id=scope_pid, lane=lane)
         else:
-            payload = {"cancelled": MANAGER.cancel_all(profile_id=scope_pid)}
+            payload = {"cancelled": MANAGER.cancel_all(profile_id=scope_pid, lane=lane)}
         _send_json(self, HTTPStatus.OK, payload)
 
     def _handle_shutdown(self) -> None:

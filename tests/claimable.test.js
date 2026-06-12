@@ -26,10 +26,13 @@ import {
   stripClaimTitleDecorations,
   dismissClaim,
   restoreClaim,
+  purgeAllHiddenClaims,
   claimAttributionHtml,
   claimSourceHtml,
   feedGeneratedAt,
   pickNewerFeed,
+  resolveClaimsFeedDoc,
+  HOSTED_BOOT_FRESHNESS_MS,
   sanitizeBlurb,
   handleClaimableClick,
   loadClaimableNow,
@@ -128,6 +131,32 @@ describe('pickNewerFeed', () => {
     };
     expect(pickNewerFeed(profile, bundled)?.items?.[0]?.id).toBe('profile');
     expect(feedGeneratedAt(profile)).toBe(Date.parse(profile.fetched_at));
+  });
+});
+
+describe('resolveClaimsFeedDoc', () => {
+  const local = {
+    generated_at: '2026-06-01T12:00:00Z',
+    items: [{ id: 'local', store: 'epic', title: 'Local', claim_url: 'https://example.com/l' }],
+  };
+  const hosted = {
+    generated_at: '2026-06-01T14:30:00Z',
+    items: [{ id: 'hosted', store: 'steam', title: 'Hosted', claim_url: 'https://example.com/h' }],
+  };
+
+  it('prefers hosted when it is substantially newer than local', () => {
+    const doc = resolveClaimsFeedDoc(local, null, hosted);
+    expect(doc.items[0].id).toBe('hosted');
+    expect(feedGeneratedAt(hosted) - feedGeneratedAt(local)).toBeGreaterThanOrEqual(HOSTED_BOOT_FRESHNESS_MS);
+  });
+
+  it('keeps local when hosted is only slightly newer', () => {
+    const slightlyNewerHosted = {
+      generated_at: '2026-06-01T12:30:00Z',
+      items: [{ id: 'hosted-new', store: 'steam', title: 'Hosted', claim_url: 'https://example.com/h2' }],
+    };
+    const doc = resolveClaimsFeedDoc(local, null, slightlyNewerHosted);
+    expect(doc.items[0].id).toBe('local');
   });
 });
 
@@ -367,6 +396,21 @@ describe('getHiddenClaims', () => {
     state.personal.__dismissedClaims = { 'epic-foo': Date.now() };
     state.ownedNormNames = new Set(['foo game']);
     expect(getHiddenClaims(sampleItems)).toHaveLength(0);
+  });
+});
+
+describe('purgeAllHiddenClaims', () => {
+  it('permanently removes all hidden claims from both lists', () => {
+    state.claimableFeed = { items: sampleItems };
+    dismissClaim('gog-bar');
+    expect(getHiddenClaims(sampleItems).map(c => c.id)).toContain('gog-bar');
+
+    purgeAllHiddenClaims();
+
+    expect(getHiddenClaims(sampleItems).map(c => c.id)).not.toContain('gog-bar');
+    expect(getVisibleClaims(sampleItems).map(c => c.id)).not.toContain('gog-bar');
+    expect(Object.keys(state.personal.__purgedClaimKeys || {}).length).toBeGreaterThan(0);
+    expect(state.personal.__dismissedClaims['gog-bar']).toBeUndefined();
   });
 });
 

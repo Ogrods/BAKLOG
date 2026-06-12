@@ -149,6 +149,51 @@ def test_enrich_item_normalizes_ends_at() -> None:
     assert out["ends_at"] == "2026-06-11T22:00:00Z"
 
 
+def test_resolve_ends_at_defaults_epic_from_first_seen() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 11, 12, 0, 0, tzinfo=UTC)
+    raw = {
+        "source": "epic",
+        "first_seen": "2026-06-01T00:00:00Z",
+    }
+    assert bfc._resolve_ends_at(raw, now=now) == "2026-06-15T00:00:00Z"
+
+
+def test_resolve_ends_at_leaves_itad_without_date() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 11, 12, 0, 0, tzinfo=UTC)
+    assert bfc._resolve_ends_at({"source": "itad"}, now=now) is None
+
+
+def test_resolve_ends_at_keeps_existing_longer_date() -> None:
+    raw = {
+        "source": "epic",
+        "ends_at": "2026-08-01T00:00:00Z",
+    }
+    assert bfc._resolve_ends_at(raw) == "2026-08-01T00:00:00Z"
+
+
+def test_enrich_item_defaults_epic_ends_at_without_upstream_date() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 11, 12, 0, 0, tzinfo=UTC)
+    out = bfc._enrich_item(
+        {
+            "id": "epic-bar",
+            "store": "epic",
+            "title": "Bar",
+            "claim_url": "https://store.epicgames.com/en-US/p/bar",
+            "source": "epic",
+            "first_seen": "2026-06-01T00:00:00Z",
+        },
+        [0.0],
+        now=now,
+    )
+    assert out["ends_at"] == "2026-06-15T00:00:00Z"
+
+
 def test_build_publishes_only_approved_auto_items(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -207,7 +252,7 @@ def test_build_publishes_only_approved_auto_items(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -272,7 +317,7 @@ def test_build_without_approved_file_publishes_manual_only(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -338,7 +383,7 @@ def test_build_applies_field_overrides(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -405,7 +450,7 @@ def test_field_override_extends_ends_at_before_expiry_prune(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -524,7 +569,7 @@ def test_build_prunes_expired_approved_and_manual_items(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -1139,7 +1184,7 @@ def test_build_publishes_key_matched_row_when_approved_id_flipped(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -1203,7 +1248,7 @@ def test_build_key_matched_row_inherits_store_and_field_overrides(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -1259,7 +1304,7 @@ def test_build_absent_approved_id_without_override_title_stays_id_only(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],
@@ -1369,7 +1414,7 @@ def test_build_excludes_dismissed_key_matched_duplicate(
     monkeypatch.setattr(
         bfc,
         "_enrich_item",
-        lambda raw, last_call, cover_lookup=None: {
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
             "id": raw["id"],
             "store": raw["store"],
             "title": raw["title"],

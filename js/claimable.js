@@ -32,6 +32,8 @@ export {
 
 export const CLAIMS_HOSTED_URL = 'https://baklog.app/free-claims.json';
 const FALLBACK_PATH = 'curated/free_claims.fallback.json';
+/** Prefer hosted feed when generated_at is this much newer than local (boot freshness). */
+export const HOSTED_BOOT_FRESHNESS_MS = 60 * 60 * 1000;
 const MAX_VISIBLE = 5;
 // Dismissals persist until the user restores them from the hidden-claims menu.
 // Never auto-prune by age or feed absence — feed ids churn and sources flap.
@@ -62,6 +64,22 @@ function dismissedClaimsMap() {
 function dismissedClaimKeysMap() {
   const m = state.personal.__dismissedClaimKeys;
   return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+}
+
+// Purged claims are permanently removed via "Clear all" in the hidden-claims
+// menu. Unlike a dismissal (restorable), a purge is irreversible: the claim must
+// never reappear as visible or hidden. Keyed by stable dedup keys (appid/title)
+// + id so a purge survives feed id churn the same way dismissals do.
+function purgedClaimKeysMap() {
+  const m = state.personal.__purgedClaimKeys;
+  return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+}
+
+function isClaimPurged(c) {
+  if (!c) return false;
+  const keyMap = purgedClaimKeysMap();
+  if (c.id && keyMap[`id:${c.id}`]) return true;
+  return claimDedupKeys(c).some(k => keyMap[k]);
 }
 
 function findClaimById(id) {
@@ -119,6 +137,37 @@ export function restoreClaim(id) {
   const owned = getOwnedClaims(feedItems);
   if (!hidden.length && !owned.length) closeHiddenClaimsModal();
   else openHiddenClaimsModal();
+}
+
+export function purgeAllHiddenClaims() {
+  const feedItems = state.claimableFeed?.items || [];
+  const hidden = getHiddenClaims(feedItems);
+  if (!hidden.length) {
+    closeClaimPurgeConfirm();
+    closeHiddenClaimsModal();
+    return;
+  }
+  if (!state.personal.__purgedClaimKeys) state.personal.__purgedClaimKeys = {};
+  const purgeMap = state.personal.__purgedClaimKeys;
+  const idMap = state.personal.__dismissedClaims;
+  const keyMap = state.personal.__dismissedClaimKeys;
+  const now = Date.now();
+  for (const claim of hidden) {
+    if (claim.id) {
+      purgeMap[`id:${claim.id}`] = now;
+      if (idMap && idMap[claim.id] != null) delete idMap[claim.id];
+    }
+    for (const k of claimDedupKeys(claim)) {
+      purgeMap[k] = now;
+      if (keyMap && keyMap[k] != null) delete keyMap[k];
+    }
+  }
+  savePersonal();
+  applyVisibleClaims();
+  renderClaimableModule();
+  updateClaimableBanner();
+  closeClaimPurgeConfirm();
+  closeHiddenClaimsModal();
 }
 
 function pruneDismissedClaims() {
@@ -235,6 +284,7 @@ export function getVisibleClaims(items) {
   const pro = isPro();
   const filtered = (items || []).filter((c) => {
     if (!isClaimEligible(c, now)) return false;
+    if (isClaimPurged(c)) return false;
     if (isClaimDismissed(c)) return false;
     if (c.premium_only && !pro) return false;
     return true;
@@ -247,6 +297,7 @@ export function getHiddenClaims(items) {
   const pro = isPro();
   const filtered = (items || []).filter((c) => {
     if (!isClaimEligible(c, now)) return false;
+    if (isClaimPurged(c)) return false;
     if (!isClaimDismissed(c)) return false;
     if (c.premium_only && !pro) return false;
     return true;
@@ -260,6 +311,7 @@ export function getOwnedClaims(items) {
   const filtered = (items || []).filter((c) => {
     if (!isClaimFeedItemValid(c)) return false;
     if (isClaimExpired(c, now)) return false;
+    if (isClaimPurged(c)) return false;
     return isClaimOwned(c);
   });
   return sortClaims(dedupeClaims(filtered));
@@ -412,6 +464,24 @@ async function loadLocalClaimsFile() {
   }
 }
 
+/** Merge local, fallback, and hosted feeds using boot freshness rules. */
+export function resolveClaimsFeedDoc(localDoc, fallbackDoc, hostedDoc, { preferHosted = false } = {}) {
+  let doc = pickNewerFeed(localDoc, fallbackDoc);
+  if (hostedDoc?.items?.length) {
+    if (preferHosted || !doc?.items?.length) {
+      doc = pickNewerFeed(doc, hostedDoc) || hostedDoc;
+    } else {
+      const hostedGen = feedGeneratedAt(hostedDoc);
+      const docGen = feedGeneratedAt(doc);
+      if (hostedGen - docGen >= HOSTED_BOOT_FRESHNESS_MS) {
+        doc = hostedDoc;
+      }
+    }
+  }
+  if (!doc?.items?.length) doc = { generated_at: null, items: [] };
+  return doc;
+}
+
 export async function loadClaimableNow({ preferHosted = false } = {}) {
   let localDoc = null;
   let fallbackDoc = null;
@@ -422,15 +492,12 @@ export async function loadClaimableNow({ preferHosted = false } = {}) {
     fallbackDoc = await loadBundledFallback();
   } catch (_) { /* offline */ }
 
-  let doc = pickNewerFeed(localDoc, fallbackDoc);
+  let hostedDoc = null;
+  try {
+    hostedDoc = await fetchHostedClaims();
+  } catch (_) { /* network */ }
 
-  if (preferHosted || !doc?.items?.length) {
-    try {
-      const hosted = await fetchHostedClaims();
-      if (hosted?.items?.length) doc = pickNewerFeed(doc, hosted) || hosted;
-    } catch (_) { /* network */ }
-  }
-  if (!doc?.items?.length) doc = { generated_at: null, items: [] };
+  const doc = resolveClaimsFeedDoc(localDoc, fallbackDoc, hostedDoc, { preferHosted });
   const feedSource = doc === localDoc ? 'local'
     : doc === fallbackDoc ? 'fallback'
       : doc?.generated_at && !doc?.fetched_at ? 'hosted'
@@ -484,7 +551,10 @@ export function openHiddenClaimsModal() {
     return;
   }
   const hiddenSection = hidden.length
-    ? `<p class="claim-hidden-intro text-sm text-slate-400 mt-2">Claims you cleared from notifications. Restore any you want to see again.</p>
+    ? `<div class="claim-hidden-section-head flex items-start justify-between gap-3 mt-2">
+        <p class="claim-hidden-intro text-sm text-slate-400">Claims you cleared from notifications. Restore any you want to see again.</p>
+        <button type="button" class="claim-hidden-clear-all-btn text-xs text-rose-300 hover:text-rose-200 px-2 py-1 rounded border border-rose-700/60 shrink-0" data-claim-purge-all>Clear all</button>
+      </div>
       <div class="claim-hidden-list mt-3 space-y-2">${hidden.map(hiddenClaimRowHtml).join('')}</div>`
     : '';
   const ownedSection = owned.length
@@ -514,6 +584,32 @@ export function openHiddenClaimsModal() {
 
 export function closeHiddenClaimsModal() {
   const dlg = document.getElementById('claimHiddenDialog');
+  if (dlg?.open) dlg.close();
+}
+
+export function openClaimPurgeConfirm() {
+  const dlg = document.getElementById('claimPurgeConfirmDialog');
+  if (!dlg) return;
+  dlg.innerHTML = `
+    <form method="dialog" class="claim-detail-panel claim-purge-confirm-panel">
+      <div class="claim-detail-header">
+        <h2 class="claim-detail-title">Clear all hidden claims?</h2>
+        <button type="submit" class="claim-detail-close" aria-label="Close">×</button>
+      </div>
+      <p class="claim-purge-confirm-body text-sm text-slate-300 mt-3">This permanently removes all hidden claims. This cannot be undone.</p>
+      <div class="claim-purge-confirm-actions flex justify-end gap-2 mt-6">
+        <button type="submit" class="claim-purge-cancel-btn text-sm text-slate-300 hover:text-slate-100 px-3 py-1.5 rounded border border-slate-600">Cancel</button>
+        <button type="button" class="claim-purge-confirm-btn text-sm text-white px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500" data-claim-purge-confirm>Clear all</button>
+      </div>
+    </form>`;
+  if (typeof dlg.showModal === 'function') {
+    dlg.showModal();
+    dlg.focus();
+  }
+}
+
+export function closeClaimPurgeConfirm() {
+  const dlg = document.getElementById('claimPurgeConfirmDialog');
   if (dlg?.open) dlg.close();
 }
 

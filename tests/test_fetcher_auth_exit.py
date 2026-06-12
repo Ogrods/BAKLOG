@@ -27,6 +27,7 @@ SESSION_AUTH_WISHLIST_SCRIPTS = [
     "fetch_epic_wishlist.py",
     "fetch_xbox_wishlist.py",
     "fetch_ubisoft_wishlist.py",
+    "fetch_nintendo_wishlist.py",
 ]
 
 # Scripts that emit exit 4 on auth failure without a dedicated *AuthError type name.

@@ -297,6 +297,9 @@ def _provider_state(provider: str) -> str:
         return "connected"
 
     if spec.kind == "oauth" and provider == "epic":
+        session_blob = get_provider_blob("epic_session")
+        if session_blob.get("refresh_token"):
+            return "connected"
         session_file = epic_cache_dir() / "session.json"
         env_code = os.getenv("EPIC_AUTH_CODE", "").strip() if _env_fallback_allowed() else ""
         if session_file.exists() or env_code:

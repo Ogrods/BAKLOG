@@ -11,6 +11,9 @@ from typing import Any
 
 from shared.install_paths import is_frozen
 
+_COMMUNITY_JSON = Path(__file__).resolve().parent / "community.json"
+_DEFAULT_RELEASES_API = "https://api.github.com/repos/Ogrods/BAKLOG/releases/latest"
+
 _TEMP_DIR_MARKERS = (
     "\\temp\\",
     "/temp/",
@@ -89,11 +92,25 @@ def update_available(current: str, latest: str) -> bool:
     return version_tuple(latest) > version_tuple(current)
 
 
+def github_releases_latest_api_url() -> str:
+    """Latest-release API URL derived from shared/community.json github_repo."""
+    try:
+        raw = json.loads(_COMMUNITY_JSON.read_text(encoding="utf-8"))
+        repo = str(raw.get("github_repo", "")).strip().rstrip("/")
+        if repo.startswith("https://github.com/"):
+            slug = repo[len("https://github.com/") :]
+            if slug:
+                return f"https://api.github.com/repos/{slug}/releases/latest"
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        pass
+    return _DEFAULT_RELEASES_API
+
+
 def fetch_latest_github_release() -> dict[str, Any]:
     import urllib.error
     import urllib.request
 
-    url = "https://api.github.com/repos/Ogrods/steam-backlog/releases/latest"
+    url = github_releases_latest_api_url()
     req = urllib.request.Request(
         url,
         headers={

@@ -120,3 +120,15 @@ def test_update_available_compares_semver() -> None:
     assert server_support.update_available("0.7.0", "0.7.1") is True
     assert server_support.update_available("0.7.1", "0.7.0") is False
     assert server_support.update_available("0.7.0", "0.7.0") is False
+
+
+def test_github_releases_api_url_matches_community_json() -> None:
+    import json
+
+    community_path = Path(__file__).resolve().parents[1] / "shared" / "community.json"
+    community = json.loads(community_path.read_text(encoding="utf-8"))
+    repo_url = str(community["github_repo"]).rstrip("/")
+    slug = repo_url.replace("https://github.com/", "")
+    api_url = server_support.github_releases_latest_api_url()
+    assert api_url == f"https://api.github.com/repos/{slug}/releases/latest"
+    assert "steam-backlog" not in api_url

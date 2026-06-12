@@ -197,6 +197,17 @@ def _redact_log_line(text: str) -> str:
     return out
 
 
+def _redact_diagnostics_payload(payload: dict) -> dict:
+    """Redact sensitive tokens from diagnostics fields before serving over HTTP."""
+    tail = payload.get("refresh_log_tail")
+    if isinstance(tail, str) and tail:
+        payload = dict(payload)
+        payload["refresh_log_tail"] = "\n".join(
+            _redact_log_line(line) for line in tail.splitlines()
+        )
+    return payload
+
+
 def _prune_expired_epic_oauth_states() -> None:
     now = time.monotonic()
     expired = [k for k, (exp, _) in _epic_oauth_states.items() if exp < now]
@@ -349,18 +360,14 @@ ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
 RUN_HISTORY_FILE = RUNS_DIR / "history.json"
 QUEUE_FILE = RUNS_DIR / "queue.json"
 
-# Kept for tests that monkeypatch these names.
-PERSONAL_DIR = personal_dir()
-PERSONAL_FILE = personal_path()
+# Kept for tests that monkeypatch this name.
 PERSONAL_BACKUP_DIR = personal_backup_dir()
 
 
 def _refresh_personal_paths() -> None:
     """Rebind module-level personal + run paths after profile switch (tests may patch)."""
-    global PERSONAL_DIR, PERSONAL_FILE, PERSONAL_BACKUP_DIR
+    global PERSONAL_BACKUP_DIR
     global RUNS_DIR, ACTIVE_RUNS_FILE, RUN_HISTORY_FILE, QUEUE_FILE
-    PERSONAL_DIR = personal_dir()
-    PERSONAL_FILE = personal_path()
     PERSONAL_BACKUP_DIR = personal_backup_dir()
     RUNS_DIR = runs_dir()
     ACTIVE_RUNS_FILE = RUNS_DIR / "active.json"
@@ -2707,7 +2714,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self) -> None:  # noqa: N802 - http.server API
         self._begin_request()
-        if self.path == "/api/config":
+        if _api_path(self) == "/api/config":
             self._handle_config_get()
             return
         if not _require_api_auth(self):
@@ -2769,68 +2776,67 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/auth/stream-ticket":
             self._handle_stream_ticket_mint()
             return
-        if _api_path(self).rstrip("/") == "/api/runs/cancel":
+        if path.rstrip("/") == "/api/runs/cancel":
             self._handle_cancel_all()
             return
-        if self.path.startswith("/api/run/"):
-            rest = self.path[len("/api/run/"):].strip("/")
+        if path.startswith("/api/run/"):
+            rest = path[len("/api/run/"):].strip("/")
             if rest.endswith("/cancel"):
                 run_id = rest[: -len("/cancel")].strip("/")
                 self._handle_cancel(run_id)
             else:
                 self._handle_submit(rest)
             return
-        if self.path.startswith("/api/auth/") and _api_path(self).endswith("/start"):
-            provider = _api_path(self)[len("/api/auth/") : -len("/start")].strip("/")
+        if path.startswith("/api/auth/") and path.endswith("/start"):
+            provider = path[len("/api/auth/") : -len("/start")].strip("/")
             self._handle_auth_start(provider)
             return
-        if self.path.startswith("/api/auth/") and self.path.endswith("/oauth-url"):
-            provider = self.path[len("/api/auth/") : -len("/oauth-url")].strip("/")
+        if path.startswith("/api/auth/") and path.endswith("/oauth-url"):
+            provider = path[len("/api/auth/") : -len("/oauth-url")].strip("/")
             if provider == "epic":
                 self._handle_epic_oauth_url()
             else:
                 _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"no oauth-url for {provider}"})
             return
-        if self.path.startswith("/api/auth/") and self.path.endswith("/open-url"):
-            provider = self.path[len("/api/auth/") : -len("/open-url")].strip("/")
+        if path.startswith("/api/auth/") and path.endswith("/open-url"):
+            provider = path[len("/api/auth/") : -len("/open-url")].strip("/")
             self._handle_auth_open_url(provider)
             return
-        if self.path.startswith("/api/auth/") and self.path.endswith("/disconnect"):
-            provider = self.path[len("/api/auth/") : -len("/disconnect")].strip("/")
+        if path.startswith("/api/auth/") and path.endswith("/disconnect"):
+            provider = path[len("/api/auth/") : -len("/disconnect")].strip("/")
             self._handle_auth_disconnect(provider)
             return
-        if self.path.startswith("/api/auth/") and self.path.endswith("/enable"):
-            provider = self.path[len("/api/auth/") : -len("/enable")].strip("/")
+        if path.startswith("/api/auth/") and path.endswith("/enable"):
+            provider = path[len("/api/auth/") : -len("/enable")].strip("/")
             self._handle_auth_enable(provider)
             return
-        if self.path == "/api/auth/master-password":
+        if path == "/api/auth/master-password":
             self._handle_auth_master_password()
             return
-        if self.path == "/api/auth/secrets/export":
+        if path == "/api/auth/secrets/export":
             self._handle_auth_secrets_export()
             return
-        if self.path.startswith("/api/auth/secrets/import"):
+        if path.startswith("/api/auth/secrets/import"):
             self._handle_auth_secrets_import()
             return
-        if self.path == "/api/profiles":
+        if path == "/api/profiles":
             if self._reject_if_csrf_strict():
                 return
             self._handle_profiles_create()
             return
-        if self.path == "/api/profiles/active":
+        if path == "/api/profiles/active":
             if self._reject_if_csrf_strict():
                 return
             self._handle_profiles_set_active()
             return
-        path_only = self.path.split("?", 1)[0]
-        if path_only.startswith("/api/profiles/") and path_only.endswith("/pin"):
+        if path.startswith("/api/profiles/") and path.endswith("/pin"):
             if self._reject_if_csrf_strict():
                 return
-            profile_id = path_only[len("/api/profiles/") : -len("/pin")].strip("/")
+            profile_id = path[len("/api/profiles/") : -len("/pin")].strip("/")
             if profile_id:
                 self._handle_profiles_set_pin(profile_id)
                 return
-        if self.path == "/api/personal":
+        if path == "/api/personal":
             if self._reject_if_csrf_strict():
                 return
             self._handle_personal_put()
@@ -2843,18 +2849,18 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if not _require_api_auth(self):
             return
-        path_only = self.path.split("?", 1)[0]
-        if path_only.startswith("/api/profiles/") and path_only.endswith("/pin"):
+        path = _api_path(self)
+        if path.startswith("/api/profiles/") and path.endswith("/pin"):
             if self._reject_if_csrf_strict():
                 return
-            profile_id = path_only[len("/api/profiles/") : -len("/pin")].strip("/")
+            profile_id = path[len("/api/profiles/") : -len("/pin")].strip("/")
             if profile_id:
                 self._handle_profiles_clear_pin(profile_id)
                 return
-        if path_only.startswith("/api/profiles/"):
+        if path.startswith("/api/profiles/"):
             if self._reject_if_csrf_strict():
                 return
-            profile_id = path_only[len("/api/profiles/") :].strip("/")
+            profile_id = path[len("/api/profiles/") :].strip("/")
             if profile_id and profile_id not in ("active",):
                 self._handle_profiles_delete(profile_id)
                 return
@@ -2888,21 +2894,20 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if not _require_api_auth(self):
             return
-        if self.path == "/api/personal":
+        if path == "/api/personal":
             if self._reject_if_csrf_strict():
                 return
             self._handle_personal_put()
             return
-        path_only = self.path.split("?", 1)[0]
-        if path_only.startswith("/api/profiles/"):
+        if path.startswith("/api/profiles/"):
             if self._reject_if_csrf_strict():
                 return
-            profile_id = path_only[len("/api/profiles/") :].strip("/")
+            profile_id = path[len("/api/profiles/") :].strip("/")
             if profile_id and profile_id not in ("active", "pin") and not profile_id.endswith("/pin"):
                 self._handle_profiles_rename(profile_id)
                 return
-        if self.path.startswith("/api/auth/") and self.path.endswith("/credentials"):
-            provider = self.path[len("/api/auth/") : -len("/credentials")].strip("/")
+        if path.startswith("/api/auth/") and path.endswith("/credentials"):
+            provider = path[len("/api/auth/") : -len("/credentials")].strip("/")
             self._handle_auth_credentials(provider)
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
@@ -2938,21 +2943,17 @@ class Handler(SimpleHTTPRequestHandler):
         _send_json(
             self,
             HTTPStatus.OK,
-            build_diagnostics_payload(
-                data_root=ROOT,
-                version=_app_version(),
-                load_run_history=_load_run_history,
+            _redact_diagnostics_payload(
+                build_diagnostics_payload(
+                    data_root=ROOT,
+                    version=_app_version(),
+                    load_run_history=_load_run_history,
+                )
             ),
         )
 
     def _handle_fetchers(self) -> None:
         try:
-            try:
-                from dotenv import load_dotenv
-
-                load_dotenv(ROOT / ".env", override=True)
-            except ImportError:
-                pass
             data = {
                 "server_platform": sys.platform,
                 "fetchers": [

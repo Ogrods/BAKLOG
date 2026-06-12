@@ -299,7 +299,7 @@ function passesSearchQuery(g, p, q) {
 }
 
 function passesFilter(ctx, g) {
-  const { view, prefs, params, personal, hiddenKeys, ownedNormNames } = ctx;
+  const { view, prefs, params, personal, hiddenKeys } = ctx;
   const ng = normalizeGame(g);
   const p = getPersonalRecord(personal, g);
   if (p.hidden) return false;

@@ -160,23 +160,6 @@ const PROVIDER_BRAND = {
 
 
 
-function providerBrand(p) {
-
-  const brand = PROVIDER_BRAND[p.key];
-
-  if (brand) return brand;
-
-  return {
-
-    color: '#475569',
-
-    initial: (p.label || '?').charAt(0).toUpperCase(),
-
-  };
-
-}
-
-
 function connStoreKey(p) {
   // Collapse store variants onto the base brand badge (e.g. amazon_web -> amazon).
   return (p.key || '').replace(/_(wishlist|web|galaxy|local)$/, '');

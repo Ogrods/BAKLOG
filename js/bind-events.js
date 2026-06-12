@@ -62,7 +62,6 @@ import {
   refreshFilterUIDebounced,
   scheduleTableRerender,
   renderSummary,
-  renderStoreChips,
   renderWishlistStoreChips,
   renderGenreChips,
   switchView,
@@ -90,10 +89,7 @@ import { bindColumnPicker } from './column-picker.js';
 import { createGlobalKeydownHandler } from './events.js';
 import { bindFetcherHealthEvents } from './bind-events-fetcher.js';
 import { bindClaimableEvents } from './bind-events-claims.js';
-import {
-  dashDrillCoop,
-  renderDashboardWishlistStats,
-} from './dashboard.js';
+import { dashDrillCoop } from './dashboard.js';
 
 function handleSponsoredDealClick(el) {
   if (!el) return;
@@ -289,16 +285,18 @@ export function bindEvents() {
   });
   const kebabBtn = document.getElementById("kebabBtn");
   const kebabMenu = document.getElementById("kebabMenu");
-  kebabBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    const open = !kebabMenu.classList.contains("open");
-    kebabMenu.classList.toggle("open", open);
-    kebabBtn.setAttribute("aria-expanded", open ? "true" : "false");
-  });
-  document.addEventListener("click", () => {
-    kebabMenu.classList.remove("open");
-    kebabBtn.setAttribute("aria-expanded", "false");
-  });
+  if (kebabBtn && kebabMenu) {
+    kebabBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      const open = !kebabMenu.classList.contains("open");
+      kebabMenu.classList.toggle("open", open);
+      kebabBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.addEventListener("click", () => {
+      kebabMenu.classList.remove("open");
+      kebabBtn.setAttribute("aria-expanded", "false");
+    });
+  }
   document.getElementById("coopFilterSegmented")?.addEventListener("click", e => {
     const btn = e.target.closest(".filter-segment[data-coop-mode]");
     if (!btn) return;

@@ -29,7 +29,6 @@ export function pickCardHtml(g) {
   const key = gameKey(g);
   const headerFallback = coverFallbackFor(g);
   const cover = libraryCoverFor(g);
-  const ratingVal = ratingValue(g);
   const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - ";
   const h = hltbMain(g);
   const store = normalizeGame(g).store;

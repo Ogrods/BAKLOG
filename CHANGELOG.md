@@ -65,6 +65,28 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - **Vitest unhandled rejection** — `cancel-in-flight.test.js` now stubs
   `EventSource` for fetcher SSE subscribe paths.
 
+## [0.8.0-beta.1] - 2026-06-11
+
+First private Windows beta build candidate (`packaging/build_windows.ps1`).
+
+### Fixed
+
+- **Update-check repo slug** — `GET /api/update-check` now queries
+  `Ogrods/BAKLOG` releases (was `Ogrods/steam-backlog`, which always 404'd).
+  URL is derived from `shared/community.json` `github_repo`.
+- **Pre-ship audit quick-wins** — mutating API routes normalize through
+  `_api_path()`; `/api/diagnostics` refresh log tail redacted; per-request
+  `load_dotenv` removed from `_handle_fetchers`; dead `PERSONAL_DIR`/`PERSONAL_FILE`
+  globals removed.
+- **`fetch_itad.py` auth contract** — invalid/revoked key mid-run →
+  `mark_invalid("itad")` + exit 4 (not traceback + exit 1).
+- **Epic Connections status** — checks `epic_session` secrets blob before
+  `session.json` heuristic.
+- **JS hygiene** — unused imports trimmed; null guards on kebab menu and
+  bootstrap prefs DOM writes.
+- **Tests** — `fetch_nintendo_wishlist.py` in auth-exit regression list;
+  `library-universe` tests seed `itch_local` connected for itch gating.
+
 ## [0.7.0] - 2026-06-08
 
 ### Added

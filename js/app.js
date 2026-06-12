@@ -159,13 +159,17 @@ async function bootstrap() {
   showProWelcomeBanner();
   if (state.prefs.shareAnonStats) startMetrics();
   await initProfiles();
-  document.getElementById("rowHeroBackdrop").checked = !!state.prefs.rowHeroBackdrop;
+  const rowHeroBackdropEl = document.getElementById("rowHeroBackdrop");
+  if (rowHeroBackdropEl) rowHeroBackdropEl.checked = !!state.prefs.rowHeroBackdrop;
   document.body.classList.toggle("row-hero-on", !!state.prefs.rowHeroBackdrop);
   syncCheckboxLabelTitles();
   applyColumnVisibility(state.activeView);
-  document.getElementById("genreMode").value = state.prefs.genreFilterMode;
-  document.getElementById("quickWinMax").value = state.prefs.quickWinMaxHours;
-  document.getElementById("quickWinMaxVal").textContent = state.prefs.quickWinMaxHours;
+  const genreModeEl = document.getElementById("genreMode");
+  if (genreModeEl) genreModeEl.value = state.prefs.genreFilterMode;
+  const quickWinMaxEl = document.getElementById("quickWinMax");
+  if (quickWinMaxEl) quickWinMaxEl.value = state.prefs.quickWinMaxHours;
+  const quickWinMaxValEl = document.getElementById("quickWinMaxVal");
+  if (quickWinMaxValEl) quickWinMaxValEl.textContent = state.prefs.quickWinMaxHours;
   applyPicksCollapsedState();
   // Hide duplicates is a session pref (state.sessionPrefs.crossStoreDedup) —
   // defaults on each reload via loadSessionPrefs(); never persisted.

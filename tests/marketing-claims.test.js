@@ -54,16 +54,22 @@ describe('marketing copy guardrails', () => {
     expect(statStrip.toLowerCase()).not.toMatch(/cloud sync/);
   });
 
-  onePagerIt('one-pager presents cloud sync as #1 roadmap in the paid tier', () => {
+  onePagerIt('one-pager presents cloud sync in the live paid tier', () => {
     const text = readFileSync('marketing/one-pager.html', 'utf8');
-    expect(text).toMatch(/tier-grid[\s\S]*cloud sync[\s\S]*#1 roadmap/i);
+    const paidCard = text.slice(
+      text.indexOf('tier-card--paid'),
+      text.indexOf('</div>\n    </div>\n\n    <div class="cta-band">'),
+    );
+    expect(paidCard.toLowerCase()).toMatch(/cloud sync/);
+    expect(paidCard).not.toMatch(/#1 roadmap/i);
+    expect(paidCard).not.toMatch(/planned/i);
   });
 
   onePagerIt('one-pager uses $5 flat pricing and free vs paid tiers', () => {
     const text = readFileSync('marketing/one-pager.html', 'utf8');
     expect(text).toMatch(/\$5\/mo/);
     expect(text).not.toMatch(/\$2\.99|\$4\.99/);
-    expect(text).toMatch(/tier-grid[\s\S]*Free forever[\s\S]*Paid \(planned\)/i);
+    expect(text).toMatch(/tier-grid[\s\S]*Free forever[\s\S]*<h3>Paid<\/h3>/i);
   });
 
   it('landing/index.html uses $5 flat pricing in public copy', () => {

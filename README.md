@@ -108,13 +108,12 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 - **Auto-enrich** (default on): after a library fetch adds games, queues HLTB, reviews, covers, and co-op tags
 - **ITAD auto-refresh** (default on): deal prices refresh on a 15–60 min schedule while the dashboard is open
 
-### Planned paid tier ($5/mo)
+### Paid tier ($5/mo)
 
-BAKLOG is free forever to import and browse. A planned optional paid tier adds power-user conveniences — none of today's free features will move behind it:
+BAKLOG is free forever to import and browse. The optional **$5/mo** (**$50/yr**) paid tier is live (via Polar checkout) and adds power-user conveniences; none of today's free features move behind it:
 
-- **Queued bulk refresh** — queue every stale store in one sweep; fetchers run back-to-back (free tier: one store at a time, on demand)
-- Scheduled stale-store refresh without keeping the app open
-- Cloud sync, no sponsored deal cards, deep achievement/trophy sync (full re-pull; free tier: cached % only), deal alerts, bonus claimables feed
+- **Live:** no sponsored deal cards; scheduled stale-store refresh without keeping the app open; deep achievement/trophy sync (full re-pull; free tier: cached % only); bonus claimables feed (DLC, add-ons, in-game bonuses)
+- **Coming soon:** cloud sync across machines; queued bulk refresh (every stale store in one sweep; free tier: one store at a time, on demand); deal/watchlist alerts
 
 See [baklog.app](https://baklog.app/) for the full free-vs-paid breakdown.
 

@@ -33,6 +33,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **Marketing live-state reconciliation (Jun 2026)** — landing, deck, one-pagers,
+  content-kit, and README aligned to code-grounded canonical copy: paid tier live
+  ($5/mo · $50/yr via Polar); 300+ stats canonical; cloud sync, queued bulk
+  refresh, deal/watchlist alerts, and premium palettes marked coming; credit-pack
+  story removed; em dashes stripped from one-pagers and landing.
 - Marketing: open-source (MIT) claim threaded through landing page (hero, trust,
   FAQ, footer, structured data) and README; canonical GitHub repo URL added to
   `shared/community.json`.

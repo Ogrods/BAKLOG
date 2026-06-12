@@ -35,7 +35,7 @@
   <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/space-grotesk-latin.woff2" />
   <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/dm-sans-latin.woff2" />
   <link rel="stylesheet" href="demo.css" />
-  <!-- Self-hosted Chart.js (pinned 4.4.1) — no third-party CDN dependency or
+  <!-- Self-hosted Chart.js (pinned 4.4.1): no third-party CDN dependency or
        supply-chain exposure. Update by re-downloading the same version. -->
   <script src="vendor/chart.umd.min.js" defer></script>
   <script src="marquee-speed.js" defer></script>
@@ -379,7 +379,7 @@
     .problem h2 { font-size: clamp(2rem, 6vw, 3.6rem); max-width: 16ch; }
     .problem p { color: var(--text-mute); font-size: 1.15rem; max-width: 52ch; margin: 1.3rem 0 0; text-wrap: pretty; }
 
-    /* Feature cards — 4-up = 2×2; 3-up = single row on wide viewports */
+    /* Feature cards: 4-up = 2×2; 3-up = single row on wide viewports */
     .features-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -416,7 +416,7 @@
     .card li { margin: 0.3rem 0; }
     .card li::marker { color: var(--accent); }
 
-    /* Wide premium callout — spans the full features grid as an intentional box */
+    /* Wide premium callout: spans the full features grid as an intentional box */
     .card--premium {
       grid-column: 1 / -1;
       border-color: var(--accent);
@@ -493,7 +493,7 @@
       .pro-checkout .btn { width: 100%; }
     }
 
-    /* How it works — equal-height cards so uneven copy stays balanced */
+    /* How it works: equal-height cards so uneven copy stays balanced */
     .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; counter-reset: step; align-items: stretch; }
     /* Starting from zero: long step 1 full width; steps 2–3 share the row below */
     #start .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -840,12 +840,12 @@
           </div>
           <p>The free tier keeps everything you need to import, browse, and decide what to play next. The optional <strong>$5/mo</strong> ($50/yr) tier layers on power-user conveniences. None of today's free features ever move behind it.</p>
           <ul>
-            <li>Queue every stale store at once: one click queues all your outdated libraries and they refresh back-to-back (free tier: one store at a time, on demand)</li>
-            <li>Scheduled stale-store refresh without keeping the app open</li>
-            <li>Cloud sync across machines</li>
             <li>No sponsored deal cards</li>
+            <li>Scheduled stale-store refresh without keeping the app open</li>
             <li>Deep achievement/trophy sync: full on-demand re-pull (free tier: cached % only)</li>
-            <li>Deal &amp; watchlist alerts</li>
+            <li>Queue every stale store at once (coming soon; free tier: one store at a time, on demand)</li>
+            <li>Cloud sync across machines (coming soon)</li>
+            <li>Deal &amp; watchlist alerts (coming soon)</li>
             <li>Bonus claimables feed: the DLC, add-ons, and in-game bonuses we filter out of the free feed, surfaced just for paid members</li>
           </ul>
           <div class="pro-checkout">
@@ -871,7 +871,7 @@
             <tr>
               <th scope="row">Manual store refresh</th>
               <td>One at a time</td>
-              <td>Queue all stale stores</td>
+              <td>Queue all stale stores (coming)</td>
             </tr>
             <tr>
               <th scope="row">Auto-refresh while app is open</th>
@@ -901,7 +901,7 @@
             <tr>
               <th scope="row">Cloud sync</th>
               <td>✕</td>
-              <td>✓</td>
+              <td>Coming</td>
             </tr>
           </tbody>
         </table>
@@ -1010,15 +1010,15 @@
         </details>
         <details>
           <summary>Is it free?</summary>
-          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary % (no on-demand deep re-pull). <strong>Claimable Now</strong> on the free tier surfaces full-game giveaways only: DLC packs, add-ons, and in-game bonuses are filtered out. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. The optional <strong>$5/mo</strong> paid tier ($50/yr) adds queued bulk refresh (every stale store in one sweep), scheduled refresh without the app open, no sponsored deal cards, cloud sync, deep achievement/trophy sync (full re-pull), and a bonus claimables feed for those DLC and bonus drops. Perks roll out on the same open codebase - see the <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Pro checkout</a> for what's live vs coming. Nothing you use free today moves behind paywall.</p>
+          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), and cached trophy summary % (no on-demand deep re-pull). <strong>Claimable Now</strong> on the free tier surfaces full-game giveaways only: DLC packs, add-ons, and in-game bonuses are filtered out. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. The live <strong>$5/mo</strong> paid tier ($50/yr) adds no sponsored deal cards, scheduled refresh without the app open, deep achievement/trophy sync (full re-pull), and a bonus claimables feed for those DLC and bonus drops. Coming soon: queued bulk refresh, cloud sync, and deal/watchlist alerts. Perks roll out on the same open codebase - see the <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Pro checkout</a>. Nothing you use free today moves behind paywall.</p>
         </details>
         <details>
           <summary>What's in the paid tier?</summary>
-          <p><strong>$5/mo</strong> or <strong>$50/yr</strong>: no sponsored deal cards, cloud sync across machines, <strong>queued bulk refresh</strong> (queue every stale store and let them run back-to-back instead of babysitting one at a time), scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), deal/watchlist alerts, and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Subscribe monthly</a> or <a href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">yearly</a>. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
+          <p><strong>$5/mo</strong> or <strong>$50/yr</strong> live today: no sponsored deal cards, scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. Coming soon: cloud sync across machines, <strong>queued bulk refresh</strong> (queue every stale store and let them run back-to-back instead of babysitting one at a time), and deal/watchlist alerts. <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Subscribe monthly</a> or <a href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">yearly</a>. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
         </details>
         <details>
           <summary>What's the difference between free and paid refresh?</summary>
-          <p>On the free tier, you refresh one store at a time: click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. Pro adds <strong>queued bulk refresh</strong>: one action queues every store that needs updating, and they run back-to-back so you can kick it off and walk away. Pro also adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). Your credentials and data still stay on your machine. Only the convenience layer changes.</p>
+          <p>On the free tier, you refresh one store at a time: click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. Pro adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). <strong>Queued bulk refresh</strong> (one action queues every stale store back-to-back) is coming soon. Your credentials and data still stay on your machine. Only the convenience layer changes.</p>
         </details>
         <details>
           <summary>Does BAKLOG show me free games to claim?</summary>
@@ -1030,7 +1030,7 @@
         </details>
         <details>
           <summary>Do I have to refresh it?</summary>
-          <p>Not manually. When you connect a store, BAKLOG auto-fetches its library. While the app is open, auto-refresh for stores older than 24h is on by default (Connections). ITAD deal prices refresh on a schedule. There is no background sync while BAKLOG is closed and no cloud sync between machines.</p>
+          <p>Not manually. When you connect a store, BAKLOG auto-fetches its library. While the app is open, auto-refresh for stores older than 24h is on by default (Connections). ITAD deal prices refresh on a schedule. On the free tier there's no background sync while closed. Pro adds scheduled refresh while closed; cloud sync between machines is a coming Pro perk.</p>
         </details>
         <details>
           <summary>Why is my count different from what the store shows?</summary>

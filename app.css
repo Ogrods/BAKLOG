@@ -6694,7 +6694,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-pro-status--ok { color: var(--accent); }
 .conn-pro-status--err { color: #f87171; }
 .conn-pro-card--link { text-align: left; }
-.pro-view-root { max-width: 56rem; margin: 0 auto; }
+.pro-view-root { width: 100%; }
 .pro-view-funnel {
   display: flex;
   flex-direction: column;
@@ -6760,6 +6760,15 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--bg-panel);
+}
+.pro-view-hero .pro-view-pricing {
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.85rem 0 0;
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--accent, #38bdf8) 22%, var(--border));
+  border-radius: 0;
+  background: transparent;
 }
 .pro-view-toggle {
   display: inline-flex;

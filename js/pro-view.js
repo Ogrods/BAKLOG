@@ -205,8 +205,8 @@ function proPitchHtml({ showSuccess = false } = {}) {
         ${proHeroBannerHtml(selectedProPlan)}
         <h1 class="pro-view-headline">${escapeHtml(PRO_PROMO.title)}</h1>
         <p class="pro-view-subhead">${escapeHtml(PRO_PROMO.tagline)}</p>
+        ${proPricingHtml()}
       </header>
-      ${proPricingHtml()}
       <section class="pro-view-perks" aria-label="Pro features">
         <h3 class="pro-view-section-title">Everything in Pro</h3>
         <ul class="pro-view-perk-grid">${proFeaturesListHtml()}</ul>

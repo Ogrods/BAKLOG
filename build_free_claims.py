@@ -8,7 +8,7 @@ import json
 import os
 import re
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -311,10 +311,16 @@ def _infer_store_from_text(store: str, title: str, blurb: object, claim_url: str
     return store or "other"
 
 
+DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower"})
+DEFAULT_EXPIRY_DAYS = 14
+
+
 def _enrich_item(
     raw: dict,
     last_call: list[float],
     cover_lookup: dict[str, str] | None = None,
+    *,
+    now: datetime | None = None,
 ) -> dict:
     claim_url = str(raw.get("claim_url") or "").strip()
     title = (raw.get("title") or "").strip()
@@ -397,7 +403,7 @@ def _enrich_item(
         "header_image": header,
         "genres": genres[:6] if isinstance(genres, list) else [],
         "blurb": _clean_blurb(raw.get("blurb")),
-        "ends_at": _normalize_ends_at(raw.get("ends_at")),
+        "ends_at": _resolve_ends_at(raw, now=now),
     }
     if appid:
         out["steam_appid"] = appid
@@ -837,6 +843,22 @@ def _normalize_ends_at(ends_at: object) -> str | None:
     return parsed.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _resolve_ends_at(raw: dict, *, now: datetime | None = None) -> str | None:
+    """Normalize ends_at or assign a 2-week default for dated giveaway sources."""
+    raw_val = raw.get("ends_at")
+    if raw_val is not None and str(raw_val).strip():
+        return _normalize_ends_at(raw_val)
+    source = (raw.get("source") or "").strip().lower()
+    if source not in DEFAULT_EXPIRY_SOURCES:
+        return None
+    clock = now or datetime.now(UTC)
+    if clock.tzinfo is None:
+        clock = clock.replace(tzinfo=UTC)
+    anchor = _parse_ends_at(raw.get("first_seen")) or clock
+    default_end = anchor + timedelta(days=DEFAULT_EXPIRY_DAYS)
+    return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def _is_expired(ends_at: object, now: datetime) -> bool:
     parsed = _parse_ends_at(ends_at)
     if parsed is None:
@@ -860,6 +882,8 @@ def _enrich_item_light(
     cover_lookup: dict[str, str] | None = None,
     live_item: dict | None = None,
     review_lookup: dict[str, int] | None = None,
+    *,
+    now: datetime | None = None,
 ) -> dict:
     """Fast enrich for admin preview — no Steam/network calls."""
     claim_url = str(raw.get("claim_url") or "").strip()
@@ -909,7 +933,7 @@ def _enrich_item_light(
         "header_image": header,
         "genres": genres[:6] if isinstance(genres, list) else [],
         "blurb": _clean_blurb(raw.get("blurb")),
-        "ends_at": _normalize_ends_at(raw.get("ends_at")),
+        "ends_at": _resolve_ends_at(raw, now=now),
     }
     if appid:
         out["steam_appid"] = appid
@@ -982,7 +1006,7 @@ def preview_publish_items(
             continue
         if not raw.get("claim_url") or not raw.get("store"):
             continue
-        if _is_expired(raw.get("ends_at"), now):
+        if _is_expired(_resolve_ends_at(raw, now=now), now):
             continue
         item_id = str(raw.get("id") or "").strip()
         items.append(
@@ -991,6 +1015,7 @@ def preview_publish_items(
                 cover_lookup,
                 live_by_id.get(item_id),
                 review_lookup=review_lookup,
+                now=now,
             )
         )
     # Mirror the build's carry-forward: an approved claim that momentarily falls
@@ -1399,10 +1424,10 @@ def main() -> int:
         if not raw.get("claim_url") or not raw.get("store"):
             stats.warn(f"skipped item missing store/claim_url: {raw!r}")
             continue
-        if _is_expired(raw.get("ends_at"), now):
+        if _is_expired(_resolve_ends_at(raw, now=now), now):
             stats.warn(f"skipped expired item: {raw.get('id')!r}")
             continue
-        items.append(_enrich_item(raw, last_call, cover_lookup))
+        items.append(_enrich_item(raw, last_call, cover_lookup, now=now))
 
     carried = _carry_forward_missing_approved(
         items,

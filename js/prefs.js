@@ -1,4 +1,4 @@
-import { state, PREFS_KEY } from './state.js';
+import { state } from './state.js';
 import { prefsStorageKey } from './profiles.js';
 import { personalStore } from './personal-store.js';
 import { resolveCoopFilterMode } from './table-query.js';

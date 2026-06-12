@@ -29,7 +29,7 @@ import { isOwnedByTitle } from './deals.js';
 import { dataFetch } from './api-client.js';
 import { isPro } from './auth-gate.js';
 import { noteSponsoredImpression } from './anon-metrics.js';
-import { PRO_CHECKOUT_MONTHLY, PRO_CHECKOUT_YEARLY } from './pro-checkout.js';
+import { PRO_CHECKOUT_MONTHLY } from './pro-checkout.js';
 
 const SPONSORS_LOCAL_PATH = 'sponsors.json';
 const SPONSORS_FALLBACK_PATH = 'curated/sponsors.json';
@@ -398,7 +398,7 @@ function migrateV1ToV2(doc) {
   const versus = [];
   for (const item of items) {
     const id = item.id;
-    const { placements, priority, ...rest } = item;
+    const { placements: _placements, priority, ...rest } = item;
     ads[id] = rest;
     for (const p of placementsForMigration(item)) {
       if (p === 'dash-versus') {
@@ -1121,7 +1121,7 @@ export function houseTableRowHtml(item, { locationKey = 'lib-row' } = {}) {
   </tr>`;
 }
 
-export function sponsoredTableRowHtml(item, { isWish, locationKey = 'lib-row' } = {}) {
+export function sponsoredTableRowHtml(item, { isWish: _isWish, locationKey = 'lib-row' } = {}) {
   if (!item) return '';
   if (String(item.kind || '').toLowerCase() === 'house') {
     return houseTableRowHtml(item, { locationKey });

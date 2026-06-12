@@ -1,9 +1,9 @@
 // Dashboard panel renderers: coop spotlight, picks-versus, wishlist stats, itch recap.
 // Extracted from dashboard.js as part of the dashboard module split.
 
-import { state, STATUS_CHIP_DEFS } from './state.js';
+import { state } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, sanitizeCoverUrl, itchIsGame, chipStatusKey, combinedPlaytime, storeBadgeHtml, formatDollar } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, libraryCoverFor, itchIsGame, combinedPlaytime, storeBadgeHtml, formatDollar } from './game-core.js';
 import { affiliateUrl, hasLiveAffiliates } from './affiliate.js';
 import { freeItchCount, paidItchCount, itchSpendTotal } from './sabermetrics.js';
 import { gameGenresCanonical } from './genres.js';
@@ -19,14 +19,10 @@ import {
   sponsoredCoopPickRowHtml,
   renderHouseLocationSlot,
 } from './sponsored-deals.js';
-import { focusGame } from './table-ui.js';
-import { DASH_STORE_LABELS, DASH_STORE_COLORS } from './dashboard-shared.js';
-// Itch click routing uses dashDrillItchGenre from the drilldown module.
-// dashboard-drilldown does NOT import this module; the cycle stays one-way.
 import { dashDrillItchGenre } from './dashboard-drilldown.js';
 import { dashboardCharts } from './dashboard-charts.js';
 import { computeRecentAdditions } from './dashboard-spotlight.js';
-import { isItchSetup, visibleItchGames } from './connections-status.js';
+import { visibleItchGames } from './connections-status.js';
 const ITCH_HERO_MIN_RATING = 80;
 const ITCH_HERO_MAX = 30;
 

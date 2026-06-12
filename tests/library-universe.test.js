@@ -9,7 +9,9 @@ describe('libraryGamesBase itch universe', () => {
 
   it('dashboardLibraryGames counts itch-only games', async () => {
     const { state } = await import('../js/state.js');
+    const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     const { dashboardLibraryGames } = await import('../js/dashboard-shared.js');
+    setAuthStatusSnapshot([{ key: 'itch_local', status: 'connected' }]);
     state.allGames = [];
     state.itchGames = [{
       name: 'Itch Solo',
@@ -24,7 +26,9 @@ describe('libraryGamesBase itch universe', () => {
 
   it('dashboardLibraryGames excludes itch non-games (physical_game, assets, etc.)', async () => {
     const { state } = await import('../js/state.js');
+    const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     const { dashboardLibraryGames } = await import('../js/dashboard-shared.js');
+    setAuthStatusSnapshot([{ key: 'itch_local', status: 'connected' }]);
     state.allGames = [];
     state.itchGames = [
       {

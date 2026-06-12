@@ -28,7 +28,6 @@ import {
   bumpPersonalMemo,
   canonicalizeNotesAcrossTitles,
   applyHiddenTitleNorms,
-  filterOutHidden,
   filterCounted,
   libraryGamesBase,
 } from './personal-storage.js';
@@ -37,7 +36,6 @@ import { isDebugEnabled } from './debug-overlay.js';
 import { invalidateTableCache } from './table-ui.js';
 import {
   refreshFilterUI,
-  renderSummary,
   renderGenreChips,
   renderStoreChips,
   renderWishlistStoreChips,

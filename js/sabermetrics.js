@@ -2,7 +2,7 @@
 // Pure functions; snapshot built once per dashboard render and reused.
 
 import { state } from './state.js';
-import { gameKey, hltbMain, ratingValue, hasEnoughReviews, combinedPlaytime, normalizeGame, firstPlayedAt, playSessionCount, parseLastPlayedMs } from './game-core.js';
+import { gameKey, hltbMain, ratingValue, combinedPlaytime, normalizeGame, firstPlayedAt, playSessionCount, parseLastPlayedMs } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo, computeWishlistWoba, isCleanupCandidate, parsePriceLike } from './deals.js';
 

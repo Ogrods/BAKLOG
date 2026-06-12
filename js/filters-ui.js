@@ -12,10 +12,8 @@ import {
   state,
   GENRE_CHIP_COLLAPSE_AT,
   WISHLIST_STATUS_CHIP_DEFS,
-  STATUS_FILTER_LABELS,
 } from './state.js';
 import { escapeHtml, escapeAttr, formatNum } from './dom-util.js';
-import { WISHLIST_STATUS_LABELS } from './row-templates.js';
 import {
   gameKey,
   normalizeGame,
@@ -36,15 +34,13 @@ import {
   effectiveSortPrice,
   isOwnedByTitle,
 } from './deals.js';
-import { gameGenresCanonical, aliasCanonicalGenre } from './genres.js';
+import { gameGenresCanonical } from './genres.js';
 import { getPersonal, filterOutHidden, filterCounted } from './personal-storage.js';
 import {
   savePrefs,
   applySavedSortForView,
   syncCoopFilterSegmented,
   setCoopFilterMode,
-  getCoopFilterMode,
-  COOP_FILTER_LABELS,
   syncFilterDomFromState,
 } from './prefs.js';
 import {
@@ -53,11 +49,9 @@ import {
   updateBulkBar,
   tableFingerprint,
   isViewCached,
-  scheduleScrollAfterLayoutSettled,
   scheduleScrollAfterChromeSettled,
   hasPendingScrollTarget,
   hasPendingToolbarScroll,
-  setPendingScrollTarget,
   prewarmTableQueryForView,
   syncRowCountLabel,
 } from './table-ui.js';
@@ -772,7 +766,6 @@ export function renderSummary() {
     const total = itchGames.length;
     const gamesOnly = itchGames.filter(itchIsGame).length;
     const hideNonGames = !!state.sessionPrefs.itchHideNonGames;
-    const showingGames = hideNonGames ? gamesOnly : total;
     const backlog = itchGames.filter(g => getPersonal(g).status === "backlog" && (!hideNonGames || itchIsGame(g)));
     const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
     const rated = itchGames.filter(g => ratingValue(g) > 0 && (!hideNonGames || itchIsGame(g)));

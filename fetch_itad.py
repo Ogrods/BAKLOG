@@ -13,9 +13,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from auth import resolve_env
+from auth import mark_invalid, resolve_env
 from fetchers._base import add_allow_empty_arg, configure_stdout, refuse_empty_result
-from fetchers._progress import RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 from itad_client import ItadClient, ItadError
 from shared.fx import ensure_fx_rates
 from shared.money import country_to_currency
@@ -107,37 +107,43 @@ def main() -> int:
         client = ItadClient(api_key, country=args.country)
     except ItadError as e:
         stats.error(str(e))
-        return stats.finish("fetch_itad", t0, exit_code=1)
+        mark_invalid("itad", error=str(e))
+        return stats.finish("fetch_itad", t0, exit_code=EXIT_CODE_AUTH)
 
     plain_by_key: dict[str, str] = {}
-    for i, (key, title) in enumerate(titles, 1):
-        if i % 10 == 0 or i == 1:
-            print(f"[{i}/{len(titles)}] {title[:50]}", flush=True)
-        appid = None
-        if key.startswith("steam:") or key.startswith("wishlist:"):
-            try:
-                appid = int(key.split(":", 1)[1])
-            except ValueError:
-                appid = None
-        game_id = client.lookup_title(title, appid=appid)
-        if game_id:
-            plain_by_key[key] = game_id
-        else:
-            stats.warn(f"no ITAD match for {title!r}")
+    try:
+        for i, (key, title) in enumerate(titles, 1):
+            if i % 10 == 0 or i == 1:
+                print(f"[{i}/{len(titles)}] {title[:50]}", flush=True)
+            appid = None
+            if key.startswith("steam:") or key.startswith("wishlist:"):
+                try:
+                    appid = int(key.split(":", 1)[1])
+                except ValueError:
+                    appid = None
+            game_id = client.lookup_title(title, appid=appid)
+            if game_id:
+                plain_by_key[key] = game_id
+            else:
+                stats.warn(f"no ITAD match for {title!r}")
 
-    print(f"Resolved {len(plain_by_key)}/{len(titles)} ITAD ids. Fetching prices...", flush=True)
-    if titles:
-        empty_exit = refuse_empty_result(
-            plain_by_key,
-            label="ITAD price resolution",
-            allow_empty=args.allow_empty,
-            output_path=ITAD_JSON,
-        )
-        if empty_exit is not None:
-            return stats.finish("fetch_itad", t0, exit_code=empty_exit)
+        print(f"Resolved {len(plain_by_key)}/{len(titles)} ITAD ids. Fetching prices...", flush=True)
+        if titles:
+            empty_exit = refuse_empty_result(
+                plain_by_key,
+                label="ITAD price resolution",
+                allow_empty=args.allow_empty,
+                output_path=ITAD_JSON,
+            )
+            if empty_exit is not None:
+                return stats.finish("fetch_itad", t0, exit_code=empty_exit)
 
-    plains = list(set(plain_by_key.values()))
-    prices_by_plain = client.prices_for_plains(plains)
+        plains = list(set(plain_by_key.values()))
+        prices_by_plain = client.prices_for_plains(plains)
+    except ItadError as e:
+        stats.error(str(e))
+        mark_invalid("itad", error=str(e))
+        return stats.finish("fetch_itad", t0, exit_code=EXIT_CODE_AUTH)
 
     by_key: dict[str, dict] = {}
     for key, plain in plain_by_key.items():

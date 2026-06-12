@@ -7,10 +7,8 @@ import {
   gameKey,
   normalizeGame,
   normalizeNameForDedup,
-  hltbMain,
   ratingValue,
   combinedPlaytime,
-  firstPlayedAt,
   playSessionCount,
   parseLastPlayedMs,
 } from './game-core.js';
@@ -51,13 +49,6 @@ function formatDollar(n) {
 function firstSeenAt(g) {
   const seen = state.libraryFirstSeenByKey || {};
   return seen[gameKey(g)] || 0;
-}
-
-function daysSince(ts) {
-  if (!ts) return null;
-  const n = typeof ts === 'number' ? ts : Date.parse(String(ts));
-  if (!n || Number.isNaN(n)) return null;
-  return Math.max(0, Math.floor((Date.now() - n) / MS_PER_DAY));
 }
 
 function finishesLast12Months(games) {
@@ -378,7 +369,7 @@ const SABER_SPOTLIGHT_SCORE = 92;
  * @param {object} snap
  * @returns {{ key: string, eyebrow: string, score: number, metaParts: string[] }[]}
  */
-export function computeSpotlightSuperlatives(games, snap) {
+export function computeSpotlightSuperlatives(games, _snap) {
   const list = games || [];
   if (list.length < 2) return [];
 

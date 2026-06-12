@@ -42,16 +42,11 @@ import {
   combinedPlaytime,
   combinedPlaytimeTooltip,
   psnPlatformsLineHtml,
-  ratingValue,
 } from './game-core.js';
 import {
   isCleanupCandidate,
   isOwnedByTitle,
-  getItadForGame,
   getDealInfo,
-  priceLowStarHtml,
-  dealDroppedBadgeHtml,
-  cutBucketClass,
 } from './deals.js';
 import { isPlatformToken } from './genres.js';
 import { syncCoverFits } from './covers.js';
@@ -62,7 +57,6 @@ import {
   savePersonal,
   bumpPersonalMemo,
   removeManualGame,
-  addManualGame,
   loadManualGames,
   saveManualGames,
   setGameHidden,
@@ -1543,7 +1537,6 @@ export async function renderTable(opts) {
 
   perfMark(perfRun, 'chrome:start');
   const isWish = state.activeView === "wishlist";
-  const wrap = document.getElementById("tableWrap");
   syncTablePhoneLayout();
   applyColumnVisibility(state.activeView);
   const statusHdr = document.getElementById("statusHeader");

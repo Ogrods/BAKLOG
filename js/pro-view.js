@@ -15,7 +15,7 @@ import {
 } from './auth-gate.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
 import { PRO_CHECKOUT_MONTHLY, PRO_CHECKOUT_YEARLY, buildProCheckoutUrl } from './pro-checkout.js';
-import { PRO_PROMO, isProPromoSponsorId } from './sponsored-deals.js';
+import { PRO_PROMO } from './sponsored-deals.js';
 import { switchView } from './filters-ui.js';
 import { state } from './state.js';
 import { savePrefs } from './prefs.js';

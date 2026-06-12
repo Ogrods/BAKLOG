@@ -2758,9 +2758,10 @@ html[data-boot-loading] .view-tab { visibility: hidden; }
 header.app-header {
   padding-top: 1rem;
   padding-bottom: 0.25rem;
-  /* Override the Tailwind mb-4 utility: with the slimmed summary chips, 1rem of
-     margin + the padding left an oversized gap under the chip row. */
-  margin-bottom: 0.5rem;
+  /* Override the Tailwind mb-4 utility: unified gap under the header rule on
+     every view before the first main content block. */
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 0 var(--border-subtle);
 }
 /* Dashboard-only sticky header: the dashboard hides #summary (and the toolbar/
    table), so the header is a stable single row here and pins cleanly. Other
@@ -2773,7 +2774,11 @@ html[data-init-view="pro"] header.app-header {
   top: 0;
   z-index: 40;
   background: var(--bg);
-  box-shadow: 0 1px 0 var(--border-subtle);
+}
+/* First main blocks share one top inset; header margin-bottom supplies the gap. */
+#main > section,
+#main > div[id] {
+  margin-top: 0;
 }
 /* No shell top padding above the header on any view; the header carries its
    own top padding instead (see header.app-header below). */

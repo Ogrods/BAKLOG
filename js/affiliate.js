@@ -34,7 +34,7 @@ export const AFFILIATE_CREDENTIALS = {
   //   e.g. 'https://go.adt231.net/c/<AID>/<CID>/<MID>?url={url}'
   gog: '',
   // Epic Games Store (param): your Support-A-Creator creator id.  e.g. 'baklog'
-  epic: '',
+  epic: 'BAKLOG',
   // Humble Store (deeplink): Impact template with {url}.
   //   e.g. 'https://humblebundle.pxf.io/c/<AID>/<CID>/<MID>?u={url}'
   humble: '',

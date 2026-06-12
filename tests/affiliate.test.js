@@ -32,12 +32,13 @@ describe('affiliateUrl', () => {
     restoreCreds(baseline);
   });
 
-  it('ships with every program disabled', () => {
-    for (const value of Object.values(AFFILIATE_CREDENTIALS)) {
-      expect(value).toBe('');
+  it('ships with Epic Support-A-Creator live and other programs disabled', () => {
+    expect(AFFILIATE_CREDENTIALS.epic).toBe('BAKLOG');
+    for (const [key, value] of Object.entries(AFFILIATE_CREDENTIALS)) {
+      if (key !== 'epic') expect(value).toBe('');
     }
-    expect(hasLiveAffiliates()).toBe(false);
-    expect(liveAffiliateShops()).toEqual([]);
+    expect(hasLiveAffiliates()).toBe(true);
+    expect(liveAffiliateShops()).toContain('Epic Games Store');
   });
 
   it('passes through Steam URLs (no program)', () => {
@@ -111,7 +112,8 @@ describe('affiliateUrl', () => {
     AFFILIATE_CREDENTIALS.gog = 'https://track.example.com/no-placeholder';
     const url = 'https://www.gog.com/en/game/bar';
     expect(affiliateUrl(url)).toBe(url);
-    expect(hasLiveAffiliates()).toBe(false);
+    expect(hasLiveAffiliates()).toBe(true);
+    expect(liveAffiliateShops()).not.toContain('GOG');
   });
 
   it('treats whitespace-only credentials as unset', () => {
@@ -119,6 +121,7 @@ describe('affiliateUrl', () => {
     const url = 'https://store.epicgames.com/en-US/p/foo';
     expect(affiliateUrl(url)).toBe(url);
     expect(hasLiveAffiliates()).toBe(false);
+    AFFILIATE_CREDENTIALS.epic = 'BAKLOG';
   });
 
   it('is idempotent for deeplink rules', () => {

@@ -31,6 +31,20 @@ export function bindClaimableEvents() {
       const restoreBtn = e.target.closest('[data-claim-restore]');
       if (restoreBtn) {
         claimable.restoreClaim(restoreBtn.dataset.claimRestore);
+        return;
+      }
+      if (e.target.closest('[data-claim-purge-all]')) {
+        claimable.openClaimPurgeConfirm();
+      }
+    });
+    document.getElementById('claimPurgeConfirmDialog')?.addEventListener('click', (e) => {
+      const dlg = e.currentTarget;
+      if (e.target === dlg) {
+        claimable.closeClaimPurgeConfirm();
+        return;
+      }
+      if (e.target.closest('[data-claim-purge-confirm]')) {
+        claimable.purgeAllHiddenClaims();
       }
     });
   });

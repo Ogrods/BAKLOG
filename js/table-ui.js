@@ -1218,7 +1218,7 @@ function timeSyncCoverFits(tbody) {
 function tableRowHtml(g, idx, { isWish }) {
   const p = getPersonal(g);
   const lowConf = g.hltb_match_confidence != null && g.hltb_match_confidence < 0.75;
-  const hiddenGem = isHiddenGem(g);
+  const hiddenGem = state.activeView !== "wishlist" && isHiddenGem(g);
   const key = gameKey(g);
   const headerFallback = coverFallbackFor(g);
   const cover = libraryCoverFor(g);

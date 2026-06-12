@@ -285,6 +285,10 @@ def _provider_state(provider: str) -> str:
     if spec.kind == "local":
         if blob.get("disabled"):
             return "disconnected"
+        # itch.io local DB is machine-wide; require per-profile opt-in so new
+        # profiles do not inherit another profile's itch catalog on the dashboard.
+        if provider == "itch_local" and not blob.get("enabled"):
+            return "disconnected"
         return "connected" if _local_data_present(provider, blob) else "disconnected"
 
     if explicit == "expired":
@@ -351,6 +355,27 @@ def mark_connected(provider: str, creds: dict[str, str], *, clear_error: bool = 
         blob.pop("last_error", None)
         blob.pop("expired_at", None)
     set_provider_blob(provider, blob)
+
+
+def seed_new_profile_auth_defaults(profile_id: str) -> None:
+    """Opt machine-wide local sources out on a brand-new profile until Connect."""
+    import auth.secrets as _secrets
+
+    target_dir = auth_dir(profile_id=profile_id)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    saved = (_secrets.AUTH_DIR, _secrets.SECRETS_FILE, _secrets.MASTER_KEY_FILE, _secrets._cache)
+    with _secrets._lock:
+        _secrets.AUTH_DIR = target_dir
+        _secrets.SECRETS_FILE = target_dir / "secrets.bin"
+        _secrets.MASTER_KEY_FILE = target_dir / ".master_key"
+        _secrets._cache = None
+        try:
+            blob = get_provider_blob("itch_local")
+            blob["disabled"] = True
+            blob.pop("enabled", None)
+            set_provider_blob("itch_local", blob)
+        finally:
+            _secrets.AUTH_DIR, _secrets.SECRETS_FILE, _secrets.MASTER_KEY_FILE, _secrets._cache = saved
 
 
 def import_env_credentials(*, profile_id: str = DEFAULT_PROFILE_ID) -> list[str]:
@@ -496,6 +521,8 @@ def enable_local(provider: str) -> None:
         raise ValueError(f"{provider} is not a local provider")
     blob = get_provider_blob(provider)
     blob.pop("disabled", None)
+    if provider == "itch_local":
+        blob["enabled"] = True
     set_provider_blob(provider, blob)
 
 
@@ -524,6 +551,8 @@ def disconnect(provider: str) -> None:
     if spec.kind == "local":
         blob = get_provider_blob(provider)
         blob["disabled"] = True
+        if provider == "itch_local":
+            blob.pop("enabled", None)
         set_provider_blob(provider, blob)
         return
     delete_provider_blob(provider)

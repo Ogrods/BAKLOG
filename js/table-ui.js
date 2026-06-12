@@ -74,6 +74,7 @@ import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
 import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
 import { buildTableEmptyStateHtml } from './table-empty-state.js';
+import { visibleItchGames } from './connections-status.js';
 import { formatPrice } from './table-price-format.js';
 
 export { formatPrice };
@@ -1400,10 +1401,11 @@ export function formatRowCountText(view, list) {
     const tail = dealBits.length ? ` · ${dealBits.join(", ")}` : "";
     base = `Wishlist: ${rows.length} of ${Math.max(0, state.wishlistGames.length - state.wishlistCrossStoreHiddenKeys.size - countUserHiddenWishlist())}${tail}`;
   } else if (view === "itch") {
-    const total = state.itchGames.length;
-    const gamesOnly = state.itchGames.filter(itchIsGame).length;
+    const itchGames = visibleItchGames();
+    const total = itchGames.length;
+    const gamesOnly = itchGames.filter(itchIsGame).length;
     const suffix = state.sessionPrefs.itchHideNonGames && gamesOnly !== total ? ` (${gamesOnly} games of ${total} items)` : "";
-    base = `Itch.io: ${rows.length} of ${state.itchGames.length}${suffix}`;
+    base = `Itch.io: ${rows.length} of ${total}${suffix}`;
   } else {
     base = `Showing ${rows.filter(countsInLibraryTotal).length} of ${countedLibraryDenominator()} games`;
   }

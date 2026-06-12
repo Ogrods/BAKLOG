@@ -10,6 +10,7 @@ import {
 // DOM-free module) so the worker/table path can never drift from the genre
 // filter chips / dashboard genre breakdown. See tests/table-query-parity.test.js.
 import { gameMatchesGenreFilters } from './genres.js';
+import { visibleItchGames } from './connections-status.js';
 
 const HLTB_BUCKETS_QUERY = [
   { minExclusive: null, maxInclusive: 2 },
@@ -424,7 +425,7 @@ function combinedPlaytimeLookup(state) {
 
 export function querySourceForView(state) {
   if (state.activeView === 'wishlist') return state.wishlistGames;
-  if (state.activeView === 'itch') return state.itchGames;
+  if (state.activeView === 'itch') return visibleItchGames();
   return state.allGames;
 }
 

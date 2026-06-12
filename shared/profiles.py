@@ -167,6 +167,12 @@ def create_profile(label: str) -> dict[str, Any]:
         raise ValueError(f"profile directory already exists: {profile_id}")
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "data").mkdir(parents=True, exist_ok=True)
+    try:
+        from auth.manager import seed_new_profile_auth_defaults
+
+        seed_new_profile_auth_defaults(profile_id)
+    except Exception:
+        pass
     doc = load_index()
     profiles = doc.setdefault("profiles", [])
     if not isinstance(profiles, list):

@@ -21,6 +21,7 @@ import {
   itchIsGame,
 } from './game-core.js';
 import { PRE_HIDDEN_KEYS, getPreHiddenFallback } from './hidden-defaults.js';
+import { visibleItchGames } from './connections-status.js';
 
 const personalMemo = createMemo();
 
@@ -544,7 +545,7 @@ export function filterCounted(list) {
 
 /** Main catalog + itch tab games, minus cross-store dupes and user-hidden rows. */
 export function libraryGamesBase() {
-  const itch = (Array.isArray(state.itchGames) ? state.itchGames : []).filter(itchIsGame);
+  const itch = visibleItchGames().filter(itchIsGame);
   const main = state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g)));
   const seen = new Set();
   const out = [];

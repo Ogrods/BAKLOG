@@ -26,6 +26,7 @@ import { DASH_STORE_LABELS, DASH_STORE_COLORS } from './dashboard-shared.js';
 import { dashDrillItchGenre } from './dashboard-drilldown.js';
 import { dashboardCharts } from './dashboard-charts.js';
 import { computeRecentAdditions } from './dashboard-spotlight.js';
+import { isItchSetup, visibleItchGames } from './connections-status.js';
 const ITCH_HERO_MIN_RATING = 80;
 const ITCH_HERO_MAX = 30;
 
@@ -629,7 +630,8 @@ export function renderDashboardItchRecap() {
   }
 
   applyItchVisibility();
-  const total = state.itchGames.length;
+  const itchGames = visibleItchGames();
+  const total = itchGames.length;
   if (!total) {
     el.innerHTML = `${itchBrandRailHtml()}
       <h3 class="itch-card-title text-sm font-semibold text-slate-200">itch.io library</h3>
@@ -637,7 +639,7 @@ export function renderDashboardItchRecap() {
     return;
   }
 
-  const gamesOnly = state.itchGames.filter(itchIsGame);
+  const gamesOnly = itchGames.filter(itchIsGame);
   const videogames = gamesOnly.length;
   const rated = gamesOnly.filter(g => ratingValue(g) > 0).length;
   const unrated = videogames - rated;

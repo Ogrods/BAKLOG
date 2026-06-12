@@ -53,11 +53,14 @@ describe('isItchTabAvailable', () => {
     expect(isItchTabAvailable()).toBe(true);
   });
 
-  it('is true when disconnected but itch library has rows', async () => {
-    mockAuthStatus([{ key: 'itch', status: 'disconnected' }]);
+  it('is false when disconnected even if a stale itch catalog is on disk', async () => {
+    mockAuthStatus([
+      { key: 'itch', status: 'disconnected' },
+      { key: 'itch_local', status: 'disconnected' },
+    ]);
     state.itchGames = [{ store: 'itch', id: 'a', name: 'Demo Game' }];
     await refreshConnections();
-    expect(isItchTabAvailable()).toBe(true);
+    expect(isItchTabAvailable()).toBe(false);
   });
 });
 

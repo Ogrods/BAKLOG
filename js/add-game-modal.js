@@ -6,6 +6,7 @@ import {
   saveManualGames,
   addManualGame,
   setGameHidden,
+  setPersonal,
 } from './personal-storage.js';
 import { refreshAfterManualChange } from './library-load.js';
 import { download } from './filters-ui.js';
@@ -29,6 +30,9 @@ export function setAddGameTarget(target) {
     b.classList.toggle("active", b.dataset.target === addGameTarget);
   });
   document.getElementById("addGameWishlistFields").classList.toggle("hidden", addGameTarget !== "wishlist");
+  // The library-total opt-out only applies to library/itch rows; wishlist items
+  // never count toward the library total, so hide it there.
+  document.getElementById("addGameCountWrap")?.classList.toggle("hidden", addGameTarget === "wishlist");
   const titleEl = document.getElementById("addGameModalTitle");
   const hint = document.getElementById("addGameHint");
   if (addGameTarget === "wishlist") {
@@ -90,6 +94,8 @@ function closeAddGameModal() {
   document.getElementById("addGameWishPrice").value = "";
   document.getElementById("addGameWishDiscount").value = "";
   document.getElementById("addGameWishUrl").value = "";
+  const countEl = document.getElementById("addGameCountInTotal");
+  if (countEl) countEl.checked = true;
   hideDuplicateWarn();
   _bypassFor = null;
 }
@@ -152,6 +158,15 @@ function readWishlistFields() {
   };
 }
 
+/** Honor the "Count this game in the library total" switch for new manual rows. */
+function applyCountPreference(game) {
+  if (addGameTarget === "wishlist") return;
+  const countEl = document.getElementById("addGameCountInTotal");
+  if (countEl && !countEl.checked) {
+    setPersonal(game, "exclude_from_count", true);
+  }
+}
+
 function applyWishlistMeta(game) {
   const w = readWishlistFields();
   game.wishlist = true;
@@ -195,6 +210,7 @@ async function importSteamMatch(title, platform, match) {
   };
   if (isWishlist) applyWishlistMeta(game);
   addManualGame(game);
+  applyCountPreference(game);
   const where = isWishlist ? `wishlist (${platform})` : platform;
   status.textContent = `Saved "${game.name}" under ${where}.`;
   refreshAfterManualChange();
@@ -236,6 +252,7 @@ function importTitleOnly() {
   };
   if (isWishlist) applyWishlistMeta(game);
   addManualGame(game);
+  applyCountPreference(game);
   const where = isWishlist ? `wishlist (${platform})` : platform;
   document.getElementById("addGameStatus").textContent = `Saved "${title}" under ${where} (no Steam data).`;
   refreshAfterManualChange();

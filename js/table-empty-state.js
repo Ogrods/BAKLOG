@@ -6,11 +6,12 @@
 import { state } from './state.js';
 import { escapeHtml } from './dom-util.js';
 import { collectActiveFilters } from './active-filters.js';
+import { visibleItchGames } from './connections-status.js';
 
 function shouldShowConnectionsCta(view) {
   if (view === 'library') return state.allGames.length === 0;
   if (view === 'wishlist') return state.wishlistGames.length === 0;
-  if (view === 'itch') return state.itchGames.length === 0;
+  if (view === 'itch') return visibleItchGames().length === 0;
   return false;
 }
 
@@ -49,8 +50,9 @@ export function buildTableEmptyStateHtml(view, colspan = 13) {
       ? "Adjust filters or check which stores are connected."
       : "Connect a store on Connections and run its wishlist fetcher.";
   } else if (view === "itch") {
-    title = state.itchGames.length ? "No itch items in this view" : "No itch.io library loaded";
-    hint = state.itchGames.length
+    const itchCount = visibleItchGames().length;
+    title = itchCount ? "No itch items in this view" : "No itch.io library loaded";
+    hint = itchCount
       ? "Turn on “Show non-games” in the filter bar if you expect zines or tools."
       : "Add your itch.io API key on Connections and run the itch fetcher.";
   }

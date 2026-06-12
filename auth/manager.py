@@ -362,23 +362,12 @@ def mark_connected(provider: str, creds: dict[str, str], *, clear_error: bool = 
 
 def seed_new_profile_auth_defaults(profile_id: str) -> None:
     """Opt machine-wide local sources out on a brand-new profile until Connect."""
-    import auth.secrets as _secrets
-
-    target_dir = auth_dir(profile_id=profile_id)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    saved = (_secrets.AUTH_DIR, _secrets.SECRETS_FILE, _secrets.MASTER_KEY_FILE, _secrets._cache)
-    with _secrets._lock:
-        _secrets.AUTH_DIR = target_dir
-        _secrets.SECRETS_FILE = target_dir / "secrets.bin"
-        _secrets.MASTER_KEY_FILE = target_dir / ".master_key"
-        _secrets._cache = None
-        try:
-            blob = get_provider_blob("itch_local")
-            blob["disabled"] = True
-            blob.pop("enabled", None)
-            set_provider_blob("itch_local", blob)
-        finally:
-            _secrets.AUTH_DIR, _secrets.SECRETS_FILE, _secrets.MASTER_KEY_FILE, _secrets._cache = saved
+    auth_dir(profile_id=profile_id).mkdir(parents=True, exist_ok=True)
+    with _with_profile_secrets(profile_id):
+        blob = get_provider_blob("itch_local")
+        blob["disabled"] = True
+        blob.pop("enabled", None)
+        set_provider_blob("itch_local", blob)
 
 
 def import_env_credentials(*, profile_id: str = DEFAULT_PROFILE_ID) -> list[str]:

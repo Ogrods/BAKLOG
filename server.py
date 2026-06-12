@@ -403,6 +403,44 @@ class PersonalCorruptError(RuntimeError):
     """personal.json is unreadable and no backup could be restored."""
 
 
+class PersonalEmptyOverwriteError(RuntimeError):
+    """Refusing to replace a populated personal doc with a fully empty payload."""
+
+
+_BAKLOG_ALLOW_EMPTY_HEADER = "X-BAKLOG-Allow-Empty"
+
+
+def _personal_doc_is_meaningful(doc: dict[str, Any]) -> bool:
+    """True when the stored doc carries personal edits, manual games, or first-seen stamps."""
+    personal = doc.get("personal")
+    if isinstance(personal, dict):
+        if any(k != "__migrated_v3" for k in personal):
+            return True
+    manual = doc.get("manual")
+    if isinstance(manual, list) and manual:
+        return True
+    library_first_seen = doc.get("libraryFirstSeen")
+    if isinstance(library_first_seen, dict) and library_first_seen:
+        return True
+    return False
+
+
+def _personal_payload_is_empty(validated: dict[str, Any]) -> bool:
+    """True when the incoming payload has no personal/manual/first-seen data."""
+    personal = validated.get("personal") or {}
+    if not isinstance(personal, dict):
+        return True
+    if any(k != "__migrated_v3" for k in personal):
+        return False
+    manual = validated.get("manual") or []
+    if isinstance(manual, list) and manual:
+        return False
+    library_first_seen = validated.get("libraryFirstSeen") or {}
+    if isinstance(library_first_seen, dict) and library_first_seen:
+        return False
+    return True
+
+
 def _normalize_personal_doc(doc: dict[str, Any]) -> dict[str, Any]:
     doc.setdefault("personal", {})
     doc.setdefault("prefs", {})
@@ -507,10 +545,20 @@ def _rotate_personal_backup() -> None:
             pass
 
 
-def _save_personal_doc(payload: dict[str, Any]) -> dict[str, Any]:
+def _save_personal_doc(payload: dict[str, Any], *, allow_empty: bool = False) -> dict[str, Any]:
     """Atomic write: temp file + os.replace(). Never partial; never corrupted."""
     with _personal_lock:
         validated = _validate_personal_payload(payload)
+        if not allow_empty and _personal_payload_is_empty(validated):
+            existing = _load_personal_doc()
+            if _personal_doc_is_meaningful(existing):
+                path = personal_path()
+                print(
+                    f"[personal] refusing empty overwrite of populated doc at {path}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                raise PersonalEmptyOverwriteError("refusing empty overwrite")
         doc = _empty_personal_doc()
         doc.update(validated)
         doc["updated_at"] = time.time()
@@ -1245,13 +1293,21 @@ class RunManager:
         self._runs_dir = runs_dir or RUNS_DIR
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        # Two parallel lanes, each cap=1: the fetcher lane serializes library/
+        # wishlist/enrich runs (they share auth sessions), while the internal
+        # lane runs admin jobs (buildClaims, claimSources) so a Publish/Enrich
+        # never blocks — or is blocked by — a Steam library fetch. Internal jobs
+        # still serialize among themselves because claimSources writes the auto
+        # feed that buildClaims reads.
         self._queue: queue.Queue[Run] = queue.Queue()
-        self._pending: list[Run] = []  # queued + active, in submission order
+        self._internal_queue: queue.Queue[Run] = queue.Queue()
+        self._pending: list[Run] = []  # queued + active (both lanes), submission order
         self._history: deque[dict[str, Any]] = deque(
             _load_run_history_from(self._runs_dir / "history.json")[-MAX_HISTORY:],
             maxlen=MAX_HISTORY,
         )
         self._active: Run | None = None
+        self._internal_active: Run | None = None
         self._runs_by_id: dict[str, Run] = {}
         self._last_queue_kick_at = 0.0
         self._watchdog_stop = threading.Event()
@@ -1272,40 +1328,69 @@ class RunManager:
 
     def _start_worker_thread(self) -> None:
         self._worker_thread = threading.Thread(
-            target=self._worker_loop, name="run-worker", daemon=True
+            target=self._worker_loop, args=(False,), name="run-worker", daemon=True
         )
         self._worker_thread.start()
+        self._internal_worker_thread = threading.Thread(
+            target=self._worker_loop, args=(True,), name="run-worker-internal", daemon=True
+        )
+        self._internal_worker_thread.start()
 
     def _ensure_worker_thread(self) -> None:
-        """Restart the queue worker if the daemon thread died (leaves runs stuck queued)."""
-        if self._worker_thread.is_alive():
-            return
-        print("[runs] worker thread died — restarting", file=sys.stderr, flush=True)
-        self._start_worker_thread()
+        """Restart either lane worker if its daemon thread died (leaves runs stuck queued)."""
+        if not self._worker_thread.is_alive():
+            print("[runs] fetcher worker thread died — restarting", file=sys.stderr, flush=True)
+            self._worker_thread = threading.Thread(
+                target=self._worker_loop, args=(False,), name="run-worker", daemon=True
+            )
+            self._worker_thread.start()
+        internal = getattr(self, "_internal_worker_thread", None)
+        if internal is None or not internal.is_alive():
+            print("[runs] internal worker thread died — restarting", file=sys.stderr, flush=True)
+            self._internal_worker_thread = threading.Thread(
+                target=self._worker_loop, args=(True,), name="run-worker-internal", daemon=True
+            )
+            self._internal_worker_thread.start()
 
     def _resync_stalled_queue(self) -> int:
         """Put pending queued runs back on the worker queue when nothing is active.
 
         This heals the wedge where runs sit in ``_pending`` with status ``queued``
         but were never handed to ``_queue.get()`` (typically after the worker thread
-        exited while the queue was empty).
+        exited while the queue was empty). Runs both lanes independently.
         """
+        return self._resync_lane(internal=False) + self._resync_lane(internal=True)
+
+    def _resync_lane(self, *, internal: bool) -> int:
+        lane_queue = self._internal_queue if internal else self._queue
         to_put: list[Run] = []
         with self._lock:
-            if self._active is not None and self._active._finished.is_set():
-                self._active = None
-            if self._active is not None:
+            active = self._internal_active if internal else self._active
+            if active is not None and active._finished.is_set():
+                if internal:
+                    self._internal_active = None
+                else:
+                    self._active = None
+                active = None
+            if active is not None:
                 return 0
-            if self._queue.qsize() > 0:
+            if lane_queue.qsize() > 0:
                 return 0
             for r in self._pending:
+                if bool(r._internal) != internal:
+                    continue
                 if r.status == "queued" and not r._finished.is_set():
                     to_put.append(r)
         for r in to_put:
-            self._queue.put(r)
+            lane_queue.put(r)
         if to_put:
             keys = ", ".join(r.key for r in to_put)
-            print(f"[runs] re-queued {len(to_put)} stalled run(s): {keys}", file=sys.stderr, flush=True)
+            lane = "internal" if internal else "fetcher"
+            print(
+                f"[runs] re-queued {len(to_put)} stalled {lane} run(s): {keys}",
+                file=sys.stderr,
+                flush=True,
+            )
         return len(to_put)
 
     def _kick_queue_if_stalled(self) -> None:
@@ -1339,15 +1424,15 @@ class RunManager:
                     and now - r._cancelling_since > CANCEL_STUCK_GRACE_SEC
                 ):
                     stuck.append(r)
-            active = self._active
-            if (
-                active
-                and active.status == "cancelling"
-                and active._cancelling_since is not None
-                and now - active._cancelling_since > CANCEL_STUCK_GRACE_SEC
-                and active not in stuck
-            ):
-                stuck.append(active)
+            for active in (self._active, self._internal_active):
+                if (
+                    active
+                    and active.status == "cancelling"
+                    and active._cancelling_since is not None
+                    and now - active._cancelling_since > CANCEL_STUCK_GRACE_SEC
+                    and active not in stuck
+                ):
+                    stuck.append(active)
         for run in stuck:
             pids = self._collect_pids_for_run(run, [])
             if pids:
@@ -1387,13 +1472,13 @@ class RunManager:
         stuck: list[Run] = []
         with self._lock:
             candidates: list[Run] = []
-            active = self._active
-            if (
-                active
-                and active.status in ("launching", "running")
-                and not active._finished.is_set()
-            ):
-                candidates.append(active)
+            for active in (self._active, self._internal_active):
+                if (
+                    active
+                    and active.status in ("launching", "running")
+                    and not active._finished.is_set()
+                ):
+                    candidates.append(active)
             for r in self._pending:
                 if (
                     r.status in ("launching", "running")
@@ -1601,16 +1686,17 @@ class RunManager:
         self._watchdog_stop.set()
         with self._lock:
             pending = list(self._pending)
-            active = self._active
+            actives = [self._active, self._internal_active]
         kill_pids: list[int] = []
         for run in pending:
             changed, pids = run.cancel()
             if changed:
                 kill_pids.extend(self._collect_pids_for_run(run, pids))
-        if active is not None:
-            changed, pids = active.cancel()
-            if changed:
-                kill_pids.extend(self._collect_pids_for_run(active, pids))
+        for active in actives:
+            if active is not None:
+                changed, pids = active.cancel()
+                if changed:
+                    kill_pids.extend(self._collect_pids_for_run(active, pids))
         if kill_pids:
             for pid in dict.fromkeys(kill_pids):
                 _terminate_pid(pid)
@@ -1626,6 +1712,9 @@ class RunManager:
             wt.join(timeout=timeout)
         if self._worker_thread.is_alive():
             self._worker_thread.join(timeout=timeout)
+        internal = getattr(self, "_internal_worker_thread", None)
+        if internal is not None and internal.is_alive():
+            internal.join(timeout=timeout)
 
     def submit(self, key: str, *, refresh: bool = False) -> Run:
         if key not in FETCHERS:
@@ -1634,10 +1723,15 @@ class RunManager:
             active = self._active
             if active and active.key == key and active.status in _IN_FLIGHT_STATUSES:
                 raise ValueError(f"{key} already queued or running")
-            if any(r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending):
+            if any(
+                not r._internal and r.key == key and r.status in _IN_FLIGHT_STATUSES
+                for r in self._pending
+            ):
                 raise ValueError(f"{key} already queued or running")
+            # Only the fetcher lane gates fetcher submits; admin/internal jobs
+            # run in their own lane and must not count toward "queue full".
             in_flight = sum(
-                1 for r in self._pending if r.status in _IN_FLIGHT_STATUSES
+                1 for r in self._pending if not r._internal and r.status in _IN_FLIGHT_STATUSES
             )
             # cancel() drops a run from _pending while the worker is still
             # finishing it on _active — count that slot so the queue can't wedge.
@@ -1676,13 +1770,21 @@ class RunManager:
         if key not in INTERNAL_JOBS:
             raise KeyError(key)
         with self._lock:
-            active = self._active
+            active = self._internal_active
             if active and active.key == key and active.status in _IN_FLIGHT_STATUSES:
                 raise ValueError(f"{key} already queued or running")
-            if any(r.key == key and r.status in _IN_FLIGHT_STATUSES for r in self._pending):
+            if any(
+                r._internal and r.key == key and r.status in _IN_FLIGHT_STATUSES
+                for r in self._pending
+            ):
                 raise ValueError(f"{key} already queued or running")
+            # The internal lane is independent of the fetcher lane: count only
+            # internal in-flight runs so a running library fetch never blocks
+            # admin Publish/Enrich (and vice versa). Internal jobs still
+            # serialize with each other (cap 1) so claimSources/buildClaims
+            # don't race the shared auto feed.
             in_flight = sum(
-                1 for r in self._pending if r.status in _IN_FLIGHT_STATUSES
+                1 for r in self._pending if r._internal and r.status in _IN_FLIGHT_STATUSES
             )
             if (
                 active
@@ -1692,7 +1794,7 @@ class RunManager:
                 in_flight += 1
             if in_flight >= 1:
                 raise ValueError(
-                    "queue full — a fetch is already running; "
+                    "an admin job is already running; "
                     "wait for it to finish before starting another"
                 )
             pid = profile_id or get_active_profile_id()
@@ -1705,7 +1807,7 @@ class RunManager:
             )
             self._pending.append(run)
             self._runs_by_id[run.id] = run
-            self._queue.put(run)
+            self._internal_queue.put(run)
         self._persist_queue()
         self._ensure_worker_thread()
         return run
@@ -1750,13 +1852,13 @@ class RunManager:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             ]
-            active = self._active
-            if (
-                active
-                and active.status in _IN_FLIGHT_STATUSES
-                and active not in targets
-            ):
-                targets.append(active)
+            for active in (self._active, self._internal_active):
+                if (
+                    active
+                    and active.status in _IN_FLIGHT_STATUSES
+                    and active not in targets
+                ):
+                    targets.append(active)
         if profile_id is not None:
             targets = [r for r in targets if r.profile_id == profile_id]
         all_pids: list[int] = []
@@ -1791,13 +1893,13 @@ class RunManager:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             ]
-            active = self._active
-            if (
-                active
-                and active.status in _IN_FLIGHT_STATUSES
-                and active not in targets
-            ):
-                targets.append(active)
+            for active in (self._active, self._internal_active):
+                if (
+                    active
+                    and active.status in _IN_FLIGHT_STATUSES
+                    and active not in targets
+                ):
+                    targets.append(active)
         if profile_id is not None:
             targets = [r for r in targets if r.profile_id == profile_id]
         all_pids: list[int] = []
@@ -1816,14 +1918,16 @@ class RunManager:
                     run.exit_code = -1
                     run.ended_at = time.time()
             all_pids.extend(self._collect_pids_for_run(run, []))
-        while True:
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                break
+        for drain in (self._queue, self._internal_queue):
+            while True:
+                try:
+                    drain.get_nowait()
+                except queue.Empty:
+                    break
         with self._lock:
             self._pending.clear()
             self._active = None
+            self._internal_active = None
         _write_active_runs([])
         _save_durable_queue([])
         if all_pids:
@@ -1846,23 +1950,33 @@ class RunManager:
         self._ensure_worker_thread()
         return {"cancelled": summaries, "force": True}
 
-    def has_runs_for_profile(self, profile_id: str) -> bool:
-        """True if any queued or running fetcher is bound to this profile."""
+    def _in_flight_targets(self, profile_id: str | None = None) -> list[Run]:
+        """Queued or running jobs in either lane, including actives dropped from _pending."""
         with self._lock:
-            return any(
-                r.profile_id == profile_id and r.status in _IN_FLIGHT_STATUSES
-                for r in self._pending
-            )
+            targets = [
+                r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
+            ]
+            for active in (self._active, self._internal_active):
+                if (
+                    active
+                    and active.status in _IN_FLIGHT_STATUSES
+                    and active not in targets
+                ):
+                    targets.append(active)
+        if profile_id is not None:
+            targets = [r for r in targets if r.profile_id == profile_id]
+        return targets
+
+    def has_runs_for_profile(self, profile_id: str) -> bool:
+        """True if any queued or running job in either lane is bound to this profile."""
+        return bool(self._in_flight_targets(profile_id))
 
     def cancel_all_and_wait(
         self,
         timeout: float = SWITCH_CANCEL_WAIT_SEC,
     ) -> dict[str, Any]:
-        """Cancel every in-flight fetcher and wait for each to finish (bounded)."""
-        with self._lock:
-            targets = [
-                r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
-            ]
+        """Cancel every in-flight job and wait for each to finish (bounded)."""
+        targets = self._in_flight_targets()
         cancelled: list[dict[str, Any]] = []
         for run in targets:
             run_obj, err = self.cancel(run.id)
@@ -1893,6 +2007,9 @@ class RunManager:
     def snapshot(self) -> dict[str, Any]:
         self._kick_queue_if_stalled_throttled()
         with self._lock:
+            # active/queue cover the fetcher lane only so the dashboard fetcher
+            # chips stay independent of admin jobs; the internal lane is exposed
+            # separately under internal_active/internal_queue.
             active = (
                 self._active.to_summary()
                 if self._active and self._active.status in _IN_FLIGHT_STATUSES
@@ -1901,10 +2018,27 @@ class RunManager:
             queued = [
                 r.to_summary()
                 for r in self._pending
-                if r.status == "queued" and r is not self._active
+                if not r._internal and r.status == "queued" and r is not self._active
+            ]
+            internal_active = (
+                self._internal_active.to_summary()
+                if self._internal_active
+                and self._internal_active.status in _IN_FLIGHT_STATUSES
+                else None
+            )
+            internal_queue = [
+                r.to_summary()
+                for r in self._pending
+                if r._internal and r.status == "queued" and r is not self._internal_active
             ]
             history = list(self._history)
-        return {"active": active, "queue": queued, "history": history}
+        return {
+            "active": active,
+            "queue": queued,
+            "internal_active": internal_active,
+            "internal_queue": internal_queue,
+            "history": history,
+        }
 
     def _finalize_run(self, run: Run) -> None:
         with run._lock:
@@ -1927,6 +2061,8 @@ class RunManager:
         with self._lock:
             if self._active is run:
                 self._active = None
+            if self._internal_active is run:
+                self._internal_active = None
             if run in self._pending:
                 self._pending.remove(run)
         self._unregister_active_process(run.id)
@@ -1934,13 +2070,17 @@ class RunManager:
         self._persist_queue()
         self._prune_runs_by_id()
 
-    def _worker_loop(self) -> None:
+    def _worker_loop(self, internal: bool = False) -> None:
+        lane_queue = self._internal_queue if internal else self._queue
         while True:
             try:
-                run = self._queue.get()
+                run = lane_queue.get()
                 if not run._finished.is_set():
                     with self._lock:
-                        self._active = run
+                        if internal:
+                            self._internal_active = run
+                        else:
+                            self._active = run
                         if run.status == "queued":
                             run.status = "launching"
                     self._persist_queue()
@@ -3057,7 +3197,9 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(raw, dict):
                 enriched.append({})
                 continue
-            enriched.append(_enrich_item(raw, last_call, cover_lookup))
+            enriched.append(
+                _enrich_item(raw, last_call, cover_lookup, upgrade_covers=True)
+            )
 
         root = data_root()
         auto_path = root / FREE_CLAIMS_AUTO_PATH
@@ -3589,8 +3731,12 @@ class Handler(SimpleHTTPRequestHandler):
                     },
                 )
                 return
+        allow_empty = self.headers.get(_BAKLOG_ALLOW_EMPTY_HEADER) == "1"
         try:
-            doc = _save_personal_doc(payload)
+            doc = _save_personal_doc(payload, allow_empty=allow_empty)
+        except PersonalEmptyOverwriteError as exc:
+            _send_json(self, HTTPStatus.CONFLICT, {"error": str(exc)})
+            return
         except PersonalCorruptError as exc:
             _send_json(self, HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
             return

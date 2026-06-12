@@ -71,7 +71,41 @@ export function activeProfileId() {
     const bound = getAccountProfileId();
     if (bound) return bound;
   }
-  return localStorage.getItem(ACTIVE_PROFILE_LS) || _status?.active || 'default';
+  const stored = localStorage.getItem(ACTIVE_PROFILE_LS);
+  if (stored) return stored;
+  // Hybrid mode (Supabase + BAKLOG_LOCAL_PROFILES): auth-gate seeds the account
+  // profile id before initProfiles() runs; use it instead of falling through to
+  // 'default' while profiles/index.json already points at the account profile.
+  if (isAccountAuthMode() && isLocalProfilesEnabled()) {
+    const bound = getAccountProfileId();
+    if (bound) return bound;
+  }
+  return _status?.active || 'default';
+}
+
+/**
+ * Pin localStorage + _status to the server's active profile before personal
+ * storage hydrates. Must run after initAuthGate() and before hydrateState().
+ */
+export async function ensureActiveProfileResolved() {
+  if (isAccountAuthMode() && !isLocalProfilesEnabled()) {
+    await syncAccountProfileId();
+    return;
+  }
+  if (isAccountAuthMode() && isLocalProfilesEnabled()) {
+    const bound = getAccountProfileId();
+    if (bound && !localStorage.getItem(ACTIVE_PROFILE_LS)) {
+      localStorage.setItem(ACTIVE_PROFILE_LS, bound);
+    }
+  }
+  try {
+    await fetchProfilesStatus();
+  } catch {
+    if (!_status?.active && !localStorage.getItem(ACTIVE_PROFILE_LS)) {
+      const bound = getAccountProfileId();
+      if (bound) localStorage.setItem(ACTIVE_PROFILE_LS, bound);
+    }
+  }
 }
 
 function profileKeySuffix(id) {

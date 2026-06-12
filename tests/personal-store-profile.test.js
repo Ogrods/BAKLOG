@@ -76,7 +76,11 @@ describe('personalStore.prepareForProfileSwitch', () => {
         if (url === '/api/personal' && opts?.method === 'GET') {
           return {
             ok: true,
-            json: async () => ({ personal: {}, prefs: {}, manual: [] }),
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: {},
+              manual: [],
+            }),
           };
         }
         if (url === '/api/personal' && opts?.method === 'PUT') {
@@ -93,6 +97,7 @@ describe('personalStore.prepareForProfileSwitch', () => {
     const { personalStore, state } = await loadStore();
     state.personal = { game1: { status: 'backlog' } };
     await personalStore.init();
+    state.personal = { game1: { status: 'playing' } };
     personalStore.notify();
     await personalStore.flush();
     expect(puts.length).toBeGreaterThanOrEqual(1);
@@ -118,7 +123,11 @@ describe('personalStore.prepareForProfileSwitch', () => {
         if (url === '/api/personal' && opts?.method === 'GET') {
           return {
             ok: true,
-            json: async () => ({ personal: {}, prefs: {}, manual: [] }),
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: {},
+              manual: [],
+            }),
           };
         }
         if (url === '/api/personal' && opts?.method === 'PUT') {
@@ -135,6 +144,7 @@ describe('personalStore.prepareForProfileSwitch', () => {
     const { personalStore, state } = await loadStore();
     state.personal = { game1: { status: 'backlog' } };
     await personalStore.init();
+    state.personal = { game1: { status: 'playing' } };
     personalStore.notify();
     await personalStore.flush();
     expect(puts.length).toBeGreaterThanOrEqual(1);
@@ -149,7 +159,11 @@ describe('personalStore.prepareForProfileSwitch', () => {
         if (url === '/api/personal' && opts?.method === 'GET') {
           return {
             ok: true,
-            json: async () => ({ personal: {}, prefs: {}, manual: [] }),
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: {},
+              manual: [],
+            }),
           };
         }
         if (url === '/api/personal' && opts?.method === 'PUT') {
@@ -167,8 +181,9 @@ describe('personalStore.prepareForProfileSwitch', () => {
     );
 
     const { personalStore, state } = await loadStore();
-    await personalStore.init();
     state.personal = { game1: { status: 'backlog' } };
+    await personalStore.init();
+    state.personal = { game1: { status: 'next' } };
     personalStore.notify();
     await personalStore.flush();
 
@@ -377,6 +392,73 @@ describe('personalStore.prepareForProfileSwitch', () => {
     state.personal = { game1: { status: 'backlog', exclude_from_count: true } };
     await personalStore.init();
     expect(state.personal.game1.exclude_from_count).toBe(true);
+  });
+
+  it('hybrid mode: populated server doc on account profile scope skips migration banner', async () => {
+    vi.resetModules();
+    const accountId = '0344d93b-a54d-4b75-8dc2-05b158b8de42';
+    vi.doMock('../js/auth-gate.js', () => ({
+      isAccountAuthMode: () => true,
+      isLocalProfilesEnabled: () => true,
+      getAccountProfileId: () => accountId,
+      getAccessToken: () => 'tok',
+      whenAuthReady: () => Promise.resolve(),
+      refreshAccessToken: async () => null,
+      handleApiUnauthorized: () => {},
+    }));
+    const { STORAGE_KEY } = await import('../js/state.js');
+    localStorage.setItem(
+      `${STORAGE_KEY}:${accountId}`,
+      JSON.stringify({ game1: { status: 'backlog' } }),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (url === '/api/personal') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: { game1: { status: 'backlog' }, game2: { status: 'playing' } },
+              prefs: { activeView: 'library' },
+              manual: [],
+              libraryFirstSeen: {},
+            }),
+          };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    const result = await personalStore.init();
+    expect(result.pendingMigration).toBeNull();
+    expect(result.migrated).toBe(true);
+    expect(state.personal.game2?.status).toBe('playing');
+  });
+
+  it('does not PUT an empty snapshot before init completes', async () => {
+    const puts = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({ personal: {}, prefs: {}, manual: [] }),
+          };
+        }
+        if (url === '/api/personal' && opts?.method === 'PUT') {
+          puts.push(JSON.parse(opts.body));
+          return { ok: true, json: async () => JSON.parse(opts.body) };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore } = await loadStore();
+    personalStore.notify();
+    await personalStore.flush();
+    expect(puts).toHaveLength(0);
   });
 
   it('first-seen merge keeps the newer local timestamp', async () => {

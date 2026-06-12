@@ -148,7 +148,7 @@ export function claimSourceHtml(source, { tag = 'span' } = {}) {
   if (!meta) return '';
   const label = escapeHtml(meta.label);
   const inner = (tag === 'a')
-    ? `<a href="${escapeAttr(meta.url)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+    ? `<a href="${escapeAttr(affiliateUrl(meta.url))}" target="_blank" rel="noopener noreferrer">${label}</a>`
     : label;
   return `<span class="claim-source" title="Referenced via ${label}">via ${inner}</span>`;
 }

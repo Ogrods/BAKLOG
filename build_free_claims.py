@@ -14,7 +14,7 @@ from pathlib import Path
 import requests
 
 from fetchers._base import configure_stdout
-from fetchers._progress import RunStats, started
+from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
     GAMERPOWER_ATTRIBUTION,
@@ -315,12 +315,29 @@ DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower"})
 DEFAULT_EXPIRY_DAYS = 14
 
 
+def _enrich_item_publish_skip(
+    store: str,
+    appid: int | None,
+    header: object,
+    genres: list,
+    review: object,
+) -> bool:
+    """True when a publish rebuild can reuse existing metadata without Steam calls."""
+    header_str = str(header or "").strip()
+    if not header_str or review is None or appid is None:
+        return False
+    if store in ("steam", "") and not genres:
+        return False
+    return True
+
+
 def _enrich_item(
     raw: dict,
     last_call: list[float],
     cover_lookup: dict[str, str] | None = None,
     *,
     now: datetime | None = None,
+    upgrade_covers: bool = True,
 ) -> dict:
     claim_url = str(raw.get("claim_url") or "").strip()
     title = (raw.get("title") or "").strip()
@@ -340,8 +357,10 @@ def _enrich_item(
     header = raw.get("header_image")
     genres = raw.get("genres") or []
     review = raw.get("review_percent")
+    network_actions: list[str] = []
 
     if appid is None:
+        network_actions.append("resolve_appid")
         appid = _resolve_steam_appid(
             store=store,
             title=title,
@@ -359,19 +378,32 @@ def _enrich_item(
                 header = borrowed
 
     if appid is None and (not header or review is None) and store != "steam":
+        network_actions.append("resolve_appid_by_title")
         appid = _resolve_steam_appid_by_title(title, last_call, blurb=raw.get("blurb"))
 
+    needs_details = False
+    needs_portrait = False
+    header_quality = _cover_quality(str(header or "").strip())
+    publish_skip = False
     if appid:
         header_str = str(header or "").strip()
-        needs_details = (
-            review is None
-            or not header_str
-            or (store in ("steam", "") and not genres)
+        publish_skip = not upgrade_covers and _enrich_item_publish_skip(
+            store, appid, header_str, genres, review
         )
-        needs_portrait = _cover_quality(header_str) < 4
+        if publish_skip:
+            needs_details = False
+            needs_portrait = False
+        else:
+            needs_details = (
+                review is None
+                or not header_str
+                or (store in ("steam", "") and not genres)
+            )
+            needs_portrait = upgrade_covers and _cover_quality(header_str) < 4
 
         real_header = None
         if needs_details:
+            network_actions.append("steam_app_details")
             details = _steam_app_details(appid, last_call)
             if details:
                 if store in ("steam", ""):
@@ -384,6 +416,7 @@ def _enrich_item(
                         if g.get("description")
                     ]
                 if review is None:
+                    network_actions.append("steam_review_percent")
                     review = _steam_review_percent(appid, last_call)
                 raw_header = (details.get("header_image") or "").strip()
                 if raw_header:
@@ -391,6 +424,7 @@ def _enrich_item(
 
         verified_portrait = None
         if needs_portrait:
+            network_actions.append("verified_portrait")
             verified_portrait = _verified_portrait_cover(appid, last_call)
         header = verified_portrait or real_header or header
 
@@ -1417,6 +1451,16 @@ def main() -> int:
     cover_lookup = _build_cover_lookup(auto_items_all)
     last_call = [0.0]
     items: list[dict] = []
+    enrich_total = sum(
+        1
+        for raw in raw_items
+        if isinstance(raw, dict)
+        and raw.get("claim_url")
+        and raw.get("store")
+        and not _is_expired(_resolve_ends_at(raw, now=now), now)
+    )
+    enrich_hb = HeartbeatTimer(interval=45.0)
+    enrich_idx = 0
     for raw in raw_items:
         if not isinstance(raw, dict):
             stats.warn("skipped non-object item")
@@ -1427,7 +1471,12 @@ def main() -> int:
         if _is_expired(_resolve_ends_at(raw, now=now), now):
             stats.warn(f"skipped expired item: {raw.get('id')!r}")
             continue
-        items.append(_enrich_item(raw, last_call, cover_lookup, now=now))
+        enrich_idx += 1
+        item_id = str(raw.get("id") or "").strip() or f"item-{enrich_idx}"
+        enrich_hb.tick_progress(enrich_idx, enrich_total, "enrich", item_id)
+        items.append(
+            _enrich_item(raw, last_call, cover_lookup, now=now, upgrade_covers=False)
+        )
 
     carried = _carry_forward_missing_approved(
         items,
@@ -1452,6 +1501,16 @@ def main() -> int:
         premium_only_ids=premium_only_ids,
         manual_items=manual_items,
     )
+
+    if not args.dry_run and auto_items:
+        auto_ids = {str(it.get("id") or "").strip() for it in auto_items}
+        to_persist = [
+            it for it in items
+            if str(it.get("id") or "").strip() in auto_ids
+        ]
+        persisted = merge_enriched_items_into_auto_feed(AUTO_PATH, to_persist)
+        if persisted:
+            stats.warn(f"persisted enrichment onto {persisted} auto feed row(s)")
 
     generated_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)

@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-06-11T22:55:16.977190+00:00",
+  "fetched_at": "2026-06-12T17:25:48.840674+00:00",
   "sources": {
     "epic": 2,
     "gamerpower": 23,
@@ -37,17 +37,17 @@
       "title": "Eets (Steam) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/eets-steam-giveaway",
       "ends_at": "2026-06-15T23:59:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/6100/b97e6e9de18d08941c872fc73abae7c2dc91ccfe/header.jpg?t=1781207036",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a2aebf9e069c.jpg",
       "blurb": "Claim Eets for free on Steam until June 15! Eets is a 2D puzzle game, something like Lemmings meets The Incredible Machine.",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 59,
       "steam_appid": 6100,
       "genres": [
         "Casual",
         "Indie",
         "Strategy"
-      ]
+      ],
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3682",
@@ -58,7 +58,6 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1053710/library_600x900_2x.jpg",
       "blurb": "This giveaway is for the dog lovers! Grab The Red Lantern for free on Steam until June 18! The Red Lantern is a 3d first person dog sledding game with very positive reviews. Don´t miss it!",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 82,
       "steam_appid": 1053710,
       "genres": [
@@ -66,7 +65,8 @@
         "Casual",
         "Indie",
         "RPG"
-      ]
+      ],
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3681",
@@ -88,9 +88,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2096510/library_600x900_2x.jpg",
       "blurb": "Checkmate your boredom! Download The Ouroboros King without any cost via Epic Games Store! The Ouroboros King combines chess with the replayability of roguelikes. Check it out!",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 81,
-      "steam_appid": 2096510
+      "steam_appid": 2096510,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3679",
@@ -101,7 +101,6 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1433340/library_600x900_2x.jpg",
       "blurb": "Start grilling patties today with this giveaway! Grab Happy’s Humble Burger Farm for free on Steam until June 15. Happy’s Humble Burger Farm is a first-person sim game about serving customers and maintaining a restaurant. Don´t miss it!",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 92,
       "steam_appid": 1433340,
       "genres": [
@@ -109,7 +108,8 @@
         "Adventure",
         "Indie",
         "Simulation"
-      ]
+      ],
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3678",
@@ -120,9 +120,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2250400/library_600x900_2x.jpg",
       "blurb": "80s Nostalgia! Get MicroCrawl for free on itch.io! MicroCrawl is a small 2D point-and-click adventure game with a first-person perspective that evokes memories of old-school dungeon crawlers from the 80s.",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 91,
-      "steam_appid": 2250400
+      "steam_appid": 2250400,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3677",
@@ -133,8 +133,8 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4747110/f8247728e4974286b897788cecda406069ab2068/header.jpg?t=1781116480",
       "blurb": "Download Not A Customer for free on itch.io. Not A Customer is a 3d first person grocery store sim game with old school Playstation 1 graphics. Check it out!",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
-      "steam_appid": 4747110
+      "steam_appid": 4747110,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3548",
@@ -142,12 +142,12 @@
       "title": "Static Voice (Itch.io) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/static-voice-itch-io-giveaway",
       "ends_at": "2026-06-19T23:59:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4207170/5b734a735246cf374806d41ec31076c84772566a/header.jpg?t=1776267157",
+      "header_image": "https://www.gamerpower.com/offers/1b/69c5a81a64b29.jpg",
       "blurb": "Claim Static Voice for free on Itch.io! Static Voice is a first-person survival game where you play as a resident of an old Soviet apartment block.",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 93,
-      "steam_appid": 4207170
+      "steam_appid": 4207170,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3553",
@@ -155,12 +155,12 @@
       "title": "Sleep Demon (Itchio) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/sleep-demon-itchio-giveaway",
       "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4465030/d04ad74487b126388fee536474bcb258c642239c/header.jpg?t=1773513774",
+      "header_image": "https://www.gamerpower.com/offers/1b/69ca788f5d0d4.jpg",
       "blurb": "Download Sleep Demon for free on Itch.io until June 14, a indie single player walking simulator game about sleep paralysis.",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 83,
-      "steam_appid": 4465030
+      "steam_appid": 4465030,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3477",
@@ -168,12 +168,12 @@
       "title": "CALLUS (itch.io) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/callus-itch-io-giveaway",
       "ends_at": "2026-06-15T23:59:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4258330/6bdf7e7240b40e22c54c407ebe860b7397c53fd8/header.jpg?t=1781111625",
+      "header_image": "https://www.gamerpower.com/offers/1b/697cea97b5a63.jpg",
       "blurb": "Want to go for a walk? Grab CALLUS for free on itch.io! Callus is a small indie psychological walking simulator with realistic gameplay.",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 76,
-      "steam_appid": 4258330
+      "steam_appid": 4258330,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "gamerpower-3676",
@@ -360,9 +360,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/317820/library_600x900_2x.jpg",
       "blurb": "Guild of Dungeoneering Ultimate Edition",
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 77,
-      "steam_appid": 317820
+      "steam_appid": 317820,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "itad-d2d983178b48",

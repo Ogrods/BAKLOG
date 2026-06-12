@@ -84,4 +84,12 @@ describe('profiles storage keys', () => {
     expect(activeProfileId()).toBe('supabase-uuid');
     expect(profileScopedStorageKey(LS_LIBRARY_WATCH)).toBe(`${LS_LIBRARY_WATCH}:supabase-uuid`);
   });
+
+  it('falls back to account profile id in hybrid mode when localStorage unset', () => {
+    authGate.isAccountAuthMode.mockReturnValue(true);
+    authGate.isLocalProfilesEnabled.mockReturnValue(true);
+    authGate.getAccountProfileId.mockReturnValue('supabase-uuid');
+    expect(activeProfileId()).toBe('supabase-uuid');
+    expect(profileScopedStorageKey(STORAGE_KEY)).toBe(`${STORAGE_KEY}:supabase-uuid`);
+  });
 });

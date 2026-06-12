@@ -357,10 +357,8 @@ def _enrich_item(
     header = raw.get("header_image")
     genres = raw.get("genres") or []
     review = raw.get("review_percent")
-    network_actions: list[str] = []
 
     if appid is None:
-        network_actions.append("resolve_appid")
         appid = _resolve_steam_appid(
             store=store,
             title=title,
@@ -378,12 +376,10 @@ def _enrich_item(
                 header = borrowed
 
     if appid is None and (not header or review is None) and store != "steam":
-        network_actions.append("resolve_appid_by_title")
         appid = _resolve_steam_appid_by_title(title, last_call, blurb=raw.get("blurb"))
 
     needs_details = False
     needs_portrait = False
-    header_quality = _cover_quality(str(header or "").strip())
     publish_skip = False
     if appid:
         header_str = str(header or "").strip()
@@ -403,7 +399,6 @@ def _enrich_item(
 
         real_header = None
         if needs_details:
-            network_actions.append("steam_app_details")
             details = _steam_app_details(appid, last_call)
             if details:
                 if store in ("steam", ""):
@@ -416,7 +411,6 @@ def _enrich_item(
                         if g.get("description")
                     ]
                 if review is None:
-                    network_actions.append("steam_review_percent")
                     review = _steam_review_percent(appid, last_call)
                 raw_header = (details.get("header_image") or "").strip()
                 if raw_header:
@@ -424,7 +418,6 @@ def _enrich_item(
 
         verified_portrait = None
         if needs_portrait:
-            network_actions.append("verified_portrait")
             verified_portrait = _verified_portrait_cover(appid, last_call)
         header = verified_portrait or real_header or header
 

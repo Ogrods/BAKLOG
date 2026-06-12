@@ -1046,3 +1046,64 @@ def test_internal_lane_still_serializes_among_itself(runs_env, internal_jobs) ->
 
     with pytest.raises(ValueError, match="admin job"):
         mgr.submit_internal("claimSources")
+
+
+def _seed_both_lanes_running(mgr, runs_dir):
+    fetcher = server.Run("demo", runs_dir=runs_dir)
+    fetcher.status = "running"
+    internal = server.Run("buildClaims", runs_dir=runs_dir, internal=True)
+    internal.status = "running"
+    with mgr._lock:
+        mgr._active = fetcher
+        mgr._internal_active = internal
+        mgr._runs_by_id[fetcher.id] = fetcher
+        mgr._runs_by_id[internal.id] = internal
+    return fetcher, internal
+
+
+def test_cancel_all_lane_fetcher_spares_internal(runs_env, internal_jobs) -> None:
+    mgr, runs_dir = runs_env
+    fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
+
+    cancelled = mgr.cancel_all(lane="fetcher")
+
+    assert {c["id"] for c in cancelled} == {fetcher.id}
+    assert fetcher._finished.is_set()
+    assert not internal._finished.is_set()
+    assert mgr._internal_active is internal
+
+
+def test_cancel_all_lane_internal_spares_fetcher(runs_env, internal_jobs) -> None:
+    mgr, runs_dir = runs_env
+    fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
+
+    cancelled = mgr.cancel_all(lane="internal")
+
+    assert {c["id"] for c in cancelled} == {internal.id}
+    assert internal._finished.is_set()
+    assert not fetcher._finished.is_set()
+    assert mgr._active is fetcher
+
+
+def test_cancel_all_no_lane_cancels_both(runs_env, internal_jobs) -> None:
+    mgr, runs_dir = runs_env
+    fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
+
+    cancelled = mgr.cancel_all()
+
+    assert {c["id"] for c in cancelled} == {fetcher.id, internal.id}
+    assert fetcher._finished.is_set()
+    assert internal._finished.is_set()
+
+
+def test_force_reset_lane_fetcher_spares_internal(runs_env, internal_jobs) -> None:
+    mgr, runs_dir = runs_env
+    fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
+
+    result = mgr.force_reset(lane="fetcher")
+
+    assert {c["id"] for c in result["cancelled"]} == {fetcher.id}
+    assert fetcher._finished.is_set()
+    assert not internal._finished.is_set()
+    assert mgr._active is None
+    assert mgr._internal_active is internal

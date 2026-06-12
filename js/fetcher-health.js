@@ -2055,7 +2055,11 @@ export const fetcherRunner = (() => {
 
   function reconcileCancelInBackground(ids, { force = false } = {}) {
     void (async () => {
-      const cancelUrl = force ? '/api/runs/cancel?force=1' : '/api/runs/cancel';
+      // Dashboard Cancel is fetcher-lane only — never kill admin (internal)
+      // jobs like buildClaims/claimSources running in parallel.
+      const cancelUrl = force
+        ? '/api/runs/cancel?lane=fetcher&force=1'
+        : '/api/runs/cancel?lane=fetcher';
       let bulkOk = false;
       try {
         const res = await fetchWithTimeoutAndProbe(cancelUrl, { method: 'POST' }, CANCEL_HTTP_MS);

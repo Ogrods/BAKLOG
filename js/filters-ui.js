@@ -83,6 +83,7 @@ import {
   isItchTabAvailable,
   authStatusLoaded,
 } from './connections.js';
+import { visibleItchGames } from './connections-status.js';
 import { collectActiveFilters } from './active-filters.js';
 
 export { collectActiveFilters } from './active-filters.js';
@@ -767,19 +768,20 @@ export function renderSummary() {
     return;
   }
   if (state.activeView === "itch") {
-    const total = state.itchGames.length;
-    const gamesOnly = state.itchGames.filter(itchIsGame).length;
+    const itchGames = visibleItchGames();
+    const total = itchGames.length;
+    const gamesOnly = itchGames.filter(itchIsGame).length;
     const hideNonGames = !!state.sessionPrefs.itchHideNonGames;
     const showingGames = hideNonGames ? gamesOnly : total;
-    const backlog = state.itchGames.filter(g => getPersonal(g).status === "backlog" && (!hideNonGames || itchIsGame(g)));
+    const backlog = itchGames.filter(g => getPersonal(g).status === "backlog" && (!hideNonGames || itchIsGame(g)));
     const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
-    const rated = state.itchGames.filter(g => ratingValue(g) > 0 && (!hideNonGames || itchIsGame(g)));
+    const rated = itchGames.filter(g => ratingValue(g) > 0 && (!hideNonGames || itchIsGame(g)));
     const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : " - ";
     const fetched = state.libraryMeta.itch?.fetched_at ? new Date(state.libraryMeta.itch.fetched_at).toLocaleString() : "";
     const countLabel = hideNonGames && gamesOnly !== total
       ? `${gamesOnly} of ${total}`
       : String(total);
-    const itchScope = hideNonGames ? state.itchGames.filter(itchIsGame) : state.itchGames;
+    const itchScope = hideNonGames ? itchGames.filter(itchIsGame) : itchGames;
     const statusChips = renderStatusChipsHtml(itchScope);
     el.innerHTML = `
       <div class="w-full flex flex-wrap gap-2">
@@ -804,7 +806,7 @@ export function renderSummary() {
     .map(k => ({
       key: k,
       label: storeLabels[k],
-      count: k === "itch" ? state.itchGames.filter(itchIsGame).length : state.allGames.filter(g => normalizeGame(g).store === k).length,
+      count: k === "itch" ? visibleItchGames().filter(itchIsGame).length : state.allGames.filter(g => normalizeGame(g).store === k).length,
     }))
     .sort((a, b) => storeDisplayRank(a.key) - storeDisplayRank(b.key));
   const hiddenCount = state.allGames.length - visibleAll.length;
@@ -815,7 +817,7 @@ export function renderSummary() {
   const storeChips = storeCounts
     .map(s => {
       if (s.key === "itch" && s.count > 0) {
-        const itchTotal = state.itchGames.length;
+        const itchTotal = visibleItchGames().length;
         const titleText = itchTotal !== s.count
           ? `Open itch.io library tab (${s.count} games of ${itchTotal} total keys)`
           : "Open itch.io library tab";
@@ -858,7 +860,7 @@ export function renderWishlistStoreChips() {
 }
 
 export function renderGenreChips() {
-  const genreSource = state.activeView === "itch" ? state.itchGames : state.allGames;
+  const genreSource = state.activeView === "itch" ? visibleItchGames() : state.allGames;
   const genres = [...new Set(genreSource.flatMap(g => gameGenresCanonical(g)))].sort();
   const html = genres.map(genre => {
     const active = (state.prefs.genreFilters || []).includes(genre);

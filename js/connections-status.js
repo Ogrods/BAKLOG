@@ -54,10 +54,20 @@ export function connectedProviderCount() {
   return authStatus.filter(p => p.status === 'connected').length;
 }
 
-/** itch.io tab: show once API key is saved or library already loaded. */
+/** True when this profile has itch.io API key or local app source enabled. */
+export function isItchSetup() {
+  const api = providerStatus('itch');
+  if (api === 'connected' || api === 'unverified') return true;
+  return providerStatus('itch_local') === 'connected';
+}
+
+/** itch.io tab: show once API key is saved or local app is enabled on this profile. */
 export function isItchTabAvailable() {
-  const row = authStatus.find(p => p.key === 'itch');
-  const status = row?.status;
-  const hasSetup = status === 'connected' || status === 'unverified';
-  return hasSetup || (state.itchGames || []).length > 0;
+  return isItchSetup();
+}
+
+/** itch rows surfaced in tables, summary chips, and dashboard recap. */
+export function visibleItchGames() {
+  if (!isItchSetup()) return [];
+  return Array.isArray(state.itchGames) ? state.itchGames : [];
 }

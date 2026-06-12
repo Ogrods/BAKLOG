@@ -105,6 +105,8 @@ export const METRIC_TIPS = {
   'top decade': 'Decade with the most owned releases.',
   'oldest unplayed': 'Oldest release-year backlog game still unplayed.',
   'newest add': 'Most recently added game (by added date, or when it first appeared in your library).',
+  'added this week': 'Games added to the library in the past 7 days (by added date, or when first seen).',
+  'added this month': 'Games added to the library in the past 30 days (by added date, or when first seen).',
   'top developer': 'Developer with the most owned titles.',
   'top publisher': 'Publisher with the most owned titles.',
   'unique developers': 'Count of distinct developers in the library.',
@@ -265,6 +267,7 @@ export const METRIC_TIPS = {
   'Double dips': 'Count of titles you own on two or more storefronts.',
   'Will you die first?': 'Backlog clear-by age at 2h/day vs a playful life expectancy - who wins?',
   'Critic gap': 'Mean |Steam review % − Metacritic| across rated library rows.',
+  'Launcher tip': 'BAKLOG can read installed games directly from your launchers, so you can clear some logins off your plate and uninstall the launchers afterward.',
 };
 
 /** Canonical metric ids for the admin Metrics tab and dashboard disable filter. */

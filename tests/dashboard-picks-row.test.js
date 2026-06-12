@@ -111,8 +111,27 @@ describe('dashboard picks row', () => {
     expect(recap.querySelector('.itch-onboard-cta--primary')?.getAttribute('href')).toContain('itch.io/games/free');
   });
 
-  it('renders library value block when itch videogames exist', async () => {
+  it('renders onboarding when a stale itch catalog exists but itch is not set up', async () => {
+    const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     const { renderDashboardItchRecap } = await import('../js/dashboard-cards.js');
+    setAuthStatusSnapshot([
+      { key: 'itch', status: 'disconnected' },
+      { key: 'itch_local', status: 'disconnected' },
+    ]);
+    state.itchGames = [
+      { store: 'itch', id: '1', name: 'Stale', classification: 'game', min_price: 0 },
+    ];
+    document.getElementById('dashItchRecap').innerHTML = '';
+    renderDashboardItchRecap();
+    const recap = document.getElementById('dashItchRecap');
+    expect(recap.textContent).toContain('Start collecting free games on itch.io');
+    expect(recap.querySelector('.itch-value-block')).toBeFalsy();
+  });
+
+  it('renders library value block when itch videogames exist', async () => {
+    const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
+    const { renderDashboardItchRecap } = await import('../js/dashboard-cards.js');
+    setAuthStatusSnapshot([{ key: 'itch_local', status: 'connected' }]);
     state.itchGames = [
       { store: 'itch', id: '1', name: 'Freebie', classification: 'game', min_price: 0 },
       { store: 'itch', id: '2', name: 'Paid', classification: 'game', min_price: 4.99 },

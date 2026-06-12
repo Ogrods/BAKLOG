@@ -460,6 +460,8 @@ export function buildInsightPool(games, snapIn, ctxIn) {
     add(`Biggest critic gap: <strong>${escapeHtml(gapLeader.g.name)}</strong> · ${gapLeader.gap} pts`, METRIC_WEIGHT.moderate);
   }
 
+  add('Launcher tip: read installs straight from your launchers - fewer logins, uninstall after.', METRIC_WEIGHT.moderate);
+
   appendCreativeInsights(entries, games, snap, METRIC_WEIGHT);
 
   noteInsightMetricKeys(entries.map((e) => metricKeyForInsight(e.html)));
@@ -859,6 +861,18 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     return ms != null && new Date(ms).getFullYear() === thisYear;
   }).length;
   if (addedThisYear) push('+', 'is-emerald', formatNum(addedThisYear), `added in ${thisYear}`);
+
+  const nowMs = Date.now();
+  const addedLastWeek = games.filter(g => {
+    const ms = effectiveAddedMs(g);
+    return ms != null && nowMs - ms <= 7 * 86400000;
+  }).length;
+  if (addedLastWeek) push('+', 'is-emerald', formatNum(addedLastWeek), 'added this week');
+  const addedLastMonth = games.filter(g => {
+    const ms = effectiveAddedMs(g);
+    return ms != null && nowMs - ms <= 30 * 86400000;
+  }).length;
+  if (addedLastMonth) push('+', 'is-emerald', formatNum(addedLastMonth), 'added this month');
 
   const devCounts = {};
   const pubCounts = {};

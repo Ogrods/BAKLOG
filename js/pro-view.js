@@ -203,9 +203,13 @@ function proPitchHtml({ showSuccess = false } = {}) {
     <div class="pro-view-funnel ${planClass}" role="region" aria-label="BAKLOG Pro">
       <header class="pro-view-hero">
         ${proHeroBannerHtml(selectedProPlan)}
-        <h1 class="pro-view-headline">${escapeHtml(PRO_PROMO.title)}</h1>
-        <p class="pro-view-subhead">${escapeHtml(PRO_PROMO.tagline)}</p>
-        ${proPricingHtml()}
+        <div class="pro-view-hero-main">
+          <div class="pro-view-hero-copy">
+            <h1 class="pro-view-headline">${escapeHtml(PRO_PROMO.title)}</h1>
+            <p class="pro-view-subhead">${escapeHtml(PRO_PROMO.tagline)}</p>
+          </div>
+          ${proPricingHtml()}
+        </div>
       </header>
       <section class="pro-view-perks" aria-label="Pro features">
         <h3 class="pro-view-section-title">Everything in Pro</h3>

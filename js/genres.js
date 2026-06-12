@@ -9,6 +9,8 @@ export const NON_GENRE_TOKENS = new Set([
   "default", "html", "html5", "flash", "java", "unity", "godot",
   "physical_game", "physical game", "assets", "asset_pack", "asset pack",
   "tool", "book", "comic", "soundtrack", "other",
+  // Store classifications/states that ride along in `genres` but are not genres.
+  "early access", "early-access",
 ]);
 
 export function isPlatformToken(name) {

@@ -429,6 +429,7 @@ export function showMigrationBanner(snap, { escapeHtml, onUploaded }) {
         <strong>Server file is empty.</strong>
         Found ${escapeHtml(summary)} in this browser that isn't on the server yet.
         Upload to <code class="bg-slate-700 px-1 rounded">data/personal.json</code>?
+        <span class="migration-banner-recommended">Recommended: syncing keeps your edits safe across browser refreshes and reinstalls.</span>
       </div>
       <div class="migration-banner-actions">
         <button type="button" id="migrationUpload" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded text-sm">Upload to server</button>

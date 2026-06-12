@@ -3622,6 +3622,13 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   font-size: 0.85rem;
 }
 .migration-banner.hidden { display: none; }
+#migrationBanner { margin-top: 0.75rem; }
+.migration-banner-recommended {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text-mute);
+  font-size: 0.8rem;
+}
 .migration-banner-body {
   display: flex; align-items: center; justify-content: space-between;
   gap: 0.75rem; flex-wrap: wrap;

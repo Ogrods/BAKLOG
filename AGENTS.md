@@ -63,15 +63,27 @@ Refresh bundle budget after intentional growth: `npm run build && node scripts/c
 .\.venv\Scripts\python.exe -m pytest          # Python (skips integration by default)
 npm test                                       # Vitest (JS)
 $env:BAKLOG_ADMIN="1"; .\.venv\Scripts\python.exe server.py   # dev + admin
-.\.venv\Scripts\python.exe scripts\stop_baklog.py             # stop strays (+ --dry-run)
+.\.venv\Scripts\python.exe scripts\stop_baklog.py             # stop strays (+ --dry-run / --dedupe)
 ```
 
 Run the dev server in **one** dedicated terminal and reuse it — `server.py` is a
-blocking `serve_forever()` loop, so spawning a fresh `python server.py` per task
-leaves the old ones running and they pile up (Cursor's "N agents with open
-processes" at quit). To clean up after a messy session: `stop_baklog.py` (graceful
-`POST /api/shutdown`, then force-kills any server/tray still on port 8765 and
-clears `.baklog_server.pid`).
+blocking `serve_forever()` loop. Strays are now contained by three layers so they
+no longer pile up (Cursor's "N agents with open processes" at quit):
+
+- **Idle self-exit** — a watchdog (`shared/idle_watchdog.py`) quits the dev server
+  after 30 min with no client contact (a server with an open dashboard tab is
+  polled every ~30s, so it never idles out; an agent server with no browser
+  self-exits). Tune with `BAKLOG_IDLE_SHUTDOWN_MINUTES` (`0` disables); off for
+  frozen builds unless set. It never interrupts an in-flight fetch or sign-in.
+- **Boot self-heal** — every start clears a dead-pid `.baklog_server.pid` and
+  reclaims the port from its own orphan (`shared/dev_server_pids.reclaim_or_exit`).
+- **Session-end dedupe** — the Cursor stop hook
+  (`scripts/hooks/cleanup-baklog-strays.py` → `stop_baklog.py --dedupe`) keeps the
+  one live server and kills extra server/tray strays when an agent turn ends.
+
+Manual cleanup after a messy session: `stop_baklog.py` (graceful `POST
+/api/shutdown`, then force-kills any server/tray still on port 8765 and clears
+`.baklog_server.pid`); `--dedupe` keeps the live server and removes only extras.
 
 ## Parallel agents (git hygiene)
 

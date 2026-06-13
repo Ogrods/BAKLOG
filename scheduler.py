@@ -33,6 +33,7 @@ from shared.profile_paths import (
 SCHEDULER_INTERVAL_SEC = 60.0
 DEFAULT_STALE_AGE_SEC = 24 * 60 * 60
 DEFAULT_STAGGER_SEC = 30 * 60
+DEFAULT_PROBE_INTERVAL_SEC = 3600.0
 # After an auth failure (exit 4) the scheduler can't re-auth headless, so back
 # off this fetcher for a while and let the UI surface "reconnect needed".
 AUTH_COOLDOWN_SEC = 60 * 60
@@ -123,6 +124,8 @@ class BackgroundScheduler:
         if self._in_quiet_hours(cfg, now):
             return None
 
+        self._maybe_probe_connections(profile_id, cfg, now)
+
         # One fetch per stagger window (mirrors the browser loop's 30 min stagger).
         if now - self._load_last_run(profile_id) < cfg["stagger_sec"]:
             return None
@@ -176,6 +179,26 @@ class BackgroundScheduler:
                 best_key = key
         return best_key
 
+    def _maybe_probe_connections(
+        self, profile_id: str, cfg: dict[str, Any], now: float
+    ) -> None:
+        """Hourly silent connection health check (Pro only; never enqueues a fetch)."""
+        from auth.connection_probe import probe_due, run_connection_probe
+
+        interval = float(cfg.get("probe_interval_sec", DEFAULT_PROBE_INTERVAL_SEC))
+        if not probe_due(profile_id, now, interval):
+            return
+        snap = self._manager.snapshot()
+        history = snap.get("history") or []
+        try:
+            run_connection_probe(profile_id, now=now, history=history)
+        except Exception as exc:  # noqa: BLE001 - probe must not kill the scheduler thread
+            print(
+                f"[scheduler] connection probe error: {exc!r}",
+                file=sys.stderr,
+                flush=True,
+            )
+
     def _auth_cooldown_keys(
         self, history: list[dict[str, Any]], now: float
     ) -> set[str]:
@@ -211,6 +234,7 @@ class BackgroundScheduler:
             "enabled": True,
             "stale_age_sec": DEFAULT_STALE_AGE_SEC,
             "stagger_sec": DEFAULT_STAGGER_SEC,
+            "probe_interval_sec": DEFAULT_PROBE_INTERVAL_SEC,
             "quiet_start_hour": None,
             "quiet_end_hour": None,
         }
@@ -228,6 +252,9 @@ class BackgroundScheduler:
         mins = doc.get("stagger_minutes")
         if isinstance(mins, (int, float)) and mins > 0:
             cfg["stagger_sec"] = float(mins) * 60
+        probe_mins = doc.get("probe_interval_minutes")
+        if isinstance(probe_mins, (int, float)) and probe_mins > 0:
+            cfg["probe_interval_sec"] = float(probe_mins) * 60
         for field in ("quiet_start_hour", "quiet_end_hour"):
             val = doc.get(field)
             if isinstance(val, int) and 0 <= val <= 23:

@@ -44,4 +44,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> check:dist-integrity"
 npm run check:dist-integrity
-exit $LASTEXITCODE
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host "==> audit free surface"
+python scripts/audit_free_surface_data.py --fail-on high --out .audit/report.json --baseline-out .audit/baseline.json --findings-out .audit/findings.yaml --handoff-out .audit/handoff.md --csv-out .audit/rows.csv
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+exit 0

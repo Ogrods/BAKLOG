@@ -6,6 +6,7 @@ store/wishlist fetchers, and prints a health summary to stdout.
 
 Usage:
   python scripts/connection_sweep.py status
+  python scripts/connection_sweep.py probe
   python scripts/connection_sweep.py fetch [--include-enrich] [--fetcher KEY]
   python scripts/connection_sweep.py all
 """
@@ -166,6 +167,35 @@ def cmd_status() -> int:
     return 0 if expired == 0 else 1
 
 
+def cmd_probe() -> int:
+    """Run silent connection probes (same path as the Pro background scheduler)."""
+    from auth.connection_probe import run_connection_probe
+    from auth.manager import _with_profile_secrets, get_status
+
+    pid, label = _active_profile()
+    results = run_connection_probe(pid)
+    with _with_profile_secrets(pid):
+        status_map = {row["key"]: row for row in get_status()}
+
+    print(f"Profile: {label} ({pid})")
+    if not results:
+        print("No connected cheap providers to probe (gog, epic, steam, itch, itad).")
+        return 0
+
+    print(f"{'OUTCOME':18} {'KEY':10} STATUS       LAST_VERIFIED")
+    print("-" * 60)
+    exit_code = 0
+    for provider in sorted(results):
+        outcome = results[provider]
+        row = status_map.get(provider, {})
+        st = row.get("status", "?")
+        lv = row.get("last_verified") or "-"
+        print(f"{outcome:18} {provider:10} {st:12} {lv}")
+        if outcome == "auth_fail" and st == "expired":
+            exit_code = 1
+    return exit_code
+
+
 def cmd_fetch(*, include_enrich: bool, fetcher: str | None, timeout_s: float) -> int:
     from fetchers.registry import ENRICH_FETCHER_KEYS, entries_by_key
 
@@ -227,7 +257,7 @@ def main() -> int:
         sys.path.insert(0, str(ROOT))
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("status", "fetch", "all"))
+    parser.add_argument("command", choices=("status", "probe", "fetch", "all"))
     parser.add_argument("--include-enrich", action="store_true", help="Also run HLTB/reviews/covers/tags")
     parser.add_argument("--fetcher", help="Single fetcher key")
     parser.add_argument("--timeout", type=float, default=600.0, help="Per-fetcher timeout seconds")
@@ -236,6 +266,8 @@ def main() -> int:
     code = 0
     if args.command in ("status", "all"):
         code = max(code, cmd_status())
+    if args.command == "probe":
+        code = max(code, cmd_probe())
     if args.command in ("fetch", "all"):
         code = max(
             code,

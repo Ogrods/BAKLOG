@@ -17,6 +17,7 @@ import {
   setSpotlightHouseAdsForTest,
   itemPlacements,
   sponsorCoverUrl,
+  sponsorActionAttrs,
   sponsoredDealCardHtml,
   sponsoredDealSlotHtml,
   sponsoredPickCardHtml,
@@ -286,13 +287,8 @@ describe('house table row', () => {
     expect(html).not.toContain('sponsored-table-status-pill');
   });
 
-  it('includes dismiss when dismissible is true', () => {
+  it('never includes dismiss on house rows', () => {
     const html = houseTableRowHtml(houseRow({ dismissible: true }));
-    expect(html).toContain('data-action="sponsored-dismiss"');
-  });
-
-  it('omits dismiss on permanent house rows', () => {
-    const html = houseTableRowHtml(houseRow({ dismissible: false }));
     expect(html).not.toContain('sponsored-dismiss');
   });
 
@@ -387,6 +383,77 @@ describe('sponsoredDashPicksCardHtml', () => {
     const html = sponsoredDashPicksCardHtml(dawnbanner({ cover: '' }));
     expect(html).toContain('sponsored-feature-card no-art');
     expect(html).not.toContain('sponsored-feature-art-bg');
+  });
+});
+
+describe('sponsoredDashPicksCardHtml bundle variant', () => {
+  const prideBundle = (overrides = {}) => sponsor({
+    id: 'ad-dash-picks-itch-pride',
+    kind: 'sponsor',
+    title: 'The Power of Pride Bundle 2026',
+    tagline: '396 indie games, zines, and more from 284 queer creators.',
+    cta: 'Grab the bundle',
+    url: 'https://itch.io/b/3682/the-power-of-pride-bundle-2026-60-edition',
+    cover: '/assets/ads/itch-pride-bundle.webp',
+    network: 'itch.io',
+    discount: 94,
+    price_base: 1087,
+    price_sale: 60,
+    bundle_items: 396,
+    bundle_creators: 284,
+    featured_titles: [
+      'Where Winter Crows Go',
+      'Syrup 2: Candy Alchemy RPG',
+      'A TAVERN FOR TEA',
+    ],
+    ...overrides,
+  });
+
+  it('renders the bundle variant with itch accent class and metrics', () => {
+    const html = sponsoredDashPicksCardHtml(prideBundle());
+    expect(html).toContain('sponsored-feature-card--bundle');
+    expect(html).toContain('Featured bundle');
+    expect(html).toContain('The Power of Pride Bundle 2026');
+    expect(html).toContain('Grab the bundle');
+    expect(html).toContain('396');
+    expect(html).toContain('284');
+    expect(html).toContain('-94%');
+    expect(html).toContain('$60.00');
+    expect(html).toContain('$1087.00');
+    expect(html).toContain('itch.io');
+  });
+
+  it('lists featured bundle titles in compact rows', () => {
+    const html = sponsoredDashPicksCardHtml(prideBundle());
+    expect(html).toContain('sponsored-bundle-titles');
+    expect(html).toContain('Where Winter Crows Go');
+    expect(html).toContain('Syrup 2: Candy Alchemy RPG');
+    expect(html).toContain('A TAVERN FOR TEA');
+  });
+
+  it('tags itch sponsor clicks with the affiliate code', () => {
+    const html = sponsoredDashPicksCardHtml(prideBundle());
+    expect(html).toContain('ac=eob7ZQcpthHDp');
+  });
+});
+
+describe('sponsorActionAttrs affiliate tagging', () => {
+  it('appends itch ac= to sponsor deal URLs', () => {
+    const attrs = sponsorActionAttrs({
+      id: 'ad-test',
+      kind: 'sponsor',
+      url: 'https://itch.io/b/3682/the-power-of-pride-bundle-2026-60-edition',
+    });
+    expect(attrs).toContain('ac=eob7ZQcpthHDp');
+  });
+
+  it('does not tag house promo URLs', () => {
+    const attrs = sponsorActionAttrs({
+      id: 'house-test',
+      kind: 'house',
+      url: 'https://itch.io/games',
+    });
+    expect(attrs).not.toContain('ac=');
   });
 });
 
@@ -592,7 +659,7 @@ describe('renderHouseLocationSlot', () => {
 });
 
 describe('house promo dismiss', () => {
-  it('renders a dismiss on closeable house banner and stripe (dismissible: true)', () => {
+  it('never renders dismiss on house banner or stripe', () => {
     const banner = houseDealBannerHtml(HOUSE_DEAL_ITEM, { accent: 'green' });
     expect(banner).toContain('sponsored-deal-banner--green');
     const stripe = houseStripeCardHtml({
@@ -604,8 +671,8 @@ describe('house promo dismiss', () => {
       url: 'https://baklog.app/',
       dismissible: true,
     });
-    expect(banner).toContain('sponsored-dismiss');
-    expect(stripe).toContain('sponsored-dismiss');
+    expect(banner).not.toContain('sponsored-dismiss');
+    expect(stripe).not.toContain('sponsored-dismiss');
   });
 
   it('omits dismiss on permanent house promos (no dismissible flag)', () => {
@@ -630,13 +697,13 @@ describe('house promo dismiss', () => {
 });
 
 describe('sponsoredDealSlotHtml', () => {
-  it('renders the Back BAKLOG house banner from wish-house', () => {
+  it('renders the BAKLOG Pro house banner from wish-house', () => {
     wireWishHouse();
     const html = sponsoredDealSlotHtml();
     expect(html).toContain('sponsored-deal-house');
-    expect(html).toContain('Back BAKLOG');
+    expect(html).toContain('Level up to BAKLOG Pro');
     expect(html).toContain('data-sponsor-house="1"');
-    expect(html).toContain('sponsored-dismiss');
+    expect(html).not.toContain('sponsored-dismiss');
   });
 
   it('returns empty string when dismissed', () => {

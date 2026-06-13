@@ -160,11 +160,15 @@ def test_resolve_ends_at_defaults_epic_from_first_seen() -> None:
     assert bfc._resolve_ends_at(raw, now=now) == "2026-06-15T00:00:00Z"
 
 
-def test_resolve_ends_at_leaves_itad_without_date() -> None:
+def test_resolve_ends_at_defaults_itad_without_date() -> None:
     from datetime import UTC, datetime
 
     now = datetime(2026, 6, 11, 12, 0, 0, tzinfo=UTC)
-    assert bfc._resolve_ends_at({"source": "itad"}, now=now) is None
+    raw = {
+        "source": "itad",
+        "first_seen": "2026-06-01T00:00:00Z",
+    }
+    assert bfc._resolve_ends_at(raw, now=now) == "2026-06-15T00:00:00Z"
 
 
 def test_resolve_ends_at_keeps_existing_longer_date() -> None:
@@ -329,6 +333,118 @@ def test_build_without_approved_file_publishes_manual_only(
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
     assert [item["id"] for item in built["items"]] == ["manual-only"]
+
+
+def test_build_skips_manual_row_when_approved_false(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+
+    input_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "manual-on",
+                        "store": "steam",
+                        "title": "Manual On",
+                        "claim_url": "https://store.steampowered.com/app/1",
+                    },
+                    {
+                        "id": "manual-off",
+                        "store": "steam",
+                        "title": "Manual Off",
+                        "claim_url": "https://store.steampowered.com/app/2",
+                        "approved": False,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    auto_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
+            "id": raw["id"],
+            "store": raw["store"],
+            "title": raw["title"],
+            "claim_url": raw["claim_url"],
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert [item["id"] for item in built["items"]] == ["manual-on"]
+
+
+def test_build_require_manual_approval_needs_explicit_true(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+
+    input_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "manual-implicit",
+                        "store": "steam",
+                        "title": "Implicit",
+                        "claim_url": "https://store.steampowered.com/app/1",
+                    },
+                    {
+                        "id": "manual-explicit",
+                        "store": "steam",
+                        "title": "Explicit",
+                        "claim_url": "https://store.steampowered.com/app/2",
+                        "approved": True,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    auto_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
+            "id": raw["id"],
+            "store": raw["store"],
+            "title": raw["title"],
+            "claim_url": raw["claim_url"],
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty", "--require-manual-approval"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert [item["id"] for item in built["items"]] == ["manual-explicit"]
 
 
 def test_build_applies_field_overrides(
@@ -1367,7 +1483,7 @@ def test_build_absent_approved_id_without_override_title_stays_id_only(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1477,7 +1593,7 @@ def test_build_excludes_dismissed_key_matched_duplicate(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1521,6 +1637,41 @@ def test_merge_enriched_items_into_auto_feed(tmp_path: Path) -> None:
     assert row["genres"] == ["Adventure"]
 
 
+def test_merge_enriched_items_into_input_feed(tmp_path: Path) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "manual-1",
+                        "store": "steam",
+                        "title": "Manual Game",
+                        "claim_url": "https://store.steampowered.com/app/1",
+                        "header_image": None,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    enriched = [
+        {
+            "id": "manual-1",
+            "header_image": bfc._steam_portrait_cover(729000),
+            "steam_appid": 729000,
+            "review_percent": 91,
+        }
+    ]
+    updated = bfc.merge_enriched_items_into_input_feed(input_path, enriched)
+    assert updated == 1
+    saved = json.loads(input_path.read_text(encoding="utf-8"))
+    row = saved["items"][0]
+    assert row["header_image"] == bfc._steam_portrait_cover(729000)
+    assert row["steam_appid"] == 729000
+    assert row["review_percent"] == 91
+
+
 def test_enrich_item_light_keeps_existing_header() -> None:
     real_header = (
         "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"
@@ -1551,6 +1702,26 @@ def test_enrich_item_light_synthesizes_portrait_when_no_header() -> None:
     }
     out = bfc._enrich_item_light(raw, None)
     assert out["header_image"] == bfc._steam_portrait_cover(1180660)
+
+
+def test_enrich_item_light_borrows_live_header_image() -> None:
+    raw = {
+        "id": "gp-1",
+        "store": "steam",
+        "title": "Tell Me Why",
+        "claim_url": "https://www.gamerpower.com/open/tell-me-why",
+        "header_image": "https://www.gamerpower.com/offers/thumb.jpg",
+        "steam_appid": 1180660,
+        "source": "gamerpower",
+    }
+    live = {
+        "id": "gp-1",
+        "header_image": bfc._steam_portrait_cover(1180660),
+        "review_percent": 88,
+    }
+    out = bfc._enrich_item_light(raw, None, live)
+    assert out["header_image"] == bfc._steam_portrait_cover(1180660)
+    assert out["review_percent"] == 88
 
 
 def test_merge_enriched_items_overwrites_dead_portrait_with_header(
@@ -1591,3 +1762,112 @@ def test_merge_enriched_items_overwrites_dead_portrait_with_header(
     assert updated == 1
     saved = json.loads(auto_path.read_text(encoding="utf-8"))
     assert saved["items"][0]["header_image"] == real_header
+
+
+# --- Blocked tier (permanent kill list) -----------------------------------
+
+
+def test_load_blocked_ids_reads_list(tmp_path: Path) -> None:
+    path = tmp_path / "approved.json"
+    path.write_text(
+        json.dumps({"ids": ["a"], "blocked": ["x", "y", " "]}),
+        encoding="utf-8",
+    )
+    assert bfc._load_blocked_ids(path) == {"x", "y"}
+
+
+def test_load_blocked_ids_missing_file(tmp_path: Path) -> None:
+    assert bfc._load_blocked_ids(tmp_path / "missing.json") == set()
+
+
+def test_parse_approved_put_payload_separates_blocked() -> None:
+    parsed = bfc.parse_approved_put_payload({
+        "ids": ["keep-1"],
+        "dismissed": ["soft-1", "shared", "keep-1"],
+        "blocked": ["block-1", "shared", "keep-1"],
+    })
+    # Blocked wins over dismissed for a shared id; approved ids shadow both.
+    assert parsed["blocked"] == ["block-1", "shared"]
+    assert parsed["dismissed"] == ["soft-1"]
+
+
+def test_prepare_approved_document_prunes_orphan_dismissed_keeps_blocked() -> None:
+    auto_items = [
+        {"id": "live-soft", "store": "steam", "title": "Live", "claim_url": "https://a"},
+    ]
+    out = bfc.prepare_approved_document(
+        ids=[],
+        store_overrides={},
+        field_overrides={},
+        premium_only_ids=set(),
+        dismissed=["live-soft", "orphan-soft"],
+        blocked=["orphan-block"],
+        auto_items=auto_items,
+    )
+    # Dismissed id no longer in the feed is cycled out; blocked id is kept verbatim.
+    assert out["dismissed"] == ["live-soft"]
+    assert out["blocked"] == ["orphan-block"]
+
+
+def test_main_build_excludes_blocked_from_feed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    approved = tmp_path / "approved.json"
+    approved.write_text(
+        json.dumps({
+            "ids": ["auto-keep", "auto-block"],
+            "blocked": ["auto-block"],
+        }),
+        encoding="utf-8",
+    )
+    assert bfc._load_blocked_ids(approved) == {"auto-block"}
+    # Folding blocked into the dismissed filter must exclude blocked ids.
+    dismissed = bfc._load_dismissed_ids(approved) | bfc._load_blocked_ids(approved)
+    assert "auto-block" in dismissed
+
+
+def test_build_refuses_empty_publish_without_allow_empty(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+    fallback_path = tmp_path / "free_claims.fallback.json"
+
+    output_path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-06-01T00:00:00Z",
+                "items": [{"id": "keep-me", "store": "epic", "title": "Old", "claim_url": "https://example.com/old"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    input_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    auto_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    approved_path.write_text(json.dumps({"ids": []}), encoding="utf-8")
+
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", fallback_path)
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+
+    import sys
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_free_claims.py",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--no-profile",
+        ],
+    )
+    code = bfc.main()
+    assert code == 2
+    kept = json.loads(output_path.read_text(encoding="utf-8"))
+    assert kept["items"][0]["id"] == "keep-me"

@@ -5,9 +5,14 @@ docs/
 audit/
 admin/
 tracker.html
+favicon.svg
+assets/baklog-logo.svg
+assets/milestones/
+assets/store-logos/
 preview-bootstrap.html
 IP.md
 tools/make_ads.py
 .cursor/rules/
 .cursor/hooks.json
+.cursor/commands/apply-tracker-pending.md
 scripts/hooks/remind-tracker.py

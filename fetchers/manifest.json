@@ -34,7 +34,7 @@
       "refreshArgs": ["--refresh"],
       "metaKey": "psn",
       "color": "#003791",
-      "requires": [{ "env": "PSN_NPSSO", "note": "NPSSO token from account.sony.com — see README" }]
+      "requires": [{ "env": "PSN_NPSSO", "note": "NPSSO token from account.sony.com - see README" }]
     },
     {
       "key": "epic",
@@ -45,7 +45,7 @@
       "refreshArgs": ["--refresh"],
       "metaKey": "epic",
       "color": "#64748b",
-      "requires": [{ "env": "EPIC_AUTH_CODE", "note": "OAuth auth code — run fetch_epic.py --auth-help" }]
+      "requires": [{ "env": "EPIC_AUTH_CODE", "note": "OAuth auth code - run fetch_epic.py --auth-help" }]
     },
     { "key": "amazon", "label": "Amazon", "group": "library", "script": "fetch_amazon.py", "args": ["--skip-hltb"], "metaKey": "amazon", "color": "#c2410c", "autoFetch": false },
     {
@@ -131,7 +131,7 @@
       "color": "#ea580c",
       "requires": [
         { "env": "STEAM_API_KEY", "note": "Steam Web API key from steamcommunity.com/dev/apikey" },
-        { "env": "STEAM_ID", "note": "Your SteamID64 — profile and wishlist must be public" }
+        { "env": "STEAM_ID", "note": "Your SteamID64 - profile and wishlist must be public" }
       ]
     },
     {

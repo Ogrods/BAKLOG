@@ -931,17 +931,61 @@ function syncSpotlightSchemeClasses(el, scheme) {
   }
 }
 
+const SPOTLIGHT_COPY_STOPWORDS = new Set([
+  'the', 'and', 'your', 'you', 'for', 'with', 'that', 'this', 'our', 'are',
+  'its', 'into', 'across', 'every', 'all', 'any', 'off', 'per', 'mo', 'now',
+]);
+
+/** Significant tokens (len > 2, non-stopword) for redundancy comparison. */
+function spotlightCopyTokens(text) {
+  return new Set(
+    String(text)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(' ')
+      .filter(w => w.length > 2 && !SPOTLIGHT_COPY_STOPWORDS.has(w)),
+  );
+}
+
+function spotlightLogoBodyCopy(slogan, tagline) {
+  const s = String(slogan || '').trim();
+  const t = String(tagline || '').trim();
+  if (!s) return { headline: t, sub: '' };
+  if (!t) return { headline: s, sub: '' };
+  const norm = (x) => x.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const ns = norm(s);
+  const nt = norm(t);
+  if (ns === nt || ns.includes(nt) || nt.includes(ns)) {
+    return { headline: s, sub: '' };
+  }
+  // Safety net: authors often restate the slogan as the tagline (e.g. "Keep
+  // your library… no manual exports" vs "BAKLOG Pro keeps your library… no
+  // manual exports"). Those aren't literal substrings, so collapse to a single
+  // line when the shorter line's significant words are mostly shared.
+  const a = spotlightCopyTokens(s);
+  const b = spotlightCopyTokens(t);
+  if (a.size && b.size) {
+    const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+    let shared = 0;
+    for (const w of small) if (big.has(w)) shared++;
+    if (shared / small.size >= 0.7) return { headline: s, sub: '' };
+  }
+  return { headline: s, sub: t };
+}
+
 function spotlightLogoInnerHtml(g) {
   const eyebrow = g._spotlightReason?.eyebrow || 'BAKLOG Pro';
   const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
   const tagline = g._spotlightReason?.metaParts?.[0] || '';
   const slogan = g._spotlightAd?.slogan || g._spotlightReason?.slogan || '';
   const cta = g._spotlightAd?.cta || '';
-  const sloganHtml = slogan
-    ? `<span class="dash-spotlight-slogan">${escapeHtml(slogan)}</span>`
+  const { headline, sub } = spotlightLogoBodyCopy(slogan, tagline);
+  const sloganHtml = headline
+    ? `<span class="dash-spotlight-slogan">${escapeHtml(headline)}</span>`
     : '';
-  const metaHtml = tagline
-    ? `<span class="dash-spotlight-meta">${tagline}</span>`
+  const metaHtml = sub
+    ? `<span class="dash-spotlight-meta">${escapeHtml(sub)}</span>`
     : '';
   return `
     <div class="dash-spotlight-logo-backdrop" aria-hidden="true"></div>

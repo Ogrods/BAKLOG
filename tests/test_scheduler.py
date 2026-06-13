@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -213,3 +214,52 @@ def test_enrichers_and_prices_never_eligible(monkeypatch):
     )
     mgr = FakeManager()
     assert _make(mgr).tick(now=time.time()) is None
+
+
+def test_probe_runs_when_due_and_pro(monkeypatch):
+    _set_ages(monkeypatch, {"steam": 10})  # fresh — no fetch enqueued
+    mgr = FakeManager()
+    s = _make(mgr)
+    now = time.time()
+    with patch("auth.connection_probe.probe_due", return_value=True) as due:
+        with patch("auth.connection_probe.run_connection_probe") as probe:
+            assert s.tick(now=now) is None
+    due.assert_called_once()
+    probe.assert_called_once()
+    assert mgr.submitted == []
+
+
+def test_probe_skipped_when_not_due(monkeypatch):
+    _set_ages(monkeypatch, {"steam": sched.DEFAULT_STALE_AGE_SEC + 100})
+    mgr = FakeManager()
+    with patch("auth.connection_probe.probe_due", return_value=False):
+        with patch("auth.connection_probe.run_connection_probe") as probe:
+            _make(mgr).tick(now=time.time())
+    probe.assert_not_called()
+
+
+def test_probe_skipped_when_not_pro(monkeypatch):
+    mgr = FakeManager()
+    with patch("auth.connection_probe.run_connection_probe") as probe:
+        _make(mgr, is_pro=False).tick(now=time.time())
+    probe.assert_not_called()
+
+
+def test_probe_skipped_when_scheduler_disabled(monkeypatch):
+    mgr = FakeManager()
+    s = _make(mgr)
+    monkeypatch.setattr(
+        s,
+        "_load_config",
+        lambda _pid: {
+            "enabled": False,
+            "stale_age_sec": sched.DEFAULT_STALE_AGE_SEC,
+            "stagger_sec": sched.DEFAULT_STAGGER_SEC,
+            "probe_interval_sec": sched.DEFAULT_PROBE_INTERVAL_SEC,
+            "quiet_start_hour": None,
+            "quiet_end_hour": None,
+        },
+    )
+    with patch("auth.connection_probe.run_connection_probe") as probe:
+        s.tick(now=time.time())
+    probe.assert_not_called()

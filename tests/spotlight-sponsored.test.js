@@ -80,6 +80,60 @@ describe('spotlight sponsored slides', () => {
     expect(html).not.toContain('class="dash-spotlight-art"');
   });
 
+  it('collapses a tagline that just restates the slogan on logo slides', () => {
+    const slide = {
+      store: 'sponsored',
+      id: 'house-spotlight-pro-sync',
+      name: 'Sync every machine',
+      _spotlightArtMode: 'logo',
+      _spotlightReason: {
+        eyebrow: 'BAKLOG Pro',
+        score: 50,
+        metaParts: ['BAKLOG Pro keeps your library and personal data aligned across machines - no manual exports.'],
+        slogan: 'Keep your library and personal data aligned across machines - no manual exports.',
+      },
+      _spotlightAd: {
+        id: 'house-spotlight-pro-sync',
+        url: 'https://baklog.app/',
+        cta: 'Get Pro - $5/mo',
+        artMode: 'logo',
+        scheme: 'sapphire',
+        slogan: 'Keep your library and personal data aligned across machines - no manual exports.',
+      },
+    };
+    const html = renderSpotlightHtml(slide);
+    expect(html).toContain('dash-spotlight-slogan');
+    expect(html).not.toContain('dash-spotlight-meta');
+    expect(html).not.toContain('BAKLOG Pro keeps your library');
+  });
+
+  it('keeps a tagline that adds new detail on logo slides', () => {
+    const slide = {
+      store: 'sponsored',
+      id: 'house-spotlight-pro-logo',
+      name: 'BAKLOG Pro',
+      _spotlightArtMode: 'logo',
+      _spotlightReason: {
+        eyebrow: 'BAKLOG Pro',
+        score: 50,
+        metaParts: ['Leveled up with bulk refresh, cloud sync, and no ads — $5/mo.'],
+        slogan: 'One honest backlog across every store.',
+      },
+      _spotlightAd: {
+        id: 'house-spotlight-pro-logo',
+        url: 'https://baklog.app/',
+        cta: 'Get Pro',
+        artMode: 'logo',
+        scheme: 'ember',
+        slogan: 'One honest backlog across every store.',
+      },
+    };
+    const html = renderSpotlightHtml(slide);
+    expect(html).toContain('dash-spotlight-slogan');
+    expect(html).toContain('dash-spotlight-meta');
+    expect(html).toContain('Leveled up with bulk refresh');
+  });
+
   it('does not emit a scheme class for non-logo sponsored slides', () => {
     const slide = {
       store: 'sponsored',

@@ -82,6 +82,9 @@ preview-bootstrap.html
 IP.md
 tools/make_ads.py
 tools/make_social_cards.py
+tools/make_one_pager_pdf.py
+assets/milestones/
+assets/social/
 
 # Local scratch run output, audits, review artifacts (never commit)
 EVENT_AUDIT.json

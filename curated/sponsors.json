@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": null,
+  "generated_at": "2026-06-13T21:27:15.475Z",
   "ads": {
     "ad-spotlight-hero-emberfall": {
       "kind": "sponsor",
@@ -9,7 +9,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-emberfall.webp",
-      "enabled": true
+      "enabled": false
     },
     "ad-spotlight-cover-ironveil": {
       "kind": "sponsor",
@@ -18,7 +18,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "enabled": true
+      "enabled": false
     },
     "ad-picks-ironveil": {
       "kind": "sponsor",
@@ -27,7 +27,7 @@
       "cta": "Grab it",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "enabled": true
+      "enabled": false
     },
     "ad-table-encore": {
       "kind": "sponsor",
@@ -36,7 +36,7 @@
       "cta": "Learn more",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-encore.webp",
-      "enabled": true
+      "enabled": false
     },
     "house-table-every-store": {
       "kind": "house",
@@ -96,7 +96,7 @@
       "cta": "View the deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-emberfall.webp",
-      "enabled": true,
+      "enabled": false,
       "network": "Cinderpeak Games",
       "genres": [
         "Action RPG",
@@ -116,7 +116,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": true,
+      "enabled": false,
       "steam_review_percent": 94
     },
     "ad-dash-versus-zephyr": {
@@ -126,7 +126,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-zephyr-edge.webp",
-      "enabled": true,
+      "enabled": false,
       "hltb_hours": 7
     },
     "ad-coop-online-zephyr": {
@@ -136,7 +136,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-zephyr-edge.webp",
-      "enabled": true,
+      "enabled": false,
       "steam_review_percent": 96
     },
     "ad-coop-couch-ironveil": {
@@ -146,7 +146,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "enabled": true,
+      "enabled": false,
       "steam_review_percent": 93
     },
     "ad-claimable-hollowmaw": {
@@ -157,7 +157,7 @@
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-hollowmaw.webp",
       "portrait": true,
-      "enabled": true,
+      "enabled": false,
       "network": "Gravewax Interactive",
       "genres": [
         "Horror",
@@ -178,7 +178,7 @@
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-apex-velocity.webp",
       "portrait": true,
-      "enabled": true,
+      "enabled": false,
       "network": "Velocity Interactive",
       "genres": [
         "Racing",
@@ -198,7 +198,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-tidewright.webp",
-      "enabled": true,
+      "enabled": false,
       "network": "Saltmarsh Studio",
       "genres": [
         "Adventure",

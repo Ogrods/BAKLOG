@@ -6,9 +6,12 @@ import contextvars
 import json
 import os
 import re
+import sys
+import threading
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from shared.install_paths import data_root
 
@@ -36,6 +39,17 @@ _ENV_OVERRIDE = "BAKLOG_PROFILE"
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 _PROFILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_RESERVED_WIN_NAMES = frozenset(
+    {
+        "con",
+        "prn",
+        "aux",
+        "nul",
+        *(f"com{i}" for i in range(1, 10)),
+        *(f"lpt{i}" for i in range(1, 10)),
+    }
+)
+_index_lock = threading.RLock()
 
 
 def _now_iso() -> str:
@@ -51,14 +65,33 @@ def _empty_index() -> dict[str, Any]:
     }
 
 
-def load_index() -> dict[str, Any]:
+def _quarantine_corrupt_index(exc: BaseException) -> Path | None:
+    if not INDEX_FILE.is_file():
+        return None
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    dest = INDEX_FILE.with_name(f"index.json.corrupt-{stamp}")
+    try:
+        INDEX_FILE.replace(dest)
+    except OSError:
+        return None
+    print(
+        f"[profiles] corrupt index.json quarantined to {dest.name}: {exc!r}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return dest
+
+
+def _load_index_unlocked() -> dict[str, Any]:
     if not INDEX_FILE.exists():
         return _empty_index()
     try:
         doc = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        _quarantine_corrupt_index(exc)
         return _empty_index()
     if not isinstance(doc, dict):
+        _quarantine_corrupt_index(ValueError("index root is not an object"))
         return _empty_index()
     doc.setdefault("active", DEFAULT_PROFILE_ID)
     profiles = doc.get("profiles")
@@ -67,24 +100,54 @@ def load_index() -> dict[str, Any]:
     return doc
 
 
-def save_index(doc: dict[str, Any]) -> None:
+def load_index() -> dict[str, Any]:
+    with _index_lock:
+        return _load_index_unlocked()
+
+
+def _validate_index_doc(doc: dict[str, Any]) -> None:
     active = doc.get("active")
     if active is not None and not is_valid_profile_id(str(active)):
         raise ValueError(f"invalid active profile in index: {active!r}")
     profiles = doc.get("profiles")
-    if isinstance(profiles, list):
-        for p in profiles:
-            if isinstance(p, dict) and p.get("id") is not None:
-                normalize_profile_id(str(p["id"]))
+    if not isinstance(profiles, list) or not profiles:
+        raise ValueError("profiles index must list at least one profile")
+    profile_ids: set[str] = set()
+    for p in profiles:
+        if isinstance(p, dict) and p.get("id") is not None:
+            pid = normalize_profile_id(str(p["id"]))
+            profile_ids.add(pid)
+    if active is not None and str(active) not in profile_ids:
+        raise ValueError(f"active profile {active!r} is not in profiles list")
+
+
+def _save_index_unlocked(doc: dict[str, Any]) -> None:
+    _validate_index_doc(doc)
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     tmp = INDEX_FILE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, INDEX_FILE)
 
 
+def save_index(doc: dict[str, Any]) -> None:
+    with _index_lock:
+        _save_index_unlocked(doc)
+
+
+@contextmanager
+def mutate_index() -> Iterator[dict[str, Any]]:
+    """Locked load → mutate → validate → save for profiles/index.json."""
+    with _index_lock:
+        doc = _load_index_unlocked()
+        yield doc
+        _save_index_unlocked(doc)
+
+
 def is_valid_profile_id(profile_id: str) -> bool:
     pid = (profile_id or "").strip()
     if not pid or pid in (".", ".."):
+        return False
+    if pid.lower() in _RESERVED_WIN_NAMES:
         return False
     if not _PROFILE_ID_RE.match(pid):
         return False
@@ -104,7 +167,7 @@ def normalize_profile_id(profile_id: str) -> str:
     return pid
 
 
-def get_active_profile_id() -> str:
+def get_active_profile_id(*, doc: dict[str, Any] | None = None) -> str:
     ctx = _request_profile_id.get()
     if ctx is not None:
         return ctx
@@ -112,14 +175,15 @@ def get_active_profile_id() -> str:
     if override:
         if is_valid_profile_id(override):
             return override
-        import sys
-
         print(
             f"WARN: ignoring invalid {_ENV_OVERRIDE}={override!r}; using index active",
             file=sys.stderr,
             flush=True,
         )
-    active = str(load_index().get("active") or DEFAULT_PROFILE_ID)
+    if doc is None:
+        active = str(load_index().get("active") or DEFAULT_PROFILE_ID)
+    else:
+        active = str(doc.get("active") or DEFAULT_PROFILE_ID)
     if is_valid_profile_id(active):
         return active
     return DEFAULT_PROFILE_ID
@@ -256,12 +320,86 @@ def profile_label(profile_id: str) -> str:
     return profile_id
 
 
-def unique_profile_id(label: str) -> str:
+def profile_dir_ids_on_disk() -> set[str]:
+    if not PROFILES_DIR.is_dir():
+        return set()
+    return {
+        child.name
+        for child in PROFILES_DIR.iterdir()
+        if child.is_dir() and is_valid_profile_id(child.name)
+    }
+
+
+def _label_for_orphan_profile_id(profile_id: str) -> str:
+    return profile_id.replace("-", " ").strip().title() or profile_id
+
+
+def unique_profile_id_for_doc(label: str, doc: dict[str, Any]) -> str:
+    """Pick a slug not present in the index doc or on disk."""
     base = slug_from_label(label)
-    existing = {p["id"] for p in list_profiles()}
-    if base not in existing:
+    if not is_valid_profile_id(base):
+        base = f"{base}-profile" if base else "profile"
+    indexed = {
+        str(p["id"])
+        for p in doc.get("profiles", [])
+        if isinstance(p, dict) and p.get("id")
+    }
+    taken = indexed | profile_dir_ids_on_disk()
+    if base not in taken:
         return base
     n = 2
-    while f"{base}-{n}" in existing:
+    while f"{base}-{n}" in taken:
         n += 1
-    return f"{base}-{n}"
+    candidate = f"{base}-{n}"
+    while not is_valid_profile_id(candidate):
+        n += 1
+        candidate = f"{base}-{n}"
+    return candidate
+
+
+def reconcile_profile_store(*, adopt_orphans: bool | None = None) -> list[str]:
+    """Align index.json with on-disk profile dirs; adopt orphan dirs on boot."""
+    if adopt_orphans is None:
+        try:
+            from shared.supabase_auth import auth_enabled
+
+            adopt_orphans = not auth_enabled()
+        except Exception:
+            adopt_orphans = True
+    notes: list[str] = []
+    with _index_lock:
+        doc = _load_index_unlocked()
+        profiles = doc.get("profiles")
+        if not isinstance(profiles, list):
+            profiles = []
+            doc["profiles"] = profiles
+        indexed_ids = {
+            str(p["id"])
+            for p in profiles
+            if isinstance(p, dict) and p.get("id") and is_valid_profile_id(str(p["id"]))
+        }
+        disk_ids = profile_dir_ids_on_disk()
+        orphans = sorted(disk_ids - indexed_ids)
+        for pid in orphans:
+            msg = f"orphan profile dir not in index: {pid}"
+            if adopt_orphans:
+                profiles.append(
+                    {"id": pid, "label": _label_for_orphan_profile_id(pid), "created_at": _now_iso()}
+                )
+                indexed_ids.add(pid)
+                msg = f"adopted orphan profile dir into index: {pid}"
+            notes.append(msg)
+        for pid in sorted(indexed_ids - disk_ids):
+            notes.append(f"index entry without profile dir: {pid}")
+        active = str(doc.get("active") or DEFAULT_PROFILE_ID)
+        if active not in indexed_ids and indexed_ids:
+            doc["active"] = sorted(indexed_ids)[0]
+            notes.append(f"active profile reset to {doc['active']!r}")
+        if orphans and adopt_orphans:
+            _save_index_unlocked(doc)
+    return notes
+
+
+def unique_profile_id(label: str) -> str:
+    doc = load_index()
+    return unique_profile_id_for_doc(label, doc)

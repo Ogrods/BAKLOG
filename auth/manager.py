@@ -394,6 +394,50 @@ def seed_new_profile_auth_defaults(profile_id: str) -> None:
             set_provider_blob(key, blob)
 
 
+def migrate_existing_itch_local_opt_in() -> list[str]:
+    """Restore itch_local for profiles that already had an itch library before the
+    per-profile opt-in gate landed.
+
+    The opt-in requirement (``itch_local.enabled``) silently disconnected itch on
+    existing profiles whose blob predates the flag, hiding their whole itch catalog
+    from the dashboard. This one-shot, idempotent migration sets ``enabled`` only
+    when (a) the profile has a non-empty ``games_itch.json`` and (b) the blob has no
+    explicit opt-in decision yet and is not disconnected. New/empty profiles and
+    profiles the user explicitly disconnected are left opted out.
+    """
+    import json
+
+    from shared import profile_paths
+
+    notes: list[str] = []
+    try:
+        rows = profile_paths.list_profiles()
+        profile_ids = [str(p.get("id")) for p in rows if isinstance(p, dict) and p.get("id")]
+    except Exception:  # noqa: BLE001 - boot migration must not raise
+        profile_ids = []
+    if profile_paths.DEFAULT_PROFILE_ID not in profile_ids:
+        profile_ids.append(profile_paths.DEFAULT_PROFILE_ID)
+    for pid in dict.fromkeys(profile_ids):
+        try:
+            catalog = profile_paths.catalog_path("games_itch.json", profile_id=pid)
+            if not catalog.is_file():
+                continue
+            doc = json.loads(catalog.read_text(encoding="utf-8"))
+            games = doc.get("games") if isinstance(doc, dict) else None
+            if not isinstance(games, list) or not games:
+                continue
+            with _with_profile_secrets(pid):
+                blob = get_provider_blob("itch_local")
+                if blob.get("disabled") or "enabled" in blob:
+                    continue
+                blob["enabled"] = True
+                set_provider_blob("itch_local", blob)
+            notes.append(f"itch_local opted in for existing profile with itch library: {pid}")
+        except Exception as exc:  # noqa: BLE001 - never block boot on one profile
+            notes.append(f"itch_local opt-in migration skipped for {pid!r}: {exc!r}")
+    return notes
+
+
 def import_env_credentials(*, profile_id: str = DEFAULT_PROFILE_ID) -> list[str]:
     """One-time migration: copy legacy ``.env`` creds into a profile's encrypted blob.
 

@@ -18,7 +18,7 @@ import { PRO_CHECKOUT_MONTHLY, PRO_CHECKOUT_YEARLY, buildProCheckoutUrl } from '
 import { PRO_PROMO } from './sponsored-deals.js';
 import { switchView } from './filters-ui.js';
 import { state } from './state.js';
-import { savePrefs } from './prefs.js';
+import { saveActiveView } from './prefs.js';
 
 export const PRO_WELCOME_STORAGE_KEY = 'baklog-pro-welcome';
 
@@ -264,8 +264,6 @@ export function applyProTabVisibility() {
   tab.classList.toggle('hidden', !show);
   if (!show && !pending && state.activeView === 'pro') {
     switchView('dashboard');
-    state.prefs.activeView = 'dashboard';
-    savePrefs();
   }
 }
 
@@ -315,7 +313,7 @@ export function consumeCheckoutQuery() {
     u.searchParams.delete('checkout_id');
     history.replaceState({}, '', u.pathname + u.search + u.hash);
     checkoutSuccessPending = true;
-    state.prefs.activeView = 'pro';
+    saveActiveView('pro');
     state.activeView = 'pro';
     return true;
   } catch {
@@ -325,7 +323,7 @@ export function consumeCheckoutQuery() {
 
 export function consumeProHash() {
   if (location.hash !== '#pro' || isPro()) return false;
-  state.prefs.activeView = 'pro';
+  saveActiveView('pro');
   state.activeView = 'pro';
   return true;
 }

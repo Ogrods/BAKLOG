@@ -10,22 +10,42 @@ vi.mock('../js/auth-gate.js', () => ({
 
 import {
   ACTIVE_PROFILE_LS,
+  LS_ACTIVE_VIEW_SESSION,
   LS_FETCHER_LAST_SEQ,
   LS_LIBRARY_WATCH,
+  LS_SPOTLIGHT_RECENT_KEYS,
   PROFILE_SCOPED_SESSION_KEYS,
   PROFILE_SCOPED_STORAGE_KEYS,
+  activeViewSessionKey,
+  claimsSnapshotStorageKey,
+  knownLibraryKeysStorageKey,
+  libraryFirstSeenStorageKey,
   prefsStorageKey,
   itadSnapshotStorageKey,
   profileScopedStorageKey,
+  spotlightRecentKeysStorageKey,
   clearProfileLocalStorage,
+  resetProfileClientCache,
+  friendlyPinError,
+  profileDisplayLabel,
   activeProfileId,
 } from '../js/profiles.js';
 import * as authGate from '../js/auth-gate.js';
-import { MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from '../js/state.js';
+import { KNOWN_LIBRARY_KEYS_KEY, LIBRARY_FIRST_SEEN_KEY, MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from '../js/state.js';
+
+const PROFILE_SUFFIX = ':work';
+
+/** Strip the active profile suffix to recover the reset-list base key. */
+function storageBaseFromKey(fullKey) {
+  expect(fullKey.endsWith(PROFILE_SUFFIX)).toBe(true);
+  return fullKey.slice(0, -PROFILE_SUFFIX.length);
+}
 
 describe('profiles storage keys', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem(ACTIVE_PROFILE_LS, 'work');
   });
 
   it('defaults to default profile id with bare storage keys', () => {
@@ -43,12 +63,31 @@ describe('profiles storage keys', () => {
     );
   });
 
-  it('PROFILE_SCOPED_STORAGE_KEYS lists every localStorage base key', () => {
-    expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(PREFS_KEY);
-    expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(STORAGE_KEY);
-    expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(MANUAL_KEY);
-    expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(LS_LIBRARY_WATCH);
+  it('PROFILE_SCOPED lists cover every *StorageKey helper base', () => {
+    const localHelpers = [
+      prefsStorageKey,
+      libraryFirstSeenStorageKey,
+      knownLibraryKeysStorageKey,
+      itadSnapshotStorageKey,
+      claimsSnapshotStorageKey,
+      spotlightRecentKeysStorageKey,
+    ];
+    for (const helper of localHelpers) {
+      expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(storageBaseFromKey(helper()));
+    }
+    expect(PROFILE_SCOPED_SESSION_KEYS).toContain(
+      storageBaseFromKey(activeViewSessionKey()),
+    );
+    for (const base of PROFILE_SCOPED_STORAGE_KEYS) {
+      if (base === PREFS_KEY) continue;
+      expect(profileScopedStorageKey(base)).toBe(`${base}${PROFILE_SUFFIX}`);
+    }
     expect(new Set(PROFILE_SCOPED_STORAGE_KEYS).size).toBe(PROFILE_SCOPED_STORAGE_KEYS.length);
+    expect(new Set(PROFILE_SCOPED_SESSION_KEYS).size).toBe(PROFILE_SCOPED_SESSION_KEYS.length);
+    expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(LIBRARY_FIRST_SEEN_KEY);
+    expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(KNOWN_LIBRARY_KEYS_KEY);
+    expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(LS_SPOTLIGHT_RECENT_KEYS);
+    expect(PROFILE_SCOPED_SESSION_KEYS).toContain(LS_ACTIVE_VIEW_SESSION);
   });
 
   it('clearProfileLocalStorage removes suffixed localStorage and sessionStorage keys', () => {
@@ -66,6 +105,56 @@ describe('profiles storage keys', () => {
       expect(sessionStorage.getItem(`${base}:work`)).toBeNull();
     }
     expect(sessionStorage.getItem(`${LS_FETCHER_LAST_SEQ}:work`)).toBeNull();
+  });
+
+  it('resetProfileClientCache clears stale scoped data for reused profile ids', () => {
+    localStorage.setItem(`${PREFS_KEY}:work`, '{"stale":true}');
+    localStorage.setItem(`${STORAGE_KEY}:work`, '{"old":"data"}');
+    localStorage.setItem(`${LIBRARY_FIRST_SEEN_KEY}:work`, '{"steam:1":1000}');
+    localStorage.setItem(`${KNOWN_LIBRARY_KEYS_KEY}:work`, '["steam:1"]');
+    localStorage.setItem(`${LS_SPOTLIGHT_RECENT_KEYS}:work`, '["steam:2"]');
+    sessionStorage.setItem(activeViewSessionKey('work'), 'library');
+    resetProfileClientCache('work');
+    expect(localStorage.getItem(`${PREFS_KEY}:work`)).toBeNull();
+    expect(localStorage.getItem(`${STORAGE_KEY}:work`)).toBeNull();
+    expect(localStorage.getItem(`${LIBRARY_FIRST_SEEN_KEY}:work`)).toBeNull();
+    expect(localStorage.getItem(`${KNOWN_LIBRARY_KEYS_KEY}:work`)).toBeNull();
+    expect(localStorage.getItem(`${LS_SPOTLIGHT_RECENT_KEYS}:work`)).toBeNull();
+    expect(sessionStorage.getItem(activeViewSessionKey('work'))).toBeNull();
+  });
+
+  it('profileDisplayLabel appends id only when a label collides', () => {
+    const profiles = [
+      { id: 'work', label: 'Work' },
+      { id: 'work-2', label: 'Work' },
+      { id: 'play', label: 'Play' },
+    ];
+    expect(profileDisplayLabel(profiles[0], profiles)).toBe('Work (work)');
+    expect(profileDisplayLabel(profiles[1], profiles)).toBe('Work (work-2)');
+    expect(profileDisplayLabel(profiles[2], profiles)).toBe('Play');
+  });
+
+  it('profileDisplayLabel collision check is trimmed and case-insensitive', () => {
+    const profiles = [
+      { id: 'work', label: 'Work' },
+      { id: 'work-2', label: 'work ' },
+    ];
+    expect(profileDisplayLabel(profiles[0], profiles)).toBe('Work (work)');
+    expect(profileDisplayLabel(profiles[1], profiles)).toBe('work  (work-2)');
+  });
+
+  it('profileDisplayLabel falls back to id when label is empty', () => {
+    const profiles = [{ id: 'work', label: '' }];
+    expect(profileDisplayLabel(profiles[0], profiles)).toBe('work');
+  });
+
+  it('friendlyPinError maps server tokens to human copy and strips em dashes', () => {
+    expect(friendlyPinError('incorrect_pin')).toBe('Incorrect PIN. Try again.');
+    expect(friendlyPinError('pin_required')).toBe('Enter the PIN for this profile.');
+    expect(friendlyPinError('too many PIN attempts \u2014 try again in 30 seconds')).toBe(
+      'too many PIN attempts - try again in 30 seconds',
+    );
+    expect(friendlyPinError('')).toBe('Could not switch profile.');
   });
 
   it('uses localStorage active profile when local profiles enabled under account auth', () => {

@@ -38,6 +38,7 @@ import { gameGenresCanonical } from './genres.js';
 import { getPersonal, filterOutHidden, filterCounted } from './personal-storage.js';
 import {
   savePrefs,
+  saveActiveView,
   applySavedSortForView,
   syncCoopFilterSegmented,
   setCoopFilterMode,
@@ -582,8 +583,7 @@ export function applyItchTabVisibility() {
   const known = authStatusLoaded() && state.dashboardDataReady;
   if (!available && known && state.activeView === "itch") {
     switchView("dashboard");
-    state.prefs.activeView = "dashboard";
-    savePrefs();
+    saveActiveView("dashboard");
     scrollToItchCard();
   }
 }
@@ -624,7 +624,7 @@ export function switchView(view) {
     }
     invalidateTableCache();
     state.activeView = view;
-    state.prefs.activeView = view;
+    saveActiveView(view);
     state.selectedKeys.clear();
     if (view !== "library") state.cleanupModeActive = false;
     if (!state._pendingFocusKey) state.focusedRowIndex = 0;

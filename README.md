@@ -20,6 +20,21 @@ From empty to 2,000+ games in about 90 seconds — three steps:
 
 → Ready to install? Jump to [**Setup**](#setup). Want the full tour first? Skim the [feature list](#features).
 
+## Documentation
+
+End-user help lives in **[guide/](guide/README.md)** (install, connect each store, dashboard tour, troubleshooting, FAQ):
+
+| Topic | Page |
+|-------|------|
+| Install and first launch | [guide/getting-started.md](guide/getting-started.md) |
+| Connect each store | [guide/connecting-stores.md](guide/connecting-stores.md) |
+| Tabs, filters, statuses | [guide/using-the-dashboard.md](guide/using-the-dashboard.md) |
+| Auto-refresh and enrichers | [guide/refresh-and-enrichment.md](guide/refresh-and-enrichment.md) |
+| Profiles and moving machines | [guide/profiles-and-moving-machines.md](guide/profiles-and-moving-machines.md) |
+| Common fixes | [guide/troubleshooting.md](guide/troubleshooting.md) |
+| Free vs paid, privacy | [guide/faq.md](guide/faq.md) |
+| Bug reports and support | [guide/getting-help.md](guide/getting-help.md) |
+
 ## Screenshots
 
 [![BAKLOG dashboard — analytics, KPI cards, and charts](dashboard.png)](dashboard.png)
@@ -172,186 +187,19 @@ Hashed assets under `dist/` get `immutable` long-term cache; `index.html` stays 
 
 ### Local profiles (optional)
 
-Use the **profile menu** in the header (next to the logo) for separate datasets — e.g. work vs play. Until you add a second profile, everything stays in the repo root as today. The first **Create** copies your current `games_*.json`, `data/`, and `cache/auth/` into `profiles/default/` (root files remain as backup) and starts the new profile empty. Switching profiles reloads the app. CLI fetchers respect `BAKLOG_PROFILE=<id>` or the active entry in `profiles/index.json` (e.g. `$env:BAKLOG_PROFILE='work'; python fetch_games.py`). The dev server **auto-ignores** `BAKLOG_PROFILE` in its own shell at startup so the menu always owns the active profile; per-run fetchers from the UI still pin the correct profile. If you had the var exported for CLI work, you can optionally clear it with `Remove-Item Env:\BAKLOG_PROFILE` (PowerShell). Rollback: delete the `profiles/` folder to return to legacy single-root layout.
+Use the **profile menu** in the header for separate datasets (e.g. work vs play). Full steps, PINs, and moving credentials: **[guide/profiles-and-moving-machines.md](guide/profiles-and-moving-machines.md)**.
 
 ## Fetch your libraries
 
-**Recommended:** run `python server.py`, open **Connections**, and click **Connect** for each store. A headed Chrome/Edge window opens for cookie/OAuth sign-in; credentials stay local in `cache/auth/`. Then run fetchers from the dashboard **Fetcher health** row or from the terminal below.
+**Recommended:** run `python server.py`, open **Connections**, and click **Connect** for each store. Then run fetchers from the **Fetcher health** row or the terminal.
 
-**Steam:** Connections → Steam → Connect (grabs your API key automatically), or set `STEAM_API_KEY` + `STEAM_ID` in `.env` manually. Set **Game details** to **Public** in Steam profile privacy.
+Per-store Connect steps, CLI fallbacks, wishlist scripts, platform matrix, fetcher flags, and exit codes: **[guide/connecting-stores.md](guide/connecting-stores.md)** and **[guide/refresh-and-enrichment.md](guide/refresh-and-enrichment.md)**.
+
+Quick start after Steam Connect:
 
 ```bash
 python fetch_games.py
 ```
-
-Writes `games_steam.json`.
-
-**GOG** — two sources, one `games_gog.json`:
-
-| Source | Connections card | When to use |
-|--------|------------------|-------------|
-| **Galaxy (local)** | GOG Galaxy (launcher) | Richest data from `galaxy-2.0.db` (Windows ProgramData or macOS Shared). Optional: `GOG_GALAXY_DB=`. No Linux path — use web below. |
-| **Web** | GOG (web) | Any OS; sign in at gog.com for library + wishlist cookie. |
-
-`fetch_gog.py` picks **auto**: Galaxy DB when present, else the saved web session. Override with `--source local|web` or `GOG_SOURCE=`.
-
-```bash
-python fetch_gog.py
-```
-
-*Fallback:* copy the `gog-al` cookie from DevTools → Application → Cookies into `GOG_AL=` in `.env`.
-
-If the web fetch fails with **403 Forbidden**, reconnect GOG on the Connections page (refreshes the `gog-al` cookie). On Windows/macOS with GOG Galaxy installed, prefer `python fetch_gog.py --source local` so the fetcher reads `galaxy-2.0.db` instead of the embed API.
-
-**PlayStation (PSN):** Connections → PlayStation → Connect and sign in at the PlayStation Store. Set trophy/game privacy to **Anyone** so the library and wishlist can load.
-
-```bash
-python fetch_psn.py
-```
-
-*Fallback:* open https://ca.account.sony.com/api/v1/ssocookie while logged in and paste the `npsso` token into `PSN_NPSSO=` in `.env`.
-
-**Epic (library):** Connections → Epic (library) → Connect — we capture and exchange the authorization code automatically.
-
-```bash
-python fetch_epic.py
-```
-
-*Fallback:* run `python fetch_epic.py --auth-help` and paste the code into `EPIC_AUTH_CODE=` in `.env`.
-
-**Epic (wishlist):** Connections → Epic (wishlist) → Connect on the storefront (separate session from library).
-
-```bash
-python fetch_epic_wishlist.py
-```
-
-**Amazon Games** — two sources, one `games_amazon.json`:
-
-| Source | Connections card | When to use |
-|--------|------------------|-------------|
-| **Launcher (Windows)** | Amazon Games (launcher) | Richest data (art, last played) from local SQLite. Optional: `AMAZON_GAMES_SQL_DIR=`. |
-| **Prime Gaming (web)** | Amazon (Prime Gaming, web) | Any OS; imports Amazon-fulfilled claims only (skips Epic/Steam key drops). |
-
-`fetch_amazon.py` picks **auto**: launcher DB on Windows when present, else the saved web session. Override with `--source launcher|web` or `AMAZON_SOURCE=`.
-
-```bash
-python fetch_amazon.py
-python fetch_amazon.py --source web --dump-raw   # debug: writes cache/amazon_web_raw.json
-```
-
-**Xbox (play history):** Connections → Xbox → Connect at [xbl.io](https://xbl.io/login), or paste an OpenXBL API key into the card.
-
-```bash
-python fetch_xbox.py --skip-hltb
-```
-
-**Xbox Store wishlist:** Connections → Xbox Store wishlist → Connect on xbox.com (separate from play history above).
-
-```bash
-python fetch_xbox_wishlist.py
-```
-
-**Battle.net (unofficial):** Connections → Battle.net → Connect and sign in at [account.battle.net](https://account.battle.net/). The managed browser saves your session cookie locally; the fetcher uses it automatically (`--browser env` when a stored cookie exists).
-
-```bash
-python fetch_battlenet.py --skip-hltb
-```
-
-*Fallback (if Connect fails or you prefer CLI-only):* DevTools → Network → `games-and-subs` → copy the full `Cookie:` header into `BATTLENET_COOKIE=` in `.env`, then `python fetch_battlenet.py --browser env --skip-hltb`. On Windows, Edge/Chrome v127+ app-bound encryption can block the legacy *fetch-time* browser-jar read (`--browser edge`); Connect + stored cookie avoids that. Firefox (`--browser firefox`) or the `.env` cookie path still work without admin.
-
-**Ubisoft Connect (unofficial):** Connections → Ubisoft Connect → Connect (one sign-in for library + Ubisoft Store wishlist).
-
-```bash
-python fetch_ubisoft.py --skip-hltb
-python fetch_ubisoft_wishlist.py
-```
-
-*Fallback:* DevTools → Network → `public-ubi` → copy `Authorization` and `Ubi-SessionId` into `.env`.
-
-**Nintendo (eShop library):** Connections → Nintendo → Connect. Only ~2 years of digital eShop history; cartridge games and older purchases must be added manually.
-
-```bash
-python fetch_nintendo.py --skip-hltb
-```
-
-*Fallback:* copy the `Cookie` header from a `ec.nintendo.com/my/transactions` request into `NINTENDO_COOKIE=` in `.env`.
-
-**Nintendo Store wishlist:** Connections → Nintendo Store wishlist → Connect on nintendo.com.
-
-```bash
-python fetch_nintendo_wishlist.py
-```
-
-**EA App:** Connections → EA App → Connect at ea.com.
-
-```bash
-python fetch_ea.py
-```
-
-**Humble Bundle:** Connections → Humble Bundle → Connect at humblebundle.com (library page). One profile unlocks library + store wishlist fetchers.
-
-```bash
-python fetch_humble.py --skip-hltb
-python fetch_humble_wishlist.py
-```
-
-**itch.io** — two sources, one `games_itch.json`:
-
-| Source | Connections card | When to use |
-|--------|------------------|-------------|
-| **Butler (local)** | itch butler (local) | Owned library + playtime from the itch app's `butler.db` (Windows / macOS / Linux). No API key required when the DB is present. |
-| **API** | itch.io (API key) | Richer metadata (publisher, full tag lists). API key from https://itch.io/user/settings/api-keys → `ITCH_API_KEY=` in `.env` or Connections. |
-
-`fetch_itch.py` picks **auto**: butler.db when present, else the API key. Override with `--source local|api` or `ITCH_SOURCE=`.
-
-```bash
-python fetch_itch.py --skip-hltb
-python enrich_steam_reviews.py --stores itch
-```
-
-Writes all owned keys (games + tools/TTRPG PDFs). The dashboard itch.io tab hides non-games by default.
-
-**Wishlist:**
-
-```bash
-python fetch_wishlist.py --skip-hltb
-python fetch_gog_wishlist.py    # optional — needs GOG_AL; until run, WL GOG chip shows "missing"
-python fetch_epic_wishlist.py
-python fetch_nintendo_wishlist.py   # Connections → Nintendo Store wishlist (separate from eShop library login)
-python fetch_itad.py
-```
-
-**Display currency / FX:** set `ITAD_COUNTRY` (e.g. `GB`) before `fetch_itad.py`; ITAD and wishlist rows use that region’s currency. The script caches daily exchange rates from [Frankfurter](https://www.frankfurter.app/) and writes comparable `price_amount` fields on wishlist JSON while keeping `price_native` / `currency_native` for the store’s real price. Re-run ITAD after wishlist fetches to refresh conversions (rates can be up to 7 days old before a warning).
-
-Wishlist JSON files (`games_wishlist.json`, `games_wishlist_gog.json`, `games_wishlist_epic.json`, `games_wishlist_nintendo.json`, etc.) are optional per store. The dashboard **Fetcher health** row marks any file that has not been fetched yet as *missing*; that is normal until you run the matching script.
-
-**Epic wishlist:** separate from launcher OAuth (`fetch_epic.py`). Connections → **Epic (wishlist)** → Connect at [store.epicgames.com/wishlist](https://store.epicgames.com/en-US/wishlist) (clear Cloudflare if shown). `fetch_epic_wishlist.py` reuses the saved browser profile headlessly — no `EPIC_STORE_COOKIE` paste.
-
-Fetcher options (all scripts):
-
-- `--refresh` — ignore cache, refetch everything (Shift+click on supported library/wishlist chips)
-- `--retry-misses` — re-attempt enricher rows cached as no match (Shift+click on HLTB, Reviews, Covers)
-- `--only-new` — only fetch games not already in the store JSON file
-- `--skip-hltb` — skip HowLongToBeat lookups (faster)
-- `--allow-empty` — allow writing a zero-item result (default: refuse and exit 2 so stale data is preserved)
-- Store-specific: `--appid`, `--id`, etc.
-
-**Exit codes:** `0` success · `1` runtime/config error · `2` suspicious empty result (or ITAD resolved zero titles) · `3` drift guard refused write · `4` auth failure (expired/invalid credential). Every script prints `=== name started at … ===` and a footer summary with elapsed time.
-
-**Stall watchdog:** when a fetcher runs via `server.py`, if stdout is silent for 30s the server injects `[server] no output for Ns — still running (PID …)` into the log panel (repeats every 60s). This is informational only — the process is not killed.
-
-First Steam run may take several minutes for a large library (Store API is rate-limited). Subsequent runs use cache and are much faster.
-
-## Enrichment scripts
-
-| Script | Purpose |
-|--------|---------|
-| `enrich_steam_reviews.py` | Backfill Steam review % on non-Steam rows via Steam store search (gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo, itch). Use `--stores nintendo` etc. to limit; Shift+click adds `--retry-misses`. |
-| `enrich_cross_store_images.py` | Backfill `header_image` / `library_image` from the Steam CDN for non-Steam rows (gog, psn, epic, amazon, xbox, battlenet, ubisoft, nintendo). |
-| `enrich_hltb.py` | Backfill HLTB hours on any `games_*.json` row missing them |
-| `enrich_protondb.py` | Backfill ProtonDB Linux / Steam Deck compatibility tiers on Steam-matched rows (`protondb_tier`/`confidence`/`report_count`/`score`/`trending_tier`); no API key. Shift+click adds `--retry-misses`. |
-| `fetch_itad.py` | Cross-store deal prices → `itad_prices.json` (wishlist by default); refreshes `cache/fx_rates.json` and converts wishlist store prices to display currency |
-| `fetch_fx.py` | Refresh FX rates only (`cache/fx_rates.json`, Frankfurter; 24h cache) |
 
 **Data attribution:** BAKLOG surfaces third-party data from [ProtonDB](https://www.protondb.com) (Steam Deck / Linux tiers, ODbL), [IsThereAnyDeal](https://isthereanydeal.com/) (deal prices), [GamerPower](https://www.gamerpower.com/) (giveaway feed), and [HowLongToBeat](https://howlongtobeat.com/) (completion hours). Store logos and trademarks belong to their respective owners; BAKLOG is not affiliated with Valve, Epic, GOG, or other storefronts.
 
@@ -371,122 +219,23 @@ Requires **Google Chrome** or **Microsoft Edge** installed (Edge ships with Wind
 
 On Windows, always use the project venv (not the Microsoft Store `python.exe` stub). Fetcher subprocesses launched from the stub can hang `subprocess.Popen` and wedge the run queue. `server.py` auto-picks `.venv` when present.
 
-**Connections tab:** sign in once per store from the dashboard — API keys via form fields, cookie/OAuth stores via a headed Chrome/Edge window. Credentials are encrypted in `cache/auth/` (OS keychain by default). `.env` still works as a fallback.
+**Connections tab:** sign in once per store from the dashboard. Credentials are encrypted in `cache/auth/` (OS keychain by default). Full install and launch steps: **[guide/getting-started.md](guide/getting-started.md)**.
 
-#### Moving to a new machine
+**Moving credentials to a new machine:** **[guide/profiles-and-moving-machines.md](guide/profiles-and-moving-machines.md)**.
 
-1. On the old machine: **Connections** → ⋮ → **Portable bundle…** → **Export bundle…**. Choose a passphrase and save the downloaded `baklog-secrets-*.bundle` somewhere safe (USB, cloud folder, etc.).
-2. Install BAKLOG on the new machine (`pip install -r requirements.txt`, `python server.py`). Chrome or Edge must be installed for Connections sign-in.
-3. **Connections** → ⋮ → **Portable bundle…** → **Import bundle…**, pick the file, enter the same passphrase. The page reloads with every provider restored — including browser cookie profiles.
-
-Terminal alternative:
-
-```bash
-python -m auth export-bundle --out baklog-secrets.bundle
-python -m auth import-bundle baklog-secrets.bundle
-```
-
-See [PRIVACY.md](PRIVACY.md#portable-secret-bundle) for what's inside the bundle and [SECURITY.md](SECURITY.md) for the full threat model.
-
-Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher — output streams live into a log panel and the chip refreshes when the run finishes.
+Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher health** row to enqueue that fetcher.
 
 **Option B (read-only):** `python -m http.server 8080` if you only want to browse and prefer to run fetchers in your terminal.
 
-**Option C:** open `index.html` directly (browsers block automatic local file loading without a server — use Option A or B for the full experience).
+**Option C:** open `index.html` directly (browsers block ES modules from `file://` - use Option A or B).
 
-### Reporting a bug
+### Reporting a bug, support, and personal data
 
-When something goes wrong, BAKLOG captures uncaught errors and unhandled
-promise rejections automatically and surfaces a sticky red toast in the
-top-right corner. From the toast, kebab menu (**Report a bug…**), or
-`?debug=1` overlay you can:
-
-- **Send report** — opens a consent dialog showing the exact sanitized JSON
-  payload (errors + app context: version, view, data version, filter count,
-  table fingerprint, last render time, dashboard counters). Add an optional
-  contact email and note, then confirm to POST the bundle to the maintainer.
-  Nothing is sent until you click **Send report** in the dialog. Personal
-  notes, library JSON, and credentials are never included (see
-  [PRIVACY.md](PRIVACY.md#error-logs-and-bug-reporting) for the full whitelist).
-- **Copy bug bundle** — same payload to your clipboard with no network request.
-  Paste into a [new GitHub issue](https://github.com/Ogrods/BAKLOG/issues/new)
-  if you prefer.
-- **Errors only** — copies just the error array, without app context.
-- **Details** — expand the stack trace inline.
-
-The last 200 errors are kept in browser `localStorage` so the bundle can
-include history across reloads. Clear the ring with
-`localStorage.removeItem('baklog-error-log')` in DevTools.
-
-**Fetcher failures are separate.** Store refresh problems show up in the
-Fetcher health panel and `profiles/<id>/cache/runs/*.jsonl` logs (exit codes
-0–4). They are not auto-sent to the bug-report endpoint.
-
-**Quick test:** DevTools → `throw new Error('test')` → sticky toast appears →
-**Report a bug…** shows the scrubbed bundle preview. Nothing is POSTed until
-you click **Send report** in the dialog. For local dev without hitting
-production, set `window.__BAKLOG_REPORT_ENDPOINT` or the
-`baklog-report-endpoint` meta tag in `index.html` (see
-[PRIVACY.md](PRIVACY.md#error-logs-and-bug-reporting)).
-
-### Community & support
-
-- **Discord** — [Join the community](https://discord.gg/baklog) for beta chat,
-  `#bug-reports`, and `#feature-requests`. No app data is piped to Discord;
-  use **Report a bug…** or paste a **Copy bug bundle** when filing bugs.
-- **GitHub** — [Source code](https://github.com/Ogrods/BAKLOG) (MIT) and
-  [open an issue](https://github.com/Ogrods/BAKLOG/issues/new) for reproducible
-  bugs and feature requests (long-term record).
-- **Email** — [dan@baklog.app](mailto:dan@baklog.app) for invite or support
-  questions.
-
-Discord invite and GitHub repo URLs are canonical in
-[`shared/community.json`](shared/community.json) — keep them in sync with the
-landing footer and app kebab menu.
-
-### Personal data storage
-
-When you launch via `python server.py` (the recommended mode), your statuses, notes, priorities, tags, UI prefs, and manually-added games are persisted to `data/personal.json`. The file is the source of truth — back it up, sync it via Dropbox/OneDrive/git, copy it to another machine. The dev server writes atomically (temp file + rename) and keeps a rolling set of timestamped backups in `data/personal_backups/` so a bad save can't wipe earlier edits.
-
-The browser's `localStorage` still exists as a hot cache that the page hydrates from on first paint, but it is overwritten from `data/personal.json` on every boot. **Server wins.**
-
-If you instead serve the dashboard read-only via `python -m http.server`, the dashboard falls back to localStorage as in earlier versions and the **Export notes** / **Import notes** buttons (in the toolbar ⋯ menu) become the only way to back up. The first time you open the dashboard via `server.py` after using read-only mode, a banner offers to upload your existing localStorage data into `data/personal.json`.
+Bug reports, Discord, GitHub issues, email, and how personal edits are stored: **[guide/getting-help.md](guide/getting-help.md)** and **[guide/using-the-dashboard.md](guide/using-the-dashboard.md)**.
 
 ## Auto-refresh on a schedule
 
-While BAKLOG is open, **auto-refresh stores older than 24h** is on by default on the Connections tab (toggle to disable). ITAD deal prices also refresh on a schedule from the Fetcher health panel.
-
-For refreshes while BAKLOG is closed, use the helper script for your OS, or click any chip in the **Fetcher health** row from the UI. Scripts and UI runs use the same fetch sequence and log to `refresh.log`.
-
-**Windows** (`refresh.ps1`):
-
-```powershell
-Set-Location "C:\path\to\steam-backlog"
-.\refresh.ps1
-```
-
-Create a weekly scheduled task (example: Sundays at 9:00; adjust the path):
-
-```powershell
-schtasks /create /SC WEEKLY /D SUN /TN "BAKLOG Refresh" /TR "powershell -ExecutionPolicy Bypass -File \"C:\path\to\steam-backlog\refresh.ps1\"" /ST 09:00
-```
-
-**macOS / Linux** (`refresh.sh`):
-
-```bash
-chmod +x refresh.sh   # first time only
-./refresh.sh
-```
-
-Schedule it weekly with `cron` (example: Sundays at 9:00):
-
-```bash
-crontab -e
-# then add:
-0 9 * * 0 cd /path/to/steam-backlog && ./refresh.sh
-```
-
-> `refresh.sh` skips `fetch_amazon.py` on non-Windows hosts (launcher DB is Windows-only). Use the Prime Gaming web Connections card + `fetch_amazon.py --source web` on macOS/Linux.
+While BAKLOG is open, **auto-refresh stores older than 24h** is on by default on the Connections tab. Scheduled `refresh.ps1` / `refresh.sh`, enrichers, and exit codes: **[guide/refresh-and-enrichment.md](guide/refresh-and-enrichment.md)**.
 
 ## Files
 

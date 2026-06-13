@@ -866,7 +866,7 @@
         <span class="drawer-footer-item"><span class="kbd-group"><kbd class="kbd">B</kbd><kbd class="kbd">N</kbd><kbd class="kbd">P</kbd><kbd class="kbd">U</kbd><kbd class="kbd">L</kbd><kbd class="kbd">F</kbd><kbd class="kbd">S</kbd></span> status</span>
         <span class="drawer-footer-item"><kbd class="kbd">Space</kbd> select</span>
       </div>
-      <p class="drawer-footer-credits">Data via <a href="https://www.protondb.com/" target="_blank" rel="noopener noreferrer">ProtonDB</a> · <a href="https://isthereanydeal.com/" target="_blank" rel="noopener noreferrer">IsThereAnyDeal</a> · <a href="https://www.gamerpower.com/" target="_blank" rel="noopener noreferrer">GamerPower</a> · <a href="https://howlongtobeat.com/" target="_blank" rel="noopener noreferrer">HowLongToBeat</a></p>
+      <p class="drawer-footer-credits">Data via <a href="https://www.protondb.com/" target="_blank" rel="noopener noreferrer">ProtonDB</a> · <a href="https://isthereanydeal.com/" target="_blank" rel="noopener noreferrer">IsThereAnyDeal</a> · <a href="https://www.gamerpower.com/" target="_blank" rel="noopener noreferrer">GamerPower</a> · <a href="https://howlongtobeat.com/" target="_blank" rel="noopener noreferrer">HowLongToBeat</a> · <a href="https://github.com/Ogrods/BAKLOG/tree/main/guide" target="_blank" rel="noopener noreferrer">User guide</a></p>
     </div>
   </aside>
 
@@ -924,6 +924,27 @@
       </div>
       <div class="border-t border-slate-700 p-3 flex justify-end">
         <button type="button" id="profileManageCancel" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-100">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile switch PIN prompt -->
+  <div id="profilePinModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+    <div class="profile-modal-card bg-slate-800 rounded-lg shadow-xl border border-slate-700 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="profilePinPromptTitle">
+      <div class="flex items-center justify-between border-b border-slate-700 p-3">
+        <h3 id="profilePinPromptTitle" class="text-lg font-semibold text-slate-100">Enter PIN</h3>
+        <button type="button" id="profilePinPromptClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
+      </div>
+      <div class="p-3 space-y-3 text-sm text-slate-300">
+        <p id="profilePinPromptNote" class="profile-modal-note text-xs text-slate-400">This profile is locked. Enter its PIN to switch in.</p>
+        <div class="profile-modal-row">
+          <input type="text" id="profilePinPromptInput" name="baklog-pin-switch" class="profile-modal-field profile-modal-pin" placeholder="PIN" maxlength="32" inputmode="numeric" autocomplete="off" data-1p-ignore data-lpignore="true" />
+        </div>
+        <p id="profilePinPromptError" class="profile-modal-error hidden" role="alert"></p>
+      </div>
+      <div class="border-t border-slate-700 p-3 flex justify-end gap-2">
+        <button type="button" id="profilePinPromptCancel" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-100">Cancel</button>
+        <button type="button" id="profilePinPromptSubmit" class="profile-modal-btn profile-modal-btn-primary">Switch</button>
       </div>
     </div>
   </div>

@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { prefsStorageKey } from './profiles.js';
+import { prefsStorageKey, activeViewSessionKey } from './profiles.js';
 import { personalStore } from './personal-store.js';
 import { resolveCoopFilterMode } from './table-query.js';
 import { migrateColumnPrefs } from './table-columns.js';
@@ -73,6 +73,9 @@ export function loadPrefs() {
   delete merged.itchHideNonGames;
   delete merged.tagFilters;
   delete merged.tagFilterMode;
+  // Active view moved to sessionStorage (resets each session, kept on refresh).
+  // Drop any persisted/server-synced copy so it can't restore across sessions.
+  delete merged.activeView;
   const rawItadMin = Number(merged.itadAutoRefreshIntervalMin);
   if (!Number.isFinite(rawItadMin)) {
     merged.itadAutoRefreshIntervalMin = 15;
@@ -147,6 +150,28 @@ export function syncFilterDomFromState() {
   setVal("maxHours", maxH);
   const maxHVal = document.getElementById("maxHoursVal");
   if (maxHVal) maxHVal.textContent = maxH >= 200 ? "200+" : String(maxH);
+}
+
+/**
+ * Read the active view saved for this session (sessionStorage). Returns null
+ * when nothing is stored - e.g. a fresh app launch - so boot falls back to the
+ * default tab instead of restoring the last session's view.
+ */
+export function loadActiveView() {
+  try {
+    return sessionStorage.getItem(activeViewSessionKey()) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the active view for the current session only (sessionStorage). */
+export function saveActiveView(view) {
+  try {
+    if (view) sessionStorage.setItem(activeViewSessionKey(), view);
+  } catch {
+    // Private-mode / quota write blocks shouldn't break navigation.
+  }
 }
 
 export function savePrefs() {

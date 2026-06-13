@@ -13,10 +13,49 @@ from pathlib import Path
 import pytest
 
 import server
-from shared import supabase_auth
+from shared import profile_paths, supabase_auth
 from shared.subprocess_guard import child_pids_of, terminate_pid_tree
 
 _RUN_MANAGER_THREAD_PREFIXES = ("run-worker", "run-watchdog", "run-kill", "run-launch-")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _protect_real_profile_store() -> None:
+    """Safety net: never let a test that forgot to isolate `profile_paths` mutate
+    the developer's real `profiles/` store.
+
+    A test that calls `create_profile`/`set_active_profile` without monkeypatching
+    `profile_paths.INDEX_FILE`/`PROFILES_DIR` (e.g. a new test before its isolation
+    fixture is wired) would otherwise write straight into the real index and leak
+    `work`/`play` dirs. We snapshot the real index + profile dir names at session
+    start and restore them at session end, removing any test-created dirs.
+    """
+    real_index = profile_paths.INDEX_FILE
+    real_profiles_dir = profile_paths.PROFILES_DIR
+    index_bytes = real_index.read_bytes() if real_index.is_file() else None
+    baseline_dirs = (
+        {p.name for p in real_profiles_dir.iterdir() if p.is_dir()}
+        if real_profiles_dir.is_dir()
+        else set()
+    )
+    yield
+    if real_profiles_dir.is_dir():
+        for child in list(real_profiles_dir.iterdir()):
+            if child.is_dir() and child.name not in baseline_dirs:
+                import shutil
+
+                warnings.warn(
+                    f"test leaked profile dir into real store: {child.name!r}; removing",
+                    stacklevel=2,
+                )
+                shutil.rmtree(child, ignore_errors=True)
+    if index_bytes is not None and real_index.is_file():
+        if real_index.read_bytes() != index_bytes:
+            warnings.warn(
+                "test mutated the real profiles/index.json; restoring snapshot",
+                stacklevel=2,
+            )
+            real_index.write_bytes(index_bytes)
 
 
 def _pid_alive(pid: int) -> bool:

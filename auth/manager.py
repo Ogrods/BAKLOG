@@ -374,14 +374,24 @@ def mark_verified(provider: str) -> None:
     set_provider_blob(provider, blob)
 
 
+def has_active_sessions() -> bool:
+    """True while a headed browser sign-in worker is still running."""
+    with _sessions_lock:
+        return any(not s._finished.is_set() for s in _active_sessions.values())
+
+
 def seed_new_profile_auth_defaults(profile_id: str) -> None:
     """Opt machine-wide local sources out on a brand-new profile until Connect."""
     auth_dir(profile_id=profile_id).mkdir(parents=True, exist_ok=True)
     with _with_profile_secrets(profile_id):
-        blob = get_provider_blob("itch_local")
-        blob["disabled"] = True
-        blob.pop("enabled", None)
-        set_provider_blob("itch_local", blob)
+        for key, spec in PROVIDERS.items():
+            if spec.kind != "local":
+                continue
+            blob = get_provider_blob(key)
+            blob["disabled"] = True
+            if key == "itch_local":
+                blob.pop("enabled", None)
+            set_provider_blob(key, blob)
 
 
 def import_env_credentials(*, profile_id: str = DEFAULT_PROFILE_ID) -> list[str]:

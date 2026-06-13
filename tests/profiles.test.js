@@ -49,6 +49,7 @@ describe('profiles storage keys', () => {
   });
 
   it('defaults to default profile id with bare storage keys', () => {
+    localStorage.removeItem(ACTIVE_PROFILE_LS);
     expect(activeProfileId()).toBe('default');
     expect(prefsStorageKey()).toBe(PREFS_KEY);
     expect(itadSnapshotStorageKey()).toBe('baklog-itad-snapshot');
@@ -178,6 +179,7 @@ describe('profiles storage keys', () => {
     authGate.isAccountAuthMode.mockReturnValue(true);
     authGate.isLocalProfilesEnabled.mockReturnValue(true);
     authGate.getAccountProfileId.mockReturnValue('supabase-uuid');
+    localStorage.removeItem(ACTIVE_PROFILE_LS);
     expect(activeProfileId()).toBe('supabase-uuid');
     expect(profileScopedStorageKey(STORAGE_KEY)).toBe(`${STORAGE_KEY}:supabase-uuid`);
   });

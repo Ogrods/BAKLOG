@@ -19,7 +19,8 @@ describe('isProPromoSponsorId', () => {
     expect(isProPromoSponsorId('house-spotlight-pro-logo')).toBe(true);
     expect(isProPromoSponsorId('house-lib-backlog')).toBe(true);
     expect(isProPromoSponsorId('house-spotlight-library')).toBe(true);
-    expect(isProPromoSponsorId('house-support-baklog')).toBe(false);
+    expect(isProPromoSponsorId('house-support-baklog')).toBe(true);
+    expect(isProPromoSponsorId('house-itch-privacy')).toBe(true);
   });
 });
 

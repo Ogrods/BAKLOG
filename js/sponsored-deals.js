@@ -256,10 +256,10 @@ const V1_PLACEMENT_MAP = {
 const HOUSE_DEFAULTS = {
   'house-support-baklog': {
     kind: 'house',
-    title: 'Back BAKLOG',
-    tagline: 'Local-first, no server to breach. Help fund development.',
-    cta: 'Join the waitlist',
-    url: 'https://baklog.app/#waitlist',
+    title: 'Level up to BAKLOG Pro',
+    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.',
+    cta: 'Get Pro - $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     dismissible: true,
     enabled: true,
@@ -285,10 +285,10 @@ const HOUSE_DEFAULTS = {
   },
   'house-itch-privacy': {
     kind: 'house',
-    title: 'Every store, one list',
-    tagline: 'There is no BAKLOG server to breach. Your libraries stay on your machine.',
-    cta: 'Learn more',
-    url: 'https://baklog.app/',
+    title: 'Level up to BAKLOG Pro',
+    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.',
+    cta: 'Get Pro - $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
     cover: '',
     dismissible: true,
     enabled: true,
@@ -297,7 +297,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'BAKLOG Pro',
     slogan: 'One honest backlog across every store.',
-    tagline: 'One honest backlog, leveled up. Bulk refresh, cloud sync, no ads - $5/mo.',
+    tagline: 'Leveled up with bulk refresh, cloud sync, and no ads — $5/mo.',
     cta: 'Get Pro',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -309,7 +309,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Sync every machine',
     slogan: 'Keep your library and personal data aligned across machines - no manual exports.',
-    tagline: 'BAKLOG Pro keeps your library and personal data aligned across machines - no manual exports.',
+    tagline: 'Cloud sync for library JSON and personal prefs.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -321,7 +321,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Fewer distractions',
     slogan: 'Paid tier drops sponsored deal slots so your deal radar stays yours.',
-    tagline: 'BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo.',
+    tagline: '$5/mo — nothing you use today moves behind paywall.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -537,13 +537,9 @@ function sponsorDismissHtml(item) {
   return `<span class="sponsored-deal-dismiss" role="button" tabindex="0" data-action="sponsored-dismiss" data-sponsor-id="${escapeAttr(item.id)}" title="Dismiss this slot" aria-label="Dismiss sponsored slot">&times;</span>`;
 }
 
-/**
- * Dismiss control for house promos. House slots are permanent by default
- * (only Pro removes them); they opt in to a session-scoped close with
- * `dismissible: true` in the feed/defaults.
- */
-function houseDismissHtml(item) {
-  return item?.dismissible ? sponsorDismissHtml(item) : '';
+/** House promos are never dismissible — only Pro tier hides all sponsored slots. */
+function houseDismissHtml(_item) {
+  return '';
 }
 
 /**
@@ -750,12 +746,14 @@ export const PRO_PROMO = {
 };
 
 const PRO_PROMO_SPONSOR_IDS = new Set([
+  'house-support-baklog',
   'house-pro-promo',
   'house-spotlight-pro-logo',
   'house-spotlight-pro-sync',
   'house-spotlight-pro-noads',
   'house-lib-backlog',
   'house-spotlight-library',
+  'house-itch-privacy',
 ]);
 
 /** True for in-app house promos that should open the Pro view tab (not Polar directly). */
@@ -767,10 +765,10 @@ export function isProPromoSponsorId(id) {
 export const HOUSE_DEAL_ITEM = {
   id: 'house-support-baklog',
   kind: 'house',
-  title: 'Back BAKLOG',
-  tagline: 'Local-first, no server to breach. Help fund development.',
-  cta: 'Join the waitlist',
-  url: 'https://baklog.app/#waitlist',
+  title: 'Level up to BAKLOG Pro',
+  tagline: 'Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.',
+  cta: 'Get Pro - $5/mo',
+  url: PRO_CHECKOUT_MONTHLY,
   dismissible: true,
 };
 

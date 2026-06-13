@@ -88,7 +88,7 @@ function proHeroBannerSrc(plan) {
 
 function proHeroBannerHtml(plan) {
   const src = escapeAttr(proHeroBannerSrc(plan));
-  return `<img class="pro-view-hero-banner" data-pro-hero-banner src="${src}" alt="BAKLOG Pro - one honest backlog across every store" width="1200" height="630" loading="lazy" decoding="async" />`;
+  return `<img class="pro-view-hero-banner" data-pro-hero-banner src="${src}" alt="BAKLOG Pro" width="1200" height="630" loading="lazy" decoding="async" />`;
 }
 
 function proFeaturesListHtml({ compact = false } = {}) {
@@ -124,7 +124,7 @@ function proCompareHtml() {
     .join('');
   return `<div class="pro-view-compare-wrap">
     <h3 class="pro-view-section-title">What stays free vs what Pro adds</h3>
-    <p class="pro-view-compare-lead">Import, browse, and decide what to play next stay on the free tier. Pro layers on power-user conveniences.</p>
+    <p class="pro-view-compare-lead">Import, browse, and pick what to play stay free. Pro adds bulk refresh, background sync, and no sponsored cards.</p>
     <table class="pro-view-compare" aria-label="Free vs Pro">${head}<tbody>${rows}</tbody></table>
   </div>`;
 }

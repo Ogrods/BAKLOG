@@ -81,25 +81,51 @@ jobs:
 
       # Fast cross-platform smoke on macOS (full suite runs on Ubuntu/Windows).
       # Catches import/path regressions without the 10m full-suite timeout.
+      #
+      # TEMPORARY DIAGNOSTIC: this job has been hanging with zero output until the
+      # 15-minute cap. A faulthandler timer armed inside conftest never fired, so
+      # the hang precedes conftest import (plugin load / collection). Arm it here
+      # BEFORE pytest is imported, and disable pytest's own faulthandler plugin so
+      # it cannot cancel our timer. The stack dump pinpoints the hung import.
       - name: Run pytest smoke subset
+        env:
+          PYTHONUNBUFFERED: "1"
         run: |
-          pytest -q \
-            tests/test_server_personal.py \
-            tests/test_server_csrf.py \
-            tests/test_run_manager.py \
-            tests/test_fetcher_progress.py \
-            tests/test_fetcher_auth_exit.py \
-            tests/test_auth_secrets.py \
-            tests/test_auth_status_platform.py \
-            tests/test_amazon_web_auth.py \
-            tests/test_amazon_web_claims.py \
-            tests/test_cdp_browser.py \
-            tests/test_gog_galaxy_client.py \
-            tests/test_itch_local_client.py \
-            tests/test_profile_pin.py \
-            tests/test_csrf_profiles.py \
-            tests/test_server_supabase_auth.py \
-            -m "not integration"
+          cat > "$RUNNER_TEMP/run_smoke.py" <<'PYEOF'
+          import faulthandler
+          import sys
+
+          faulthandler.dump_traceback_later(45, repeat=True)
+          import pytest
+
+          sys.exit(
+              pytest.main(
+                  [
+                      "-v",
+                      "-p",
+                      "no:faulthandler",
+                      "tests/test_server_personal.py",
+                      "tests/test_server_csrf.py",
+                      "tests/test_run_manager.py",
+                      "tests/test_fetcher_progress.py",
+                      "tests/test_fetcher_auth_exit.py",
+                      "tests/test_auth_secrets.py",
+                      "tests/test_auth_status_platform.py",
+                      "tests/test_amazon_web_auth.py",
+                      "tests/test_amazon_web_claims.py",
+                      "tests/test_cdp_browser.py",
+                      "tests/test_gog_galaxy_client.py",
+                      "tests/test_itch_local_client.py",
+                      "tests/test_profile_pin.py",
+                      "tests/test_csrf_profiles.py",
+                      "tests/test_server_supabase_auth.py",
+                      "-m",
+                      "not integration",
+                  ]
+              )
+          )
+          PYEOF
+          python -u "$RUNNER_TEMP/run_smoke.py"
 
   javascript:
     name: JavaScript (vitest)

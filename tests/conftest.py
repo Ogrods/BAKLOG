@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import faulthandler
 import os
 import subprocess
 import sys
@@ -10,14 +9,6 @@ import threading
 import time
 import warnings
 from pathlib import Path
-
-# TEMPORARY DIAGNOSTIC (macOS smoke hang): arm a faulthandler timer BEFORE the
-# heavy imports below so a hang during import/collection - which runs before any
-# fixture and so escapes pytest-timeout/faulthandler_timeout (both per-test) -
-# dumps every thread's stack to stderr instead of silently timing out at the
-# 15-minute runner cap. macOS-gated so passing Windows/Linux runs stay quiet.
-if sys.platform == "darwin":
-    faulthandler.dump_traceback_later(30, repeat=True)
 
 import pytest
 

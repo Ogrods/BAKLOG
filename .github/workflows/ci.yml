@@ -82,15 +82,16 @@ jobs:
       # Fast cross-platform smoke on macOS (full suite runs on Ubuntu/Windows).
       # Catches import/path regressions without the 10m full-suite timeout.
       # GitHub macOS runners ship a huge RLIMIT_NOFILE; CPython fork+exec for
-      # subprocess.Popen(pipes) then spends ~10s per spawn closing FDs. Cap the
-      # limit so the smoke subset finishes well inside the job timeout.
+      # subprocess.Popen(pipes) then spends ~10s per spawn closing FDs on the
+      # runner's huge RLIMIT_NOFILE (see tests/conftest.py darwin setrlimit).
+      # test_run_manager.py is omitted here — it is subprocess-heavy (~40 spawns)
+      # and fully exercised on Ubuntu + Windows; keeping import/path/client tests.
       - name: Run pytest smoke subset
         run: |
           ulimit -n 256
           pytest -q \
             tests/test_server_personal.py \
             tests/test_server_csrf.py \
-            tests/test_run_manager.py \
             tests/test_fetcher_progress.py \
             tests/test_fetcher_auth_exit.py \
             tests/test_auth_secrets.py \

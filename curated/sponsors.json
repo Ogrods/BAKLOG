@@ -23,7 +23,7 @@
     "ad-picks-ironveil": {
       "kind": "sponsor",
       "title": "Ironveil",
-      "tagline": "On sale now — 80% off",
+      "tagline": "On sale now - 80% off",
       "cta": "Grab it",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-ironveil.webp",
@@ -32,7 +32,7 @@
     "ad-table-encore": {
       "kind": "sponsor",
       "title": "Encore",
-      "tagline": "Replay-worthy roguelike — weekend-sized",
+      "tagline": "Replay-worthy roguelike - weekend-sized",
       "cta": "Learn more",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-encore.webp",
@@ -41,7 +41,7 @@
     "house-table-every-store": {
       "kind": "house",
       "title": "Every store, one backlog",
-      "tagline": "Steam, Epic, GOG and more — deduped into one honest list. Free and local-first.",
+      "tagline": "Steam, Epic, GOG and more - deduped into one honest list. Free and local-first.",
       "cta": "Start free",
       "url": "https://baklog.app/",
       "enabled": true
@@ -53,7 +53,7 @@
       "cta": "View the deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": true,
+      "enabled": false,
       "network": "Lantern Forge Studios",
       "genres": [
         "Tactical RPG",
@@ -65,6 +65,29 @@
       "release_year": 2025,
       "discount": 35,
       "price_base": 29.99
+    },
+    "ad-dash-picks-itch-pride": {
+      "kind": "sponsor",
+      "title": "The Power of Pride Bundle 2026",
+      "tagline": "396 indie games, zines, and more from 284 queer creators. Mutual aid bundle - every purchase supports artists directly.",
+      "cta": "Grab the bundle",
+      "url": "https://itch.io/b/3682/the-power-of-pride-bundle-2026-60-edition",
+      "cover": "/assets/ads/itch-pride-bundle.webp",
+      "enabled": true,
+      "network": "itch.io",
+      "discount": 94,
+      "price_base": 1087,
+      "price_sale": 60,
+      "bundle_items": 396,
+      "bundle_creators": 284,
+      "featured_titles": [
+        "Where Winter Crows Go",
+        "Syrup 2: Candy Alchemy RPG",
+        "A TAVERN FOR TEA",
+        "Cuscuta: A Prayer for Endless Winter",
+        "Detective Beebo: Night at the Mansion"
+      ],
+      "ends": "2026-07-06"
     },
     "ad-feature-banner-emberfall": {
       "kind": "sponsor",
@@ -93,7 +116,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": true,
+      "enabled": false,
       "steam_review_percent": 94
     },
     "ad-dash-versus-zephyr": {
@@ -150,7 +173,7 @@
     "ad-claimable-apex-velocity": {
       "kind": "sponsor",
       "title": "Apex Velocity",
-      "tagline": "Blistering arcade racer — drift through neon cities",
+      "tagline": "Blistering arcade racer - drift through neon cities",
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/cover-apex-velocity.webp",
@@ -191,8 +214,8 @@
     "house-support-baklog": {
       "kind": "house",
       "title": "Level up to BAKLOG Pro",
-      "tagline": "Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.",
-      "cta": "Get Pro — $5/mo",
+      "tagline": "Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "enabled": true
@@ -201,7 +224,7 @@
       "kind": "house",
       "title": "Move faster. Cut the noise.",
       "tagline": "Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.",
-      "cta": "Get Pro — $5/mo",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "enabled": true
@@ -210,7 +233,7 @@
       "kind": "house",
       "title": "You own 600 games. You've played 40.",
       "tagline": "One honest backlog across every store. Private, Steam-ready.",
-      "cta": "Get Pro — $5/mo",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "enabled": true
@@ -218,8 +241,8 @@
     "house-itch-privacy": {
       "kind": "house",
       "title": "Level up to BAKLOG Pro",
-      "tagline": "Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.",
-      "cta": "Get Pro — $5/mo",
+      "tagline": "Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "dismissible": true,
@@ -229,7 +252,7 @@
       "kind": "house",
       "title": "BAKLOG Pro",
       "slogan": "One honest backlog across every store.",
-      "tagline": "Leveled up with bulk refresh, cloud sync, and no ads — $5/mo.",
+      "tagline": "Leveled up with bulk refresh, cloud sync, and no ads - $5/mo.",
       "cta": "Get Pro",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -240,9 +263,9 @@
     "house-spotlight-pro-sync": {
       "kind": "house",
       "title": "Sync every machine",
-      "slogan": "Keep your library and personal data aligned across machines — no manual exports.",
+      "slogan": "Keep your library and personal data aligned across machines - no manual exports.",
       "tagline": "Cloud sync for library JSON and personal prefs.",
-      "cta": "Get Pro — $5/mo",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "art_mode": "logo",
@@ -253,8 +276,8 @@
       "kind": "house",
       "title": "Fewer distractions",
       "slogan": "Paid tier drops sponsored deal slots so your deal radar stays yours.",
-      "tagline": "$5/mo — nothing you use today moves behind paywall.",
-      "cta": "Get Pro — $5/mo",
+      "tagline": "$5/mo - nothing you use today moves behind paywall.",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "art_mode": "logo",
@@ -266,7 +289,7 @@
       "title": "It's just your library",
       "slogan": "It's not a godsend, it's just your library.",
       "tagline": "Every game you already own, deduped across every store into one honest backlog. Local-first.",
-      "cta": "Get Pro — $5/mo",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "art_mode": "logo",
@@ -288,14 +311,12 @@
     "dash-coop-couch": [
       "ad-coop-couch-ironveil"
     ],
-    "dash-versus-rated": [
-      "ad-dash-versus-dawnbanner"
-    ],
+    "dash-versus-rated": [],
     "dash-versus-fast": [
       "ad-dash-versus-zephyr"
     ],
     "dash-pick": [
-      "ad-dash-picks-dawnbanner"
+      "ad-dash-picks-itch-pride"
     ],
     "dash-house": [
       "house-pro-promo"

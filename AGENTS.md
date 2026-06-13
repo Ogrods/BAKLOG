@@ -24,13 +24,21 @@ Deep reference (maintainer clone only): `docs/ARCHITECTURE.md` in the private `b
 5. **Admin console** — only when `BAKLOG_ADMIN=1`; routes under `/api/internal/*`.
 6. **Keep sync pairs aligned** — `js/store-brand-colors.js` ↔ `app.css --brand-*`; `js/theme.js` ↔ theme CSS; `landing/marquee-speed.js` ↔ `js/marquee-speed.js`; `js/claim-card.js` `stripClaimTitleDecorations` ↔ `shared/steam_match.py` `strip_giveaway_decorations`; `js/claim-card.js` `sanitizeBlurb` ↔ `build_free_claims.py` `_clean_blurb`; `js/claim-card.js` `CLAIM_SOURCE_RANK` ↔ `shared/free_claims_sources.py` `SOURCE_PRECEDENCE`; `admin/claims-workspace.js` `normTitleKey` / `gameMatchKeys` ↔ `shared/free_claims_sources.py` `norm_title` / `claim_match_keys` (admin `coverLookupKey` is intentionally looser for DUPE stamps only); `js/sponsored-deals.js` `HOUSE_BANNER_FEATURES` / `PRO_PROMO` ↔ `landing/index.html` trust pillars + paid-tier copy; `js/sponsored-deals.js` `AD_LOCATIONS` / `LOCATION_GROUPS` / `LOCATION_CAPACITY` ↔ `admin/admin.js` (and `shared/sponsors_validate.py` `SPONSOR_AD_LOCATIONS`, `scripts/migrate_sponsors_v2.py`); admin Metrics catalog + `metricKeyForLabel` ↔ `METRIC_TIPS` keys in `js/metric-tips.js`.
 7. **Scope discipline** — new user-visible surfaces must state which budget they fit (module line cap, bundle entry/CSS ceiling, or `server.py` line cap) and prefer lazy/flagged/admin-gated delivery (`?debug=1`, `BAKLOG_ADMIN=1`) over always-on code. Extend registries (`fetchers/manifest.json`, `METRIC_TIPS`, `BAKLOG_EVENT_REGISTRY`) instead of growing monolith modules (`fetcher-health.js`, `connections.js`, `table-ui.js`).
+8. **No em dashes in front-facing copy** — never use `—` (em dash, U+2014) in any user-visible string: app UI (`index.html`, rendered `js/*.js` strings, `app.css` `content:`), landing site (`landing/`), marketing copy, and rendered data feeds (`curated/sponsors.json`, `landing/sponsors.json`, `fetchers/manifest.json` notes). Use a spaced hyphen (` - `) or rephrase. This applies only to copy users read; code comments, docstrings, and server/console diagnostics are exempt. Third-party game titles/blurbs in claim feeds are not our copy and stay verbatim.
+
+## Ads & banners — how a change reaches the app
+
+Two **separate** systems; mixing them up is why banner edits "don't show". Full guide: `.cursor/rules/frontend.mdc` → "Banners & ads".
+
+- **Feed-driven** (`house-*` deal slots, dash-spotlight Pro slides, paid `ad-*`): from `sponsors.json`. App resolution order (first non-empty wins): local profile `/sponsors.json` → **hosted `baklog.app/sponsors.json`** → bundled `curated/sponsors.json`. The **hosted feed wins on any online machine**, so editing `curated/sponsors.json` alone changes nothing. To ship: edit `landing/sponsors.json` (mirror `curated/`), keep the rule-6 sponsor sync pairs aligned (and add to `PRO_PROMO_SPONSOR_IDS` if it should open the Pro tab), commit, push, let Vercel redeploy, then **verify with `Invoke-WebRequest https://baklog.app/sponsors.json`**.
+- **Hardcoded JS** (dashboard `PRO_PROMO` banner, wishlist house banner, Connections Pro card `renderConnectionsProLink`/`CONN_PRO_PITCH` in `js/pro-view.js`): from `js/` source only. Edit + reload (dev raw ESM is `no-store`); run `npm run build` if serving built `dist/`. The Connections card renders only on the Connections tab for non‑Pro sessions.
 
 ## Weight guardrails (CI)
 
 - `npm run check:module-size` — any `js/*.js` over **3800** lines fails (ratchet down after splits).
 - `npm run check:bundle-size` — critical-path `dist/` entry JS + CSS ceilings in `size-budget.json`.
 - `npm run lint` — ESLint weight rules (`max-lines`, `complexity`, `import/no-cycle`; warnings for now).
-- `pytest tests/test_repo_size_budgets.py` — `server.py` capped at **4530** lines.
+- `pytest tests/test_repo_size_budgets.py` — `server.py` capped at **4300** lines.
 
 Refresh bundle budget after intentional growth: `npm run build && node scripts/check-bundle-size.mjs --write`.
 
@@ -75,11 +83,11 @@ The helpers enforce the branch-naming scheme and junction `.venv` + `node_module
 
 **Merge hygiene** — squash-merge PRs to `main`, then delete the local branch and `git push origin --delete <branch>`. Run `git fetch --prune` after cleanup. Tag or bundle before destructive branch deletes (`git tag backup/<branch>-YYYY-MM-DD <branch>`; `git bundle create ..\baklog-backups\pre-reset.bundle --all`).
 
-**Tracker handoff** — edit `tracker.html` in the private `baklog-internal` clone directly. Do not create `tracker-update-*.md` scratch files in the public repo.
+**Tracker handoff** — edit `..\baklog-internal\tracker.html` directly when the sibling clone exists, then `.\scripts\sync-internal-repo.ps1 -Push`. Fallback: `.cursor/tracker-pending-<slug>.md` (or legacy `tracker-update-pending-<slug>.md` in repo root — also gitignored); backstop: `/apply-tracker-pending`. Do not create `PROGRESS.md`.
 
 ## Progress tracker
 
-Canonical progress lives in **`tracker.html`** (private, gitignored). On completing a meaningful task, update the relevant `PHASES` / findings entry with `[DONE]` or `[RESOLVED]` and a dated note — do not create a separate `PROGRESS.md`. See `docs/WORKFLOW.md` and `.cursor/rules/internal-workflow.mdc` in the maintainer clone.
+Canonical progress lives in **`..\baklog-internal\tracker.html`** (private sibling clone, gitignored in public). On completing a meaningful task, update the relevant `PHASES` / findings entry with `[DONE]` or `[RESOLVED]` and a dated note, then push via `sync-internal-repo.ps1 -Push`. If the internal clone is unavailable or editing is blocked, write `.cursor/tracker-pending-<slug>.md` and run `/apply-tracker-pending` later — do not create a separate `PROGRESS.md`. See `docs/WORKFLOW.md` and `.cursor/rules/internal-workflow.mdc`.
 
 ## Maintainer docs (private repo)
 

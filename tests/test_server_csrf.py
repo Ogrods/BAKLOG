@@ -11,11 +11,21 @@ from pathlib import Path
 import pytest
 
 import server
+from shared import profile_paths
 
 
 @pytest.fixture()
 def csrf_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     runs_dir = tmp_path / "runs"
+    # Isolate the personal-data path: without this the PUT /api/personal test
+    # writes to the developer's real profiles/default/data/personal.json. On a
+    # populated dev machine the empty-overwrite guard then returns 409 instead of
+    # 200 (CI passes only because a fresh checkout has no personal.json).
+    prof = tmp_path / "profiles"
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
+    monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
+    server._refresh_personal_paths()
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
     monkeypatch.setattr(server, "RUN_HISTORY_FILE", runs_dir / "history.json")

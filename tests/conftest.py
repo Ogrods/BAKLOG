@@ -20,6 +20,63 @@ _RUN_MANAGER_THREAD_PREFIXES = ("run-worker", "run-watchdog", "run-kill", "run-l
 
 
 @pytest.fixture(autouse=True, scope="session")
+def _stub_os_keyring():
+    """Route every test through an in-memory keyring, never the real OS keychain.
+
+    `auth.secrets._get_master_key` falls back to `keyring.get_password` /
+    `keyring.set_password` whenever no master password override is set. The
+    platform behaviour diverges sharply:
+
+    - Linux CI has no Secret Service backend, so the call raises `KeyringError`
+      and `auth.secrets` quietly falls back to a disk master key - fast.
+    - Windows uses Credential Manager - fast, but writes a real entry.
+    - macOS has a Keychain backend that pops a GUI authorization prompt the CI
+      runner can never answer. That call is native (Security.framework), holds
+      the GIL, and so neither pytest-timeout (`timeout_method = "thread"`) nor
+      `faulthandler_timeout` can interrupt it. The macOS smoke job therefore
+      hangs with zero output until the 15-minute runner cap kills it.
+
+    A process-wide in-memory backend makes all three OSes behave identically and
+    keeps the real OS keychain (and the dev machine's Credential Manager)
+    untouched. Tests that exercise the keyring wrappers directly
+    (`test_secrets.py`) monkeypatch `_load_keyring_key` / `_save_keyring_key`, so
+    they are unaffected by the backend swap.
+    """
+    try:
+        import keyring
+        from keyring.backend import KeyringBackend
+    except Exception:
+        yield
+        return
+
+    class _InMemoryKeyring(KeyringBackend):
+        priority = 1  # type: ignore[assignment]
+
+        def __init__(self) -> None:
+            super().__init__()
+            self._store: dict[tuple[str, str], str] = {}
+
+        def get_password(self, service: str, username: str) -> str | None:
+            return self._store.get((service, username))
+
+        def set_password(self, service: str, username: str, password: str) -> None:
+            self._store[(service, username)] = password
+
+        def delete_password(self, service: str, username: str) -> None:
+            self._store.pop((service, username), None)
+
+    previous = keyring.get_keyring()
+    keyring.set_keyring(_InMemoryKeyring())
+    try:
+        yield
+    finally:
+        try:
+            keyring.set_keyring(previous)
+        except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True, scope="session")
 def _protect_real_profile_store() -> None:
     """Safety net: never let a test that forgot to isolate `profile_paths` mutate
     the developer's real `profiles/` store.

@@ -108,7 +108,7 @@ export const TIP_GROUPS = [
     "Share a PC? Give each person their own BAKLOG profile.",
   ],
   [
-    "Check the Wishlist tab for Claimable Now - free games before they're gone.",
+    "Never miss a free game again - check Claimable Now on your Wishlist.",
     "Free games rotate fast - the Claimable Now feed flags them on your Wishlist.",
   ],
   [

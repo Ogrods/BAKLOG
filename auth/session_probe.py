@@ -114,7 +114,7 @@ def probe_steam_session_quiet() -> ProbeResult:
 
 def probe_itch_session_quiet() -> ProbeResult:
     """Tri-state itch.io API key probe."""
-    from auth.api_keys import KEY_INVALID, KEY_UNREACHABLE, KEY_VALID, validate_itch_key
+    from auth.api_keys import KEY_INVALID, KEY_VALID, validate_itch_key
     from auth.manager import resolve_env
 
     key = resolve_env("ITCH_API_KEY", provider="itch", allow_process_env=False)
@@ -130,7 +130,7 @@ def probe_itch_session_quiet() -> ProbeResult:
 
 def probe_itad_session_quiet() -> ProbeResult:
     """Tri-state ITAD API key probe."""
-    from auth.api_keys import KEY_INVALID, KEY_UNREACHABLE, KEY_VALID, validate_itad_key
+    from auth.api_keys import KEY_INVALID, KEY_VALID, validate_itad_key
     from auth.manager import resolve_env
 
     key = resolve_env("ITAD_API_KEY", provider="itad", allow_process_env=False)

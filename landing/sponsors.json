@@ -117,7 +117,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": false,
+      "enabled": true,
       "steam_review_percent": 94
     },
     "ad-dash-versus-zephyr": {
@@ -326,7 +326,9 @@
     "dash-coop-couch": [
       "ad-coop-couch-ironveil"
     ],
-    "dash-versus-rated": [],
+    "dash-versus-rated": [
+      "ad-dash-versus-dawnbanner"
+    ],
     "dash-versus-fast": [
       "ad-dash-versus-zephyr"
     ],

@@ -2903,12 +2903,6 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             server_internal_routes.handle_internal_free_claims_enrich(self)
             return
-        if path == "/api/internal/free-claims/discord":
-            if not ADMIN_ENABLED:
-                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
-                return
-            server_internal_routes.handle_internal_free_claims_discord(self)
-            return
         if path == "/api/internal/free-claims/preview":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")

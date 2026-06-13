@@ -375,6 +375,7 @@ export function friendlyPinError(msg) {
 
 let _pinPromptTarget = null;
 let _pinPromptRelease = null;
+let _pinPromptOnSubmit = null;
 
 function setPinPromptError(msg) {
   const errEl = el('profilePinPromptError');
@@ -388,20 +389,30 @@ function setPinPromptError(msg) {
   }
 }
 
-function openPinPrompt(id) {
+/**
+ * Open the masked PIN dialog. Defaults to switching into `id`; pass
+ * `opts.onSubmit(id, pin)` (and optional note/submitLabel) to reuse the dialog
+ * for other locked actions such as deleting a PIN-protected profile.
+ */
+function openPinPrompt(id, opts = {}) {
   closeMenu();
   _pinPromptTarget = id;
+  _pinPromptOnSubmit = typeof opts.onSubmit === 'function'
+    ? opts.onSubmit
+    : (pid, pin) => switchProfile(pid, pin);
   const modal = el('profilePinModal');
   if (!modal) return;
   const dialog = modal.querySelector('[role="dialog"]') || modal;
   const input = el('profilePinPromptInput');
   const note = el('profilePinPromptNote');
+  const submitBtn = el('profilePinPromptSubmit');
   const profiles = _status?.profiles || [];
   const target = profiles.find((p) => p.id === id);
+  const name = target ? profileDisplayLabel(target, profiles) : id;
   if (note) {
-    const name = target ? profileDisplayLabel(target, profiles) : id;
-    note.textContent = `“${name}” is locked. Enter its PIN to switch in.`;
+    note.textContent = opts.note || `“${name}” is locked. Enter its PIN to switch in.`;
   }
+  if (submitBtn) submitBtn.textContent = opts.submitLabel || 'Switch';
   if (input) input.value = '';
   setPinPromptError('');
   modal.classList.remove('hidden');
@@ -418,12 +429,14 @@ function closePinPrompt() {
   _pinPromptRelease?.();
   _pinPromptRelease = null;
   _pinPromptTarget = null;
+  _pinPromptOnSubmit = null;
   el('profileMenuTrigger')?.focus();
 }
 
 async function submitPinPrompt() {
   const id = _pinPromptTarget;
-  if (!id) return;
+  const onSubmit = _pinPromptOnSubmit;
+  if (!id || !onSubmit) return;
   const pin = (el('profilePinPromptInput')?.value || '').trim();
   if (!pin) {
     setPinPromptError('Enter the PIN for this profile.');
@@ -432,7 +445,8 @@ async function submitPinPrompt() {
   const submitBtn = el('profilePinPromptSubmit');
   if (submitBtn) submitBtn.disabled = true;
   try {
-    await switchProfile(id, pin);
+    await onSubmit(id, pin);
+    closePinPrompt();
   } catch (err) {
     setPinPromptError(friendlyPinError(err.message));
     const input = el('profilePinPromptInput');
@@ -543,6 +557,16 @@ async function renameActiveProfile() {
   }
 }
 
+async function performProfileDelete(id, pin, label) {
+  await api('DELETE', `/api/profiles/${encodeURIComponent(id)}`, pin ? { currentPin: pin } : undefined);
+  resetProfileClientCache(id);
+  await fetchProfilesStatus();
+  populateDeleteSelect();
+  const sel = el('profileDeleteSelect');
+  if (sel) sel.value = '';
+  setManageStatus(`Deleted “${label}”.`);
+}
+
 async function deleteSelectedProfile() {
   const sel = el('profileDeleteSelect');
   const id = sel?.value;
@@ -555,13 +579,18 @@ async function deleteSelectedProfile() {
   if (!confirm(`Delete profile "${label}"? This removes its games and connections under profiles/${id}/. Root backup files are not deleted.`)) {
     return;
   }
+  // A PIN-locked profile requires its PIN to delete, mirroring switch-in.
+  const target = (_status?.profiles || []).find((p) => p.id === id);
+  if (target?.hasPin) {
+    openPinPrompt(id, {
+      note: `“${label}” is locked. Enter its PIN to delete it.`,
+      submitLabel: 'Delete',
+      onSubmit: (pid, pin) => performProfileDelete(pid, pin, label),
+    });
+    return;
+  }
   try {
-    await api('DELETE', `/api/profiles/${encodeURIComponent(id)}`);
-    resetProfileClientCache(id);
-    await fetchProfilesStatus();
-    populateDeleteSelect();
-    if (sel) sel.value = '';
-    setManageStatus(`Deleted “${label}”.`);
+    await performProfileDelete(id, '', label);
   } catch (e) {
     showManageError(e.message);
   }

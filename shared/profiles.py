@@ -260,7 +260,7 @@ def rename_profile(profile_id: str, label: str) -> dict[str, Any]:
     return {"id": profile_id, "label": label}
 
 
-def delete_profile(profile_id: str) -> None:
+def delete_profile(profile_id: str, current_pin: str | None = None) -> None:
     profile_id = normalize_profile_id(profile_id)
     with mutate_index() as doc:
         profiles = [p for p in doc.get("profiles", []) if isinstance(p, dict)]
@@ -268,6 +268,13 @@ def delete_profile(profile_id: str) -> None:
             raise ValueError("cannot delete the last profile")
         if get_active_profile_id(doc=doc) == profile_id:
             raise ValueError("cannot delete the active profile — switch first")
+        if profile_has_pin(profile_id, doc):
+            limit_err = pin_rate_limit_error(profile_id)
+            if limit_err:
+                raise ValueError(limit_err)
+            if not current_pin or not verify_profile_pin(profile_id, current_pin, doc):
+                record_pin_failure(profile_id)
+                raise ValueError("current PIN is incorrect")
         remaining = [p for p in profiles if p.get("id") != profile_id]
         if len(remaining) == len(profiles):
             raise ValueError(f"unknown profile: {profile_id}")

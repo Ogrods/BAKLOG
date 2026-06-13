@@ -219,4 +219,16 @@ describe('recordLibraryFirstSeen', () => {
     expect(state.libraryFirstSeenByKey[gameKey(state.allGames[0])]).toBe(0);
     expect(state.libraryFirstSeenByKey[gameKey(state.allGames[1])]).toBe(0);
   });
+
+  it('stamps merge-diff keys during a re-seed when a pre-merge snapshot exists', async () => {
+    const { captureLibraryKeysBeforeMerge } = await import('../js/library-load.js');
+    recordLibraryFirstSeen();
+    captureLibraryKeysBeforeMerge();
+    state.libraryFirstSeenByKey = {};
+    state.allGames.push({ store: 'nintendo', id: 'new-1', name: 'Fresh Switch Game' });
+    const n = recordLibraryFirstSeen();
+    expect(n).toBe(1);
+    expect(state.libraryFirstSeenByKey['nintendo:new-1']).toBeGreaterThan(0);
+    expect(state.libraryFirstSeenByKey[gameKey(state.allGames[0])]).toBe(0);
+  });
 });

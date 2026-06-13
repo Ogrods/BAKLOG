@@ -2,6 +2,7 @@ export const STORAGE_KEY = 'steam-backlog-personal';
 export const PREFS_KEY = 'steam-backlog-ui-prefs';
 export const MANUAL_KEY = 'steam-backlog-manual-games';
 export const LIBRARY_FIRST_SEEN_KEY = 'steam-backlog-library-first-seen';
+export const KNOWN_LIBRARY_KEYS_KEY = 'baklog-known-library-keys';
 
 export const state = {
   allGames: [],
@@ -56,6 +57,10 @@ export const state = {
   ownedSteamAppids: new Set(),
   /** gameKey -> ms epoch when this library row was first observed (0 = silent seed). */
   libraryFirstSeenByKey: {},
+  /** Persisted snapshot of library keys from the last merge (profile-scoped LS). */
+  knownLibraryKeySet: new Set(),
+  /** Keys present before the in-flight catalog rebuild; merge-only, not persisted. */
+  _libraryKeysBeforeMerge: null,
   filtersDrawerOpen: false,
   genreChipsExpanded: false,
   _visibleList: null,

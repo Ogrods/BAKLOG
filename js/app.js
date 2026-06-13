@@ -33,6 +33,7 @@ import { escapeHtml, syncCheckboxLabelTitles } from './dom-util.js';
 import {
   loadPersonal,
   loadLibraryFirstSeen,
+  loadKnownLibraryKeys,
   migrateV3,
   stripLegacyTags,
   seedPreHiddenDefaults,
@@ -43,6 +44,8 @@ import {
   loadPrefs,
   loadSessionPrefs,
   savePrefs,
+  loadActiveView,
+  saveActiveView,
   applySavedSortForView,
   syncFilterDomFromState,
 } from './prefs.js';
@@ -114,7 +117,8 @@ function hydrateState() {
   state.prefs = loadPrefs();
   state.sessionPrefs = loadSessionPrefs();
   state.libraryFirstSeenByKey = loadLibraryFirstSeen();
-  setBootCurtainLabel(state.prefs.activeView);
+  state.knownLibraryKeySet = loadKnownLibraryKeys();
+  setBootCurtainLabel(loadActiveView() || 'dashboard');
   installPersonalStorageSync();
 }
 
@@ -148,8 +152,11 @@ async function bootstrap() {
   seedPreHiddenDefaults();
   state.prefs.genreFilters = (state.prefs.genreFilters || []).map(aliasCanonicalGenre);
   const VALID_VIEWS = new Set(["dashboard", "library", "wishlist", "itch", "connections", "pro"]);
-  if (VALID_VIEWS.has(state.prefs.activeView)) {
-    state.activeView = state.prefs.activeView;
+  // Active view is restored from sessionStorage only: a refresh keeps the tab,
+  // but a fresh session (app close + reopen) clears it and lands on dashboard.
+  const sessionView = loadActiveView();
+  if (sessionView && VALID_VIEWS.has(sessionView)) {
+    state.activeView = sessionView;
   }
   applySavedSortForView(state.activeView);
   syncViewTabAria(state.activeView);
@@ -273,8 +280,7 @@ async function bootstrap() {
     }
     if (state.activeView === "itch" && !isItchTabAvailable()) {
       state.activeView = "dashboard";
-      state.prefs.activeView = "dashboard";
-      savePrefs();
+      saveActiveView("dashboard");
       updateViewChrome({ skipDashboardSchedule: true });
     }
     // Dashboard still renders after lift (Chart.js is heavy); the boot curtain

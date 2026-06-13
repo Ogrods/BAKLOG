@@ -16,19 +16,32 @@ from typing import Any
 from shared import profile_paths
 from shared.profile_paths import (
     DEFAULT_PROFILE_ID,
+    get_active_profile_id,
     is_legacy_layout,
-    list_profiles,
     load_index,
+    mutate_index,
     normalize_profile_id,
     profile_data_dir,
-    profile_label,
-    save_index,
-    unique_profile_id,
+    unique_profile_id_for_doc,
 )
 
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+# Server-side cap mirroring the maxlength on the create/rename inputs in index.html.
+LABEL_MAX_LEN = 64
+
+
+def _validate_label(label: str) -> str:
+    """Normalize + length-check a profile label (server-side; HTML maxlength is cosmetic)."""
+    label = (label or "").strip()
+    if not label:
+        raise ValueError("label is required")
+    if len(label) > LABEL_MAX_LEN:
+        raise ValueError(f"label must be {LABEL_MAX_LEN} characters or fewer")
+    return label
 
 
 # Root artifacts copied into profiles/default/ on first multi-profile add.
@@ -88,6 +101,30 @@ def _copy_tree_if_missing(
         elif _copy_file_if_missing(child, target):
             copied += 1
     return copied
+
+
+def _quarantine_profile_dir(profile_id: str, dest: Path) -> Path:
+    """Move a profile tree aside so boot reconcile cannot re-adopt it."""
+    profile_paths.PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    trash = profile_paths.PROFILES_DIR / f".trash-{profile_id}-{stamp}"
+    try:
+        dest.rename(trash)
+        return trash
+    except OSError:
+        return dest
+
+
+def _remove_profile_dir(dest: Path) -> None:
+    if not dest.is_dir():
+        return
+    shutil.rmtree(dest, ignore_errors=True)
+    if dest.is_dir():
+        print(
+            f"[profiles] WARN: profile dir still present after delete: {dest}",
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 def finalize_default_profile_migration() -> None:
@@ -156,78 +193,90 @@ def _copy_auth_for_migration(auth_src: Path, dest_auth: Path) -> int:
 
 def create_profile(label: str) -> dict[str, Any]:
     """Add a new empty profile; migrates legacy root into profiles/default/ first."""
-    label = (label or "").strip()
-    if not label:
-        raise ValueError("label is required")
+    label = _validate_label(label)
     if is_legacy_layout():
         ensure_default_profile_dir()
-    profile_id = unique_profile_id(label)
+    profile_id: str
+    with mutate_index() as doc:
+        profile_id = unique_profile_id_for_doc(label, doc)
+        profiles = doc.setdefault("profiles", [])
+        if not isinstance(profiles, list):
+            profiles = []
+            doc["profiles"] = profiles
+        profiles.append({"id": profile_id, "label": label, "created_at": _now_iso()})
     dest = profile_data_dir(profile_id)
-    if dest.exists():
-        raise ValueError(f"profile directory already exists: {profile_id}")
-    dest.mkdir(parents=True, exist_ok=True)
-    (dest / "data").mkdir(parents=True, exist_ok=True)
     try:
-        from auth.manager import seed_new_profile_auth_defaults
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "data").mkdir(parents=True, exist_ok=True)
+        try:
+            from auth.manager import seed_new_profile_auth_defaults
 
-        seed_new_profile_auth_defaults(profile_id)
+            seed_new_profile_auth_defaults(profile_id)
+        except Exception:
+            pass
     except Exception:
-        pass
-    doc = load_index()
-    profiles = doc.setdefault("profiles", [])
-    if not isinstance(profiles, list):
-        profiles = []
-        doc["profiles"] = profiles
-    profiles.append({"id": profile_id, "label": label, "created_at": _now_iso()})
-    save_index(doc)
+        with mutate_index() as doc:
+            doc["profiles"] = [
+                p
+                for p in doc.get("profiles", [])
+                if not (isinstance(p, dict) and p.get("id") == profile_id)
+            ]
+        _remove_profile_dir(dest)
+        raise
     return {"id": profile_id, "label": label}
 
 
 def set_active_profile(profile_id: str) -> dict[str, Any]:
     profile_id = normalize_profile_id(profile_id)
-    ids = {p["id"] for p in list_profiles()}
-    if profile_id not in ids:
-        raise ValueError(f"unknown profile: {profile_id}")
-    doc = load_index()
-    doc["active"] = profile_id
-    save_index(doc)
-    return {"active": profile_id, "label": profile_label(profile_id)}
+    with mutate_index() as doc:
+        ids = {
+            str(p["id"])
+            for p in doc.get("profiles", [])
+            if isinstance(p, dict) and p.get("id")
+        }
+        if profile_id not in ids:
+            raise ValueError(f"unknown profile: {profile_id}")
+        doc["active"] = profile_id
+        label = profile_id
+        for p in doc.get("profiles", []):
+            if isinstance(p, dict) and p.get("id") == profile_id:
+                label = str(p.get("label") or profile_id)
+                break
+    return {"active": profile_id, "label": label}
 
 
 def rename_profile(profile_id: str, label: str) -> dict[str, Any]:
     profile_id = normalize_profile_id(profile_id)
-    label = (label or "").strip()
-    if not label:
-        raise ValueError("label is required")
-    doc = load_index()
-    found = False
-    for p in doc.get("profiles", []):
-        if isinstance(p, dict) and p.get("id") == profile_id:
-            p["label"] = label
-            found = True
-            break
-    if not found:
-        raise ValueError(f"unknown profile: {profile_id}")
-    save_index(doc)
+    label = _validate_label(label)
+    with mutate_index() as doc:
+        found = False
+        for p in doc.get("profiles", []):
+            if isinstance(p, dict) and p.get("id") == profile_id:
+                p["label"] = label
+                found = True
+                break
+        if not found:
+            raise ValueError(f"unknown profile: {profile_id}")
     return {"id": profile_id, "label": label}
 
 
 def delete_profile(profile_id: str) -> None:
     profile_id = normalize_profile_id(profile_id)
-    doc = load_index()
-    profiles = [p for p in doc.get("profiles", []) if isinstance(p, dict)]
-    if len(profiles) <= 1:
-        raise ValueError("cannot delete the last profile")
-    if doc.get("active") == profile_id:
-        raise ValueError("cannot delete the active profile — switch first")
-    remaining = [p for p in profiles if p.get("id") != profile_id]
-    if len(remaining) == len(profiles):
-        raise ValueError(f"unknown profile: {profile_id}")
-    doc["profiles"] = remaining
-    save_index(doc)
+    with mutate_index() as doc:
+        profiles = [p for p in doc.get("profiles", []) if isinstance(p, dict)]
+        if len(profiles) <= 1:
+            raise ValueError("cannot delete the last profile")
+        if get_active_profile_id(doc=doc) == profile_id:
+            raise ValueError("cannot delete the active profile — switch first")
+        remaining = [p for p in profiles if p.get("id") != profile_id]
+        if len(remaining) == len(profiles):
+            raise ValueError(f"unknown profile: {profile_id}")
+        doc["profiles"] = remaining
+    clear_pin_failures(profile_id)
     dest = profile_data_dir(profile_id)
     if dest.is_dir():
-        shutil.rmtree(dest)
+        trash = _quarantine_profile_dir(profile_id, dest)
+        _remove_profile_dir(trash)
 
 
 PIN_MIN_LEN = 4
@@ -292,7 +341,7 @@ def verify_profile_pin(profile_id: str, pin: str, doc: dict[str, Any] | None = N
 def pin_rate_limit_error(profile_id: str) -> str | None:
     until = _pin_lock_until.get(profile_id, 0.0)
     if time.time() < until:
-        return f"too many PIN attempts — try again in {_PIN_LOCK_SECONDS} seconds"
+        return f"too many PIN attempts - try again in {_PIN_LOCK_SECONDS} seconds"
     return None
 
 
@@ -315,42 +364,40 @@ def set_profile_pin(profile_id: str, pin: str, current_pin: str | None = None) -
     pin = (pin or "").strip()
     if len(pin) < PIN_MIN_LEN or len(pin) > PIN_MAX_LEN:
         raise ValueError(f"PIN must be {PIN_MIN_LEN}-{PIN_MAX_LEN} characters")
-    doc = load_index()
-    p = _profile_entry(doc, profile_id)
-    if not isinstance(p, dict):
-        raise ValueError(f"unknown profile: {profile_id}")
-    if profile_has_pin(profile_id, doc):
-        limit_err = pin_rate_limit_error(profile_id)
-        if limit_err:
-            raise ValueError(limit_err)
-        if not current_pin or not verify_profile_pin(profile_id, current_pin, doc):
-            record_pin_failure(profile_id)
-            raise ValueError("current PIN is incorrect")
-        clear_pin_failures(profile_id)
-    salt = os.urandom(16)
-    p["pin"] = {
-        "salt": base64.b64encode(salt).decode("ascii"),
-        "hash": base64.b64encode(_hash_pin(pin, salt)).decode("ascii"),
-        "n": _PIN_SCRYPT_N,
-    }
-    save_index(doc)
+    with mutate_index() as doc:
+        p = _profile_entry(doc, profile_id)
+        if not isinstance(p, dict):
+            raise ValueError(f"unknown profile: {profile_id}")
+        if profile_has_pin(profile_id, doc):
+            limit_err = pin_rate_limit_error(profile_id)
+            if limit_err:
+                raise ValueError(limit_err)
+            if not current_pin or not verify_profile_pin(profile_id, current_pin, doc):
+                record_pin_failure(profile_id)
+                raise ValueError("current PIN is incorrect")
+            clear_pin_failures(profile_id)
+        salt = os.urandom(16)
+        p["pin"] = {
+            "salt": base64.b64encode(salt).decode("ascii"),
+            "hash": base64.b64encode(_hash_pin(pin, salt)).decode("ascii"),
+            "n": _PIN_SCRYPT_N,
+        }
 
 
 def clear_profile_pin(profile_id: str, current_pin: str) -> None:
     profile_id = normalize_profile_id(profile_id)
-    doc = load_index()
-    p = _profile_entry(doc, profile_id)
-    if not isinstance(p, dict):
-        raise ValueError(f"unknown profile: {profile_id}")
-    if profile_has_pin(profile_id, doc):
-        limit_err = pin_rate_limit_error(profile_id)
-        if limit_err:
-            raise ValueError(limit_err)
-        if not verify_profile_pin(profile_id, current_pin, doc):
-            record_pin_failure(profile_id)
-            raise ValueError("current PIN is incorrect")
-    p.pop("pin", None)
-    save_index(doc)
+    with mutate_index() as doc:
+        p = _profile_entry(doc, profile_id)
+        if not isinstance(p, dict):
+            raise ValueError(f"unknown profile: {profile_id}")
+        if profile_has_pin(profile_id, doc):
+            limit_err = pin_rate_limit_error(profile_id)
+            if limit_err:
+                raise ValueError(limit_err)
+            if not verify_profile_pin(profile_id, current_pin, doc):
+                record_pin_failure(profile_id)
+                raise ValueError("current PIN is incorrect")
+        p.pop("pin", None)
     clear_pin_failures(profile_id)
 
 
@@ -365,14 +412,18 @@ def _public_profile_row(p: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any
 
 
 def profiles_status() -> dict[str, Any]:
-    from shared.profile_paths import get_active_profile_id
-
     doc = load_index()
-    active = get_active_profile_id()
+    active = get_active_profile_id(doc=doc)
     profiles = doc.get("profiles") if isinstance(doc.get("profiles"), list) else []
+    active_entry = _profile_entry(doc, active)
+    active_label = (
+        str(active_entry.get("label") or active)
+        if isinstance(active_entry, dict)
+        else active
+    )
     return {
         "active": active,
-        "active_label": profile_label(active),
+        "active_label": active_label,
         "legacy": is_legacy_layout(active),
         "profiles": [
             _public_profile_row(p, doc)

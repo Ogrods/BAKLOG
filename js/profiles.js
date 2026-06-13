@@ -11,7 +11,7 @@ import {
   getAccountProfileId,
   signOutAccount,
 } from './auth-gate.js';
-import { LIBRARY_FIRST_SEEN_KEY, MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from './state.js';
+import { KNOWN_LIBRARY_KEYS_KEY, LIBRARY_FIRST_SEEN_KEY, MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from './state.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { escapeAttr } from './dom-util.js';
 import {
@@ -37,6 +37,9 @@ export const LS_AUTO_STALE_LAST_RUN = 'baklog-auto-stale-last-run';
 export const LS_FETCHER_SUPPRESSED_RUNS = 'fetcher-suppressed-run-ids';
 export const LS_FETCHER_LAST_SEQ = 'fetcher-last-seq-by-run';
 export const LS_LIBRARY_WATCH = 'baklog-library-watch';
+export const LS_SPOTLIGHT_RECENT_KEYS = 'baklog-spotlight-recent';
+/** Session-only; profile-suffixed like prefs. */
+export const LS_ACTIVE_VIEW_SESSION = `${PREFS_KEY}:activeView`;
 
 export const PROFILE_SCOPED_STORAGE_KEYS = Object.freeze([
   PREFS_KEY,
@@ -44,6 +47,9 @@ export const PROFILE_SCOPED_STORAGE_KEYS = Object.freeze([
   CLAIMS_SNAPSHOT_PREFIX,
   STORAGE_KEY,
   MANUAL_KEY,
+  LIBRARY_FIRST_SEEN_KEY,
+  KNOWN_LIBRARY_KEYS_KEY,
+  LS_SPOTLIGHT_RECENT_KEYS,
   LS_FETCHER_AUTH_COOLDOWN,
   LS_RECONNECT_DISMISSED,
   LS_ITAD_LAST_AUTO_RUN,
@@ -52,8 +58,9 @@ export const PROFILE_SCOPED_STORAGE_KEYS = Object.freeze([
   LS_LIBRARY_WATCH,
 ]);
 
-/** Profile-suffixed sessionStorage keys (fetcher SSE resume state). */
+/** Profile-suffixed sessionStorage keys (fetcher SSE resume state + active tab). */
 export const PROFILE_SCOPED_SESSION_KEYS = Object.freeze([
+  LS_ACTIVE_VIEW_SESSION,
   LS_FETCHER_SUPPRESSED_RUNS,
   LS_FETCHER_LAST_SEQ,
 ]);
@@ -117,8 +124,23 @@ export function prefsStorageKey() {
   return `${PREFS_KEY}${profileKeySuffix()}`;
 }
 
-export function libraryFirstSeenStorageKey() {
-  return `${LIBRARY_FIRST_SEEN_KEY}${profileKeySuffix()}`;
+// Active view lives in sessionStorage (not prefs/localStorage) so it survives a
+// page refresh but resets to the default tab on a fresh session (app close +
+// reopen). Profile-scoped like prefs so switching profiles doesn't leak views.
+export function activeViewSessionKey(id) {
+  return `${LS_ACTIVE_VIEW_SESSION}${profileKeySuffix(id)}`;
+}
+
+export function libraryFirstSeenStorageKey(id) {
+  return `${LIBRARY_FIRST_SEEN_KEY}${profileKeySuffix(id)}`;
+}
+
+export function knownLibraryKeysStorageKey(id) {
+  return `${KNOWN_LIBRARY_KEYS_KEY}${profileKeySuffix(id)}`;
+}
+
+export function spotlightRecentKeysStorageKey(id) {
+  return `${LS_SPOTLIGHT_RECENT_KEYS}${profileKeySuffix(id)}`;
 }
 
 export function itadSnapshotStorageKey() {
@@ -134,6 +156,7 @@ export function profileScopedStorageKey(base) {
   return `${base}${profileKeySuffix()}`;
 }
 
+/** Wipe per-profile browser caches (localStorage + sessionStorage suffixes). */
 export function clearProfileLocalStorage(profileId) {
   try {
     const suffix = profileId && profileId !== 'default' ? `:${profileId}` : '';
@@ -146,6 +169,9 @@ export function clearProfileLocalStorage(profileId) {
     }
   } catch (_) { /* ignore */ }
 }
+
+/** Alias for delete/create paths that must not reuse stale client caches. */
+export const resetProfileClientCache = clearProfileLocalStorage;
 
 function syncActiveToStorage() {
   if (_status?.active) {
@@ -255,17 +281,36 @@ function handleMenuThemeClick(e) {
   return true;
 }
 
+/**
+ * Display label for a profile. Labels aren't unique (two profiles can both be
+ * "Work"); when a label collides with another profile's, append the id so the
+ * rows are distinguishable, e.g. "Work (work-2)". Comparison is trimmed +
+ * case-insensitive so "Work" and "work " count as a collision.
+ */
+export function profileDisplayLabel(profile, profiles) {
+  const label = (profile?.label || profile?.id || '').toString();
+  const norm = label.trim().toLowerCase();
+  const collides = (profiles || []).some(
+    (other) =>
+      other !== profile &&
+      other?.id !== profile?.id &&
+      ((other?.label || other?.id || '').toString().trim().toLowerCase() === norm),
+  );
+  return collides ? `${label} (${profile?.id})` : label;
+}
+
 function renderMenuList() {
   const list = el('profileMenuList');
   if (!list || !_status) return;
   const active = _status.active;
+  const profiles = _status.profiles || [];
   const accountRow = isAccountAuthMode()
     ? `<div class="profile-menu-account-email px-3 py-2 text-xs text-slate-400 border-b border-slate-600/80">${escapeHtml(getAccountEmail() || 'Signed in')}</div>`
     : '';
-  const rows = (_status.profiles || []).map((p) => {
+  const rows = profiles.map((p) => {
     const selected = p.id === active;
     const lock = p.hasPin ? ' 🔒' : '';
-    return `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 ${selected ? 'profile-menu-option-active' : ''}" data-profile-switch="${escapeAttr(p.id)}" data-profile-has-pin="${p.hasPin ? '1' : '0'}" title="Switch to this profile">${escapeHtml(p.label || p.id)}${lock}${selected ? ' ✓' : ''}</button>`;
+    return `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 ${selected ? 'profile-menu-option-active' : ''}" data-profile-switch="${escapeAttr(p.id)}" data-profile-has-pin="${p.hasPin ? '1' : '0'}" title="Switch to this profile">${escapeHtml(profileDisplayLabel(p, profiles))}${lock}${selected ? ' ✓' : ''}</button>`;
   });
   const signOutRow = isAccountAuthMode()
     ? `<button type="button" role="menuitem" class="profile-menu-option w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 border-t border-slate-600/80" data-account-signout title="Sign out of this account">Sign out</button>`
@@ -289,13 +334,19 @@ function escapeHtml(s) {
  */
 function resetTabMemoryForProfile(id) {
   try {
+    // Active view now lives in sessionStorage; clear it so the switched-in
+    // profile reloads onto the dashboard rather than a view it was left on
+    // earlier this session.
+    sessionStorage.removeItem(activeViewSessionKey(id));
     const suffix = id && id !== 'default' ? `:${id}` : '';
+    // Scrub any stale activeView left in legacy localStorage prefs (pre-session
+    // migration) so it can't leak back if read elsewhere.
     const key = `${PREFS_KEY}${suffix}`;
     const raw = localStorage.getItem(key);
     if (!raw) return;
     const prefs = JSON.parse(raw);
-    if (prefs && prefs.activeView && prefs.activeView !== 'dashboard') {
-      prefs.activeView = 'dashboard';
+    if (prefs && 'activeView' in prefs) {
+      delete prefs.activeView;
       localStorage.setItem(key, JSON.stringify(prefs));
     }
   } catch (_) { /* ignore */ }
@@ -311,6 +362,87 @@ async function switchProfile(id, pin) {
   localStorage.setItem(ACTIVE_PROFILE_LS, id);
   resetTabMemoryForProfile(id);
   location.reload();
+}
+
+/** Map server PIN error tokens to friendly copy; pass through human strings. */
+export function friendlyPinError(msg) {
+  const raw = String(msg || '').trim();
+  if (raw === 'incorrect_pin') return 'Incorrect PIN. Try again.';
+  if (raw === 'pin_required') return 'Enter the PIN for this profile.';
+  // The 429 lockout message is already human-readable; normalize any em dash.
+  return raw.replace(/\s*\u2014\s*/g, ' - ') || 'Could not switch profile.';
+}
+
+let _pinPromptTarget = null;
+let _pinPromptRelease = null;
+
+function setPinPromptError(msg) {
+  const errEl = el('profilePinPromptError');
+  if (!errEl) return;
+  if (msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  } else {
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
+}
+
+function openPinPrompt(id) {
+  closeMenu();
+  _pinPromptTarget = id;
+  const modal = el('profilePinModal');
+  if (!modal) return;
+  const dialog = modal.querySelector('[role="dialog"]') || modal;
+  const input = el('profilePinPromptInput');
+  const note = el('profilePinPromptNote');
+  const profiles = _status?.profiles || [];
+  const target = profiles.find((p) => p.id === id);
+  if (note) {
+    const name = target ? profileDisplayLabel(target, profiles) : id;
+    note.textContent = `“${name}” is locked. Enter its PIN to switch in.`;
+  }
+  if (input) input.value = '';
+  setPinPromptError('');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  _pinPromptRelease = trapFocus(dialog, { onEscape: closePinPrompt });
+  input?.focus();
+}
+
+function closePinPrompt() {
+  const modal = el('profilePinModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  _pinPromptRelease?.();
+  _pinPromptRelease = null;
+  _pinPromptTarget = null;
+  el('profileMenuTrigger')?.focus();
+}
+
+async function submitPinPrompt() {
+  const id = _pinPromptTarget;
+  if (!id) return;
+  const pin = (el('profilePinPromptInput')?.value || '').trim();
+  if (!pin) {
+    setPinPromptError('Enter the PIN for this profile.');
+    return;
+  }
+  const submitBtn = el('profilePinPromptSubmit');
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    await switchProfile(id, pin);
+  } catch (err) {
+    setPinPromptError(friendlyPinError(err.message));
+    const input = el('profilePinPromptInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
 }
 
 function clearManageMessages() {
@@ -386,7 +518,8 @@ async function createProfile() {
     return;
   }
   try {
-    await api('POST', '/api/profiles', { label });
+    const created = await api('POST', '/api/profiles', { label });
+    resetProfileClientCache(created?.id || '');
     if (input) input.value = '';
     await fetchProfilesStatus();
     populateDeleteSelect();
@@ -424,7 +557,7 @@ async function deleteSelectedProfile() {
   }
   try {
     await api('DELETE', `/api/profiles/${encodeURIComponent(id)}`);
-    clearProfileLocalStorage(id);
+    resetProfileClientCache(id);
     await fetchProfilesStatus();
     populateDeleteSelect();
     if (sel) sel.value = '';
@@ -438,7 +571,8 @@ function populateDeleteSelect() {
   const sel = el('profileDeleteSelect');
   if (!sel || !_status) return;
   const active = _status.active;
-  const others = (_status.profiles || []).filter((p) => p.id !== active);
+  const profiles = _status.profiles || [];
+  const others = profiles.filter((p) => p.id !== active);
   sel.replaceChildren();
   const placeholder = document.createElement('option');
   placeholder.value = '';
@@ -447,7 +581,7 @@ function populateDeleteSelect() {
   for (const p of others) {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = p.label || p.id;
+    opt.textContent = profileDisplayLabel(p, profiles);
     sel.appendChild(opt);
   }
 }
@@ -478,12 +612,10 @@ export function bindProfilesUI() {
       const id = sw.getAttribute('data-profile-switch');
       if (id && id !== _status?.active) {
         const needPin = sw.getAttribute('data-profile-has-pin') === '1';
-        const go = (pin) => switchProfile(id, pin).catch((err) => alert(err.message));
         if (needPin) {
-          const entered = window.prompt('Enter PIN for this profile:');
-          if (entered != null && entered.trim()) go(entered.trim());
+          openPinPrompt(id);
         } else {
-          go();
+          switchProfile(id).catch((err) => alert(friendlyPinError(err.message)));
         }
       }
       return;
@@ -503,6 +635,17 @@ export function bindProfilesUI() {
 
   el('profileManageClose')?.addEventListener('click', closeManageModal);
   el('profileManageCancel')?.addEventListener('click', closeManageModal);
+  el('profilePinPromptClose')?.addEventListener('click', closePinPrompt);
+  el('profilePinPromptCancel')?.addEventListener('click', closePinPrompt);
+  el('profilePinPromptSubmit')?.addEventListener('click', () => submitPinPrompt());
+  el('profilePinPromptInput')?.addEventListener('input', () => setPinPromptError(''));
+  el('profilePinPromptInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitPinPrompt();
+    }
+  });
+  bindEscapeClose(el('profilePinModal'), closePinPrompt);
   el('profileRenameSave')?.addEventListener('click', () => renameActiveProfile());
   el('profileCreateBtn')?.addEventListener('click', () => createProfile());
   el('profileDeleteBtn')?.addEventListener('click', () => deleteSelectedProfile());

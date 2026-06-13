@@ -11,6 +11,7 @@ vi.mock('../js/chart-loader.js', () => ({
 import { state } from '../js/state.js';
 import { refreshConnections, isItchTabAvailable } from '../js/connections.js';
 import { applyItchTabVisibility } from '../js/filters-ui.js';
+import { loadActiveView, saveActiveView } from '../js/prefs.js';
 
 function mockAuthStatus(providers) {
   global.fetch = vi.fn((url) => {
@@ -70,7 +71,7 @@ describe('applyItchTabVisibility', () => {
     state.dashboardDataReady = false;
     state.activeView = 'library';
     state.prefs = state.prefs || {};
-    state.prefs.activeView = 'library';
+    saveActiveView('library');
     document.body.innerHTML = `
       <button type="button" class="view-tab" data-view="itch">itch.io</button>
       <button type="button" class="view-tab" data-view="dashboard">Dashboard</button>
@@ -104,22 +105,22 @@ describe('applyItchTabVisibility', () => {
 
   it('does not redirect away from itch during boot before data is known', async () => {
     state.activeView = 'itch';
-    state.prefs.activeView = 'itch';
+    saveActiveView('itch');
     state.dashboardDataReady = false;
     mockAuthStatus([{ key: 'itch', status: 'disconnected' }]);
     await refreshConnections();
     applyItchTabVisibility();
     expect(state.activeView).toBe('itch');
-    expect(state.prefs.activeView).toBe('itch');
+    expect(loadActiveView()).toBe('itch');
   });
 
   it('redirects from itch to dashboard once auth and library data are known', async () => {
     state.activeView = 'itch';
-    state.prefs.activeView = 'itch';
+    saveActiveView('itch');
     state.dashboardDataReady = true;
     mockAuthStatus([{ key: 'itch', status: 'disconnected' }]);
     await refreshConnections();
     applyItchTabVisibility();
-    expect(state.prefs.activeView).toBe('dashboard');
+    expect(loadActiveView()).toBe('dashboard');
   });
 });

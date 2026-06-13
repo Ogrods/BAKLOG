@@ -6,6 +6,7 @@ import { escapeAttr, escapeHtml } from './dom-util.js';
 import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, parseLastPlayedMs, formatDollar, normalizeGame } from './game-core.js';
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
+import { spotlightRecentKeysStorageKey } from './profiles.js';
 import { getDealInfo, cutBucketClass } from './deals.js';
 import { isBarrel, isLeveragePick, getLibrarySnapshot, topWarGame, metacriticScore } from './sabermetrics.js';
 import { computeSpotlightSuperlatives } from './creative-metrics.js';
@@ -66,9 +67,6 @@ export const RATING_FAMILY_CAP = 0.45;
 /** Bounded random jitter (+/-) applied to spotlight scores before pool selection. */
 export const SPOTLIGHT_SCORE_JITTER = 5;
 
-const SPOTLIGHT_RECENT_KEYS_BASE = 'baklog-spotlight-recent';
-const ACTIVE_PROFILE_LS = 'baklog-active-profile';
-
 let _scoreJitterAmount = SPOTLIGHT_SCORE_JITTER;
 
 /** Test seam: override score jitter amplitude (0 disables jitter). */
@@ -76,20 +74,10 @@ export function setScoreJitterForTest(amount) {
   _scoreJitterAmount = amount;
 }
 
-function spotlightRecentKeysLsKey() {
-  let pid = 'default';
-  try {
-    pid = localStorage.getItem(ACTIVE_PROFILE_LS) || 'default';
-  } catch {
-    pid = 'default';
-  }
-  return `${SPOTLIGHT_RECENT_KEYS_BASE}${pid && pid !== 'default' ? `:${pid}` : ''}`;
-}
-
 function loadSpotlightRecentKeys() {
   if (typeof localStorage === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(spotlightRecentKeysLsKey());
+    const raw = localStorage.getItem(spotlightRecentKeysStorageKey());
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr) ? arr.filter(k => typeof k === 'string' && k) : [];
   } catch {
@@ -100,7 +88,7 @@ function loadSpotlightRecentKeys() {
 function writeSpotlightRecentKeys(keys) {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(spotlightRecentKeysLsKey(), JSON.stringify(keys));
+    localStorage.setItem(spotlightRecentKeysStorageKey(), JSON.stringify(keys));
   } catch {
     /* ignore storage failures */
   }
@@ -462,10 +450,20 @@ export function computeRecentAdditions(games, cap = 10) {
   const out = [];
   const debugEntries = isDebugEnabled() ? [] : null;
 
+  // itch has its own tab and often imports large free/bundle libraries in one
+  // batch, which would otherwise flood this card and bury additions from the
+  // main stores. Demote itch rows below non-itch ones (newest-first within each
+  // group) so the primary-store recents stay visible.
+  const isItchEntry = e => gameKey(e.g).startsWith('itch:');
   const tracked = games
     .map(g => ({ g, at: seen[gameKey(g)] ?? 0 }))
     .filter(e => e.at > 0)
-    .sort(compareRecentAdditionEntries);
+    .sort((a, b) => {
+      const ia = isItchEntry(a) ? 1 : 0;
+      const ib = isItchEntry(b) ? 1 : 0;
+      if (ia !== ib) return ia - ib;
+      return compareRecentAdditionEntries(a, b);
+    });
 
   for (const e of tracked) {
     if (out.length >= cap) break;

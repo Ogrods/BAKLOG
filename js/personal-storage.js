@@ -1,5 +1,5 @@
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
-import { libraryFirstSeenStorageKey, profileScopedStorageKey } from './profiles.js';
+import { knownLibraryKeysStorageKey, libraryFirstSeenStorageKey, profileScopedStorageKey } from './profiles.js';
 
 export function personalStorageKey() {
   return profileScopedStorageKey(STORAGE_KEY);
@@ -51,6 +51,23 @@ export function saveLibraryFirstSeen(map) {
       libraryFirstSeenStorageKey(),
       JSON.stringify(map && typeof map === 'object' ? map : {}),
     );
+  } catch { /* quota / private mode */ }
+}
+
+export function loadKnownLibraryKeys() {
+  try {
+    const raw = localStorage.getItem(knownLibraryKeysStorageKey());
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveKnownLibraryKeys(set) {
+  try {
+    localStorage.setItem(knownLibraryKeysStorageKey(), JSON.stringify([...(set || [])]));
   } catch { /* quota / private mode */ }
 }
 

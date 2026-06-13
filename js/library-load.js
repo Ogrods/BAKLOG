@@ -25,6 +25,7 @@ import {
 import {
   loadManualGames,
   saveLibraryFirstSeen,
+  saveKnownLibraryKeys,
   bumpPersonalMemo,
   canonicalizeNotesAcrossTitles,
   applyHiddenTitleNorms,
@@ -197,6 +198,31 @@ export async function loadProtondbCache() {
   await loadCacheMeta("cache/protondb_map.json", "protondb");
 }
 
+/** Snapshot library keys before a catalog rebuild so merge diff can stamp real first-seen times. */
+export function captureLibraryKeysBeforeMerge() {
+  const itchGames = Array.isArray(state.itchGames) ? state.itchGames : [];
+  state._libraryKeysBeforeMerge = new Set(
+    [...state.allGames, ...itchGames].map(gameKey),
+  );
+}
+
+function stampMergeDiffFirstSeen(priorKeys) {
+  if (!priorKeys || priorKeys.size === 0) return { n: 0, changed: false };
+  const itchGames = Array.isArray(state.itchGames) ? state.itchGames : [];
+  let n = 0;
+  let changed = false;
+  for (const g of [...state.allGames, ...itchGames]) {
+    const key = gameKey(g);
+    if (priorKeys.has(key)) continue;
+    const cur = state.libraryFirstSeenByKey[key] ?? 0;
+    if (cur > 0) continue;
+    state.libraryFirstSeenByKey[key] = Date.now();
+    n += 1;
+    changed = true;
+  }
+  return { n, changed };
+}
+
 /** Stamp first-seen timestamps for library keys (silent seed on first load).
  *  Returns count of keys newly stamped with a real timestamp (0 on first seed). */
 export function recordLibraryFirstSeen() {
@@ -211,6 +237,8 @@ export function recordLibraryFirstSeen() {
   // true). Re-seed as baseline rather than flooding "Recently added" with the
   // entire library stamped at the current time.
   const effectiveSeeded = seeded && !mapWasEmpty;
+  const isReseed = seeded && mapWasEmpty;
+  const priorKeys = state._libraryKeysBeforeMerge;
   let changed = false;
   let newlyStamped = 0;
   const debugNewKeys = isDebugEnabled() && effectiveSeeded ? [] : null;
@@ -220,19 +248,47 @@ export function recordLibraryFirstSeen() {
   const itchGames = Array.isArray(state.itchGames) ? state.itchGames : [];
   for (const g of [...state.allGames, ...itchGames]) {
     const key = gameKey(g);
-    if (key in state.libraryFirstSeenByKey) continue;
-    state.libraryFirstSeenByKey[key] = effectiveSeeded ? Date.now() : 0;
-    changed = true;
+    if (key in state.libraryFirstSeenByKey) {
+      if (
+        state.libraryFirstSeenByKey[key] === 0
+        && priorKeys?.size > 0
+        && !priorKeys.has(key)
+      ) {
+        state.libraryFirstSeenByKey[key] = Date.now();
+        changed = true;
+        newlyStamped += 1;
+        debugNewKeys?.push(key);
+      }
+      continue;
+    }
+    let stamp = 0;
     if (effectiveSeeded) {
+      stamp = Date.now();
+    } else if (isReseed && priorKeys?.size > 0 && !priorKeys.has(key)) {
+      stamp = Date.now();
+    }
+    state.libraryFirstSeenByKey[key] = stamp;
+    changed = true;
+    if (stamp > 0) {
       newlyStamped += 1;
       debugNewKeys?.push(key);
     }
   }
+  const mergeDiff = stampMergeDiffFirstSeen(priorKeys);
+  newlyStamped += mergeDiff.n;
+  changed = changed || mergeDiff.changed;
+  state._libraryKeysBeforeMerge = null;
+  const currentKeys = new Set([...state.allGames, ...itchGames].map(gameKey));
+  state.knownLibraryKeySet = currentKeys;
+  saveKnownLibraryKeys(currentKeys);
   if (isDebugEnabled()) {
     console.debug('[baklog-recents] recordLibraryFirstSeen', {
       mapWasEmpty,
       seeded,
       effectiveSeeded,
+      isReseed,
+      priorKeyCount: priorKeys?.size ?? 0,
+      mergeDiffStamped: mergeDiff.n,
       totalKeys: Object.keys(state.libraryFirstSeenByKey).length,
       newlyStamped,
       newlyStampedKeys: debugNewKeys ?? [],
@@ -246,7 +302,7 @@ export function recordLibraryFirstSeen() {
     saveLibraryFirstSeen(state.libraryFirstSeenByKey);
     personalStore.notify();
   }
-  return effectiveSeeded ? newlyStamped : 0;
+  return newlyStamped;
 }
 
 function countLibraryVisible() {
@@ -381,6 +437,7 @@ export function rebuildWishlistFromMetas() {
 }
 
 export async function reloadAllLibraryStoreFiles() {
+  captureLibraryKeysBeforeMerge();
   const entries = await Promise.all(
     Object.entries(LIBRARY_STORE_JSON).map(async ([metaKey, file]) => {
       try {
@@ -445,6 +502,7 @@ export async function reloadAfterFetcher(key) {
     state.libraryMeta[metaKey] = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
     rebuildWishlistFromMetas();
   } else if (LIBRARY_STORE_JSON[key]) {
+    captureLibraryKeysBeforeMerge();
     state.libraryMeta[key] = await fetchLibraryJson(LIBRARY_STORE_JSON[key]);
     rebuildAllGamesFromMetas();
   } else {
@@ -518,6 +576,7 @@ export async function reloadGames() {
   state.libraryMeta.ubisoft = ubisoft;
   state.libraryMeta.humble = humble;
   state.libraryMeta.ea = ea;
+  captureLibraryKeysBeforeMerge();
   rebuildAllGamesFromMetas();
   state.libraryMeta.wishlist = wishlist;
   state.libraryMeta.wishlistGog = wishlistGog;

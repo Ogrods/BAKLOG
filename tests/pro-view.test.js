@@ -11,7 +11,10 @@ vi.mock('../js/auth-gate.js', () => ({
 }));
 
 vi.mock('../js/filters-ui.js', () => ({ switchView: vi.fn() }));
-vi.mock('../js/prefs.js', () => ({ savePrefs: vi.fn() }));
+vi.mock('../js/prefs.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, savePrefs: vi.fn() };
+});
 
 describe('isProPromoSponsorId', () => {
   it('recognizes house Pro promo ids', () => {
@@ -114,9 +117,10 @@ describe('post-checkout return', () => {
     });
     const { consumeCheckoutQuery } = await import('../js/pro-view.js');
     const { state } = await import('../js/state.js');
+    const { loadActiveView } = await import('../js/prefs.js');
     expect(consumeCheckoutQuery()).toBe(true);
     expect(replaceState).toHaveBeenCalledWith({}, '', '/');
-    expect(state.prefs.activeView).toBe('pro');
+    expect(loadActiveView()).toBe('pro');
     expect(state.activeView).toBe('pro');
   });
 

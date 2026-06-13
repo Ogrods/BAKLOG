@@ -4215,10 +4215,17 @@ def main() -> None:
     _maybe_import_legacy_env()
     try:
         from shared.profiles import finalize_default_profile_migration
+        from shared.profile_paths import reconcile_profile_store
 
         finalize_default_profile_migration()
+        for note in reconcile_profile_store():
+            print(f"[profiles] {note}", file=sys.stderr, flush=True)
+        from auth.manager import migrate_existing_itch_local_opt_in
+
+        for note in migrate_existing_itch_local_opt_in():
+            print(f"[auth] {note}", file=sys.stderr, flush=True)
     except Exception as exc:  # noqa: BLE001 - must not block server boot
-        print(f"[profiles] default migration finalize skipped: {exc}", file=sys.stderr, flush=True)
+        print(f"[profiles] profile store reconcile skipped: {exc}", file=sys.stderr, flush=True)
 
     def _handle_exit(signum: int, _frame: Any) -> None:
         print(f"\nShutting down (signal {signum}).")

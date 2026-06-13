@@ -114,6 +114,33 @@ def _default_supabase_auth_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _reset_auth_sessions():
+    """Isolate the browser sign-in registry between tests.
+
+    `auth.manager` tracks in-flight CDP sign-ins in a module-global
+    `_active_sessions` dict. `start_browser_auth` registers a session, and its
+    worker thread only clears it via `session.finish()` in a `finally` block
+    that runs after `mark_connected` fires. Tests that start a session and wait
+    on `mark_connected` (e.g. `test_auth_manager_profile.py`) can return before
+    that daemon thread reaches `finish()`, leaving an "active" session behind.
+    A later `POST /api/profiles/active` then sees `has_active_sessions()` True
+    and returns 409 instead of switching - the source of the flaky Windows
+    failures in `test_profile_pin`/`test_csrf_profiles`/`test_profile_switch_cancel`.
+    Clearing the registry around each test guarantees a clean precondition.
+    """
+    try:
+        from auth import manager as auth_manager
+    except Exception:
+        yield
+        return
+    with auth_manager._sessions_lock:
+        auth_manager._active_sessions.clear()
+    yield
+    with auth_manager._sessions_lock:
+        auth_manager._active_sessions.clear()
+
+
+@pytest.fixture(autouse=True)
 def _detect_thread_and_child_leaks(request: pytest.FixtureRequest):
     if request.node.get_closest_marker("no_leak_check"):
         yield

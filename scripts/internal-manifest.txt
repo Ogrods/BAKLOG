@@ -5,6 +5,7 @@ docs/
 audit/
 admin/
 tracker.html
+tracker-git.html
 favicon.svg
 assets/baklog-logo.svg
 assets/milestones/

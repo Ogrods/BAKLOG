@@ -9,6 +9,7 @@ favicon.svg
 assets/baklog-logo.svg
 assets/milestones/
 assets/store-logos/
+assets/social/
 preview-bootstrap.html
 IP.md
 tools/make_ads.py

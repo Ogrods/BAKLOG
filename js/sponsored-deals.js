@@ -347,6 +347,18 @@ const HOUSE_DEFAULTS = {
     scheme: 'emerald',
     enabled: true,
   },
+  'house-spotlight-pro-alerts': {
+    kind: 'house',
+    title: 'Never miss a free game again',
+    slogan: 'Never miss a free game again.',
+    tagline: 'Deal & watchlist alerts when giveaways and sales land - coming soon with Pro.',
+    cta: 'Get Pro - $5/mo',
+    url: PRO_CHECKOUT_MONTHLY,
+    cover: '',
+    art_mode: 'logo',
+    scheme: 'amber',
+    enabled: true,
+  },
   'house-spotlight-library': {
     kind: 'house',
     title: 'It\'s just your library',
@@ -384,6 +396,7 @@ const SPOTLIGHT_PRO_AD_IDS = [
   'house-spotlight-pro-logo',
   'house-spotlight-pro-sync',
   'house-spotlight-pro-noads',
+  'house-spotlight-pro-alerts',
   'house-spotlight-library',
 ];
 
@@ -744,7 +757,7 @@ export const PRO_PROMO = {
     },
     {
       title: 'Deal/watchlist alerts',
-      desc: 'Get notified when wishlist titles hit your target price or go on sale.',
+      desc: 'Never miss a free game again - alerts when Epic, GOG, Steam, and Prime drops land, plus wishlist price targets.',
       icon: '🔔',
     },
   ],
@@ -773,6 +786,7 @@ const PRO_PROMO_SPONSOR_IDS = new Set([
   'house-spotlight-pro-logo',
   'house-spotlight-pro-sync',
   'house-spotlight-pro-noads',
+  'house-spotlight-pro-alerts',
   'house-lib-backlog',
   'house-spotlight-library',
   'house-itch-privacy',

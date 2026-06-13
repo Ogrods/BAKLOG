@@ -256,11 +256,23 @@
       "title": "Fewer distractions",
       "slogan": "Paid tier drops sponsored deal slots so your deal radar stays yours.",
       "tagline": "BAKLOG Pro drops sponsored slots so your deal radar stays yours. $5/mo.",
-      "cta": "Get Pro — $5/mo",
+      "cta": "Get Pro - $5/mo",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
       "art_mode": "logo",
       "scheme": "emerald",
+      "enabled": true
+    },
+    "house-spotlight-pro-alerts": {
+      "kind": "house",
+      "title": "Never miss a free game again",
+      "slogan": "Never miss a free game again.",
+      "tagline": "Deal & watchlist alerts when giveaways and sales land - coming soon with Pro.",
+      "cta": "Get Pro - $5/mo",
+      "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
+      "cover": "",
+      "art_mode": "logo",
+      "scheme": "amber",
       "enabled": true
     },
     "house-spotlight-library": {

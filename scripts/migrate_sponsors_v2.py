@@ -107,6 +107,18 @@ HOUSE_DEFAULTS = {
         "scheme": "emerald",
         "enabled": True,
     },
+    "house-spotlight-pro-alerts": {
+        "kind": "house",
+        "title": "Never miss a free game again",
+        "slogan": "Never miss a free game again.",
+        "tagline": "Deal & watchlist alerts when giveaways and sales land - coming soon with Pro.",
+        "cta": "Get Pro - $5/mo",
+        "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
+        "cover": "",
+        "art_mode": "logo",
+        "scheme": "amber",
+        "enabled": True,
+    },
     "house-spotlight-library": {
         "kind": "house",
         "title": "It's just your library",

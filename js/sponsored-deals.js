@@ -790,6 +790,7 @@ const PRO_PROMO_SPONSOR_IDS = new Set([
   'house-lib-backlog',
   'house-spotlight-library',
   'house-itch-privacy',
+  'house-table-every-store',
 ]);
 
 /** True for in-app house promos that should open the Pro view tab (not Polar directly). */
@@ -1157,9 +1158,50 @@ export function houseTableRowHtml(item, { locationKey = 'lib-row' } = {}) {
   </tr>`;
 }
 
-export function sponsoredTableRowHtml(item, { isWish: _isWish, locationKey = 'lib-row' } = {}) {
+/** House promo rendered in the full-column sponsor shell (dismiss swap path). */
+function houseTableRowInSponsorShellHtml(item, { locationKey = 'lib-row' } = {}) {
   if (!item) return '';
-  if (String(item.kind || '').toLowerCase() === 'house') {
+  noteSponsoredImpression(locationKey, item.id);
+  const discTitle = sponsorDiscTitle(item);
+  const cta = item.cta || 'Learn more';
+  const tagline = item.tagline ? escapeHtml(item.tagline) : '';
+  const coverCell = `<span class="cover-wrap"><span class="house-table-mark" aria-hidden="true">${baklogBannerMarkHtml(`houseRowShell-${item.id || 'house'}`)}</span></span>`;
+  return `<tr class="sponsored-table-row sponsored-deal-house" data-sponsored-row="1"
+    ${sponsorActionAttrs(item)} title="${escapeAttr(discTitle)}">
+    <td class="col-select p-2 text-center" aria-hidden="true"></td>
+    <td class="col-cover p-2">${coverCell}</td>
+    <td class="col-game p-2 game-name-cell">
+      <button type="button" class="sponsored-table-name text-left w-full">
+        <span class="house-table-kicker">From BAKLOG</span>
+        <span class="flex items-center gap-1.5 min-w-0">
+          <span class="sponsored-table-title game-name truncate min-w-0">${escapeHtml(item.title)}</span>
+        </span>
+        ${tagline ? `<span class="sponsored-table-tagline-row">${tagline}</span>` : ''}
+      </button>
+    </td>
+    <td class="col-status p-2">${SP_DASH}</td>
+    <td class="col-score p-2 text-right">${SP_DASH}</td>
+    <td class="col-played p-2 text-right text-slate-300">${SP_DASH}</td>
+    <td class="col-hltb p-2 text-right text-slate-300">${SP_DASH}</td>
+    <td class="col-steam p-2 text-right">${SP_DASH}</td>
+    <td class="col-mc p-2 text-right text-slate-300">${SP_DASH}</td>
+    <td class="col-price p-2 text-right">${SP_DASH}</td>
+    <td class="col-released p-2 text-slate-300 whitespace-nowrap">${SP_DASH}</td>
+    <td class="col-lastplayed p-2 text-slate-300">${SP_DASH}</td>
+    <td class="col-genres p-2 text-slate-400 text-xs truncate"></td>
+    <td class="col-notes p-2 sponsored-table-notes">
+      <span class="sponsored-deal-cta">${escapeHtml(cta)} &rarr;</span>
+    </td>
+  </tr>`;
+}
+
+export function sponsoredTableRowHtml(item, { isWish: _isWish, locationKey = 'lib-row', tableLayout = 'auto' } = {}) {
+  if (!item) return '';
+  const isHouse = String(item.kind || '').toLowerCase() === 'house';
+  if (isHouse && tableLayout === 'sponsor') {
+    return houseTableRowInSponsorShellHtml(item, { locationKey });
+  }
+  if (isHouse) {
     return houseTableRowHtml(item, { locationKey });
   }
   noteSponsoredImpression(locationKey, item.id);
@@ -1514,7 +1556,7 @@ export function placementsForDismissRefresh(sponsorId) {
   return locationsForDismissRefresh(sponsorId);
 }
 
-function refreshJobsForLocation(loc, sponsorId) {
+function refreshJobsForLocation(loc, sponsorId, { skipTableRow = false } = {}) {
   const jobs = [];
   if (loc.startsWith('dash-') && loc !== 'dash-house') {
     if (loc === 'dash-spotlight') {
@@ -1541,7 +1583,7 @@ function refreshJobsForLocation(loc, sponsorId) {
   }
   if ((loc.endsWith('-pick') || loc.endsWith('-row')) && !loc.includes('versus')) {
     if (loc.endsWith('-pick')) jobs.push(import('./picks-ui.js').then(m => m.renderPicks()));
-    if (loc.endsWith('-row')) {
+    if (loc.endsWith('-row') && !skipTableRow) {
       jobs.push(import('./table-ui.js').then(m => {
         if (state.activeView === 'library' || state.activeView === 'wishlist' || state.activeView === 'itch') {
           return m.renderTable({ force: true });
@@ -1555,12 +1597,18 @@ function refreshJobsForLocation(loc, sponsorId) {
   return jobs;
 }
 
-/** Re-render only the surfaces that showed the dismissed sponsor. */
-export function refreshSponsoredSurfaces(sponsorId) {
+/**
+ * Re-render only the surfaces that showed the dismissed sponsor.
+ * @param {string} sponsorId
+ * @param {{ skipTableRow?: boolean }} [opts] skipTableRow: the caller already
+ *   swapped the row ad in place (syncSponsoredTableAfterDismiss), so skip the
+ *   full table re-render that would otherwise re-rotate the slot and flicker.
+ */
+export function refreshSponsoredSurfaces(sponsorId, { skipTableRow = false } = {}) {
   const locations = new Set(locationsForDismissRefresh(sponsorId));
   const jobs = [];
   for (const loc of locations) {
-    jobs.push(...refreshJobsForLocation(loc, sponsorId));
+    jobs.push(...refreshJobsForLocation(loc, sponsorId, { skipTableRow }));
   }
   return Promise.all(jobs);
 }

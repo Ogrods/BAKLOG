@@ -265,13 +265,22 @@ describe('house table row', () => {
   const houseRow = (overrides = {}) => ({
     id: 'house-table-every-store',
     kind: 'house',
-    title: 'Every store, one backlog',
-    tagline: 'Steam, Epic, GOG and more - deduped into one honest list.',
-    cta: 'Start free',
-    url: 'https://baklog.app/',
+    title: 'BAKLOG Pro',
+    tagline: 'Bulk-refresh every store at once and sync your library across machines. $5/mo.',
+    cta: 'Get Pro - $5/mo',
+    url: 'https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw',
     dismissible: true,
     enabled: true,
     ...overrides,
+  });
+
+  it('renders house promo in sponsor shell when tableLayout is sponsor', () => {
+    const html = sponsoredTableRowHtml(houseRow(), { tableLayout: 'sponsor' });
+    expect(html).toContain('sponsored-deal-house');
+    expect(html).not.toContain('sponsored-table-row--house');
+    expect(html).toContain('From BAKLOG');
+    expect(html).not.toContain('sponsored-table-deal-pill');
+    expect(html).not.toContain('sponsored-table-status-pill');
   });
 
   it('renders a branded house row without faux game stats', () => {
@@ -279,8 +288,8 @@ describe('house table row', () => {
     expect(html).toContain('sponsored-table-row--house');
     expect(html).toContain('sponsored-deal-house');
     expect(html).toContain('From BAKLOG');
-    expect(html).toContain('Every store, one backlog');
-    expect(html).toContain('Start free');
+    expect(html).toContain('BAKLOG Pro');
+    expect(html).toContain('Get Pro - $5/mo');
     expect(html).toContain('data-sponsor-house="1"');
     expect(html).not.toContain('>Sponsored<');
     expect(html).not.toContain('sponsored-table-deal-pill');

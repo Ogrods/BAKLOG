@@ -6,6 +6,11 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { state } from '../js/state.js';
 import { loadSessionPrefs } from '../js/prefs.js';
 import { syncSponsoredTableAfterDismiss, tableFingerprint } from '../js/table-ui.js';
+import {
+  dismissSponsoredDeal,
+  __resetDismissedSponsorsForTest,
+  __setSponsorsForTest,
+} from '../js/sponsored-deals.js';
 
 function resetState() {
   state.activeView = 'library';
@@ -89,7 +94,12 @@ describe('tableFingerprint', () => {
 });
 
 describe('syncSponsoredTableAfterDismiss', () => {
-  it('removes the sponsored table row without a full renderTable()', () => {
+  beforeEach(() => {
+    __resetDismissedSponsorsForTest();
+    __setSponsorsForTest({ version: 2, ads: {}, locations: {} });
+  });
+
+  it('removes the sponsored table row when no creative remains', () => {
     document.body.innerHTML = `
       <table><tbody id="tbody">
         <tr data-row-index="0"><td>Game A</td></tr>
@@ -99,5 +109,29 @@ describe('syncSponsoredTableAfterDismiss', () => {
     syncSponsoredTableAfterDismiss();
     expect(document.querySelector('.sponsored-table-row')).toBeNull();
     expect(document.querySelectorAll('#tbody tr').length).toBe(2);
+  });
+
+  it('swaps in the next eligible creative in place instead of collapsing', () => {
+    __setSponsorsForTest({
+      version: 2,
+      ads: {
+        'ad-a': { kind: 'sponsor', title: 'Encore', tagline: 'a', cta: 'Go', url: 'https://x.test/' },
+        'ad-b': { kind: 'sponsor', title: 'Ironveil', tagline: 'b', cta: 'Go', url: 'https://x.test/' },
+      },
+      locations: { 'lib-row': ['ad-a', 'ad-b'] },
+    });
+    document.body.innerHTML = `
+      <table><tbody id="tbody">
+        <tr data-row-index="0"><td>Game A</td></tr>
+        <tr class="sponsored-table-row" data-sponsor-id="ad-a"><td>Encore ad</td></tr>
+        <tr data-row-index="1"><td>Game B</td></tr>
+      </tbody></table>`;
+    dismissSponsoredDeal('ad-a');
+    syncSponsoredTableAfterDismiss();
+    const row = document.querySelector('.sponsored-table-row');
+    expect(row).not.toBeNull();
+    expect(document.querySelectorAll('#tbody tr').length).toBe(3);
+    expect(row.textContent).toContain('Ironveil');
+    expect(row.classList.contains('sponsored-table-row--house')).toBe(false);
   });
 });

@@ -129,10 +129,13 @@ let _eventsBound = false;
 function handleSponsoredDismiss(dismissEl) {
   const id = dismissEl.dataset.sponsorId;
   dismissSponsoredDeal(id);
-  if (dismissEl.closest('.sponsored-table-row')) {
+  // A table-row dismiss swaps the next creative into the slot in place, so skip
+  // the full table re-render below (it would re-rotate the slot and flicker).
+  const inTableRow = !!dismissEl.closest('.sponsored-table-row');
+  if (inTableRow) {
     syncSponsoredTableAfterDismiss();
   }
-  refreshSponsoredSurfaces(id);
+  refreshSponsoredSurfaces(id, { skipTableRow: inTableRow });
 }
 
 export function bindEvents() {

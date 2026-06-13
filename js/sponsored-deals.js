@@ -21,6 +21,23 @@
  *   kind: "house" -> no badge; anything else -> "Sponsored".
  *   dismissible: house promos opt in to a close (X); sponsors are always closeable.
  *   art_mode: "logo" renders the BAKLOG mark in the dash-spotlight (no cover art).
+ *
+ * WHERE THE FEED COMES FROM (read this before "my ad edit isn't showing"):
+ *   loadSponsoredDeals() resolves in strict order and the FIRST non-empty wins:
+ *     1. local  GET /sponsors.json    -> active profile's sponsors.json (seeded via
+ *                                          admin console; usually absent in dev)
+ *     2. hosted https://baklog.app/sponsors.json (deployed from landing/sponsors.json
+ *                                          via Vercel) -- THIS is what most machines use
+ *     3. bundled curated/sponsors.json  -- last resort, only when 1 AND 2 are empty/offline
+ *   So editing curated/sponsors.json alone changes NOTHING on a machine with internet:
+ *   the hosted feed shadows it. To ship a feed-driven banner change you MUST edit
+ *   landing/sponsors.json (mirror curated/), commit, push, and let Vercel redeploy
+ *   baklog.app. Verify live: GET https://baklog.app/sponsors.json.
+ *   Sync pairs: HOUSE_DEFAULTS (below) <-> curated/sponsors.json <-> landing/sponsors.json
+ *   <-> scripts/migrate_sponsors_v2.py HOUSE_DEFAULTS <-> admin/admin.js HOUSE_MIGRATION_DEFAULTS.
+ *   NOTE: hardcoded banners (proPromoBannerHtml, the wishlist house banner here, and
+ *   js/pro-view.js renderConnectionsProLink) are NOT feed-driven -- they update by
+ *   editing js/ source + reload (dev raw ESM) or `npm run build` (frozen/built mode).
  */
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
@@ -30,6 +47,7 @@ import { dataFetch } from './api-client.js';
 import { isPro } from './auth-gate.js';
 import { noteSponsoredImpression } from './anon-metrics.js';
 import { PRO_CHECKOUT_MONTHLY } from './pro-checkout.js';
+import { affiliateUrl } from './affiliate.js';
 
 const SPONSORS_LOCAL_PATH = 'sponsors.json';
 const SPONSORS_FALLBACK_PATH = 'curated/sponsors.json';
@@ -257,7 +275,7 @@ const HOUSE_DEFAULTS = {
   'house-support-baklog': {
     kind: 'house',
     title: 'Level up to BAKLOG Pro',
-    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.',
+    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -286,7 +304,7 @@ const HOUSE_DEFAULTS = {
   'house-itch-privacy': {
     kind: 'house',
     title: 'Level up to BAKLOG Pro',
-    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.',
+    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -297,7 +315,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'BAKLOG Pro',
     slogan: 'One honest backlog across every store.',
-    tagline: 'Leveled up with bulk refresh, cloud sync, and no ads — $5/mo.',
+    tagline: 'Leveled up with bulk refresh, cloud sync, and no ads - $5/mo.',
     cta: 'Get Pro',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -321,7 +339,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Fewer distractions',
     slogan: 'Paid tier drops sponsored deal slots so your deal radar stays yours.',
-    tagline: '$5/mo — nothing you use today moves behind paywall.',
+    tagline: '$5/mo - nothing you use today moves behind paywall.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -527,7 +545,11 @@ function sponsorHouseClass(item) {
 }
 
 export function sponsorActionAttrs(item, { house } = {}) {
-  const url = isSafeHttpUrl(item.url) ? escapeAttr(item.url) : '';
+  const raw = isSafeHttpUrl(item.url) ? item.url : '';
+  const tagged = raw && String(item?.kind || '').toLowerCase() !== 'house'
+    ? affiliateUrl(raw)
+    : raw;
+  const url = tagged ? escapeAttr(tagged) : '';
   const isHouse = house ?? String(item?.kind || '').toLowerCase() === 'house';
   const houseAttr = isHouse ? ' data-sponsor-house="1"' : '';
   return `data-action="sponsored-deal" data-sponsor-id="${escapeAttr(item.id)}" data-sponsor-url="${url}"${houseAttr}`;
@@ -766,7 +788,7 @@ export const HOUSE_DEAL_ITEM = {
   id: 'house-support-baklog',
   kind: 'house',
   title: 'Level up to BAKLOG Pro',
-  tagline: 'Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.',
+  tagline: 'Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.',
   cta: 'Get Pro - $5/mo',
   url: PRO_CHECKOUT_MONTHLY,
   dismissible: true,
@@ -1077,7 +1099,9 @@ function sponsorFakeStats(item) {
   const year = item.release_year ?? at(16, 6, 2020); // 2020-2025
   const disc = item.discount ?? [20, 25, 33, 40, 50][seed % 5];
   const baseNum = item.price_base ?? [14.99, 19.99, 24.99, 29.99][(seed >>> 12) % 4];
-  const sale = (baseNum * (1 - disc / 100)).toFixed(2);
+  const sale = item.price_sale != null
+    ? Number(item.price_sale).toFixed(2)
+    : (baseNum * (1 - disc / 100)).toFixed(2);
   const base = baseNum.toFixed(2);
   const score = (steam / Math.log2(hltb + 2)).toFixed(1);
   const genres = item.genres
@@ -1236,6 +1260,92 @@ function sponsoredFeatureStatsHtml(s) {
     .join('');
 }
 
+function isBundleFeatureAd(item) {
+  return Number(item?.bundle_items) > 0;
+}
+
+function sponsoredBundleStatsHtml(item, s) {
+  const items = Number(item.bundle_items) || 0;
+  const creators = Number(item.bundle_creators) || 0;
+  const chips = [
+    { label: 'Items', value: String(items), cls: '' },
+    { label: 'Creators', value: String(creators), cls: '' },
+    { label: 'Off', value: `${s.disc}%`, cls: ' is-discount' },
+    { label: 'Bundle', value: `$${s.sale}`, cls: ' is-price' },
+  ];
+  return chips
+    .map(c => `<span class="sponsored-feature-stat${c.cls}">
+        <span class="sponsored-feature-stat-value">${escapeHtml(c.value)}</span>
+        <span class="sponsored-feature-stat-label">${escapeHtml(c.label)}</span>
+      </span>`)
+    .join('');
+}
+
+function sponsoredBundleTitlesHtml(item) {
+  const titles = Array.isArray(item.featured_titles) ? item.featured_titles : [];
+  if (!titles.length) return '';
+  const rows = titles.slice(0, 5).map(title =>
+    `<div class="sponsored-bundle-title-row">
+        <span class="sponsored-bundle-title-dot" aria-hidden="true"></span>
+        <span class="sponsored-bundle-title-text">${escapeHtml(String(title))}</span>
+      </div>`,
+  ).join('');
+  return `<div class="sponsored-bundle-titles-label">Includes</div>
+      <div class="sponsored-bundle-titles">${rows}</div>`;
+}
+
+/**
+ * Elevated itch.io bundle variant for the dash-pick slot. Keeps the feature-card
+ * art fade but swaps game stats for bundle metrics and a compact title list that
+ * mirrors the sibling "Recently added" rows in the picks row.
+ */
+function sponsoredFeatureBundleAdHtml(item, { banner = false } = {}) {
+  const discTitle = sponsorDiscTitle(item);
+  const cta = item.cta || 'Grab the bundle';
+  const coverUrl = sponsorCoverUrl(item.cover);
+  const s = sponsorFakeStats(item);
+  const network = item.network ? escapeHtml(String(item.network)) : '';
+  const showWas = s.disc > 0 && s.base;
+  const artLayers = coverUrl
+    ? `<img class="sponsored-feature-art-bg" src="${escapeAttr(coverUrl)}" alt="" aria-hidden="true" loading="lazy" onerror="this.style.display='none'" />
+      <img class="sponsored-feature-art" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'" />
+      <span class="sponsored-feature-fade" aria-hidden="true"></span>`
+    : '';
+  const bannerCls = banner ? ' sponsored-feature-card--banner' : '';
+  const noArtCls = coverUrl ? '' : ' no-art';
+  const body = `<div class="sponsored-feature-body">
+      <div class="sponsored-feature-head">
+        <span class="dash-kpi-label">Featured bundle</span>
+      </div>
+      <div class="sponsored-feature-hero">
+        <div class="sponsored-feature-title">${escapeHtml(item.title)}</div>
+        ${item.tagline ? `<p class="sponsored-feature-blurb">${escapeHtml(item.tagline)}</p>` : ''}
+        <div class="sponsored-feature-priceline">
+          <span class="sponsored-feature-cut">-${s.disc}%</span>
+          <span class="sponsored-feature-sale">$${s.sale}</span>
+          ${showWas ? `<span class="sponsored-feature-was">$${s.base}</span>` : ''}
+        </div>
+      </div>
+      <div class="sponsored-feature-panel">
+        <div class="sponsored-feature-stats sponsored-feature-stats--bundle">
+          ${sponsoredBundleStatsHtml(item, s)}
+        </div>
+      </div>
+      ${sponsoredBundleTitlesHtml(item)}
+      <div class="sponsored-feature-detail">
+        ${network ? `<span class="sponsored-feature-by">${network}</span>` : ''}
+      </div>
+      <span class="sponsored-feature-cta">${escapeHtml(cta)} &rarr;</span>
+    </div>`;
+  return `<button type="button"
+    class="dash-card sponsored-feature-card sponsored-feature-card--bundle${noArtCls}${bannerCls}${sponsorHouseClass(item)} text-left w-full"
+    ${sponsorActionAttrs(item)} title="${escapeAttr(discTitle)}">
+    ${sponsorBadgeHtml(item, 'sponsored-badge--inline')}
+    ${artLayers}${body}
+    ${sponsorDismissHtml(item)}
+  </button>`;
+}
+
 /**
  * Shared markup for the content-rich "feature" sponsor ad. Cover art bleeds in
  * from the right and fades right-to-left into the card background (mirrors the
@@ -1308,6 +1418,9 @@ function sponsoredFeatureAdHtml(item, { banner = false } = {}) {
 export function sponsoredDashPicksCardHtml(item) {
   if (!item) return '';
   noteSponsoredImpression('dash-pick', item.id);
+  if (isBundleFeatureAd(item)) {
+    return sponsoredFeatureBundleAdHtml(item, { banner: false });
+  }
   return sponsoredFeatureAdHtml(item, { banner: false });
 }
 

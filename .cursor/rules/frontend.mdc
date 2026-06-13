@@ -38,3 +38,32 @@ Tabs in `index.html`: dashboard, library, wishlist, itch (conditional), connecti
 - Use `escapeHtml` / `escapeAttr` from `dom-util.js` for user-derived strings
 - Off-main-thread filtering via `table-query.worker.js`
 - Lazy Chart.js via `chart-loader.js`
+
+## Copy conventions
+
+- **No em dashes in front-facing copy.** Never use `—` (em dash, U+2014) in user-visible strings — rendered `js/*.js` string literals, `index.html` text, or `app.css` `content:` values. Use a spaced hyphen (` - `) or rephrase. Code comments and docstrings are exempt; this is about what users read. See AGENTS.md hard rule 8.
+
+## Banners & ads — how a change actually reaches the app
+
+There are **two completely separate** ad/banner systems. Picking the wrong one is why "I edited the banner but don't see it" keeps recurring. Identify which one you're touching first.
+
+**1. Feed-driven banners** (`house-support-baklog`, `house-itch-privacy`, `house-pro-promo`, `house-lib-backlog`, the dash-spotlight Pro slides, every paid `ad-*` sponsor). Source: `sponsors.json`. `loadSponsoredDeals()` (`js/sponsored-deals.js`) resolves in order, first non-empty wins:
+
+1. local `GET /sponsors.json` → active profile's `sponsors.json` (seeded by the admin console; usually **absent in dev**)
+2. hosted `https://baklog.app/sponsors.json` → deployed from `landing/sponsors.json` via Vercel — **this is what almost every real machine uses**
+3. bundled `curated/sponsors.json` → last resort, only when 1 **and** 2 are empty/offline
+
+⚠️ Editing `curated/sponsors.json` alone does **nothing** on any machine with internet — the hosted feed shadows it. To ship a feed-driven banner change:
+
+- Edit `landing/sponsors.json` **and** mirror `curated/sponsors.json` (keep them identical).
+- Keep the sync pairs aligned: `HOUSE_DEFAULTS` (`js/sponsored-deals.js`) ↔ `curated/sponsors.json` ↔ `landing/sponsors.json` ↔ `scripts/migrate_sponsors_v2.py` `HOUSE_DEFAULTS` ↔ `admin/admin.js` `HOUSE_MIGRATION_DEFAULTS`. If the ad should open the Pro tab instead of a URL, add its id to `PRO_PROMO_SPONSOR_IDS`.
+- Commit, push, let **Vercel redeploy** baklog.app.
+- **Verify live:** `Invoke-WebRequest https://baklog.app/sponsors.json` and confirm your id + copy are present. Do not trust the local repo file — confirm the hosted feed.
+
+**2. Hardcoded JS banners** (the dashboard `PRO_PROMO` banner `proPromoBannerHtml`, the wishlist house banner, and the Connections-tab Pro card `renderConnectionsProLink` / `CONN_PRO_PITCH` in `js/pro-view.js`). Source: `js/` only — **not** `sponsors.json`. To update:
+
+- Edit the `js/` source. In dev the server sends raw ESM with `Cache-Control: no-store`, so a **page reload** picks it up (an already-open SPA tab must be reloaded — modules don't hot-swap).
+- If the server runs built mode (`BAKLOG_SERVE_BUILT=1` or a frozen PyInstaller exe), run `npm run build` to regenerate `dist/` first.
+- The Connections Pro card only renders on the **Connections tab** in a **non‑Pro** session (`isPro()` false). It's hidden for Pro users / `?pro=1`.
+
+**Quick triage when a banner won't show:** (a) which system is it? (b) for feed-driven, is the **hosted** feed updated (curl it)? (c) for JS, did you reload / rebuild? (d) are you Pro / on the right tab? (e) is the slot dismissed this session?

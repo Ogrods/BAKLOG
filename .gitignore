@@ -81,6 +81,7 @@ tracker-git.html
 preview-bootstrap.html
 IP.md
 tools/make_ads.py
+tools/make_social_cards.py
 
 # Local scratch run output, audits, review artifacts (never commit)
 EVENT_AUDIT.json

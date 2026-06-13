@@ -12,6 +12,7 @@ assets/store-logos/
 preview-bootstrap.html
 IP.md
 tools/make_ads.py
+tools/make_social_cards.py
 .cursor/rules/
 .cursor/hooks.json
 .cursor/commands/apply-tracker-pending.md

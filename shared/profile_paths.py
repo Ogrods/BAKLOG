@@ -8,10 +8,11 @@ import os
 import re
 import sys
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from shared.install_paths import data_root
 

@@ -13,6 +13,12 @@ from pathlib import Path
 import pytest
 
 import server
+from shared import profile_paths
+
+
+def _profile_sponsors_path(tmp_path: Path) -> Path:
+    """Active profile sponsors.json under an isolated test data root."""
+    return tmp_path / "profiles" / "default" / "sponsors.json"
 
 
 def _request(
@@ -63,6 +69,19 @@ def admin_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(server, "FREE_CLAIMS_INPUT_PATH", Path("free-claims.input.json"))
     monkeypatch.setattr(server, "MANAGER", server.RunManager(runs_dir=runs_dir))
     monkeypatch.setattr(server, "data_root", lambda: tmp_path)
+    prof = tmp_path / "profiles"
+    prof.mkdir(parents=True, exist_ok=True)
+    default_dir = prof / "default"
+    default_dir.mkdir(parents=True, exist_ok=True)
+    (default_dir / ".migration_complete").write_text("", encoding="utf-8")
+    (prof / "index.json").write_text(
+        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default"}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
+    monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
+    monkeypatch.setattr(server, "ROOT", tmp_path)
     httpd = ThreadingHTTPServer(
         ("127.0.0.1", 0),
         partial(server.Handler, directory=str(server.ROOT)),
@@ -507,7 +526,7 @@ def test_sponsors_put_accepts_cover_and_placements(
     admin_server: tuple[str, Path], tmp_path: Path
 ) -> None:
     base, _ = admin_server
-    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
     sponsors_path.write_text(json.dumps({"items": []}), encoding="utf-8")
     payload = {
@@ -534,7 +553,7 @@ def test_sponsors_put_accepts_dash_deal_rail_placement(
     admin_server: tuple[str, Path], tmp_path: Path
 ) -> None:
     base, _ = admin_server
-    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
     sponsors_path.write_text(json.dumps({"items": []}), encoding="utf-8")
     payload = {
@@ -557,7 +576,7 @@ def test_sponsors_put_accepts_dash_deal_rail_placement(
 
 def test_sponsors_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path) -> None:
     base, _ = admin_server
-    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
     sponsors_path.write_text(json.dumps({"items": []}), encoding="utf-8")
     payload = {
@@ -585,7 +604,7 @@ def test_sponsors_put_accepts_v2_schema(
     admin_server: tuple[str, Path], tmp_path: Path
 ) -> None:
     base, _ = admin_server
-    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
     sponsors_path.write_text(json.dumps({"version": 2, "ads": {}, "locations": {}}), encoding="utf-8")
     payload = {
@@ -623,7 +642,7 @@ def test_sponsors_put_rejects_unknown_location(admin_server: tuple[str, Path]) -
 
 def test_sponsors_get_returns_input(admin_server: tuple[str, Path], tmp_path: Path) -> None:
     base, _ = admin_server
-    sponsors_path = tmp_path / "curated" / "sponsors.json"
+    sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
     sponsors_path.write_text(
         json.dumps({"items": [{"id": "a", "title": "Existing"}]}),

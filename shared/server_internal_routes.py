@@ -467,14 +467,26 @@ def handle_internal_free_claims_approved_put(handler: SimpleHTTPRequestHandler) 
     s._send_json(handler, HTTPStatus.OK, {"ok": True, "ids": len(out.get("ids") or [])})
 
 
+def _admin_sponsors_path(s):
+    """Profile-scoped sponsors.json for the app; BAKLOG_SPONSORS_INPUT overrides."""
+    import os
+
+    if os.environ.get("BAKLOG_SPONSORS_INPUT", "").strip():
+        return s._resolve_contained_data_path(s.SPONSORS_PATH)
+    return s.sponsors_path()
+
+
 def handle_internal_sponsors_get(handler: SimpleHTTPRequestHandler) -> None:
     s = _srv()
-    root = s.data_root()
+    path = _admin_sponsors_path(s)
+    if path is None:
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "invalid sponsors input path"})
+        return
     s._send_json(
         handler,
         HTTPStatus.OK,
         {
-            "input": s._read_optional_json(root / s.SPONSORS_PATH) or {"items": []},
+            "input": s._read_optional_json(path) or {"items": []},
         },
     )
 
@@ -493,7 +505,7 @@ def handle_internal_sponsors_put(handler: SimpleHTTPRequestHandler) -> None:
     if validation_err:
         s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": validation_err})
         return
-    out_path = s._resolve_contained_data_path(s.SPONSORS_PATH)
+    out_path = _admin_sponsors_path(s)
     if out_path is None:
         s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "invalid sponsors input path"})
         return

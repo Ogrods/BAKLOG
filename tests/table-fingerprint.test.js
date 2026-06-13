@@ -10,6 +10,7 @@ import {
   dismissSponsoredDeal,
   __resetDismissedSponsorsForTest,
   __setSponsorsForTest,
+  sponsoredTableRowHtml,
 } from '../js/sponsored-deals.js';
 
 function resetState() {
@@ -133,5 +134,40 @@ describe('syncSponsoredTableAfterDismiss', () => {
     expect(document.querySelectorAll('#tbody tr').length).toBe(3);
     expect(row.textContent).toContain('Ironveil');
     expect(row.classList.contains('sponsored-table-row--house')).toBe(false);
+  });
+
+  it('swaps sponsor row for house promo in sponsor shell (same row height layout)', () => {
+    __setSponsorsForTest({
+      version: 2,
+      ads: {
+        'ad-a': { kind: 'sponsor', title: 'Encore', tagline: 'a', cta: 'Go', url: 'https://x.test/' },
+        'house-pro': {
+          kind: 'house',
+          title: 'BAKLOG Pro',
+          tagline: 'Bulk-refresh every store.',
+          cta: 'Get Pro',
+          url: 'https://buy.polar.sh/test',
+        },
+      },
+      locations: { 'lib-row': ['ad-a', 'house-pro'] },
+    });
+    const sponsorRow = sponsoredTableRowHtml(
+      { kind: 'sponsor', id: 'ad-a', title: 'Encore', tagline: 'a', cta: 'Go', url: 'https://x.test/' },
+      { locationKey: 'lib-row', tableLayout: 'sponsor' },
+    );
+    document.body.innerHTML = `
+      <table><tbody id="tbody">
+        <tr data-row-index="0"><td>Game A</td></tr>
+        ${sponsorRow}
+        <tr data-row-index="1"><td>Game B</td></tr>
+      </tbody></table>`;
+    dismissSponsoredDeal('ad-a');
+    syncSponsoredTableAfterDismiss();
+    const row = document.querySelector('.sponsored-table-row');
+    expect(row).not.toBeNull();
+    expect(row.textContent).toContain('BAKLOG Pro');
+    expect(row.classList.contains('sponsored-table-row--house')).toBe(false);
+    expect(row.querySelector('.house-table-kicker')).toBeNull();
+    expect(row.querySelector('.sponsored-table-badge')).not.toBeNull();
   });
 });

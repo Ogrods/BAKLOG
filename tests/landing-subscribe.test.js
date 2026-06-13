@@ -130,10 +130,27 @@ describe("landing/api/subscribe.js", () => {
       status: 500,
       text: async () => "upstream error",
     });
-    const res = await handleSubscribe(makeRequest({ email: "tester@example.com" }));
+    const res = await handleSubscribe(makeRequest({ email: "tester@example.com" }, { ip: "10.0.0.91" }));
     expect(res.status).toBe(502);
-    expect(await res.json()).toEqual({ error: "Send failed" });
+    expect(await res.json()).toEqual({ error: "Send failed", stage: "founder_notify" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns ok when founder notification fails but Supabase captured the signup", async () => {
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service_role_test";
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, text: async () => "" })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: async () => "domain not verified",
+      })
+      .mockResolvedValueOnce({ ok: true, text: async () => "" });
+    const res = await handleSubscribe(makeRequest({ email: "tester@example.com" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("still returns ok when confirmation auto-reply fails", async () => {
@@ -144,10 +161,20 @@ describe("landing/api/subscribe.js", () => {
         status: 500,
         text: async () => "welcome failed",
       });
-    const res = await handleSubscribe(makeRequest({ email: "tester@example.com" }));
+    const res = await handleSubscribe(makeRequest({ email: "tester@example.com" }, { ip: "10.0.0.92" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const [, founderOpts] = fetchMock.mock.calls[0];
+    const founderPayload = JSON.parse(founderOpts.body);
+    expect(founderPayload.to).toBe("founder@example.com");
+    expect(founderPayload.reply_to).toBe("tester@example.com");
+
+    const [, welcomeOpts] = fetchMock.mock.calls[1];
+    const welcomePayload = JSON.parse(welcomeOpts.body);
+    expect(welcomePayload.to).toBe("tester@example.com");
+    expect(welcomePayload.subject).toContain("invite list");
   });
 
   it("sends founder notification and confirmation for a valid signup", async () => {

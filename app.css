@@ -3044,7 +3044,7 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   padding: 0.85rem 1rem;
   border-radius: 0.75rem;
   border: 1px solid var(--border);
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
+  background: linear-gradient(135deg, var(--bg), var(--bg-panel));
   cursor: pointer;
   position: relative;
   overflow: hidden;

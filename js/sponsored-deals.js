@@ -1172,9 +1172,9 @@ function houseTableRowInSponsorShellHtml(item, { locationKey = 'lib-row' } = {})
     <td class="col-cover p-2">${coverCell}</td>
     <td class="col-game p-2 game-name-cell">
       <button type="button" class="sponsored-table-name text-left w-full">
-        <span class="house-table-kicker">From BAKLOG</span>
         <span class="flex items-center gap-1.5 min-w-0">
           <span class="sponsored-table-title game-name truncate min-w-0">${escapeHtml(item.title)}</span>
+          <span class="sponsored-badge sponsored-table-badge shrink-0" title="${escapeAttr(discTitle)}">From BAKLOG</span>
         </span>
         ${tagline ? `<span class="sponsored-table-tagline-row">${tagline}</span>` : ''}
       </button>

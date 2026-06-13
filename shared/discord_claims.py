@@ -15,6 +15,10 @@ from shared.steam_match import strip_giveaway_decorations
 
 CLAIM_LINK = "https://baklog.app"
 
+# Public community webhook (non-members). Gets the closed-beta invite copy.
+ALTAR_WEBHOOK_NAME = "Sacrificial Altar"
+BETA_INVITE_LINE = f"BAKLOG is in closed beta. Request an invite at {CLAIM_LINK}"
+
 _WEBHOOK_ENV = (
     ("BAKLOG_DISCORD_CLAIMS_WEBHOOK_1", "Sacrificial Altar"),
     ("BAKLOG_DISCORD_CLAIMS_WEBHOOK_2", "BAKLOG Discord"),
@@ -77,9 +81,26 @@ def _display_store(item: dict[str, Any]) -> str:
     return store.replace("_", " ").title()
 
 
-def build_discord_payload(item: dict[str, Any]) -> dict[str, Any]:
-    """Build a Discord webhook JSON body for one claim."""
+def _claim_url(item: dict[str, Any]) -> str:
+    url = str(item.get("claim_url") or "").strip()
+    if url.startswith("http://") or url.startswith("https://"):
+        return url[:2048]
+    return ""
+
+
+def build_discord_payload(
+    item: dict[str, Any], *, include_beta_invite: bool = False
+) -> dict[str, Any]:
+    """Build a Discord webhook JSON body for one claim.
+
+    The embed links to the real store claim URL when present (falling back to
+    the BAKLOG site). When ``include_beta_invite`` is set, the content adds a
+    closed-beta invite line for the public Altar audience; members' server gets
+    the plain claim post.
+    """
     title = _display_title(item)
+    claim_url = _claim_url(item)
+    link = claim_url or CLAIM_LINK
     fields: list[dict[str, Any]] = [
         {
             "name": "Store",
@@ -99,15 +120,22 @@ def build_discord_payload(item: dict[str, Any]) -> dict[str, Any]:
 
     embed: dict[str, Any] = {
         "title": title[:256],
-        "url": CLAIM_LINK,
+        "url": link,
         "fields": fields,
     }
     header_image = str(item.get("header_image") or "").strip()
     if header_image.startswith("http://") or header_image.startswith("https://"):
         embed["thumbnail"] = {"url": header_image[:2048]}
 
+    if claim_url:
+        content_lines = [f"Free game, claim it here: {claim_url}"]
+    else:
+        content_lines = [f"Free game on BAKLOG: {CLAIM_LINK}"]
+    if include_beta_invite:
+        content_lines.append(BETA_INVITE_LINE)
+
     payload: dict[str, Any] = {
-        "content": f"Free game on BAKLOG: {CLAIM_LINK}",
+        "content": "\n".join(content_lines),
         "embeds": [embed],
     }
     if str(item.get("source") or "").strip().lower() == "gamerpower":
@@ -169,10 +197,15 @@ def post_to_webhook(url: str, body: dict[str, Any]) -> dict[str, Any]:
 
 
 def post_claim_to_discord(item: dict[str, Any]) -> list[dict[str, Any]]:
-    """Post one claim embed to every configured webhook."""
-    body = build_discord_payload(item)
+    """Post one claim embed to every configured webhook.
+
+    The public Altar webhook gets closed-beta invite copy; other targets get the
+    plain claim post.
+    """
     results: list[dict[str, Any]] = []
     for target in load_webhooks():
+        include_beta_invite = target["name"] == ALTAR_WEBHOOK_NAME
+        body = build_discord_payload(item, include_beta_invite=include_beta_invite)
         posted = post_to_webhook(target["url"], body)
         results.append({"name": target["name"], **posted})
     return results

@@ -35,7 +35,7 @@ function clientIp(request) {
 async function logToSupabase({ email, ip, time }) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return;
+  if (!url || !key) return false;
 
   const r = await fetch(`${url}/rest/v1/waitlist`, {
     method: "POST",
@@ -51,6 +51,7 @@ async function logToSupabase({ email, ip, time }) {
     const detail = await r.text().catch(() => "");
     throw new Error(`Supabase ${r.status}: ${detail}`);
   }
+  return true;
 }
 
 async function sendEmail(apiKey, payload) {
@@ -155,8 +156,11 @@ export default {
     const signupTime = new Date().toISOString();
     console.log(`waitlist_signup\t${signupTime}\t${await emailLogTag(email)}`);
 
+    let signupCaptured = false;
     try {
-      await logToSupabase({ email, ip, time: signupTime });
+      if (await logToSupabase({ email, ip, time: signupTime })) {
+        signupCaptured = true;
+      }
     } catch (err) {
       console.error("subscribe: supabase log failed", err);
     }
@@ -169,9 +173,12 @@ export default {
         subject: `New BAKLOG invite request: ${email}`,
         text: `New signup: ${email}\nTime: ${signupTime}`,
       });
+      signupCaptured = true;
     } catch (err) {
       console.error("subscribe: founder notification failed", err);
-      return Response.json({ error: "Send failed" }, { status: 502 });
+      if (!signupCaptured) {
+        return Response.json({ error: "Send failed", stage: "founder_notify" }, { status: 502 });
+      }
     }
 
     // Confirmation auto-reply to the signer. Best-effort: a failure here must not

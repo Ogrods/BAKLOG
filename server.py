@@ -2891,6 +2891,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             server_internal_routes.handle_internal_free_claims_enrich(self)
             return
+        if path == "/api/internal/free-claims/discord":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            server_internal_routes.handle_internal_free_claims_discord(self)
+            return
         if path == "/api/internal/free-claims/preview":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
@@ -3308,38 +3314,32 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_profiles_delete(self, profile_id: str) -> None:
         if _profile_admin_blocked():
-            _send_json(
-                self,
-                HTTPStatus.FORBIDDEN,
-                {"error": "profile management is disabled while account sign-in is enabled"},
-            )
+            _send_json(self, HTTPStatus.FORBIDDEN, {
+                "error": "profile management is disabled while account sign-in is enabled"})
             return
         if MANAGER.has_runs_for_profile(profile_id):
-            _send_json(
-                self,
-                HTTPStatus.CONFLICT,
-                {
-                    "error": (
-                        "This profile has a fetch running or queued. "
-                        "Cancel its runs or let them finish before deleting."
-                    ),
-                },
-            )
+            _send_json(self, HTTPStatus.CONFLICT, {"error": (
+                "This profile has a fetch running or queued. "
+                "Cancel its runs or let them finish before deleting."
+            )})
             return
+        current_pin: str | None = None
+        if int(self.headers.get("Content-Length") or 0) > 0:
+            payload, err = _read_json_body(self)
+            if err:
+                _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+                return
+            current_pin = str((payload or {}).get("currentPin") or (payload or {}).get("pin") or "").strip() or None
         try:
             from shared.profiles import delete_profile
 
-            delete_profile(profile_id)
+            delete_profile(profile_id, current_pin=current_pin)
             _refresh_personal_paths()
             _send_json(self, HTTPStatus.OK, {"ok": True})
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except OSError as exc:
-            _send_json(
-                self,
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                {"error": f"profile delete failed: {exc}"},
-            )
+            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"profile delete failed: {exc}"})
 
     def _handle_personal_get(self) -> None:
         try:
@@ -4214,8 +4214,8 @@ def main() -> None:
     atexit.register(_remove_pid_file)
     _maybe_import_legacy_env()
     try:
-        from shared.profiles import finalize_default_profile_migration
         from shared.profile_paths import reconcile_profile_store
+        from shared.profiles import finalize_default_profile_migration
 
         finalize_default_profile_migration()
         for note in reconcile_profile_store():

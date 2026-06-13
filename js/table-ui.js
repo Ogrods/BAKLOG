@@ -683,6 +683,8 @@ export function scheduleScrollAfterChromeSettled() {
   const picks = document.getElementById('picksSection');
   const toolbar = document.getElementById('toolbarSection');
   const summary = document.getElementById('summary');
+  const viewHouse = document.getElementById('viewHouseSlot');
+  const wishRadar = document.getElementById('wishlistDealRadar');
   if (!picks || !toolbar || typeof ResizeObserver !== 'function') {
     const run = () => scheduleScrollAfterLayoutSettled();
     if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 800 });
@@ -696,7 +698,23 @@ export function scheduleScrollAfterChromeSettled() {
   _chromeScrollObs.observe(picks);
   _chromeScrollObs.observe(toolbar);
   if (summary) _chromeScrollObs.observe(summary);
+  if (viewHouse) _chromeScrollObs.observe(viewHouse);
+  if (wishRadar) _chromeScrollObs.observe(wishRadar);
   requestAnimationFrame(() => requestAnimationFrame(tryConsume));
+}
+
+const CHROME_BAND_ABOVE_TOOLBAR = ['viewHouseSlot', 'wishlistDealRadar'];
+
+function isChromeBandAboveToolbarSettled(toolbarTop) {
+  for (const id of CHROME_BAND_ABOVE_TOOLBAR) {
+    const el = document.getElementById(id);
+    if (!el || el.classList.contains('hidden')) continue;
+    const hasContent = el.innerHTML.trim().length > 0;
+    if (hasContent && el.offsetHeight < 8) return false;
+    const bottom = el.offsetTop + el.offsetHeight;
+    if (bottom > 0 && toolbarTop > 0 && toolbarTop < bottom - 2) return false;
+  }
+  return true;
 }
 
 function scrollDeferredToRefreshFilterUI() {
@@ -720,6 +738,7 @@ function isToolbarScrollReady() {
   const toolbarTop = toolbar.offsetTop;
   if (picksTop > 0 && toolbarTop > 0) {
     if (toolbarTop < picksTop + picks.offsetHeight - 4) return false;
+    if (!isChromeBandAboveToolbarSettled(toolbarTop)) return false;
     const toolbarRectTop = toolbar.getBoundingClientRect().top;
     if (window.scrollY < 16 && toolbarRectTop < 80) return false;
   }

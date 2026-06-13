@@ -54,7 +54,7 @@
       "cta": "View the deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": true,
+      "enabled": false,
       "network": "Lantern Forge Studios",
       "genres": [
         "Tactical RPG",
@@ -66,6 +66,29 @@
       "release_year": 2025,
       "discount": 35,
       "price_base": 29.99
+    },
+    "ad-dash-picks-itch-pride": {
+      "kind": "sponsor",
+      "title": "The Power of Pride Bundle 2026",
+      "tagline": "396 indie games, zines, and more from 284 queer creators. Mutual aid bundle - every purchase supports artists directly.",
+      "cta": "Grab the bundle",
+      "url": "https://itch.io/b/3682/the-power-of-pride-bundle-2026-60-edition",
+      "cover": "/assets/ads/itch-pride-bundle.webp",
+      "enabled": true,
+      "network": "itch.io",
+      "discount": 94,
+      "price_base": 1087,
+      "price_sale": 60,
+      "bundle_items": 396,
+      "bundle_creators": 284,
+      "featured_titles": [
+        "Where Winter Crows Go",
+        "Syrup 2: Candy Alchemy RPG",
+        "A TAVERN FOR TEA",
+        "Cuscuta: A Prayer for Endless Winter",
+        "Detective Beebo: Night at the Mansion"
+      ],
+      "ends": "2026-07-06"
     },
     "ad-feature-banner-emberfall": {
       "kind": "sponsor",
@@ -94,7 +117,7 @@
       "cta": "View deal",
       "url": "https://baklog.app/#waitlist",
       "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": true,
+      "enabled": false,
       "steam_review_percent": 94
     },
     "ad-dash-versus-zephyr": {
@@ -291,14 +314,12 @@
     "dash-coop-couch": [
       "ad-coop-couch-ironveil"
     ],
-    "dash-versus-rated": [
-      "ad-dash-versus-dawnbanner"
-    ],
+    "dash-versus-rated": [],
     "dash-versus-fast": [
       "ad-dash-versus-zephyr"
     ],
     "dash-pick": [
-      "ad-dash-picks-dawnbanner"
+      "ad-dash-picks-itch-pride"
     ],
     "dash-house": [
       "house-pro-promo"

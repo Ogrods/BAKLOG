@@ -22,7 +22,7 @@ Deep reference (maintainer clone only): `docs/ARCHITECTURE.md` in the private `b
 3. **Fetcher contract** — each script exposes `main() -> int`. Exit codes: `0` ok, `1` error, `2` refused empty, `3` refused drift, `4` auth failure (`fetchers/_progress.py`).
 4. **Mutating localhost API** — send `X-BAKLOG-Local: 1` from the app/admin console.
 5. **Admin console** — only when `BAKLOG_ADMIN=1`; routes under `/api/internal/*`.
-6. **Keep sync pairs aligned** — `js/store-brand-colors.js` ↔ `app.css --brand-*`; `js/theme.js` ↔ theme CSS; `landing/marquee-speed.js` ↔ `js/marquee-speed.js`; `js/claim-card.js` `stripClaimTitleDecorations` ↔ `shared/steam_match.py` `strip_giveaway_decorations`; `js/claim-card.js` `sanitizeBlurb` ↔ `build_free_claims.py` `_clean_blurb`; `js/claim-card.js` `CLAIM_SOURCE_RANK` ↔ `shared/free_claims_sources.py` `SOURCE_PRECEDENCE`; `admin/claims-workspace.js` `normTitleKey` / `gameMatchKeys` ↔ `shared/free_claims_sources.py` `norm_title` / `claim_match_keys` (admin `coverLookupKey` is intentionally looser for DUPE stamps only); `js/sponsored-deals.js` `HOUSE_BANNER_FEATURES` / `PRO_PROMO` ↔ `landing/index.html` trust pillars + paid-tier copy; `js/sponsored-deals.js` `AD_LOCATIONS` / `LOCATION_GROUPS` / `LOCATION_CAPACITY` ↔ `admin/admin.js` (and `shared/sponsors_validate.py` `SPONSOR_AD_LOCATIONS`, `scripts/migrate_sponsors_v2.py`); admin Metrics catalog + `metricKeyForLabel` ↔ `METRIC_TIPS` keys in `js/metric-tips.js`.
+6. **Keep sync pairs aligned** — `js/store-brand-colors.js` ↔ `app.css --brand-*`; `js/theme.js` ↔ theme CSS; `landing/marquee-speed.js` ↔ `js/marquee-speed.js`; `js/fetcher-registry.js` ↔ `fetchers/registry.py` (generated — `python -c "from fetchers.registry import export_js_registry; export_js_registry()"`); `js/claim-card.js` `stripClaimTitleDecorations` ↔ `shared/steam_match.py` `strip_giveaway_decorations`; `js/claim-card.js` `sanitizeBlurb` ↔ `build_free_claims.py` `_clean_blurb`; `js/claim-card.js` `CLAIM_SOURCE_RANK` ↔ `shared/free_claims_sources.py` `SOURCE_PRECEDENCE`; `admin/claims-workspace.js` `normTitleKey` / `gameMatchKeys` ↔ `shared/free_claims_sources.py` `norm_title` / `claim_match_keys` (admin `coverLookupKey` is intentionally looser for DUPE stamps only); `js/sponsored-deals.js` `HOUSE_BANNER_FEATURES` / `PRO_PROMO` ↔ `landing/index.html` trust pillars + paid-tier copy; `js/sponsored-deals.js` `AD_LOCATIONS` / `LOCATION_GROUPS` / `LOCATION_CAPACITY` ↔ `admin/admin.js` (and `shared/sponsors_validate.py` `SPONSOR_AD_LOCATIONS`, `scripts/migrate_sponsors_v2.py`); admin Metrics catalog + `metricKeyForLabel` ↔ `METRIC_TIPS` keys in `js/metric-tips.js`. Partial lists in `.cursor/rules/frontend.mdc` and `landing.mdc` — **this rule is the canonical full list**.
 7. **Scope discipline** — new user-visible surfaces must state which budget they fit (module line cap, bundle entry/CSS ceiling, or `server.py` line cap) and prefer lazy/flagged/admin-gated delivery (`?debug=1`, `BAKLOG_ADMIN=1`) over always-on code. Extend registries (`fetchers/manifest.json`, `METRIC_TIPS`, `BAKLOG_EVENT_REGISTRY`) instead of growing monolith modules (`fetcher-health.js`, `connections.js`, `table-ui.js`).
 8. **No em dashes in front-facing copy** — never use `—` (em dash, U+2014) in any user-visible string: app UI (`index.html`, rendered `js/*.js` strings, `app.css` `content:`), landing site (`landing/`), marketing copy, and rendered data feeds (`curated/sponsors.json`, `landing/sponsors.json`, `fetchers/manifest.json` notes). Use a spaced hyphen (` - `) or rephrase. This applies only to copy users read; code comments, docstrings, and server/console diagnostics are exempt. Third-party game titles/blurbs in claim feeds are not our copy and stay verbatim.
 
@@ -35,12 +35,14 @@ Two **separate** systems; mixing them up is why banner edits "don't show". Full 
 
 ## Weight guardrails (CI)
 
-- `npm run check:module-size` — any `js/*.js` over **3800** lines fails (ratchet down after splits).
+- `npm run check:module-size` — any `js/*.js` over **3800** lines fails (`table-query.worker.js` exempt).
 - `npm run check:bundle-size` — critical-path `dist/` entry JS + CSS ceilings in `size-budget.json`.
 - `npm run lint` — ESLint weight rules (`max-lines`, `complexity`, `import/no-cycle`; warnings for now).
-- `pytest tests/test_repo_size_budgets.py` — `server.py` capped at **4300** lines.
+- `pytest tests/test_repo_size_budgets.py` — `server.py` capped at **4300** lines; `scripts/git_tree.py` at **720**.
 
 Refresh bundle budget after intentional growth: `npm run build && node scripts/check-bundle-size.mjs --write`.
+
+**Full local CI parity:** `.\scripts\test-all.ps1 -Full` runs ruff → pytest → vitest → check:module-size → lint → vendor:supabase → build → check:bundle-size → check:dist-integrity → `scripts/audit_free_surface_data.py --fail-on high`.
 
 ## Auth gating (layers)
 

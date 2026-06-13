@@ -484,18 +484,26 @@ export function resolveClaimsFeedDoc(localDoc, fallbackDoc, hostedDoc, { preferH
 
 export async function loadClaimableNow({ preferHosted = false } = {}) {
   let localDoc = null;
+  let localOk = false;
   let fallbackDoc = null;
+  let fallbackOk = false;
+  let hostedDoc = null;
+  let hostedOk = false;
   try {
     localDoc = await loadLocalClaimsFile();
+    localOk = localDoc != null;
   } catch (_) { /* offline */ }
   try {
     fallbackDoc = await loadBundledFallback();
+    fallbackOk = fallbackDoc != null;
   } catch (_) { /* offline */ }
 
-  let hostedDoc = null;
   try {
     hostedDoc = await fetchHostedClaims();
+    hostedOk = true;
   } catch (_) { /* network */ }
+
+  state.claimableFeedUnavailable = !(localOk || fallbackOk || hostedOk);
 
   const doc = resolveClaimsFeedDoc(localDoc, fallbackDoc, hostedDoc, { preferHosted });
   const feedSource = doc === localDoc ? 'local'
@@ -630,7 +638,8 @@ export function renderClaimableModule() {
   const claims = state.claimableNow;
   const hiddenCount = getHiddenClaims(feedItems).length;
   const ownedCount = getOwnedClaims(feedItems).length;
-  const hide = !show || (!claims.length && !hiddenCount && !ownedCount);
+  const unavailable = state.claimableFeedUnavailable;
+  const hide = !show || (!claims.length && !hiddenCount && !ownedCount && !unavailable);
   if (hide) {
     mount.classList.add('hidden');
     mount.innerHTML = '';
@@ -641,11 +650,13 @@ export function renderClaimableModule() {
   const sponsoredHtml = sponsoredItems.length
     ? `<div class="sponsored-claim-row">${sponsoredItems.map(sponsoredClaimCardHtml).join('')}</div>`
     : '';
+  const emptyReason = unavailable && !claims.length ? 'unavailable' : 'empty';
   mount.innerHTML = sponsoredHtml + claimableModuleMarkup(claims, {
     visibleCount: _claimsVisibleCount,
     attribution: state.claimableFeed?.attribution,
     showHiddenButtonHtml: showHiddenClaimsButtonHtml(hiddenCount + ownedCount),
     allowHero: !_claimDismissedSinceLoad,
+    emptyReason,
   });
   if (claims.length || sponsoredHtml) syncCoverFits(mount);
 }

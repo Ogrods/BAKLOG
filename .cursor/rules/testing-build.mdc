@@ -31,9 +31,11 @@ npm run check:bundle-size       # requires npm run build first
 ## Full suite
 
 ```powershell
-.\scripts\test-all.ps1           # pytest + JS
-.\scripts\test-all.ps1 -Full   # + module-size, lint, build, bundle, dist-integrity (CI parity)
+.\scripts\test-all.ps1           # ruff + pytest + vitest
+.\scripts\test-all.ps1 -Full     # + module-size, lint, build, bundle-size, dist-integrity, audit_free_surface_data
 ```
+
+**Line budgets** (`pytest tests/test_repo_size_budgets.py`): `server.py` **4300**; `scripts/git_tree.py` **720**. Module-size: `js/*.js` **3800** (`table-query.worker.js` exempt).
 
 ## Frontend build (optional)
 

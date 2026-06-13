@@ -9,7 +9,7 @@ Local-only cross-store backlog. Read `AGENTS.md` first.
 
 ## Repo map
 
-- `server.py` — stdlib HTTP server (127.0.0.1:8765), static files + `/api/*` + SSE
+- `server.py` + `shared/server_internal_routes.py` — stdlib HTTP server (127.0.0.1:8765), static files + `/api/*` + SSE; admin routes split to keep server.py under CI line cap
 - `auth/` — encrypted credentials, CDP browser sign-in, provider registry
 - `fetch_*.py` + `fetchers/manifest.json` — whitelisted store fetchers
 - `shared/` — `profile_paths.py`, `install_paths.py`, `free_claims_sources.py`

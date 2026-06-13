@@ -13,10 +13,13 @@ import {
   dupeStampIdSet,
   filterClaimsItems,
   groupDuplicates,
+  isStaleAutoClaim,
+  AUTO_HIDE_AGE_MS,
   looksLikeBonusClaim,
   missingPublishFields,
   normTitleKey,
   pendingNeedsPublishEnrichment,
+  reindexToFeedOrder,
   slugManualId,
   sortClaimsItems,
   stripClaimTitleDecorations,
@@ -319,6 +322,146 @@ describe('sortClaimsItems', () => {
     );
     expect(sorted.map((row) => row.id)).toEqual(['steam-z', 'amazon-a']);
   });
+
+  it('floats a newer first_seen to the top regardless of feed position', () => {
+    const sorted = sortClaimsItems(
+      [
+        { id: 'epic-old', first_seen: '2026-06-11T22:48:59+00:00' },
+        { id: 'gamerpower-3684', first_seen: '2026-06-11T22:48:59+00:00' },
+        { id: 'gamerpower-3410', first_seen: '2026-06-12T21:29:40+00:00' },
+        { id: 'itad-old', first_seen: '2026-06-11T22:48:59+00:00' },
+      ],
+      'newest',
+    );
+    expect(sorted[0].id).toBe('gamerpower-3410');
+  });
+
+  it('keeps feed order for a same-batch tie instead of burying by id', () => {
+    const sorted = sortClaimsItems(
+      [
+        { id: 'epic-a', first_seen: '2026-06-11T22:48:59+00:00' },
+        { id: 'gamerpower-1', first_seen: '2026-06-11T22:48:59+00:00' },
+        { id: 'itad-z', first_seen: '2026-06-11T22:48:59+00:00' },
+      ],
+      'newest',
+    );
+    // Equal stamps must preserve incoming order; id-desc would put itad-z first.
+    expect(sorted.map((row) => row.id)).toEqual(['epic-a', 'gamerpower-1', 'itad-z']);
+  });
+});
+
+describe('reindexToFeedOrder', () => {
+  const feed = [
+    { id: 'epic-a', first_seen: '2026-06-11T22:48:59+00:00' },
+    { id: 'gamerpower-b', first_seen: '2026-06-11T22:48:59+00:00' },
+    { id: 'itad-c', first_seen: '2026-06-11T22:48:59+00:00' },
+    { id: 'gamerpower-new', first_seen: '2026-06-12T21:29:40+00:00' },
+  ];
+
+  it('returns a restored item to its original feed slot after push-to-end', () => {
+    let visible = feed.filter((it) => it.id !== 'gamerpower-b');
+    visible = reindexToFeedOrder(visible, feed);
+    expect(visible.map((row) => row.id)).toEqual(['epic-a', 'itad-c', 'gamerpower-new']);
+
+    // Simulate restoreHiddenItem: push clone to end, then reindex.
+    visible = [...visible, { ...feed[1] }];
+    visible = reindexToFeedOrder(visible, feed);
+    expect(visible.map((row) => row.id)).toEqual([
+      'epic-a',
+      'gamerpower-b',
+      'itad-c',
+      'gamerpower-new',
+    ]);
+  });
+
+  it('matches sortClaimsItems newest order after hide/restore round-trip', () => {
+    let visible = feed.filter((it) => it.id !== 'itad-c');
+    visible = reindexToFeedOrder(visible, feed);
+    visible = [...visible, { ...feed[2] }];
+    visible = reindexToFeedOrder(visible, feed);
+    const sorted = sortClaimsItems(visible, 'newest');
+    expect(sorted.map((row) => row.id)).toEqual([
+      'gamerpower-new',
+      'epic-a',
+      'gamerpower-b',
+      'itad-c',
+    ]);
+  });
+
+  it('places unblock the same as restore for the same feed id', () => {
+    const hiddenId = 'gamerpower-b';
+    const afterRestore = reindexToFeedOrder(
+      [...feed.filter((it) => it.id !== hiddenId), { ...feed[1] }],
+      feed,
+    );
+    const afterUnblock = reindexToFeedOrder(
+      [...feed.filter((it) => it.id !== hiddenId), { ...feed[1] }],
+      feed,
+    );
+    expect(afterRestore.map((row) => row.id)).toEqual(afterUnblock.map((row) => row.id));
+  });
+});
+
+describe('isStaleAutoClaim', () => {
+  const now = Date.parse('2026-06-12T00:00:00+00:00');
+  const oldSeen = new Date(now - AUTO_HIDE_AGE_MS - 86400000).toISOString();
+  const recentSeen = new Date(now - 86400000).toISOString();
+
+  it('is not stale without a first_seen stamp', () => {
+    expect(isStaleAutoClaim({ id: 'a' }, now)).toBe(false);
+  });
+
+  it('is not stale when younger than the threshold', () => {
+    expect(isStaleAutoClaim({ id: 'a', first_seen: recentSeen }, now)).toBe(false);
+  });
+
+  it('is stale when older than a month with no end date', () => {
+    expect(isStaleAutoClaim({ id: 'a', first_seen: oldSeen }, now)).toBe(true);
+  });
+
+  it('is stale when older than a month and already ended', () => {
+    const ended = new Date(now - 86400000).toISOString();
+    expect(isStaleAutoClaim({ id: 'a', first_seen: oldSeen, ends_at: ended }, now)).toBe(true);
+  });
+
+  it('is NOT stale when the end date is still in the future', () => {
+    const future = new Date(now + 7 * 86400000).toISOString();
+    expect(isStaleAutoClaim({ id: 'a', first_seen: oldSeen, ends_at: future }, now)).toBe(false);
+  });
+});
+
+describe('filterClaimsItems stale auto-hide', () => {
+  const now = Date.parse('2026-06-12T00:00:00+00:00');
+  const oldSeen = new Date(now - AUTO_HIDE_AGE_MS - 86400000).toISOString();
+  const recentSeen = new Date(now - 86400000).toISOString();
+  const items = [
+    { id: 'fresh', store: 'epic', title: 'Fresh', claim_url: 'https://x', first_seen: recentSeen },
+    { id: 'stale-unsel', store: 'epic', title: 'StaleUnsel', claim_url: 'https://x', first_seen: oldSeen },
+    { id: 'stale-sel', store: 'epic', title: 'StaleSel', claim_url: 'https://x', first_seen: oldSeen },
+    { id: 'stale-live', store: 'epic', title: 'StaleLive', claim_url: 'https://x', first_seen: oldSeen, ends_at: new Date(now + 7 * 86400000).toISOString() },
+  ];
+  const approvedIds = new Set(['stale-sel']);
+
+  it('hides stale unselected rows from the default view', () => {
+    const out = filterClaimsItems(items, { approvedIds }, now);
+    const ids = out.map((it) => it.id);
+    expect(ids).toContain('fresh');
+    expect(ids).toContain('stale-sel'); // selected stays
+    expect(ids).toContain('stale-live'); // future end date stays
+    expect(ids).not.toContain('stale-unsel');
+  });
+
+  it('shows only stale rows under the stale filter', () => {
+    const out = filterClaimsItems(items, { status: 'stale', approvedIds }, now);
+    const ids = out.map((it) => it.id).sort();
+    expect(ids).toEqual(['stale-sel', 'stale-unsel']);
+  });
+
+  it('does not apply stale auto-hide to explicit filters like unselected', () => {
+    const out = filterClaimsItems(items, { status: 'unselected', approvedIds }, now);
+    const ids = out.map((it) => it.id);
+    expect(ids).toContain('stale-unsel');
+  });
 });
 
 describe('publishDiffFieldChanges', () => {
@@ -328,6 +471,16 @@ describe('publishDiffFieldChanges', () => {
       { title: 'New', review_percent: 70 },
     );
     expect(changes).toEqual([{ field: 'title', before: 'Old', after: 'New' }]);
+  });
+
+  it('includes header_image when cover changes', () => {
+    const changes = publishDiffFieldChanges(
+      { header_image: 'https://example.com/old.jpg' },
+      { header_image: 'https://example.com/new.jpg' },
+    );
+    expect(changes).toEqual([
+      { field: 'header_image', before: 'https://example.com/old.jpg', after: 'https://example.com/new.jpg' },
+    ]);
   });
 });
 
@@ -388,6 +541,26 @@ describe('diffPublishFeeds', () => {
     const diff = diffPublishFeeds(live, pending);
     expect(diff.removed).toHaveLength(0);
     expect(diff.added).toHaveLength(0);
+  });
+});
+
+describe('claimRowStatus manual rows', () => {
+  it('marks unchecked manual rows as not selected', () => {
+    const st = claimRowStatus(
+      { id: 'manual-off', store: 'steam', title: 'Off', claim_url: 'https://x', approved: false },
+      { isAuto: false },
+    );
+    expect(st.publishState).toBe('not_selected');
+    expect(st.publishable).toBe(false);
+  });
+
+  it('marks default manual rows as will publish', () => {
+    const st = claimRowStatus(
+      { id: 'manual-on', store: 'steam', title: 'On', claim_url: 'https://x' },
+      { isAuto: false },
+    );
+    expect(st.publishState).toBe('will_publish');
+    expect(st.publishable).toBe(true);
   });
 });
 

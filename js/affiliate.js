@@ -41,7 +41,7 @@ export const AFFILIATE_CREDENTIALS = {
   humble: '',
   // itch.io (param): your itch.io Partner affiliate code (sets the `ac` cookie).
   //   e.g. 'eob7ZQcpthHDp'
-  itch: '',
+  itch: 'eob7ZQcpthHDp',
 
   // --- Sponsor-feed programs (reference only) ------------------------------
   // These shops are surfaced via the Sponsored feed (curated/sponsors.json),

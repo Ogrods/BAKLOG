@@ -298,6 +298,7 @@ def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:
     return True
 
 # Personal-data persistence (scoped to active profile via shared.profile_paths).
+from shared import server_internal_routes  # noqa: E402
 from shared.platform_support import platform_supported  # noqa: E402
 from shared.profile_paths import (  # noqa: E402
     PROFILE_CACHE_JSON_FILES,
@@ -314,7 +315,6 @@ from shared.profile_paths import (  # noqa: E402
     set_request_profile_id,
     sponsors_path,
 )
-from shared.safe_write import safe_write_text  # noqa: E402
 from shared.server_static import (  # noqa: E402
     LIBRARY_JSON_RE as _LIBRARY_JSON_RE,
 )
@@ -327,7 +327,6 @@ from shared.server_static import (  # noqa: E402
 from shared.server_static import (  # noqa: E402
     static_class as _static_class_impl,
 )
-from shared.sponsors_validate import validate_sponsors_payload  # noqa: E402
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
@@ -738,6 +737,11 @@ _DEFAULT_INTERNAL_JOBS: dict[str, dict[str, Any]] = {
         "options": {
             "--dry-run": {"type": "bool", "default": False},
             "--no-profile": {"type": "bool", "default": False},
+            "--allow-empty": {"type": "bool", "default": False},
+            "--require-manual-approval": {
+                "type": "bool",
+                "default": False,
+            },
         },
     },
 }
@@ -852,11 +856,6 @@ def validate_internal_args(spec: dict[str, Any], args: dict[str, Any]) -> list[s
     return extra
 
 
-def _is_safe_http_url(url: str) -> bool:
-    u = str(url or "").strip()
-    return u.startswith("http://") or u.startswith("https://")
-
-
 def _resolve_contained_data_path(rel: Path) -> Path | None:
     """Resolve rel under data_root(); None when the path escapes the data root."""
     root = data_root().resolve()
@@ -876,75 +875,6 @@ def _admin_list_too_large(items: list[Any], *, cap: int, label: str) -> str | No
 
 def _is_internal_admin_path(path: str) -> bool:
     return path.startswith("/api/internal/")
-
-
-def _validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
-    items = doc.get("items")
-    if not isinstance(items, list):
-        return "items must be a list"
-    too_large = _admin_list_too_large(items, cap=MAX_ADMIN_CLAIM_ITEMS, label="items")
-    if too_large:
-        return too_large
-    for i, item in enumerate(items):
-        if not isinstance(item, dict):
-            return f"items[{i}] must be an object"
-        for field in ("id", "store", "title", "claim_url"):
-            if not str(item.get(field) or "").strip():
-                return f"items[{i}] missing {field}"
-        if not _is_safe_http_url(str(item.get("claim_url") or "")):
-            return f"items[{i}] claim_url must start with http:// or https://"
-        premium_only = item.get("premium_only")
-        if premium_only is not None and not isinstance(premium_only, bool):
-            return f"items[{i}] premium_only must be a boolean"
-    return None
-
-
-def _validate_approved_payload(doc: dict[str, Any]) -> str | None:
-    ids = doc.get("ids")
-    if not isinstance(ids, list):
-        return "ids must be a list"
-    for i, item_id in enumerate(ids):
-        if not str(item_id or "").strip():
-            return f"ids[{i}] must be a non-empty string"
-    overrides = doc.get("store_overrides")
-    if overrides is not None:
-        if not isinstance(overrides, dict):
-            return "store_overrides must be an object"
-        for key, val in overrides.items():
-            if not str(val or "").strip():
-                return f"store_overrides[{key}] must be a non-empty string"
-    field_overrides = doc.get("field_overrides")
-    if field_overrides is not None:
-        if not isinstance(field_overrides, dict):
-            return "field_overrides must be an object"
-        allowed = {"title", "claim_url", "ends_at"}
-        for key, val in field_overrides.items():
-            if not isinstance(val, dict):
-                return f"field_overrides[{key}] must be an object"
-            for field, field_val in val.items():
-                if field not in allowed:
-                    return f"field_overrides[{key}] unknown key {field!r}"
-                if field in ("title", "claim_url") and not str(field_val or "").strip():
-                    return f"field_overrides[{key}][{field}] must be a non-empty string"
-                if field == "claim_url" and not _is_safe_http_url(str(field_val or "")):
-                    return f"field_overrides[{key}][claim_url] must start with http:// or https://"
-                if field == "ends_at" and field_val is not None and not str(field_val).strip():
-                    return f"field_overrides[{key}][ends_at] must be a non-empty string"
-    dismissed = doc.get("dismissed")
-    if dismissed is not None:
-        if not isinstance(dismissed, list):
-            return "dismissed must be a list"
-        for i, item_id in enumerate(dismissed):
-            if not str(item_id or "").strip():
-                return f"dismissed[{i}] must be a non-empty string"
-    premium_only_ids = doc.get("premium_only_ids")
-    if premium_only_ids is not None:
-        if not isinstance(premium_only_ids, list):
-            return "premium_only_ids must be a list"
-        for i, item_id in enumerate(premium_only_ids):
-            if not str(item_id or "").strip():
-                return f"premium_only_ids[{i}] must be a non-empty string"
-    return None
 
 
 def _read_optional_json(path: Path) -> dict[str, Any] | None:
@@ -2852,19 +2782,19 @@ class Handler(SimpleHTTPRequestHandler):
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_jobs_get()
+            server_internal_routes.handle_internal_jobs_get(self)
             return
         if path == "/api/internal/free-claims":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_free_claims_get()
+            server_internal_routes.handle_internal_free_claims_get(self)
             return
         if path == "/api/internal/sponsors":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_sponsors_get()
+            server_internal_routes.handle_internal_sponsors_get(self)
             return
         if not _require_api_auth(self):
             return
@@ -2930,19 +2860,19 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
             key = path[len("/api/internal/run/") :].strip("/").split("/", 1)[0]
-            self._handle_internal_submit(key)
+            server_internal_routes.handle_internal_submit(self, key)
             return
         if path == "/api/internal/free-claims/enrich":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_free_claims_enrich()
+            server_internal_routes.handle_internal_free_claims_enrich(self)
             return
         if path == "/api/internal/free-claims/preview":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_free_claims_preview()
+            server_internal_routes.handle_internal_free_claims_preview(self)
             return
         if path == "/api/auth/stream-ticket":
             from shared.supabase_auth import auth_enabled, verify_bearer_user
@@ -3067,19 +2997,19 @@ class Handler(SimpleHTTPRequestHandler):
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_free_claims_approved_put()
+            server_internal_routes.handle_internal_free_claims_approved_put(self)
             return
         if path == "/api/internal/free-claims":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_free_claims_put()
+            server_internal_routes.handle_internal_free_claims_put(self)
             return
         if path == "/api/internal/sponsors":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
-            self._handle_internal_sponsors_put()
+            server_internal_routes.handle_internal_sponsors_put(self)
             return
         if not _require_api_auth(self):
             return
@@ -3165,358 +3095,6 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.OK, data)
         except Exception as exc:  # noqa: BLE001
             _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-
-    def _handle_internal_jobs_get(self) -> None:
-        jobs = [
-            {
-                "key": key,
-                "label": spec["label"],
-                "group": spec.get("group", "internal"),
-                "description": spec.get("description", ""),
-                "options": spec.get("options") or {},
-            }
-            for key, spec in INTERNAL_JOBS.items()
-        ]
-        _send_json(self, HTTPStatus.OK, {"jobs": jobs})
-
-    def _handle_internal_submit(self, key: str) -> None:
-        if key not in INTERNAL_JOBS:
-            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown internal job: {key}"})
-            return
-        payload, err = _read_json_body(self)
-        if err == "empty body":
-            payload = {}
-        elif err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        args_in = payload.get("args") or {}
-        if not isinstance(args_in, dict):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "args must be an object"})
-            return
-        try:
-            extra = validate_internal_args(INTERNAL_JOBS[key], args_in)
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        try:
-            run = MANAGER.submit_internal(key, extra)
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.CONFLICT, {"error": str(exc)})
-            return
-        _send_json(
-            self,
-            HTTPStatus.ACCEPTED,
-            {
-                "run_id": run.id,
-                "key": run.key,
-                "label": run.label,
-                "status": run.status,
-            },
-        )
-
-    def _handle_internal_free_claims_enrich(self) -> None:
-        payload, err = _read_json_body(self)
-        if err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        items = payload.get("items")
-        if not isinstance(items, list):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "items must be a list"})
-            return
-        too_large = _admin_list_too_large(
-            items, cap=MAX_ADMIN_ENRICH_BATCH, label="enrich items",
-        )
-        if too_large:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": too_large})
-            return
-        from build_free_claims import (
-            _build_cover_lookup,
-            _enrich_item,
-            merge_enriched_items_into_auto_feed,
-        )
-
-        cover_lookup = _build_cover_lookup(
-            [raw for raw in items if isinstance(raw, dict)]
-        )
-        last_call = [0.0]
-        enriched: list[dict[str, Any]] = []
-        for raw in items:
-            if not isinstance(raw, dict):
-                enriched.append({})
-                continue
-            enriched.append(
-                _enrich_item(raw, last_call, cover_lookup, upgrade_covers=True)
-            )
-
-        root = data_root()
-        auto_path = root / FREE_CLAIMS_AUTO_PATH
-        auto_doc = _read_optional_json(auto_path) or {}
-        auto_ids = {
-            str(it.get("id") or "").strip()
-            for it in (auto_doc.get("items") or [])
-            if isinstance(it, dict) and str(it.get("id") or "").strip()
-        }
-        to_persist = [
-            row for row in enriched
-            if isinstance(row, dict) and str(row.get("id") or "").strip() in auto_ids
-        ]
-        persisted = merge_enriched_items_into_auto_feed(auto_path, to_persist)
-
-        _send_json(
-            self,
-            HTTPStatus.OK,
-            {"items": enriched, "count": len(enriched), "persisted": persisted},
-        )
-
-    def _handle_internal_free_claims_preview(self) -> None:
-        payload, err = _read_json_body(self)
-        if err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        manual_items = payload.get("manual_items")
-        auto_items = payload.get("auto_items")
-        approved = payload.get("approved_ids")
-        if manual_items is not None and not isinstance(manual_items, list):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "manual_items must be a list"})
-            return
-        if auto_items is not None and not isinstance(auto_items, list):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "auto_items must be a list"})
-            return
-        if approved is not None and not isinstance(approved, list):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "approved_ids must be a list"})
-            return
-        dismissed = payload.get("dismissed")
-        if dismissed is not None and not isinstance(dismissed, list):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "dismissed must be a list"})
-            return
-        premium_only = payload.get("premium_only_ids")
-        if premium_only is not None and not isinstance(premium_only, list):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "premium_only_ids must be a list"})
-            return
-
-        root = data_root()
-        if manual_items is None:
-            manual_doc = _read_optional_json(root / FREE_CLAIMS_INPUT_PATH) or {}
-            manual_items = manual_doc.get("items") or []
-        if auto_items is None:
-            auto_doc = _read_optional_json(root / FREE_CLAIMS_AUTO_PATH) or {}
-            auto_items = auto_doc.get("items") or []
-        if approved is None:
-            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
-            approved = approved_doc.get("ids") or []
-
-        store_overrides = payload.get("store_overrides")
-        if store_overrides is None:
-            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
-            store_overrides = approved_doc.get("store_overrides") or {}
-        field_overrides = payload.get("field_overrides")
-        if field_overrides is None:
-            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
-            field_overrides = approved_doc.get("field_overrides") or {}
-        if dismissed is None:
-            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
-            dismissed = approved_doc.get("dismissed") or []
-        premium_only_ids_payload = payload.get("premium_only_ids")
-        if premium_only_ids_payload is None:
-            approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
-            premium_only_ids_payload = approved_doc.get("premium_only_ids") or []
-
-        if not isinstance(store_overrides, dict):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "store_overrides must be an object"})
-            return
-        if not isinstance(field_overrides, dict):
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "field_overrides must be an object"})
-            return
-
-        manual_list = [it for it in (manual_items or []) if isinstance(it, dict)]
-        auto_list = [it for it in (auto_items or []) if isinstance(it, dict)]
-        for label, lst in (("manual_items", manual_list), ("auto_items", auto_list)):
-            too_large = _admin_list_too_large(lst, cap=MAX_ADMIN_CLAIM_ITEMS, label=label)
-            if too_large:
-                _send_json(self, HTTPStatus.BAD_REQUEST, {"error": too_large})
-                return
-
-        from build_free_claims import preview_publish_items
-
-        approved_ids = {
-            str(item_id).strip()
-            for item_id in approved
-            if str(item_id).strip()
-        }
-        clean_store: dict[str, str] = {}
-        for key, val in store_overrides.items():
-            k = str(key).strip()
-            v = str(val or "").strip().lower()
-            if k and v:
-                clean_store[k] = v
-        dismissed_ids = {
-            str(item_id).strip()
-            for item_id in (dismissed or [])
-            if str(item_id).strip()
-        }
-        premium_only_ids = {
-            str(item_id).strip()
-            for item_id in (premium_only_ids_payload or [])
-            if str(item_id).strip()
-        }
-
-        built_doc = _read_optional_json(root / FREE_CLAIMS_BUILT_PATH) or {}
-        live_items = [
-            it for it in (built_doc.get("items") or []) if isinstance(it, dict)
-        ]
-
-        items = preview_publish_items(
-            manual_items=manual_list,
-            auto_items_all=auto_list,
-            approved_ids=approved_ids,
-            store_overrides=clean_store,
-            field_overrides={
-                str(k).strip(): v
-                for k, v in field_overrides.items()
-                if str(k).strip() and isinstance(v, dict)
-            },
-            dismissed_ids=dismissed_ids,
-            live_items=live_items,
-            premium_only_ids=premium_only_ids,
-        )
-        # Mirror build_free_claims.py: the published feed carries the GamerPower
-        # attribution credit whenever a GamerPower-sourced item is present, so the
-        # preview iframe renders the same footer a brand-new user sees.
-        from build_free_claims import GAMERPOWER_ATTRIBUTION
-
-        attribution = (
-            [GAMERPOWER_ATTRIBUTION]
-            if any(item.get("source") == "gamerpower" for item in items)
-            else []
-        )
-        _send_json(
-            self,
-            HTTPStatus.OK,
-            {"items": items, "count": len(items), "attribution": attribution},
-        )
-
-    def _handle_internal_free_claims_get(self) -> None:
-        root = data_root()
-        approved_doc = _read_optional_json(root / FREE_CLAIMS_APPROVED_PATH) or {}
-        approved_ids = approved_doc.get("ids") or []
-        if not isinstance(approved_ids, list):
-            approved_ids = []
-        store_overrides = approved_doc.get("store_overrides")
-        if not isinstance(store_overrides, dict):
-            store_overrides = {}
-        field_overrides = approved_doc.get("field_overrides")
-        if not isinstance(field_overrides, dict):
-            field_overrides = {}
-        dismissed = approved_doc.get("dismissed")
-        if not isinstance(dismissed, list):
-            dismissed = []
-        premium_only_ids = approved_doc.get("premium_only_ids")
-        if not isinstance(premium_only_ids, list):
-            premium_only_ids = []
-        _send_json(
-            self,
-            HTTPStatus.OK,
-            {
-                "input": _read_optional_json(root / FREE_CLAIMS_INPUT_PATH) or {"items": []},
-                "auto": _read_optional_json(root / FREE_CLAIMS_AUTO_PATH),
-                "approved": approved_ids,
-                "store_overrides": store_overrides,
-                "field_overrides": field_overrides,
-                "dismissed": dismissed,
-                "premium_only_ids": premium_only_ids,
-                "built": _read_optional_json(root / FREE_CLAIMS_BUILT_PATH),
-            },
-        )
-
-    def _handle_internal_free_claims_put(self) -> None:
-        payload, err = _read_json_body(self)
-        if err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        validation_err = _validate_free_claims_payload(payload)
-        if validation_err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
-            return
-        out_path = _resolve_contained_data_path(FREE_CLAIMS_INPUT_PATH)
-        if out_path is None:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid free-claims input path"})
-            return
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        safe_write_text(
-            out_path,
-            json.dumps(payload, indent=2, ensure_ascii=False),
-        )
-        _send_json(self, HTTPStatus.OK, {"ok": True, "items": len(payload.get("items") or [])})
-
-    def _handle_internal_free_claims_approved_put(self) -> None:
-        payload, err = _read_json_body(self)
-        if err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        validation_err = _validate_approved_payload(payload)
-        if validation_err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
-            return
-        from build_free_claims import parse_approved_put_payload, prepare_approved_document
-
-        parsed = parse_approved_put_payload(payload)
-        root = data_root()
-        auto_doc = _read_optional_json(root / FREE_CLAIMS_AUTO_PATH) or {}
-        auto_items = [it for it in (auto_doc.get("items") or []) if isinstance(it, dict)]
-        built_doc = _read_optional_json(root / FREE_CLAIMS_BUILT_PATH) or {}
-        prior_rows = {
-            str(it.get("id") or "").strip(): it
-            for it in (built_doc.get("items") or [])
-            if isinstance(it, dict) and str(it.get("id") or "").strip()
-        }
-        out = prepare_approved_document(**parsed, auto_items=auto_items, prior_rows_by_id=prior_rows)
-        out_path = data_root() / FREE_CLAIMS_APPROVED_PATH
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        safe_write_text(
-            out_path,
-            json.dumps(out, indent=2, ensure_ascii=False),
-        )
-        _send_json(self, HTTPStatus.OK, {"ok": True, "ids": len(out.get("ids") or [])})
-
-    def _handle_internal_sponsors_get(self) -> None:
-        root = data_root()
-        _send_json(
-            self,
-            HTTPStatus.OK,
-            {
-                "input": _read_optional_json(root / SPONSORS_PATH) or {"items": []},
-            },
-        )
-
-    def _handle_internal_sponsors_put(self) -> None:
-        payload, err = _read_json_body(self)
-        if err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        validation_err = validate_sponsors_payload(payload)
-        if validation_err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": validation_err})
-            return
-        out_path = _resolve_contained_data_path(SPONSORS_PATH)
-        if out_path is None:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid sponsors input path"})
-            return
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        safe_write_text(
-            out_path,
-            json.dumps(payload, indent=2, ensure_ascii=False),
-        )
-        if payload.get("version") == 2:
-            count = len(payload.get("ads") or {})
-        else:
-            count = len(payload.get("items") or [])
-        _send_json(self, HTTPStatus.OK, {"ok": True, "items": count, "ads": count})
 
     @staticmethod
     def _parse_run_submit_path(rest: str) -> tuple[str, bool]:

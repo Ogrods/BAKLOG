@@ -13,7 +13,7 @@ from pathlib import Path
 
 import requests
 
-from fetchers._base import configure_stdout
+from fetchers._base import configure_stdout, refuse_empty_result
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
@@ -311,7 +311,7 @@ def _infer_store_from_text(store: str, title: str, blurb: object, claim_url: str
     return store or "other"
 
 
-DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower"})
+DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower", "itad"})
 DEFAULT_EXPIRY_DAYS = 14
 
 
@@ -530,17 +530,26 @@ def _load_approved_ids(path: Path) -> set[str]:
     return {str(item_id).strip() for item_id in ids if str(item_id).strip()}
 
 
-def _load_dismissed_ids(path: Path) -> set[str]:
+def _load_id_list(path: Path, key: str) -> set[str]:
     if not path.is_file():
         return set()
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return set()
-    dismissed = doc.get("dismissed") or []
-    if not isinstance(dismissed, list):
+    values = doc.get(key) or []
+    if not isinstance(values, list):
         return set()
-    return {str(item_id).strip() for item_id in dismissed if str(item_id).strip()}
+    return {str(item_id).strip() for item_id in values if str(item_id).strip()}
+
+
+def _load_dismissed_ids(path: Path) -> set[str]:
+    return _load_id_list(path, "dismissed")
+
+
+def _load_blocked_ids(path: Path) -> set[str]:
+    """Permanently blocked claim ids — hidden from the feed and the review modal."""
+    return _load_id_list(path, "blocked")
 
 
 def _load_premium_only_ids(path: Path) -> set[str]:
@@ -565,6 +574,38 @@ def _manual_premium_only_ids(manual_items: list[dict]) -> set[str]:
         if item_id and item.get("premium_only") is True:
             out.add(item_id)
     return out
+
+
+def require_manual_approval_enabled(*, env: bool | None = None, cli_flag: bool = False) -> bool:
+    """True when manual rows need an explicit ``approved: true`` to publish."""
+    if cli_flag:
+        return True
+    if env is not None:
+        return env
+    return os.environ.get("BAKLOG_REQUIRE_MANUAL_APPROVAL") == "1"
+
+
+def manual_row_publishable(item: dict, *, require_manual_approval: bool) -> bool:
+    """Whether a manual input row should reach the published feed."""
+    if not isinstance(item, dict):
+        return False
+    if require_manual_approval:
+        return item.get("approved") is True
+    return item.get("approved") is not False
+
+
+def filter_manual_items_for_publish(
+    manual_items: list[dict],
+    *,
+    require_manual_approval: bool,
+) -> list[dict]:
+    return [
+        item
+        for item in manual_items
+        if isinstance(item, dict) and manual_row_publishable(
+            item, require_manual_approval=require_manual_approval
+        )
+    ]
 
 
 def _apply_premium_only(
@@ -931,10 +972,16 @@ def _enrich_item_light(
     header = raw.get("header_image")
     genres = raw.get("genres") or []
     review = raw.get("review_percent")
-    if review is None and live_item is not None:
-        live_review = live_item.get("review_percent")
-        if live_review is not None:
-            review = live_review
+    if live_item is not None:
+        live_header = str(live_item.get("header_image") or "").strip()
+        if live_header:
+            current = str(header or "").strip()
+            if not current or _cover_quality(live_header) >= _cover_quality(current):
+                header = live_header
+        if review is None:
+            live_review = live_item.get("review_percent")
+            if live_review is not None:
+                review = live_review
     # Title-keyed fallback: a re-keyed copy (e.g. ITAD id kept over the Epic
     # sibling) won't id-match the live row, so borrow the review by title.
     if review is None and review_lookup:
@@ -985,6 +1032,7 @@ def preview_publish_items(
     dismissed_ids: set[str] | None = None,
     live_items: list[dict] | None = None,
     premium_only_ids: set[str] | None = None,
+    require_manual_approval: bool = False,
     now: datetime | None = None,
 ) -> list[dict]:
     """Dry-run merge + prune for admin preview (no disk writes, no Steam API)."""
@@ -1024,7 +1072,11 @@ def preview_publish_items(
             field_overrides_by_key=field_by_key,
         )
 
-    raw_items = merge_manual_and_auto(manual_items, auto_items)
+    publish_manual = filter_manual_items_for_publish(
+        manual_items,
+        require_manual_approval=require_manual_approval,
+    )
+    raw_items = merge_manual_and_auto(publish_manual, auto_items)
     cover_lookup = _build_cover_lookup(auto_items_all)
     review_lookup = _build_review_lookup(list(live_by_id.values()) + auto_items_all)
     items: list[dict] = []
@@ -1129,6 +1181,46 @@ def merge_enriched_items_into_auto_feed(
     return updated
 
 
+def merge_enriched_items_into_input_feed(
+    input_path: Path,
+    enriched_items: list[dict],
+) -> int:
+    """Persist enrichment onto manual rows in free-claims.input.json matched by id."""
+    if not input_path.is_file():
+        return 0
+    try:
+        doc = json.loads(input_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    items = doc.get("items") or []
+    if not isinstance(items, list):
+        return 0
+
+    by_id = {
+        str(item.get("id") or "").strip(): item
+        for item in enriched_items
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    }
+    if not by_id:
+        return 0
+
+    updated = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("id") or "").strip()
+        enriched = by_id.get(item_id)
+        if not enriched:
+            continue
+        if _apply_enrich_fields_to_item(item, enriched):
+            updated += 1
+
+    if updated:
+        doc["items"] = items
+        safe_write_text(input_path, json.dumps(doc, indent=2, ensure_ascii=False))
+    return updated
+
+
 def rekey_approved_state(
     *,
     ids: list[str],
@@ -1222,11 +1314,20 @@ def parse_approved_put_payload(payload: dict) -> dict:
                 cleaned[field] = text
         if cleaned:
             field_overrides[k] = cleaned
+    # Blocked wins over dismissed: a permanently blocked id never lingers in the
+    # reviewable dismissed list. Neither list may shadow an approved id.
+    blocked: list[str] = []
+    seen_blocked: set[str] = set()
+    for item_id in payload.get("blocked") or []:
+        b = str(item_id).strip()
+        if b and b not in id_set and b not in seen_blocked:
+            blocked.append(b)
+            seen_blocked.add(b)
     dismissed: list[str] = []
     seen_dismissed: set[str] = set()
     for item_id in payload.get("dismissed") or []:
         d = str(item_id).strip()
-        if d and d not in id_set and d not in seen_dismissed:
+        if d and d not in id_set and d not in seen_blocked and d not in seen_dismissed:
             dismissed.append(d)
             seen_dismissed.add(d)
     premium_only_ids: set[str] = set()
@@ -1240,6 +1341,7 @@ def parse_approved_put_payload(payload: dict) -> dict:
         "field_overrides": field_overrides,
         "premium_only_ids": premium_only_ids,
         "dismissed": dismissed,
+        "blocked": blocked,
     }
 
 
@@ -1251,9 +1353,15 @@ def prepare_approved_document(
     premium_only_ids: set[str],
     dismissed: list[str],
     auto_items: list[dict],
+    blocked: list[str] | None = None,
     prior_rows_by_id: dict[str, dict] | None = None,
 ) -> dict:
-    """Re-key approved state and shape the on-disk approved.json document."""
+    """Re-key approved state and shape the on-disk approved.json document.
+
+    Soft-hidden (``dismissed``) ids that no longer exist in the source feed are
+    orphan-pruned here so the reviewable hidden list self-cycles; ``blocked`` ids
+    (a permanent kill list) are kept verbatim so a re-listed claim never returns.
+    """
     rekeyed_ids, store, fields, premium = rekey_approved_state(
         ids=ids,
         store_overrides=store_overrides,
@@ -1267,13 +1375,28 @@ def prepare_approved_document(
     premium_list = sorted(p for p in premium if p in id_set)
     merged_fields = dict(field_overrides)
     merged_fields.update(fields)
+    blocked_list = list(blocked or [])
+    blocked_set = set(blocked_list)
+    auto_ids = {
+        str(it.get("id") or "").strip()
+        for it in (auto_items or [])
+        if isinstance(it, dict) and str(it.get("id") or "").strip()
+    }
+    # Orphan-prune dismissed ids: keep only those still in the feed (so the
+    # hidden modal stays meaningful). Drop any that became blocked.
+    pruned_dismissed = [
+        d for d in dismissed
+        if d not in blocked_set and (not auto_ids or d in auto_ids)
+    ]
     out: dict = {"ids": rekeyed_ids}
     if store:
         out["store_overrides"] = store
     if merged_fields:
         out["field_overrides"] = merged_fields
-    if dismissed:
-        out["dismissed"] = dismissed
+    if pruned_dismissed:
+        out["dismissed"] = pruned_dismissed
+    if blocked_list:
+        out["blocked"] = blocked_list
     if premium_list:
         out["premium_only_ids"] = premium_list
     return out
@@ -1316,7 +1439,18 @@ def main() -> int:
         help="Skip writing the active profile's free_claims.json (publish-only)",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Allow overwriting the published feed with zero items",
+    )
+    parser.add_argument(
+        "--require-manual-approval",
+        action="store_true",
+        help="Only publish manual rows with approved: true (default: publish unless approved: false)",
+    )
     args = parser.parse_args()
+    require_manual_approval = require_manual_approval_enabled(cli_flag=args.require_manual_approval)
 
     stats = RunStats()
     t0 = started("build_free_claims.py")
@@ -1344,7 +1478,9 @@ def main() -> int:
             by_source[src] = by_source.get(src, 0) + 1
         _debug_claims(f"auto feed: {len(auto_items_all)} item(s) by source {by_source}")
     approved_ids = _load_approved_ids(APPROVED_PATH)
-    dismissed_ids = _load_dismissed_ids(APPROVED_PATH)
+    # Blocked ids are a permanent kill list; fold them into the dismissed filter
+    # so they are excluded from the feed exactly like a soft-hidden claim.
+    dismissed_ids = _load_dismissed_ids(APPROVED_PATH) | _load_blocked_ids(APPROVED_PATH)
     premium_only_ids = _load_premium_only_ids(APPROVED_PATH)
     store_overrides = _load_store_overrides(APPROVED_PATH)
     field_overrides = _load_field_overrides(APPROVED_PATH)
@@ -1437,7 +1573,28 @@ def main() -> int:
             f"approved selection: {len(auto_items)} of {len(auto_items_all)} auto; "
             f"dismissed={len(dismissed_ids)} expired_approved={len(expired_approved_ids)}"
         )
-    raw_items = merge_manual_and_auto(manual_items, auto_items)
+    publish_manual = filter_manual_items_for_publish(
+        manual_items,
+        require_manual_approval=require_manual_approval,
+    )
+    skipped_manual = max(0, len(manual_items) - len(publish_manual))
+    if skipped_manual:
+        stats.warn(
+            f"skipped {skipped_manual} unapproved manual item(s) "
+            f"(require_manual_approval={require_manual_approval})"
+        )
+    if publish_manual:
+        shipped_manual_ids = [
+            str(item.get("id") or "").strip()
+            for item in publish_manual
+            if str(item.get("id") or "").strip()
+        ]
+        if shipped_manual_ids:
+            stats.warn(
+                f"manual rows publishing ({len(shipped_manual_ids)}): "
+                + ", ".join(shipped_manual_ids)
+            )
+    raw_items = merge_manual_and_auto(publish_manual, auto_items)
     if auto_items:
         stats.warn(f"merged {len(auto_items)} auto item(s); {len(raw_items)} total before enrich")
 
@@ -1495,15 +1652,23 @@ def main() -> int:
         manual_items=manual_items,
     )
 
-    if not args.dry_run and auto_items:
+    if not args.dry_run:
         auto_ids = {str(it.get("id") or "").strip() for it in auto_items}
-        to_persist = [
+        manual_ids = {str(it.get("id") or "").strip() for it in publish_manual}
+        to_persist_auto = [
             it for it in items
             if str(it.get("id") or "").strip() in auto_ids
         ]
-        persisted = merge_enriched_items_into_auto_feed(AUTO_PATH, to_persist)
-        if persisted:
-            stats.warn(f"persisted enrichment onto {persisted} auto feed row(s)")
+        to_persist_manual = [
+            it for it in items
+            if str(it.get("id") or "").strip() in manual_ids
+        ]
+        persisted_auto = merge_enriched_items_into_auto_feed(AUTO_PATH, to_persist_auto)
+        if persisted_auto:
+            stats.warn(f"persisted enrichment onto {persisted_auto} auto feed row(s)")
+        persisted_manual = merge_enriched_items_into_input_feed(args.input, to_persist_manual)
+        if persisted_manual:
+            stats.warn(f"persisted enrichment onto {persisted_manual} manual input row(s)")
 
     generated_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
@@ -1549,6 +1714,15 @@ def main() -> int:
             flush=True,
         )
     else:
+        empty_code = refuse_empty_result(
+            items,
+            label="build_free_claims publish set",
+            allow_empty=args.allow_empty,
+            output_path=args.output,
+        )
+        if empty_code:
+            stats.error("refusing empty publish — re-run with --allow-empty if intentional")
+            return stats.finish("build_free_claims", t0, exit_code=empty_code)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(args.output, text)
         FALLBACK_PATH.parent.mkdir(parents=True, exist_ok=True)

@@ -350,16 +350,20 @@ export function claimableModuleMarkup(claims, {
   attribution = null,
   showHiddenButtonHtml = '',
   allowHero = true,
+  emptyReason = 'empty',
 } = {}) {
   const list = Array.isArray(claims) ? claims : [];
   const showHiddenBtn = showHiddenButtonHtml || '';
   const attributionHtml = claimAttributionHtml(attribution);
   if (!list.length) {
+    const emptyMsg = emptyReason === 'unavailable'
+      ? 'Feed updating - check back soon.'
+      : 'No new free games to claim right now.';
     return `<section class="claimable-now-module dash-card claim-rows-card claim-empty-card" aria-label="Claimable Now">
       <div class="claim-empty-row">
         <div class="claim-empty-text">
           <span class="dash-kpi-label claim-rows-head">Claimable Now</span>
-          <span class="claim-empty-msg">No new free games to claim right now.</span>
+          <span class="claim-empty-msg">${escapeHtml(emptyMsg)}</span>
         </div>
         <div class="claim-empty-actions">${showHiddenBtn}</div>
       </div>

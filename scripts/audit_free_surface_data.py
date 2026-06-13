@@ -166,7 +166,7 @@ def _is_expired(item: dict, now: datetime | None = None) -> bool:
     return parsed < now
 
 
-def _row_issues(item: dict, *, now: datetime | None = None) -> list[str]:
+def _row_issues(item: dict, *, now: datetime | None = None, feed_name: str = "") -> list[str]:
     issues: list[str] = []
     for field in REQUIRED_ITEM_FIELDS:
         if not str(item.get(field) or "").strip():
@@ -192,7 +192,7 @@ def _row_issues(item: dict, *, now: datetime | None = None) -> list[str]:
         issues.append("steam_store_no_appid")
     if appid is not None and review is None:
         issues.append("appid_no_review")
-    if item.get("ends_at") is None and source == "itad":
+    if item.get("ends_at") is None and source == "itad" and feed_name == "auto":
         issues.append("itad_no_ends_at")
     return issues
 
@@ -246,7 +246,7 @@ def _audit_feed(name: str, doc: dict | None, path: Path) -> dict[str, Any]:
     items = _items(doc)
     rows = []
     for item in items:
-        issues = _row_issues(item, now=now)
+        issues = _row_issues(item, now=now, feed_name=name)
         rows.append(
             {
                 "id": item.get("id"),
@@ -711,7 +711,7 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
                         feed_name,
                         f"ITAD row {row.get('id')} has ends_at=null",
                         "Expiry known or UX handles unknown",
-                        "Document unknown-expiry UX; optional manual field_overrides",
+                        "Document unknown-expiry UX; build assigns 14d default at publish",
                         row=row.get("id"),
                         blocks="ITAD ends_at: null",
                     )
@@ -939,18 +939,28 @@ def main() -> int:
     parser.add_argument("--handoff-out", default="review-handoff.md", help="Executive handoff markdown")
     parser.add_argument("--check-urls", action="store_true", help="HEAD-check up to 30 cover URLs (slow)")
     parser.add_argument("--url-limit", type=int, default=30)
+    parser.add_argument(
+        "--fail-on",
+        choices=("high", "medium", "low"),
+        default=None,
+        help="Exit 1 when findings at or above this severity exist (CI gate)",
+    )
     args = parser.parse_args()
 
     profile_id = args.profile or get_active_profile_id()
     report = run_audit(profile_id, check_urls=args.check_urls, url_limit=args.url_limit)
 
+    out_path = ROOT / args.out
     baseline_path = ROOT / args.baseline_out
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
     baseline_path.write_text(json.dumps(report["baseline"], indent=2, ensure_ascii=False), encoding="utf-8")
 
     out_path = ROOT / args.out
     out_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
     findings_path = ROOT / args.findings_out
+    findings_path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["# Free-tier data review findings", f"# captured: {report['captured_at']}", ""]
     for f in report["findings"]:
         lines.append(f"- id: {f['id']}")
@@ -962,9 +972,11 @@ def main() -> int:
     findings_path.write_text("\n".join(lines), encoding="utf-8")
 
     csv_path = ROOT / args.csv_out
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
     _write_row_csv(report, csv_path)
 
     handoff_path = ROOT / args.handoff_out
+    handoff_path.parent.mkdir(parents=True, exist_ok=True)
     _write_handoff_md(report, handoff_path)
 
     print(f"Profile: {profile_id}")
@@ -974,6 +986,16 @@ def main() -> int:
     print(f"Handoff  -> {handoff_path}")
     print(f"Findings -> {findings_path} ({len(report['findings'])} items)")
     print(f"Summary: {dict(report['findings_summary'])} by severity, {dict(report['findings_by_owner'])} by owner")
+    if args.fail_on:
+        rank = {"high": 3, "medium": 2, "low": 1}
+        floor = rank[args.fail_on]
+        bad = [f for f in report["findings"] if rank.get(f.get("severity"), 0) >= floor]
+        if bad:
+            print(
+                f"FAIL: {len(bad)} finding(s) at or above {args.fail_on} severity",
+                file=sys.stderr,
+            )
+            return 1
     return 0
 
 

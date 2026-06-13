@@ -117,17 +117,42 @@ vercel dev   # run from landing/  (uses .env / Vercel env)
 
 ## Claimable Now feed (`free-claims.json`)
 
-The local app and read-only mode pull a maintainer-curated list of free giveaways from `https://baklog.app/free-claims.json`. The feed aggregates active giveaways from Epic, GamerPower, and IsThereAnyDeal (Epic, GOG, Steam, Prime, and more). This file is **not** built by Vercel — you publish it from the repo:
+The local app and read-only mode pull a maintainer-curated list of free giveaways from `https://baklog.app/free-claims.json`. The feed aggregates active giveaways from Epic, GamerPower, and IsThereAnyDeal (Epic, GOG, Steam, Prime, and more). This file is **not** built by Vercel — you publish it from the repo.
 
-0. Run `python fetch_claim_sources.py` (optionally `--dry-run`) to refresh auto-discovered claims from Epic, GamerPower, and ITAD giveaways RSS into `curated/free_claims.auto.json`. Epic is the most reliable source; GamerPower and ITAD broaden coverage for GOG/Steam and other stores. **GamerPower requires attribution** — the published feed includes `"attribution": ["GamerPower.com"]` when any GamerPower item is included.
-1. Edit `free-claims.input.json` at the repo root (add/update manual `items` with `id`, `store`, `title`, `claim_url`, optional `ends_at`, `steam_appid`, `notes`). Manual entries always win over auto-sourced duplicates.
-2. Run `python build_free_claims.py` — merges manual + auto items, Steam-enriches entries, and writes:
+### Maintainer workflow (admin console recommended)
+
+With `BAKLOG_ADMIN=1`, open `/admin/` → **Claims**:
+
+1. **Fetch latest** — runs `fetch_claim_sources.py` → `curated/free_claims.auto.json` (Epic, GamerPower, ITAD RSS). Epic is the most reliable source; GamerPower and ITAD broaden coverage. **GamerPower requires attribution** — the published feed includes `"attribution": ["GamerPower.com"]` when any GamerPower item is included.
+2. **Review auto rows** — only checked (**Publish**) rows in `curated/free_claims.approved.json` reach the public feed. Use **Hide** (soft, restorable) or **Block** (permanent kill list) for noise. **Hide stale (30d+)** bulk-soft-hides old rows. Selection auto-saves to `approved.json`.
+3. **Manual rows** (optional) — edit `free-claims.input.json` or use **Add manual row**. Each manual row has a **Publish** checkbox (unchecked rows write `approved: false` and are skipped on build). Legacy rows without `approved` still publish. Strict shops: `build_free_claims.py --require-manual-approval` or `BAKLOG_REQUIRE_MANUAL_APPROVAL=1` (only `approved: true` ships).
+4. **Enrich in place** (optional) — Steam metadata without a full publish rebuild; persists to both `curated/free_claims.auto.json` and `free-claims.input.json`.
+5. **Publish selected** — runs `build_free_claims.py` (refuses an empty publish unless `--allow-empty`). Writes:
    - `landing/free-claims.json` (hosted on Vercel)
    - `curated/free_claims.fallback.json` (bundled offline fallback)
-   - active profile `free_claims.json` (local app picks this up immediately; use `--no-profile` to skip)
-3. Commit and deploy `landing/` (or copy `landing/free-claims.json` to production).
+   - active profile `free_claims.json` (local app; use `--no-profile` to skip)
+6. **Deploy** — commit and deploy `landing/` (or copy `landing/free-claims.json` to production).
+
+**Pre-deploy check** (fetch → dry-run build → audit → optional Vercel hook):
+
+```powershell
+.\scripts\publish-claims-check.ps1
+# optional: $env:BAKLOG_VERCEL_DEPLOY_HOOK = "https://api.vercel.com/v1/integrations/deploy/..."
+```
+
+**Pro bonus claims (`premium_only`)** — the hosted feed is one JSON file for all users; free-tier clients filter `premium_only` rows client-side (`js/claimable.js`). A separate Pro-gated feed endpoint is a possible future option.
+
+CLI equivalent:
+
+```powershell
+.\.venv\Scripts\python.exe fetch_claim_sources.py
+# curate curated/free_claims.approved.json (or use admin)
+.\.venv\Scripts\python.exe build_free_claims.py
+```
 
 Other machines pull the hosted feed via **Prices → Free** or `python fetch_free_claims.py` (also in `refresh.ps1` / `refresh.sh` after ITAD).
+
+Audit cross-layer health: `python scripts/audit_free_surface_data.py --fail-on high` (also in `scripts/test-all.ps1 -Full`).
 
 ## Sponsored deal feed (`sponsors.json`)
 

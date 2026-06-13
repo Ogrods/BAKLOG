@@ -81,6 +81,17 @@ describe('claimableModuleMarkup', () => {
     expect(html).toContain('data-claim-show-more');
     expect(html).toContain('+2 more');
   });
+
+  it('shows feed-updating copy when emptyReason is unavailable', () => {
+    const html = claimableModuleMarkup([], { emptyReason: 'unavailable' });
+    expect(html).toContain('Feed updating');
+    expect(html).not.toContain('No new free games');
+  });
+
+  it('shows nothing-right-now copy by default when empty', () => {
+    const html = claimableModuleMarkup([]);
+    expect(html).toContain('No new free games to claim right now');
+  });
 });
 
 describe('claimDetailPanelHtml affiliate tagging', () => {

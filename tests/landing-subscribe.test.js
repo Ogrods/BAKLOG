@@ -209,4 +209,29 @@ describe("landing/api/subscribe.js", () => {
     expect(welcomePayload.to).toBe("tester@example.com");
     expect(welcomePayload.subject).toContain("invite list");
   });
+
+  it("reports durable log NOT saved when Supabase is unconfigured", async () => {
+    const res = await handleSubscribe(makeRequest(
+      { email: "tester@example.com" },
+      { ip: "10.0.0.94" },
+    ));
+    expect(res.status).toBe(200);
+    const [, founderOpts] = fetchMock.mock.calls[0];
+    const founderPayload = JSON.parse(founderOpts.body);
+    expect(founderPayload.text).toContain("Durable log: NOT saved to Supabase");
+  });
+
+  it("reports durable log saved when Supabase write succeeds", async () => {
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service_role_test";
+    const res = await handleSubscribe(makeRequest(
+      { email: "tester@example.com" },
+      { ip: "10.0.0.95" },
+    ));
+    expect(res.status).toBe(200);
+    // calls: [0] supabase insert, [1] founder notify, [2] confirmation
+    const [, founderOpts] = fetchMock.mock.calls[1];
+    const founderPayload = JSON.parse(founderOpts.body);
+    expect(founderPayload.text).toContain("Durable log: saved to Supabase");
+  });
 });

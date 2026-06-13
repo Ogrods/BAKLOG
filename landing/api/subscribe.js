@@ -158,10 +158,18 @@ export default {
     console.log(`waitlist_signup\t${signupTime}\t${await emailLogTag(email)}`);
     // Without Supabase, the Vercel function log above is the durable capture path (see landing/README.md).
 
+    // Track the durable-write outcome so the founder notification is self-verifying:
+    // a glance at the email tells you whether the row reached Supabase, instead of
+    // emails silently succeeding while durable capture is misconfigured or failing.
+    let durableLog;
     try {
-      await logToSupabase({ email, ip, time: signupTime });
+      const saved = await logToSupabase({ email, ip, time: signupTime });
+      durableLog = saved
+        ? "saved to Supabase"
+        : "NOT saved to Supabase (logging not configured - Vercel function log only)";
     } catch (err) {
       console.error("subscribe: supabase log failed", err);
+      durableLog = "NOT saved to Supabase (write failed - check Vercel logs)";
     }
 
     try {
@@ -170,7 +178,7 @@ export default {
         to,
         reply_to: email,
         subject: `New BAKLOG invite request: ${email}`,
-        text: `New signup: ${email}\nTime: ${signupTime}`,
+        text: `New signup: ${email}\nTime: ${signupTime}\nDurable log: ${durableLog}`,
       });
     } catch (err) {
       console.error("subscribe: founder notification failed", err);

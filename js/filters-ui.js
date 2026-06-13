@@ -480,7 +480,9 @@ export function updateViewChrome(options) {
   // Picks chrome is synchronous here — async renderViewHouseSlot raced category
   // drill-ins and re-painted the house stripe after toolbar scroll (68px jump).
   updatePicksChrome();
-  if (isDash || !hideTableUi) renderViewHouseSlot();
+  const callHouseSlot = isDash || isConn || isProView || !hideTableUi;
+  if (callHouseSlot) renderViewHouseSlot();
+  else document.getElementById('viewHouseSlot')?.classList.add('hidden');
   document.getElementById("picksSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("toolbarSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("tableShell")?.classList.toggle("hidden", hideTableUi);

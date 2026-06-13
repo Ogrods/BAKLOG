@@ -111,6 +111,7 @@ export function showViewOverlay(view) {
     ov.setAttribute("aria-hidden", "false");
     ov.classList.add("show");
   }
+  document.getElementById('viewHouseSlot')?.classList.add('hidden');
   document.querySelectorAll(".view-tab").forEach(b => { b.disabled = true; });
 }
 

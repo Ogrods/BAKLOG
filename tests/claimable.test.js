@@ -49,6 +49,7 @@ function resetState() {
   state.ownedSteamAppids = new Set();
   state.crossStoreHiddenKeys = new Set();
   state.claimableFeed = null;
+  state.claimableFeedUnavailable = false;
   state.claimableNow = [];
 }
 
@@ -483,6 +484,7 @@ describe('dismissed claims survive an empty/failed feed load', () => {
     vi.spyOn(apiClient, 'dataFetch').mockRejectedValue(new Error('network down'));
     globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down'));
     await loadClaimableNow();
+    expect(state.claimableFeedUnavailable).toBe(true);
     expect(Object.keys(state.personal.__dismissedClaims).sort())
       .toEqual(['gamerpower-1604', 'itad-de23882e1f39']);
   });

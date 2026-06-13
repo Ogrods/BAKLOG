@@ -27,6 +27,12 @@ alwaysApply: false
 
 ## Keep in sync
 
+See **AGENTS.md hard rule 6** for the canonical full sync-pair list. Landing-specific:
+
 - `landing/marquee-speed.js` ↔ `js/marquee-speed.js` (duplicate IIFE vs ESM)
 - Sample covers: `landing/assets/sample/*.{webp,png}` (fictional games)
 - Demo stats in `demo.js` are independent from app state — update both if changing marketing numbers
+
+## Copy conventions
+
+- **No em dashes in marketing copy.** Never use `—` (em dash, U+2014) in any front-facing string in `landing/` (hero, demo text, `sponsors.json`, email copy in `api/subscribe.js`). Use a spaced hyphen (` - `) or rephrase. Code comments are exempt. See AGENTS.md hard rule 8.

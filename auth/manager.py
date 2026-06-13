@@ -358,6 +358,20 @@ def mark_connected(provider: str, creds: dict[str, str], *, clear_error: bool = 
         blob.pop("last_error", None)
         blob.pop("expired_at", None)
     set_provider_blob(provider, blob)
+    try:
+        from auth.connection_probe import clear_probe_strike
+        from shared.profile_paths import get_active_profile_id
+
+        clear_probe_strike(get_active_profile_id(), provider)
+    except Exception:  # noqa: BLE001 - probe strike reset is best-effort
+        pass
+
+
+def mark_verified(provider: str) -> None:
+    """Bump ``last_verified`` without changing connection status or running a fetch."""
+    blob = get_provider_blob(provider)
+    blob["last_verified"] = _now_iso()
+    set_provider_blob(provider, blob)
 
 
 def seed_new_profile_auth_defaults(profile_id: str) -> None:

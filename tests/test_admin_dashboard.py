@@ -702,7 +702,7 @@ def test_free_claims_enrich_persists_auto_feed(
 
     import build_free_claims as bfc
 
-    def fake_enrich(raw: dict, last_call: list[float], cover_lookup=None) -> dict:
+    def fake_enrich(raw: dict, last_call: list[float], cover_lookup=None, **kwargs) -> dict:
         return {
             **raw,
             "header_image": bfc._steam_portrait_cover(729000),
@@ -812,6 +812,30 @@ def test_free_claims_preview_excludes_dismissed_key_matched_duplicate(
         "approved_ids": ["itad-0c69ed1f1bd8"],
         "field_overrides": {"itad-0c69ed1f1bd8": {"title": "Rogue Waters"}},
         "dismissed": ["epic-rogue-waters-9764d6"],
+    }
+    code, data = _request(base, "POST", "/api/internal/free-claims/preview", body=payload)
+    assert code == 200
+    assert data.get("items") == []
+
+
+def test_free_claims_preview_excludes_blocked_ids(
+    admin_server: tuple[str, Path],
+) -> None:
+    """Blocked ids must not appear in preview (same as build dismissed filter)."""
+    base, _ = admin_server
+    payload = {
+        "manual_items": [],
+        "auto_items": [
+            {
+                "id": "epic-blocked",
+                "store": "epic",
+                "title": "Blocked Game",
+                "claim_url": "https://store.epicgames.com/en-US/p/blocked",
+                "ends_at": "2099-01-01T00:00:00Z",
+            }
+        ],
+        "approved_ids": ["epic-blocked"],
+        "blocked": ["epic-blocked"],
     }
     code, data = _request(base, "POST", "/api/internal/free-claims/preview", body=payload)
     assert code == 200

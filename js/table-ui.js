@@ -157,6 +157,7 @@ function markFocusedRow(key) {
 export function scrollToRowIndex(idx, { smooth = false } = {}) {
   const list = state._visibleList || sortedGames(filteredGames());
   if (!list.length || idx < 0 || idx >= list.length) return;
+  setRowAdAnchor(idx);
   const key = gameKey(list[idx]);
   const useSmooth = smooth && list.length <= FIRST_CHUNK;
   setPendingScrollTarget({
@@ -502,6 +503,32 @@ let _pendingScrollTarget = null;
 let _lastConsumeWasSmooth = false;
 let _chromeScrollObs = null;
 
+const SPONSORED_TABLE_SLOT = 5;
+const ROW_AD_DRILL_OFFSET = 1;
+let _rowAdAnchorIndex = null;
+
+export function setRowAdAnchor(idx) {
+  if (typeof idx === 'number' && idx >= 0) _rowAdAnchorIndex = idx;
+  else _rowAdAnchorIndex = null;
+}
+
+export function clearRowAdAnchor() {
+  _rowAdAnchorIndex = null;
+}
+
+function resolveSponsoredTableSlot(total) {
+  if (!total) return 0;
+  if (_rowAdAnchorIndex != null) {
+    return Math.min(total - 1, Math.max(0, _rowAdAnchorIndex - ROW_AD_DRILL_OFFSET));
+  }
+  return total > SPONSORED_TABLE_SLOT ? SPONSORED_TABLE_SLOT : Math.max(0, total - 1);
+}
+
+/** Vitest hook for sponsored row ad slot resolution. */
+export function sponsoredTableSlotForTest(total) {
+  return resolveSponsoredTableSlot(total);
+}
+
 function disconnectChromeScrollObs() {
   if (_chromeScrollObs) {
     _chromeScrollObs.disconnect();
@@ -515,6 +542,7 @@ export function setPendingScrollTarget(target) {
     disconnectChromeScrollObs();
     return;
   }
+  if (target.kind === 'toolbar') clearRowAdAnchor();
   _pendingScrollTarget = {
     consumed: false,
     smooth: false,
@@ -598,6 +626,7 @@ export function consumePendingScrollTarget(list = state._visibleList) {
     t.idx = idx;
     state.pickedKey = key;
     state.focusedRowIndex = idx;
+    setRowAdAnchor(idx);
 
     const row = ensureRowPaintedForScroll(list, idx, key);
     if (row) {
@@ -1133,8 +1162,6 @@ function tbodyRowCount() {
   return document.getElementById("tbody")?.querySelectorAll("tr[data-row-index]").length || 0;
 }
 
-const SPONSORED_TABLE_SLOT = 5;
-
 /**
  * Drop the sponsored table row immediately on dismiss — avoids waiting for a
  * full renderTable() query + virtual repaint (~200ms+ on large libraries).
@@ -1161,11 +1188,8 @@ function appendChunk(list, start, end, ctx) {
   const t0 = run ? performance.now() : 0;
   const out = [];
   const rowLoc = resolveTableRowLocation();
-  // Anchor the ad to the fixed slot, but on short (drilled) lists fall back to
-  // the last row so the row ad still appears instead of being dropped because
-  // index 5 was never rendered.
   const total = list.length;
-  const slot = total > SPONSORED_TABLE_SLOT ? SPONSORED_TABLE_SLOT : Math.max(0, total - 1);
+  const slot = resolveSponsoredTableSlot(total);
   const tableAd = total > 0 && slot >= start && slot < end
     ? getAdsForLocation(rowLoc)[0]
     : null;
@@ -1568,6 +1592,9 @@ export async function renderTable(opts) {
     if (pidx >= 0) anchorIndex = pidx;
   }
   if (perfRun && anchorIndex != null) perfRun.meta.resolvedAnchorIndex = anchorIndex;
+
+  if (anchorIndex != null) setRowAdAnchor(anchorIndex);
+  else clearRowAdAnchor();
 
   perfMeasure(perfRun, 'chrome:dom-prep', 'chrome:start');
   perfMark(perfRun, 'paint:start');

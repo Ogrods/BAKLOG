@@ -17,6 +17,8 @@ export const state = {
     itad: null, claims: null, hltb: null,
   },
   claimableFeed: null,
+  /** True when no local, bundled, or hosted claims feed could be loaded. */
+  claimableFeedUnavailable: false,
   claimableNow: [],
   crossStoreHiddenKeys: new Set(),
   crossStoreOwnedStores: new Map(),

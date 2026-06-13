@@ -3574,6 +3574,67 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   .sponsored-feature-card--banner .sponsored-feature-art { width: 100%; }
   .sponsored-feature-card--banner .sponsored-feature-cta { margin-left: 0; }
 }
+/* itch.io bundle variant (dash-pick slot) - pink accent to match the itch recap card */
+.sponsored-feature-card--bundle {
+  border-color: color-mix(in srgb, var(--brand-itch, #fa5c5c) 45%, var(--border-subtle));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-itch, #fa5c5c) 14%, transparent),
+    0 14px 32px -20px color-mix(in srgb, var(--brand-itch, #fa5c5c) 40%, transparent);
+}
+.sponsored-feature-card--bundle::before {
+  background: var(--brand-itch, #fa5c5c);
+}
+.sponsored-feature-card--bundle:hover {
+  border-color: color-mix(in srgb, var(--brand-itch, #fa5c5c) 62%, var(--border-subtle));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-itch, #fa5c5c) 24%, transparent),
+    0 18px 40px -18px color-mix(in srgb, var(--brand-itch, #fa5c5c) 50%, transparent);
+}
+.sponsored-feature-card--bundle .sponsored-feature-cta {
+  background: color-mix(in srgb, var(--brand-itch, #fa5c5c) 88%, #000);
+}
+.sponsored-feature-card--bundle .sponsored-feature-cta:hover {
+  background: var(--brand-itch, #fa5c5c);
+}
+.sponsored-feature-stats--bundle {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.sponsored-feature-stat.is-discount .sponsored-feature-stat-value {
+  color: #86efac;
+}
+.sponsored-feature-stat.is-price .sponsored-feature-stat-value {
+  color: #fde68a;
+}
+.sponsored-bundle-titles-label {
+  margin-top: 0.35rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.sponsored-bundle-titles {
+  display: grid;
+  gap: 4px;
+  margin-top: 0.35rem;
+}
+.sponsored-bundle-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.35rem;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--text-soft, #cbd5e1);
+  border-left: 2px solid color-mix(in srgb, var(--brand-itch, #fa5c5c) 45%, transparent);
+  padding-left: 8px;
+}
+.sponsored-bundle-title-dot {
+  display: none;
+}
+.sponsored-bundle-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Claimable-area sponsored ads: up to three content-rich feature cards laid out
    as an equal-width row (each ~1/3) above the Claimable Now card stacked beneath
    them inside #claimableNowModule. Cards wrap to full width on narrow screens. */
@@ -7603,7 +7664,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   flex: 1;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 12px;
 }
 .conn-card-body-main { flex: 1 1 240px; min-width: 0; }

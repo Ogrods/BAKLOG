@@ -32,13 +32,15 @@ describe('affiliateUrl', () => {
     restoreCreds(baseline);
   });
 
-  it('ships with Epic Support-A-Creator live and other programs disabled', () => {
+  it('ships with Epic and itch affiliate programs live and other programs disabled', () => {
     expect(AFFILIATE_CREDENTIALS.epic).toBe('BAKLOG');
+    expect(AFFILIATE_CREDENTIALS.itch).toBe('eob7ZQcpthHDp');
     for (const [key, value] of Object.entries(AFFILIATE_CREDENTIALS)) {
-      if (key !== 'epic') expect(value).toBe('');
+      if (key !== 'epic' && key !== 'itch') expect(value).toBe('');
     }
     expect(hasLiveAffiliates()).toBe(true);
     expect(liveAffiliateShops()).toContain('Epic Games Store');
+    expect(liveAffiliateShops()).toContain('itch.io');
   });
 
   it('passes through Steam URLs (no program)', () => {
@@ -118,10 +120,12 @@ describe('affiliateUrl', () => {
 
   it('treats whitespace-only credentials as unset', () => {
     AFFILIATE_CREDENTIALS.epic = '   ';
+    AFFILIATE_CREDENTIALS.itch = '   ';
     const url = 'https://store.epicgames.com/en-US/p/foo';
     expect(affiliateUrl(url)).toBe(url);
     expect(hasLiveAffiliates()).toBe(false);
     AFFILIATE_CREDENTIALS.epic = 'BAKLOG';
+    AFFILIATE_CREDENTIALS.itch = 'eob7ZQcpthHDp';
   });
 
   it('is idempotent for deeplink rules', () => {

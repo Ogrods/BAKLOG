@@ -29,8 +29,8 @@ HOUSE_DEFAULTS = {
     "house-support-baklog": {
         "kind": "house",
         "title": "Level up to BAKLOG Pro",
-        "tagline": "Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.",
-        "cta": "Get Pro — $5/mo",
+        "tagline": "Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.",
+        "cta": "Get Pro - $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "dismissible": True,
@@ -43,7 +43,7 @@ HOUSE_DEFAULTS = {
             "Queue every stale store, sync across machines, and drop sponsored deal cards. "
             "Nothing you use today moves behind paywall."
         ),
-        "cta": "Get Pro — $5/mo",
+        "cta": "Get Pro - $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "enabled": True,
@@ -52,7 +52,7 @@ HOUSE_DEFAULTS = {
         "kind": "house",
         "title": "You own 600 games. You've played 40.",
         "tagline": "One honest backlog across every store. Private, Steam-ready.",
-        "cta": "Get Pro — $5/mo",
+        "cta": "Get Pro - $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "dismissible": True,
@@ -61,8 +61,8 @@ HOUSE_DEFAULTS = {
     "house-itch-privacy": {
         "kind": "house",
         "title": "Level up to BAKLOG Pro",
-        "tagline": "Queue every stale store, sync across machines, and drop sponsored cards — $5/mo.",
-        "cta": "Get Pro — $5/mo",
+        "tagline": "Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.",
+        "cta": "Get Pro - $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "dismissible": True,
@@ -72,7 +72,7 @@ HOUSE_DEFAULTS = {
         "kind": "house",
         "title": "BAKLOG Pro",
         "slogan": "One honest backlog across every store.",
-        "tagline": "Leveled up with bulk refresh, cloud sync, and no ads — $5/mo.",
+        "tagline": "Leveled up with bulk refresh, cloud sync, and no ads - $5/mo.",
         "cta": "Get Pro",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -85,10 +85,10 @@ HOUSE_DEFAULTS = {
         "title": "Sync every machine",
         "slogan": (
             "Keep your library and personal data aligned across machines "
-            "— no manual exports."
+            "- no manual exports."
         ),
         "tagline": "Cloud sync for library JSON and personal prefs.",
-        "cta": "Get Pro — $5/mo",
+        "cta": "Get Pro - $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "art_mode": "logo",
@@ -99,8 +99,8 @@ HOUSE_DEFAULTS = {
         "kind": "house",
         "title": "Fewer distractions",
         "slogan": "Paid tier drops sponsored deal slots so your deal radar stays yours.",
-        "tagline": "$5/mo — nothing you use today moves behind paywall.",
-        "cta": "Get Pro — $5/mo",
+        "tagline": "$5/mo - nothing you use today moves behind paywall.",
+        "cta": "Get Pro - $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "art_mode": "logo",
@@ -115,7 +115,7 @@ HOUSE_DEFAULTS = {
             "Every game you already own, deduped across every store "
             "into one honest backlog. Local-first."
         ),
-        "cta": "Get Pro — $5/mo",
+        "cta": "Get Pro - $5/mo",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
         "art_mode": "logo",

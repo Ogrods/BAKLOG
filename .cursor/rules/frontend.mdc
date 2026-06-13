@@ -25,9 +25,11 @@ alwaysApply: false
 
 ## Sync pairs (update together)
 
+See **AGENTS.md hard rule 6** for the canonical full list. Local subset:
+
 - `js/store-brand-colors.js` ↔ `app.css` `:root --brand-*`
 - `js/theme.js` ↔ `app.css` `html[data-theme]`
-- `js/fetcher-registry.js` — generated from `fetchers/registry.py`
+- `js/fetcher-registry.js` ↔ `fetchers/registry.py` (generated)
 
 ## Views
 

@@ -37,6 +37,7 @@ import {
   filteredGames,
   sortedGames,
   cancelPendingScrollTarget,
+  clearRowAdAnchor,
   initTablePhoneLayout,
   syncSponsoredTableAfterDismiss,
   syncRowCountLabel,
@@ -605,6 +606,7 @@ export function bindEvents() {
       // overlay → new content paints from y=0. Drill-ins go through
       // dashboard-drilldown.js which manages its own scroll target.
       cancelPendingScrollTarget();
+      clearRowAdAnchor();
       const fromView = state.activeView;
       // Hide dashboard before scrollTo — otherwise jumping to y=0 while still on
       // the dashboard tab briefly exposes the mega hero at the top of the page.

@@ -33,4 +33,4 @@ alwaysApply: false
 
 ## Groups in manifest
 
-`library` (12 stores), `wishlist` (8), `prices` (ITAD, free claims), `enrich` (HLTB, reviews, covers, co-op tags)
+`library` (12 stores), `wishlist` (8), `prices` (ITAD, free claims), `enrich` (HLTB, reviews, covers, co-op tags, ProtonDB) — **27 manifest keys** total

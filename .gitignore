@@ -44,7 +44,9 @@ _tmp_*
 _baseline_*
 tmp/
 count-animation-demo.html
+.cursor/tracker-pending-*.md
 tracker-update-pending-*.md
+.audit/
 free-claims.input.json
 _sweep_output*.txt
 debug-*.log

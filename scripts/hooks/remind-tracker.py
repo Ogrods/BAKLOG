@@ -14,8 +14,10 @@ def main() -> int:
         "Session ending — if you completed meaningful work, update tracker.html: "
         "mark the relevant PHASES/findings entry [DONE] or [RESOLVED] with a dated note. "
         "See docs/WORKFLOW.md. Do not create PROGRESS.md. "
-        "If you cannot edit tracker.html right now (e.g. plan mode or any other restriction), "
-        "write the update to a temporary markdown file and apply it to tracker.html as soon as you can."
+        "Direct-edit-first: when ..\\baklog-internal\\tracker.html exists, edit it there "
+        "and run .\\scripts\\sync-internal-repo.ps1 -Push. "
+        "Only if the internal clone is missing or editing is blocked (e.g. plan mode), "
+        "write .cursor/tracker-pending-<slug>.md and run /apply-tracker-pending later."
     )
     print(json.dumps({"followup_message": msg}))
     return 0

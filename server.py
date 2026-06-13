@@ -43,7 +43,6 @@ import queue
 import re
 import secrets
 import signal
-import socket
 import subprocess
 import sys
 import threading
@@ -67,13 +66,22 @@ from shared.dev_server_pids import (
     pid_alive as _pid_alive,
 )
 from shared.dev_server_pids import (
-    pid_is_python_server as _pid_is_python_server,
+    reclaim_or_exit as _reclaim_or_exit,
 )
 from shared.dev_server_pids import (
-    pid_listening_on_port as _pid_listening_on_port_impl,
+    remove_own_pid_file as _remove_own_pid_file,
 )
 from shared.dev_server_pids import (
     terminate_pid as _terminate_pid,
+)
+from shared.dev_server_pids import (
+    write_pid_file as _write_pid_file_impl,
+)
+from shared.idle_watchdog import (
+    note_activity as _note_activity,
+)
+from shared.idle_watchdog import (
+    start_idle_watchdog as _start_idle_watchdog,
 )
 from shared.install_paths import (
     bundle_root,
@@ -2666,6 +2674,10 @@ def _run_accessible(run: Run | None) -> Run | None:
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def handle_one_request(self) -> None:  # http.server API
+        _note_activity()  # reset the idle-shutdown countdown on any client contact
+        super().handle_one_request()
+
     def handle(self) -> None:
         try:
             super().handle()
@@ -4027,6 +4039,21 @@ def _start_background_scheduler() -> None:
         print(f"[scheduler] not started: {exc!r}", file=sys.stderr, flush=True)
 
 
+def _start_idle_shutdown_watchdog() -> None:
+    """Self-exit after a no-activity window so abandoned dev servers don't pile
+    up. Default 30 min in dev; off for frozen builds (a tester's minimized app
+    must stay resident) unless BAKLOG_IDLE_SHUTDOWN_MINUTES is set (0 disables)."""
+    raw = os.environ.get("BAKLOG_IDLE_SHUTDOWN_MINUTES")
+    if raw is None:
+        minutes = 0.0 if is_frozen() else 30.0
+    else:
+        try:
+            minutes = max(0.0, float(raw))
+        except ValueError:
+            minutes = 0.0
+    _start_idle_watchdog(minutes * 60.0, _server_is_idle_ok, _trigger_dev_shutdown)
+
+
 def _shutdown_server() -> None:
     if SCHEDULER is not None:
         SCHEDULER.stop()
@@ -4066,80 +4093,26 @@ def _maybe_import_legacy_env() -> None:
         print(f"[auth] .env import skipped: {exc}", file=sys.stderr, flush=True)
 
 
-def _dev_server_port_busy() -> bool:
-    """True when something is already accepting TCP on HOST:PORT."""
-    try:
-        with socket.create_connection((HOST, PORT), timeout=0.3):
-            return True
-    except OSError:
-        return False
-
-
 # Records the PID of the live dev server so a restart can reclaim the port if a
 # previous instance was orphaned (e.g. the terminal window was closed instead of
 # Ctrl+C, so graceful shutdown never ran and the listener kept holding the port).
+# Single-instance reclaim + stale-pid self-heal live in shared/dev_server_pids.py.
 PID_FILE = ROOT / ".baklog_server.pid"
 
 
-def _write_pid_file() -> None:
+def _server_is_idle_ok() -> bool:
+    """True when it is safe to self-exit on idle: no in-flight fetcher runs and
+    no active browser sign-in, so a long fetch or CDP login is never cut off."""
     try:
-        PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
-    except OSError as exc:
-        print(f"[server] could not write pid file: {exc}", file=sys.stderr, flush=True)
+        if MANAGER._in_flight_targets():
+            return False
+        from auth.manager import has_active_sessions
 
-
-def _remove_pid_file() -> None:
-    try:
-        if PID_FILE.is_file() and PID_FILE.read_text(encoding="utf-8").strip() == str(os.getpid()):
-            PID_FILE.unlink()
-    except OSError:
-        pass
-
-
-def _pid_from_pid_file() -> int | None:
-    try:
-        recorded = PID_FILE.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    return int(recorded) if recorded.isdigit() else None
-
-
-def _pid_listening_on_port() -> int | None:
-    """The PID currently LISTENING on HOST:PORT (see shared.dev_server_pids)."""
-    return _pid_listening_on_port_impl(HOST, PORT)
-
-
-def _reclaim_stale_server() -> bool:
-    """If the busy port is held by our own orphaned instance, terminate it so this
-    start can take over. Prefers the pid file, falls back to whoever is listening
-    on the port. Returns True if a reclaim was attempted."""
-    me = os.getpid()
-    candidates = [_pid_from_pid_file(), _pid_listening_on_port()]
-    for pid in candidates:
-        if pid is None or pid == me:
-            continue
-        if not _pid_is_python_server(pid):
-            continue
-        print(
-            f"[server] port {PORT} held by orphaned instance (pid {pid}) — reclaiming it",
-            file=sys.stderr,
-            flush=True,
-        )
-        _terminate_pid(pid)
-        return True
-    return False
-
-
-def _exit_if_dev_server_busy() -> None:
-    if not _dev_server_port_busy():
-        return
-    if _reclaim_stale_server():
-        for _ in range(30):  # up to ~3s for the orphan's socket to close
-            time.sleep(0.1)
-            if not _dev_server_port_busy():
-                return
-    print(_DEV_SERVER_BUSY_MSG, file=sys.stderr, flush=True)
-    raise SystemExit(1)
+        if has_active_sessions():
+            return False
+    except Exception:  # noqa: BLE001 - a probe error must not trigger an exit
+        return False
+    return True
 
 
 class BaklogDevServer(ThreadingHTTPServer):
@@ -4211,7 +4184,7 @@ def _frozen_pause_before_exit(code: int = 1) -> None:
 def main() -> None:
     global _DEV_HTTPD
     atexit.register(_shutdown_server)
-    atexit.register(_remove_pid_file)
+    atexit.register(lambda: _remove_own_pid_file(PID_FILE))
     _maybe_import_legacy_env()
     try:
         from shared.profile_paths import reconcile_profile_store
@@ -4240,9 +4213,10 @@ def main() -> None:
     from shared.server_support import run_boot_checks
 
     run_boot_checks(ROOT)
-    _exit_if_dev_server_busy()
+    _reclaim_or_exit(HOST, PORT, PID_FILE, _DEV_SERVER_BUSY_MSG)
     MANAGER._reap_orphan_processes()
     _start_background_scheduler()
+    _start_idle_shutdown_watchdog()
     handler = partial(Handler, directory=str(static_root()))
     try:
         httpd = BaklogDevServer((HOST, PORT), handler)
@@ -4251,7 +4225,7 @@ def main() -> None:
         raise SystemExit(1) from None
     _DEV_HTTPD = httpd
     with httpd:
-        _write_pid_file()
+        _write_pid_file_impl(PID_FILE)
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")
         if serve_built_frontend():
             if is_frozen():

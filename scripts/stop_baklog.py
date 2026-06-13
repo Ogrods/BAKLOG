@@ -14,6 +14,7 @@ Ctrl+C / SIGTERM / ``POST /api/shutdown``. This helper cleans the slate:
 Usage:
   .\\.venv\\Scripts\\python.exe scripts/stop_baklog.py            # graceful + force cleanup
   .\\.venv\\Scripts\\python.exe scripts/stop_baklog.py --dry-run  # list, don't kill
+  .\\.venv\\Scripts\\python.exe scripts/stop_baklog.py --dedupe   # keep the live server, kill extras
 """
 from __future__ import annotations
 
@@ -144,6 +145,43 @@ def collect_targets() -> list[int]:
     return sorted(_port_pids() | _cmdline_pids())
 
 
+def _live_server_pid() -> int | None:
+    """The single process currently LISTENING on the dev port (the good server)."""
+    if not _port_open():
+        return None
+    pids = _port_pids()
+    return next(iter(pids)) if pids else None
+
+
+def dedupe() -> int:
+    """Keep the one server listening on the port; force-stop every other stray
+    server/tray process and clear the pid file unless it points at the keeper.
+
+    Used by the Cursor session-end hook so abandoned agent terminals don't pile
+    up, without ever killing the server a session is actively using."""
+    keep = _live_server_pid()
+    killed: list[int] = []
+    for pid in collect_targets():
+        if pid == keep:
+            continue
+        terminate_pid_tree(pid)
+        killed.append(pid)
+    if killed:
+        kept = f" (kept live server pid {keep})" if keep else ""
+        print(f"[stop_baklog] deduped stray pids: {', '.join(map(str, killed))}{kept}")
+    # Only clear the pid file when it does NOT record the server we kept.
+    recorded = None
+    try:
+        if PID_FILE.is_file():
+            txt = PID_FILE.read_text(encoding="utf-8").strip()
+            recorded = int(txt) if txt.isdigit() else None
+    except OSError:
+        recorded = None
+    if recorded != keep and _clear_pid_file():
+        print(f"[stop_baklog] removed stale pid file {PID_FILE}")
+    return 0
+
+
 def _clear_pid_file() -> bool:
     try:
         if PID_FILE.is_file():
@@ -163,7 +201,15 @@ def main() -> int:
         action="store_true",
         help="List what would be stopped without killing anything.",
     )
+    parser.add_argument(
+        "--dedupe",
+        action="store_true",
+        help="Keep the live server on the port; kill only extra strays + stale pid file.",
+    )
     args = parser.parse_args()
+
+    if args.dedupe:
+        return dedupe()
 
     if args.dry_run:
         targets = collect_targets()

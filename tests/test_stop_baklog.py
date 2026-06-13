@@ -112,3 +112,79 @@ def test_force_kills_targets_and_clears_pid_file(
     assert killed == [4242, 5252]
     assert "force-stopped pids: 4242, 5252" in out
     assert not pid_file.is_file()  # stale pid file removed
+
+
+# ---- dedupe (session-end hook) --------------------------------------------
+
+
+def test_dedupe_keeps_live_server_and_kills_extras(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    killed: list[int] = []
+    pid_file = tmp_path / ".baklog_server.pid"
+    pid_file.write_text("100", encoding="utf-8")  # points at the kept server
+
+    monkeypatch.setattr(stop_baklog, "_live_server_pid", lambda: 100)
+    monkeypatch.setattr(stop_baklog, "collect_targets", lambda: [100, 200, 300])
+    monkeypatch.setattr(
+        stop_baklog, "terminate_pid_tree", lambda pid: killed.append(pid)
+    )
+    monkeypatch.setattr(stop_baklog, "PID_FILE", pid_file)
+
+    assert stop_baklog.dedupe() == 0
+    out = capsys.readouterr().out
+    assert killed == [200, 300]  # live server (100) untouched
+    assert "deduped stray pids: 200, 300" in out
+    assert pid_file.is_file()  # pid file matches the keeper, so it's preserved
+
+
+def test_dedupe_clears_pid_file_not_matching_keeper(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    killed: list[int] = []
+    pid_file = tmp_path / ".baklog_server.pid"
+    pid_file.write_text("999", encoding="utf-8")  # stale, not the kept server
+
+    monkeypatch.setattr(stop_baklog, "_live_server_pid", lambda: 100)
+    monkeypatch.setattr(stop_baklog, "collect_targets", lambda: [100, 200])
+    monkeypatch.setattr(
+        stop_baklog, "terminate_pid_tree", lambda pid: killed.append(pid)
+    )
+    monkeypatch.setattr(stop_baklog, "PID_FILE", pid_file)
+
+    assert stop_baklog.dedupe() == 0
+    assert killed == [200]
+    assert not pid_file.is_file()  # stale pid file cleared
+
+
+def test_dedupe_with_no_live_server_kills_all(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    killed: list[int] = []
+    pid_file = tmp_path / ".baklog_server.pid"
+    pid_file.write_text("200", encoding="utf-8")
+
+    monkeypatch.setattr(stop_baklog, "_live_server_pid", lambda: None)
+    monkeypatch.setattr(stop_baklog, "collect_targets", lambda: [200, 300])
+    monkeypatch.setattr(
+        stop_baklog, "terminate_pid_tree", lambda pid: killed.append(pid)
+    )
+    monkeypatch.setattr(stop_baklog, "PID_FILE", pid_file)
+
+    assert stop_baklog.dedupe() == 0
+    assert killed == [200, 300]
+    assert not pid_file.is_file()
+
+
+def test_main_dedupe_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    called = {"dedupe": 0}
+    monkeypatch.setattr(
+        stop_baklog, "dedupe", lambda: called.__setitem__("dedupe", 1) or 0
+    )
+    monkeypatch.setattr(stop_baklog.sys, "argv", ["stop_baklog.py", "--dedupe"])
+    assert stop_baklog.main() == 0
+    assert called["dedupe"] == 1

@@ -111,7 +111,15 @@ export default {
     }
 
     const ip = clientIp(request);
-    const rate = await checkRateLimit(ip, { namespace: "subscribe" });
+    // #region agent log
+    let rate;
+    try {
+      rate = await checkRateLimit(ip, { namespace: "subscribe" });
+    } catch (rlErr) {
+      console.error(`DEBUG-6ad957 rate-limit-threw ${rlErr && rlErr.message ? rlErr.message : String(rlErr)}`);
+      throw rlErr;
+    }
+    // #endregion
     if (rate.misconfigured) {
       console.error("subscribe: missing KV rate-limit credentials in production");
       return Response.json({ error: "Server not configured" }, { status: 503 });
@@ -156,13 +164,19 @@ export default {
     const signupTime = new Date().toISOString();
     console.log(`waitlist_signup\t${signupTime}\t${await emailLogTag(email)}`);
 
+    // #region agent log
+    const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    let dbg = { supabaseConfigured, supabaseOk: false, supabaseErr: null, resendFounderOk: false, resendFounderErr: null };
+    // #endregion
     let signupCaptured = false;
     try {
       if (await logToSupabase({ email, ip, time: signupTime })) {
         signupCaptured = true;
+        dbg.supabaseOk = true;
       }
     } catch (err) {
       console.error("subscribe: supabase log failed", err);
+      dbg.supabaseErr = err && err.message ? err.message : String(err);
     }
 
     try {
@@ -174,12 +188,20 @@ export default {
         text: `New signup: ${email}\nTime: ${signupTime}`,
       });
       signupCaptured = true;
+      dbg.resendFounderOk = true;
     } catch (err) {
       console.error("subscribe: founder notification failed", err);
+      dbg.resendFounderErr = err && err.message ? err.message : String(err);
+      // #region agent log
+      console.error(`DEBUG-6ad957 capture ${JSON.stringify({ ...dbg, signupCaptured, decision: signupCaptured ? "200-fallback" : "502" })}`);
+      // #endregion
       if (!signupCaptured) {
         return Response.json({ error: "Send failed", stage: "founder_notify" }, { status: 502 });
       }
     }
+    // #region agent log
+    console.error(`DEBUG-6ad957 capture ${JSON.stringify({ ...dbg, signupCaptured, decision: "200" })}`);
+    // #endregion
 
     // Confirmation auto-reply to the signer. Best-effort: a failure here must not
     // fail the request, since the signup was already captured above.

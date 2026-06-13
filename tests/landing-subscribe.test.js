@@ -136,6 +136,19 @@ describe("landing/api/subscribe.js", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("returns ok when Supabase reports duplicate email (409)", async () => {
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service_role_test";
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 409, text: async () => "duplicate" })
+      .mockResolvedValueOnce({ ok: true, text: async () => "" })
+      .mockResolvedValueOnce({ ok: true, text: async () => "" });
+    const res = await handleSubscribe(makeRequest({ email: "tester@example.com" }, { ip: "10.0.0.93" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("returns ok when founder notification fails but Supabase captured the signup", async () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service_role_test";

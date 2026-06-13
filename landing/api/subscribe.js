@@ -47,11 +47,12 @@ async function logToSupabase({ email, ip, time }) {
     },
     body: JSON.stringify({ email, ip, source: "landing", created_at: time }),
   });
-  if (!r.ok) {
-    const detail = await r.text().catch(() => "");
-    throw new Error(`Supabase ${r.status}: ${detail}`);
+  if (r.ok || r.status === 409) {
+    // 409 = duplicate email on unique constraint; already on the list.
+    return true;
   }
-  return true;
+  const detail = await r.text().catch(() => "");
+  throw new Error(`Supabase ${r.status}: ${detail}`);
 }
 
 async function sendEmail(apiKey, payload) {
@@ -111,15 +112,7 @@ export default {
     }
 
     const ip = clientIp(request);
-    // #region agent log
-    let rate;
-    try {
-      rate = await checkRateLimit(ip, { namespace: "subscribe" });
-    } catch (rlErr) {
-      console.error(`DEBUG-6ad957 rate-limit-threw ${rlErr && rlErr.message ? rlErr.message : String(rlErr)}`);
-      throw rlErr;
-    }
-    // #endregion
+    const rate = await checkRateLimit(ip, { namespace: "subscribe" });
     if (rate.misconfigured) {
       console.error("subscribe: missing KV rate-limit credentials in production");
       return Response.json({ error: "Server not configured" }, { status: 503 });
@@ -164,19 +157,11 @@ export default {
     const signupTime = new Date().toISOString();
     console.log(`waitlist_signup\t${signupTime}\t${await emailLogTag(email)}`);
     // Without Supabase, the Vercel function log above is the durable capture path (see landing/README.md).
-    let signupCaptured = true;
 
-    // #region agent log
-    const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
-    let dbg = { supabaseConfigured, supabaseOk: false, supabaseErr: null, resendFounderOk: false, resendFounderErr: null };
-    // #endregion
     try {
-      if (await logToSupabase({ email, ip, time: signupTime })) {
-        dbg.supabaseOk = true;
-      }
+      await logToSupabase({ email, ip, time: signupTime });
     } catch (err) {
       console.error("subscribe: supabase log failed", err);
-      dbg.supabaseErr = err && err.message ? err.message : String(err);
     }
 
     try {
@@ -187,17 +172,9 @@ export default {
         subject: `New BAKLOG invite request: ${email}`,
         text: `New signup: ${email}\nTime: ${signupTime}`,
       });
-      dbg.resendFounderOk = true;
     } catch (err) {
       console.error("subscribe: founder notification failed", err);
-      dbg.resendFounderErr = err && err.message ? err.message : String(err);
-      // #region agent log
-      console.error(`DEBUG-6ad957 capture ${JSON.stringify({ ...dbg, signupCaptured, decision: "200-founder-failed" })}`);
-      // #endregion
     }
-    // #region agent log
-    console.error(`DEBUG-6ad957 capture ${JSON.stringify({ ...dbg, signupCaptured, decision: "200" })}`);
-    // #endregion
 
     // Confirmation auto-reply to the signer. Best-effort: a failure here must not
     // fail the request, since the signup was already captured above.

@@ -222,20 +222,23 @@ def _detect_thread_and_child_leaks(request: pytest.FixtureRequest):
     yield
 
     def _suspected_leak() -> tuple[set[int], list[threading.Thread]]:
-        children = {p for p in child_pids_of() if _pid_alive(p)} - baseline_children
         threads = [
             t for t in _run_manager_threads() if t.name not in baseline_threads
         ]
+        children = {p for p in child_pids_of() if _pid_alive(p)} - baseline_children
         return children, threads
 
-    # Fast path: the vast majority of tests spawn no child process and no
-    # RunManager thread, so check first and skip the settle-sleep entirely.
-    # The 0.25s sleep only matters when a just-terminated child/thread may not
-    # be reaped yet - i.e. when we actually observe a potential leak. Paying it
-    # unconditionally cost ~0.25s x ~1200 tests (~5 min) of pure sleep per run.
-    leftover_children, leaked_threads = _suspected_leak()
-    if not leftover_children and not leaked_threads:
-        return
+    # Fast path: check threads first (pure Python), then children. Skip the
+    # settle-sleep unless a leak is actually suspected.
+    leaked_threads = [
+        t for t in _run_manager_threads() if t.name not in baseline_threads
+    ]
+    if not leaked_threads:
+        leftover_children = {p for p in child_pids_of() if _pid_alive(p)} - baseline_children
+        if not leftover_children:
+            return
+    else:
+        leftover_children = set()
     # Something looks leaked: give it a brief grace period to settle, then
     # re-check before warning/cleaning to avoid false positives.
     time.sleep(0.25)

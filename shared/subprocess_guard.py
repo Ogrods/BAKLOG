@@ -71,6 +71,41 @@ def _win_child_pids_snapshot(ppid: int) -> set[int]:
         kernel32.CloseHandle(snap)
 
 
+def _linux_child_pids_snapshot(ppid: int) -> set[int]:
+    """Enumerate child PIDs via /proc (no subprocess spawn).
+
+    Called on every test by the leak-detection fixture on Linux CI, so it must
+    be cheap — shelling out to ``ps`` here added noticeable per-test overhead
+    across the full suite (~1200 tests x 2 calls).
+    """
+    from pathlib import Path
+
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return set()
+    pids: set[int] = set()
+    for entry in proc.iterdir():
+        name = entry.name
+        if not name.isdigit():
+            continue
+        try:
+            stat = (entry / "stat").read_text()
+        except OSError:
+            continue
+        rparen = stat.rfind(")")
+        if rparen < 0:
+            continue
+        parts = stat[rparen + 2 :].split()
+        if len(parts) < 2:
+            continue
+        try:
+            if int(parts[1]) == ppid:
+                pids.add(int(name))
+        except ValueError:
+            continue
+    return pids
+
+
 def child_pids_of(parent_pid: int | None = None) -> set[int]:
     """Return PIDs whose parent is ``parent_pid`` (defaults to current process)."""
     ppid = parent_pid if parent_pid is not None else os.getpid()
@@ -83,6 +118,11 @@ def child_pids_of(parent_pid: int | None = None) -> set[int]:
             # sys.platform was monkeypatched to "win32" on a non-Windows host
             # (ctypes.windll only exists on real Windows). Fall back to ps below.
             pass
+    if sys.platform == "linux":
+        try:
+            return _linux_child_pids_snapshot(ppid)
+        except OSError:
+            return set()
     try:
         out = subprocess.check_output(
             ["ps", "-o", "pid=", "--ppid", str(ppid)],

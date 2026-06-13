@@ -1524,11 +1524,25 @@ class RunManager:
         """Point run storage at the active profile after POST /api/profiles/active."""
         self._runs_dir = runs_dir()
         self._runs_dir.mkdir(parents=True, exist_ok=True)
+        active_pid = get_active_profile_id()
         with self._lock:
             self._history = deque(
                 _load_run_history_from(self._runs_dir / "history.json")[-MAX_HISTORY:],
                 maxlen=MAX_HISTORY,
             )
+            self._runs_by_id = {
+                rid: run
+                for rid, run in self._runs_by_id.items()
+                if run.profile_id == active_pid
+            }
+            self._pending = [r for r in self._pending if r.profile_id == active_pid]
+            if self._active is not None and self._active.profile_id != active_pid:
+                self._active = None
+            if (
+                self._internal_active is not None
+                and self._internal_active.profile_id != active_pid
+            ):
+                self._internal_active = None
 
     def _persist_queue(self) -> None:
         with self._lock:
@@ -2629,13 +2643,22 @@ def _profile_admin_blocked() -> bool:
     return auth_enabled() and not local_profiles_enabled()
 
 
-def _run_accessible(run: Run | None) -> Run | None:
-    """When account auth is on, only the bound profile may access a run."""
+def _profile_run_isolation_enabled() -> bool:
+    """Scope run access/history to the active profile when isolation matters."""
     from shared.supabase_auth import auth_enabled
 
+    if auth_enabled():
+        return True
+    from shared.profile_paths import list_profiles
+
+    return len(list_profiles()) > 1
+
+
+def _run_accessible(run: Run | None) -> Run | None:
+    """Only the active profile may access a run when isolation is enabled."""
     if run is None:
         return None
-    if not auth_enabled():
+    if not _profile_run_isolation_enabled():
         return run
     if run.profile_id == get_active_profile_id():
         return run
@@ -3201,6 +3224,15 @@ class Handler(SimpleHTTPRequestHandler):
                     )
                     return
             clear_pin_failures(profile_id)
+            from auth.manager import has_active_sessions
+
+            if has_active_sessions():
+                _send_json(
+                    self,
+                    HTTPStatus.CONFLICT,
+                    {"error": "Finish or cancel the sign-in window before switching profiles."},
+                )
+                return
             MANAGER.cancel_all_and_wait()
             result = set_active_profile(profile_id)
             _refresh_personal_paths()
@@ -3377,9 +3409,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_runs(self) -> None:
         snap = MANAGER.snapshot()
-        from shared.supabase_auth import auth_enabled
-
-        if auth_enabled():
+        if _profile_run_isolation_enabled():
             pid = get_active_profile_id()
             active = snap.get("active")
             if active and active.get("profile_id") != pid:
@@ -3850,8 +3880,10 @@ class Handler(SimpleHTTPRequestHandler):
         if run is None:
             terminal = MANAGER.stream_terminal_summary(run_id)
             if terminal is not None:
-                from shared.supabase_auth import auth_enabled
-                if auth_enabled() and terminal.get("profile_id") != get_active_profile_id():
+                if (
+                    _profile_run_isolation_enabled()
+                    and terminal.get("profile_id") != get_active_profile_id()
+                ):
                     terminal = None
             if terminal is None:
                 self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")

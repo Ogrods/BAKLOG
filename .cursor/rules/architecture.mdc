@@ -27,7 +27,7 @@ profiles/<id>/
   cache/auth/secrets.bin, cache/runs/
 ```
 
-Active profile: `profiles/index.json` → `active`; override with `BAKLOG_PROFILE`.
+Active profile: `profiles/index.json` → `active`; override with `BAKLOG_PROFILE` (CLI/subprocess only — bypasses PIN; server pops its own env at boot).
 
 ## Invariants
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 from unittest.mock import patch
@@ -21,6 +20,16 @@ def isolated_profiles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(profile_paths, "INDEX_FILE", prof_dir / "index.json")
     monkeypatch.delenv("BAKLOG_PROFILE", raising=False)
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def _reset_pin_state() -> None:
+    """PIN failure/lockout dicts are module-level; isolate them per test."""
+    profiles._pin_failures.clear()
+    profiles._pin_lock_until.clear()
+    yield
+    profiles._pin_failures.clear()
+    profiles._pin_lock_until.clear()
 
 
 def test_reserved_profile_ids_rejected() -> None:
@@ -154,9 +163,52 @@ def test_delete_profile_clears_pin_lockout(isolated_profiles: Path) -> None:
     doc["active"] = "work"
     profile_paths.save_index(doc)
     profiles.set_profile_pin("play", "1234")
-    profiles.delete_profile("play")
+    profiles.delete_profile("play", current_pin="1234")
     profiles.create_profile("Play")
     assert profiles.pin_rate_limit_error("play") is None
+
+
+def test_delete_locked_profile_requires_pin(isolated_profiles: Path) -> None:
+    profiles.create_profile("Work")
+    profiles.create_profile("Play")
+    doc = profile_paths.load_index()
+    doc["active"] = "work"
+    profile_paths.save_index(doc)
+    profiles.set_profile_pin("play", "1234")
+    with pytest.raises(ValueError, match="current PIN is incorrect"):
+        profiles.delete_profile("play")
+    with pytest.raises(ValueError, match="current PIN is incorrect"):
+        profiles.delete_profile("play", current_pin="0000")
+    # Profile survives the failed attempts.
+    assert "play" in {p["id"] for p in profile_paths.load_index()["profiles"]}
+    profiles.delete_profile("play", current_pin="1234")
+    assert "play" not in {p["id"] for p in profile_paths.load_index()["profiles"]}
+
+
+def test_delete_unlocked_profile_ignores_pin_arg(isolated_profiles: Path) -> None:
+    profiles.create_profile("Work")
+    profiles.create_profile("Play")
+    doc = profile_paths.load_index()
+    doc["active"] = "work"
+    profile_paths.save_index(doc)
+    profiles.delete_profile("play")
+    assert "play" not in {p["id"] for p in profile_paths.load_index()["profiles"]}
+
+
+def test_delete_locked_profile_lockout_blocks(isolated_profiles: Path) -> None:
+    profiles.create_profile("Work")
+    profiles.create_profile("Play")
+    doc = profile_paths.load_index()
+    doc["active"] = "work"
+    profile_paths.save_index(doc)
+    profiles.set_profile_pin("play", "1234")
+    for _ in range(profiles._PIN_MAX_ATTEMPTS):
+        with pytest.raises(ValueError):
+            profiles.delete_profile("play", current_pin="0000")
+    # Now locked out: even the correct PIN is refused with the lockout message.
+    with pytest.raises(ValueError, match="too many PIN attempts"):
+        profiles.delete_profile("play", current_pin="1234")
+    assert "play" in {p["id"] for p in profile_paths.load_index()["profiles"]}
 
 
 def test_delete_profile_blocks_effective_active_via_env(

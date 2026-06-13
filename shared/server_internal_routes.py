@@ -227,6 +227,65 @@ def handle_internal_free_claims_enrich(handler: SimpleHTTPRequestHandler) -> Non
     )
 
 
+def handle_internal_free_claims_discord(handler: SimpleHTTPRequestHandler) -> None:
+    s = _srv()
+    payload, err = s._read_json_body(handler)
+    if err:
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": err})
+        return
+    assert payload is not None
+    item = payload.get("item")
+    if not isinstance(item, dict):
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "item must be an object"})
+        return
+
+    from shared.discord_claims import (
+        load_webhooks,
+        post_claim_to_discord,
+        validate_claim_item_for_discord,
+    )
+
+    validation_err = validate_claim_item_for_discord(item)
+    if validation_err:
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": validation_err})
+        return
+
+    webhooks = load_webhooks()
+    if not webhooks:
+        s._send_json(
+            handler,
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {
+                "error": (
+                    "Discord webhooks not configured. Set "
+                    "BAKLOG_DISCORD_CLAIMS_WEBHOOK_1 and/or "
+                    "BAKLOG_DISCORD_CLAIMS_WEBHOOK_2 before posting."
+                ),
+            },
+        )
+        return
+
+    from build_free_claims import _build_cover_lookup, _enrich_item
+
+    to_post = dict(item)
+    try:
+        cover_lookup = _build_cover_lookup([item])
+        to_post = _enrich_item(dict(item), [0.0], cover_lookup, upgrade_covers=True)
+    except Exception:
+        to_post = dict(item)
+
+    posted = post_claim_to_discord(to_post)
+    if posted and all(not row.get("ok") for row in posted):
+        s._send_json(
+            handler,
+            HTTPStatus.BAD_GATEWAY,
+            {"error": "All Discord webhooks failed", "posted": posted},
+        )
+        return
+
+    s._send_json(handler, HTTPStatus.OK, {"posted": posted, "item_id": to_post.get("id")})
+
+
 def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> None:
     s = _srv()
     payload, err = s._read_json_body(handler)

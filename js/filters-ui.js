@@ -56,7 +56,7 @@ import {
   prewarmTableQueryForView,
   syncRowCountLabel,
 } from './table-ui.js';
-import { renderPicks } from './picks-ui.js';
+import { renderPicks, updatePicksChrome, renderViewHouseSlot } from './picks-ui.js';
 import { showViewOverlay, hideViewOverlay } from './loading-curtain.js';
 import { ensureChartJs } from './chart-loader.js';
 
@@ -477,12 +477,10 @@ export function updateViewChrome(options) {
   applyItchTabVisibility();
   updateWishlistDrawerVisibility();
   updatePickTabsVisibility();
-  // Quick-Wins slider visibility (only shown on the Quick Wins tab) lives in
-  // picks-ui via updatePicksChrome; import lazily to avoid a top-level cycle.
-  void import('./picks-ui.js').then(m => {
-    m.updatePicksChrome();
-    m.renderViewHouseSlot?.();
-  });
+  // Picks chrome is synchronous here — async renderViewHouseSlot raced category
+  // drill-ins and re-painted the house stripe after toolbar scroll (68px jump).
+  updatePicksChrome();
+  if (isDash || !hideTableUi) renderViewHouseSlot();
   document.getElementById("picksSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("toolbarSection")?.classList.toggle("hidden", hideTableUi);
   document.getElementById("tableShell")?.classList.toggle("hidden", hideTableUi);

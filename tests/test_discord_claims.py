@@ -50,6 +50,71 @@ def test_build_discord_payload_shape() -> None:
     assert "footer" not in embed
 
 
+def test_build_discord_payload_uses_claim_url() -> None:
+    payload = build_discord_payload(
+        {
+            "id": "epic-1",
+            "store": "epic",
+            "title": "Portal 2",
+            "claim_url": "https://store.epicgames.com/p/portal-2",
+        }
+    )
+    embed = payload["embeds"][0]
+    assert embed["url"] == "https://store.epicgames.com/p/portal-2"
+    assert "https://store.epicgames.com/p/portal-2" in payload["content"]
+    assert CLAIM_LINK not in payload["content"]
+
+
+def test_build_discord_payload_beta_invite_adds_copy() -> None:
+    payload = build_discord_payload(
+        {
+            "id": "epic-1",
+            "store": "epic",
+            "title": "Portal 2",
+            "claim_url": "https://store.epicgames.com/p/portal-2",
+        },
+        include_beta_invite=True,
+    )
+    assert "https://store.epicgames.com/p/portal-2" in payload["content"]
+    assert "closed beta" in payload["content"]
+    assert CLAIM_LINK in payload["content"]
+
+
+def test_build_discord_payload_ignores_non_http_claim_url() -> None:
+    payload = build_discord_payload(
+        {"id": "x", "store": "steam", "title": "Foo", "claim_url": "javascript:alert(1)"}
+    )
+    assert payload["embeds"][0]["url"] == CLAIM_LINK
+
+
+def test_post_claim_to_discord_varies_content_per_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BAKLOG_DISCORD_CLAIMS_WEBHOOK_1", "https://discord.example/altar")
+    monkeypatch.setenv("BAKLOG_DISCORD_CLAIMS_WEBHOOK_2", "https://discord.example/members")
+    bodies: dict[str, dict] = {}
+
+    def fake_post(url: str, body: dict) -> dict:
+        bodies[url] = body
+        return {"ok": True, "status": 204}
+
+    with patch("shared.discord_claims.post_to_webhook", side_effect=fake_post):
+        post_claim_to_discord(
+            {
+                "id": "x",
+                "store": "steam",
+                "title": "Foo",
+                "claim_url": "https://store.steampowered.com/app/620",
+            }
+        )
+    altar = bodies["https://discord.example/altar"]["content"]
+    members = bodies["https://discord.example/members"]["content"]
+    assert "closed beta" in altar
+    assert "closed beta" not in members
+    assert "https://store.steampowered.com/app/620" in altar
+    assert "https://store.steampowered.com/app/620" in members
+
+
 def test_build_discord_payload_strips_giveaway_title() -> None:
     payload = build_discord_payload(
         {

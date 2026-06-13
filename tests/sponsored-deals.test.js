@@ -279,6 +279,8 @@ describe('house table row', () => {
     expect(html).toContain('sponsored-deal-house');
     expect(html).not.toContain('sponsored-table-row--house');
     expect(html).toContain('From BAKLOG');
+    expect(html).not.toContain('<span class="house-table-kicker">');
+    expect(html).toContain('sponsored-table-badge');
     expect(html).not.toContain('sponsored-table-deal-pill');
     expect(html).not.toContain('sponsored-table-status-pill');
   });

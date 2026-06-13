@@ -86,7 +86,7 @@ jobs:
       # limit so the smoke subset finishes well inside the job timeout.
       - name: Run pytest smoke subset
         run: |
-          ulimit -n 4096
+          ulimit -n 256
           pytest -q \
             tests/test_server_personal.py \
             tests/test_server_csrf.py \

@@ -10,6 +10,21 @@ import time
 import warnings
 from pathlib import Path
 
+# GitHub macOS runners ship a huge RLIMIT_NOFILE. CPython subprocess.Popen with
+# pipes cannot use posix_spawn there, so fork+exec closes every FD up to the
+# limit (~10s/spawn on CI). Cap in-process so pytest and its children inherit a
+# desktop-like limit. ci.yml also runs `ulimit -n 256` before pytest.
+if sys.platform == "darwin":
+    import resource
+
+    try:
+        _soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        _cap = 256
+        if _soft > _cap:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (_cap, max(_hard, _cap)))
+    except OSError:
+        pass
+
 import pytest
 
 import server

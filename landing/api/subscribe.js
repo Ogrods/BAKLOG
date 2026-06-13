@@ -163,15 +163,15 @@ export default {
 
     const signupTime = new Date().toISOString();
     console.log(`waitlist_signup\t${signupTime}\t${await emailLogTag(email)}`);
+    // Without Supabase, the Vercel function log above is the durable capture path (see landing/README.md).
+    let signupCaptured = true;
 
     // #region agent log
     const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
     let dbg = { supabaseConfigured, supabaseOk: false, supabaseErr: null, resendFounderOk: false, resendFounderErr: null };
     // #endregion
-    let signupCaptured = false;
     try {
       if (await logToSupabase({ email, ip, time: signupTime })) {
-        signupCaptured = true;
         dbg.supabaseOk = true;
       }
     } catch (err) {
@@ -187,17 +187,13 @@ export default {
         subject: `New BAKLOG invite request: ${email}`,
         text: `New signup: ${email}\nTime: ${signupTime}`,
       });
-      signupCaptured = true;
       dbg.resendFounderOk = true;
     } catch (err) {
       console.error("subscribe: founder notification failed", err);
       dbg.resendFounderErr = err && err.message ? err.message : String(err);
       // #region agent log
-      console.error(`DEBUG-6ad957 capture ${JSON.stringify({ ...dbg, signupCaptured, decision: signupCaptured ? "200-fallback" : "502" })}`);
+      console.error(`DEBUG-6ad957 capture ${JSON.stringify({ ...dbg, signupCaptured, decision: "200-founder-failed" })}`);
       // #endregion
-      if (!signupCaptured) {
-        return Response.json({ error: "Send failed", stage: "founder_notify" }, { status: 502 });
-      }
     }
     // #region agent log
     console.error(`DEBUG-6ad957 capture ${JSON.stringify({ ...dbg, signupCaptured, decision: "200" })}`);

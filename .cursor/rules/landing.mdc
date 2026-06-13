@@ -35,4 +35,4 @@ See **AGENTS.md hard rule 6** for the canonical full sync-pair list. Landing-spe
 
 ## Copy conventions
 
-- **No em dashes in marketing copy.** Never use `—` (em dash, U+2014) in any front-facing string in `landing/` (hero, demo text, `sponsors.json`, email copy in `api/subscribe.js`). Use a spaced hyphen (` - `) or rephrase. Code comments are exempt. See AGENTS.md hard rule 8.
+- **No em dashes or AI tells in marketing copy.** Never use `—` (em dash, U+2014) in any front-facing string in `landing/` (hero, demo text, `sponsors.json`, email copy in `api/subscribe.js`). Use a spaced hyphen (` - `) or rephrase. Also avoid LLM-flavored marketing (contrast frames, hype verbs, empty intensifiers, abstract positioning, verbatim claim repetition across sections). Code comments are exempt. See AGENTS.md hard rule 8.

@@ -43,7 +43,7 @@ Tabs in `index.html`: dashboard, library, wishlist, itch (conditional), connecti
 
 ## Copy conventions
 
-- **No em dashes in front-facing copy.** Never use `—` (em dash, U+2014) in user-visible strings — rendered `js/*.js` string literals, `index.html` text, or `app.css` `content:` values. Use a spaced hyphen (` - `) or rephrase. Code comments and docstrings are exempt; this is about what users read. See AGENTS.md hard rule 8.
+- **No em dashes or AI tells in front-facing copy.** Never use `—` (em dash, U+2014) in user-visible strings — rendered `js/*.js` string literals, `index.html` text, or `app.css` `content:` values. Use a spaced hyphen (` - `) or rephrase. Also avoid LLM-flavored marketing (contrast frames, hype verbs, empty intensifiers, abstract positioning, verbatim claim repetition across sections). Code comments and docstrings are exempt; this is about what users read. See AGENTS.md hard rule 8.
 
 ## Banners & ads — how a change actually reaches the app
 

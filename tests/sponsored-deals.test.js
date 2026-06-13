@@ -82,8 +82,8 @@ function proPromoItem(overrides = {}) {
     id: 'house-pro-promo',
     kind: 'house',
     banner: 'pro',
-    title: 'Move faster. Cut the noise.',
-    tagline: 'Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.',
+    title: 'Refresh faster. See fewer ads.',
+    tagline: 'Queue stale stores, sync across machines, and remove sponsored deal cards. Nothing you use today moves behind paywall.',
     cta: 'Get Pro — $5/mo',
     url: 'https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw',
     placements: 'dash-deal-rail',
@@ -572,6 +572,7 @@ describe('getSpotlightHouseAds', () => {
       'house-spotlight-pro-logo',
       'house-spotlight-pro-sync',
       'house-spotlight-pro-noads',
+      'house-spotlight-pro-alerts',
       'house-spotlight-library',
     ]);
     expect(ads[0].art_mode).toBe('logo');
@@ -583,6 +584,7 @@ describe('getSpotlightHouseAds', () => {
       'house-spotlight-pro-logo',
       'house-spotlight-pro-sync',
       'house-spotlight-pro-noads',
+      'house-spotlight-pro-alerts',
       'house-spotlight-library',
     ]);
   });
@@ -701,7 +703,7 @@ describe('sponsoredDealSlotHtml', () => {
     wireWishHouse();
     const html = sponsoredDealSlotHtml();
     expect(html).toContain('sponsored-deal-house');
-    expect(html).toContain('Level up to BAKLOG Pro');
+    expect(html).toContain('Upgrade to BAKLOG Pro');
     expect(html).toContain('data-sponsor-house="1"');
     expect(html).not.toContain('sponsored-dismiss');
   });
@@ -837,7 +839,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['local-ad']));
-    expect(state.sponsoredDeals).toHaveLength(9);
+    expect(state.sponsoredDeals).toHaveLength(10);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -856,7 +858,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['remote-ad']));
-    expect(state.sponsoredDeals).toHaveLength(9);
+    expect(state.sponsoredDeals).toHaveLength(10);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       SPONSORS_HOSTED_URL,
       expect.objectContaining({ cache: 'no-store' }),
@@ -878,7 +880,7 @@ describe('loadSponsoredDeals', () => {
     await loadSponsoredDeals();
 
     expect(state.sponsoredDeals.map(x => x.id)).toEqual(expect.arrayContaining(['bundled-ad']));
-    expect(state.sponsoredDeals).toHaveLength(9);
+    expect(state.sponsoredDeals).toHaveLength(10);
   });
 
   it('respects window.__BAKLOG_SPONSORS_ENDPOINT override', async () => {

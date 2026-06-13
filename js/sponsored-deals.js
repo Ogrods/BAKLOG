@@ -274,8 +274,8 @@ const V1_PLACEMENT_MAP = {
 const HOUSE_DEFAULTS = {
   'house-support-baklog': {
     kind: 'house',
-    title: 'Level up to BAKLOG Pro',
-    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.',
+    title: 'Upgrade to BAKLOG Pro',
+    tagline: 'Bulk refresh, cloud sync, and no sponsored cards - $5/mo.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -284,8 +284,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-pro-promo': {
     kind: 'house',
-    title: 'Move faster. Cut the noise.',
-    tagline: 'Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.',
+    title: 'Refresh faster. See fewer ads.',
+    tagline: 'Queue stale stores, sync across machines, and remove sponsored deal cards. Nothing you use today moves behind paywall.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -303,8 +303,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-itch-privacy': {
     kind: 'house',
-    title: 'Level up to BAKLOG Pro',
-    tagline: 'Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.',
+    title: 'Upgrade to BAKLOG Pro',
+    tagline: 'Background refresh, cloud sync, and no sponsored cards - $5/mo.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -350,8 +350,8 @@ const HOUSE_DEFAULTS = {
   'house-spotlight-pro-alerts': {
     kind: 'house',
     title: 'Never miss a free game again',
-    slogan: 'Never miss a free game again.',
-    tagline: 'Deal & watchlist alerts when giveaways and sales land - coming soon with Pro.',
+    slogan: 'Alerts when giveaways and sales land.',
+    tagline: 'Deal & watchlist alerts - coming soon with Pro.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -362,8 +362,8 @@ const HOUSE_DEFAULTS = {
   'house-spotlight-library': {
     kind: 'house',
     title: 'It\'s just your library',
-    slogan: 'It\'s not a godsend, it\'s just your library.',
-    tagline: 'Every game you already own, deduped across every store into one honest backlog. Local-first.',
+    slogan: 'Your library, every store, one place.',
+    tagline: 'Every game you own, deduped across stores. Local-first.',
     cta: 'Get Pro - $5/mo',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -701,14 +701,14 @@ export function spotlightLogoMarkHtml() {
 const HOUSE_BANNER_FEATURES = [
   {
     title: 'Local-first',
-    desc: 'Your library never leaves your machine. Nothing to breach, sell, or subpoena.',
+    desc: 'Your library never leaves your machine. No BAKLOG server holds your data.',
   },
   {
     title: 'Every store, one list',
     desc: '12 libraries and 8 wishlists, deduped across Steam, Epic, GOG, and more.',
   },
   {
-    title: 'Open & honest',
+    title: 'Open source',
     desc: 'No telemetry. Full source on GitHub (MIT) - audit every line.',
   },
 ];
@@ -717,9 +717,9 @@ const HOUSE_BANNER_FEATURES = [
 // Sync pair: PRO_PROMO ↔ landing/index.html paid tier + FAQ pricing answers.
 export const PRO_PROMO = {
   label: 'BAKLOG Pro',
-  title: 'Move faster. Cut the noise.',
+  title: 'Refresh faster. See fewer ads.',
   price: '$5/mo ($50/yr)',
-  tagline: 'Queue every stale store, sync across machines, and drop sponsored deal cards. Nothing you use today moves behind paywall.',
+  tagline: 'Queue stale stores, sync across machines, and remove sponsored deal cards. Nothing you use today moves behind paywall.',
   cta: 'Get Pro - $5/mo',
   ctaYearly: 'Get Pro - $50/yr',
   url: PRO_CHECKOUT_MONTHLY,
@@ -801,8 +801,8 @@ export function isProPromoSponsorId(id) {
 export const HOUSE_DEAL_ITEM = {
   id: 'house-support-baklog',
   kind: 'house',
-  title: 'Level up to BAKLOG Pro',
-  tagline: 'Queue every stale store, sync across machines, and drop sponsored cards - $5/mo.',
+  title: 'Upgrade to BAKLOG Pro',
+  tagline: 'Bulk refresh, cloud sync, and no sponsored cards - $5/mo.',
   cta: 'Get Pro - $5/mo',
   url: PRO_CHECKOUT_MONTHLY,
   dismissible: true,

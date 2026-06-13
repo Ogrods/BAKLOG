@@ -145,8 +145,8 @@ export const SUPPORT_GROUPS = [
     "Sponsored cards are clearly marked and optional, but a click helps keep BAKLOG free.",
   ],
   [
-    "BAKLOG Pro (planned, $5/mo) adds sync and bulk refresh - and nothing free today moves behind it.",
-    "Want fewer sponsored slots? BAKLOG Pro is the planned no-ads path.",
+    "BAKLOG Pro ($5/mo) adds sync and bulk refresh - and nothing free today moves behind it.",
+    "Want fewer sponsored slots? BAKLOG Pro is the no-ads path.",
   ],
   [
     "Not in the beta yet? Request an invite at baklog.app - we onboard in small waves.",

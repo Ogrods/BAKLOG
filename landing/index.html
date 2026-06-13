@@ -538,6 +538,10 @@
     .foot-tagline, .foot-pricing { color: var(--text-mute); font-size: 0.85rem; margin: 0.85rem 0 0; line-height: 1.5; text-wrap: pretty; }
     .foot-tagline strong { color: var(--text); font-weight: 600; }
     .foot-pricing { margin-top: 0.5rem; }
+    .foot-social { display: flex; gap: 0.55rem; margin-top: 1.1rem; }
+    .foot-social a { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 999px; border: 1px solid var(--border-subtle); color: var(--text-mute); transition: color .15s ease, border-color .15s ease, background-color .15s ease; }
+    .foot-social a:hover { color: #fff; border-color: var(--text-mute); background: rgba(255,255,255,0.06); }
+    .foot-social svg { width: 18px; height: 18px; fill: currentColor; }
     .foot-links { display: grid; grid-template-columns: repeat(2, auto); gap: 2rem 3.5rem; }
     .foot-col h4 { margin: 0 0 0.65rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); }
     .foot-col a { display: block; font-size: 0.9rem; line-height: 1.45; font-weight: 600; padding: 0.15rem 0; }
@@ -1090,13 +1094,26 @@
           </div>
           <p class="foot-tagline"><strong>baklog.app</strong>. One honest backlog across every store.</p>
           <p class="foot-pricing">Free forever to import &middot; $5/mo optional &middot; Invite-only early access. Invites go out in small waves.</p>
+          <div class="foot-social" aria-label="Follow BAKLOG">
+            <a href="https://x.com/baklogdotapp" target="_blank" rel="noopener noreferrer" aria-label="BAKLOG on X" title="X (@baklogdotapp)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <a href="https://bsky.app/profile/baklog.bsky.social" target="_blank" rel="noopener noreferrer" aria-label="BAKLOG on Bluesky" title="Bluesky (baklog.bsky.social)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364C23.622 9.418 24 4.458 24 3.768c0-.688-.139-1.86-.902-2.203-.659-.299-1.664-.621-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8z"/></svg>
+            </a>
+            <a href="https://www.instagram.com/baklog.app/" target="_blank" rel="noopener noreferrer" aria-label="BAKLOG on Instagram" title="Instagram (@baklog.app)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+            </a>
+            <a href="https://www.tiktok.com/@baklogbacklog" target="_blank" rel="noopener noreferrer" aria-label="BAKLOG on TikTok" title="TikTok (@baklogbacklog)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
+            </a>
+          </div>
         </div>
         <nav class="foot-links" aria-label="Footer">
           <div class="foot-col">
             <h4>Community</h4>
-            <!-- Discord + GitHub: keep in sync with shared/community.json + index.html kebab menu -->
+            <!-- GitHub: keep in sync with shared/community.json -->
             <a href="#waitlist">Request an invite</a>
-            <a href="https://discord.gg/baklog" target="_blank" rel="noopener noreferrer">Discord</a>
             <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href="mailto:dan@baklog.app">dan@baklog.app</a>
           </div>

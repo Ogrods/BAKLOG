@@ -1182,11 +1182,48 @@ function tbodyRowCount() {
 }
 
 /**
- * Drop the sponsored table row immediately on dismiss — avoids waiting for a
- * full renderTable() query + virtual repaint (~200ms+ on large libraries).
+ * Resolve the sponsored row markup for the next eligible creative in the active
+ * table location, or '' when none remain. Advances the round-robin cursor so a
+ * dismiss reveals a *different* creative rather than re-resolving the same one.
+ */
+function nextSponsoredTableRowHtml({ layoutHint = 'auto' } = {}) {
+  const rowLoc = resolveTableRowLocation();
+  rotateLocationAd(rowLoc);
+  const next = getAdsForLocation(rowLoc)[0];
+  if (!next) return '';
+  const isWish = state.activeView === 'wishlist';
+  const ctx = { isWish, locationKey: rowLoc };
+  const outgoingIsHouse = layoutHint === 'house';
+  const nextIsHouse = String(next.kind || '').toLowerCase() === 'house';
+  // On dismiss from a sponsor row, render the next house creative in the same
+  // full-column shell so the row height stays put (strip layout is initial-paint only).
+  if (!outgoingIsHouse && nextIsHouse) {
+    return sponsoredTableRowHtml(next, { ...ctx, tableLayout: 'sponsor' });
+  }
+  return sponsoredTableRowHtml(next, ctx);
+}
+
+/**
+ * Swap the sponsored table row to the next eligible creative the instant it is
+ * dismissed — so the slot "instantly changes" instead of collapsing the row and
+ * waiting for a full renderTable() query + virtual repaint (~200ms+ on large
+ * libraries). Only when no creative remains do we drop the row (collapse).
  */
 export function syncSponsoredTableAfterDismiss() {
-  document.getElementById('tbody')?.querySelector('.sponsored-table-row')?.remove();
+  const row = document.getElementById('tbody')?.querySelector('.sponsored-table-row');
+  const outgoingIsHouse = !!row?.classList.contains('sponsored-table-row--house');
+  if (!row) return;
+  const html = nextSponsoredTableRowHtml({ layoutHint: outgoingIsHouse ? 'house' : 'sponsor' });
+  if (html) {
+    const tmpl = document.createElement('template');
+    tmpl.innerHTML = html.trim();
+    const newRow = tmpl.content.querySelector('tr');
+    if (newRow) {
+      row.replaceWith(newRow);
+      return;
+    }
+  }
+  row.remove();
   if (_virtualList) {
     _virtualWindow = { start: -1, end: -1 };
     _virtualWindowList = null;
@@ -1213,7 +1250,9 @@ function appendChunk(list, start, end, ctx) {
     ? getAdsForLocation(rowLoc)[0]
     : null;
   for (let i = start; i < end; i++) {
-    if (tableAd && i === slot) out.push(sponsoredTableRowHtml(tableAd, { ...ctx, locationKey: rowLoc }));
+    if (tableAd && i === slot) {
+      out.push(sponsoredTableRowHtml(tableAd, { ...ctx, locationKey: rowLoc, tableLayout: 'sponsor' }));
+    }
     out.push(tableRowHtml(list[i], i, ctx));
   }
   const html = out.join("");

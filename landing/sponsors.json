@@ -40,11 +40,10 @@
     },
     "house-table-every-store": {
       "kind": "house",
-      "title": "Every store, one backlog",
-      "tagline": "Steam, Epic, GOG and more - deduped into one honest list. Free and local-first.",
-      "cta": "Start free",
-      "url": "https://baklog.app/",
-      "dismissible": true,
+      "title": "BAKLOG Pro",
+      "tagline": "Bulk-refresh every store at once and sync your library across machines. $5/mo.",
+      "cta": "Get Pro - $5/mo",
+      "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "enabled": true
     },
     "ad-dash-picks-dawnbanner": {

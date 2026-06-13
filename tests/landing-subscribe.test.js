@@ -124,16 +124,16 @@ describe("landing/api/subscribe.js", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when founder notification fails", async () => {
+  it("returns ok when founder notification fails (signup already logged)", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 500,
       text: async () => "upstream error",
     });
     const res = await handleSubscribe(makeRequest({ email: "tester@example.com" }, { ip: "10.0.0.91" }));
-    expect(res.status).toBe(502);
-    expect(await res.json()).toEqual({ error: "Send failed", stage: "founder_notify" });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("returns ok when founder notification fails but Supabase captured the signup", async () => {

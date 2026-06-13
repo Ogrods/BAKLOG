@@ -440,7 +440,11 @@ def test_build_require_manual_approval_needs_explicit_true(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty", "--require-manual-approval"])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["build_free_claims.py", "--no-profile", "--allow-empty", "--require-manual-approval"],
+    )
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))

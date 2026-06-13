@@ -298,6 +298,7 @@ def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:
     return True
 
 # Personal-data persistence (scoped to active profile via shared.profile_paths).
+from shared import server_internal_routes  # noqa: E402
 from shared.platform_support import platform_supported  # noqa: E402
 from shared.profile_paths import (  # noqa: E402
     PROFILE_CACHE_JSON_FILES,
@@ -326,7 +327,6 @@ from shared.server_static import (  # noqa: E402
 from shared.server_static import (  # noqa: E402
     static_class as _static_class_impl,
 )
-from shared import server_internal_routes  # noqa: E402
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()

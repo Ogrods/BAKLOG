@@ -75,7 +75,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 # then run dist\baklog\Start BAKLOG (tray).bat
 ```
 
-**Start at login:** the tray menu can register login autostart (Windows registry / macOS LaunchAgent / Linux XDG). In dev this launches `tray_app.py`; the PyInstaller `BAKLOG.exe` bundle is server-only (no tray icon) — use the tray launcher or `refresh.ps1` / OS scheduler for closed-app refresh.
+**Start at login:** the tray menu can register login autostart (Windows registry / macOS LaunchAgent / Linux XDG). In dev this launches `tray_app.py`; frozen beta builds use **BAKLOG Tray.exe** (installer or `Start BAKLOG.bat`).
 
 **Pro background refresh:** when the server process is alive (tray or `python server.py`), the paid tier scheduler refreshes stale stores without an open browser tab. Under Supabase auth, sign in once in the browser so the server caches your plan for headless refresh.
 

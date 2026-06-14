@@ -1,7 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec for BAKLOG (Windows onedir). Run via packaging/build_windows.ps1.
-# Entry point is server.py (HTTP server + fetcher dispatch). For the system tray
-# icon in dev/dist builds, run tray_app.py separately — see scripts/build_installer.ps1.
+# Dual entry: BAKLOG.exe (server + fetcher dispatch) and BAKLOG Tray.exe (primary launcher).
 
 import sys
 from pathlib import Path
@@ -62,6 +61,13 @@ hiddenimports = [
     "cryptography.hazmat.primitives.ciphers.aead",
 ]
 
+tray_hiddenimports = hiddenimports + [
+    "pystray",
+    "PIL",
+    "PIL.Image",
+    "PIL.ImageDraw",
+]
+
 a = Analysis(
     [str(root / "server.py")],
     pathex=[str(root)],
@@ -78,7 +84,26 @@ a = Analysis(
     noarchive=False,
 )
 
+a_tray = Analysis(
+    [str(root / "tray_app.py")],
+    pathex=[str(root)],
+    binaries=[],
+    datas=[],
+    hiddenimports=tray_hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=["tests", "landing", "marketing", "node_modules"],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+MERGE((a, "BAKLOG", "BAKLOG"), (a_tray, "BAKLOG", "BAKLOG Tray"))
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz_tray = PYZ(a_tray.pure, a_tray.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
@@ -98,8 +123,27 @@ exe = EXE(
     entitlements_file=None,
 )
 
+exe_tray = EXE(
+    pyz_tray,
+    a_tray.scripts,
+    [],
+    exclude_binaries=True,
+    name="BAKLOG Tray",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
 coll = COLLECT(
     exe,
+    exe_tray,
     a.binaries,
     a.zipfiles,
     a.datas,

@@ -1,0 +1,9 @@
+Welcome to the BAKLOG beta.
+
+Windows may show "Windows protected your PC" or "Unknown publisher" because this build is not code-signed yet. Click More info, then Run anyway.
+
+After install, launch BAKLOG from the Start Menu. A tray icon appears in the notification area. Right-click it for Open, Restart, or Quit. You do not need to keep a console window open.
+
+Connections sign-in requires Google Chrome or Microsoft Edge.
+
+Your library data stays on this PC. Nothing is uploaded to our servers.

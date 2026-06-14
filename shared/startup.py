@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from shared.install_paths import bundle_root, is_frozen
+from shared.install_paths import bundle_root, frozen_tray_exe, is_frozen
 
 _SUPPORTED = frozenset({"win32", "darwin", "linux"})
 
@@ -67,6 +67,9 @@ def pythonw_executable() -> str:
 def startup_argv() -> list[str]:
     """Argv used to launch the tray at login."""
     if is_frozen():
+        tray = frozen_tray_exe()
+        if tray.is_file():
+            return [str(tray)]
         return [sys.executable]
     if sys.platform == "win32":
         return [pythonw_executable(), str(bundle_root() / "tray_app.py")]

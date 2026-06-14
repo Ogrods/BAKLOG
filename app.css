@@ -8306,6 +8306,55 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
   #activeFilterPills > * {
     flex-shrink: 0;
   }
+
+  /* Phone spacing pass: tighten hero cards and stack deal/conn chrome. */
+  .dash-mega,
+  .dash-hero {
+    padding: 1.1rem 1rem 1rem;
+    border-radius: 12px;
+  }
+  .dash-hero-number {
+    font-size: clamp(36px, 12vw, 56px);
+  }
+  .conn-hero {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+  }
+  .conn-hero-actions {
+    margin-left: auto;
+  }
+  .deal-hero-body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .deal-hero-cover {
+    width: 72px;
+    height: 108px;
+  }
+  .migration-banner-body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .migration-banner-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .pro-view-funnel {
+    gap: 1rem;
+  }
+  #picksSection > div:first-of-type .ml-auto {
+    margin-left: 0;
+    width: 100%;
+  }
+  #quickWinMaxWrap {
+    width: 100%;
+  }
+  #quickWinMax {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
 }
 
 #toolbarSection .toolbar-kebab-pick--phone {

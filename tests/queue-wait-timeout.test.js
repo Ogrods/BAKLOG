@@ -48,7 +48,7 @@ describe('waitForQueueSlot no-progress timeout (real timer behaviour)', () => {
     // A single Covers run holds the only slot for ~240s but emits heartbeat
     // lines (line_count grows) every 60s — well within the 120s window.
     fetcherRunner.applyServerSnapshotInFlight({
-      active: { id: 'r1', key: 'steamCovers', line_count: 1 },
+      active: { id: 'r1', key: 'steamCovers', status: 'running', line_count: 1 },
     });
     const waitP = fetcherRunner.waitForQueueSlot();
     const settled = waitP.then(() => 'resolved', (e) => `rejected:${e.message}`);
@@ -56,7 +56,7 @@ describe('waitForQueueSlot no-progress timeout (real timer behaviour)', () => {
     for (let lc = 2; lc <= 5; lc += 1) {
       await vi.advanceTimersByTimeAsync(60_000);
       fetcherRunner.applyServerSnapshotInFlight({
-        active: { id: 'r1', key: 'steamCovers', line_count: lc },
+        active: { id: 'r1', key: 'steamCovers', status: 'running', line_count: lc },
       });
     }
     // 240s elapsed, far past the 120s cap, but progress never stalled > window.
@@ -70,7 +70,7 @@ describe('waitForQueueSlot no-progress timeout (real timer behaviour)', () => {
     // Same active run, never advances (line_count frozen) — a genuinely wedged
     // queue should still surface the timeout so we never wait forever.
     fetcherRunner.applyServerSnapshotInFlight({
-      active: { id: 'r1', key: 'steamCovers', line_count: 1 },
+      active: { id: 'r1', key: 'steamCovers', status: 'running', line_count: 1 },
     });
     const waitP = fetcherRunner.waitForQueueSlot();
     const settled = waitP.then(() => 'resolved', (e) => `rejected:${e.message}`);
@@ -81,7 +81,7 @@ describe('waitForQueueSlot no-progress timeout (real timer behaviour)', () => {
   });
 
   it('resolves when the slot frees before the cap (control)', async () => {
-    fetcherRunner.applyServerSnapshotInFlight({ active: { id: 'r2', key: 'steam', line_count: 1 } });
+    fetcherRunner.applyServerSnapshotInFlight({ active: { id: 'r2', key: 'steam', status: 'running', line_count: 1 } });
     const waitP = fetcherRunner.waitForQueueSlot();
     const settled = waitP.then(() => 'resolved', (e) => `rejected:${e.message}`);
 

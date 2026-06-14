@@ -512,7 +512,7 @@ export async function reloadAfterFetcher(key) {
   await applyMergedLibrary(key);
   const newCount = state._lastNewlyAddedCount ?? 0;
   if (LIBRARY_STORE_JSON[key] && !ENRICH_FETCHER_KEYS.has(key)) {
-    void maybeAutoEnrichNewAdditions(newCount);
+    void maybeAutoEnrichNewAdditions(newCount).catch(() => {});
   }
   if (key === 'steam') {
     void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());

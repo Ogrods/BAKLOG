@@ -101,6 +101,27 @@ def main() -> int:
     if args.limit:
         titles = titles[: args.limit]
     scope = "library + wishlist" if args.include_library else "wishlist"
+
+    # Empty input is "nothing to do", not a failure. Previously an empty wishlist
+    # fell through to a 0-row write and exit 2 with no explanation, surfacing as a
+    # bare "failed" chip. Detect it up front and tell the user what to do instead,
+    # leaving any existing itad_prices.json untouched.
+    if not titles:
+        if args.include_library:
+            stats.warn(
+                "No wishlist or library titles found to price yet. Add games to a "
+                "store wishlist (or import a library), then run ITAD prices again."
+            )
+        else:
+            stats.warn(
+                "Your wishlist is empty, so there is nothing for ITAD to price. "
+                "ITAD tracks price drops on wishlist titles - add games to a store "
+                "wishlist and re-fetch it, then run ITAD prices again. To also track "
+                "prices for games you own, run with --include-library."
+            )
+        print(f"No {scope} titles to look up - skipping ITAD price fetch.", flush=True)
+        return stats.finish("fetch_itad", t0, exit_code=0, extra="0 titles to price")
+
     print(f"Looking up ITAD prices for {len(titles)} {scope} titles...")
 
     try:
@@ -128,15 +149,17 @@ def main() -> int:
                 stats.warn(f"no ITAD match for {title!r}")
 
         print(f"Resolved {len(plain_by_key)}/{len(titles)} ITAD ids. Fetching prices...", flush=True)
-        if titles:
-            empty_exit = refuse_empty_result(
-                plain_by_key,
-                label="ITAD price resolution",
-                allow_empty=args.allow_empty,
-                output_path=ITAD_JSON,
-            )
-            if empty_exit is not None:
-                return stats.finish("fetch_itad", t0, exit_code=empty_exit)
+        # Titles is non-empty here (the empty-input case returns early above), so a
+        # zero resolution means every wishlist title failed to match - refuse the
+        # empty overwrite rather than wipe existing prices.
+        empty_exit = refuse_empty_result(
+            plain_by_key,
+            label="ITAD price resolution",
+            allow_empty=args.allow_empty,
+            output_path=ITAD_JSON,
+        )
+        if empty_exit is not None:
+            return stats.finish("fetch_itad", t0, exit_code=empty_exit)
 
         plains = list(set(plain_by_key.values()))
         prices_by_plain = client.prices_for_plains(plains)

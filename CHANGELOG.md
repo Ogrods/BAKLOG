@@ -33,6 +33,9 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- **Fetcher auto-refresh defaults off** — ITAD auto-refresh, claims auto-refresh, and
+  auto-enrich new games now ship disabled in `js/prefs.js`; opt in from the fetcher
+  health panel.
 - **Marketing live-state reconciliation (Jun 2026)** — landing, deck, one-pagers,
   content-kit, and README aligned to code-grounded canonical copy: paid tier live
   ($5/mo · $50/yr via Polar); 300+ stats canonical; cloud sync, queued bulk

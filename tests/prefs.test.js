@@ -99,6 +99,13 @@ describe('loadPrefs', () => {
     expect(p.autoFetchStale24h).toBe(true);
   });
 
+  it('defaults fetcher auto-refresh and enrich off', () => {
+    const p = loadPrefs();
+    expect(p.itadAutoRefreshDisabled).toBe(true);
+    expect(p.claimsAutoRefreshDisabled).toBe(true);
+    expect(p.autoEnrichOnAdd).toBe(false);
+  });
+
   it('clamps itadAutoRefreshIntervalMin to 15-60 and snaps to step 5', () => {
     localStorage.setItem(prefsStorageKey(), JSON.stringify({ itadAutoRefreshIntervalMin: 10 }));
     expect(loadPrefs().itadAutoRefreshIntervalMin).toBe(15);

@@ -2498,6 +2498,27 @@ body.bulk-bar-open { padding-bottom: 56px; }
 #viewLoadingOverlay.app-view-overlay.show {
   opacity: 1;
   pointer-events: auto;
+  /* Match boot curtain: solid scrim, no bleed-through of async paints beneath. */
+  background: var(--bg);
+  backdrop-filter: none;
+}
+/* Tab-switch curtain: keep view chrome invisible while the scrim is up so deal
+   radar, dashboard mega, claimables, and house banners paint invisibly and
+   appear together when the overlay lifts. visibility (not display) so Chart.js
+   can still measure canvases during dashboard replay under the scrim. */
+html:has(#viewLoadingOverlay.show) #claimableNowModule,
+html:has(#viewLoadingOverlay.show) #picksSection,
+html:has(#viewLoadingOverlay.show) #wishlistDealRadar,
+html:has(#viewLoadingOverlay.show) #wishlistHouseSlot,
+html:has(#viewLoadingOverlay.show) #viewHouseSlot,
+html:has(#viewLoadingOverlay.show) #summary,
+html:has(#viewLoadingOverlay.show) #toolbarSection,
+html:has(#viewLoadingOverlay.show) #tableShell,
+html:has(#viewLoadingOverlay.show) #rowCount,
+html:has(#viewLoadingOverlay.show) #dashboardContainer,
+html:has(#viewLoadingOverlay.show) #connectionsContainer,
+html:has(#viewLoadingOverlay.show) #proContainer {
+  visibility: hidden !important;
 }
 .app-view-overlay-card {
   display: flex;
@@ -2761,6 +2782,14 @@ header.app-header {
   /* Override the Tailwind mb-4 utility: unified gap under the header rule on
      every view before the first main content block. */
   margin-bottom: 0.75rem;
+}
+/* Pin the bottom rule to the nav row, not the full header block. Table views
+   keep #summary chips inside <header>; a rule on header.app-header only
+   paints below those chips so the line looks missing under the tabs.
+   padding-bottom gives a consistent gap between the tabs and the rule on
+   every view. */
+.app-header-row {
+  padding-bottom: 0.75rem;
   box-shadow: 0 1px 0 var(--border-subtle);
 }
 /* Dashboard-only sticky header: the dashboard hides #summary (and the toolbar/

@@ -57,6 +57,12 @@ if (-not (Test-Path $TrayExe)) {
     Write-Error "Build failed: $TrayExe not found"
 }
 
+$InternalDir = Join-Path $OutDir "_internal"
+$FallbackJson = Join-Path $InternalDir "curated\free_claims.fallback.json"
+if (-not (Test-Path $FallbackJson)) {
+    Write-Error "Build failed: bundled curated feed missing at $FallbackJson (PyInstaller must ship curated/ for offline claims fallback)"
+}
+
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 
 @"

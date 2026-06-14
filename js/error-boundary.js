@@ -144,7 +144,8 @@ function isStalePersistedError(entry) {
     || msg === 'lastBarSummary is not defined'
     || msg === 'eff is not defined'
     || msg === 'cancelGlobalFetcherTailThrottle is not defined'
-    || msg === 'itadPendingAutoRun is not defined';
+    || msg === 'itadPendingAutoRun is not defined'
+    || msg === 'queue wait timeout';
 }
 
 function prunePersistedRing() {

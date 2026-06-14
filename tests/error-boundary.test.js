@@ -139,6 +139,7 @@ describe("error-boundary rehydration", () => {
     const seeded = JSON.stringify([
       { kind: "error", time: 1, message: "ResizeObserver loop completed with undelivered notifications.", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
       { kind: "unhandledrejection", time: 2, message: "authStatus is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
+      { kind: "unhandledrejection", time: 4, message: "queue wait timeout", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
       { kind: "reported", time: 3, message: "still relevant", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
     ]);
     installWindow({ localStorageRaw: seeded });

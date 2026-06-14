@@ -52,3 +52,10 @@ def test_pyinstaller_hiddenimports_include_tray_deps() -> None:
     hidden = _spec_hiddenimports()
     for mod in ("pystray", "PIL", "PIL.Image", "PIL.ImageDraw"):
         assert mod in hidden, f"packaging/baklog.spec hiddenimports missing {mod}"
+
+
+def test_pyinstaller_datas_include_curated_feeds() -> None:
+    text = SPEC.read_text(encoding="utf-8")
+    assert '("curated"), "curated")' in text.replace(" ", "") or (
+        'root / "curated"' in text and '"curated"' in text
+    ), "packaging/baklog.spec datas must bundle curated/ (free_claims.fallback.json offline)"

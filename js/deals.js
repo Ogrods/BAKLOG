@@ -58,6 +58,10 @@ export function wishlistGamesWithDeals(wl) {
   });
 }
 
+/** Tooltip on the Today's top deal label (deal score, not lowest price). */
+export const TOP_DEAL_LABEL_TOOLTIP =
+  'Picks the on-sale wishlist title with the highest deal score: discount %, plus bonuses for historical lows and strong Steam ratings, with a small penalty for prices above $30. Not always the cheapest price.';
+
 export function syncDealFilterControls() {
   const onSaleEl = document.getElementById("dealOnSaleOnly");
   if (onSaleEl) onSaleEl.checked = !!state.prefs.dealOnSaleOnly;
@@ -127,7 +131,7 @@ export function dealHeroCardHtml(g) {
   // same row. The bind-events click handler picks up data-deal-url on wishlist.
   const dealUrl = d?.url ? ` data-deal-url="${escapeAttr(d.url)}"` : "";
   return `<button type="button" class="deal-card-clickable deal-hero dash-card deal-rail-card text-left w-full" data-action="deal-hero" data-key="${escapeAttr(key)}"${dealUrl} title="Jump to ${escapeAttr(g.name)} on Wishlist">
-    <div class="dash-kpi-label" title="Best-scoring wishlist deal right now (discount, rating, historical low)">Today&apos;s top deal</div>
+    <div class="dash-kpi-label" title="${escapeAttr(TOP_DEAL_LABEL_TOOLTIP)}">Today&apos;s top deal</div>
     <div class="deal-hero-body mt-2">
       <span class="cover-wrap deal-hero-cover-wrap${window.coverLandscapeAttr(cover)}">
         <img class="deal-hero-cover${window.coverLandscapeAttr(cover)}" src="${escapeAttr(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
@@ -152,7 +156,7 @@ export function dealHeroEmptyHtml(opts = {}) {
     ? "Connect a store and run its wishlist fetcher to start tracking deals."
     : "No active deals right now - check back after the next price refresh.";
   return `<div class="dash-card deal-rail-card deal-hero-empty">
-    <div class="dash-kpi-label" title="Best-scoring wishlist deal right now (discount, rating, historical low)">Today&apos;s top deal</div>
+    <div class="dash-kpi-label" title="${escapeAttr(TOP_DEAL_LABEL_TOOLTIP)}">Today&apos;s top deal</div>
     <div class="text-sm text-slate-400 mt-3">${hint}</div>
   </div>`;
 }

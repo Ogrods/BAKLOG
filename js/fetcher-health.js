@@ -1316,13 +1316,18 @@ export const fetcherRunner = (() => {
     return since > 0 ? `${base}?since=${since}` : base;
   }
 
-  /** Statuses that hold the single fetcher slot on the server (excludes cancelling). */
-  const BLOCKING_RUN_STATUSES = new Set(['queued', 'launching', 'running']);
+  /**
+   * Statuses that DON'T hold the fetcher slot: a run being torn down (cancelling)
+   * or already terminal. A run with no explicit status is treated as blocking
+   * (matches prior behaviour for minimal snapshots).
+   */
+  const NON_BLOCKING_RUN_STATUSES = new Set(['cancelling', 'done', 'failed', 'cancelled']);
 
   function runBlocksQueueSlot(run) {
-    if (!run?.id) return false;
-    if (suppressedRunIds.has(run.id)) return false;
-    return BLOCKING_RUN_STATUSES.has(run.status);
+    if (!run) return false;
+    if (run.id && suppressedRunIds.has(run.id)) return false;
+    if (run.status && NON_BLOCKING_RUN_STATUSES.has(run.status)) return false;
+    return true;
   }
 
   function applyServerSnapshotInFlight(snap) {

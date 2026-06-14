@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from shared.install_paths import bundle_root
+from shared.install_paths import bundle_root, is_frozen
 
 MANIFEST_PATH = bundle_root() / "fetchers" / "manifest.json"
 
@@ -111,7 +111,10 @@ def validate_manifest(path: Path | None = None) -> list[str]:
         if not key or not script:
             errors.append(f"entry missing key or script: {entry!r}")
             continue
-        if not (bundle_root() / script).is_file():
+        # Frozen builds compile fetch_*.py into the PYZ; the source files are not
+        # shipped as on-disk data, so skip source-file checks there (this is a
+        # dev/CI integrity check, not a runtime gate).
+        if not is_frozen() and not (bundle_root() / script).is_file():
             errors.append(f"{key}: missing script {script}")
         group = entry.get("group", "library")
         meta = entry.get("metaKey", key)
@@ -125,7 +128,7 @@ def validate_manifest(path: Path | None = None) -> list[str]:
         if requires and group in ("library", "wishlist", "prices") and key not in AUTH_PROVIDER_BY_KEY:
             errors.append(f"{key}: has requires but no AUTH_PROVIDER_BY_KEY")
         refresh = entry.get("refreshArgs") or []
-        if refresh:
+        if refresh and not is_frozen():
             flags = _script_flags(script)
             for arg in refresh:
                 if arg not in flags:

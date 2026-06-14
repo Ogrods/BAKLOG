@@ -21,7 +21,7 @@ Write-Host "Installing Python dependencies..."
 
 Write-Host "Building production frontend (esbuild dist/)..."
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-    Write-Error "npm not found — install Node.js 22+ before building the frozen bundle"
+    Write-Error "npm not found - install Node.js 22+ before building the frozen bundle"
 }
 npm ci
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -60,7 +60,7 @@ start "" "%~dp0BAKLOG.exe"
 $Version = "0.0.0"
 $PyProject = Join-Path $Root "pyproject.toml"
 if (Test-Path $PyProject) {
-    if ($PyProject -match 'version\s*=\s*"([^"]+)"') {
+    if ((Get-Content $PyProject -Raw) -match 'version\s*=\s*"([^"]+)"') {
         $Version = $Matches[1]
     }
 }

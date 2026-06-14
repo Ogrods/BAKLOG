@@ -42,10 +42,24 @@ def test_server_argv_includes_server_py_in_dev(monkeypatch):
     assert len(argv) == 2
 
 
-def test_server_argv_frozen_is_self(monkeypatch):
+def test_server_argv_frozen_uses_sibling_server_exe(monkeypatch, tmp_path):
+    tray_exe = tmp_path / "BAKLOG Tray.exe"
+    server_exe = tmp_path / "BAKLOG.exe"
+    tray_exe.write_text("tray", encoding="utf-8")
+    server_exe.write_text("server", encoding="utf-8")
     monkeypatch.setattr(tray_app, "is_frozen", lambda: True)
+    monkeypatch.setattr(tray_app.sys, "executable", str(tray_exe))
     argv = tray_app._server_argv()
-    assert argv == [sys.executable]
+    assert argv == [str(server_exe)]
+
+
+def test_server_argv_frozen_missing_server_raises(monkeypatch, tmp_path):
+    tray_exe = tmp_path / "BAKLOG Tray.exe"
+    tray_exe.write_text("tray", encoding="utf-8")
+    monkeypatch.setattr(tray_app, "is_frozen", lambda: True)
+    monkeypatch.setattr(tray_app.sys, "executable", str(tray_exe))
+    with pytest.raises(FileNotFoundError, match="BAKLOG server not found"):
+        tray_app._server_argv()
 
 
 def test_controller_not_running_when_port_closed(monkeypatch):

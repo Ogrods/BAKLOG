@@ -23,9 +23,19 @@ def test_startup_supported_on_known_platforms(monkeypatch):
     assert startup.startup_supported() is False
 
 
-def test_startup_argv_frozen(monkeypatch):
+def test_startup_argv_frozen_uses_tray_exe(monkeypatch, tmp_path):
+    tray_exe = tmp_path / "BAKLOG Tray.exe"
+    tray_exe.write_text("tray", encoding="utf-8")
     monkeypatch.setattr(startup, "is_frozen", lambda: True)
-    assert startup.startup_argv() == [sys.executable]
+    monkeypatch.setattr(startup, "frozen_tray_exe", lambda: tray_exe)
+    assert startup.startup_argv() == [str(tray_exe)]
+
+
+def test_startup_argv_frozen_falls_back_to_executable(monkeypatch, tmp_path):
+    monkeypatch.setattr(startup, "is_frozen", lambda: True)
+    monkeypatch.setattr(startup, "frozen_tray_exe", lambda: tmp_path / "missing.exe")
+    monkeypatch.setattr(startup.sys, "executable", r"C:\fallback\BAKLOG.exe")
+    assert startup.startup_argv() == [r"C:\fallback\BAKLOG.exe"]
 
 
 def test_startup_argv_dev_ends_with_tray_app(monkeypatch):

@@ -12,7 +12,18 @@ Install BAKLOG, run the local server, and open the dashboard in your browser.
 
 On Windows, use the project `.venv` Python - not the Microsoft Store `python.exe` stub. Fetcher subprocesses launched from the stub can hang and wedge the run queue. `server.py` auto-picks `.venv` when present.
 
-## Install
+## Beta (Windows)
+
+If you received a beta invite:
+
+1. Download and run **BAKLOG-v\*-Setup.exe** from your invite link.
+2. If SmartScreen warns about an unknown publisher, click **More info**, then **Run anyway**.
+3. Launch **BAKLOG** from the Start Menu. A tray icon appears and your browser opens.
+4. Open the **Connections** tab and connect each store you use (Chrome or Edge required).
+
+Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.bat` or `BAKLOG Tray.exe`. See `BETA-README.txt` in the bundle.
+
+## Install (from source)
 
 1. Clone or download the repo from [GitHub](https://github.com/Ogrods/BAKLOG).
 
@@ -77,7 +88,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 # then run dist\baklog\Start BAKLOG (tray).bat
 ```
 
-**Start at login:** the tray menu can register login autostart (Windows registry / macOS LaunchAgent / Linux XDG). The PyInstaller `BAKLOG.exe` bundle is server-only (no tray icon) - use the tray launcher or `refresh.ps1` / OS scheduler for closed-app refresh.
+**Start at login:** the tray menu can register login autostart (Windows registry / macOS LaunchAgent / Linux XDG). Frozen beta builds launch **BAKLOG Tray.exe** from the Start Menu or installer shortcut.
 
 **Pro background refresh:** when the server process is alive (tray or `python server.py`), the paid tier scheduler refreshes stale stores without an open browser tab. Under Supabase auth, sign in once in the browser so the server caches your plan for headless refresh.
 

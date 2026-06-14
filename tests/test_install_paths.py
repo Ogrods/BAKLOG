@@ -69,3 +69,15 @@ def test_serve_built_true_with_flag_and_manifest(monkeypatch, tmp_path):
     assets = install_paths.built_immutable_assets()
     assert "app.abc.css" in assets
     assert "js/app-XYZ.js" in assets
+
+
+def test_frozen_bundle_paths(monkeypatch, tmp_path):
+    tray_exe = tmp_path / "BAKLOG Tray.exe"
+    server_exe = tmp_path / "BAKLOG.exe"
+    tray_exe.write_text("tray", encoding="utf-8")
+    server_exe.write_text("server", encoding="utf-8")
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths.sys, "executable", str(tray_exe))
+    assert install_paths.frozen_bundle_dir() == tmp_path.resolve()
+    assert install_paths.frozen_server_exe() == server_exe
+    assert install_paths.frozen_tray_exe() == tray_exe

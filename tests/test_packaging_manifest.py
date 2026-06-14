@@ -23,9 +23,19 @@ def _manifest_script_stems() -> set[str]:
 
 def _spec_hiddenimports() -> set[str]:
     text = SPEC.read_text(encoding="utf-8")
-    block = re.search(r"hiddenimports\s*=\s*\[(.*?)\]", text, re.DOTALL)
-    assert block, "hiddenimports block not found in baklog.spec"
-    return set(re.findall(r'"([^"]+)"', block.group(1)))
+    blocks = re.findall(r"hiddenimports\s*=\s*\[(.*?)\]", text, re.DOTALL)
+    assert blocks, "hiddenimports block not found in baklog.spec"
+    out: set[str] = set()
+    for block in blocks:
+        out.update(re.findall(r'"([^"]+)"', block))
+    tray_extra = re.search(
+        r"tray_hiddenimports\s*=\s*hiddenimports\s*\+\s*\[(.*?)\]",
+        text,
+        re.DOTALL,
+    )
+    if tray_extra:
+        out.update(re.findall(r'"([^"]+)"', tray_extra.group(1)))
+    return out
 
 
 def test_manifest_scripts_in_pyinstaller_hiddenimports() -> None:
@@ -36,3 +46,9 @@ def test_manifest_scripts_in_pyinstaller_hiddenimports() -> None:
         "packaging/baklog.spec hiddenimports missing manifest scripts: "
         + ", ".join(missing)
     )
+
+
+def test_pyinstaller_hiddenimports_include_tray_deps() -> None:
+    hidden = _spec_hiddenimports()
+    for mod in ("pystray", "PIL", "PIL.Image", "PIL.ImageDraw"):
+        assert mod in hidden, f"packaging/baklog.spec hiddenimports missing {mod}"

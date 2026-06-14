@@ -1,5 +1,5 @@
 # Build a distributable folder for BAKLOG (portable .venv copy).
-# Prefer packaging/build_windows.ps1 (PyInstaller BAKLOG.exe) for beta testers.
+# Prefer packaging/build_windows.ps1 (PyInstaller BAKLOG.exe + BAKLOG Tray.exe) for beta testers.
 # Connections sign-in requires Google Chrome or Microsoft Edge on the target machine.
 #
 # Usage:

@@ -15,6 +15,19 @@ def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def frozen_bundle_dir() -> Path:
+    """Directory containing BAKLOG.exe and BAKLOG Tray.exe in a frozen onedir build."""
+    return Path(sys.executable).resolve().parent
+
+
+def frozen_server_exe() -> Path:
+    return frozen_bundle_dir() / "BAKLOG.exe"
+
+
+def frozen_tray_exe() -> Path:
+    return frozen_bundle_dir() / "BAKLOG Tray.exe"
+
+
 def bundle_root() -> Path:
     """Read-only app assets (UI, manifest, packaged scripts)."""
     if is_frozen():

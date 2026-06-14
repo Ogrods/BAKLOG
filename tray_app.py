@@ -10,9 +10,9 @@ Run it:
     pythonw tray_app.py           # dev, no console window (Windows)
     Start BAKLOG (tray).bat       # from scripts/build_installer.ps1 output
 
-The PyInstaller bundle (``BAKLOG.exe`` from packaging/baklog.spec) is the
-**server** entry only — use ``tray_app.py`` (or the tray .bat) for the icon.
-Frozen login autostart launches ``BAKLOG.exe`` (server, no tray icon).
+The PyInstaller bundle ships ``BAKLOG Tray.exe`` (primary launcher) and
+``BAKLOG.exe`` (server + fetcher dispatch). Frozen login autostart registers
+``BAKLOG Tray.exe``.
 
 Optional deps (tray UI):
     pip install pystray Pillow
@@ -35,7 +35,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-from shared.install_paths import bundle_root, is_frozen
+from shared.install_paths import bundle_root, frozen_server_exe, is_frozen
 from shared.startup import (
     is_startup_enabled,
     python_executable,
@@ -67,11 +67,16 @@ def _port_open(timeout: float = 0.3) -> bool:
 def _server_argv() -> list[str]:
     """Command that launches the BAKLOG server.
 
-    Frozen: the bundled exe runs the server when launched with no fetcher args.
+    Frozen: sibling ``BAKLOG.exe`` next to ``BAKLOG Tray.exe``.
     Dev: run server.py with the project interpreter.
     """
     if is_frozen():
-        return [sys.executable]
+        server = frozen_server_exe()
+        if not server.is_file():
+            raise FileNotFoundError(
+                f"BAKLOG server not found next to tray launcher: {server}"
+            )
+        return [str(server)]
     return [python_executable(), str(bundle_root() / "server.py")]
 
 

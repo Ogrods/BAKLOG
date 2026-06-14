@@ -102,6 +102,8 @@ describe('buildMarqueeItems', () => {
     const pool = buildInsightPool([], snap);
     const labels = pool.map((entry) => entry.html.replace(/<[^>]+>/g, ''));
     expect(labels.some((t) => t.includes('Mendoza line'))).toBe(false);
+    expect(labels.some((t) => t.includes('Launcher tip'))).toBe(false);
+    expect(pool).toHaveLength(0);
   });
 
   it('excludes disabled catalog metrics from marquee output', () => {

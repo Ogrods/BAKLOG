@@ -462,7 +462,9 @@ export function buildInsightPool(games, snapIn, ctxIn) {
     add(`Biggest critic gap: <strong>${escapeHtml(gapLeader.g.name)}</strong> · ${gapLeader.gap} pts`, METRIC_WEIGHT.moderate);
   }
 
-  add('Launcher tip: read installs straight from your launchers - fewer logins, uninstall after.', METRIC_WEIGHT.moderate);
+  if (games.length > 0) {
+    add('Launcher tip: read installs straight from your launchers - fewer logins, uninstall after.', METRIC_WEIGHT.moderate);
+  }
 
   appendCreativeInsights(entries, games, snap, METRIC_WEIGHT);
 

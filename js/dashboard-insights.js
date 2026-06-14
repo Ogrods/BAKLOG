@@ -380,8 +380,10 @@ export function buildInsightPool(games, snapIn, ctxIn) {
   if (clutch[0]) add(`Clutch pick: <strong>${escapeHtml(clutch[0].name)}</strong>`);
 
   const snap = snapIn || getLibrarySnapshot(games);
-  const mendoza = Math.round(snap.mendozaLine);
-  add(`Mendoza line: <strong>${mendoza}%</strong>`, METRIC_WEIGHT.moderate);
+  if (games.length > 0) {
+    const mendoza = Math.round(snap.mendozaLine);
+    add(`Mendoza line: <strong>${mendoza}%</strong>`, METRIC_WEIGHT.moderate);
+  }
 
   const tracked = ctxIn ? gamesFromMegaCtx(ctxIn, 'tracked') : games.filter(g => g.trophy_progress != null);
   const closest = tracked.length
@@ -679,7 +681,7 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
   if (cleanup) push('^', 'is-rose', formatNum(cleanup), 'cleanup candidates', null, { weight: W.friendly });
   const clutchCount = backlog.filter(g => isLeveragePick(g)).length;
   if (clutchCount) push('*', 'is-violet', formatNum(clutchCount), 'clutch picks', null, { weight: W.friendly });
-  const streak = hotColdStreak(snap);
+  const streak = total > 0 ? hotColdStreak(snap) : null;
   if (streak) {
     const streakGlyph = streak === 'hot' ? '+' : streak === 'cold' ? '^' : '~';
     const streakCls = streak === 'hot' ? 'is-emerald' : streak === 'cold' ? 'is-rose' : 'is-amber';
@@ -697,7 +699,7 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     push('~', pyth.delta >= 0 ? 'is-emerald' : 'is-rose', `${sign}${formatPct100(Math.abs(pyth.delta), 0)}`, 'vs pythagorean', null, { weight: W.cryptic });
   }
 
-  if (snap.rBar > 0) {
+  if (total > 0 && snap.rBar > 0) {
     push('~', 'is-amber', `${Math.round(snap.rBar)}%`, 'league avg rating', null, { weight: W.friendly });
   }
   const belowMendoza = backlog.filter(g => rating(g) > 0 && rating(g) < snap.mendozaLine).length;
@@ -1213,10 +1215,12 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
   appendCreativeMarqueeChips(push, games, snap, METRIC_WEIGHT);
 
   // kojima metric — super-rare MGSV codec easter egg
-  push('*', 'is-violet', '1', 'gay character: you, the player.', null, {
-    weight: W.kojima,
-    iconTitle: 'kojima',
-  });
+  if (total > 0) {
+    push('*', 'is-violet', '1', 'gay character: you, the player.', null, {
+      weight: W.kojima,
+      iconTitle: 'kojima',
+    });
+  }
 
   noteMarqueeMetricKeys(items.map((it) => metricKeyForLabel(it.label)));
   const enabledItems = items.filter((it) => isMarqueeMetricEnabled(it.label));

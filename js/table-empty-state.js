@@ -19,7 +19,8 @@ function shouldShowConnectionsCta(view) {
 export function buildTableEmptyStateHtml(view, colspan = 13) {
   const col = Math.max(1, colspan);
   const pills = collectActiveFilters();
-  const hasFilters = pills.length > 0;
+  const catalogEmpty = view === 'library' && state.allGames.length === 0;
+  const hasFilters = !catalogEmpty && pills.length > 0;
 
   if (hasFilters) {
     const actions = [

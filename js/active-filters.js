@@ -51,7 +51,7 @@ export function collectActiveFilters() {
   }
   if (state.cleanupModeActive && state.activeView === "library") pills.push({ kind: "cleanup", value: "1", label: "Cleanup mode" });
   if (state.activeView === "itch" && state.sessionPrefs.itchHideNonGames) pills.push({ kind: "itchHideNonGames", value: "1", label: "Hide tools, soundtracks, etc." });
-  if (state.sessionPrefs.crossStoreDedup) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
+  if (state.sessionPrefs.crossStoreDedup && state.allGames.length > 0) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
   if (state.activeView === "wishlist") {
     if (state.prefs.dealOnSaleOnly) pills.push({ kind: "dealOnSale", value: "1", label: "On sale only" });
     if (state.prefs.dealHistoricalLowOnly) pills.push({ kind: "dealLow", value: "1", label: "Historical low only" });

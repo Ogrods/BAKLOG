@@ -30,6 +30,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-timeout>=2.3",
+    "pytest-sugar>=1.0",
     "ruff>=0.4",
 ]
 # System tray launcher (tray_app.py). Optional — the server runs without it.
@@ -48,6 +49,7 @@ faulthandler_timeout = 70
 markers = [
     "integration: optional tests that launch a real Chrome/Edge browser",
     "no_leak_check: skip autouse thread/child leak detector for self-check tests",
+    "slow: timing/subprocess-heavy tests (run on the dedicated Ubuntu slow lane; excluded from Windows/macOS smoke). Run locally with -m slow; skip with -m 'not slow'.",
 ]
 
 [tool.ruff]

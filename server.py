@@ -1664,6 +1664,14 @@ class RunManager:
                 _terminate_pid(pid)
         _write_active_runs([])
         _save_durable_queue([])
+        # Wake both worker lanes so their blocking queue.get() returns and the
+        # threads exit, letting join_threads() finish immediately rather than
+        # waiting out each 5s join timeout.
+        for lane_queue in (self._queue, self._internal_queue):
+            try:
+                lane_queue.put_nowait(None)
+            except Exception:  # noqa: BLE001 - best-effort wakeup
+                pass
         self.join_threads(timeout=5.0)
 
     def join_threads(self, timeout: float = 5.0) -> None:
@@ -2076,6 +2084,12 @@ class RunManager:
         while True:
             try:
                 run = lane_queue.get()
+                # Shutdown sentinel: unblocks a worker parked on get() so
+                # join_threads() returns promptly instead of waiting out the
+                # full join timeout (the dominant cost in run-manager tests and
+                # in graceful tray/server quit).
+                if run is None:
+                    return
                 if not run._finished.is_set():
                     with self._lock:
                         if internal:

@@ -64,7 +64,7 @@ jobs:
   python-macos:
     name: Python (macOS smoke)
     runs-on: macos-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -80,25 +80,22 @@ jobs:
           pip install -e ".[dev]"
 
       # Fast cross-platform smoke on macOS (full suite runs on Ubuntu/Windows).
-      # Catches import/path regressions without the 10m full-suite timeout.
+      # Skip test_run_manager.py — subprocess timing tests can exceed 15m on macOS runners.
       - name: Run pytest smoke subset
         run: |
           pytest -q \
-            tests/test_server_personal.py \
             tests/test_server_csrf.py \
-            tests/test_run_manager.py \
             tests/test_fetcher_progress.py \
             tests/test_fetcher_auth_exit.py \
             tests/test_auth_secrets.py \
             tests/test_auth_status_platform.py \
-            tests/test_amazon_web_auth.py \
-            tests/test_amazon_web_claims.py \
             tests/test_cdp_browser.py \
             tests/test_gog_galaxy_client.py \
             tests/test_itch_local_client.py \
             tests/test_profile_pin.py \
             tests/test_csrf_profiles.py \
-            tests/test_server_supabase_auth.py \
+            tests/test_install_paths.py \
+            tests/test_packaging_manifest.py \
             -m "not integration"
 
   javascript:

@@ -176,6 +176,15 @@ describe('connections content groups (Epic)', () => {
     expect(note).toMatch(/library card is on top/i);
   });
 
+  it('hero count reflects collapsed rail rows, not raw providers', async () => {
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+
+    // epic + epic_wishlist collapse into one rail row, so the hero denominator
+    // is 1 (stores) rather than 2 (raw auth providers).
+    expect(document.getElementById('connHeroCount')?.textContent).toBe('0 of 1 stores connected');
+  });
+
   it('renders Content and Source facet badges on Epic library card', async () => {
     const { refreshConnections } = await import('../js/connections.js');
     await refreshConnections();

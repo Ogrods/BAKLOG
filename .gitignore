@@ -87,6 +87,7 @@ assets/milestones/
 assets/social/
 
 # Local scratch run output, audits, review artifacts (never commit)
+.build-windows.log
 EVENT_AUDIT.json
 EVENT_AUDIT.md
 FREE_SURFACE_REVIEW.md

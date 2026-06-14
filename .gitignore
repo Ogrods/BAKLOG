@@ -93,6 +93,7 @@ FREE_SURFACE_REVIEW.md
 _tail_label.txt
 pytest_*.txt
 full_pytest_run.txt
+.pytest-full.log
 protondb_run.txt
 review-baseline.json
 review-feed-rows.csv

@@ -629,13 +629,18 @@ export function consumePendingScrollTarget(list = state._visibleList) {
     setRowAdAnchor(idx);
 
     const row = ensureRowPaintedForScroll(list, idx, key);
-    if (row) {
+    if (usesVirtualScroll(list)) {
+      // Virtual lists: position by deterministic index math (top-spacer height +
+      // measured row height) instead of the freshly-painted row's rect. The giant
+      // top spacer isn't always laid out when we measure two rAF after paint, so a
+      // getBoundingClientRect read can land the drill "much too high" near the top
+      // of the page. This mirrors the anchor-paint path that dashboard drills use.
+      scrollToVirtualRowIndex(idx, { behavior: t.smooth ? "smooth" : "auto" });
+      if (row) markFocusedRow(key);
+      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
+    } else if (row) {
       markFocusedRow(key);
       scrollRowToCenter(row, { smooth: !!t.smooth });
-      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
-    } else if (usesVirtualScroll(list)) {
-      scrollToVirtualRowIndex(idx, { behavior: "auto" });
-      markFocusedRow(key);
       if (_pendingFlashKeys.has(key)) applyRowFlash(key);
     }
 

@@ -7,6 +7,7 @@
  */
 
 import { startBootTipRotation, stopBootTipRotation } from './tips.js';
+import { state } from './state.js';
 
 export const LOADING_LABELS = {
   dashboard: "Loading dashboard…",
@@ -14,6 +15,7 @@ export const LOADING_LABELS = {
   wishlist: "Loading wishlist…",
   itch: "Loading itch.io…",
   connections: "Loading connections…",
+  pro: "Loading Pro…",
 };
 
 const MIN_BOOT_VISIBLE_MS = 150;
@@ -122,6 +124,33 @@ export function hideViewOverlay() {
     ov.setAttribute("aria-hidden", "true");
   }
   document.querySelectorAll(".view-tab").forEach(b => { b.disabled = false; });
+}
+
+/** Wait two animation frames so layout/paint can catch up before lifting the scrim. */
+export function waitViewPaintSettled() {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+}
+
+/**
+ * Lift the tab-switch scrim only after async view work finishes and chrome paints.
+ * @param {Promise<unknown>} readyPromise
+ * @param {string} view — target view id checked against state.activeView
+ * @param {{ onBeforeHide?: () => void, onAfterHide?: () => void }} [hooks]
+ */
+export async function releaseViewOverlayWhenReady(readyPromise, view, { onBeforeHide, onAfterHide } = {}) {
+  try {
+    await readyPromise;
+    if (state.activeView !== view) return;
+    onBeforeHide?.();
+    await waitViewPaintSettled();
+    if (state.activeView !== view) return;
+    hideViewOverlay();
+    onAfterHide?.();
+  } catch {
+    hideViewOverlay();
+  }
 }
 
 export function isViewOverlayVisible() {

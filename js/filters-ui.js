@@ -57,7 +57,7 @@ import {
   syncRowCountLabel,
 } from './table-ui.js';
 import { renderPicks, updatePicksChrome, renderViewHouseSlot } from './picks-ui.js';
-import { showViewOverlay, hideViewOverlay } from './loading-curtain.js';
+import { showViewOverlay, releaseViewOverlayWhenReady } from './loading-curtain.js';
 import { ensureChartJs } from './chart-loader.js';
 
 export { hideViewOverlay as hideViewLoading } from './loading-curtain.js';
@@ -395,6 +395,12 @@ export async function refreshFilterUI(options) {
     deferSummaryRender();
     return;
   }
+  if (state.activeView === "pro") {
+    if (!options?.skipTable) deferTableRender();
+    if (!options?.skipPicks) deferPicksRender();
+    deferSummaryRender();
+    return;
+  }
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
   // Chart drill-ins: paint summary + picks before the table so toolbar scroll
   // does not land while chrome above the table is still growing.
@@ -443,7 +449,8 @@ export function scheduleTableRerender() {
   _tableRerenderTimer = setTimeout(renderTable, 200);
 }
 
-export function updateWishlistDrawerVisibility() {
+export function updateWishlistDrawerVisibility(options = {}) {
+  const deferRadar = !!options?.deferTableChrome;
   const section = document.getElementById("wishlistDealsSection");
   if (section) section.classList.toggle("hidden", state.activeView !== "wishlist");
   const showWishlistDeals = state.activeView === "wishlist" && state.dashboardDataReady;
@@ -452,14 +459,24 @@ export function updateWishlistDrawerVisibility() {
     // Wait for the library/wishlist data to land before showing the radar so
     // it never flashes the "No wishlist data — run fetch_wishlist.py" message
     // on reload (mirrors the dashboardDataReady gate the dashboard uses).
-    radar.classList.toggle("hidden", !showWishlistDeals);
-    if (showWishlistDeals) renderDashboardWishlistStats();
+    // Also defer during tab-switch overlay (deferTableChrome) so deal cards do
+    // not paint above the scrim before lift.
+    radar.classList.toggle("hidden", !showWishlistDeals || deferRadar);
+    if (showWishlistDeals && !deferRadar) renderDashboardWishlistStats();
   }
   const wishHouse = document.getElementById("wishlistHouseSlot");
   if (wishHouse) {
     wishHouse.classList.toggle("hidden", !showWishlistDeals);
   }
-  void import('./claimable.js').then(m => m.renderClaimableModule());
+  // Hide the claimables module synchronously when leaving wishlist so it never
+  // lingers while the slow async import resolves (the render below keeps it
+  // hidden as a no-op). On wishlist the render decides show/hide as before.
+  if (!showWishlistDeals) {
+    document.getElementById("claimableNowModule")?.classList.add("hidden");
+  }
+  void import('./claimable.js').then((m) => {
+    m.renderClaimableModule();
+  });
 }
 
 export function updateViewChrome(options) {
@@ -475,7 +492,7 @@ export function updateViewChrome(options) {
   // initial view. Once the user switches views, the attribute matches reality.
   document.documentElement.setAttribute("data-init-view", state.activeView);
   applyItchTabVisibility();
-  updateWishlistDrawerVisibility();
+  updateWishlistDrawerVisibility({ deferTableChrome: deferChrome });
   updatePickTabsVisibility();
   // Picks chrome is synchronous here — async renderViewHouseSlot raced category
   // drill-ins and re-painted the house stripe after toolbar scroll (68px jump).
@@ -603,10 +620,9 @@ export function switchView(view) {
     cancelScheduledDashboardRender();
     stopDashboardRotations();
   }
-  // Light-up the clicked tab immediately so the click feels responsive even on
-  // first-render paths where doSwitch is deferred to the next rAF.
-  syncViewTabAria(view);
+  // Cover stale content before tab aria updates; cached switches still feel instant.
   if (useOverlay) showViewOverlay(view);
+  else syncViewTabAria(view);
   if (drillIn && state._drillHideOverlay) {
     drillOverlaySafety = setTimeout(() => {
       if (state._drillHideOverlay) {
@@ -616,6 +632,7 @@ export function switchView(view) {
     }, 600);
   }
   const doSwitch = () => {
+    if (useOverlay) syncViewTabAria(view);
     if (fromView === "dashboard") {
       cancelScheduledDashboardRender();
       // Charts left intact so the return trip can replay animations
@@ -652,17 +669,20 @@ export function switchView(view) {
     updateViewChrome({ drillIn, skipDashboardSchedule, deferTableChrome });
     void flushDeferredRenders();
     const refreshDone = refreshFilterUI({ force: true, drillIn, skipDashboardSchedule });
-    if (view === "dashboard") {
-      // Explicit tab click — load Chart.js then render so the overlay doesn't linger.
+    const paintDashboard = () => {
       cancelScheduledDashboardRender();
       setDashReplayAllowed(true);
-      ensureChartJs()
+      return ensureChartJs()
         .then(() => {
           if (state.activeView !== "dashboard") return;
-          renderDashboard({ replay: true, replayRibbonOnly: true });
+          return renderDashboard({ replay: true, replayRibbonOnly: true });
         })
         .catch(err => console.warn("[switchView] Chart.js load failed", err))
         .finally(() => setDashReplayAllowed(false));
+    };
+    let dashboardPaint = null;
+    if (view === "dashboard") {
+      dashboardPaint = paintDashboard();
       fetcherRunner.probeApi().then(async ok => {
         if (!ok) return;
         await fetcherRunner.syncFromServer();
@@ -672,11 +692,11 @@ export function switchView(view) {
     } else if (view === "connections") {
       fetcherRunner.stopDashboardPolling();
       startConnectionsPolling();
-      refreshConnections();
+      if (!useOverlay || drillIn) refreshConnections();
     } else if (view === "pro") {
       fetcherRunner.stopDashboardPolling();
       stopConnectionsPolling();
-      void import('./pro-view.js').then((m) => m.renderProView());
+      if (!useOverlay || drillIn) void import('./pro-view.js').then((m) => m.renderProView());
     } else {
       fetcherRunner.stopDashboardPolling();
       stopConnectionsPolling();
@@ -687,17 +707,28 @@ export function switchView(view) {
       else setTimeout(warm, 500);
     }
     if (useOverlay && !drillIn) {
+      let overlayReady;
       if (view === "dashboard") {
-        // catch() before finally(): a transient Chart.js load failure must not
-        // leak as an unhandledrejection (the render path above logs it).
-        ensureChartJs().catch(() => {}).finally(() => hideViewOverlay());
+        overlayReady = dashboardPaint;
+      } else if (view === "connections") {
+        overlayReady = Promise.resolve(refreshDone).then(() => refreshConnections());
+      } else if (view === "pro") {
+        overlayReady = Promise.resolve(refreshDone).then(() => import('./pro-view.js').then((m) => m.renderProView()));
+      } else if (view === "wishlist") {
+        // Keep the scrim up until claimables paint so they don't pop in above
+        // the picks after reveal and shove the visible page down.
+        overlayReady = Promise.resolve(refreshDone)
+          .then(() => import('./claimable.js'))
+          .then((m) => m.renderClaimableModule());
       } else {
-        refreshDone.finally(() => {
-          updateViewChrome({ skipDashboardSchedule: view === "dashboard" });
-          hideViewOverlay();
-          if (hasPendingScrollTarget()) scheduleScrollAfterChromeSettled();
-        });
+        overlayReady = refreshDone;
       }
+      void releaseViewOverlayWhenReady(overlayReady, view, {
+        onBeforeHide: () => updateViewChrome({ skipDashboardSchedule: view === "dashboard" }),
+        onAfterHide: () => {
+          if (hasPendingScrollTarget()) scheduleScrollAfterChromeSettled();
+        },
+      });
     }
   };
   if (useOverlay) {

@@ -147,6 +147,11 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
+    # MERGE assigns tray-only deps (pystray, Pillow's _imaging.pyd) to a_tray;
+    # COLLECT must aggregate them too or the tray exe falls back to headless.
+    a_tray.binaries,
+    a_tray.zipfiles,
+    a_tray.datas,
     strip=False,
     upx=True,
     upx_exclude=[],

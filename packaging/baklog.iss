@@ -1,6 +1,6 @@
 ; Inno Setup script for BAKLOG Windows beta (unsigned).
 ; Compile via packaging/build_windows.ps1 or:
-;   ISCC.exe /DAppVersion=0.8.0-beta.1 packaging\baklog.iss
+;   ISCC.exe /DAppVersion=0.8.15 packaging\baklog.iss
 
 #ifndef AppVersion
 #define AppVersion "0.0.0"

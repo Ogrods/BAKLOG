@@ -129,15 +129,21 @@ class GogClient:
     def validate_session(self) -> bool:
         """Verify the session can reach GOG embed APIs.
 
-        ``userData.json`` must accept the cookie. The paginated library endpoint
-        often 403s scripted clients even right after a browser sign-in; when that
-        happens we still accept the session if the owned-game ID list works (same
-        degraded path as the web fetch loop in ``fetch_gog.main``).
+        Both ``userData.json`` and the paginated library endpoint routinely 403
+        scripted clients even right after a valid browser sign-in, so neither is
+        treated as a hard auth failure on its own. We accept the session as long
+        as the owned-game ID list works — the same degraded path the web fetch
+        loop (``fetch_gog.main``) relies on — and only fail when that also 403s.
         """
         self._throttle()
         resp = self.session.get(f"{EMBED_BASE}/userData.json", timeout=30)
-        self._raise_if_auth_error(resp)
-        resp.raise_for_status()
+        # A 401/403 on userData.json alone is NOT fatal: scripted clients are
+        # routinely blocked there even with a valid cookie, and the fetch loop
+        # degrades to the owned-ID path regardless. Only surface non-auth errors
+        # here; let the library -> owned-IDs cascade below decide auth validity,
+        # so a probe racing a running fetch can't false-expire the session.
+        if resp.status_code not in (401, 403):
+            resp.raise_for_status()
         try:
             self.get_filtered_products(page=1, refresh=True)
             return True

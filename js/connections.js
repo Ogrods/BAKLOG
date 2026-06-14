@@ -135,6 +135,19 @@ const STATUS_NOTE = {
 
 
 
+// Per-provider setup callouts with a clickable link, shown above the tips on the
+// connection card. Keep the text short; the link does the heavy lifting.
+const CONN_HELP_LINKS = {
+  steam: {
+    url: 'https://steamcommunity.com/dev/apikey',
+    before: 'Register for a Steam Web API key ',
+    linkText: 'here',
+    after: ' first, then sign in to connect.',
+  },
+};
+
+
+
 const PROVIDER_BRAND = {
   steam: { color: STORE_BRAND_COLORS.steam, initial: 'S' },
   gog: { color: STORE_BRAND_COLORS.gog, initial: 'G' },
@@ -642,6 +655,12 @@ async function pasteFromClipboard(card) {
 
 
 
+function buildConnHelpLink(key) {
+  const help = CONN_HELP_LINKS[key];
+  if (!help || !isSafeHttpUrl(help.url)) return '';
+  return `<p class="conn-help">${escapeHtml(help.before)}<a class="conn-help-link" href="${escapeAttr(help.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(help.linkText)}</a>${escapeHtml(help.after)}</p>`;
+}
+
 function buildCardHtml(p) {
 
   const st = p.status || 'disconnected';
@@ -653,6 +672,8 @@ function buildCardHtml(p) {
   const expiry = p.expiry_days ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>` : '';
 
   const note = STATUS_NOTE[st] ? `<p class="conn-note">${escapeHtml(STATUS_NOTE[st])}</p>` : '';
+
+  const helpLink = buildConnHelpLink(p.key);
 
   const err = p.last_error ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>` : '';
 
@@ -706,6 +727,8 @@ function buildCardHtml(p) {
           ${facets}
 
           <p class="conn-desc">${escapeHtml(p.description || '')}</p>
+
+          ${helpLink}
 
           ${tips}
 

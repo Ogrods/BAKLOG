@@ -52,6 +52,15 @@ describe('buildTableEmptyStateHtml', () => {
     expect(html).not.toContain('data-table-clear-filters');
   });
 
+  it('shows onboarding copy on empty library even with default dedup pref', () => {
+    state.sessionPrefs = loadSessionPrefs();
+    state.allGames = [];
+    const html = buildTableEmptyStateHtml('library', 13);
+    expect(html).toContain('Your library is empty');
+    expect(html).toContain('data-table-goto-connections');
+    expect(html).not.toContain('No games match your filters');
+  });
+
   it('shows Open Connections when wishlist is empty and no filters', () => {
     state.sessionPrefs.crossStoreDedup = false;
     state.wishlistGames = [];

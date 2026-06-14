@@ -20,7 +20,7 @@ vi.mock('../js/deals.js', () => ({
 }));
 
 import { state } from '../js/state.js';
-import { buildMarqueeItems, renderMarqueeHtml } from '../js/dashboard-insights.js';
+import { buildMarqueeItems, renderMarqueeHtml, buildInsightPool } from '../js/dashboard-insights.js';
 import { applyMarqueeSpeed, MARQUEE_PX_PER_SEC } from '../js/marquee-speed.js';
 import { marqueeTip } from '../js/metric-tips.js';
 import { getLibrarySnapshot, invalidateLibrarySnapshot } from '../js/sabermetrics.js';
@@ -84,6 +84,24 @@ describe('buildMarqueeItems', () => {
   it('uses the passed snapshot without throwing on an empty library', () => {
     const snap = getLibrarySnapshot([]);
     expect(() => buildMarqueeItems([], snap)).not.toThrow();
+  });
+
+  // Regression: an empty library must yield zero marquee chips. The snapshot
+  // primes rBar to a 70% league-average default and hotColdStreak falls back to
+  // 'cold', both of which used to leak "league avg rating" + "finish streak"
+  // chips that showed two stuck chips on a fresh, data-free dashboard.
+  it('emits no marquee items for an empty library', () => {
+    const snap = getLibrarySnapshot([]);
+    const items = buildMarqueeItems([], snap);
+    expect(items).toHaveLength(0);
+    expect(renderMarqueeHtml(items)).toBe('');
+  });
+
+  it('emits no insight pool entries for an empty library', () => {
+    const snap = getLibrarySnapshot([]);
+    const pool = buildInsightPool([], snap);
+    const labels = pool.map((entry) => entry.html.replace(/<[^>]+>/g, ''));
+    expect(labels.some((t) => t.includes('Mendoza line'))).toBe(false);
   });
 
   it('excludes disabled catalog metrics from marquee output', () => {

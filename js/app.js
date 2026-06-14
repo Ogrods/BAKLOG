@@ -255,7 +255,7 @@ async function bootstrap() {
   }
   const reloadPromise = reloadGames().catch(async () => {
     const banner = document.getElementById("bootErrorBanner");
-    if (banner) {
+    if (banner && state.activeView !== "pro") {
       banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">No library data yet. Open <strong>Connections</strong>, connect a store, and your games will appear here.</span></div>';
       banner.classList.remove("hidden");
     }

@@ -57,7 +57,7 @@ import {
   syncRowCountLabel,
 } from './table-ui.js';
 import { renderPicks, updatePicksChrome, renderViewHouseSlot } from './picks-ui.js';
-import { showViewOverlay, releaseViewOverlayWhenReady } from './loading-curtain.js';
+import { showViewOverlay, releaseViewOverlayWhenReady, hideViewOverlay } from './loading-curtain.js';
 import { ensureChartJs } from './chart-loader.js';
 
 export { hideViewOverlay as hideViewLoading } from './loading-curtain.js';
@@ -768,7 +768,9 @@ export function renderSummary() {
     const lowOnlyActive = !!state.prefs.dealHistoricalLowOnly;
     const hideOwnedActive = !!state.prefs.dealHideOwned;
     const resetChip = `<div class="summary-stat-chip" data-stat="wishlist" title="All wishlist entries"><span>Wishlist</span> <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="wishlist">${wl.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>`;
-    const onSaleChip = `<button type="button" class="summary-deal-chip${onSaleActive ? " active" : ""}" data-wishlist-deal-filter="onSale" title="${onSaleActive ? "Clear: show only on-sale wishlist items" : "Show only on-sale wishlist items"}">On sale <span class="text-emerald-200 font-semibold ml-1">${onSale.length}</span></button>`;
+    const onSaleChip = onSale.length
+      ? `<button type="button" class="summary-deal-chip${onSaleActive ? " active" : ""}" data-wishlist-deal-filter="onSale" title="${onSaleActive ? "Clear: show only on-sale wishlist items" : "Show only on-sale wishlist items"}">On sale <span class="text-emerald-200 font-semibold ml-1">${onSale.length}</span></button>`
+      : "";
     const lowChip = lows.length
       ? `<button type="button" class="summary-deal-chip historical${lowOnlyActive ? " active" : ""}" data-wishlist-deal-filter="historicalLow" title="${lowOnlyActive ? "Clear: show only historical lows" : "Show only historical lows"}">Historical low <span class="text-amber-300 font-semibold ml-1">${lows.length}</span></button>`
       : "";

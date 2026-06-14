@@ -1271,8 +1271,13 @@ export function renderDashboardCharts(games, aggIn) {
     : 0;
   const reviewHeadlineEl = document.getElementById('ribbonReviewHeadline');
   if (reviewHeadlineEl) {
-    reviewHeadlineEl.innerHTML = `<strong>${positivePct}%</strong> positive`;
-    reviewHeadlineEl.title = `${positivePct}% of rated games are Mostly Positive or better`;
+    if (ratedTotal) {
+      reviewHeadlineEl.innerHTML = `<strong>${positivePct}%</strong> positive`;
+      reviewHeadlineEl.title = `${positivePct}% of rated games are Mostly Positive or better`;
+    } else {
+      reviewHeadlineEl.innerHTML = '<strong>—</strong> no rated games';
+      reviewHeadlineEl.title = 'No Steam review scores in library yet';
+    }
   }
 
   setDashboardChart("chartReleases", {

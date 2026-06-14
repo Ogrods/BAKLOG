@@ -3,4 +3,5 @@
 # Or:      pip install -e ".[dev]"
 pytest>=8.0
 pytest-timeout>=2.3
+pytest-sugar>=1.0
 ruff>=0.4

@@ -10,6 +10,11 @@ import pytest
 
 import server
 
+# Whole module is subprocess/timing-heavy (real Popen spawns + watchdog polling).
+# It dominates CI wall time, so it runs on the dedicated Ubuntu "slow" lane and is
+# excluded from the Windows/macOS smoke jobs. Run locally with `-m slow`.
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture()
 def runs_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -519,7 +524,10 @@ def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch: pyte
 
     def blocking_popen(*args, **kwargs):
         launch_started.set()
-        time.sleep(60)
+        # LAUNCH_TIMEOUT_SEC is mocked to 0.1s above, so the timeout fires long
+        # before this returns. Keep the sleep short so the abandoned launch thread
+        # does not linger for a full minute after the assertion already passed.
+        time.sleep(5)
         return _LateProc()
 
     monkeypatch.setattr(server, "popen_fetcher", blocking_popen)
@@ -638,7 +646,7 @@ def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPa
             "argv": [
                 server.sys.executable,
                 "-c",
-                "print('start'); import time; time.sleep(30)",
+                "print('start'); import time; time.sleep(10)",
             ],
             "refreshArgs": [],
             "metaKey": "long_enrich",
@@ -675,7 +683,7 @@ def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.Monke
             "argv": [
                 server.sys.executable,
                 "-c",
-                "print('started'); import time; time.sleep(10)",
+                "print('started'); import time; time.sleep(5)",
             ],
             "refreshArgs": [],
             "metaKey": "one_line",
@@ -893,7 +901,7 @@ def test_shutdown_cancels_in_flight_run(runs_env, monkeypatch: pytest.MonkeyPatc
         "slow",
         {
             "label": "Slow",
-            "argv": [server.sys.executable, "-c", "import time; time.sleep(60)"],
+            "argv": [server.sys.executable, "-c", "import time; time.sleep(10)"],
             "refreshArgs": [],
             "metaKey": "slow",
             "group": "library",

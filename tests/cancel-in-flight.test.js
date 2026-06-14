@@ -25,6 +25,7 @@ describe('cancelInFlightRuns server truth', () => {
 
   afterEach(() => {
     delete global.EventSource;
+    vi.useRealTimers();
   });
 
   it('applyServerSnapshotInFlight tracks server queue without client chips', async () => {
@@ -419,6 +420,10 @@ describe('cancelInFlightRuns server truth', () => {
   });
 
   it('waitForQueueSlot polls /api/runs and unblocks when the fetcher lane frees', async () => {
+    vi.useFakeTimers();
+    // Unique id: other suites reuse 'r1'; a suppressed id leaked via sessionStorage
+    // makes runBlocksQueueSlot() drop this run and flake isQueueFull().
+    const RUN_ID = 'poll-unblock-run';
     let runsGets = 0;
     const fetchMock = vi.fn(async (url) => {
       const u = String(url);
@@ -428,11 +433,14 @@ describe('cancelInFlightRuns server truth', () => {
         return {
           ok: true,
           json: async () => ({
-            active: busy ? { id: 'r1', key: 'steam', status: 'running' } : null,
+            active: busy ? { id: RUN_ID, key: 'steam', status: 'running' } : null,
             queue: [],
             history: [],
           }),
         };
+      }
+      if (u.includes('/api/fetchers')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
       }
       if (u.includes('/api/config')) {
         return { ok: true, json: async () => ({}) };
@@ -443,14 +451,19 @@ describe('cancelInFlightRuns server truth', () => {
     const { fetcherRunner } = await import('../js/fetcher-health.js');
     await fetcherRunner.probeApi(true);
     fetcherRunner.applyServerSnapshotInFlight({
-      active: { id: 'r1', key: 'steam', status: 'running' },
+      active: { id: RUN_ID, key: 'steam', status: 'running' },
       queue: [],
       history: [],
     });
     expect(fetcherRunner.isQueueFull()).toBe(true);
-    await fetcherRunner.waitForQueueSlot();
+    const waitP = fetcherRunner.waitForQueueSlot();
+    // WAIT_QUEUE_SNAPSHOT_POLL_MS is 2000; two polls: busy then idle.
+    await vi.advanceTimersByTimeAsync(2500);
+    await vi.advanceTimersByTimeAsync(2500);
+    await waitP;
     expect(runsGets).toBeGreaterThanOrEqual(1);
     expect(fetcherRunner.isQueueFull()).toBe(false);
+    vi.useRealTimers();
   });
 
   it('claims auto-run proceeds while an internal job holds the internal lane', async () => {

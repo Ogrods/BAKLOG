@@ -1,6 +1,12 @@
 # Build BAKLOG Windows onedir bundle with PyInstaller + optional Inno Setup installer.
 # Run from repo root. Requires: pip install pyinstaller, Node 22+ for frontend build.
-# Optional: Inno Setup 6 (ISCC.exe) for BAKLOG-v*-Setup.exe.
+# Optional: Inno Setup 6 (ISCC.exe) for BAKLOG-Setup.exe.
+#
+# Release artifacts use STABLE (un-versioned) filenames so the "latest" download
+# URL never changes across releases:
+#   https://github.com/Ogrods/BAKLOG/releases/latest/download/BAKLOG-win64.zip
+#   https://github.com/Ogrods/BAKLOG/releases/latest/download/BAKLOG-Setup.exe
+# The real version lives INSIDE the bundle (pyproject.toml + index.html meta).
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
@@ -70,7 +76,9 @@ echo Connections sign-in requires Google Chrome or Microsoft Edge.
 pause
 "@ | Set-Content -Encoding ASCII (Join-Path $OutDir "Start BAKLOG (server console).bat")
 
-# Version label for release artifacts (from pyproject.toml).
+# Version label (from pyproject.toml) - embedded inside the bundle and passed to
+# Inno Setup as the installer version. Release filenames stay STABLE (un-versioned)
+# so the latest/download URL is permanent; the version is read from inside the zip.
 $Version = "0.0.0"
 $PyProject = Join-Path $Root "pyproject.toml"
 if (Test-Path $PyProject) {
@@ -79,16 +87,16 @@ if (Test-Path $PyProject) {
     }
 }
 
-$ZipName = "BAKLOG-v$Version-win64.zip"
+$ZipName = "BAKLOG-win64.zip"
 $ZipPath = Join-Path $ReleaseDir $ZipName
 if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
 Compress-Archive -Path $OutDir -DestinationPath $ZipPath -Force
 
 $Hash = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLower()
-$HashFile = Join-Path $ReleaseDir "BAKLOG-v$Version-win64.sha256"
+$HashFile = Join-Path $ReleaseDir "BAKLOG-win64.sha256"
 "$Hash  $ZipName" | Set-Content -Encoding ASCII -NoNewline $HashFile
 
-$SetupExe = Join-Path $ReleaseDir "BAKLOG-v$Version-Setup.exe"
+$SetupExe = Join-Path $ReleaseDir "BAKLOG-Setup.exe"
 $Iscc = $null
 if (Get-Command ISCC.exe -ErrorAction SilentlyContinue) {
     $Iscc = "ISCC.exe"
@@ -117,7 +125,7 @@ if ($Iscc) {
         Pop-Location
     }
 } else {
-    Write-Warning "ISCC.exe not found - skipping BAKLOG-v$Version-Setup.exe (install Inno Setup 6 to enable)."
+    Write-Warning "ISCC.exe not found - skipping BAKLOG-Setup.exe (install Inno Setup 6 to enable)."
 }
 
 Write-Host ""

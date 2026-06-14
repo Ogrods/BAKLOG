@@ -87,7 +87,7 @@ Thanks for joining the waitlist. The Windows beta is ready to install.
 Download it here: ${releaseUrl}
 
 Quick start:
-- Grab BAKLOG-v*-Setup.exe (or the portable zip) from the release page.
+- Grab BAKLOG-Setup.exe (or the portable zip) from the release page.
 - If Windows SmartScreen warns about an unknown publisher, click More info, then Run anyway. The build is not code-signed yet.
 - Launch BAKLOG, open the Connections tab, and connect the stores you use.
 
@@ -109,7 +109,7 @@ https://baklog.app`;
       </p>
       <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">Quick start:</p>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
-        <li>Grab BAKLOG-v*-Setup.exe (or the portable zip) from the release page.</li>
+        <li>Grab BAKLOG-Setup.exe (or the portable zip) from the release page.</li>
         <li>If Windows SmartScreen warns about an unknown publisher, click More info, then Run anyway. The build is not code-signed yet.</li>
         <li>Launch BAKLOG, open the Connections tab, and connect the stores you use.</li>
       </ul>

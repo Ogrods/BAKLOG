@@ -16,7 +16,7 @@ On Windows, use the project `.venv` Python - not the Microsoft Store `python.exe
 
 If you received a beta invite:
 
-1. Download and run **BAKLOG-v\*-Setup.exe** from your invite link.
+1. Download and run **BAKLOG-Setup.exe** from your invite link.
 2. If SmartScreen warns about an unknown publisher, click **More info**, then **Run anyway**.
 3. Launch **BAKLOG** from the Start Menu. A tray icon appears and your browser opens.
 4. Open the **Connections** tab and connect each store you use (Chrome or Edge required).

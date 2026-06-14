@@ -755,9 +755,11 @@ export function bindEvents() {
     banner.classList.remove('hidden');
   }
 
-  document.getElementById("reportBug")?.addEventListener("click", () => {
-    openBugReportDialog();
-  });
+  for (const btn of document.querySelectorAll("#reportBug, #reportBugHeader")) {
+    btn.addEventListener("click", () => {
+      openBugReportDialog();
+    });
+  }
   document.getElementById("checkUpdates")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
     try {

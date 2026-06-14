@@ -15,6 +15,7 @@ datas = [
     (str(root / "dist"), "dist"),
     (str(root / "assets"), "assets"),
     (str(root / "vendor"), "vendor"),
+    (str(root / "curated"), "curated"),
     (str(root / "fetchers" / "manifest.json"), "fetchers"),
     (str(root / "pyproject.toml"), "."),
 ]

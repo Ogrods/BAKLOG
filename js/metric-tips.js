@@ -93,7 +93,7 @@ export const METRIC_TIPS = {
   // Deals / wishlist
   'steal-tier deals': 'Wishlist deals classified as steal-tier by deal score.',
   'on sale now': 'Wishlist items with an active discount.',
-  'top deal': 'Wishlist item with the highest deal score right now.',
+  'top deal': 'Wishlist on-sale title with the highest deal score (discount %, historical-low and rating bonuses, price penalty above $30). Not always the cheapest price.',
   'avg discount': 'Mean discount % across on-sale wishlist items.',
   'steepest cut': 'Largest single discount % on your wishlist.',
   'wishlist value': 'Sum of regular (MSRP) prices for wishlist items with price data.',

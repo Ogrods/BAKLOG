@@ -53,6 +53,22 @@ Optional durable logging (recommended):
 
 Run `sql/waitlist.sql` once in the Supabase SQL editor before enabling these vars. Without Supabase env vars, signups still work; they are only emailed and logged to Vercel function logs.
 
+### Send beta invites to the waitlist
+
+`../scripts/send-beta-invites.mjs` (`npm run invite:beta` from the repo root) emails not-yet-invited waitlist signups a beta invite via Resend, linking to the GitHub release page, then stamps `invited_at` so the next wave skips them. It is a local maintainer one-off, not a Vercel function. Re-run `sql/waitlist.sql` once so the `invited_at` column + `update` grant exist.
+
+It reads env from your shell or `landing/.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `BETA_FROM` (or `NOTIFY_FROM`), optional `BETA_REPLY_TO` (or `NOTIFY_TO`), and optional `BETA_RELEASE_URL` (defaults to `https://github.com/Ogrods/BAKLOG/releases/latest`).
+
+**Safe by default - prints the plan and sends nothing until you add `--send`:**
+
+```sh
+npm run invite:beta                                   # dry run, first 25 waitlist rows
+node scripts/send-beta-invites.mjs --limit 10         # dry run, size the wave
+node scripts/send-beta-invites.mjs --email me@you.com           # dry run, single test address
+node scripts/send-beta-invites.mjs --email me@you.com --send    # real test send (does not touch waitlist)
+node scripts/send-beta-invites.mjs --limit 20 --send  # real wave of 20, marks them invited
+```
+
 ### BAKLOG Pro (Polar webhook)
 
 `api/polar-webhook.js` receives Polar subscription webhooks and writes `app_metadata.plan` on the buyer's Supabase user (hosted-auth installs). Pure-local buyers use the license key from Polar + `POST /api/license/activate` on the local server instead.

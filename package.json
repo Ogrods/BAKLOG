@@ -20,6 +20,7 @@
     "check:spotlight:baseline": "node scripts/spotlight-visual-check.mjs --mode=baseline",
     "check:spotlight": "node scripts/spotlight-visual-check.mjs --mode=after",
     "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/module/index.js --bundle --format=esm --outfile=js/vendor/supabase-js.mjs",
+    "invite:beta": "node scripts/send-beta-invites.mjs",
     "lint": "eslint js/",
     "check:module-size": "node scripts/check-module-size.mjs",
     "check:bundle-size": "node scripts/check-bundle-size.mjs",

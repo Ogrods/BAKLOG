@@ -834,7 +834,11 @@ export function renderSummary() {
     }))
     .sort((a, b) => storeDisplayRank(a.key) - storeDisplayRank(b.key));
   const hiddenCount = state.allGames.length - visibleAll.length;
-  const staleCount = state.allGames.filter(g => g.stale).length;
+  // Count stale on the same visible base the table renders from (cross-store
+  // dupes + user-hidden already removed). Counting raw state.allGames here made
+  // the chip overcount vs. the staleOnly filter, which drops both. See
+  // tests/stale-sync-count.test.js.
+  const staleCount = visibleAll.filter(g => g.stale).length;
   const staleActive = !!state.sessionPrefs.staleOnly;
   const sourceCount = storeCounts.filter(s => s.count > 0).length;
   const activeStore = state.prefs.storeFilter || "";

@@ -315,6 +315,94 @@ class TestGracefulClose:
         assert proc.exited
         assert not proc.terminated
 
+    def test_close_sends_browser_close_even_when_proc_already_exited(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Launcher proc may exit before the visible window; CDP must still close it."""
+        ctx = _bare_context()
+        calls: list[str] = []
+
+        class _ExitedProc:
+            def poll(self) -> int:
+                return 0
+
+            def wait(self, timeout: float | None = None) -> int:
+                return 0
+
+            def terminate(self) -> None:
+                raise AssertionError("should not terminate an already-exited launcher")
+
+            def kill(self) -> None:
+                raise AssertionError("should not kill an already-exited launcher")
+
+        class _FakeWs:
+            def close(self) -> None:
+                return None
+
+        def fake_send(method, params=None, *, session_id=None, timeout=60):
+            calls.append(method)
+            return {}
+
+        monkeypatch.setattr(
+            "auth.cdp_browser._pids_listening_on_local_port", lambda _port: []
+        )
+
+        ctx._proc = _ExitedProc()  # type: ignore[attr-defined]
+        ctx._ws = _FakeWs()  # type: ignore[attr-defined]
+        ctx._port = 9222  # type: ignore[attr-defined]
+        ctx._send = fake_send  # type: ignore[method-assign]
+
+        ctx.close()
+
+        assert calls == ["Browser.close"]
+
+    def test_close_kills_debug_port_when_proc_already_exited(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When the launcher proc is gone, force-quit the CDP listener on our port."""
+        ctx = _bare_context()
+        calls: list[str] = []
+        killed: list[int] = []
+
+        class _ExitedProc:
+            def poll(self) -> int:
+                return 0
+
+            def wait(self, timeout: float | None = None) -> int:
+                return 0
+
+            def terminate(self) -> None:
+                raise AssertionError("should not terminate an already-exited launcher")
+
+            def kill(self) -> None:
+                raise AssertionError("should not kill an already-exited launcher")
+
+        class _FakeWs:
+            def close(self) -> None:
+                return None
+
+        def fake_send(method, params=None, *, session_id=None, timeout=60):
+            calls.append(method)
+            return {}
+
+        monkeypatch.setattr(
+            "auth.cdp_browser._pids_listening_on_local_port", lambda port: [4242]
+        )
+        monkeypatch.setattr(
+            "auth.cdp_browser._kill_pids",
+            lambda pids: killed.extend(pids) or list(pids),
+        )
+
+        ctx._proc = _ExitedProc()  # type: ignore[attr-defined]
+        ctx._ws = _FakeWs()  # type: ignore[attr-defined]
+        ctx._port = 9222  # type: ignore[attr-defined]
+        ctx._send = fake_send  # type: ignore[method-assign]
+
+        ctx.close()
+
+        assert calls == ["Browser.close"]
+        assert killed == [4242]
+
 
 class TestFindBrowser:
     def test_override_env(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -431,11 +431,13 @@ function renderHero() {
 
   }
 
-  const connected = connectedProviderCount();
+  const entries = railEntries();
 
-  const total = getAuthStatusSnapshot().length;
+  const connected = entries.filter(e => e.status === 'connected').length;
 
-  countEl.textContent = `${connected} of ${total} connections made`;
+  const total = entries.length;
+
+  countEl.textContent = `${connected} of ${total} stores connected`;
 
   fillEl.style.width = total ? `${(connected / total) * 100}%` : '0%';
 

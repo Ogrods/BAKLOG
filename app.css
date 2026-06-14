@@ -7708,6 +7708,23 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-tips li:first-child { color: var(--text-dim); }
 .conn-tips li:first-child::before { background: var(--accent); }
 .conn-note { color: var(--text-mute); font-size: 11px; margin-top: 4px; }
+.conn-help {
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+}
+.conn-help-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.conn-help-link:hover { text-decoration: none; }
 .conn-notes {
   flex: 1 1 200px;
   max-width: 280px;

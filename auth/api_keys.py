@@ -14,6 +14,10 @@ if TYPE_CHECKING:
 
 POLL_SEC = 0.5
 SUCCESS_WAIT_SEC = 300
+# Cap how many times we auto-submit the "register a key" form. After this we
+# keep polling (so a manually-registered key is still picked up) but stop
+# re-clicking Register so a wedged form can't thrash Steam.
+MAX_STEAM_REGISTER_ATTEMPTS = 5
 
 # Tri-state result for API-key checks so callers can tell a genuinely rejected
 # key apart from a transient network failure (no connection, timeout, 5xx).
@@ -35,27 +39,6 @@ _STEAM_ID_RE = re.compile(r"\b(7656119\d{10})\b")
 _ITCH_KEY_RE = re.compile(r"\b([a-zA-Z0-9]{20,64})\b")
 _ITAD_KEY_RE = re.compile(r"\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b", re.I)
 _XBL_KEY_RE = re.compile(r"\b([a-zA-Z0-9]{24,128})\b")
-
-
-def _wait_loop(
-    page,
-    *,
-    session: AuthSession | None,
-    message: str,
-    try_extract,
-) -> dict[str, str]:
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    while time.time() < deadline:
-        try:
-            creds = try_extract()
-            if creds:
-                return creds
-        except Exception:
-            pass
-        if session:
-            session.emit("waiting_for_user", {"message": message})
-        page.wait_for_timeout(int(POLL_SEC * 1000))
-    raise RuntimeError(message)
 
 
 def _steam_id_from_cookies(context) -> str:
@@ -104,6 +87,41 @@ def _steam_steam_id(page, context=None) -> str:
     return ""
 
 
+def _steam_tick_agreement(page) -> None:
+    """Tick the 'I agree to the Steam Web API Terms of Use' box if present.
+
+    Steam's register form silently refuses to submit while the agreement box is
+    unchecked, which left users with no key and a spinning window. Setting the
+    box from JS is idempotent (no-op when already checked).
+    """
+    try:
+        page.evaluate(
+            """() => {
+                const boxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
+                const tick = cb => {
+                    if (cb && !cb.checked) {
+                        cb.checked = true;
+                        cb.dispatchEvent(new Event('input', { bubbles: true }));
+                        cb.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                };
+                let hit = false;
+                for (const cb of boxes) {
+                    const label = (cb.closest('label') || {}).innerText || '';
+                    const ctx = ((cb.id || '') + ' ' + (cb.name || '') + ' ' + label).toLowerCase();
+                    if (ctx.includes('agree') || ctx.includes('terms')) {
+                        tick(cb);
+                        hit = true;
+                    }
+                }
+                if (!hit && boxes.length === 1) tick(boxes[0]);
+                return hit || boxes.length === 1;
+            }"""
+        )
+    except Exception:
+        pass
+
+
 def _steam_try_register_key(page) -> None:
     """Register a Web API key if the dev page shows the domain form."""
     try:
@@ -111,6 +129,8 @@ def _steam_try_register_key(page) -> None:
         if domain.count() == 0:
             return
         domain.fill("127.0.0.1", timeout=3000)
+        # Steam won't issue a key until the Terms-of-Use box is checked.
+        _steam_tick_agreement(page)
         for label in ("Register", "Request", "Create"):
             btn = page.get_by_role("button", name=re.compile(label, re.I))
             if btn.count() > 0:
@@ -125,7 +145,16 @@ def _steam_try_register_key(page) -> None:
         pass
 
 
-def _steam_extract_from_page(page, context=None) -> dict[str, str] | None:
+def _steam_registration_form_present(page) -> bool:
+    """True when the dev page is showing the 'register a key' form (no key yet)."""
+    try:
+        domain = page.locator('input[name="domain"], #domain, input[placeholder*="domain" i]').first
+        return domain.count() > 0
+    except Exception:
+        return False
+
+
+def _steam_extract_from_page(page, context=None, *, try_register: bool = True) -> dict[str, str] | None:
     url = (page.url or "").lower()
     if "login" in url and "steamcommunity.com" in url:
         return None
@@ -135,7 +164,8 @@ def _steam_extract_from_page(page, context=None) -> dict[str, str] | None:
             page.goto(STEAM_APIKEY_URL, wait_until="domcontentloaded", timeout=20000)
         except Exception:
             return None
-    _steam_try_register_key(page)
+    if try_register:
+        _steam_try_register_key(page)
     body = page.content()
     m = re.search(r"Key[:\s#]*([0-9A-F]{32})", body, re.I)
     api_key = m.group(1) if m else ""
@@ -165,17 +195,58 @@ def _validate_steam(creds: dict[str, str]) -> None:
 
 
 def extract_steam(page, context, session: AuthSession | None = None) -> dict[str, str]:
-    def attempt() -> dict[str, str] | None:
-        return _steam_extract_from_page(page, context)
+    """Capture STEAM_API_KEY + STEAM_ID, auto-registering a key if needed.
 
-    creds = _wait_loop(
-        page,
-        session=session,
-        message="Sign in to Steam, then wait — we'll register your API key automatically.",
-        try_extract=attempt,
+    Signed-in users with no key yet get one registered automatically (domain
+    127.0.0.1, Terms-of-Use box ticked). If auto-registration can't produce a
+    key, the error tells them how to register one by hand instead of failing
+    with a generic timeout.
+    """
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    register_attempts = 0
+    saw_register_form = False
+    last_message = 0.0
+
+    while time.time() < deadline:
+        try:
+            creds = _steam_extract_from_page(
+                page, context, try_register=register_attempts < MAX_STEAM_REGISTER_ATTEMPTS
+            )
+        except Exception:
+            creds = None
+        if creds:
+            # Let a genuinely invalid key raise its specific error (don't retry).
+            _validate_steam(creds)
+            return creds
+
+        if _steam_registration_form_present(page):
+            saw_register_form = True
+            register_attempts += 1
+
+        if session and time.time() - last_message > 5:
+            last_message = time.time()
+            session.emit(
+                "waiting_for_user",
+                {
+                    "message": (
+                        "No Steam API key yet. Registering one for you with domain 127.0.0.1."
+                        if saw_register_form
+                        else "Sign in to Steam and wait. We'll grab your API key automatically."
+                    )
+                },
+            )
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    if saw_register_form:
+        raise RuntimeError(
+            "We couldn't auto-register a Steam Web API key. Open "
+            "steamcommunity.com/dev/apikey, agree to the terms, register a key with "
+            "domain 127.0.0.1, then click Connect again."
+        )
+    raise RuntimeError(
+        "We couldn't read your Steam API key. Make sure you're signed in to Steam, "
+        "then click Connect again."
     )
-    _validate_steam(creds)
-    return creds
 
 
 def _scrape_keys_dom(page, *, pattern_hint: str = r"(?:API\s*Key|apikey|access[_\s-]?token)") -> list[str]:

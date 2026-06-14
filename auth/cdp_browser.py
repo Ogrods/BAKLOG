@@ -32,6 +32,102 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 
+# #region agent log
+def _dbg6c42d0(location: str, message: str, data: dict) -> None:
+    try:
+        payload = {
+            "sessionId": "6c42d0",
+            "hypothesisId": "A",
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        log_path = Path(__file__).resolve().parent.parent / "debug-6c42d0.log"
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+# #endregion
+
+
+def _subprocess_no_window_flags() -> int:
+    if os.name != "nt":
+        return 0
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _pids_listening_on_local_port(port: int) -> list[int]:
+    """Return PIDs listening on localhost ``port`` (best-effort)."""
+    if port <= 0:
+        return []
+    pids: set[int] = set()
+    if os.name == "nt":
+        try:
+            out = subprocess.check_output(
+                ["netstat", "-ano"],
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                creationflags=_subprocess_no_window_flags(),
+            )
+        except Exception:
+            return []
+        needle = f":{port}"
+        for line in out.splitlines():
+            if "LISTENING" not in line.upper() or needle not in line:
+                continue
+            parts = line.split()
+            if not parts:
+                continue
+            try:
+                pids.add(int(parts[-1]))
+            except ValueError:
+                pass
+    else:
+        try:
+            out = subprocess.check_output(
+                ["lsof", "-i", f":{port}", "-sTCP:LISTEN", "-t"],
+                text=True,
+                errors="ignore",
+                timeout=5,
+            )
+            for line in out.splitlines():
+                try:
+                    pids.add(int(line.strip()))
+                except ValueError:
+                    pass
+        except Exception:
+            pass
+    return sorted(pids)
+
+
+def _kill_pids(pids: list[int]) -> list[int]:
+    """Force-kill ``pids`` (tree kill on Windows). Returns PIDs we attempted."""
+    killed: list[int] = []
+    flags = _subprocess_no_window_flags()
+    for pid in pids:
+        if pid <= 0:
+            continue
+        try:
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/PID", str(pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=flags,
+                    check=False,
+                )
+            else:
+                import signal
+
+                os.kill(pid, signal.SIGTERM)
+            killed.append(pid)
+        except Exception:
+            pass
+    return killed
+
+
 _BLANK_URLS = frozenset({"", "about:blank", "chrome://newtab/"})
 
 
@@ -1079,11 +1175,49 @@ class CdpContext:
             return CdpContext._id_counter
 
     def close(self) -> None:
-        if self._proc.poll() is None:
+        proc_poll = self._proc.poll()
+        port = int(getattr(self, "_port", 0) or 0)
+        # #region agent log
+        _dbg6c42d0(
+            "cdp_browser.py:close",
+            "entry",
+            {
+                "proc_poll": proc_poll,
+                "page_count": len(getattr(self, "pages", ())),
+                "port": port,
+            },
+        )
+        # #endregion
+        for page in list(getattr(self, "pages", ())):
             try:
-                self._send("Browser.close")
+                if not page.is_closed:
+                    page.close()
             except Exception:
                 pass
+        # Always ask the browser to quit over CDP. On Windows the Popen handle
+        # often refers to a short-lived launcher whose child keeps the real
+        # window alive after poll() is already non-None — skipping Browser.close
+        # in that case leaves the sign-in window open after a successful connect.
+        browser_close_err: str | None = None
+        try:
+            self._send("Browser.close")
+            # #region agent log
+            _dbg6c42d0(
+                "cdp_browser.py:close",
+                "Browser.close sent",
+                {"proc_poll": proc_poll, "port": port},
+            )
+            # #endregion
+        except Exception as exc:  # noqa: BLE001
+            browser_close_err = type(exc).__name__
+            # #region agent log
+            _dbg6c42d0(
+                "cdp_browser.py:close",
+                "Browser.close failed",
+                {"proc_poll": proc_poll, "port": port, "error": browser_close_err},
+            )
+            # #endregion
+        if self._proc.poll() is None:
             try:
                 self._proc.wait(timeout=8)
             except Exception:
@@ -1092,15 +1226,34 @@ class CdpContext:
             self._ws.close()
         except Exception:
             pass
+        terminated = False
         if self._proc.poll() is None:
             try:
                 self._proc.terminate()
                 self._proc.wait(timeout=5)
+                terminated = True
             except Exception:
                 try:
                     self._proc.kill()
+                    terminated = True
                 except Exception:
                     pass
+        port_pids = _pids_listening_on_local_port(port)
+        port_killed = _kill_pids(port_pids) if port_pids else []
+        # #region agent log
+        _dbg6c42d0(
+            "cdp_browser.py:close",
+            "exit",
+            {
+                "proc_poll": self._proc.poll(),
+                "browser_close_err": browser_close_err,
+                "terminated": terminated,
+                "port": port,
+                "port_pids": port_pids,
+                "port_killed": port_killed,
+            },
+        )
+        # #endregion
 
     def __enter__(self) -> CdpContext:
         return self

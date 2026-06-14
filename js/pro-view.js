@@ -380,27 +380,6 @@ export async function handleCheckoutSuccessReturn() {
   document.getElementById('proViewLicenseKey')?.focus();
 }
 
-// Connections-tab Pro card pitch. Intentionally distinct from the dashboard
-// banner (PRO_PROMO.title) and the house upsells so each surface reads fresh;
-// leans on the automation angle that fits the Connections (fetcher) context.
-const CONN_PRO_PITCH = 'Set every store to refresh on its own, even when BAKLOG is closed';
-
-export function renderConnectionsProLink() {
-  const el = document.getElementById('connProPanel');
-  if (!el) return;
-  if (isPro()) {
-    el.innerHTML = '';
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  el.innerHTML = `<div class="conn-pro-card conn-pro-card--link" role="region" aria-label="BAKLOG Pro">
-    <p class="conn-pro-title">${escapeHtml(PRO_PROMO.label)}</p>
-    <p class="conn-pro-lead">${escapeHtml(CONN_PRO_PITCH)} - ${escapeHtml(PRO_PROMO.price)}.</p>
-    <button type="button" class="conn-pro-btn" data-goto-pro-view>View plans &amp; activate</button>
-  </div>`;
-}
-
 export function wireProView() {
   if (proViewWired) return;
   proViewWired = true;
@@ -435,11 +414,5 @@ export function wireProView() {
     }
     setProStatus('Not Pro yet. Finish checkout with your account email, then try again.', false);
     btn.disabled = false;
-  });
-  document.getElementById('connectionsContainer')?.addEventListener('click', (ev) => {
-    if (ev.target.closest('[data-goto-pro-view]')) {
-      ev.preventDefault();
-      goToProView();
-    }
   });
 }

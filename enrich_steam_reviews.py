@@ -27,7 +27,7 @@ from shared.profile_paths import cache_json_path
 from shared.steam_match import pick_appid
 from steam_client import SteamClient
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 
 def mapping_file() -> Path:

@@ -20,7 +20,7 @@ from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 from shared.steam_match import pick_appid
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 load_dotenv()
 
 SEARCH_URL = "https://store.steampowered.com/api/storesearch/"

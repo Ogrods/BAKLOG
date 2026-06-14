@@ -37,10 +37,20 @@ def write_catalog_text(path: Path, text: str) -> Path:
 
 
 def configure_stdout() -> None:
-    """Avoid UnicodeEncodeError on Windows consoles (cp1252)."""
+    """UTF-8 + line-buffered stdout/stderr for fetcher children.
+
+    ``line_buffering=True`` is essential, not cosmetic: the server captures a
+    fetcher via ``stdout=PIPE`` and kills it if it sees no output for 180s. On a
+    pipe, Python defaults to block buffering (and ``reconfigure`` overrides
+    ``PYTHONUNBUFFERED``), so during a slow run - e.g. a cold cache where Steam's
+    1.5s store throttle applies to every game - the per-game progress lines pile
+    up in the buffer and never reach the server, which then false-kills a healthy
+    fetch as "no output for 60s". Flushing on every newline keeps progress
+    visible so the stall watchdog only fires on a genuinely wedged child.
+    """
     for stream in (sys.stdout, sys.stderr):
         try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
+            stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
         except (AttributeError, OSError):
             pass
 

@@ -22,7 +22,7 @@ from hltb_client import HltbClient
 from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 
 def mapping_file() -> Path:

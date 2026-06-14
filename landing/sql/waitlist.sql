@@ -9,7 +9,12 @@ create table if not exists public.waitlist (
   ip text
 );
 
+-- Beta invite bookkeeping: set by scripts/send-beta-invites.mjs so waves never
+-- double-invite the same signup. Null = not yet invited.
+alter table public.waitlist add column if not exists invited_at timestamptz;
+
 alter table public.waitlist enable row level security;
 -- Required: service_role must have table grants (RLS alone is not enough).
-grant select, insert on public.waitlist to service_role;
+-- update is needed so the beta-invite script can stamp invited_at.
+grant select, insert, update on public.waitlist to service_role;
 -- No policies: anon/public have no access; service_role bypasses RLS.

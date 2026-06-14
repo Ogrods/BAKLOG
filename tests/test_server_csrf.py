@@ -11,10 +11,17 @@ from pathlib import Path
 import pytest
 
 import server
+from shared import profile_paths
 
 
 @pytest.fixture()
 def csrf_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    prof = tmp_path / "profiles"
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
+    monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
+    server._refresh_personal_paths()
+
     runs_dir = tmp_path / "runs"
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")

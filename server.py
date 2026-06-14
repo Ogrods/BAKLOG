@@ -93,7 +93,9 @@ from shared.install_paths import (
 )
 
 if __name__ == "__main__":
-    from baklog_fetcher_dispatch import exit_if_fetcher_child; exit_if_fetcher_child()
+    from baklog_fetcher_dispatch import exit_if_fetcher_child
+
+    exit_if_fetcher_child()
 
 
 def _warn_built_manifest_version_mismatch() -> None:
@@ -2150,7 +2152,9 @@ class RunManager:
             run.add_line("stderr", f"[server] failed to build subprocess env: {exc!r}")
             return
 
-        from baklog_fetcher_dispatch import apply_fetcher_env_mirror; apply_fetcher_env_mirror(argv, env)
+        from baklog_fetcher_dispatch import apply_fetcher_env_mirror
+
+        apply_fetcher_env_mirror(argv, env)
 
         # Run Popen on a launcher thread so a wedged CreateProcess can't wedge
         # the queue worker. If the launch doesn't return within

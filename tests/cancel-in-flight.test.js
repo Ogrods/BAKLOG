@@ -14,6 +14,11 @@ function installMockEventSource() {
 describe('cancelInFlightRuns server truth', () => {
   beforeEach(() => {
     vi.resetModules();
+    // fetcher-health.js hydrates suppressed run ids from sessionStorage at module
+    // init; without clearing, cancelled ids (e.g. r1) leak across tests and make
+    // runBlocksQueueSlot() drop a still-active run, flaking isQueueFull() asserts.
+    localStorage.clear();
+    sessionStorage.clear();
     document.body.innerHTML = '<div id="fetcherRunLog"></div>';
     installMockEventSource();
   });

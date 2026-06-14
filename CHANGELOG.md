@@ -22,8 +22,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.15] - 2026-06-14
+
 ### Added
 
+- **Report bug** button in the header (next to Pro) for one-tap bug-bundle capture.
 - Beta blind-spot hardening: warn when the frozen exe runs from a temp/zip-extract
   folder (`running_from_temp` in `/api/config` + boot banner); self-heal stale
   Windows login-autostart registry entries on boot; opt-in `GET /api/update-check`
@@ -65,6 +68,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
   sets (`js/dashboard.js`, `js/metrics-rendered.js`).
 - **App shell 404 with Supabase auth** — `GET /` returned 404 because Python
   3.13 `translate_path` no longer maps directory requests to `index.html`.
+- **Flaky `cancel-in-flight` queue test** — suppressed run ids persisted in
+  `sessionStorage` leaked across tests (`vi.resetModules()` re-hydrated them at
+  module init), so `runBlocksQueueSlot()` could drop a still-active run and flake
+  `isQueueFull()`. Tests now clear storage in `beforeEach`.
 - **Vitest unhandled rejection** — `cancel-in-flight.test.js` now stubs
   `EventSource` for fetcher SSE subscribe paths.
 

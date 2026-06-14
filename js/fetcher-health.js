@@ -1234,6 +1234,9 @@ export const fetcherRunner = (() => {
   const LAST_SEQ_KEY = profileScopedStorageKey(LS_FETCHER_LAST_SEQ);
   const lastSeqByRunId = new Map();
   const IN_FLIGHT_POLL_MS = 10_000;
+  // No-progress window: how long the slot may sit busy WITHOUT the active run
+  // advancing before we give up. A run that keeps emitting lines resets it, so
+  // legitimately long fetches/enrichers are waited out rather than aborted.
   const WAIT_QUEUE_SLOT_MS = 120_000;
   const RECONNECT_BASE_MS = 2000;
   const RECONNECT_MAX_MS = 30000;
@@ -1248,6 +1251,15 @@ export const fetcherRunner = (() => {
   let inFlightPollTimer = null;
   /** True when the last /api/runs snapshot had active or queued rows (server truth). */
   let lastServerInFlight = false;
+  /** Signature (active run id + line count + queue depth) of the last in-flight snapshot. */
+  let lastInFlightSig = '';
+  /**
+   * Timestamp the in-flight signature last advanced. Drives a NO-PROGRESS queue
+   * wait timeout (not a total-wait cap): a legitimately long run that keeps
+   * emitting lines keeps resetting this, so we keep waiting; only a genuinely
+   * wedged slot (no progress for the window) trips the timeout.
+   */
+  let inFlightProgressAt = 0;
   let cancelInFlight = false;
   /** Bumped on each user cancel — client batch loops capture epoch and stop if it changes. */
   let cancelEpoch = 0;
@@ -1306,6 +1318,17 @@ export const fetcherRunner = (() => {
 
   function applyServerSnapshotInFlight(snap) {
     lastServerInFlight = !!(snap?.active || (snap?.queue?.length));
+    const active = snap?.active;
+    const queueLen = snap?.queue?.length || 0;
+    // line_count grows on every emitted line (heartbeats included), so the
+    // signature changes while a run is alive; a frozen run keeps it stable.
+    const sig = active
+      ? `${active.id || active.key || 'run'}:${active.line_count ?? 0}:${queueLen}`
+      : (lastServerInFlight ? `q:${queueLen}` : '');
+    if (sig && sig !== lastInFlightSig) {
+      inFlightProgressAt = Date.now();
+    }
+    lastInFlightSig = sig;
     updateCancelButton();
   }
 
@@ -1841,7 +1864,9 @@ export const fetcherRunner = (() => {
     }
     if (cancelInFlight) return Promise.reject(new Error('cancelled'));
     if (!isQueueFull()) return Promise.resolve();
-    const start = Date.now();
+    // Deadline base is the later of wait-start and the last observed progress;
+    // it slides forward as the active run advances (see inFlightProgressAt).
+    let progressDeadlineBase = Date.now();
     let lastSnapPoll = 0;
     return new Promise((resolve, reject) => {
       const schedule = (delay) => setTimeout(tick, delay);
@@ -1858,7 +1883,10 @@ export const fetcherRunner = (() => {
           resolve();
           return;
         }
-        if (Date.now() - start > WAIT_QUEUE_SLOT_MS) {
+        if (inFlightProgressAt > progressDeadlineBase) {
+          progressDeadlineBase = inFlightProgressAt;
+        }
+        if (Date.now() - progressDeadlineBase > WAIT_QUEUE_SLOT_MS) {
           reject(new Error('queue wait timeout'));
           return;
         }

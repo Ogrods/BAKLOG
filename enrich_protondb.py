@@ -29,7 +29,7 @@ from fetchers._progress import HeartbeatTimer, RunStats, started
 from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 SUMMARY_URL = "https://www.protondb.com/api/v1/reports/summaries/{appid}.json"
 HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}

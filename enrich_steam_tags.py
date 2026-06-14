@@ -46,7 +46,7 @@ from steam_metadata import (
 
 HEARTBEAT_EVERY = 25  # Steam API lookups between progress lines (avoids server stall-kill)
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 def mapping_file() -> Path:
     return cache_json_path("steam_review_map.json")

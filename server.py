@@ -92,6 +92,9 @@ from shared.install_paths import (
     static_root,
 )
 
+if __name__ == "__main__":
+    from baklog_fetcher_dispatch import exit_if_fetcher_child; exit_if_fetcher_child()
+
 
 def _warn_built_manifest_version_mismatch() -> None:
     if not serve_built_frontend():
@@ -1247,6 +1250,7 @@ class RunManager:
         *,
         enable_watchdog: bool = True,
         reap_orphans: bool | None = None,
+        restore_durable: bool = True,
     ) -> None:
         self._runs_dir = runs_dir or RUNS_DIR
         self._runs_dir.mkdir(parents=True, exist_ok=True)
@@ -1282,7 +1286,9 @@ class RunManager:
                 target=self._watchdog_loop, name="run-watchdog", daemon=True
             )
             self._watchdog_thread.start()
-        self._restore_durable_queue()
+        # Production server defers restore to main() after bind; tests pass True.
+        if restore_durable:
+            self._restore_durable_queue()
 
     def _start_worker_thread(self) -> None:
         self._worker_thread = threading.Thread(
@@ -2144,6 +2150,8 @@ class RunManager:
             run.add_line("stderr", f"[server] failed to build subprocess env: {exc!r}")
             return
 
+        from baklog_fetcher_dispatch import apply_fetcher_env_mirror; apply_fetcher_env_mirror(argv, env)
+
         # Run Popen on a launcher thread so a wedged CreateProcess can't wedge
         # the queue worker. If the launch doesn't return within
         # LAUNCH_TIMEOUT_SEC the run is marked failed and the worker moves on
@@ -2340,7 +2348,7 @@ class RunManager:
         run._proc = None
 
 
-MANAGER = RunManager()
+MANAGER = RunManager(restore_durable=False)
 
 # Pro-tier background scheduler (created/started in main(); None under pytest import).
 SCHEDULER: Any = None
@@ -4244,6 +4252,7 @@ def main() -> None:
     _DEV_HTTPD = httpd
     with httpd:
         _write_pid_file_impl(PID_FILE)
+        MANAGER._restore_durable_queue()  # primary server only; after port bind
         print(f"BAKLOG dev server on http://{HOST}:{PORT}")
         if serve_built_frontend():
             if is_frozen():
@@ -4279,10 +4288,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) >= 3 and sys.argv[1] == "--run-fetcher":
-        from baklog_fetcher_dispatch import run_fetcher
-
-        raise SystemExit(run_fetcher(sys.argv[2], sys.argv[3:]))
+    # Fetcher-child dispatch happens at the top of this module (before any
+    # server/RunManager state is built); reaching here means server mode.
     try:
         main()
     except SystemExit as exc:

@@ -645,11 +645,21 @@ def _python_executable() -> str:
 def _load_fetchers() -> dict[str, dict[str, Any]]:
     """Build the fetcher registry from fetchers/manifest.json."""
     try:
-        from fetchers.registry import MANIFEST_PATH, validate_manifest
+        from fetchers.registry import MANIFEST_PATH
+    except ImportError as exc:
+        print(f"[fetchers] registry import failed: {exc!r}", file=sys.stderr)
+        return {}
+    # Validation is a dev/CI integrity check that inspects fetcher source files;
+    # keep it isolated so a validation hiccup (e.g. source not shipped in a frozen
+    # build) can never blank the runtime registry.
+    try:
+        from fetchers.registry import validate_manifest
 
-        errs = validate_manifest(MANIFEST_PATH)
-        for err in errs:
+        for err in validate_manifest(MANIFEST_PATH):
             print(f"[fetchers] manifest: {err}", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - never let validation kill the registry
+        print(f"[fetchers] manifest validation skipped: {exc!r}", file=sys.stderr)
+    try:
         raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         entries = raw.get("fetchers", [])
     except (OSError, json.JSONDecodeError) as exc:

@@ -141,9 +141,17 @@ export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {
   }
 
   const batchEpoch = getCancelEpochFn();
-  await waitFn({ batchEpoch });
-  if (getCancelEpochFn() === batchEpoch) {
-    await runFn(primaryKey, { auto: true });
+  try {
+    await waitFn({ batchEpoch });
+    if (getCancelEpochFn() === batchEpoch) {
+      await runFn(primaryKey, { auto: true });
+    }
+  } catch (err) {
+    if (err?.message !== 'cancelled') {
+      // Surface in fetcher log when wired; never leak as unhandledrejection.
+      const logFn = deps.appendLine;
+      if (logFn) logFn(`[auto-fetch on connect aborted: ${err}]`, 'stderr');
+    }
   }
   return true;
 }

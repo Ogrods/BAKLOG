@@ -34,6 +34,88 @@ describe('cancelInFlightRuns server truth', () => {
     expect(fetcherRunner.getLastServerInFlight()).toBe(false);
   });
 
+  it('does not treat cancelling runs as queue-blocking', async () => {
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'die-1', key: 'steam', status: 'cancelling', line_count: 40 },
+      queue: [],
+      history: [],
+    });
+    expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+    expect(fetcherRunner.isQueueFull()).toBe(false);
+  });
+
+  it('does not re-latch queue-full from suppressed runs after cancel', async () => {
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [{
+              key: 'gog',
+              label: 'GOG',
+              metaKey: 'gog',
+              group: 'library',
+              color: '#fff',
+              cmd: 'fetch_gog.py',
+              available: true,
+            }],
+          }),
+        };
+      }
+      if (u.includes('/api/runs') && method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({
+            active: { id: 'die-2', key: 'gog', status: 'cancelling', line_count: 10 },
+            queue: [{ id: 'q1', key: 'hltb', status: 'queued' }],
+            history: [],
+          }),
+        };
+      }
+      if (u.includes('/api/runs/cancel') && method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({
+            cancelled: [{ id: 'die-2', key: 'gog', status: 'cancelling' }],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'die-2', key: 'gog', status: 'running', line_count: 10 },
+      queue: [{ id: 'q1', key: 'hltb', status: 'queued' }],
+      history: [],
+    });
+    expect(fetcherRunner.getLastServerInFlight()).toBe(true);
+    await fetcherRunner.cancelInFlightRuns();
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'die-2', key: 'gog', status: 'cancelling', line_count: 10 },
+      queue: [{ id: 'q1', key: 'hltb', status: 'queued' }],
+      history: [],
+    });
+    expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+    expect(fetcherRunner.isQueueFull()).toBe(false);
+  });
+
+  it('waitForQueueSlot unblocks when the server snapshot only has a cancelling run', async () => {
+    vi.useFakeTimers();
+    const { fetcherRunner } = await import('../js/fetcher-health.js');
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { id: 'c1', key: 'steamCovers', status: 'cancelling', line_count: 99 },
+      queue: [],
+      history: [],
+    });
+    await expect(fetcherRunner.waitForQueueSlot()).resolves.toBeUndefined();
+    vi.useRealTimers();
+  });
+
   it('clears stale queue-full after a run ends on the client', async () => {
     const fetchMock = vi.fn(async (url) => {
       if (String(url).includes('/api/runs')) {

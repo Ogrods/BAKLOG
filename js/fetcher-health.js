@@ -1316,14 +1316,24 @@ export const fetcherRunner = (() => {
     return since > 0 ? `${base}?since=${since}` : base;
   }
 
+  /** Statuses that hold the single fetcher slot on the server (excludes cancelling). */
+  const BLOCKING_RUN_STATUSES = new Set(['queued', 'launching', 'running']);
+
+  function runBlocksQueueSlot(run) {
+    if (!run?.id) return false;
+    if (suppressedRunIds.has(run.id)) return false;
+    return BLOCKING_RUN_STATUSES.has(run.status);
+  }
+
   function applyServerSnapshotInFlight(snap) {
-    lastServerInFlight = !!(snap?.active || (snap?.queue?.length));
-    const active = snap?.active;
-    const queueLen = snap?.queue?.length || 0;
+    const blockingActive = runBlocksQueueSlot(snap?.active) ? snap.active : null;
+    const blockingQueue = (snap?.queue || []).filter(runBlocksQueueSlot);
+    lastServerInFlight = !!(blockingActive || blockingQueue.length);
+    const queueLen = blockingQueue.length;
     // line_count grows on every emitted line (heartbeats included), so the
     // signature changes while a run is alive; a frozen run keeps it stable.
-    const sig = active
-      ? `${active.id || active.key || 'run'}:${active.line_count ?? 0}:${queueLen}`
+    const sig = blockingActive
+      ? `${blockingActive.id || blockingActive.key || 'run'}:${blockingActive.line_count ?? 0}:${queueLen}`
       : (lastServerInFlight ? `q:${queueLen}` : '');
     if (sig && sig !== lastInFlightSig) {
       inFlightProgressAt = Date.now();

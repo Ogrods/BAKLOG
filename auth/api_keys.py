@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import time
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 from auth.cdp_compat import click_by_text
 
@@ -57,7 +58,33 @@ def _wait_loop(
     raise RuntimeError(message)
 
 
-def _steam_steam_id(page) -> str:
+def _steam_id_from_cookies(context) -> str:
+    """Read the SteamID64 from the ``steamLoginSecure`` cookie (no navigation).
+
+    Steam stores the cookie value as ``<steamid64>%7C%7C<token>`` (URL-encoded
+    ``||``), so the leading 17-digit id is available the moment the user is
+    signed in - without ever loading the profile page.
+    """
+    try:
+        for cookie in context.cookies() or []:
+            if cookie.get("name") != "steamLoginSecure":
+                continue
+            value = unquote(str(cookie.get("value", "")))
+            m = _STEAM_ID_RE.search(value)
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+    return ""
+
+
+def _steam_steam_id(page, context=None) -> str:
+    # Cookies first - ground truth, and reading them never moves the window.
+    if context is not None:
+        sid = _steam_id_from_cookies(context)
+        if sid:
+            return sid
+    # Inline globals on whatever page is loaded - still no navigation.
     try:
         sid = page.evaluate(
             """() => {
@@ -72,14 +99,8 @@ def _steam_steam_id(page) -> str:
             return sid.strip()
     except Exception:
         pass
-    try:
-        page.goto("https://steamcommunity.com/my/profile", wait_until="domcontentloaded", timeout=15000)
-        body = page.content()
-        m = _STEAM_ID_RE.search(body)
-        if m:
-            return m.group(1)
-    except Exception:
-        pass
+    # Give up without navigating: bouncing to /my/profile every poll is what
+    # flipped the visible tab and tripped Steam's rate limiter.
     return ""
 
 
@@ -104,11 +125,12 @@ def _steam_try_register_key(page) -> None:
         pass
 
 
-def _steam_extract_from_page(page) -> dict[str, str] | None:
+def _steam_extract_from_page(page, context=None) -> dict[str, str] | None:
     url = (page.url or "").lower()
     if "login" in url and "steamcommunity.com" in url:
         return None
-    if "steamcommunity.com" not in url or "apikey" not in url:
+    will_nav = "steamcommunity.com" not in url or "apikey" not in url
+    if will_nav:
         try:
             page.goto(STEAM_APIKEY_URL, wait_until="domcontentloaded", timeout=20000)
         except Exception:
@@ -120,7 +142,7 @@ def _steam_extract_from_page(page) -> dict[str, str] | None:
     if not api_key:
         keys = _STEAM_KEY_RE.findall(body)
         api_key = keys[0] if keys else ""
-    steam_id = _steam_steam_id(page)
+    steam_id = _steam_steam_id(page, context)
     if not api_key or not steam_id:
         return None
     return {"STEAM_API_KEY": api_key, "STEAM_ID": steam_id}
@@ -144,7 +166,7 @@ def _validate_steam(creds: dict[str, str]) -> None:
 
 def extract_steam(page, context, session: AuthSession | None = None) -> dict[str, str]:
     def attempt() -> dict[str, str] | None:
-        return _steam_extract_from_page(page)
+        return _steam_extract_from_page(page, context)
 
     creds = _wait_loop(
         page,

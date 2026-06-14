@@ -1,7 +1,7 @@
 BAKLOG beta — quick start (Windows)
 ===================================
 
-Recommended: run BAKLOG-v*-Setup.exe from your invite link.
+Recommended: run BAKLOG-Setup.exe from your invite link.
 
 1. If Windows SmartScreen warns "Unknown publisher":
    click More info, then Run anyway.

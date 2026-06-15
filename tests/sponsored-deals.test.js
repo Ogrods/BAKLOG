@@ -291,7 +291,8 @@ describe('house table row', () => {
     expect(html).toContain('sponsored-deal-house');
     expect(html).toContain('From BAKLOG');
     expect(html).toContain('BAKLOG Pro');
-    expect(html).toContain('Get Pro - $5/mo');
+    expect(html).toContain('Support BAKLOG');
+    expect(html).not.toContain('Get Pro - $5/mo');
     expect(html).toContain('data-sponsor-house="1"');
     expect(html).not.toContain('>Sponsored<');
     expect(html).not.toContain('sponsored-table-deal-pill');
@@ -739,7 +740,8 @@ describe('proPromoBannerHtml', () => {
     expect(html).toContain('sponsored-deal-pro');
     expect(html).toContain('BAKLOG Pro');
     expect(html).toContain('Queued bulk refresh');
-    expect(html).toContain('$5/mo');
+    expect(html).toContain('Support BAKLOG');
+    expect(html).not.toContain('$5/mo');
     expect(html).toContain('buy.polar.sh/polar_cl_');
     expect(html).not.toContain('sponsored-dismiss');
   });

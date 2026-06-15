@@ -22,6 +22,27 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.18] - 2026-06-15
+
+### Fixed
+
+- Legacy `.env` migration now strips only the imported store-credential lines and
+  preserves operational config (`BAKLOG_SUPABASE_*`, `BAKLOG_ADMIN`, Polar org id,
+  etc.), deleting `.env` only when nothing but credentials and comments remain.
+  Previously the whole file was deleted after import, which could wipe a
+  self-hoster's settings.
+
+### Added
+
+- `.github/CODEOWNERS` and an opt-in `.pre-commit-config.yaml` (ruff lint plus
+  basic file hooks).
+
+### Changed
+
+- Release workflow now runs the Python and JS test suites before building, so a
+  tag can never publish from a commit whose tests fail, and attaches a signed
+  SPDX SBOM (in addition to the existing build-provenance attestation).
+
 ## [0.8.17] - 2026-06-15
 
 ### Added

@@ -336,7 +336,6 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_hint = 0.0
     while time.time() < deadline:
-        live = [pg for pg in context.pages if not pg.is_closed]
         drive = _drive_connect_page(page, context)
 
         redirect_page = None

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fetch_nintendo_wishlist import (
+from fetchers.fetch_nintendo_wishlist import (
     _build_row,
     _signed_out,
     _wishlist_graphql_ok,
@@ -26,7 +26,7 @@ def test_parse_wishlist_from_next_data_fixture() -> None:
 
 
 def test_build_row_schema() -> None:
-    from fetch_nintendo_wishlist import WishlistItem
+    from fetchers.fetch_nintendo_wishlist import WishlistItem
 
     item = WishlistItem(
         product_id="71000000012345",

@@ -746,7 +746,7 @@ FETCHERS: dict[str, dict[str, Any]] = _load_fetchers()
 _DEFAULT_INTERNAL_JOBS: dict[str, dict[str, Any]] = {
     "claimSources": {
         "label": "Fetch claim sources",
-        "script": "fetch_claim_sources.py",
+        "script": "fetchers/fetch_claim_sources.py",
         "group": "claims",
         "description": "Auto-discover free claims from Epic, GamerPower, and ITAD giveaways RSS",
         "args": [],
@@ -761,7 +761,7 @@ _DEFAULT_INTERNAL_JOBS: dict[str, dict[str, Any]] = {
     },
     "buildClaims": {
         "label": "Build free claims feed",
-        "script": "build_free_claims.py",
+        "script": "fetchers/build_free_claims.py",
         "group": "claims",
         "description": "Merge manual + approved auto items, enrich with Steam metadata, publish feed",
         "args": [],
@@ -3851,8 +3851,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         try:
-            from auth.manager import mark_connected
             from epic_client import EpicClient, default_epic_cache_dir
+
+            from auth.manager import mark_connected
 
             client = EpicClient(auth_code=code, cache_dir=default_epic_cache_dir())
             client.login()

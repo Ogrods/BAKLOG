@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 import auth.runner as runner
-from epic_client import (
+from clients.epic_client import (
     EpicAuthError,
     EpicClient,
     EpicCorrectiveActionError,

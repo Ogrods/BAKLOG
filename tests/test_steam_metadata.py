@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from steam_metadata import (
+from clients.steam_metadata import (
     ALWAYS_WRITE_FIELDS,
     FILL_IF_MISSING_FIELDS,
     apply_enrichment_to_row,

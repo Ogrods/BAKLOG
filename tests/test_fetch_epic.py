@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from fetch_epic import (
+from fetchers.fetch_epic import (
     _can_reuse_cached_epic_row,
     _is_game_item,
     _is_non_game_title,

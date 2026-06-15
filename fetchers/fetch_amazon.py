@@ -14,10 +14,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from amazon_web_client import AmazonWebAuthError
 from auth import mark_invalid
 from auth.manager import is_local_provider_disabled, mark_connected
 from auth.secrets import profile_dir
+from clients.amazon_web_client import AmazonWebAuthError
 from fetchers._authoritative import AMAZON
 
 try:
@@ -25,6 +25,7 @@ try:
 except ImportError:
     class AmazonGamesError(Exception):  # type: ignore[no-redef]
         """Stub when amazon_client is unavailable (non-Windows)."""
+from clients.hltb_client import HltbClient
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
@@ -36,7 +37,6 @@ from fetchers._base import (
     write_catalog_guarded,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from hltb_client import HltbClient
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_AMAZON_JSON = Path("games_amazon.json")

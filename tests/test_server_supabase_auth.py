@@ -417,7 +417,7 @@ def test_epic_callback_success_binds_profile(auth_server, monkeypatch: pytest.Mo
         captured["provider"] = provider
         captured["profile"] = profile_paths.get_active_profile_id()
 
-    monkeypatch.setattr("epic_client.EpicClient", _FakeEpic)
+    monkeypatch.setattr("clients.epic_client.EpicClient", _FakeEpic)
     monkeypatch.setattr("auth.manager.mark_connected", _fake_mark_connected)
 
     status, raw = _request(

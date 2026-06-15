@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from ea_client import EaAuthError, EaCaptureError, EaClient
+from .ea_client import EaAuthError, EaCaptureError, EaClient
 
 EA_GRAPHQL_HOST = "service-aggregation-layer.juno.ea.com"
 EA_LOGIN_URL = "https://www.ea.com/login"

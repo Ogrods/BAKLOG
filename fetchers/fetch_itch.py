@@ -28,6 +28,9 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from auth.manager import is_local_provider_disabled
+from clients.hltb_client import HltbClient
+from clients.itch_client import ItchApiError, ItchAuthError, ItchClient
+from clients.itch_game import itch_is_videogame
 from fetchers._base import (
     add_allow_empty_arg,
     add_dry_run_arg,
@@ -44,9 +47,6 @@ from fetchers._base import (
     write_games_json,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from hltb_client import HltbClient
-from itch_client import ItchApiError, ItchAuthError, ItchClient
-from itch_game import itch_is_videogame
 
 GAMES_ITCH_JSON = Path("games_itch.json")
 HLTB_DELAY_SEC = 1.0

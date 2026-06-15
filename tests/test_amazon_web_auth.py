@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from amazon_web_client import (
+from clients.amazon_web_client import (
     COLLECTION_URLS,
     GAMING_HOME_URL,
     LUNA_CLAIMS_URL,
@@ -25,7 +25,7 @@ from amazon_web_client import (
     try_parse_claims_from_html,
     try_parse_claims_from_text,
 )
-from fetch_amazon import _read_raw_dump_claims, _web_outcome_kind_from_capture
+from fetchers.fetch_amazon import _read_raw_dump_claims, _web_outcome_kind_from_capture
 
 
 class _FakeCookieJar:

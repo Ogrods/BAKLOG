@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-import enrich_cross_store_images as enrich
+import enrichers.enrich_cross_store_images as enrich
 from shared.steam_match import normalize_title
 
 ARMATUS_ROW = {
@@ -111,7 +111,7 @@ def test_enriches_armatus_wishlist_row(tmp_path: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(enrich, "steam_search_appid", lambda name: 3660710 if name == "Armatus" else None)
     monkeypatch.setattr(enrich, "image_url_ok", lambda _url: True)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
-    monkeypatch.setattr(sys, "argv", ["enrich_cross_store_images.py"])
+    monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py"])
 
     enrich.main()
 
@@ -171,7 +171,7 @@ def test_itch_non_game_skipped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(enrich, "steam_search_appid", fake_search)
     monkeypatch.setattr(enrich, "image_url_ok", lambda _url: True)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
-    monkeypatch.setattr(sys, "argv", ["enrich_cross_store_images.py"])
+    monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py"])
 
     enrich.main()
 
@@ -207,7 +207,7 @@ def test_upgrade_lowres_skipped_without_flag(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr(enrich, "meta_file", lambda: meta_path)
     monkeypatch.setattr(enrich, "steam_search_appid", lambda name: searches.append(name) or 99)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
-    monkeypatch.setattr(sys, "argv", ["enrich_cross_store_images.py"])
+    monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py"])
 
     enrich.main()
 
@@ -232,7 +232,7 @@ def test_upgrade_lowres_replaces_native_art(tmp_path: Path, monkeypatch: pytest.
     monkeypatch.setattr(enrich, "steam_search_appid", lambda name: 4242 if name == "Native Capsule Game" else None)
     monkeypatch.setattr(enrich, "image_url_ok", lambda _url: True)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
-    monkeypatch.setattr(sys, "argv", ["enrich_cross_store_images.py", "--upgrade-lowres"])
+    monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py", "--upgrade-lowres"])
 
     enrich.main()
 
@@ -265,7 +265,7 @@ def test_upgrade_lowres_skips_cached_checked_rows(tmp_path: Path, monkeypatch: p
     monkeypatch.setattr(enrich, "meta_file", lambda: meta_path)
     monkeypatch.setattr(enrich, "steam_search_appid", lambda name: searches.append(name) or 4242)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
-    monkeypatch.setattr(sys, "argv", ["enrich_cross_store_images.py", "--upgrade-lowres"])
+    monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py", "--upgrade-lowres"])
 
     enrich.main()
 

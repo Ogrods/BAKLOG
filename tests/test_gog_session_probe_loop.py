@@ -19,7 +19,7 @@ from __future__ import annotations
 import requests
 
 from auth.session_probe import probe_gog_session
-from gog_client import GogClient
+from clients.gog_client import GogClient
 
 
 class FakeResp:
@@ -83,7 +83,7 @@ def test_genuinely_dead_session_still_fails(tmp_path) -> None:
     """When EVERY endpoint 403s, the session is really dead and must fail."""
     import pytest
 
-    from gog_client import GogAuthError
+    from clients.gog_client import GogAuthError
 
     client = _client(tmp_path, userdata=403, library=403, owned=403)
     with pytest.raises(GogAuthError):
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     import tempfile
     from pathlib import Path
 
-    from gog_client import GogAuthError
+    from clients.gog_client import GogAuthError
 
     tmp = Path(tempfile.mkdtemp())
     c = _client(tmp, userdata=403, library=403, owned=200)

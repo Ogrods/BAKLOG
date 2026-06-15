@@ -13,6 +13,8 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from clients.hltb_client import HltbClient
+from clients.xbox_client import XboxAuthError, XboxClient, XboxRateLimitError
 from fetchers._authoritative import XBOX
 from fetchers._base import (
     add_allow_empty_arg,
@@ -27,8 +29,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from hltb_client import HltbClient
-from xbox_client import XboxAuthError, XboxClient, XboxRateLimitError
 
 GAMES_XBOX_JSON = Path("games_xbox.json")
 HLTB_DELAY_SEC = 1.0

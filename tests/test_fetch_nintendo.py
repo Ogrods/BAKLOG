@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from unittest.mock import patch
 
-from nintendo_client import NintendoCaptureError
+from clients.nintendo_client import NintendoCaptureError
 
 
 def test_capture_error_does_not_mark_invalid(tmp_path, monkeypatch) -> None:
@@ -12,18 +12,18 @@ def test_capture_error_does_not_mark_invalid(tmp_path, monkeypatch) -> None:
     prof.mkdir(parents=True)
     (prof / "Default").mkdir()
 
-    monkeypatch.setattr("fetch_nintendo.profile_dir", lambda _p: prof)
-    monkeypatch.setattr("fetch_nintendo._nintendo_connected", lambda: True)
-    monkeypatch.setattr("fetch_nintendo.resolve_env", lambda *_a, **_k: "c=1")
+    monkeypatch.setattr("fetchers.fetch_nintendo.profile_dir", lambda _p: prof)
+    monkeypatch.setattr("fetchers.fetch_nintendo._nintendo_connected", lambda: True)
+    monkeypatch.setattr("fetchers.fetch_nintendo.resolve_env", lambda *_a, **_k: "c=1")
 
     mark_calls: list = []
 
     def fake_mark_invalid(provider: str, *, error: str = "") -> None:
         mark_calls.append((provider, error))
 
-    monkeypatch.setattr("fetch_nintendo.mark_invalid", fake_mark_invalid)
+    monkeypatch.setattr("fetchers.fetch_nintendo.mark_invalid", fake_mark_invalid)
 
-    with patch("fetch_nintendo.NintendoClient") as mock_cls:
+    with patch("fetchers.fetch_nintendo.NintendoClient") as mock_cls:
         mock_cls.return_value.fetch_all_transactions.side_effect = NintendoCaptureError(
             "capture failed"
         )

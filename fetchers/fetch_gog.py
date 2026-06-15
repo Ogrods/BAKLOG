@@ -16,6 +16,9 @@ from dotenv import load_dotenv
 from auth import mark_invalid, resolve_env
 from auth.manager import is_local_provider_disabled, mark_connected
 from auth.session_probe import probe_gog_session
+from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
+from clients.gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
+from clients.hltb_client import HltbClient
 from fetchers._authoritative import GOG
 from fetchers._base import (
     add_allow_empty_arg,
@@ -29,9 +32,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
-from gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
-from gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
-from hltb_client import HltbClient
 
 GAMES_GOG_JSON = Path("games_gog.json")
 HLTB_DELAY_SEC = 1.0

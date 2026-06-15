@@ -13,6 +13,8 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from clients.hltb_client import HltbClient
+from clients.ubisoft_client import UbisoftAuthError, UbisoftClient
 from fetchers._authoritative import UBISOFT
 from fetchers._base import (
     add_allow_empty_arg,
@@ -27,9 +29,7 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from hltb_client import HltbClient
 from shared.raw_dumps import profile_raw_dump_path
-from ubisoft_client import UbisoftAuthError, UbisoftClient
 
 GAMES_UBISOFT_JSON = Path("games_ubisoft.json")
 UBISOFT_RAW_DUMP = profile_raw_dump_path("ubisoft_raw.json")

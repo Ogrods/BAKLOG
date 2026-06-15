@@ -12,7 +12,7 @@ from auth.secrets import (
     reset_cache,
     set_master_password_override,
 )
-from epic_client import EpicClient, default_epic_cache_dir
+from clients.epic_client import EpicClient, default_epic_cache_dir
 from shared import profile_paths
 from shared.profiles import create_profile
 

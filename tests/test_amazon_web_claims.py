@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from amazon_web_client import (
+from clients.amazon_web_client import (
     _CODE_FIELD_NAMES,
     _capture_claims_from_response,
     _drain_claim_candidates,

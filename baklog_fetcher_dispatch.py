@@ -22,7 +22,8 @@ RUN_FETCHER_ARGS_ENV = "BAKLOG_RUN_FETCHER_ARGS"
 
 
 def _module_for_script(script: str) -> str:
-    return Path(script).stem
+    rel = Path(script).with_suffix("")
+    return rel.as_posix().replace("/", ".")
 
 
 def parse_runtime_request(

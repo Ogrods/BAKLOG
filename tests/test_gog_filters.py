@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import fetch_gog as fg
-from gog_filters import (
+import fetchers.fetch_gog as fg
+from clients.gog_filters import (
     apply_gog_name_filters,
     collapse_metadata_barren_dupes,
     collapse_pack_dupes,

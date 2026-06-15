@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
+from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 
 
 @pytest.fixture()

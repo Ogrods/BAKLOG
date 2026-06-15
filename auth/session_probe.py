@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
+from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 
 ProbeResult = Literal["ok", "auth_fail", "unreachable"]
 

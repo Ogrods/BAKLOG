@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from itch_local_client import ItchLocalClient, ItchLocalError, default_butler_db
+from clients.itch_local_client import ItchLocalClient, ItchLocalError, default_butler_db
 
 
 def _seed_butler_db(path: Path) -> None:
@@ -81,7 +81,7 @@ def test_default_butler_db_windows_includes_itch_folder(
 def test_default_butler_db_darwin_path(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(
-        "itch_local_client.Path.home",
+        "clients.itch_local_client.Path.home",
         lambda: Path("/Users/testuser"),
     )
     path = default_butler_db()
@@ -100,7 +100,7 @@ def test_default_butler_db_linux_prefers_local_share(
     modern.mkdir(parents=True)
     db = modern / "butler.db"
     db.write_text("", encoding="utf-8")
-    monkeypatch.setattr("itch_local_client.Path.home", lambda: home)
+    monkeypatch.setattr("clients.itch_local_client.Path.home", lambda: home)
     assert default_butler_db() == db
 
 
@@ -110,6 +110,6 @@ def test_default_butler_db_linux_falls_back_to_config(
     monkeypatch.setattr(sys, "platform", "linux")
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setattr("itch_local_client.Path.home", lambda: home)
+    monkeypatch.setattr("clients.itch_local_client.Path.home", lambda: home)
     path = default_butler_db()
     assert path == home / ".config" / "itch" / "db" / "butler.db"

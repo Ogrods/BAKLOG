@@ -78,7 +78,7 @@ def test_enricher_writes_coop_and_fills_missing_genres(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Force a fresh import so the script picks up the patched cwd / env.
-    for mod in ("enrich_steam_tags", "steam_client"):
+    for mod in ("enrichers.enrich_steam_tags", "clients.steam_client"):
         sys.modules.pop(mod, None)
     import enrich_steam_tags
     from steam_client import SteamClient
@@ -152,7 +152,7 @@ def test_enricher_writes_coop_and_fills_missing_genres(
 def test_enricher_dry_run_does_not_write(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    for mod in ("enrich_steam_tags", "steam_client"):
+    for mod in ("enrichers.enrich_steam_tags", "clients.steam_client"):
         sys.modules.pop(mod, None)
     import enrich_steam_tags
     from steam_client import SteamClient
@@ -184,7 +184,7 @@ def test_enricher_bails_without_mapping(
     monkeypatch.setattr("shared.profile_paths.profile_root", lambda profile_id=None: tmp_path)
     monkeypatch.setenv("STEAM_API_KEY", "test_key")
     monkeypatch.setenv("STEAM_ID", "76561197960287930")
-    for mod in ("enrich_steam_tags",):
+    for mod in ("enrichers.enrich_steam_tags",):
         sys.modules.pop(mod, None)
     import enrich_steam_tags
 

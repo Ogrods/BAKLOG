@@ -11,6 +11,9 @@ import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from clients.hltb_client import HltbClient
+from clients.steam_client import SteamClient
+from clients.steam_metadata import coop_flags_from_categories, enrichment_from_appdetails
 from fetchers._base import (
     STEAM_CREDENTIALS_HINT,
     STEAM_PRIVATE_PROFILE_HINT,
@@ -25,9 +28,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from hltb_client import HltbClient
-from steam_client import SteamClient
-from steam_metadata import coop_flags_from_categories, enrichment_from_appdetails
 
 GAMES_STEAM_JSON = Path("games_steam.json")
 HLTB_DELAY_SEC = 1.0

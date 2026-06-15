@@ -1149,7 +1149,7 @@ NINTENDO_WISHLIST_POLL_SEC = 2.5
 
 def _nintendo_wishlist_session_ready(html: str, url: str, api_payloads: list[Any]) -> bool:
     """True when storefront GraphQL confirms a signed-in wish-list session."""
-    from fetch_nintendo_wishlist import _wishlist_graphql_ok, parse_wishlist_sources
+    from fetchers.fetch_nintendo_wishlist import _wishlist_graphql_ok, parse_wishlist_sources
 
     u = (url or "").lower()
     if "accounts.nintendo.com/login" in u:
@@ -1161,7 +1161,7 @@ def _nintendo_wishlist_session_ready(html: str, url: str, api_payloads: list[Any
 
 def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
     """Open nintendo.com/us/wish-list/, wait for sign-in, return marker cred."""
-    from fetch_nintendo_wishlist import (
+    from fetchers.fetch_nintendo_wishlist import (
         _drain_nintendo_candidates,
         _is_nintendo_graphql_url,
     )

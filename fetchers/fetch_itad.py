@@ -14,9 +14,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from clients.itad_client import ItadClient, ItadError
 from fetchers._base import add_allow_empty_arg, configure_stdout, refuse_empty_result
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from itad_client import ItadClient, ItadError
 from shared.fx import ensure_fx_rates
 from shared.money import country_to_currency
 from shared.profile_paths import catalog_path, itad_path

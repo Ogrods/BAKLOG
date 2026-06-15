@@ -32,17 +32,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from auth import resolve_env
-from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
-from fetchers._progress import HeartbeatTimer, RunStats, started
-from itch_game import itch_is_videogame as _itch_is_videogame
-from shared.profile_paths import cache_json_path
-from steam_client import SteamClient
-from steam_metadata import (
+from clients.itch_game import itch_is_videogame as _itch_is_videogame
+from clients.steam_client import SteamClient
+from clients.steam_metadata import (
     ALWAYS_WRITE_FIELDS,
     FILL_IF_MISSING_FIELDS,
     apply_enrichment_to_row,
     enrichment_from_appdetails,
 )
+from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
+from fetchers._progress import HeartbeatTimer, RunStats, started
+from shared.profile_paths import cache_json_path
 
 HEARTBEAT_EVERY = 25  # Steam API lookups between progress lines (avoids server stall-kill)
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from gog_client import GogClient
+from clients.gog_client import GogClient
 
 
 @pytest.fixture()

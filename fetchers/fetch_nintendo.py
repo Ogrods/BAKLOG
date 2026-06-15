@@ -15,6 +15,13 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from auth.secrets import profile_dir
+from clients.hltb_client import HltbClient
+from clients.nintendo_client import (
+    NintendoAuthError,
+    NintendoCaptureError,
+    NintendoClient,
+    NintendoEndpointError,
+)
 from fetchers._authoritative import NINTENDO
 from fetchers._base import (
     add_allow_empty_arg,
@@ -29,13 +36,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
-from hltb_client import HltbClient
-from nintendo_client import (
-    NintendoAuthError,
-    NintendoCaptureError,
-    NintendoClient,
-    NintendoEndpointError,
-)
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")

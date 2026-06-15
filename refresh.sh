@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # POSIX (macOS / Linux) counterpart to refresh.ps1 — runs the fetch sequence in
 # order and tees output to refresh.log. The Windows launcher DB path is omitted
-# here; run fetch_amazon.py --source web manually after connecting Prime Gaming
+# here; run fetchers/fetch_amazon.py --source web manually after connecting Prime Gaming
 # (web) on Connections if you use Amazon on macOS/Linux.
 set -uo pipefail
 
 cd "$(dirname "$0")"
+export PYTHONPATH="$(pwd)"
 log="./refresh.log"
 : > "$log"
 
@@ -23,23 +24,23 @@ run() {
   "$py" "$@" 2>&1 | tee -a "$log"
 }
 
-run fetch_games.py
-run fetch_gog.py
-run fetch_psn.py
-run fetch_epic.py
-run fetch_xbox.py --skip-hltb
-run fetch_battlenet.py --skip-hltb
-run fetch_ubisoft.py --skip-hltb
-run fetch_nintendo.py --skip-hltb
-run fetch_humble.py --skip-hltb
-run fetch_ea.py --skip-hltb
-run fetch_itch.py --only-new --skip-hltb
-run enrich_steam_reviews.py --stores itch
-run fetch_wishlist.py --skip-hltb
-run fetch_psn_wishlist.py
-run fetch_ubisoft_wishlist.py
-run fetch_nintendo_wishlist.py
-run fetch_humble_wishlist.py
-run fetch_itad.py
-run fetch_free_claims.py
-run enrich_cross_store_images.py
+run fetchers/fetch_games.py
+run fetchers/fetch_gog.py
+run fetchers/fetch_psn.py
+run fetchers/fetch_epic.py
+run fetchers/fetch_xbox.py --skip-hltb
+run fetchers/fetch_battlenet.py --skip-hltb
+run fetchers/fetch_ubisoft.py --skip-hltb
+run fetchers/fetch_nintendo.py --skip-hltb
+run fetchers/fetch_humble.py --skip-hltb
+run fetchers/fetch_ea.py --skip-hltb
+run fetchers/fetch_itch.py --only-new --skip-hltb
+run enrichers/enrich_steam_reviews.py --stores itch
+run fetchers/fetch_wishlist.py --skip-hltb
+run fetchers/fetch_psn_wishlist.py
+run fetchers/fetch_ubisoft_wishlist.py
+run fetchers/fetch_nintendo_wishlist.py
+run fetchers/fetch_humble_wishlist.py
+run fetchers/fetch_itad.py
+run fetchers/fetch_free_claims.py
+run enrichers/enrich_cross_store_images.py

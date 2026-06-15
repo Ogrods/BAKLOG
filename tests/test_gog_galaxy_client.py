@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from gog_galaxy_client import GogGalaxyClient, GogGalaxyError, default_galaxy_db
+from clients.gog_galaxy_client import GogGalaxyClient, GogGalaxyError, default_galaxy_db
 
 
 def _seed_galaxy_db(path: Path) -> None:

@@ -85,7 +85,7 @@ def test_enricher_writes_steam_and_mapped_gog_rows(
             return False
         return None
 
-    for mod in ("enrich_protondb",):
+    for mod in ("enrichers.enrich_protondb",):
         sys.modules.pop(mod, None)
     import enrich_protondb
 

@@ -12,7 +12,7 @@ import sys
 
 import pytest
 
-import fetch_claim_sources as fcs
+import fetchers.fetch_claim_sources as fcs
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def _run(monkeypatch, items, out_path, *extra_args, counts=None):
         fcs, "collect_claims", lambda sources, **kw: (items, counts or {"gamerpower": len(items)})
     )
     monkeypatch.setattr(
-        sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path), *extra_args]
+        sys, "argv", ["fetchers.fetch_claim_sources.py", "--output", str(out_path), *extra_args]
     )
     return fcs.main()
 
@@ -105,7 +105,7 @@ def test_failed_source_carries_prior_rows_forward(monkeypatch, out_path):
 
     monkeypatch.setattr(fcs, "collect_claims", fake_collect)
     monkeypatch.setattr(
-        sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)]
+        sys, "argv", ["fetchers.fetch_claim_sources.py", "--output", str(out_path)]
     )
     code = fcs.main()
     assert code == 0
@@ -124,7 +124,7 @@ def test_genuine_zero_source_not_carried_forward(monkeypatch, out_path):
 
     monkeypatch.setattr(fcs, "collect_claims", fake_collect)
     monkeypatch.setattr(
-        sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)]
+        sys, "argv", ["fetchers.fetch_claim_sources.py", "--output", str(out_path)]
     )
     code = fcs.main()
     assert code == 0
@@ -144,7 +144,7 @@ def test_vanished_source_refuses_exit_3_without_allow_drift(monkeypatch, out_pat
         return [_claim("itad-new", "itad")], {"itad": 1}
 
     monkeypatch.setattr(fcs, "collect_claims", fake_collect)
-    monkeypatch.setattr(sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)])
+    monkeypatch.setattr(sys, "argv", ["fetchers.fetch_claim_sources.py", "--output", str(out_path)])
     code = fcs.main()
     assert code == 3
     doc = json.loads(out_path.read_text(encoding="utf-8"))
@@ -165,7 +165,7 @@ def test_vanished_source_allowed_when_rows_carried_forward(monkeypatch, out_path
         return [_claim("itad-new", "itad")], {"itad": 1}
 
     monkeypatch.setattr(fcs, "collect_claims", fake_collect)
-    monkeypatch.setattr(sys, "argv", ["fetch_claim_sources.py", "--output", str(out_path)])
+    monkeypatch.setattr(sys, "argv", ["fetchers.fetch_claim_sources.py", "--output", str(out_path)])
     code = fcs.main()
     assert code == 0
     doc = json.loads(out_path.read_text(encoding="utf-8"))

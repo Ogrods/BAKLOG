@@ -4,17 +4,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fetch_humble import (
+from fetchers.fetch_humble import (
     LibraryItem,
     _build_row,
     _parse_order_detail,
     _subproduct_is_game,
 )
-from fetch_humble_wishlist import (
+from fetchers.fetch_humble_wishlist import (
     WishlistItem,
     _item_from_lookup,
 )
-from fetch_humble_wishlist import (
+from fetchers.fetch_humble_wishlist import (
     _build_row as _build_wishlist_row,
 )
 

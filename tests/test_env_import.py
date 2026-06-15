@@ -127,6 +127,34 @@ def test_maybe_import_legacy_env_deletes_env_not_archive(
     assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
 
 
+def test_maybe_import_legacy_env_preserves_non_credential_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from shared.legacy_env import maybe_import_legacy_env
+
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "# header comment\n"
+        "ITCH_API_KEY=from-dotenv\n"
+        "BAKLOG_SUPABASE_URL=https://x.supabase.co\n"
+        "AMAZON_GAMES_SQL_DIR=C:/games\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ITCH_API_KEY", "from-dotenv")
+
+    count, err = maybe_import_legacy_env(tmp_path)
+
+    assert err is None
+    assert count == 1
+    # File survives because config remains; the credential line is gone.
+    assert env_path.exists()
+    surviving = env_path.read_text(encoding="utf-8")
+    assert "ITCH_API_KEY" not in surviving
+    assert "BAKLOG_SUPABASE_URL=https://x.supabase.co" in surviving
+    assert "AMAZON_GAMES_SQL_DIR=C:/games" in surviving
+    assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
+
+
 def test_remediates_existing_env_imported_archive(tmp_path: Path):
     from shared.legacy_env import maybe_import_legacy_env, remediate_env_imported_archive
 

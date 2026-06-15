@@ -1,0 +1,4 @@
+# Default owner for everything in the repo. Pull requests automatically
+# request review from this owner. See:
+# https://docs.github.com/articles/about-code-owners
+* @Ogrods

@@ -1,0 +1,24 @@
+# Opt-in local hooks. Install once with:  pre-commit install
+# Run across the repo with:               pre-commit run --all-files
+#
+# Ruff uses the E/F/I/UP selection from pyproject.toml (no formatter, to match
+# the existing lint-only setup). The pre-push leak/size hooks in scripts/hooks
+# remain the source of truth for CI-parity guards.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.(md|markdown)$'
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]

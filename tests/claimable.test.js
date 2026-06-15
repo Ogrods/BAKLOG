@@ -2,7 +2,7 @@
  * Tests for js/claimable.js — free claimable feed filtering and diff.
  */
 
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
 const isProMock = vi.hoisted(() => vi.fn(() => false));
 
@@ -33,6 +33,7 @@ import {
   pickNewerFeed,
   resolveClaimsFeedDoc,
   HOSTED_BOOT_FRESHNESS_MS,
+  CLAIMS_HOSTED_FETCH_MS,
   sanitizeBlurb,
   handleClaimableClick,
   loadClaimableNow,
@@ -626,6 +627,39 @@ describe('dismissed claims survive partial feed churn on fetch', () => {
 
     expect(getVisibleClaims(state.claimableFeed.items).map(c => c.id)).not.toContain('epic-target');
     expect(getHiddenClaims(state.claimableFeed.items).map(c => c.id)).toContain('epic-target');
+  });
+});
+
+describe('hosted claims fetch timeout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('falls back to local feed when hosted fetch hangs', async () => {
+    const localDoc = { generated_at: '2026-06-01T00:00:00Z', items: sampleItems.slice(0, 2) };
+    vi.spyOn(apiClient, 'dataFetch').mockImplementation(async (url) => {
+      const path = String(url).split('?')[0];
+      if (path.endsWith('free_claims.json')) {
+        return { ok: true, json: async () => localDoc };
+      }
+      return { ok: false };
+    });
+    globalThis.fetch = vi.fn((_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      });
+    }));
+
+    const promise = loadClaimableNow();
+    await vi.advanceTimersByTimeAsync(CLAIMS_HOSTED_FETCH_MS + 50);
+    await promise;
+
+    expect(state.claimableFeed?.items?.length).toBe(2);
+    expect(state.claimableFeedUnavailable).toBe(false);
   });
 });
 

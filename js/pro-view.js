@@ -148,8 +148,8 @@ function proPricingHtml() {
 
   return `<div class="pro-view-pricing">
     <div class="pro-view-toggle" role="group" aria-label="Billing interval">
-      <button type="button" class="pro-view-toggle-btn${selectedProPlan === 'monthly' ? ' is-active' : ''}" data-pro-plan="monthly" aria-pressed="${monthlyPressed}">Monthly · $5/mo</button>
-      <button type="button" class="pro-view-toggle-btn${selectedProPlan === 'yearly' ? ' is-active' : ''}" data-pro-plan="yearly" aria-pressed="${yearlyPressed}">Yearly · $50/yr <span class="pro-view-save">Save $10</span></button>
+      <button type="button" class="pro-view-toggle-btn${selectedProPlan === 'monthly' ? ' is-active' : ''}" data-pro-plan="monthly" aria-pressed="${monthlyPressed}">Monthly</button>
+      <button type="button" class="pro-view-toggle-btn${selectedProPlan === 'yearly' ? ' is-active' : ''}" data-pro-plan="yearly" aria-pressed="${yearlyPressed}">Yearly</button>
     </div>
     <a class="pro-view-btn pro-view-btn--primary" data-pro-checkout href="${checkoutHref}" target="_blank" rel="noopener noreferrer">${escapeHtml(checkoutLabel)}</a>
     <p class="pro-view-founder">${escapeHtml(PRO_PROMO.founderNote)}</p>

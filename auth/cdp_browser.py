@@ -32,23 +32,6 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 
-# #region agent log
-def _dbg6c42d0(location: str, message: str, data: dict) -> None:
-    try:
-        payload = {
-            "sessionId": "6c42d0",
-            "hypothesisId": "A",
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        log_path = Path(__file__).resolve().parent.parent / "debug-6c42d0.log"
-        with log_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-# #endregion
 
 
 def _subprocess_no_window_flags() -> int:
@@ -719,12 +702,12 @@ class CdpPage:
             pass
         self.bring_to_front()
 
-    def close(self) -> None:
+    def close(self, *, timeout: float = 60) -> None:
         if self._closed:
             return
         try:
             self._context._send(
-                "Target.closeTarget", {"targetId": self._target_id}
+                "Target.closeTarget", {"targetId": self._target_id}, timeout=timeout
             )
         except Exception:
             pass
@@ -849,6 +832,7 @@ class CdpContext:
         self._init_scripts: list[str] = []
         self._page_handlers: list[Callable[[CdpPage], None]] = []
         self._ubisoft_native_popup_targets: set[str] = set()
+        self._ws_dead = False
         self.request = CdpHttpClient(self)
 
     def on(self, event: str, handler: Callable) -> None:
@@ -1150,6 +1134,8 @@ class CdpContext:
         session_id: str | None = None,
         timeout: float = 60,
     ) -> dict:
+        if self._ws_dead:
+            raise ConnectionError("CDP connection closed")
         msg_id = self._next_id()
         payload: dict[str, Any] = {"id": msg_id, "method": method, "params": params or {}}
         if session_id:
@@ -1177,46 +1163,23 @@ class CdpContext:
     def close(self) -> None:
         proc_poll = self._proc.poll()
         port = int(getattr(self, "_port", 0) or 0)
-        # #region agent log
-        _dbg6c42d0(
-            "cdp_browser.py:close",
-            "entry",
-            {
-                "proc_poll": proc_poll,
-                "page_count": len(getattr(self, "pages", ())),
-                "port": port,
-            },
-        )
-        # #endregion
         for page in list(getattr(self, "pages", ())):
             try:
                 if not page.is_closed:
-                    page.close()
+                    page.close(timeout=5)
             except Exception:
                 pass
         # Always ask the browser to quit over CDP. On Windows the Popen handle
         # often refers to a short-lived launcher whose child keeps the real
         # window alive after poll() is already non-None — skipping Browser.close
         # in that case leaves the sign-in window open after a successful connect.
+        # Short timeout: the process terminate/kill + port-kill fallbacks below
+        # do the real teardown, so we never block the UI ~60s on a dead socket.
         browser_close_err: str | None = None
         try:
-            self._send("Browser.close")
-            # #region agent log
-            _dbg6c42d0(
-                "cdp_browser.py:close",
-                "Browser.close sent",
-                {"proc_poll": proc_poll, "port": port},
-            )
-            # #endregion
+            self._send("Browser.close", timeout=5)
         except Exception as exc:  # noqa: BLE001
             browser_close_err = type(exc).__name__
-            # #region agent log
-            _dbg6c42d0(
-                "cdp_browser.py:close",
-                "Browser.close failed",
-                {"proc_poll": proc_poll, "port": port, "error": browser_close_err},
-            )
-            # #endregion
         if self._proc.poll() is None:
             try:
                 self._proc.wait(timeout=8)
@@ -1240,20 +1203,6 @@ class CdpContext:
                     pass
         port_pids = _pids_listening_on_local_port(port)
         port_killed = _kill_pids(port_pids) if port_pids else []
-        # #region agent log
-        _dbg6c42d0(
-            "cdp_browser.py:close",
-            "exit",
-            {
-                "proc_poll": self._proc.poll(),
-                "browser_close_err": browser_close_err,
-                "terminated": terminated,
-                "port": port,
-                "port_pids": port_pids,
-                "port_killed": port_killed,
-            },
-        )
-        # #endregion
 
     def __enter__(self) -> CdpContext:
         return self
@@ -1290,6 +1239,15 @@ def _reader_loop(
                 msg.get("params") or {},
                 msg.get("sessionId"),
             )
+    # Socket is dead: the reader will never deliver any more responses. Wake
+    # every in-flight _send waiter so they fail fast instead of blocking for
+    # their full (60s) timeout — otherwise teardown after a connect hangs ~60s.
+    if context is not None:
+        context._ws_dead = True
+    for entry in list(pending.values()):
+        if entry.get("error") is None and entry.get("result") is None:
+            entry["error"] = "CDP connection closed"
+        entry["done"].set()
 
 
 def _ensure_persistent_session_prefs(profile: Path) -> None:
@@ -1383,6 +1341,9 @@ def launch_persistent_profile(
         "--remote-allow-origins=http://127.0.0.1,http://localhost,http://[::1]",
         "--no-first-run",
         "--no-default-browser-check",
+        # Sign-in uses an isolated profile, but extensions synced into that profile
+        # (or enterprise policy) can redirect OAuth flows — keep the window clean.
+        "--disable-extensions",
         # Omit --disable-blink-features=AutomationControlled: Chrome/Edge show a
         # persistent "unsupported command-line flag" infobar that blocks the login UI.
         "--disable-features=IsolateOrigins,site-per-process",

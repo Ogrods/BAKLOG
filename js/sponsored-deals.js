@@ -453,9 +453,45 @@ function migrateV1ToV2(doc) {
   };
 }
 
+function patchHousePromoCopy(adsMap) {
+  for (const [id, defaults] of Object.entries(HOUSE_DEFAULTS)) {
+    const ad = adsMap[id];
+    if (!ad || typeof ad !== 'object') continue;
+    for (const key of ['title', 'tagline', 'slogan', 'cta']) {
+      if (defaults[key] != null) ad[key] = defaults[key];
+    }
+  }
+  for (const ad of Object.values(adsMap)) {
+    if (!ad || typeof ad !== 'object' || String(ad.kind || '').toLowerCase() !== 'house') continue;
+    ad.cta = houseDisplayCta(ad);
+    if (typeof ad.tagline === 'string') {
+      ad.tagline = ad.tagline
+        .replace(/\s*[\u2014\-]\s*\$5\s*\/\s*mo\.?/gi, '')
+        .replace(/\s*\(\$50\s*\/\s*yr\)/gi, '')
+        .trim();
+    }
+  }
+}
+
+/** House-promo CTA: always "Support BAKLOG" (never legacy "$5/mo" feed copy). */
+export function houseDisplayCta(item, fallback = 'Support BAKLOG') {
+  const raw = String(item?.cta || '').trim();
+  if (!raw || /\$5\s*\/\s*mo/i.test(raw) || /\$50\s*\/\s*yr/i.test(raw) || /get pro/i.test(raw)) {
+    return fallback;
+  }
+  return raw;
+}
+
+function sponsorCta(item) {
+  const isHouse = String(item?.kind || '').toLowerCase() === 'house';
+  if (isHouse) return houseDisplayCta(item);
+  return item?.cta || 'Learn more';
+}
+
 function applySponsorsDoc(doc) {
   const v2 = doc?.version === 2 ? doc : migrateV1ToV2(doc || {});
   const adsMap = v2.ads && typeof v2.ads === 'object' ? v2.ads : {};
+  patchHousePromoCopy(adsMap);
   const locMap = v2.locations && typeof v2.locations === 'object' ? v2.locations : {};
   state.sponsoredAds = adsMap;
   state.adLocations = locMap;
@@ -723,7 +759,7 @@ export const PRO_PROMO = {
   cta: 'Support BAKLOG',
   ctaYearly: 'Support BAKLOG',
   url: PRO_CHECKOUT_MONTHLY,
-  founderNote: 'Back the roadmap - lock in $50/yr while Pro is early.',
+  founderNote: 'Back the roadmap while Pro is early.',
   features: [
     {
       title: 'Queued bulk refresh',
@@ -828,7 +864,7 @@ export const PRO_PROMO_ITEM = {
 export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
   if (!item) return '';
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const accentCls = accent === 'green' ? ' sponsored-deal-banner--green' : '';
   const tagline = item.tagline
     ? `<p class="house-banner-tagline">${escapeHtml(item.tagline)}</p>`
@@ -874,7 +910,7 @@ export function proPromoBannerHtml(item) {
   const discTitle = 'House promotion from BAKLOG - optional paid tier';
   const title = item.title || PRO_PROMO.title;
   const taglineText = item.tagline ?? PRO_PROMO.tagline;
-  const cta = item.cta || PRO_PROMO.cta;
+  const cta = houseDisplayCta(item, PRO_PROMO.cta);
   const urlRaw = item.url || PRO_PROMO.url;
   const tagline = taglineText
     ? `<p class="house-banner-tagline">${escapeHtml(taglineText)}</p>`
@@ -923,7 +959,7 @@ export function proPromoSlotHtml() {
 export function houseStripeCardHtml(item, { variant = 'lib' } = {}) {
   if (!item) return '';
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const variantCls = variant === 'itch' ? ' house-stripe-card--itch' : ' house-stripe-card--lib';
   return `<button type="button"
     class="house-stripe-card${variantCls}${sponsorHouseClass(item)} text-left w-full"
@@ -970,7 +1006,7 @@ export function sponsoredDealCardHtml(item) {
     return houseDealBannerHtml(item);
   }
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const tagline = item.tagline ? `<div class="sponsored-deal-tagline">${escapeHtml(item.tagline)}</div>` : '';
   const coverUrl = sponsorCoverUrl(item.cover);
   const cover = coverUrl
@@ -1006,7 +1042,7 @@ export function sponsoredDealSlotHtml() {
 export function sponsoredPickCardHtml(item) {
   if (!item) return '';
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const coverUrl = sponsorCoverUrl(item.cover);
   // Mirror pickCardHtml exactly so the tile occupies one grid slot with identical
   // dimensions (fixed 2/3 cover box + name line + one-line meta row). Landscape
@@ -1042,7 +1078,7 @@ export function sponsoredPickSlotHtml(locationKey = 'lib-pick') {
 export function sponsoredDealPickCardHtml(item) {
   if (!item) return '';
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const coverUrl = sponsorCoverUrl(item.cover);
   const ls = coverUrl ? (window.coverLandscapeAttr?.(coverUrl) || '') : '';
   const coverHtml = coverUrl
@@ -1132,7 +1168,7 @@ export function houseTableRowHtml(item, { locationKey = 'lib-row' } = {}) {
   if (!item) return '';
   noteSponsoredImpression(locationKey, item.id);
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const coverUrl = sponsorCoverUrl(item.cover);
   const coverCell = coverUrl
     ? `<span class="cover-wrap"><img class="cover" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'" /></span>`
@@ -1163,7 +1199,7 @@ function houseTableRowInSponsorShellHtml(item, { locationKey = 'lib-row' } = {})
   if (!item) return '';
   noteSponsoredImpression(locationKey, item.id);
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const tagline = item.tagline ? escapeHtml(item.tagline) : '';
   const coverCell = `<span class="cover-wrap"><span class="house-table-mark" aria-hidden="true">${baklogBannerMarkHtml(`houseRowShell-${item.id || 'house'}`)}</span></span>`;
   return `<tr class="sponsored-table-row sponsored-deal-house" data-sponsored-row="1"
@@ -1210,7 +1246,7 @@ export function sponsoredTableRowHtml(item, { isWish: _isWish, locationKey = 'li
   const coverHtml = coverUrl
     ? `<img class="cover" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'" />`
     : '';
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const tagline = item.tagline ? escapeHtml(item.tagline) : '';
   const s = sponsorFakeStats(item);
   // The whole row is the click target (data-action on the <tr>); the focusable
@@ -1414,7 +1450,7 @@ function sponsoredFeatureBundleAdHtml(item, { banner = false } = {}) {
  */
 function sponsoredFeatureAdHtml(item, { banner = false } = {}) {
   const discTitle = sponsorDiscTitle(item);
-  const cta = item.cta || 'Learn more';
+  const cta = sponsorCta(item);
   const coverUrl = sponsorCoverUrl(item.cover);
   const s = sponsorFakeStats(item);
   const network = item.network ? escapeHtml(String(item.network)) : '';

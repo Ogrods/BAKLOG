@@ -2689,6 +2689,10 @@ export const fetcherRunner = (() => {
         }
         if (ok) {
           lastRunFailedByKey.delete(key);
+          fetchSuccessLabels.add(src.label || key);
+          // Clear the chip before client-side reload so a slow hosted-feed merge
+          // cannot leave the claims fetcher spinning after the subprocess exited.
+          markChipState(key, null);
           if (runId !== _lastAppliedDoneRunId) {
             _lastAppliedDoneRunId = runId;
             await refreshAfterFetch(key);
@@ -2699,8 +2703,6 @@ export const fetcherRunner = (() => {
             clearReconnectRequired(provider);
             clearReconnectBanner(provider);
           }
-          fetchSuccessLabels.add(src.label || key);
-          markChipState(key, null);
         } else if (cancelled) {
           markChipState(key, null);
         } else {
@@ -2751,6 +2753,8 @@ export const fetcherRunner = (() => {
           const ok = finished.status === 'done' && finished.exit_code === 0;
           logEvent('info', `[${src.label}: stream dropped after exit ${finished.exit_code}]`);
           if (liveRunId === runId) setStatus(ok ? 'done' : 'failed');
+          if (ok) fetchSuccessLabels.add(src.label || key);
+          if (ok) markChipState(key, null);
           if (ok && finished.id !== _lastAppliedDoneRunId) {
             _lastAppliedDoneRunId = finished.id;
             await refreshAfterFetch(key);
@@ -2758,8 +2762,6 @@ export const fetcherRunner = (() => {
           if (!ok && finished.status === 'done') {
             handleFetcherAuthOutcome(key, finished, '');
           }
-          if (ok) fetchSuccessLabels.add(src.label || key);
-          markChipState(key, null);
           if (liveRunId === runId) liveRunId = null;
           return;
         }

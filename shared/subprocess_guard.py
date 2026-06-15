@@ -18,12 +18,12 @@ def _max_run_seconds_from_env(default: float = 1800.0) -> float:
         return default
 
 
-def _win_child_pids_snapshot(ppid: int) -> set[int]:
-    """Enumerate child PIDs via the Toolhelp snapshot API (no subprocess spawn).
+def _win_proc_table() -> dict[int, int]:
+    """Return a ``{pid: ppid}`` map for every process via the Toolhelp snapshot API.
 
-    This is called on every test by the leak-detection fixture, so it must be
-    cheap — shelling out to PowerShell here added ~1s per test (minutes across
-    the suite). ``CreateToolhelp32Snapshot`` returns in well under a millisecond.
+    No subprocess spawn — this is called on every test by the leak-detection
+    fixture, so it must be cheap. ``CreateToolhelp32Snapshot`` returns in well
+    under a millisecond; shelling out to PowerShell added ~1s per test.
     """
     import ctypes
     from ctypes import wintypes
@@ -54,21 +54,48 @@ def _win_child_pids_snapshot(ppid: int) -> set[int]:
     invalid = wintypes.HANDLE(-1).value
     snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     if not snap or snap == invalid:
-        return set()
+        return {}
     try:
         entry = PROCESSENTRY32()
         entry.dwSize = ctypes.sizeof(PROCESSENTRY32)
-        pids: set[int] = set()
+        table: dict[int, int] = {}
         if not kernel32.Process32First(snap, ctypes.byref(entry)):
-            return set()
+            return {}
         while True:
-            if int(entry.th32ParentProcessID) == ppid:
-                pids.add(int(entry.th32ProcessID))
+            table[int(entry.th32ProcessID)] = int(entry.th32ParentProcessID)
             if not kernel32.Process32Next(snap, ctypes.byref(entry)):
                 break
-        return pids
+        return table
     finally:
         kernel32.CloseHandle(snap)
+
+
+def _win_child_pids_snapshot(ppid: int) -> set[int]:
+    return {pid for pid, parent in _win_proc_table().items() if parent == ppid}
+
+
+def _proc_parent_map() -> dict[int, int]:
+    """Best-effort ``{pid: ppid}`` map for the whole process table."""
+    if sys.platform == "win32":
+        try:
+            return _win_proc_table()
+        except (OSError, AttributeError):
+            return {}
+    try:
+        out = subprocess.check_output(
+            ["ps", "-eo", "pid=,ppid="],
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    table: dict[int, int] = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+            table[int(parts[0])] = int(parts[1])
+    return table
 
 
 def child_pids_of(parent_pid: int | None = None) -> set[int]:
@@ -93,6 +120,40 @@ def child_pids_of(parent_pid: int | None = None) -> set[int]:
         return {int(x) for x in out.split() if x.strip().isdigit()}
     except (OSError, subprocess.SubprocessError, ValueError):
         return set()
+
+
+def related_pids(pid: int) -> set[int]:
+    """``pid`` plus all of its ancestors and descendants (best effort).
+
+    Used to protect a whole launch tree from a tree-kill: on Windows a venv
+    ``python.exe`` launcher spawns the real ``python3.13.exe`` child that binds
+    the port, so killing the launcher with ``taskkill /T`` would cascade into
+    the listening child. Callers keep this set intact when culling strays.
+    """
+    if pid <= 0:
+        return set()
+    table = _proc_parent_map()
+    related = {pid}
+
+    cur = pid
+    while cur in table:
+        parent = table[cur]
+        if parent <= 0 or parent in related:
+            break
+        related.add(parent)
+        cur = parent
+
+    children_by_parent: dict[int, list[int]] = {}
+    for child, parent in table.items():
+        children_by_parent.setdefault(parent, []).append(child)
+    stack = [pid]
+    while stack:
+        node = stack.pop()
+        for child in children_by_parent.get(node, ()):
+            if child not in related:
+                related.add(child)
+                stack.append(child)
+    return related
 
 
 def terminate_pid_tree(pid: int) -> None:

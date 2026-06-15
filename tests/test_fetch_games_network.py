@@ -16,7 +16,7 @@ from fetchers._base import STEAM_CREDENTIALS_HINT
 def test_missing_credentials_message_mentions_connections(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fetch_games, "resolve_env", lambda key, **_: "")
     with patch.object(fetch_games, "load_dotenv"):
-        with patch.object(fetchers.fetch_games.sys, "argv", ["fetchers.fetch_games.py", "--skip-hltb"]):
+        with patch.object(fetch_games.sys, "argv", ["fetchers/fetch_games.py", "--skip-hltb"]):
             code = fetch_games.main()
     assert code == 1
     assert "Connections" in STEAM_CREDENTIALS_HINT

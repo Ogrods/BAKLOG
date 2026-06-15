@@ -108,7 +108,7 @@ def test_private_profile_hint_on_empty_library(
     steam.get_owned_games.return_value = []
     with patch.object(fetch_games, "load_dotenv"):
         with patch.object(fetch_games, "SteamClient", return_value=steam):
-            with patch.object(fetchers.fetch_games.sys, "argv", ["fetchers.fetch_games.py", "--skip-hltb"]):
+            with patch.object(fetch_games.sys, "argv", ["fetchers/fetch_games.py", "--skip-hltb"]):
                 code = fetch_games.main()
     assert code == 2
     captured = capsys.readouterr()

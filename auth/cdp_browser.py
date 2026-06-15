@@ -1161,7 +1161,6 @@ class CdpContext:
             return CdpContext._id_counter
 
     def close(self) -> None:
-        proc_poll = self._proc.poll()
         port = int(getattr(self, "_port", 0) or 0)
         for page in list(getattr(self, "pages", ())):
             try:
@@ -1175,11 +1174,10 @@ class CdpContext:
         # in that case leaves the sign-in window open after a successful connect.
         # Short timeout: the process terminate/kill + port-kill fallbacks below
         # do the real teardown, so we never block the UI ~60s on a dead socket.
-        browser_close_err: str | None = None
         try:
             self._send("Browser.close", timeout=5)
-        except Exception as exc:  # noqa: BLE001
-            browser_close_err = type(exc).__name__
+        except Exception:  # noqa: BLE001
+            pass
         if self._proc.poll() is None:
             try:
                 self._proc.wait(timeout=8)
@@ -1189,20 +1187,18 @@ class CdpContext:
             self._ws.close()
         except Exception:
             pass
-        terminated = False
         if self._proc.poll() is None:
             try:
                 self._proc.terminate()
                 self._proc.wait(timeout=5)
-                terminated = True
             except Exception:
                 try:
                     self._proc.kill()
-                    terminated = True
                 except Exception:
                     pass
         port_pids = _pids_listening_on_local_port(port)
-        port_killed = _kill_pids(port_pids) if port_pids else []
+        if port_pids:
+            _kill_pids(port_pids)
 
     def __enter__(self) -> CdpContext:
         return self

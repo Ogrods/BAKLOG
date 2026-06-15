@@ -155,6 +155,31 @@ def test_maybe_import_legacy_env_preserves_non_credential_config(
     assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
 
 
+def test_maybe_import_legacy_env_strips_exported_credential_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """python-dotenv honors `export KEY=value`; the stripper must too."""
+    from shared.legacy_env import maybe_import_legacy_env
+
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "export ITCH_API_KEY=from-dotenv\n"
+        "BAKLOG_ADMIN=1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ITCH_API_KEY", "from-dotenv")
+
+    count, err = maybe_import_legacy_env(tmp_path)
+
+    assert err is None
+    assert count == 1
+    surviving = env_path.read_text(encoding="utf-8")
+    # Exported credential line removed; non-credential config preserved.
+    assert "ITCH_API_KEY" not in surviving
+    assert "BAKLOG_ADMIN=1" in surviving
+    assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
+
+
 def test_remediates_existing_env_imported_archive(tmp_path: Path):
     from shared.legacy_env import maybe_import_legacy_env, remediate_env_imported_archive
 

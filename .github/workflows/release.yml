@@ -55,6 +55,19 @@ jobs:
           }
           Write-Host "Tag matches pyproject version: $proj"
 
+      # Gate: never publish a release from a commit whose tests do not pass.
+      - name: Install Python deps
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run Python tests
+        run: python -m pytest -q -m "not integration and not slow"
+
+      - name: Install JS deps
+        run: npm ci
+
+      - name: Run JS tests
+        run: npm test
+
       - name: Build Windows bundle
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
@@ -67,10 +80,23 @@ jobs:
           }
           Get-FileHash release/BAKLOG-win64.zip -Algorithm SHA256 | Format-List
 
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: release/BAKLOG
+          format: spdx-json
+          output-file: release/BAKLOG-win64.sbom.spdx.json
+
       - name: Generate build provenance attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: release/BAKLOG-win64.zip
+
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v2
+        with:
+          subject-path: release/BAKLOG-win64.zip
+          sbom-path: release/BAKLOG-win64.sbom.spdx.json
 
       - name: Publish GitHub Release
         shell: pwsh
@@ -80,5 +106,6 @@ jobs:
           gh release create "${{ github.ref_name }}" `
             "release/BAKLOG-win64.zip" `
             "release/BAKLOG-win64.sha256" `
+            "release/BAKLOG-win64.sbom.spdx.json" `
             --title "BAKLOG ${{ github.ref_name }}" `
             --generate-notes

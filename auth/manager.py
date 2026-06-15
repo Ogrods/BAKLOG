@@ -486,6 +486,23 @@ def import_env_credentials(*, profile_id: str = DEFAULT_PROFILE_ID) -> list[str]
     return imported
 
 
+def credential_env_key_names() -> set[str]:
+    """Every env var name that holds a store credential (for legacy .env cleanup).
+
+    Mirrors the selection in ``import_env_credentials``: provider ``env_keys`` for
+    non-local providers, plus the legacy single-cookie aliases. Operational config
+    keys (``BAKLOG_*``, ``AMAZON_GAMES_SQL_DIR``, etc.) are intentionally excluded
+    so they survive the .env migration.
+    """
+    names: set[str] = set()
+    for provider, spec in PROVIDERS.items():
+        if spec.kind == "local" or not spec.env_keys:
+            continue
+        names.update(spec.env_keys)
+        names.update(_LEGACY_ENV_ALIASES.get(provider, ()))
+    return names
+
+
 def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any]:
     spec = spec_for(provider)
     if spec.kind not in ("form", "manual") and not spec.form_fields:

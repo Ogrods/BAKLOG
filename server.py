@@ -4120,7 +4120,7 @@ def _maybe_import_legacy_env() -> None:
     elif count:
         print(
             f"[auth] Imported {count} provider(s) from .env into profile "
-            f"'{DEFAULT_PROFILE_ID}' (plaintext .env deleted)",
+            f"'{DEFAULT_PROFILE_ID}' (plaintext credentials removed from .env)",
             flush=True,
         )
 

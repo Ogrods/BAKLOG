@@ -1,0 +1,84 @@
+# Immutable releases: a push of a v* tag builds the Windows bundle on a clean
+# runner, attaches a SHA-256 + a signed build-provenance attestation, and
+# publishes the GitHub Release. The artifact is built from the tagged commit by
+# CI (not hand-uploaded), so anyone can verify it with `gh attestation verify`.
+#
+# Policy: tags are immutable. Never move or re-point a published v* tag - cut a
+# new patch tag instead. The job refuses to build when the tag does not match
+# the version in pyproject.toml, so a tag always names exactly what it ships.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write       # create the GitHub Release
+  id-token: write       # OIDC token for provenance signing
+  attestations: write   # store the build-provenance attestation
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and publish Windows release
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Verify tag matches pyproject version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $m = Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"([^"]+)"'
+          if (-not $m) { Write-Error "Could not read version from pyproject.toml"; exit 1 }
+          $proj = $m.Matches[0].Groups[1].Value
+          if ($tag -ne $proj) {
+            Write-Error "Tag '$tag' does not match pyproject version '$proj' - bump the version or fix the tag."
+            exit 1
+          }
+          Write-Host "Tag matches pyproject version: $proj"
+
+      - name: Build Windows bundle
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
+
+      - name: Verify build artifacts exist
+        shell: pwsh
+        run: |
+          foreach ($f in @("release/BAKLOG-win64.zip", "release/BAKLOG-win64.sha256")) {
+            if (-not (Test-Path $f)) { Write-Error "Missing build artifact: $f"; exit 1 }
+          }
+          Get-FileHash release/BAKLOG-win64.zip -Algorithm SHA256 | Format-List
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/BAKLOG-win64.zip
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "release/BAKLOG-win64.zip" `
+            "release/BAKLOG-win64.sha256" `
+            --title "BAKLOG ${{ github.ref_name }}" `
+            --generate-notes

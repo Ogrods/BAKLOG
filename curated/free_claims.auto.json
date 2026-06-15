@@ -1,9 +1,9 @@
 {
-  "fetched_at": "2026-06-13T01:34:30.335704+00:00",
+  "fetched_at": "2026-06-15T07:14:39.835663+00:00",
   "sources": {
     "epic": 2,
-    "gamerpower": 24,
-    "itad": 19
+    "gamerpower": 17,
+    "itad": 17
   },
   "attribution": [
     "GamerPower.com"
@@ -96,7 +96,7 @@
       "title": "The Ouroboros King (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/the-ouroboros-king-epic-games-giveaway",
       "ends_at": "2026-06-18T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2acdafba4cc.jpg",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/33630d7105014582a478094e89953f49/the-ouroboros-king-jwabx.jpg",
       "blurb": "Checkmate your boredom! Download The Ouroboros King without any cost via Epic Games Store! The Ouroboros King combines chess with the replayability of roguelikes. Check it out!",
       "source": "gamerpower",
       "review_percent": 81,
@@ -123,31 +123,6 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "gamerpower-3678",
-      "store": "itch",
-      "title": "MicroCrawl (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/microcrawl-itch-io-giveaway",
-      "ends_at": "2026-06-13T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2a809e44c1e.jpg",
-      "blurb": "80s Nostalgia! Get MicroCrawl for free on itch.io! MicroCrawl is a small 2D point-and-click adventure game with a first-person perspective that evokes memories of old-school dungeon crawlers from the 80s.",
-      "source": "gamerpower",
-      "review_percent": 91,
-      "steam_appid": 2250400,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3677",
-      "store": "itch",
-      "title": "Not A Customer (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/not-a-customer-itch-io-giveaway",
-      "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2a03608807c.jpg",
-      "blurb": "Download Not A Customer for free on itch.io. Not A Customer is a 3d first person grocery store sim game with old school Playstation 1 graphics. Check it out!",
-      "source": "gamerpower",
-      "steam_appid": 4747110,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
       "id": "gamerpower-3548",
       "store": "itch",
       "title": "Static Voice (Itch.io) Giveaway",
@@ -158,19 +133,6 @@
       "source": "gamerpower",
       "review_percent": 93,
       "steam_appid": 4207170,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3553",
-      "store": "itch",
-      "title": "Sleep Demon (Itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/sleep-demon-itchio-giveaway",
-      "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/69ca788f5d0d4.jpg",
-      "blurb": "Download Sleep Demon for free on Itch.io until June 14, a indie single player walking simulator game about sleep paralysis.",
-      "source": "gamerpower",
-      "review_percent": 83,
-      "steam_appid": 4465030,
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
@@ -187,19 +149,6 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "gamerpower-3676",
-      "store": "itch",
-      "title": "Dire Echo (itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/dire-echo-itchio-giveaway",
-      "ends_at": "2026-06-11T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a27eafa35794.jpg",
-      "blurb": "Explore deep space with this giveaway. Get Dire Echo for free on itch.io, a 3d sci-fi first-person exploration game featuring impressive visuals.",
-      "source": "gamerpower",
-      "review_percent": 75,
-      "steam_appid": 3743180,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
       "id": "gamerpower-3279",
       "store": "other",
       "title": "Blacklist Mafia (IndieGala) Giveaway",
@@ -207,28 +156,6 @@
       "ends_at": null,
       "header_image": "https://www.gamerpower.com/offers/1b/68ca9583aca60.jpg",
       "blurb": "Live your mafia fantasy! Grab Blacklist Mafia for free on IndieGala. Blacklist Mafia is a small 2D adventure game where you experience life in the mafia.",
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3673",
-      "store": "epic",
-      "title": "Relaxing Simulator (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/relaxing-simulator-epic-games-giveaway",
-      "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25c2413d322.jpg",
-      "blurb": "Just relax and grab Relaxing Simulator for free on the Epic Games Store for the ultimate relaxing experience!",
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3671",
-      "store": "other",
-      "title": "Flufftopia (itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/flufftopia-itchio-giveaway",
-      "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a25903df2853.jpg",
-      "blurb": "Flufftopia is free on itch.io until June 14th 2026. Flufftopia is a small clicker game with a story. Check it out!",
       "source": "gamerpower",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -246,23 +173,6 @@
       "genres": [
         "Adventure",
         "Free To Play"
-      ],
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3665",
-      "store": "steam",
-      "title": "Gravity Circuit (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/gravity-circuit-steam-giveaway",
-      "ends_at": "2026-06-14T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a1dbddf722cd.jpg",
-      "blurb": "Looking for a cool Steam game? Grab Gravity Circuit for free via Steam until June 14. Gravity Circuit is a action packed 2D platformer in the spirit of console classics. Don´t miss this one.",
-      "source": "gamerpower",
-      "review_percent": 92,
-      "steam_appid": 858710,
-      "genres": [
-        "Action",
-        "Indie"
       ],
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -380,7 +290,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16262/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/317820/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/guild-of-dungeoneering-ultimate-edition/info/\">Guild of Dungeoneering Ultimate Edition</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 18 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-e04dd85a41d740ac972df346afd913a6-7db8b0275a974889923a85ce9e911936&amp;offers=1-e04dd85a41d740ac972df346afd913a6-4cfa595c665d4d1aadadc5ff35a5c11a>go to giveaway</a>",
+      "blurb": "Guild of Dungeoneering Ultimate Edition",
       "source": "itad",
       "review_percent": 77,
       "steam_appid": 317820,
@@ -437,7 +347,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16253/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2800500/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/blacklist-mafia/info/\">Blacklist Mafia</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/blacklist-mafia>go to giveaway</a>",
+      "blurb": "Blacklist Mafia",
       "source": "itad",
       "review_percent": 82,
       "steam_appid": 2800500,
@@ -450,23 +360,10 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16251/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/another-world-adventures/info/\">Another World Adventures</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 20 Jun 2026 03:00:00 +0200\n                                        | <a href=https://s-xavier-uy.itch.io/another-world-adventures>go to giveaway</a>",
+      "blurb": "Another World Adventures",
       "source": "itad",
       "review_percent": 50,
       "steam_appid": 3445980,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-7a69412dd110",
-      "store": "epic",
-      "title": "Relaxing Simulator free on EpicGameStore on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16247/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2965380/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/relaxing-simulator/info/\">Relaxing Simulator</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 15 Jun 2026 07:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/relaxing-simulator-4cca47>go to giveaway</a>",
-      "source": "itad",
-      "review_percent": 89,
-      "steam_appid": 2965380,
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
@@ -481,24 +378,13 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "itad-047270155013",
-      "store": "steam",
-      "title": "Gravity Circuit free on Steam on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16228/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/gravity-circuit/info/\">Gravity Circuit</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Tue, 14 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/858710/Gravity_Circuit/>go to giveaway</a>",
-      "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
       "id": "itad-0d4598c53ffe",
       "store": "other",
       "title": "Mr.Brocco & Co - FREE on IndieGala on IndieGala Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16196/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/mr-brocco-and-co/info/\">Mr.Brocco &amp; Co</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/mrbrocco-co>go to giveaway</a>",
+      "blurb": "Mr.Brocco & Co",
       "source": "itad",
       "review_percent": 83,
       "steam_appid": 2074560,
@@ -522,7 +408,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16143/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/the-brave-little-cloud/info/\">The Brave Little Cloud</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/the-brave-little-cloud>go to giveaway</a>",
+      "blurb": "The Brave Little Cloud",
       "source": "itad",
       "review_percent": 97,
       "steam_appid": 2635070,
@@ -557,7 +443,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/15746/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
+      "blurb": "Smiley Dusty",
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -568,7 +454,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/7433/",
       "ends_at": null,
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/die-young-prologue/info/\">Die Young: Prologue</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/die-young-prologue>go to giveaway</a>",
+      "blurb": "Die Young: Prologue",
       "source": "itad",
       "review_percent": 78,
       "steam_appid": 973000,

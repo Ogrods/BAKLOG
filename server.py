@@ -348,23 +348,17 @@ MAX_RUN_SECONDS = _max_run_seconds_from_env()
 def _max_run_seconds_for_key(key: str) -> float:
     """Per-fetcher runtime cap from manifest maxRunSeconds, else global default.
 
-    A manifest value of 0 (or negative) is the explicit "no runtime cap" sentinel
-    and returns infinity, so long-running enrichers (e.g. HLTB on a large fresh
-    library) are never force-killed by the runtime ceiling. The silent-stall
-    watchdog still applies, so a truly hung process is not immortal.
+    maxRunSeconds <= 0 means "no cap" (returns inf) for long enrichers like HLTB.
     """
     spec = FETCHERS.get(key) or INTERNAL_JOBS.get(key) or {}
     override = spec.get("maxRunSeconds")
-    if override is not None:
-        try:
-            value = float(override)
-        except (TypeError, ValueError):
-            value = None
-        if value is not None:
-            if value <= 0:
-                return float("inf")
-            return max(60.0, value)
-    return MAX_RUN_SECONDS
+    try:
+        value = float(override) if override is not None else None
+    except (TypeError, ValueError):
+        value = None
+    if value is None:
+        return MAX_RUN_SECONDS
+    return float("inf") if value <= 0 else max(60.0, value)
 
 
 def _release_server_profile_env() -> str | None:
@@ -707,9 +701,7 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
             except (TypeError, ValueError):
                 max_run_seconds = None
             else:
-                # <= 0 is the "no runtime cap" sentinel; keep it verbatim so
-                # _max_run_seconds_for_key can map it to infinity. Otherwise
-                # enforce the 60s floor.
+                # <= 0 = "no cap" sentinel (kept verbatim); else 60s floor.
                 if max_run_seconds > 0:
                     max_run_seconds = max(60.0, max_run_seconds)
         fetchers[key] = {

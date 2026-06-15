@@ -21,11 +21,18 @@ def remediate_env_imported_archive(root: Path) -> bool:
 
 
 def _split_env_line(line: str) -> str | None:
-    """Return the assignment key for a ``KEY=value`` line, else None (blank/comment)."""
+    """Return the assignment key for a ``KEY=value`` line, else None (blank/comment).
+
+    Honors python-dotenv's ``export KEY=value`` form so an exported credential is
+    matched (and stripped) the same as a bare assignment.
+    """
     stripped = line.strip()
     if not stripped or stripped.startswith("#") or "=" not in stripped:
         return None
-    return stripped.split("=", 1)[0].strip()
+    key = stripped.split("=", 1)[0].strip()
+    if key.startswith("export ") or key.startswith("export\t"):
+        key = key[len("export"):].strip()
+    return key or None
 
 
 def _strip_credential_lines(text: str, cred_keys: set[str]) -> tuple[str, bool]:

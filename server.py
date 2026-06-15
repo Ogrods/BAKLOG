@@ -4110,25 +4110,19 @@ def _trigger_dev_shutdown() -> None:
 
 
 def _maybe_import_legacy_env() -> None:
-    """One-time: migrate root .env credentials into the default profile's encrypted
-    blob, then archive .env as .env.imported. Never blocks server start on failure."""
-    env_path = ROOT / ".env"
-    imported_path = ROOT / ".env.imported"
-    if not env_path.is_file() or imported_path.exists():
-        return
-    try:
-        from auth.manager import import_env_credentials
-        from shared.profile_paths import DEFAULT_PROFILE_ID
+    """One-time: migrate root .env into encrypted storage, then delete .env."""
+    from shared.legacy_env import maybe_import_legacy_env
+    from shared.profile_paths import DEFAULT_PROFILE_ID
 
-        keys = import_env_credentials(profile_id=DEFAULT_PROFILE_ID)
-        os.replace(env_path, imported_path)
+    count, err = maybe_import_legacy_env(ROOT)
+    if err:
+        print(f"[auth] .env import skipped: {err}", file=sys.stderr, flush=True)
+    elif count:
         print(
-            f"[auth] Imported {len(keys)} provider(s) from .env into profile "
-            f"'{DEFAULT_PROFILE_ID}' -> .env.imported",
+            f"[auth] Imported {count} provider(s) from .env into profile "
+            f"'{DEFAULT_PROFILE_ID}' (plaintext .env deleted)",
             flush=True,
         )
-    except Exception as exc:  # noqa: BLE001 - migration must never block boot
-        print(f"[auth] .env import skipped: {exc}", file=sys.stderr, flush=True)
 
 
 # Records the PID of the live dev server so a restart can reclaim the port if a

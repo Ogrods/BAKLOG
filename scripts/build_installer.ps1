@@ -57,7 +57,7 @@ if (-not $UsedGitArchive) {
         '.git', '.venv', 'venv', 'node_modules', 'dist', '__pycache__', 'cache', 'data', '.env',
         'profiles', 'admin', 'docs', 'marketing', 'audit', 'landing', 'tracker.html',
         'IP.md', 'EVENT_AUDIT.md', 'EVENT_AUDIT.json', 'review-handoff.md', 'FREE_SURFACE_REVIEW.md',
-        '.env.imported', 'itad_prices.json', 'free_claims.json', 'refresh.log', '.cursor',
+        'itad_prices.json', 'free_claims.json', 'refresh.log', '.cursor',
         'build', 'lighthouse', '.pytest_cache', '.ruff_cache', 'steam_backlog.egg-info'
     )
     Get-ChildItem -Path $Root -Force | Where-Object {

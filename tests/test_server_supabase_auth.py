@@ -438,7 +438,7 @@ def test_epic_callback_success_binds_profile(auth_server, monkeypatch: pytest.Mo
 
 
 def test_build_epic_oauth_login_url_shape() -> None:
-    from epic_client import CLIENT_ID, build_epic_oauth_login_url
+    from clients.epic_client import CLIENT_ID, build_epic_oauth_login_url
 
     url = build_epic_oauth_login_url("http://127.0.0.1:8765/oauth/epic/callback", "st8")
     assert url.startswith("https://www.epicgames.com/id/login?")

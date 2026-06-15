@@ -50,7 +50,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_effective_tier_prefers_confirmed_over_pending() -> None:
-    from enrich_protondb import effective_tier, summary_to_row_fields
+    from enrichers.enrich_protondb import effective_tier, summary_to_row_fields
 
     assert effective_tier({"tier": "pending", "provisionalTier": "gold"}) == "gold"
     fields = summary_to_row_fields(
@@ -87,7 +87,7 @@ def test_enricher_writes_steam_and_mapped_gog_rows(
 
     for mod in ("enrichers.enrich_protondb",):
         sys.modules.pop(mod, None)
-    import enrich_protondb
+    import enrichers.enrich_protondb as enrich_protondb
 
     monkeypatch.setattr(enrich_protondb, "fetch_summary", fake_fetch)
 

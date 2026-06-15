@@ -27,7 +27,7 @@ def test_capture_error_does_not_mark_invalid(tmp_path, monkeypatch) -> None:
         mock_cls.return_value.fetch_all_transactions.side_effect = NintendoCaptureError(
             "capture failed"
         )
-        import fetch_nintendo
+        import fetchers.fetch_nintendo as fetch_nintendo
 
         monkeypatch.setattr(sys, "argv", ["fetch_nintendo", "--skip-hltb"])
         code = fetch_nintendo.main()

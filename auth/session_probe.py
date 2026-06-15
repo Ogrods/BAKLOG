@@ -79,7 +79,7 @@ def probe_gog_session_quiet(gog_al: str) -> ProbeResult:
 
 def probe_epic_session_quiet() -> ProbeResult:
     """Tri-state Epic probe: refresh-token exchange only (no library read)."""
-    from epic_client import EpicAuthError, EpicClient, EpicCorrectiveActionError
+    from clients.epic_client import EpicAuthError, EpicClient, EpicCorrectiveActionError
 
     try:
         client = EpicClient()

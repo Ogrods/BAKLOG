@@ -111,7 +111,7 @@ BATTLENET_GAMES_URL = "https://account.battle.net/games"
 
 def _battlenet_has_session(context) -> bool:
     """True when the Playwright context can read the games-and-subs API."""
-    from battlenet_client import ACCOUNT_URL
+    from clients.battlenet_client import ACCOUNT_URL
 
     try:
         resp = context.request.get(ACCOUNT_URL, timeout=30_000)
@@ -139,7 +139,7 @@ def _extract_battlenet_inline(page, context, session: AuthSession | None = None)
             header = _cookie_header(context.cookies(), (".battle.net", "battle.net"))
             if not header:
                 break
-            from battlenet_client import probe_session
+            from clients.battlenet_client import probe_session
 
             probe_session(header)
             if session:
@@ -199,7 +199,7 @@ def _nintendo_has_session(context) -> bool:
 def _nintendo_session_has_id_token(context) -> bool:
     """Verify /api/auth/session returns an idToken (GraphQL prerequisite)."""
     try:
-        from nintendo_client import PLAYWRIGHT_REQUEST_TIMEOUT_MS, probe_session_id_token
+        from clients.nintendo_client import PLAYWRIGHT_REQUEST_TIMEOUT_MS, probe_session_id_token
 
         return bool(
             probe_session_id_token(
@@ -302,7 +302,7 @@ def _epic_code_from_text(text: str) -> str:
 
 def _epic_error_from_text(text: str) -> dict[str, str] | None:
     """Detect Epic's corrective-action gate in a redirect body (HTML-wrapped JSON safe)."""
-    from epic_client import corrective_action_in_text
+    from clients.epic_client import corrective_action_in_text
 
     return corrective_action_in_text(text or "")
 
@@ -360,7 +360,7 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
                     html = ""
                 code = _epic_code_from_text(html)
             if code:
-                from epic_client import (
+                from clients.epic_client import (
                     EpicAuthError,
                     EpicClient,
                     EpicCorrectiveActionError,
@@ -476,7 +476,7 @@ def _check_npsso(npsso: str) -> str:
     polling instead of permanently discarding a token that may be fine.
     """
     try:
-        from psn_client import PsnAuthError, validate_npsso
+        from clients.psn_client import PsnAuthError, validate_npsso
     except Exception:  # noqa: BLE001
         return PSN_CHECK_UNREACHABLE
     try:
@@ -1397,7 +1397,7 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
 
 def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Confirm ea.com login, persist profile + web-session Bearer token."""
-    from ea_session import (
+    from clients.ea_session import (
         EA_DEALS_URL,
         EA_GRAPHQL_HOST,
         EA_LOGIN_URL,
@@ -1472,7 +1472,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
 
 def _extract_amazon_web(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Confirm Prime Gaming session; durable credential is the saved browser profile."""
-    from amazon_web_client import (
+    from clients.amazon_web_client import (
         COLLECTION_URLS,
         _capture_claims_from_response,
         _poll_prime_collection,

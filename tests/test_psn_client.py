@@ -142,7 +142,7 @@ def test_edition_suffix_groups_via_dedupe_key() -> None:
         stat_agg,
         _stat(title_id="B", name="Game Name", hours=5),
     )
-    from psn_client import PsnGameEntry
+    from clients.psn_client import PsnGameEntry
 
     entry = PsnGameEntry(
         id="x",

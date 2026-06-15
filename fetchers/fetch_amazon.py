@@ -21,7 +21,7 @@ from clients.amazon_web_client import AmazonWebAuthError
 from fetchers._authoritative import AMAZON
 
 try:
-    from amazon_client import AmazonGamesError
+    from clients.amazon_client import AmazonGamesError
 except ImportError:
     class AmazonGamesError(Exception):  # type: ignore[no-redef]
         """Stub when amazon_client is unavailable (non-Windows)."""
@@ -55,7 +55,7 @@ def _launcher_db_ready(sql_dir: Path | None) -> bool:
     if sys.platform != "win32":
         return False
     try:
-        from amazon_client import DEFAULT_SQL_DIR, ENTITLEMENTS_DB
+        from clients.amazon_client import DEFAULT_SQL_DIR, ENTITLEMENTS_DB
     except ImportError:
         return False
     base = sql_dir if sql_dir is not None else DEFAULT_SQL_DIR
@@ -250,7 +250,7 @@ def load_existing() -> dict[str, dict]:
 
 
 def _load_launcher_records(sql_dir: Path | None) -> list[dict]:
-    from amazon_client import AmazonGamesClient
+    from clients.amazon_client import AmazonGamesClient
 
     client = AmazonGamesClient(sql_dir)
     print(f"Reading Amazon Games library from:\n  {client.sql_dir}", flush=True)

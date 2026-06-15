@@ -37,7 +37,7 @@ from shared.dev_server_pids import (  # noqa: E402 - sys.path bootstrap above
     pid_listening_on_port,
 )
 from shared.install_paths import data_root  # noqa: E402
-from shared.subprocess_guard import terminate_pid_tree  # noqa: E402
+from shared.subprocess_guard import related_pids, terminate_pid_tree  # noqa: E402
 
 HOST = DEFAULT_HOST
 PORT = int(os.environ.get("PORT", str(DEFAULT_PORT)))
@@ -160,9 +160,15 @@ def dedupe() -> int:
     Used by the Cursor session-end hook so abandoned agent terminals don't pile
     up, without ever killing the server a session is actively using."""
     keep = _live_server_pid()
+    # Protect the keeper's whole launch tree: on Windows a venv python.exe
+    # launcher spawns the real python3.13.exe child that binds the port, so a
+    # tree-kill (taskkill /T) of the launcher would cascade into the listening
+    # child. related_pids(keep) covers that parent launcher + any children.
+    protected = related_pids(keep) if keep else set()
+    targets = collect_targets()
     killed: list[int] = []
-    for pid in collect_targets():
-        if pid == keep:
+    for pid in targets:
+        if pid in protected:
             continue
         terminate_pid_tree(pid)
         killed.append(pid)

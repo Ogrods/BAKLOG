@@ -625,6 +625,21 @@ def test_max_run_seconds_for_key_enforces_sixty_second_floor(monkeypatch: pytest
     assert server._max_run_seconds_for_key("fast") == 60.0
 
 
+def test_max_run_seconds_for_key_zero_means_no_cap(monkeypatch: pytest.MonkeyPatch):
+    # 0 (or negative) is the "no runtime cap" sentinel -> infinity, so a long
+    # HLTB enrich on a big library is never force-killed by the runtime ceiling.
+    monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1800.0)
+    monkeypatch.setitem(server.FETCHERS, "hltb", {"maxRunSeconds": 0})
+    assert server._max_run_seconds_for_key("hltb") == float("inf")
+
+
+def test_manifest_registration_keeps_zero_cap_sentinel():
+    # The shipped HLTB manifest entry must register as the uncapped sentinel
+    # (0), not get rewritten to the 60s floor.
+    assert server.FETCHERS["hltb"]["maxRunSeconds"] == 0
+    assert server._max_run_seconds_for_key("hltb") == float("inf")
+
+
 def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(server, "MAX_RUN_SECONDS", 9999.0)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)

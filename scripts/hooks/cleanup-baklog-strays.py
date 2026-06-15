@@ -25,7 +25,7 @@ def main() -> int:
     if not python.is_file():
         python = ROOT / ".venv" / "bin" / "python"
     try:
-        subprocess.run(
+        _res = subprocess.run(
             [str(python), str(ROOT / "scripts" / "stop_baklog.py"), "--dedupe"],
             cwd=str(ROOT),
             capture_output=True,

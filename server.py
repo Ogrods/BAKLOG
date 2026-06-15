@@ -346,14 +346,24 @@ MAX_RUN_SECONDS = _max_run_seconds_from_env()
 
 
 def _max_run_seconds_for_key(key: str) -> float:
-    """Per-fetcher runtime cap from manifest maxRunSeconds, else global default."""
+    """Per-fetcher runtime cap from manifest maxRunSeconds, else global default.
+
+    A manifest value of 0 (or negative) is the explicit "no runtime cap" sentinel
+    and returns infinity, so long-running enrichers (e.g. HLTB on a large fresh
+    library) are never force-killed by the runtime ceiling. The silent-stall
+    watchdog still applies, so a truly hung process is not immortal.
+    """
     spec = FETCHERS.get(key) or INTERNAL_JOBS.get(key) or {}
     override = spec.get("maxRunSeconds")
     if override is not None:
         try:
-            return max(60.0, float(override))
+            value = float(override)
         except (TypeError, ValueError):
-            pass
+            value = None
+        if value is not None:
+            if value <= 0:
+                return float("inf")
+            return max(60.0, value)
     return MAX_RUN_SECONDS
 
 
@@ -693,9 +703,15 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
         max_run_seconds = entry.get("maxRunSeconds")
         if max_run_seconds is not None:
             try:
-                max_run_seconds = max(60.0, float(max_run_seconds))
+                max_run_seconds = float(max_run_seconds)
             except (TypeError, ValueError):
                 max_run_seconds = None
+            else:
+                # <= 0 is the "no runtime cap" sentinel; keep it verbatim so
+                # _max_run_seconds_for_key can map it to infinity. Otherwise
+                # enforce the 60s floor.
+                if max_run_seconds > 0:
+                    max_run_seconds = max(60.0, max_run_seconds)
         fetchers[key] = {
             "label": label,
             # Absolute script path so the launch never depends on subprocess cwd.

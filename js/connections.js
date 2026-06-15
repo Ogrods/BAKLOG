@@ -2053,6 +2053,21 @@ async function startBrowserConnect(provider) {
 
   const streamUrl = await urlWithStreamTicket(`/api/auth/${data.session_id}/stream`);
   const es = new EventSource(streamUrl);
+  let connectUiFinished = false;
+
+  async function finishConnectUi() {
+    if (connectUiFinished) return;
+    connectUiFinished = true;
+    stopPostConnectFastPoll();
+    reconnectProviders.delete(provider);
+    renderReconnectBanner();
+    try { es.close(); } catch (_) { /* noop */ }
+    try {
+      await refreshConnections();
+      const row = getAuthStatusSnapshot().find(r => r.key === provider);
+      if (log && row?.status === 'connected') log.textContent = 'Connected.';
+    } catch (_) { /* noop */ }
+  }
 
   es.addEventListener('waiting_for_user', ev => {
 
@@ -2072,13 +2087,7 @@ async function startBrowserConnect(provider) {
 
     if (log) log.textContent = 'Connected.';
 
-    reconnectProviders.delete(provider);
-
-    renderReconnectBanner();
-
-    es.close();
-
-    refreshConnections();
+    void finishConnectUi();
 
   });
 
@@ -2096,11 +2105,16 @@ async function startBrowserConnect(provider) {
 
     }
 
+    connectUiFinished = true;
     es.close();
 
   });
 
-  es.addEventListener('done', () => es.close());
+  es.addEventListener('done', () => {
+    // Belt-and-suspenders: if the extracted event was dropped, still settle the
+    // Connections card from the final auth/status poll on session end.
+    void finishConnectUi();
+  });
 
 }
 

@@ -10,6 +10,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { houseDisplayCta } from '../js/sponsored-deals.js';
 
 const curated = JSON.parse(readFileSync('curated/sponsors.json', 'utf8'));
 const landing = JSON.parse(readFileSync('landing/sponsors.json', 'utf8'));
@@ -46,5 +47,17 @@ describe('sponsors.json feeds stay mirrored', () => {
     expect(curated.ads).toEqual(landing.ads);
     expect(curated.locations).toEqual(landing.locations);
     expect(curated.version).toEqual(landing.version);
+  });
+});
+
+describe('houseDisplayCta runtime sanitizer', () => {
+  it('rewrites legacy $5/mo CTAs to Support BAKLOG', () => {
+    expect(houseDisplayCta({ cta: 'Get Pro - $5/mo' })).toBe('Support BAKLOG');
+    expect(houseDisplayCta({ cta: 'Get Pro — $5/mo' })).toBe('Support BAKLOG');
+    expect(houseDisplayCta({ cta: '' })).toBe('Support BAKLOG');
+  });
+
+  it('keeps Support BAKLOG verbatim', () => {
+    expect(houseDisplayCta({ cta: 'Support BAKLOG' })).toBe('Support BAKLOG');
   });
 });

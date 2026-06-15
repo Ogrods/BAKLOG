@@ -180,6 +180,33 @@ def test_dedupe_with_no_live_server_kills_all(
     assert not pid_file.is_file()
 
 
+def test_dedupe_protects_keeper_launch_tree(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Regression: the venv python.exe launcher is the parent of the listening
+    python3.13.exe child. Both match the server.py cmdline scan, so the launcher
+    lands in targets - but tree-killing it (taskkill /T) would cascade into the
+    kept child. dedupe must protect the keeper's whole launch tree."""
+    killed: list[int] = []
+    pid_file = tmp_path / ".baklog_server.pid"
+    pid_file.write_text("7528", encoding="utf-8")
+
+    monkeypatch.setattr(stop_baklog, "_live_server_pid", lambda: 7528)
+    # keeper child 7528, its launcher parent 3208, and an unrelated stray 9999
+    monkeypatch.setattr(stop_baklog, "related_pids", lambda pid: {7528, 3208})
+    monkeypatch.setattr(stop_baklog, "collect_targets", lambda: [3208, 7528, 9999])
+    monkeypatch.setattr(
+        stop_baklog, "terminate_pid_tree", lambda pid: killed.append(pid)
+    )
+    monkeypatch.setattr(stop_baklog, "PID_FILE", pid_file)
+
+    assert stop_baklog.dedupe() == 0
+    # launcher (3208) + listening child (7528) preserved; only the real stray dies
+    assert killed == [9999]
+    assert pid_file.is_file()
+
+
 def test_main_dedupe_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     called = {"dedupe": 0}
     monkeypatch.setattr(

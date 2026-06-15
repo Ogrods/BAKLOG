@@ -215,7 +215,7 @@
       "metaKey": "claims",
       "color": "#f97316"
     },
-    { "key": "hltb", "label": "HLTB", "group": "enrich", "script": "enrich_hltb.py", "refreshArgs": ["--retry-misses"], "metaKey": "hltb", "color": "#a78bfa", "maxRunSeconds": 7200 },
+    { "key": "hltb", "label": "HLTB", "group": "enrich", "script": "enrich_hltb.py", "refreshArgs": ["--retry-misses"], "metaKey": "hltb", "color": "#a78bfa", "maxRunSeconds": 0 },
     {
       "key": "steamReviews",
       "label": "Reviews",

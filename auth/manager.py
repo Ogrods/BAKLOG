@@ -229,7 +229,7 @@ def _local_data_present(provider: str, blob: dict[str, Any]) -> bool:
         elif sys.platform != "win32":
             return False
         else:
-            from amazon_client import default_sql_dir
+            from clients.amazon_client import default_sql_dir
 
             sql_dir = default_sql_dir()
         entitlements = sql_dir / "Entitlements.sqlite"
@@ -243,7 +243,7 @@ def _local_data_present(provider: str, blob: dict[str, Any]) -> bool:
         if isinstance(env_db, str) and env_db.strip() and Path(env_db.strip()).is_file():
             db_path = Path(env_db.strip())
         else:
-            from gog_galaxy_client import GogGalaxyError, default_galaxy_db
+            from clients.gog_galaxy_client import GogGalaxyError, default_galaxy_db
 
             try:
                 db_path = default_galaxy_db()
@@ -259,7 +259,7 @@ def _local_data_present(provider: str, blob: dict[str, Any]) -> bool:
         if isinstance(env_db, str) and env_db.strip() and Path(env_db.strip()).is_file():
             db_path = Path(env_db.strip())
         else:
-            from itch_local_client import default_butler_db
+            from clients.itch_local_client import default_butler_db
 
             db_path = default_butler_db()
         return db_path.is_file()
@@ -520,7 +520,7 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
                 "ITAD rejected this API key — copy the API key UUID from isthereanydeal.com/apps/my/"
             )
     if provider == "epic":
-        from epic_client import (
+        from clients.epic_client import (
             EpicAuthError,
             EpicClient,
             EpicCorrectiveActionError,

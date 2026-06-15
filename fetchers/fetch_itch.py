@@ -280,7 +280,7 @@ def refuse_itch_source_drift(
 def _butler_db_ready(db_path: Path | None) -> bool:
     if is_local_provider_disabled("itch_local"):
         return False
-    from itch_local_client import default_butler_db
+    from clients.itch_local_client import default_butler_db
 
     path = db_path if db_path is not None else default_butler_db()
     return path.is_file()
@@ -363,7 +363,7 @@ def _tag_api_row(row: dict) -> dict:
 
 
 def _load_local_records(db_path: Path | None) -> list[dict]:
-    from itch_local_client import ItchLocalClient
+    from clients.itch_local_client import ItchLocalClient
 
     client = ItchLocalClient(db_path)
     print(f"Reading itch.io library from:\n  {client.db_path}", flush=True)
@@ -442,7 +442,7 @@ def main() -> int:
 
     if source == "local":
         try:
-            from itch_local_client import ItchLocalError
+            from clients.itch_local_client import ItchLocalError
 
             records = _load_local_records(db_path)
         except ItchLocalError as e:

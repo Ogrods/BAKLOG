@@ -168,7 +168,7 @@ def handle_internal_free_claims_enrich(handler: SimpleHTTPRequestHandler) -> Non
     if too_large:
         s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": too_large})
         return
-    from build_free_claims import (
+    from fetchers.build_free_claims import (
         _build_cover_lookup,
         _enrich_item,
         merge_enriched_items_into_auto_feed,
@@ -304,7 +304,7 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
             s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": too_large})
             return
 
-    from build_free_claims import preview_publish_items, require_manual_approval_enabled
+    from fetchers.build_free_claims import preview_publish_items, require_manual_approval_enabled
 
     approved_ids = {
         str(item_id).strip()
@@ -354,7 +354,7 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
         premium_only_ids=premium_only_ids,
         require_manual_approval=require_manual_approval_enabled(),
     )
-    from build_free_claims import GAMERPOWER_ATTRIBUTION
+    from fetchers.build_free_claims import GAMERPOWER_ATTRIBUTION
 
     attribution = (
         [GAMERPOWER_ATTRIBUTION]
@@ -445,7 +445,7 @@ def handle_internal_free_claims_approved_put(handler: SimpleHTTPRequestHandler) 
     if validation_err:
         s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": validation_err})
         return
-    from build_free_claims import parse_approved_put_payload, prepare_approved_document
+    from fetchers.build_free_claims import parse_approved_put_payload, prepare_approved_document
 
     parsed = parse_approved_put_payload(payload)
     root = s.data_root()

@@ -80,8 +80,8 @@ def test_enricher_writes_coop_and_fills_missing_genres(
     # Force a fresh import so the script picks up the patched cwd / env.
     for mod in ("enrichers.enrich_steam_tags", "clients.steam_client"):
         sys.modules.pop(mod, None)
-    import enrich_steam_tags
-    from steam_client import SteamClient
+    import enrichers.enrich_steam_tags as enrich_steam_tags
+    from clients.steam_client import SteamClient
 
     canned = {
         4242: {
@@ -154,8 +154,8 @@ def test_enricher_dry_run_does_not_write(
 ) -> None:
     for mod in ("enrichers.enrich_steam_tags", "clients.steam_client"):
         sys.modules.pop(mod, None)
-    import enrich_steam_tags
-    from steam_client import SteamClient
+    import enrichers.enrich_steam_tags as enrich_steam_tags
+    from clients.steam_client import SteamClient
 
     def fake_get_app_details(self, appid: int, refresh: bool = False) -> dict | None:
         return {
@@ -186,7 +186,7 @@ def test_enricher_bails_without_mapping(
     monkeypatch.setenv("STEAM_ID", "76561197960287930")
     for mod in ("enrichers.enrich_steam_tags",):
         sys.modules.pop(mod, None)
-    import enrich_steam_tags
+    import enrichers.enrich_steam_tags as enrich_steam_tags
 
     exit_code = enrich_steam_tags.main([])
     assert exit_code == 1

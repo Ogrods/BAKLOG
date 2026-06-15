@@ -157,7 +157,7 @@ class _PlaytimeResp:
 
 
 def _playtime_client(payload: object, account_id: str | None = "acc"):
-    from epic_client import EpicClient
+    from clients.epic_client import EpicClient
 
     client = object.__new__(EpicClient)
     client._account_id = account_id

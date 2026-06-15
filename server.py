@@ -3646,7 +3646,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_epic_oauth_url(self) -> None:
         """Mint a profile-bound OAuth state and return the Epic browser sign-in URL."""
         try:
-            from epic_client import build_epic_oauth_login_url
+            from clients.epic_client import build_epic_oauth_login_url
 
             state = secrets.token_urlsafe(24)
             _register_epic_oauth_state(state, profile_id=get_active_profile_id())
@@ -3851,9 +3851,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         try:
-            from epic_client import EpicClient, default_epic_cache_dir
-
             from auth.manager import mark_connected
+            from clients.epic_client import EpicClient, default_epic_cache_dir
 
             client = EpicClient(auth_code=code, cache_dir=default_epic_cache_dir())
             client.login()

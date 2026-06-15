@@ -704,7 +704,7 @@ def _xbl_scrape_key_candidates(page) -> list[str]:
 
 def _xbox_key_check(key: str) -> str:
     """Probe an OpenXBL key: 'valid' | 'invalid' | 'rate_limited' (non-raising)."""
-    from xbox_client import XboxAuthError, XboxClient, XboxRateLimitError
+    from clients.xbox_client import XboxAuthError, XboxClient, XboxRateLimitError
 
     try:
         XboxClient(key).get_account()

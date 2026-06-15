@@ -339,7 +339,7 @@ def refuse_gog_source_drift(
 def _galaxy_db_ready(db_path: Path | None) -> bool:
     if is_local_provider_disabled("gog_galaxy"):
         return False
-    from gog_galaxy_client import default_galaxy_db
+    from clients.gog_galaxy_client import default_galaxy_db
 
     path = db_path if db_path is not None else default_galaxy_db()
     return path.is_file()
@@ -418,7 +418,7 @@ def _build_game_row_from_local(rec: dict, hltb: dict | None, source: str) -> dic
 
 
 def _load_local_records(db_path: Path | None) -> list[dict]:
-    from gog_galaxy_client import GogGalaxyClient
+    from clients.gog_galaxy_client import GogGalaxyClient
 
     client = GogGalaxyClient(db_path)
     print(f"Reading GOG library from Galaxy database:\n  {client.db_path}", flush=True)
@@ -498,7 +498,7 @@ def main() -> int:
 
     if source == "local":
         try:
-            from gog_galaxy_client import GogGalaxyError
+            from clients.gog_galaxy_client import GogGalaxyError
 
             records = _load_local_records(db_path)
         except ImportError as e:

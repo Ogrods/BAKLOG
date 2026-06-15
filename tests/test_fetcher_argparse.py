@@ -34,7 +34,7 @@ _NO_DUPLICATE_ALLOW_DRIFT = (
 
 def test_fetch_ea_help_exits_zero() -> None:
     """Duplicate --allow-drift registration crashes argparse before --help."""
-    proc = _run_help("fetchers.fetch_ea.py")
+    proc = _run_help("fetch_ea.py")
     combined = (proc.stdout or "") + (proc.stderr or "")
     assert proc.returncode == 0, combined
     assert "conflicting option" not in combined.lower()
@@ -53,13 +53,13 @@ def test_fetch_scripts_do_not_duplicate_allow_drift_in_source() -> None:
 
 
 def test_fetch_nintendo_help_lists_rebuild_flag() -> None:
-    proc = _run_help("fetchers.fetch_nintendo.py")
+    proc = _run_help("fetch_nintendo.py")
     assert proc.returncode == 0, proc.stderr or proc.stdout
     assert "--rebuild" in (proc.stdout or "")
 
 
 def test_fetch_humble_accepts_skip_hltb_flag() -> None:
     """Manifest passes --skip-hltb; script must advertise it in --help."""
-    proc = _run_help("fetchers.fetch_humble.py")
+    proc = _run_help("fetch_humble.py")
     assert proc.returncode == 0, proc.stderr or proc.stdout
     assert "--skip-hltb" in (proc.stdout or "")

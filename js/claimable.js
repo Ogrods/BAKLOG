@@ -31,6 +31,8 @@ export {
 } from './claim-card.js';
 
 export const CLAIMS_HOSTED_URL = 'https://baklog.app/free-claims.json';
+/** Max wait for the hosted claims feed during reload (post-fetcher must not hang the chip). */
+export const CLAIMS_HOSTED_FETCH_MS = 12_000;
 const FALLBACK_PATH = 'curated/free_claims.fallback.json';
 /** Prefer hosted feed when generated_at is this much newer than local (boot freshness). */
 export const HOSTED_BOOT_FRESHNESS_MS = 60 * 60 * 1000;
@@ -364,9 +366,19 @@ export function saveClaimsSnapshot(items) {
 
 async function fetchHostedClaims() {
   const url = getClaimsEndpoint();
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`claims feed ${res.status}`);
-  return res.json();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CLAIMS_HOSTED_FETCH_MS);
+  try {
+    const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+    if (!res.ok) throw new Error(`claims feed ${res.status}`);
+    const doc = await res.json();
+    return doc;
+  } catch (err) {
+    if (err?.name === 'AbortError') throw new Error('claims feed timeout');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function loadBundledFallback() {

@@ -9,6 +9,7 @@ import threading
 import time
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlparse
 
 from auth.api_keys import (
     extract_itad,
@@ -19,6 +20,7 @@ from auth.api_keys import (
 from auth.cdp_browser import (
     STEALTH_INIT_SCRIPT,
     auth_banner_init_script,
+    is_blank_browser_url,
     launch_persistent_profile,
 )
 from auth.epic_wishlist_session import EPIC_WISHLIST_URL, epic_store_login_url
@@ -28,6 +30,31 @@ from auth.secrets import profile_dir
 SUCCESS_WAIT_SEC = 300
 POLL_SEC = 0.5
 PSN_STORE_URL = "https://store.playstation.com/en-us/"
+
+
+def _connect_pages(page, context) -> list:
+    """Live tabs for a connect session: primary page first, then others."""
+    out: list = []
+    if page and not page.is_closed:
+        out.append(page)
+    for pg in context.pages:
+        if not pg.is_closed and pg is not page:
+            out.append(pg)
+    return out or [context.new_page()]
+
+
+def _drive_connect_page(page, context):
+    """Tab the connect loop should observe and navigate.
+
+    CDP may list a preserved ``about:blank`` OAuth popup before the main tab
+    finishes loading; ``context.pages[0]`` then looks signed-out/blank while the
+    real login URL is on another target (Epic library, Nintendo, etc.).
+    """
+    for pg in _connect_pages(page, context):
+        if not is_blank_browser_url(pg.url or ""):
+            return pg
+    pages = _connect_pages(page, context)
+    return pages[0]
 PSN_SSOCOOKIE_URL = "https://ca.account.sony.com/api/v1/ssocookie"
 PSN_SSOCOOKIE_INTERVAL_SEC = 10
 
@@ -200,9 +227,8 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
     last_hint = 0.0
     last_nav = 0.0
     while time.time() < deadline:
-        live = [pg for pg in context.pages if not pg.is_closed]
-        main = live[0] if live else context.new_page()
-        url = (main.url or "").lower()
+        drive = _drive_connect_page(page, context)
+        url = (drive.url or "").lower()
         signed_in = "ec.nintendo.com" in url and "login" not in url and "connect" not in url
 
         # Once signed in (we've returned to ec.nintendo.com), the eShop session
@@ -224,11 +250,11 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
             if now - last_nav > 4:
                 last_nav = now
                 try:
-                    main.bring_to_front()
+                    drive.bring_to_front()
                 except Exception:
                     pass
                 try:
-                    main.goto(NINTENDO_ACCOUNT_URL, wait_until="domcontentloaded", timeout=20_000)
+                    drive.goto(NINTENDO_ACCOUNT_URL, wait_until="domcontentloaded", timeout=20_000)
                 except Exception:
                     pass
 
@@ -311,10 +337,16 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     last_hint = 0.0
     while time.time() < deadline:
         live = [pg for pg in context.pages if not pg.is_closed]
-        main = live[0] if live else context.new_page()
-        url = (main.url or "").lower()
+        drive = _drive_connect_page(page, context)
 
-        if EPIC_REDIRECT_MARKER in url:
+        redirect_page = None
+        for pg in _connect_pages(page, context):
+            if EPIC_REDIRECT_MARKER in (pg.url or "").lower():
+                redirect_page = pg
+                break
+        if redirect_page is not None:
+            main = redirect_page
+            url = (main.url or "").lower()
             body = ""
             try:
                 body = main.evaluate("() => document.body ? document.body.innerText : ''") or ""
@@ -358,6 +390,7 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
                 page.wait_for_timeout(int(POLL_SEC * 1000))
                 continue
 
+        url = (drive.url or "").lower()
         now = time.time()
         if session and now - last_hint > 10:
             last_hint = now
@@ -730,6 +763,105 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
 XBOX_WISHLIST_URL = "https://www.xbox.com/en-us/wishlist"
 XBOX_WISHLIST_POLL_SEC = 2.5
 
+_XBOX_WISHLIST_DOM_PROBE = """() => {
+  const out = {host:'', path:'', hasState:false, isSignedIn:null, btnCount:0,
+              matchTexts:[], onAuth:false, err:null};
+  try {
+    const loc = window.location;
+    out.host = (loc.hostname || '').toLowerCase();
+    out.path = (loc.pathname || '').toLowerCase();
+    out.onAuth = out.path.includes('/auth/msa');
+    const st = window.__PRELOADED_STATE__;
+    out.hasState = !!st;
+    if (st && st.user) out.isSignedIn = !!st.user.isSignedIn;
+    const els = Array.from(document.querySelectorAll('button, a[role="button"], a'));
+    const re = /\\b(buy|details|pre-order|preorder)\\b/i;
+    for (const el of els) {
+      const t = (el.textContent || '').trim();
+      if (re.test(t)) { out.matchTexts.push(t.slice(0, 24)); }
+    }
+    out.btnCount = out.matchTexts.length;
+  } catch (e) { out.err = String(e); }
+  return JSON.stringify(out);
+}"""
+
+
+def _xbox_url_on_wishlist(url: str) -> bool:
+    """True only when the navigated path is xbox.com/wishlist (not redirect_uri)."""
+    try:
+        parsed = urlparse(url or "")
+    except Exception:  # noqa: BLE001
+        return False
+    host = (parsed.hostname or "").lower()
+    if host != "xbox.com" and not host.endswith(".xbox.com"):
+        return False
+    return "/wishlist" in (parsed.path or "").lower()
+
+
+def _xbox_url_is_login(url: str) -> bool:
+    u = (url or "").lower()
+    if _xbox_url_on_wishlist(url):
+        return False
+    return (
+        "login.live.com" in u
+        or "login.microsoftonline" in u
+        or "account.microsoft" in u
+        or ("signin" in u and "xbox.com" not in u)
+    )
+
+
+def _xbox_wishlist_dom_diag(page) -> dict | None:
+    """Return DOM diagnostics for the wishlist tab (or ``None`` on failure)."""
+    if page is None:
+        return {"diag_err": "page_none"}
+    try:
+        if not _xbox_url_on_wishlist(page.url or ""):
+            return {"diag_err": "not_wishlist", "url": (page.url or "")[:80]}
+        raw = page.evaluate(_XBOX_WISHLIST_DOM_PROBE, timeout=5)
+        if isinstance(raw, str):
+            return json.loads(raw)
+        if isinstance(raw, dict):
+            return raw
+        return {"diag_err": "bad_type", "raw_type": type(raw).__name__}
+    except Exception as exc:  # noqa: BLE001
+        return {"diag_err": "evaluate_threw", "exc": str(exc)[:120]}
+
+
+def _xbox_wishlist_dom_signed_in(page) -> bool:
+    """Detect a hydrated wishlist when SSR still says signed-out after fresh OAuth.
+
+    Signed-in evidence: ``__PRELOADED_STATE__.user.isSignedIn`` true, or the
+    rendered list shows purchase actions (BUY / DETAILS / PRE-ORDER). A
+    signed-out wishlist redirects to ``/auth/msa`` and never renders these.
+    """
+    diag = _xbox_wishlist_dom_diag(page)
+    if not diag:
+        return False
+    if diag.get("onAuth"):
+        return False
+    if diag.get("isSignedIn") is True:
+        return True
+    return bool(diag.get("btnCount"))
+
+
+def _xbox_any_wishlist_dom_signed_in(context) -> tuple[bool, Any]:
+    """Scan every live tab for a hydrated signed-in wishlist."""
+    for pg in context.pages:
+        if pg.is_closed:
+            continue
+        if _xbox_url_on_wishlist(pg.url or "") and _xbox_wishlist_dom_signed_in(pg):
+            return True, pg
+    return False, None
+
+
+def _xbox_has_msa_session(context) -> bool:
+    """True when Microsoft/Xbox auth cookies are present in the profile."""
+    try:
+        names = {c.get("name", "") for c in context.cookies()}
+    except Exception:  # noqa: BLE001
+        return False
+    return "WLSSC" in names or any(n.startswith("XBXXtk") for n in names)
+
 
 def _parse_xbox_preloaded_state(html: str) -> dict | None:
     """Carve ``window.__PRELOADED_STATE__ = { ... }`` out of the SSR HTML.
@@ -778,27 +910,46 @@ def _parse_xbox_preloaded_state(html: str) -> dict | None:
     return None
 
 
+def _xbox_signed_in_state_from_html(html: str) -> dict | None:
+    state = _parse_xbox_preloaded_state(html)
+    if not state:
+        return None
+    user = state.get("user") or {}
+    if not user.get("isSignedIn"):
+        return None
+    page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
+    err = page_meta.get("error") or {}
+    if err.get("httpStatusCode") == 403:
+        return None
+    return state
+
+
 def _xbox_signed_in_state(context, page=None) -> dict | None:
     """Return parsed wishlist SSR when signed in (else ``None``).
 
-    Prefer the live page document after ``page.goto`` — cookie-only HTTP GET
-    often returns a signed-out ``__PRELOADED_STATE__`` on xbox.com.
+    Prefer the live page document after ``page.goto`` — but stale client-side
+    SSR can show signed-out even when cookies are valid, and the /auth/msa
+    handoff page always looks signed-out. Fall through to cookie-based HTTP GET
+    when the page document does not confirm a signed-in wishlist session.
+    After a fresh MSA sign-in the SPA can hydrate the wishlist while SSR still
+    says signed-out; scan every live wishlist tab and accept DOM evidence.
     """
-    if page is not None:
+    pages: list = []
+    if page is not None and not page.is_closed:
+        pages.append(page)
+    for pg in context.pages:
+        if not pg.is_closed and pg not in pages and _xbox_url_on_wishlist(pg.url or ""):
+            pages.append(pg)
+
+    for pg in pages:
         try:
-            url = (page.url or "").lower()
-            if "xbox.com" in url:
-                _html = page.content()
-                state = _parse_xbox_preloaded_state(_html)
+            url = pg.url or ""
+            if _xbox_url_on_wishlist(url):
+                state = _xbox_signed_in_state_from_html(pg.content())
                 if state:
-                    user = state.get("user") or {}
-                    if not user.get("isSignedIn"):
-                        return None
-                    page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
-                    err = page_meta.get("error") or {}
-                    if err.get("httpStatusCode") == 403:
-                        return None
                     return state
+                if _xbox_wishlist_dom_signed_in(pg):
+                    return {"user": {"isSignedIn": True}, "_source": "dom"}
         except Exception:  # noqa: BLE001
             pass
     try:
@@ -811,17 +962,7 @@ def _xbox_signed_in_state(context, page=None) -> dict | None:
         html = resp.text()
     except Exception:  # noqa: BLE001
         return None
-    state = _parse_xbox_preloaded_state(html)
-    if not state:
-        return None
-    user = state.get("user") or {}
-    if not user.get("isSignedIn"):
-        return None
-    page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
-    err = page_meta.get("error") or {}
-    if err.get("httpStatusCode") == 403:
-        return None
-    return state
+    return _xbox_signed_in_state_from_html(html)
 
 
 def _xbox_capture_wishlist_api(page, sniffer, *, timeout_s: float = 12.0) -> None:
@@ -846,41 +987,76 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
     """
     from auth.xbox_wishlist_capture import WishlistApiSniffer
 
+
     sniffer = WishlistApiSniffer()
-    try:
-        page.on("response", sniffer.on_response)
-    except Exception:  # noqa: BLE001
-        pass
+    _sniffer_pages: set[int] = set()
+
+    def _attach_sniffer(pg) -> None:
+        """Bind the Emerald sniffer to every live tab. After a fresh MSA sign-in
+        the wishlist (where the XHR fires) loads in a different tab than the one
+        the connect loop started from, so attaching only to ``page`` misses the
+        token entirely."""
+        try:
+            key = id(pg)
+            if key not in _sniffer_pages:
+                pg.on("response", sniffer.on_response)
+                _sniffer_pages.add(key)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _xbox_active_page():
+        """Pick the tab actually on the wishlist; never the /auth/msa handoff or
+        the login.live popup. CDP often lists the handoff tab as ``pages[0]``
+        after sign-in, which strands a loop that blindly polls ``page``."""
+        live = [pg for pg in context.pages if not pg.is_closed]
+        for pg in live:
+            if _xbox_url_on_wishlist(pg.url or ""):
+                return pg
+        for pg in live:
+            u = (pg.url or "").lower()
+            if "xbox.com" in u and "/auth/msa" not in u and "action=loggedin" not in u:
+                return pg
+        return _drive_connect_page(page, context)
+
+    _attach_sniffer(page)
 
     try:
         page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
     except Exception:  # noqa: BLE001
         pass
 
+
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
     last_ssr_refresh = 0.0
     while time.time() < deadline:
-        url = (page.url or "").lower()
-        on_login = (
-            "login.live.com" in url
-            or "login.microsoftonline" in url
-            or "signin" in url
-            or "account.microsoft" in url
+        for pg in context.pages:
+            if not pg.is_closed:
+                _attach_sniffer(pg)
+        active = _xbox_active_page()
+        url = active.url or ""
+        url_low = url.lower()
+        on_login = _xbox_url_is_login(url)
+        # MSA hands the session back via xbox.com/auth/msa. Two distinct phases:
+        #   - MID-EXCHANGE (action=login / #code= / oauth20): the SPA is still
+        #     setting cookies; navigating away aborts it, so we must wait.
+        #   - HANDOFF DONE (action=loggedin): the cookie exchange is COMPLETE.
+        #     In this headed CDP context the SPA does not always auto-redirect
+        #     to /wishlist, so the loop would otherwise sit on the handoff page
+        #     forever (Emerald XHR never fires, SSR here is signed-out). Once
+        #     done, drive the tab to /wishlist to trigger the wishlist session.
+        handoff_done = "action=loggedin" in url_low
+        mid_exchange = not handoff_done and (
+            ("/auth/msa" in url_low and "action=login" in url_low)
+            or "#code=" in url_low
+            or ("oauth20" in url_low and _xbox_url_is_login(url))
         )
-        # MSA hands the session back via xbox.com/auth/msa?action=loggedin#code=...
-        # (or an oauth20 redirect). The SPA must process that code to set the
-        # signed-in cookies; navigating away here aborts the exchange and the
-        # session never completes — so treat it like login: wait, do not refresh.
-        on_handoff = (
-            "/auth/msa" in url
-            or "action=loggedin" in url
-            or "#code=" in url
-            or "oauth20" in url
-        )
-        on_wishlist = "wishlist" in url
+        on_handoff = handoff_done or mid_exchange or "/auth/msa" in url_low
+        on_wishlist = _xbox_url_on_wishlist(url)
+        dom_signed_in_any, dom_page = _xbox_any_wishlist_dom_signed_in(context)
+        dom_signed_in = dom_signed_in_any
         token_ready = bool(sniffer.token)
-        if token_ready and on_wishlist and not on_login:
+        if token_ready and dom_signed_in_any and not on_login:
             if session:
                 session.emit(
                     "waiting_for_user",
@@ -888,26 +1064,50 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
                 )
             sniffer.dump()
             return _xbox_wishlist_connect_creds(sniffer)
+        # Cookie exchange complete (action=loggedin) but the SPA stalled on the
+        # handoff page: drive forward to /wishlist so the Emerald wishlist XHR
+        # fires. Wait through mid-exchange; never navigate during it.
+        if handoff_done and not on_wishlist:
+            now = time.time()
+            if now - last_ssr_refresh >= 3.0:
+                last_ssr_refresh = now
+                try:
+                    # commit: do not wait for the heavy SPA readyState probe — that
+                    # can block 15s+ while the user already sees the wishlist.
+                    active.goto(XBOX_WISHLIST_URL, wait_until="commit", timeout=15000)
+                    active.wait_for_timeout(1500)
+                except Exception:  # noqa: BLE001
+                    pass
+                continue
         # xbox.com bakes __PRELOADED_STATE__ into the HTML at load time and
         # never refreshes it client-side. After MSA sign-in we may need one
         # refresh to pull SSR that reflects the new cookies — but once the user
         # is on /wishlist, stop hammering reloads or the Emerald API never fires.
-        if not on_login and not on_handoff and "xbox.com" in url:
+        elif not on_login and not on_handoff and "xbox.com" in url_low:
             now = time.time()
             need_refresh = not on_wishlist or (
-                not token_ready and now - last_ssr_refresh >= 8.0
+                not token_ready
+                and not dom_signed_in
+                and now - last_ssr_refresh >= 8.0
             )
             if need_refresh:
                 last_ssr_refresh = now
                 try:
-                    page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=15000)
-                    page.wait_for_timeout(2500)
+                    active.goto(XBOX_WISHLIST_URL, wait_until="commit", timeout=15000)
+                    active.wait_for_timeout(1500)
                 except Exception:  # noqa: BLE001
                     pass
 
-        state = _xbox_signed_in_state(context, page)
+        # During MSA OAuth the active tab navigates constantly — page.content()
+        # and the cookie-based HTTP GET can block for 20s+ and stall the loop.
+        state = None
+        if not on_login and not mid_exchange:
+            state = _xbox_signed_in_state(context, dom_page or active)
         token_ready = bool(sniffer.token)
-        if token_ready and on_wishlist and not on_login:
+        dom_signed_in_any, dom_page = _xbox_any_wishlist_dom_signed_in(context)
+        dom_signed_in = dom_signed_in_any
+        msa_ready = _xbox_has_msa_session(context)
+        if token_ready and dom_signed_in_any and not on_login:
             if session:
                 session.emit(
                     "waiting_for_user",
@@ -915,13 +1115,13 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
                 )
             sniffer.dump()
             return _xbox_wishlist_connect_creds(sniffer)
-        if state is not None:
+        if state is not None or (dom_signed_in_any and msa_ready and not on_login):
             if session:
                 session.emit(
                     "waiting_for_user",
                     {"message": "Signed in \u2014 capturing your wishlist session..."},
                 )
-            _xbox_capture_wishlist_api(page, sniffer)
+            _xbox_capture_wishlist_api(dom_page or active, sniffer)
             sniffer.dump()
             return _xbox_wishlist_connect_creds(sniffer)
 
@@ -930,13 +1130,13 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
             last_msg = now
             if on_login:
                 msg = "Sign in to your Microsoft account in the browser window."
-            elif "xbox.com" not in url:
+            elif "xbox.com" not in url_low:
                 msg = "Open xbox.com/wishlist after signing in."
             else:
                 msg = "Signed in \u2014 waiting for xbox.com to issue your wishlist session."
             session.emit("waiting_for_user", {"message": msg})
 
-        page.wait_for_timeout(int(XBOX_WISHLIST_POLL_SEC * 1000))
+        active.wait_for_timeout(int(XBOX_WISHLIST_POLL_SEC * 1000))
 
     raise RuntimeError(
         "Could not detect an Xbox sign-in \u2014 sign in to xbox.com/wishlist "
@@ -1305,6 +1505,7 @@ def _extract_amazon_web(page, context, session: AuthSession | None = None) -> di
         start_at_signin=True,
         session=session,
         poll_interval_ms=int(POLL_SEC * 1000),
+        session_only_grace_s=2.0,
     )
 
     if captured["done"]:

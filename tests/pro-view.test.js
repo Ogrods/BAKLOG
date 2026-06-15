@@ -46,7 +46,7 @@ describe('renderProView', () => {
     const root = document.getElementById('proViewRoot');
     expect(root.innerHTML).toContain(PRO_PROMO.title);
     expect(root.querySelector('[data-pro-checkout]')?.textContent).toContain('Support BAKLOG');
-    expect(root.innerHTML).toContain('$50/yr');
+    expect(root.innerHTML).not.toMatch(/\$5\s*\/\s*mo/i);
     expect(root.innerHTML).toContain('buy.polar.sh');
     expect(root.querySelector('[data-pro-hero-banner]')).toBeTruthy();
     expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-polar-yearly');
@@ -78,7 +78,7 @@ describe('renderProView', () => {
     const root = document.getElementById('proViewRoot');
     root.querySelector('[data-pro-plan="monthly"]')?.click();
     expect(root.querySelector('[data-pro-checkout]')?.textContent).toContain('Support BAKLOG');
-    expect(root.innerHTML).toContain('$5/mo');
+    expect(root.innerHTML).not.toMatch(/\$5\s*\/\s*mo/i);
     expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-polar.png');
     expect(root.querySelector('.pro-view-funnel--monthly')).toBeTruthy();
   });

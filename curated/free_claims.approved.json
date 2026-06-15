@@ -9,11 +9,6 @@
     "gamerpower-3446",
     "gamerpower-3477",
     "gamerpower-3548",
-    "gamerpower-3553",
-    "gamerpower-3665",
-    "gamerpower-3671",
-    "gamerpower-3677",
-    "gamerpower-3678",
     "gamerpower-3679",
     "gamerpower-3680",
     "gamerpower-3682",
@@ -33,7 +28,6 @@
   "store_overrides": {
     "gamerpower-3266": "indiegala",
     "gamerpower-3446": "indiegala",
-    "gamerpower-3671": "indiegala",
     "itad-0d4598c53ffe": "indiegala",
     "itad-1b0433806065": "indiegala",
     "itad-dd5b5b16e035": "indiegala"
@@ -62,21 +56,6 @@
     },
     "gamerpower-3548": {
       "title": "Static Voice"
-    },
-    "gamerpower-3553": {
-      "title": "Sleep Demon"
-    },
-    "gamerpower-3665": {
-      "title": "Gravity Circuit"
-    },
-    "gamerpower-3671": {
-      "title": "Flufftopia"
-    },
-    "gamerpower-3677": {
-      "title": "Not A Customer"
-    },
-    "gamerpower-3678": {
-      "title": "MicroCrawl"
     },
     "gamerpower-3679": {
       "title": "Happy's Humble Burger Farm"
@@ -127,21 +106,11 @@
     }
   },
   "dismissed": [
-    "gamerpower-3674",
-    "gamerpower-3667",
-    "gamerpower-3668",
-    "itad-8b45ae1603ee",
     "itad-98730029b14b",
     "gamerpower-3287",
     "itad-78f8867f4481",
-    "itad-48cfa4ebeae5",
-    "itad-239f10d33b17",
-    "gamerpower-3673",
-    "epic-songs-of-conquest",
-    "epic-rogue-waters-9764d6",
     "gamerpower-3272",
     "itad-50a2b5b1d7a6",
-    "itad-047270155013",
     "gamerpower-3279",
     "itad-8738c881d524",
     "epic-the-ouroboros-king-e1d547",
@@ -150,7 +119,6 @@
     "itad-8ca7cd481f36",
     "gamerpower-3681",
     "itad-0d845ad1210c",
-    "gamerpower-3676",
     "itad-d85d5bb4128d",
     "itad-e46cedded0fc",
     "gamerpower-3410"

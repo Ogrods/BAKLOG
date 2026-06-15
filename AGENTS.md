@@ -45,7 +45,7 @@ Two **separate** systems; mixing them up is why banner edits "don't show". Full 
 - `npm run check:module-size` — any `js/*.js` over **3800** lines fails (`table-query.worker.js` exempt).
 - `npm run check:bundle-size` — critical-path `dist/` entry JS + CSS ceilings in `size-budget.json`.
 - `npm run lint` — ESLint weight rules (`max-lines`, `complexity`, `import/no-cycle`; warnings for now).
-- `pytest tests/test_repo_size_budgets.py` — `server.py` capped at **4300** lines; `scripts/git_tree.py` at **720**.
+- `pytest tests/test_repo_size_budgets.py` — `server.py` capped at **4320** lines; `scripts/git_tree.py` at **720**.
 
 Refresh bundle budget after intentional growth: `npm run build && node scripts/check-bundle-size.mjs --write`.
 

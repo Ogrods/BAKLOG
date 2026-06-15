@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-import fetch_itch as fi
+import fetchers.fetch_itch as fi
 
 
 def _local_row(itch_id: int, *, name: str = "App Game") -> dict:

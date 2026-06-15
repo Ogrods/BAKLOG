@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-import build_free_claims as bfc
+import fetchers.build_free_claims as bfc
 
 
 def test_clean_blurb_strips_urls_and_boilerplate() -> None:
@@ -263,7 +263,7 @@ def test_build_publishes_only_approved_auto_items(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -328,7 +328,7 @@ def test_build_without_approved_file_publishes_manual_only(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -384,7 +384,7 @@ def test_build_skips_manual_row_when_approved_false(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile", "--allow-empty"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -443,7 +443,7 @@ def test_build_require_manual_approval_needs_explicit_true(
     monkeypatch.setattr(
         sys,
         "argv",
-        ["build_free_claims.py", "--no-profile", "--allow-empty", "--require-manual-approval"],
+        ["fetchers.build_free_claims.py", "--no-profile", "--allow-empty", "--require-manual-approval"],
     )
 
     assert bfc.main() == 0
@@ -511,7 +511,7 @@ def test_build_applies_field_overrides(
             "ends_at": raw.get("ends_at"),
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -578,7 +578,7 @@ def test_field_override_extends_ends_at_before_expiry_prune(
             "ends_at": raw.get("ends_at"),
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -697,7 +697,7 @@ def test_build_prunes_expired_approved_and_manual_items(
             "ends_at": raw.get("ends_at"),
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1367,7 +1367,7 @@ def test_build_publishes_key_matched_row_when_approved_id_flipped(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1431,7 +1431,7 @@ def test_build_key_matched_row_inherits_store_and_field_overrides(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1487,7 +1487,7 @@ def test_build_absent_approved_id_without_override_title_stays_id_only(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile", "--allow-empty"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1597,7 +1597,7 @@ def test_build_excludes_dismissed_key_matched_duplicate(
             "claim_url": raw["claim_url"],
         },
     )
-    monkeypatch.setattr(sys, "argv", ["build_free_claims.py", "--no-profile", "--allow-empty"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile", "--allow-empty"])
 
     assert bfc.main() == 0
     built = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1863,7 +1863,7 @@ def test_build_refuses_empty_publish_without_allow_empty(
         sys,
         "argv",
         [
-            "build_free_claims.py",
+            "fetchers.build_free_claims.py",
             "--input",
             str(input_path),
             "--output",

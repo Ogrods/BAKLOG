@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from fetch_psn import _build_game_row
-from psn_client import PsnGameEntry
+from clients.psn_client import PsnGameEntry
+from fetchers.fetch_psn import _build_game_row
 
 
 def test_build_game_row_persists_play_count_without_sessions_tag() -> None:

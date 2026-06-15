@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-from psn_client import PsnClient, _accumulate_stat_into_agg, _apply_stat_to_entry, _new_stat_agg
+from clients.psn_client import PsnClient, _accumulate_stat_into_agg, _apply_stat_to_entry, _new_stat_agg
 
 
 def _stat(

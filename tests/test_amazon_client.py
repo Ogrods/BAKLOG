@@ -9,7 +9,7 @@ import pytest
 if sys.platform != "win32":
     pytest.skip("amazon_client requires Windows (DPAPI)", allow_module_level=True)
 
-import amazon_client
+import clients.amazon_client as amazon_client
 
 
 def _fuel_ent(sku: str = "the_secret_of_monkey_island_special_edition_game") -> dict:

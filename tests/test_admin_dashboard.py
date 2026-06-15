@@ -180,7 +180,7 @@ def test_internal_job_skips_fetcher_key_collision(
                     {
                         "key": "customJob",
                         "label": "Should skip",
-                        "script": "fetch_free_claims.py",
+                        "script": "fetchers/fetch_free_claims.py",
                     }
                 ]
             }
@@ -719,7 +719,7 @@ def test_free_claims_enrich_persists_auto_feed(
         encoding="utf-8",
     )
 
-    import build_free_claims as bfc
+    import fetchers.build_free_claims as bfc
 
     def fake_enrich(raw: dict, last_call: list[float], cover_lookup=None, **kwargs) -> dict:
         return {

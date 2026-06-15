@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import argparse
 
-import fetch_gog as fg
-import fetch_itch as fi
-import fetch_nintendo as fn
-from fetch_epic import _acquired_at_from_record, _build_game_row_from_record
+import fetchers.fetch_gog as fg
+import fetchers.fetch_itch as fi
+import fetchers.fetch_nintendo as fn
+from fetchers.fetch_epic import _acquired_at_from_record, _build_game_row_from_record
 
 
 class TestGogNeedsDetails:

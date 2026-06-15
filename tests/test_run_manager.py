@@ -941,7 +941,7 @@ def test_manifest_fetcher_argv_uses_absolute_script_path() -> None:
     spec = server.FETCHERS["steam"]
     script = spec["argv"][1]
     assert Path(script).is_absolute()
-    assert script == str(server.ROOT / "fetch_games.py")
+    assert script == str(server.ROOT / "fetchers/fetch_games.py")
 
 
 def test_execute_runs_from_repo_root_for_nondefault_profile(
@@ -987,7 +987,7 @@ def test_execute_runs_from_repo_root_for_nondefault_profile(
     assert run._finished.wait(timeout=10)
 
     assert captured["cwd"] == str(server.ROOT)
-    assert captured["argv"][1] == str(server.ROOT / "fetch_games.py")
+    assert captured["argv"][1] == str(server.ROOT / "fetchers/fetch_games.py")
 
 
 @pytest.fixture()
@@ -997,7 +997,7 @@ def internal_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
         "buildClaims",
         {
             "label": "Build free claims feed",
-            "script": "build_free_claims.py",
+            "script": "fetchers/build_free_claims.py",
             "group": "claims",
             "args": [],
             "options": {},
@@ -1008,7 +1008,7 @@ def internal_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
         "claimSources",
         {
             "label": "Fetch claim sources",
-            "script": "fetch_claim_sources.py",
+            "script": "fetchers/fetch_claim_sources.py",
             "group": "claims",
             "args": [],
             "options": {},

@@ -14,9 +14,9 @@ from threading import Lock
 import requests
 from dotenv import load_dotenv
 
+from clients.itch_game import itch_is_videogame as _itch_is_videogame
 from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
-from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 from shared.steam_match import pick_appid
 

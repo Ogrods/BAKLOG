@@ -11,7 +11,7 @@ import sys
 
 import pytest
 
-import fetch_free_claims as ffc
+import fetchers.fetch_free_claims as ffc
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def out_path(tmp_path, monkeypatch):
 
 def _run(monkeypatch, data, *extra_args):
     monkeypatch.setattr(ffc, "_fetch_url", lambda url, **kw: data)
-    monkeypatch.setattr(sys, "argv", ["fetch_free_claims.py", *extra_args])
+    monkeypatch.setattr(sys, "argv", ["fetchers.fetch_free_claims.py", *extra_args])
     return ffc.main()
 
 
@@ -77,6 +77,6 @@ def test_fetch_error_exits_1(monkeypatch, out_path):
         raise ValueError("bad feed")
 
     monkeypatch.setattr(ffc, "_fetch_url", boom)
-    monkeypatch.setattr(sys, "argv", ["fetch_free_claims.py"])
+    monkeypatch.setattr(sys, "argv", ["fetchers.fetch_free_claims.py"])
     assert ffc.main() == 1
     assert not out_path.exists()

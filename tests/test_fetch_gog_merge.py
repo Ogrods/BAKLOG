@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import fetch_gog as fg
+import fetchers.fetch_gog as fg
 from auth.manager import _local_data_present
 
 
@@ -114,7 +114,7 @@ class TestResolveSource:
         monkeypatch.setenv("GOG_GALAXY_DB", "ready")
         monkeypatch.setattr(fg, "is_local_provider_disabled", lambda _p: False)
         monkeypatch.setattr(
-            "gog_galaxy_client.default_galaxy_db", lambda: galaxy_db
+            "clients.gog_galaxy_client.default_galaxy_db", lambda: galaxy_db
         )
 
         env_db = os.getenv("GOG_GALAXY_DB", "").strip()
@@ -130,6 +130,6 @@ class TestResolveSource:
         galaxy_db = tmp_path / "galaxy-2.0.db"
         galaxy_db.write_text("", encoding="utf-8")
         monkeypatch.setattr(
-            "gog_galaxy_client.default_galaxy_db", lambda: galaxy_db
+            "clients.gog_galaxy_client.default_galaxy_db", lambda: galaxy_db
         )
         assert _local_data_present("gog_galaxy", {"GOG_GALAXY_DB": "ready"}) is True

@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 from auth import mark_connected, mark_invalid, resolve_env
 from auth.secrets import profile_dir
-from ea_client import (
+from clients.ea_client import (
     EA_PLAY_OWNERSHIP,
     REAL_OWNERSHIP,
     XGP_ONLY,
@@ -23,7 +23,8 @@ from ea_client import (
     EaCaptureError,
     EaClient,
 )
-from ea_session import DEFAULT_TRIGGER_URLS, probe_ea_token, sniff_ea_bearer
+from clients.ea_session import DEFAULT_TRIGGER_URLS, probe_ea_token, sniff_ea_bearer
+from clients.hltb_client import HltbClient
 from fetchers._authoritative import EA
 from fetchers._base import (
     add_allow_empty_arg,
@@ -38,7 +39,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
-from hltb_client import HltbClient
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_EA_JSON = Path("games_ea.json")

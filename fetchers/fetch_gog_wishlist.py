@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from auth.session_probe import probe_gog_session
+from clients.gog_client import GogAuthError, GogClient
+from clients.hltb_client import HltbClient
 from fetchers._base import (
     add_allow_empty_arg,
     configure_stdout,
@@ -29,8 +31,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
-from gog_client import GogAuthError, GogClient
-from hltb_client import HltbClient
 from shared.money import format_price
 
 GAMES_WISHLIST_GOG_JSON = Path("games_wishlist_gog.json")
@@ -63,7 +63,7 @@ def _fetch_wishlist_ids(gog: GogClient, refresh: bool) -> list[int]:
     # on GOG. Use the user-state TTL (0s) so we don't keep showing yesterday's
     # snapshot, while still honoring an explicit ``--refresh`` for any future
     # cache layers we might add.
-    from gog_client import USER_STATE_TTL
+    from clients.gog_client import USER_STATE_TTL
 
     data = gog._get(
         "/user/wishlist.json",

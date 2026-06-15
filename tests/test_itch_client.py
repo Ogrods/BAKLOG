@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from itch_client import ItchAuthError, ItchClient
+from clients.itch_client import ItchAuthError, ItchClient
 
 
 def test_init_requires_api_key() -> None:

@@ -20,44 +20,36 @@ datas = [
     (str(root / "pyproject.toml"), "."),
 ]
 
+_fetcher_scripts = sorted((root / "fetchers").glob("fetch_*.py"))
+_enricher_scripts = sorted((root / "fetchers").parent.joinpath("enrichers").glob("enrich_*.py"))
+_extra_fetchers = [
+    root / "fetchers" / "fetch_free_claims.py",
+    root / "fetchers" / "fetch_claim_sources.py",
+    root / "fetchers" / "build_free_claims.py",
+]
+_client_scripts = [p for p in (root / "clients").glob("*.py") if p.name != "__init__.py"]
+
+def _mod(path: Path) -> str:
+    rel = path.relative_to(root).with_suffix("")
+    return rel.as_posix().replace("/", ".")
+
 hiddenimports = [
     "baklog_fetcher_dispatch",
-    "fetch_games",
-    "fetch_gog",
-    "fetch_psn",
-    "fetch_epic",
-    "fetch_amazon",
-    "fetch_xbox",
-    "fetch_battlenet",
-    "fetch_ubisoft",
-    "fetch_nintendo",
-    "fetch_itch",
-    "fetch_humble",
-    "fetch_ea",
-    "fetch_itad",
-    "fetch_wishlist",
-    "fetch_gog_wishlist",
-    "fetch_epic_wishlist",
-    "fetch_psn_wishlist",
-    "fetch_ubisoft_wishlist",
-    "fetch_xbox_wishlist",
-    "fetch_nintendo_wishlist",
-    "fetch_humble_wishlist",
-    "fetch_fx",
-    "fetch_free_claims",
-    "enrich_hltb",
-    "enrich_steam_reviews",
-    "enrich_cross_store_images",
-    "enrich_steam_tags",
-    "enrich_protondb",
+    "clients",
+    *[_mod(p) for p in _client_scripts],
+    "fetchers",
+    "fetchers.registry",
+    *[_mod(p) for p in _fetcher_scripts],
+    *[_mod(p) for p in _extra_fetchers if p.is_file()],
+    "enrichers",
+    *[_mod(p) for p in _enricher_scripts],
     "auth",
     "auth.cdp_browser",
     "auth.manager",
     "auth.secrets",
-    "fetchers",
-    "fetchers.registry",
     "shared.install_paths",
     "shared.built_frontend",
+    "shared.legacy_env",
     "keyring.backends.Windows",
     "cryptography.hazmat.primitives.ciphers.aead",
 ]

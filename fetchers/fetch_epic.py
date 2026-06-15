@@ -13,7 +13,8 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
-from epic_client import LOGIN_URL, EpicAuthError, EpicClient, EpicCorrectiveActionError, default_epic_cache_dir
+from clients.epic_client import LOGIN_URL, EpicAuthError, EpicClient, EpicCorrectiveActionError, default_epic_cache_dir
+from clients.hltb_client import HltbClient
 from fetchers._authoritative import EPIC
 from fetchers._base import (
     add_allow_empty_arg,
@@ -28,7 +29,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
-from hltb_client import HltbClient
 
 GAMES_EPIC_JSON = Path("games_epic.json")
 HLTB_DELAY_SEC = 1.0

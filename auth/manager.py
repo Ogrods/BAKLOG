@@ -207,6 +207,11 @@ def subprocess_env_for_profile(profile_id: str) -> dict[str, str]:
         if v:
             env[k] = v
     env.update(profile_credentials_env(profile_id))
+    from shared.install_paths import bundle_root
+
+    root = str(bundle_root().resolve())
+    existing = env.get("PYTHONPATH", "").strip()
+    env["PYTHONPATH"] = root if not existing else f"{root}{os.pathsep}{existing}"
     return env
 
 

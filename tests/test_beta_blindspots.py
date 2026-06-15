@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import fetch_games
+import fetchers.fetch_games as fetch_games
 import shared.server_support as server_support
 import shared.startup as startup
 from fetchers._base import STEAM_PRIVATE_PROFILE_HINT
@@ -108,7 +108,7 @@ def test_private_profile_hint_on_empty_library(
     steam.get_owned_games.return_value = []
     with patch.object(fetch_games, "load_dotenv"):
         with patch.object(fetch_games, "SteamClient", return_value=steam):
-            with patch.object(fetch_games.sys, "argv", ["fetch_games.py", "--skip-hltb"]):
+            with patch.object(fetchers.fetch_games.sys, "argv", ["fetchers.fetch_games.py", "--skip-hltb"]):
                 code = fetch_games.main()
     assert code == 2
     captured = capsys.readouterr()

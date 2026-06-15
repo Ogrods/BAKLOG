@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nintendo_client import (
+from clients.nintendo_client import (
     NintendoAuthError,
     NintendoCaptureError,
     NintendoClient,
@@ -154,7 +154,7 @@ def test_fetch_via_browser_queues_then_drains(monkeypatch, tmp_path) -> None:
         return FakeContext()
 
     monkeypatch.setattr("auth.cdp_browser.launch_persistent_profile", fake_launch)
-    monkeypatch.setattr("nintendo_client.time.sleep", lambda _s: None)
+    monkeypatch.setattr("clients.nintendo_client.time.sleep", lambda _s: None)
     profile = tmp_path / "nintendo"
     profile.mkdir()
     client = NintendoClient(profile_path=profile)
@@ -223,7 +223,7 @@ def test_empty_capture_raises_capture_error_not_auth(monkeypatch, tmp_path) -> N
         "auth.cdp_browser.launch_persistent_profile",
         lambda _p, *, headless=True: FakeContext(),
     )
-    monkeypatch.setattr("nintendo_client.time.sleep", lambda _s: None)
+    monkeypatch.setattr("clients.nintendo_client.time.sleep", lambda _s: None)
     profile = tmp_path / "nintendo"
     profile.mkdir()
     client = NintendoClient(profile_path=profile)
@@ -303,7 +303,7 @@ def test_direct_graphql_continues_past_duplicate_page(monkeypatch) -> None:
     collected = list(page_one["data"]["account"]["transactionHistories"]["transactionHistories"])
     seen_ids = {"51988550814"}
 
-    monkeypatch.setattr("nintendo_client.time.sleep", lambda _s: None)
+    monkeypatch.setattr("clients.nintendo_client.time.sleep", lambda _s: None)
     client = NintendoClient()
     context = MagicMock()
     context.request.get = fake_get

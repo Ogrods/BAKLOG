@@ -26,6 +26,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid
 from auth.secrets import profile_dir
+from clients.hltb_client import HltbClient
 from fetchers._authoritative import HUMBLE
 from fetchers._base import (
     add_allow_empty_arg,
@@ -40,7 +41,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
-from hltb_client import HltbClient
 
 GAMES_HUMBLE_JSON = Path("games_humble.json")
 ORDERS_URL = "https://www.humblebundle.com/api/v1/user/order"

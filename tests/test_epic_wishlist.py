@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fetch_epic_wishlist import (
+from fetchers.fetch_epic_wishlist import (
     _build_row,
     parse_wishlist_sources,
 )

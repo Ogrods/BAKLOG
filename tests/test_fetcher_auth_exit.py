@@ -10,33 +10,33 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Fetch scripts with dedicated *AuthError handlers (or session-expired wishlist paths).
 AUTH_EXIT_SCRIPTS = [
-    "fetch_gog.py",
-    "fetch_gog_wishlist.py",
-    "fetch_psn.py",
-    "fetch_psn_wishlist.py",
-    "fetch_epic.py",
-    "fetch_xbox.py",
-    "fetch_battlenet.py",
-    "fetch_nintendo.py",
-    "fetch_ubisoft.py",
-    "fetch_itch.py",
-    "fetch_ea.py",
+    "fetchers/fetch_gog.py",
+    "fetchers/fetch_gog_wishlist.py",
+    "fetchers/fetch_psn.py",
+    "fetchers/fetch_psn_wishlist.py",
+    "fetchers/fetch_epic.py",
+    "fetchers/fetch_xbox.py",
+    "fetchers/fetch_battlenet.py",
+    "fetchers/fetch_nintendo.py",
+    "fetchers/fetch_ubisoft.py",
+    "fetchers/fetch_itch.py",
+    "fetchers/fetch_ea.py",
 ]
 
 SESSION_AUTH_WISHLIST_SCRIPTS = [
-    "fetch_epic_wishlist.py",
-    "fetch_xbox_wishlist.py",
-    "fetch_ubisoft_wishlist.py",
-    "fetch_nintendo_wishlist.py",
+    "fetchers/fetch_epic_wishlist.py",
+    "fetchers/fetch_xbox_wishlist.py",
+    "fetchers/fetch_ubisoft_wishlist.py",
+    "fetchers/fetch_nintendo_wishlist.py",
 ]
 
 # Scripts that emit exit 4 on auth failure without a dedicated *AuthError type name.
 AUTH_EXIT_SCRIPTS_GENERIC = [
-    "fetch_amazon.py",
-    "fetch_humble.py",
-    "fetch_humble_wishlist.py",
-    "fetch_games.py",
-    "fetch_wishlist.py",
+    "fetchers/fetch_amazon.py",
+    "fetchers/fetch_humble.py",
+    "fetchers/fetch_humble_wishlist.py",
+    "fetchers/fetch_games.py",
+    "fetchers/fetch_wishlist.py",
 ]
 
 

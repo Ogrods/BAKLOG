@@ -16,7 +16,7 @@ from auth.session_probe import (
     probe_steam_session_quiet,
     probe_xbox_wishlist_session,
 )
-from gog_client import GOG_AUTH_MESSAGE, GogAuthError
+from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError
 
 
 class TestProbeGogSession:
@@ -108,14 +108,14 @@ class TestQuietProbes:
             assert probe_gog_session_quiet("token") == "unreachable"
 
     def test_epic_quiet_ok(self) -> None:
-        with patch("epic_client.EpicClient") as cls:
+        with patch("clients.epic_client.EpicClient") as cls:
             inst = cls.return_value
             inst._load_session.return_value = {"refresh_token": "rt"}
             assert probe_epic_session_quiet() == "ok"
             inst.login.assert_called_once()
 
     def test_epic_quiet_no_refresh_token(self) -> None:
-        with patch("epic_client.EpicClient") as cls:
+        with patch("clients.epic_client.EpicClient") as cls:
             cls.return_value._load_session.return_value = {}
             assert probe_epic_session_quiet() == "auth_fail"
 

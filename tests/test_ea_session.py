@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ea_client import EaAuthError, EaCaptureError
-from ea_session import (
+from clients.ea_client import EaAuthError, EaCaptureError
+from clients.ea_session import (
     DEFAULT_TRIGGER_URLS,
     is_ea_login_page,
     normalize_bearer,
@@ -31,7 +31,7 @@ def test_probe_ea_token_ok(monkeypatch) -> None:
         def probe_owned_games(self) -> None:
             return None
 
-    monkeypatch.setattr("ea_session.EaClient", lambda *_a, **_k: Client())
+    monkeypatch.setattr("clients.ea_session.EaClient", lambda *_a, **_k: Client())
     out = probe_ea_token("tok")
     assert out["ok"] is True
 

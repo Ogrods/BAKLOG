@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import fetch_amazon as fa
+import fetchers.fetch_amazon as fa
 
 
 def _launcher_row(

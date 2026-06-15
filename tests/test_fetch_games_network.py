@@ -9,14 +9,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-import fetch_games
+import fetchers.fetch_games as fetch_games
 from fetchers._base import STEAM_CREDENTIALS_HINT
 
 
 def test_missing_credentials_message_mentions_connections(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fetch_games, "resolve_env", lambda key, **_: "")
     with patch.object(fetch_games, "load_dotenv"):
-        with patch.object(fetch_games.sys, "argv", ["fetch_games.py", "--skip-hltb"]):
+        with patch.object(fetchers.fetch_games.sys, "argv", ["fetchers.fetch_games.py", "--skip-hltb"]):
             code = fetch_games.main()
     assert code == 1
     assert "Connections" in STEAM_CREDENTIALS_HINT
@@ -93,7 +93,7 @@ def test_main_survives_store_error_with_cached_catalog(
                 with patch.object(
                     fetch_games.sys,
                     "argv",
-                    ["fetch_games.py", "--skip-hltb", "--allow-empty", "--allow-drift"],
+                    ["fetchers.fetch_games.py", "--skip-hltb", "--allow-empty", "--allow-drift"],
                 ):
                     code = fetch_games.main()
 

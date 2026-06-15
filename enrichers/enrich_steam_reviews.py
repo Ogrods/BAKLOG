@@ -20,12 +20,12 @@ from pathlib import Path
 import requests
 
 from auth import resolve_env
+from clients.itch_game import itch_is_videogame as _itch_is_videogame
+from clients.steam_client import SteamClient
 from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
-from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 from shared.steam_match import pick_appid
-from steam_client import SteamClient
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 

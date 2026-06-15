@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location("fetch_xbox", _ROOT / "fetch_xbox.py")
+_spec = importlib.util.spec_from_file_location("fetchers.fetch_xbox", _ROOT / "fetchers/fetch_xbox.py")
 _mod = importlib.util.module_from_spec(_spec)
 assert _spec.loader is not None
 _spec.loader.exec_module(_mod)

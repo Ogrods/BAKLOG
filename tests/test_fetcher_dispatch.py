@@ -101,8 +101,8 @@ def test_every_fetcher_reconfigures_stdout_line_buffered():
     offenders: list[str] = []
     targets = sorted(
         {
-            *_REPO.glob("fetch_*.py"),
-            *_REPO.glob("enrich_*.py"),
+            *_REPO.glob("fetchers/fetch_*.py"),
+            *_REPO.glob("enrichers/enrich_*.py"),
             _REPO / "fetchers" / "_base.py",
         }
     )

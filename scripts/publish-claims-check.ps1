@@ -14,6 +14,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+$env:PYTHONPATH = $Root
 
 $Python = Join-Path $Root ".venv\Scripts\python.exe"
 if (-not (Test-Path $Python)) {
@@ -32,12 +33,12 @@ function Invoke-Step {
 
 if (-not $SkipFetch) {
     Invoke-Step "fetch_claim_sources.py" {
-        & $Python fetch_claim_sources.py
+        & $Python fetchers/fetch_claim_sources.py
     }
 }
 
 Invoke-Step "build_free_claims.py --dry-run" {
-    & $Python build_free_claims.py --dry-run --no-profile
+    & $Python fetchers/build_free_claims.py --dry-run --no-profile
 }
 
 Invoke-Step "audit_free_surface_data.py --fail-on high" {

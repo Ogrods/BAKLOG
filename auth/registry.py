@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from amazon_web_client import amazon_signin_url
 from auth.epic_wishlist_session import epic_store_login_url
+from clients.amazon_web_client import amazon_signin_url
 
 AuthKind = Literal["form", "browser", "oauth", "local", "manual"]
 

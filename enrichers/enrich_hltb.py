@@ -16,10 +16,10 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+from clients.hltb_client import HltbClient
+from clients.itch_game import itch_is_videogame as _itch_is_videogame
 from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
-from hltb_client import HltbClient
-from itch_game import itch_is_videogame as _itch_is_videogame
 from shared.profile_paths import cache_json_path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)

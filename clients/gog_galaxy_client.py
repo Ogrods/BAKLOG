@@ -29,7 +29,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from gog_filters import (
+from .gog_filters import (
     apply_gog_name_filters,
     should_skip_gog_title,
 )

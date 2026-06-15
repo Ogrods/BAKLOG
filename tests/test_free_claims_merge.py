@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fetch_claim_sources import _stamp_first_seen
+from fetchers.fetch_claim_sources import _stamp_first_seen
 from shared.free_claims_sources import (
     carry_claim_enrichment,
     claim_match_keys,

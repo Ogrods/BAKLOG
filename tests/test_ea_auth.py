@@ -7,7 +7,7 @@ from auth.runner import _extract_ea
 
 
 def test_extract_ea_returns_bearer_token(monkeypatch) -> None:
-    monkeypatch.setattr("ea_session.probe_ea_token", lambda _t, _c: {"ok": True})
+    monkeypatch.setattr("clients.ea_session.probe_ea_token", lambda _t, _c: {"ok": True})
 
     handlers: list = []
 

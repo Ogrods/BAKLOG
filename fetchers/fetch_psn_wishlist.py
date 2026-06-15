@@ -22,6 +22,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
+from clients.hltb_client import HltbClient
+from clients.psn_client import PsnAuthError, PsnClient, PsnWishlistEntry
 from fetchers._base import (
     add_allow_empty_arg,
     catalog_file,
@@ -31,8 +33,6 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
-from hltb_client import HltbClient
-from psn_client import PsnAuthError, PsnClient, PsnWishlistEntry
 
 GAMES_WISHLIST_PSN_JSON = Path("games_wishlist_psn.json")
 HLTB_DELAY_SEC = 1.0

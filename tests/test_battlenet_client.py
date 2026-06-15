@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from battlenet_client import (
+from clients.battlenet_client import (
     ACCOUNT_URL,
     BattleNetAuthError,
     BattleNetClient,
@@ -24,7 +24,7 @@ def test_empty_cookie_raises():
         BattleNetClient("")
 
 
-@patch("battlenet_client.requests.Session")
+@patch("clients.battlenet_client.requests.Session")
 def test_get_raw_account_401(mock_session_cls):
     session = MagicMock()
     mock_session_cls.return_value = session
@@ -38,7 +38,7 @@ def test_get_raw_account_401(mock_session_cls):
     session.get.assert_called_once_with(ACCOUNT_URL, timeout=30)
 
 
-@patch("battlenet_client.requests.Session")
+@patch("clients.battlenet_client.requests.Session")
 def test_get_raw_account_success(mock_session_cls):
     session = MagicMock()
     mock_session_cls.return_value = session
@@ -52,14 +52,14 @@ def test_get_raw_account_success(mock_session_cls):
     assert data == {"gameAccounts": []}
 
 
-@patch("battlenet_client.BattleNetClient.get_raw_account")
+@patch("clients.battlenet_client.BattleNetClient.get_raw_account")
 def test_probe_session_delegates(mock_get):
     mock_get.return_value = {"modernGames": []}
     assert probe_session("session=ok") == {"modernGames": []}
     mock_get.assert_called_once()
 
 
-@patch("battlenet_client.BattleNetClient.get_raw_account")
+@patch("clients.battlenet_client.BattleNetClient.get_raw_account")
 def test_probe_session_raises_on_auth(mock_get):
     mock_get.side_effect = BattleNetAuthError("Battle.net rejected the session (401).")
     with pytest.raises(BattleNetAuthError):

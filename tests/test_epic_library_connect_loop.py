@@ -71,8 +71,8 @@ def test_epic_library_captures_redirect_on_non_first_tab(monkeypatch: pytest.Mon
         def login(self) -> None:
             return None
 
-    monkeypatch.setattr("epic_client.EpicClient", _FakeEpicClient)
-    monkeypatch.setattr("epic_client.default_epic_cache_dir", lambda: "/tmp/epic")
+    monkeypatch.setattr("clients.epic_client.EpicClient", _FakeEpicClient)
+    monkeypatch.setattr("clients.epic_client.default_epic_cache_dir", lambda: "/tmp/epic")
 
     creds = runner._extract_epic_inline(primary, ctx, session=None)
     assert creds == {"EPIC_AUTH_CODE": "epic-lib-code-123"}

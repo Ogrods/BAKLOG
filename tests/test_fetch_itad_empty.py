@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-import fetch_itad
+import fetchers.fetch_itad as fetch_itad
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         "ItadClient",
         lambda *a, **k: pytest.fail("ItadClient should not be built for an empty wishlist"),
     )
-    monkeypatch.setattr("sys.argv", ["fetch_itad.py"])
+    monkeypatch.setattr("sys.argv", ["fetchers.fetch_itad.py"])
     return catalogs
 
 

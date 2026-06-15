@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import fetch_gog as fg
-import fetch_itch as fi
+import fetchers.fetch_gog as fg
+import fetchers.fetch_itch as fi
 
 
 def _write_gog_catalog(path: Path, games: list[dict]) -> None:

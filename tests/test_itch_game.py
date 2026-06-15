@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from itch_game import ITCH_NON_GAME_CLASSIFICATIONS, itch_is_videogame
+from clients.itch_game import ITCH_NON_GAME_CLASSIFICATIONS, itch_is_videogame
 
 
 def test_asset_pack_is_not_videogame() -> None:

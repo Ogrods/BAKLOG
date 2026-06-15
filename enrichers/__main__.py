@@ -54,7 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     ns = parser.parse_args(argv)
     cmd = COMMANDS[ns.command] + ns.args
-    return subprocess.call(cmd)
+    env = {**dict(__import__("os").environ), "PYTHONPATH": str(ROOT)}
+    return subprocess.call(cmd, env=env)
 
 
 if __name__ == "__main__":

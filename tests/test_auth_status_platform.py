@@ -33,7 +33,7 @@ def test_platform_supported_semantics():
 def test_amazon_state_unavailable_off_platform(monkeypatch: pytest.MonkeyPatch):
     """When the OS isn't supported, _provider_state must short-circuit to
     'unavailable' without importing the Windows-only amazon_client."""
-    sys.modules.pop("amazon_client", None)
+    sys.modules.pop("clients.amazon_client", None)
     monkeypatch.setattr(manager, "platform_supported", lambda platforms: False)
 
     assert manager._provider_state("amazon") == "unavailable"
@@ -113,7 +113,7 @@ def test_amazon_local_data_absent_off_windows(monkeypatch: pytest.MonkeyPatch):
     """Without an explicit SQL dir, Amazon launcher DB is not probed off Windows."""
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("AMAZON_GAMES_SQL_DIR", raising=False)
-    sys.modules.pop("amazon_client", None)
+    sys.modules.pop("clients.amazon_client", None)
     assert manager._local_data_present("amazon", {}) is False
     assert "amazon_client" not in sys.modules
 

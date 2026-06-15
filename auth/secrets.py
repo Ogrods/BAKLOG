@@ -52,6 +52,11 @@ MASTER_KEY_FILE: Path | None = None
 # this profile id instead of the live active profile. Keeps load/save/key in sync
 # with the patched SECRETS_FILE when operating on a non-active profile.
 PROFILE_ID_OVERRIDE: str | None = None
+# Frozen pre-rebrand identifier. Do NOT rename to "baklog": this is the OS
+# keyring service name under which every existing install stored its master
+# key. Changing it would orphan those keys, silently forcing a plaintext
+# disk-fallback or full re-auth on upgrade. The user-facing brand is BAKLOG;
+# this internal string stays for backward compatibility.
 SERVICE_NAME = "steam-backlog"
 KEYRING_ACCOUNT = "secrets-master"
 KEY_VERSION_LEGACY = 0

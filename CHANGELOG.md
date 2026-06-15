@@ -22,6 +22,29 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.17] - 2026-06-15
+
+### Added
+
+- Tag-triggered immutable release workflow (`.github/workflows/release.yml`):
+  pushing a `vX.Y.Z` tag builds the Windows bundle on a clean runner, verifies
+  the tag matches `pyproject.toml`, attaches a SHA-256 and a signed
+  build-provenance attestation, and publishes the GitHub Release.
+- Contributor scaffolding: `CONTRIBUTING.md`, pull-request and issue templates,
+  weekly Dependabot (pip / npm / github-actions), and an `.editorconfig`.
+
+### Changed
+
+- Reorganized the root Python modules into `clients/`, `fetchers/`, and
+  `enrichers/` packages with package-qualified imports. No behavior change;
+  verified end to end against a frozen build (all 27 fetchers dispatch).
+- Refreshed the free-claims feeds and pruned expired approved giveaways.
+
+### Security
+
+- Legacy `.env` credentials are now deleted after import instead of being
+  renamed to `.env.imported`, so no plaintext secrets are left on disk.
+
 ## [0.8.15] - 2026-06-14
 
 ### Added

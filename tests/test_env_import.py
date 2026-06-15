@@ -107,3 +107,36 @@ def test_skips_local_amazon_provider(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AMAZON_GAMES_SQL_DIR", "C:/whatever")
     imported = import_env_credentials(profile_id="default")
     assert "amazon" not in imported
+
+
+def test_maybe_import_legacy_env_deletes_env_not_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from shared.legacy_env import maybe_import_legacy_env
+
+    env_path = tmp_path / ".env"
+    env_path.write_text("ITCH_API_KEY=from-dotenv\n", encoding="utf-8")
+    monkeypatch.setenv("ITCH_API_KEY", "from-dotenv")
+
+    count, err = maybe_import_legacy_env(tmp_path)
+
+    assert err is None
+    assert count == 1
+    assert not env_path.exists()
+    assert not (tmp_path / ".env.imported").exists()
+    assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
+
+
+def test_remediates_existing_env_imported_archive(tmp_path: Path):
+    from shared.legacy_env import maybe_import_legacy_env, remediate_env_imported_archive
+
+    stale = tmp_path / ".env.imported"
+    stale.write_text("STEAM_API_KEY=leaked\n", encoding="utf-8")
+    assert remediate_env_imported_archive(tmp_path) is True
+    assert not stale.exists()
+
+    stale.write_text("STEAM_API_KEY=leaked\n", encoding="utf-8")
+    count, err = maybe_import_legacy_env(tmp_path)
+    assert err is None
+    assert count == 0
+    assert not stale.exists()

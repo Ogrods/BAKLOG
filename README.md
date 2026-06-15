@@ -181,7 +181,7 @@ Hashed assets under `dist/` get `immutable` long-term cache; `index.html` stays 
    copy .env.example .env
    ```
 
-   Prefer the **Connections** page instead — it stores credentials in encrypted per-profile storage. On first `python server.py` start, any `.env` credentials are imported once into the **default** profile's encrypted store and the file is archived as `.env.imported`.
+   Prefer the **Connections** page instead — it stores credentials in encrypted per-profile storage. On first `python server.py` start, any `.env` credentials are imported once into the **default** profile's encrypted store and the plaintext `.env` file is deleted.
 
 5. Set **Game details** to **Public** in Steam → Profile → Edit Profile → Privacy Settings.
 

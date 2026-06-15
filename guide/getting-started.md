@@ -38,7 +38,7 @@ Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.b
 
    Developers and CI can use `pip install -e ".[dev]"` instead.
 
-3. (Optional, legacy) Copy `.env.example` to `.env` and fill in credentials. Prefer the **Connections** tab instead - it stores credentials in encrypted per-profile storage. On first `python server.py` start, any `.env` credentials are imported once into the **default** profile's encrypted store and the file is archived as `.env.imported`.
+3. (Optional, legacy) Copy `.env.example` to `.env` and fill in credentials. Prefer the **Connections** tab instead - it stores credentials in encrypted per-profile storage. On first `python server.py` start, any `.env` credentials are imported once into the **default** profile's encrypted store and the plaintext `.env` file is deleted.
 
 ## Run the dashboard
 

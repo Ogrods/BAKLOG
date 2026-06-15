@@ -72,9 +72,10 @@ describe('marketing copy guardrails', () => {
     expect(text).toMatch(/tier-grid[\s\S]*Free forever[\s\S]*<h3>Paid<\/h3>/i);
   });
 
-  it('landing/index.html uses $5 flat pricing in public copy', () => {
+  it('landing/index.html uses Support BAKLOG framing without visible monthly pricing', () => {
     const text = readFileSync('landing/index.html', 'utf8');
-    expect(text).toMatch(/\$5\/mo/);
+    expect(text).not.toMatch(/\$5\/mo/);
     expect(text).not.toMatch(/\$2\.99|\$4\.99/);
+    expect(text).toMatch(/Support BAKLOG/);
   });
 });

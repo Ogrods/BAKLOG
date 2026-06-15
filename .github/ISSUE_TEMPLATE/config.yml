@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security report
+    url: https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md
+    about: Please report security issues privately, not as a public issue.
+  - name: Early access / waitlist
+    url: https://baklog.app
+    about: Request invite-only early access to the hosted waitlist.

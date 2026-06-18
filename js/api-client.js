@@ -118,19 +118,20 @@ export async function baklogFetch(url, init = {}) {
   return fetchWithAuthRetry(url, init, method);
 }
 
-/** Mint a single-use SSE ticket (EventSource cannot send Authorization). */
-export async function mintStreamTicket() {
+/** Mint a limited-reuse SSE ticket (EventSource cannot send Authorization). */
+export async function mintStreamTicket(runId = null) {
   if (!isAccountAuthMode()) return null;
-  const res = await baklogFetch('/api/auth/stream-ticket', { method: 'POST' });
+  const body = runId ? JSON.stringify({ run_id: runId }) : undefined;
+  const res = await baklogFetch('/api/auth/stream-ticket', { method: 'POST', body });
   if (!res.ok) return null;
   const data = await res.json().catch(() => ({}));
   return data.ticket || null;
 }
 
 /** Append ?ticket= for authenticated SSE streams. */
-export async function urlWithStreamTicket(url) {
+export async function urlWithStreamTicket(url, { runId = null } = {}) {
   if (!isAccountAuthMode()) return url;
-  const ticket = await mintStreamTicket();
+  const ticket = await mintStreamTicket(runId);
   if (!ticket) {
     throw new Error('Could not mint SSE stream ticket');
   }

@@ -2626,7 +2626,7 @@ export const fetcherRunner = (() => {
     }
     let esUrl;
     try {
-      esUrl = await urlWithStreamTicket(streamUrl(runId));
+      esUrl = await urlWithStreamTicket(streamUrl(runId), { runId });
     } catch (_) {
       scheduleReconnect(runId, key, src, { queuedOnly });
       return;

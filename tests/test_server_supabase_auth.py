@@ -100,6 +100,20 @@ def _request(
         return exc.code, exc.read()
 
 
+def _stream_open_status(base: str, path: str) -> int:
+    """GET /api/stream/* and return status without reading the SSE body."""
+    import http.client
+    from urllib.parse import urlparse
+
+    parsed = urlparse(f"{base}{path}")
+    conn = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=3)
+    try:
+        conn.request("GET", parsed.path + (f"?{parsed.query}" if parsed.query else ""))
+        return conn.getresponse().status
+    finally:
+        conn.close()
+
+
 def _get_json(base: str, path: str, *, auth: str | None = None) -> tuple[int, dict]:
     status, raw = _request(base, path, auth=auth)
     try:
@@ -323,7 +337,41 @@ def test_stream_ticket_mint_and_sse_access(auth_server) -> None:
     assert status == 401
 
 
-def test_stream_ticket_single_use(auth_server) -> None:
+def test_stream_ticket_limited_reuse(auth_server) -> None:
+    base, secret, _tmp = auth_server
+    sub = "550e8400-e29b-41d4-a716-446655440000"
+    profile_id = sub.lower()
+    account_profiles.ensure_profile_for_user(sub, "a@example.com")
+    run_id = "ticket-reuse-terminal"
+    summary = {
+        "id": run_id,
+        "status": "done",
+        "exit_code": 0,
+        "started_at": "2026-01-01T00:00:00Z",
+        "ended_at": "2026-01-01T00:00:01Z",
+        "profile_id": profile_id,
+    }
+    with server.MANAGER._lock:
+        server.MANAGER._history.appendleft(summary)
+    status, raw = _request(
+        base,
+        "/api/auth/stream-ticket",
+        method="POST",
+        auth=_bearer(secret, sub=sub),
+        headers={"Content-Type": "application/json"},
+        body=b"{}",
+    )
+    assert status == 200
+    ticket = json.loads(raw.decode("utf-8"))["ticket"]
+    max_uses = server._STREAM_TICKET_MAX_USES
+    for _ in range(max_uses):
+        status_ok = _stream_open_status(base, f"/api/stream/{run_id}?ticket={ticket}")
+        assert status_ok == 200
+    status_exhausted = _stream_open_status(base, f"/api/stream/{run_id}?ticket={ticket}")
+    assert status_exhausted == 401
+
+
+def test_stream_ticket_not_consumed_on_unknown_run(auth_server) -> None:
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     account_profiles.ensure_profile_for_user(sub, "a@example.com")
@@ -337,10 +385,10 @@ def test_stream_ticket_single_use(auth_server) -> None:
     )
     assert status == 200
     ticket = json.loads(raw.decode("utf-8"))["ticket"]
-    status1, _ = _request(base, f"/api/stream/abc?ticket={ticket}")
-    assert status1 != 401
-    status2, _ = _request(base, f"/api/stream/abc?ticket={ticket}")
-    assert status2 == 401
+    status404, _ = _request(base, f"/api/stream/missing-run?ticket={ticket}")
+    assert status404 == 404
+    status_ok, _ = _request(base, f"/api/stream/abc?ticket={ticket}")
+    assert status_ok != 401
 
 
 def test_epic_callback_without_bearer(auth_server) -> None:

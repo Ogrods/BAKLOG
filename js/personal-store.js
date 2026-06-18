@@ -157,7 +157,7 @@ export const personalStore = (() => {
   // rule, so the cleared claim reappears on the next reload. Union both sides
   // instead, keeping the newer numeric timestamp when a key exists on both
   // (non-numeric legacy values are preserved if that's all we have).
-  const DISMISSAL_MAP_KEYS = new Set(['__dismissedClaims', '__dismissedClaimKeys']);
+  const DISMISSAL_MAP_KEYS = new Set(['__dismissedClaims', '__dismissedClaimKeys', '__purgedClaimKeys']);
 
   function _mergeDismissalMaps(baseMap, incomingMap) {
     const base = baseMap && typeof baseMap === 'object' && !Array.isArray(baseMap) ? baseMap : {};
@@ -216,15 +216,10 @@ export const personalStore = (() => {
   }
 
   function _loadLegacyUnscopedPersonal() {
-    if (personalStorageKey() === STORAGE_KEY) return null;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch {
-      return null;
-    }
+    // Pre-multi-profile, personal lived at unscoped STORAGE_KEY (default's cache).
+    // Default still reads/writes that key via personalStorageKey(); never merge it
+    // into other profiles — that leaked default dismissals/personal into promo/test.
+    return null;
   }
 
   function applyServerDoc(doc) {

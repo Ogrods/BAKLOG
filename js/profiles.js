@@ -11,7 +11,14 @@ import {
   getAccountProfileId,
   signOutAccount,
 } from './auth-gate.js';
-import { KNOWN_LIBRARY_KEYS_KEY, LIBRARY_FIRST_SEEN_KEY, MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from './state.js';
+import {
+  COLOR_THEME_KEY,
+  KNOWN_LIBRARY_KEYS_KEY,
+  LIBRARY_FIRST_SEEN_KEY,
+  MANUAL_KEY,
+  PREFS_KEY,
+  STORAGE_KEY,
+} from './state.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { escapeAttr } from './dom-util.js';
 import {
@@ -38,8 +45,17 @@ export const LS_FETCHER_SUPPRESSED_RUNS = 'fetcher-suppressed-run-ids';
 export const LS_FETCHER_LAST_SEQ = 'fetcher-last-seq-by-run';
 export const LS_LIBRARY_WATCH = 'baklog-library-watch';
 export const LS_SPOTLIGHT_RECENT_KEYS = 'baklog-spotlight-recent';
+export const LS_AD_CURSORS = 'baklog-ad-cursors';
+export const LS_STAT_LAYOUT = 'baklog-fetcher-stat-layout';
+export const LS_GALLERY_MODE = 'baklog.coverGalleryMode';
+export const LS_DASH_FAILED_COVERS = 'baklog-dash-failed-covers';
+export const LS_LANDSCAPE_COVERS = 'baklog-landscape-covers';
+export const LS_METRICS_RENDERED = 'baklog-metrics-rendered';
+export const LS_UNTAPPED_BATCH = 'baklog-metrics-untapped-batch-seeded';
 /** Session-only; profile-suffixed like prefs. */
 export const LS_ACTIVE_VIEW_SESSION = `${PREFS_KEY}:activeView`;
+export const LS_METRIC_SEED = '__baklogMetricSeed';
+export const LS_PRO_WELCOME = 'baklog-pro-welcome';
 
 export const PROFILE_SCOPED_STORAGE_KEYS = Object.freeze([
   PREFS_KEY,
@@ -56,6 +72,14 @@ export const PROFILE_SCOPED_STORAGE_KEYS = Object.freeze([
   LS_CLAIMS_LAST_AUTO_RUN,
   LS_AUTO_STALE_LAST_RUN,
   LS_LIBRARY_WATCH,
+  LS_AD_CURSORS,
+  COLOR_THEME_KEY,
+  LS_STAT_LAYOUT,
+  LS_GALLERY_MODE,
+  LS_DASH_FAILED_COVERS,
+  LS_LANDSCAPE_COVERS,
+  LS_METRICS_RENDERED,
+  LS_UNTAPPED_BATCH,
 ]);
 
 /** Profile-suffixed sessionStorage keys (fetcher SSE resume state + active tab). */
@@ -63,6 +87,8 @@ export const PROFILE_SCOPED_SESSION_KEYS = Object.freeze([
   LS_ACTIVE_VIEW_SESSION,
   LS_FETCHER_SUPPRESSED_RUNS,
   LS_FETCHER_LAST_SEQ,
+  LS_METRIC_SEED,
+  LS_PRO_WELCOME,
 ]);
 
 let _status = null;
@@ -149,6 +175,42 @@ export function itadSnapshotStorageKey() {
 
 export function claimsSnapshotStorageKey() {
   return `${CLAIMS_SNAPSHOT_PREFIX}${profileKeySuffix()}`;
+}
+
+export function colorThemeStorageKey(id) {
+  return `${COLOR_THEME_KEY}${profileKeySuffix(id)}`;
+}
+
+export function statLayoutStorageKey(id) {
+  return `${LS_STAT_LAYOUT}${profileKeySuffix(id)}`;
+}
+
+export function galleryModeStorageKey(id) {
+  return `${LS_GALLERY_MODE}${profileKeySuffix(id)}`;
+}
+
+export function dashFailedCoversStorageKey(id) {
+  return `${LS_DASH_FAILED_COVERS}${profileKeySuffix(id)}`;
+}
+
+export function landscapeCoversStorageKey(id) {
+  return `${LS_LANDSCAPE_COVERS}${profileKeySuffix(id)}`;
+}
+
+export function metricsRenderedStorageKey(id) {
+  return `${LS_METRICS_RENDERED}${profileKeySuffix(id)}`;
+}
+
+export function untappedBatchMarkerStorageKey(id) {
+  return `${LS_UNTAPPED_BATCH}${profileKeySuffix(id)}`;
+}
+
+export function metricSeedSessionKey(id) {
+  return `${LS_METRIC_SEED}${profileKeySuffix(id)}`;
+}
+
+export function proWelcomeSessionKey(id) {
+  return `${LS_PRO_WELCOME}${profileKeySuffix(id)}`;
 }
 
 /** Prefix a localStorage base key with the active profile suffix. */

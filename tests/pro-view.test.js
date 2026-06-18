@@ -4,9 +4,11 @@ import { isProPromoSponsorId, proPromoBannerHtml, PRO_PROMO, PRO_PROMO_ITEM } fr
 vi.mock('../js/auth-gate.js', () => ({
   isPro: vi.fn(() => false),
   isAccountAuthMode: vi.fn(() => false),
+  isLocalProfilesEnabled: vi.fn(() => false),
   licenseActivationEnabled: vi.fn(() => true),
   proCheckoutUrls: vi.fn(() => ({})),
   getAccountEmail: vi.fn(() => ''),
+  getAccountProfileId: vi.fn(() => ''),
   refreshAccountPlan: vi.fn(async () => 'free'),
 }));
 
@@ -132,12 +134,13 @@ describe('post-checkout return', () => {
     authGate.refreshAccountPlan.mockResolvedValue('pro');
     const reload = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload });
-    const { PRO_WELCOME_STORAGE_KEY, markCheckoutSuccessPending, handleCheckoutSuccessReturn } = await import('../js/pro-view.js');
+    const { markCheckoutSuccessPending, handleCheckoutSuccessReturn } = await import('../js/pro-view.js');
+    const { proWelcomeSessionKey } = await import('../js/profiles.js');
     markCheckoutSuccessPending();
     await handleCheckoutSuccessReturn();
     expect(authGate.refreshAccountPlan).toHaveBeenCalled();
     expect(document.getElementById('proViewStatus').textContent).toContain('Pro is active');
-    expect(sessionStorage.getItem(PRO_WELCOME_STORAGE_KEY)).toBe('1');
+    expect(sessionStorage.getItem(proWelcomeSessionKey())).toBe('1');
     vi.advanceTimersByTime(500);
     expect(reload).toHaveBeenCalled();
   });
@@ -195,13 +198,14 @@ describe('Pro activation UX', () => {
   it('showProWelcomeBanner renders once when flag is set and user is Pro', async () => {
     const authGate = await import('../js/auth-gate.js');
     authGate.isPro.mockReturnValue(true);
-    const { PRO_WELCOME_STORAGE_KEY, showProWelcomeBanner } = await import('../js/pro-view.js');
-    sessionStorage.setItem(PRO_WELCOME_STORAGE_KEY, '1');
+    const { showProWelcomeBanner } = await import('../js/pro-view.js');
+    const { proWelcomeSessionKey } = await import('../js/profiles.js');
+    sessionStorage.setItem(proWelcomeSessionKey(), '1');
     showProWelcomeBanner();
     const banner = document.getElementById('proWelcomeBanner');
     expect(banner.classList.contains('hidden')).toBe(false);
     expect(banner.textContent).toContain("You're on Pro");
-    expect(sessionStorage.getItem(PRO_WELCOME_STORAGE_KEY)).toBeNull();
+    expect(sessionStorage.getItem(proWelcomeSessionKey())).toBeNull();
     banner.querySelector('.pro-welcome-dismiss')?.click();
     expect(banner.classList.contains('hidden')).toBe(true);
   });

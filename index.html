@@ -30,7 +30,9 @@
         var valid = { dashboard: 1, library: 1, wishlist: 1, itch: 1, connections: 1, pro: 1 };
         if (!valid[view]) view = 'dashboard';
         document.documentElement.setAttribute('data-init-view', view);
-        var theme = localStorage.getItem('baklog-color-theme') || 'default';
+        var pid = localStorage.getItem('baklog-active-profile') || 'default';
+        var themeSuffix = pid && pid !== 'default' ? ':' + pid : '';
+        var theme = localStorage.getItem('baklog-color-theme' + themeSuffix) || 'default';
         var validThemes = { default: 1, dark: 1, 'log-jammin': 1, ember: 1, synthwave: 1, terminal: 1 };
         if (theme === 'timber') theme = 'log-jammin';
         if (!validThemes[theme]) theme = 'default';

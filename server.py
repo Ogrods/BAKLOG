@@ -3220,7 +3220,6 @@ class Handler(SimpleHTTPRequestHandler):
             from shared.profiles import create_profile
 
             created = create_profile(str(payload.get("label") or ""))
-            _refresh_personal_paths()
             _send_json(self, HTTPStatus.CREATED, created)
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})

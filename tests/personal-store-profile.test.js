@@ -486,4 +486,47 @@ describe('personalStore.prepareForProfileSwitch', () => {
     await personalStore.init();
     expect(state.libraryFirstSeenByKey['steam:1']).toBe(5000);
   });
+
+  it('does not merge unscoped default localStorage dismissals into non-default profile', async () => {
+    vi.resetModules();
+    localStorage.clear();
+    localStorage.setItem('baklog-active-profile', 'promo');
+    // Unscoped key is default's pre-multi-profile cache — must not bleed into promo.
+    localStorage.setItem(
+      'steam-backlog-personal',
+      JSON.stringify({
+        __dismissedClaims: { 'epic-citizen-sleeper-944858': 1781799498808 },
+        __dismissedClaimKeys: { 'title:citizen sleeper': 1781799498808 },
+      }),
+    );
+    localStorage.setItem(
+      'steam-backlog-personal:promo',
+      JSON.stringify({ game1: { status: 'backlog' } }),
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({
+              personal: { game1: { status: 'backlog' } },
+              prefs: {},
+              manual: [],
+            }),
+          };
+        }
+        if (url === '/api/personal' && opts?.method === 'PUT') {
+          return { ok: true, json: async () => JSON.parse(opts.body) };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    await personalStore.init();
+    expect(state.personal.__dismissedClaims).toBeUndefined();
+    expect(state.personal.__dismissedClaimKeys).toBeUndefined();
+  });
 });

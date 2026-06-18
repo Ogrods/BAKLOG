@@ -1,18 +1,14 @@
 {
   "ids": [
-    "epic-warhammer-40k-speed-freeks-12879c",
     "gamerpower-1604",
     "gamerpower-2204",
     "gamerpower-2386",
     "gamerpower-3096",
     "gamerpower-3266",
     "gamerpower-3446",
-    "gamerpower-3477",
     "gamerpower-3548",
-    "gamerpower-3679",
     "gamerpower-3680",
     "gamerpower-3682",
-    "gamerpower-3684",
     "itad-073a56345192",
     "itad-0c69ed1f1bd8",
     "itad-0d4598c53ffe",
@@ -23,7 +19,9 @@
     "itad-b07aac9ebd26",
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
-    "itad-f0cffe659c19"
+    "itad-f0cffe659c19",
+    "epic-robobeat-5f084b",
+    "epic-citizen-sleeper-944858"
   ],
   "store_overrides": {
     "gamerpower-3266": "indiegala",
@@ -51,23 +49,14 @@
     "gamerpower-3446": {
       "title": "GigaBash"
     },
-    "gamerpower-3477": {
-      "title": "CALLUS"
-    },
     "gamerpower-3548": {
       "title": "Static Voice"
-    },
-    "gamerpower-3679": {
-      "title": "Happy's Humble Burger Farm"
     },
     "gamerpower-3680": {
       "title": "The Ouroboros King"
     },
     "gamerpower-3682": {
       "title": "The Red Lantern"
-    },
-    "gamerpower-3684": {
-      "title": "Eets"
     },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
@@ -112,15 +101,10 @@
     "gamerpower-3272",
     "itad-50a2b5b1d7a6",
     "gamerpower-3279",
-    "itad-8738c881d524",
-    "epic-the-ouroboros-king-e1d547",
-    "itad-d2d983178b48",
-    "itad-caf022eee569",
-    "itad-8ca7cd481f36",
-    "gamerpower-3681",
-    "itad-0d845ad1210c",
     "itad-d85d5bb4128d",
-    "itad-e46cedded0fc",
-    "gamerpower-3410"
+    "gamerpower-3687",
+    "gamerpower-3688",
+    "itad-13ca8fbedd28",
+    "itad-529a5bd808a1"
   ]
 }

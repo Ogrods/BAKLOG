@@ -1,64 +1,61 @@
 {
-  "fetched_at": "2026-06-15T07:14:39.835663+00:00",
+  "fetched_at": "2026-06-18T16:13:35.645617+00:00",
   "sources": {
     "epic": 2,
-    "gamerpower": 17,
-    "itad": 17
+    "gamerpower": 13,
+    "itad": 12
   },
   "attribution": [
     "GamerPower.com"
   ],
   "items": [
     {
-      "id": "epic-the-ouroboros-king-e1d547",
+      "id": "epic-citizen-sleeper-944858",
       "store": "epic",
-      "title": "The Ouroboros King",
-      "claim_url": "https://store.epicgames.com/en-US/p/the-ouroboros-king-e1d547",
-      "ends_at": "2026-06-18T15:00:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/33630d7105014582a478094e89953f49/the-ouroboros-king-jwabx.jpg",
+      "title": "Citizen Sleeper",
+      "claim_url": "https://store.epicgames.com/en-US/p/citizen-sleeper-944858",
+      "ends_at": "2026-06-25T15:00:00Z",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1578650/header.jpg?t=1780960841",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-18T16:13:35.645617+00:00",
+      "review_percent": 92,
+      "steam_appid": 1578650
     },
     {
-      "id": "epic-warhammer-40k-speed-freeks-12879c",
+      "id": "epic-robobeat-5f084b",
       "store": "epic",
-      "title": "Warhammer 40K Speed Freeks",
-      "claim_url": "https://store.epicgames.com/en-US/p/warhammer-40k-speed-freeks-12879c",
-      "ends_at": "2026-06-18T15:00:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/a1af14251fb748fc9bda63bfc260f933/warhammer-40k-speed-freeks-1k4pq.jpg",
+      "title": "ROBOBEAT",
+      "claim_url": "https://store.epicgames.com/en-US/p/robobeat-5f084b",
+      "ends_at": "2026-06-25T15:00:00Z",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1456760/6deea24de35cafe95a4b3693ff925608b44bc4a2/header.jpg?t=1781256997",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-18T16:13:35.645617+00:00",
+      "review_percent": 94,
+      "steam_appid": 1456760
     },
     {
-      "id": "gamerpower-3410",
-      "store": "steam",
-      "title": "Wild Terra 2: New Lands (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/wild-terra-2-new-lands-steam-giveaway",
-      "ends_at": "2026-06-15T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/69419e7cba2bf.jpg",
-      "blurb": "This giveaway is for all MMORPG fans out there! To celebrate the latest update, Juvty Worlds is giving away Wild Terra 2: New Lands for free on Steam! If you’re into medieval worlds, this one’s worth checking out. Wild Terra 2 throws you into a living sandbox filled with pets, raids, crafting, and plenty of danger. Grab it while it’s free and jump into the adventure!",
+      "id": "gamerpower-3688",
+      "store": "epic",
+      "title": "ROBOBEAT (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/robobeat-epic-games-giveaway",
+      "ends_at": "2026-06-25T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a3408d9a75df.jpg",
+      "blurb": "You are on a mission to capture a robot gone rogue! So grab ROBOBEAT directly from the Epic Games Store while it's free, jump into the game, and play this rhythm shooter until you complete your mission!",
       "source": "gamerpower",
-      "first_seen": "2026-06-12T21:29:40.643267+00:00"
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
     },
     {
-      "id": "gamerpower-3684",
-      "store": "steam",
-      "title": "Eets (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/eets-steam-giveaway",
-      "ends_at": "2026-06-15T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2aebf9e069c.jpg",
-      "blurb": "Claim Eets for free on Steam until June 15! Eets is a 2D puzzle game, something like Lemmings meets The Incredible Machine.",
+      "id": "gamerpower-3687",
+      "store": "epic",
+      "title": "Citizen Sleeper (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/citizen-sleeper-epic-games-giveaway",
+      "ends_at": "2026-06-25T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a34084f6356e.jpg",
+      "blurb": "Don’t miss this amazing narrative RPG, available for free this week on the Epic Games Store! Citizen Sleeper is a captivating cyberpunk experience set in a fascinating universe. Seriously, don’t miss it!",
       "source": "gamerpower",
-      "review_percent": 59,
-      "steam_appid": 6100,
-      "genres": [
-        "Casual",
-        "Indie",
-        "Strategy"
-      ],
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
     },
     {
       "id": "gamerpower-3682",
@@ -80,49 +77,6 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "gamerpower-3681",
-      "store": "epic",
-      "title": "Warhammer 40,000: Speed Freeks (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/warhammer-40-000-speed-freeks-epic-games-giveaway",
-      "ends_at": "2026-06-18T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2ace194c587.jpg",
-      "blurb": "You don't need to race to grab this giveaway! Score Warhammer 40,000: Speed Freeks for free on Epic Games Store until June 18! Warhammer 40,000: Speed Freeks is a cool combat racing game in the Warhammer 40,000 universe!",
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3680",
-      "store": "epic",
-      "title": "The Ouroboros King (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/the-ouroboros-king-epic-games-giveaway",
-      "ends_at": "2026-06-18T23:59:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/33630d7105014582a478094e89953f49/the-ouroboros-king-jwabx.jpg",
-      "blurb": "Checkmate your boredom! Download The Ouroboros King without any cost via Epic Games Store! The Ouroboros King combines chess with the replayability of roguelikes. Check it out!",
-      "source": "gamerpower",
-      "review_percent": 81,
-      "steam_appid": 2096510,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3679",
-      "store": "steam",
-      "title": "Happy's Humble Burger Farm (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/happy-s-humble-burger-farm-steam-giveaway",
-      "ends_at": "2026-06-15T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2ab69455c6c.jpg",
-      "blurb": "Start grilling patties today with this giveaway! Grab Happy’s Humble Burger Farm for free on Steam until June 15. Happy’s Humble Burger Farm is a first-person sim game about serving customers and maintaining a restaurant. Don´t miss it!",
-      "source": "gamerpower",
-      "review_percent": 92,
-      "steam_appid": 1433340,
-      "genres": [
-        "Action",
-        "Adventure",
-        "Indie",
-        "Simulation"
-      ],
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
       "id": "gamerpower-3548",
       "store": "itch",
       "title": "Static Voice (Itch.io) Giveaway",
@@ -133,19 +87,6 @@
       "source": "gamerpower",
       "review_percent": 93,
       "steam_appid": 4207170,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3477",
-      "store": "itch",
-      "title": "CALLUS (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/callus-itch-io-giveaway",
-      "ends_at": "2026-06-15T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/697cea97b5a63.jpg",
-      "blurb": "Want to go for a walk? Grab CALLUS for free on itch.io! Callus is a small indie psychological walking simulator with realistic gameplay.",
-      "source": "gamerpower",
-      "review_percent": 76,
-      "steam_appid": 4258330,
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
@@ -262,83 +203,26 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "itad-e46cedded0fc",
-      "store": "steam",
-      "title": "Wild Terra 2: New Lands - FREE on Steam on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16265/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/wild-terra-2-new-lands/info/\">Wild Terra 2: New Lands</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 15 Jun 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1134700/Wild_Terra_2_New_Lands/>go to giveaway</a>",
-      "source": "itad",
-      "first_seen": "2026-06-12T21:29:40.643267+00:00"
-    },
-    {
-      "id": "itad-caf022eee569",
-      "store": "steam",
-      "title": "Eets - FREE on Steam on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16263/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/eets/info/\">Eets</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 15 Jun 2026 19:11:00 +0200\n                                        | <a href=https://store.steampowered.com/app/6100/Eets/>go to giveaway</a>",
-      "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-330faa9821bf",
+      "id": "itad-529a5bd808a1",
       "store": "epic",
-      "title": "Guild of Dungeoneering Ultimate Edition free on mobile on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16262/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/317820/library_600x900_2x.jpg",
-      "blurb": "Guild of Dungeoneering Ultimate Edition",
-      "source": "itad",
-      "review_percent": 77,
-      "steam_appid": 317820,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-d2d983178b48",
-      "store": "steam",
-      "title": "The Red Lantern - FREE on Steam on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16261/",
+      "title": "ROBOBEAT - FREE on Epic Games on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16273/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/the-red-lantern/info/\">The Red Lantern</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 18 Jun 2026 17:06:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1053710/The_Red_Lantern/>go to giveaway</a>",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/robobeat/info/\">ROBOBEAT</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 25 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/robobeat-5f084b>go to giveaway</a>",
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
     },
     {
-      "id": "itad-8738c881d524",
-      "store": "steam",
-      "title": "Happy's Humble Burger Farm - FREE on Steam on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16259/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/happys-humble-burger-farm/info/\">Happy&#039;s Humble Burger Farm</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Mon, 15 Jun 2026 15:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1433340/Happys_Humble_Burger_Farm/>go to giveaway</a>",
-      "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-8ca7cd481f36",
+      "id": "itad-13ca8fbedd28",
       "store": "epic",
-      "title": "Warhammer 40,000: Speed Freeks - FREE on Epic Games on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16258/",
+      "title": "Citizen Sleeper - FREE on Epic Games on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16272/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/warhammer-40000-speed-freeks/info/\">Warhammer 40,000: Speed Freeks</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 18 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/warhammer-40k-speed-freeks-12879c>go to giveaway</a>",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/citizen-sleeper/info/\">Citizen Sleeper</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 25 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/citizen-sleeper-944858>go to giveaway</a>",
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-0d845ad1210c",
-      "store": "epic",
-      "title": "The Ouroboros King - FREE on Epic Games on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16257/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/the-ouroboros-king/info/\">The Ouroboros King</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 18 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/the-ouroboros-king-e1d547>go to giveaway</a>",
-      "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
     },
     {
       "id": "itad-f0cffe659c19",

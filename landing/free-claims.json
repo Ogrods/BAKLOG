@@ -1,35 +1,45 @@
 {
-  "generated_at": "2026-06-15T07:15:02.129605+00:00",
+  "generated_at": "2026-06-18T16:17:28.072395+00:00",
   "items": [
     {
-      "id": "epic-warhammer-40k-speed-freeks-12879c",
+      "id": "epic-construction-simulator-3",
       "store": "epic",
-      "title": "Warhammer 40K Speed Freeks",
-      "claim_url": "https://store.epicgames.com/en-US/p/warhammer-40k-speed-freeks-12879c",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/a1af14251fb748fc9bda63bfc260f933/warhammer-40k-speed-freeks-1k4pq.jpg",
+      "title": "Construction Simulator 3",
+      "claim_url": "https://store.epicgames.com/p/construction-simulator-3-ios-79078c",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1370120/42465c70c11e03da3d3d4c0d8ba221ca29ea6c1f/header.jpg?t=1764066253",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-06-18T15:00:00Z",
-      "source": "epic",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "ends_at": "2026-06-25T15:00:00Z",
+      "steam_appid": 1370120,
+      "review_percent": 56
     },
     {
-      "id": "gamerpower-3684",
-      "store": "steam",
-      "title": "Eets",
-      "claim_url": "https://www.gamerpower.com/open/eets-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2aebf9e069c.jpg",
-      "genres": [
-        "Casual",
-        "Indie",
-        "Strategy"
-      ],
-      "blurb": "Claim Eets for free on Steam until June 15! Eets is a 2D puzzle game, something like Lemmings meets The Incredible Machine.",
-      "ends_at": "2026-06-15T23:59:00Z",
-      "steam_appid": 6100,
-      "review_percent": 59,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "id": "epic-citizen-sleeper-944858",
+      "store": "epic",
+      "title": "Citizen Sleeper",
+      "claim_url": "https://store.epicgames.com/en-US/p/citizen-sleeper-944858",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1578650/header.jpg?t=1780960841",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-06-25T15:00:00Z",
+      "steam_appid": 1578650,
+      "review_percent": 92,
+      "source": "epic",
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+    },
+    {
+      "id": "epic-robobeat-5f084b",
+      "store": "epic",
+      "title": "ROBOBEAT",
+      "claim_url": "https://store.epicgames.com/en-US/p/robobeat-5f084b",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1456760/6deea24de35cafe95a4b3693ff925608b44bc4a2/header.jpg?t=1781256997",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-06-25T15:00:00Z",
+      "steam_appid": 1456760,
+      "review_percent": 94,
+      "source": "epic",
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
     },
     {
       "id": "gamerpower-3682",
@@ -51,39 +61,6 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "gamerpower-3680",
-      "store": "epic",
-      "title": "The Ouroboros King",
-      "claim_url": "https://www.gamerpower.com/open/the-ouroboros-king-epic-games-giveaway",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/33630d7105014582a478094e89953f49/the-ouroboros-king-jwabx.jpg",
-      "genres": [],
-      "blurb": "Checkmate your boredom! Download The Ouroboros King without any cost via Epic Games Store! The Ouroboros King combines chess with the replayability of roguelikes. Check it out!",
-      "ends_at": "2026-06-18T23:59:00Z",
-      "steam_appid": 2096510,
-      "review_percent": 81,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3679",
-      "store": "steam",
-      "title": "Happy's Humble Burger Farm",
-      "claim_url": "https://www.gamerpower.com/open/happy-s-humble-burger-farm-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2ab69455c6c.jpg",
-      "genres": [
-        "Action",
-        "Adventure",
-        "Indie",
-        "Simulation"
-      ],
-      "blurb": "Start grilling patties today with this giveaway! Grab Happy’s Humble Burger Farm for free on Steam until June 15. Happy’s Humble Burger Farm is a first-person sim game about serving customers and maintaining a restaurant. Don´t miss it!",
-      "ends_at": "2026-06-15T23:59:00Z",
-      "steam_appid": 1433340,
-      "review_percent": 92,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
       "id": "gamerpower-3548",
       "store": "itch",
       "title": "Static Voice",
@@ -94,20 +71,6 @@
       "ends_at": "2026-06-19T23:59:00Z",
       "steam_appid": 4207170,
       "review_percent": 93,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3477",
-      "store": "itch",
-      "title": "CALLUS",
-      "claim_url": "https://www.gamerpower.com/open/callus-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/697cea97b5a63.jpg",
-      "genres": [],
-      "blurb": "Want to go for a walk? Grab CALLUS for free on itch.io! Callus is a small indie psychological walking simulator with realistic gameplay.",
-      "ends_at": "2026-06-15T23:59:00Z",
-      "steam_appid": 4258330,
-      "review_percent": 76,
       "source": "gamerpower",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -194,20 +157,6 @@
       "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
       "ends_at": "2026-06-25T22:48:59Z",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-330faa9821bf",
-      "store": "epic",
-      "title": "Guild of Dungeoneering Ultimate Edition",
-      "claim_url": "https://isthereanydeal.com/giveaways/16262/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/317820/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Guild of Dungeoneering Ultimate Edition",
-      "ends_at": "2026-06-25T22:48:59Z",
-      "steam_appid": 317820,
-      "review_percent": 77,
-      "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
@@ -306,6 +255,34 @@
       "source": "itad"
     },
     {
+      "id": "itad-330faa9821bf",
+      "store": "epic",
+      "title": "Guild of Dungeoneering Ultimate Edition",
+      "claim_url": "https://isthereanydeal.com/giveaways/16262/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/317820/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Guild of Dungeoneering Ultimate Edition",
+      "ends_at": "2026-06-25T22:48:59Z",
+      "steam_appid": 317820,
+      "review_percent": 77,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "gamerpower-3680",
+      "store": "epic",
+      "title": "The Ouroboros King",
+      "claim_url": "https://www.gamerpower.com/open/the-ouroboros-king-epic-games-giveaway",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/33630d7105014582a478094e89953f49/the-ouroboros-king-jwabx.jpg",
+      "genres": [],
+      "blurb": "Checkmate your boredom! Download The Ouroboros King without any cost via Epic Games Store! The Ouroboros King combines chess with the replayability of roguelikes. Check it out!",
+      "ends_at": "2026-06-18T23:59:00Z",
+      "steam_appid": 2096510,
+      "review_percent": 81,
+      "source": "gamerpower",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
       "id": "itad-b07aac9ebd26",
       "store": "epic",
       "title": "Wytchwood",
@@ -316,19 +293,6 @@
       "ends_at": null,
       "steam_appid": 729000,
       "review_percent": 93,
-      "source": "itad"
-    },
-    {
-      "id": "itad-073a56345192",
-      "store": "epic",
-      "title": "Songs of Conquest",
-      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Songs of Conquest",
-      "ends_at": null,
-      "steam_appid": 867210,
-      "review_percent": 86,
       "source": "itad"
     },
     {
@@ -344,6 +308,19 @@
       "review_percent": 89,
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
+    },
+    {
+      "id": "itad-073a56345192",
+      "store": "epic",
+      "title": "Songs of Conquest",
+      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Songs of Conquest",
+      "ends_at": null,
+      "steam_appid": 867210,
+      "review_percent": 86,
+      "source": "itad"
     }
   ],
   "attribution": [

@@ -27,7 +27,12 @@ export const personalStore = (() => {
   let dirty = false;
   let initComplete = false;
   let pendingMigration = null;
+  let profileSwitchSaveBlock = false;
   const PUSH_DEBOUNCE_MS = 600;
+
+  function isProfileSwitchSaveBlocked() {
+    return profileSwitchSaveBlock;
+  }
 
   function snapshotLocal() {
     const snap = {
@@ -251,6 +256,7 @@ export const personalStore = (() => {
   }
 
   async function init() {
+    profileSwitchSaveBlock = false;
     const localSnapBeforeProbe = snapshotLocal();
     const available = await probe();
     if (!available) return { migrated: false, pendingMigration: null };
@@ -309,6 +315,7 @@ export const personalStore = (() => {
   }
 
   function notify() {
+    if (profileSwitchSaveBlock) return;
     if (apiAvailable !== true) return;
     if (!initComplete) {
       dirty = true;
@@ -368,6 +375,7 @@ export const personalStore = (() => {
   }
 
   function flushSync() {
+    if (profileSwitchSaveBlock) return;
     if (apiAvailable !== true) return;
     if (!initComplete) return;
     if (!dirty && !pushTimer) return;
@@ -403,6 +411,11 @@ export const personalStore = (() => {
     }
     dirty = false;
     initComplete = false;
+    profileSwitchSaveBlock = true;
+    try {
+      const { cancelPendingPersonalSave } = await import('./personal-storage.js');
+      cancelPendingPersonalSave();
+    } catch (_) { /* ignore */ }
   }
 
   return {
@@ -413,6 +426,7 @@ export const personalStore = (() => {
     prepareForProfileSwitch,
     uploadLocalToServer,
     dismissMigration,
+    isProfileSwitchSaveBlocked,
   };
 })();
 

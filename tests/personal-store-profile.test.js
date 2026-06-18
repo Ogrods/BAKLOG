@@ -529,4 +529,37 @@ describe('personalStore.prepareForProfileSwitch', () => {
     expect(state.personal.__dismissedClaims).toBeUndefined();
     expect(state.personal.__dismissedClaimKeys).toBeUndefined();
   });
+
+  it('blocks debounced savePersonal after prepareForProfileSwitch (switch race)', async () => {
+    vi.resetModules();
+    localStorage.clear();
+    localStorage.setItem('baklog-active-profile', 'test');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, opts) => {
+        if (url === '/api/personal' && opts?.method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({ personal: {}, prefs: {}, manual: [] }),
+          };
+        }
+        if (url === '/api/personal' && opts?.method === 'PUT') {
+          return { ok: true, json: async () => JSON.parse(opts.body) };
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }),
+    );
+
+    const { personalStore, state } = await loadStore();
+    const { savePersonal } = await import('../js/personal-storage.js');
+    await personalStore.init();
+    state.personal.__dismissedClaims = { 'epic-construction-simulator-3': 123 };
+    savePersonal();
+    await personalStore.prepareForProfileSwitch();
+    localStorage.setItem('baklog-active-profile', 'promo');
+    savePersonal();
+    expect(localStorage.getItem('steam-backlog-personal:promo')).toBeNull();
+    expect(personalStore.isProfileSwitchSaveBlocked()).toBe(true);
+  });
 });

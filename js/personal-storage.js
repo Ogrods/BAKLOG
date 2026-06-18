@@ -151,15 +151,26 @@ function safeLocalSet(key, value) {
   }
 }
 
+export function cancelPendingPersonalSave() {
+  if (_savePersonalTimer) {
+    clearTimeout(_savePersonalTimer);
+    _savePersonalTimer = null;
+  }
+}
+
 export function savePersonal() {
+  if (personalStore.isProfileSwitchSaveBlocked?.()) return;
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = setTimeout(() => {
+    _savePersonalTimer = null;
+    if (personalStore.isProfileSwitchSaveBlocked?.()) return;
     safeLocalSet(personalStorageKey(), JSON.stringify(state.personal));
     personalStore.notify();
   }, 250);
 }
 
 export function flushSavePersonal() {
+  if (personalStore.isProfileSwitchSaveBlocked?.()) return;
   if (!_savePersonalTimer) return;
   clearTimeout(_savePersonalTimer);
   _savePersonalTimer = null;

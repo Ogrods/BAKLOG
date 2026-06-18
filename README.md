@@ -12,7 +12,7 @@
 
 ## Watch your library appear
 
-From empty to 2,000+ games in about 90 seconds — three steps:
+From empty to 2,000+ games in about 90 seconds — three steps. That timing comes from real tests on an above-average Steam library; extremely large libraries take longer.
 
 1. **Connect** — link your stores once from the **Connections** tab. Credentials stay encrypted on your machine (OS keyring + AES-GCM fallback).
 2. **Auto-fetch on connect** — BAKLOG opens a channel to each store and brings everything you own back to one table. Fetcher chips light up as each library lands, and auto-refresh quietly updates stores older than 24h while the app is open.

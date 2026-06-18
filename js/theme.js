@@ -5,12 +5,15 @@
 
 export const COLOR_THEME_KEY = 'baklog-color-theme';
 
-export const THEMES = ['default', 'dark', 'timber', 'ember', 'synthwave', 'terminal'];
+export const THEMES = ['default', 'dark', 'log-jammin', 'ember', 'synthwave', 'terminal'];
+
+/** @deprecated renamed to log-jammin */
+const LEGACY_THEME_ALIASES = { timber: 'log-jammin' };
 
 export const THEME_LABELS = {
   default: 'Default',
   dark: 'Midnight (OLED)',
-  timber: 'Timber',
+  'log-jammin': "Log Jammin'",
   ember: 'Ember',
   synthwave: 'Synthwave',
   terminal: 'Terminal',
@@ -21,16 +24,22 @@ export const THEME_LABELS = {
 export const THEME_SWATCHES = {
   default: { bg: '#0f172a', accent: '#38bdf8', accent2: '#0ea5e9' },
   dark: { bg: '#000000', accent: '#ffffff', accent2: '#d4d4d8' },
-  timber: { bg: '#171410', accent: '#2f8049', accent2: '#47703a' },
+  'log-jammin': { bg: '#171410', accent: '#2f8049', accent2: '#47703a' },
   ember: { bg: '#0f0d0b', accent: '#f97316', accent2: '#fbbf24' },
   synthwave: { bg: '#14101f', accent: '#ff2e88', accent2: '#a855f7' },
   terminal: { bg: '#0c1413', accent: '#34e6b0', accent2: '#22d3ee' },
 };
 
+function resolveThemeId(stored) {
+  if (THEMES.includes(stored)) return stored;
+  const alias = LEGACY_THEME_ALIASES[stored];
+  return alias && THEMES.includes(alias) ? alias : 'default';
+}
+
 export function getColorTheme() {
   try {
     const v = localStorage.getItem(COLOR_THEME_KEY);
-    return THEMES.includes(v) ? v : 'default';
+    return resolveThemeId(v);
   } catch {
     return 'default';
   }
@@ -41,7 +50,7 @@ import { BAKLOG_THEME_CHANGE } from './custom-events.js';
 export const THEME_CHANGE_EVENT = BAKLOG_THEME_CHANGE;
 
 export function setColorTheme(theme) {
-  const t = THEMES.includes(theme) ? theme : 'default';
+  const t = resolveThemeId(theme);
   const prev = document.documentElement.getAttribute('data-theme');
   try {
     localStorage.setItem(COLOR_THEME_KEY, t);

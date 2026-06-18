@@ -3,12 +3,12 @@
 Generate BAKLOG logo intro GIFs: three logs fly/bounce into place, then BAKLOG wordmark drops in.
 
 Outputs to marketing/assets/logo/:
-  logo-toss-a.gif / logo-drop-b.gif / logo-scatter-c.gif  — timber forest theme
+  logo-toss-a.gif / logo-drop-b.gif / logo-scatter-c.gif  — Log Jammin' theme
   logo-drop-midnight*.gif                               — white-on-black drop variants
 
 Requires: Pillow (pip install pillow)
 Run:
-  python tools/make_logo_gif.py              # timber toss/drop/scatter (both motto + plain)
+  python tools/make_logo_gif.py              # Log Jammin' toss/drop/scatter (both motto + plain)
   python tools/make_logo_gif.py midnight     # six white-on-black drop GIFs
   python tools/make_logo_gif.py blue         # deck-navy orbit GIF(s)
 """
@@ -84,7 +84,7 @@ class GifPreset:
         return self.out_h * self.supersample
 
 
-def timber_preset(out_w: int = 400, out_h: int = 400, supersample: int = 4) -> GifPreset:
+def log_jammin_preset(out_w: int = 400, out_h: int = 400, supersample: int = 4) -> GifPreset:
     return GifPreset(out_w=out_w, out_h=out_h, supersample=supersample)
 
 
@@ -929,8 +929,8 @@ def build_animation(
     return frames
 
 
-def run_timber_batch(arg: str) -> None:
-    preset = timber_preset()
+def run_log_jammin_batch(arg: str) -> None:
+    preset = log_jammin_preset()
     print(f"Canvas {preset.canvas_w}x{preset.canvas_h} -> {preset.out_w}x{preset.out_h} @ {FPS}fps")
     print(f"Output: {OUT_DIR}")
 
@@ -1024,7 +1024,7 @@ def main() -> int:
     elif arg == "blue":
         run_blue_batch()
     else:
-        run_timber_batch(arg)
+        run_log_jammin_batch(arg)
     print("\nDone.")
     return 0
 

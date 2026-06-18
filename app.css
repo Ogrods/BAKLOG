@@ -455,7 +455,7 @@ html[data-theme="dark"] {
   --overlay-scrim-soft: rgba(0, 0, 0, 0.82);
 }
 
-html[data-theme="timber"] {
+html[data-theme="log-jammin"] {
   --bg: #171410;
   --bg-panel: #221c17;
   --bg-elev: #2d241c;

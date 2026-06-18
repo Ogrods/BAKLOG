@@ -1548,7 +1548,7 @@ export function sponsorToSpotlightGame(item) {
   const cover = sponsorCoverUrl(item.cover);
   const isHouse = String(item?.kind || '').toLowerCase() === 'house';
   const disclosure = sponsorDisclosure(item);
-  const tagline = item.tagline ? escapeHtml(item.tagline) : '';
+  const tagline = item.tagline ? String(item.tagline) : '';
   const artMode = String(item.art_mode || '').toLowerCase() === 'logo' ? 'logo' : '';
   const schemeRaw = String(item.scheme || '').toLowerCase();
   const scheme = SPOTLIGHT_PREMIUM_SCHEMES.includes(schemeRaw) ? schemeRaw : '';

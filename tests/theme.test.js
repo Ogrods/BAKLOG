@@ -23,10 +23,17 @@ describe('theme', () => {
   });
 
   it('setColorTheme persists and sets data-theme on html', () => {
+    setColorTheme('log-jammin');
+    expect(localStorage.getItem(COLOR_THEME_KEY)).toBe('log-jammin');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('log-jammin');
+    expect(getColorTheme()).toBe('log-jammin');
+  });
+
+  it('migrates legacy timber theme id', () => {
+    localStorage.setItem(COLOR_THEME_KEY, 'timber');
+    expect(getColorTheme()).toBe('log-jammin');
     setColorTheme('timber');
-    expect(localStorage.getItem(COLOR_THEME_KEY)).toBe('timber');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('timber');
-    expect(getColorTheme()).toBe('timber');
+    expect(localStorage.getItem(COLOR_THEME_KEY)).toBe('log-jammin');
   });
 
   it('applyColorThemeFromStorage syncs from localStorage', () => {
@@ -36,6 +43,6 @@ describe('theme', () => {
   });
 
   it('exposes all six themes', () => {
-    expect(THEMES).toEqual(['default', 'dark', 'timber', 'ember', 'synthwave', 'terminal']);
+    expect(THEMES).toEqual(['default', 'dark', 'log-jammin', 'ember', 'synthwave', 'terminal']);
   });
 });

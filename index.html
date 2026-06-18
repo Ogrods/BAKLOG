@@ -31,7 +31,8 @@
         if (!valid[view]) view = 'dashboard';
         document.documentElement.setAttribute('data-init-view', view);
         var theme = localStorage.getItem('baklog-color-theme') || 'default';
-        var validThemes = { default: 1, dark: 1, timber: 1, ember: 1, synthwave: 1, terminal: 1 };
+        var validThemes = { default: 1, dark: 1, 'log-jammin': 1, ember: 1, synthwave: 1, terminal: 1 };
+        if (theme === 'timber') theme = 'log-jammin';
         if (!validThemes[theme]) theme = 'default';
         document.documentElement.setAttribute('data-theme', theme);
         // Boot curtain covers every view consistently so the swap from

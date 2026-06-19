@@ -21,7 +21,9 @@ If you received a beta invite:
 3. Launch **BAKLOG** from the Start Menu. A tray icon appears and your browser opens.
 4. Open the **Connections** tab and connect each store you use (Chrome or Edge required).
 
-Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.bat` or `BAKLOG Tray.exe`. See `BETA-README.txt` in the bundle.
+Your library data (profiles, games, connections) lives in `%LOCALAPPDATA%\BAKLOG-Data`, separate from the app folder. Uninstalling BAKLOG removes only the app; your data stays until you delete that folder.
+
+Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.bat` or `BAKLOG Tray.exe`. Add an empty `portable.txt` beside `BAKLOG.exe` only if you want all data in the unzip folder (thumb drives). See `BETA-README.txt` in the bundle.
 
 ## Install (from source)
 
@@ -60,7 +62,7 @@ Then open **http://localhost:8765** in your browser.
 
 1. Open the **Connections** tab and click **Connect** for each store you use. A headed browser window opens for cookie or OAuth sign-in. Credentials stay encrypted on your machine (OS keyring + AES-GCM fallback). See [Connecting stores](connecting-stores.md) for per-store steps.
 
-2. After connecting, BAKLOG **auto-fetches** each store by default and opens the fetcher log. Fetcher chips in the **Fetcher health** row light up as each library lands.
+2. After connecting, BAKLOG **auto-fetches** each store by default and opens the fetcher log. Fetcher chips in the **Fetcher health** row light up as each library lands. The ~90 second figure you may see in marketing copy was measured on an above-average Steam library (~2,000+ games); extremely large libraries take longer. Watch the fetcher log for progress.
 
 3. Browse the **Dashboard**, **Library**, **Wishlist**, and **itch.io** tabs. See [Using the dashboard](using-the-dashboard.md).
 

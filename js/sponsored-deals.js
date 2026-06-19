@@ -48,6 +48,7 @@ import { isPro } from './auth-gate.js';
 import { noteSponsoredImpression } from './anon-metrics.js';
 import { PRO_CHECKOUT_MONTHLY } from './pro-checkout.js';
 import { affiliateUrl } from './affiliate.js';
+import { LS_AD_CURSORS, profileScopedStorageKey } from './profiles.js';
 
 const SPONSORS_LOCAL_PATH = 'sponsors.json';
 const SPONSORS_FALLBACK_PATH = 'curated/sponsors.json';
@@ -106,7 +107,9 @@ const AD_LOCATION_SET = new Set(AD_LOCATIONS);
 /** @deprecated use AD_LOCATIONS — kept for tests migrating off placement strings */
 export const SPONSOR_PLACEMENTS = AD_LOCATIONS;
 
-const CURSOR_STORAGE_KEY = 'baklog-ad-cursors';
+function adCursorStorageKey() {
+  return profileScopedStorageKey(LS_AD_CURSORS);
+}
 /** @type {Map<string, { start: number, eligibleLen: number }>} */
 const sessionLocationPicks = new Map();
 
@@ -142,12 +145,12 @@ function isDismissed(id) {
 export function __resetDismissedSponsorsForTest() {
   dismissedThisSession.clear();
   sessionLocationPicks.clear();
-  try { localStorage.removeItem(CURSOR_STORAGE_KEY); } catch (_) { /* noop */ }
+  try { localStorage.removeItem(adCursorStorageKey()); } catch (_) { /* noop */ }
 }
 
 export function __resetLocationCursorsForTest() {
   sessionLocationPicks.clear();
-  try { localStorage.removeItem(CURSOR_STORAGE_KEY); } catch (_) { /* noop */ }
+  try { localStorage.removeItem(adCursorStorageKey()); } catch (_) { /* noop */ }
 }
 
 /** Test helper: apply v1 items[] or v2 doc into state. */
@@ -163,7 +166,7 @@ export function __migrateV1ForTest(doc) {
 
 function readCursors() {
   try {
-    const raw = localStorage.getItem(CURSOR_STORAGE_KEY);
+    const raw = localStorage.getItem(adCursorStorageKey());
     return raw ? JSON.parse(raw) : {};
   } catch (_) {
     return {};
@@ -172,7 +175,7 @@ function readCursors() {
 
 function writeCursors(cursors) {
   try {
-    localStorage.setItem(CURSOR_STORAGE_KEY, JSON.stringify(cursors));
+    localStorage.setItem(adCursorStorageKey(), JSON.stringify(cursors));
   } catch (_) { /* noop */ }
 }
 

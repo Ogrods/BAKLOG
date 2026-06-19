@@ -3,7 +3,12 @@
  * Boot IIFE in index.html mirrors KEY for FOUC-free first paint.
  */
 
-export const COLOR_THEME_KEY = 'baklog-color-theme';
+import { COLOR_THEME_KEY } from './state.js';
+import { BAKLOG_THEME_CHANGE } from './custom-events.js';
+
+export { COLOR_THEME_KEY };
+
+export const THEME_CHANGE_EVENT = BAKLOG_THEME_CHANGE;
 
 export const THEMES = ['default', 'dark', 'log-jammin', 'ember', 'synthwave', 'terminal'];
 
@@ -36,24 +41,30 @@ function resolveThemeId(stored) {
   return alias && THEMES.includes(alias) ? alias : 'default';
 }
 
+function themeStorageKey() {
+  try {
+    const pid = localStorage.getItem('baklog-active-profile') || 'default';
+    const suffix = pid && pid !== 'default' ? `:${pid}` : '';
+    return `${COLOR_THEME_KEY}${suffix}`;
+  } catch {
+    return COLOR_THEME_KEY;
+  }
+}
+
 export function getColorTheme() {
   try {
-    const v = localStorage.getItem(COLOR_THEME_KEY);
+    const v = localStorage.getItem(themeStorageKey());
     return resolveThemeId(v);
   } catch {
     return 'default';
   }
 }
 
-import { BAKLOG_THEME_CHANGE } from './custom-events.js';
-
-export const THEME_CHANGE_EVENT = BAKLOG_THEME_CHANGE;
-
 export function setColorTheme(theme) {
   const t = resolveThemeId(theme);
   const prev = document.documentElement.getAttribute('data-theme');
   try {
-    localStorage.setItem(COLOR_THEME_KEY, t);
+    localStorage.setItem(themeStorageKey(), t);
   } catch {
     /* ignore */
   }

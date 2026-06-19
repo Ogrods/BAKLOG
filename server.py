@@ -175,9 +175,17 @@ _LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
 # this map is only populated if something calls _register_epic_oauth_state (legacy redirect flow).
 _epic_oauth_states: dict[str, tuple[float, str]] = {}
 _epic_oauth_states_lock = threading.Lock()
-_stream_tickets: dict[str, tuple[str, float]] = {}
+_stream_tickets: dict[str, tuple[str, float, int, str | None]] = {}
 _stream_tickets_lock = threading.Lock()
-_STREAM_TICKET_TTL_SEC = 30.0
+_STREAM_TICKET_TTL_SEC = 90.0
+# EventSource auto-reconnects with the same URL; single-use tickets caused 401
+# loops when a failed connect (404/503) consumed the ticket first.
+_STREAM_TICKET_MAX_USES = 12
+# Block the stream handler briefly on first connect so a run submitted on another
+# dev-server process (split-brain on localhost) can finish and land in shared history.
+_STREAM_ATTACH_SHORT_WAIT_SEC = 2.0
+_STREAM_ATTACH_LONG_WAIT_SEC = 300.0
+_STREAM_ATTACH_POLL_SEC = 0.1
 _LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.I), r"\1[redacted]"),
     # Cookie / Set-Cookie values run to end-of-line (they may contain spaces,
@@ -263,27 +271,72 @@ def _consume_epic_oauth_state(state: str | None) -> str | None:
 
 def _prune_expired_stream_tickets() -> None:
     now = time.time()
-    expired = [k for k, (_, exp) in _stream_tickets.items() if exp < now]
+    expired = [k for k, (_, exp, _uses, _run) in _stream_tickets.items() if exp < now]
     for k in expired:
         _stream_tickets.pop(k, None)
 
 
-def _mint_stream_ticket(profile_id: str) -> str:
+def _mint_stream_ticket(profile_id: str, *, run_id: str | None = None) -> str:
     ticket = secrets.token_urlsafe(32)
     with _stream_tickets_lock:
         _prune_expired_stream_tickets()
-        _stream_tickets[ticket] = (profile_id, time.time() + _STREAM_TICKET_TTL_SEC)
+        _stream_tickets[ticket] = (
+            profile_id,
+            time.time() + _STREAM_TICKET_TTL_SEC,
+            _STREAM_TICKET_MAX_USES,
+            run_id,
+        )
     return ticket
 
 
+def _peek_stream_ticket(ticket: str | None, run_id: str | None = None) -> str | None:
+    """Validate a ticket without consuming a use (404/503 must not burn tickets)."""
+    if not ticket:
+        return None
+    now = time.time()
+    with _stream_tickets_lock:
+        entry = _stream_tickets.get(ticket)
+        if not entry:
+            return None
+        profile_id, expiry, _uses_left, bound_run = entry
+        if expiry < now:
+            return None
+        if bound_run and run_id and bound_run != run_id:
+            return None
+    return profile_id
+
+
+def _commit_stream_ticket(ticket: str | None, run_id: str | None = None) -> str | None:
+    """Consume one ticket use once the stream endpoint is ready to respond."""
+    if not ticket:
+        return None
+    now = time.time()
+    with _stream_tickets_lock:
+        entry = _stream_tickets.get(ticket)
+        if not entry:
+            return None
+        profile_id, expiry, uses_left, bound_run = entry
+        if expiry < now:
+            _stream_tickets.pop(ticket, None)
+            return None
+        if bound_run and run_id and bound_run != run_id:
+            return None
+        if uses_left <= 1:
+            _stream_tickets.pop(ticket, None)
+        else:
+            _stream_tickets[ticket] = (profile_id, expiry, uses_left - 1, bound_run)
+    return profile_id
+
+
 def _consume_stream_ticket(ticket: str | None) -> str | None:
+    """Legacy single-use consume for auth-provider SSE (no run binding)."""
     if not ticket:
         return None
     with _stream_tickets_lock:
         entry = _stream_tickets.pop(ticket, None)
     if not entry:
         return None
-    profile_id, expiry = entry
+    profile_id, expiry, _uses_left, _bound_run = entry
     if expiry < time.time():
         return None
     return profile_id
@@ -962,6 +1015,10 @@ def _write_active_runs(runs: list[dict[str, Any]]) -> None:
         _write_json_atomic(ACTIVE_RUNS_FILE, {"runs": runs})
 
 
+def _run_id_active_on_disk(run_id: str) -> bool:
+    return any(entry.get("id") == run_id for entry in _read_active_runs())
+
+
 def _filter_runs_by_lane(runs: list[Run], lane: str | None) -> list[Run]:
     """Restrict a run list to one lane. lane="fetcher" drops internal (admin)
     runs; lane="internal" keeps only them; None passes everything through."""
@@ -1635,6 +1692,19 @@ class RunManager:
                 while len(self._history) > MAX_HISTORY:
                     self._history.pop()
 
+    def _register_pending_run(self, run: Run) -> None:
+        """Cross-process hint so stream handlers can wait for another dev server."""
+        entry = {
+            "id": run.id,
+            "pid": 0,
+            "key": run.key,
+            "label": run.label,
+            "started_at": run.started_at or time.time(),
+        }
+        active = [e for e in _read_active_runs() if e.get("id") != run.id]
+        active.append(entry)
+        _write_active_runs(active)
+
     def _register_active_process(self, run: Run, pid: int) -> None:
         entry = {
             "id": run.id,
@@ -1752,6 +1822,7 @@ class RunManager:
             self._pending.append(run)
             self._runs_by_id[run.id] = run
             self._queue.put(run)
+        self._register_pending_run(run)
         self._persist_queue()
         self._ensure_worker_thread()
         return run
@@ -1804,6 +1875,7 @@ class RunManager:
             self._pending.append(run)
             self._runs_by_id[run.id] = run
             self._internal_queue.put(run)
+        self._register_pending_run(run)
         self._persist_queue()
         self._ensure_worker_thread()
         return run
@@ -2717,6 +2789,48 @@ def _run_accessible(run: Run | None) -> Run | None:
     return None
 
 
+def _stream_terminal_accessible(run_id: str) -> dict[str, Any] | None:
+    terminal = MANAGER.stream_terminal_summary(run_id)
+    if terminal is None:
+        return None
+    if (
+        _profile_run_isolation_enabled()
+        and terminal.get("profile_id") != get_active_profile_id()
+    ):
+        return None
+    return terminal
+
+
+def _resolve_stream_target(run_id: str) -> tuple[Run | None, dict[str, Any] | None]:
+    run = _run_accessible(MANAGER.get(run_id))
+    if run is not None:
+        return run, None
+    return None, _stream_terminal_accessible(run_id)
+
+
+def _wait_for_stream_target(
+    run_id: str, *, since: int
+) -> tuple[Run | None, dict[str, Any] | None]:
+    run, terminal = _resolve_stream_target(run_id)
+    if run is not None or terminal is not None or since > 0:
+        return run, terminal
+    short_deadline = time.time() + _STREAM_ATTACH_SHORT_WAIT_SEC
+    while time.time() < short_deadline:
+        run, terminal = _resolve_stream_target(run_id)
+        if run is not None or terminal is not None:
+            return run, terminal
+        time.sleep(_STREAM_ATTACH_POLL_SEC)
+    if not _run_id_active_on_disk(run_id):
+        return None, None
+    long_deadline = time.time() + _STREAM_ATTACH_LONG_WAIT_SEC
+    while time.time() < long_deadline:
+        run, terminal = _resolve_stream_target(run_id)
+        if run is not None or terminal is not None:
+            return run, terminal
+        time.sleep(_STREAM_ATTACH_POLL_SEC)
+    return None, None
+
+
 class Handler(SimpleHTTPRequestHandler):
     def handle_one_request(self) -> None:  # http.server API
         _note_activity()  # reset the idle-shutdown countdown on any client contact
@@ -2847,8 +2961,6 @@ class Handler(SimpleHTTPRequestHandler):
             self._handle_epic_oauth_callback()
             return
         if path.startswith("/api/stream/"):
-            if not _authorize_stream(self):
-                return
             self._handle_stream(path[len("/api/stream/"):])
             return
         if path.startswith("/api/auth/") and path.endswith("/stream"):
@@ -3127,9 +3239,10 @@ class Handler(SimpleHTTPRequestHandler):
         config["frozen"] = is_frozen()
         config["version"] = _app_version()
         config["chromium_available"] = _chromium_available()
+        from shared.install_paths import frozen_bundle_dir
         from shared.server_support import is_running_from_temp_dir
 
-        config["running_from_temp"] = is_running_from_temp_dir(ROOT)
+        config["running_from_temp"] = is_frozen() and is_running_from_temp_dir(frozen_bundle_dir())
         _send_json(self, HTTPStatus.OK, config)
 
     def _handle_support_get(self, path: str) -> None:
@@ -3220,7 +3333,6 @@ class Handler(SimpleHTTPRequestHandler):
             from shared.profiles import create_profile
 
             created = create_profile(str(payload.get("label") or ""))
-            _refresh_personal_paths()
             _send_json(self, HTTPStatus.CREATED, created)
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -3467,6 +3579,12 @@ class Handler(SimpleHTTPRequestHandler):
             snap["queue"] = [
                 r for r in (snap.get("queue") or []) if r.get("profile_id") == pid
             ]
+            internal_active = snap.get("internal_active")
+            if internal_active and internal_active.get("profile_id") != pid:
+                snap["internal_active"] = None
+            snap["internal_queue"] = [
+                r for r in (snap.get("internal_queue") or []) if r.get("profile_id") == pid
+            ]
             snap["history"] = [
                 r for r in (snap.get("history") or []) if r.get("profile_id") == pid
             ]
@@ -3586,8 +3704,24 @@ class Handler(SimpleHTTPRequestHandler):
         )
 
     def _handle_stream_ticket_mint(self) -> None:
-        """Single-use ticket for EventSource streams (cannot send Authorization)."""
-        ticket = _mint_stream_ticket(get_active_profile_id())
+        """Limited-reuse ticket for EventSource streams (cannot send Authorization)."""
+        payload, err = _read_json_body(self)
+        if err == "empty body":
+            payload = {}
+        elif err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        run_id: str | None = None
+        profile_id = get_active_profile_id()
+        run = None
+        raw_run = payload.get("run_id") if isinstance(payload, dict) else None
+        if raw_run:
+            run_id = str(raw_run).strip().split("/", 1)[0].split("?", 1)[0] or None
+            run = MANAGER.get(run_id) if run_id else None
+            if run is not None:
+                profile_id = run.profile_id
+        ticket = _mint_stream_ticket(profile_id, run_id=run_id)
         _send_json(self, HTTPStatus.OK, {"ticket": ticket})
 
     def _handle_auth_status(self) -> None:
@@ -3924,20 +4058,24 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_stream(self, run_id: str) -> None:
         global _sse_connections
+        from shared.supabase_auth import auth_enabled
+
         run_id = run_id.strip("/").split("/", 1)[0].split("?", 1)[0]
         since = _stream_resume_since(self)
-        run = _run_accessible(MANAGER.get(run_id))
-        if run is None:
-            terminal = MANAGER.stream_terminal_summary(run_id)
-            if terminal is not None:
-                if (
-                    _profile_run_isolation_enabled()
-                    and terminal.get("profile_id") != get_active_profile_id()
-                ):
-                    terminal = None
-            if terminal is None:
-                self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")
+        ticket = _stream_ticket_from_handler(self)
+        if auth_enabled():
+            profile_id = _peek_stream_ticket(ticket, run_id)
+            if not profile_id:
+                _send_auth_required(self)
                 return
+            set_request_profile_id(profile_id)
+
+        run, terminal = _wait_for_stream_target(run_id, since=since)
+        if run is None and terminal is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "Unknown run id")
+            return
+
+        if run is None and terminal is not None:
             with _sse_lock:
                 if _sse_connections >= MAX_SSE_CONNECTIONS:
                     _send_json(
@@ -3947,6 +4085,11 @@ class Handler(SimpleHTTPRequestHandler):
                     )
                     return
                 _sse_connections += 1
+            if auth_enabled() and not _commit_stream_ticket(ticket, run_id):
+                with _sse_lock:
+                    _sse_connections = max(0, _sse_connections - 1)
+                _send_auth_required(self)
+                return
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
@@ -3988,6 +4131,12 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 return
             _sse_connections += 1
+
+        if auth_enabled() and not _commit_stream_ticket(ticket, run_id):
+            with _sse_lock:
+                _sse_connections = max(0, _sse_connections - 1)
+            _send_auth_required(self)
+            return
 
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/event-stream")
@@ -4184,8 +4333,8 @@ def _check_data_dir_writable() -> None:
     except OSError:
         msg = (
             f"BAKLOG cannot write to its data folder:\n  {target}\n"
-            "Move BAKLOG to a writable location (e.g. Desktop or Documents), "
-            "or set BAKLOG_DATA_DIR to a writable folder."
+            "On Windows the default is %LOCALAPPDATA%\\BAKLOG-Data. "
+            "Move BAKLOG to a writable location or set BAKLOG_DATA_DIR."
         )
         print(msg, file=sys.stderr, flush=True)
         raise SystemExit(1) from None

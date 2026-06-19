@@ -5,6 +5,7 @@
 
 import { sanitizeCoverUrl, spotlightCropForAspect } from "./game-core.js";
 import { escapeAttr, isSafeHttpUrl } from "./dom-util.js";
+import { dashFailedCoversStorageKey, landscapeCoversStorageKey } from "./profiles.js";
 
 /** Cover URL safe for HTML src= attributes (escaped + http/https only). */
 export function safeCoverAttrUrl(url) {
@@ -34,7 +35,7 @@ function escHtml(s) {
 const DASH_FAILED_COVERS_KEY = "baklog-dash-failed-covers";
 window.__dashFailedCovers = window.__dashFailedCovers || (() => {
   try {
-    const stored = JSON.parse(localStorage.getItem(DASH_FAILED_COVERS_KEY) || "[]");
+    const stored = JSON.parse(localStorage.getItem(dashFailedCoversStorageKey()) || "[]");
     return new Set(Array.isArray(stored) ? stored : []);
   } catch { return new Set(); }
 })();
@@ -45,7 +46,7 @@ function persistDashFailedCovers() {
     _dashFailedSaveTimer = 0;
     try {
       localStorage.setItem(
-        DASH_FAILED_COVERS_KEY,
+        dashFailedCoversStorageKey(),
         JSON.stringify([...window.__dashFailedCovers].slice(-2000)),
       );
     } catch {}
@@ -97,7 +98,7 @@ window.coverFallback = function (img) {
 };
 const LANDSCAPE_CACHE_KEY = "baklog-landscape-covers";
 window.__landscapeCovers = (() => {
-  try { return new Set(JSON.parse(localStorage.getItem(LANDSCAPE_CACHE_KEY) || "[]")); }
+  try { return new Set(JSON.parse(localStorage.getItem(landscapeCoversStorageKey()) || "[]")); }
   catch { return new Set(); }
 })();
 let _landscapeSaveTimer = 0;
@@ -105,7 +106,7 @@ function persistLandscapeCache() {
   if (_landscapeSaveTimer) return;
   _landscapeSaveTimer = setTimeout(() => {
     _landscapeSaveTimer = 0;
-    try { localStorage.setItem(LANDSCAPE_CACHE_KEY, JSON.stringify([...window.__landscapeCovers].slice(-1500))); } catch {}
+    try { localStorage.setItem(landscapeCoversStorageKey(), JSON.stringify([...window.__landscapeCovers].slice(-1500))); } catch {}
   }, 800);
 }
 window.coverLandscapeAttr = function (url) {

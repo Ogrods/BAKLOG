@@ -18,10 +18,19 @@ import {
   PROFILE_SCOPED_STORAGE_KEYS,
   activeViewSessionKey,
   claimsSnapshotStorageKey,
+  colorThemeStorageKey,
+  dashFailedCoversStorageKey,
+  galleryModeStorageKey,
   knownLibraryKeysStorageKey,
+  landscapeCoversStorageKey,
   libraryFirstSeenStorageKey,
+  metricSeedSessionKey,
+  metricsRenderedStorageKey,
   prefsStorageKey,
+  proWelcomeSessionKey,
+  statLayoutStorageKey,
   itadSnapshotStorageKey,
+  untappedBatchMarkerStorageKey,
   profileScopedStorageKey,
   spotlightRecentKeysStorageKey,
   clearProfileLocalStorage,
@@ -31,7 +40,7 @@ import {
   activeProfileId,
 } from '../js/profiles.js';
 import * as authGate from '../js/auth-gate.js';
-import { KNOWN_LIBRARY_KEYS_KEY, LIBRARY_FIRST_SEEN_KEY, MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from '../js/state.js';
+import { COLOR_THEME_KEY, KNOWN_LIBRARY_KEYS_KEY, LIBRARY_FIRST_SEEN_KEY, MANUAL_KEY, PREFS_KEY, STORAGE_KEY } from '../js/state.js';
 
 const PROFILE_SUFFIX = ':work';
 
@@ -72,13 +81,21 @@ describe('profiles storage keys', () => {
       itadSnapshotStorageKey,
       claimsSnapshotStorageKey,
       spotlightRecentKeysStorageKey,
+      colorThemeStorageKey,
+      statLayoutStorageKey,
+      galleryModeStorageKey,
+      dashFailedCoversStorageKey,
+      landscapeCoversStorageKey,
+      metricsRenderedStorageKey,
+      untappedBatchMarkerStorageKey,
     ];
     for (const helper of localHelpers) {
       expect(PROFILE_SCOPED_STORAGE_KEYS).toContain(storageBaseFromKey(helper()));
     }
-    expect(PROFILE_SCOPED_SESSION_KEYS).toContain(
-      storageBaseFromKey(activeViewSessionKey()),
-    );
+    const sessionHelpers = [activeViewSessionKey, metricSeedSessionKey, proWelcomeSessionKey];
+    for (const helper of sessionHelpers) {
+      expect(PROFILE_SCOPED_SESSION_KEYS).toContain(storageBaseFromKey(helper()));
+    }
     for (const base of PROFILE_SCOPED_STORAGE_KEYS) {
       if (base === PREFS_KEY) continue;
       expect(profileScopedStorageKey(base)).toBe(`${base}${PROFILE_SUFFIX}`);

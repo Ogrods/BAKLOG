@@ -1,8 +1,7 @@
 // One-time seed: the 2026-06-08 untapped-metadata batch starts in Unused (hidden)
 // until the maintainer moves them to Used. Auto-sync preserves manual hides.
 
-const BATCH_SEEDED_BASE = 'baklog-metrics-untapped-batch-seeded';
-const ACTIVE_PROFILE_LS = 'baklog-active-profile';
+import { untappedBatchMarkerStorageKey } from './profiles.js';
 
 /** @type {readonly string[]} */
 export const UNTAPPED_BATCH_METRIC_KEYS = Object.freeze([
@@ -29,21 +28,9 @@ export const UNTAPPED_BATCH_METRIC_KEYS = Object.freeze([
   'upcoming wishlist',
 ]);
 
-function profileSuffix(profileId) {
-  let pid = profileId;
-  if (pid == null) {
-    try {
-      pid = localStorage.getItem(ACTIVE_PROFILE_LS) || 'default';
-    } catch {
-      pid = 'default';
-    }
-  }
-  return pid && pid !== 'default' ? `:${pid}` : '';
-}
-
 /** @param {string} [profileId] */
 export function untappedBatchMarkerKey(profileId) {
-  return `${BATCH_SEEDED_BASE}${profileSuffix(profileId)}`;
+  return untappedBatchMarkerStorageKey(profileId);
 }
 
 /**

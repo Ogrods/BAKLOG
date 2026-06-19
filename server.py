@@ -3239,7 +3239,7 @@ class Handler(SimpleHTTPRequestHandler):
         config["frozen"] = is_frozen()
         config["version"] = _app_version()
         config["chromium_available"] = _chromium_available()
-        from shared.install_paths import frozen_bundle_dir, is_frozen
+        from shared.install_paths import frozen_bundle_dir
         from shared.server_support import is_running_from_temp_dir
 
         config["running_from_temp"] = is_frozen() and is_running_from_temp_dir(frozen_bundle_dir())

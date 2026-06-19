@@ -3,6 +3,7 @@ export const PREFS_KEY = 'steam-backlog-ui-prefs';
 export const MANUAL_KEY = 'steam-backlog-manual-games';
 export const LIBRARY_FIRST_SEEN_KEY = 'steam-backlog-library-first-seen';
 export const KNOWN_LIBRARY_KEYS_KEY = 'baklog-known-library-keys';
+export const COLOR_THEME_KEY = 'baklog-color-theme';
 
 export const state = {
   allGames: [],

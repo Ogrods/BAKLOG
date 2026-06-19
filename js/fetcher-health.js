@@ -29,6 +29,7 @@ import {
   LS_CLAIMS_LAST_AUTO_RUN,
   LS_RECONNECT_DISMISSED,
   profileScopedStorageKey,
+  statLayoutStorageKey,
 } from './profiles.js';
 import { markClaimsPendingAutoRun } from './claimable.js';
 import { savePrefs } from './prefs.js';
@@ -1179,7 +1180,6 @@ export {
   startFastAgeTick,
 };
 
-const STAT_LAYOUT_KEY = 'baklog-fetcher-stat-layout';
 const STAT_LAYOUTS = ['compact', 'landscape'];
 
 export function toggleLegendTips() {
@@ -1189,7 +1189,7 @@ export function toggleLegendTips() {
 
 function statLayout() {
   try {
-    const v = localStorage.getItem(STAT_LAYOUT_KEY);
+    const v = localStorage.getItem(statLayoutStorageKey());
     return STAT_LAYOUTS.includes(v) ? v : 'compact';
   } catch {
     return 'compact';
@@ -1210,7 +1210,7 @@ function syncStatLayoutToggle() {
 
 export function cycleStatLayout() {
   const next = statLayout() === 'compact' ? 'landscape' : 'compact';
-  try { localStorage.setItem(STAT_LAYOUT_KEY, next); } catch { /* ignore */ }
+  try { localStorage.setItem(statLayoutStorageKey(), next); } catch { /* ignore */ }
   renderDashboardFetcherHealth();
   return next;
 }
@@ -1422,6 +1422,7 @@ export const fetcherRunner = (() => {
     reconnectTimers.clear();
     reconnectAttempts.clear();
     for (const { es } of sourcesByRunId.values()) {
+      es.onerror = null;
       try { es.close(); } catch (_) {}
     }
     sourcesByRunId.clear();
@@ -2619,12 +2620,13 @@ export const fetcherRunner = (() => {
     clearReconnect(runId);
     const prior = sourcesByRunId.get(runId);
     if (prior) {
-      try { prior.es.close(); } catch (_) {}
       sourcesByRunId.delete(runId);
+      prior.es.onerror = null;
+      try { prior.es.close(); } catch (_) {}
     }
     let esUrl;
     try {
-      esUrl = await urlWithStreamTicket(streamUrl(runId));
+      esUrl = await urlWithStreamTicket(streamUrl(runId), { runId });
     } catch (_) {
       scheduleReconnect(runId, key, src, { queuedOnly });
       return;
@@ -2661,6 +2663,8 @@ export const fetcherRunner = (() => {
     es.addEventListener('line', evt => {
       try {
         const data = JSON.parse(evt.data);
+        if (evt.lastEventId) recordLineSeq(runId, evt.lastEventId);
+        else if (data.seq != null) recordLineSeq(runId, data.seq);
         const text = data.text || '';
         recentLog.push(text);
         if (recentLog.length > 40) recentLog.shift();
@@ -2734,10 +2738,13 @@ export const fetcherRunner = (() => {
 
     es.onerror = async () => {
       if (suppressedRunIds.has(runId) || cancelInFlight) return;
-      if (!sourcesByRunId.has(runId)) return;
-      // Close immediately so the browser cannot auto-reconnect with a consumed ticket.
-      try { es.close(); } catch (_) {}
+      const attached = sourcesByRunId.get(runId);
+      if (!attached || attached.es !== es) return;
+      // Let the browser retry with the same ticket URL (multi-use tickets on the server).
+      if (es.readyState === EventSource.CONNECTING) return;
       sourcesByRunId.delete(runId);
+      es.onerror = null;
+      try { es.close(); } catch (_) {}
       try {
         const snap = await fetchRunsSnapshot();
         if (!snap) throw new Error('no snapshot');

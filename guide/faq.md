@@ -73,6 +73,10 @@ Stores pad your library with things that aren't games: DLC skins, soundtracks, w
 
 Separately, you can hide any game you don't want to see and restore it later from the **Hidden games** panel. See [Using the dashboard](using-the-dashboard.md#blacklist-vs-hidden-list).
 
+## How long does the first import take?
+
+Marketing copy uses ~90 seconds for 0 to 2,000+ games. That number comes from timing a real import on an above-average Steam library. Smaller libraries finish faster; extremely large ones take longer. Each store fetches independently - the fetcher log shows progress.
+
 ## Do I have to refresh manually?
 
 Not usually. When you connect a store, BAKLOG auto-fetches its library. While the app is open, auto-refresh for stores older than 24h is on by default (Connections). ITAD deal prices refresh on a schedule.

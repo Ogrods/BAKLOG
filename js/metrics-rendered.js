@@ -8,28 +8,12 @@ import { state } from './state.js';
 import { METRIC_KEYS, metricKeyForInsight } from './metric-tips.js';
 import { savePrefs } from './prefs.js';
 import { mergeUntappedBatchSeed } from './metrics-untapped-batch.js';
-
-const RENDERED_BASE = 'baklog-metrics-rendered';
-const ACTIVE_PROFILE_LS = 'baklog-active-profile';
-
-function profileSuffix() {
-  let pid = 'default';
-  try {
-    pid = localStorage.getItem(ACTIVE_PROFILE_LS) || 'default';
-  } catch {
-    pid = 'default';
-  }
-  return pid && pid !== 'default' ? `:${pid}` : '';
-}
-
-function renderedKey() {
-  return `${RENDERED_BASE}${profileSuffix()}`;
-}
+import { metricsRenderedStorageKey } from './profiles.js';
 
 /** @returns {string[]} */
 export function loadRenderedMetricKeys() {
   try {
-    const raw = localStorage.getItem(renderedKey());
+    const raw = localStorage.getItem(metricsRenderedStorageKey());
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr) ? arr.filter((k) => typeof k === 'string' && k) : [];
   } catch {
@@ -39,7 +23,7 @@ export function loadRenderedMetricKeys() {
 
 function writeRenderedMetricKeys(keys) {
   try {
-    localStorage.setItem(renderedKey(), JSON.stringify([...new Set(keys.filter(Boolean))]));
+    localStorage.setItem(metricsRenderedStorageKey(), JSON.stringify([...new Set(keys.filter(Boolean))]));
   } catch {
     /* ignore storage failures */
   }

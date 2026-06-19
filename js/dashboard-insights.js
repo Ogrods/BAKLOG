@@ -101,6 +101,7 @@ import { appendCreativeInsights, appendCreativeMarqueeChips } from './creative-m
 import { marqueeTip, insightTip, metricKeyForLabel, metricKeyForInsight } from './metric-tips.js';
 import { noteMarqueeMetricKeys, noteInsightMetricKeys } from './metrics-rendered.js';
 import { familyForInsight, familyForLabel, spreadByFamily } from './stat-families.js';
+import { metricSeedSessionKey } from './profiles.js';
 
 /** Sabermetric marquee/pill appearance weights (session-stable RNG). */
 export const METRIC_WEIGHT = {
@@ -133,8 +134,6 @@ function isInsightMetricEnabled(html) {
   return !disabledMetricSet().has(key);
 }
 
-const METRIC_SEED_KEY = '__baklogMetricSeed';
-
 let _insightTimer = null;
 let _lastInsights = null;
 let _insightFadeTimer = null;
@@ -150,11 +149,11 @@ export function stopInsightRotation() {
 function metricRng() {
   let seed;
   try {
-    const raw = sessionStorage.getItem(METRIC_SEED_KEY);
+    const raw = sessionStorage.getItem(metricSeedSessionKey());
     seed = raw != null ? Number(raw) : NaN;
     if (!Number.isFinite(seed)) {
       seed = (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
-      sessionStorage.setItem(METRIC_SEED_KEY, String(seed));
+      sessionStorage.setItem(metricSeedSessionKey(), String(seed));
     }
   } catch {
     seed = (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;

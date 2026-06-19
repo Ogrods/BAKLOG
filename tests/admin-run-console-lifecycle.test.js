@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRunConsole } from '../admin/run-console.js';
 
 function mountConsoleDom() {
@@ -17,10 +17,36 @@ function mountConsoleDom() {
   `;
 }
 
+function installMockEventSource({ fireOnClose = true } = {}) {
+  class MockEventSource {
+    constructor(url) {
+      this.url = url;
+      this.onerror = null;
+      this.readyState = 2;
+      this._handlers = {};
+      MockEventSource.last = this;
+      this.close = vi.fn(() => {
+        if (fireOnClose && this.onerror) this.onerror(new Event('error'));
+      });
+    }
+    addEventListener(type, fn) {
+      this._handlers[type] = fn;
+    }
+  }
+  MockEventSource.last = null;
+  global.EventSource = MockEventSource;
+  return MockEventSource;
+}
+
 describe('createRunConsole local lifecycle', () => {
   beforeEach(() => {
     mountConsoleDom();
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    delete global.EventSource;
+    vi.useRealTimers();
   });
 
   it('beginLocal exposes cancel, aborts fetch signal, and endLocal clears running state', async () => {
@@ -43,5 +69,41 @@ describe('createRunConsole local lifecycle', () => {
     consoleApi.endLocal('cancelled');
     expect(document.getElementById('runConsoleStatus').textContent).toMatch(/cancelled/);
     expect(document.getElementById('runCancelBtn').hidden).toBe(true);
+  });
+});
+
+describe('createRunConsole SSE reconnect', () => {
+  beforeEach(() => {
+    mountConsoleDom();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    delete global.EventSource;
+    vi.useRealTimers();
+  });
+
+  it('does not schedule duplicate reconnects when close() re-fires onerror', async () => {
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 0;
+    });
+    const MockES = installMockEventSource({ fireOnClose: true });
+    const adminFetch = vi.fn().mockResolvedValue({ history: [] });
+    const consoleApi = createRunConsole({
+      adminFetch,
+      streamUrl: async () => '/api/stream/test-run',
+    });
+
+    void consoleApi.subscribe('test-run', 'Fetch claim sources');
+    await Promise.resolve();
+
+    const es = MockES.last;
+    expect(es).toBeTruthy();
+
+    es.onerror(new Event('error'));
+    const body = document.getElementById('runConsoleBody');
+    const droppedLines = (body.textContent.match(/stream dropped/g) || []).length;
+    expect(droppedLines).toBe(1);
   });
 });

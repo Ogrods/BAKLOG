@@ -19,6 +19,7 @@ import { PRO_PROMO } from './sponsored-deals.js';
 import { switchView } from './filters-ui.js';
 import { state } from './state.js';
 import { saveActiveView } from './prefs.js';
+import { proWelcomeSessionKey } from './profiles.js';
 
 export const PRO_WELCOME_STORAGE_KEY = 'baklog-pro-welcome';
 
@@ -42,7 +43,7 @@ function clearActivationPending() {
 
 function completeProActivation({ message = 'Pro is active - reloading…', reloadMs = 500 } = {}) {
   try {
-    sessionStorage.setItem(PRO_WELCOME_STORAGE_KEY, '1');
+    sessionStorage.setItem(proWelcomeSessionKey(), '1');
   } catch (_) { /* private mode */ }
   clearActivationPending();
   setProStatus(message, true);
@@ -276,13 +277,13 @@ export function goToProView() {
 export function showProWelcomeBanner() {
   let flagged = false;
   try {
-    flagged = sessionStorage.getItem(PRO_WELCOME_STORAGE_KEY) === '1';
+    flagged = sessionStorage.getItem(proWelcomeSessionKey()) === '1';
   } catch (_) { /* private mode */ }
   if (!flagged || !isPro()) return;
   const host = document.getElementById('proWelcomeBanner');
   if (!host) return;
   try {
-    sessionStorage.removeItem(PRO_WELCOME_STORAGE_KEY);
+    sessionStorage.removeItem(proWelcomeSessionKey());
   } catch (_) { /* private mode */ }
   host.innerHTML = `<div class="migration-banner-body">
       <div>

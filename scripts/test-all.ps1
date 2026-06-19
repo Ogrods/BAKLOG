@@ -50,4 +50,8 @@ Write-Host "==> audit free surface"
 python scripts/audit_free_surface_data.py --fail-on high --out .audit/report.json --baseline-out .audit/baseline.json --findings-out .audit/findings.yaml --handoff-out .audit/handoff.md --csv-out .audit/rows.csv
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host "==> audit profile security"
+python scripts/audit_security.py --fail-on high --ignore-disk-bleed
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 exit 0

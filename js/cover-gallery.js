@@ -8,6 +8,7 @@ import {
 } from './game-core.js';
 import { trapFocus } from './focus-trap.js';
 import { visibleListForKeyboard } from './table-ui.js';
+import { galleryModeStorageKey } from './profiles.js';
 
 /** @type {HTMLDialogElement | null} */
 let dialog = null;
@@ -28,7 +29,7 @@ const MAX_VIEW_H_RATIO = 0.85;
 /** @type {'cover' | 'landscape'} */
 function loadGalleryMode() {
   try {
-    const v = localStorage.getItem(GALLERY_MODE_KEY);
+    const v = localStorage.getItem(galleryModeStorageKey());
     return v === 'landscape' ? 'landscape' : 'cover';
   } catch {
     return 'cover';
@@ -40,7 +41,7 @@ let galleryMode = loadGalleryMode();
 
 function persistGalleryMode() {
   try {
-    localStorage.setItem(GALLERY_MODE_KEY, galleryMode);
+    localStorage.setItem(galleryModeStorageKey(), galleryMode);
   } catch { /* ignore quota / private mode */ }
 }
 

@@ -40,7 +40,6 @@ import html
 import json
 import os
 import queue
-import re
 import secrets
 import signal
 import subprocess
@@ -170,184 +169,24 @@ _BAKLOG_LOCAL_HEADER = "X-BAKLOG-Local"
 # bare "::1" because urlparse().hostname returns it without brackets; the Host
 # header path strips brackets/port via _normalize_host before comparing.
 _LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
-# Epic OAuth state -> (expiry_monotonic, profile_id).
-# Production Epic Connect uses Playwright + authorizationCode paste (auth/runner.py);
-# this map is only populated if something calls _register_epic_oauth_state (legacy redirect flow).
-_epic_oauth_states: dict[str, tuple[float, str]] = {}
-_epic_oauth_states_lock = threading.Lock()
-_stream_tickets: dict[str, tuple[str, float, int, str | None]] = {}
-_stream_tickets_lock = threading.Lock()
-_STREAM_TICKET_TTL_SEC = 90.0
-# EventSource auto-reconnects with the same URL; single-use tickets caused 401
-# loops when a failed connect (404/503) consumed the ticket first.
-_STREAM_TICKET_MAX_USES = 12
-# Block the stream handler briefly on first connect so a run submitted on another
-# dev-server process (split-brain on localhost) can finish and land in shared history.
-_STREAM_ATTACH_SHORT_WAIT_SEC = 2.0
-_STREAM_ATTACH_LONG_WAIT_SEC = 300.0
-_STREAM_ATTACH_POLL_SEC = 0.1
-_LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]+", re.I), r"\1[redacted]"),
-    # Cookie / Set-Cookie values run to end-of-line (they may contain spaces,
-    # `;`, `=`); anchoring to EOL keeps a stray token from leaking past the
-    # first whitespace.
-    (re.compile(r"(Cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
-    (re.compile(r"(set-cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
-    (re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*)[\"']?[\w\-]+", re.I), r"\1[redacted]"),
-    (re.compile(r"([?&]ticket=)[^&\s]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(NPSSO[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(Ubi_v1[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(refresh_token[=:\s\"']+)[\w\-\.]+", re.I), r"\1[redacted]"),
-    # Portable-bundle / secrets-export passphrase in any key=value form.
-    (re.compile(r"(passphrase[\"']?\s*[=:]\s*)[\"']?[^\s\"'&,}]+", re.I), r"\1[redacted]"),
-    # Per-store credential tokens that can surface in fetcher debug output.
-    (re.compile(r"(GOG_AL[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(EPIC_AUTH_CODE[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(EA_BEARER_TOKEN[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(XBL_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(UBISOFT_SESSION_ID[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(STEAM_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
-    (re.compile(r"(Authorization:\s*)(?!Bearer\s)([^\s,]+)", re.I), r"\1[redacted]"),
-]
-
-
-def _redact_log_line(text: str) -> str:
-    out = text
-    for pattern, repl in _LOG_REDACT_PATTERNS:
-        out = pattern.sub(repl, out)
-    return out
-
-
-def _redact_diagnostics_payload(payload: dict) -> dict:
-    """Redact sensitive tokens from diagnostics fields before serving over HTTP."""
-    tail = payload.get("refresh_log_tail")
-    if isinstance(tail, str) and tail:
-        payload = dict(payload)
-        payload["refresh_log_tail"] = "\n".join(
-            _redact_log_line(line) for line in tail.splitlines()
-        )
-    return payload
-
-
-def _prune_expired_epic_oauth_states() -> None:
-    now = time.monotonic()
-    expired = [k for k, (exp, _) in _epic_oauth_states.items() if exp < now]
-    for k in expired:
-        _epic_oauth_states.pop(k, None)
-
-
-def _register_epic_oauth_state(
-    state: str,
-    profile_id: str | None = None,
-    *,
-    ttl_sec: float = 600.0,
-) -> None:
-    from shared.profile_paths import get_active_profile_id
-
-    pid = profile_id or get_active_profile_id()
-    with _epic_oauth_states_lock:
-        _prune_expired_epic_oauth_states()
-        _epic_oauth_states[state] = (time.monotonic() + ttl_sec, pid)
-
-
-def _consume_epic_oauth_state(state: str | None) -> str | None:
-    """Return bound profile_id when state is valid; None when rejected.
-
-    A valid, single-use, server-minted state is always required (CSRF defense)
-    regardless of whether Supabase auth is enabled. There is no fallback path
-    that accepts a missing state.
-    """
-    if not state:
-        return None
-    with _epic_oauth_states_lock:
-        entry = _epic_oauth_states.pop(state, None)
-    if not entry:
-        return None
-    expires, profile_id = entry
-    if expires < time.monotonic():
-        return None
-    return profile_id
-
-
-def _prune_expired_stream_tickets() -> None:
-    now = time.time()
-    expired = [k for k, (_, exp, _uses, _run) in _stream_tickets.items() if exp < now]
-    for k in expired:
-        _stream_tickets.pop(k, None)
-
-
-def _mint_stream_ticket(profile_id: str, *, run_id: str | None = None) -> str:
-    ticket = secrets.token_urlsafe(32)
-    with _stream_tickets_lock:
-        _prune_expired_stream_tickets()
-        _stream_tickets[ticket] = (
-            profile_id,
-            time.time() + _STREAM_TICKET_TTL_SEC,
-            _STREAM_TICKET_MAX_USES,
-            run_id,
-        )
-    return ticket
-
-
-def _peek_stream_ticket(ticket: str | None, run_id: str | None = None) -> str | None:
-    """Validate a ticket without consuming a use (404/503 must not burn tickets)."""
-    if not ticket:
-        return None
-    now = time.time()
-    with _stream_tickets_lock:
-        entry = _stream_tickets.get(ticket)
-        if not entry:
-            return None
-        profile_id, expiry, _uses_left, bound_run = entry
-        if expiry < now:
-            return None
-        if bound_run and run_id and bound_run != run_id:
-            return None
-    return profile_id
-
-
-def _commit_stream_ticket(ticket: str | None, run_id: str | None = None) -> str | None:
-    """Consume one ticket use once the stream endpoint is ready to respond."""
-    if not ticket:
-        return None
-    now = time.time()
-    with _stream_tickets_lock:
-        entry = _stream_tickets.get(ticket)
-        if not entry:
-            return None
-        profile_id, expiry, uses_left, bound_run = entry
-        if expiry < now:
-            _stream_tickets.pop(ticket, None)
-            return None
-        if bound_run and run_id and bound_run != run_id:
-            return None
-        if uses_left <= 1:
-            _stream_tickets.pop(ticket, None)
-        else:
-            _stream_tickets[ticket] = (profile_id, expiry, uses_left - 1, bound_run)
-    return profile_id
-
-
-def _consume_stream_ticket(ticket: str | None) -> str | None:
-    """Legacy single-use consume for auth-provider SSE (no run binding)."""
-    if not ticket:
-        return None
-    with _stream_tickets_lock:
-        entry = _stream_tickets.pop(ticket, None)
-    if not entry:
-        return None
-    profile_id, expiry, _uses_left, _bound_run = entry
-    if expiry < time.time():
-        return None
-    return profile_id
-
-
-def _stream_ticket_from_handler(handler: SimpleHTTPRequestHandler) -> str | None:
-    parsed = urlparse(handler.path)
-    raw = (parse_qs(parsed.query).get("ticket") or [None])[0]
-    if raw is None:
-        return None
-    return str(raw).strip() or None
+from shared.log_redact import (  # noqa: E402, I001
+    redact_diagnostics_payload as _redact_diagnostics_payload,
+    redact_log_line as _redact_log_line,
+)
+from shared.server_epic_oauth import (  # noqa: E402, I001
+    consume_epic_oauth_state as _consume_epic_oauth_state,
+    register_epic_oauth_state as _register_epic_oauth_state,
+)
+from shared.server_stream_tickets import (  # noqa: E402, I001
+    STREAM_ATTACH_LONG_WAIT_SEC as _STREAM_ATTACH_LONG_WAIT_SEC,
+    STREAM_ATTACH_POLL_SEC as _STREAM_ATTACH_POLL_SEC,
+    STREAM_ATTACH_SHORT_WAIT_SEC as _STREAM_ATTACH_SHORT_WAIT_SEC,
+    commit_stream_ticket as _commit_stream_ticket,
+    consume_stream_ticket as _consume_stream_ticket,
+    mint_stream_ticket as _mint_stream_ticket,
+    peek_stream_ticket as _peek_stream_ticket,
+    stream_ticket_from_handler as _stream_ticket_from_handler,
+)
 
 
 def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:

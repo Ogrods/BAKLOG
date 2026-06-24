@@ -14,6 +14,8 @@ import pytest
 
 import server
 from shared import account_profiles, profile_paths, supabase_auth
+from shared.server_epic_oauth import epic_oauth_states
+from shared.server_stream_tickets import STREAM_TICKET_MAX_USES
 
 
 def _bearer(secret: str, sub: str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890") -> str:
@@ -363,7 +365,7 @@ def test_stream_ticket_limited_reuse(auth_server) -> None:
     )
     assert status == 200
     ticket = json.loads(raw.decode("utf-8"))["ticket"]
-    max_uses = server._STREAM_TICKET_MAX_USES
+    max_uses = STREAM_TICKET_MAX_USES
     for _ in range(max_uses):
         status_ok = _stream_open_status(base, f"/api/stream/{run_id}?ticket={ticket}")
         assert status_ok == 200
@@ -431,7 +433,7 @@ def test_epic_oauth_url_endpoint_registers_state(auth_server) -> None:
     assert "epicgames.com/id/login" in data["url"]
     assert "oauth%2Fepic%2Fcallback" in data["url"] or "callback" in data["url"]
     assert data["state"]
-    assert data["state"] in server._epic_oauth_states
+    assert data["state"] in epic_oauth_states
 
 
 def test_epic_oauth_url_unknown_provider(auth_server) -> None:
@@ -510,12 +512,12 @@ def test_epic_callback_consumes_valid_state_when_auth_off(local_server) -> None:
     base, _tmp = local_server
     state = "epic-local-state-01"
     server._register_epic_oauth_state(state, profile_id="default")
-    assert state in server._epic_oauth_states
+    assert state in epic_oauth_states
     # A valid minted state is accepted (single-use) even with auth disabled; the
     # missing code yields 400 but the state is consumed, proving the valid path ran.
     status, _ = _request(base, f"/oauth/epic/callback?state={state}")
     assert status == 400
-    assert state not in server._epic_oauth_states
+    assert state not in epic_oauth_states
 
 
 def test_secrets_export_corrupt_returns_400(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:

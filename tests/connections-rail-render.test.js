@@ -54,6 +54,7 @@ vi.mock('../js/state.js', () => ({
   MANUAL_KEY: 'steam-backlog-manual-games',
   LIBRARY_FIRST_SEEN_KEY: 'steam-backlog-library-first-seen',
   KNOWN_LIBRARY_KEYS_KEY: 'baklog-known-library-keys',
+  COLOR_THEME_KEY: 'baklog-color-theme',
 }));
 
 vi.mock('../js/visibility.js', () => ({

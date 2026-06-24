@@ -19,7 +19,7 @@
     "landing": "python -m http.server 4000 --directory landing",
     "check:spotlight:baseline": "node scripts/spotlight-visual-check.mjs --mode=baseline",
     "check:spotlight": "node scripts/spotlight-visual-check.mjs --mode=after",
-    "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/module/index.js --bundle --format=esm --outfile=js/vendor/supabase-js.mjs",
+    "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --outfile=js/vendor/supabase-js.mjs",
     "invite:beta": "node scripts/send-beta-invites.mjs",
     "lint": "eslint js/",
     "check:module-size": "node scripts/check-module-size.mjs",
@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/supabase-js": "^2.108.2",
     "@tailwindcss/cli": "^4.3.1",
     "axe-core": "^4.12.0",
     "esbuild": "^0.28.0",

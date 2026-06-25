@@ -38,6 +38,7 @@ from fetchers._authoritative import EA
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
+    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -327,6 +328,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch EA App library (unofficial GraphQL)")
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
+    add_only_new_arg(parser)
     parser.add_argument("--skip-hltb", action="store_true")
     parser.add_argument("--dump-raw", action="store_true")
     parser.add_argument(
@@ -497,6 +499,9 @@ def main() -> int:
         name = _clean_name(str((item.get("product") or {}).get("name") or ""))
         print(f"[{i}/{len(deduped)}] {name}", flush=True)
         cached = existing.get(_row_id(item))
+        if args.only_new and cached:
+            games_out.append(cached)
+            continue
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:

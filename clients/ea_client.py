@@ -18,9 +18,9 @@ from urllib.parse import quote
 import requests
 
 GRAPHQL_URL = "https://service-aggregation-layer.juno.ea.com/graphql"
-# Persisted-query identifiers used by the ea.com web app (see Playnite EaLibrary
-# 3.x). These are the website's own operation hashes, not desktop-only queries.
-OWNED_GAMES_HASH = "5de4178ee7e1f084ce9deca856c74a9e03547a67dfafc0cb844d532fb54ae73d"
+# Persisted-query identifiers used by the ea.com web app (Juno GraphQL APQ).
+# getPreloadedOwnedGames hash matches the live ea.com deals/library page (2025+).
+OWNED_GAMES_HASH = "779f1cd1355699752e20c0b3877847f4e3010ef5de131c248e98f8eff84f0718"
 PLAY_TIMES_HASH = "3f09b35e06b75c74d8ec3e520a598ebb5e2992b1e1268b6dd3b8ed99b9fafb29"
 
 REAL_OWNERSHIP = frozenset({
@@ -135,7 +135,7 @@ class EaClient:
                 "next": "0",
                 "type": ["DIGITAL_FULL_GAME", "PACKAGED_FULL_GAME"],
                 "entitlementEnabled": True,
-                "storefronts": ["EA"],
+                "storefronts": ["EA", "STEAM", "EPIC"],
                 "ownershipMethods": sorted(REAL_OWNERSHIP | EA_PLAY_OWNERSHIP | XGP_ONLY),
                 "platforms": ["PC"],
             },
@@ -157,7 +157,7 @@ class EaClient:
                     "next": offset,
                     "type": ["DIGITAL_FULL_GAME", "PACKAGED_FULL_GAME"],
                     "entitlementEnabled": True,
-                    "storefronts": ["EA"],
+                    "storefronts": ["EA", "STEAM", "EPIC"],
                     "ownershipMethods": sorted(REAL_OWNERSHIP | EA_PLAY_OWNERSHIP | XGP_ONLY),
                     "platforms": ["PC"],
                 },

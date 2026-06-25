@@ -17,6 +17,12 @@ const adminOnlyTests = [
 export default defineConfig({
   test: {
     environment: 'happy-dom',
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        execArgv: ['--no-experimental-webstorage'],
+      },
+    },
     include: ['tests/**/*.test.js'],
     // admin/ is gitignored (baklog-internal); skip its unit tests on public CI.
     exclude: adminPresent ? [] : adminOnlyTests,

@@ -394,6 +394,29 @@ async function handleFetcherAuthOutcome(key, data, logText) {
 
 const FRESH_THRESHOLDS = { fresh: 7 * 86400000, recent: 30 * 86400000 };
 // ITAD is a deal feed — library-style 7d/30d thresholds are misleading.
+const STALE_SWEEP_ORDER = {
+  itch: 10,
+  gog: 20,
+  xbox: 30,
+  amazon: 40,
+  epic: 50,
+  psn: 60,
+  steam: 70,
+  humble: 80,
+  battlenet: 90,
+  ubisoft: 100,
+  nintendo: 110,
+  ea: 120,
+  hltb: 200,
+  steamReviews: 210,
+  steamCovers: 220,
+  steamTags: 230,
+  protondb: 240,
+};
+
+function staleSweepRank(key) {
+  return STALE_SWEEP_ORDER[key] ?? 150;
+}
 const STALE_OVERRIDES = {
   itad: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
   claims: { fresh: 60 * 60_000, recent: 6 * 60 * 60_000 },
@@ -1251,6 +1274,8 @@ export const fetcherRunner = (() => {
   let inFlightPollTimer = null;
   /** True when the last /api/runs snapshot had active or queued rows (server truth). */
   let lastServerInFlight = false;
+  let lastFetcherLaneInFlight = false;
+  let lastEnrichLaneInFlight = false;
   /** Signature (active run id + line count + queue depth) of the last in-flight snapshot. */
   let lastInFlightSig = '';
   /**
@@ -1333,12 +1358,17 @@ export const fetcherRunner = (() => {
   function applyServerSnapshotInFlight(snap) {
     const blockingActive = runBlocksQueueSlot(snap?.active) ? snap.active : null;
     const blockingQueue = (snap?.queue || []).filter(runBlocksQueueSlot);
-    lastServerInFlight = !!(blockingActive || blockingQueue.length);
-    const queueLen = blockingQueue.length;
+    const enrichActive = runBlocksQueueSlot(snap?.enrich_active) ? snap.enrich_active : null;
+    const enrichQueue = (snap?.enrich_queue || []).filter(runBlocksQueueSlot);
+    lastFetcherLaneInFlight = !!(blockingActive || blockingQueue.length);
+    lastEnrichLaneInFlight = !!(enrichActive || enrichQueue.length);
+    lastServerInFlight = lastFetcherLaneInFlight || lastEnrichLaneInFlight;
+    const queueLen = blockingQueue.length + enrichQueue.length;
+    const blockingRun = blockingActive || enrichActive;
     // line_count grows on every emitted line (heartbeats included), so the
     // signature changes while a run is alive; a frozen run keeps it stable.
-    const sig = blockingActive
-      ? `${blockingActive.id || blockingActive.key || 'run'}:${blockingActive.line_count ?? 0}:${queueLen}`
+    const sig = blockingRun
+      ? `${blockingRun.id || blockingRun.key || 'run'}:${blockingRun.line_count ?? 0}:${queueLen}`
       : (lastServerInFlight ? `q:${queueLen}` : '');
     if (sig && sig !== lastInFlightSig) {
       inFlightProgressAt = Date.now();
@@ -1870,16 +1900,29 @@ export const fetcherRunner = (() => {
   function inFlightCount() {
     return runStateByKey.size;
   }
+  function isEnrichKey(key) {
+    return source(key)?.group === 'enrich';
+  }
+  function isQueueFullForKey(key) {
+    const enrich = isEnrichKey(key);
+    const laneBusy = enrich ? lastEnrichLaneInFlight : lastFetcherLaneInFlight;
+    if (laneBusy) return true;
+    for (const [k] of runStateByKey) {
+      if (isEnrichKey(k) === enrich) return true;
+    }
+    return false;
+  }
   function isQueueFull() {
     return inFlightCount() >= MAX_IN_FLIGHT || lastServerInFlight;
   }
   const WAIT_QUEUE_SNAPSHOT_POLL_MS = 2000;
-  function waitForQueueSlot({ batchEpoch } = {}) {
+  function waitForQueueSlot({ batchEpoch, key } = {}) {
     if (batchEpoch !== undefined && getCancelEpoch() !== batchEpoch) {
       return Promise.reject(new Error('cancelled'));
     }
     if (cancelInFlight) return Promise.reject(new Error('cancelled'));
-    if (!isQueueFull()) return Promise.resolve();
+    if (key && !isQueueFullForKey(key)) return Promise.resolve();
+    if (!key && !isQueueFull()) return Promise.resolve();
     // Deadline base is the later of wait-start and the last observed progress;
     // it slides forward as the active run advances (see inFlightProgressAt).
     let progressDeadlineBase = Date.now();
@@ -1895,7 +1938,7 @@ export const fetcherRunner = (() => {
           reject(new Error('cancelled'));
           return;
         }
-        if (!isQueueFull()) {
+        if (key ? !isQueueFullForKey(key) : !isQueueFull()) {
           resolve();
           return;
         }
@@ -1912,7 +1955,7 @@ export const fetcherRunner = (() => {
           void fetchRunsSnapshot({ force: true })
             .then((snap) => {
               if (snap) applyServerSnapshotInFlight(snap);
-              if (!isQueueFull()) resolve();
+              if (key ? !isQueueFullForKey(key) : !isQueueFull()) resolve();
               else schedule(200);
             })
             .catch(() => schedule(200));
@@ -2036,7 +2079,7 @@ export const fetcherRunner = (() => {
     } else {
       btn.disabled = !show;
       btn.textContent = 'Cancel';
-      btn.title = 'Stop all queued and running fetchers (Shift+click: force reset queue)';
+      btn.title = 'Stop all queued and running fetchers and enrichers (Shift+click: force reset queue)';
     }
   }
 
@@ -2067,7 +2110,9 @@ export const fetcherRunner = (() => {
       for (const id of [...pending]) {
         const onActive = snap.active?.id === id;
         const onQueue = (snap.queue || []).some(r => r.id === id);
-        if (!onActive && !onQueue) {
+        const onEnrichActive = snap.enrich_active?.id === id;
+        const onEnrichQueue = (snap.enrich_queue || []).some(r => r.id === id);
+        if (!onActive && !onQueue && !onEnrichActive && !onEnrichQueue) {
           const hist = (snap.history || []).find(r => r.id === id);
           if (hist && ['done', 'failed', 'cancelled'].includes(hist.status)) {
             pending.delete(id);
@@ -2086,6 +2131,8 @@ export const fetcherRunner = (() => {
     for (const key of [...runStateByKey.keys()]) markChipState(key, null);
     liveRunId = null;
     lastServerInFlight = false;
+    lastFetcherLaneInFlight = false;
+    lastEnrichLaneInFlight = false;
     logEvent(
       'info',
       force ? '[force reset - queue cleared locally]' : '[cancelled]',
@@ -2097,28 +2144,43 @@ export const fetcherRunner = (() => {
     updateCancelButton();
   }
 
+  async function cancelServerLane(lane, { force = false } = {}) {
+    const qs = force ? `?lane=${lane}&force=1` : `?lane=${lane}`;
+    try {
+      const res = await fetchWithTimeoutAndProbe(
+        `/api/runs/cancel${qs}`,
+        { method: 'POST' },
+        CANCEL_HTTP_MS,
+      );
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.cancelled?.length ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function reconcileCancelInBackground(ids, { force = false } = {}) {
     void (async () => {
-      // Dashboard Cancel is fetcher-lane only — never kill admin (internal)
-      // jobs like buildClaims/claimSources running in parallel.
-      const cancelUrl = force
-        ? '/api/runs/cancel?lane=fetcher&force=1'
-        : '/api/runs/cancel?lane=fetcher';
+      // Dashboard Cancel clears fetcher + enrich lanes only — never kill admin
+      // (internal) jobs like buildClaims/claimSources running in parallel.
       let bulkOk = false;
-      try {
-        const res = await fetchWithTimeoutAndProbe(cancelUrl, { method: 'POST' }, CANCEL_HTTP_MS);
-        if (res.ok) {
+      let cancelledTotal = 0;
+      for (const lane of ['fetcher', 'enrich']) {
+        const n = await cancelServerLane(lane, { force });
+        if (n > 0) {
           bulkOk = true;
-          const data = await res.json();
-          const n = data.cancelled?.length ?? 0;
-          if (n) {
-            logEvent(
-              'info',
-              force ? `[server force reset: ${n} run(s)]` : `[server cancelled ${n} run(s)]`,
-            );
-          }
+          cancelledTotal += n;
         }
-      } catch (_) {}
+      }
+      if (cancelledTotal) {
+        logEvent(
+          'info',
+          force
+            ? `[server force reset: ${cancelledTotal} run(s)]`
+            : `[server cancelled ${cancelledTotal} run(s)]`,
+        );
+      }
       if (!bulkOk && ids.length) {
         for (const id of ids) {
           await cancelOneRun(id);
@@ -2157,6 +2219,8 @@ export const fetcherRunner = (() => {
       applyServerSnapshotInFlight(snap);
       if (snap?.active) ids.push(snap.active.id);
       for (const q of snap?.queue || []) ids.push(q.id);
+      if (snap?.enrich_active) ids.push(snap.enrich_active.id);
+      for (const q of snap?.enrich_queue || []) ids.push(q.id);
       const clientStale = inFlightCount() > 0;
       if (!ids.length && !force && !clientStale && !lastServerInFlight) {
         return;
@@ -2177,6 +2241,10 @@ export const fetcherRunner = (() => {
     const inFlightKeys = new Set();
     if (snap.active?.key) inFlightKeys.add(snap.active.key);
     for (const q of snap.queue || []) {
+      if (q.key) inFlightKeys.add(q.key);
+    }
+    if (snap.enrich_active?.key) inFlightKeys.add(snap.enrich_active.key);
+    for (const q of snap.enrich_queue || []) {
       if (q.key) inFlightKeys.add(q.key);
     }
     const historyByKey = new Map();
@@ -2468,7 +2536,7 @@ export const fetcherRunner = (() => {
     // Hard cap mirrors server-side enforcement (max 1 active run, no queuing).
     // Without this guard a fast double-click could land two POSTs before the
     // server's lock saw the first one as pending.
-    if (isQueueFull()) {
+    if (isQueueFullForKey(key)) {
       if (!auto) {
         ensurePanel(src);
         logEvent(
@@ -2529,7 +2597,7 @@ export const fetcherRunner = (() => {
         attempt === 0
         && !cancelInFlight
         && !runStateByKey.has(key)
-        && !isQueueFull();
+        && !isQueueFullForKey(key);
       if (!canRetry) return false;
       await new Promise(r => setTimeout(r, 600));
       }
@@ -2582,7 +2650,8 @@ export const fetcherRunner = (() => {
         cooldownMs: authCooldownRemainingMs(src.key),
         disconnected: isFetcherDisconnected(src.key),
       }))
-      .map(src => src.key);
+      .map(src => src.key)
+      .sort((a, b) => staleSweepRank(a) - staleSweepRank(b));
     if (!staleKeys.length) return;
     const batchEpoch = getCancelEpoch();
     // Respect the global cap. Wait for an open slot between submits so we
@@ -2594,7 +2663,7 @@ export const fetcherRunner = (() => {
         break;
       }
       try {
-        await waitForQueueSlot({ batchEpoch });
+        await waitForQueueSlot({ batchEpoch, key });
         if (getCancelEpoch() !== batchEpoch) {
           logEvent('info', '[run stale aborted: cancelled]');
           break;
@@ -2951,6 +3020,7 @@ export const fetcherRunner = (() => {
     stateFor,
     inFlightCount,
     isQueueFull,
+    isQueueFullForKey,
     waitForQueueSlot,
     run,
     runAllStale,
@@ -3281,7 +3351,7 @@ export function renderDashboardFetcherHealth() {
           configHint ? `Note:${configHint}` : '',
           'Server is offline - start `python server.py` to run fetchers from the UI.',
         ].filter(Boolean);
-    const queueFullElsewhere = fetcherRunner.isQueueFull() && !runState;
+    const queueFullElsewhere = fetcherRunner.isQueueFullForKey(src.key) && !runState;
     if (queueFullElsewhere) {
       titleLines.push('Queue full - a fetch is already running. Wait for it to finish.');
     }

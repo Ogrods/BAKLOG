@@ -83,6 +83,8 @@ Run `sql/polar_entitlement.sql` once in the Supabase SQL editor (`get_user_id_by
 
 Local app: set `BAKLOG_POLAR_ORG_ID` to your Polar organization id (Settings → General) so `POST /api/license/activate` can validate license keys against Polar.
 
+**Checkout rollout (beta vs public):** set `BAKLOG_PRO_CHECKOUT=1` on Vercel **and** on the local server env when Polar checkout should be live. Default is off during beta. The marketing site loads `pro-checkout-gate.js`, which reads `GET /api/pro-config` and hides checkout CTAs when disabled. Grant beta-wide Pro on hosted accounts with `python scripts/grant_beta_pro.py` (dry-run by default; pass `--apply`).
+
 **Checkout link success URL (both monthly and yearly links):** set Polar → Checkout Links → Success URL to:
 
 `http://127.0.0.1:8765/?checkout=success&checkout_id={CHECKOUT_ID}`

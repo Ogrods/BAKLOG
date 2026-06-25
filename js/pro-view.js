@@ -10,6 +10,8 @@ import {
   getAccountProfileId,
   isAccountAuthMode,
   isPro,
+  licenseActivationEnabled,
+  proCheckoutEnabled,
   proCheckoutUrls,
   refreshAccountPlan,
 } from './auth-gate.js';
@@ -140,6 +142,11 @@ function proTrustHtml() {
 }
 
 function proPricingHtml() {
+  if (!proCheckoutEnabled()) {
+    return `<div class="pro-view-pricing pro-view-pricing--beta">
+    <p class="pro-view-founder">Checkout is closed during beta. Pro perks will roll out to beta testers before public launch.</p>
+  </div>`;
+  }
   const monthly = escapeAttr(proCheckoutLink('monthly'));
   const yearly = escapeAttr(proCheckoutLink('yearly'));
   const monthlyPressed = selectedProPlan === 'monthly' ? 'true' : 'false';
@@ -163,10 +170,23 @@ function proActivationHtml() {
     const emailNote = email
       ? `Checkout with <strong>${escapeHtml(email)}</strong> so Pro links to this account.`
       : 'Use the same email as your BAKLOG account at checkout.';
+    const checkoutNote = proCheckoutEnabled()
+      ? 'After payment, click refresh - or sign out and back in.'
+      : 'During beta, Pro is granted on the server side. Use refresh after perks are enabled for your account.';
     return `
       <div class="pro-view-activate">
         <h3 class="pro-view-section-title">After checkout</h3>
-        <p class="pro-view-note">${emailNote} After payment, click refresh - or sign out and back in.</p>
+        <p class="pro-view-note">${emailNote} ${checkoutNote}</p>
+        <div class="pro-view-actions">
+          <button type="button" class="pro-view-btn pro-view-btn--ghost" data-pro-refresh>Refresh Pro status</button>
+        </div>
+      </div>`;
+  }
+  if (!licenseActivationEnabled()) {
+    return `
+      <div class="pro-view-activate">
+        <h3 class="pro-view-section-title">After checkout</h3>
+        <p class="pro-view-note">License activation is not configured on this install. Set <code>BAKLOG_POLAR_ORG_ID</code> in your environment, then restart the server.</p>
         <div class="pro-view-actions">
           <button type="button" class="pro-view-btn pro-view-btn--ghost" data-pro-refresh>Refresh Pro status</button>
         </div>
@@ -347,9 +367,11 @@ async function submitProLicense(form) {
       body: JSON.stringify({ key }),
     });
     const data = await res.json().catch(() => ({}));
+    const errMsg = [data.message, data.error].find((v) => typeof v === 'string' && v.trim())
+      || (res.ok ? 'Activation failed.' : `Activation failed (HTTP ${res.status}).`);
     if (!res.ok || !data.ok) {
       licenseActivating = false;
-      setProStatus(data.message || data.error || 'Activation failed.', false);
+      setProStatus(errMsg, false);
       return;
     }
     completeProActivation({
@@ -374,7 +396,11 @@ export async function handleCheckoutSuccessReturn() {
       completeProActivation();
       return;
     }
-    setProStatus('Payment received. Pro may take a moment - click Refresh Pro status, or paste your license key below.', false);
+    setProStatus('Payment received. Pro may take a moment - click Refresh Pro status.', false);
+    return;
+  }
+  if (!licenseActivationEnabled()) {
+    setProStatus('Payment received. License activation is not configured on this install.', false);
     return;
   }
   setProStatus('Paste the license key from your Polar receipt email to finish activation.', true);

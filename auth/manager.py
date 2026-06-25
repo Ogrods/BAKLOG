@@ -643,11 +643,21 @@ def disconnect(provider: str) -> None:
 
 # Cloudflare-gated storefronts where wiping the profile on reconnect forces a
 # new cf_clearance challenge every time and Epic drops the storefront session.
-PRESERVE_PROFILE_ON_RECONNECT = frozenset({"epic_wishlist"})
+PRESERVE_PROFILE_ON_RECONNECT = frozenset(
+    k for k, s in PROVIDERS.items() if s.preserve_profile_on_reconnect
+)
 
 
 def _should_clear_on_reconnect(provider: str) -> bool:
     return provider not in PRESERVE_PROFILE_ON_RECONNECT
+
+
+def _unfinished_session_for(provider: str) -> AuthSession | None:
+    with _sessions_lock:
+        for session in _active_sessions.values():
+            if session.provider == provider and not session._finished.is_set():
+                return session
+    return None
 
 
 def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
@@ -656,6 +666,12 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
         raise ValueError(f"{provider} uses manual sign-in — click Open in browser and paste your API key")
     if spec.kind not in ("browser", "oauth"):
         raise ValueError(f"{provider} does not support browser sign-in")
+    existing = _unfinished_session_for(provider)
+    if existing is not None:
+        raise ValueError(
+            f"A sign-in window for {spec.label} is already open. "
+            "Finish or close it before starting again."
+        )
     if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.
@@ -671,7 +687,6 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
     with _sessions_lock:
         _active_sessions[session_id] = session
 
-
     def _worker() -> None:
         try:
             creds = run_browser_auth(provider, session)
@@ -684,12 +699,9 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 session.emit("error", {"message": msg})
                 return
 
-            from auth.session_probe import (
-                ADVISORY_BROWSER_PROBE,
-                probe_browser_session,
-            )
+            from auth.session_probe import probe_browser_session
 
-            if provider in ADVISORY_BROWSER_PROBE:
+            if spec.post_connect_probe == "advisory":
                 # Headed sign-in already confirmed the session via the live page
                 # (the connect window won't close until xbox.com reports
                 # isSignedIn). The headless re-check is both unreliable AND

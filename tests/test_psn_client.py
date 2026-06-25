@@ -80,6 +80,46 @@ class _FakePsnMe:
         yield from self._entitlements
 
 
+def test_parallel_collect_walks_run_concurrently() -> None:
+    """title_stats, trophy_titles, and entitlements walks start in parallel."""
+    import threading
+    import time
+
+    lock = threading.Lock()
+    active: set[str] = set()
+    peak = 0
+
+    def track(name: str):
+        with lock:
+            active.add(name)
+            nonlocal peak
+            peak = max(peak, len(active))
+        time.sleep(0.05)
+        with lock:
+            active.discard(name)
+
+    class _SlowMe:
+        def title_stats(self, limit=None):
+            track("stats")
+            yield from [_stat(title_id="T1", name="Game A")]
+
+        def trophy_titles(self, limit=None):
+            track("trophy")
+            yield from [_trophy()]
+
+        def game_entitlements(self, limit=None):
+            track("ent")
+            yield from []
+
+    client = object.__new__(PsnClient)
+    client._client = _SlowMe()
+    client.last_dedupe_dropped = 0
+    client.last_filtered_non_games = 0
+    games = client.collect_library()
+    assert peak >= 2
+    assert len(games) >= 1
+
+
 def test_cross_gen_playtime_summed() -> None:
     ps4_min = int(timedelta(hours=2304, minutes=16).total_seconds() // 60)
     ps5_min = int(timedelta(hours=168).total_seconds() // 60)

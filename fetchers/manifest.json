@@ -6,7 +6,8 @@
       "group": "library",
       "script": "fetchers/fetch_games.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "refreshArgs": [
         "--refresh"
@@ -30,7 +31,8 @@
       "group": "library",
       "script": "fetchers/fetch_gog.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "refreshArgs": [
         "--refresh"
@@ -45,7 +47,8 @@
       "group": "library",
       "script": "fetchers/fetch_psn.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "refreshArgs": [
         "--refresh"
@@ -65,7 +68,8 @@
       "group": "library",
       "script": "fetchers/fetch_epic.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "refreshArgs": [
         "--refresh"
@@ -85,7 +89,8 @@
       "group": "library",
       "script": "fetchers/fetch_amazon.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "amazon",
       "color": "#c2410c",
@@ -97,7 +102,8 @@
       "group": "library",
       "script": "fetchers/fetch_xbox.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "xbox",
       "color": "#107C10",
@@ -114,7 +120,8 @@
       "group": "library",
       "script": "fetchers/fetch_battlenet.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "battlenet",
       "color": "#148EFF",
@@ -131,7 +138,8 @@
       "group": "library",
       "script": "fetchers/fetch_ubisoft.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "ubisoft",
       "color": "#FFD200",
@@ -152,7 +160,8 @@
       "group": "library",
       "script": "fetchers/fetch_nintendo.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "nintendo",
       "color": "#E60012",
@@ -169,7 +178,8 @@
       "group": "library",
       "script": "fetchers/fetch_itch.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "itch",
       "color": "#fa5c5c",
@@ -186,7 +196,8 @@
       "group": "library",
       "script": "fetchers/fetch_humble.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "humble",
       "color": "#cc2929",
@@ -202,7 +213,8 @@
       "group": "library",
       "script": "fetchers/fetch_ea.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "ea",
       "color": "#FF4747",
@@ -218,7 +230,8 @@
       "group": "wishlist",
       "script": "fetchers/fetch_wishlist.py",
       "args": [
-        "--skip-hltb"
+        "--skip-hltb",
+        "--only-new"
       ],
       "metaKey": "wishlist",
       "color": "#ea580c",
@@ -238,6 +251,9 @@
       "label": "WL GOG",
       "group": "wishlist",
       "script": "fetchers/fetch_gog_wishlist.py",
+      "args": [
+        "--only-new"
+      ],
       "refreshArgs": [
         "--refresh"
       ],
@@ -255,6 +271,9 @@
       "label": "WL Epic",
       "group": "wishlist",
       "script": "fetchers/fetch_epic_wishlist.py",
+      "args": [
+        "--only-new"
+      ],
       "metaKey": "wishlistEpic",
       "color": "#64748b",
       "requires": [
@@ -268,6 +287,9 @@
       "label": "WL PSN",
       "group": "wishlist",
       "script": "fetchers/fetch_psn_wishlist.py",
+      "args": [
+        "--only-new"
+      ],
       "metaKey": "wishlistPsn",
       "color": "#003791",
       "requires": [
@@ -282,6 +304,9 @@
       "label": "WL Ubisoft",
       "group": "wishlist",
       "script": "fetchers/fetch_ubisoft_wishlist.py",
+      "args": [
+        "--only-new"
+      ],
       "metaKey": "wishlistUbisoft",
       "color": "#FFD200",
       "requires": [
@@ -295,6 +320,9 @@
       "label": "WL Xbox",
       "group": "wishlist",
       "script": "fetchers/fetch_xbox_wishlist.py",
+      "args": [
+        "--only-new"
+      ],
       "metaKey": "wishlistXbox",
       "color": "#107C10",
       "requires": [
@@ -308,6 +336,9 @@
       "label": "WL Nintendo",
       "group": "wishlist",
       "script": "fetchers/fetch_nintendo_wishlist.py",
+      "args": [
+        "--only-new"
+      ],
       "metaKey": "wishlistNintendo",
       "color": "#E60012",
       "requires": [
@@ -321,6 +352,9 @@
       "label": "WL Humble",
       "group": "wishlist",
       "script": "fetchers/fetch_humble_wishlist.py",
+      "args": [
+        "--only-new"
+      ],
       "metaKey": "wishlistHumble",
       "color": "#cc2929",
       "requires": [

@@ -214,7 +214,8 @@ describe('cancelInFlightRuns server truth', () => {
     const bulkCancels = fetchMock.mock.calls
       .map(c => String(c[0]))
       .filter(u => u.includes('/api/runs/cancel'));
-    expect(bulkCancels.every(u => u.includes('lane=fetcher'))).toBe(true);
+    expect(bulkCancels.some(u => u.includes('lane=fetcher'))).toBe(true);
+    expect(bulkCancels.some(u => u.includes('lane=enrich'))).toBe(true);
   });
 
   it('bumps cancel epoch when user cancels', async () => {

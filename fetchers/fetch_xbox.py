@@ -19,6 +19,7 @@ from fetchers._authoritative import XBOX
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
+    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -116,6 +117,7 @@ def _build_row(title: dict, hltb: dict | None) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Xbox library via OpenXBL")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     args = parser.parse_args()
@@ -172,8 +174,12 @@ def main() -> int:
     for i, title in enumerate(games, 1):
         name = title.get("name") or tid_placeholder(title)
         tid = str(title.get("titleId") or title.get("modernTitleId") or "")
-        print(f"[{i}/{len(games)}] {name}", flush=True)
         cached = existing.get(tid)
+        if args.only_new and cached:
+            games_out.append(cached)
+            stats.ok += 1
+            continue
+        print(f"[{i}/{len(games)}] {name}", flush=True)
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:

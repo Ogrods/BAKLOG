@@ -54,8 +54,8 @@ debug-*.log
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+!.cursor/hooks.json
 .cursor/rules/internal-*.mdc
-.cursor/hooks.json
 .baklog_server.pid
 
 # Generated Lighthouse reports (npm run / npx lighthouse)

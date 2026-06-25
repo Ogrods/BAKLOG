@@ -70,7 +70,9 @@ function topErrorSummary(bundle) {
   const session = bundle.errors?.session || [];
   const persisted = bundle.errors?.persisted || [];
   const latest = session[session.length - 1] || persisted[persisted.length - 1];
-  if (!latest) return { message: "(no errors captured)", stack: "" };
+  if (!latest) {
+    return { message: "(no errors captured)", stack: "", name: "ManualReport" };
+  }
   return {
     message: String(latest.message || "(no message)").slice(0, 500),
     stack: String(latest.stack || "").slice(0, 2000),

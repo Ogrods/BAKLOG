@@ -156,4 +156,20 @@ describe("landing/api/report.js", () => {
     expect(payload.reply_to).toBe("tester@example.com");
     expect(payload.subject).toContain("BAKLOG bug report");
   });
+
+  it("uses ManualReport subject when the bundle has no captured errors", async () => {
+    const res = await handleReport(makeRequest({
+      bundle: {
+        ...validBundle(),
+        errors: { session: [], persisted: [] },
+      },
+      note: "Pro activation failed",
+    }, { ip: "10.0.0.88" }));
+    expect(res.status).toBe(200);
+    const [, opts] = fetchMock.mock.calls[0];
+    const payload = JSON.parse(opts.body);
+    expect(payload.subject).toContain("ManualReport");
+    expect(payload.text).toContain("ManualReport: (no errors captured)");
+    expect(payload.text).not.toContain("undefined:");
+  });
 });

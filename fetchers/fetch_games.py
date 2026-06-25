@@ -171,6 +171,7 @@ def _fetch_store_data(
     *,
     refresh: bool,
     cached_row: dict | None,
+    skip_reviews: bool = False,
 ) -> tuple[dict | None, dict | None]:
     """Return (details_data, reviews) from store APIs with cache fallback."""
     details_data: dict | None = None
@@ -179,7 +180,14 @@ def _fetch_store_data(
         app_result = steam.get_app_details(appid, refresh=refresh)
         if app_result and app_result.get("success"):
             details_data = app_result["data"]
-        reviews = steam.get_review_summary(appid, refresh=refresh)
+        if not skip_reviews:
+            reviews = steam.get_review_summary(appid, refresh=refresh)
+        elif cached_row:
+            reviews = {
+                "percent_positive": cached_row.get("steam_review_percent"),
+                "total_reviews": cached_row.get("steam_review_count"),
+                "review_score_desc": cached_row.get("steam_review_desc"),
+            }
     except requests.RequestException as exc:
         print(f"  Store API warning for {appid}: {exc}", flush=True)
         if cached_row:
@@ -264,6 +272,17 @@ def main() -> int:
     games_out: list[dict] = []
     skipped = 0
 
+    store_prefetch: list[int] = []
+    for owned in owned_games:
+        appid = owned["appid"]
+        if args.only_new and appid in existing and not args.refresh and not args.appid:
+            continue
+        cached_row = existing.get(appid)
+        if args.refresh or cached_row is None or args.appid:
+            store_prefetch.append(appid)
+    if store_prefetch:
+        steam.get_app_details_batch(store_prefetch, refresh=args.refresh)
+
     for i, owned in enumerate(owned_games, 1):
         appid = owned["appid"]
         name = owned.get("name", str(appid))
@@ -293,6 +312,7 @@ def main() -> int:
                 appid,
                 refresh=args.refresh,
                 cached_row=cached_row,
+                skip_reviews=args.only_new and not args.refresh and not args.appid,
             )
 
         hltb = None

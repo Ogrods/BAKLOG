@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": ".venv/Scripts/python.exe scripts/hooks/remind-tracker.py",
+        "loop_limit": 1
+      },
+      {
+        "command": ".venv/Scripts/python.exe scripts/hooks/cleanup-baklog-strays.py",
+        "loop_limit": 1
+      }
+    ]
+  }
+}

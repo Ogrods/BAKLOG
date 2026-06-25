@@ -390,6 +390,11 @@ export async function fetchLibraryJson(path) {
   return res.json();
 }
 
+/** Keep the in-memory catalog when a reload misses (never wipe on a failed fetch). */
+function preserveLibraryMeta(metaKey, fetched) {
+  return fetched ?? state.libraryMeta[metaKey] ?? null;
+}
+
 export { LIBRARY_STORE_JSON };
 
 export function rebuildAllGamesFromMetas() {
@@ -441,7 +446,8 @@ export async function reloadAllLibraryStoreFiles() {
   const entries = await Promise.all(
     Object.entries(LIBRARY_STORE_JSON).map(async ([metaKey, file]) => {
       try {
-        return [metaKey, await fetchLibraryJson(file)];
+        const data = await fetchLibraryJson(file);
+        return [metaKey, preserveLibraryMeta(metaKey, data)];
       } catch {
         return [metaKey, state.libraryMeta[metaKey] ?? null];
       }
@@ -499,11 +505,14 @@ export async function reloadAfterFetcher(key) {
     refreshClaimableUi();
   } else if (WISHLIST_FETCHER_JSON[key]) {
     const metaKey = WISHLIST_FETCHER_META_KEY[key];
-    state.libraryMeta[metaKey] = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
+    state.libraryMeta[metaKey] = preserveLibraryMeta(
+      metaKey,
+      await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]),
+    );
     rebuildWishlistFromMetas();
   } else if (LIBRARY_STORE_JSON[key]) {
     captureLibraryKeysBeforeMerge();
-    state.libraryMeta[key] = await fetchLibraryJson(LIBRARY_STORE_JSON[key]);
+    state.libraryMeta[key] = preserveLibraryMeta(key, await fetchLibraryJson(LIBRARY_STORE_JSON[key]));
     rebuildAllGamesFromMetas();
   } else {
     await reloadGames();
@@ -564,28 +573,28 @@ export async function reloadGames() {
     fetchLibraryJson("games_wishlist_humble.json"),
   ]);
   if (!steam && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft && !humble && !ea) throw new Error("No library files found");
-  state.libraryMeta.steam = steam;
-  state.libraryMeta.gog = gog;
-  state.libraryMeta.psn = psn;
-  state.libraryMeta.epic = epic;
-  state.libraryMeta.amazon = amazon;
-  state.libraryMeta.nintendo = nintendo;
-  state.libraryMeta.itch = itch;
-  state.libraryMeta.xbox = xbox;
-  state.libraryMeta.battlenet = battlenet;
-  state.libraryMeta.ubisoft = ubisoft;
-  state.libraryMeta.humble = humble;
-  state.libraryMeta.ea = ea;
+  state.libraryMeta.steam = preserveLibraryMeta('steam', steam);
+  state.libraryMeta.gog = preserveLibraryMeta('gog', gog);
+  state.libraryMeta.psn = preserveLibraryMeta('psn', psn);
+  state.libraryMeta.epic = preserveLibraryMeta('epic', epic);
+  state.libraryMeta.amazon = preserveLibraryMeta('amazon', amazon);
+  state.libraryMeta.nintendo = preserveLibraryMeta('nintendo', nintendo);
+  state.libraryMeta.itch = preserveLibraryMeta('itch', itch);
+  state.libraryMeta.xbox = preserveLibraryMeta('xbox', xbox);
+  state.libraryMeta.battlenet = preserveLibraryMeta('battlenet', battlenet);
+  state.libraryMeta.ubisoft = preserveLibraryMeta('ubisoft', ubisoft);
+  state.libraryMeta.humble = preserveLibraryMeta('humble', humble);
+  state.libraryMeta.ea = preserveLibraryMeta('ea', ea);
   captureLibraryKeysBeforeMerge();
   rebuildAllGamesFromMetas();
-  state.libraryMeta.wishlist = wishlist;
-  state.libraryMeta.wishlistGog = wishlistGog;
-  state.libraryMeta.wishlistEpic = wishlistEpic;
-  state.libraryMeta.wishlistPsn = wishlistPsn;
-  state.libraryMeta.wishlistUbisoft = wishlistUbisoft;
-  state.libraryMeta.wishlistXbox = wishlistXbox;
-  state.libraryMeta.wishlistNintendo = wishlistNintendo;
-  state.libraryMeta.wishlistHumble = wishlistHumble;
+  state.libraryMeta.wishlist = preserveLibraryMeta('wishlist', wishlist);
+  state.libraryMeta.wishlistGog = preserveLibraryMeta('wishlistGog', wishlistGog);
+  state.libraryMeta.wishlistEpic = preserveLibraryMeta('wishlistEpic', wishlistEpic);
+  state.libraryMeta.wishlistPsn = preserveLibraryMeta('wishlistPsn', wishlistPsn);
+  state.libraryMeta.wishlistUbisoft = preserveLibraryMeta('wishlistUbisoft', wishlistUbisoft);
+  state.libraryMeta.wishlistXbox = preserveLibraryMeta('wishlistXbox', wishlistXbox);
+  state.libraryMeta.wishlistNintendo = preserveLibraryMeta('wishlistNintendo', wishlistNintendo);
+  state.libraryMeta.wishlistHumble = preserveLibraryMeta('wishlistHumble', wishlistHumble);
   rebuildWishlistFromMetas();
   await Promise.all([
     loadItadPrices(),

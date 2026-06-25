@@ -21,6 +21,7 @@ from fetchers._authoritative import BATTLENET
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
+    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -189,6 +190,7 @@ def _build_client(browser: str, env_cookie: str) -> BattleNetClient:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Battle.net library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     load_dotenv()
@@ -289,8 +291,12 @@ def main() -> int:
     games_out: list[dict] = []
     for i, item in enumerate(deduped, 1):
         name = _name(item)
+        row_id = _id(item, name or "")
+        cached = existing.get(row_id)
+        if args.only_new and cached:
+            games_out.append(cached)
+            continue
         print(f"[{i}/{len(deduped)}] {name}")
-        cached = existing.get(_id(item, name or ""))
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:

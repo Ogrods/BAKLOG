@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -392,6 +393,9 @@ class PsnClient:
     def __init__(self, npsso: str):
         self.last_dedupe_dropped = 0
         self.last_filtered_non_games = 0
+        self.last_title_stats_count = 0
+        self.last_trophy_count = 0
+        self.last_entitlement_count = 0
         try:
             self._psnawp = PSNAWP(npsso)
             self._client = self._psnawp.me()
@@ -470,25 +474,36 @@ class PsnClient:
             )
         return entries
 
-    def collect_library(self) -> list[PsnGameEntry]:
-        hb = HeartbeatTimer(interval=25.0)
-        heartbeat("PSN library: loading title stats")
+    def probe_library_fingerprint(self) -> tuple[int, str | None]:
+        """Cheap title-stats walk: count + newest last_played (for incremental skip)."""
+        count = 0
+        max_last: str | None = None
+        for stat in self._client.title_stats(limit=None):
+            count += 1
+            last = _iso(getattr(stat, "last_played_date_time", None))
+            if last and (max_last is None or last > max_last):
+                max_last = last
+        return count, max_last
+
+    def _walk_title_stats(self) -> tuple[dict[str, object], dict[str, object], dict, int]:
         stats_by_title_id: dict[str, object] = {}
         stats_by_name: dict[str, object] = {}
         stat_agg = _new_stat_agg()
-        for i, stat in enumerate(self._client.title_stats(limit=None), 1):
-            hb.tick_progress(i, 0, "PSN title stats")
+        count = 0
+        for stat in self._client.title_stats(limit=None):
+            count += 1
             if stat.title_id:
                 stats_by_title_id[stat.title_id] = stat
             if stat.name:
                 stats_by_name[_norm_name(stat.name)] = stat
             _accumulate_stat_into_agg(stat_agg, stat)
+        return stats_by_title_id, stats_by_name, stat_agg, count
 
+    def _walk_trophy_entries(self) -> tuple[dict[str, PsnGameEntry], int]:
         entries: dict[str, PsnGameEntry] = {}
-        heartbeat(progress_line(0, 0, "PSN title stats", f"{len(stats_by_title_id)} loaded"))
-
-        for i, trophy in enumerate(self._client.trophy_titles(limit=None), 1):
-            hb.tick_progress(i, 0, "PSN trophies")
+        count = 0
+        for trophy in self._client.trophy_titles(limit=None):
+            count += 1
             comm_id = trophy.np_communication_id
             if not comm_id:
                 continue
@@ -516,7 +531,30 @@ class PsnClient:
                 store_url=_store_url(None, comm_id),
             )
             entries[comm_id] = entry
+        return entries, count
 
+    def _walk_entitlements_raw(self) -> tuple[list, int]:
+        raw: list = []
+        count = 0
+        for entitlement in self._client.game_entitlements(limit=None):
+            count += 1
+            raw.append(entitlement)
+        return raw, count
+
+    def collect_library(self) -> list[PsnGameEntry]:
+        hb = HeartbeatTimer(interval=25.0)
+        heartbeat("PSN library: loading (parallel API walks)")
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            f_stats = ex.submit(self._walk_title_stats)
+            f_trophy = ex.submit(self._walk_trophy_entries)
+            f_ent = ex.submit(self._walk_entitlements_raw)
+            stats_by_title_id, stats_by_name, stat_agg, title_stats_count = f_stats.result()
+            entries, trophy_count = f_trophy.result()
+            entitlements, entitlement_count = f_ent.result()
+        self.last_title_stats_count = title_stats_count
+        self.last_trophy_count = trophy_count
+        self.last_entitlement_count = entitlement_count
+        heartbeat(progress_line(0, 0, "PSN title stats", f"{title_stats_count} loaded"))
         heartbeat(progress_line(0, len(entries), "PSN trophies", f"{len(entries)} titles"))
 
         for entry in entries.values():
@@ -531,8 +569,8 @@ class PsnClient:
 
         seen_title_ids = {e.title_id for e in entries.values() if e.title_id}
 
-        for i, entitlement in enumerate(self._client.game_entitlements(limit=None), 1):
-            hb.tick_progress(i, 0, "PSN entitlements")
+        for entitlement in entitlements:
+            hb.tick_progress(0, 0, "PSN entitlements")
             if entitlement.get("isGame") is False or entitlement.get("isBeta") is True:
                 continue
             title_meta = entitlement.get("titleMeta") or {}

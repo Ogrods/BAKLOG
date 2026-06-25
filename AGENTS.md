@@ -38,7 +38,7 @@ Deep reference (maintainer clone only): `docs/ARCHITECTURE.md` in the private `b
 Two **separate** systems; mixing them up is why banner edits "don't show". Full guide: `.cursor/rules/frontend.mdc` → "Banners & ads".
 
 - **Feed-driven** (`house-*` deal slots, dash-spotlight Pro slides, paid `ad-*`): from `sponsors.json`. App resolution order (first non-empty wins): local profile `/sponsors.json` → **hosted `baklog.app/sponsors.json`** → bundled `curated/sponsors.json`. The **hosted feed wins on any online machine**, so editing `curated/sponsors.json` alone changes nothing. To ship: edit `landing/sponsors.json` (mirror `curated/`), keep the rule-6 sponsor sync pairs aligned (and add to `PRO_PROMO_SPONSOR_IDS` if it should open the Pro tab), commit, push, let Vercel redeploy, then **verify with `Invoke-WebRequest https://baklog.app/sponsors.json`**.
-- **Hardcoded JS** (dashboard `PRO_PROMO` banner, wishlist house banner, Connections Pro card `renderConnectionsProLink`/`CONN_PRO_PITCH` in `js/pro-view.js`): from `js/` source only. Edit + reload (dev raw ESM is `no-store`); run `npm run build` if serving built `dist/`. The Connections card renders only on the Connections tab for non‑Pro sessions.
+- **Hardcoded JS** (dashboard `PRO_PROMO` banner, wishlist house banner, Connections background-refresh note via `bgRefreshPlanNote()` in `js/connections.js`): from `js/` source only. Edit + reload (dev raw ESM is `no-store`); run `npm run build` if serving built `dist/`. The Connections note renders only on the Connections tab for non‑Pro sessions.
 
 ## Weight guardrails (CI)
 

@@ -35,7 +35,7 @@ def _script_flags(script: str) -> set[str]:
     flags: set[str] = set()
     for m in re.finditer(r'add_argument\(\s*["\'](--[\w-]+)', text):
         flags.add(m.group(1))
-    if "add_hltb_args" in text:
+    if "add_hltb_args" in text or "add_only_new_arg" in text:
         base = (ROOT / "fetchers/_base.py").read_text(encoding="utf-8")
         for m in re.finditer(r'add_argument\(\s*["\'](--[\w-]+)', base):
             flags.add(m.group(1))
@@ -81,6 +81,20 @@ def test_reload_mapping(entry: dict) -> None:
 def test_manifest_keys_unique() -> None:
     keys = [e["key"] for e in ENTRIES]
     assert len(keys) == len(set(keys))
+
+
+def test_manifest_has_27_fetchers() -> None:
+    assert len(ENTRIES) == 27
+
+
+@pytest.mark.parametrize("entry", ENTRIES, ids=[e["key"] for e in ENTRIES])
+def test_manifest_entry_has_required_fields(entry: dict) -> None:
+    assert entry.get("key")
+    assert entry.get("label")
+    assert entry.get("group") in ("library", "wishlist", "prices", "enrich")
+    assert entry.get("script")
+    script = ROOT / entry["script"]
+    assert script.is_file(), f"{entry['key']}: missing {entry['script']}"
 
 
 def test_all_library_manifest_keys_in_app_js() -> None:
@@ -160,6 +174,16 @@ def test_manual_empty_guard(script: str) -> None:
 def test_documented_no_standard_empty_guard(script: str) -> None:
     """Enrichers mutate in place; Steam/PSN trust non-zero library from API."""
     assert script in NO_EMPTY_GUARD_SCRIPTS
+
+
+def test_library_wishlist_default_only_new() -> None:
+    """Incremental sync: library and wishlist fetchers default to --only-new."""
+    for entry in ENTRIES:
+        group = entry.get("group")
+        if group not in ("library", "wishlist"):
+            continue
+        args = entry.get("args") or []
+        assert "--only-new" in args, f"{entry['key']}: missing --only-new in manifest args"
 
 
 def test_registry_validate_manifest() -> None:

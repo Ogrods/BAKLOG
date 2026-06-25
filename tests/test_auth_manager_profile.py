@@ -100,3 +100,26 @@ def test_clear_browser_session_removes_profile_dir(
 
     auth_manager.clear_browser_session("xbox_wishlist")
     assert not prof.exists()
+
+
+def test_start_browser_auth_rejects_overlapping_provider_session(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_run(_provider: str, _session: object) -> dict[str, str]:
+        started.set()
+        release.wait(timeout=5.0)
+        return {"token": "x"}
+
+    monkeypatch.setattr(auth_manager, "run_browser_auth", slow_run)
+    monkeypatch.setattr(auth_manager, "mark_connected", lambda _p, _c: None)
+
+    auth_manager.start_browser_auth("steam")
+    assert started.wait(timeout=3.0)
+
+    with pytest.raises(ValueError, match="already open"):
+        auth_manager.start_browser_auth("steam")
+
+    release.set()

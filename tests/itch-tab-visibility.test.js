@@ -54,14 +54,14 @@ describe('isItchTabAvailable', () => {
     expect(isItchTabAvailable()).toBe(true);
   });
 
-  it('is false when disconnected even if a stale itch catalog is on disk', async () => {
+  it('stays available when disconnected but a cached itch catalog exists', async () => {
     mockAuthStatus([
       { key: 'itch', status: 'disconnected' },
       { key: 'itch_local', status: 'disconnected' },
     ]);
     state.itchGames = [{ store: 'itch', id: 'a', name: 'Demo Game' }];
     await refreshConnections();
-    expect(isItchTabAvailable()).toBe(false);
+    expect(isItchTabAvailable()).toBe(true);
   });
 });
 
@@ -114,7 +114,7 @@ describe('applyItchTabVisibility', () => {
     expect(loadActiveView()).toBe('itch');
   });
 
-  it('redirects from itch to dashboard once auth and library data are known', async () => {
+  it('redirects from itch to dashboard when disconnected and library is empty', async () => {
     state.activeView = 'itch';
     saveActiveView('itch');
     state.dashboardDataReady = true;
@@ -122,5 +122,19 @@ describe('applyItchTabVisibility', () => {
     await refreshConnections();
     applyItchTabVisibility();
     expect(loadActiveView()).toBe('dashboard');
+  });
+
+  it('keeps itch view when disconnected but cached library exists', async () => {
+    state.activeView = 'itch';
+    saveActiveView('itch');
+    state.dashboardDataReady = true;
+    state.itchGames = [{ store: 'itch', id: 'a', name: 'Demo Game' }];
+    mockAuthStatus([
+      { key: 'itch', status: 'disconnected' },
+      { key: 'itch_local', status: 'disconnected' },
+    ]);
+    await refreshConnections();
+    applyItchTabVisibility();
+    expect(loadActiveView()).toBe('itch');
   });
 });

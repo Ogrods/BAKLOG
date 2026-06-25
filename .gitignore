@@ -1,5 +1,6 @@
 .env
 .env.imported
+packaging/bundle-auth.env
 # Generated per-store library + wishlist JSON (never commit personal catalog data)
 games_*.json
 games_wishlist_*.json
@@ -102,3 +103,6 @@ review-findings.yaml
 review-handoff.md
 review-report.json
 scripts/_diag_personal.py
+
+.vercel
+.env*

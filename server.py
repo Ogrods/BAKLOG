@@ -3602,7 +3602,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_auth_session_get(self) -> None:
         """Lightweight account session probe (JWT + bound profile + plan)."""
-        from shared.entitlement import current_plan
+        from shared.comp_pro import ensure_comp_pro_on_login
+        from shared.entitlement import PLAN_PRO, current_plan, note_authenticated_plan
         from shared.profile_paths import get_active_profile_id
         from shared.supabase_auth import verify_bearer_user
 
@@ -3611,16 +3612,25 @@ class Handler(SimpleHTTPRequestHandler):
         if not user:
             _send_auth_required(self)
             return
-        # Resolve plan from the same verified bearer so the UI gets the real plan
-        # after sign-in (GET /api/config is fetched without a bearer at boot).
+        email = user.get("email") or ""
+        user_id = user.get("id") or ""
+        plan = current_plan(authorization)
+        refresh_session = False
+        if email:
+            _should_pro, _upgraded = ensure_comp_pro_on_login(user_id, email)
+            if _should_pro and plan != PLAN_PRO:
+                plan = PLAN_PRO
+                note_authenticated_plan(plan)
+                refresh_session = True
         _send_json(
             self,
             HTTPStatus.OK,
             {
                 "ok": True,
-                "email": user.get("email") or "",
+                "email": email,
                 "profile": get_active_profile_id(),
-                "plan": current_plan(authorization),
+                "plan": plan,
+                **({"refreshSession": True} if refresh_session else {}),
             },
         )
 

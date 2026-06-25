@@ -3,7 +3,7 @@
 Uses the GoTrue admin API to set ``app_metadata.plan`` on each user. Safe by
 default: prints the plan and exits unless ``--apply`` is passed.
 
-Env (shell or landing/.env):
+Env (shell or repo ``.env``):
   SUPABASE_URL
   SUPABASE_SERVICE_ROLE_KEY
 
@@ -17,75 +17,13 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+from shared.supabase_admin import admin_request, list_users, load_maintainer_env
+
 PRO_ALIASES = frozenset({"pro", "paid", "premium"})
-
-
-def _load_dotenv() -> None:
-    for rel in ("landing/.env", ".env"):
-        path = ROOT / rel
-        if not path.is_file():
-            continue
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            key = key.strip()
-            if key and key not in os.environ:
-                os.environ[key] = val.strip().strip('"').strip("'")
-
-
-def _request(
-    method: str,
-    url: str,
-    *,
-    key: str,
-    body: dict | None = None,
-) -> dict | list:
-    data = None
-    headers = {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json",
-    }
-    if body is not None:
-        data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method=method, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            raw = resp.read().decode("utf-8")
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"{method} {url} -> HTTP {exc.code}: {detail}") from exc
-
-
-def _list_users(base: str, key: str) -> list[dict]:
-    users: list[dict] = []
-    page = 1
-    while True:
-        qs = urllib.parse.urlencode({"page": page, "per_page": 200})
-        batch = _request("GET", f"{base}/auth/v1/admin/users?{qs}", key=key)
-        if not isinstance(batch, dict):
-            break
-        chunk = batch.get("users") or []
-        if not chunk:
-            break
-        users.extend(chunk)
-        if len(chunk) < 200:
-            break
-        page += 1
-    return users
 
 
 def _normalize_plan(raw: str) -> str:
@@ -107,7 +45,7 @@ def _created_before(user: dict, cutoff: datetime | None) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    _load_dotenv()
+    load_maintainer_env()
     parser = argparse.ArgumentParser(description="Grant or revoke hosted BAKLOG Pro via Supabase admin.")
     parser.add_argument("--apply", action="store_true", help="Write changes (default is dry-run).")
     parser.add_argument("--plan", default="pro", choices=("pro", "free"), help="Plan to set (default: pro).")
@@ -131,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
         cutoff = datetime.fromisoformat(args.before).replace(tzinfo=timezone.utc)
 
     target_plan = _normalize_plan(args.plan)
-    users = _list_users(url, key)
+    users = list_users(url, key)
     email_filter = (args.email or "").strip().lower()
     selected: list[dict] = []
     for user in users:
@@ -159,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         meta["plan"] = target_plan
         print(f"  {mail}  {prev!r} -> {target_plan!r}  ({uid})")
         if args.apply and uid:
-            _request(
+            admin_request(
                 "PUT",
                 f"{url}/auth/v1/admin/users/{uid}",
                 key=key,

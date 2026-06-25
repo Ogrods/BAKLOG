@@ -1,0 +1,4 @@
+# Emails that receive plan=pro automatically on sign-in (Create account or invite).
+# Does not affect other beta testers. One address per line; # comments ok.
+pvjk@hotmail.com
+madisonjclark@gmail.com

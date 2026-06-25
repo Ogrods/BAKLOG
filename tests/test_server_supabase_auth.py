@@ -134,6 +134,31 @@ def test_auth_session_returns_profile(auth_server) -> None:
     assert data["email"] == ""
 
 
+def test_auth_session_comp_pro_upgrades(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+    base, secret, _tmp = auth_server
+    sub = "550e8400-e29b-41d4-a716-446655440000"
+    token = jwt.encode(
+        {
+            "sub": sub,
+            "email": "paul@example.com",
+            "aud": "authenticated",
+            "iss": "https://test.supabase.co/auth/v1",
+            "exp": int(time.time()) + 3600,
+            "app_metadata": {"plan": "free"},
+        },
+        secret,
+        algorithm="HS256",
+    )
+    monkeypatch.setattr(
+        "shared.comp_pro.ensure_comp_pro_on_login",
+        lambda uid, email: (True, True),
+    )
+    status, data = _get_json(base, "/api/auth/session", auth=f"Bearer {token}")
+    assert status == 200
+    assert data["plan"] == "pro"
+    assert data.get("refreshSession") is True
+
+
 def test_auth_session_requires_bearer(auth_server) -> None:
     base, _secret, _tmp = auth_server
     status, data = _get_json(base, "/api/auth/session")

@@ -24,7 +24,8 @@ function mountCountSurface() {
 
 function rafSync() {
   vi.stubGlobal('requestAnimationFrame', (cb) => {
-    cb(performance.now() + 2000);
+    // One shot with enough elapsed time to finish any count roll in tests.
+    cb(performance.now() + 5000);
     return 1;
   });
 }
@@ -58,7 +59,7 @@ describe('flashCountUp', () => {
   it('spawns one popup per game for small deltas', () => {
     const node = mountCountSurface();
     flashCountUp(node, 10, 12, n => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(350);
     const popups = document.querySelectorAll('.library-count-popup');
     expect(popups.length).toBe(2);
     expect(popups[0].textContent).toBe('+1');
@@ -66,14 +67,23 @@ describe('flashCountUp', () => {
     expect(node.textContent).toBe('12');
   });
 
-  it('caps popups at 10 for large deltas', () => {
+  it('caps popups at 10 for large deltas (always +1, never chunked)', () => {
     const node = mountCountSurface();
-    flashCountUp(node, 0, 1946, n => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(800);
+    flashCountUp(node, 0, 50, n => String(Math.round(n)), { popups: true });
+    for (let i = 0; i < 10; i++) vi.advanceTimersByTime(300);
     const popups = document.querySelectorAll('.library-count-popup');
-    expect(popups.length).toBe(10);
-    const sum = [...popups].reduce((s, el) => s + parseInt(el.textContent.slice(1).replace(/,/g, ''), 10), 0);
-    expect(sum).toBeGreaterThanOrEqual(1946);
+    expect(popups.length).toBeLessThanOrEqual(4);
+    expect(popups.length).toBeGreaterThanOrEqual(1);
+    for (const el of popups) expect(el.textContent).toBe('+1');
+  });
+
+  it('spaces popups across the roll (sequential, not a 70ms pile)', () => {
+    const node = mountCountSurface();
+    flashCountUp(node, 0, 5, n => String(Math.round(n)), { popups: true });
+    vi.advanceTimersByTime(50);
+    expect(document.querySelectorAll('.library-count-popup').length).toBe(1);
+    vi.advanceTimersByTime(280);
+    expect(document.querySelectorAll('.library-count-popup').length).toBe(2);
   });
 
   it('skips popups when prefers-reduced-motion', () => {
@@ -148,7 +158,7 @@ describe('flashCountUp', () => {
     // Once armed (post-boot), a live addition animates.
     armLibraryCountAnimations();
     fireLibraryCountFlash('library', 1946, 1949);
-    vi.advanceTimersByTime(300);
+    vi.advanceTimersByTime(700);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 
@@ -165,7 +175,7 @@ describe('flashCountUp', () => {
       </span>`;
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13, { rowPrev: 8, rowNext: 11 });
-    vi.advanceTimersByTime(300);
+    vi.advanceTimersByTime(700);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 
@@ -176,7 +186,7 @@ describe('flashCountUp', () => {
       </span>`;
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13);
-    vi.advanceTimersByTime(300);
+    vi.advanceTimersByTime(700);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 

@@ -17,7 +17,8 @@ import { easeInOutCubic, heroCountRollMs } from './dashboard-shared.js';
 
 // Match landing mega-hero demo (`landing/demo.js` COUNT_ROLL_MS).
 const COUNT_ROLL_MS = 1000;
-const POPUP_SPAWN_INTERVAL_MS = 70;
+/** Gap between sequential +1 popups — matches runLibraryCountSmallDemo stepMs. */
+const SEQ_POPUP_GAP_MS = 300;
 const POPUP_LIFETIME_MS = 700;
 const POPUP_CAP = 10;
 // Tight jitter — popups stack as a column off the right edge of the number,
@@ -87,34 +88,25 @@ function nodeStillAlive(node) {
 }
 
 /**
- * Spawn floating "+N" popups inside `host`. Cheap: CSS keyframe drives the
- * motion, JS only schedules creation and a cleanup timer.
+ * Spawn a train of sequential "+1" popups beside `anchorNode`. Each label is
+ * always +1 (combat-text style); large imports cap at POPUP_CAP pops, not
+ * chunked sums like +44. Spacing is synced to the counter roll duration.
  */
-function spawnPopups(host, total, count, opts) {
-  if (!host || !host.isConnected) return [];
+function spawnPopups(host, popupCount, opts) {
+  if (!host || !host.isConnected || popupCount <= 0) return [];
   const timers = [];
   const anchorNode = opts?.anchorNode || host;
   const surfaceKey = anchorNode?.id || '';
-  // Chunk math: distribute `total` across `count` popups. Last popup absorbs
-  // the remainder so labels sum to exactly `total`.
-  const baseChunk = Math.floor(total / count);
-  let remaining = total;
-  const labels = [];
-  for (let i = 0; i < count; i++) {
-    const isLast = i === count - 1;
-    const value = isLast ? remaining : Math.max(1, baseChunk);
-    remaining -= value;
-    labels.push(value);
-  }
-  for (let i = 0; i < count; i++) {
-    const delay = i * POPUP_SPAWN_INTERVAL_MS;
+  const gapMs = Math.max(80, opts?.spawnIntervalMs ?? SEQ_POPUP_GAP_MS);
+  for (let i = 0; i < popupCount; i++) {
+    const delay = i * gapMs;
     const id = setTimeout(() => {
       if (!host.isConnected && !anchorNode.isConnected) return;
       const el = document.createElement('span');
       el.className = 'library-count-popup';
       if (surfaceKey) el.dataset.libcountSurface = surfaceKey;
       el.setAttribute('aria-hidden', 'true');
-      el.textContent = `+${labels[i].toLocaleString('en-US')}`;
+      el.textContent = '+1';
       // Bias jitter toward the right (positive) so the column drifts outward
       // rather than back into the number it's reporting against.
       const dx = (Math.random() * JITTER_PX * 2) - (JITTER_PX * 0.5);
@@ -128,7 +120,9 @@ function spawnPopups(host, total, count, opts) {
         el.classList.add('library-count-popup--floated');
         if (!isHero) {
           el.classList.add('library-count-popup--floated-chip');
-          el.style.fontSize = `${Math.max(11, Math.min(20, fs * 0.95)).toFixed(1)}px`;
+          el.style.fontSize = `${Math.max(20, Math.min(32, fs * 1.75)).toFixed(1)}px`;
+        } else {
+          el.style.fontSize = `${Math.max(28, Math.min(52, fs * 0.48)).toFixed(1)}px`;
         }
         let left = rect.right + Math.max(3, fs * 0.25);
         let top = rect.top + (isHero ? fs * 0.05 : 0);
@@ -192,11 +186,23 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
   const delta = safeTo - safeFrom;
   const popupCount = host && wantPopups ? Math.min(delta, POPUP_CAP) : 0;
   const isHeroMount = !!(host && host.closest('.dash-mega'));
-  let durationMs = opts.durationMs;
-  if (!Number.isFinite(durationMs)) {
+  const userDuration = Number.isFinite(opts.durationMs) ? opts.durationMs : null;
+  let durationMs = userDuration;
+  if (!userDuration) {
     durationMs = isHeroMount ? heroCountRollMs(delta, popupCount) : COUNT_ROLL_MS;
   }
-  durationMs = Math.max(120, durationMs);
+  const popupTrainMs = popupCount > 0 ? (popupCount - 1) * SEQ_POPUP_GAP_MS + 400 : 0;
+  if (!userDuration) {
+    durationMs = Math.max(120, durationMs, popupTrainMs);
+  } else {
+    durationMs = Math.max(120, durationMs);
+  }
+  const spawnIntervalMs = popupCount > 1
+    ? Math.min(
+      SEQ_POPUP_GAP_MS,
+      Math.floor((Math.max(durationMs, popupTrainMs) * 0.92) / (popupCount - 1)),
+    )
+    : 0;
 
   const episode = {
     node,
@@ -212,9 +218,10 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
 
   // Spawn popups in parallel with the rolling count. If we have nowhere to
   // mount them, skip popups silently (the count still rolls).
-  if (host && wantPopups) {
-    spawnPopups(host, delta, popupCount, {
+  if (host && wantPopups && popupCount > 0) {
+    spawnPopups(host, popupCount, {
       anchorNode: node,
+      spawnIntervalMs,
       onTimers: (ids) => { episode.spawnTimers = ids; },
     });
   }

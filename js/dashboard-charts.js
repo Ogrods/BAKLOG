@@ -1476,7 +1476,7 @@ export function renderDashboardCharts(games, aggIn) {
       scales: {
         x: {
           type: "logarithmic",
-          title: { display: true, text: "HLTB main (hours, log scale)", color: "#94a3b8" },
+          title: { display: false },
           min: 0.5,
           ticks: {
             color: "#94a3b8",

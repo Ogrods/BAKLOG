@@ -842,11 +842,13 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <h3>Private by design</h3>
-          <p>There is no BAKLOG server holding your logins. The install is the security model.</p>
+          <p>There is no BAKLOG backend hoarding your logins or library. Local-first is the architecture, not a localhost socket trick: catalogs, encrypted credentials, and store fetches run on your PC and only talk to storefronts when you connect or refresh, from your IP.</p>
           <ul>
-            <li>Local-first; runs on your machine</li>
-            <li>Credentials encrypted, never uploaded</li>
-            <li>Zero telemetry: <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>; audit every fetcher and credential path</li>
+            <li>Store sign-in opens your own installed Chrome or Edge on your machine. Session cookies stay in a local browser profile on disk. No container, no remote sandbox, nothing shipped to us.</li>
+            <li>Credentials encrypted at rest (AES-256-GCM); keys in Windows Credential Manager, macOS Keychain, or Linux Secret Service</li>
+            <li>No telemetry in the app. <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a> with a published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> you can read before you trust us</li>
+            <li>baklog.app is separate from your library: waitlist email if you request an invite, a bug report only if you click Send, and a public free-games feed. Your catalog never uploads there.</li>
+            <li>We do not sell data because we do not host it. Optional invite login stores email only; your games stay in your local profile folder.</li>
           </ul>
         </article>
 
@@ -1019,7 +1021,7 @@
       <div class="faq" style="text-align:left">
         <details>
           <summary>Is it safe?</summary>
-          <p>Your credentials stay encrypted on your machine. Store fetches use your own browser session and your IP. There is no BAKLOG server holding your logins. The app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a>. You can read the code and verify that yourself.</p>
+          <p>Your credentials stay encrypted on your machine (AES-256-GCM, OS keychain). Store sign-in runs in your own local browser, not a container and not a shared cloud vault. Fetches go straight from your PC to each storefront, from your IP. There is no BAKLOG server holding your library. The full app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a> with a published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> that lists what we defend and what we do not (local malware, storefront ToS, and the rest). baklog.app only sees a waitlist email or an opt-in bug report you send; it never receives your catalog.</p>
         </details>
         <details>
           <summary>Is it open source?</summary>

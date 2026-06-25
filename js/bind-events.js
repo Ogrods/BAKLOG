@@ -53,8 +53,21 @@ import {
   normalizePicksLimit,
   renderPicksLimitButtons,
   applyPicksCollapsedState,
-  picksViewKey,
+  picksLimitView,
 } from './picks-ui.js';
+import {
+  addKeysToCustomList,
+  removeKeysFromCustomList,
+  parseCustomListTabId,
+  renderCustomPickTabs,
+  CUSTOM_LIST_MAX_KEYS,
+} from './custom-lists.js';
+import {
+  initCustomListsUi,
+  renderBulkAddToListMenu,
+  showCustomListNotice,
+} from './custom-lists-ui.js';
+import { initCustomListPicksDnd } from './custom-lists-picks-dnd.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
 import { recordSponsoredClick } from './anon-metrics.js';
 import { dismissSponsoredDeal, isProPromoSponsorId, refreshSponsoredSurfaces } from './sponsored-deals.js';
@@ -72,6 +85,7 @@ import {
   scheduleTableRerender,
   renderSummary,
   renderWishlistStoreChips,
+  renderCustomListFilterChips,
   renderGenreChips,
   switchView,
   scrollToItchCard,
@@ -433,7 +447,7 @@ export function bindEvents() {
   document.getElementById("picksLimitGroup").addEventListener("click", e => {
     const btn = e.target.closest(".picks-limit-btn");
     if (!btn) return;
-    setPicksLimitForView(picksViewKey(), +btn.dataset.limit || 16);
+    setPicksLimitForView(picksLimitView(), +btn.dataset.limit || 16);
     renderPicksLimitButtons();
     renderPicks();
   });
@@ -468,6 +482,18 @@ export function bindEvents() {
     applyPrefsChange(
       { prefs: { wishlistStoreFilter: chip.dataset.wishlistStore || "" } },
       { renderers: [renderWishlistStoreChips] },
+    );
+  });
+  document.getElementById("customListFilterChips")?.addEventListener("click", e => {
+    const chip = e.target.closest(".custom-list-filter-chip");
+    if (!chip) return;
+    const idx = Number(chip.dataset.customListFilter);
+    if (!Number.isInteger(idx)) return;
+    const current = state.prefs.customListFilter;
+    const next = current === idx ? null : idx;
+    applyPrefsChange(
+      { prefs: { customListFilter: next } },
+      { renderers: [renderCustomListFilterChips] },
     );
   });
   document.getElementById("summary").addEventListener("click", e => {
@@ -649,8 +675,63 @@ export function bindEvents() {
       bulkRemove();
       return;
     }
+    if (e.target.closest("#bulkRemoveFromListBtn")) {
+      const idx = parseCustomListTabId(effectivePicksTab());
+      if (idx < 0) return;
+      const keys = [...state.selectedKeys];
+      const removed = removeKeysFromCustomList(idx, keys);
+      if (removed) {
+        state.selectedKeys.clear();
+        updateBulkBar();
+        invalidateTableCache();
+        renderTable();
+        renderCustomPickTabs();
+        renderCustomListFilterChips();
+        renderPicks();
+        showCustomListNotice(`Removed ${removed} from list.`);
+      }
+      return;
+    }
+    const addBtn = e.target.closest(".bulk-add-list");
+    if (addBtn) {
+      const idx = Number(addBtn.dataset.listIndex);
+      if (!Number.isFinite(idx)) return;
+      const keys = [...state.selectedKeys];
+      const { added, skippedFull } = addKeysToCustomList(idx, keys);
+      document.getElementById("bulkAddToListMenu")?.classList.add("hidden");
+      document.getElementById("bulkAddToListBtn")?.setAttribute("aria-expanded", "false");
+      state.selectedKeys.clear();
+      updateBulkBar();
+      invalidateTableCache();
+      renderTable();
+      renderCustomPickTabs();
+      renderCustomListFilterChips();
+      renderPicks();
+      if (added && skippedFull) {
+        showCustomListNotice(`Added ${added}; ${skippedFull} skipped (${CUSTOM_LIST_MAX_KEYS} max).`);
+      } else if (added) {
+        showCustomListNotice(`Added ${added} to list.`);
+      } else if (skippedFull) {
+        showCustomListNotice(`List is full (${CUSTOM_LIST_MAX_KEYS} max).`);
+      }
+      return;
+    }
     const btn = e.target.closest(".bulk-status");
     if (btn?.dataset.status) bulkSetStatus(btn.dataset.status);
+  });
+  const bulkAddBtn = document.getElementById("bulkAddToListBtn");
+  const bulkAddMenu = document.getElementById("bulkAddToListMenu");
+  bulkAddBtn?.addEventListener("click", e => {
+    e.stopPropagation();
+    renderBulkAddToListMenu();
+    const open = bulkAddMenu?.classList.toggle("hidden") === false;
+    bulkAddBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest("#bulkAddToListBtn") && !e.target.closest("#bulkAddToListMenu")) {
+      bulkAddMenu?.classList.add("hidden");
+      bulkAddBtn?.setAttribute("aria-expanded", "false");
+    }
   });
   document.getElementById("bulkClear").addEventListener("click", () => {
     state.selectedKeys.clear();
@@ -713,6 +794,7 @@ export function bindEvents() {
     window.open(url, "_blank", "noopener");
   });
   document.addEventListener("click", e => {
+    if (e.target.closest(".pick-card-drag-handle")) return;
     const card = e.target.closest(".pick-card");
     if (!card) return;
     focusGame(card.dataset.gameKey);
@@ -757,6 +839,8 @@ export function bindEvents() {
   bindAddGameModal();
   bindOrphanPruneUI();
   bindHiddenPanelUI();
+  initCustomListsUi();
+  initCustomListPicksDnd();
   bindColumnPicker();
   document.getElementById("exportPersonal").addEventListener("click", () => {
     download("baklog-personal.json", JSON.stringify(exportPersonalDoc(), null, 2), "application/json");

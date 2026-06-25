@@ -27,6 +27,12 @@ export function collectActiveFilters() {
   if (state.activeView === "library" && state.prefs.releaseYearFilter) {
     pills.push({ kind: "releaseYear", value: state.prefs.releaseYearFilter, label: `Released: ${state.prefs.releaseYearFilter}` });
   }
+  if (state.activeView === "library" && state.prefs.customListFilter != null) {
+    const lists = state.prefs.customLists || [];
+    const idx = Number(state.prefs.customListFilter);
+    const name = lists[idx]?.name || `List ${idx + 1}`;
+    pills.push({ kind: "customList", value: String(idx), label: `List: ${name}` });
+  }
   if (state.activeView === "wishlist" && state.prefs.wishlistStoreFilter) {
     const labelMap = { steam: "Steam", gog: "GOG", epic: "Epic", psn: "PlayStation", ubisoft: "Ubisoft" };
     const v = state.prefs.wishlistStoreFilter;

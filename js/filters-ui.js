@@ -1,4 +1,11 @@
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
+import { renderCustomPickTabs } from './custom-lists.js';
+import {
+  shouldShowCustomListTab,
+  getCustomLists,
+  defaultListName,
+  formatCustomListFilterLabel,
+} from './custom-lists.js';
 import {
   consumeDeferredRenders,
   deferPicksRender,
@@ -28,6 +35,7 @@ import {
   recomputeCrossStoreHidden,
   itchIsGame,
   combinedPlaytime,
+  findGameByKey,
 } from './game-core.js';
 import { STORE_DISPLAY_ORDER, storeDisplayRank } from './dashboard-shared.js';
 import {
@@ -216,6 +224,7 @@ export function removeActiveFilter(kind, value) {
     case "maxHours":        return applyPrefsChange({ sessionPrefs: { maxHours: 200 } });
     case "store":           return applyPrefsChange({ prefs: { storeFilter: "" } },           { renderers: [renderStoreChips] });
     case "releaseYear":     return applyPrefsChange({ prefs: { releaseYearFilter: "" } });
+    case "customList":      return applyPrefsChange({ prefs: { customListFilter: null } }, { renderers: [renderCustomListFilterChips] });
     case "wishlistStore":   return applyPrefsChange({ prefs: { wishlistStoreFilter: "" } },   { renderers: [renderWishlistStoreChips] });
     case "hltbBucket":      return applyPrefsChange({ prefs: { hltbBucket: null } });
     case "genre":
@@ -285,6 +294,7 @@ export function clearAllFilters() {
         storeFilter: "",
         wishlistStoreFilter: "",
         releaseYearFilter: "",
+        customListFilter: null,
         hltbBucket: null,
         genreFilters: [],
       },
@@ -306,6 +316,7 @@ export function clearAllFilters() {
         () => setInputChecked("crossStoreDedup", false),
         () => setInputChecked("itchShowNonGames", true),
         updateCleanupBtnState,
+        renderCustomListFilterChips,
       ],
     },
   );
@@ -322,6 +333,7 @@ let _filterDrawerRelease = null;
 
 export function openFiltersDrawer() {
   state.filtersDrawerOpen = true;
+  renderCustomListFilterChips();
   document.getElementById("filterDrawerBackdrop").classList.add("open");
   const drawer = document.getElementById("filterDrawer");
   drawer.classList.add("open");
@@ -516,6 +528,7 @@ export function updateViewChrome(options) {
   document.getElementById("itchFilterSection")?.classList.toggle("hidden", !isItch);
   // Cross-store dedup applies to library and wishlist (not itch — single store).
   document.getElementById("libraryStoreSection")?.classList.toggle("hidden", isItch || isDash || isConn || isProView || deferChrome);
+  document.getElementById("libraryCustomListsSection")?.classList.toggle("hidden", isWish || isItch || isDash || isConn || isProView || deferChrome);
   document.getElementById("wishlistStoreSection")?.classList.toggle("hidden", !isWish || deferChrome);
   const dedupHint = document.getElementById("crossStoreDedupHint");
   if (dedupHint) {
@@ -547,12 +560,21 @@ export function updateViewChrome(options) {
 }
 
 export function updatePickTabsVisibility() {
+  const lists = getCustomLists();
   document.querySelectorAll(".pick-tab").forEach(btn => {
     const owner = btn.dataset.pickView;
     // Each tab declares data-pick-view (library | wishlist). Hide tabs that
     // belong to another view so wishlist never shows library "Top Rated", etc.
-    btn.classList.toggle("hidden", !!owner && owner !== state.activeView);
+    let hidden = !!owner && owner !== state.activeView;
+    const customMatch = /^customList([0-2])$/.exec(btn.dataset.tab || '');
+    if (customMatch) {
+      const idx = Number(customMatch[1]);
+      hidden = hidden || !shouldShowCustomListTab(lists[idx], idx);
+    }
+    btn.classList.toggle("hidden", hidden);
   });
+  renderCustomPickTabs();
+  renderCustomListFilterChips();
 }
 
 export function syncViewTabAria(view) {
@@ -897,6 +919,27 @@ export function renderWishlistStoreChips() {
   document.querySelectorAll(".wishlist-store-chip").forEach(chip => {
     chip.classList.toggle("active", chip.dataset.wishlistStore === (state.prefs.wishlistStoreFilter || ""));
   });
+}
+
+export function renderCustomListFilterChips() {
+  const wrap = document.getElementById("customListFilterChips");
+  if (!wrap) return;
+  const lists = getCustomLists();
+  const active = state.prefs.customListFilter;
+  const chips = lists.map((list, i) => {
+    if (!shouldShowCustomListTab(list, i)) return "";
+    const name = list?.name || defaultListName(i);
+    const label = formatCustomListFilterLabel(name);
+    const resolved = (list?.keys || []).filter(k => !!findGameByKey(k)).length;
+    const title = resolved
+      ? `${name} (${resolved} in library) — click again to clear`
+      : `${name} — click again to clear`;
+    const on = active === i;
+    return `<button type="button" class="custom-list-filter-chip px-2 py-1 rounded border border-slate-600 text-xs ${on ? "active" : "bg-slate-700 text-slate-300"}" data-custom-list-filter="${i}" title="${escapeAttr(title)}">${escapeHtml(label)}</button>`;
+  }).filter(Boolean);
+  wrap.innerHTML = chips.length
+    ? chips.join("")
+    : '<span class="text-xs text-slate-400">Rename a list or add games from Picks to filter here.</span>';
 }
 
 export function renderGenreChips() {

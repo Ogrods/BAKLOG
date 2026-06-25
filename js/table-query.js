@@ -307,6 +307,7 @@ function passesFilter(ctx, g) {
     if (prefs.storeFilter && ng.store !== prefs.storeFilter) return false;
     if (prefs.releaseYearFilter && !matchesReleaseYearFilter(g, prefs.releaseYearFilter)) return false;
     if (hiddenKeys.has(gameKey(g))) return false;
+    if (ctx.customListKeySet && !ctx.customListKeySet.has(gameKey(g))) return false;
   }
   if (view === 'wishlist') {
     if (prefs.wishlistStoreFilter) {
@@ -379,6 +380,17 @@ function sortCompare(ctx, a, b) {
   return sortDir * (va - vb);
 }
 
+function customListFilterKeysFromPrefs(prefs) {
+  const val = prefs?.customListFilter;
+  if (val == null || val === '') return null;
+  const idx = Number(val);
+  if (!Number.isInteger(idx) || idx < 0 || idx > 2) return null;
+  const lists = prefs?.customLists;
+  if (!Array.isArray(lists) || !lists[idx]) return [];
+  const keys = lists[idx].keys;
+  return Array.isArray(keys) ? keys.filter(k => typeof k === 'string' && k.trim()) : [];
+}
+
 export function buildQueryContext(state, params) {
   const itadMeta = state.libraryMeta?.itad;
   let displayCurrency = 'USD';
@@ -412,6 +424,7 @@ export function buildQueryContext(state, params) {
     // consistent with the main-thread display.
     combinedPlaytime: combinedPlaytimeLookup(state),
     playedTitleNorms: state.playedTitleNorms,
+    customListFilterKeys: customListFilterKeysFromPrefs(state.prefs),
   };
 }
 
@@ -431,6 +444,9 @@ export function querySourceForView(state) {
 
 export function queryGames(payload) {
   const ctx = payload.ctx;
+  if (ctx.customListFilterKeys != null && !ctx.customListKeySet) {
+    ctx.customListKeySet = new Set(ctx.customListFilterKeys);
+  }
   const source = payload.source;
   const filtered = [];
   for (let i = 0; i < source.length; i++) {

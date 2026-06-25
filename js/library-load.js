@@ -42,6 +42,7 @@ import {
   renderGenreChips,
   renderStoreChips,
   renderWishlistStoreChips,
+  renderCustomListFilterChips,
   switchView,
   updateWishlistDrawerVisibility,
   applyItchTabVisibility,
@@ -331,6 +332,7 @@ export async function finishEmptyLibraryLoad() {
   _prevRowCountWishlist = visibleRowCountForActiveView('wishlist');
   renderStoreChips();
   renderWishlistStoreChips();
+  renderCustomListFilterChips();
   renderGenreChips();
   await refreshLibraryChromeAfterMerge();
 }
@@ -375,6 +377,7 @@ export async function applyMergedLibrary(mergeKey = null) {
 
   renderStoreChips();
   renderWishlistStoreChips();
+  renderCustomListFilterChips();
   renderGenreChips();
   await refreshLibraryChromeAfterMerge();
 

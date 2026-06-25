@@ -3,6 +3,7 @@ import { prefsStorageKey, activeViewSessionKey } from './profiles.js';
 import { personalStore } from './personal-store.js';
 import { resolveCoopFilterMode } from './table-query.js';
 import { migrateColumnPrefs } from './table-columns.js';
+import { defaultCustomLists, migrateCustomLists, normalizeCustomListFilter } from './custom-lists.js';
 
 export const PICKS_LIMIT_VIEWS = ["library", "wishlist", "itch"];
 const VALID_PICKS_LIMITS = [16, 24, 48, 96];
@@ -88,6 +89,8 @@ export function loadPrefs() {
     autoFetchOnConnect: true,
     autoFetchStale24h: true,
     connectionNotes: {},
+    customLists: defaultCustomLists(),
+    customListFilter: null,
   };
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem(prefsStorageKey()) || "{}"); } catch { return fallback; }
@@ -140,6 +143,8 @@ export function loadPrefs() {
     merged.rowHeroBackdropDefaulted = true;
   }
   migrateColumnPrefs(merged);
+  merged.customLists = migrateCustomLists(merged);
+  merged.customListFilter = normalizeCustomListFilter(merged.customListFilter);
   merged.picksCollapsed = merged.picksCollapsed === true;
   if (!merged.viewPicksLimits || typeof merged.viewPicksLimits !== "object") {
     merged.viewPicksLimits = {};

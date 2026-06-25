@@ -517,6 +517,10 @@
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="quickWins" data-pick-view="library" title="Short HLTB backlog games (under max hours slider)">Quick Wins</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="hiddenGems" data-pick-view="library" title="High-rated backlog games with few Steam reviews">Hidden Gems</button>
         <button class="pick-tab px-2 py-1 rounded border border-slate-600 text-xs" data-tab="returnTo" data-pick-view="library" title="Started but unfinished - pick up where you left off">Return To</button>
+        <span class="pick-tab-sep hidden sm:inline text-slate-600 text-xs pick-tab-sep-custom" aria-hidden="true">|</span>
+        <button class="pick-tab pick-tab-custom px-2 py-1 rounded border border-slate-600 text-xs hidden" data-tab="customList0" data-pick-view="library" title="Your custom list">List 1</button>
+        <button class="pick-tab pick-tab-custom px-2 py-1 rounded border border-slate-600 text-xs hidden" data-tab="customList1" data-pick-view="library" title="Your custom list">List 2</button>
+        <button class="pick-tab pick-tab-custom px-2 py-1 rounded border border-slate-600 text-xs hidden" data-tab="customList2" data-pick-view="library" title="Your custom list">List 3</button>
         <button class="pick-tab px-2 py-1 rounded border border-emerald-700/60 text-xs text-emerald-300" data-tab="wishlistDeals" data-pick-view="wishlist" title="Best deals on your wishlist (ITAD + Steam)">Wishlist Deals</button>
         <div class="ml-auto flex flex-wrap items-center gap-2">
           <label id="quickWinMaxWrap" class="text-xs text-slate-300">Quick-win max hours:
@@ -564,6 +568,7 @@
             <button type="button" id="pickForMeKebab" class="toolbar-kebab-pick--phone w-full text-left px-3 py-2 hover:bg-slate-700" title="Pick a random visible game · Shift+click widens to non-backlog / all wishlist">Pick for me</button>
             <button type="button" id="reloadData" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Reload game catalogs and personal data from disk">Reload library</button>
             <button type="button" id="hiddenGamesMenu" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="View and restore games hidden from the library">Hidden games</button>
+            <button type="button" id="manageCustomListsBtn" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Rename and reorder your custom Picks lists">Manage my lists…</button>
             <div class="kebab-divider" role="separator"></div>
             <div class="kebab-group-label">Data</div>
             <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export statuses, notes, prefs, manual games, and settings as JSON for backup or transfer">Export personal data</button>
@@ -765,6 +770,11 @@
       <span id="bulkCount" class="text-slate-200 font-medium mr-2">0 selected</span>
       <span class="text-slate-400 text-xs mr-2">Status:</span>
       <div id="bulkStatusButtons" class="flex flex-wrap gap-2 items-center"></div>
+      <div class="bulk-add-list-wrap">
+        <button type="button" id="bulkAddToListBtn" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 border border-slate-600 text-xs font-medium" title="Add selected games to a custom list" aria-haspopup="menu" aria-expanded="false">Add to list ▾</button>
+        <div id="bulkAddToListMenu" class="hidden" role="menu" aria-label="Add to custom list"></div>
+      </div>
+      <button type="button" id="bulkRemoveFromListBtn" class="hidden px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 border border-slate-600 text-xs font-medium" title="Remove selected games from the active custom list">Remove from list</button>
       <button type="button" id="bulkRemove" class="px-2 py-1 rounded bg-rose-900/80 hover:bg-rose-800 border border-rose-700/60 text-rose-100 text-xs font-medium" title="Delete custom entries; hide pulled entries (restorable from kebab menu)">Remove</button>
       <button type="button" id="bulkClear" class="ml-auto px-2 py-1 rounded text-slate-400 hover:text-slate-200 text-xs" title="Clear row selection">Clear selection</button>
     </div>
@@ -780,7 +790,7 @@
         <button type="button" id="closeFiltersBtn" class="text-slate-400 hover:text-slate-100 text-xl leading-none px-2" aria-label="Close filters" title="Close filters">&times;</button>
       </div>
     </div>
-    <div class="flex-1 overflow-y-auto p-3 space-y-0 text-sm">
+    <div class="flex-1 overflow-y-auto theme-scrollbar p-3 space-y-0 text-sm">
       <!--
         Filter consolidation: status + store chips live in the top summary bar
         (renderSummary). The drawer keeps the long-tail filters below. The
@@ -819,6 +829,13 @@
           <input id="crossStoreDedup" type="checkbox" class="rounded" />
           Hide duplicates
         </label>
+      </div>
+      <div id="libraryCustomListsSection" class="drawer-section hidden">
+        <div class="drawer-section-head">
+          <span class="drawer-section-label">My lists</span>
+          <button type="button" class="drawer-info" aria-label="About my lists filter" title="Tap a list to show only those games in the library table. Tap again to turn the filter off.">?</button>
+        </div>
+        <div id="customListFilterChips" class="flex flex-wrap gap-1.5 items-center"></div>
       </div>
       <div id="wishlistStoreSection" class="drawer-section hidden">
         <div class="drawer-section-head">
@@ -950,7 +967,7 @@
         <h3 id="profileManageTitle" class="text-lg font-semibold text-slate-100">Manage profiles</h3>
         <button type="button" id="profileManageClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
-      <div class="p-3 space-y-4 overflow-y-auto flex-1 text-sm text-slate-300">
+      <div class="p-3 space-y-4 overflow-y-auto theme-scrollbar flex-1 text-sm text-slate-300">
         <p class="profile-modal-note text-xs text-slate-400">Each profile keeps its own library, connections, and personal data under <code class="text-slate-300">profiles/&lt;name&gt;/</code>. Your first extra profile copies today&apos;s data into <code class="text-slate-300">profiles/default/</code> as a backup. Switching profiles reloads the app.</p>
 
         <div class="profile-modal-section">
@@ -1034,7 +1051,7 @@
         Removing only deletes the personal data attached to that key; the server writes a timestamped backup to <code>data/personal_backups/</code> before each save, so a wrong delete can still be restored.
       </div>
       <div id="orphanPruneSummary" class="px-3 py-2 text-xs text-slate-300 border-b border-slate-700"></div>
-      <div id="orphanPruneList" class="overflow-y-auto p-3 space-y-1 flex-1"></div>
+      <div id="orphanPruneList" class="overflow-y-auto theme-scrollbar p-3 space-y-1 flex-1"></div>
       <div class="border-t border-slate-700 p-3 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2 text-xs">
           <button type="button" id="orphanPruneSelectAll" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">Select all</button>
@@ -1057,7 +1074,7 @@
         <button id="hiddenPanelClose" type="button" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
       <div id="hiddenPanelSummary" class="px-3 py-2 text-xs text-slate-300 border-b border-slate-700"></div>
-      <div id="hiddenPanelList" class="overflow-y-auto p-3 space-y-1 flex-1"></div>
+      <div id="hiddenPanelList" class="overflow-y-auto theme-scrollbar p-3 space-y-1 flex-1"></div>
       <div class="border-t border-slate-700 p-3 flex items-center justify-end gap-2 text-sm">
         <button type="button" id="hiddenPanelCancel" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Close</button>
         <button type="button" id="hiddenPanelRestoreAll" class="px-3 py-1.5 rounded bg-cyan-800 hover:bg-cyan-700 text-white">Restore all</button>
@@ -1073,7 +1090,7 @@
         <button id="columnsModalClose" type="button" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
       <p class="px-3 pt-2 text-xs text-slate-400">Show or hide columns for the current view. Game, Status, and the row checkbox always stay visible.</p>
-      <div id="columnsList" class="overflow-y-auto p-3 flex-1"></div>
+      <div id="columnsList" class="overflow-y-auto theme-scrollbar p-3 flex-1"></div>
       <div class="border-t border-slate-700 p-3 flex items-center justify-between gap-2 text-sm">
         <div class="flex gap-2">
           <button type="button" id="columnsShowAllBtn" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Show all</button>
@@ -1091,7 +1108,7 @@
         <h3 id="addGameModalTitle" class="text-lg font-semibold text-slate-100">Add a game</h3>
         <button id="addGameClose" class="text-slate-400 hover:text-slate-100 text-2xl leading-none px-2" aria-label="Close">&times;</button>
       </div>
-      <div class="p-4 space-y-3 overflow-y-auto">
+      <div class="p-4 space-y-3 overflow-y-auto theme-scrollbar">
         <div class="inline-flex rounded border border-slate-600 overflow-hidden text-xs" role="group" aria-label="Add to library or wishlist">
           <button type="button" class="add-target-btn px-3 py-1.5 bg-slate-700" data-target="library">Add to Library</button>
           <button type="button" class="add-target-btn px-3 py-1.5 bg-slate-700 border-l border-slate-600" data-target="wishlist">Add to Wishlist</button>
@@ -1150,6 +1167,17 @@
       </div>
     </div>
   </div>
+
+  <dialog id="customListsDialog" class="custom-lists-dialog" aria-labelledby="customListsDialogTitle">
+    <h2 id="customListsDialogTitle" class="custom-lists-dialog__title">Manage my lists</h2>
+    <p class="custom-lists-dialog__lead">Up to 3 lists, 9,999 games each. Lists sync with your profile backup.</p>
+    <div id="customListsDialogBody" class="custom-lists-dialog__body"></div>
+    <p id="customListsPruneStatus" class="custom-lists-dialog__status" role="status"></p>
+    <div class="custom-lists-dialog__footer">
+      <button type="button" id="customListsPruneBtn" class="custom-lists-dialog__btn custom-lists-dialog__btn--secondary">Prune missing games</button>
+      <button type="button" id="customListsDoneBtn" class="custom-lists-dialog__btn custom-lists-dialog__btn--primary">Done</button>
+    </div>
+  </dialog>
 
   <dialog id="claimDetailDialog" class="claim-detail-dialog bg-transparent border-0 p-0 backdrop:bg-black/60" tabindex="-1"></dialog>
   <dialog id="claimHiddenDialog" class="claim-detail-dialog claim-hidden-dialog bg-transparent border-0 p-0 backdrop:bg-black/60" tabindex="-1"></dialog>

@@ -877,6 +877,7 @@ export function tableFingerprint() {
     stale: !!sp.staleOnly,
     store: state.prefs.storeFilter || "",
     wstore: state.prefs.wishlistStoreFilter || "",
+    customList: state.prefs.customListFilter ?? null,
     releaseYear: state.prefs.releaseYearFilter || "",
     hltbBucket: state.prefs.hltbBucket ?? null,
     gen: state.prefs.genreFilters || [],

@@ -68,6 +68,22 @@ jobs:
       - name: Run JS tests
         run: npm test
 
+      - name: Verify release auth secrets (fail fast)
+        shell: pwsh
+        env:
+          BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
+          BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: |
+          if (-not $env:BAKLOG_SUPABASE_URL -or -not $env:BAKLOG_SUPABASE_ANON_KEY) {
+            Write-Error @"
+          GitHub repo secrets BAKLOG_SUPABASE_URL and BAKLOG_SUPABASE_ANON_KEY must be set before tagging.
+          v0.8.19 release failed at write_bundle_auth_env (run 28146418432) when these were empty.
+          Set secrets under Settings -> Secrets and variables -> Actions, then cut a new patch tag (tags are immutable).
+          "@
+            exit 1
+          }
+          Write-Host "Release auth secrets present (values not printed)."
+
       - name: Build Windows bundle
         shell: pwsh
         env:

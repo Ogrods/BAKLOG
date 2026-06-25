@@ -22,6 +22,13 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- Post-build frozen bundle smoke gate (`scripts/frozen_bundle_smoke.py`): layout,
+  bundled auth `.env`, data-dir migration, `/api/config`, and fetcher dispatch.
+- Release workflow fail-fast check for `BAKLOG_SUPABASE_URL` / `BAKLOG_SUPABASE_ANON_KEY`
+  before PyInstaller runs.
+
 ## [0.8.19] - 2026-06-25
 
 ### Added

@@ -63,17 +63,17 @@ if (-not (Test-Path $FallbackJson)) {
     Write-Error "Build failed: bundled curated feed missing at $FallbackJson (PyInstaller must ship curated/ for offline claims fallback)"
 }
 
-Write-Host "Smoke: legacy data-dir migration on frozen build..."
-& $Python scripts/frozen_data_dir_migration_smoke.py --bundle-dir $OutDir
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_data_dir_migration_smoke failed (exit $LASTEXITCODE)"
-}
-
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 
 Write-Host "Writing bundled account-auth .env..."
 & $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host "Smoke: frozen bundle (migration + /api/config + fetcher dispatch)..."
+& $Python scripts/frozen_bundle_smoke.py --bundle-dir $OutDir
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
+}
 
 @"
 @echo off

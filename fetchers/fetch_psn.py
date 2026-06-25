@@ -11,9 +11,11 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from clients.hltb_client import HltbClient
-from clients.psn_client import PsnAuthError, PsnClient, PsnGameEntry
+from clients.psn_client import PsnAuthError, PsnClient, PsnGameEntry, _dedupe_key
 from fetchers._authoritative import PSN
 from fetchers._base import (
+    STALE_FIELD,
+    STALE_SINCE_FIELD,
     add_allow_empty_arg,
     add_no_carry_arg,
     apply_carry_forward,
@@ -29,6 +31,61 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
 
 GAMES_PSN_JSON = Path("games_psn.json")
 HLTB_DELAY_SEC = 1.0
+
+
+def apply_psn_carry_forward(
+    games_out: list[dict],
+    existing: dict[str, dict],
+    *,
+    no_carry: bool = False,
+) -> list[dict]:
+    """Carry forward missing rows; drop stale copies superseded by id churn (NPWR vs PPSA)."""
+    if no_carry:
+        return games_out
+    carried = apply_carry_forward(
+        games_out,
+        existing,
+        key_fn=row_key_by_id,
+        no_carry=False,
+    )
+    fresh_name_keys = {_dedupe_key(row.get("name")) for row in games_out}
+    fresh_name_keys.discard("")
+    if not fresh_name_keys:
+        return carried
+    pruned: list[dict] = []
+    dropped = 0
+    for row in carried:
+        name_key = _dedupe_key(row.get("name"))
+        if row.get(STALE_FIELD) and name_key and name_key in fresh_name_keys:
+            dropped += 1
+            continue
+        pruned.append(row)
+    if dropped:
+        print(
+            f"  Pruned {dropped} stale PSN row(s) superseded by a fresh copy "
+            f"(cross-id trophy/entitlement merge).",
+            flush=True,
+        )
+    return pruned
+
+
+def prune_stale_psn_duplicates(games: list[dict]) -> list[dict]:
+    """One-shot catalog repair: drop stale rows when a fresh same-title row exists."""
+    fresh_keys = {_dedupe_key(g.get("name")) for g in games if not g.get(STALE_FIELD)}
+    fresh_keys.discard("")
+    out: list[dict] = []
+    dropped = 0
+    for g in games:
+        name_key = _dedupe_key(g.get("name"))
+        if g.get(STALE_FIELD) and name_key and name_key in fresh_keys:
+            dropped += 1
+            continue
+        cleaned = dict(g)
+        if not g.get(STALE_FIELD):
+            cleaned.pop(STALE_FIELD, None)
+            cleaned.pop(STALE_SINCE_FIELD, None)
+        out.append(cleaned)
+    return out, dropped
 
 
 def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
@@ -265,10 +322,9 @@ def main() -> int:
         if drift_exit is not None:
             return stats.finish("fetch_psn", t0, exit_code=drift_exit)
 
-    games_out = apply_carry_forward(
+    games_out = apply_psn_carry_forward(
         games_out,
         existing,
-        key_fn=row_key_by_id,
         no_carry=args.no_carry,
     )
 

@@ -19,7 +19,7 @@ ProbeResult = Literal["ok", "auth_fail", "unreachable"]
 PROBEABLE_BROWSER = frozenset({"gog", "xbox_wishlist"})
 
 # Cheap/no-browser providers eligible for silent hourly health checks.
-PROBEABLE_QUIET = frozenset({"gog", "epic", "steam", "itch", "itad"})
+PROBEABLE_QUIET = frozenset({"gog", "epic", "steam", "itch", "itad", "psn"})
 
 # Providers whose headed sign-in is authoritative: the connect window confirms
 # the session via the live page before closing, so a headless probe miss must
@@ -144,6 +144,23 @@ def probe_itad_session_quiet() -> ProbeResult:
     return "unreachable"
 
 
+def probe_psn_session_quiet() -> ProbeResult:
+    """Tri-state PSN NPSSO probe."""
+    from auth.manager import resolve_env
+    from clients.psn_client import PsnAuthError, PsnClient
+
+    npsso = resolve_env("PSN_NPSSO", provider="psn", allow_process_env=False)
+    if not npsso:
+        return "auth_fail"
+    try:
+        PsnClient(npsso).validate_session()
+        return "ok"
+    except PsnAuthError:
+        return "auth_fail"
+    except Exception:  # noqa: BLE001
+        return "unreachable"
+
+
 def probe_provider_quiet(provider: str) -> ProbeResult:
     """Run a silent tri-state probe for one cheap provider (never raises)."""
     from auth.manager import resolve_env
@@ -160,4 +177,6 @@ def probe_provider_quiet(provider: str) -> ProbeResult:
         return probe_itch_session_quiet()
     if provider == "itad":
         return probe_itad_session_quiet()
+    if provider == "psn":
+        return probe_psn_session_quiet()
     return "unreachable"

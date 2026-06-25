@@ -15,7 +15,9 @@ def steam_client(tmp_path: Path) -> SteamClient:
     return SteamClient("key", "76561198000000000", cache_dir=tmp_path / "steam")
 
 
-def test_get_app_details_batch_chunks_and_caches(steam_client: SteamClient) -> None:
+def test_get_app_details_batch_chunks_and_caches(
+    steam_client: SteamClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     appids = list(range(1, APP_DETAILS_BATCH_SIZE + 5))
     calls: list[str] = []
 
@@ -31,9 +33,13 @@ def test_get_app_details_batch_chunks_and_caches(steam_client: SteamClient) -> N
         resp.raise_for_status = MagicMock()
         return resp
 
-    with patch("clients.steam_client._get_with_retry", side_effect=fake_get):
-        with patch.object(steam_client, "_throttle_store"):
-            out = steam_client.get_app_details_batch(appids)
+    def _block_network(*_args, **_kwargs):
+        raise AssertionError("unexpected network call in batch appdetails test")
+
+    monkeypatch.setattr("clients.steam_client._get_with_retry", fake_get)
+    monkeypatch.setattr("clients.steam_client.requests.get", _block_network)
+    monkeypatch.setattr(steam_client, "_throttle_store", lambda: None)
+    out = steam_client.get_app_details_batch(appids)
 
     assert len(out) == len(appids)
     assert out[1]["data"]["name"] == "Game 1"

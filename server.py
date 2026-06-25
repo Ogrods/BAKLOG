@@ -3604,38 +3604,9 @@ class Handler(SimpleHTTPRequestHandler):
         )
 
     def _handle_auth_session_get(self) -> None:
-        """Lightweight account session probe (JWT + bound profile + plan)."""
-        from shared.comp_pro import ensure_comp_pro_on_login
-        from shared.entitlement import PLAN_PRO, current_plan, note_authenticated_plan
-        from shared.profile_paths import get_active_profile_id
-        from shared.supabase_auth import verify_bearer_user
+        from shared.server_auth_session import handle_auth_session_get
 
-        authorization = self.headers.get("Authorization")
-        user = verify_bearer_user(authorization)
-        if not user:
-            _send_auth_required(self)
-            return
-        email = user.get("email") or ""
-        user_id = user.get("id") or ""
-        plan = current_plan(authorization)
-        refresh_session = False
-        if email:
-            _should_pro, _upgraded = ensure_comp_pro_on_login(user_id, email)
-            if _should_pro and plan != PLAN_PRO:
-                plan = PLAN_PRO
-                note_authenticated_plan(plan)
-                refresh_session = True
-        _send_json(
-            self,
-            HTTPStatus.OK,
-            {
-                "ok": True,
-                "email": email,
-                "profile": get_active_profile_id(),
-                "plan": plan,
-                **({"refreshSession": True} if refresh_session else {}),
-            },
-        )
+        handle_auth_session_get(self)
 
     def _handle_stream_ticket_mint(self) -> None:
         """Limited-reuse ticket for EventSource streams (cannot send Authorization)."""
@@ -3884,66 +3855,9 @@ class Handler(SimpleHTTPRequestHandler):
             _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "import_failed", exc)
 
     def _handle_epic_oauth_callback(self) -> None:
-        from urllib.parse import parse_qs, urlparse
+        from shared.server_epic_oauth import handle_epic_oauth_callback
 
-        parsed = urlparse(self.path)
-        params = parse_qs(parsed.query)
-        code = (params.get("code") or [None])[0]
-        state = (params.get("state") or [None])[0]
-        # Always require a server-minted state (CSRF defense), even when Supabase
-        # auth is disabled for local use.
-        if not state:
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            body = b"<html><body><p>Missing OAuth state.</p></body></html>"
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
-        profile_id = _consume_epic_oauth_state(state)
-        if profile_id is None:
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            body = b"<html><body><p>Invalid or expired OAuth state.</p></body></html>"
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
-        set_request_profile_id(profile_id)
-        if not code:
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            body = b"<html><body><p>Missing authorization code.</p></body></html>"
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
-        try:
-            from auth.manager import mark_connected
-            from clients.epic_client import EpicClient, default_epic_cache_dir
-
-            client = EpicClient(auth_code=code, cache_dir=default_epic_cache_dir())
-            client.login()
-            mark_connected("epic", {"EPIC_AUTH_CODE": code})
-            body = (
-                b"<html><body><p>Epic connected. You can close this tab and return to the dashboard.</p>"
-                b"<script>try{const c=new BroadcastChannel('baklog-auth');"
-                b"c.postMessage({provider:'epic'});c.close();}catch(e){}"
-                b"setTimeout(()=>window.close(),1500)</script></body></html>"
-            )
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        except Exception as exc:  # noqa: BLE001
-            safe = html.escape(str(exc), quote=True)
-            body = f"<html><body><p>Epic sign-in failed: {safe}</p></body></html>".encode()
-            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+        handle_epic_oauth_callback(self)
 
     def _handle_auth_stream(self, session_id: str) -> None:
         global _sse_connections

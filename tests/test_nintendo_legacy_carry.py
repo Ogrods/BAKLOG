@@ -12,7 +12,7 @@ from fetchers.fetch_nintendo import (
     carry_forward_nintendo_legacy,
     load_nintendo_dropped_ids,
     maybe_repair_nintendo_catalog_on_disk,
-    refuse_nintendo_drift_result,
+    refuse_nintendo_source_drift,
     repair_nintendo_stale_catalog,
 )
 
@@ -127,7 +127,7 @@ def test_refuse_nintendo_drift_uses_fresh_baseline_not_total(
     monkeypatch.setattr("fetchers.fetch_nintendo.catalog_file", lambda _p: catalog)
     rows = [{"id": str(i)} for i in range(40)]
     assert (
-        refuse_nintendo_drift_result(
+        refuse_nintendo_source_drift(
             rows,
             label="Nintendo library rows",
             allow_drift=False,
@@ -137,7 +137,7 @@ def test_refuse_nintendo_drift_uses_fresh_baseline_not_total(
     )
     small = [{"id": str(i)} for i in range(20)]
     assert (
-        refuse_nintendo_drift_result(
+        refuse_nintendo_source_drift(
             small,
             label="Nintendo library rows",
             allow_drift=False,

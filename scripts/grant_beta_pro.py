@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from shared.supabase_admin import admin_request, list_users, load_maintainer_env
 
@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
 
     cutoff = None
     if args.before:
-        cutoff = datetime.fromisoformat(args.before).replace(tzinfo=timezone.utc)
+        cutoff = datetime.fromisoformat(args.before).replace(tzinfo=UTC)
 
     target_plan = _normalize_plan(args.plan)
     users = list_users(url, key)

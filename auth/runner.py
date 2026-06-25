@@ -180,8 +180,6 @@ NINTENDO_ACCOUNT_URL = "https://ec.nintendo.com/my/transactions/"
 from auth.connect_extractors import (  # noqa: E402
     extract_nintendo_session,
     nintendo_connect_hint,
-    nintendo_has_session as _nintendo_has_session,
-    nintendo_session_has_id_token as _nintendo_session_has_id_token,
 )
 
 
@@ -1409,10 +1407,6 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                     pass
             if not owned_accum:
                 cookie_jar = context.cookies()
-                has_remid = any(
-                    (c.get("name") or "").lower() == "remid" and (c.get("value") or "")
-                    for c in cookie_jar
-                )
                 bearer = (saw_token.get("value") or "").strip() if saw_token.get("ok") else ""
                 for mode, token in (
                     ("bearer+cookies", bearer),

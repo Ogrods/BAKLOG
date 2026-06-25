@@ -12,14 +12,13 @@ from typing import Any
 from .ea_client import (
     EA_PLAY_OWNERSHIP,
     EA_WEB_ORIGIN,
-    EA_WEB_REFERER,
-    EaAuthError,
-    EaCaptureError,
-    EaClient,
     GRAPHQL_URL,
     OWNED_GAMES_HASH,
     REAL_OWNERSHIP,
     XGP_ONLY,
+    EaAuthError,
+    EaCaptureError,
+    EaClient,
     owned_games_full_document_body,
 )
 
@@ -380,9 +379,8 @@ def fetch_owned_games_playwright_request(
             }
         try:
             resp = request.post(GRAPHQL_URL, headers=headers, data=json.dumps(body))
-            status = int(getattr(resp, "status", 0) or 0)
             payload = resp.json()
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             break
         errors = payload.get("errors") or []
         if errors:
@@ -427,7 +425,7 @@ def fetch_owned_games_inpage(page: Any, *, page_size: int = 500, max_pages: int 
             }
         try:
             result = _inpage_owned_eval(page, body=body)
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             break
         if not isinstance(result, dict):
             break

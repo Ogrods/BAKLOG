@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from shared.install_paths import data_root, frozen_bundle_dir, is_frozen, is_portable_frozen, is_portable_frozen
+from shared.install_paths import data_root, frozen_bundle_dir, is_frozen, is_portable_frozen
 
 _COMMUNITY_JSON = Path(__file__).resolve().parent / "community.json"
 _DEFAULT_RELEASES_API = "https://api.github.com/repos/Ogrods/BAKLOG/releases/latest"

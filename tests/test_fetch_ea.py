@@ -138,8 +138,9 @@ def test_stored_token_browser_fallback_when_apq_stale(monkeypatch, tmp_path) -> 
 
 
 def test_resolve_session_skips_browser_when_snapshot_fresh(monkeypatch, tmp_path) -> None:
-    import fetchers.fetch_ea as fetch_ea
     from datetime import UTC, datetime
+
+    import fetchers.fetch_ea as fetch_ea
 
     snap = tmp_path / "connect_snapshot.json"
     snap.write_text(
@@ -164,8 +165,9 @@ def test_resolve_session_skips_browser_when_snapshot_fresh(monkeypatch, tmp_path
 
 
 def test_resolve_session_skips_browser_for_auth_only_snapshot(monkeypatch, tmp_path) -> None:
-    import fetchers.fetch_ea as fetch_ea
     from datetime import UTC, datetime
+
+    import fetchers.fetch_ea as fetch_ea
 
     snap = tmp_path / "connect_snapshot.json"
     snap.write_text(

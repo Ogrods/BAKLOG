@@ -394,7 +394,6 @@ def has_active_sessions() -> bool:
             if not s._finished.is_set()
         ]
         result = bool(active)
-        total_registered = len(_active_sessions)
     return result
 
 
@@ -700,19 +699,16 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
             f"A sign-in window for {spec.label} is already open. "
             "Finish or close it before starting again."
         )
-    cleared = False
     if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.
         clear_browser_session(provider)
-        cleared = True
     elif provider in PRESERVE_PROFILE_ON_RECONNECT:
         # Keep profile on reconnect (connected/expired) but drop ghost cookies
         # when starting from disconnected so connect cannot auto-complete on a
         # stale storefront session left in the profile dir.
         if _provider_state(provider) == "disconnected":
             clear_browser_session(provider)
-            cleared = True
     session_id = uuid.uuid4().hex[:12]
     session = AuthSession(session_id, provider, fresh_connect=fresh)
     with _sessions_lock:

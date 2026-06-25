@@ -1159,3 +1159,40 @@ def test_force_reset_lane_fetcher_spares_internal(runs_env, internal_jobs) -> No
     assert not internal._finished.is_set()
     assert mgr._active is None
     assert mgr._internal_active is internal
+
+
+def _seed_fetcher_and_enrich_running(mgr, runs_dir):
+    fetcher = server.Run("demo", runs_dir=runs_dir)
+    fetcher.status = "running"
+    enrich = server.Run("hltb", runs_dir=runs_dir, enrich=True)
+    enrich.status = "running"
+    with mgr._lock:
+        mgr._active = fetcher
+        mgr._enrich_active = enrich
+        mgr._runs_by_id[fetcher.id] = fetcher
+        mgr._runs_by_id[enrich.id] = enrich
+    return fetcher, enrich
+
+
+def test_cancel_all_lane_fetcher_spares_enrich(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    fetcher, enrich = _seed_fetcher_and_enrich_running(mgr, runs_dir)
+
+    cancelled = mgr.cancel_all(lane="fetcher")
+
+    assert {c["id"] for c in cancelled} == {fetcher.id}
+    assert fetcher._finished.is_set()
+    assert not enrich._finished.is_set()
+    assert mgr._enrich_active is enrich
+
+
+def test_cancel_all_lane_enrich_spares_fetcher(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    fetcher, enrich = _seed_fetcher_and_enrich_running(mgr, runs_dir)
+
+    cancelled = mgr.cancel_all(lane="enrich")
+
+    assert {c["id"] for c in cancelled} == {enrich.id}
+    assert enrich._finished.is_set()
+    assert not fetcher._finished.is_set()
+    assert mgr._active is fetcher

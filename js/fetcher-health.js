@@ -2079,7 +2079,7 @@ export const fetcherRunner = (() => {
     } else {
       btn.disabled = !show;
       btn.textContent = 'Cancel';
-      btn.title = 'Stop all queued and running fetchers (Shift+click: force reset queue)';
+      btn.title = 'Stop all queued and running fetchers and enrichers (Shift+click: force reset queue)';
     }
   }
 
@@ -2110,7 +2110,9 @@ export const fetcherRunner = (() => {
       for (const id of [...pending]) {
         const onActive = snap.active?.id === id;
         const onQueue = (snap.queue || []).some(r => r.id === id);
-        if (!onActive && !onQueue) {
+        const onEnrichActive = snap.enrich_active?.id === id;
+        const onEnrichQueue = (snap.enrich_queue || []).some(r => r.id === id);
+        if (!onActive && !onQueue && !onEnrichActive && !onEnrichQueue) {
           const hist = (snap.history || []).find(r => r.id === id);
           if (hist && ['done', 'failed', 'cancelled'].includes(hist.status)) {
             pending.delete(id);
@@ -2129,6 +2131,8 @@ export const fetcherRunner = (() => {
     for (const key of [...runStateByKey.keys()]) markChipState(key, null);
     liveRunId = null;
     lastServerInFlight = false;
+    lastFetcherLaneInFlight = false;
+    lastEnrichLaneInFlight = false;
     logEvent(
       'info',
       force ? '[force reset - queue cleared locally]' : '[cancelled]',
@@ -2140,28 +2144,43 @@ export const fetcherRunner = (() => {
     updateCancelButton();
   }
 
+  async function cancelServerLane(lane, { force = false } = {}) {
+    const qs = force ? `?lane=${lane}&force=1` : `?lane=${lane}`;
+    try {
+      const res = await fetchWithTimeoutAndProbe(
+        `/api/runs/cancel${qs}`,
+        { method: 'POST' },
+        CANCEL_HTTP_MS,
+      );
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.cancelled?.length ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function reconcileCancelInBackground(ids, { force = false } = {}) {
     void (async () => {
-      // Dashboard Cancel is fetcher-lane only — never kill admin (internal)
-      // jobs like buildClaims/claimSources running in parallel.
-      const cancelUrl = force
-        ? '/api/runs/cancel?lane=fetcher&force=1'
-        : '/api/runs/cancel?lane=fetcher';
+      // Dashboard Cancel clears fetcher + enrich lanes only — never kill admin
+      // (internal) jobs like buildClaims/claimSources running in parallel.
       let bulkOk = false;
-      try {
-        const res = await fetchWithTimeoutAndProbe(cancelUrl, { method: 'POST' }, CANCEL_HTTP_MS);
-        if (res.ok) {
+      let cancelledTotal = 0;
+      for (const lane of ['fetcher', 'enrich']) {
+        const n = await cancelServerLane(lane, { force });
+        if (n > 0) {
           bulkOk = true;
-          const data = await res.json();
-          const n = data.cancelled?.length ?? 0;
-          if (n) {
-            logEvent(
-              'info',
-              force ? `[server force reset: ${n} run(s)]` : `[server cancelled ${n} run(s)]`,
-            );
-          }
+          cancelledTotal += n;
         }
-      } catch (_) {}
+      }
+      if (cancelledTotal) {
+        logEvent(
+          'info',
+          force
+            ? `[server force reset: ${cancelledTotal} run(s)]`
+            : `[server cancelled ${cancelledTotal} run(s)]`,
+        );
+      }
       if (!bulkOk && ids.length) {
         for (const id of ids) {
           await cancelOneRun(id);
@@ -2200,6 +2219,8 @@ export const fetcherRunner = (() => {
       applyServerSnapshotInFlight(snap);
       if (snap?.active) ids.push(snap.active.id);
       for (const q of snap?.queue || []) ids.push(q.id);
+      if (snap?.enrich_active) ids.push(snap.enrich_active.id);
+      for (const q of snap?.enrich_queue || []) ids.push(q.id);
       const clientStale = inFlightCount() > 0;
       if (!ids.length && !force && !clientStale && !lastServerInFlight) {
         return;
@@ -2220,6 +2241,10 @@ export const fetcherRunner = (() => {
     const inFlightKeys = new Set();
     if (snap.active?.key) inFlightKeys.add(snap.active.key);
     for (const q of snap.queue || []) {
+      if (q.key) inFlightKeys.add(q.key);
+    }
+    if (snap.enrich_active?.key) inFlightKeys.add(snap.enrich_active.key);
+    for (const q of snap.enrich_queue || []) {
       if (q.key) inFlightKeys.add(q.key);
     }
     const historyByKey = new Map();

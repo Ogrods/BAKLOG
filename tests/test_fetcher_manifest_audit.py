@@ -83,6 +83,20 @@ def test_manifest_keys_unique() -> None:
     assert len(keys) == len(set(keys))
 
 
+def test_manifest_has_27_fetchers() -> None:
+    assert len(ENTRIES) == 27
+
+
+@pytest.mark.parametrize("entry", ENTRIES, ids=[e["key"] for e in ENTRIES])
+def test_manifest_entry_has_required_fields(entry: dict) -> None:
+    assert entry.get("key")
+    assert entry.get("label")
+    assert entry.get("group") in ("library", "wishlist", "prices", "enrich")
+    assert entry.get("script")
+    script = ROOT / entry["script"]
+    assert script.is_file(), f"{entry['key']}: missing {entry['script']}"
+
+
 def test_all_library_manifest_keys_in_app_js() -> None:
     lib_keys = {e["key"] for e in ENTRIES if e.get("group") == "library"}
     assert lib_keys == set(LIBRARY_STORE_JSON.keys())

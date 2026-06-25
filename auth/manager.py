@@ -35,6 +35,7 @@ _LEGACY_ENV_ALIASES: dict[str, tuple[str, ...]] = {
 ROOT = Path(__file__).resolve().parents[1]
 
 
+
 _active_sessions: dict[str, AuthSession] = {}
 _sessions_lock = threading.Lock()
 
@@ -207,8 +208,9 @@ def subprocess_env_for_profile(profile_id: str) -> dict[str, str]:
         if v:
             env[k] = v
     env.update(profile_credentials_env(profile_id))
-    from shared.install_paths import bundle_root
+    from shared.install_paths import bundle_root, data_root
 
+    env["BAKLOG_DATA_DIR"] = str(data_root().resolve())
     root = str(bundle_root().resolve())
     existing = env.get("PYTHONPATH", "").strip()
     env["PYTHONPATH"] = root if not existing else f"{root}{os.pathsep}{existing}"
@@ -382,7 +384,18 @@ def mark_verified(provider: str) -> None:
 def has_active_sessions() -> bool:
     """True while a headed browser sign-in worker is still running."""
     with _sessions_lock:
-        return any(not s._finished.is_set() for s in _active_sessions.values())
+        active = [
+            {
+                "session_id": sid,
+                "provider": s.provider,
+                "finished": s._finished.is_set(),
+            }
+            for sid, s in _active_sessions.items()
+            if not s._finished.is_set()
+        ]
+        result = bool(active)
+        total_registered = len(_active_sessions)
+    return result
 
 
 def seed_new_profile_auth_defaults(profile_id: str) -> None:
@@ -619,6 +632,19 @@ def clear_browser_session(provider: str) -> None:
     reconnect is exactly what made "Reconnect" feel like a no-op.
     """
     prof = profile_dir(provider)
+    try:
+        from auth.cdp_browser import release_chromium_profile_lock
+
+        release_chromium_profile_lock(prof)
+    except Exception:  # noqa: BLE001
+        pass
+    if provider == "ea":
+        try:
+            from clients.ea_session import ea_connect_snapshot_path
+
+            ea_connect_snapshot_path().unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001
+            pass
     if prof.exists():
         shutil.rmtree(prof, ignore_errors=True)
     if provider == "epic":
@@ -637,15 +663,17 @@ def disconnect(provider: str) -> None:
             blob.pop("enabled", None)
         set_provider_blob(provider, blob)
         return
+    if spec.kind in ("browser", "oauth"):
+        from auth.cdp_browser import release_chromium_profile_lock
+
+        release_chromium_profile_lock(profile_dir(provider))
     delete_provider_blob(provider)
     clear_browser_session(provider)
 
 
 # Cloudflare-gated storefronts where wiping the profile on reconnect forces a
 # new cf_clearance challenge every time and Epic drops the storefront session.
-PRESERVE_PROFILE_ON_RECONNECT = frozenset(
-    k for k, s in PROVIDERS.items() if s.preserve_profile_on_reconnect
-)
+PRESERVE_PROFILE_ON_RECONNECT = frozenset({"epic_wishlist"})
 
 
 def _should_clear_on_reconnect(provider: str) -> bool:
@@ -672,20 +700,24 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
             f"A sign-in window for {spec.label} is already open. "
             "Finish or close it before starting again."
         )
+    cleared = False
     if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.
         clear_browser_session(provider)
+        cleared = True
     elif provider in PRESERVE_PROFILE_ON_RECONNECT:
         # Keep profile on reconnect (connected/expired) but drop ghost cookies
         # when starting from disconnected so connect cannot auto-complete on a
         # stale storefront session left in the profile dir.
         if _provider_state(provider) == "disconnected":
             clear_browser_session(provider)
+            cleared = True
     session_id = uuid.uuid4().hex[:12]
-    session = AuthSession(session_id, provider)
+    session = AuthSession(session_id, provider, fresh_connect=fresh)
     with _sessions_lock:
         _active_sessions[session_id] = session
+
 
     def _worker() -> None:
         try:
@@ -699,9 +731,12 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 session.emit("error", {"message": msg})
                 return
 
-            from auth.session_probe import probe_browser_session
+            from auth.session_probe import (
+                ADVISORY_BROWSER_PROBE,
+                probe_browser_session,
+            )
 
-            if spec.post_connect_probe == "advisory":
+            if provider in ADVISORY_BROWSER_PROBE:
                 # Headed sign-in already confirmed the session via the live page
                 # (the connect window won't close until xbox.com reports
                 # isSignedIn). The headless re-check is both unreliable AND

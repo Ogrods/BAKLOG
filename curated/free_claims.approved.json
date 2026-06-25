@@ -8,7 +8,6 @@
     "gamerpower-3446",
     "gamerpower-3548",
     "gamerpower-3680",
-    "gamerpower-3682",
     "itad-073a56345192",
     "itad-0c69ed1f1bd8",
     "itad-0d4598c53ffe",
@@ -55,9 +54,6 @@
     "gamerpower-3680": {
       "title": "The Ouroboros King"
     },
-    "gamerpower-3682": {
-      "title": "The Red Lantern"
-    },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
     },
@@ -97,7 +93,6 @@
   "dismissed": [
     "itad-98730029b14b",
     "gamerpower-3287",
-    "itad-78f8867f4481",
     "gamerpower-3272",
     "itad-50a2b5b1d7a6",
     "gamerpower-3279",
@@ -105,6 +100,8 @@
     "gamerpower-3687",
     "gamerpower-3688",
     "itad-13ca8fbedd28",
-    "itad-529a5bd808a1"
+    "itad-529a5bd808a1",
+    "itad-a71d166daf70",
+    "gamerpower-3682"
   ]
 }

@@ -55,6 +55,7 @@ def _spec_resolved_hiddenimports() -> set[str]:
         "auth.manager",
         "auth.secrets",
         "shared.install_paths",
+        "shared.data_dir_migration",
         "shared.built_frontend",
         "shared.legacy_env",
         "keyring.backends.Windows",
@@ -77,6 +78,11 @@ def test_pyinstaller_hiddenimports_include_tray_deps() -> None:
     text = SPEC.read_text(encoding="utf-8")
     for mod in ("pystray", "PIL", "PIL.Image", "PIL.ImageDraw"):
         assert mod in text, f"packaging/baklog.spec tray_hiddenimports missing {mod}"
+
+
+def test_pyinstaller_hiddenimports_include_data_dir_migration() -> None:
+    hidden = _spec_resolved_hiddenimports()
+    assert "shared.data_dir_migration" in hidden
 
 
 def test_pyinstaller_datas_include_curated_feeds() -> None:

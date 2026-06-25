@@ -23,6 +23,8 @@ import {
   priorityScore,
   renderStatusChipsHtml,
   renderBulkStatusButtons,
+  hltbBacklogHoursTitle,
+  HLTB_FETCH_TOOLTIP,
   recomputeCrossStoreHidden,
   itchIsGame,
   combinedPlaytime,
@@ -801,6 +803,7 @@ export function renderSummary() {
     const hideNonGames = !!state.sessionPrefs.itchHideNonGames;
     const backlog = itchGames.filter(g => getPersonal(g).status === "backlog" && (!hideNonGames || itchIsGame(g)));
     const totalHltb = backlog.reduce((s, g) => s + (hltbMain(g) || 0), 0);
+    const backlogHltbTitle = hltbBacklogHoursTitle(totalHltb, backlog, 'Sum of HLTB main hours on itch backlog');
     const rated = itchGames.filter(g => ratingValue(g) > 0 && (!hideNonGames || itchIsGame(g)));
     const avg = rated.length ? (rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length).toFixed(0) : " - ";
     const fetched = state.libraryMeta.itch?.fetched_at ? new Date(state.libraryMeta.itch.fetched_at).toLocaleString() : "";
@@ -812,7 +815,7 @@ export function renderSummary() {
     el.innerHTML = `
       <div class="w-full flex flex-wrap gap-2">
         <div class="summary-stat-chip summary-stat-chip--itch" title="itch.io items in your library">itch.io <span class="text-slate-100 font-semibold ml-1">${countLabel}</span></div>
-        <div class="summary-stat-chip summary-stat-chip--itch" title="Sum of HLTB main hours on itch backlog">Backlog hours <span class="text-slate-100 font-semibold ml-1">${formatNum(Math.round(totalHltb))}h</span></div>
+        <div class="summary-stat-chip summary-stat-chip--itch" title="${escapeAttr(backlogHltbTitle)}">Backlog hours <span class="text-slate-100 font-semibold ml-1"${Math.round(totalHltb) <= 0 && backlogHltbTitle === HLTB_FETCH_TOOLTIP ? ` title="${escapeAttr(HLTB_FETCH_TOOLTIP)}"` : ''}>${formatNum(Math.round(totalHltb))}h</span></div>
         <div class="summary-stat-chip summary-stat-chip--itch" title="itch.io items with a community rating">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
         <div class="summary-stat-chip summary-stat-chip--itch" title="Mean itch.io review % (rated items)">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
         ${fetched ? `<div class="summary-stat-chip summary-stat-chip--itch text-slate-400" title="Last itch.io library fetch time">Fetched ${escapeHtml(fetched)}</div>` : ""}

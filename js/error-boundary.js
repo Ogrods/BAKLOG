@@ -352,7 +352,7 @@ function copyErrorLog(btn) {
  *   - localStorage contents (besides the error ring, which we own)
  *   - credentials / .env values / cookies
  */
-export function buildBugBundle() {
+export function buildBugBundle(extra = {}) {
   const win = (typeof window !== 'undefined') ? window : null;
   const doc = (typeof document !== 'undefined') ? document : null;
   const versionMeta = doc?.querySelector('meta[name="baklog-version"]');
@@ -376,6 +376,7 @@ export function buildBugBundle() {
       dash_stats: dashStats ? { ...dashStats } : null,
       propagation: win?.__baklogProp ? { ...win.__baklogProp } : null,
     },
+    server: extra.server || null,
     errors: {
       session_count: _errors.length,
       persisted_count: _persistedRing.length,
@@ -384,6 +385,31 @@ export function buildBugBundle() {
     },
     notice: 'This bundle was assembled locally. Nothing was sent anywhere. Paste it into a GitHub issue if you want to share it.',
   };
+}
+
+/** Fetch redacted server diagnostics for bug bundles (best-effort). */
+export async function fetchBugBundleServerContext() {
+  try {
+    const res = await fetch('/api/diagnostics');
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      data_dir_path: data.data_dir_path ?? null,
+      portable: data.portable ?? null,
+      frozen: data.frozen ?? null,
+      platform: data.platform ?? null,
+      running_from_temp: data.running_from_temp ?? null,
+      version: data.version ?? null,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+/** buildBugBundle plus optional server diagnostics (async). */
+export async function buildBugBundleAsync() {
+  const server = await fetchBugBundleServerContext();
+  return buildBugBundle({ server });
 }
 
 function readWindowField(win, dotted) {
@@ -473,7 +499,7 @@ export function getBugReportEndpoint() {
  * @param {{ contact?: string, note?: string }} [opts]
  */
 export async function submitBugReport({ contact = '', note = '' } = {}) {
-  const bundle = buildBugBundle();
+  const bundle = await buildBugBundleAsync();
   bundle.errors.persisted = bundle.errors.persisted.slice(-25);
   const res = await fetch(getBugReportEndpoint(), {
     method: 'POST',
@@ -493,7 +519,7 @@ export async function submitBugReport({ contact = '', note = '' } = {}) {
  * @returns {Promise<boolean>}
  */
 export async function copyBugBundleToClipboard() {
-  const payload = JSON.stringify(buildBugBundle(), null, 2);
+  const payload = JSON.stringify(await buildBugBundleAsync(), null, 2);
   try {
     if (navigator?.clipboard?.writeText) {
       await navigator.clipboard.writeText(payload);

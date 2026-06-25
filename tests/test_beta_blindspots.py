@@ -56,8 +56,12 @@ def test_is_running_from_temp_dir_marker_rar(monkeypatch: pytest.MonkeyPatch, tm
 def test_check_data_location_prints_warning(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    monkeypatch.setattr(server_support, "is_frozen", lambda: True)
+    monkeypatch.setattr(server_support, "is_portable_frozen", lambda: False)
+    monkeypatch.setattr(server_support, "frozen_bundle_dir", lambda: tmp_path)
     monkeypatch.setattr(server_support, "is_running_from_temp_dir", lambda _p: True)
-    server_support.check_data_location(tmp_path)
+    monkeypatch.setattr(server_support, "data_root", lambda: tmp_path / "BAKLOG-Data")
+    server_support.check_data_location()
     captured = capsys.readouterr()
     assert "temporary folder" in captured.err
 

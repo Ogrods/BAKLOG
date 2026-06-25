@@ -54,6 +54,7 @@ def test_subprocess_env_uses_profile_blob_only(
     env = subprocess_env_for_profile("work")
     assert env.get("ITAD_API_KEY") == "profile-itad"
     assert env.get("BAKLOG_PROFILE") == "work"
+    assert env.get("BAKLOG_DATA_DIR")
     assert env.get("ITAD_API_KEY") != "process-itad"
 
 

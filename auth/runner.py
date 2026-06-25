@@ -83,11 +83,12 @@ _STEALTH_INIT = STEALTH_INIT_SCRIPT
 
 
 class AuthSession:
-    __slots__ = ("id", "provider", "events", "_listeners", "_finished", "_lock")
+    __slots__ = ("id", "provider", "fresh_connect", "events", "_listeners", "_finished", "_lock")
 
-    def __init__(self, session_id: str, provider: str) -> None:
+    def __init__(self, session_id: str, provider: str, *, fresh_connect: bool = False) -> None:
         self.id = session_id
         self.provider = provider
+        self.fresh_connect = fresh_connect
         self.events: queue.Queue[tuple[str, dict]] = queue.Queue()
         self._listeners: list[Callable[[str, dict], None]] = []
         self._finished = threading.Event()
@@ -1297,67 +1298,230 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
 
 
 def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, str]:
-    """Confirm ea.com login, persist profile + web-session Bearer token."""
-    from auth.connect_extractors import (
-        build_ea_header_sniffer,
-        ea_connect_hint,
-        extract_ea_bearer_session,
+    """Confirm ea.com login via in-browser Juno GraphQL (and legacy Bearer when present)."""
+    from clients.ea_session import (
+        EA_COOKIE_SESSION,
+        EA_DEALS_URL,
+        EA_GRAPHQL_HOST,
+        EA_LOGIN_URL,
+        _ensure_ea_deals_ready,
+        _merge_owned_items,
+        drain_ea_graphql_hook,
+        ensure_ea_graphql_hook,
+        fetch_owned_games_inpage,
+        fetch_owned_games_playwright_request,
+        install_ea_graphql_hook,
+        is_ea_session_expired_page,
+        normalize_bearer,
+        probe_ea_token,
+        write_ea_connect_snapshot,
     )
-    from auth.connect_loop import run_connect_poll
-    from clients.ea_session import EA_DEALS_URL, EA_HOME_URL, EA_LOGIN_URL
 
-    sniffer = build_ea_header_sniffer()
-    sniffer.attach(context)
-    nudged = {"done": False}
+    install_ea_graphql_hook(context)
+    ensure_ea_graphql_hook(page)
 
-    def _active_page():
-        return _drive_connect_page(page, context)
+    saw_token: dict[str, Any] = {"ok": False, "value": ""}
 
-    def _maybe_nudge_deals() -> None:
-        active = _active_page()
-        url = (active.url or "").lower()
-        signed_in = (
-            url.rstrip("/") in (EA_HOME_URL.rstrip("/"), EA_HOME_URL.rstrip("/") + "/")
-            or ("ea.com" in url and "login" not in url and "signin.ea.com" not in url)
-        )
-        if signed_in and not nudged["done"]:
-            nudged["done"] = True
-            if session:
-                session.emit("signed_in", {"url": active.url or EA_LOGIN_URL})
-            try:
-                active.bring_to_front()
-            except Exception:
-                pass
-            try:
-                active.goto(EA_DEALS_URL, wait_until="domcontentloaded", timeout=25_000)
-            except Exception:
-                pass
+    def on_request(request) -> None:
+        if EA_GRAPHQL_HOST not in (request.url or ""):
+            return
+        auth = request.headers.get("authorization") or request.headers.get("Authorization")
+        token = normalize_bearer(auth)
+        if token:
+            saw_token["ok"] = True
+            saw_token["value"] = token
 
-    def _check() -> dict[str, str] | None:
+    context.on("request", on_request)
+    try:
+        page.goto(EA_LOGIN_URL, wait_until="commit", timeout=25_000)
+    except Exception:
+        pass
+
+    deadline = time.time() + SUCCESS_WAIT_SEC
+    last_hint = 0.0
+    nudged = False
+    redirected_expired = False
+    saw_signin = False
+    require_signin = bool(getattr(session, "fresh_connect", False)) if session else False
+    consecutive_auth = 0
+    owned_accum: list[dict] = []
+    owned_seen: set[str] = set()
+    last_poll_log = 0.0
+
+    def _login_witnessed() -> bool:
+        return saw_signin or not require_signin
+
+    while time.time() < deadline:
         abort_if_browser_closed(context)
-        active = _active_page()
-        if is_blank_browser_url(active.url or ""):
+
+        cookies = context.cookies()
+
+        auth_ok, owned_batch, hook_stats = drain_ea_graphql_hook(page)
+        _merge_owned_items(owned_accum, owned_seen, owned_batch)
+
+        # Mixed deals-page traffic often includes both authenticated `me` rows and
+        # unauthenticated errors in one drain ΓÇö prefer auth_ok for this poll.
+        if auth_ok:
+            consecutive_auth += 1
+        elif hook_stats.get("hook_unauthenticated"):
+            consecutive_auth = 0
+        else:
+            consecutive_auth = 0
+
+        now = time.time()
+        if now - last_poll_log >= 2.0:
+            last_poll_log = now
+
+        hook_entries = int(hook_stats.get("hook_entries") or 0)
+        deals_burst_ok = (
+            nudged
+            and hook_entries >= 1
+            and bool(hook_stats.get("hook_authenticated"))
+        )
+        sustained_cookie = auth_ok and _login_witnessed() and (
+            consecutive_auth >= 2 or bool(owned_accum) or deals_burst_ok
+        )
+        if sustained_cookie:
+            if deals_burst_ok and not owned_accum:
+                for _ in range(4):
+                    try:
+                        page.wait_for_timeout(500)
+                    except Exception:
+                        break
+                    ensure_ea_graphql_hook(page)
+                    _auth_ok, owned_batch, _stats = drain_ea_graphql_hook(page)
+                    _merge_owned_items(owned_accum, owned_seen, owned_batch)
+                    if owned_accum:
+                        break
+            if not owned_accum and deals_burst_ok:
+                try:
+                    _ensure_ea_deals_ready(page, dwell_ms=1500)
+                    pw_owned = fetch_owned_games_playwright_request(context)
+                    _merge_owned_items(owned_accum, owned_seen, pw_owned)
+                except Exception:  # noqa: BLE001
+                    pass
+            if not owned_accum and deals_burst_ok:
+                try:
+                    _ensure_ea_deals_ready(page, dwell_ms=1500)
+                    inpage_owned = fetch_owned_games_inpage(page)
+                    _merge_owned_items(owned_accum, owned_seen, inpage_owned)
+                except Exception:  # noqa: BLE001
+                    pass
+            if not owned_accum:
+                cookie_jar = context.cookies()
+                has_remid = any(
+                    (c.get("name") or "").lower() == "remid" and (c.get("value") or "")
+                    for c in cookie_jar
+                )
+                bearer = (saw_token.get("value") or "").strip() if saw_token.get("ok") else ""
+                for mode, token in (
+                    ("bearer+cookies", bearer),
+                    ("cookies", ""),
+                ):
+                    if mode == "bearer+cookies" and not token:
+                        continue
+                    try:
+                        from clients.ea_client import EaClient
+
+                        client = EaClient(token, cookies=cookie_jar) if token else EaClient(cookies=cookie_jar)
+                        api_owned = client.get_owned_games()
+                        _merge_owned_items(owned_accum, owned_seen, api_owned)
+                        if owned_accum:
+                            break
+                    except Exception:  # noqa: BLE001
+                        pass
+            if not owned_accum:
+                for attempt in range(3):
+                    try:
+                        _ensure_ea_deals_ready(page, dwell_ms=1500 + attempt * 1000)
+                        inpage_owned = fetch_owned_games_inpage(page)
+                        _merge_owned_items(owned_accum, owned_seen, inpage_owned)
+                        if owned_accum:
+                            break
+                    except Exception:  # noqa: BLE001
+                        pass
+            cookie_jar = context.cookies()
+            write_ea_connect_snapshot(
+                owned_accum,
+                browser_auth_ok=True,
+                cookies=cookie_jar,
+            )
+            return {
+                "EA_PROFILE": "ready",
+                "EA_BEARER_TOKEN": EA_COOKIE_SESSION,
+            }
+
+        if saw_token["ok"] and saw_token["value"] and _login_witnessed():
+            probe = probe_ea_token(saw_token["value"], cookies)
+            # APQ-owned-games miss falls back to subscription probe only ΓÇö that
+            # bearer still fails fetch_ea; wait for sustained cookie handoff.
+            if probe.get("ok") and not probe.get("library_via_browser"):
+                return {
+                    "EA_PROFILE": "ready",
+                    "EA_BEARER_TOKEN": saw_token["value"],
+                }
+            saw_token["ok"] = False
+            saw_token["value"] = ""
+
+        url = (page.url or "").lower()
+        if "signin.ea.com" in url:
+            saw_signin = True
+        signed_in = "ea.com" in url and "login" not in url and "signin.ea.com" not in url
+        expired_page = False
+        try:
+            expired_page = is_ea_session_expired_page(page.content(), page.url or "")
+        except Exception:
+            expired_page = False
+
+        if signed_in and not nudged:
+            if require_signin and not saw_signin:
+                try:
+                    page.goto(EA_LOGIN_URL, wait_until="commit", timeout=25_000)
+                    ensure_ea_graphql_hook(page)
+                except Exception:
+                    pass
+            else:
+                nudged = True
+                if session:
+                    session.emit("signed_in", {"url": page.url or EA_LOGIN_URL})
+                try:
+                    page.bring_to_front()
+                except Exception:
+                    pass
+                try:
+                    page.goto(EA_DEALS_URL, wait_until="commit", timeout=25_000)
+                    ensure_ea_graphql_hook(page)
+                    page.wait_for_timeout(1500)
+                except Exception:
+                    pass
+        elif expired_page and not redirected_expired:
+            redirected_expired = True
+            ensure_ea_graphql_hook(page)
             try:
-                active.goto(EA_LOGIN_URL, wait_until="domcontentloaded", timeout=25_000)
+                page.goto(EA_LOGIN_URL, wait_until="commit", timeout=25_000)
             except Exception:
                 pass
-        _maybe_nudge_deals()
-        return extract_ea_bearer_session(context, sniffer=sniffer)
+        elif signed_in and nudged:
+            ensure_ea_graphql_hook(page)
 
-    def _hint() -> str:
-        return ea_connect_hint(_active_page(), saw_token=bool(sniffer.captured.get("EA_BEARER_TOKEN")))
+        now = time.time()
+        if session and now - last_hint > 10:
+            last_hint = now
+            if "signin.ea.com" in url or "/login" in url:
+                msg = "Sign in to your EA account in the browser window."
+            elif expired_page:
+                msg = "EA session expired ΓÇö sign in again in the browser window."
+            elif signed_in:
+                msg = "Signed in ΓÇö confirming your EA session on the deals page."
+            else:
+                msg = "Keep the window open while we confirm your EA App session."
+            session.emit("waiting_for_user", {"message": msg})
 
-    return run_connect_poll(
-        context=context,
-        session=session,
-        deadline=time.time() + SUCCESS_WAIT_SEC,
-        poll_sec=POLL_SEC,
-        check=_check,
-        hint=_hint,
-        timeout_message=(
-            "EA session not confirmed — sign in at ea.com, then wait on the deals page "
-            "before the window closes."
-        ),
+        page.wait_for_timeout(int(POLL_SEC * 1000))
+
+    raise RuntimeError(
+        "EA session not confirmed ΓÇö sign in at ea.com and wait for the deals page "
+        "to finish loading before the window closes."
     )
 
 

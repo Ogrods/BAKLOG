@@ -1,27 +1,40 @@
 """EA App (Juno) library client — replays your own ea.com web session.
 
-This client does **not** impersonate EA's desktop app. It carries no baked-in
-client secret and performs no first-party OAuth flow. Instead it reuses the
-Bearer token that ea.com's own website obtains for the signed-in user (sniffed
-from your saved browser profile in fetch_ea.py) and replays the website's own
-GraphQL query against the same endpoint your browser already calls. In other
-words: the same traffic you could generate yourself with DevTools open on
-ea.com, automated locally on your machine.
+Reuses the ea.com browser profile cookies (and optional legacy Bearer token)
+to call the same Juno GraphQL endpoint the website uses.
 """
 
 from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from urllib.parse import quote
 
 import requests
 
 GRAPHQL_URL = "https://service-aggregation-layer.juno.ea.com/graphql"
-# Persisted-query identifiers used by the ea.com web app (Juno GraphQL APQ).
-# getPreloadedOwnedGames hash matches the live ea.com deals/library page (2025+).
-OWNED_GAMES_HASH = "779f1cd1355699752e20c0b3877847f4e3010ef5de131c248e98f8eff84f0718"
+EA_WEB_ORIGIN = "https://www.ea.com"
+EA_WEB_REFERER = "https://www.ea.com/sales/deals"
+
+# Legacy persisted-query hashes (Bearer GET path only).
+OWNED_GAMES_HASH = "5de4178ee7e1f084ce9deca856c74a9e03547a67dfafc0cb844d532fb54ae73d"
 PLAY_TIMES_HASH = "3f09b35e06b75c74d8ec3e520a598ebb5e2992b1e1268b6dd3b8ed99b9fafb29"
+USER_SUBSCRIPTION_HASH = "d127c63383688258dd6133009a12668a2f3d1a6d47c4927d00fa84a398205a88"
+
+PLAY_TIMES_QUERY = """
+query GetGamePlayTimes($gameSlugs: [String!]!) {
+  me {
+    recentGames(gameSlugs: $gameSlugs) {
+      items {
+        gameSlug
+        totalPlayTimeSeconds
+        lastSessionEndDate
+      }
+    }
+  }
+}
+"""
 
 REAL_OWNERSHIP = frozenset({
     "UNKNOWN",
@@ -44,7 +57,50 @@ EA_PLAY_OWNERSHIP = frozenset({
 })
 XGP_ONLY = frozenset({"XGP_VAULT"})
 
-REQUEST_DELAY_SEC = 0.15
+# Full document when Juno APQ hash is stale. Validated live against Juno schema (401 when
+# cookie replay is unbound; validation error when args/fields drift).
+OWNED_GAMES_QUERY = """
+query getPreloadedOwnedGames(
+  $limit: Int!
+  $next: String!
+) {
+  me {
+    ownedGameProducts(
+      locale: "DEFAULT"
+      paging: { limit: $limit, next: $next }
+      type: [DIGITAL_FULL_GAME, PACKAGED_FULL_GAME]
+      entitlementEnabled: true
+      storefronts: [EA]
+      ownershipMethod: [PURCHASE, REDEMPTION, ENTITLEMENT_GRANT]
+      platforms: [PC]
+    ) {
+      next
+      items {
+        originOfferId
+        product {
+          name
+          gameSlug
+        }
+      }
+    }
+  }
+}
+"""
+
+_REQUEST_DELAY_SEC = 0.15
+
+
+REQUEST_DELAY_SEC = _REQUEST_DELAY_SEC
+
+_OWNED_VARIABLES_BASE = {
+    "isMac": False,
+    "locale": "DEFAULT",
+    "type": ["DIGITAL_FULL_GAME", "PACKAGED_FULL_GAME"],
+    "entitlementEnabled": True,
+    "storefronts": ["EA"],
+    "ownershipMethods": sorted(REAL_OWNERSHIP | EA_PLAY_OWNERSHIP | XGP_ONLY),
+    "platforms": ["PC"],
+}
 
 
 class EaAuthError(Exception):
@@ -52,7 +108,7 @@ class EaAuthError(Exception):
 
 
 class EaCaptureError(Exception):
-    """Logged-in session present but Bearer token could not be captured."""
+    """Logged-in session present but session could not be validated."""
 
 
 def _persisted_url(operation: str, variables: dict, sha256_hash: str) -> str:
@@ -68,41 +124,81 @@ def _persisted_url(operation: str, variables: dict, sha256_hash: str) -> str:
     )
 
 
+def _apply_cookies(session: requests.Session, cookies: list[dict] | dict | None) -> None:
+    if isinstance(cookies, dict):
+        for name, value in cookies.items():
+            if name and value is not None:
+                session.cookies.set(name, value, domain=".ea.com", path="/")
+        return
+    for c in cookies or []:
+        name = c.get("name")
+        value = c.get("value")
+        if not name or value is None:
+            continue
+        session.cookies.set(
+            name,
+            value,
+            domain=(c.get("domain") or ".ea.com").lstrip("."),
+            path=c.get("path") or "/",
+        )
+
+
+def owned_games_full_document_body(
+    *,
+    limit: int,
+    offset: str = "0",
+    preload: bool = True,
+) -> dict:
+    """POST body for getPreloadedOwnedGames when APQ hash is stale."""
+    _ = preload
+    return {
+        "operationName": "getPreloadedOwnedGames",
+        "query": OWNED_GAMES_QUERY,
+        "variables": {
+            "limit": limit,
+            "next": offset,
+        },
+    }
+
+
 class EaClient:
     def __init__(
         self,
-        access_token: str,
+        access_token: str = "",
         cookies: list[dict] | dict | None = None,
     ) -> None:
         token = (access_token or "").strip()
         if token.lower().startswith("bearer "):
             token = token[7:].strip()
-        if not token:
+        has_cookies = bool(cookies)
+        if not token and not has_cookies:
             raise EaAuthError(
-                "No EA web session token — connect EA App on the Connections page first."
+                "No EA web session — connect EA App on the Connections page first."
             )
         self._access_token = token
+        self._cookie_mode = not token
         self._last_request = 0.0
         self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/131.0.0.0 Safari/537.36"
-                ),
-                "Accept": "application/json",
-                "Authorization": f"Bearer {token}",
-            }
-        )
-        if isinstance(cookies, dict):
-            self.session.cookies.update(cookies)
-        elif isinstance(cookies, list):
-            for c in cookies:
-                name = c.get("name")
-                value = c.get("value")
-                if name and value is not None:
-                    self.session.cookies.set(name, value)
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+        }
+        if self._cookie_mode or token:
+            headers.update(
+                {
+                    "Origin": EA_WEB_ORIGIN,
+                    "Referer": EA_WEB_REFERER,
+                    "x-client-id": "eacom-fe",
+                }
+            )
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        self.session.headers.update(headers)
+        _apply_cookies(self.session, cookies)
 
     def _throttle(self) -> None:
         elapsed = time.time() - self._last_request
@@ -110,59 +206,153 @@ class EaClient:
             time.sleep(REQUEST_DELAY_SEC - elapsed)
         self._last_request = time.time()
 
+    def _raise_graphql_errors(self, data: dict, resp: requests.Response) -> None:
+        if resp.status_code in (401, 403):
+            raise EaAuthError(
+                f"EA GraphQL unauthorized ({resp.status_code}) — reconnect EA App."
+            )
+        if resp.status_code >= 400:
+            raise EaAuthError(f"EA GraphQL HTTP {resp.status_code}: {resp.text[:300]}")
+        if data.get("errors"):
+            err = data["errors"][0] if data["errors"] else {}
+            code = ((err.get("extensions") or {}).get("code") or "").upper()
+            msg = str(err.get("message") or "")
+            if code == "UNAUTHENTICATED" or "not authenticated" in msg.lower():
+                raise EaAuthError("EA GraphQL not authenticated — reconnect EA App.")
+            raise EaAuthError(f"EA GraphQL errors: {data['errors'][:1]}")
+
     def _graphql_get(self, operation: str, variables: dict, sha256_hash: str) -> dict:
         self._throttle()
         url = _persisted_url(operation, variables, sha256_hash)
         resp = self.session.get(url, timeout=60)
-        if resp.status_code in (401, 403):
-            raise EaAuthError(f"EA GraphQL unauthorized ({resp.status_code}) — reconnect EA App.")
-        if resp.status_code >= 400:
-            raise EaAuthError(f"EA GraphQL HTTP {resp.status_code}: {resp.text[:300]}")
         data = resp.json()
-        if data.get("errors"):
-            raise EaAuthError(f"EA GraphQL errors: {data['errors'][:1]}")
+        self._raise_graphql_errors(data, resp)
         return data
 
+    def _graphql_post(
+        self,
+        operation: str,
+        query: str,
+        variables: dict,
+    ) -> dict:
+        self._throttle()
+        resp = self.session.post(
+            GRAPHQL_URL,
+            json={
+                "operationName": operation,
+                "query": query,
+                "variables": variables,
+            },
+            timeout=60,
+        )
+        data = resp.json()
+        self._raise_graphql_errors(data, resp)
+        return data
+
+    def _graphql_apq_post(
+        self,
+        operation: str,
+        variables: dict,
+        sha256_hash: str,
+    ) -> dict:
+        self._throttle()
+        resp = self.session.post(
+            GRAPHQL_URL,
+            json={
+                "operationName": operation,
+                "variables": variables,
+                "extensions": {
+                    "persistedQuery": {"version": 1, "sha256Hash": sha256_hash},
+                },
+            },
+            timeout=60,
+        )
+        data = resp.json()
+        self._raise_graphql_errors(data, resp)
+        return data
+
+    def probe_user_subscription(self) -> None:
+        """Lightweight probe matching ea.com deals-page traffic."""
+        root = self._graphql_apq_post(
+            "GetUserSubscription",
+            {},
+            USER_SUBSCRIPTION_HASH,
+        )
+        if (root.get("data") or {}).get("me") is None:
+            raise EaAuthError("EA GraphQL not authenticated — reconnect EA App.")
+
     def probe_owned_games(self) -> None:
-        """Single-page owned-games query to verify the Bearer token."""
+        """Verify Bearer token against the same APQ the ea.com web app uses."""
+        if self._cookie_mode:
+            self.probe_user_subscription()
+            return
         self._graphql_get(
             "getPreloadedOwnedGames",
             {
-                "isMac": False,
+                **_OWNED_VARIABLES_BASE,
                 "addFieldsToPreloadGames": False,
-                "locale": "en",
                 "limit": 1,
                 "next": "0",
-                "type": ["DIGITAL_FULL_GAME", "PACKAGED_FULL_GAME"],
-                "entitlementEnabled": True,
-                "storefronts": ["EA", "STEAM", "EPIC"],
-                "ownershipMethods": sorted(REAL_OWNERSHIP | EA_PLAY_OWNERSHIP | XGP_ONLY),
-                "platforms": ["PC"],
             },
             OWNED_GAMES_HASH,
         )
 
-    def get_owned_games(self) -> list[dict]:
+    def _owned_page_variables(self, *, limit: int, offset: str, preload: bool) -> dict:
+        return {
+            **_OWNED_VARIABLES_BASE,
+            "addFieldsToPreloadGames": preload,
+            "limit": limit,
+            "next": offset,
+        }
+
+    def _owned_items_from_root(self, root: dict) -> tuple[list[dict], str | None]:
+        owned = (root.get("data") or {}).get("me", {}).get("ownedGameProducts") or {}
+        items = owned.get("items") or []
+        batch = [i for i in items if isinstance(i, dict)]
+        nxt = owned.get("next")
+        return batch, str(nxt) if nxt else None
+
+    def _owned_full_page_variables(self, *, limit: int, offset: str, preload: bool) -> dict:
+        """Variables for OWNED_GAMES_QUERY."""
+        _ = preload
+        return {
+            "limit": limit,
+            "next": offset,
+        }
+
+    def _get_owned_games_full(self) -> list[dict]:
+        """Full GraphQL document when Juno APQ hash is stale (PersistedQueryNotFound)."""
         out: list[dict] = []
         offset = "0"
-        page = 0
         while True:
-            root = self._graphql_get(
+            root = self._graphql_post(
                 "getPreloadedOwnedGames",
-                {
-                    "isMac": False,
-                    "addFieldsToPreloadGames": True,
-                    "locale": "en",
-                    "limit": 500,
-                    "next": offset,
-                    "type": ["DIGITAL_FULL_GAME", "PACKAGED_FULL_GAME"],
-                    "entitlementEnabled": True,
-                    "storefronts": ["EA", "STEAM", "EPIC"],
-                    "ownershipMethods": sorted(REAL_OWNERSHIP | EA_PLAY_OWNERSHIP | XGP_ONLY),
-                    "platforms": ["PC"],
-                },
-                OWNED_GAMES_HASH,
+                OWNED_GAMES_QUERY,
+                self._owned_full_page_variables(limit=500, offset=offset, preload=True),
             )
+            batch, offset = self._owned_items_from_root(root)
+            out.extend(batch)
+            if not offset:
+                break
+        return out
+
+    def _get_owned_games_apq(self) -> list[dict]:
+        out: list[dict] = []
+        offset = "0"
+        while True:
+            variables = self._owned_page_variables(limit=500, offset=offset, preload=True)
+            if self._cookie_mode:
+                root = self._graphql_apq_post(
+                    "getPreloadedOwnedGames",
+                    variables,
+                    OWNED_GAMES_HASH,
+                )
+            else:
+                root = self._graphql_get(
+                    "getPreloadedOwnedGames",
+                    variables,
+                    OWNED_GAMES_HASH,
+                )
             owned = (root.get("data") or {}).get("me", {}).get("ownedGameProducts") or {}
             items = owned.get("items") or []
             if isinstance(items, list):
@@ -170,17 +360,37 @@ class EaClient:
             offset = owned.get("next")
             if not offset:
                 break
-            page += 1
         return out
+
+    @staticmethod
+    def _should_fallback_owned_document(exc: EaAuthError) -> bool:
+        msg = str(exc)
+        return "PersistedQueryNotFound" in msg or "Graphql validation error" in msg
+
+    def get_owned_games(self) -> list[dict]:
+        try:
+            return self._get_owned_games_apq()
+        except EaAuthError as exc:
+            if not self._should_fallback_owned_document(exc):
+                raise
+            items = self._get_owned_games_full()
+            return items
 
     def get_play_times(self, slugs: list[str]) -> list[dict]:
         if not slugs:
             return []
-        root = self._graphql_get(
-            "GetGamePlayTimes",
-            {"gameSlugs": slugs},
-            PLAY_TIMES_HASH,
-        )
+        if self._cookie_mode:
+            root = self._graphql_post(
+                "GetGamePlayTimes",
+                PLAY_TIMES_QUERY,
+                {"gameSlugs": slugs},
+            )
+        else:
+            root = self._graphql_get(
+                "GetGamePlayTimes",
+                {"gameSlugs": slugs},
+                PLAY_TIMES_HASH,
+            )
         recent = (root.get("data") or {}).get("me", {}).get("recentGames") or {}
         items = recent.get("items") or []
         return [i for i in items if isinstance(i, dict)]

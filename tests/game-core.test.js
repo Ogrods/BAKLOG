@@ -19,6 +19,10 @@ import {
   alphaBucket,
   formatHours,
   formatReleaseDate,
+  HLTB_FETCH_TOOLTIP,
+  backlogMissingHltbCount,
+  hltbBacklogHoursTitle,
+  hltbClearByYearsTitle,
   recomputeCrossStoreHidden,
   combinedPlaytime,
   combinedPlaytimeTooltip,
@@ -549,6 +553,29 @@ describe('formatHours', () => {
     expect(formatHours(0)).toBe('0h');
     expect(formatHours(null)).toBe('0h');
     expect(formatHours(undefined)).toBe('0h');
+  });
+});
+
+describe('hltb fetch tooltips', () => {
+  it('flags backlog totals that read 0h because HLTB was never fetched', () => {
+    const games = [
+      { store: 'steam', id: 1, name: 'A', hltb_main_hours: null },
+      { store: 'steam', id: 2, name: 'B', hltb_main_hours: 10 },
+    ];
+    state.personal = {
+      'steam:1': { status: 'backlog' },
+      'steam:2': { status: 'finished' },
+    };
+    expect(backlogMissingHltbCount(games)).toBe(1);
+    expect(hltbBacklogHoursTitle(0, games)).toBe(HLTB_FETCH_TOOLTIP);
+    expect(hltbClearByYearsTitle('0', 0, games)).toBe(HLTB_FETCH_TOOLTIP);
+  });
+
+  it('keeps normal titles when backlog hours are populated', () => {
+    const games = [{ store: 'steam', id: 1, name: 'A', hltb_main_hours: 12 }];
+    state.personal = { 'steam:1': { status: 'backlog' } };
+    expect(hltbBacklogHoursTitle(12, games)).toBe('Sum of HowLongToBeat main-story hours across backlog games');
+    expect(hltbClearByYearsTitle('0.0', 12, games)).toBe('Backlog HLTB main hours ÷ (2 hours × 365 days)');
   });
 });
 

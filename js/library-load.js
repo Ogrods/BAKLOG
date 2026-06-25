@@ -34,7 +34,7 @@ import {
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { isDebugEnabled } from './debug-overlay.js';
-import { invalidateTableCache } from './table-ui.js';
+import { invalidateTableCache, visibleRowCountForActiveView } from './table-ui.js';
 import {
   refreshFilterUI,
   renderGenreChips,
@@ -90,6 +90,8 @@ async function refreshLibraryChromeAfterMerge() {
 // initial roll handled inside applyMegaHeroCounters.
 let _prevLibraryCount = null;
 let _prevWishlistCount = null;
+let _prevRowCountLibrary = null;
+let _prevRowCountWishlist = null;
 
 export async function loadItadPrices() {
   let prevByKey = {};
@@ -323,6 +325,8 @@ export async function finishEmptyLibraryLoad() {
   buildOwnedNormNames();
   _prevLibraryCount = countLibraryVisible();
   _prevWishlistCount = countWishlistVisible();
+  _prevRowCountLibrary = visibleRowCountForActiveView('library');
+  _prevRowCountWishlist = visibleRowCountForActiveView('wishlist');
   renderStoreChips();
   renderWishlistStoreChips();
   renderGenreChips();
@@ -354,8 +358,14 @@ export async function applyMergedLibrary(mergeKey = null) {
   const wlNow = countWishlistVisible();
   const libPrev = _prevLibraryCount;
   const wlPrev = _prevWishlistCount;
+  const rowLibPrev = _prevRowCountLibrary;
+  const rowWlPrev = _prevRowCountWishlist;
+  const rowLibNow = visibleRowCountForActiveView('library');
+  const rowWlNow = visibleRowCountForActiveView('wishlist');
   _prevLibraryCount = libNow;
   _prevWishlistCount = wlNow;
+  _prevRowCountLibrary = rowLibNow;
+  _prevRowCountWishlist = rowWlNow;
 
   renderStoreChips();
   renderWishlistStoreChips();
@@ -371,11 +381,18 @@ export async function applyMergedLibrary(mergeKey = null) {
   // in "Recently added".
   try {
     const newlyAdded = state._lastNewlyAddedCount ?? 0;
-    if (libPrev != null && libNow > libPrev && newlyAdded > 0) {
-      fireLibraryCountFlash('library', libPrev, libNow);
+    const willFlashLib = libPrev != null && libNow > libPrev && newlyAdded > 0;
+    if (willFlashLib) {
+      fireLibraryCountFlash('library', libPrev, libNow, {
+        rowPrev: rowLibPrev,
+        rowNext: rowLibNow,
+      });
     }
     if (wlPrev != null && wlNow > wlPrev) {
-      fireLibraryCountFlash('wishlist', wlPrev, wlNow);
+      fireLibraryCountFlash('wishlist', wlPrev, wlNow, {
+        rowPrev: rowWlPrev,
+        rowNext: rowWlNow,
+      });
     }
   } catch (err) {
     console.warn('[library-count-anim]', err);
@@ -615,6 +632,7 @@ export async function reloadGames() {
 }
 
 export function refreshAfterManualChange() {
+  captureLibraryKeysBeforeMerge();
   const allManual = loadManualGames().map(g => normalizeGame(g));
   const manualWishlist = allManual.filter(g => !!g.wishlist);
   const nonWishlistManual = allManual.filter(g => !g.wishlist);

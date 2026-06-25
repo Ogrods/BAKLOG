@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from shared.install_paths import is_frozen
+from shared.install_paths import data_root, frozen_bundle_dir, is_frozen, is_portable_frozen, is_portable_frozen
 
 _COMMUNITY_JSON = Path(__file__).resolve().parent / "community.json"
 _DEFAULT_RELEASES_API = "https://api.github.com/repos/Ogrods/BAKLOG/releases/latest"
@@ -42,7 +42,7 @@ def is_running_from_temp_dir(path: Path) -> bool:
 
 def run_boot_checks(data_root: Path) -> None:
     """Non-fatal boot warnings and Windows autostart self-heal."""
-    check_data_location(data_root)
+    check_data_location()
     if not is_frozen() or sys.platform != "win32":
         return
     try:
@@ -57,17 +57,45 @@ def run_boot_checks(data_root: Path) -> None:
         print(f"[startup] reconcile skipped: {exc!r}", file=sys.stderr, flush=True)
 
 
-def check_data_location(data_root: Path) -> None:
-    """Warn (do not exit) when the frozen exe runs from a temp zip-extract folder."""
-    if not is_running_from_temp_dir(data_root):
+def check_data_location() -> None:
+    """Warn when the frozen app bundle runs from a purgeable temp/zip-extract folder."""
+    if not is_frozen():
         return
+    app_dir = frozen_bundle_dir()
+    if not is_running_from_temp_dir(app_dir):
+        return
+    if is_portable_frozen():
+        print(
+            "WARNING: BAKLOG is running from a temporary folder (e.g. inside a zip preview).\n"
+            "Portable mode stores library data beside the exe, so it may be lost when "
+            "Windows cleans up. Unzip to Desktop or Documents, or remove portable.txt "
+            "to use the default data folder.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+    data_hint = data_root()
     print(
         "WARNING: BAKLOG is running from a temporary folder (e.g. inside a zip preview).\n"
-        "Your library data will be lost when Windows cleans up. Unzip BAKLOG to a "
-        "permanent folder (Desktop, Documents) before connecting stores.",
+        f"Library data is stored separately at:\n  {data_hint}\n"
+        "Unzip or install BAKLOG to a permanent folder (Desktop, Documents) "
+        "before connecting stores.",
         file=sys.stderr,
         flush=True,
     )
+
+
+def redact_user_path(path: Path) -> str:
+    """Support-safe path string with home prefix replaced by ~."""
+    try:
+        resolved = path.resolve()
+        home = Path.home().resolve()
+        if resolved == home or home in resolved.parents:
+            rel = resolved.relative_to(home)
+            return "~/" + rel.as_posix()
+    except (OSError, RuntimeError, ValueError):
+        pass
+    return str(path)
 
 
 def normalize_version_tag(tag: str) -> str:
@@ -186,7 +214,9 @@ def build_diagnostics_payload(
         "platform": sys.platform,
         "frozen": is_frozen(),
         "data_dir": data_root.name,
-        "running_from_temp": is_running_from_temp_dir(data_root),
+        "data_dir_path": redact_user_path(data_root),
+        "portable": is_frozen() and is_portable_frozen(),
+        "running_from_temp": is_frozen() and is_running_from_temp_dir(frozen_bundle_dir()),
         "recent_runs": recent_runs,
         "refresh_log_tail": tail_text_file(data_root / "refresh.log"),
     }

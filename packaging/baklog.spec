@@ -48,6 +48,7 @@ hiddenimports = [
     "auth.manager",
     "auth.secrets",
     "shared.install_paths",
+    "shared.data_dir_migration",
     "shared.built_frontend",
     "shared.legacy_env",
     "keyring.backends.Windows",

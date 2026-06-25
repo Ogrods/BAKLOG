@@ -9,6 +9,11 @@ from pathlib import Path
 from shared import install_paths
 
 
+def _reset_frozen_cache() -> None:
+    install_paths._FROZEN_DATA_ROOT = None
+    install_paths._FROZEN_MIGRATION_ATTEMPTED = False
+
+
 def test_dev_roots_align(monkeypatch):
     monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
@@ -81,3 +86,64 @@ def test_frozen_bundle_paths(monkeypatch, tmp_path):
     assert install_paths.frozen_bundle_dir() == tmp_path.resolve()
     assert install_paths.frozen_server_exe() == server_exe
     assert install_paths.frozen_tray_exe() == tray_exe
+
+
+def test_frozen_default_data_dir_windows(monkeypatch, tmp_path):
+    _reset_frozen_cache()
+    monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)
+    monkeypatch.delenv("BAKLOG_PORTABLE", raising=False)
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    data_dir = tmp_path / "BAKLOG-Data"
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths.sys, "executable", str(app_dir / "BAKLOG.exe"))
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    assert install_paths.data_root() == data_dir.resolve()
+
+
+def test_frozen_portable_marker_uses_install_dir(monkeypatch, tmp_path):
+    _reset_frozen_cache()
+    monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)
+    monkeypatch.delenv("BAKLOG_PORTABLE", raising=False)
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    (app_dir / install_paths.PORTABLE_MARKER).write_text("", encoding="utf-8")
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths.sys, "executable", str(app_dir / "BAKLOG.exe"))
+    assert install_paths.data_root() == app_dir.resolve()
+
+
+def test_frozen_migrates_legacy_on_first_data_root(monkeypatch, tmp_path):
+    _reset_frozen_cache()
+    monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)
+    monkeypatch.delenv("BAKLOG_PORTABLE", raising=False)
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    (app_dir / "profiles").mkdir()
+    (app_dir / "profiles" / "index.json").write_text('{"active":"default"}', encoding="utf-8")
+    data_dir = tmp_path / "BAKLOG-Data"
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths.sys, "executable", str(app_dir / "BAKLOG.exe"))
+    assert install_paths.data_root() == data_dir.resolve()
+    assert (data_dir / "profiles" / "index.json").is_file()
+    assert not (app_dir / "profiles").exists()
+
+
+def test_frozen_migrates_legacy_when_data_dir_override_set(monkeypatch, tmp_path):
+    _reset_frozen_cache()
+    monkeypatch.delenv("BAKLOG_PORTABLE", raising=False)
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    (app_dir / "games_steam.json").write_text('{"games":[]}', encoding="utf-8")
+    custom_data = tmp_path / "custom-data"
+    monkeypatch.setenv("BAKLOG_DATA_DIR", str(custom_data))
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths.sys, "executable", str(app_dir / "BAKLOG.exe"))
+    assert install_paths.data_root() == custom_data.resolve()
+    assert (custom_data / "games_steam.json").is_file()
+    assert not (app_dir / "games_steam.json").exists()

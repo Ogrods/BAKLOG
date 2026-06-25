@@ -107,6 +107,16 @@ export function countUpDurationForDelta(delta) {
   return Math.min(1300, Math.max(450, 400 + 50 * Math.sqrt(d)));
 }
 
+// Landing mega-hero ratio adapted for live fetches: popup train finishes while
+// the hero count is still rolling (+1 ~750ms; big imports cap ~3500ms).
+export function heroCountRollMs(delta, popupCount) {
+  const d = Math.abs(Math.round(delta)) || 1;
+  const count = Math.max(0, Math.round(popupCount) || 0);
+  const train = (count - 1) * 70 + 500;
+  const landingScaled = 600 + Math.sqrt(d) * 280;
+  return Math.min(3500, Math.max(train, landingScaled));
+}
+
 export function animateCount(el, from, to, format, durationMs = 900, opts = {}) {
   if (!el) return;
   if (isPageHidden()) {

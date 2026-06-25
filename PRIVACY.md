@@ -3,7 +3,10 @@
 BAKLOG is a **local-first** desktop tool. It does not ship telemetry or
 analytics. The "server" referenced in the README is a `http://127.0.0.1` Python
 process that serves files to your own browser tab. Game libraries, personal
-notes, and store credentials stay on your machine under `profiles/<id>/`.
+notes, and store credentials stay on your machine. On frozen Windows beta
+installs, the default data root is `%LOCALAPPDATA%\BAKLOG-Data` (override with
+`BAKLOG_DATA_DIR`). Profile-scoped files live under `profiles/<id>/` inside that
+root.
 
 **Optional Supabase sign-in:** If you enable invite-only auth (set
 `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env`), Supabase stores your account

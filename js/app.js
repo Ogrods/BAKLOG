@@ -242,7 +242,7 @@ async function bootstrap() {
         if (cfg.running_from_temp) {
           const banner = document.getElementById('bootErrorBanner');
           if (banner) {
-            banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">BAKLOG is running from a temporary folder. Unzip it to Desktop or Documents before connecting stores, or your data may be lost.</span></div>';
+            banner.innerHTML = '<div class="migration-banner-body"><span class="text-amber-400">BAKLOG is running from a temporary folder. Install or unzip it to Desktop or Documents. Your library data is stored in a separate folder and is not lost when Windows cleans up temp files.</span></div>';
             banner.classList.remove('hidden');
           }
         }

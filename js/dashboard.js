@@ -9,9 +9,19 @@
 //   dashboard-drilldown   — dash* drill-down helpers
 
 import { state } from './state.js';
-import { escapeHtml, formatNum } from './dom-util.js';
+import { escapeHtml, formatNum, escapeAttr } from './dom-util.js';
 import { renderDashboardFetcherHealth } from './fetcher-health.js';
-import { gameKey, hltbMain, ratingValue, normalizeGame, combinedPlaytime, itchIsGame } from './game-core.js';
+import {
+  gameKey,
+  hltbMain,
+  ratingValue,
+  normalizeGame,
+  combinedPlaytime,
+  itchIsGame,
+  HLTB_FETCH_TOOLTIP,
+  hltbBacklogHoursTitle,
+  hltbClearByYearsTitle,
+} from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
@@ -186,7 +196,24 @@ function computeMegaHeroStats(games, snap, agg) {
     stores,
     storeKeys,
     years,
+    backlogHltbTitle: hltbBacklogHoursTitle(backlogHrs, games),
+    yearsClearTitle: hltbClearByYearsTitle(years, backlogHrs, games),
   };
+}
+
+function applyMegaHeroHltbTitles(stats) {
+  const backlogPillar = document.getElementById('dashHeroBacklog')?.closest('.dash-hero-pillar');
+  if (backlogPillar && stats.backlogHltbTitle) backlogPillar.title = stats.backlogHltbTitle;
+  const backlogVal = document.getElementById('dashHeroBacklog');
+  if (backlogVal) {
+    if (Math.round(stats.backlogHrs) <= 0 && stats.backlogHltbTitle === HLTB_FETCH_TOOLTIP) {
+      backlogVal.title = stats.backlogHltbTitle;
+    } else {
+      backlogVal.removeAttribute('title');
+    }
+  }
+  const yearsSpan = document.getElementById('dashHeroYearsClear');
+  if (yearsSpan && stats.yearsClearTitle) yearsSpan.title = stats.yearsClearTitle;
 }
 
 function applyMegaHeroCounters(stats) {
@@ -225,6 +252,7 @@ function applyMegaHeroCounters(stats) {
     }
     _dashLastCounters[item.id] = item.to;
   }
+  applyMegaHeroHltbTitles(stats);
   _dashCountersInitialized = true;
 }
 
@@ -283,7 +311,7 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
     tagline.innerHTML = `
         <span title="Finished share of library excluding skipped games"><strong>${stats.completion}%</strong> complete</span>
         <span class="sep">·</span>
-        <span title="Backlog HLTB main hours ÷ (2 hours × 365 days)"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
+        <span id="dashHeroYearsClear" title="${escapeAttr(stats.yearsClearTitle)}"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
         <span title="Wishlist items with an active discount right now"><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>`;
   }
@@ -343,7 +371,7 @@ function renderDashboardMega(games, snap, agg) {
       <div class="dash-hero-tagline">
         <span title="Finished share of library excluding skipped games"><strong>${stats.completion}%</strong> complete</span>
         <span class="sep">·</span>
-        <span title="Backlog HLTB main hours ÷ (2 hours × 365 days)"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
+        <span id="dashHeroYearsClear" title="${escapeAttr(stats.yearsClearTitle)}"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
         <span title="Wishlist items with an active discount right now"><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>
       </div>
@@ -352,8 +380,8 @@ function renderDashboardMega(games, snap, agg) {
           <div class="dash-hero-pillar-value" id="dashHeroPlayed">${escapeHtml(formatNum(Math.round(stats.playedHrs)))}h</div>
           <div class="dash-hero-pillar-label">Played</div>
         </div>
-        <div class="dash-hero-pillar" title="Sum of HowLongToBeat main-story hours across backlog games">
-          <div class="dash-hero-pillar-value" id="dashHeroBacklog">${escapeHtml(formatNum(Math.round(stats.backlogHrs)))}h</div>
+        <div class="dash-hero-pillar" title="${escapeAttr(stats.backlogHltbTitle)}">
+          <div class="dash-hero-pillar-value" id="dashHeroBacklog"${Math.round(stats.backlogHrs) <= 0 && stats.backlogHltbTitle === HLTB_FETCH_TOOLTIP ? ` title="${escapeAttr(HLTB_FETCH_TOOLTIP)}"` : ''}>${escapeHtml(formatNum(Math.round(stats.backlogHrs)))}h</div>
           <div class="dash-hero-pillar-label">Backlog</div>
         </div>
         <div class="dash-hero-pillar" title="Mean review % across rated games">

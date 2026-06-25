@@ -56,6 +56,11 @@ See [PRIVACY.md](../PRIVACY.md#portable-secret-bundle) for bundle contents and [
 
 ### Library and personal data
 
+On Windows beta installs, library data lives in `%LOCALAPPDATA%\BAKLOG-Data`
+(profiles, `games_*.json`, connections, personal edits). The app itself installs
+to `%LOCALAPPDATA%\BAKLOG`. Back up or copy the **data** folder when moving
+machines. Override with `BAKLOG_DATA_DIR` if you use a custom location.
+
 Copy these folders/files to the new machine (or sync via Dropbox/OneDrive):
 
 - `games_*.json`, `itad_prices.json` (or `profiles/<id>/` equivalents)

@@ -119,6 +119,26 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 
 **Fix:** Run `python server.py` instead. Or use **Export notes** / **Import notes** in the toolbar menu. A banner offers to migrate localStorage into `data/personal.json` on first server boot.
 
+## Library gone after reinstall or update
+
+**Symptom:** Connections and games missing after uninstalling, reinstalling, or updating the beta installer.
+
+**Cause (older builds):** Library data lived in the same folder as `BAKLOG.exe`. Uninstall removed everything.
+
+**Fix (current builds):** Data is in `%LOCALAPPDATA%\BAKLOG-Data` on Windows (separate from the app). If you still have that folder, reinstall BAKLOG and launch normally - first boot migrates any leftover data from the old install folder once. If you deleted `BAKLOG-Data`, restore from backup or a portable bundle export from Connections.
+
+**Portable zip:** Add an empty `portable.txt` beside `BAKLOG.exe` only if you want all data in the unzip folder (thumb drives). Otherwise data goes to `BAKLOG-Data` automatically. If you used the default data folder first and later add `portable.txt`, the app will look beside the exe (which looks empty). Remove `portable.txt` to return to `BAKLOG-Data`, or copy your `BAKLOG-Data` folder beside the exe before enabling portable mode.
+
+**Manual recovery:** If migration did not run or you still have files in the old install folder (`%LOCALAPPDATA%\BAKLOG`), copy these into `%LOCALAPPDATA%\BAKLOG-Data` (with BAKLOG closed): `profiles/`, `cache/`, `data/`, root `games_*.json`, `itad_prices.json`, `free_claims.json`, `.env`, and `license.json` if present. Launch BAKLOG again.
+
+**Note:** Browser `localStorage` at `http://127.0.0.1:8765` can still hold default-profile UI prefs after a reinstall even when server files are gone. Use the migration banner to upload into `data/personal.json`, or clear site data if you want a truly fresh start.
+
+## Connections lists many stores on a new profile
+
+**Symptom:** A fresh profile shows many store cards (about 19) on the Connections tab.
+
+**Expected:** BAKLOG lists every supported store you *can* connect. That is not the same as already connected. A new profile should show **0 stores connected** in the header until you click Connect. Local launcher sources (Amazon Games, GOG Galaxy, itch app) stay disabled on new profiles until you enable them on that profile.
+
 ## Bug reports vs fetcher failures
 
 Dashboard JavaScript errors can be reported via the sticky toast or **Report a bug…** menu. Fetcher failures are separate - check **Fetcher health**, exit codes, and `profiles/<id>/cache/runs/*.jsonl`. See [Getting help](getting-help.md).

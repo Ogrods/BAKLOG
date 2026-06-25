@@ -22,6 +22,22 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Changed
+
+- Frozen installs (BAKLOG.exe / installer) now store library data in a separate
+  OS user-data folder (`%LOCALAPPDATA%\BAKLOG-Data` on Windows) instead of beside
+  the exe. First launch migrates existing co-located data automatically (resumable
+  if interrupted). Portable zip users who want a single folder can add `portable.txt`
+  beside the exe. Migration also runs when `BAKLOG_DATA_DIR` is set on frozen builds.
+
+### Fixed
+
+- App/data split hardening: resumable legacy migration (partial first-boot no
+  longer strands catalogs in the install folder), `BAKLOG_DATA_DIR` override still
+  migrates from the install dir, PyInstaller bundles `shared.data_dir_migration`,
+  `/api/config` and bug bundles include redacted data path, uninstaller reminds
+  users that `BAKLOG-Data` survives.
+
 ## [0.8.18] - 2026-06-15
 
 ### Fixed

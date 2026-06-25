@@ -1520,6 +1520,7 @@ def launch_persistent_profile(
     window_position: tuple[int, int] | None = None,
     window_size: tuple[int, int] | None = None,
     start_minimized: bool = False,
+    initial_url: str | None = None,
 ) -> CdpContext:
     """Launch Chrome/Edge with a persistent profile and return a CDP context.
 
@@ -1530,6 +1531,9 @@ def launch_persistent_profile(
     When ``window_position`` is set on a headed launch, the window is placed off-screen
     (``--window-position`` / ``--window-size``) instead of maximized — same real-browser
     fingerprint as a visible connect window without stealing focus.
+
+    When ``initial_url`` is set, the first connect page navigates there after CDP attach
+    (used by EA Connect to open the login page immediately).
     """
     exe = find_chromium_executable()
     port = _free_port()
@@ -1680,6 +1684,19 @@ def launch_persistent_profile(
     # Chrome/Edge's "unsupported command-line flag" infobar). Runs before any
     # page script on every document, including frames.
     context.add_init_script(_AUTOMATION_MASK_SCRIPT)
+
+    if initial_url:
+        page = next((p for p in context.pages if not p.is_closed), None)
+        if page is None:
+            try:
+                page = context.new_page()
+            except Exception:
+                page = None
+        if page is not None:
+            try:
+                page.goto(initial_url, wait_until="domcontentloaded", timeout=25_000)
+            except Exception:
+                pass
 
     return context
 

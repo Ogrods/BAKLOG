@@ -66,6 +66,14 @@ describe('dashboard picks row', () => {
     expect(itchTab).not.toMatch(/\bhidden\b/);
   });
 
+  it('places the dash sponsored pick slot after the itch card in index.html', () => {
+    const rowStart = INDEX_HTML.indexOf('id="dashboardPicksRow"');
+    const itchIdx = INDEX_HTML.indexOf('id="dashItchCard"', rowStart);
+    const sponsoredIdx = INDEX_HTML.indexOf('id="dashboardSponsoredPick"', rowStart);
+    expect(itchIdx).toBeGreaterThan(-1);
+    expect(sponsoredIdx).toBeGreaterThan(itchIdx);
+  });
+
   it('shows the itch card on a truly-empty new profile', async () => {
     const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     setAuthStatusSnapshot([]);

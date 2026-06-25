@@ -559,12 +559,11 @@
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB length (backlog)</h3><div class="dash-chart-wrap"><canvas id="chartHltbHist"></canvas></div></div>
         <div id="dashboardFeatureBanner" class="dash-feature-banner-slot hidden"></div>
         <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">Releases by year <span class="text-xs font-normal text-slate-400">area + 3-yr rolling average</span></h3><div class="dash-chart-wrap tall"><canvas id="chartReleases"></canvas><div id="chartReleasesEraTooltip" class="dash-era-tooltip" hidden></div></div></div>
-        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB vs Steam rating</h3><div class="dash-chart-wrap tall"><canvas id="chartScatter"></canvas><div id="chartScatterTooltip" class="dash-scatter-cursor-tip" hidden></div></div><div id="chartScatterList" class="dash-scatter-list" role="region" aria-label="Scatter cluster inspector" aria-expanded="false"></div></div>
+        <div class="dash-card"><h3 class="text-sm font-semibold text-slate-200 mb-2">HLTB vs Steam rating</h3><div class="dash-chart-wrap tall"><canvas id="chartScatter"></canvas><div id="chartScatterTooltip" class="dash-scatter-cursor-tip" hidden></div></div><div class="dash-scatter-foot"><p class="dash-scatter-x-label">HLTB main (hours, log scale)</p><div id="chartScatterList" class="dash-scatter-list" role="region" aria-label="Scatter cluster inspector" aria-expanded="false"></div></div></div>
         <div id="dashboardCoopSpotlight" class="dash-card"></div>
         <div id="dashboardWishlistStats" class="dash-wishlist-stats-target grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
         <div id="dashboardHouseSlot" class="dash-house-slot hidden mb-4"></div>
         <div id="dashboardPicksRow" class="dash-picks-row">
-          <div id="dashboardSponsoredPick" class="dash-sponsored-pick-slot hidden"></div>
           <div class="dash-card dash-picks-versus" id="dashPicksVersusCard">
             <div class="dash-versus-head">
               <h3 class="text-sm font-semibold text-slate-200">What to play next</h3>
@@ -589,6 +588,7 @@
             <h3 class="text-sm font-semibold text-slate-200 mb-2">Recently added</h3>
             <div id="dashRecentAdditions" class="dash-recent-list"></div>
           </div>
+          <div id="dashboardSponsoredPick" class="dash-sponsored-pick-slot hidden"></div>
         </div>
       </div>
     </section>

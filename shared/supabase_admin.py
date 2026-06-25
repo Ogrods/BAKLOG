@@ -98,6 +98,58 @@ def invite_user_by_email(
     return result if isinstance(result, dict) else {}
 
 
+def create_user_by_email(
+    base: str,
+    key: str,
+    email: str,
+    *,
+    plan: str = "pro",
+    email_confirm: bool = True,
+) -> dict:
+    """Create a hosted auth user without sending email (admin API)."""
+    body: dict = {
+        "email": email.strip(),
+        "email_confirm": email_confirm,
+        "app_metadata": {"plan": plan},
+    }
+    result = admin_request(
+        "POST",
+        f"{base}/auth/v1/admin/users",
+        key=key,
+        body=body,
+    )
+    return result if isinstance(result, dict) else {}
+
+
+def delete_user_by_id(base: str, key: str, user_id: str) -> None:
+    uid = (user_id or "").strip()
+    if not uid:
+        raise ValueError("missing user id")
+    req = urllib.request.Request(
+        f"{base}/auth/v1/admin/users/{uid}",
+        method="DELETE",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            resp.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"DELETE {base}/auth/v1/admin/users/{uid} -> HTTP {exc.code}: {detail}") from exc
+
+
+def delete_user_by_email(base: str, key: str, email: str) -> bool:
+    user = find_user_by_email(base, key, email)
+    if not user:
+        return False
+    uid = str(user.get("id") or user.get("user_id") or "")
+    delete_user_by_id(base, key, uid)
+    return True
+
+
 def set_user_plan(base: str, key: str, user_id: str, plan: str, user: dict | None = None) -> None:
     meta = dict((user or {}).get("app_metadata") or {})
     meta["plan"] = plan

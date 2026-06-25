@@ -30,6 +30,7 @@ import {
 import { normalizeNameForDedup } from './game-core.js';
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { affiliateUrl } from './affiliate.js';
+import { sortClaimsItems } from './claim-sort.js';
 
 export {
   EPIC_MOBILE_STORE,
@@ -96,13 +97,9 @@ export function dedupeClaims(list) {
   return [...best.values()];
 }
 
+/** Newest first — matches admin Claims auto table default (first_seen desc). */
 export function sortClaims(list) {
-  return list.sort((a, b) => {
-    const ea = a.ends_at ? Date.parse(a.ends_at) : Infinity;
-    const eb = b.ends_at ? Date.parse(b.ends_at) : Infinity;
-    if (ea !== eb) return ea - eb;
-    return String(a.title || '').localeCompare(String(b.title || ''));
-  });
+  return sortClaimsItems(list, 'newest');
 }
 
 /**
@@ -418,7 +415,8 @@ export function claimDetailPanelHtml(claim, {
  * `visibleCount` with a "+N more →" toggle), plus optional show-hidden button
  * and feed attribution footer. Callers pass claims already filtered/deduped/
  * sorted (the live app via getVisibleClaims; the admin preview via
- * sortClaims(dedupeClaims(items))).
+ * sortClaims(dedupeClaims(items))). Order is newest first by first_seen desc,
+ * matching the admin Claims auto table default.
  */
 export function claimableModuleMarkup(claims, {
   visibleCount = Infinity,

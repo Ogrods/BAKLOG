@@ -26,7 +26,8 @@
     "gamerpower-3446": "indiegala",
     "itad-0d4598c53ffe": "indiegala",
     "itad-1b0433806065": "indiegala",
-    "itad-dd5b5b16e035": "indiegala"
+    "itad-dd5b5b16e035": "indiegala",
+    "itad-f520d9928848": "epic_mobile"
   },
   "field_overrides": {
     "gamerpower-1604": {
@@ -83,8 +84,11 @@
       "claim_url": "https://freebies.indiegala.com/blacklist-mafia"
     },
     "itad-f520d9928848": {
-      "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
-      "claim_url": "https://buff.ly/fkDgxlX"
+      "claim_urls": {
+        "ios": "https://buff.ly/fkDgxlX",
+        "android": "https://buff.ly/ugVKgPs"
+      },
+      "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge"
     }
   },
   "dismissed": [

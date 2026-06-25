@@ -207,14 +207,25 @@ describe('dedupe + sort (getVisibleClaims internals)', () => {
     expect(dedupeClaims(items)[0].source).toBe('epic');
   });
 
-  it('sorts by ends_at then title', () => {
+  it('sorts newest by first_seen descending', () => {
     const items = [
-      { id: 'b', store: 'epic', title: 'Bbb', claim_url: 'https://e/b', ends_at: '2099-03-01T00:00:00Z' },
-      { id: 'a', store: 'epic', title: 'Aaa', claim_url: 'https://e/a', ends_at: '2099-01-01T00:00:00Z' },
-      { id: 'noend', store: 'epic', title: 'Zzz', claim_url: 'https://e/z' },
+      { id: 'steam-older', store: 'epic', title: 'Old', claim_url: 'https://e/o', first_seen: '2026-06-01T12:00:00+00:00' },
+      { id: 'epic-newer', store: 'epic', title: 'New', claim_url: 'https://e/n', first_seen: '2026-06-10T08:00:00+00:00' },
+      { id: 'gog-middle', store: 'epic', title: 'Mid', claim_url: 'https://e/m', first_seen: '2026-06-05T00:00:00+00:00' },
     ];
     const out = sortClaims([...items]);
-    expect(out.map(c => c.id)).toEqual(['a', 'b', 'noend']);
+    expect(out.map(c => c.id)).toEqual(['epic-newer', 'gog-middle', 'steam-older']);
+  });
+
+  it('keeps feed order for equal first_seen stamps', () => {
+    const stamp = '2026-06-11T22:48:59+00:00';
+    const items = [
+      { id: 'epic-a', store: 'epic', title: 'A', claim_url: 'https://e/a', first_seen: stamp },
+      { id: 'gamerpower-1', store: 'epic', title: 'B', claim_url: 'https://e/b', first_seen: stamp },
+      { id: 'itad-z', store: 'epic', title: 'C', claim_url: 'https://e/c', first_seen: stamp },
+    ];
+    const out = sortClaims([...items]);
+    expect(out.map(c => c.id)).toEqual(['epic-a', 'gamerpower-1', 'itad-z']);
   });
 
   it('keeps epic_mobile separate from epic PC for the same title', () => {

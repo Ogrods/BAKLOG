@@ -371,6 +371,8 @@ def _enrich_item(
     *,
     now: datetime | None = None,
     upgrade_covers: bool = True,
+    prior_row: dict | None = None,
+    is_manual: bool = False,
 ) -> dict:
     claim_url = str(raw.get("claim_url") or "").strip()
     title = (raw.get("title") or "").strip()
@@ -472,7 +474,12 @@ def _enrich_item(
     source = raw.get("source")
     if source:
         out["source"] = source
-    first_seen = raw.get("first_seen")
+    first_seen = _resolve_first_seen(
+        raw,
+        prior_row=prior_row,
+        now=now,
+        is_manual=is_manual,
+    )
     if first_seen:
         out["first_seen"] = first_seen
     return out
@@ -965,6 +972,29 @@ def _resolve_ends_at(raw: dict, *, now: datetime | None = None) -> str | None:
     return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _resolve_first_seen(
+    raw: dict,
+    *,
+    prior_row: dict | None,
+    now: datetime | None,
+    is_manual: bool,
+) -> str | None:
+    """Resolve first_seen for publish output; stamp manual rows on first publish."""
+    existing = _normalize_ends_at(raw.get("first_seen"))
+    if existing:
+        return existing
+    if is_manual and prior_row:
+        prior = _normalize_ends_at(prior_row.get("first_seen"))
+        if prior:
+            return prior
+    if not is_manual:
+        return None
+    clock = now or datetime.now(UTC)
+    if clock.tzinfo is None:
+        clock = clock.replace(tzinfo=UTC)
+    return clock.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def _is_expired(ends_at: object, now: datetime) -> bool:
     parsed = _parse_ends_at(ends_at)
     if parsed is None:
@@ -990,6 +1020,8 @@ def _enrich_item_light(
     review_lookup: dict[str, int] | None = None,
     *,
     now: datetime | None = None,
+    prior_row: dict | None = None,
+    is_manual: bool = False,
 ) -> dict:
     """Fast enrich for admin preview — no Steam/network calls."""
     claim_url = str(raw.get("claim_url") or "").strip()
@@ -1054,7 +1086,12 @@ def _enrich_item_light(
     source = raw.get("source")
     if source:
         out["source"] = source
-    first_seen = raw.get("first_seen")
+    first_seen = _resolve_first_seen(
+        raw,
+        prior_row=prior_row or live_item,
+        now=now,
+        is_manual=is_manual,
+    )
     if first_seen:
         out["first_seen"] = first_seen
     return out
@@ -1114,6 +1151,11 @@ def preview_publish_items(
         manual_items,
         require_manual_approval=require_manual_approval,
     )
+    manual_ids = {
+        str(it.get("id") or "").strip()
+        for it in publish_manual
+        if str(it.get("id") or "").strip()
+    }
     raw_items = merge_manual_and_auto(publish_manual, auto_items)
     cover_lookup = _build_cover_lookup(auto_items_all)
     review_lookup = _build_review_lookup(list(live_by_id.values()) + auto_items_all)
@@ -1133,6 +1175,8 @@ def preview_publish_items(
                 live_by_id.get(item_id),
                 review_lookup=review_lookup,
                 now=now,
+                prior_row=live_by_id.get(item_id),
+                is_manual=item_id in manual_ids,
             )
         )
     # Mirror the build's carry-forward: an approved claim that momentarily falls
@@ -1251,6 +1295,10 @@ def merge_enriched_items_into_input_feed(
         if not enriched:
             continue
         if _apply_enrich_fields_to_item(item, enriched):
+            updated += 1
+        src_fs = enriched.get("first_seen")
+        if src_fs and item.get("first_seen") != src_fs:
+            item["first_seen"] = src_fs
             updated += 1
 
     if updated:
@@ -1629,6 +1677,11 @@ def main() -> int:
     if auto_items:
         stats.warn(f"merged {len(auto_items)} auto item(s); {len(raw_items)} total before enrich")
 
+    manual_ids = {
+        str(it.get("id") or "").strip()
+        for it in publish_manual
+        if str(it.get("id") or "").strip()
+    }
     cover_lookup = _build_cover_lookup(auto_items_all)
     last_call = [0.0]
     items: list[dict] = []
@@ -1656,7 +1709,15 @@ def main() -> int:
         item_id = str(raw.get("id") or "").strip() or f"item-{enrich_idx}"
         enrich_hb.tick_progress(enrich_idx, enrich_total, "enrich", item_id)
         items.append(
-            _enrich_item(raw, last_call, cover_lookup, now=now, upgrade_covers=False)
+            _enrich_item(
+                raw,
+                last_call,
+                cover_lookup,
+                now=now,
+                upgrade_covers=False,
+                prior_row=prior_published_rows.get(item_id),
+                is_manual=item_id in manual_ids,
+            )
         )
 
     carried = _carry_forward_missing_approved(

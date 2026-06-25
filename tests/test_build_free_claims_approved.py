@@ -86,6 +86,86 @@ def test_preview_publish_items_stamps_premium_only() -> None:
     by_id = {it["id"]: it for it in items}
     assert by_id["auto-pro"].get("premium_only") is True
     assert by_id["manual-pro"].get("premium_only") is True
+    assert by_id["manual-pro"].get("first_seen") == "2026-06-08T12:00:00Z"
+
+
+def test_resolve_first_seen_stamps_manual_on_first_publish() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    stamp = bfc._resolve_first_seen(
+        {"id": "manual-a", "title": "A"},
+        prior_row=None,
+        now=now,
+        is_manual=True,
+    )
+    assert stamp == "2026-06-08T12:00:00Z"
+
+
+def test_resolve_first_seen_preserves_existing_manual_stamp() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    stamp = bfc._resolve_first_seen(
+        {"id": "manual-a", "first_seen": "2026-06-01T08:00:00Z"},
+        prior_row=None,
+        now=now,
+        is_manual=True,
+    )
+    assert stamp == "2026-06-01T08:00:00Z"
+
+
+def test_resolve_first_seen_borrows_prior_published_manual_stamp() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    stamp = bfc._resolve_first_seen(
+        {"id": "manual-a", "title": "A"},
+        prior_row={"id": "manual-a", "first_seen": "2026-06-03T10:00:00Z"},
+        now=now,
+        is_manual=True,
+    )
+    assert stamp == "2026-06-03T10:00:00Z"
+
+
+def test_resolve_first_seen_does_not_stamp_auto_rows() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=UTC)
+    assert bfc._resolve_first_seen(
+        {"id": "epic-a", "title": "A"},
+        prior_row={"id": "epic-a", "first_seen": "2026-06-03T10:00:00Z"},
+        now=now,
+        is_manual=False,
+    ) is None
+
+
+def test_merge_enriched_items_into_input_feed_persists_first_seen(tmp_path: Path) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    input_path.write_text(
+        json.dumps({
+            "items": [{
+                "id": "manual-a",
+                "store": "epic",
+                "title": "Manual A",
+                "claim_url": "https://example.com/a",
+            }],
+        }),
+        encoding="utf-8",
+    )
+    updated = bfc.merge_enriched_items_into_input_feed(
+        input_path,
+        [{
+            "id": "manual-a",
+            "store": "epic",
+            "title": "Manual A",
+            "claim_url": "https://example.com/a",
+            "first_seen": "2026-06-08T12:00:00Z",
+        }],
+    )
+    assert updated == 1
+    doc = json.loads(input_path.read_text(encoding="utf-8"))
+    assert doc["items"][0]["first_seen"] == "2026-06-08T12:00:00Z"
 
 
 def test_infer_store_from_text_maps_itchio_giveaways() -> None:

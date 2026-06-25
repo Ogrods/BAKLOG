@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-06-25",
+  "note": "Initial p50 estimates from local dev (raw ESM). Re-capture on BAKLOG_SERVE_BUILT=1 after npm run build for production-path baselines.",
+  "environment": "local-dev-esm",
+  "scenarios": {
+    "bootCurtainLiftMs": 2500,
+    "tableRenderMs": {
+      "100": 430,
+      "500": 360,
+      "2000": 410
+    },
+    "tableQueryMs": {
+      "2000": 30
+    },
+    "tabSwitchMs": {
+      "library": 400,
+      "dashboard": 1800,
+      "wishlist": 700,
+      "connections": 600
+    }
+  }
+}

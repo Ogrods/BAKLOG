@@ -16,7 +16,7 @@ describe('storeLetter', () => {
 // Stores that render an SVG glyph badge (have a brand logo asset). Everything
 // else falls back to a letter badge.
 const GLYPH_STORES = new Set([
-  'steam', 'epic', 'humble', 'psn', 'xbox',
+  'steam', 'epic', 'epic_mobile', 'humble', 'psn', 'xbox',
   'nintendo', 'amazon', 'itch', 'battlenet', 'ubisoft', 'ea',
 ]);
 
@@ -43,6 +43,16 @@ describe('storeLogoHtml', () => {
     expect(storeLogoHtml('itch', { size: 'sm' })).toContain("--store-badge-glyph:url('assets/store-logos/itch.svg')");
     expect(storeLogoHtml('humble', { size: 'sm' })).toContain("--store-badge-glyph:url('assets/store-logos/humble-h.svg')");
     expect(storeLogoHtml('ea', { size: 'sm' })).toContain("--store-badge-glyph:url('assets/store-logos/ea.svg')");
+  });
+
+  it('renders the Epic glyph for epic_mobile with an Epic Mobile tooltip', () => {
+    const html = storeLogoHtml('epic_mobile', { size: 'sm' });
+    expect(html).toContain('store-badge epic_mobile');
+    expect(html).toContain('store-badge--glyph');
+    expect(html).toContain("--store-badge-glyph:url('assets/store-logos/epic.svg')");
+    expect(html).not.toContain('>Em<');
+    expect(html).toContain('title="Epic Mobile"');
+    expect(html).toContain('aria-label="Epic Mobile"');
   });
 
   it('covers every codified store key', () => {

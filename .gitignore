@@ -104,6 +104,7 @@ review-findings.yaml
 review-handoff.md
 review-report.json
 scripts/_diag_personal.py
+scripts/perf-last-run.json
 
 .vercel
 .env*

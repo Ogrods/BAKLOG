@@ -47,6 +47,22 @@ let _readOnlyPollTimer = null;
 // user dismisses any claim from a longer list, the last survivor must stay a row
 // rather than inflating into the hero card. Reset whenever a fresh feed loads.
 let _claimDismissedSinceLoad = false;
+let _claimsRenderFingerprint = '';
+
+function claimsRenderFingerprint() {
+  const feedItems = state.claimableFeed?.items || [];
+  return JSON.stringify({
+    view: state.activeView,
+    ready: !!state.dashboardDataReady,
+    feedLen: feedItems.length,
+    feedSig: feedItems.map(i => i.id).join('|'),
+    visible: _claimsVisibleCount,
+    dismissed: !!_claimDismissedSinceLoad,
+    unavail: !!state.claimableFeedUnavailable,
+    hidden: getHiddenClaims(feedItems).length,
+    owned: getOwnedClaims(feedItems).length,
+  });
+}
 
 export function getClaimsEndpoint() {
   return (document.querySelector('meta[name="baklog-claims-endpoint"]')?.content)
@@ -637,6 +653,10 @@ export function closeClaimPurgeConfirm() {
 export function renderClaimableModule() {
   const mount = document.getElementById('claimableNowModule');
   if (!mount) return;
+  const fp = claimsRenderFingerprint();
+  if (fp === _claimsRenderFingerprint && mount.innerHTML && !mount.classList.contains('hidden')) {
+    return;
+  }
   const show = state.activeView === 'wishlist' && state.dashboardDataReady;
   const feedItems = state.claimableFeed?.items || [];
   // Recompute the visible set from the current feed + owned + dismissed state on
@@ -656,6 +676,7 @@ export function renderClaimableModule() {
   if (hide) {
     mount.classList.add('hidden');
     mount.innerHTML = '';
+    _claimsRenderFingerprint = fp;
     return;
   }
   mount.classList.remove('hidden');
@@ -672,6 +693,7 @@ export function renderClaimableModule() {
     emptyReason,
   });
   if (claims.length || sponsoredHtml) syncCoverFits(mount);
+  _claimsRenderFingerprint = fp;
 }
 
 export function showClaimableBanner(newCount) {

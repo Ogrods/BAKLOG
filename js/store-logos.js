@@ -39,6 +39,7 @@ const SIZE_CLASS = {
 const STORE_GLYPH_PATHS = {
   steam: 'assets/store-logos/steam.svg',
   epic: 'assets/store-logos/epic.svg',
+  epic_mobile: 'assets/store-logos/epic.svg',
   humble: 'assets/store-logos/humble-h.svg',
   psn: 'assets/store-logos/playstation.svg',
   xbox: 'assets/store-logos/xbox.svg',
@@ -76,6 +77,7 @@ const HERO_WORDLETS = { gog: 'gog' };
 export const STORE_RAIL_GLYPH_OFFSET = {
   steam: { x: 1.5 },
   epic: { x: 0.5 },
+  epic_mobile: { x: 0.5 },
   psn: { x: 0.5 },
   xbox: {},
   nintendo: { x: 0.5 },

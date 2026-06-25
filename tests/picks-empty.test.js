@@ -23,7 +23,7 @@ beforeEach(() => {
   state.prefs = {
     picksTab: 'topRated',
     libraryPicksTab: 'topRated',
-    picksLimit: 16,
+    viewPicksLimits: { library: 16 },
     quickWinMaxHours: 15,
   };
   state.sessionPrefs = { crossStoreDedup: false };

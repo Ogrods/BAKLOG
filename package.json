@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:perf": "vitest run tests/table-render-perf.test.js tests/table-query-perf.test.js tests/loading-curtain-perf.test.js",
     "test:js": "vitest run",
     "test:js:watch": "vitest",
     "test:all": "python -m pytest -q && npm test",
@@ -24,7 +25,10 @@
     "lint": "eslint js/",
     "check:module-size": "node scripts/check-module-size.mjs",
     "check:bundle-size": "node scripts/check-bundle-size.mjs",
-    "check:dist-integrity": "node scripts/check-dist-integrity.mjs"
+    "check:dist-integrity": "node scripts/check-dist-integrity.mjs",
+    "check:perf": "npm run test:perf",
+    "perf:audit": "node scripts/perf-audit.mjs",
+    "perf:profile": "node scripts/generate-perf-profile.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

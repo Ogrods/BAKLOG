@@ -94,7 +94,7 @@ export const personalStore = (() => {
     'libraryPicksTab',
     'itchPicksTab',
     'picksCollapsed',
-    'picksLimit',
+    'viewPicksLimits',
     'viewSorts',
     // Server doc can lag behind loadPrefs()'s on-by-default migration; stale
     // rowHeroBackdrop:false must not undo the local toggle/migration each boot.

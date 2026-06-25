@@ -204,14 +204,16 @@ export function claimPlatformButtonsHtml(claim, { variant = 'row' } = {}) {
   if (isEpicMobileStore(claim.store)) {
     const urls = normalizeClaimUrls(claim.claim_urls);
     const parts = [];
+    const iosLabel = variant === 'row' ? 'iOS' : 'Claim on iOS';
+    const androidLabel = variant === 'row' ? 'Android' : 'Claim on Android';
     if (urls.ios) {
       parts.push(
-        `<button type="button" class="btn-claim-open btn-claim-open--ios ${btnClass}" data-claim-go-ios="${id}">Claim on iOS</button>`,
+        `<button type="button" class="btn-claim-open btn-claim-open--ios ${btnClass}" data-claim-go-ios="${id}" aria-label="Claim on iOS">${iosLabel}</button>`,
       );
     }
     if (urls.android) {
       parts.push(
-        `<button type="button" class="btn-claim-open btn-claim-open--android ${btnClass}" data-claim-go-android="${id}">Claim on Android</button>`,
+        `<button type="button" class="btn-claim-open btn-claim-open--android ${btnClass}" data-claim-go-android="${id}" aria-label="Claim on Android">${androidLabel}</button>`,
       );
     }
     return parts.join('');

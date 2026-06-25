@@ -1,0 +1,21 @@
+{
+  "note": "Runtime perf ceilings for Vitest micro-benchmarks and Playwright perf-audit.mjs. Refresh after baseline capture on CI runner.",
+  "capturedAt": "2026-06-25",
+  "tableRenderMs": {
+    "100": 600,
+    "500": 500,
+    "2000": 500
+  },
+  "tableQueryMs": {
+    "2000": 300
+  },
+  "bootCurtainLiftMs": 8000,
+  "tabSwitchMs": {
+    "library": 1500,
+    "dashboard": 5000,
+    "wishlist": 2500,
+    "connections": 2000
+  },
+  "chartTotalMs": 6000,
+  "chartJankyFrames": 12
+}

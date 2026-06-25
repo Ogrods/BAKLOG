@@ -12,6 +12,9 @@ import {
   persistCurrentSort,
   savePrefs,
   VIEW_SORT_DEFAULTS,
+  getPicksLimitForView,
+  setPicksLimitForView,
+  PICKS_LIMIT_VIEWS,
 } from '../js/prefs.js';
 
 beforeEach(() => {
@@ -41,7 +44,7 @@ describe('savePrefs quota handling', () => {
   });
 
   it('does not throw when localStorage write exceeds quota', () => {
-    state.prefs = { picksLimit: 8 };
+    state.prefs = { viewPicksLimits: { library: 24 } };
     expect(() => savePrefs()).not.toThrow();
     expect(warn).toHaveBeenCalled();
   });
@@ -56,10 +59,12 @@ describe('loadPrefs', () => {
   });
 
   it('merges stored values with defaults', () => {
-    localStorage.setItem(prefsStorageKey(), JSON.stringify({ dealMinDiscount: 25, picksLimit: 8 }));
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ dealMinDiscount: 25, picksLimit: 48 }));
     const p = loadPrefs();
     expect(p.dealMinDiscount).toBe(25);
-    expect(p.picksLimit).toBe(8);
+    expect(p.viewPicksLimits.library).toBe(48);
+    expect(p.viewPicksLimits.wishlist).toBe(48);
+    expect(p.picksLimit).toBeUndefined();
     expect(p.dealOnSaleOnly).toBe(false);
   });
 
@@ -188,5 +193,42 @@ describe('loadSessionPrefs', () => {
     expect(s.itchHideNonGames).toBe(true);
     expect(s.search).toBe('');
     expect(s.maxHours).toBe(200);
+  });
+});
+
+describe('viewPicksLimits', () => {
+  it('defaults each picks view to 16', () => {
+    state.prefs = loadPrefs();
+    for (const view of PICKS_LIMIT_VIEWS) {
+      expect(getPicksLimitForView(view)).toBe(16);
+    }
+  });
+
+  it('stores per-view limits independently', () => {
+    state.prefs = loadPrefs();
+    setPicksLimitForView('library', 48);
+    setPicksLimitForView('wishlist', 96);
+    expect(getPicksLimitForView('library')).toBe(48);
+    expect(getPicksLimitForView('wishlist')).toBe(96);
+    expect(getPicksLimitForView('itch')).toBe(16);
+    const stored = JSON.parse(localStorage.getItem(prefsStorageKey()));
+    expect(stored.viewPicksLimits.library).toBe(48);
+    expect(stored.viewPicksLimits.wishlist).toBe(96);
+  });
+
+  it('migrates legacy picksLimit into all views', () => {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ picksLimit: 24 }));
+    const p = loadPrefs();
+    expect(p.viewPicksLimits.library).toBe(24);
+    expect(p.viewPicksLimits.wishlist).toBe(24);
+    expect(p.viewPicksLimits.itch).toBe(24);
+    expect(p.picksLimit).toBeUndefined();
+  });
+
+  it('coerces invalid stored limits to 16', () => {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify({ viewPicksLimits: { library: 2, wishlist: 99 } }));
+    const p = loadPrefs();
+    expect(p.viewPicksLimits.library).toBe(16);
+    expect(p.viewPicksLimits.wishlist).toBe(16);
   });
 });

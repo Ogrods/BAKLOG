@@ -161,8 +161,10 @@ describe('epic_mobile claim buttons', () => {
     const html = claimRowHtml(claim);
     expect(html).toContain('data-claim-go-ios="epic-mobile-1"');
     expect(html).toContain('data-claim-go-android="epic-mobile-1"');
-    expect(html).toContain('Claim on iOS');
-    expect(html).toContain('Claim on Android');
+    expect(html).toContain('aria-label="Claim on iOS"');
+    expect(html).toContain('aria-label="Claim on Android"');
+    expect(html).toContain('>iOS</button>');
+    expect(html).toContain('>Android</button>');
     expect(html).not.toMatch(/data-claim-go="epic-mobile-1"/);
   });
 

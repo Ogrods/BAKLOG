@@ -49,7 +49,9 @@ Two **separate** systems; mixing them up is why banner edits "don't show". Full 
 
 Refresh bundle budget after intentional growth: `npm run build && node scripts/check-bundle-size.mjs --write`.
 
-**Full local CI parity:** `.\scripts\test-all.ps1 -Full` runs ruff → pytest → vitest → check:module-size → lint → vendor:supabase → build → check:bundle-size → check:dist-integrity → `scripts/audit_free_surface_data.py --fail-on high`.
+**Full local CI parity:** `.\scripts\test-all.ps1 -Full` runs ruff → pytest → vitest → **test:perf** → check:module-size → lint → vendor:supabase → build → check:bundle-size → check:dist-integrity → `scripts/audit_free_surface_data.py --fail-on high`.
+
+**Runtime perf:** `npm run test:perf` (Vitest micro-benchmarks vs `perf-budget.json`); `.\scripts\start-perf-server.ps1` or `node scripts/perf-audit.mjs` for Playwright boot/tab timing (requires built server + `BAKLOG_PROFILE=perf`). Opt-in marks: `?perf=1` → `window.__baklogBootPerf`, `__baklogPerf`, `__baklogChartPerf`.
 
 ## Auth gating (layers)
 

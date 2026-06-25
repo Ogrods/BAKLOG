@@ -1199,7 +1199,7 @@ export function renderDashboardCharts(games, aggIn) {
 
   const buckets = ["0–2h", "2–5h", "5–10h", "10–20h", "20–40h", "40h+"];
   const hltbBucketColors = ["#22c55e", "#84cc16", "#eab308", "#f59e0b", "#ef4444", "#b91c1c"];
-  const hltbBarDuration = 600;
+  const hltbBarDuration = prefersReducedMotion() ? 0 : 600;
   const hltbBarEntrance = (ctx) => ctx.type === "data" && ctx.mode === "default";
   const hltbBarDurationFn = (ctx) => (hltbBarEntrance(ctx) ? hltbBarDuration : 0);
   const hltbBarEasingFn = (ctx) => (hltbBarEntrance(ctx) ? "easeOutBack" : "linear");

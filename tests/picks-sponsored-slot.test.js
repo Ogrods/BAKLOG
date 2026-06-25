@@ -42,7 +42,7 @@ beforeEach(() => {
   state.ownedNormNames = new Set();
   state.prefs = {
     picksTab: 'wishlistDeals',
-    picksLimit: 16,
+    viewPicksLimits: { wishlist: 16 },
     quickWinMaxHours: 15,
   };
   state.activeView = 'wishlist';

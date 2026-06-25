@@ -20,9 +20,12 @@ alwaysApply: false
 
 ```powershell
 npm test
+npm run test:perf              # table render/query + boot curtain perf budgets
 npm run lint                    # ESLint weight guardrails (warnings)
 npm run check:module-size       # js/*.js line cap (3800)
 npm run check:bundle-size       # requires npm run build first
+npm run perf:profile            # regenerate tests/fixtures/perf-profile/
+npm run perf:audit              # Playwright timing (server must be running)
 ```
 
 - Config: `vitest.config.js`

@@ -18,6 +18,10 @@ Write-Host "==> vitest"
 npm test
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host "==> test:perf"
+npm run test:perf
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 if (-not $Full) {
     Write-Host ""
     Write-Host "Tip: .\scripts\test-all.ps1 -Full adds module-size, lint, build, and bundle checks (CI frontend-build job)."

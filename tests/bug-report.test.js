@@ -4,14 +4,17 @@ import { Window } from "happy-dom";
 
 vi.mock("../js/error-boundary.js", async (importOriginal) => {
   const actual = await importOriginal();
+  const bundle = {
+    bundle: "baklog-bug-bundle",
+    app_version: "test",
+    errors: { session: [], persisted: [], session_count: 0, persisted_count: 0 },
+    runtime: { view: "library" },
+    server: null,
+  };
   return {
     ...actual,
-    buildBugBundle: vi.fn(() => ({
-      bundle: "baklog-bug-bundle",
-      app_version: "test",
-      errors: { session: [], persisted: [], session_count: 0, persisted_count: 0 },
-      runtime: { view: "library" },
-    })),
+    buildBugBundle: vi.fn(() => bundle),
+    buildBugBundleAsync: vi.fn(async () => bundle),
     copyBugBundleToClipboard: vi.fn(async () => true),
     submitBugReport: vi.fn(async () => ({ ok: true })),
   };
@@ -50,13 +53,15 @@ describe("bug report dialog", () => {
     vi.clearAllMocks();
   });
 
-  it("opens the dialog and shows a payload preview", () => {
+  it("opens the dialog and shows a payload preview", async () => {
     openBugReportDialog();
     const modal = document.getElementById("bugReportModal");
     expect(modal).toBeTruthy();
     expect(modal.classList.contains("flex")).toBe(true);
     const preview = document.getElementById("bugReportPreview");
-    expect(preview.textContent).toContain("baklog-bug-bundle");
+    await vi.waitFor(() => {
+      expect(preview.textContent).toContain("baklog-bug-bundle");
+    });
   });
 
   it("closes on Cancel", () => {

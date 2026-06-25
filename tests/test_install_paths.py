@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 from pathlib import Path
+
+import pytest
 
 from shared import install_paths
 
@@ -88,6 +91,7 @@ def test_frozen_bundle_paths(monkeypatch, tmp_path):
     assert install_paths.frozen_tray_exe() == tray_exe
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows LOCALAPPDATA frozen data dir")
 def test_frozen_default_data_dir_windows(monkeypatch, tmp_path):
     _reset_frozen_cache()
     monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)
@@ -115,6 +119,7 @@ def test_frozen_portable_marker_uses_install_dir(monkeypatch, tmp_path):
     assert install_paths.data_root() == app_dir.resolve()
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows LOCALAPPDATA frozen data dir")
 def test_frozen_migrates_legacy_on_first_data_root(monkeypatch, tmp_path):
     _reset_frozen_cache()
     monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)

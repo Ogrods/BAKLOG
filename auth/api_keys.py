@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 from auth.cdp_browser import abort_if_browser_closed
+from auth.cdp_compat import click_by_text
 
 if TYPE_CHECKING:
     from auth.runner import AuthSession

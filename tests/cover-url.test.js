@@ -20,6 +20,13 @@ describe("sanitizeCoverUrl", () => {
     const ms = "https://store-images.s-microsoft.com/image/apps.1";
     expect(sanitizeCoverUrl(ms)).toBe(ms);
   });
+
+  it("expands Nintendo atum CDN size placeholders", () => {
+    const raw = "https://atum-img-lp1.cdn.nintendo.net/i/c/abc_${size}";
+    expect(sanitizeCoverUrl(raw)).toBe(
+      "https://atum-img-lp1.cdn.nintendo.net/i/c/abc_256",
+    );
+  });
 });
 
 describe("libraryCoverFor", () => {

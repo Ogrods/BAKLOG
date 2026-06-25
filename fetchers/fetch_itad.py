@@ -30,11 +30,17 @@ LIBRARY_FILES = [
     "games_psn.json",
     "games_epic.json",
     "games_amazon.json",
+    "games_nintendo.json",
 ]
 WISHLIST_FILE = "games_wishlist.json"
 
 
-def _collect_titles(include_library: bool) -> list[tuple[str, str]]:
+def _collect_titles(
+    include_library: bool,
+    *,
+    library_stores: set[str] | None = None,
+    include_wishlist: bool = True,
+) -> list[tuple[str, str]]:
     """(lookup_key, title) - lookup_key is store:id or wishlist:appid."""
     seen: set[str] = set()
     out: list[tuple[str, str]] = []
@@ -45,20 +51,24 @@ def _collect_titles(include_library: bool) -> list[tuple[str, str]]:
         seen.add(key)
         out.append((key, title.strip()))
 
-    wp = catalog_path(WISHLIST_FILE)
-    if wp.exists():
-        data = json.loads(wp.read_text(encoding="utf-8"))
-        for g in data.get("games", []):
-            appid = g.get("appid") or g.get("id")
-            add(f"wishlist:{appid}", g.get("name") or "")
+    if include_wishlist:
+        wp = catalog_path(WISHLIST_FILE)
+        if wp.exists():
+            data = json.loads(wp.read_text(encoding="utf-8"))
+            for g in data.get("games", []):
+                appid = g.get("appid") or g.get("id")
+                add(f"wishlist:{appid}", g.get("name") or "")
 
     if include_library:
         for path in LIBRARY_FILES:
+            store_key = path.replace("games_", "").replace(".json", "")
+            if library_stores and store_key not in library_stores:
+                continue
             p = catalog_path(path)
             if not p.exists():
                 continue
             data = json.loads(p.read_text(encoding="utf-8"))
-            store = data.get("store") or path.replace("games_", "").replace(".json", "")
+            store = data.get("store") or store_key
             for g in data.get("games", []):
                 gid = g.get("id") or g.get("appid")
                 if gid is None:
@@ -82,6 +92,17 @@ def main() -> int:
         action="store_true",
         help="Also look up every owned game (slow; default is wishlist only).",
     )
+    parser.add_argument(
+        "--stores",
+        nargs="+",
+        metavar="STORE",
+        help="With --include-library, only price these library stores (e.g. nintendo).",
+    )
+    parser.add_argument(
+        "--skip-wishlist",
+        action="store_true",
+        help="Skip Steam wishlist titles (library-only ITAD run).",
+    )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     configure_stdout()
@@ -97,10 +118,22 @@ def main() -> int:
         stats.error("Set ITAD_API_KEY in .env (free key from https://isthereanydeal.com/dev/api/)")
         return stats.finish("fetch_itad", t0, exit_code=1)
 
-    titles = _collect_titles(include_library=args.include_library)
+    titles = _collect_titles(
+        include_library=args.include_library,
+        library_stores=set(args.stores) if args.stores else None,
+        include_wishlist=not args.skip_wishlist,
+    )
     if args.limit:
         titles = titles[: args.limit]
-    scope = "library + wishlist" if args.include_library else "wishlist"
+    scope_parts: list[str] = []
+    if not args.skip_wishlist:
+        scope_parts.append("wishlist")
+    if args.include_library:
+        if args.stores:
+            scope_parts.append(f"library ({', '.join(sorted(args.stores))})")
+        else:
+            scope_parts.append("library")
+    scope = " + ".join(scope_parts) or "titles"
 
     # Empty input is "nothing to do", not a failure. Previously an empty wishlist
     # fell through to a 0-row write and exit 2 with no explanation, surfacing as a
@@ -175,16 +208,27 @@ def main() -> int:
         else:
             stats.warn(f"no price data for {key}")
 
+    out = itad_path()
+    merged_by_key: dict[str, dict] = {}
+    if out.exists():
+        try:
+            prior = json.loads(out.read_text(encoding="utf-8"))
+            prior_map = prior.get("by_key")
+            if isinstance(prior_map, dict):
+                merged_by_key.update(prior_map)
+        except (OSError, json.JSONDecodeError):
+            pass
+    merged_by_key.update(by_key)
+
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "country": args.country,
         "currency": country_to_currency(args.country),
-        "count": len(by_key),
-        "by_key": by_key,
+        "count": len(merged_by_key),
+        "by_key": merged_by_key,
     }
-    out = itad_path()
     safe_write_text(out, json.dumps(payload, indent=2, ensure_ascii=False))
-    print(f"Wrote {len(by_key)} price rows to {ITAD_JSON}.", flush=True)
+    print(f"Wrote {len(by_key)} new price row(s); {len(merged_by_key)} total in {ITAD_JSON}.", flush=True)
     fx_files, fx_rows = refresh_wishlist_fx_after_itad(args.country)
     if fx_rows:
         print(

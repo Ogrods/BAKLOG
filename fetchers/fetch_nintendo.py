@@ -10,7 +10,6 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -27,6 +26,7 @@ from clients.nintendo_vgc import (
     NintendoVgcAuthError,
     NintendoVgcCaptureError,
     NintendoVgcClient,
+    resolve_nintendo_icon_url,
 )
 from fetchers._authoritative import NINTENDO
 from fetchers._base import (
@@ -46,9 +46,13 @@ from fetchers._base import (
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from fetchers.nintendo_hybrid import (
     find_existing_row,
+    finalize_nintendo_library_rows,
     index_existing_rows,
+    is_nintendo_playable_game,
+    match_nintendo_title_key,
     merge_vgc_with_transactions,
     norm_nintendo_title,
+    nintendo_store_url,
 )
 from shared.profile_paths import personal_path
 from shared.raw_dumps import profile_raw_dump_path
@@ -255,11 +259,14 @@ def carry_forward_nintendo_legacy(
     """Union prior rows missing from the fresh fetch; tag nintendo_legacy, not stale."""
     now = now_iso or datetime.now(UTC).isoformat()
     present = {key_fn(row) for row in fresh_rows}
-    present_titles = {
-        _norm_nintendo_title(str(row.get("name") or ""))
-        for row in fresh_rows
-        if row.get("name")
-    }
+    present_titles: set[str] = set()
+    for row in fresh_rows:
+        name = str(row.get("name") or "")
+        if not name:
+            continue
+        present_titles.add(_norm_nintendo_title(name))
+        present_titles.add(match_nintendo_title_key(name))
+    present_titles.discard("")
     out: list[dict] = []
     for row in fresh_rows:
         merged = dict(row)
@@ -275,6 +282,11 @@ def carry_forward_nintendo_legacy(
             continue
         title_key = _norm_nintendo_title(str(old.get("name") or ""))
         if title_key and title_key in present_titles:
+            continue
+        match_key = match_nintendo_title_key(str(old.get("name") or ""))
+        if match_key and match_key in present_titles:
+            continue
+        if not is_nintendo_playable_game(old):
             continue
         legacy_row = dict(old)
         legacy_row[NINTENDO_LEGACY_FIELD] = True
@@ -313,6 +325,42 @@ def repair_nintendo_stale_catalog(
     return out, repaired
 
 
+def repair_nintendo_cover_urls(games: list[dict]) -> tuple[list[dict], int]:
+    """Expand atum CDN ``${size}`` placeholders on rows already on disk."""
+    repaired = 0
+    out: list[dict] = []
+    for row in games:
+        merged = dict(row)
+        sizes = merged.get("nintendo_icon_sizes")
+        for field in ("header_image", "library_image", "nintendo_icon_url_standard"):
+            raw = merged.get(field)
+            if not raw or "${size}" not in str(raw):
+                continue
+            prefer_large = field == "header_image"
+            fixed = resolve_nintendo_icon_url(
+                str(raw),
+                sizes,
+                prefer_large=prefer_large,
+            )
+            if fixed and fixed != raw:
+                merged[field] = fixed
+                repaired += 1
+        out.append(merged)
+    return out, repaired
+
+
+def prune_nintendo_non_playable_rows(games: list[dict]) -> tuple[list[dict], int]:
+    """Drop junk entitlements already on disk (streaming apps, DLC packs, etc.)."""
+    out: list[dict] = []
+    dropped = 0
+    for row in games:
+        if is_nintendo_playable_game(row):
+            out.append(row)
+        else:
+            dropped += 1
+    return out, dropped
+
+
 def maybe_repair_nintendo_catalog_on_disk(dropped_ids: set[str] | None = None) -> int:
     """Heal on-disk games_nintendo.json rows still flagged stale from older syncs."""
     path = catalog_file(GAMES_NINTENDO_JSON)
@@ -322,10 +370,14 @@ def maybe_repair_nintendo_catalog_on_disk(dropped_ids: set[str] | None = None) -
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return 0
-    games, repaired = repair_nintendo_stale_catalog(
-        payload.get("games") or [],
+    games = payload.get("games") or []
+    games, stale_repaired = repair_nintendo_stale_catalog(
+        games,
         dropped_ids=dropped_ids,
     )
+    games, cover_repaired = repair_nintendo_cover_urls(games)
+    games, pruned = prune_nintendo_non_playable_rows(games)
+    repaired = stale_repaired + cover_repaired + pruned
     if not repaired:
         return 0
     payload["games"] = games
@@ -340,11 +392,14 @@ def maybe_repair_nintendo_catalog_on_disk(dropped_ids: set[str] | None = None) -
         GAMES_NINTENDO_JSON,
         json.dumps(payload, indent=2, ensure_ascii=False),
     )
-    print(
-        f"  Repaired {repaired} stale Nintendo row(s) "
-        f"({NINTENDO_LEGACY_FIELD}=true).",
-        flush=True,
-    )
+    notes: list[str] = []
+    if stale_repaired:
+        notes.append(f"{stale_repaired} stale→{NINTENDO_LEGACY_FIELD}")
+    if cover_repaired:
+        notes.append(f"{cover_repaired} cover URL(s)")
+    if pruned:
+        notes.append(f"{pruned} non-game row(s)")
+    print(f"  Repaired Nintendo catalog on disk ({', '.join(notes)}).", flush=True)
     return repaired
 
 
@@ -389,11 +444,60 @@ def maybe_backfill_nintendo_catalog_meta() -> bool:
     return True
 
 
+def _apply_vgc_metadata(row: dict, item: dict) -> None:
+    """Copy normalized VGC fields onto a catalog row (Steam cannot enrich Nintendo)."""
+    if item.get("apparent_platform"):
+        row["nintendo_apparent_platform"] = item["apparent_platform"]
+    icon_sizes = item.get("icon_sizes")
+    if icon_sizes:
+        row["nintendo_icon_sizes"] = icon_sizes
+    if item.get("icon_url_standard"):
+        row["nintendo_icon_url_standard"] = item["icon_url_standard"]
+    if item.get("is_dlc"):
+        row["nintendo_is_dlc"] = True
+    if item.get("device_type"):
+        row["nintendo_device_type"] = item["device_type"]
+    if item.get("content_type"):
+        row["nintendo_content_type"] = item["content_type"]
+    if item.get("is_lending"):
+        row["nintendo_is_lending"] = True
+    if item.get("is_partial_lending"):
+        row["nintendo_is_partial_lending"] = True
+    if item.get("lending_expire_datetime"):
+        row["nintendo_lending_expire"] = item["lending_expire_datetime"]
+    for src, dst in (
+        ("has_application", "nintendo_has_application"),
+        ("has_addon_contents", "nintendo_has_addon_contents"),
+        ("has_upgrade", "nintendo_has_upgrade"),
+        ("has_nx_application", "nintendo_has_nx_application"),
+        ("has_nx_addon_contents", "nintendo_has_nx_addon_contents"),
+        ("has_ounce_application", "nintendo_has_ounce_application"),
+        ("has_ounce_addon_contents", "nintendo_has_ounce_addon_contents"),
+    ):
+        if item.get(src):
+            row[dst] = True
+    if item.get("contains_released") is not None:
+        row["nintendo_contains_released"] = bool(item.get("contains_released"))
+    if item.get("transaction_name"):
+        row["nintendo_transaction_name"] = item["transaction_name"]
+
+
 def _build_row(item: dict, hltb: dict | None) -> dict:
     name = item["name"]
     row_id = str(item["id"])
     nid = item.get("nintendo_id")
-    icon = item.get("icon_url")
+    app_id = item.get("application_id")
+    icon_sizes = item.get("icon_sizes")
+    header_icon = resolve_nintendo_icon_url(
+        item.get("icon_url") or item.get("icon_url_standard"),
+        icon_sizes,
+        prefer_large=True,
+    )
+    library_icon = resolve_nintendo_icon_url(
+        item.get("icon_url_standard") or item.get("icon_url"),
+        icon_sizes,
+        prefer_large=False,
+    )
     row = {
         "store": "nintendo",
         "id": row_id,
@@ -401,8 +505,8 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
         "name": name,
         "playtime_minutes": None,
         "last_played": None,
-        "header_image": icon,
-        "library_image": icon,
+        "header_image": header_icon,
+        "library_image": library_icon,
         "release_date": item.get("purchase_date"),
         "genres": [],
         "tags": list(item.get("tags") or []),
@@ -414,7 +518,10 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
         "hltb_completionist_hours": None,
         "hltb_match_confidence": None,
         "hltb_name": None,
-        "store_url": f"https://www.nintendo.com/us/store/products/{quote(name)}/",
+        "store_url": nintendo_store_url(
+            str(app_id) if app_id else None,
+            name,
+        ),
         "type": "game",
         "price": None,
         "price_initial": None,
@@ -422,7 +529,6 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
         "currency": None,
         "nintendo_platform": item.get("nintendo_platform") or item.get("device_type"),
     }
-    app_id = item.get("application_id")
     if app_id:
         row["application_id"] = str(app_id)
     vgc_id = item.get("vgc_id")
@@ -434,6 +540,7 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
     source = item.get("ownership_source")
     if source:
         row["nintendo_ownership_source"] = source
+    _apply_vgc_metadata(row, item)
     if hltb:
         row.update(
             {
@@ -554,9 +661,17 @@ def main() -> int:
     merged = (
         merge_vgc_with_transactions(vgc_rows, merged_tx)
         if vgc_rows
-        else merged_tx
+        else finalize_nintendo_library_rows(merged_tx)
     )
-    print(f"Hybrid library slice: {len(merged)} title(s).")
+    vgc_rows_n = len(vgc_rows)
+    if vgc_rows_n:
+        print(
+            f"VGC-primary library: {vgc_rows_n} entitlement(s), "
+            f"{len(merged)} row(s) after merging receipts.",
+            flush=True,
+        )
+    else:
+        print(f"Hybrid library slice: {len(merged)} title(s).", flush=True)
 
     empty_exit = refuse_empty_result(
         merged,
@@ -646,9 +761,9 @@ def main() -> int:
         "fresh_count": fresh_count,
         "game_count": len(final_games),
         "note": (
-            "Digital entitlements via Virtual Game Cards when available; eShop purchase "
-            "dates from transaction history (~2 year window); no cartridge-only games; "
-            "older purchases kept as nintendo_legacy"
+            "Primary: Virtual Game Cards (entitlements, icons, platform flags, publisher). "
+            "Secondary: eShop transaction receipts for purchase dates (~2 year window). "
+            "No cartridge-only games. Older purchases kept as nintendo_legacy."
         ),
         "games": sorted(final_games, key=lambda g: g["name"].lower()),
     }

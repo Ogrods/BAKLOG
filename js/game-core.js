@@ -12,54 +12,11 @@ import { COOP_NAME_OVERRIDES } from './coop-overrides.js';
 import { formatMoney, displayCurrency } from './currency.js';
 import { storeLogoHtml, storeLetter } from './store-logos.js';
 import { affiliateUrl } from './affiliate.js';
-
+export { isJunkEntry, shouldAutoHideByTitle, JUNK_NAMES } from './library-noise.js';
 export { storeLetter };
 
 // === Constants & config ===
 export const STORE_PRIORITY = ["steam", "psn", "gog", "epic", "amazon", "nintendo", "itch", "xbox", "battlenet", "ubisoft", "humble", "ea", "other", "manual"];
-
-// --- The blacklist ---------------------------------------------------------
-// JUNK_NAMES + JUNK_NAME_PATTERNS are the "blacklist": entries that are not
-// games at all (store apps, DLC skins, soundtracks, internal entitlement
-// slugs). isJunkEntry() drops them unconditionally — they are never shown and
-// users cannot restore them. This is distinct from the "hidden list" (see
-// js/hidden-defaults.js), which is real games a user has chosen to hide and can
-// restore from the Hidden games panel. Blacklist = noise, hardcoded; hidden
-// list = user-editable. Python fetchers carry mirror blacklists at the source
-// (e.g. _is_entitlement_slug in fetch_epic.py, psn_client.py, gog_filters.py).
-export const JUNK_NAMES = new Set([
-  "live",
-  "hbo max",
-  "hbo go",
-  "shadow costume for sonic",
-  "sonic holiday costume",
-  "lego sonic skin",
-]);
-const JUNK_NAME_PATTERNS = [
-  /\btech beta\b/i,
-  /\b(pre[- ]game )?editor\b/i,
-  /\bresource archiver\b/i,
-  /\bbeta\b$/i,
-  // "<Character> Costume for <Game>" pattern — Nintendo eShop lists these as
-  // full SKUs alongside real games. "Costume Quest" is a legit title so we
-  // require the "for" form to avoid false positives.
-  /\bcostume for\b/i,
-  // Epic ships PTR/public-testing branches as separate library entries
-  // (e.g. "Chivalry 2 - Public Testing"). Drop them so they don't shadow
-  // the real release.
-  /\bpublic testing\b/i,
-  // Cosmetic wallpaper SKUs (e.g. Epic "HD Wallpaper", "Death Stranding — HD
-  // Wallpaper") get listed as standalone library entries and can pick up a
-  // mismatched Steam score. Match a trailing "wallpaper" only, so legit titles
-  // like "Wallpaper Engine" are unaffected. Mirrors psn_client.py.
-  /\bwallpaper$/i,
-  // Epic internal entitlement slugs leak in as titles (e.g.
-  // "Fortnite_StWContent", "Fortnite_Studio"): a single token with no spaces
-  // joined by an underscore. Real titles use spaces ("Aerial_Knight's Never
-  // Yield" has a space, so it is unaffected). Mirrors _is_entitlement_slug in
-  // fetch_epic.py.
-  /^\S*_\S*$/,
-];
 
 const MIN_REVIEW_COUNT = 50;
 
@@ -118,24 +75,10 @@ export function applyCoopOverrides(g) {
   return g;
 }
 
-/**
- * Blacklist check: true when an entry is not a real game (store apps, DLC
- * skins, soundtracks, entitlement slugs) and should be dropped silently. This
- * is the hardcoded blacklist — not the user-editable hidden list. See the
- * JUNK_NAMES comment above and js/hidden-defaults.js.
- */
-export function isJunkEntry(g) {
-  const raw = String(g.name || "").trim();
-  if (!raw) return true;
-  const lower = raw.toLowerCase();
-  if (JUNK_NAMES.has(lower)) return true;
-  return JUNK_NAME_PATTERNS.some(re => re.test(raw));
-}
-
 export function dedupeWithinStore(games) {
   const byKey = new Map();
   for (const g of games) {
-    if (isJunkEntry(g)) continue;
+    if (!String(g?.name || "").trim()) continue;
     const ng = normalizeGame(g);
     const key = `${ng.store}:${ng.id}`;
     const existing = byKey.get(key);
@@ -362,8 +305,12 @@ export function gameNumericId(g) {
 
 export function sanitizeCoverUrl(url) {
   if (!url) return "";
-  const u = String(url).trim();
-  return u.replace("://images-eds.xboxlive.com/", "://images-eds-ssl.xboxlive.com/");
+  let u = String(url).trim();
+  u = u.replace("://images-eds.xboxlive.com/", "://images-eds-ssl.xboxlive.com/");
+  if (u.includes("${size}") && /cdn\.nintendo\.net/i.test(u)) {
+    u = u.replace(/\$\{size\}/g, "256");
+  }
+  return u;
 }
 
 export function coverFallbackFor(g) {

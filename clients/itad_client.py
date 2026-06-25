@@ -11,7 +11,9 @@ from fetchers._progress import HeartbeatTimer
 from shared.money import format_price, normalize_currency_code
 
 BASE = "https://api.isthereanydeal.com"
-REQUEST_DELAY_SEC = 0.35
+REQUEST_DELAY_SEC = 1.5
+_RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
+_RETRY_BACKOFF = (30, 90, 180)
 
 
 class ItadError(Exception):
@@ -43,13 +45,32 @@ class ItadClient:
         self._last = time.time()
 
     def _get(self, path: str, params: dict | None = None) -> dict:
-        self._throttle()
         p = {"key": self.api_key, **(params or {})}
-        resp = self.session.get(f"{BASE}/{path}", params=p, timeout=30)
-        if resp.status_code == 401:
-            raise ItadError("Invalid ITAD_API_KEY")
-        resp.raise_for_status()
-        return resp.json()
+        last_exc: BaseException | None = None
+        for attempt in range(len(_RETRY_BACKOFF) + 1):
+            self._throttle()
+            resp = self.session.get(f"{BASE}/{path}", params=p, timeout=30)
+            if resp.status_code == 401:
+                raise ItadError("Invalid ITAD_API_KEY")
+            if resp.status_code in _RETRYABLE_HTTP and attempt < len(_RETRY_BACKOFF):
+                time.sleep(_RETRY_BACKOFF[attempt])
+                continue
+            try:
+                resp.raise_for_status()
+                return resp.json()
+            except requests.HTTPError as exc:
+                last_exc = exc
+                if (
+                    exc.response is not None
+                    and exc.response.status_code in _RETRYABLE_HTTP
+                    and attempt < len(_RETRY_BACKOFF)
+                ):
+                    time.sleep(_RETRY_BACKOFF[attempt])
+                    continue
+                raise
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("ITAD GET retry loop exited without response")
 
     def _post(self, path: str, body: list | dict, params: dict | None = None) -> list | dict:
         self._throttle()

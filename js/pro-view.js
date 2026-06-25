@@ -277,7 +277,15 @@ export function renderProView({ showSuccess = false } = {}) {
   applyProPlanToggle(el, selectedProPlan);
 }
 
+function reconcileStaleCheckoutPending() {
+  if (!isPro() || licenseActivating || !checkoutSuccessPending) return;
+  const root = document.getElementById('proViewRoot');
+  if (root?.querySelector('.pro-view-success')) return;
+  clearActivationPending();
+}
+
 export function applyProTabVisibility() {
+  reconcileStaleCheckoutPending();
   const tab = document.querySelector('.view-tab[data-view="pro"]');
   if (!tab) return;
   const pending = isProActivationPending();

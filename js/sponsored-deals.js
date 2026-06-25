@@ -1651,3 +1651,8 @@ export function refreshSponsoredSurfaces(sponsorId, { skipTableRow = false } = {
   }
   return Promise.all(jobs);
 }
+
+/** Re-render all sponsored surfaces after plan tier changes (free ↔ pro). */
+export function refreshAdsForPlanChange() {
+  return refreshSponsoredSurfaces('');
+}

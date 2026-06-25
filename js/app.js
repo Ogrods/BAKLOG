@@ -23,7 +23,7 @@ import {
   ensureProfileScopedFetcherState,
 } from './fetcher-health.js';
 import { startMetrics } from './anon-metrics.js';
-import { initAuthGate } from './auth-gate.js';
+import { initAuthGate, onPlanChange } from './auth-gate.js';
 import { initConnections, isItchTabAvailable } from './connections.js';
 import {
   initDashboard,
@@ -83,6 +83,7 @@ import { suppressChartStaggerForBoot, resizeRibbonCharts } from './dashboard-cha
 import { prewarmTableQueryForView, tableFingerprint } from './table-ui.js';
 import { applyColumnVisibility } from './table-columns.js';
 import { initBugReportDialog } from './bug-report.js';
+import { refreshAdsForPlanChange } from './sponsored-deals.js';
 import {
   applyProTabVisibility,
   consumeCheckoutQuery,
@@ -173,6 +174,10 @@ async function bootstrap() {
   savePrefs();
   bindEvents();
   wireProView();
+  onPlanChange(() => {
+    applyProTabVisibility();
+    void refreshAdsForPlanChange();
+  });
   applyProTabVisibility();
   showProWelcomeBanner();
   if (state.prefs.shareAnonStats) startMetrics();

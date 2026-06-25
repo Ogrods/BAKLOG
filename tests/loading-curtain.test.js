@@ -70,4 +70,14 @@ describe('releaseViewOverlayWhenReady', () => {
     await releaseViewOverlayWhenReady(Promise.resolve(), 'library');
     expect(document.getElementById('viewLoadingOverlay').classList.contains('show')).toBe(true);
   });
+
+  it('cached switchView clears abandoned overlay when superseded navigation bails', async () => {
+    const { state } = await import('../js/state.js');
+    state.activeView = 'dashboard';
+    document.querySelector('.view-tab').disabled = true;
+    const { hideViewOverlay } = await import('../js/loading-curtain.js');
+    hideViewOverlay();
+    expect(document.getElementById('viewLoadingOverlay').classList.contains('show')).toBe(false);
+    expect(document.querySelector('.view-tab').disabled).toBe(false);
+  });
 });

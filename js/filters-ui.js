@@ -634,6 +634,10 @@ export function switchView(view) {
     }, 600);
   }
   const doSwitch = () => {
+    // Cached switches skip the scrim; clear any abandoned overlay from a
+    // superseded navigation (e.g. Pro user clicks Support then applyProTabVisibility
+    // redirects to cached dashboard before the pro switch lifts its scrim).
+    if (!useOverlay) hideViewOverlay();
     if (useOverlay) syncViewTabAria(view);
     if (fromView === "dashboard") {
       cancelScheduledDashboardRender();

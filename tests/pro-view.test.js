@@ -204,11 +204,24 @@ describe('Pro activation UX', () => {
     authGate.isPro.mockReturnValue(true);
     const { state } = await import('../js/state.js');
     state.activeView = 'pro';
+    document.getElementById('proContainer')?.remove();
+    document.body.insertAdjacentHTML('beforeend', '<div id="proContainer"><div id="proViewRoot"><div class="pro-view-success"></div></div></div>');
     const { markCheckoutSuccessPending, applyProTabVisibility } = await import('../js/pro-view.js');
     markCheckoutSuccessPending();
     applyProTabVisibility();
     const tab = document.querySelector('.view-tab[data-view="pro"]');
     expect(tab.classList.contains('hidden')).toBe(false);
+  });
+
+  it('applyProTabVisibility clears stale checkout pending and hides tab when already Pro', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.isPro.mockReturnValue(true);
+    document.body.insertAdjacentHTML('beforeend', '<div id="proContainer"><div id="proViewRoot"></div></div>');
+    const { markCheckoutSuccessPending, applyProTabVisibility } = await import('../js/pro-view.js');
+    markCheckoutSuccessPending();
+    applyProTabVisibility();
+    const tab = document.querySelector('.view-tab[data-view="pro"]');
+    expect(tab.classList.contains('hidden')).toBe(true);
   });
 
   it('showProWelcomeBanner renders once when flag is set and user is Pro', async () => {

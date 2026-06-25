@@ -205,6 +205,16 @@ def current_plan(authorization: str | None = None) -> str:
             claim = _verify_jwt_plan(authorization)
             if claim is not None:
                 plan = PLAN_PRO if claim in _PRO_ALIASES else PLAN_FREE
+                try:
+                    from shared.comp_pro import is_comp_pro_email
+                    from shared.supabase_auth import verify_bearer_user
+
+                    user = verify_bearer_user(authorization)
+                    email = (user or {}).get("email") or ""
+                    if email and is_comp_pro_email(email):
+                        plan = PLAN_PRO
+                except Exception:  # noqa: BLE001 - entitlement must never crash a request
+                    pass
                 note_authenticated_plan(plan)
                 return plan
         return PLAN_FREE

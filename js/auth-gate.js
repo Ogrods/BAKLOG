@@ -34,6 +34,22 @@ let _plan = 'free';
 let _licenseActivation = false;
 let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: '', yearly: '' };
+const _planListeners = new Set();
+
+/** Subscribe to plan changes (free ↔ pro). Returns unsubscribe. */
+export function onPlanChange(fn) {
+  _planListeners.add(fn);
+  return () => { _planListeners.delete(fn); };
+}
+
+function setPlan(plan) {
+  if (typeof plan !== 'string' || !plan || plan === _plan) return;
+  const prev = _plan;
+  _plan = plan;
+  for (const fn of _planListeners) {
+    try { fn(_plan, prev); } catch (_) { /* listener */ }
+  }
+}
 
 const DEBUG_PRO_STORAGE_KEY = 'baklog-debug-pro';
 
@@ -213,7 +229,7 @@ export function showAuthGatePanel(panel = 'signin') {
 
 function applyConfigEntitlement(config) {
   if (!config || typeof config !== 'object') return;
-  if (typeof config.plan === 'string' && config.plan) _plan = config.plan;
+  if (typeof config.plan === 'string' && config.plan) setPlan(config.plan);
   _licenseActivation = !!config.licenseActivation;
   _proCheckoutEnabled = !!config.proCheckoutEnabled;
   const checkout = config.proCheckout;
@@ -246,7 +262,7 @@ export async function refreshAccountPlan() {
       if (res.ok) {
         const data = await res.json();
         if (typeof data.plan === 'string' && data.plan) {
-          _plan = data.plan;
+          setPlan(data.plan);
           return _plan;
         }
       }
@@ -300,7 +316,7 @@ async function probeServerToken() {
     const data = await res.json();
     if (data.profile) _accountProfileId = String(data.profile);
     if (data.email) _accountEmail = data.email;
-    if (typeof data.plan === 'string' && data.plan) _plan = data.plan;
+    if (typeof data.plan === 'string' && data.plan) setPlan(data.plan);
     if (data.refreshSession && _supabase) {
       await refreshAccessToken();
       if (!(await probeServerToken())) return false;

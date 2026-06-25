@@ -51,7 +51,8 @@ import {
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
 import { recordSponsoredClick } from './anon-metrics.js';
 import { dismissSponsoredDeal, isProPromoSponsorId, refreshSponsoredSurfaces } from './sponsored-deals.js';
-import { goToProView } from './pro-view.js';
+import { goToProView, isProActivationPending } from './pro-view.js';
+import { isPro } from './auth-gate.js';
 import { openCoverGallery } from './cover-gallery.js';
 import { initTrophyPopover } from './trophy-popover.js';
 import {
@@ -605,6 +606,8 @@ export function bindEvents() {
         if (jumpToItchCard) scrollToItchCard();
         return;
       }
+      // Pro users should not open Support (house promos use goToProView with the same guard).
+      if (view === 'pro' && isPro() && !isProActivationPending()) return;
       // Top-tab clicks (never drill-ins, never the dashboard drill helpers)
       // should land the user at the top of the page so they see the header,
       // summary, then picks, then table. Scroll BEFORE switchView so the

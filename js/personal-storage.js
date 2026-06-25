@@ -21,6 +21,7 @@ import {
   itchIsGame,
 } from './game-core.js';
 import { PRE_HIDDEN_KEYS, getPreHiddenFallback } from './hidden-defaults.js';
+import { shouldAutoHideLibraryRow } from './library-noise.js';
 import { visibleItchGames } from './connections-status.js';
 import { migrateColumnPrefs } from './table-columns.js';
 
@@ -811,6 +812,19 @@ export function seedPreHiddenDefaults() {
   window._dataVersion = (window._dataVersion || 0) + 1;
   personalMemo.bump();
   savePersonal();
+  return changed;
+}
+
+/** Auto-hide catalog noise rows (streaming apps, vouchers, etc.) via personal.hidden. */
+export function seedNoiseAutoHidden(games, { itchIsGameFn } = {}) {
+  let changed = false;
+  for (const g of games || []) {
+    if (!g || !String(g.name || "").trim()) continue;
+    if (getPersonal(g).hidden === true) continue;
+    if (!shouldAutoHideLibraryRow(g, { itchIsGameFn })) continue;
+    setGameHidden(g, true, { silent: true });
+    changed = true;
+  }
   return changed;
 }
 

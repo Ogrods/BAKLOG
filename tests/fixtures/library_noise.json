@@ -1,0 +1,13 @@
+[
+  { "title": "YouTube", "should_auto_hide": true },
+  { "title": "Hulu", "should_auto_hide": true },
+  { "title": "Freedom to buy games", "should_auto_hide": true },
+  { "title": "Hades", "should_auto_hide": false },
+  { "title": "Wallpaper Engine", "should_auto_hide": false },
+  { "title": "Sonic Digital Art Book", "should_auto_hide": true },
+  { "title": "Q.U.B.E. 2 Soundtrack", "should_auto_hide": true },
+  { "title": "Foo_Bar_Entitlement", "should_auto_hide": true },
+  { "title": "CUSA20387_00", "should_auto_hide": true },
+  { "title": "Skyrim Special Edition", "edition_base_key": "skyrim" },
+  { "title": "Skyrim", "edition_base_key": "skyrim" }
+]

@@ -11,8 +11,8 @@ import {
   runLibraryCountSmallDemo,
   armLibraryCountAnimations,
   disarmLibraryCountAnimations,
+  strictSyncRollMs,
 } from '../js/library-count-animation.js';
-import { countUpDurationForDelta } from '../js/dashboard-shared.js';
 import { state } from '../js/state.js';
 
 function mountCountSurface() {
@@ -86,7 +86,7 @@ describe('flashCountUp', () => {
   it('spawns one popup per game for small deltas', () => {
     const node = mountCountSurface();
     flashCountUp(node, 10, 12, n => String(Math.round(n)), { popups: true });
-    const dur = countUpDurationForDelta(2);
+    const dur = strictSyncRollMs(2, 2);
     flushRaf(dur + 50);
     vi.advanceTimersByTime(Math.ceil(dur));
     const popups = document.querySelectorAll('.library-count-popup');
@@ -120,8 +120,22 @@ describe('flashCountUp', () => {
   it('fires one popup per integer on small deltas (tick-synced)', () => {
     const node = mountCountSurface();
     flashCountUp(node, 0, 5, n => String(Math.round(n)), { popups: true });
-    flushRaf(countUpDurationForDelta(5) + 50);
+    flushRaf(strictSyncRollMs(5, 5) + 50);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(5);
+  });
+
+  it('staggers multi-add popups vertically on the same surface', () => {
+    const node = mountCountSurface();
+    flashCountUp(node, 10, 13, n => String(Math.round(n)), { popups: true });
+    const dur = strictSyncRollMs(3, 3);
+    flushRaf(dur + 50);
+    vi.advanceTimersByTime(Math.ceil(dur));
+    const popups = [...document.querySelectorAll('.library-count-popup')];
+    expect(popups.length).toBe(3);
+    const tops = popups.map(el => parseFloat(el.style.top));
+    expect(new Set(tops).size).toBe(3);
+    expect(tops[1]).toBeGreaterThan(tops[0]);
+    expect(tops[2]).toBeGreaterThan(tops[1]);
   });
 
   it('skips popups when prefers-reduced-motion', () => {
@@ -161,12 +175,13 @@ describe('flashCountUp', () => {
   it('replaces prior episode but keeps already-spawned popups climbing', () => {
     const node = mountCountSurface();
     flashCountUp(node, 0, 3, n => String(Math.round(n)), { popups: true });
-    flushRaf(Math.ceil(countUpDurationForDelta(3) / 3));
+    const roll3 = strictSyncRollMs(3, 3);
+    flushRaf(Math.ceil(roll3 / 3));
     const firstBurstCount = document.querySelectorAll('.library-count-popup').length;
     expect(firstBurstCount).toBeGreaterThan(0);
     flashCountUp(node, 3, 6, n => String(Math.round(n)), { popups: true });
-    flushRaf(countUpDurationForDelta(3));
-    vi.advanceTimersByTime(countUpDurationForDelta(3));
+    flushRaf(roll3);
+    vi.advanceTimersByTime(roll3);
     const second = document.querySelectorAll('.library-count-popup').length;
     // Popups from the first episode + new ones — second total should be >= first.
     expect(second).toBeGreaterThanOrEqual(firstBurstCount);
@@ -198,8 +213,9 @@ describe('flashCountUp', () => {
     // Once armed (post-boot), a live addition animates.
     armLibraryCountAnimations();
     fireLibraryCountFlash('library', 1946, 1949);
-    flushRaf(700);
-    vi.advanceTimersByTime(700);
+    const dur3 = strictSyncRollMs(3, 3);
+    flushRaf(dur3 + 50);
+    vi.advanceTimersByTime(Math.ceil(dur3));
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 
@@ -216,8 +232,9 @@ describe('flashCountUp', () => {
       </span>`;
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13, { rowPrev: 8, rowNext: 11 });
-    flushRaf(700);
-    vi.advanceTimersByTime(700);
+    const dur3 = strictSyncRollMs(3, 3);
+    flushRaf(dur3 + 50);
+    vi.advanceTimersByTime(Math.ceil(dur3));
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 
@@ -228,8 +245,9 @@ describe('flashCountUp', () => {
       </span>`;
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13);
-    flushRaf(700);
-    vi.advanceTimersByTime(700);
+    const dur3 = strictSyncRollMs(3, 3);
+    flushRaf(dur3 + 50);
+    vi.advanceTimersByTime(Math.ceil(dur3));
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 

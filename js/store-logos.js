@@ -9,6 +9,7 @@ export const STORE_BADGE_LETTERS = {
   gog: 'G',
   psn: 'P',
   epic: 'E',
+  epic_mobile: 'Em',
   amazon: 'A',
   xbox: 'X',
   battlenet: 'B',

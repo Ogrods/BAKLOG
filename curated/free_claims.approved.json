@@ -1,13 +1,13 @@
 {
   "ids": [
+    "epic-rollercoaster-tycoon-3-complete-edition",
+    "epic-voidwrought-ce8f4b",
     "gamerpower-1604",
     "gamerpower-2204",
     "gamerpower-2386",
     "gamerpower-3096",
     "gamerpower-3266",
     "gamerpower-3446",
-    "gamerpower-3548",
-    "gamerpower-3680",
     "itad-073a56345192",
     "itad-0c69ed1f1bd8",
     "itad-0d4598c53ffe",
@@ -19,8 +19,7 @@
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
     "itad-f0cffe659c19",
-    "epic-robobeat-5f084b",
-    "epic-citizen-sleeper-944858"
+    "itad-f520d9928848"
   ],
   "store_overrides": {
     "gamerpower-3266": "indiegala",
@@ -47,12 +46,6 @@
     },
     "gamerpower-3446": {
       "title": "GigaBash"
-    },
-    "gamerpower-3548": {
-      "title": "Static Voice"
-    },
-    "gamerpower-3680": {
-      "title": "The Ouroboros King"
     },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
@@ -88,6 +81,10 @@
     "itad-f0cffe659c19": {
       "title": "Blacklist Mafia",
       "claim_url": "https://freebies.indiegala.com/blacklist-mafia"
+    },
+    "itad-f520d9928848": {
+      "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
+      "claim_url": "https://buff.ly/fkDgxlX"
     }
   },
   "dismissed": [
@@ -97,11 +94,9 @@
     "itad-50a2b5b1d7a6",
     "gamerpower-3279",
     "itad-d85d5bb4128d",
-    "gamerpower-3687",
-    "gamerpower-3688",
-    "itad-13ca8fbedd28",
-    "itad-529a5bd808a1",
-    "itad-a71d166daf70",
-    "gamerpower-3682"
+    "gamerpower-3692",
+    "gamerpower-392",
+    "itad-c2d91592ecf7",
+    "itad-63ac54bf0426"
   ]
 }

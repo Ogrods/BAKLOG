@@ -109,8 +109,26 @@ function popupSpawnDelays(delta, popupCount, durationMs) {
   return Array.from({ length: popupCount }, (_, i) => i * gapMs);
 }
 
+function activePopupStackIndex(anchorNode) {
+  const surfaceKey = anchorNode?.id || '';
+  if (!surfaceKey || typeof document === 'undefined') return 0;
+  return document.querySelectorAll(
+    `.library-count-popup[data-libcount-surface="${surfaceKey}"]`,
+  ).length;
+}
+
+/** Minimum roll duration so tick-synced +1 popups stay readable (not piled on 700ms CSS). */
+export function strictSyncRollMs(delta, popupCap) {
+  let durationMs = countUpDurationForDelta(delta);
+  if (popupCap > 0) {
+    const popupTrainMs = (popupCap - 1) * SEQ_POPUP_GAP_MS + countUpDurationForDelta(1);
+    durationMs = Math.max(durationMs, popupTrainMs);
+  }
+  return Math.max(120, durationMs);
+}
+
 /** Mount one scrolling-combat-text +1 popup beside `anchorNode`. */
-function mountOnePopup(host, anchorNode) {
+function mountOnePopup(host, anchorNode, stackIndex = null) {
   if (!host || !host.isConnected) return;
   const surfaceKey = anchorNode?.id || '';
   const el = document.createElement('span');
@@ -133,8 +151,9 @@ function mountOnePopup(host, anchorNode) {
     } else {
       el.style.fontSize = `${Math.max(28, Math.min(52, fs * 0.48)).toFixed(1)}px`;
     }
+    const stack = Number.isFinite(stackIndex) ? stackIndex : activePopupStackIndex(anchorNode);
     let left = rect.right + Math.max(3, fs * 0.25);
-    let top = rect.top + (isHero ? fs * 0.05 : 0);
+    let top = rect.top + (isHero ? fs * 0.05 : 0) + stack * (isHero ? fs * 0.42 : fs * 0.55);
     if (typeof window !== 'undefined') {
       left = Math.min(left, window.innerWidth - 80);
       top = Math.max(8, Math.min(top, window.innerHeight - 40));
@@ -241,7 +260,7 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
   let durationMs = userDuration;
   if (!userDuration) {
     if (strictSync) {
-      durationMs = countUpDurationForDelta(delta);
+      durationMs = strictSyncRollMs(delta, popupCap);
     } else {
       durationMs = isHeroMount ? heroCountRollMs(delta, popupCount) : COUNT_ROLL_MS;
     }

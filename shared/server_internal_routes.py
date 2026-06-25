@@ -7,6 +7,12 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
 from typing import Any
 
+from shared.free_claims_sources import (
+    is_epic_mobile_store,
+    item_missing_link_fields,
+    normalize_claim_urls,
+)
+
 
 def _is_safe_http_url(url: str) -> bool:
     u = str(url or "").strip()
@@ -32,11 +38,29 @@ def validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
     for i, item in enumerate(items):
         if not isinstance(item, dict):
             return f"items[{i}] must be an object"
-        for field in ("id", "store", "title", "claim_url"):
+        for field in ("id", "store", "title"):
             if not str(item.get(field) or "").strip():
                 return f"items[{i}] missing {field}"
-        if not _is_safe_http_url(str(item.get("claim_url") or "")):
-            return f"items[{i}] claim_url must start with http:// or https://"
+        missing_links = item_missing_link_fields(item)
+        if missing_links:
+            if "claim_urls" in missing_links:
+                return (
+                    f"items[{i}] epic_mobile requires at least one of "
+                    f"claim_urls.ios / claim_urls.android"
+                )
+            return f"items[{i}] missing claim_url"
+        if not is_epic_mobile_store(item.get("store")):
+            claim_url = str(item.get("claim_url") or "")
+            if not _is_safe_http_url(claim_url):
+                return f"items[{i}] claim_url must start with http:// or https://"
+        else:
+            claim_urls = normalize_claim_urls(item.get("claim_urls"))
+            for platform, url in claim_urls.items():
+                if not _is_safe_http_url(url):
+                    return (
+                        f"items[{i}] claim_urls.{platform} must start with "
+                        f"http:// or https://"
+                    )
         premium_only = item.get("premium_only")
         if premium_only is not None and not isinstance(premium_only, bool):
             return f"items[{i}] premium_only must be a boolean"
@@ -61,7 +85,7 @@ def validate_approved_payload(doc: dict[str, Any]) -> str | None:
     if field_overrides is not None:
         if not isinstance(field_overrides, dict):
             return "field_overrides must be an object"
-        allowed = {"title", "claim_url", "ends_at"}
+        allowed = {"title", "claim_url", "claim_urls", "ends_at"}
         for key, val in field_overrides.items():
             if not isinstance(val, dict):
                 return f"field_overrides[{key}] must be an object"
@@ -72,6 +96,15 @@ def validate_approved_payload(doc: dict[str, Any]) -> str | None:
                     return f"field_overrides[{key}][{field}] must be a non-empty string"
                 if field == "claim_url" and not _is_safe_http_url(str(field_val or "")):
                     return f"field_overrides[{key}][claim_url] must start with http:// or https://"
+                if field == "claim_urls":
+                    if not isinstance(field_val, dict):
+                        return f"field_overrides[{key}][claim_urls] must be an object"
+                    cleaned = normalize_claim_urls(field_val)
+                    if not cleaned:
+                        return (
+                            f"field_overrides[{key}][claim_urls] needs at least one "
+                            f"http(s) ios or android URL"
+                        )
                 if field == "ends_at" and field_val is not None and not str(field_val).strip():
                     return f"field_overrides[{key}][ends_at] must be a non-empty string"
     dismissed = doc.get("dismissed")

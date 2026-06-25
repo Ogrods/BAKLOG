@@ -36,7 +36,7 @@ let _chromiumAvailable = true;
 
 const LOCAL_PROVIDER_FOOTER = {
   amazon: {
-    connected: 'Auto-detected from Amazon Games launcher',
+    connected: 'Auto-detected from Amazon Games launcher. Open the app and sync, then run the Amazon fetcher for new games.',
     disconnected: 'Disconnected - cached library stays visible. Connect to refresh, or use Prime web',
   },
   gog_galaxy: {
@@ -346,7 +346,7 @@ function groupConnectNote(groupKey, members) {
     const lead = anyConnected
       ? 'Ready to pull - at least one source is connected.'
       : 'Connect the launcher or Prime web below to start pulling.';
-    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one Amazon source. Run the Amazon fetcher and BAKLOG auto-detects what's available - it scans the Amazon Games launcher database first (file scan) and falls back to Prime Gaming (web).</p></div>`;
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one Amazon source. Run the Amazon fetcher and BAKLOG auto-detects what's available - launcher database first, then Prime web.</p><p><strong>Launcher:</strong> open the Amazon Games app and let it sync before you fetch. BAKLOG only reads what's already in the local database and does not refresh it in the background.</p><p><strong>Prime web:</strong> uses your saved sign-in and fetches headless - no launcher needed. It only imports Amazon-fulfilled Prime claims, not your full launcher library.</p></div>`;
   }
   if (groupKey === 'gog') {
     const lead = anyConnected

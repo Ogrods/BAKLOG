@@ -12,6 +12,7 @@ import {
   claimableModuleMarkup,
   claimCardHtml,
   claimDetailPanelHtml,
+  claimRowHtml,
   dedupeClaims,
   sortClaims,
   sanitizeBlurb,
@@ -146,6 +147,38 @@ describe('claimCardHtml safety + clamping', () => {
   });
 });
 
+describe('epic_mobile claim buttons', () => {
+  it('renders platform claim buttons instead of a single claim CTA', () => {
+    const claim = {
+      id: 'epic-mobile-1',
+      store: 'epic_mobile',
+      title: 'Northgard',
+      claim_urls: {
+        ios: 'https://apps.apple.com/app/id123',
+        android: 'https://play.google.com/store/apps/details?id=abc',
+      },
+    };
+    const html = claimRowHtml(claim);
+    expect(html).toContain('data-claim-go-ios="epic-mobile-1"');
+    expect(html).toContain('data-claim-go-android="epic-mobile-1"');
+    expect(html).toContain('Claim on iOS');
+    expect(html).toContain('Claim on Android');
+    expect(html).not.toMatch(/data-claim-go="epic-mobile-1"/);
+  });
+
+  it('detail panel shows platform claim links', () => {
+    const html = claimDetailPanelHtml({
+      id: 'epic-mobile-2',
+      store: 'epic_mobile',
+      title: 'Game',
+      claim_urls: { ios: 'https://apps.apple.com/app/id999' },
+    });
+    expect(html).toContain('Claim on iOS');
+    expect(html).toContain('https://apps.apple.com/app/id999');
+    expect(html).not.toContain('Claim free');
+  });
+});
+
 describe('dedupe + sort (getVisibleClaims internals)', () => {
   it('collapses the same game from multiple sources by source precedence (epic wins)', () => {
     const items = [
@@ -182,5 +215,19 @@ describe('dedupe + sort (getVisibleClaims internals)', () => {
     ];
     const out = sortClaims([...items]);
     expect(out.map(c => c.id)).toEqual(['a', 'b', 'noend']);
+  });
+
+  it('keeps epic_mobile separate from epic PC for the same title', () => {
+    const items = [
+      { id: 'epic-pc', store: 'epic', title: 'Northgard', claim_url: 'https://e/x', source: 'epic' },
+      {
+        id: 'epic-m',
+        store: 'epic_mobile',
+        title: 'Northgard free for mobile on EGS',
+        claim_urls: { ios: 'https://apps.apple.com/app/id123' },
+        source: 'itad',
+      },
+    ];
+    expect(dedupeClaims(items)).toHaveLength(2);
   });
 });

@@ -17,9 +17,13 @@ from fetchers._base import configure_stdout, refuse_empty_result
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
+    EPIC_MOBILE_STORE,
     GAMERPOWER_ATTRIBUTION,
     claim_match_keys,
+    has_valid_claim_links,
+    is_epic_mobile_store,
     merge_manual_and_auto,
+    normalize_claim_urls,
     norm_title,
 )
 from shared.profile_paths import free_claims_path
@@ -34,7 +38,7 @@ FALLBACK_PATH = Path("curated/free_claims.fallback.json")
 STORE_DELAY_SEC = 1.5
 STEAM_STORESEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 STEAM_HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
-FIELD_OVERRIDE_KEYS = frozenset({"title", "claim_url", "ends_at"})
+FIELD_OVERRIDE_KEYS = frozenset({"title", "claim_url", "claim_urls", "ends_at"})
 ITAD_GAME_SLUG_RE = re.compile(
     r"isthereanydeal\.com/game/([^/\"'>]+)/info",
     re.IGNORECASE,
@@ -295,15 +299,19 @@ def _resolve_steam_appid(
 
 _ITCH_HINT = re.compile(r"itch\.?io", re.IGNORECASE)
 _INDIEGALA_HINT = re.compile(r"indiegala", re.IGNORECASE)
+_MOBILE_EPIC_HINT = re.compile(r"mobile", re.IGNORECASE)
+_EGS_EPIC_HINT = re.compile(r"\b(epic|egs)\b", re.IGNORECASE)
 
 
 def _infer_store_from_text(store: str, title: str, blurb: object, claim_url: str) -> str:
     """GamerPower often tags itch.io/IndieGala giveaways as store='other'. Infer from text."""
-    if store and store != "other":
-        return store
     haystack = " ".join(
         part for part in (title, str(blurb or ""), claim_url) if part
     )
+    if _MOBILE_EPIC_HINT.search(haystack) and _EGS_EPIC_HINT.search(haystack):
+        return EPIC_MOBILE_STORE
+    if store and store != "other":
+        return store
     if _ITCH_HINT.search(haystack):
         return "itch"
     if _INDIEGALA_HINT.search(haystack):
@@ -313,6 +321,31 @@ def _infer_store_from_text(store: str, title: str, blurb: object, claim_url: str
 
 DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower", "itad"})
 DEFAULT_EXPIRY_DAYS = 14
+
+
+def _claim_links_payload(raw: dict, store: str) -> dict[str, object]:
+    """Outbound link fields for a published claim row."""
+    if is_epic_mobile_store(store):
+        urls = normalize_claim_urls(raw.get("claim_urls"))
+        return {"claim_urls": urls} if urls else {}
+    claim_url = str(raw.get("claim_url") or "").strip()
+    return {"claim_url": claim_url} if claim_url else {}
+
+
+def _clean_field_override_entry(val: dict) -> dict[str, object]:
+    cleaned: dict[str, object] = {}
+    for field in FIELD_OVERRIDE_KEYS:
+        if field not in val:
+            continue
+        if field == "claim_urls":
+            urls = normalize_claim_urls(val[field])
+            if urls:
+                cleaned["claim_urls"] = urls
+            continue
+        text = str(val[field] or "").strip()
+        if text:
+            cleaned[field] = text
+    return cleaned
 
 
 def _enrich_item_publish_skip(
@@ -426,7 +459,7 @@ def _enrich_item(
         "id": item_id,
         "store": store,
         "title": title or item_id,
-        "claim_url": claim_url,
+        **_claim_links_payload(raw, store),
         "header_image": header,
         "genres": genres[:6] if isinstance(genres, list) else [],
         "blurb": _clean_blurb(raw.get("blurb")),
@@ -658,9 +691,14 @@ def _load_field_overrides(path: Path) -> dict[str, dict[str, str]]:
         item_id = str(key).strip()
         if not item_id or not isinstance(val, dict):
             continue
-        cleaned: dict[str, str] = {}
+        cleaned: dict[str, object] = {}
         for field in FIELD_OVERRIDE_KEYS:
             if field not in val:
+                continue
+            if field == "claim_urls":
+                urls = normalize_claim_urls(val[field])
+                if urls:
+                    cleaned["claim_urls"] = urls
                 continue
             text = str(val[field] or "").strip()
             if text:
@@ -1003,7 +1041,7 @@ def _enrich_item_light(
         "id": item_id,
         "store": store,
         "title": title or item_id,
-        "claim_url": claim_url,
+        **_claim_links_payload(raw, store),
         "header_image": header,
         "genres": genres[:6] if isinstance(genres, list) else [],
         "blurb": _clean_blurb(raw.get("blurb")),
@@ -1083,7 +1121,7 @@ def preview_publish_items(
     for raw in raw_items:
         if not isinstance(raw, dict):
             continue
-        if not raw.get("claim_url") or not raw.get("store"):
+        if not has_valid_claim_links(raw) or not raw.get("store"):
             continue
         if _is_expired(_resolve_ends_at(raw, now=now), now):
             continue
@@ -1299,19 +1337,12 @@ def parse_approved_put_payload(payload: dict) -> dict:
         v = str(val or "").strip().lower()
         if k and v:
             store_overrides[k] = v
-    field_overrides: dict[str, dict[str, str]] = {}
-    allowed_fields = {"title", "claim_url", "ends_at"}
+    field_overrides: dict[str, dict[str, object]] = {}
     for key, val in (payload.get("field_overrides") or {}).items():
         k = str(key).strip()
         if not k or not isinstance(val, dict):
             continue
-        cleaned: dict[str, str] = {}
-        for field, field_val in val.items():
-            if field not in allowed_fields:
-                continue
-            text = str(field_val or "").strip()
-            if text:
-                cleaned[field] = text
+        cleaned = _clean_field_override_entry(val)
         if cleaned:
             field_overrides[k] = cleaned
     # Blocked wins over dismissed: a permanently blocked id never lingers in the
@@ -1605,7 +1636,7 @@ def main() -> int:
         1
         for raw in raw_items
         if isinstance(raw, dict)
-        and raw.get("claim_url")
+        and has_valid_claim_links(raw)
         and raw.get("store")
         and not _is_expired(_resolve_ends_at(raw, now=now), now)
     )
@@ -1615,8 +1646,8 @@ def main() -> int:
         if not isinstance(raw, dict):
             stats.warn("skipped non-object item")
             continue
-        if not raw.get("claim_url") or not raw.get("store"):
-            stats.warn(f"skipped item missing store/claim_url: {raw!r}")
+        if not has_valid_claim_links(raw) or not raw.get("store"):
+            stats.warn(f"skipped item missing store or claim link(s): {raw!r}")
             continue
         if _is_expired(_resolve_ends_at(raw, now=now), now):
             stats.warn(f"skipped expired item: {raw.get('id')!r}")

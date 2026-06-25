@@ -5,6 +5,7 @@
 export const STORE_BRAND_COLORS = {
   steam: '#1b2838',     // Steam UI navy
   epic: '#2f2d2e',       // Epic Games brand black
+  epic_mobile: '#2f2d2e', // Epic mobile giveaways (same brand gray)
   gog: '#5100dc',        // GOG 2025 brand guidelines primary purple
   humble: '#cb272c',     // Humble Bundle brand red
   psn: '#003791',        // PlayStation wordmark blue

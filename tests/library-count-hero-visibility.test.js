@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flashCountUp } from '../js/library-count-animation.js';
+import { flashCountUp, strictSyncRollMs } from '../js/library-count-animation.js';
 import { countUpDurationForDelta } from '../js/dashboard-shared.js';
 
 const APP_CSS = readFileSync(join(import.meta.dirname, '..', 'app.css'), 'utf8');
@@ -148,7 +148,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     const chip = document.querySelector('[data-count-target="library"]');
     stubLayoutRect(chip, { w: 40, h: 20, left: 50, top: 60 });
     flashCountUp(chip, 10, 12, (n) => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(countUpDurationForDelta(2));
+    vi.advanceTimersByTime(strictSyncRollMs(2, 2));
     const popups = document.querySelectorAll('.library-count-popup');
     expect(popups.length).toBe(2);
     for (const el of popups) {

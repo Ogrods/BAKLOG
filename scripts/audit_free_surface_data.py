@@ -26,7 +26,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from shared.free_claims_sources import claim_match_keys, norm_title
+from shared.free_claims_sources import (
+    claim_match_keys,
+    is_epic_mobile_store,
+    item_missing_link_fields,
+    norm_title,
+    normalize_claim_urls,
+)
 from shared.profile_paths import (
     free_claims_path,
     get_active_profile_id,
@@ -42,7 +48,7 @@ BUILT_PATH = ROOT / "landing" / "free-claims.json"
 FALLBACK_PATH = ROOT / "curated" / "free_claims.fallback.json"
 SPONSORS_PATH = ROOT / "curated" / "sponsors.json"
 
-REQUIRED_ITEM_FIELDS = ("id", "store", "title", "claim_url")
+REQUIRED_ITEM_FIELDS = ("id", "store", "title")
 BLURB_LEAK_RE = re.compile(r"<a\b|isthereanydeal\.com/giveaways", re.I)
 STEAM_PORTRAIT_RE = re.compile(r"/library_600x900_2x\.jpg", re.I)
 
@@ -171,9 +177,14 @@ def _row_issues(item: dict, *, now: datetime | None = None, feed_name: str = "")
     for field in REQUIRED_ITEM_FIELDS:
         if not str(item.get(field) or "").strip():
             issues.append(f"missing_{field}")
-    url = str(item.get("claim_url") or "")
-    if url and not url.startswith(("http://", "https://")):
-        issues.append("bad_claim_url_scheme")
+    for field in item_missing_link_fields(item):
+        issues.append(f"missing_{field}")
+        if field == "claim_urls":
+            issues.append("epic_mobile_no_platform_urls")
+    if not is_epic_mobile_store(item.get("store")):
+        url = str(item.get("claim_url") or "")
+        if url and not url.startswith(("http://", "https://")):
+            issues.append("bad_claim_url_scheme")
     if item.get("store") == "other":
         issues.append("store_other")
     blurb = str(item.get("blurb") or "")

@@ -422,6 +422,7 @@ html[data-init-view="pro"] .view-tab[data-view="pro"] {
   --brand-gog: #5100dc;
   --brand-psn: #003791;
   --brand-epic: #2f2d2e;
+  --brand-epic-mobile: #2f2d2e;
   --brand-amazon: #ff9900;
   --brand-nintendo: #e60012;
   --brand-xbox: #107c10;
@@ -1212,6 +1213,7 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .store-badge.gog { background: var(--brand-gog); color: #fff; }
 .store-badge.psn { background: var(--brand-psn); color: #fff; }
 .store-badge.epic { background: var(--brand-epic); color: #fff; box-shadow: inset 0 0 0 1px #64748b; }
+.store-badge.epic_mobile { background: var(--brand-epic-mobile); color: #fff; box-shadow: inset 0 0 0 1px #64748b; }
 .store-badge.amazon { background: var(--brand-amazon); color: #1a1200; }
 .store-badge.nintendo { background: var(--brand-nintendo); color: #fff; }
 .store-badge.xbox { background: var(--brand-xbox); color: #fff; }
@@ -1799,6 +1801,15 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
 .claim-detail-claim-btn:focus-visible {
   outline: 2px solid #fff7ed;
   outline-offset: 2px;
+}
+.claim-detail-platform-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+.claim-detail-platform-actions .claim-detail-claim-btn {
+  margin-top: 0;
 }
 .claim-detail-clear {
   display: block;

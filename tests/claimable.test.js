@@ -173,6 +173,27 @@ describe('getVisibleClaims', () => {
     expect(visible.map(c => c.id)).toEqual(['gog-bar']);
   });
 
+  it('includes epic_mobile rows with platform urls', () => {
+    const items = [{
+      id: 'epic-mobile-1',
+      store: 'epic_mobile',
+      title: 'Mobile Game',
+      claim_urls: { ios: 'https://apps.apple.com/app/id1' },
+      ends_at: '2099-01-01T00:00:00Z',
+    }];
+    expect(getVisibleClaims(items).map((c) => c.id)).toEqual(['epic-mobile-1']);
+  });
+
+  it('drops epic_mobile rows without platform urls', () => {
+    const items = [{
+      id: 'epic-mobile-bad',
+      store: 'epic_mobile',
+      title: 'Mobile Game',
+      ends_at: '2099-01-01T00:00:00Z',
+    }];
+    expect(getVisibleClaims(items)).toHaveLength(0);
+  });
+
   it('hides owned steam appid matches', () => {
     state.allGames = [{ store: 'steam', appid: 570, id: 570, name: 'Dota 2' }];
     buildOwnedNormNames();

@@ -1,78 +1,181 @@
 {
-  "generated_at": "2026-06-18T16:17:28.072395+00:00",
+  "generated_at": "2026-06-25T18:48:35.564801+00:00",
   "items": [
     {
-      "id": "epic-construction-simulator-3",
-      "store": "epic",
-      "title": "Construction Simulator 3",
-      "claim_url": "https://store.epicgames.com/p/construction-simulator-3-ios-79078c",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1370120/42465c70c11e03da3d3d4c0d8ba221ca29ea6c1f/header.jpg?t=1764066253",
+      "id": "other-please-touch-the-artwork",
+      "store": "other",
+      "title": "Please, Touch the Artwork",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1097100/library_600x900_2x.jpg",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-06-25T15:00:00Z",
-      "steam_appid": 1370120,
-      "review_percent": 56
+      "ends_at": null,
+      "steam_appid": 1097100,
+      "review_percent": 83,
+      "premium_only": true
     },
     {
-      "id": "epic-citizen-sleeper-944858",
-      "store": "epic",
-      "title": "Citizen Sleeper",
-      "claim_url": "https://store.epicgames.com/en-US/p/citizen-sleeper-944858",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1578650/header.jpg?t=1780960841",
+      "id": "amazon-terraforming-mars",
+      "store": "amazon",
+      "title": "Terraforming Mars",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/800270/library_600x900_2x.jpg",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-06-25T15:00:00Z",
-      "steam_appid": 1578650,
-      "review_percent": 92,
-      "source": "epic",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+      "ends_at": null,
+      "steam_appid": 800270,
+      "review_percent": 71
     },
     {
-      "id": "epic-robobeat-5f084b",
-      "store": "epic",
-      "title": "ROBOBEAT",
-      "claim_url": "https://store.epicgames.com/en-US/p/robobeat-5f084b",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1456760/6deea24de35cafe95a4b3693ff925608b44bc4a2/header.jpg?t=1781256997",
+      "id": "amazon-lost-eidolons-veil-of-the-witch",
+      "store": "amazon",
+      "title": "Lost Eidolons: Veil of the Witch",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2530490/library_600x900_2x.jpg",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-06-25T15:00:00Z",
-      "steam_appid": 1456760,
-      "review_percent": 94,
-      "source": "epic",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+      "ends_at": null,
+      "steam_appid": 2530490,
+      "review_percent": 82
     },
     {
-      "id": "gamerpower-3682",
-      "store": "steam",
-      "title": "The Red Lantern",
-      "claim_url": "https://www.gamerpower.com/open/the-red-lantern-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2acfee386f6.jpg",
+      "id": "amazon-space-grunts-chrono-shard",
+      "store": "epic",
+      "title": "Space Grunts: Chrono Shard",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3403540/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": null,
+      "ends_at": null,
+      "steam_appid": 3403540,
+      "review_percent": 100
+    },
+    {
+      "id": "steam-tested-on-humans-escape-room",
+      "store": "amazon",
+      "title": "Tested on Humans: Escape Room",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1483780/library_600x900_2x.jpg",
       "genres": [
         "Adventure",
-        "Casual",
+        "Indie"
+      ],
+      "blurb": null,
+      "ends_at": null,
+      "steam_appid": 1483780,
+      "review_percent": 86
+    },
+    {
+      "id": "steam-sin-slayers-reign-of-the-8th",
+      "store": "amazon",
+      "title": "Sin Slayers: Reign of The 8th",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2790000/library_600x900_2x.jpg",
+      "genres": [
+        "Adventure",
+        "Indie",
+        "RPG",
+        "Strategy"
+      ],
+      "blurb": null,
+      "ends_at": null,
+      "steam_appid": 2790000,
+      "review_percent": 69
+    },
+    {
+      "id": "steam-paradise-killer",
+      "store": "amazon",
+      "title": "Paradise Killer",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1160220/library_600x900_2x.jpg",
+      "genres": [
+        "Adventure",
         "Indie",
         "RPG"
       ],
-      "blurb": "This giveaway is for the dog lovers! Grab The Red Lantern for free on Steam until June 18! The Red Lantern is a 3d first person dog sledding game with very positive reviews. Don´t miss it!",
-      "ends_at": "2026-06-18T23:59:00Z",
-      "steam_appid": 1053710,
-      "review_percent": 82,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "blurb": null,
+      "ends_at": null,
+      "steam_appid": 1160220,
+      "review_percent": 93
     },
     {
-      "id": "gamerpower-3548",
-      "store": "itch",
-      "title": "Static Voice",
-      "claim_url": "https://www.gamerpower.com/open/static-voice-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/69c5a81a64b29.jpg",
+      "id": "steam-wargame-construction-set-iii-age-of-rifles-1846-1905",
+      "store": "amazon",
+      "title": "Wargame Construction Set III: Age of Rifles 1846-1905",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2707280/library_600x900_2x.jpg",
+      "genres": [
+        "Simulation",
+        "Strategy"
+      ],
+      "blurb": null,
+      "ends_at": null,
+      "steam_appid": 2707280,
+      "review_percent": 97
+    },
+    {
+      "id": "steam-space-grunts-2",
+      "store": "amazon",
+      "title": "Space Grunts 2",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1125370/library_600x900_2x.jpg",
+      "genres": [
+        "Indie"
+      ],
+      "blurb": null,
+      "ends_at": null,
+      "steam_appid": 1125370,
+      "review_percent": 67
+    },
+    {
+      "id": "steam-sugardew-island",
+      "store": "amazon",
+      "title": "Sugardew Island",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": null,
       "genres": [],
-      "blurb": "Claim Static Voice for free on Itch.io! Static Voice is a first-person survival game where you play as a resident of an old Soviet apartment block.",
-      "ends_at": "2026-06-19T23:59:00Z",
-      "steam_appid": 4207170,
-      "review_percent": 93,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "blurb": null,
+      "ends_at": null
+    },
+    {
+      "id": "amazon-between-time-escape-room",
+      "store": "amazon",
+      "title": "Between Time: Escape Room",
+      "claim_url": "https://luna.amazon.com/claims/home",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1580150/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": null,
+      "ends_at": null,
+      "steam_appid": 1580150,
+      "review_percent": 80
+    },
+    {
+      "id": "epic-rollercoaster-tycoon-3-complete-edition",
+      "store": "epic",
+      "title": "RollerCoaster Tycoon 3 Complete Edition",
+      "claim_url": "https://store.epicgames.com/en-US/p/rollercoaster-tycoon-3-complete-edition",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1368820/header.jpg?t=1779306991",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-07-02T15:00:00Z",
+      "steam_appid": 1368820,
+      "review_percent": 87,
+      "source": "epic",
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
+    },
+    {
+      "id": "epic-voidwrought-ce8f4b",
+      "store": "epic",
+      "title": "Voidwrought",
+      "claim_url": "https://store.epicgames.com/en-US/p/voidwrought-ce8f4b",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2014550/header.jpg?t=1782215852",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-07-02T15:00:00Z",
+      "steam_appid": 2014550,
+      "review_percent": 77,
+      "source": "epic",
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
       "id": "gamerpower-2386",
@@ -160,6 +263,20 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
+      "id": "itad-f520d9928848",
+      "store": "epic",
+      "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
+      "claim_url": "https://buff.ly/fkDgxlX",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1361510/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge",
+      "ends_at": "2026-07-09T18:31:16Z",
+      "steam_appid": 1361510,
+      "review_percent": 94,
+      "source": "itad",
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
+    },
+    {
       "id": "itad-f0cffe659c19",
       "store": "indiegala",
       "title": "Blacklist Mafia",
@@ -170,20 +287,6 @@
       "ends_at": "2026-06-25T22:48:59Z",
       "steam_appid": 2800500,
       "review_percent": 82,
-      "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-6d00ffeb0fdc",
-      "store": "itch",
-      "title": "Another World Adventures",
-      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Another World Adventures",
-      "ends_at": "2026-06-25T22:48:59Z",
-      "steam_appid": 3445980,
-      "review_percent": 50,
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -255,6 +358,19 @@
       "source": "itad"
     },
     {
+      "id": "itad-073a56345192",
+      "store": "epic",
+      "title": "Songs of Conquest",
+      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Songs of Conquest",
+      "ends_at": null,
+      "steam_appid": 867210,
+      "review_percent": 86,
+      "source": "itad"
+    },
+    {
       "id": "itad-330faa9821bf",
       "store": "epic",
       "title": "Guild of Dungeoneering Ultimate Edition",
@@ -269,17 +385,17 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "gamerpower-3680",
-      "store": "epic",
-      "title": "The Ouroboros King",
-      "claim_url": "https://www.gamerpower.com/open/the-ouroboros-king-epic-games-giveaway",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/33630d7105014582a478094e89953f49/the-ouroboros-king-jwabx.jpg",
+      "id": "itad-6d00ffeb0fdc",
+      "store": "itch",
+      "title": "Another World Adventures",
+      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Checkmate your boredom! Download The Ouroboros King without any cost via Epic Games Store! The Ouroboros King combines chess with the replayability of roguelikes. Check it out!",
-      "ends_at": "2026-06-18T23:59:00Z",
-      "steam_appid": 2096510,
-      "review_percent": 81,
-      "source": "gamerpower",
+      "blurb": "Another World Adventures",
+      "ends_at": "2026-06-25T22:48:59Z",
+      "steam_appid": 3445980,
+      "review_percent": 50,
+      "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
@@ -308,19 +424,6 @@
       "review_percent": 89,
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-073a56345192",
-      "store": "epic",
-      "title": "Songs of Conquest",
-      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Songs of Conquest",
-      "ends_at": null,
-      "steam_appid": 867210,
-      "review_percent": 86,
-      "source": "itad"
     }
   ],
   "attribution": [

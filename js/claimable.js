@@ -10,6 +10,7 @@ import { syncCoverFits } from './covers.js';
 import { getAdsForLocation, sponsoredClaimCardHtml } from './sponsored-deals.js';
 import { isPro } from './auth-gate.js';
 import { affiliateUrl } from './affiliate.js';
+import { hasValidClaimLinks, normalizeClaimUrls } from './claim-links.js';
 import { isDebugEnabled } from './debug-overlay.js';
 import {
   stripClaimTitleDecorations,
@@ -265,7 +266,7 @@ function claimDedupKeys(c) {
 }
 
 function isClaimFeedItemValid(c) {
-  return !!(c?.id && c.claim_url && c.store);
+  return !!(c?.id && c.store && hasValidClaimLinks(c));
 }
 
 function isClaimExpired(c, now = Date.now()) {
@@ -786,6 +787,31 @@ export function handleClaimableClick(e) {
           source: claim.source,
           claim_url: claim.claim_url,
           affiliateApplied: outbound !== claim.claim_url,
+          outbound,
+        });
+      }
+      window.open(outbound, '_blank', 'noopener,noreferrer');
+    }
+    return true;
+  }
+  const platformBtn = e.target.closest('[data-claim-go-ios], [data-claim-go-android]');
+  if (platformBtn) {
+    const id = platformBtn.dataset.claimGoIos || platformBtn.dataset.claimGoAndroid;
+    const platform = platformBtn.dataset.claimGoIos ? 'ios' : 'android';
+    const claim = (state.claimableFeed?.items || []).find(c => c.id === id)
+      || state.claimableNow.find(c => c.id === id);
+    const urls = normalizeClaimUrls(claim?.claim_urls);
+    const target = urls[platform];
+    if (isSafeHttpUrl(target)) {
+      const outbound = affiliateUrl(target);
+      if (isDebugEnabled()) {
+        console.debug('[baklog-claims] claim open', {
+          id: claim.id,
+          store: claim.store,
+          source: claim.source,
+          platform,
+          claim_url: target,
+          affiliateApplied: outbound !== target,
           outbound,
         });
       }

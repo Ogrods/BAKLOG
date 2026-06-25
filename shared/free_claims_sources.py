@@ -21,6 +21,47 @@ GAMERPOWER_ATTRIBUTION = "GamerPower.com"
 ITAD_SKIP_KEYWORDS = ("bundle", "beta", "dlc", "loot", " key")
 
 SOURCE_PRECEDENCE = {"epic": 0, "gamerpower": 1, "itad": 2}
+
+EPIC_MOBILE_STORE = "epic_mobile"
+
+
+def is_epic_mobile_store(store: object) -> bool:
+    return str(store or "").strip().lower() == EPIC_MOBILE_STORE
+
+
+def _is_safe_http_url(url: str) -> bool:
+    u = str(url or "").strip()
+    return u.startswith("http://") or u.startswith("https://")
+
+
+def normalize_claim_urls(raw: object) -> dict[str, str]:
+    """Return sanitized platform URLs (ios/android) with http(s) schemes only."""
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key in ("ios", "android"):
+        val = str(raw.get(key) or "").strip()
+        if val and _is_safe_http_url(val):
+            out[key] = val
+    return out
+
+
+def has_valid_claim_links(item: dict) -> bool:
+    """True when the item has the outbound link(s) required for its store."""
+    if is_epic_mobile_store(item.get("store")):
+        return bool(normalize_claim_urls(item.get("claim_urls")))
+    return bool(str(item.get("claim_url") or "").strip())
+
+
+def item_missing_link_fields(item: dict) -> list[str]:
+    """Publish-time link field names missing from a claim row."""
+    if is_epic_mobile_store(item.get("store")):
+        if not normalize_claim_urls(item.get("claim_urls")):
+            return ["claim_urls"]
+        return []
+    if not str(item.get("claim_url") or "").strip():
+        return ["claim_url"]
+    return []
 # User-facing dedup (js/claim-card.js dedupeClaims) collapses by appid/title.
 # dedup_claim_items_by_id below dedupes by feed id only and keeps cross-source
 # title dupes so the admin console can DUPE-stamp them before publish approval.

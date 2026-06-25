@@ -1,93 +1,61 @@
 {
-  "fetched_at": "2026-06-19T00:09:34.278729+00:00",
+  "fetched_at": "2026-06-25T18:31:16.975950+00:00",
   "sources": {
     "epic": 2,
-    "gamerpower": 13,
-    "itad": 12
+    "gamerpower": 11,
+    "itad": 11
   },
   "attribution": [
     "GamerPower.com"
   ],
   "items": [
     {
-      "id": "epic-citizen-sleeper-944858",
+      "id": "epic-rollercoaster-tycoon-3-complete-edition",
       "store": "epic",
-      "title": "Citizen Sleeper",
-      "claim_url": "https://store.epicgames.com/en-US/p/citizen-sleeper-944858",
-      "ends_at": "2026-06-25T15:00:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/919d5976f3804d4cabb8ca90ea43a956/citizen-sleeper-xudwg.jpg",
+      "title": "RollerCoaster Tycoon 3 Complete Edition",
+      "claim_url": "https://store.epicgames.com/en-US/p/rollercoaster-tycoon-3-complete-edition",
+      "ends_at": "2026-07-02T15:00:00Z",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1368820/header.jpg?t=1779306991",
       "blurb": null,
       "source": "epic",
-      "review_percent": 92,
-      "steam_appid": 1578650,
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+      "first_seen": "2026-06-25T18:31:16.975950+00:00",
+      "review_percent": 87,
+      "steam_appid": 1368820
     },
     {
-      "id": "epic-robobeat-5f084b",
+      "id": "epic-voidwrought-ce8f4b",
       "store": "epic",
-      "title": "ROBOBEAT",
-      "claim_url": "https://store.epicgames.com/en-US/p/robobeat-5f084b",
-      "ends_at": "2026-06-25T15:00:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/91105717b53044ed8e384e5fada71db8/robobeat-1ojda.png",
+      "title": "Voidwrought",
+      "claim_url": "https://store.epicgames.com/en-US/p/voidwrought-ce8f4b",
+      "ends_at": "2026-07-02T15:00:00Z",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2014550/header.jpg?t=1782215852",
       "blurb": null,
       "source": "epic",
-      "review_percent": 94,
-      "steam_appid": 1456760,
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+      "first_seen": "2026-06-25T18:31:16.975950+00:00",
+      "review_percent": 77,
+      "steam_appid": 2014550
     },
     {
-      "id": "gamerpower-3688",
+      "id": "gamerpower-3692",
       "store": "epic",
-      "title": "ROBOBEAT (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/robobeat-epic-games-giveaway",
-      "ends_at": "2026-06-25T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a3408d9a75df.jpg",
-      "blurb": "You are on a mission to capture a robot gone rogue! So grab ROBOBEAT directly from the Epic Games Store while it's free, jump into the game, and play this rhythm shooter until you complete your mission!",
+      "title": "Voidwrought (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/voidwrought-epic-games-giveaway",
+      "ends_at": "2026-07-02T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a3d437b1768d.jpg",
+      "blurb": "Looking for a new Metroidvania? Grab Voidwrought for free via Epic Games Store until July 2. Voidwrought is a fun 2d fast-paced action-platformer with ancient artifacts, shrines and epic boss battles.",
       "source": "gamerpower",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
-      "id": "gamerpower-3687",
+      "id": "gamerpower-392",
       "store": "epic",
-      "title": "Citizen Sleeper (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/citizen-sleeper-epic-games-giveaway",
-      "ends_at": "2026-06-25T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a34084f6356e.jpg",
-      "blurb": "Don’t miss this amazing narrative RPG, available for free this week on the Epic Games Store! Citizen Sleeper is a captivating cyberpunk experience set in a fascinating universe. Seriously, don’t miss it!",
+      "title": "RollerCoaster Tycoon 3 Complete Edition (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/free-rollercoaster-tycoon-3-complete-edition",
+      "ends_at": "2026-07-02T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/5f6cb4d5cc440.jpg",
+      "blurb": "Grab RollerCoaster Tycoon 3 Complete Edition for free on Epic Games Store and start building the park of your dreams! RollerCoaster Tycoon 3 Complete Edition is a critically acclaimed rollercoaster simulation game that you should not miss!",
       "source": "gamerpower",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
-    },
-    {
-      "id": "gamerpower-3682",
-      "store": "steam",
-      "title": "The Red Lantern (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/the-red-lantern-steam-giveaway",
-      "ends_at": "2026-06-18T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a2acfee386f6.jpg",
-      "blurb": "This giveaway is for the dog lovers! Grab The Red Lantern for free on Steam until June 18! The Red Lantern is a 3d first person dog sledding game with very positive reviews. Don´t miss it!",
-      "source": "gamerpower",
-      "review_percent": 82,
-      "steam_appid": 1053710,
-      "genres": [
-        "Adventure",
-        "Casual",
-        "Indie",
-        "RPG"
-      ],
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3548",
-      "store": "itch",
-      "title": "Static Voice (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/static-voice-itch-io-giveaway",
-      "ends_at": "2026-06-19T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/69c5a81a64b29.jpg",
-      "blurb": "Claim Static Voice for free on Itch.io! Static Voice is a first-person survival game where you play as a resident of an old Soviet apartment block.",
-      "source": "gamerpower",
-      "review_percent": 93,
-      "steam_appid": 4207170,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
       "id": "gamerpower-3279",
@@ -203,37 +171,39 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "itad-a71d166daf70",
+      "id": "itad-f520d9928848",
       "store": "epic",
-      "title": "Construction Simulator 3 free on MOBILE from EGS on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16276/",
+      "title": "TMNT - Shredder's Revenge free on Mobile from EGS on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16306/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/construction-simulator-3/info/\">Construction Simulator 3</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 25 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-e2d49ab2557448a2a9724c42999066f1-4943ede186ff4b67840e3e59ecdaf76c&amp;offers=1-e2d49ab2557448a2a9724c42999066f1-bb800dbdf3614954979eed03f517f670>go to giveaway</a>",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1361510/library_600x900_2x.jpg",
+      "blurb": "Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge",
       "source": "itad",
-      "first_seen": "2026-06-18T17:18:28.632143+00:00"
+      "first_seen": "2026-06-25T18:31:16.975950+00:00",
+      "review_percent": 94,
+      "steam_appid": 1361510
     },
     {
-      "id": "itad-529a5bd808a1",
+      "id": "itad-c2d91592ecf7",
       "store": "epic",
-      "title": "ROBOBEAT - FREE on Epic Games on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16273/",
+      "title": "Voidwrought - FREE on Epic Games on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16302/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/robobeat/info/\">ROBOBEAT</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 25 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/robobeat-5f084b>go to giveaway</a>",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/voidwrought/info/\">Voidwrought</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 02 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/voidwrought-ce8f4b>go to giveaway</a>",
       "source": "itad",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
-      "id": "itad-13ca8fbedd28",
+      "id": "itad-63ac54bf0426",
       "store": "epic",
-      "title": "Citizen Sleeper - FREE on Epic Games on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16272/",
+      "title": "Rollercoaster Tycoon 3 Complete Edition - FREE on Epic Games on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16301/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/citizen-sleeper/info/\">Citizen Sleeper</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 25 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/citizen-sleeper-944858>go to giveaway</a>",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/rollercoaster-tycoon-3-complete-edition/info/\">RollerCoaster Tycoon® 3: Complete Edition</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 02 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/rollercoaster-tycoon-3-complete-edition>go to giveaway</a>",
       "source": "itad",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00"
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
       "id": "itad-f0cffe659c19",
@@ -242,23 +212,10 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16253/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2800500/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/blacklist-mafia/info/\">Blacklist Mafia</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/blacklist-mafia>go to giveaway</a>",
+      "blurb": "Blacklist Mafia",
       "source": "itad",
       "review_percent": 82,
       "steam_appid": 2800500,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-6d00ffeb0fdc",
-      "store": "itch",
-      "title": "Another World Adventures free on itch.io on Itch.io",
-      "claim_url": "https://isthereanydeal.com/giveaways/16251/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/another-world-adventures/info/\">Another World Adventures</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 20 Jun 2026 03:00:00 +0200\n                                        | <a href=https://s-xavier-uy.itch.io/another-world-adventures>go to giveaway</a>",
-      "source": "itad",
-      "review_percent": 50,
-      "steam_appid": 3445980,
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
@@ -268,7 +225,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16229/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/tell-me-why/info/\">Tell Me Why</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-2/info/\">Tell Me Why: Chapter 2</a>\n                        \n                                                \n                        <br />\n                                            <a href=\"https://isthereanydeal.com/game/tell-me-why-chapter-3/info/\">Tell Me Why: Chapter 3</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Wed, 01 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1180660/Tell_Me_Why>go to giveaway</a>",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/tell-me-why/info/\">Tell Me Why</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Wed, 01 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1180660/Tell_Me_Why>go to giveaway</a>",
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -279,7 +236,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16196/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/mr-brocco-and-co/info/\">Mr.Brocco &amp; Co</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/mrbrocco-co>go to giveaway</a>",
+      "blurb": "Mr.Brocco & Co",
       "source": "itad",
       "review_percent": 83,
       "steam_appid": 2074560,
@@ -292,7 +249,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16143/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/the-brave-little-cloud/info/\">The Brave Little Cloud</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/the-brave-little-cloud>go to giveaway</a>",
+      "blurb": "The Brave Little Cloud",
       "source": "itad",
       "review_percent": 97,
       "steam_appid": 2635070,
@@ -338,7 +295,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/7433/",
       "ends_at": null,
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/die-young-prologue/info/\">Die Young: Prologue</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/die-young-prologue>go to giveaway</a>",
+      "blurb": "Die Young: Prologue",
       "source": "itad",
       "review_percent": 78,
       "steam_appid": 973000,

@@ -574,6 +574,23 @@ describe('missingPublishFields', () => {
   it('lists all missing', () => {
     expect(missingPublishFields({})).toEqual(['id', 'store', 'claim_url']);
   });
+
+  it('requires claim_urls for epic_mobile', () => {
+    expect(missingPublishFields({
+      id: 'epic_mobile-northgard',
+      store: 'epic_mobile',
+      title: 'Northgard',
+    })).toEqual(['claim_urls']);
+  });
+
+  it('accepts epic_mobile with one platform url', () => {
+    expect(missingPublishFields({
+      id: 'epic_mobile-northgard',
+      store: 'epic_mobile',
+      title: 'Northgard',
+      claim_urls: { ios: 'https://apps.apple.com/app/id123' },
+    })).toEqual([]);
+  });
 });
 
 describe('computeOverviewStats', () => {

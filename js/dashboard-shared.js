@@ -65,7 +65,7 @@ export const DASH_REVIEW_COLORS = {
 };
 
 export const DASH_STORE_LABELS = {
-  steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic", amazon: "Amazon",
+  steam: "Steam", gog: "GOG", psn: "PSN", epic: "Epic", epic_mobile: "Epic Mobile", amazon: "Amazon",
   xbox: "Xbox", battlenet: "Battle.net", ubisoft: "Ubisoft", nintendo: "Nintendo", humble: "Humble", ea: "EA App",
   itch: "itch.io", indiegala: "IndieGala", other: "Other", manual: "Manual",
 };

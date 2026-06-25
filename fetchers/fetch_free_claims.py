@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 from fetchers._base import configure_stdout
 from fetchers._progress import RunStats, started
+from shared.free_claims_sources import has_valid_claim_links
 from shared.profile_paths import free_claims_path
 from shared.safe_write import safe_write_text
 
@@ -64,18 +65,18 @@ def main() -> int:
         if not isinstance(item, dict):
             invalid += 1
             continue
-        if not item.get("id") or not item.get("claim_url") or not item.get("store"):
+        if not item.get("id") or not item.get("store") or not has_valid_claim_links(item):
             invalid += 1
             continue
         valid_items.append(item)
     valid = len(valid_items)
     if invalid:
-        stats.warn(f"dropped {invalid} malformed claim row(s) (need id, store, claim_url)")
+        stats.warn(f"dropped {invalid} malformed claim row(s) (need id, store, and valid claim link(s))")
 
     # Refuse to overwrite the user's claims with nothing unless explicitly allowed.
     if valid == 0 and not args.allow_empty:
         stats.error(
-            "feed produced 0 valid claim(s) (need id, store, claim_url) — refusing to "
+            "feed produced 0 valid claim(s) (need id, store, and valid claim link(s)) — refusing to "
             "overwrite. Re-run with --allow-empty if there are genuinely no live giveaways."
         )
         return stats.finish("fetch_free_claims", t0, exit_code=2)

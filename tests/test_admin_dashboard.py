@@ -369,6 +369,31 @@ def test_free_claims_approved_put_writes_field_overrides(
     }
 
 
+def test_free_claims_approved_put_writes_claim_urls_field_overrides(
+    admin_server: tuple[str, Path],
+    tmp_path: Path,
+) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    payload = {
+        "ids": ["itad-f520d9928848"],
+        "field_overrides": {
+            "itad-f520d9928848": {
+                "claim_urls": {
+                    "ios": "https://apps.apple.com/app/id123",
+                    "android": "https://play.google.com/store/apps/details?id=abc",
+                },
+            },
+        },
+    }
+    code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body=payload)
+    assert code == 200, data
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert saved["field_overrides"]["itad-f520d9928848"]["claim_urls"]["ios"].startswith(
+        "https://apps.apple.com/",
+    )
+
+
 def test_free_claims_get_returns_dismissed(admin_server: tuple[str, Path], tmp_path: Path) -> None:
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"

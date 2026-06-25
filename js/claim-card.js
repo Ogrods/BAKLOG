@@ -19,9 +19,26 @@
  * - sanitizeBlurb ↔ build_free_claims._clean_blurb
  */
 import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
+import {
+  EPIC_MOBILE_STORE,
+  hasValidClaimLinks,
+  inferClaimUrlPlatform,
+  isEpicMobileStore,
+  missingClaimLinkFields,
+  normalizeClaimUrls,
+} from './claim-links.js';
 import { normalizeNameForDedup } from './game-core.js';
 import { storeLogoHtml, storeDisplayName } from './store-logos.js';
 import { affiliateUrl } from './affiliate.js';
+
+export {
+  EPIC_MOBILE_STORE,
+  hasValidClaimLinks,
+  inferClaimUrlPlatform,
+  isEpicMobileStore,
+  missingClaimLinkFields,
+  normalizeClaimUrls,
+} from './claim-links.js';
 
 /** Strip giveaway/store boilerplate from auto-sourced claim titles before ownership match. */
 export function stripClaimTitleDecorations(title) {
@@ -45,9 +62,14 @@ export function stripClaimTitleDecorations(title) {
 const CLAIM_SOURCE_RANK = { epic: 0, gamerpower: 1, itad: 2 };
 
 export function claimDedupKey(c) {
-  if (c.steam_appid != null && c.steam_appid !== '') return `appid:${c.steam_appid}`;
+  if (c.steam_appid != null && c.steam_appid !== '') {
+    const base = `appid:${c.steam_appid}`;
+    return isEpicMobileStore(c.store) ? `${base}:mobile` : base;
+  }
   const norm = normalizeNameForDedup(stripClaimTitleDecorations(c.title || ''));
-  return norm ? `title:${norm}` : `id:${c.id}`;
+  if (!norm) return `id:${c.id}`;
+  if (isEpicMobileStore(c.store)) return `title:${norm}:mobile`;
+  return `title:${norm}`;
 }
 
 /** Collapse the same game arriving from multiple sources to one row. */
@@ -173,6 +195,65 @@ function claimPremiumBadgeHtml(claim) {
   return '<span class="claim-pro-badge deal-cut-badge" title="Pro-only bonus drop">Pro</span>';
 }
 
+const CLAIM_OPEN_BTN_CLASS = {
+  hero: 'bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold px-3 py-1.5 rounded',
+  row: 'bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-2.5 py-1 rounded',
+};
+
+/** Primary claim CTA(s) for list/hero cards (buttons; claimable.js handles clicks). */
+export function claimPlatformButtonsHtml(claim, { variant = 'row' } = {}) {
+  const id = escapeAttr(claim.id);
+  const btnClass = CLAIM_OPEN_BTN_CLASS[variant] || CLAIM_OPEN_BTN_CLASS.row;
+  if (isEpicMobileStore(claim.store)) {
+    const urls = normalizeClaimUrls(claim.claim_urls);
+    const parts = [];
+    if (urls.ios) {
+      parts.push(
+        `<button type="button" class="btn-claim-open btn-claim-open--ios ${btnClass}" data-claim-go-ios="${id}">Claim on iOS</button>`,
+      );
+    }
+    if (urls.android) {
+      parts.push(
+        `<button type="button" class="btn-claim-open btn-claim-open--android ${btnClass}" data-claim-go-android="${id}">Claim on Android</button>`,
+      );
+    }
+    return parts.join('');
+  }
+  return `<button type="button" class="btn-claim-open ${btnClass}" data-claim-go="${id}">Claim free →</button>`;
+}
+
+function claimDetailClaimActionsHtml(claim, owned) {
+  if (owned) {
+    return '<p class="claim-detail-owned">Already in your library.</p>';
+  }
+  if (isEpicMobileStore(claim.store)) {
+    const urls = normalizeClaimUrls(claim.claim_urls);
+    const parts = [];
+    if (urls.ios) {
+      const href = escapeAttr(affiliateUrl(urls.ios));
+      parts.push(
+        `<a href="${href}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn claim-detail-claim-btn--ios">Claim on iOS</a>`,
+      );
+    }
+    if (urls.android) {
+      const href = escapeAttr(affiliateUrl(urls.android));
+      parts.push(
+        `<a href="${href}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn claim-detail-claim-btn--android">Claim on Android</a>`,
+      );
+    }
+    if (!parts.length) {
+      return '<p class="claim-detail-owned">Claim link unavailable.</p>';
+    }
+    return `<div class="claim-detail-platform-actions">${parts.join('')}</div>`;
+  }
+  const claimable = isSafeHttpUrl(claim.claim_url);
+  if (!claimable) {
+    return '<p class="claim-detail-owned">Claim link unavailable.</p>';
+  }
+  const claimHref = escapeAttr(affiliateUrl(claim.claim_url));
+  return `<a href="${claimHref}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn">Claim free →</a>`;
+}
+
 export function claimCardHtml(claim) {
   const title = escapeHtml(claim.title || 'Free game');
   const store = claim.store || 'other';
@@ -215,7 +296,7 @@ export function claimCardHtml(claim) {
           <div class="deal-hero-stats-row">${review}${genreHtml}</div>
         </div>
         <div class="claim-hero-actions flex flex-wrap gap-2 mt-3">
-          <button type="button" class="btn-claim-open bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold px-3 py-1.5 rounded" data-claim-go="${escapeAttr(claim.id)}">Claim free →</button>
+          ${claimPlatformButtonsHtml(claim, { variant: 'hero' })}
           <button type="button" class="btn-claim-clear text-slate-400 hover:text-slate-200 text-sm px-2 py-1.5 rounded border border-slate-600" data-claim-clear="${escapeAttr(claim.id)}">Clear</button>
         </div>
       </div>
@@ -260,7 +341,7 @@ export function claimRowHtml(claim) {
       <span class="claim-cell-ends">${endsHtml}</span>
     </span>
     <span class="claim-cell-actions">
-      <button type="button" class="btn-claim-open bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-2.5 py-1 rounded" data-claim-go="${escapeAttr(claim.id)}">Claim free →</button>
+      ${claimPlatformButtonsHtml(claim, { variant: 'row' })}
       <button type="button" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded border border-slate-600" data-claim-clear="${escapeAttr(claim.id)}">Clear</button>
     </span>
   </div>`;
@@ -309,13 +390,7 @@ export function claimDetailPanelHtml(claim, {
   const endsHtml = ends
     ? `<span class="claim-detail-ends">Ends ${escapeHtml(ends)}</span>`
     : '';
-  const claimable = !owned && isSafeHttpUrl(claim.claim_url);
-  const claimHref = claimable ? affiliateUrl(claim.claim_url) : '';
-  const claimBtn = owned
-    ? `<p class="claim-detail-owned">Already in your library.</p>`
-    : (claimable
-      ? `<a href="${escapeAttr(claimHref)}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn">Claim free →</a>`
-      : `<p class="claim-detail-owned">Claim link unavailable.</p>`);
+  const claimBtn = claimDetailClaimActionsHtml(claim, owned);
   return `<form method="dialog" class="claim-detail-panel">
       <div class="claim-detail-header">
         <h2 class="claim-detail-title">${escapeHtml(claim.title || 'Free game')}</h2>

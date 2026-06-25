@@ -66,6 +66,9 @@ if (-not (Test-Path $FallbackJson)) {
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 
 Write-Host "Writing bundled account-auth .env..."
+$urlSet = [bool]$env:BAKLOG_SUPABASE_URL
+$anonSet = [bool]$env:BAKLOG_SUPABASE_ANON_KEY
+Write-Host "  Auth env: BAKLOG_SUPABASE_URL=$(if ($urlSet) { 'set' } else { 'MISSING' }), BAKLOG_SUPABASE_ANON_KEY=$(if ($anonSet) { 'set' } else { 'MISSING' })"
 & $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

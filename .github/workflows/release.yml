@@ -68,6 +68,13 @@ jobs:
       - name: Run JS tests
         run: npm test
 
+      - name: Verify production frontend (fail before PyInstaller)
+        run: |
+          npm run vendor:supabase
+          npm run build
+          npm run check:dist-integrity
+          npm run check:bundle-size
+
       - name: Verify release auth secrets (fail fast)
         shell: pwsh
         env:

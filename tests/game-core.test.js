@@ -156,13 +156,13 @@ describe('dedupeWithinStore', () => {
     expect(out[0].id).toBe(2);
   });
 
-  it('drops junk entries entirely', () => {
+  it('keeps noise rows in catalog (auto-hidden elsewhere)', () => {
     const games = [
       { store: 'steam', id: 1, name: 'live' },
       { store: 'steam', id: 2, name: 'Hades' },
     ];
     const out = dedupeWithinStore(games);
-    expect(out.map(g => g.name)).toEqual(['Hades']);
+    expect(out.map(g => g.name).sort()).toEqual(['Hades', 'live']);
   });
 });
 

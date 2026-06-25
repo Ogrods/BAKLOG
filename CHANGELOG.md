@@ -22,21 +22,36 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.19] - 2026-06-25
+
+### Added
+
+- Self-service Supabase signup plus forgot/reset password on the auth gate.
+- Comp-Pro on login for invitee emails listed in `packaging/pro_invitees.txt`
+  (requires `SUPABASE_SERVICE_ROLE_KEY` on the server that handles sign-in).
+
 ### Changed
 
-- Frozen installs (BAKLOG.exe / installer) now store library data in a separate
-  OS user-data folder (`%LOCALAPPDATA%\BAKLOG-Data` on Windows) instead of beside
-  the exe. First launch migrates existing co-located data automatically (resumable
-  if interrupted). Portable zip users who want a single folder can add `portable.txt`
-  beside the exe. Migration also runs when `BAKLOG_DATA_DIR` is set on frozen builds.
+- Frozen installs store library data under `%LOCALAPPDATA%\BAKLOG-Data` on
+  Windows (resumable migration from a co-located install; `portable.txt` keeps
+  single-folder mode). `BAKLOG_DATA_DIR` override still migrates from the legacy
+  install dir on first boot.
+- Shared connect loop and smoother headed sign-in for browser-backed stores.
+- Dependabot dependency bumps (GitHub Actions, pip, npm) and server helper
+  extractions (`shared/server_auth_session.py`, `shared/server_epic_oauth.py`,
+  and related modules).
 
 ### Fixed
 
-- App/data split hardening: resumable legacy migration (partial first-boot no
-  longer strands catalogs in the install folder), `BAKLOG_DATA_DIR` override still
-  migrates from the install dir, PyInstaller bundles `shared.data_dir_migration`,
-  `/api/config` and bug bundles include redacted data path, uninstaller reminds
-  users that `BAKLOG-Data` survives.
+- EA Connect: GraphQL hook pipeline, profile isolation during connect, and
+  `initial_url` on `launch_persistent_profile` (regression from the EA connect
+  merge).
+- Library count combat-text: sequential `+1` popups, linear hero roll,
+  tick-synced popups on small acquisition deltas, and mega-hero handoff when
+  `fireLibraryCountFlash` owns the burst.
+- Profile dismiss/switch isolation and related localStorage scoping.
+- CI stability after dependency merges (Vitest, ruff, server line budget,
+  Linux pytest flakes).
 
 ## [0.8.18] - 2026-06-15
 

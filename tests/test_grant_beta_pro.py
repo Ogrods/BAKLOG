@@ -19,8 +19,12 @@ def test_main_dry_run_lists_users(monkeypatch, capsys) -> None:
             }
         ]
 
-    monkeypatch.setattr(grant, "_list_users", fake_list)
-    monkeypatch.setattr(grant, "_request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not write")))
+    monkeypatch.setattr(grant, "list_users", fake_list)
+    monkeypatch.setattr(
+        grant,
+        "admin_request",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not write")),
+    )
 
     rc = grant.main(["--email", "beta@example.com"])
     out = capsys.readouterr().out
@@ -49,8 +53,8 @@ def test_main_apply_updates_user(monkeypatch, capsys) -> None:
         writes.append((method, url, body))
         return {}
 
-    monkeypatch.setattr(grant, "_list_users", fake_list)
-    monkeypatch.setattr(grant, "_request", fake_request)
+    monkeypatch.setattr(grant, "list_users", fake_list)
+    monkeypatch.setattr(grant, "admin_request", fake_request)
 
     rc = grant.main(["--email", "beta@example.com", "--apply"])
     out = capsys.readouterr().out

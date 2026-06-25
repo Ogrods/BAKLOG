@@ -25,7 +25,8 @@ window unless you launched the server-console shortcut.
 Your data stays on this PC. Nothing is uploaded to our servers.
 
 If your invite build uses account sign-in (Supabase), you will see a sign-in
-screen before the dashboard. Store Connect still requires Chrome or Edge.
+screen before the dashboard. Create a free account on that screen, or sign in
+if you already have one. Store Connect still requires Chrome or Edge.
 
 Bug reports: use the app menu (Report a bug…) or Discord #bug-reports.
 Version: see the About line in the app or BAKLOG-*.sha256 next to the zip.

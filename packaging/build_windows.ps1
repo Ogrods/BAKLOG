@@ -65,6 +65,10 @@ if (-not (Test-Path $FallbackJson)) {
 
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 
+Write-Host "Writing bundled account-auth .env..."
+& $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 @"
 @echo off
 cd /d "%~dp0"

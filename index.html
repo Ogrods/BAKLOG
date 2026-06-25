@@ -75,9 +75,9 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen">
   <div id="authGateOverlay" class="auth-gate-overlay" hidden aria-hidden="true">
     <div class="auth-gate-card">
-      <h2 class="auth-gate-title">Sign in to BAKLOG</h2>
-      <p class="auth-gate-hint">Invite-only. Use the email and password from your Supabase invite.</p>
-      <form id="authGateForm" class="auth-gate-form">
+      <h2 id="authGateTitle" class="auth-gate-title">Sign in to BAKLOG</h2>
+      <p id="authGateHint" class="auth-gate-hint">Sign in with your BAKLOG account. New here? Create a free account below.</p>
+      <form id="authGateForm" class="auth-gate-form" data-auth-panel="signin">
         <label class="auth-gate-field">
           <span class="auth-gate-label">Email</span>
           <input type="email" id="authGateEmail" name="email" autocomplete="username" required class="auth-gate-input" />
@@ -88,6 +88,55 @@
         </label>
         <p id="authGateError" class="auth-gate-error hidden" role="alert"></p>
         <button type="submit" id="authGateSubmit" class="auth-gate-submit">Sign in</button>
+        <p class="auth-gate-foot">
+          <button type="button" id="authGateForgotLink" class="auth-gate-link">Forgot password?</button>
+          <span class="auth-gate-foot-sep" aria-hidden="true"> · </span>
+          <button type="button" id="authGateCreateLink" class="auth-gate-link">Create account</button>
+        </p>
+      </form>
+      <form id="authGateSignupForm" class="auth-gate-form hidden" data-auth-panel="signup" hidden>
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">Email</span>
+          <input type="email" id="authGateSignupEmail" name="email" autocomplete="username" required class="auth-gate-input" />
+        </label>
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">Password</span>
+          <input type="password" id="authGateSignupPassword" name="password" autocomplete="new-password" required minlength="8" class="auth-gate-input" />
+        </label>
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">Confirm password</span>
+          <input type="password" id="authGateSignupConfirm" name="confirm-password" autocomplete="new-password" required minlength="8" class="auth-gate-input" />
+        </label>
+        <p id="authGateSignupError" class="auth-gate-error hidden" role="alert"></p>
+        <p id="authGateSignupSuccess" class="auth-gate-success hidden" role="status"></p>
+        <button type="submit" id="authGateSignupSubmit" class="auth-gate-submit">Create account</button>
+        <p class="auth-gate-foot">
+          <button type="button" id="authGateSignupBack" class="auth-gate-link">Already have an account? Sign in</button>
+        </p>
+      </form>
+      <form id="authGateForgotForm" class="auth-gate-form hidden" data-auth-panel="forgot" hidden>
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">Email</span>
+          <input type="email" id="authGateForgotEmail" name="email" autocomplete="username" required class="auth-gate-input" />
+        </label>
+        <p id="authGateForgotError" class="auth-gate-error hidden" role="alert"></p>
+        <p id="authGateForgotSuccess" class="auth-gate-success hidden" role="status"></p>
+        <button type="submit" id="authGateForgotSubmit" class="auth-gate-submit">Send reset link</button>
+        <p class="auth-gate-foot">
+          <button type="button" id="authGateBackToSignIn" class="auth-gate-link">Back to sign in</button>
+        </p>
+      </form>
+      <form id="authGateResetForm" class="auth-gate-form hidden" data-auth-panel="reset" hidden>
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">New password</span>
+          <input type="password" id="authGateNewPassword" name="new-password" autocomplete="new-password" required minlength="8" class="auth-gate-input" />
+        </label>
+        <label class="auth-gate-field">
+          <span class="auth-gate-label">Confirm password</span>
+          <input type="password" id="authGateConfirmPassword" name="confirm-password" autocomplete="new-password" required minlength="8" class="auth-gate-input" />
+        </label>
+        <p id="authGateResetError" class="auth-gate-error hidden" role="alert"></p>
+        <button type="submit" id="authGateResetSubmit" class="auth-gate-submit">Update password</button>
       </form>
     </div>
   </div>

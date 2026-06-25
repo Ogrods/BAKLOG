@@ -145,6 +145,72 @@ function setAuthError(msg) {
   }
 }
 
+function setPanelMessage(id, msg, { success = false } = {}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    if (success) el.classList.add('auth-gate-success');
+    else el.classList.remove('auth-gate-success');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+    el.classList.remove('auth-gate-success');
+  }
+}
+
+const AUTH_PANEL_COPY = {
+  signin: {
+    title: 'Sign in to BAKLOG',
+    hint: 'Sign in with your BAKLOG account. New here? Create a free account below.',
+  },
+  signup: {
+    title: 'Create your BAKLOG account',
+    hint: 'Free account for beta. Your library stays on this PC; we only store your email for sign-in.',
+  },
+  forgot: {
+    title: 'Reset your password',
+    hint: 'Enter your account email. We will send a link to choose a new password.',
+  },
+  reset: {
+    title: 'Choose a new password',
+    hint: 'Pick a new password for your BAKLOG account, then sign in.',
+  },
+};
+
+function authRedirectUrl() {
+  try {
+    return `${location.origin}${location.pathname}`;
+  } catch {
+    return 'http://127.0.0.1:8765/';
+  }
+}
+
+/** Show sign-in, forgot-password, or reset-password panel on the auth gate. */
+export function showAuthGatePanel(panel = 'signin') {
+  const key = AUTH_PANEL_COPY[panel] ? panel : 'signin';
+  const title = document.getElementById('authGateTitle');
+  const hint = document.getElementById('authGateHint');
+  if (title) title.textContent = AUTH_PANEL_COPY[key].title;
+  if (hint) hint.textContent = AUTH_PANEL_COPY[key].hint;
+  for (const form of document.querySelectorAll('[data-auth-panel]')) {
+    const active = form.getAttribute('data-auth-panel') === key;
+    form.hidden = !active;
+    form.classList.toggle('hidden', !active);
+  }
+  if (key === 'signin') setAuthError('');
+  if (key === 'signup') {
+    setPanelMessage('authGateSignupError', '');
+    setPanelMessage('authGateSignupSuccess', '');
+  }
+  if (key === 'forgot') {
+    setPanelMessage('authGateForgotError', '');
+    setPanelMessage('authGateForgotSuccess', '');
+  }
+  if (key === 'reset') setPanelMessage('authGateResetError', '');
+}
+
 function applyConfigEntitlement(config) {
   if (!config || typeof config !== 'object') return;
   if (typeof config.plan === 'string' && config.plan) _plan = config.plan;
@@ -234,9 +300,11 @@ async function probeServerToken() {
     const data = await res.json();
     if (data.profile) _accountProfileId = String(data.profile);
     if (data.email) _accountEmail = data.email;
-    // Plan from the bearer-authenticated probe — /api/config is fetched without
-    // a bearer at boot, so this is where JWT-based pro reaches the UI.
     if (typeof data.plan === 'string' && data.plan) _plan = data.plan;
+    if (data.refreshSession && _supabase) {
+      await refreshAccessToken();
+      if (!(await probeServerToken())) return false;
+    }
     return !!data.ok;
   } catch {
     return false;
@@ -311,10 +379,157 @@ function bindSignInForm() {
         return;
       }
       if (!data.session) {
-        setAuthError('No session returned. Use the link from your invite email if this is your first sign-in.');
+        setAuthError('No session returned. Confirm your email if you just signed up, then try again.');
         return;
       }
       await onAuthenticated(data.session);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('authGateForgotLink')?.addEventListener('click', () => {
+    const email = document.getElementById('authGateEmail')?.value?.trim();
+    const forgotEmail = document.getElementById('authGateForgotEmail');
+    if (forgotEmail && email) forgotEmail.value = email;
+    showAuthGatePanel('forgot');
+  });
+
+  document.getElementById('authGateCreateLink')?.addEventListener('click', () => {
+    const email = document.getElementById('authGateEmail')?.value?.trim();
+    const signupEmail = document.getElementById('authGateSignupEmail');
+    if (signupEmail && email) signupEmail.value = email;
+    showAuthGatePanel('signup');
+  });
+}
+
+function bindSignUpForm() {
+  const form = document.getElementById('authGateSignupForm');
+  const btn = document.getElementById('authGateSignupSubmit');
+  if (!form || !btn || !_supabase) return;
+
+  document.getElementById('authGateSignupBack')?.addEventListener('click', () => {
+    showAuthGatePanel('signin');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setPanelMessage('authGateSignupError', '');
+    setPanelMessage('authGateSignupSuccess', '');
+    const email = document.getElementById('authGateSignupEmail')?.value?.trim();
+    const password = document.getElementById('authGateSignupPassword')?.value || '';
+    const confirm = document.getElementById('authGateSignupConfirm')?.value || '';
+    if (!email) {
+      setPanelMessage('authGateSignupError', 'Enter your email.');
+      return;
+    }
+    if (password.length < 8) {
+      setPanelMessage('authGateSignupError', 'Password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      setPanelMessage('authGateSignupError', 'Passwords do not match.');
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const { data, error } = await _supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: authRedirectUrl() },
+      });
+      if (error) {
+        setPanelMessage('authGateSignupError', error.message || 'Could not create account.');
+        return;
+      }
+      if (data.session) {
+        await onAuthenticated(data.session);
+        return;
+      }
+      setPanelMessage(
+        'authGateSignupSuccess',
+        'Account created. Check your email to confirm, then sign in.',
+        { success: true },
+      );
+      showAuthGatePanel('signin');
+      setAuthError('Confirm your email, then sign in with your new password.');
+      const signInEmail = document.getElementById('authGateEmail');
+      if (signInEmail) signInEmail.value = email;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+function bindForgotPasswordForm() {
+  const form = document.getElementById('authGateForgotForm');
+  const btn = document.getElementById('authGateForgotSubmit');
+  if (!form || !btn || !_supabase) return;
+
+  document.getElementById('authGateBackToSignIn')?.addEventListener('click', () => {
+    showAuthGatePanel('signin');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setPanelMessage('authGateForgotError', '');
+    setPanelMessage('authGateForgotSuccess', '');
+    const email = document.getElementById('authGateForgotEmail')?.value?.trim();
+    if (!email) {
+      setPanelMessage('authGateForgotError', 'Enter your account email.');
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const { error } = await _supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: authRedirectUrl(),
+      });
+      if (error) {
+        setPanelMessage('authGateForgotError', error.message || 'Could not send reset email.');
+        return;
+      }
+      setPanelMessage(
+        'authGateForgotSuccess',
+        'If that email is registered, a reset link is on its way. Check your inbox.',
+        { success: true },
+      );
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+function bindResetPasswordForm() {
+  const form = document.getElementById('authGateResetForm');
+  const btn = document.getElementById('authGateResetSubmit');
+  if (!form || !btn || !_supabase) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setPanelMessage('authGateResetError', '');
+    const password = document.getElementById('authGateNewPassword')?.value || '';
+    const confirm = document.getElementById('authGateConfirmPassword')?.value || '';
+    if (password.length < 8) {
+      setPanelMessage('authGateResetError', 'Password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      setPanelMessage('authGateResetError', 'Passwords do not match.');
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const { data, error } = await _supabase.auth.updateUser({ password });
+      if (error) {
+        setPanelMessage('authGateResetError', error.message || 'Could not update password.');
+        return;
+      }
+      if (data.session) {
+        await onAuthenticated(data.session);
+        return;
+      }
+      showAuthGatePanel('signin');
+      setAuthError('Password updated. Sign in with your new password.');
     } finally {
       btn.disabled = false;
     }
@@ -362,6 +577,10 @@ export async function initAuthGate() {
   });
 
   bindSignInForm();
+  bindSignUpForm();
+  bindForgotPasswordForm();
+  bindResetPasswordForm();
+  showAuthGatePanel('signin');
 
   const { data: { session }, error: sessionError } = await _supabase.auth.getSession();
   if (sessionError && isStaleRefreshTokenError(sessionError)) {
@@ -375,7 +594,13 @@ export async function initAuthGate() {
 
   _authedPromise = new Promise((resolve) => { _resolveAuthed = resolve; });
   setOverlayVisible(true);
-  _supabase.auth.onAuthStateChange((_event, nextSession) => {
+  _supabase.auth.onAuthStateChange((event, nextSession) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      showAuthGatePanel('reset');
+      setOverlayVisible(true);
+      setAuthError('');
+      return;
+    }
     if (nextSession?.access_token) {
       onAuthenticated(nextSession);
     } else if (!_authReadySettled) {
@@ -432,6 +657,7 @@ export async function signOutAccount(opts = {}) {
   _accessToken = null;
   _accountProfileId = '';
   if (opts.intentional) {
+    showAuthGatePanel('signin');
     setOverlayVisible(true);
     setAuthError('');
   } else {

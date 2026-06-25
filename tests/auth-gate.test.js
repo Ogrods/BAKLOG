@@ -9,8 +9,11 @@ const supabaseMock = vi.hoisted(() => {
     auth: {
       getSession: vi.fn(async () => getSessionResult ?? { data: { session }, error: null }),
       signInWithPassword: vi.fn(async () => ({ data: { session }, error: null })),
+      signUp: vi.fn(async () => ({ data: { user: { id: 'new' }, session: null }, error: null })),
       signOut,
       refreshSession: vi.fn(async () => ({ data: { session }, error: null })),
+      resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
+      updateUser: vi.fn(async () => ({ data: { session }, error: null })),
       onAuthStateChange: vi.fn((cb) => {
         authListener = cb;
         return { data: { subscription: { unsubscribe: vi.fn() } } };
@@ -23,12 +26,15 @@ const supabaseMock = vi.hoisted(() => {
     setSession(s) { session = s; getSessionResult = null; },
     setGetSessionResult(r) { getSessionResult = r; },
     getSession() { return session; },
-    fireAuthChange(next) { authListener?.('SIGNED_IN', next); },
+    fireAuthChange(event, next) { authListener?.(event, next); },
     reset() {
       session = null;
       authListener = null;
       getSessionResult = null;
       signOut.mockClear();
+      client.auth.resetPasswordForEmail.mockClear();
+      client.auth.updateUser.mockClear();
+      client.auth.signUp.mockClear();
     },
   };
 });
@@ -42,11 +48,37 @@ describe('auth-gate', () => {
     supabaseMock.reset();
     document.body.innerHTML = `
       <div id="authGateOverlay" hidden></div>
-      <form id="authGateForm">
+      <h2 id="authGateTitle"></h2>
+      <p id="authGateHint"></p>
+      <form id="authGateForm" data-auth-panel="signin">
         <input id="authGateEmail" />
         <input id="authGatePassword" />
         <p id="authGateError" class="hidden"></p>
         <button type="submit" id="authGateSubmit"></button>
+        <button type="button" id="authGateForgotLink"></button>
+        <button type="button" id="authGateCreateLink"></button>
+      </form>
+      <form id="authGateSignupForm" class="hidden" data-auth-panel="signup" hidden>
+        <input id="authGateSignupEmail" />
+        <input id="authGateSignupPassword" />
+        <input id="authGateSignupConfirm" />
+        <p id="authGateSignupError" class="hidden"></p>
+        <p id="authGateSignupSuccess" class="hidden auth-gate-success"></p>
+        <button type="submit" id="authGateSignupSubmit"></button>
+        <button type="button" id="authGateSignupBack"></button>
+      </form>
+      <form id="authGateForgotForm" class="hidden" data-auth-panel="forgot" hidden>
+        <input id="authGateForgotEmail" />
+        <p id="authGateForgotError" class="hidden"></p>
+        <p id="authGateForgotSuccess" class="hidden auth-gate-success"></p>
+        <button type="submit" id="authGateForgotSubmit"></button>
+        <button type="button" id="authGateBackToSignIn"></button>
+      </form>
+      <form id="authGateResetForm" class="hidden" data-auth-panel="reset" hidden>
+        <input id="authGateNewPassword" />
+        <input id="authGateConfirmPassword" />
+        <p id="authGateResetError" class="hidden"></p>
+        <button type="submit" id="authGateResetSubmit"></button>
       </form>`;
     document.documentElement.removeAttribute('data-auth-required');
     document.documentElement.removeAttribute('data-boot-loading');
@@ -168,5 +200,72 @@ describe('auth-gate', () => {
     expect(isPro()).toBe(true);
     expect(getPlan()).toBe('pro');
     localStorage.removeItem('baklog-debug-pro');
+  });
+
+  it('showAuthGatePanel toggles signup form', async () => {
+    const { showAuthGatePanel } = await import('../js/auth-gate.js');
+    showAuthGatePanel('signup');
+    expect(document.getElementById('authGateSignupForm').hidden).toBe(false);
+    expect(document.getElementById('authGateTitle').textContent).toContain('Create');
+  });
+
+  it('signup submit calls signUp', async () => {
+    supabaseMock.setGetSessionResult({
+      data: { session: null },
+      error: { message: 'Invalid Refresh Token: Refresh Token Not Found' },
+    });
+    const { initAuthGate } = await import('../js/auth-gate.js');
+    initAuthGate();
+    await new Promise((r) => setTimeout(r, 50));
+    document.getElementById('authGateCreateLink').click();
+    document.getElementById('authGateSignupEmail').value = 'new@example.com';
+    document.getElementById('authGateSignupPassword').value = 'password123';
+    document.getElementById('authGateSignupConfirm').value = 'password123';
+    document.getElementById('authGateSignupForm').requestSubmit();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(supabaseMock.client.auth.signUp).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      password: 'password123',
+      options: { emailRedirectTo: expect.any(String) },
+    });
+  });
+
+  it('showAuthGatePanel toggles forgot-password form', async () => {
+    const { showAuthGatePanel } = await import('../js/auth-gate.js');
+    showAuthGatePanel('forgot');
+    expect(document.getElementById('authGateForm').hidden).toBe(true);
+    expect(document.getElementById('authGateForgotForm').hidden).toBe(false);
+    expect(document.getElementById('authGateTitle').textContent).toContain('Reset');
+  });
+
+  it('forgot-password submit calls resetPasswordForEmail', async () => {
+    supabaseMock.setGetSessionResult({
+      data: { session: null },
+      error: { message: 'Invalid Refresh Token: Refresh Token Not Found' },
+    });
+    const { initAuthGate } = await import('../js/auth-gate.js');
+    initAuthGate();
+    await new Promise((r) => setTimeout(r, 50));
+    document.getElementById('authGateForgotLink').click();
+    document.getElementById('authGateForgotEmail').value = 'user@example.com';
+    document.getElementById('authGateForgotForm').requestSubmit();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(supabaseMock.client.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      'user@example.com',
+      expect.objectContaining({ redirectTo: expect.any(String) }),
+    );
+  });
+
+  it('PASSWORD_RECOVERY shows reset panel', async () => {
+    supabaseMock.setGetSessionResult({
+      data: { session: null },
+      error: { message: 'Invalid Refresh Token: Refresh Token Not Found' },
+    });
+    const { initAuthGate } = await import('../js/auth-gate.js');
+    initAuthGate();
+    await new Promise((r) => setTimeout(r, 50));
+    supabaseMock.fireAuthChange('PASSWORD_RECOVERY', { access_token: 'recovery-tok' });
+    expect(document.getElementById('authGateResetForm').hidden).toBe(false);
+    expect(document.getElementById('authGateTitle').textContent).toContain('new password');
   });
 });

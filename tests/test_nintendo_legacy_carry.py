@@ -8,12 +8,12 @@ from pathlib import Path
 from fetchers._base import LAST_SEEN_FIELD, STALE_FIELD, STALE_SINCE_FIELD, row_key_by_id
 from fetchers.fetch_nintendo import (
     NINTENDO_LEGACY_FIELD,
+    _nintendo_drift_baseline,
     carry_forward_nintendo_legacy,
     load_nintendo_dropped_ids,
     maybe_repair_nintendo_catalog_on_disk,
     refuse_nintendo_drift_result,
     repair_nintendo_stale_catalog,
-    _nintendo_drift_baseline,
 )
 
 

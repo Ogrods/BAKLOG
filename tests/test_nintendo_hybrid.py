@@ -6,8 +6,8 @@ from fetchers.nintendo_hybrid import (
     find_existing_row,
     index_existing_rows,
     is_nintendo_playable_game,
-    merge_vgc_with_transactions,
     match_nintendo_title_key,
+    merge_vgc_with_transactions,
     nintendo_store_url,
 )
 

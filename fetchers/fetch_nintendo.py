@@ -45,14 +45,14 @@ from fetchers._base import (
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from fetchers.nintendo_hybrid import (
-    find_existing_row,
     finalize_nintendo_library_rows,
+    find_existing_row,
     index_existing_rows,
     is_nintendo_playable_game,
     match_nintendo_title_key,
     merge_vgc_with_transactions,
-    norm_nintendo_title,
     nintendo_store_url,
+    norm_nintendo_title,
 )
 from shared.profile_paths import personal_path
 from shared.raw_dumps import profile_raw_dump_path

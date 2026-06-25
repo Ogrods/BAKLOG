@@ -2,29 +2,27 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from clients.nintendo_vgc import (
     NintendoVgcAuthError,
     NintendoVgcCaptureError,
+    _merge_vgc_payload,
+    _portal_html_has_vgc_data,
+    _portal_html_looks_unsigned,
     fetch_vgc_portal_html,
     map_vgc_view,
     parse_vgc_embedded_json,
     region_from_vgc_state,
     resolve_nintendo_icon_url,
-    _merge_vgc_payload,
-    _portal_html_has_vgc_data,
-    _portal_html_looks_unsigned,
 )
 from scripts.probe_nintendo_vgc import diff_vgc_vs_catalog
-
 
 SAMPLE_PORTAL_HTML = """
 <html><body>
 <div id="data" data-json="{&quot;idToken&quot;:&quot;tok-abc&quot;,&quot;savannaClientId&quot;:&quot;client-1&quot;,&quot;shopGraphQLApiUrl&quot;:&quot;https://example.test/graphql&quot;}"></div>
-<div id="state" data-json="{&quot;lang&quot;:&quot;en-US&quot;,&quot;user&quot;:{&quot;country&quot;:&quot;US&quot;}}"></div>
+<div id="state" data-json="{&quot;lang&quot;:&quot;en-US&quot;,&quot;user&quot;:{&quot;country&quot;:&quot;US&quot;}}">
+</div>
 </body></html>
 """
 

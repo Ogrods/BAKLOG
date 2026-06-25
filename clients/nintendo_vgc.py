@@ -24,6 +24,51 @@ DEFAULT_USER_AGENT = (
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
+_SIZE_PLACEHOLDER = "${size}"
+_DEFAULT_ICON_SIZE = 256
+_HEADER_ICON_SIZE = 512
+
+
+def _parse_icon_sizes(sizes: Any) -> list[int]:
+    if not isinstance(sizes, list):
+        return []
+    out: list[int] = []
+    for raw in sizes:
+        try:
+            out.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _pick_icon_size(sizes: Any, *, prefer_large: bool = False) -> int:
+    parsed = _parse_icon_sizes(sizes)
+    if not parsed:
+        return _HEADER_ICON_SIZE if prefer_large else _DEFAULT_ICON_SIZE
+    viable = [s for s in parsed if s >= 128]
+    pool = viable or parsed
+    if prefer_large:
+        return max(pool)
+    return min(pool, key=lambda s: abs(s - _DEFAULT_ICON_SIZE))
+
+
+def resolve_nintendo_icon_url(
+    url: str | None,
+    sizes: Any = None,
+    *,
+    prefer_large: bool = False,
+) -> str | None:
+    """Expand Nintendo atum CDN ``${size}`` placeholders to a real pixel size."""
+    if not url:
+        return None
+    text = str(url).strip()
+    if not text:
+        return None
+    if _SIZE_PLACEHOLDER not in text:
+        return text
+    size = _pick_icon_size(sizes, prefer_large=prefer_large)
+    return text.replace(_SIZE_PLACEHOLDER, str(size))
+
 REGION_DEFAULTS: dict[str, dict[str, Any]] = {
     "US": {
         "country": "US",
@@ -169,7 +214,17 @@ def _platform_label(view: dict[str, Any]) -> str | None:
 def map_vgc_view(view: dict[str, Any]) -> dict[str, Any]:
     """Normalize a single VGC view row for catalog merge / probe diff."""
     icon = view.get("icon") if isinstance(view.get("icon"), dict) else {}
-    icon_url = icon.get("upgradedIconUrl") or icon.get("url")
+    icon_sizes = icon.get("sizes")
+    icon_url = resolve_nintendo_icon_url(
+        icon.get("upgradedIconUrl") or icon.get("url"),
+        icon_sizes,
+        prefer_large=True,
+    )
+    icon_standard = resolve_nintendo_icon_url(
+        icon.get("url"),
+        icon_sizes,
+        prefer_large=False,
+    )
     name = " ".join(str(view.get("applicationName") or "").split()).strip()
     app_id = str(view.get("applicationId") or view.get("id") or "").strip()
     is_dlc = bool(
@@ -185,9 +240,20 @@ def map_vgc_view(view: dict[str, Any]) -> dict[str, Any]:
         "apparent_platform": view.get("apparentPlatform"),
         "publisher": view.get("publisher"),
         "icon_url": icon_url,
+        "icon_url_standard": icon_standard,
+        "icon_sizes": icon_sizes,
         "is_dlc": is_dlc,
         "is_lending": bool(view.get("isLending")),
-        "raw": view,
+        "is_partial_lending": bool(view.get("isPartialLending")),
+        "lending_expire_datetime": view.get("lendingExpireDatetime"),
+        "has_application": bool(view.get("hasApplication")),
+        "has_addon_contents": bool(view.get("hasAddOnContents")),
+        "has_upgrade": bool(view.get("hasUpgrade")),
+        "has_nx_application": bool(view.get("hasNxApplication")),
+        "has_nx_addon_contents": bool(view.get("hasNxAddOnContents")),
+        "has_ounce_application": bool(view.get("hasOunceApplication")),
+        "has_ounce_addon_contents": bool(view.get("hasOunceAddOnContents")),
+        "contains_released": view.get("containsReleased"),
     }
 
 

@@ -13,6 +13,7 @@ from clients.nintendo_vgc import (
     map_vgc_view,
     parse_vgc_embedded_json,
     region_from_vgc_state,
+    resolve_nintendo_icon_url,
     _merge_vgc_payload,
     _portal_html_has_vgc_data,
     _portal_html_looks_unsigned,
@@ -60,13 +61,17 @@ def test_map_vgc_view_switch_and_dlc() -> None:
             "applicationName": "Zelda™ Tears",
             "apparentPlatform": "NX",
             "hasNxApplication": True,
-            "icon": {"url": "https://img.test/icon.png"},
+            "icon": {
+                "url": "https://atum-img.test/i/c/abc_${size}",
+                "sizes": [128, 256, 512],
+            },
         }
     )
     assert base["application_id"] == "0100abc"
     assert base["name"] == "Zelda™ Tears"
     assert base["platform"] == "Nintendo Switch"
-    assert base["icon_url"] == "https://img.test/icon.png"
+    assert base["icon_url"] == "https://atum-img.test/i/c/abc_512"
+    assert base["icon_url_standard"] == "https://atum-img.test/i/c/abc_256"
     assert base["is_dlc"] is False
 
     dlc = map_vgc_view(
@@ -77,6 +82,42 @@ def test_map_vgc_view_switch_and_dlc() -> None:
         }
     )
     assert dlc["is_dlc"] is True
+
+
+def test_resolve_nintendo_icon_url_expands_size_placeholder() -> None:
+    url = "https://atum-img.test/i/c/abc_${size}"
+    assert resolve_nintendo_icon_url(url, [128, 256, 512]) == (
+        "https://atum-img.test/i/c/abc_256"
+    )
+    assert resolve_nintendo_icon_url(url, [128, 256, 512], prefer_large=True) == (
+        "https://atum-img.test/i/c/abc_512"
+    )
+
+
+def test_map_vgc_view_exposes_entitlement_metadata() -> None:
+    view = {
+        "id": "vgc-1",
+        "applicationId": "0100abc",
+        "applicationName": "Zelda™ Tears",
+        "apparentPlatform": "NX",
+        "publisher": "Nintendo",
+        "hasNxApplication": True,
+        "hasApplication": True,
+        "isLending": True,
+        "containsReleased": True,
+        "icon": {
+            "url": "https://img.test/a_${size}",
+            "upgradedIconUrl": "https://img.test/b_${size}",
+            "sizes": [256, 512],
+        },
+    }
+    mapped = map_vgc_view(view)
+    assert mapped["icon_url"] == "https://img.test/b_512"
+    assert mapped["icon_url_standard"] == "https://img.test/a_256"
+    assert mapped["has_nx_application"] is True
+    assert mapped["is_lending"] is True
+    assert mapped["contains_released"] is True
+    assert "raw" not in mapped
 
 
 def test_merge_vgc_payload_dedupes_application_id() -> None:

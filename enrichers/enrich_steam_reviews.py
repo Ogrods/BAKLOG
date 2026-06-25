@@ -22,7 +22,7 @@ import requests
 from auth import resolve_env
 from clients.itch_game import itch_is_videogame as _itch_is_videogame
 from clients.steam_client import SteamClient
-from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
+from fetchers._base import catalog_file, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.profile_paths import cache_json_path
 from shared.steam_match import pick_appid
@@ -149,12 +149,13 @@ def main() -> int:
         store_files = [row for row in STORE_FILES if row[1] in wanted]
 
     load_dotenv()
-    api_key = resolve_env("STEAM_API_KEY", provider="steam")
-    steam_id = resolve_env("STEAM_ID", provider="steam")
+    api_key = resolve_env("STEAM_API_KEY", provider="steam") or ""
+    steam_id = resolve_env("STEAM_ID", provider="steam") or ""
     if not api_key or not steam_id:
-        stats.error(STEAM_CREDENTIALS_HINT)
-        return stats.finish("enrich_steam_reviews", t0, exit_code=1)
-
+        print(
+            "  Steam library not connected — using public Store search + review API only.",
+            flush=True,
+        )
     steam = SteamClient(api_key=api_key, steam_id=steam_id)
     mapping = load_mapping()
     owned_ids = steam_appids_by_id()

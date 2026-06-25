@@ -159,7 +159,44 @@ def pids_holding_chromium_profile(user_data_dir: str | Path) -> list[int]:
                 timeout=12,
             )
         except Exception:
-            return []
+            try:
+                out = subprocess.check_output(
+                    [
+                        "wmic",
+                        "process",
+                        "where",
+                        "name='chrome.exe' or name='msedge.exe'",
+                        "get",
+                        "ProcessId,CommandLine",
+                        "/format:csv",
+                    ],
+                    text=True,
+                    encoding="utf-8",
+                    errors="ignore",
+                    creationflags=flags,
+                    timeout=12,
+                )
+            except Exception:
+                return []
+            for line in out.splitlines():
+                if not line.strip() or line.lower().startswith("node,"):
+                    continue
+                parts = line.split(",", 2)
+                if len(parts) < 3:
+                    continue
+                try:
+                    pid_s = parts[1].strip()
+                    cmd = parts[2]
+                except IndexError:
+                    continue
+                cmd_l = cmd.lower()
+                if not any(needle in cmd_l and "--user-data-dir" in cmd_l for needle in needles):
+                    continue
+                try:
+                    pids.add(int(pid_s))
+                except ValueError:
+                    pass
+            return sorted(pids)
         for line in out.splitlines():
             if "|" not in line:
                 continue
@@ -214,20 +251,7 @@ def release_chromium_profile_lock(user_data_dir: str | Path) -> list[int]:
     return pids
 
 
-_BLANK_URLS = frozenset({
-    "",
-    "about:blank",
-    "chrome://newtab/",
-    "chrome://new-tab-page/",
-    "edge://newtab/",
-    "edge://new-tab-page/",
-})
-_BLANK_URL_PREFIXES = (
-    "chrome://new-tab",
-    "chrome://newtab",
-    "edge://new-tab",
-    "edge://newtab",
-)
+_BLANK_URLS = frozenset({"", "about:blank", "chrome://newtab/"})
 
 
 # Hides the navigator.webdriver automation signal without a launch flag (the
@@ -912,20 +936,19 @@ class CdpHttpResponse:
     def text(self) -> str:
         return self._body
 
+    def json(self) -> dict:
+        return json.loads(self._body)
+
 
 class CdpHttpClient:
     def __init__(self, context: CdpContext) -> None:
         self._context = context
 
-    def get(
-        self,
-        url: str,
-        *,
-        headers: dict[str, str] | None = None,
-        timeout: float = 30_000,
-    ) -> CdpHttpResponse:
+    def _cookie_jar(self) -> dict[str, str]:
         cookies = self._context.cookies()
-        jar = {c["name"]: c["value"] for c in cookies if c.get("name")}
+        return {c["name"]: c["value"] for c in cookies if c.get("name")}
+
+    def _base_headers(self, headers: dict[str, str] | None) -> dict[str, str]:
         req_headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -934,7 +957,40 @@ class CdpHttpClient:
         }
         if headers:
             req_headers.update(headers)
-        resp = requests.get(url, cookies=jar, headers=req_headers, timeout=timeout / 1000.0)
+        return req_headers
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float = 30_000,
+    ) -> CdpHttpResponse:
+        resp = requests.get(
+            url,
+            cookies=self._cookie_jar(),
+            headers=self._base_headers(headers),
+            timeout=timeout / 1000.0,
+        )
+        return CdpHttpResponse(resp.status_code, resp.text)
+
+    def post(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        data: str | None = None,
+        json: dict | None = None,
+        timeout: float = 30_000,
+    ) -> CdpHttpResponse:
+        resp = requests.post(
+            url,
+            cookies=self._cookie_jar(),
+            headers=self._base_headers(headers),
+            data=data,
+            json=json,
+            timeout=timeout / 1000.0,
+        )
         return CdpHttpResponse(resp.status_code, resp.text)
 
 
@@ -963,7 +1019,6 @@ class CdpContext:
         self._init_scripts: list[str] = []
         self._page_handlers: list[Callable[[CdpPage], None]] = []
         self._ubisoft_native_popup_targets: set[str] = set()
-        self._connect_launch_primary_target: str | None = None
         self._ws_dead = False
         self.request = CdpHttpClient(self)
 
@@ -1059,7 +1114,7 @@ class CdpContext:
         self._pages_by_target[target_id] = page
         self._send("Page.enable", session_id=session_id)
         self._send("Runtime.enable", session_id=session_id)
-        self._send("Network.enable", session_id=session_id)
+        self._send("Network.enable", {"includeExtraInfo": True}, session_id=session_id)
         # Do not enable Debugger.* — Ubisoft Connect (and similar storefronts)
         # detect CDP debugging and hang the login page in perpetual loading.
         for src in self._init_scripts:
@@ -1087,17 +1142,6 @@ class CdpContext:
                 time.sleep(0.25)
             url = (page.url or "").strip()
             others = [p for p in self.pages if p is not page and not p.is_closed]
-
-            if is_blank_browser_url(url) and others:
-                try:
-                    page.close()
-                except Exception:
-                    pass
-                try:
-                    others[0].bring_to_front()
-                except Exception:
-                    pass
-                return
 
             if _should_preserve_popup(url):
                 # Blank OAuth popups must stay open but should not steal focus
@@ -1195,13 +1239,6 @@ class CdpContext:
         target_id = info.get("targetId", "")
         if not target_id or target_id in self._pages_by_target:
             return
-        primary = self._connect_launch_primary_target
-        if primary and target_id != primary:
-            try:
-                self._send("Target.closeTarget", {"targetId": target_id})
-            except Exception:
-                pass
-            return
         if target_id in self._ubisoft_native_popup_targets:
             return
         opener_id = str(info.get("openerId") or info.get("openerFrameId") or "")
@@ -1226,13 +1263,6 @@ class CdpContext:
         sid = params.get("sessionId") or ""
         target_id = info.get("targetId", "")
         if info.get("type") != "page" or not sid or not target_id:
-            return
-        primary = self._connect_launch_primary_target
-        if primary and target_id != primary:
-            try:
-                self._send("Target.closeTarget", {"targetId": target_id})
-            except Exception:
-                pass
             return
         # Safety net: if a Ubisoft login popup ever gets attached, release it so it
         # keeps running natively (the real gate is in _on_target_created).
@@ -1366,8 +1396,8 @@ class CdpContext:
         self.close()
 
 
-class ConnectBrowserClosed(RuntimeError):
-    """Raised when the headed connect browser closes before credentials are saved."""
+class ConnectBrowserClosed(Exception):
+    """User closed the headed sign-in browser before connect finished."""
 
 
 def browser_session_gone(context: CdpContext | Any) -> bool:
@@ -1375,6 +1405,8 @@ def browser_session_gone(context: CdpContext | Any) -> bool:
     if getattr(context, "_ws_dead", False):
         return True
     pages = list(getattr(context, "pages", ()) or ())
+    # Do not treat Popen.poll() != None as dead: on Windows the launcher proc
+    # often exits while the real browser window and CDP socket stay alive.
     if pages:
         return all(p.is_closed for p in pages)
     return False
@@ -1481,93 +1513,13 @@ def _ensure_persistent_session_prefs(profile: Path) -> None:
         pass
 
 
-def _target_list_url(port: int, target_id: str) -> str:
-    try:
-        targets = _fetch_json(f"http://127.0.0.1:{port}/json/list", timeout=5)
-        for t in targets:
-            if t.get("id") == target_id:
-                return (t.get("url") or "").strip()
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
-        pass
-    return ""
-
-
-def _close_stray_page_targets(
-    context: CdpContext, port: int, keep_target_id: str
-) -> None:
-    try:
-        targets = _fetch_json(f"http://127.0.0.1:{port}/json/list", timeout=5)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
-        return
-    for t in targets:
-        if t.get("type") != "page":
-            continue
-        tid = (t.get("id") or "").strip()
-        if not tid or tid == keep_target_id:
-            continue
-        try:
-            context._send("Target.closeTarget", {"targetId": tid})
-        except Exception:
-            pass
-        page = context._pages_by_target.pop(tid, None)
-        if page is not None:
-            page._closed = True
-            if page in context.pages:
-                context.pages.remove(page)
-
-
-def _page_effective_url(page: CdpPage, port: int) -> str:
-    try:
-        current = (page.url or "").strip()
-    except Exception:
-        current = ""
-    if not current:
-        current = (page._url or "").strip()
-    if not current:
-        current = _target_list_url(port, page._target_id)
-    return current
-
-
-def _wait_for_non_blank_url(
-    page: CdpPage, port: int, *, timeout_s: float = 20.0
-) -> str:
-    deadline = time.time() + timeout_s
-    last = ""
-    while time.time() < deadline:
-        last = _page_effective_url(page, port)
-        if last and not is_blank_browser_url(last):
-            return last
-        time.sleep(0.2)
-    return last
-
-
-def _ensure_page_navigated(
-    page: CdpPage,
-    url: str,
-    port: int,
-    *,
-    timeout_s: float = 25.0,
-) -> str:
-    target = (url or "").strip()
-    if not target:
-        return _page_effective_url(page, port)
-    current = _wait_for_non_blank_url(page, port, timeout_s=min(8.0, timeout_s))
-    if current and not is_blank_browser_url(current):
-        return current
-    try:
-        page.goto(target, wait_until="domcontentloaded", timeout=int(timeout_s * 1000))
-    except Exception:
-        pass
-    return _wait_for_non_blank_url(page, port, timeout_s=timeout_s) or current
-
-
 def launch_persistent_profile(
     user_data_dir: str | Path,
     *,
     headless: bool | str = False,
     window_position: tuple[int, int] | None = None,
     window_size: tuple[int, int] | None = None,
-    initial_url: str | None = None,
+    start_minimized: bool = False,
 ) -> CdpContext:
     """Launch Chrome/Edge with a persistent profile and return a CDP context.
 
@@ -1615,36 +1567,56 @@ def launch_persistent_profile(
         ww, wh = window_size if window_size is not None else (1280, 900)
         args.append(f"--window-position={wx},{wy}")
         args.append(f"--window-size={ww},{wh}")
+    elif start_minimized:
+        ww, wh = window_size if window_size is not None else (1280, 900)
+        args.append("--start-minimized")
+        args.append(f"--window-size={ww},{wh}")
     else:
         args.append("--start-maximized")
 
-    proc = subprocess.Popen(
-        args,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
-    )
-
+    proc: subprocess.Popen[Any] | None = None
     ws_url = None
-    deadline = time.time() + 30
-    while time.time() < deadline:
-        if proc.poll() is not None:
-            proc.kill()
-            raise _browser_launch_error(
-                f"Browser exited immediately (code {proc.returncode}). "
-                "Close any other window using this profile and try again."
-            )
-        try:
-            version = _fetch_json(f"http://127.0.0.1:{port}/json/version", timeout=2)
-            ws_url = version.get("webSocketDebuggerUrl")
-            if ws_url:
-                break
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-            pass
-        time.sleep(0.2)
+    released_pids: list[int] = []
+    for attempt in range(2):
+        proc = subprocess.Popen(
+            args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+        )
+
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                exit_code = proc.returncode
+                proc.kill()
+                if attempt == 0 and exit_code == 21:
+                    released_pids = release_chromium_profile_lock(profile)
+                    break
+                hint = (
+                    "Close any other window using this profile and try again."
+                    if not released_pids
+                    else "A stale sign-in window was still using this profile; try Reconnect again."
+                )
+                raise _browser_launch_error(
+                    f"Browser exited immediately (code {exit_code}). {hint} "
+                    "Install Google Chrome or Microsoft Edge, set BAKLOG_CHROME_PATH "
+                    "to the browser executable, or try the other installed browser."
+                )
+            try:
+                version = _fetch_json(f"http://127.0.0.1:{port}/json/version", timeout=2)
+                ws_url = version.get("webSocketDebuggerUrl")
+                if ws_url:
+                    break
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+                pass
+            time.sleep(0.2)
+        if ws_url:
+            break
 
     if not ws_url:
-        proc.kill()
+        if proc is not None:
+            proc.kill()
         raise _browser_launch_error("Browser did not start CDP debugging endpoint in time.")
 
     try:
@@ -1683,47 +1655,25 @@ def launch_persistent_profile(
     })
     context._send("Target.setDiscoverTargets", {"discover": True})
 
-    start_url = (initial_url or "").strip()
-    if start_url:
-        for pg in list(context.pages):
-            if not pg.is_closed:
-                try:
-                    pg.close()
-                except Exception:
-                    pass
-        context.pages.clear()
-        result = context._send("Target.createTarget", {"url": start_url})
-        target_id = result.get("targetId", "")
-        context._connect_launch_primary_target = target_id or None
-        try:
-            page = context._attach_page(target_id)
+    # Attach existing page targets (new ones are attached via _on_target_created).
+    targets = _fetch_json(f"http://127.0.0.1:{port}/json/list", timeout=5)
+    page_targets = [t for t in targets if t.get("type") == "page"]
+    for t in page_targets:
+        page = context._attach_page(t["id"])
+        if page not in context.pages:
             context.pages.append(page)
-            _close_stray_page_targets(context, port, target_id)
-            final_url = _ensure_page_navigated(page, start_url, port)
-            for pg in list(context.pages):
-                if pg._target_id != target_id and not pg.is_closed:
-                    try:
-                        pg.close()
-                    except Exception:
-                        pass
-            context.pages = [
-                p for p in context.pages if p._target_id == target_id and not p.is_closed
-            ]
-            if page not in context.pages:
-                context.pages.append(page)
-        finally:
-            context._connect_launch_primary_target = None
-    else:
-        # Attach existing page targets (new ones are attached via _on_target_created).
-        targets = _fetch_json(f"http://127.0.0.1:{port}/json/list", timeout=5)
-        page_targets = [t for t in targets if t.get("type") == "page"]
-        for t in page_targets:
-            page = context._attach_page(t["id"])
-            if page not in context.pages:
-                context.pages.append(page)
 
+    if not context.pages:
+        deadline = time.time() + 10.0
+        last_err = ""
+        while time.time() < deadline and not context.pages:
+            try:
+                context.new_page()
+            except Exception as exc:  # noqa: BLE001
+                last_err = str(exc)
+                time.sleep(0.25)
         if not context.pages:
-            context.new_page()
+            raise RuntimeError(last_err or "Browser did not expose a connect page")
 
     # Mask the automation signal via a CDP init script instead of the
     # --disable-blink-features=AutomationControlled launch flag (which triggers
@@ -1734,63 +1684,9 @@ def launch_persistent_profile(
     return context
 
 
-def open_connect_page(context: CdpContext, url: str) -> CdpPage:
-    """Open a connect tab already navigated to ``url`` (avoids stuck about:blank tabs).
-
-    Chrome often boots with one or more ``about:blank`` targets. ``Page.navigate`` on
-    those targets can fail if CDP attaches a second blank popup first (WinError 10054).
-    Creating the target with the destination URL lets the browser navigate natively.
-    """
-    target_url = (url or "").strip()
-    if not target_url:
-        raise ValueError("connect url required")
-
-    result = context._send("Target.createTarget", {"url": target_url})
-    target_id = result.get("targetId", "")
-    context._connect_launch_primary_target = target_id or None
-    page: CdpPage | None = None
-    final_url = ""
-    try:
-        page = context._attach_page(target_id)
-        if page not in context.pages:
-            context.pages.append(page)
-
-        _close_stray_page_targets(context, context._port, target_id)
-        final_url = _ensure_page_navigated(page, target_url, context._port)
-
-        for pg in list(context.pages):
-            if pg is page or pg.is_closed:
-                continue
-            if is_blank_browser_url(_page_effective_url(pg, context._port)):
-                try:
-                    pg.close()
-                except Exception:
-                    pass
-    finally:
-        context._connect_launch_primary_target = None
-
-    try:
-        if page is not None:
-            page.bring_to_front()
-    except Exception:
-        pass
-    try:
-        if page is not None:
-            page.focus_window()
-    except Exception:
-        pass
-    if page is None:
-        raise RuntimeError("Failed to open connect page")
-    return page
-
-
 def is_blank_browser_url(url: str) -> bool:
-    """True for about:blank, new-tab pages, and other empty popup URLs."""
-    u = (url or "").strip()
-    if u in _BLANK_URLS:
-        return True
-    lower = u.lower()
-    return any(lower.startswith(prefix) for prefix in _BLANK_URL_PREFIXES)
+    """True for about:blank and other empty popup URLs."""
+    return (url or "").strip() in _BLANK_URLS
 
 
 _POPUP_MERGE_READY = re.compile(

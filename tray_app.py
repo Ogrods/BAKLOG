@@ -35,7 +35,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-from shared.install_paths import bundle_root, frozen_server_exe, is_frozen
+from shared.install_paths import bundle_root, data_root, frozen_server_exe, is_frozen
 from shared.startup import (
     is_startup_enabled,
     python_executable,
@@ -210,9 +210,11 @@ class ServerController:
         if self.is_running():
             return True
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        child_env = {**os.environ, "BAKLOG_DATA_DIR": str(data_root().resolve())}
         self.proc = subprocess.Popen(
             _server_argv(),
             cwd=str(bundle_root()),
+            env=child_env,
             creationflags=flags,
         )
         deadline = time.monotonic() + wait_secs

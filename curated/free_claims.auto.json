@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-06-18T16:13:35.645617+00:00",
+  "fetched_at": "2026-06-19T00:09:34.278729+00:00",
   "sources": {
     "epic": 2,
     "gamerpower": 13,
@@ -15,12 +15,12 @@
       "title": "Citizen Sleeper",
       "claim_url": "https://store.epicgames.com/en-US/p/citizen-sleeper-944858",
       "ends_at": "2026-06-25T15:00:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1578650/header.jpg?t=1780960841",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/919d5976f3804d4cabb8ca90ea43a956/citizen-sleeper-xudwg.jpg",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00",
       "review_percent": 92,
-      "steam_appid": 1578650
+      "steam_appid": 1578650,
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
     },
     {
       "id": "epic-robobeat-5f084b",
@@ -28,12 +28,12 @@
       "title": "ROBOBEAT",
       "claim_url": "https://store.epicgames.com/en-US/p/robobeat-5f084b",
       "ends_at": "2026-06-25T15:00:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1456760/6deea24de35cafe95a4b3693ff925608b44bc4a2/header.jpg?t=1781256997",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/91105717b53044ed8e384e5fada71db8/robobeat-1ojda.png",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-06-18T16:13:35.645617+00:00",
       "review_percent": 94,
-      "steam_appid": 1456760
+      "steam_appid": 1456760,
+      "first_seen": "2026-06-18T16:13:35.645617+00:00"
     },
     {
       "id": "gamerpower-3688",
@@ -203,6 +203,17 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
+      "id": "itad-a71d166daf70",
+      "store": "epic",
+      "title": "Construction Simulator 3 free on MOBILE from EGS on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16276/",
+      "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/construction-simulator-3/info/\">Construction Simulator 3</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 25 Jun 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-e2d49ab2557448a2a9724c42999066f1-4943ede186ff4b67840e3e59ecdaf76c&amp;offers=1-e2d49ab2557448a2a9724c42999066f1-bb800dbdf3614954979eed03f517f670>go to giveaway</a>",
+      "source": "itad",
+      "first_seen": "2026-06-18T17:18:28.632143+00:00"
+    },
+    {
       "id": "itad-529a5bd808a1",
       "store": "epic",
       "title": "ROBOBEAT - FREE on Epic Games on Epic Game Store",
@@ -231,7 +242,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16253/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2800500/library_600x900_2x.jpg",
-      "blurb": "Blacklist Mafia",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/blacklist-mafia/info/\">Blacklist Mafia</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/blacklist-mafia>go to giveaway</a>",
       "source": "itad",
       "review_percent": 82,
       "steam_appid": 2800500,
@@ -244,7 +255,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16251/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
-      "blurb": "Another World Adventures",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/another-world-adventures/info/\">Another World Adventures</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 20 Jun 2026 03:00:00 +0200\n                                        | <a href=https://s-xavier-uy.itch.io/another-world-adventures>go to giveaway</a>",
       "source": "itad",
       "review_percent": 50,
       "steam_appid": 3445980,
@@ -268,21 +279,10 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16196/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
-      "blurb": "Mr.Brocco & Co",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/mr-brocco-and-co/info/\">Mr.Brocco &amp; Co</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/mrbrocco-co>go to giveaway</a>",
       "source": "itad",
       "review_percent": 83,
       "steam_appid": 2074560,
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "itad-78f8867f4481",
-      "store": "steam",
-      "title": "World of Warships x Azur Lane - Quest for AL Avrora - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16170/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/world-of-warships-x-azur-lane-quest-for-al-avrora--1/info/\">World of Warships x Azur Lane — Quest for AL Avrora</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 18 Jun 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/4627430/World_of_Warships_x_Azur_Lane__Quest_for_AL_Avrora/>go to giveaway</a>",
-      "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
@@ -292,7 +292,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16143/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
-      "blurb": "The Brave Little Cloud",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/the-brave-little-cloud/info/\">The Brave Little Cloud</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/the-brave-little-cloud>go to giveaway</a>",
       "source": "itad",
       "review_percent": 97,
       "steam_appid": 2635070,
@@ -338,7 +338,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/7433/",
       "ends_at": null,
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
-      "blurb": "Die Young: Prologue",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/die-young-prologue/info/\">Die Young: Prologue</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/die-young-prologue>go to giveaway</a>",
       "source": "itad",
       "review_percent": 78,
       "steam_appid": 973000,

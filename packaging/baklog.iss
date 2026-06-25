@@ -38,6 +38,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
+[Dirs]
+Name: "{userlocalappdata}\BAKLOG-Data"; Permissions: users-full
+
 [Files]
 Source: "..\release\BAKLOG\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
@@ -49,3 +52,20 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\BAKLOG Tray.exe"; Tasks: de
 
 [Run]
 Filename: "{app}\BAKLOG Tray.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  DataDir: string;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    DataDir := ExpandConstant('{userlocalappdata}\BAKLOG-Data');
+    MsgBox(
+      'BAKLOG was removed from your PC.' + #13#10 + #13#10 +
+      'Your library and connections are still in:' + #13#10 +
+      DataDir + #13#10 + #13#10 +
+      'Delete that folder only if you want to erase your data.',
+      mbInformation, MB_OK);
+  end;
+end;

@@ -426,6 +426,15 @@
   );
   pointer-events: none;
 }
+/* Floating portrait covers sit on the right — left text scrim only, no wash on art. */
+.dash-spotlight.has-portrait-art .dash-spotlight-gradient {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--bg) 80%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 35%, transparent) 30%,
+    transparent 52%
+  );
+}
 .dash-spotlight-nav {
   position: absolute;
   top: 14px;

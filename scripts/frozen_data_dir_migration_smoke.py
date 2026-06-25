@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Smoke-test legacy install-dir → BAKLOG-Data migration on a frozen build.
+
+Stages co-located profiles/ beside BAKLOG.exe, boots the server briefly with a
+fresh LOCALAPPDATA, and asserts files moved into BAKLOG-Data.
+
+Usage (from repo root, after packaging/build_windows.ps1):
+  .\\.venv\\Scripts\\python.exe scripts/frozen_data_dir_migration_smoke.py \\
+    --bundle-dir release/BAKLOG
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+_REPO = Path(__file__).resolve().parents[1]
+
+
+def _wait_for_server(base: str, *, timeout_sec: float = 25.0) -> bool:
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(f"{base}/api/config", timeout=2) as resp:
+                if resp.status == 200:
+                    return True
+        except (urllib.error.URLError, TimeoutError, OSError):
+            time.sleep(0.4)
+    return False
+
+
+def run_smoke(bundle_dir: Path) -> dict:
+    bundle_dir = bundle_dir.resolve()
+    exe = bundle_dir / "BAKLOG.exe"
+    if not exe.is_file():
+        raise FileNotFoundError(f"missing frozen server: {exe}")
+
+    legacy_profiles = bundle_dir / "profiles"
+    backup: Path | None = None
+    if legacy_profiles.exists():
+        backup = bundle_dir / ".smoke_profiles_backup"
+        if backup.exists():
+            shutil.rmtree(backup)
+        shutil.move(str(legacy_profiles), str(backup))
+
+    legacy_profiles.mkdir()
+    (legacy_profiles / "index.json").write_text(
+        json.dumps({"active": "default", "profiles": []}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "games_steam_smoke.json").write_text('{"games":[]}', encoding="utf-8")
+
+    report: dict = {"ok": False, "bundle_dir": str(bundle_dir)}
+    proc: subprocess.Popen | None = None
+    try:
+        with tempfile.TemporaryDirectory(prefix="baklog-migrate-smoke-") as td:
+            localappdata = Path(td)
+            data_dir = localappdata / "BAKLOG-Data"
+            env = {
+                **os.environ,
+                "LOCALAPPDATA": str(localappdata),
+                "BAKLOG_NO_BROWSER": "1",
+            }
+            env.pop("BAKLOG_DATA_DIR", None)
+            env.pop("BAKLOG_PORTABLE", None)
+            proc = subprocess.Popen(
+                [str(exe)],
+                cwd=str(bundle_dir),
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+            )
+            if not _wait_for_server("http://127.0.0.1:8765"):
+                err = (proc.stderr.read() if proc.stderr else b"").decode("utf-8", errors="replace")
+                report["error"] = f"server did not respond within timeout; stderr tail: {err[-500:]}"
+                return report
+
+            migrated_index = data_dir / "profiles" / "index.json"
+            migrated_games = data_dir / "games_steam_smoke.json"
+            report["data_dir"] = str(data_dir)
+            report["migrated_index"] = migrated_index.is_file()
+            report["migrated_games"] = migrated_games.is_file()
+            report["legacy_profiles_gone"] = not legacy_profiles.exists()
+            report["ok"] = all(
+                (
+                    report["migrated_index"],
+                    report["migrated_games"],
+                    report["legacy_profiles_gone"],
+                )
+            )
+            return report
+    finally:
+        if proc is not None and proc.poll() is None:
+            if sys.platform == "win32":
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", str(proc.pid), "/T"],
+                    capture_output=True,
+                    check=False,
+                )
+            else:
+                proc.terminate()
+        smoke_games = bundle_dir / "games_steam_smoke.json"
+        if smoke_games.is_file():
+            smoke_games.unlink()
+        if legacy_profiles.exists():
+            shutil.rmtree(legacy_profiles, ignore_errors=True)
+        if backup is not None and backup.exists():
+            if legacy_profiles.exists():
+                shutil.rmtree(legacy_profiles, ignore_errors=True)
+            shutil.move(str(backup), str(legacy_profiles))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Frozen legacy data-dir migration smoke")
+    parser.add_argument(
+        "--bundle-dir",
+        type=Path,
+        default=_REPO / "release" / "BAKLOG",
+        help="PyInstaller onedir output (contains BAKLOG.exe)",
+    )
+    parser.add_argument("--json-out", type=Path, default=None, help="Write JSON report to this path")
+    args = parser.parse_args()
+    report = run_smoke(args.bundle_dir)
+    text = json.dumps(report, indent=2)
+    print(text)
+    if args.json_out:
+        args.json_out.write_text(text + "\n", encoding="utf-8")
+    return 0 if report.get("ok") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

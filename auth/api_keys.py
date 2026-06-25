@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
-from auth.cdp_compat import click_by_text
+from auth.cdp_browser import abort_if_browser_closed
 
 if TYPE_CHECKING:
     from auth.runner import AuthSession
@@ -208,6 +208,7 @@ def extract_steam(page, context, session: AuthSession | None = None) -> dict[str
     last_message = 0.0
 
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         try:
             creds = _steam_extract_from_page(
                 page, context, try_register=register_attempts < MAX_STEAM_REGISTER_ATTEMPTS
@@ -336,6 +337,7 @@ def extract_itch(page, context, session: AuthSession | None = None) -> dict[str,
     generated = False
     last_message = 0.0
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         url = (page.url or "").lower()
 
         # If the user is on a transient verification/login flow, just wait.
@@ -495,6 +497,7 @@ def extract_itad(page, context, session: AuthSession | None = None) -> dict[str,
     last_message = 0.0
 
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         url = (page.url or "").lower()
 
         if any(p in url for p in ("oauth/login", "auth/login", "captcha", "verify")):
@@ -763,6 +766,7 @@ def extract_xbox(page, context, session: AuthSession | None = None) -> dict[str,
         return None
 
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         # Request-header key is ground truth — prefer it, but still validate.
         if header_key.get("XBL_API_KEY"):
             hit = _accept_trusted([header_key["XBL_API_KEY"]])

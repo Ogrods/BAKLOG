@@ -43,6 +43,17 @@ describe('processAuthStatusTransitions', () => {
     expect(runConnect).toHaveBeenCalledWith(['gog', 'wishlistGog'], expect.any(Object));
   });
 
+  it('auto-fetches EA on disconnected → connected', () => {
+    const prev = new Map([['ea', 'disconnected']]);
+    const runConnect = vi.fn();
+    processAuthStatusTransitions(
+      [{ key: 'ea', status: 'connected', fetcher_keys: ['ea'] }],
+      prev,
+      { maybeAutoFetchOnConnect: runConnect, autoFetchOnConnect: true },
+    );
+    expect(runConnect).toHaveBeenCalledWith(['ea'], expect.any(Object));
+  });
+
   it('does not auto-fetch when already connected', () => {
     const prev = new Map([['steam', 'connected']]);
     const runConnect = vi.fn();

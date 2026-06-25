@@ -1494,6 +1494,24 @@ export function formatRowCountText(view, list) {
   return base + extra;
 }
 
+/** Filtered row count for library/wishlist table views (matches #rowCount). */
+export function visibleRowCountForActiveView(view = state.activeView) {
+  if (view !== 'library' && view !== 'wishlist') return null;
+  const params = collectTableParams(state.sessionPrefs);
+  const list = queryGames({
+    source: querySourceForView({ ...state, activeView: view }),
+    ctx: {
+      ...buildQueryContext(state, params),
+      hiddenKeys: view === 'wishlist'
+        ? state.wishlistCrossStoreHiddenKeys
+        : state.crossStoreHiddenKeys,
+      ownedNormNames: state.ownedNormNames,
+    },
+  });
+  if (view === 'library') return list.filter(countsInLibraryTotal).length;
+  return list.length;
+}
+
 /** Paint #rowCount; library/wishlist views get a popup mount target for 1UP animation. */
 export function renderRowCountEl(el, view, list) {
   if (!el) return;

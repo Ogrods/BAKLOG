@@ -6,4 +6,4 @@ After install, launch BAKLOG from the Start Menu. A tray icon appears in the not
 
 Connections sign-in requires Google Chrome or Microsoft Edge.
 
-Your library data stays on this PC. Nothing is uploaded to our servers.
+Your library data stays on this PC in %LOCALAPPDATA%\BAKLOG-Data (separate from the app folder). Uninstalling BAKLOG removes only the app; your library and connections remain until you delete that data folder.

@@ -412,8 +412,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
         fetcher_keys=("ea",),
         tips=(
             "Sign in with your EA account in the browser window.",
-            "After sign-in we'll open EA's deals page to confirm your session and save your web token.",
-            "Each sync uses your saved session token; the browser profile is refreshed when needed.",
+            "After sign-in we open the deals page briefly to confirm your session.",
+            "If the chip shows Session expired, click Reconnect (not Connect) for a clean sign-in.",
+            "Each sync replays your saved browser profile; reconnect if library fetches start failing.",
             "Only PC titles sold on EA are listed \u2014 Steam/Epic copies stay on those store fetchers.",
         ),
         connect_strategy="bearer_header",

@@ -4,7 +4,7 @@
  * error-boundary.js can open this without importing it.
  */
 
-import { buildBugBundle, copyBugBundleToClipboard, submitBugReport } from './error-boundary.js';
+import { buildBugBundleAsync, copyBugBundleToClipboard, submitBugReport } from './error-boundary.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
 
 let _shellEl = null;
@@ -75,10 +75,11 @@ function setStatus(text, isError = false) {
   node.classList.toggle('baklog-bug-report-status--error', isError);
 }
 
-function refreshPreview() {
+async function refreshPreview() {
   const preview = document.getElementById('bugReportPreview');
   if (!preview) return;
-  const bundle = buildBugBundle();
+  preview.textContent = 'Loading preview…';
+  const bundle = await buildBugBundleAsync();
   const transport = {
     ...bundle,
     errors: {

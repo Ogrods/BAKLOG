@@ -31,6 +31,7 @@ def clear_request_profile_id() -> None:
     _request_profile_id.set(None)
 
 
+# Bound at import; shared.install_paths.data_root() runs legacy migration on first call.
 ROOT = data_root()
 PROFILES_DIR = ROOT / "profiles"
 INDEX_FILE = PROFILES_DIR / "index.json"

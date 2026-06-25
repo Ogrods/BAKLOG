@@ -158,6 +158,17 @@ describe('flashCountUp', () => {
     expect(() => fireLibraryCountFlash('wishlist', 10, 100)).not.toThrow();
   });
 
+  it('fireLibraryCountFlash routes library deltas to the row count when active', () => {
+    document.body.innerHTML = `
+      <span class="library-count-host" data-libcount-host>
+        <span data-count-target="rowcount-library">10</span>
+      </span>`;
+    state.activeView = 'library';
+    fireLibraryCountFlash('library', 10, 13, { rowPrev: 8, rowNext: 11 });
+    vi.advanceTimersByTime(300);
+    expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
+  });
+
   it('fireLibraryCountFlash routes library deltas to the library chip when active', () => {
     document.body.innerHTML = `
       <span class="library-count-host" data-libcount-host>

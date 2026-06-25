@@ -586,6 +586,31 @@ export function hltbMain(g) {
   return g.hltb_main_hours;
 }
 
+/** Shown when an HLTB-backed total reads 0h because estimates were never fetched. */
+export const HLTB_FETCH_TOOLTIP = 'No playtime estimates yet. Run the HLTB fetcher from the fetcher log to look up HowLongToBeat hours.';
+
+export function backlogMissingHltbCount(games) {
+  let n = 0;
+  for (const g of games || []) {
+    if ((getPersonal(g).status || 'backlog') !== 'backlog') continue;
+    if (hltbMain(g) == null) n++;
+  }
+  return n;
+}
+
+export function hltbBacklogHoursTitle(backlogHrs, games, defaultTitle = 'Sum of HowLongToBeat main-story hours across backlog games') {
+  if (backlogHrs <= 0 && backlogMissingHltbCount(games) > 0) return HLTB_FETCH_TOOLTIP;
+  return defaultTitle;
+}
+
+export function hltbClearByYearsTitle(years, backlogHrs, games) {
+  const yrs = Number(years);
+  if ((Number.isFinite(yrs) ? yrs : backlogHrs) <= 0 && backlogMissingHltbCount(games) > 0) {
+    return HLTB_FETCH_TOOLTIP;
+  }
+  return 'Backlog HLTB main hours ÷ (2 hours × 365 days)';
+}
+
 export function ratingValue(g) {
   return g.steam_review_percent ?? 0;
 }

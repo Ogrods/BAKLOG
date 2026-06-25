@@ -14,10 +14,16 @@ Recommended: run BAKLOG-Setup.exe from your invite link.
    Sign-in requires Google Chrome or Microsoft Edge.
 5. After connecting, fetcher chips import your libraries automatically.
 
+Your library data (profiles, games, connections) is stored separately at
+%LOCALAPPDATA%\BAKLOG-Data. In-place upgrades and uninstalling the app
+leave that folder on disk. Reinstalling BAKLOG picks your data back up.
+
 Portable zip fallback:
 - Unzip to a normal folder (Desktop or Documents), not from the zip temp folder.
 - Double-click Start BAKLOG.bat (launches the tray) or BAKLOG Tray.exe.
 - For support, Start BAKLOG (server console).bat opens a visible server window.
+- To keep all data in the unzip folder (thumb drive), add an empty portable.txt
+  file beside BAKLOG.exe before first launch.
 
 Quit BAKLOG from the tray icon (right-click, Quit). Do not close a console
 window unless you launched the server-console shortcut.

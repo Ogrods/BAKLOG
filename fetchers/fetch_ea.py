@@ -23,13 +23,22 @@ from clients.ea_client import (
     EaCaptureError,
     EaClient,
 )
-from clients.ea_session import DEFAULT_TRIGGER_URLS, probe_ea_token, sniff_ea_bearer
+from clients.ea_session import (
+    EA_COOKIE_SESSION,
+    EA_LIBRARY_URLS,
+    capture_ea_browser_session,
+    fetch_owned_games_browser,
+    launch_ea_profile,
+    probe_ea_cookies,
+    probe_ea_token,
+    read_ea_connect_snapshot,
+    sniff_ea_bearer,
+)
 from clients.hltb_client import HltbClient
 from fetchers._authoritative import EA
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
-    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -64,10 +73,28 @@ def _clean_name(raw: str) -> str:
 
 
 def _ea_connected() -> bool:
-    prof = profile_dir("ea")
-    if prof.exists() and any(prof.iterdir()):
-        return True
-    return bool(resolve_env("EA_BEARER_TOKEN", provider="ea"))
+    """True only after Connect marks EA connected — not while a sign-in window is open."""
+    from auth.manager import get_provider_blob
+
+    return get_provider_blob("ea").get("status") == "connected"
+
+
+def _load_ea_profile_cookies() -> list[dict]:
+    """Best-effort cookie jar read for API replay (no page navigation)."""
+    from auth.manager import has_active_sessions
+
+    if has_active_sessions():
+        return []
+    profile = profile_dir("ea")
+    if not profile.exists() or not any(profile.iterdir()):
+        return []
+    try:
+        from auth.cdp_browser import launch_persistent_profile
+
+        with launch_persistent_profile(str(profile), headless=True) as ctx:
+            return ctx.cookies()
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def _resolve_session(
@@ -77,53 +104,94 @@ def _resolve_session(
     dump_debug: bool = False,
 ) -> tuple[str, list[dict], dict[str, Any]]:
     """Return (bearer_token, cookies, debug_info)."""
-    debug: dict[str, Any] = {"headless": headless, "stored_token_probe": None}
+    debug: dict[str, Any] = {
+        "headless": headless,
+        "launch_mode": "headed",
+        "stored_token_probe": None,
+    }
     stored = (resolve_env("EA_BEARER_TOKEN", provider="ea") or "").strip()
 
-    if stored:
+    if stored and stored != EA_COOKIE_SESSION:
         probe = probe_ea_token(stored)
         debug["stored_token_probe"] = probe
-        if probe.get("ok"):
-            debug["token_source"] = "stored"
-            return stored, [], debug
-        err = (probe.get("error") or "")[:200]
-        if "PersistedQueryNotFound" in err:
-            debug["token_source"] = "stored_apq_stale"
-            return stored, [], debug
+        if probe.get("ok") and not probe.get("library_via_browser"):
+            cookies = _load_ea_profile_cookies()
+            try:
+                items = EaClient(stored, cookies=cookies).get_owned_games()
+                debug["token_source"] = "stored"
+                debug["owned_items"] = items
+                return stored, cookies, debug
+            except EaAuthError as exc:
+                debug["stored_owned_error"] = str(exc)
+
+    snapshot = read_ea_connect_snapshot()
+    if snapshot:
+        cookies = list(snapshot.get("cookies") or [])
+        if not cookies:
+            cookies = _load_ea_profile_cookies()
+        owned = list(snapshot.get("owned_items") or [])
+        debug["token_source"] = "connect_snapshot"
+        debug["owned_items"] = owned
+        debug["browser_auth_ok"] = True
+        debug["connect_snapshot_at"] = snapshot.get("captured_at")
+        debug["connect_snapshot_auth_only"] = not owned
+        debug["connect_snapshot_cookie_count"] = len(cookies)
+        return "", cookies, debug
 
     profile = profile_dir("ea")
     if not profile.exists() or not any(profile.iterdir()):
+        from auth.manager import get_provider_blob
+
+        if get_provider_blob("ea").get("status") == "connected":
+            raise EaAuthError(
+                "EA session expired — open Connections → EA App → Reconnect and sign in at ea.com."
+            )
         raise EaAuthError(
             "No saved EA profile at cache/auth/profiles/ea. "
             "Open the Connections page and connect EA App first."
         )
 
-    from auth.cdp_browser import launch_persistent_profile
-
-    with launch_persistent_profile(str(profile), headless=headless) as ctx:
+    with launch_ea_profile(profile, visible=not headless) as ctx:
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         try:
-            result = sniff_ea_bearer(
-                ctx,
-                page,
-                trigger_urls=DEFAULT_TRIGGER_URLS,
-                timeout_s=timeout_s,
-                debug_out=debug,
-            )
+            if stored == EA_COOKIE_SESSION:
+                result = capture_ea_browser_session(
+                    ctx,
+                    page,
+                    timeout_s=timeout_s,
+                    debug_out=debug,
+                )
+            else:
+                result = sniff_ea_bearer(
+                    ctx,
+                    page,
+                    trigger_urls=EA_LIBRARY_URLS,
+                    timeout_s=timeout_s,
+                    debug_out=debug,
+                )
         except (EaAuthError, EaCaptureError):
             if dump_debug:
                 _write_fetch_debug(debug, page=page)
             raise
         debug.update(result.debug)
+        debug["owned_items"] = result.owned_items
         debug["token_source"] = "sniff"
         if dump_debug:
             debug["final_url"] = result.debug.get("final_url")
             _write_fetch_debug(debug, page=page)
         mark_connected(
             "ea",
-            {"EA_PROFILE": "ready", "EA_BEARER_TOKEN": result.token},
+            {
+                "EA_PROFILE": "ready",
+                "EA_BEARER_TOKEN": (
+                    EA_COOKIE_SESSION
+                    if (result.token or "") == EA_COOKIE_SESSION or result.debug.get("browser_auth_ok")
+                    else (result.token or EA_COOKIE_SESSION)
+                ),
+            },
         )
-        return result.token, result.cookies, debug
+        token = result.token if result.token and result.token != EA_COOKIE_SESSION else ""
+        return token, result.cookies, debug
 
 
 def _write_fetch_debug(debug: dict[str, Any], *, page: Any = None) -> None:
@@ -261,7 +329,6 @@ def main() -> int:
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     parser.add_argument("--skip-hltb", action="store_true")
-    add_only_new_arg(parser)
     parser.add_argument("--dump-raw", action="store_true")
     parser.add_argument(
         "--headed",
@@ -284,6 +351,16 @@ def main() -> int:
         )
         return stats.finish("fetch_ea", t0, exit_code=1)
 
+    from auth.manager import has_active_sessions
+
+    if has_active_sessions():
+        stats.error(
+            "EA sign-in is still open. Finish Connect (wait for the browser window to close) "
+            "before refreshing EA."
+        )
+        return stats.finish("fetch_ea", t0, exit_code=1)
+
+    _dbg: dict[str, Any] = {}
     try:
         token, cookies, _dbg = run_with_heartbeat(
             lambda: _resolve_session(
@@ -293,9 +370,13 @@ def main() -> int:
             "EA session capture",
         )
     except EaCaptureError as e:
+        if _dbg:
+            _write_fetch_debug(_dbg)
         stats.error(str(e))
         return stats.finish("fetch_ea", t0, exit_code=1)
     except EaAuthError as e:
+        if _dbg:
+            _write_fetch_debug(_dbg)
         mark_invalid("ea", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_ea", t0, exit_code=EXIT_CODE_AUTH)
@@ -303,7 +384,13 @@ def main() -> int:
         msg = str(e)
         is_transport = any(
             tok in msg.lower()
-            for tok in ("cdp command timed out", "websocket", "browser", "debugging endpoint")
+            for tok in (
+                "cdp command timed out",
+                "cdp connection closed",
+                "websocket",
+                "browser",
+                "debugging endpoint",
+            )
         )
         if is_transport:
             stats.error(f"EA session capture transport error: {msg}")
@@ -313,8 +400,41 @@ def main() -> int:
         return stats.finish("fetch_ea", t0, exit_code=EXIT_CODE_AUTH)
 
     try:
-        client = EaClient(token, cookies=cookies)
-        raw_items = client.get_owned_games()
+        raw_items: list[dict] = list(_dbg.get("owned_items") or [])
+        if token:
+            try:
+                client = EaClient(token, cookies=cookies)
+                raw_items = run_with_heartbeat(
+                    client.get_owned_games,
+                    "EA owned games (API)",
+                )
+            except EaAuthError:
+                if not raw_items:
+                    raw_items = []
+        if not raw_items:
+            try:
+                client = EaClient(cookies=cookies)
+                raw_items = run_with_heartbeat(
+                    client.get_owned_games,
+                    "EA owned games (cookie API)",
+                )
+            except EaAuthError:
+                raw_items = []
+        if not raw_items:
+            raw_items = run_with_heartbeat(
+                lambda: fetch_owned_games_browser(
+                    profile_dir("ea"),
+                    headless=not args.headed,
+                ),
+                "EA owned games (browser)",
+            )
+        if not raw_items:
+            raise EaAuthError(
+                "EA library fetch returned no games. Reconnect EA App on Connections, "
+                "then refresh again."
+            )
+        if "client" not in locals() or client is None:
+            client = EaClient(token, cookies=cookies) if token or cookies else None
     except EaAuthError as e:
         mark_invalid("ea", error=str(e))
         stats.error(str(e))
@@ -376,11 +496,8 @@ def main() -> int:
 
     for i, item in enumerate(sorted(deduped, key=_sort_key), 1):
         name = _clean_name(str((item.get("product") or {}).get("name") or ""))
-        cached = existing.get(_row_id(item))
-        if args.only_new and cached:
-            games_out.append(cached)
-            continue
         print(f"[{i}/{len(deduped)}] {name}", flush=True)
+        cached = existing.get(_row_id(item))
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:

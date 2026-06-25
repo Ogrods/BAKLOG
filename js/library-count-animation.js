@@ -13,7 +13,7 @@
 
 import { state } from './state.js';
 import { prefersReducedMotion } from './motion.js';
-import { easeInOutCubic } from './dashboard-shared.js';
+import { easeInOutCubic, heroCountRollMs } from './dashboard-shared.js';
 
 // Match landing mega-hero demo (`landing/demo.js` COUNT_ROLL_MS).
 const COUNT_ROLL_MS = 1000;
@@ -57,6 +57,10 @@ function cancelEpisode(node, opts = {}) {
   if (opts.keepPopups === false && prev.host && prev.host.isConnected) {
     prev.host.querySelectorAll('.library-count-popup').forEach(el => el.remove());
   }
+  if (opts.keepPopups === false && prev.node?.id) {
+    document.querySelectorAll(`.library-count-popup[data-libcount-surface="${prev.node.id}"]`)
+      .forEach(el => el.remove());
+  }
   node[SURFACE_KEY] = null;
   _activeSurfaces.delete(node);
 }
@@ -89,6 +93,8 @@ function nodeStillAlive(node) {
 function spawnPopups(host, total, count, opts) {
   if (!host || !host.isConnected) return [];
   const timers = [];
+  const anchorNode = opts?.anchorNode || host;
+  const surfaceKey = anchorNode?.id || '';
   // Chunk math: distribute `total` across `count` popups. Last popup absorbs
   // the remainder so labels sum to exactly `total`.
   const baseChunk = Math.floor(total / count);
@@ -103,16 +109,39 @@ function spawnPopups(host, total, count, opts) {
   for (let i = 0; i < count; i++) {
     const delay = i * POPUP_SPAWN_INTERVAL_MS;
     const id = setTimeout(() => {
-      if (!host.isConnected) return;
+      if (!host.isConnected && !anchorNode.isConnected) return;
       const el = document.createElement('span');
       el.className = 'library-count-popup';
+      if (surfaceKey) el.dataset.libcountSurface = surfaceKey;
       el.setAttribute('aria-hidden', 'true');
       el.textContent = `+${labels[i].toLocaleString('en-US')}`;
       // Bias jitter toward the right (positive) so the column drifts outward
       // rather than back into the number it's reporting against.
       const dx = (Math.random() * JITTER_PX * 2) - (JITTER_PX * 0.5);
       el.style.setProperty('--baklog-dx', `${dx.toFixed(1)}px`);
-      host.appendChild(el);
+      const anchorEl = anchorNode.isConnected ? anchorNode : host;
+      const rect = anchorEl.getBoundingClientRect();
+      const hasRect = rect.width > 0 || rect.height > 0;
+      if (hasRect && typeof document !== 'undefined') {
+        const fs = parseFloat(getComputedStyle(anchorEl).fontSize) || 16;
+        const isHero = anchorEl.id === 'dashHeroCount';
+        el.classList.add('library-count-popup--floated');
+        if (!isHero) {
+          el.classList.add('library-count-popup--floated-chip');
+          el.style.fontSize = `${Math.max(11, Math.min(20, fs * 0.95)).toFixed(1)}px`;
+        }
+        let left = rect.right + Math.max(3, fs * 0.25);
+        let top = rect.top + (isHero ? fs * 0.05 : 0);
+        if (typeof window !== 'undefined') {
+          left = Math.min(left, window.innerWidth - 80);
+          top = Math.max(8, Math.min(top, window.innerHeight - 40));
+        }
+        el.style.left = `${left}px`;
+        el.style.top = `${top}px`;
+        document.body.appendChild(el);
+      } else {
+        host.appendChild(el);
+      }
       // Belt-and-suspenders: animationend fires removal, but if the
       // animation is suspended (tab hidden) we still want the node gone.
       const reap = setTimeout(() => { if (el.isConnected) el.remove(); }, POPUP_LIFETIME_MS + 200);
@@ -158,9 +187,16 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
     return;
   }
 
-  const durationMs = Math.max(120, opts.durationMs || COUNT_ROLL_MS);
   const wantPopups = opts.popups !== false && safeTo > safeFrom;
   const host = wantPopups ? ensureHost(node) : null;
+  const delta = safeTo - safeFrom;
+  const popupCount = host && wantPopups ? Math.min(delta, POPUP_CAP) : 0;
+  const isHeroMount = !!(host && host.closest('.dash-mega'));
+  let durationMs = opts.durationMs;
+  if (!Number.isFinite(durationMs)) {
+    durationMs = isHeroMount ? heroCountRollMs(delta, popupCount) : COUNT_ROLL_MS;
+  }
+  durationMs = Math.max(120, durationMs);
 
   const episode = {
     node,
@@ -176,10 +212,9 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
 
   // Spawn popups in parallel with the rolling count. If we have nowhere to
   // mount them, skip popups silently (the count still rolls).
-  if (host && safeTo > safeFrom) {
-    const delta = safeTo - safeFrom;
-    const popupCount = Math.min(delta, POPUP_CAP);
+  if (host && wantPopups) {
     spawnPopups(host, delta, popupCount, {
+      anchorNode: node,
       onTimers: (ids) => { episode.spawnTimers = ids; },
     });
   }
@@ -236,7 +271,7 @@ export function disarmLibraryCountAnimations() {
  * High-level entry point: animate every mounted surface for this `kind`.
  * Called from applyMergedLibrary() with `prev` and `next` counts.
  */
-export function fireLibraryCountFlash(kind, prev, next) {
+export function fireLibraryCountFlash(kind, prev, next, rowOpts = {}) {
   if (typeof document === 'undefined') return;
   // Disarmed until boot completes — initial count-up never spawns popups.
   if (!_armed) return;
@@ -244,15 +279,18 @@ export function fireLibraryCountFlash(kind, prev, next) {
   if (next === prev) return;
   // We never visualize decreases as "−1" popups; just settle text quietly.
   const isDecrease = next < prev;
-  const surfaces = collectSurfaces(kind);
+  const surfaces = collectSurfaces(kind, prev, next, rowOpts);
   for (const surface of surfaces) {
-    flashCountUp(surface.node, prev, next, surface.format, {
-      popups: !isDecrease,
+    const from = surface.prev;
+    const to = surface.next;
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to === from) continue;
+    flashCountUp(surface.node, from, to, surface.format, {
+      popups: !isDecrease && to > from,
     });
   }
 }
 
-function collectSurfaces(kind) {
+function collectSurfaces(kind, prev, next, rowOpts = {}) {
   const out = [];
   if (kind === 'library') {
     // Hero number on Dashboard. Only animate if visible (Dashboard mounted
@@ -260,18 +298,42 @@ function collectSurfaces(kind) {
     // and the next switchView() will paint the final value cleanly.
     if (state.activeView === 'dashboard') {
       const hero = document.getElementById('dashHeroCount');
-      if (hero) out.push({ node: hero, format: fmtCommas });
+      if (hero) out.push({ node: hero, format: fmtCommas, prev, next });
     }
     // Summary chip: "Games <N>"
     const libChip = document.querySelector('[data-count-target="library"]');
     if (libChip && state.activeView === 'library') {
-      out.push({ node: libChip, format: fmtPlain });
+      out.push({ node: libChip, format: fmtPlain, prev, next });
     }
-    // Row count under the table — only when on library view.
+    // Row count under the table ("Showing N of …") — respects active filters.
+    const rowPrev = rowOpts.rowPrev;
+    const rowNext = rowOpts.rowNext;
+    const rowChip = document.querySelector('[data-count-target="rowcount-library"]');
+    if (
+      rowChip
+      && state.activeView === 'library'
+      && Number.isFinite(rowPrev)
+      && Number.isFinite(rowNext)
+      && rowNext > rowPrev
+    ) {
+      out.push({ node: rowChip, format: fmtPlain, prev: rowPrev, next: rowNext });
+    }
   } else if (kind === 'wishlist') {
     const wlChip = document.querySelector('[data-count-target="wishlist"]');
     if (wlChip && state.activeView === 'wishlist') {
-      out.push({ node: wlChip, format: fmtPlain });
+      out.push({ node: wlChip, format: fmtPlain, prev, next });
+    }
+    const rowPrev = rowOpts.rowPrev;
+    const rowNext = rowOpts.rowNext;
+    const rowChip = document.querySelector('[data-count-target="rowcount-wishlist"]');
+    if (
+      rowChip
+      && state.activeView === 'wishlist'
+      && Number.isFinite(rowPrev)
+      && Number.isFinite(rowNext)
+      && rowNext > rowPrev
+    ) {
+      out.push({ node: rowChip, format: fmtPlain, prev: rowPrev, next: rowNext });
     }
   }
   return out;
@@ -382,13 +444,17 @@ export function runLibraryCountDemo(opts = {}) {
       running = next;
       const t = setTimeout(() => {
         if (!hero.isConnected) return;
-        flashCountUp(hero, prev, next, fmtCommas, { popups: true, durationMs: 1000 });
+        flashCountUp(hero, prev, next, fmtCommas, { popups: true });
       }, elapsed);
       _demoTimers.push(t);
     }
     // After the last burst, restore the real hero text so the demo doesn't
     // leave the dashboard reading 2,984 when the actual library is 1,946.
-    const restoreAt = elapsed + 1600;
+    const lastStep = sequence[sequence.length - 1];
+    const lastRoll = lastStep
+      ? heroCountRollMs(lastStep.delta, Math.min(lastStep.delta, POPUP_CAP))
+      : 1600;
+    const restoreAt = elapsed + lastRoll + 200;
     const restoreId = setTimeout(() => {
       _demoRunning = false;
       if (hero.isConnected) {
@@ -441,11 +507,11 @@ export function runLibraryCountSmallDemo(opts = {}) {
       running = next;
       const id = setTimeout(() => {
         if (!hero.isConnected) return;
-        flashCountUp(hero, prev, next, fmtCommas, { popups: true, durationMs: 400 });
+        flashCountUp(hero, prev, next, fmtCommas, { popups: true });
       }, i * stepMs);
       _demoTimers.push(id);
     }
-    const restoreAt = total * stepMs + 900;
+    const restoreAt = total * stepMs + heroCountRollMs(1, 1) + 150;
     const restoreId = setTimeout(() => {
       _demoRunning = false;
       if (!hero.isConnected) return;

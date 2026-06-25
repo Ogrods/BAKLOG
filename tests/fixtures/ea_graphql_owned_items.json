@@ -1,0 +1,59 @@
+{
+  "data": {
+    "me": {
+      "ownedGameProducts": {
+        "next": null,
+        "items": [
+          {
+            "originOfferId": "OFW-TEST-001",
+            "id": "item-001",
+            "product": {
+              "id": "prod-001",
+              "name": "Battlefield 2042",
+              "gameSlug": "battlefield-2042",
+              "baseItem": {
+                "gameType": "GAME",
+                "isLauncher": false
+              },
+              "gameProductUser": {
+                "ownershipMethods": ["PURCHASE"]
+              }
+            }
+          },
+          {
+            "originOfferId": "OFW-TEST-002",
+            "id": "item-002",
+            "product": {
+              "id": "prod-002",
+              "name": "EA app",
+              "gameSlug": "ea-app",
+              "baseItem": {
+                "gameType": "LAUNCHER",
+                "isLauncher": true
+              },
+              "gameProductUser": {
+                "ownershipMethods": ["PURCHASE"]
+              }
+            }
+          },
+          {
+            "originOfferId": "OFW-TEST-003",
+            "id": "item-003",
+            "product": {
+              "id": "prod-003",
+              "name": "The Sims 4",
+              "gameSlug": "the-sims-4",
+              "baseItem": {
+                "gameType": "GAME",
+                "isLauncher": false
+              },
+              "gameProductUser": {
+                "ownershipMethods": ["VAULT"]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

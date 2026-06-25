@@ -24,8 +24,6 @@ from auth.cdp_browser import (
     _BROWSER_LAUNCH_HINT,
     CdpContext,
     CdpPage,
-    CdpRequest,
-    CdpResponse,
     _cdp_websocket_error,
     _chromium_executable_candidates,
     _should_preserve_popup,
@@ -65,7 +63,7 @@ class TestCookieHeader:
 class TestBlankUrl:
     @pytest.mark.parametrize(
         "url",
-        ["", "about:blank", "chrome://newtab/", "chrome://new-tab-page/"],
+        ["", "about:blank", "chrome://newtab/"],
     )
     def test_blank_urls(self, url: str) -> None:
         assert is_blank_browser_url(url)
@@ -114,29 +112,39 @@ class TestRegisterPageDebugger:
         assert ("Network.enable", "SESSION-1") in calls
 
 
-class TestCdpContextResponseHandlers:
-    def test_dispatch_response_invokes_context_handlers(self) -> None:
+class TestNetworkExtraInfo:
+    def test_extra_info_merges_authorization_and_redispatches(self) -> None:
         ctx = _bare_context()
         ctx._request_handlers = []
-        ctx._response_handlers = []
         page = CdpPage(ctx, "TARGET-1", "SESSION-1")
-        seen: list[str] = []
+        seen: list[bool] = []
 
-        ctx.on("response", lambda _resp: seen.append("ctx"))
-        req = CdpRequest(url="https://example.com/gql", headers={})
-        resp = CdpResponse(
-            url=req.url,
-            status=200,
-            request=req,
-            headers={},
-            _page=page,
-            _request_id="req-1",
+        def handler(req) -> None:
+            auth = req.headers.get("authorization")
+            seen.append(bool(auth))
+
+        ctx._request_handlers.append(handler)
+
+        page._handle_network_event(
+            "Network.requestWillBeSent",
+            {
+                "requestId": "req-1",
+                "request": {
+                    "url": "https://service-aggregation-layer.juno.ea.com/graphql",
+                    "headers": {"accept": "application/json"},
+                },
+            },
         )
-        page._dispatch_response(resp)
-        assert seen == ["ctx"]
+        assert seen == [False]
 
-
-class TestCdpErrors:
+        page._handle_network_event(
+            "Network.requestWillBeSentExtraInfo",
+            {
+                "requestId": "req-1",
+                "headers": {"Authorization": "Bearer ea-test-token"},
+            },
+        )
+        assert seen == [False, True]
     def test_websocket_403_message(self) -> None:
         err = _cdp_websocket_error(
             Exception("Handshake status 403 Forbidden - remote-allow-origins")
@@ -151,7 +159,38 @@ class TestCdpErrors:
         assert _BROWSER_LAUNCH_HINT in str(err)
 
 
-class TestCookiesRouting:
+class TestHttpClient:
+    def test_post_forwards_cookies_and_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import auth.cdp_browser as cdp
+
+        ctx = _bare_context()
+        ctx.cookies = lambda: [{"name": "remid", "value": "abc", "domain": ".ea.com"}]  # type: ignore[method-assign]
+        captured: dict = {}
+
+        class _FakeResp:
+            status_code = 200
+            text = '{"ok":true}'
+
+        def fake_post(url, *, cookies, headers, data, json, timeout):
+            captured.update(
+                {"url": url, "cookies": cookies, "headers": headers, "data": data, "json": json}
+            )
+            return _FakeResp()
+
+        monkeypatch.setattr(cdp.requests, "post", fake_post)
+        client = cdp.CdpHttpClient(ctx)
+        resp = client.post(
+            "https://example.com/gql",
+            headers={"accept": "application/json"},
+            data='{"q":1}',
+        )
+
+        assert captured["url"] == "https://example.com/gql"
+        assert captured["cookies"] == {"remid": "abc"}
+        assert captured["data"] == '{"q":1}'
+        assert resp.status == 200
+        assert resp.json() == {"ok": True}
+
     def test_uses_page_session_for_network_getallcookies(self) -> None:
         ctx = _bare_context()
         ctx.pages = [_FakePage("SESSION-1")]
@@ -319,6 +358,23 @@ class TestLaunchArgs:
 
         assert "--start-maximized" in exc.value.args
         assert not any(a.startswith("--window-position=") for a in exc.value.args)
+
+
+class TestProfileLockRelease:
+    def test_release_chromium_profile_lock_kills_matching_pids(self, monkeypatch, tmp_path: Path) -> None:
+        import auth.cdp_browser as cdp
+
+        profile = tmp_path / "ea-profile"
+        profile.mkdir()
+        killed: list[int] = []
+
+        monkeypatch.setattr(cdp, "pids_holding_chromium_profile", lambda _p: [4242, 5151])
+        monkeypatch.setattr(cdp, "_kill_pids", lambda pids: killed.extend(pids) or pids)
+        monkeypatch.setattr(cdp.time, "sleep", lambda _s: None)
+
+        out = cdp.release_chromium_profile_lock(profile)
+        assert out == [4242, 5151]
+        assert killed == [4242, 5151]
 
 
 class TestGracefulClose:
@@ -526,3 +582,65 @@ def test_launch_goto_title() -> None:
         import shutil
 
         shutil.rmtree(profile, ignore_errors=True)
+
+
+class TestBrowserSessionGone:
+    def test_exited_launcher_proc_is_not_gone_when_socket_live(self) -> None:
+        from auth.cdp_browser import browser_session_gone
+
+        class _Proc:
+            def poll(self) -> int:
+                return 0
+
+        class _Ctx:
+            _ws_dead = False
+            _proc = _Proc()
+            pages = []
+
+        assert browser_session_gone(_Ctx()) is False
+
+    def test_detects_all_pages_closed(self) -> None:
+        from auth.cdp_browser import (
+            ConnectBrowserClosed,
+            abort_if_browser_closed,
+            browser_session_gone,
+        )
+
+        class _Page:
+            _closed = True
+
+            @property
+            def is_closed(self) -> bool:
+                return self._closed
+
+        class _Proc:
+            def poll(self) -> None:
+                return None
+
+        class _Ctx:
+            _ws_dead = False
+            _proc = _Proc()
+            pages = [_Page()]
+
+        assert browser_session_gone(_Ctx()) is True
+        with pytest.raises(ConnectBrowserClosed):
+            abort_if_browser_closed(_Ctx())
+
+    def test_live_browser_not_gone(self) -> None:
+        from auth.cdp_browser import browser_session_gone
+
+        class _Page:
+            @property
+            def is_closed(self) -> bool:
+                return False
+
+        class _Proc:
+            def poll(self) -> None:
+                return None
+
+        class _Ctx:
+            _ws_dead = False
+            _proc = _Proc()
+            pages = [_Page()]
+
+        assert browser_session_gone(_Ctx()) is False

@@ -239,13 +239,13 @@ function applyMegaHeroCounters(stats) {
         continue;
       }
       if (item.id === 'dashHeroCount' && Number.isFinite(prev) && item.to > prev) {
-        animateCount(node, prev, item.to, item.format, countUpDurationForDelta(item.to - prev), { easeInOut: true });
+        animateCount(node, prev, item.to, item.format, countUpDurationForDelta(item.to - prev), { linear: true });
       } else {
         node.textContent = item.format(item.to);
       }
     } else {
       if (item.id === 'dashHeroCount') {
-        animateCount(node, 0, item.to, item.format, countUpDurationForDelta(item.to), { easeInOut: true });
+        animateCount(node, 0, item.to, item.format, countUpDurationForDelta(item.to), { linear: true });
       } else {
         animateCount(node, 0, item.to, item.format, 1000);
       }

@@ -13,7 +13,7 @@
 
 import { state } from './state.js';
 import { prefersReducedMotion } from './motion.js';
-import { easeInOutCubic, heroCountRollMs } from './dashboard-shared.js';
+import { heroCountRollMs } from './dashboard-shared.js';
 
 // Match landing mega-hero demo (`landing/demo.js` COUNT_ROLL_MS).
 const COUNT_ROLL_MS = 1000;
@@ -242,7 +242,7 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
     }
     const elapsed = (now || performance.now()) - start;
     const t = Math.min(1, elapsed / durationMs);
-    const v = safeFrom + (safeTo - safeFrom) * easeInOutCubic(t);
+    const v = safeFrom + (safeTo - safeFrom) * t;
     node.textContent = format(v);
     if (t < 1) {
       episode.rafId = requestAnimationFrame(tick);

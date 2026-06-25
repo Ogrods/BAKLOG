@@ -18,8 +18,11 @@
   const SPOTLIGHT_INTERVAL_MS = 7000;
   const SPOTLIGHT_FADE_MS = 300;
   const COUNT_ROLL_MS = 1000;
-  const POPUP_SPAWN_MS = 70;
+  const POPUP_SPAWN_MS = 300;
+  /** Steady +1 stream interval for the long mega-hero climb demo. */
+  const POPUP_STREAM_MS = 200;
   const POPUP_CAP = 10;
+  const POPUP_STREAM_CAP = 40;
   const POPUP_LIFETIME_MS = 700;
   const JITTER_PX = 4;
 
@@ -288,7 +291,7 @@
       return;
     }
     const t = Math.min(1, (now - countStart) / countDur);
-    const v = countFrom + (countTo - countFrom) * easeInOutCubic(t);
+    const v = countFrom + (countTo - countFrom) * t;
     countNode.textContent = countFormat(v);
     if (t < 1) {
       requestAnimationFrame(countTick);
@@ -305,20 +308,24 @@
     countTimers = [];
   }
 
-  function spawnPopups(host, total, count) {
+  function spawnPopups(host, opts = {}) {
     if (!host || reducedMotion()) return;
-    const base = Math.floor(total / count);
-    let remaining = total;
-    for (let i = 0; i < count; i++) {
-      const value = i === count - 1 ? remaining : Math.max(1, base);
-      remaining -= value;
-      const delay = i * POPUP_SPAWN_MS;
+    const durationMs = Number.isFinite(opts.durationMs) ? opts.durationMs : COUNT_ROLL_MS;
+    const streamMs = Number.isFinite(opts.streamMs) ? opts.streamMs : POPUP_SPAWN_MS;
+    const maxPopups = Number.isFinite(opts.maxPopups) ? opts.maxPopups : POPUP_CAP;
+    const gapMs = Math.max(120, streamMs);
+    const popupCount = Math.min(
+      maxPopups,
+      Math.max(1, Math.floor((durationMs * 0.92) / gapMs)),
+    );
+    for (let i = 0; i < popupCount; i++) {
+      const delay = i * gapMs;
       const id = setTimeout(() => {
         if (!host.isConnected) return;
         const el = document.createElement("span");
         el.className = "library-count-popup";
         el.setAttribute("aria-hidden", "true");
-        el.textContent = `+${value.toLocaleString("en-US")}`;
+        el.textContent = "+1";
         const dx = Math.random() * JITTER_PX * 2 - JITTER_PX * 0.5;
         el.style.setProperty("--baklog-dx", `${dx.toFixed(1)}px`);
         host.appendChild(el);
@@ -347,9 +354,11 @@
     const durationMs = opts.durationMs || COUNT_ROLL_MS;
     const host = opts.popups !== false ? node.closest("[data-libcount-host]") : null;
     if (host && safeTo > safeFrom) {
-      const delta = safeTo - safeFrom;
-      const count = Number.isFinite(opts.popupCount) ? opts.popupCount : Math.min(delta, POPUP_CAP);
-      spawnPopups(host, delta, count);
+      spawnPopups(host, {
+        durationMs,
+        streamMs: opts.streamMs,
+        maxPopups: opts.maxPopups,
+      });
     }
     countNode = node;
     countFormat = format;
@@ -401,7 +410,12 @@
     reserveCountWidth(hero);
     hero.textContent = "0";
     const climbMs = 8000;
-    flashCountUp(hero, 0, FINAL_COUNT, fmtCommas, { popups: true, durationMs: climbMs, popupCount: 10 });
+    flashCountUp(hero, 0, FINAL_COUNT, fmtCommas, {
+      popups: true,
+      durationMs: climbMs,
+      streamMs: POPUP_STREAM_MS,
+      maxPopups: POPUP_STREAM_CAP,
+    });
     countTimers.push(setTimeout(() => {
       animatePillar("dashHeroPlayed", STATS.playedHrs, "h");
       animatePillar("dashHeroBacklog", STATS.backlogHrs, "h");

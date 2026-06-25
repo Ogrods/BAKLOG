@@ -15,7 +15,7 @@ describe('heroCountRollMs', () => {
   });
 
   it('covers full popup train length for multi-popup bursts', () => {
-    const train = (10 - 1) * 70 + 500;
+    const train = (10 - 1) * 300 + 500;
     expect(heroCountRollMs(50, 10)).toBeGreaterThanOrEqual(train);
   });
 });

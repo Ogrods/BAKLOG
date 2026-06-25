@@ -381,8 +381,7 @@ export async function applyMergedLibrary(mergeKey = null) {
   // in "Recently added".
   try {
     const newlyAdded = state._lastNewlyAddedCount ?? 0;
-    const willFlashLib = libPrev != null && libNow > libPrev && newlyAdded > 0;
-    if (willFlashLib) {
+    if (libPrev != null && libNow > libPrev && newlyAdded > 0) {
       fireLibraryCountFlash('library', libPrev, libNow, {
         rowPrev: rowLibPrev,
         rowNext: rowLibNow,

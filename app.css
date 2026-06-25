@@ -4498,8 +4498,7 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   border-radius: 14px;
   padding: 28px 32px 22px;
   position: relative;
-  /* visible: combat-text "+N" popups climb above the hero digits */
-  overflow: visible;
+  overflow: hidden;
 }
 .dash-hero::before,
 .dash-mega::before {
@@ -4512,8 +4511,6 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   border-radius: 50%;
   background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
   pointer-events: none;
-  /* Contain the decorative blob now that the card no longer clips children. */
-  clip-path: inset(0 round 14px);
 }
 .dash-hero-eyebrow {
   font-size: 11px;
@@ -4665,8 +4662,6 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
   display: block;
   transition: opacity 0.45s ease;
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 .dash-spotlight-art-bg.is-loaded { opacity: 1; }
 /* Midnight (OLED) only: portrait / non-hero spotlight covers sit on pure black -
@@ -4743,53 +4738,22 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   background: transparent;
 }
 /* Bright scheme panel masked so the left edge dissolves to transparent; right
-   edge stays solid (no right fade). Feather the mask over ~50% so the blend
-   into the mega hero bg is gradual (a single stop at 22% read as a vertical seam). */
+   edge stays solid (no right fade). */
 .dash-spotlight-logo-backdrop {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg,
-      var(--bg) 0%,
-      color-mix(in srgb, var(--bg) 70%, transparent) 30%,
-      transparent 52%),
     radial-gradient(120% 150% at 50% 45%,
       color-mix(in srgb, var(--spot-glow, var(--accent)) 60%, transparent) 0%,
       transparent 62%),
     var(--spot-grad, linear-gradient(120deg,
       color-mix(in srgb, var(--accent) 55%, var(--bg)) 0%,
-      color-mix(in srgb, var(--accent) 35%, var(--bg)) 38%,
-      color-mix(in srgb, var(--accent) 22%, var(--bg)) 72%,
+      color-mix(in srgb, var(--accent) 22%, var(--bg)) 55%,
       var(--bg) 100%));
-  -webkit-mask-image: linear-gradient(90deg,
-    transparent 0%,
-    transparent 4%,
-    rgba(0, 0, 0, 0.1) 12%,
-    rgba(0, 0, 0, 0.28) 20%,
-    rgba(0, 0, 0, 0.48) 28%,
-    rgba(0, 0, 0, 0.66) 36%,
-    rgba(0, 0, 0, 0.82) 44%,
-    rgba(0, 0, 0, 0.94) 52%,
-    #000 58%,
-    #000 100%);
-  mask-image: linear-gradient(90deg,
-    transparent 0%,
-    transparent 4%,
-    rgba(0, 0, 0, 0.1) 12%,
-    rgba(0, 0, 0, 0.28) 20%,
-    rgba(0, 0, 0, 0.48) 28%,
-    rgba(0, 0, 0, 0.66) 36%,
-    rgba(0, 0, 0, 0.82) 44%,
-    rgba(0, 0, 0, 0.94) 52%,
-    #000 58%,
-    #000 100%);
-}
-/* Logo spotlight carries its own scheme glow — hide the mega card orb so two
-   radials don't stack into banding on the right panel. */
-.dash-mega--has-spotlight:has(.has-logo-art)::before {
-  opacity: 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 100%);
 }
 /* No right-edge fade on logo slides. */
 .dash-spotlight.has-logo-art .dash-spotlight-gradient {
@@ -4865,20 +4829,20 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   --accent: #fb923c;
   --spot-ink: #160b04;
   --spot-glow: #f97316;
-  --spot-grad: linear-gradient(120deg, #fbbf24 0%, #f59e0b 28%, #f97316 55%, #ea580c 78%, #e2502a 100%);
+  --spot-grad: linear-gradient(120deg, #fbbf24 0%, #f97316 55%, #e2502a 100%);
 }
 .dash-spotlight--scheme-sapphire {
   --accent: #818cf8;
   --spot-ink: #070b1c;
   --spot-glow: #6366f1;
-  --spot-grad: linear-gradient(120deg, #38bdf8 0%, #4a8ef0 28%, #6366f1 55%, #4f46c4 78%, #4338ca 100%);
+  --spot-grad: linear-gradient(120deg, #38bdf8 0%, #6366f1 55%, #4338ca 100%);
 }
 /* Emerald — matches the deals green palette (#10b981 / #34d399 / #6ee7b7). */
 .dash-spotlight--scheme-emerald {
   --accent: #34d399;
   --spot-ink: #04130d;
   --spot-glow: #10b981;
-  --spot-grad: linear-gradient(120deg, #6ee7b7 0%, #4ade80 28%, #34d399 55%, #10b981 78%, #059669 100%);
+  --spot-grad: linear-gradient(120deg, #6ee7b7 0%, #34d399 55%, #059669 100%);
 }
 @keyframes spotlightHeroZoom {
   from { transform: scale(1) translateZ(0); }
@@ -4912,9 +4876,6 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
   box-sizing: border-box;
   padding: 10px 0;
   filter: brightness(1.32);
-  /* Floating portrait covers: no landscape left-fade mask (demo.css parity). */
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 @keyframes spotlightSheen1 {
   0%, 18% {
@@ -5082,15 +5043,6 @@ html[data-theme="dark"] .dash-spotlight.has-portrait-art .dash-spotlight-art-bg 
     color-mix(in srgb, var(--bg) 45%, transparent) 100%
   );
   pointer-events: none;
-}
-/* Floating portrait covers sit on the right — left text scrim only, no wash on art. */
-.dash-spotlight.has-portrait-art .dash-spotlight-gradient {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--bg) 80%, transparent) 0%,
-    color-mix(in srgb, var(--bg) 35%, transparent) 30%,
-    transparent 52%
-  );
 }
 .dash-spotlight-nav {
   position: absolute;
@@ -8043,8 +7995,9 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
 #connectionsContainer .text-slate-400 { color: var(--text-mute); }
 
 /* Library-count "1UP" animation: rolling counter + scrolling combat text.
-   Motion is fully CSS-driven (composited transform + opacity) so the JS
-   side just appends spans and the browser paints them on its own thread. */
+   Popups use position:fixed (anchored to the counter via getBoundingClientRect)
+   so they are not clipped by .dash-mega { overflow:hidden } or #summary scroll.
+   Motion is fully CSS-driven (composited transform + opacity). */
 .library-count-host {
   position: relative;
   display: inline-block;
@@ -8069,9 +8022,6 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
   display: inline-block;
   width: max-content;
   max-width: min(640px, 60%);
-  position: relative;
-  z-index: 6;
-  isolation: isolate;
 }
 .dash-mega .library-count-host > .dash-hero-number {
   max-width: none;
@@ -8087,14 +8037,15 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
   left: 100%;
   top: 0;
   margin-left: 0.25em;
+  transform: translate(var(--baklog-dx, 0px), 0) scale(0.85);
+  transform-origin: left center;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  /* 0.5em resolved against body-sized .library-count-host (~14px), not the
-     hero digits — popups were ~7px and effectively invisible on Dashboard. */
-  font-size: 0.9rem;
+  /* Fallback when not floated (jsdom / pre-layout). */
+  font-size: 1rem;
   line-height: 1;
   color: #6ee7b7;
-  text-shadow: 0 0 8px rgba(110, 231, 183, 0.55), 0 1px 2px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 0 10px rgba(110, 231, 183, 0.65), 0 1px 3px rgba(0, 0, 0, 0.65);
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
@@ -8102,51 +8053,47 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
   will-change: transform, opacity;
   animation: baklog-libcount-pop 700ms ease-out forwards;
 }
-/* Dashboard hero: scale popups with the mega number. */
-.dash-mega .library-count-popup {
-  font-size: clamp(20px, 3.5vw, 36px);
-}
-/* Floated to body so dashboard overflow/stacking cannot clip combat text. */
+/* Floated to body so dashboard/header overflow cannot clip combat text. */
 .library-count-popup--floated {
   position: fixed;
   left: auto;
   top: auto;
   margin-left: 0;
-  /* Above dashboard chrome; below boot/view/auth overlays (see --overlay-z-*). */
   z-index: 120;
-  font-size: clamp(20px, 3.5vw, 36px);
+  font-size: clamp(28px, 4.5vw, 48px);
   animation: baklog-libcount-pop-hero 700ms ease-out forwards;
 }
-/* Chip/summary counters: floated popups use px motion, not hero em scale. */
+/* Summary chip + row count: smaller than hero, still clearly readable. */
 .library-count-popup--floated-chip {
-  animation: baklog-libcount-pop 700ms ease-out forwards;
+  font-size: clamp(20px, 2.4vw, 32px);
+  animation: baklog-libcount-pop 820ms ease-out forwards;
 }
 @keyframes baklog-libcount-pop-hero {
   0% {
     opacity: 0;
-    transform: translate(var(--baklog-dx, 0), 0.12em) scale(0.85);
+    transform: translate(var(--baklog-dx, 0), 0.15em) scale(0.85);
   }
   18% {
     opacity: 1;
-    transform: translate(calc(var(--baklog-dx, 0) + 0.1em), -0.22em) scale(1.18);
+    transform: translate(calc(var(--baklog-dx, 0) + 0.12em), -0.28em) scale(1.18);
   }
   100% {
     opacity: 0;
-    transform: translate(calc(var(--baklog-dx, 0) + 0.32em), -1.55em) scale(1);
+    transform: translate(calc(var(--baklog-dx, 0) + 0.38em), -1.65em) scale(1);
   }
 }
 @keyframes baklog-libcount-pop {
   0% {
     opacity: 0;
-    transform: translate(var(--baklog-dx, 0px), 6px) scale(0.85);
+    transform: translate(var(--baklog-dx, 0px), 8px) scale(0.85);
   }
   18% {
     opacity: 1;
-    transform: translate(calc(var(--baklog-dx, 0px) + 4px), -10px) scale(1.15);
+    transform: translate(calc(var(--baklog-dx, 0px) + 5px), -14px) scale(1.18);
   }
   100% {
     opacity: 0;
-    transform: translate(calc(var(--baklog-dx, 0px) + 12px), -58px) scale(1);
+    transform: translate(calc(var(--baklog-dx, 0px) + 14px), -72px) scale(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {

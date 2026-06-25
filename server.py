@@ -3146,7 +3146,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_config_get(self) -> None:
         from shared.entitlement import current_plan, maybe_refresh_local_license
         from shared.polar_license import polar_configured
-        from shared.pro_checkout import public_checkout_urls
+        from shared.pro_checkout import pro_checkout_enabled, public_checkout_urls
         from shared.supabase_auth import auth_enabled, public_auth_config
 
         maybe_refresh_local_license()
@@ -3155,6 +3155,7 @@ class Handler(SimpleHTTPRequestHandler):
         # local license file / BAKLOG_PLAN override. Defaults to "free".
         config["plan"] = current_plan(self.headers.get("Authorization"))
         config["licenseActivation"] = polar_configured() and not auth_enabled()
+        config["proCheckoutEnabled"] = pro_checkout_enabled()
         config["proCheckout"] = public_checkout_urls()
         config["frozen"] = is_frozen()
         config["version"] = _app_version()

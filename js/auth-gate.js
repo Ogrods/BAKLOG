@@ -32,6 +32,7 @@ let _accountProfileId = '';
 let _localProfiles = false;
 let _plan = 'free';
 let _licenseActivation = false;
+let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: '', yearly: '' };
 
 const DEBUG_PRO_STORAGE_KEY = 'baklog-debug-pro';
@@ -148,6 +149,7 @@ function applyConfigEntitlement(config) {
   if (!config || typeof config !== 'object') return;
   if (typeof config.plan === 'string' && config.plan) _plan = config.plan;
   _licenseActivation = !!config.licenseActivation;
+  _proCheckoutEnabled = !!config.proCheckoutEnabled;
   const checkout = config.proCheckout;
   _proCheckout = {
     monthly: checkout?.monthly || '',
@@ -159,6 +161,10 @@ export function licenseActivationEnabled() {
   return _licenseActivation;
 }
 
+export function proCheckoutEnabled() {
+  return _proCheckoutEnabled;
+}
+
 export function proCheckoutUrls() {
   return { ..._proCheckout };
 }
@@ -167,6 +173,7 @@ export function proCheckoutUrls() {
 export async function refreshAccountPlan() {
   try {
     if (_authRequired && _accessToken) {
+      await refreshAccessToken();
       const res = await fetch('/api/auth/session', {
         headers: { Authorization: `Bearer ${_accessToken}` },
       });

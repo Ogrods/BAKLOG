@@ -41,7 +41,7 @@
       ]
     },
     {
-      "source": "/(main|demo)\\.js|demo\\.css",
+      "source": "/(main|demo|pro-checkout-gate)\\.js|demo\\.css",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]

@@ -36,7 +36,7 @@
  *   Sync pairs: HOUSE_DEFAULTS (below) <-> curated/sponsors.json <-> landing/sponsors.json
  *   <-> scripts/migrate_sponsors_v2.py HOUSE_DEFAULTS <-> admin/admin.js HOUSE_MIGRATION_DEFAULTS.
  *   NOTE: hardcoded banners (proPromoBannerHtml, the wishlist house banner here, and
- *   js/pro-view.js renderConnectionsProLink) are NOT feed-driven -- they update by
+ *   js/pro-view.js Support tab funnel) are NOT feed-driven -- they update by
  *   editing js/ source + reload (dev raw ESM) or `npm run build` (frozen/built mode).
  */
 import { state } from './state.js';

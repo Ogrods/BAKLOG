@@ -40,6 +40,7 @@
   <script src="vendor/chart.umd.min.js" defer></script>
   <script src="marquee-speed.js" defer></script>
   <script src="demo.js" defer></script>
+  <script src="pro-checkout-gate.js" defer></script>
   <script src="main.js" defer></script>
 
   <!-- Structured data: inline. The src attribute is ignored on ld+json blocks,
@@ -488,6 +489,17 @@
       background: var(--accent);
       box-shadow: 0 10px 26px rgba(56, 189, 248, 0.42);
     }
+    .pro-checkout-beta-note,
+    .pro-checkout-beta-inline {
+      color: var(--text-mute);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .pro-checkout-beta-inline {
+      font-weight: 600;
+      color: var(--text);
+    }
     @media (max-width: 599px) {
       .tier-compare { display: block; overflow-x: auto; }
       .pro-checkout .btn { width: 100%; }
@@ -853,9 +865,9 @@
             <li>Never miss a free game again - deal &amp; watchlist alerts (coming soon)</li>
             <li>Bonus claimables feed: the DLC, add-ons, and in-game bonuses we filter out of the free feed, surfaced just for paid members</li>
           </ul>
-          <div class="pro-checkout">
-            <a class="btn" href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Support BAKLOG</a>
-            <a class="btn btn--secondary" href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">Support BAKLOG (yearly)</a>
+          <div class="pro-checkout" data-pro-checkout>
+            <a class="btn pro-checkout-link" href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Support BAKLOG</a>
+            <a class="btn btn--secondary pro-checkout-link" href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">Support BAKLOG (yearly)</a>
           </div>
         </article>
 
@@ -1015,11 +1027,11 @@
         </details>
         <details>
           <summary>Is it free?</summary>
-          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), cached trophy summary % (no on-demand deep re-pull), and <strong>Claimable Now</strong> for full-game giveaways. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. An optional paid tier adds more - see <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Support BAKLOG</a>. Nothing you use free today moves behind paywall.</p>
+          <p>Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), cached trophy summary % (no on-demand deep re-pull), and <strong>Claimable Now</strong> for full-game giveaways. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. An optional paid tier adds more - see <a class="pro-checkout-link" href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Support BAKLOG</a>. Nothing you use free today moves behind paywall.</p>
         </details>
         <details>
           <summary>What's in the paid tier?</summary>
-          <p>Pro perks live today: no sponsored deal cards, scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. Coming soon: cloud sync across machines, <strong>queued bulk refresh</strong> (queue every stale store and let them run back-to-back instead of babysitting one at a time), and never miss a free game again - deal/watchlist alerts. <a href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Support BAKLOG</a> or <a href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">Support BAKLOG (yearly)</a>. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
+          <p>Pro perks live today: no sponsored deal cards, scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), and a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed. Coming soon: cloud sync across machines, <strong>queued bulk refresh</strong> (queue every stale store and let them run back-to-back instead of babysitting one at a time), and never miss a free game again - deal/watchlist alerts. <a class="pro-checkout-link" href="https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw" target="_blank" rel="noopener noreferrer">Support BAKLOG</a> or <a class="pro-checkout-link" href="https://buy.polar.sh/polar_cl_EluZmAQP7KUeeSQfnVfEwML7NdbrW3ruDy4SB364dE3" target="_blank" rel="noopener noreferrer">Support BAKLOG (yearly)</a>. The free tier keeps everything you need to import, browse, and decide what to play next.</p>
         </details>
         <details>
           <summary>What's the difference between free and paid refresh?</summary>

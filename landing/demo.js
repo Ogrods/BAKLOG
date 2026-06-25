@@ -101,6 +101,8 @@
     "Connect a store and fetcher chips light up as libraries land.",
     "DLC skins and soundtracks are filtered out, so the count reflects real games.",
     "Credentials stay encrypted on your machine - fetchers use your browser session.",
+    "No container sign-in: your own Chrome or Edge opens locally; cookies stay on disk.",
+    "MIT on GitHub - server, fetchers, and auth are in the public repo if you want to read them first.",
   ];
 
   const reducedMotion = () =>

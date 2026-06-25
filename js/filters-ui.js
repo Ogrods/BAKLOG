@@ -906,69 +906,6 @@ export function renderGenreChips() {
 }
 
 // === Export ===
-export function exportTopBacklogMarkdown() {
-  const visible = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
-  const backlog = visible
-    .filter(g => chipStatusKey(g) === "backlog")
-    .sort((a, b) => priorityScore(b) - priorityScore(a))
-    .slice(0, 20);
-  if (!backlog.length) {
-    alert("No backlog games to export.");
-    return;
-  }
-  const lines = [
-    "# BAKLOG - Top 20 backlog",
-    "",
-    "| # | Game | Store | Score | HLTB main | Rating |",
-    "|---:|---|---|---:|---:|---:|",
-  ];
-  backlog.forEach((g, i) => {
-    const store = normalizeGame(g).store.toUpperCase();
-    const h = hltbMain(g);
-    const rating = ratingValue(g);
-    lines.push(
-      `| ${i + 1} | ${g.name.replace(/\|/g, "\\|")} | ${store} | ${priorityScore(g).toFixed(1)} | ${h != null ? `${h}h` : " - "} | ${rating > 0 ? `${rating}%` : " - "} |`,
-    );
-  });
-  const md = lines.join("\n");
-  navigator.clipboard.writeText(md).then(
-    () => { /* copied */ },
-    () => download("baklog-top-20.md", md, "text/markdown"),
-  );
-}
-
-export function exportCsv() {
-  // Local import-free path: read the visible list snapshot from state so we
-  // don't pull table-ui's filteredGames into the import graph here.
-  const list = state._visibleList || [];
-  const isWish = state.activeView === "wishlist";
-  const headers = isWish
-    ? ["store", "wishlist_store", "id", "name", "tracking_status", "deal_price", "deal_discount_pct", "deal_shop", "historical_low", "steam_review_percent", "hltb_main", "release_date", "genres", "notes", "store_url"]
-    : ["store", "id", "name", "status", "score", "playtime_hours", "hltb_main", "hltb_main_extra", "hltb_completionist", "steam_review_percent", "price", "discount_percent", "release_date", "genres", "notes"];
-  const rows = list.map(g => {
-    const p = getPersonal(g);
-    const ng = normalizeGame(g);
-    const d = getDealInfo(g);
-    if (isWish) {
-      return [
-        ng.store, g.wishlist_store ?? "", ng.id, g.name, p.status,
-        d?.price != null ? d.price.toFixed(2) : "", effectiveDiscountPercent(g) || "",
-        d?.shop ?? "", d?.isHistoricalLow ? "yes" : "",
-        g.steam_review_percent ?? "", hltbMain(g) ?? "",
-        g.release_date ?? "", (g.genres || []).join("; "), p.notes,
-        g.store_url ?? d?.url ?? "",
-      ];
-    }
-    return [
-      ng.store, ng.id, g.name, p.status, priorityScore(g).toFixed(2), (combinedPlaytime(g) / 60).toFixed(1),
-      hltbMain(g) ?? "", g.hltb_main_extra_hours ?? "", g.hltb_completionist_hours ?? "", g.steam_review_percent ?? "",
-      g.price ?? "", effectiveDiscountPercent(g) || (g.discount_percent ?? ""), g.release_date ?? "", (g.genres || []).join("; "), p.notes
-    ];
-  }).map(cells => cells.map(x => `"${String(x).replace(/"/g, '""')}"`).join(","));
-  const fname = isWish ? "steam-backlog-wishlist.csv" : "steam-backlog-library.csv";
-  download(fname, `${headers.join(",")}\n${rows.join("\n")}`, "text/csv");
-}
-
 export function download(name, content, type) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([content], { type }));

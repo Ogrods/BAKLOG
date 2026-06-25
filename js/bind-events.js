@@ -7,8 +7,13 @@ import {
 import {
   getPersonal,
   setPersonal,
-  mergeImportedPersonal,
+  exportPersonalDoc,
+  mergeImportedPersonalDoc,
 } from './personal-storage.js';
+import {
+  exportLibraryBackupDoc,
+  importLibraryBackupDoc,
+} from './library-backup.js';
 import {
   savePrefs,
   persistCurrentSort,
@@ -68,8 +73,6 @@ import {
   renderGenreChips,
   switchView,
   scrollToItchCard,
-  exportCsv,
-  exportTopBacklogMarkdown,
   download,
   applyPrefsChange,
   clearAllFilters,
@@ -749,9 +752,23 @@ export function bindEvents() {
   bindOrphanPruneUI();
   bindHiddenPanelUI();
   bindColumnPicker();
-  document.getElementById("exportCsv").addEventListener("click", exportCsv);
-  document.getElementById("exportTopBacklog")?.addEventListener("click", exportTopBacklogMarkdown);
-  document.getElementById("exportPersonal").addEventListener("click", () => download("baklog-personal.json", JSON.stringify(state.personal, null, 2), "application/json"));
+  document.getElementById("exportPersonal").addEventListener("click", () => {
+    download("baklog-personal.json", JSON.stringify(exportPersonalDoc(), null, 2), "application/json");
+  });
+  document.getElementById("exportLibraryBackup")?.addEventListener("click", async () => {
+    kebabMenu.classList.remove("open");
+    try {
+      const doc = await exportLibraryBackupDoc();
+      const count = Object.keys(doc.catalogs || {}).length;
+      if (!count) {
+        showKebabBanner("No library catalogs found to export.", { error: true });
+        return;
+      }
+      download("baklog-library-backup.json", JSON.stringify(doc), "application/json");
+    } catch (err) {
+      showKebabBanner(`Library export failed: ${err?.message || err}`, { error: true });
+    }
+  });
   function showKebabBanner(message, { error = false } = {}) {
     const banner = document.getElementById('bootErrorBanner');
     if (!banner) return;
@@ -807,7 +824,8 @@ export function bindEvents() {
     const file = e.target.files[0];
     if (!file) return;
     try {
-      mergeImportedPersonal(JSON.parse(await file.text()));
+      mergeImportedPersonalDoc(JSON.parse(await file.text()));
+      applyPrefsChange();
       renderSummary();
       renderPicks();
       renderTable();
@@ -816,9 +834,29 @@ export function bindEvents() {
       reportError(err, { source: 'importNotes', kind: 'import' });
       const banner = document.getElementById('bootErrorBanner');
       if (banner) {
-        banner.textContent = 'Notes import failed - file is not valid JSON.';
+        banner.textContent = 'Personal data import failed - file is not valid JSON.';
         banner.classList.remove('hidden');
       }
+    }
+    e.target.value = "";
+  });
+  document.getElementById("importLibraryBackup")?.addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    kebabMenu.classList.remove("open");
+    try {
+      const result = await importLibraryBackupDoc(JSON.parse(await file.text()));
+      await reloadGames();
+      applyPrefsChange();
+      renderSummary();
+      renderPicks();
+      renderTable();
+      const count = result?.count ?? Object.keys(result?.imported || {}).length;
+      showKebabBanner(`Library backup imported (${count} catalog file${count === 1 ? '' : 's'}).`);
+    } catch (err) {
+      console.warn('[importLibraryBackup] failed', err);
+      reportError(err, { source: 'importLibraryBackup', kind: 'import' });
+      showKebabBanner(`Library import failed: ${err?.message || err}`, { error: true });
     }
     e.target.value = "";
   });

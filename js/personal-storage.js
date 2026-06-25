@@ -1,5 +1,5 @@
 import { state, STORAGE_KEY, MANUAL_KEY } from './state.js';
-import { knownLibraryKeysStorageKey, libraryFirstSeenStorageKey, profileScopedStorageKey } from './profiles.js';
+import { knownLibraryKeysStorageKey, libraryFirstSeenStorageKey, profileScopedStorageKey, prefsStorageKey } from './profiles.js';
 
 export function personalStorageKey() {
   return profileScopedStorageKey(STORAGE_KEY);
@@ -22,6 +22,7 @@ import {
 } from './game-core.js';
 import { PRE_HIDDEN_KEYS, getPreHiddenFallback } from './hidden-defaults.js';
 import { visibleItchGames } from './connections-status.js';
+import { migrateColumnPrefs } from './table-columns.js';
 
 const personalMemo = createMemo();
 
@@ -361,6 +362,169 @@ export function mergeImportedPersonal(incoming) {
   personalMemo.bump();
   savePersonal();
   reconcileNotesAcrossTitles();
+}
+
+const DISMISSAL_MAP_KEYS = new Set(['__dismissedClaims', '__dismissedClaimKeys', '__purgedClaimKeys']);
+
+/** Prefs that describe the live tab; never overwrite from an imported backup. */
+const IMPORT_KEEP_LOCAL_PREF_KEYS = new Set([
+  'activeView',
+  'picksTab',
+  'libraryPicksTab',
+  'itchPicksTab',
+  'picksCollapsed',
+  'viewPicksLimits',
+  'viewSorts',
+  'rowHeroBackdrop',
+  'rowHeroBackdropDefaulted',
+  'librarySeenSeeded',
+]);
+
+function mergeDismissalMaps(baseMap, incomingMap) {
+  const base = baseMap && typeof baseMap === 'object' && !Array.isArray(baseMap) ? baseMap : {};
+  const incoming = incomingMap && typeof incomingMap === 'object' && !Array.isArray(incomingMap) ? incomingMap : {};
+  const out = { ...base };
+  for (const [key, ts] of Object.entries(incoming)) {
+    if (!(key in out)) { out[key] = ts; continue; }
+    const a = Number(out[key]);
+    const b = Number(ts);
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      if (b > a) out[key] = ts;
+    } else if (!Number.isFinite(a) && Number.isFinite(b)) {
+      out[key] = ts;
+    }
+  }
+  return out;
+}
+
+function mergeImportedFirstSeen(localSeen, incomingSeen) {
+  const out = { ...(localSeen && typeof localSeen === 'object' ? localSeen : {}) };
+  for (const [key, sv] of Object.entries(incomingSeen || {})) {
+    const sn = Number(sv);
+    const ln = Number(out[key]);
+    if ((!Number.isFinite(sn) || sn <= 0) && Number.isFinite(ln) && ln > 0) continue;
+    if (Number.isFinite(sn) && sn > 0 && Number.isFinite(ln) && ln > 0) {
+      out[key] = sn >= ln ? sv : out[key];
+      continue;
+    }
+    out[key] = sv;
+  }
+  return out;
+}
+
+function mergeManualGameLists(current, incoming) {
+  const byKey = new Map();
+  for (const g of current || []) {
+    if (!g || !g.store || g.id == null) continue;
+    byKey.set(`${g.store}:${g.id}`, g);
+  }
+  for (const g of incoming || []) {
+    if (!g || !g.store || g.id == null) continue;
+    const k = `${g.store}:${g.id}`;
+    const prev = byKey.get(k);
+    byKey.set(k, prev ? { ...prev, ...g } : g);
+  }
+  return [...byKey.values()];
+}
+
+function normalizeImportPayload(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const hasDocShape = (
+    Object.prototype.hasOwnProperty.call(raw, 'personal')
+    || Object.prototype.hasOwnProperty.call(raw, 'prefs')
+    || Object.prototype.hasOwnProperty.call(raw, 'manual')
+    || Object.prototype.hasOwnProperty.call(raw, 'libraryFirstSeen')
+  );
+  if (hasDocShape) return raw;
+  return { personal: raw };
+}
+
+function mergeImportedPrefs(incomingPrefs) {
+  if (!incomingPrefs || typeof incomingPrefs !== 'object' || Array.isArray(incomingPrefs)) return false;
+  const cleaned = { ...incomingPrefs };
+  delete cleaned.activeView;
+  delete cleaned.crossStoreDedup;
+  delete cleaned.hideSponsoredDeals;
+  delete cleaned.itchHideNonGames;
+  delete cleaned.tagFilters;
+  delete cleaned.tagFilterMode;
+  const merged = { ...state.prefs, ...cleaned };
+  for (const key of IMPORT_KEEP_LOCAL_PREF_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(state.prefs, key)) {
+      merged[key] = state.prefs[key];
+    }
+  }
+  migrateColumnPrefs(merged);
+  merged.picksCollapsed = merged.picksCollapsed === true;
+  state.prefs = merged;
+  try {
+    localStorage.setItem(prefsStorageKey(), JSON.stringify(state.prefs));
+  } catch { /* quota / private mode */ }
+  return true;
+}
+
+/** Full personal.json document for backup or transfer (matches server PUT shape). */
+export function exportPersonalDoc() {
+  return {
+    schema_version: 1,
+    personal: JSON.parse(JSON.stringify(state.personal || {})),
+    prefs: JSON.parse(JSON.stringify(state.prefs || {})),
+    manual: JSON.parse(JSON.stringify(loadManualGames())),
+    libraryFirstSeen: JSON.parse(JSON.stringify(state.libraryFirstSeenByKey || {})),
+    exported_at: new Date().toISOString(),
+  };
+}
+
+/** Merge a full personal.json backup or legacy personal-only export. */
+export function mergeImportedPersonalDoc(raw) {
+  const incoming = normalizeImportPayload(raw);
+  if (!incoming) throw new Error('invalid personal backup');
+
+  const incPersonal = incoming.personal && typeof incoming.personal === 'object' ? incoming.personal : {};
+  for (const key of DISMISSAL_MAP_KEYS) {
+    if (incPersonal[key]) {
+      state.personal[key] = mergeDismissalMaps(state.personal[key], incPersonal[key]);
+    }
+  }
+  for (const [key, val] of Object.entries(incPersonal)) {
+    if (DISMISSAL_MAP_KEYS.has(key)) continue;
+    if (isMetaPersonalKey(key)) {
+      if (!(key in state.personal)) state.personal[key] = val;
+      continue;
+    }
+    if (!val || typeof val !== 'object') continue;
+    const existing = state.personal[key] || { ...PERSONAL_DEFAULT };
+    const { tags: _ignored, ...rest } = val;
+    state.personal[key] = { ...existing, ...rest };
+  }
+  state.personal.__migrated_v3 = true;
+  state.personal.__tags_removed_v1 = true;
+
+  let prefsChanged = false;
+  if (incoming.prefs) prefsChanged = mergeImportedPrefs(incoming.prefs);
+
+  let manualChanged = false;
+  if (Array.isArray(incoming.manual) && incoming.manual.length) {
+    const mergedManual = mergeManualGameLists(loadManualGames(), incoming.manual);
+    saveManualGames(mergedManual);
+    manualChanged = true;
+  }
+
+  let firstSeenChanged = false;
+  if (incoming.libraryFirstSeen && typeof incoming.libraryFirstSeen === 'object') {
+    state.libraryFirstSeenByKey = mergeImportedFirstSeen(
+      state.libraryFirstSeenByKey,
+      incoming.libraryFirstSeen,
+    );
+    saveLibraryFirstSeen(state.libraryFirstSeenByKey);
+    firstSeenChanged = true;
+  }
+
+  window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
+  savePersonal();
+  reconcileNotesAcrossTitles();
+  if (prefsChanged || manualChanged || firstSeenChanged) personalStore.notify();
 }
 
 function noteTextForKey(key) {

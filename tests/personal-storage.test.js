@@ -9,7 +9,10 @@ import { state } from '../js/state.js';
 import {
   setPersonal,
   mergeImportedPersonal,
+  exportPersonalDoc,
+  mergeImportedPersonalDoc,
   getPersonal,
+  loadManualGames,
   canonicalizeNotesAcrossTitles,
   reconcileNotesAcrossTitles,
   findOrphanPersonalKeys,
@@ -103,6 +106,54 @@ describe('mergeImportedPersonal', () => {
     });
     expect(state.personal[key].status).toBe('next');
     expect(state.personal[key]).not.toHaveProperty('tags');
+  });
+});
+
+describe('exportPersonalDoc / mergeImportedPersonalDoc', () => {
+  beforeEach(() => {
+    state.personal = {};
+    state.prefs = { picksTab: 'topRated', storeFilter: 'steam', customLists: [{ name: 'Favs', keys: [] }] };
+    state.libraryFirstSeenByKey = { 'steam:1': 1000 };
+    saveManualGames([]);
+    localStorage.clear();
+  });
+
+  it('exports the full server document shape', () => {
+    const key = gameKey(testGame);
+    state.personal[key] = { status: 'next', notes: 'note', priority: 0, hltb_override: null };
+    saveManualGames([{ store: 'manual', id: 'x', name: 'Manual Game' }]);
+    const doc = exportPersonalDoc();
+    expect(doc.schema_version).toBe(1);
+    expect(doc.personal[key].status).toBe('next');
+    expect(doc.prefs.storeFilter).toBe('steam');
+    expect(doc.manual).toHaveLength(1);
+    expect(doc.libraryFirstSeen['steam:1']).toBe(1000);
+    expect(doc.exported_at).toBeTruthy();
+  });
+
+  it('merges a full doc and keeps live tab prefs local-first', () => {
+    const key = gameKey(testGame);
+    state.prefs.picksTab = 'shortest';
+    mergeImportedPersonalDoc({
+      personal: { [key]: { status: 'playing', notes: 'imported' } },
+      prefs: { picksTab: 'topRated', storeFilter: 'gog', dealMaxPrice: 5 },
+      manual: [{ store: 'manual', id: 'y', name: 'Imported manual' }],
+      libraryFirstSeen: { 'steam:2': 2000 },
+    });
+    expect(state.personal[key].status).toBe('playing');
+    expect(state.prefs.storeFilter).toBe('gog');
+    expect(state.prefs.dealMaxPrice).toBe(5);
+    expect(state.prefs.picksTab).toBe('shortest');
+    expect(state.libraryFirstSeenByKey['steam:2']).toBe(2000);
+    expect(loadManualGames().some(g => g.id === 'y')).toBe(true);
+  });
+
+  it('accepts legacy personal-only exports', () => {
+    const key = gameKey(testGame);
+    mergeImportedPersonalDoc({
+      [key]: { notes: 'legacy import' },
+    });
+    expect(state.personal[key].notes).toBe('legacy import');
   });
 });
 

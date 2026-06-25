@@ -201,10 +201,8 @@
             <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="itch" title="itch.io library">itch.io</button>
             <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="connections" title="Connect stores and manage API keys / OAuth">Connections</button>
             <button type="button" class="view-tab px-3 py-1.5 rounded border border-slate-600 text-sm" data-view="pro" title="Support BAKLOG - back the roadmap and activate">Support</button>
-            <button type="button" id="reportBugHeader" class="px-3 py-1.5 rounded border border-slate-600 text-sm text-slate-300 hover:bg-slate-700/60 shrink-0" title="Review and optionally send a sanitized bug report (errors + app context). Nothing is sent until you confirm in the dialog.">Report bug</button>
           </nav>
         </div>
-        <span class="app-header-tagline text-[11px] hidden sm:inline self-center" title="All data is stored locally - nothing is uploaded by default">Cross-store backlog · local-only</span>
         <div class="header-actions app-header-actions ml-auto flex items-center gap-2 shrink-0 self-center">
           <div id="fetcherPopoverAnchor" class="fetcher-popover-anchor relative shrink-0">
             <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle" title="Show fetcher log" aria-haspopup="dialog" aria-expanded="false" aria-controls="fetcherPopover"><span class="sr-only" aria-live="polite" id="fetcherGlobalStatusLive"></span><span id="fetcherGlobalStatusText" class="fh-global-status-label">Fetcher log</span><span id="fetcherGlobalStatusTail" class="fh-global-status-tail" aria-hidden="true"><span class="fh-global-status-tail-inner"></span></span></button>
@@ -224,8 +222,11 @@
               </div>
             </div>
           </div>
-          <button type="button" id="headerFullscreenBtn" class="header-fullscreen-btn shrink-0" title="Full screen (F11)" aria-label="Full screen (F11)" aria-pressed="false">
-            <svg class="header-fullscreen-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="19" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M8.5 21h7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M12 17v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          <button type="button" id="headerFullscreenBtn" class="header-icon-btn shrink-0" title="Full screen (F11)" aria-label="Full screen (F11)" aria-pressed="false">
+            <svg class="header-icon-btn-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="19" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M8.5 21h7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M12 17v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          </button>
+          <button type="button" id="reportBugHeader" class="header-icon-btn shrink-0" title="Review and optionally send a sanitized bug report (errors + app context). Nothing is sent until you confirm in the dialog." aria-label="Report bug">
+            <svg class="header-icon-btn-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="5.5" r="2.25" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M10.5 4 9 2M13.5 4 15 2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><ellipse cx="12" cy="9.75" rx="2.75" ry="2.25" fill="none" stroke="currentColor" stroke-width="1.75"/><ellipse cx="12" cy="16" rx="3.75" ry="4.5" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M9.5 9 6 7.5M9 10.5 5.5 10.5M9.5 12 6 13.5M14.5 9 18 7.5M15 10.5 18.5 10.5M14.5 12 18 13.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></svg>
           </button>
           <div id="profileMenuWrap" class="profile-menu-wrap relative shrink-0">
             <button type="button" id="profileMenuTrigger" class="profile-menu-trigger px-2 py-1 rounded border text-xs flex items-center gap-1" aria-haspopup="menu" aria-expanded="false" aria-controls="profileMenu" aria-label="Profile">
@@ -318,8 +319,8 @@
           "Leave BAKLOG open and it can quietly refresh stores older than a day.",
           "Add a note to any row - a yellow dot marks games you've annotated.",
           "Jot a reminder on any game; annotated rows get a little yellow dot.",
-          "Export visible rows to CSV, or copy your top 20 backlog as Markdown, from the menu.",
-          "Want your list elsewhere? Export CSV or copy your top backlog as Markdown.",
+          "Back up statuses, notes, and settings - Export personal data in the ⋯ menu.",
+          "Moving machines? Export library backup + personal data, then import on the new PC.",
           "Leaving BAKLOG open on the dashboard keeps the spotlight rotating - and helps fund the free tier.",
           "Keep BAKLOG open on the dashboard and the spotlight's sponsored slides help keep the lights on.",
           "Buying through our affiliate links costs you nothing extra and helps keep BAKLOG running.",
@@ -484,7 +485,7 @@
           <code class="text-slate-300">python -m auth export-bundle</code> /
           <code class="text-slate-300">import-bundle</code> (also supports <code>--dry-run</code>).
         </p>
-        <dialog id="secretsBundleDialog" class="bg-slate-800 border border-slate-600 rounded-lg p-4 text-slate-100 max-w-sm w-full">
+        <dialog id="secretsBundleDialog" class="app-modal-panel bg-slate-800 border border-slate-600 rounded-lg p-4 text-slate-100 max-w-sm w-full">
           <form method="dialog" id="secretsBundleDialogForm">
             <h4 id="secretsBundleDialogTitle" class="text-sm font-semibold mb-2">Bundle passphrase</h4>
             <p id="secretsBundleDialogHelp" class="text-xs text-slate-400 mb-2"></p>
@@ -565,10 +566,10 @@
             <button type="button" id="hiddenGamesMenu" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="View and restore games hidden from the library">Hidden games</button>
             <div class="kebab-divider" role="separator"></div>
             <div class="kebab-group-label">Data</div>
-            <button type="button" id="exportCsv" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Download visible rows as CSV">Export CSV</button>
-            <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export statuses and notes JSON for backup or transfer">Export personal data (status, notes)</button>
-            <button type="button" id="exportTopBacklog" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy top 20 backlog games as Markdown to clipboard">Copy top 20 backlog (Markdown)</button>
-            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer" title="Import personal data JSON (statuses, notes)">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
+            <button type="button" id="exportPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export statuses, notes, prefs, manual games, and settings as JSON for backup or transfer">Export personal data</button>
+            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer" title="Import a personal data JSON backup (statuses, notes, prefs, manual games)">Import personal data<input id="importNotes" type="file" accept=".json" class="hidden" /></label>
+            <button type="button" id="exportLibraryBackup" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Export store catalog JSON files (games_*.json) for backup or transfer">Export library backup</button>
+            <label class="block w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer" title="Import a library backup JSON file (store catalogs from Export library backup)">Import library backup<input id="importLibraryBackup" type="file" accept=".json" class="hidden" /></label>
             <button type="button" id="cleanupOrphanPersonal" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Review and remove personal data (status, notes) left behind by games no longer in any connected library">Clean up unknown games…</button>
             <div class="kebab-divider" role="separator"></div>
             <div class="kebab-group-label">Help</div>
@@ -943,7 +944,7 @@
   </aside>
 
   <!-- Profile manage modal -->
-  <div id="profileManageModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+  <div id="profileManageModal" class="app-modal fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
     <div class="profile-modal-card bg-slate-800 rounded-lg shadow-xl border border-slate-700 max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="profileManageTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="profileManageTitle" class="text-lg font-semibold text-slate-100">Manage profiles</h3>
@@ -1001,7 +1002,7 @@
   </div>
 
   <!-- Profile switch PIN prompt -->
-  <div id="profilePinModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+  <div id="profilePinModal" class="app-modal fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
     <div class="profile-modal-card bg-slate-800 rounded-lg shadow-xl border border-slate-700 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="profilePinPromptTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="profilePinPromptTitle" class="text-lg font-semibold text-slate-100">Enter PIN</h3>
@@ -1022,7 +1023,7 @@
   </div>
 
   <!-- Orphan personal-data cleanup modal -->
-  <div id="orphanPruneModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+  <div id="orphanPruneModal" class="app-modal fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
     <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="orphanPruneTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="orphanPruneTitle" class="text-lg font-semibold text-slate-100">Clean up unknown games</h3>
@@ -1049,7 +1050,7 @@
   </div>
 
   <!-- Hidden games panel -->
-  <div id="hiddenPanelModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+  <div id="hiddenPanelModal" class="app-modal fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
     <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="hiddenPanelTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="hiddenPanelTitle" class="text-lg font-semibold text-slate-100">Hidden games</h3>
@@ -1065,7 +1066,7 @@
   </div>
 
   <!-- Column picker modal -->
-  <div id="columnsModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+  <div id="columnsModal" class="app-modal fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
     <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-md max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="columnsModalTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="columnsModalTitle" class="text-lg font-semibold text-slate-100">Columns</h3>
@@ -1084,7 +1085,7 @@
   </div>
 
   <!-- Add-game modal -->
-  <div id="addGameModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
+  <div id="addGameModal" class="app-modal fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4" role="presentation">
     <div class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-2xl max-h-[85vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="addGameModalTitle">
       <div class="flex items-center justify-between border-b border-slate-700 p-3">
         <h3 id="addGameModalTitle" class="text-lg font-semibold text-slate-100">Add a game</h3>

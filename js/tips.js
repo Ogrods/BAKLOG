@@ -124,8 +124,8 @@ export const TIP_GROUPS = [
     "Jot a reminder on any game; annotated rows get a little yellow dot.",
   ],
   [
-    "Export visible rows to CSV, or copy your top 20 backlog as Markdown, from the menu.",
-    "Want your list elsewhere? Export CSV or copy your top backlog as Markdown.",
+    "Back up statuses, notes, and settings - Export personal data in the ⋯ menu.",
+    "Moving machines? Export library backup + personal data, then import on the new PC.",
   ],
 ];
 

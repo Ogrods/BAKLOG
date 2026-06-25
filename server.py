@@ -14,6 +14,7 @@ Endpoints:
     GET  /api/stream/<run_id>      -> SSE: status / line / done events (?since=N or Last-Event-ID for resume)
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
+    POST /api/catalogs/import -> restore games_*.json / itad_prices.json from backup
     GET  /api/profiles        -> {active, active_label, legacy, profiles[]}
     POST /api/profiles        -> create profile {label}
     POST /api/profiles/active -> switch active profile {id}
@@ -3068,6 +3069,13 @@ class Handler(SimpleHTTPRequestHandler):
             if self._reject_if_csrf_strict():
                 return
             self._handle_personal_put()
+            return
+        if path == "/api/catalogs/import":
+            if self._reject_if_csrf_strict():
+                return
+            from shared.server_catalog_import import handle_catalogs_import_post
+
+            handle_catalogs_import_post(self)
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 

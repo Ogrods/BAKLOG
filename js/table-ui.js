@@ -63,6 +63,8 @@ import {
   countUserHiddenWishlist,
   countsInLibraryTotal,
   countedLibraryDenominator,
+  addNintendoDroppedId,
+  NINTENDO_DROPPED_KEY,
 } from './personal-storage.js';
 import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
@@ -341,6 +343,7 @@ function snapshotRemoveState(keys) {
     if (g) for (const k of getSameTitleKeys(g)) expanded.add(k);
   }
   expanded.add('__hidden_title_norms_v1');
+  expanded.add(NINTENDO_DROPPED_KEY);
   const personalSnap = snapshotPersonalForKeys(expanded);
   const manualSnap = [];
   for (const key of keys) {
@@ -389,7 +392,12 @@ export function bulkRemove() {
     if (g.manual) {
       removeManualGame(g.store, g.id);
       delete state.personal[key];
-    } else setGameHidden(g, true, { silent: true });
+    } else {
+      if (g.store === 'nintendo') {
+        addNintendoDroppedId(g.nintendo_id ?? g.id, { silent: true });
+      }
+      setGameHidden(g, true, { silent: true });
+    }
   }
   savePersonal();
   bumpPersonalMemo();

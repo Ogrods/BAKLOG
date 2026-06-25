@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,23 +25,28 @@ from clients.nintendo_client import (
 )
 from fetchers._authoritative import NINTENDO
 from fetchers._base import (
+    LAST_SEEN_FIELD,
+    STALE_FIELD,
+    STALE_SINCE_FIELD,
     add_allow_empty_arg,
     add_no_carry_arg,
     add_only_new_arg,
-    apply_carry_forward,
     catalog_file,
     configure_stdout,
     merge_cached_row,
-    refuse_drift_result,
     refuse_empty_result,
     row_key_by_id,
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from shared.profile_paths import personal_path
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
 
+NINTENDO_LEGACY_FIELD = "nintendo_legacy"
+NINTENDO_DROPPED_KEY = "__nintendo_dropped_ids_v1"
+NINTENDO_DRIFT_THRESHOLD = 0.5
 
 NINTENDO_RAW_DUMP = profile_raw_dump_path("nintendo_raw.json")
 
@@ -130,6 +136,126 @@ def load_existing() -> dict[str, dict]:
         return {}
     data = json.loads(catalog_file(GAMES_NINTENDO_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
+
+
+def load_nintendo_dropped_ids() -> set[str]:
+    """Ids the user removed via bulk Remove; excluded from carry-forward."""
+    path = personal_path()
+    if not path.exists():
+        return set()
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(doc, dict):
+        return set()
+    personal = doc.get("personal")
+    if not isinstance(personal, dict):
+        return set()
+    raw = personal.get(NINTENDO_DROPPED_KEY)
+    if not isinstance(raw, list):
+        return set()
+    return {str(item) for item in raw if item}
+
+
+def _nintendo_drift_baseline(output_path: Path) -> int | None:
+    """Fresh-slice count for drift guard (not total catalog including legacy rows)."""
+    path = catalog_file(output_path)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    fresh_count = data.get("fresh_count")
+    if isinstance(fresh_count, int) and fresh_count >= 0:
+        return fresh_count
+    games = data.get("games")
+    if not isinstance(games, list):
+        return None
+    non_legacy = sum(
+        1
+        for row in games
+        if isinstance(row, dict)
+        and not row.get(NINTENDO_LEGACY_FIELD)
+        and not row.get(STALE_FIELD)
+    )
+    if non_legacy > 0:
+        return non_legacy
+    game_count = data.get("game_count")
+    if isinstance(game_count, int) and game_count >= 0:
+        return game_count
+    return len(games) or None
+
+
+def refuse_nintendo_drift_result(
+    items: list[dict],
+    *,
+    label: str,
+    allow_drift: bool,
+    output_path: Path,
+) -> int | None:
+    """Drift guard using fresh_count baseline so legacy carry rows do not block sync."""
+    new_count = len(items)
+    prev = _nintendo_drift_baseline(output_path)
+    if prev is None or prev <= 0 or allow_drift:
+        return None
+    floor = max(1, int(prev * NINTENDO_DRIFT_THRESHOLD))
+    if new_count >= floor:
+        return None
+    pct = (new_count / prev * 100) if prev else 0.0
+    where = f" ({output_path})" if output_path else ""
+    print(
+        f"ERROR: {label} returned {new_count} items{where}, but the previous fresh "
+        f"slice had {prev} (≈{pct:.0f}% — under the "
+        f"{int(NINTENDO_DRIFT_THRESHOLD * 100)}% floor).\n"
+        "Likely a broken auth or upstream API. If this drop is real, re-run with --allow-drift.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 3
+
+
+def carry_forward_nintendo_legacy(
+    fresh_rows: list[dict],
+    existing_rows: list[dict],
+    *,
+    dropped_ids: set[str],
+    key_fn,
+    now_iso: str | None = None,
+) -> list[dict]:
+    """Union prior rows missing from the fresh fetch; tag nintendo_legacy, not stale."""
+    now = now_iso or datetime.now(UTC).isoformat()
+    present = {key_fn(row) for row in fresh_rows}
+    out: list[dict] = []
+    for row in fresh_rows:
+        merged = dict(row)
+        merged[LAST_SEEN_FIELD] = now
+        merged.pop(STALE_FIELD, None)
+        merged.pop(STALE_SINCE_FIELD, None)
+        merged.pop(NINTENDO_LEGACY_FIELD, None)
+        out.append(merged)
+    carried = 0
+    for old in existing_rows:
+        key = key_fn(old)
+        if key in present or key in dropped_ids:
+            continue
+        legacy_row = dict(old)
+        legacy_row[NINTENDO_LEGACY_FIELD] = True
+        legacy_row.pop(STALE_FIELD, None)
+        legacy_row.pop(STALE_SINCE_FIELD, None)
+        legacy_row.setdefault(LAST_SEEN_FIELD, old.get(LAST_SEEN_FIELD))
+        out.append(legacy_row)
+        carried += 1
+    if carried:
+        print(
+            f"  Carried forward {carried} legacy game(s) "
+            f"({NINTENDO_LEGACY_FIELD}=true).",
+            flush=True,
+        )
+    return out
 
 
 def _build_row(item: dict, hltb: dict | None) -> dict:
@@ -269,7 +395,12 @@ def main() -> int:
         return stats.finish("fetch_nintendo", t0, exit_code=empty_exit)
 
     hltb_client = HltbClient()
-    existing = load_existing()
+    dropped_ids = load_nintendo_dropped_ids()
+    existing = {
+        key: row
+        for key, row in load_existing().items()
+        if key not in dropped_ids
+    }
     games_out: list[dict] = []
     for i, item in enumerate(merged, 1):
         cached = existing.get(str(item["id"]))
@@ -295,7 +426,7 @@ def main() -> int:
             )
         )
 
-    drift_exit = refuse_drift_result(
+    drift_exit = refuse_nintendo_drift_result(
         games_out,
         label="Nintendo library rows",
         allow_drift=args.allow_drift,
@@ -304,25 +435,39 @@ def main() -> int:
     if drift_exit is not None:
         return stats.finish("fetch_nintendo", t0, exit_code=drift_exit)
 
-    games_out = apply_carry_forward(
-        games_out,
-        existing,
-        key_fn=row_key_by_id,
-        no_carry=args.no_carry,
-    )
+    fresh_count = len(games_out)
+    if args.no_carry:
+        final_games = [
+            row for row in games_out if row_key_by_id(row) not in dropped_ids
+        ]
+    else:
+        final_games = carry_forward_nintendo_legacy(
+            games_out,
+            list(existing.values()),
+            dropped_ids=dropped_ids,
+            key_fn=row_key_by_id,
+        )
+    if dropped_ids:
+        final_games = [
+            row for row in final_games if row_key_by_id(row) not in dropped_ids
+        ]
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "nintendo",
-        "game_count": len(games_out),
-        "note": "eShop digital purchases only; ~2 year history limit; no cartridge games",
-        "games": sorted(games_out, key=lambda g: g["name"].lower()),
+        "fresh_count": fresh_count,
+        "game_count": len(final_games),
+        "note": (
+            "eShop digital purchases only; ~2 year history limit; no cartridge games; "
+            "older purchases kept as nintendo_legacy"
+        ),
+        "games": sorted(final_games, key=lambda g: g["name"].lower()),
     }
     write_catalog_text(GAMES_NINTENDO_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
-    print(f"\nWrote {len(games_out)} games to {GAMES_NINTENDO_JSON}.", flush=True)
+    print(f"\nWrote {len(final_games)} games to {GAMES_NINTENDO_JSON}.", flush=True)
     print("Reload the dashboard to see your Nintendo library.", flush=True)
-    stats.ok = len(games_out)
-    return stats.finish("fetch_nintendo", t0, exit_code=0, extra=f"{len(games_out)} games")
+    stats.ok = len(final_games)
+    return stats.finish("fetch_nintendo", t0, exit_code=0, extra=f"{len(final_games)} games")
 
 
 if __name__ == "__main__":

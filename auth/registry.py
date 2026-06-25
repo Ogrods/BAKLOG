@@ -329,7 +329,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         key="nintendo",
         label="Nintendo",
         kind="browser",
-        description="Your Nintendo eShop purchases (digital only, last ~2 years).",
+        description=(
+            "Your Nintendo eShop purchases (digital only). Nintendo shows ~2 years of "
+            "history; BAKLOG keeps older purchases across syncs."
+        ),
         env_keys=("NINTENDO_COOKIE",),
         login_url="https://ec.nintendo.com/my/transactions/",
         success_url_pattern=r"ec\.nintendo\.com",
@@ -338,8 +341,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
         tips=(
             "Sign in with your Nintendo Account and let the eShop transactions page finish loading.",
             "Purchase history is read from your saved browser profile (not cookie text alone).",
-            "Only digital eShop purchases from roughly the last two years are available \u2014 no physical carts.",
-            "Sessions last about two weeks; reconnect when new eShop buys don't appear.",
+            "Nintendo only exposes about two years of eShop history - BAKLOG keeps older digital purchases in your library.",
+            "Use bulk Remove on a library row if you want a title dropped for good on the next sync.",
+            "Physical cartridges are not included. Sessions last about two weeks; reconnect when new buys do not appear.",
         ),
     ),
     "nintendo_wishlist": ProviderSpec(

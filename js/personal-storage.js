@@ -224,7 +224,48 @@ const META_KEYS = new Set([
   "__hidden_mirrored_v1",
   "__hidden_title_norms_v1",
   "__hidden_title_norms_migrated_v1",
+  "__nintendo_dropped_ids_v1",
 ]);
+
+export const NINTENDO_DROPPED_KEY = '__nintendo_dropped_ids_v1';
+
+export function loadNintendoDroppedIds() {
+  const raw = state.personal[NINTENDO_DROPPED_KEY];
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(raw.filter(Boolean).map(String));
+}
+
+function saveNintendoDroppedIds(ids, options) {
+  const list = [...ids].sort();
+  const prev = state.personal[NINTENDO_DROPPED_KEY];
+  const same = Array.isArray(prev)
+    && prev.length === list.length
+    && prev.every((v, i) => v === list[i]);
+  if (same) return false;
+  state.personal[NINTENDO_DROPPED_KEY] = list;
+  window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
+  savePersonal();
+  if (!options?.silent) scheduleDownstreamSync();
+  return true;
+}
+
+export function addNintendoDroppedId(id, options) {
+  if (!id) return false;
+  const ids = loadNintendoDroppedIds();
+  const key = String(id);
+  if (ids.has(key)) return false;
+  ids.add(key);
+  return saveNintendoDroppedIds(ids, options);
+}
+
+export function removeNintendoDroppedId(id, options) {
+  if (!id) return false;
+  const ids = loadNintendoDroppedIds();
+  const key = String(id);
+  if (!ids.delete(key)) return false;
+  return saveNintendoDroppedIds(ids, options);
+}
 
 function isMetaPersonalKey(key) {
   return META_KEYS.has(key) || String(key).startsWith("__");

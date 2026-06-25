@@ -5,6 +5,7 @@ import {
   setGameHidden,
   setPersonalByKey,
   flushSavePersonal,
+  removeNintendoDroppedId,
 } from './personal-storage.js';
 import { storeBadgeHtml, wishlistBadgeHtml } from './game-core.js';
 import { storeLogoHtml } from './store-logos.js';
@@ -110,8 +111,12 @@ function close() {
 }
 
 function unhideEntry(entry, options) {
-  if (entry.game) setGameHidden(entry.game, false, options);
-  else setPersonalByKey(entry.key, 'hidden', false, options);
+  if (entry.game) {
+    if (entry.game.store === 'nintendo') {
+      removeNintendoDroppedId(entry.game.nintendo_id ?? entry.game.id, { silent: true });
+    }
+    setGameHidden(entry.game, false, options);
+  } else setPersonalByKey(entry.key, 'hidden', false, options);
 }
 
 function restoreKey(key) {

@@ -68,6 +68,8 @@ let pollTimer = null;
 // True while refreshConnections() is running, so the baklog:auth-status listener
 // (below) doesn't redundantly re-render — refreshConnections renders itself.
 let _connRefreshInFlight = false;
+let _connRenderFingerprint = '';
+let _connAuthFingerprint = '';
 
 const POST_CONNECT_FAST_POLL_MS = 3000;
 const POST_CONNECT_FAST_POLL_MAX_MS = 30_000;
@@ -336,6 +338,13 @@ function groupConnectNote(groupKey, members) {
   const def = PROVIDER_GROUPS[groupKey];
   if (!def) return '';
   const anyConnected = (members || []).some(m => m.status === 'connected');
+  if (groupKey === 'nintendo') {
+    const lead = anyConnected
+      ? 'Ready to pull - at least one Nintendo sign-in is connected.'
+      : 'Connect the library and/or wishlist cards below when you need them.';
+    const legacyNote = 'Nintendo only shows about two years of eShop purchase history. BAKLOG keeps older digital purchases in your library across syncs - they are not marked stale. Use bulk Remove on a row if you want a title gone for good. Physical cartridges are not included.';
+    return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>Library and wishlist are separate sign-ins for Nintendo. They use different credentials - connect each one you want. The library card is on top.</p><p>${escapeHtml(legacyNote)}</p></div>`;
+  }
   if (def.type === 'content') {
     const lead = anyConnected
       ? `Ready to pull - at least one ${def.label} sign-in is connected.`
@@ -866,6 +875,54 @@ function renderConnPrefs() {
   }
 }
 
+function connAuthFingerprint() {
+  return JSON.stringify(getAuthStatusSnapshot().map(p => ({
+    key: p.key,
+    status: p.status || 'disconnected',
+    connected: !!p.connected,
+    available: p.available !== false,
+    label: p.label || '',
+  })));
+}
+
+function connRenderFingerprint() {
+  return JSON.stringify({
+    auth: connAuthFingerprint(),
+    sel: groupRepFor(_selectedKey),
+    chromium: !!_chromiumAvailable,
+  });
+}
+
+function syncConnRailSelection(selKey) {
+  document.querySelectorAll('#connRail .conn-rail-item[data-provider]').forEach(el => {
+    const prov = el.getAttribute('data-provider');
+    if (!prov) return;
+    const selected = groupRepFor(prov) === selKey;
+    el.classList.toggle('is-selected', selected);
+    el.setAttribute('aria-selected', selected ? 'true' : 'false');
+    el.tabIndex = selected ? 0 : -1;
+  });
+}
+
+function renderConnectionsPaneOnly(selKey) {
+  const pane = document.getElementById('connPane');
+  if (!pane) return;
+  const noteFocus = captureConnNoteFocus();
+  if (PROVIDER_GROUPS[selKey]) {
+    const members = PROVIDER_GROUPS[selKey].members
+      .map(k => getAuthStatusSnapshot().find(x => x.key === k))
+      .filter(Boolean);
+    const note = groupConnectNote(selKey, members);
+    pane.innerHTML = `${note}<div class="conn-card-stack">${members.map(buildCardHtml).join('')}</div>`;
+  } else {
+    const selected = getAuthStatusSnapshot().find(p => p.key === selKey);
+    pane.innerHTML = selected
+      ? buildCardHtml(selected)
+      : '<p class="text-sm text-slate-400">Select a provider on the left to get started.</p>';
+  }
+  restoreConnNoteFocus(noteFocus, pane);
+}
+
 function renderConnections() {
 
   const rail = document.getElementById('connRail');
@@ -873,6 +930,21 @@ function renderConnections() {
   const pane = document.getElementById('connPane');
 
   if (!rail || !pane) return;
+
+  const authFp = connAuthFingerprint();
+  const fp = connRenderFingerprint();
+  let selKey = groupRepFor(_selectedKey);
+  if (fp === _connRenderFingerprint && rail.innerHTML.trim() && pane.innerHTML.trim()) {
+    return;
+  }
+  if (authFp === _connAuthFingerprint && rail.innerHTML.trim()) {
+    syncConnRailSelection(selKey);
+    renderConnectionsPaneOnly(selKey);
+    _connRenderFingerprint = fp;
+    return;
+  }
+  _connAuthFingerprint = authFp;
+  _connRenderFingerprint = fp;
 
   renderHero();
 
@@ -892,7 +964,7 @@ function renderConnections() {
 
   ensureSelectedKey();
 
-  const selKey = groupRepFor(_selectedKey);
+  selKey = groupRepFor(_selectedKey);
   const entries = railEntries();
   const railParts = [];
   const steam = entries.find(e => e.key === 'steam');

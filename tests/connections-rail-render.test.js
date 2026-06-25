@@ -246,3 +246,27 @@ describe('connections source groups (GOG)', () => {
     expect(galaxy?.querySelector('.conn-facet--source')?.textContent).toBe('File scan');
   });
 });
+
+describe('connections content groups (Nintendo)', () => {
+  beforeEach(() => {
+    mockProviders.list = [
+      mkProvider('nintendo', { label: 'Nintendo', description: 'Nintendo library' }),
+      mkProvider('nintendo_wishlist', { label: 'Nintendo Wishlist', description: 'Nintendo wishlist' }),
+    ];
+    mountConnectionsDom();
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('shows legacy retention note for Nintendo content group', async () => {
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+
+    const note = document.querySelector('.conn-group-note')?.textContent || '';
+    expect(note).toMatch(/two years of eShop purchase history/i);
+    expect(note).toMatch(/not marked stale/i);
+    expect(note).toMatch(/bulk Remove/i);
+  });
+});

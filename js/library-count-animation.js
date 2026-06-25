@@ -13,7 +13,7 @@
 
 import { state } from './state.js';
 import { prefersReducedMotion } from './motion.js';
-import { heroCountRollMs } from './dashboard-shared.js';
+import { countUpDurationForDelta, heroCountRollMs } from './dashboard-shared.js';
 
 // Match landing mega-hero demo (`landing/demo.js` COUNT_ROLL_MS).
 const COUNT_ROLL_MS = 1000;
@@ -21,6 +21,8 @@ const COUNT_ROLL_MS = 1000;
 const SEQ_POPUP_GAP_MS = 300;
 const POPUP_LIFETIME_MS = 700;
 const POPUP_CAP = 10;
+/** Through this delta, one +1 popup per game and each fires on its integer tick. */
+const STRICT_POPUP_SYNC_MAX = 15;
 // Tight jitter — popups stack as a column off the right edge of the number,
 // drifting up + slightly outward. Big values look more like noise than text.
 const JITTER_PX = 4;
@@ -50,6 +52,16 @@ function cancelEpisode(node, opts = {}) {
   if (prev.rafId) cancelAnimationFrame(prev.rafId);
   if (prev.spawnTimers) {
     for (const id of prev.spawnTimers) clearTimeout(id);
+  }
+  // Chained demo/fetcher bursts: if a replacement episode cut the roll short,
+  // still show one +1 so rapid landings do not look silent.
+  if (
+    prev.to > prev.from
+    && prev.popupsSpawned === 0
+    && prev.host
+    && opts.keepPopups !== false
+  ) {
+    mountOnePopup(prev.host, prev.node);
   }
   // Settle text to its final value so we never leave half-rolled digits.
   try { if (prev.format && prev.to != null) node.textContent = prev.format(prev.to); } catch (_) {}
@@ -87,62 +99,97 @@ function nodeStillAlive(node) {
   return !!(node && node.isConnected);
 }
 
+function popupSpawnDelays(delta, popupCount, durationMs) {
+  if (popupCount <= 0) return [];
+  if (popupCount === 1) return [durationMs];
+  const gapMs = Math.max(
+    80,
+    Math.min(SEQ_POPUP_GAP_MS, Math.floor((durationMs * 0.92) / (popupCount - 1))),
+  );
+  return Array.from({ length: popupCount }, (_, i) => i * gapMs);
+}
+
+/** Mount one scrolling-combat-text +1 popup beside `anchorNode`. */
+function mountOnePopup(host, anchorNode) {
+  if (!host || !host.isConnected) return;
+  const surfaceKey = anchorNode?.id || '';
+  const el = document.createElement('span');
+  el.className = 'library-count-popup';
+  if (surfaceKey) el.dataset.libcountSurface = surfaceKey;
+  el.setAttribute('aria-hidden', 'true');
+  el.textContent = '+1';
+  const dx = (Math.random() * JITTER_PX * 2) - (JITTER_PX * 0.5);
+  el.style.setProperty('--baklog-dx', `${dx.toFixed(1)}px`);
+  const anchorEl = anchorNode?.isConnected ? anchorNode : host;
+  const rect = anchorEl?.getBoundingClientRect?.();
+  const hasRect = rect && (rect.width > 0 || rect.height > 0);
+  if (hasRect && typeof document !== 'undefined') {
+    const fs = parseFloat(getComputedStyle(anchorEl).fontSize) || 16;
+    const isHero = anchorEl.id === 'dashHeroCount';
+    el.classList.add('library-count-popup--floated');
+    if (!isHero) {
+      el.classList.add('library-count-popup--floated-chip');
+      el.style.fontSize = `${Math.max(20, Math.min(32, fs * 1.75)).toFixed(1)}px`;
+    } else {
+      el.style.fontSize = `${Math.max(28, Math.min(52, fs * 0.48)).toFixed(1)}px`;
+    }
+    let left = rect.right + Math.max(3, fs * 0.25);
+    let top = rect.top + (isHero ? fs * 0.05 : 0);
+    if (typeof window !== 'undefined') {
+      left = Math.min(left, window.innerWidth - 80);
+      top = Math.max(8, Math.min(top, window.innerHeight - 40));
+    }
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    document.body.appendChild(el);
+  } else {
+    host.appendChild(el);
+  }
+  const reap = setTimeout(() => { if (el.isConnected) el.remove(); }, POPUP_LIFETIME_MS + 200);
+  el.addEventListener('animationend', () => {
+    clearTimeout(reap);
+    if (el.isConnected) el.remove();
+  }, { once: true });
+}
+
+function syncPopupsOnTick(episode, v) {
+  if (!episode.tickPopups || !episode.host) return;
+  const displayed = Math.min(episode.to, Math.round(v));
+  // One popup per animation frame — a stalled main thread must not dump the
+  // whole strict-sync train in a single rAF callback.
+  if (
+    episode.lastPopupInt < displayed
+    && episode.popupsSpawned < episode.popupCap
+    && episode.lastPopupInt < episode.to
+  ) {
+    episode.lastPopupInt += 1;
+    if (episode.lastPopupInt > episode.from) {
+      mountOnePopup(episode.host, episode.node);
+      episode.popupsSpawned += 1;
+    }
+  }
+}
+
 /**
  * Spawn a train of sequential "+1" popups beside `anchorNode`. Each label is
  * always +1 (combat-text style); large imports cap at POPUP_CAP pops, not
- * chunked sums like +44. Spacing is synced to the counter roll duration.
+ * chunked sums like +44. Small deltas (<= STRICT_POPUP_SYNC_MAX) fire one popup
+ * per integer step; larger deltas loosen across ~92% of the roll.
  */
 function spawnPopups(host, popupCount, opts) {
   if (!host || !host.isConnected || popupCount <= 0) return [];
   const timers = [];
   const anchorNode = opts?.anchorNode || host;
-  const surfaceKey = anchorNode?.id || '';
-  const gapMs = Math.max(80, opts?.spawnIntervalMs ?? SEQ_POPUP_GAP_MS);
+  const delays = opts?.delays ?? popupSpawnDelays(
+    opts?.delta ?? popupCount,
+    popupCount,
+    opts?.durationMs ?? COUNT_ROLL_MS,
+  );
   for (let i = 0; i < popupCount; i++) {
-    const delay = i * gapMs;
+    const delay = delays[i];
     const id = setTimeout(() => {
       if (!host.isConnected && !anchorNode.isConnected) return;
-      const el = document.createElement('span');
-      el.className = 'library-count-popup';
-      if (surfaceKey) el.dataset.libcountSurface = surfaceKey;
-      el.setAttribute('aria-hidden', 'true');
-      el.textContent = '+1';
-      // Bias jitter toward the right (positive) so the column drifts outward
-      // rather than back into the number it's reporting against.
-      const dx = (Math.random() * JITTER_PX * 2) - (JITTER_PX * 0.5);
-      el.style.setProperty('--baklog-dx', `${dx.toFixed(1)}px`);
-      const anchorEl = anchorNode.isConnected ? anchorNode : host;
-      const rect = anchorEl.getBoundingClientRect();
-      const hasRect = rect.width > 0 || rect.height > 0;
-      if (hasRect && typeof document !== 'undefined') {
-        const fs = parseFloat(getComputedStyle(anchorEl).fontSize) || 16;
-        const isHero = anchorEl.id === 'dashHeroCount';
-        el.classList.add('library-count-popup--floated');
-        if (!isHero) {
-          el.classList.add('library-count-popup--floated-chip');
-          el.style.fontSize = `${Math.max(20, Math.min(32, fs * 1.75)).toFixed(1)}px`;
-        } else {
-          el.style.fontSize = `${Math.max(28, Math.min(52, fs * 0.48)).toFixed(1)}px`;
-        }
-        let left = rect.right + Math.max(3, fs * 0.25);
-        let top = rect.top + (isHero ? fs * 0.05 : 0);
-        if (typeof window !== 'undefined') {
-          left = Math.min(left, window.innerWidth - 80);
-          top = Math.max(8, Math.min(top, window.innerHeight - 40));
-        }
-        el.style.left = `${left}px`;
-        el.style.top = `${top}px`;
-        document.body.appendChild(el);
-      } else {
-        host.appendChild(el);
-      }
-      // Belt-and-suspenders: animationend fires removal, but if the
-      // animation is suspended (tab hidden) we still want the node gone.
-      const reap = setTimeout(() => { if (el.isConnected) el.remove(); }, POPUP_LIFETIME_MS + 200);
-      el.addEventListener('animationend', () => {
-        clearTimeout(reap);
-        if (el.isConnected) el.remove();
-      }, { once: true });
+      mountOnePopup(host, anchorNode);
     }, delay);
     timers.push(id);
   }
@@ -184,45 +231,49 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
   const wantPopups = opts.popups !== false && safeTo > safeFrom;
   const host = wantPopups ? ensureHost(node) : null;
   const delta = safeTo - safeFrom;
-  const popupCount = host && wantPopups ? Math.min(delta, POPUP_CAP) : 0;
+  const strictSync = delta <= STRICT_POPUP_SYNC_MAX;
+  const popupCap = host && wantPopups
+    ? (strictSync ? delta : Math.min(delta, POPUP_CAP))
+    : 0;
+  const popupCount = popupCap;
   const isHeroMount = !!(host && host.closest('.dash-mega'));
   const userDuration = Number.isFinite(opts.durationMs) ? opts.durationMs : null;
   let durationMs = userDuration;
   if (!userDuration) {
-    durationMs = isHeroMount ? heroCountRollMs(delta, popupCount) : COUNT_ROLL_MS;
+    if (strictSync) {
+      durationMs = countUpDurationForDelta(delta);
+    } else {
+      durationMs = isHeroMount ? heroCountRollMs(delta, popupCount) : COUNT_ROLL_MS;
+    }
   }
-  const popupTrainMs = popupCount > 0 ? (popupCount - 1) * SEQ_POPUP_GAP_MS + 400 : 0;
-  if (!userDuration) {
+  if (!userDuration && !strictSync) {
+    const popupTrainMs = popupCount > 0 ? (popupCount - 1) * SEQ_POPUP_GAP_MS + 400 : 0;
     durationMs = Math.max(120, durationMs, popupTrainMs);
   } else {
     durationMs = Math.max(120, durationMs);
   }
-  const spawnIntervalMs = popupCount > 1
-    ? Math.min(
-      SEQ_POPUP_GAP_MS,
-      Math.floor((Math.max(durationMs, popupTrainMs) * 0.92) / (popupCount - 1)),
-    )
-    : 0;
-
   const episode = {
     node,
     host,
     from: safeFrom,
     to: safeTo,
     format,
+    delta,
+    popupCap,
+    lastPopupInt: safeFrom,
+    popupsSpawned: 0,
+    tickPopups: !!(host && wantPopups && popupCap > 0 && strictSync),
     rafId: 0,
     spawnTimers: [],
   };
   node[SURFACE_KEY] = episode;
   _activeSurfaces.add(node);
 
-  // Spawn popups in parallel with the rolling count. If we have nowhere to
-  // mount them, skip popups silently (the count still rolls).
-  if (host && wantPopups && popupCount > 0) {
-    spawnPopups(host, popupCount, {
+  if (host && wantPopups && popupCap > 0 && !strictSync) {
+    episode.spawnTimers = spawnPopups(host, popupCount, {
       anchorNode: node,
-      spawnIntervalMs,
-      onTimers: (ids) => { episode.spawnTimers = ids; },
+      delta,
+      durationMs,
     });
   }
 
@@ -244,12 +295,12 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
     const t = Math.min(1, elapsed / durationMs);
     const v = safeFrom + (safeTo - safeFrom) * t;
     node.textContent = format(v);
+    if (episode.tickPopups) syncPopupsOnTick(episode, v);
     if (t < 1) {
       episode.rafId = requestAnimationFrame(tick);
     } else {
       node.textContent = format(safeTo);
-      // Keep spawnTimers reference so a subsequent cancel can clear them
-      // mid-flight, but null out the rafId.
+      if (episode.tickPopups) syncPopupsOnTick(episode, safeTo);
       episode.rafId = 0;
     }
   }
@@ -483,7 +534,7 @@ export function runLibraryCountDemo(opts = {}) {
  *
  * Options:
  *   - count: number of +1 bursts (default 5).
- *   - stepMs: gap between bursts (default 320ms — close enough to overlap).
+ *   - stepMs: gap between bursts (default 520ms — clears each +1 roll).
  *   - startFrom: starting count (default: current hero count).
  */
 export function runLibraryCountSmallDemo(opts = {}) {
@@ -498,7 +549,7 @@ export function runLibraryCountSmallDemo(opts = {}) {
   clearDemoTimers();
   try {
     const total = Number.isFinite(opts.count) && opts.count > 0 ? Math.floor(opts.count) : 5;
-    const stepMs = Number.isFinite(opts.stepMs) ? opts.stepMs : 320;
+    const stepMs = Number.isFinite(opts.stepMs) ? opts.stepMs : 520;
     const parseHero = () => {
       const n = parseInt((hero.textContent || '0').replace(/[^\d]/g, ''), 10);
       return Number.isFinite(n) ? n : 0;
@@ -518,7 +569,7 @@ export function runLibraryCountSmallDemo(opts = {}) {
       }, i * stepMs);
       _demoTimers.push(id);
     }
-    const restoreAt = total * stepMs + heroCountRollMs(1, 1) + 150;
+    const restoreAt = total * stepMs + countUpDurationForDelta(1) + 150;
     const restoreId = setTimeout(() => {
       _demoRunning = false;
       if (!hero.isConnected) return;
@@ -534,4 +585,5 @@ export function runLibraryCountSmallDemo(opts = {}) {
 if (typeof window !== 'undefined') {
   window.baklogDemoLibraryCount = runLibraryCountDemo;
   window.baklogDemoLibraryCountSmall = runLibraryCountSmallDemo;
+  window.baklogCancelLibraryCountAnimations = cancelAllLibraryCountAnimations;
 }

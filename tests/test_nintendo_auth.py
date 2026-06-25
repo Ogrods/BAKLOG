@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-from auth.runner import _nintendo_has_session, _nintendo_session_has_id_token
+from auth.connect_extractors import nintendo_has_session, nintendo_session_has_id_token
 
 
 def test_nintendo_has_session_requires_named_cookies() -> None:
@@ -15,7 +15,7 @@ def test_nintendo_has_session_requires_named_cookies() -> None:
                 {"name": "tracking", "value": "x", "domain": "ec.nintendo.com"},
             ]
 
-    assert _nintendo_has_session(Ctx()) is False
+    assert nintendo_has_session(Ctx()) is False
 
     class CtxOk:
         @staticmethod
@@ -24,7 +24,7 @@ def test_nintendo_has_session_requires_named_cookies() -> None:
                 {"name": "NASID", "value": "sess", "domain": "ec.nintendo.com"},
             ]
 
-    assert _nintendo_has_session(CtxOk()) is True
+    assert nintendo_has_session(CtxOk()) is True
 
     class CtxNextAuth:
         @staticmethod
@@ -37,7 +37,7 @@ def test_nintendo_has_session_requires_named_cookies() -> None:
                 },
             ]
 
-    assert _nintendo_has_session(CtxNextAuth()) is True
+    assert nintendo_has_session(CtxNextAuth()) is True
 
 
 def test_nintendo_session_has_id_token(monkeypatch) -> None:
@@ -51,4 +51,4 @@ def test_nintendo_session_has_id_token(monkeypatch) -> None:
                 resp.text = json.dumps({"idToken": "tok123"})
                 return resp
 
-    assert _nintendo_session_has_id_token(Ctx()) is True
+    assert nintendo_session_has_id_token(Ctx()) is True

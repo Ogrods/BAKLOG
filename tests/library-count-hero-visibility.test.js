@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flashCountUp } from '../js/library-count-animation.js';
+import { countUpDurationForDelta } from '../js/dashboard-shared.js';
 
 const APP_CSS = readFileSync(join(import.meta.dirname, '..', 'app.css'), 'utf8');
 /** Keep in sync with js/library-count-animation.js SEQ_POPUP_GAP_MS. */
@@ -119,7 +120,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
   it('floats dash-mega popups on document.body with hero-readable font-size', () => {
     const hero = mountDashHeroSurface();
     flashCountUp(hero, 1946, 1947, (n) => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(0);
+    vi.advanceTimersByTime(countUpDurationForDelta(1));
     const popup = document.querySelector('.library-count-popup');
     expect(popup, 'popup element').toBeTruthy();
     expect(popup.parentElement).toBe(document.body);
@@ -132,7 +133,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
   it('mid-flight floated popup stays mounted with hero font-size', () => {
     const hero = mountDashHeroSurface();
     flashCountUp(hero, 1946, 1947, (n) => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(countUpDurationForDelta(1));
     const popup = document.querySelector('.library-count-popup--floated');
     expect(popup?.isConnected).toBe(true);
     expect(popup?.textContent).toBe('+1');
@@ -147,7 +148,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     const chip = document.querySelector('[data-count-target="library"]');
     stubLayoutRect(chip, { w: 40, h: 20, left: 50, top: 60 });
     flashCountUp(chip, 10, 12, (n) => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(SEQ_POPUP_GAP_MS + 50);
+    vi.advanceTimersByTime(countUpDurationForDelta(2));
     const popups = document.querySelectorAll('.library-count-popup');
     expect(popups.length).toBe(2);
     for (const el of popups) {

@@ -12,6 +12,7 @@ import {
   armLibraryCountAnimations,
   disarmLibraryCountAnimations,
 } from '../js/library-count-animation.js';
+import { countUpDurationForDelta } from '../js/dashboard-shared.js';
 import { state } from '../js/state.js';
 
 function mountCountSurface() {
@@ -19,22 +20,48 @@ function mountCountSurface() {
     <span class="library-count-host" data-libcount-host>
       <span id="count" data-count-target="library">10</span>
     </span>`;
-  return document.getElementById('count');
+  const node = document.getElementById('count');
+  node.getBoundingClientRect = () => ({
+    width: 48,
+    height: 24,
+    left: 80,
+    top: 120,
+    right: 128,
+    bottom: 144,
+    x: 80,
+    y: 120,
+    toJSON: () => ({}),
+  });
+  return node;
 }
 
 function rafSync() {
+  const pending = [];
   vi.stubGlobal('requestAnimationFrame', (cb) => {
-    // One shot with enough elapsed time to finish any count roll in tests.
-    cb(performance.now() + 5000);
-    return 1;
+    pending.push(cb);
+    return pending.length;
   });
+  return function flushRaf(untilMs = 6000, stepMs = 16) {
+    const t0 = performance.now();
+    let step = 0;
+    const maxStep = Math.max(Math.ceil(untilMs / stepMs) + 8, 320);
+    while (pending.length && step < maxStep) {
+      const batch = pending.splice(0);
+      for (const cb of batch) {
+        step += 1;
+        cb(t0 + step * stepMs);
+      }
+    }
+  };
 }
 
 describe('flashCountUp', () => {
+  let flushRaf;
+
   beforeEach(() => {
     document.body.innerHTML = '';
     vi.useFakeTimers();
-    rafSync();
+    flushRaf = rafSync();
     vi.stubGlobal('matchMedia', (q) => ({
       matches: false,
       media: q,
@@ -59,7 +86,9 @@ describe('flashCountUp', () => {
   it('spawns one popup per game for small deltas', () => {
     const node = mountCountSurface();
     flashCountUp(node, 10, 12, n => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(350);
+    const dur = countUpDurationForDelta(2);
+    flushRaf(dur + 50);
+    vi.advanceTimersByTime(Math.ceil(dur));
     const popups = document.querySelectorAll('.library-count-popup');
     expect(popups.length).toBe(2);
     expect(popups[0].textContent).toBe('+1');
@@ -70,20 +99,29 @@ describe('flashCountUp', () => {
   it('caps popups at 10 for large deltas (always +1, never chunked)', () => {
     const node = mountCountSurface();
     flashCountUp(node, 0, 50, n => String(Math.round(n)), { popups: true });
-    for (let i = 0; i < 10; i++) vi.advanceTimersByTime(300);
-    const popups = document.querySelectorAll('.library-count-popup');
-    expect(popups.length).toBeLessThanOrEqual(4);
-    expect(popups.length).toBeGreaterThanOrEqual(1);
-    for (const el of popups) expect(el.textContent).toBe('+1');
+    expect(node.__baklogLibCountAnim.spawnTimers.length).toBe(10);
+    vi.advanceTimersByTime(3200);
+    flushRaf(4000);
+    for (const el of document.querySelectorAll('.library-count-popup')) {
+      expect(el.textContent).toBe('+1');
+    }
   });
 
-  it('spaces popups across the roll (sequential, not a 70ms pile)', () => {
+  it('does not burst large-delta popups when the first rAF is late', () => {
+    const node = mountCountSurface();
+    flashCountUp(node, 1946, 2116, n => String(Math.round(n)), { popups: true });
+    expect(node.__baklogLibCountAnim.spawnTimers.length).toBe(10);
+    flushRaf(6000, 6000);
+    expect(document.querySelectorAll('.library-count-popup').length).toBe(0);
+    vi.advanceTimersByTime(300);
+    expect(document.querySelectorAll('.library-count-popup').length).toBeLessThanOrEqual(2);
+  });
+
+  it('fires one popup per integer on small deltas (tick-synced)', () => {
     const node = mountCountSurface();
     flashCountUp(node, 0, 5, n => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(50);
-    expect(document.querySelectorAll('.library-count-popup').length).toBe(1);
-    vi.advanceTimersByTime(280);
-    expect(document.querySelectorAll('.library-count-popup').length).toBe(2);
+    flushRaf(countUpDurationForDelta(5) + 50);
+    expect(document.querySelectorAll('.library-count-popup').length).toBe(5);
   });
 
   it('skips popups when prefers-reduced-motion', () => {
@@ -103,6 +141,7 @@ describe('flashCountUp', () => {
   it('does not spawn popups on decrease', () => {
     const node = mountCountSurface();
     flashCountUp(node, 50, 40, n => String(Math.round(n)), { popups: true });
+    flushRaf(2000);
     vi.advanceTimersByTime(800);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(0);
     expect(node.textContent).toBe('40');
@@ -122,12 +161,12 @@ describe('flashCountUp', () => {
   it('replaces prior episode but keeps already-spawned popups climbing', () => {
     const node = mountCountSurface();
     flashCountUp(node, 0, 3, n => String(Math.round(n)), { popups: true });
-    // Let the first 2 popups spawn before firing a second episode.
-    vi.advanceTimersByTime(150);
+    flushRaf(Math.ceil(countUpDurationForDelta(3) / 3));
     const firstBurstCount = document.querySelectorAll('.library-count-popup').length;
     expect(firstBurstCount).toBeGreaterThan(0);
     flashCountUp(node, 3, 6, n => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(400);
+    flushRaf(countUpDurationForDelta(3));
+    vi.advanceTimersByTime(countUpDurationForDelta(3));
     const second = document.querySelectorAll('.library-count-popup').length;
     // Popups from the first episode + new ones — second total should be >= first.
     expect(second).toBeGreaterThanOrEqual(firstBurstCount);
@@ -137,6 +176,7 @@ describe('flashCountUp', () => {
   it('cancelAllLibraryCountAnimations rips down active episodes AND stray popups', () => {
     const node = mountCountSurface();
     flashCountUp(node, 0, 5, n => String(Math.round(n)), { popups: true });
+    flushRaf(200);
     vi.advanceTimersByTime(200);
     expect(document.querySelectorAll('.library-count-popup').length).toBeGreaterThan(0);
     cancelAllLibraryCountAnimations();
@@ -158,6 +198,7 @@ describe('flashCountUp', () => {
     // Once armed (post-boot), a live addition animates.
     armLibraryCountAnimations();
     fireLibraryCountFlash('library', 1946, 1949);
+    flushRaf(700);
     vi.advanceTimersByTime(700);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
@@ -175,6 +216,7 @@ describe('flashCountUp', () => {
       </span>`;
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13, { rowPrev: 8, rowNext: 11 });
+    flushRaf(700);
     vi.advanceTimersByTime(700);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
@@ -186,6 +228,7 @@ describe('flashCountUp', () => {
       </span>`;
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13);
+    flushRaf(700);
     vi.advanceTimersByTime(700);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
@@ -207,13 +250,14 @@ describe('flashCountUp', () => {
         <span id="dashHeroCount">1946</span>
       </span>`;
     runLibraryCountSmallDemo({ count: 4, stepMs: 100 });
-    // Spawn loop fires its setTimeouts; let them resolve and the popups appear.
     vi.advanceTimersByTime(500);
+    flushRaf(500);
     const hero = document.getElementById('dashHeroCount');
     // After all +1 bursts the count climbed from 1946 to 1950.
     expect(hero.textContent.replace(/,/g, '')).toBe('1950');
-    // Final restore timer fires at total*stepMs + 900 = 4*100 + 900 = 1300ms.
+    // Final restore timer fires at total*stepMs + roll + 150 = 4*520 + 450 + 150.
     vi.advanceTimersByTime(1500);
+    flushRaf(1500);
     // Restore burst (no popups) settles back to original.
     expect(hero.textContent.replace(/,/g, '')).toBe('1946');
   });
@@ -226,7 +270,8 @@ describe('flashCountUp', () => {
     runLibraryCountSmallDemo({ count: 3, stepMs: 100 });
     // Second call while first is running must be a no-op.
     runLibraryCountSmallDemo({ count: 99, stepMs: 100 });
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(600);
+    flushRaf(2000);
     const hero = document.getElementById('dashHeroCount');
     // If the second call had taken effect we'd see 199 here, not 103.
     expect(hero.textContent.replace(/,/g, '')).toBe('103');

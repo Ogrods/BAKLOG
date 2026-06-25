@@ -239,7 +239,13 @@ function applyMegaHeroCounters(stats) {
         continue;
       }
       if (item.id === 'dashHeroCount' && Number.isFinite(prev) && item.to > prev) {
-        animateCount(node, prev, item.to, item.format, countUpDurationForDelta(item.to - prev), { linear: true });
+        const acquisitionBurst = (state._lastNewlyAddedCount ?? 0) > 0;
+        if (acquisitionBurst) {
+          // fireLibraryCountFlash (after render) owns the roll + popups.
+          node.textContent = item.format(prev);
+        } else {
+          animateCount(node, prev, item.to, item.format, countUpDurationForDelta(item.to - prev), { linear: true });
+        }
       } else {
         node.textContent = item.format(item.to);
       }

@@ -55,13 +55,17 @@ def configure_stdout() -> None:
             pass
 
 
-def add_hltb_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
+def add_only_new_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--only-new",
         action="store_true",
-        help="Only HLTB-lookup games not already in the output file",
+        help="Skip per-row enrichment for titles already in the output file",
     )
+
+
+def add_hltb_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
+    add_only_new_arg(parser)
 
 
 def add_dry_run_arg(parser: argparse.ArgumentParser) -> None:

@@ -1054,6 +1054,35 @@ def test_fetcher_lane_parallel_to_internal(runs_env, internal_jobs) -> None:
     assert snap["active"]["key"] == "demo"
 
 
+def test_enrich_lane_parallel_to_fetcher(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    monkeypatch_item = {
+        "label": "Enrich demo",
+        "argv": [server.sys.executable, "-c", "print('enrich')"],
+        "refreshArgs": [],
+        "metaKey": "enrich_demo",
+        "group": "enrich",
+        "color": "#fff",
+        "requires": [],
+    }
+    server.FETCHERS["enrich_demo"] = monkeypatch_item
+    try:
+        running = server.Run("demo", runs_dir=runs_dir)
+        running.status = "running"
+        with mgr._lock:
+            mgr._pending.append(running)
+            mgr._runs_by_id[running.id] = running
+            mgr._active = running
+
+        enrich = mgr.submit("enrich_demo")
+        assert enrich._enrich
+        snap = mgr.snapshot()
+        assert snap["active"]["key"] == "demo"
+        assert snap["enrich_active"]["key"] == "enrich_demo"
+    finally:
+        server.FETCHERS.pop("enrich_demo", None)
+
+
 def test_internal_lane_still_serializes_among_itself(runs_env, internal_jobs) -> None:
     mgr, runs_dir = runs_env
     running = server.Run(

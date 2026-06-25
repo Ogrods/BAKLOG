@@ -3,6 +3,7 @@
 
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import re
 import time
@@ -19,6 +20,7 @@ from fetchers._authoritative import EPIC
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
+    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -186,6 +188,11 @@ def _can_reuse_cached_epic_row(
 
 def _epic_row_id(rec: dict) -> str:
     return f"{rec['namespace']}:{rec['catalogItemId']}"
+
+
+def _entitlement_set_hash(apps: list[dict]) -> str:
+    ids = sorted(_epic_row_id(rec) for rec in apps)
+    return hashlib.sha256("\n".join(ids).encode()).hexdigest()[:16]
 
 
 def _needs_catalog_fetch(rec: dict, existing: dict[str, dict], args: argparse.Namespace) -> bool:
@@ -400,6 +407,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Epic library into games_epic.json")
     parser.add_argument("--refresh", action="store_true", help="Re-fetch all catalog metadata")
     parser.add_argument("--skip-hltb", action="store_true", help="Skip HowLongToBeat lookups")
+    add_only_new_arg(parser)
     parser.add_argument("--auth-help", action="store_true", help="Print Epic login instructions")
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
@@ -473,10 +481,27 @@ def main() -> int:
         return stats.finish("fetch_epic", t0, exit_code=drift_exit)
 
     existing = load_existing()
-    apps_needing_catalog = apps if args.refresh else [
-        rec for rec in apps if _needs_catalog_fetch(rec, existing, args)
-    ]
-    catalog_skipped = len(apps) - len(apps_needing_catalog)
+    set_hash = _entitlement_set_hash(apps)
+    prev_hash: str | None = None
+    if catalog_file(GAMES_EPIC_JSON).exists():
+        try:
+            prev_hash = json.loads(
+                catalog_file(GAMES_EPIC_JSON).read_text(encoding="utf-8")
+            ).get("entitlement_set_hash")
+        except json.JSONDecodeError:
+            prev_hash = None
+    if args.only_new and not args.refresh and prev_hash and set_hash == prev_hash:
+        apps_needing_catalog: list[dict] = []
+        catalog_skipped = len(apps)
+        print(
+            f"  catalog: entitlement set unchanged ({len(apps)} titles, no API calls)",
+            flush=True,
+        )
+    else:
+        apps_needing_catalog = apps if args.refresh else [
+            rec for rec in apps if _needs_catalog_fetch(rec, existing, args)
+        ]
+        catalog_skipped = len(apps) - len(apps_needing_catalog)
     catalog: dict[tuple[str, str], dict] = {}
 
     if apps_needing_catalog:
@@ -543,6 +568,10 @@ def main() -> int:
         row_id = _epic_row_id(rec)
         item = catalog.get((ns, cid))
         name = (item or {}).get("title") or rec.get("sandboxName") or rec.get("appName") or cid
+
+        if args.only_new and row_id in existing and not args.refresh:
+            games_out.append(existing[row_id])
+            continue
 
         if not args.refresh and row_id in existing:
             cached_early = existing[row_id]
@@ -647,6 +676,7 @@ def main() -> int:
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "epic",
         "game_count": len(games_out),
+        "entitlement_set_hash": set_hash,
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
     write_catalog_text(GAMES_EPIC_JSON, json.dumps(payload, indent=2, ensure_ascii=False))

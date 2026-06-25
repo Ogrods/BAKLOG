@@ -371,6 +371,10 @@ class EpicClient:
         self, namespace: str, catalog_id: str, country: str = "US", locale: str = "en-US"
     ) -> dict | None:
         """Catalog metadata for one item (legendary-compatible endpoint)."""
+        cache_key = f"{namespace}_{catalog_id}"
+        cached = self._read_catalog_cache(cache_key)
+        if cached is not None:
+            return cached
         self._throttle()
         resp = self.session.get(
             f"https://{CATALOG_HOST}/catalog/api/shared/namespace/{namespace}/bulk/items",
@@ -389,7 +393,32 @@ class EpicClient:
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
-        return resp.json().get(catalog_id)
+        item = resp.json().get(catalog_id)
+        if item:
+            build = item.get("buildVersion") or item.get("buildVersionId") or ""
+            versioned_key = f"{namespace}_{catalog_id}_{build}" if build else cache_key
+            self._write_catalog_cache(versioned_key, item)
+            if versioned_key != cache_key:
+                self._write_catalog_cache(cache_key, item)
+        return item
+
+    def _catalog_cache_path(self, key: str) -> Path:
+        safe = re.sub(r"[^\w.-]", "_", key)
+        return self._cache_dir / "catalog" / f"{safe}.json"
+
+    def _read_catalog_cache(self, key: str) -> dict | None:
+        path = self._catalog_cache_path(key)
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def _write_catalog_cache(self, key: str, data: dict) -> None:
+        path = self._catalog_cache_path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
     def get_catalog_bulk(
         self, namespace: str, catalog_ids: list[str], country: str = "US",

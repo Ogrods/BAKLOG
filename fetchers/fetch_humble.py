@@ -31,6 +31,7 @@ from fetchers._authoritative import HUMBLE
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
+    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -324,6 +325,7 @@ def main() -> int:
         action="store_true",
         help="Accepted for manifest/dashboard parity; HLTB is off by default (use --hltb to enable)",
     )
+    add_only_new_arg(parser)
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
     parser.add_argument(
         "--include-nongames",
@@ -381,10 +383,13 @@ def main() -> int:
     existing = _load_existing_by_machine()
     rows: list[dict] = []
     for i, item in enumerate(items, 1):
+        cached = existing.get(item.machine_name)
+        if args.only_new and cached:
+            rows.append(cached)
+            continue
         print(f"[{i}/{len(items)}] {item.name}", flush=True)
         hltb = None
         hltb_updated = False
-        cached = existing.get(item.machine_name)
         if hltb_client and item.name:
             if cached and cached.get("hltb_main_hours") is not None:
                 hltb = {

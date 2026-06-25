@@ -26,6 +26,7 @@ from fetchers._authoritative import NINTENDO
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
+    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -185,6 +186,7 @@ def _nintendo_connected() -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Nintendo eShop purchase history")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     parser.add_argument(
@@ -270,8 +272,11 @@ def main() -> int:
     existing = load_existing()
     games_out: list[dict] = []
     for i, item in enumerate(merged, 1):
-        print(f"[{i}/{len(merged)}] {item['name']}")
         cached = existing.get(str(item["id"]))
+        if args.only_new and cached:
+            games_out.append(cached)
+            continue
+        print(f"[{i}/{len(merged)}] {item['name']}")
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:

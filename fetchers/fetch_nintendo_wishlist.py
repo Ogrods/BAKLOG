@@ -34,6 +34,7 @@ from auth.secrets import profile_dir
 from clients.hltb_client import HltbClient
 from fetchers._base import (
     add_allow_empty_arg,
+    add_only_new_arg,
     catalog_file,
     configure_stdout,
     refuse_drift_result,
@@ -1085,6 +1086,7 @@ def main() -> int:
         description="Fetch Nintendo.com wish list into games_wishlist_nintendo.json",
     )
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
+    add_only_new_arg(parser)
     parser.add_argument(
         "--dump",
         action="store_true",
@@ -1209,9 +1211,12 @@ def main() -> int:
 
     for i, item in enumerate(items, 1):
         row_id = f"nintendo-{item.product_id}"
+        cached = existing.get(row_id)
+        if args.only_new and cached:
+            rows.append(cached)
+            continue
         print(f"[{i}/{len(items)}] {item.title}", flush=True)
         hltb = None
-        cached = existing.get(row_id)
         if hltb_client and item.title:
             if cached and cached.get("hltb_main_hours") is not None:
                 hltb = {

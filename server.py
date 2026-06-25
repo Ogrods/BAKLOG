@@ -858,11 +858,17 @@ def _run_id_active_on_disk(run_id: str) -> bool:
     return any(entry.get("id") == run_id for entry in _read_active_runs())
 
 
+def _fetcher_is_enrich(key: str) -> bool:
+    return FETCHERS.get(key, {}).get("group") == "enrich"
+
+
 def _filter_runs_by_lane(runs: list[Run], lane: str | None) -> list[Run]:
-    """Restrict a run list to one lane. lane="fetcher" drops internal (admin)
-    runs; lane="internal" keeps only them; None passes everything through."""
+    """Restrict a run list to one lane. lane="fetcher" drops internal/enrich runs;
+    lane="enrich" keeps enrich only; lane="internal" keeps admin jobs; None = all."""
     if lane == "fetcher":
-        return [r for r in runs if not r._internal]
+        return [r for r in runs if not r._internal and not r._enrich]
+    if lane == "enrich":
+        return [r for r in runs if r._enrich]
     if lane == "internal":
         return [r for r in runs if r._internal]
     return list(runs)
@@ -906,7 +912,7 @@ class Run:
         "lines", "_lock", "_listeners", "_finished", "_proc", "cancelled", "refresh",
         "_log_path", "_runs_dir", "profile_id", "_cancelling_since", "_no_proc_since",
         "_history_note", "_next_seq", "_total_lines", "_finalized",
-        "_internal", "_internal_extra_args",
+        "_internal", "_internal_extra_args", "_enrich",
     )
 
     def __init__(
@@ -917,6 +923,7 @@ class Run:
         runs_dir: Path = RUNS_DIR,
         profile_id: str | None = None,
         internal: bool = False,
+        enrich: bool = False,
         extra_args: list[str] | None = None,
     ) -> None:
         if internal:
@@ -931,6 +938,7 @@ class Run:
         self.label: str = spec["label"]
         self.refresh: bool = refresh
         self._internal = internal
+        self._enrich = enrich and not internal
         self._internal_extra_args = list(extra_args or [])
         self.status: str = "queued"  # queued | launching | running | cancelling | done | failed | cancelled
         self.started_at: float | None = None
@@ -996,6 +1004,14 @@ class Run:
         if self._history_note:
             summary["note"] = self._history_note
         summary["profile_id"] = self.profile_id
+        if self._enrich:
+            summary["lane"] = "enrich"
+        elif self._internal:
+            summary["lane"] = "internal"
+        else:
+            summary["lane"] = "fetcher"
+        if not self._internal:
+            summary["group"] = FETCHERS.get(self.key, {}).get("group")
         return summary
 
     def add_line(self, stream: str, text: str) -> None:
@@ -1161,20 +1177,18 @@ class RunManager:
         self._runs_dir = runs_dir or RUNS_DIR
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        # Two parallel lanes, each cap=1: the fetcher lane serializes library/
-        # wishlist/enrich runs (they share auth sessions), while the internal
-        # lane runs admin jobs (buildClaims, claimSources) so a Publish/Enrich
-        # never blocks — or is blocked by — a Steam library fetch. Internal jobs
-        # still serialize among themselves because claimSources writes the auto
-        # feed that buildClaims reads.
+        # Three parallel lanes, each cap=1: fetcher (library/wishlist/prices),
+        # enrich (HLTB/reviews/covers/tags), and internal (admin jobs).
         self._queue: queue.Queue[Run] = queue.Queue()
+        self._enrich_queue: queue.Queue[Run] = queue.Queue()
         self._internal_queue: queue.Queue[Run] = queue.Queue()
-        self._pending: list[Run] = []  # queued + active (both lanes), submission order
+        self._pending: list[Run] = []  # queued + active (all lanes), submission order
         self._history: deque[dict[str, Any]] = deque(
             _load_run_history_from(self._runs_dir / "history.json")[-MAX_HISTORY:],
             maxlen=MAX_HISTORY,
         )
         self._active: Run | None = None
+        self._enrich_active: Run | None = None
         self._internal_active: Run | None = None
         self._runs_by_id: dict[str, Run] = {}
         self._last_queue_kick_at = 0.0
@@ -1198,27 +1212,38 @@ class RunManager:
 
     def _start_worker_thread(self) -> None:
         self._worker_thread = threading.Thread(
-            target=self._worker_loop, args=(False,), name="run-worker", daemon=True
+            target=self._worker_loop, args=("fetcher",), name="run-worker", daemon=True
         )
         self._worker_thread.start()
+        self._enrich_worker_thread = threading.Thread(
+            target=self._worker_loop, args=("enrich",), name="run-worker-enrich", daemon=True
+        )
+        self._enrich_worker_thread.start()
         self._internal_worker_thread = threading.Thread(
-            target=self._worker_loop, args=(True,), name="run-worker-internal", daemon=True
+            target=self._worker_loop, args=("internal",), name="run-worker-internal", daemon=True
         )
         self._internal_worker_thread.start()
 
     def _ensure_worker_thread(self) -> None:
-        """Restart either lane worker if its daemon thread died (leaves runs stuck queued)."""
+        """Restart any lane worker if its daemon thread died."""
         if not self._worker_thread.is_alive():
             print("[runs] fetcher worker thread died — restarting", file=sys.stderr, flush=True)
             self._worker_thread = threading.Thread(
-                target=self._worker_loop, args=(False,), name="run-worker", daemon=True
+                target=self._worker_loop, args=("fetcher",), name="run-worker", daemon=True
             )
             self._worker_thread.start()
+        enrich = getattr(self, "_enrich_worker_thread", None)
+        if enrich is None or not enrich.is_alive():
+            print("[runs] enrich worker thread died — restarting", file=sys.stderr, flush=True)
+            self._enrich_worker_thread = threading.Thread(
+                target=self._worker_loop, args=("enrich",), name="run-worker-enrich", daemon=True
+            )
+            self._enrich_worker_thread.start()
         internal = getattr(self, "_internal_worker_thread", None)
         if internal is None or not internal.is_alive():
             print("[runs] internal worker thread died — restarting", file=sys.stderr, flush=True)
             self._internal_worker_thread = threading.Thread(
-                target=self._worker_loop, args=(True,), name="run-worker-internal", daemon=True
+                target=self._worker_loop, args=("internal",), name="run-worker-internal", daemon=True
             )
             self._internal_worker_thread.start()
 
@@ -1229,25 +1254,55 @@ class RunManager:
         but were never handed to ``_queue.get()`` (typically after the worker thread
         exited while the queue was empty). Runs both lanes independently.
         """
-        return self._resync_lane(internal=False) + self._resync_lane(internal=True)
+        return (
+            self._resync_lane("fetcher")
+            + self._resync_lane("enrich")
+            + self._resync_lane("internal")
+        )
 
-    def _resync_lane(self, *, internal: bool) -> int:
-        lane_queue = self._internal_queue if internal else self._queue
+    def _lane_queue(self, lane: str) -> queue.Queue[Run]:
+        if lane == "internal":
+            return self._internal_queue
+        if lane == "enrich":
+            return self._enrich_queue
+        return self._queue
+
+    def _lane_active(self, lane: str) -> Run | None:
+        if lane == "internal":
+            return self._internal_active
+        if lane == "enrich":
+            return self._enrich_active
+        return self._active
+
+    def _set_lane_active(self, lane: str, run: Run | None) -> None:
+        if lane == "internal":
+            self._internal_active = run
+        elif lane == "enrich":
+            self._enrich_active = run
+        else:
+            self._active = run
+
+    def _run_in_lane(self, run: Run, lane: str) -> bool:
+        if lane == "internal":
+            return run._internal
+        if lane == "enrich":
+            return run._enrich
+        return not run._internal and not run._enrich
+
+    def _resync_lane(self, lane: str) -> int:
+        lane_queue = self._lane_queue(lane)
         to_put: list[Run] = []
         with self._lock:
-            active = self._internal_active if internal else self._active
+            active = self._lane_active(lane)
             if active is not None and active._finished.is_set():
-                if internal:
-                    self._internal_active = None
-                else:
-                    self._active = None
+                self._set_lane_active(lane, None)
                 active = None
             if active is not None:
                 return 0
             if lane_queue.qsize() > 0:
                 return 0
             for r in self._pending:
-                if bool(r._internal) != internal:
+                if not self._run_in_lane(r, lane):
                     continue
                 if r.status == "queued" and not r._finished.is_set():
                     to_put.append(r)
@@ -1255,7 +1310,6 @@ class RunManager:
             lane_queue.put(r)
         if to_put:
             keys = ", ".join(r.key for r in to_put)
-            lane = "internal" if internal else "fetcher"
             print(
                 f"[runs] re-queued {len(to_put)} stalled {lane} run(s): {keys}",
                 file=sys.stderr,
@@ -1294,7 +1348,7 @@ class RunManager:
                     and now - r._cancelling_since > CANCEL_STUCK_GRACE_SEC
                 ):
                     stuck.append(r)
-            for active in (self._active, self._internal_active):
+            for active in (self._active, self._enrich_active, self._internal_active):
                 if (
                     active
                     and active.status == "cancelling"
@@ -1342,7 +1396,7 @@ class RunManager:
         stuck: list[Run] = []
         with self._lock:
             candidates: list[Run] = []
-            for active in (self._active, self._internal_active):
+            for active in (self._active, self._enrich_active, self._internal_active):
                 if (
                     active
                     and active.status in ("launching", "running")
@@ -1469,6 +1523,11 @@ class RunManager:
             if self._active is not None and self._active.profile_id != active_pid:
                 self._active = None
             if (
+                self._enrich_active is not None
+                and self._enrich_active.profile_id != active_pid
+            ):
+                self._enrich_active = None
+            if (
                 self._internal_active is not None
                 and self._internal_active.profile_id != active_pid
             ):
@@ -1583,7 +1642,7 @@ class RunManager:
         self._watchdog_stop.set()
         with self._lock:
             pending = list(self._pending)
-            actives = [self._active, self._internal_active]
+            actives = [self._active, self._enrich_active, self._internal_active]
         kill_pids: list[int] = []
         for run in pending:
             changed, pids = run.cancel()
@@ -1602,7 +1661,7 @@ class RunManager:
         # Wake both worker lanes so their blocking queue.get() returns and the
         # threads exit, letting join_threads() finish immediately rather than
         # waiting out each 5s join timeout.
-        for lane_queue in (self._queue, self._internal_queue):
+        for lane_queue in (self._queue, self._enrich_queue, self._internal_queue):
             try:
                 lane_queue.put_nowait(None)
             except Exception:  # noqa: BLE001 - best-effort wakeup
@@ -1617,6 +1676,9 @@ class RunManager:
             wt.join(timeout=timeout)
         if self._worker_thread.is_alive():
             self._worker_thread.join(timeout=timeout)
+        enrich = getattr(self, "_enrich_worker_thread", None)
+        if enrich is not None and enrich.is_alive():
+            enrich.join(timeout=timeout)
         internal = getattr(self, "_internal_worker_thread", None)
         if internal is not None and internal.is_alive():
             internal.join(timeout=timeout)
@@ -1624,22 +1686,25 @@ class RunManager:
     def submit(self, key: str, *, refresh: bool = False) -> Run:
         if key not in FETCHERS:
             raise KeyError(key)
+        is_enrich = _fetcher_is_enrich(key)
+
+        def _in_lane(r: Run) -> bool:
+            if is_enrich:
+                return r._enrich
+            return not r._internal and not r._enrich
+
         with self._lock:
-            active = self._active
+            active = self._enrich_active if is_enrich else self._active
             if active and active.key == key and active.status in _IN_FLIGHT_STATUSES:
                 raise ValueError(f"{key} already queued or running")
             if any(
-                not r._internal and r.key == key and r.status in _IN_FLIGHT_STATUSES
+                _in_lane(r) and r.key == key and r.status in _IN_FLIGHT_STATUSES
                 for r in self._pending
             ):
                 raise ValueError(f"{key} already queued or running")
-            # Only the fetcher lane gates fetcher submits; admin/internal jobs
-            # run in their own lane and must not count toward "queue full".
             in_flight = sum(
-                1 for r in self._pending if not r._internal and r.status in _IN_FLIGHT_STATUSES
+                1 for r in self._pending if _in_lane(r) and r.status in _IN_FLIGHT_STATUSES
             )
-            # cancel() drops a run from _pending while the worker is still
-            # finishing it on _active — count that slot so the queue can't wedge.
             if (
                 active
                 and active.status in _IN_FLIGHT_STATUSES
@@ -1647,8 +1712,9 @@ class RunManager:
             ):
                 in_flight += 1
             if in_flight >= 1:
+                lane_label = "enrich" if is_enrich else "fetch"
                 raise ValueError(
-                    "queue full — a fetch is already running; "
+                    f"queue full — a {lane_label} is already running; "
                     "wait for it to finish before starting another"
                 )
             profile_id = get_active_profile_id()
@@ -1657,10 +1723,11 @@ class RunManager:
                 refresh=refresh,
                 runs_dir=runs_dir(profile_id=profile_id),
                 profile_id=profile_id,
+                enrich=is_enrich,
             )
             self._pending.append(run)
             self._runs_by_id[run.id] = run
-            self._queue.put(run)
+            (self._enrich_queue if is_enrich else self._queue).put(run)
         self._register_pending_run(run)
         self._persist_queue()
         self._ensure_worker_thread()
@@ -1768,7 +1835,7 @@ class RunManager:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             ]
-            for active in (self._active, self._internal_active):
+            for active in (self._active, self._enrich_active, self._internal_active):
                 if (
                     active
                     and active.status in _IN_FLIGHT_STATUSES
@@ -1819,7 +1886,7 @@ class RunManager:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             ]
-            for active in (self._active, self._internal_active):
+            for active in (self._active, self._enrich_active, self._internal_active):
                 if (
                     active
                     and active.status in _IN_FLIGHT_STATUSES
@@ -1850,6 +1917,8 @@ class RunManager:
         drains: list[queue.Queue] = []
         if lane in (None, "fetcher"):
             drains.append(self._queue)
+        if lane in (None, "enrich"):
+            drains.append(self._enrich_queue)
         if lane in (None, "internal"):
             drains.append(self._internal_queue)
         for drain in drains:
@@ -1862,11 +1931,14 @@ class RunManager:
             if lane is None:
                 self._pending.clear()
                 self._active = None
+                self._enrich_active = None
                 self._internal_active = None
             else:
                 self._pending = [r for r in self._pending if r not in targets]
                 if lane == "fetcher":
                     self._active = None
+                elif lane == "enrich":
+                    self._enrich_active = None
                 elif lane == "internal":
                     self._internal_active = None
         if lane is None:
@@ -1902,7 +1974,7 @@ class RunManager:
             targets = [
                 r for r in self._pending if r.status in _IN_FLIGHT_STATUSES
             ]
-            for active in (self._active, self._internal_active):
+            for active in (self._active, self._enrich_active, self._internal_active):
                 if (
                     active
                     and active.status in _IN_FLIGHT_STATUSES
@@ -1953,9 +2025,7 @@ class RunManager:
     def snapshot(self) -> dict[str, Any]:
         self._kick_queue_if_stalled_throttled()
         with self._lock:
-            # active/queue cover the fetcher lane only so the dashboard fetcher
-            # chips stay independent of admin jobs; the internal lane is exposed
-            # separately under internal_active/internal_queue.
+            # active/queue cover the fetcher lane; enrich and internal are separate.
             active = (
                 self._active.to_summary()
                 if self._active and self._active.status in _IN_FLIGHT_STATUSES
@@ -1964,7 +2034,21 @@ class RunManager:
             queued = [
                 r.to_summary()
                 for r in self._pending
-                if not r._internal and r.status == "queued" and r is not self._active
+                if not r._internal
+                and not r._enrich
+                and r.status == "queued"
+                and r is not self._active
+            ]
+            enrich_active = (
+                self._enrich_active.to_summary()
+                if self._enrich_active
+                and self._enrich_active.status in _IN_FLIGHT_STATUSES
+                else None
+            )
+            enrich_queue = [
+                r.to_summary()
+                for r in self._pending
+                if r._enrich and r.status == "queued" and r is not self._enrich_active
             ]
             internal_active = (
                 self._internal_active.to_summary()
@@ -1981,6 +2065,8 @@ class RunManager:
         return {
             "active": active,
             "queue": queued,
+            "enrich_active": enrich_active,
+            "enrich_queue": enrich_queue,
             "internal_active": internal_active,
             "internal_queue": internal_queue,
             "history": history,
@@ -2007,6 +2093,8 @@ class RunManager:
         with self._lock:
             if self._active is run:
                 self._active = None
+            if self._enrich_active is run:
+                self._enrich_active = None
             if self._internal_active is run:
                 self._internal_active = None
             if run in self._pending:
@@ -2016,36 +2104,29 @@ class RunManager:
         self._persist_queue()
         self._prune_runs_by_id()
 
-    def _worker_loop(self, internal: bool = False) -> None:
-        lane_queue = self._internal_queue if internal else self._queue
+    def _worker_loop(self, lane: str = "fetcher") -> None:
+        lane_queue = self._lane_queue(lane)
         while True:
             try:
                 run = lane_queue.get()
-                # Shutdown sentinel: unblocks a worker parked on get() so
-                # join_threads() returns promptly instead of waiting out the
-                # full join timeout (the dominant cost in run-manager tests and
-                # in graceful tray/server quit).
                 if run is None:
                     return
                 if not run._finished.is_set():
                     with self._lock:
-                        if internal:
-                            self._internal_active = run
-                        else:
-                            self._active = run
+                        self._set_lane_active(lane, run)
                         if run.status == "queued":
                             run.status = "launching"
                     self._persist_queue()
                     try:
                         if run.status != "cancelled":
                             self._execute(run)
-                    except Exception as exc:  # noqa: BLE001 - surface anything the subprocess plumbing might raise.
+                    except Exception as exc:  # noqa: BLE001
                         if not run.cancelled:
                             run.status = "failed"
                             run.exit_code = -1
                             run.add_line("stderr", f"[server] worker error: {exc!r}")
                 self._finalize_run(run)
-            except Exception as exc:  # noqa: BLE001 - keep the worker alive
+            except Exception as exc:  # noqa: BLE001
                 print(f"[runs] worker loop error: {exc!r}", file=sys.stderr, flush=True)
                 time.sleep(0.5)
 

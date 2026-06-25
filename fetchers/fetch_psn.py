@@ -125,20 +125,68 @@ def main() -> int:
 
     hltb_client = HltbClient()
     existing = load_existing()
+    prev_meta: dict = {}
+    if catalog_file(GAMES_PSN_JSON).exists():
+        try:
+            prev_meta = json.loads(catalog_file(GAMES_PSN_JSON).read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            prev_meta = {}
 
     print(f"Fetching PSN library for {online_id}...")
-    try:
-        library = psn.collect_library()
-    except PsnAuthError as exc:
-        mark_invalid("psn", error=str(exc))
-        stats.error(str(exc))
-        return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
+    library: list | None = None
+    if (
+        args.only_new
+        and not args.refresh
+        and not args.psn_id
+        and existing
+        and prev_meta.get("title_stats_count") is not None
+    ):
+        try:
+            probe_count, probe_max = psn.probe_library_fingerprint()
+        except PsnAuthError as exc:
+            mark_invalid("psn", error=str(exc))
+            stats.error(str(exc))
+            return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
+        if (
+            probe_count == prev_meta.get("title_stats_count")
+            and probe_max == prev_meta.get("max_last_played")
+        ):
+            print(
+                "PSN library fingerprint unchanged — skipping full collect.",
+                flush=True,
+            )
+            library = []
+
+    if library is None:
+        try:
+            library = psn.collect_library()
+        except PsnAuthError as exc:
+            mark_invalid("psn", error=str(exc))
+            stats.error(str(exc))
+            return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
 
     if args.psn_id:
         library = [entry for entry in library if entry.id == args.psn_id]
         if not library:
             stats.error(f"No PSN title found with id {args.psn_id!r}.")
             return stats.finish("fetch_psn", t0, exit_code=1)
+    elif not library and args.only_new and not args.refresh and existing:
+        games_out = sorted(existing.values(), key=lambda g: g["name"].lower())
+        payload = {
+            "fetched_at": datetime.now(UTC).isoformat(),
+            "store": "psn",
+            "online_id": online_id,
+            "game_count": len(games_out),
+            "title_stats_count": prev_meta.get("title_stats_count"),
+            "trophy_count": prev_meta.get("trophy_count"),
+            "entitlement_count": prev_meta.get("entitlement_count"),
+            "max_last_played": prev_meta.get("max_last_played"),
+            "games": games_out,
+        }
+        write_catalog_text(GAMES_PSN_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
+        print(f"\nWrote {len(games_out)} games to {GAMES_PSN_JSON} (unchanged).", flush=True)
+        stats.ok = len(games_out)
+        return stats.finish("fetch_psn", t0, exit_code=0, extra=f"{len(games_out)} games")
     else:
         empty_exit = refuse_empty_result(
             library,
@@ -229,6 +277,13 @@ def main() -> int:
         "store": "psn",
         "online_id": online_id,
         "game_count": len(games_out),
+        "title_stats_count": getattr(psn, "last_title_stats_count", None),
+        "trophy_count": getattr(psn, "last_trophy_count", None),
+        "entitlement_count": getattr(psn, "last_entitlement_count", None),
+        "max_last_played": max(
+            (g.get("last_played") for g in games_out if g.get("last_played")),
+            default=None,
+        ),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
 

@@ -16,7 +16,9 @@ from clients.steam_client import SteamClient
 from fetchers._base import (
     STEAM_CREDENTIALS_HINT,
     add_allow_empty_arg,
+    add_only_new_arg,
     configure_stdout,
+    load_existing_games,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -44,6 +46,7 @@ def fetch_wishlist_items(api_key: str, steam_id: str) -> list[dict]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Steam wishlist")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     configure_stdout()
@@ -80,11 +83,15 @@ def main() -> int:
     print(f"Found {len(items)} wishlist items.")
     steam = SteamClient(api_key, steam_id)
     hltb = HltbClient()
+    existing = load_existing_games(GAMES_WISHLIST_JSON)
     games_out: list[dict] = []
 
     for i, item in enumerate(items, 1):
         appid = int(item.get("appid") or item.get("app_id") or 0)
         if not appid:
+            continue
+        if args.only_new and str(appid) in existing:
+            games_out.append(existing[str(appid)])
             continue
         print(f"[{i}/{len(items)}] appid {appid}")
 

@@ -303,6 +303,7 @@ describe("buildBugBundle shape", () => {
       "generated_at",
       "notice",
       "runtime",
+      "server",
       "ua",
     ]);
     const runtimeKeys = Object.keys(bundle.runtime).sort();
@@ -329,14 +330,28 @@ describe("submitBugReport", () => {
   /** @type {import('vitest').Mock} */
   let fetchMock;
 
+  function installFetchMock(reportImpl) {
+    fetchMock = vi.fn(async (url, opts) => {
+      const target = String(url);
+      if (target.includes("/api/diagnostics")) {
+        return {
+          ok: true,
+          json: async () => ({ frozen: false, portable: false }),
+        };
+      }
+      if (reportImpl) return reportImpl(url, opts);
+      return {
+        ok: true,
+        json: async () => ({ ok: true }),
+      };
+    });
+    global.fetch = fetchMock;
+  }
+
   beforeEach(() => {
     installWindow({ versionMeta: "9.9.9-test" });
     _resetForTests();
-    fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ok: true }),
-    }));
-    global.fetch = fetchMock;
+    installFetchMock();
     window.__BAKLOG_REPORT_ENDPOINT = "https://test.example/api/report";
   });
 
@@ -359,8 +374,9 @@ describe("submitBugReport", () => {
       contact: `${"a".repeat(400)}@example.com`,
       note: "b".repeat(3000),
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, opts] = fetchMock.mock.calls[0];
+    const reportCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/report"));
+    expect(reportCalls).toHaveLength(1);
+    const [url, opts] = reportCalls[0];
     expect(url).toBe("https://test.example/api/report");
     expect(opts.method).toBe("POST");
     expect(opts.headers["Content-Type"]).toBe("application/json");
@@ -372,7 +388,12 @@ describe("submitBugReport", () => {
   });
 
   it("throws when the server returns a non-OK status", async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) });
+    installFetchMock(async (url) => {
+      if (String(url).includes("/api/diagnostics")) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return { ok: false, status: 502, json: async () => ({}) };
+    });
     await expect(submitBugReport()).rejects.toThrow("report failed: 502");
   });
 

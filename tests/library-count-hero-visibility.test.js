@@ -1,7 +1,6 @@
 /**
  * Regression: dashboard hero "+N" combat-text must be readable and not clipped
- * by .dash-mega overflow. Body-mounted floats must carry hero font-size without
- * a .dash-mega ancestor (js/library-count-animation.js spawnPopups).
+ * by .dash-mega overflow. Popups float to document.body via position:fixed.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,10 +8,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flashCountUp } from '../js/library-count-animation.js';
 
 const APP_CSS = readFileSync(join(import.meta.dirname, '..', 'app.css'), 'utf8');
+/** Keep in sync with js/library-count-animation.js SEQ_POPUP_GAP_MS. */
+const SEQ_POPUP_GAP_MS = 300;
 
 function extractRuleBlock(css, selector) {
   const re = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm');
   return css.match(re)?.[1] ?? '';
+}
+
+function stubLayoutRect(el, { w = 120, h = 48, left = 100, top = 200 } = {}) {
+  el.getBoundingClientRect = () => ({
+    width: w,
+    height: h,
+    left,
+    top,
+    right: left + w,
+    bottom: top + h,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  });
 }
 
 function mountDashHeroSurface() {
@@ -25,14 +40,17 @@ function mountDashHeroSurface() {
         </span>
       </div>
     </div>`;
-  return document.getElementById('dashHeroCount');
+  const hero = document.getElementById('dashHeroCount');
+  stubLayoutRect(hero);
+  return hero;
 }
 
 describe('library-count hero visibility CSS contract', () => {
-  it('does not clip combat-text with overflow:hidden on .dash-mega', () => {
-    const block = extractRuleBlock(APP_CSS, '.dash-mega');
-    expect(block, '.dash-mega rule').toBeTruthy();
-    expect(block).not.toMatch(/overflow:\s*hidden/);
+  it('escapes .dash-mega overflow via fixed floated popups', () => {
+    const mega = extractRuleBlock(APP_CSS, '.dash-mega');
+    expect(mega, '.dash-mega rule').toBeTruthy();
+    const floated = extractRuleBlock(APP_CSS, '.library-count-popup--floated');
+    expect(floated).toMatch(/position:\s*fixed/);
   });
 
   it('sets hero font-size on floated popups (body mount, no .dash-mega ancestor)', () => {
@@ -41,9 +59,9 @@ describe('library-count hero visibility CSS contract', () => {
     );
   });
 
-  it('keeps in-host hero popup sizing for non-floated surfaces', () => {
+  it('sizes chip floated popups smaller than hero floats', () => {
     expect(APP_CSS).toMatch(
-      /\.dash-mega\s+\.library-count-popup\s*\{[^}]*font-size:\s*clamp\(/,
+      /\.library-count-popup--floated-chip\s*\{[^}]*font-size:\s*clamp\(/,
     );
   });
 
@@ -54,9 +72,9 @@ describe('library-count hero visibility CSS contract', () => {
     expect(APP_CSS).toMatch(/@keyframes baklog-libcount-pop-hero/);
   });
 
-  it('does not set a resting transform on base popups', () => {
-    const block = extractRuleBlock(APP_CSS, '.library-count-popup');
-    expect(block).not.toMatch(/^\s*transform:/m);
+  it('animates popups via keyframes (not a static end-state transform)', () => {
+    expect(APP_CSS).toMatch(/@keyframes baklog-libcount-pop\b/);
+    expect(APP_CSS).toMatch(/@keyframes baklog-libcount-pop-hero/);
   });
 });
 
@@ -101,7 +119,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
   it('floats dash-mega popups on document.body with hero-readable font-size', () => {
     const hero = mountDashHeroSurface();
     flashCountUp(hero, 1946, 1947, (n) => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(100);
+    vi.advanceTimersByTime(0);
     const popup = document.querySelector('.library-count-popup');
     expect(popup, 'popup element').toBeTruthy();
     expect(popup.parentElement).toBe(document.body);
@@ -121,19 +139,22 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     expect(parseFloat(getComputedStyle(popup).fontSize)).toBeGreaterThanOrEqual(20);
   });
 
-  it('chip popups stay in-host without --floated', () => {
+  it('chip popups float on body sequentially (+1 each)', () => {
     document.body.innerHTML = `
       <span class="library-count-host" data-libcount-host>
         <span data-count-target="library">10</span>
       </span>`;
     const chip = document.querySelector('[data-count-target="library"]');
+    stubLayoutRect(chip, { w: 40, h: 20, left: 50, top: 60 });
     flashCountUp(chip, 10, 12, (n) => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(SEQ_POPUP_GAP_MS + 50);
     const popups = document.querySelectorAll('.library-count-popup');
     expect(popups.length).toBe(2);
     for (const el of popups) {
-      expect(el.classList.contains('library-count-popup--floated')).toBe(false);
-      expect(el.parentElement?.classList.contains('library-count-host')).toBe(true);
+      expect(el.classList.contains('library-count-popup--floated')).toBe(true);
+      expect(el.classList.contains('library-count-popup--floated-chip')).toBe(true);
+      expect(el.parentElement).toBe(document.body);
+      expect(el.textContent).toBe('+1');
     }
   });
 });

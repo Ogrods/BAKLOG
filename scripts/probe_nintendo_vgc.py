@@ -144,21 +144,6 @@ def main() -> int:
     args = parser.parse_args()
 
     prof = profile_dir("nintendo")
-    # #region agent log
-    from shared.agent_debug_log import agent_debug_log
-
-    agent_debug_log(
-        "E",
-        "scripts/probe_nintendo_vgc.py:main",
-        "probe start",
-        {
-            "headed": args.headed,
-            "profile_path": str(prof),
-            "profile_exists": prof.exists(),
-            "profile_nonempty": prof.exists() and any(prof.iterdir()),
-        },
-    )
-    # #endregion
     if not prof.exists() or not any(prof.iterdir()):
         print(
             "Nintendo is not connected (no saved browser profile). "

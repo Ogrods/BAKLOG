@@ -229,38 +229,15 @@ def _portal_html_looks_unsigned(page_html: str) -> bool:
 
 
 def fetch_vgc_portal_html(context: Any, *, user_agent: str, page: Any | None = None) -> str:
-    """Load VGC portal HTML via HTTP GET (Playnite-style), not SPA domcontentloaded."""
-    from shared.agent_debug_log import agent_debug_log
-
+    """Load VGC portal HTML via HTTP GET with profile cookies, not SPA domcontentloaded."""
     headers = {
         "User-Agent": user_agent,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://accounts.nintendo.com/",
     }
-    # #region agent log
-    agent_debug_log(
-        location="clients/nintendo_vgc.py:fetch_vgc_portal_html",
-        message="VGC portal fetch via HTTP GET",
-        data={"url": VGC_PORTAL_URL},
-        hypothesis_id="G",
-    )
-    # #endregion
     resp = context.request.get(VGC_PORTAL_URL, headers=headers, timeout=60_000)
     html_body = resp.text() if resp.status == 200 else ""
-    # #region agent log
-    agent_debug_log(
-        location="clients/nintendo_vgc.py:fetch_vgc_portal_html",
-        message="VGC portal HTTP GET result",
-        data={
-            "status": resp.status,
-            "has_data_json": _portal_html_has_vgc_data(html_body),
-            "looks_unsigned": _portal_html_looks_unsigned(html_body),
-            "body_len": len(html_body),
-        },
-        hypothesis_id="G",
-    )
-    # #endregion
     if _portal_html_has_vgc_data(html_body):
         return html_body
     if _portal_html_looks_unsigned(html_body):
@@ -271,14 +248,6 @@ def fetch_vgc_portal_html(context: Any, *, user_agent: str, page: Any | None = N
     active_page = page
     if active_page is None:
         active_page = context.pages[0] if context.pages else context.new_page()
-    # #region agent log
-    agent_debug_log(
-        location="clients/nintendo_vgc.py:fetch_vgc_portal_html",
-        message="VGC portal HTTP GET missing data-json; fallback commit navigation",
-        data={"status": resp.status},
-        hypothesis_id="G",
-    )
-    # #endregion
     try:
         active_page.goto(VGC_PORTAL_URL, wait_until="commit", timeout=30_000)
     except Exception as exc:

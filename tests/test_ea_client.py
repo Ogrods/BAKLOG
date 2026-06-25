@@ -5,9 +5,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
-from clients.ea_client import EaAuthError, EaClient, OWNED_GAMES_HASH, USER_SUBSCRIPTION_HASH
+from clients.ea_client import USER_SUBSCRIPTION_HASH, EaAuthError, EaClient
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 

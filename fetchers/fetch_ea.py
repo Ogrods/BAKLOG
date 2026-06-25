@@ -29,7 +29,6 @@ from clients.ea_session import (
     capture_ea_browser_session,
     fetch_owned_games_browser,
     launch_ea_profile,
-    probe_ea_cookies,
     probe_ea_token,
     read_ea_connect_snapshot,
     sniff_ea_bearer,

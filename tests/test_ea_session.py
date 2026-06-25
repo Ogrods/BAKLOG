@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from clients.ea_client import EaAuthError, EaCaptureError
+from clients.ea_client import EaAuthError
 from clients.ea_session import (
     DEFAULT_TRIGGER_URLS,
     EA_COOKIE_SESSION,

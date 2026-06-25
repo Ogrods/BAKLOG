@@ -37,7 +37,10 @@ def _backup(path: Path) -> Path:
     return dest
 
 
-def _bleed_ids(default_maps: dict[str, dict[str, Any]], profile_maps: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
+def _bleed_ids(
+    default_maps: dict[str, dict[str, Any]],
+    profile_maps: dict[str, dict[str, Any]],
+) -> dict[str, list[str]]:
     removed: dict[str, list[str]] = {}
     for key in BLEED_KEYS:
         d_map = default_maps.get(key) or {}

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T18:48:35.564801+00:00",
+  "generated_at": "2026-06-25T19:10:46.854357+00:00",
   "items": [
     {
       "id": "other-please-touch-the-artwork",
@@ -12,6 +12,7 @@
       "ends_at": null,
       "steam_appid": 1097100,
       "review_percent": 83,
+      "first_seen": "2026-06-25T19:10:27Z",
       "premium_only": true
     },
     {
@@ -24,7 +25,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 800270,
-      "review_percent": 71
+      "review_percent": 71,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "amazon-lost-eidolons-veil-of-the-witch",
@@ -36,7 +38,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 2530490,
-      "review_percent": 82
+      "review_percent": 82,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "amazon-space-grunts-chrono-shard",
@@ -48,7 +51,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 3403540,
-      "review_percent": 100
+      "review_percent": 100,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "steam-tested-on-humans-escape-room",
@@ -63,7 +67,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 1483780,
-      "review_percent": 86
+      "review_percent": 86,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "steam-sin-slayers-reign-of-the-8th",
@@ -80,7 +85,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 2790000,
-      "review_percent": 69
+      "review_percent": 69,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "steam-paradise-killer",
@@ -96,7 +102,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 1160220,
-      "review_percent": 93
+      "review_percent": 93,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "steam-wargame-construction-set-iii-age-of-rifles-1846-1905",
@@ -111,7 +118,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 2707280,
-      "review_percent": 97
+      "review_percent": 97,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "steam-space-grunts-2",
@@ -125,7 +133,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 1125370,
-      "review_percent": 67
+      "review_percent": 67,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "steam-sugardew-island",
@@ -135,7 +144,8 @@
       "header_image": null,
       "genres": [],
       "blurb": null,
-      "ends_at": null
+      "ends_at": null,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "amazon-between-time-escape-room",
@@ -147,7 +157,8 @@
       "blurb": null,
       "ends_at": null,
       "steam_appid": 1580150,
-      "review_percent": 80
+      "review_percent": 80,
+      "first_seen": "2026-06-25T19:10:27Z"
     },
     {
       "id": "epic-rollercoaster-tycoon-3-complete-edition",
@@ -161,7 +172,7 @@
       "steam_appid": 1368820,
       "review_percent": 87,
       "source": "epic",
-      "first_seen": "2026-06-25T18:31:16.975950+00:00"
+      "first_seen": "2026-06-25T18:31:16Z"
     },
     {
       "id": "epic-voidwrought-ce8f4b",
@@ -175,7 +186,7 @@
       "steam_appid": 2014550,
       "review_percent": 77,
       "source": "epic",
-      "first_seen": "2026-06-25T18:31:16.975950+00:00"
+      "first_seen": "2026-06-25T18:31:16Z"
     },
     {
       "id": "gamerpower-2386",
@@ -192,7 +203,7 @@
       "steam_appid": 1180660,
       "review_percent": 82,
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "gamerpower-3266",
@@ -206,7 +217,7 @@
       "steam_appid": 2081930,
       "review_percent": 85,
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "gamerpower-3096",
@@ -220,7 +231,7 @@
       "steam_appid": 3102000,
       "review_percent": 76,
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "gamerpower-3446",
@@ -234,7 +245,7 @@
       "steam_appid": 1546400,
       "review_percent": 94,
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "gamerpower-2204",
@@ -248,7 +259,7 @@
       "steam_appid": 2299730,
       "review_percent": 86,
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "gamerpower-1604",
@@ -260,13 +271,16 @@
       "blurb": "Grab Dora Diginoid for free on itch.io! Dora Diginoid is an indie Metroidvania sci-fi adventure game where you explore the base 17.",
       "ends_at": "2026-06-25T22:48:59Z",
       "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "itad-f520d9928848",
-      "store": "epic",
+      "store": "epic_mobile",
       "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
-      "claim_url": "https://buff.ly/fkDgxlX",
+      "claim_urls": {
+        "ios": "https://buff.ly/fkDgxlX",
+        "android": "https://buff.ly/ugVKgPs"
+      },
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1361510/library_600x900_2x.jpg",
       "genres": [],
       "blurb": "Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge",
@@ -274,7 +288,7 @@
       "steam_appid": 1361510,
       "review_percent": 94,
       "source": "itad",
-      "first_seen": "2026-06-25T18:31:16.975950+00:00"
+      "first_seen": "2026-06-25T18:31:16Z"
     },
     {
       "id": "itad-f0cffe659c19",
@@ -288,7 +302,7 @@
       "steam_appid": 2800500,
       "review_percent": 82,
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "itad-0d4598c53ffe",
@@ -302,7 +316,7 @@
       "steam_appid": 2074560,
       "review_percent": 83,
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "itad-dd5b5b16e035",
@@ -316,7 +330,7 @@
       "steam_appid": 2635070,
       "review_percent": 97,
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "itad-de23882e1f39",
@@ -328,7 +342,7 @@
       "blurb": "Smiley Dusty",
       "ends_at": "2026-06-25T22:48:59Z",
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
       "id": "itad-1b0433806065",
@@ -342,20 +356,21 @@
       "steam_appid": 973000,
       "review_percent": 78,
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "first_seen": "2026-06-11T22:48:59Z"
     },
     {
-      "id": "itad-0c69ed1f1bd8",
-      "store": "epic",
-      "title": "Rogue Waters",
-      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "id": "itad-6d00ffeb0fdc",
+      "store": "itch",
+      "title": "Another World Adventures",
+      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Rogue Waters",
-      "ends_at": null,
-      "steam_appid": 1691190,
-      "review_percent": 76,
-      "source": "itad"
+      "blurb": "Another World Adventures",
+      "ends_at": "2026-06-25T22:48:59Z",
+      "steam_appid": 3445980,
+      "review_percent": 50,
+      "source": "itad",
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "itad-073a56345192",
@@ -385,18 +400,17 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
-      "id": "itad-6d00ffeb0fdc",
-      "store": "itch",
-      "title": "Another World Adventures",
-      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3445980/library_600x900_2x.jpg",
+      "id": "itad-0c69ed1f1bd8",
+      "store": "epic",
+      "title": "Rogue Waters",
+      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Another World Adventures",
-      "ends_at": "2026-06-25T22:48:59Z",
-      "steam_appid": 3445980,
-      "review_percent": 50,
-      "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00"
+      "blurb": "Rogue Waters",
+      "ends_at": null,
+      "steam_appid": 1691190,
+      "review_percent": 76,
+      "source": "itad"
     },
     {
       "id": "itad-b07aac9ebd26",

@@ -61,13 +61,20 @@ export function isItchSetup() {
   return providerStatus('itch_local') === 'connected';
 }
 
-/** itch.io tab: show once API key is saved or local app is enabled on this profile. */
+/** True when a previously fetched itch catalog is still on disk in this profile. */
+export function hasCachedItchLibrary() {
+  const rows = state.itchGames;
+  if (Array.isArray(rows) && rows.length > 0) return true;
+  const cached = state.libraryMeta?.itch?.games;
+  return Array.isArray(cached) && cached.length > 0;
+}
+
+/** itch.io tab: connected setup or a cached library worth browsing. */
 export function isItchTabAvailable() {
-  return isItchSetup();
+  return isItchSetup() || hasCachedItchLibrary();
 }
 
 /** itch rows surfaced in tables, summary chips, and dashboard recap. */
 export function visibleItchGames() {
-  if (!isItchSetup()) return [];
   return Array.isArray(state.itchGames) ? state.itchGames : [];
 }

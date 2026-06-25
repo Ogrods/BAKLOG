@@ -13,6 +13,8 @@ from typing import Literal
 
 from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 
+from auth.registry import PROVIDERS
+
 ProbeResult = Literal["ok", "auth_fail", "unreachable"]
 
 # Providers that have a probe implementation in this module.
@@ -25,7 +27,9 @@ PROBEABLE_QUIET = frozenset({"gog", "epic", "steam", "itch", "itad"})
 # the session via the live page before closing, so a headless probe miss must
 # never veto the connect (xbox.com serves signed-out SSR to headless Chrome
 # inconsistently). For these, the probe is advisory — logged, never blocking.
-ADVISORY_BROWSER_PROBE = frozenset({"xbox_wishlist"})
+ADVISORY_BROWSER_PROBE = frozenset(
+    k for k, s in PROVIDERS.items() if s.post_connect_probe == "advisory"
+)
 
 
 def probe_browser_session(provider: str, creds: dict[str, str]) -> str | None:

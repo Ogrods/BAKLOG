@@ -1,4 +1,4 @@
-"""Tests for EA Connections session validation."""
+"""Fake-CDP loop test: EA connect sniffs Bearer and probes before saving."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from auth.runner import _extract_ea
+import auth.runner as runner
 
 
 class _FakeTime:
@@ -33,11 +33,11 @@ class _FakePage:
         pass
 
 
-def test_extract_ea_returns_bearer_token(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_extract_ea_uses_header_sniffer(monkeypatch: pytest.MonkeyPatch) -> None:
     clock = _FakeTime(step_s=5.0)
-    monkeypatch.setattr("auth.runner.time", clock)
+    monkeypatch.setattr(runner, "time", clock)
     monkeypatch.setattr("auth.connect_loop.time", clock)
-    monkeypatch.setattr("auth.runner.abort_if_browser_closed", lambda _ctx: None)
+    monkeypatch.setattr(runner, "abort_if_browser_closed", lambda _ctx: None)
     monkeypatch.setattr("clients.ea_session.probe_ea_token", lambda _t, _c: {"ok": True})
 
     handlers: list = []
@@ -52,17 +52,19 @@ def test_extract_ea_returns_bearer_token(monkeypatch: pytest.MonkeyPatch) -> Non
         def cookies(self) -> list:
             return []
 
-    def _inject_token(_self, _ms: int) -> None:
+    ctx = Ctx()
+    page = _FakePage()
+
+    def _inject_token() -> None:
         for h in handlers:
             h(
                 MagicMock(
                     url="https://service-aggregation-layer.juno.ea.com/graphql",
-                    headers={"Authorization": "Bearer connect-token"},
+                    headers={"Authorization": "Bearer loop-token"},
                 )
             )
 
-    monkeypatch.setattr(_FakePage, "wait_for_timeout", _inject_token)
+    monkeypatch.setattr(_FakePage, "wait_for_timeout", lambda _self, _ms: _inject_token())
 
-    creds = _extract_ea(_FakePage(), Ctx())
-    assert creds["EA_PROFILE"] == "ready"
-    assert creds["EA_BEARER_TOKEN"] == "connect-token"
+    creds = runner._extract_ea(page, ctx, session=None)
+    assert creds == {"EA_PROFILE": "ready", "EA_BEARER_TOKEN": "loop-token"}

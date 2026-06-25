@@ -85,6 +85,10 @@ def _resolve_session(
         if probe.get("ok"):
             debug["token_source"] = "stored"
             return stored, [], debug
+        err = (probe.get("error") or "")[:200]
+        if "PersistedQueryNotFound" in err:
+            debug["token_source"] = "stored_apq_stale"
+            return stored, [], debug
 
     profile = profile_dir("ea")
     if not profile.exists() or not any(profile.iterdir()):

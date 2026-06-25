@@ -37,15 +37,15 @@ let _chromiumAvailable = true;
 const LOCAL_PROVIDER_FOOTER = {
   amazon: {
     connected: 'Auto-detected from Amazon Games launcher',
-    disconnected: 'Launcher library hidden - Connect to use it again, or use Prime web',
+    disconnected: 'Disconnected - cached library stays visible. Connect to refresh, or use Prime web',
   },
   gog_galaxy: {
     connected: 'Auto-detected from GOG Galaxy on this PC',
-    disconnected: 'Galaxy library hidden - Connect to use it again, or use GOG (web)',
+    disconnected: 'Disconnected - cached library stays visible. Connect to refresh, or use GOG (web)',
   },
   itch_local: {
     connected: 'Auto-detected from the itch desktop app',
-    disconnected: 'Local itch library hidden - Connect to use it again, or use an API key',
+    disconnected: 'Disconnected - cached library stays visible. Connect to refresh, or use an API key',
   },
 };
 

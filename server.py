@@ -36,7 +36,6 @@ so the browser cannot execute arbitrary commands.
 from __future__ import annotations
 
 import atexit
-import html
 import json
 import os
 import queue
@@ -174,7 +173,6 @@ from shared.log_redact import (  # noqa: E402, I001
     redact_log_line as _redact_log_line,
 )
 from shared.server_epic_oauth import (  # noqa: E402, I001
-    consume_epic_oauth_state as _consume_epic_oauth_state,
     register_epic_oauth_state as _register_epic_oauth_state,
 )
 from shared.server_stream_tickets import (  # noqa: E402, I001

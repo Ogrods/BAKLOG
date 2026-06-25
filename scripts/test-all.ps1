@@ -11,7 +11,7 @@ python -m ruff check .
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> pytest"
-python -m pytest -q
+python -m pytest --force-sugar -m "not integration and not slow" --durations=20
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> vitest"

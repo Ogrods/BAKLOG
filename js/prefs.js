@@ -4,6 +4,43 @@ import { personalStore } from './personal-store.js';
 import { resolveCoopFilterMode } from './table-query.js';
 import { migrateColumnPrefs } from './table-columns.js';
 
+export const PICKS_LIMIT_VIEWS = ["library", "wishlist", "itch"];
+const VALID_PICKS_LIMITS = [16, 24, 48, 96];
+const DEFAULT_PICKS_LIMIT = 16;
+
+function coercePicksLimit(n) {
+  const v = Number(n);
+  return VALID_PICKS_LIMITS.includes(v) ? v : DEFAULT_PICKS_LIMIT;
+}
+
+function normalizeViewPicksLimits(raw) {
+  const src = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const out = {};
+  for (const view of PICKS_LIMIT_VIEWS) {
+    out[view] = coercePicksLimit(src[view]);
+  }
+  return out;
+}
+
+/** Persisted picks row cap for the given tab (library / wishlist / itch). */
+export function getPicksLimitForView(view) {
+  if (!PICKS_LIMIT_VIEWS.includes(view)) return DEFAULT_PICKS_LIMIT;
+  if (!state.prefs.viewPicksLimits || typeof state.prefs.viewPicksLimits !== "object") {
+    state.prefs.viewPicksLimits = normalizeViewPicksLimits({});
+  }
+  return coercePicksLimit(state.prefs.viewPicksLimits[view]);
+}
+
+export function setPicksLimitForView(view, limit) {
+  if (!PICKS_LIMIT_VIEWS.includes(view)) return;
+  if (!state.prefs.viewPicksLimits || typeof state.prefs.viewPicksLimits !== "object") {
+    state.prefs.viewPicksLimits = normalizeViewPicksLimits({});
+  }
+  state.prefs.viewPicksLimits[view] = coercePicksLimit(limit);
+  delete state.prefs.picksLimit;
+  savePrefs();
+}
+
 export const COOP_FILTER_LABELS = {
   any: "Any co-op",
   online: "Online co-op",
@@ -37,7 +74,8 @@ export function loadPrefs() {
     picksTab: "topRated", libraryPicksTab: "topRated", itchPicksTab: "topRated", picksCollapsed: false,
     columns: {}, rowHeroBackdrop: true, genreFilters: [], genreFilterMode: "OR", quickWinMaxHours: 15,
     metricsDisabled: [],
-    storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "", picksLimit: 16,
+    storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "",
+    viewPicksLimits: normalizeViewPicksLimits({}),
     dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false,
     dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {},
     shareAnonStats: false,
@@ -51,8 +89,9 @@ export function loadPrefs() {
     autoFetchStale24h: true,
     connectionNotes: {},
   };
-  let merged;
-  try { merged = { ...fallback, ...(JSON.parse(localStorage.getItem(prefsStorageKey()) || "{}")) }; } catch { return fallback; }
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(prefsStorageKey()) || "{}"); } catch { return fallback; }
+  const merged = { ...fallback, ...stored };
   if (!["off", "any", "online", "local", "both"].includes(merged.coopFilterMode)) {
     merged.coopFilterMode = merged.coopAny ? "any" : "off";
   }
@@ -102,6 +141,18 @@ export function loadPrefs() {
   }
   migrateColumnPrefs(merged);
   merged.picksCollapsed = merged.picksCollapsed === true;
+  if (!merged.viewPicksLimits || typeof merged.viewPicksLimits !== "object") {
+    merged.viewPicksLimits = {};
+  }
+  if (Object.prototype.hasOwnProperty.call(stored, "picksLimit")) {
+    const coerced = coercePicksLimit(stored.picksLimit);
+    merged.viewPicksLimits = Object.fromEntries(
+      PICKS_LIMIT_VIEWS.map((view) => [view, coerced]),
+    );
+  } else {
+    merged.viewPicksLimits = normalizeViewPicksLimits(merged.viewPicksLimits);
+  }
+  delete merged.picksLimit;
   return merged;
 }
 

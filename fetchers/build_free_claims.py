@@ -23,8 +23,8 @@ from shared.free_claims_sources import (
     has_valid_claim_links,
     is_epic_mobile_store,
     merge_manual_and_auto,
-    normalize_claim_urls,
     norm_title,
+    normalize_claim_urls,
 )
 from shared.profile_paths import free_claims_path
 from shared.safe_write import safe_write_text

@@ -20,10 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from auth.secrets import profile_dir
-from clients.nintendo_vgc import NintendoVgcAuthError, NintendoVgcCaptureError, NintendoVgcClient
-from fetchers._base import catalog_file
-from shared.profile_paths import profile_cache_dir
+from auth.secrets import profile_dir  # noqa: E402
+from clients.nintendo_vgc import NintendoVgcAuthError, NintendoVgcCaptureError, NintendoVgcClient  # noqa: E402
+from fetchers._base import catalog_file  # noqa: E402
+from shared.profile_paths import profile_cache_dir  # noqa: E402
 
 GAMES_NINTENDO_JSON = Path("games_nintendo.json")
 RAW_DUMP = profile_cache_dir() / "nintendo" / "vgc_probe.json"

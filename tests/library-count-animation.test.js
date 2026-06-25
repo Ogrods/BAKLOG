@@ -57,6 +57,13 @@ function rafSync() {
 
 describe('flashCountUp', () => {
   let flushRaf;
+  const POPUP_REAP_MS = 900; // POPUP_LIFETIME_MS + 200 in library-count-animation.js
+
+  function finishStrictSyncAnimation(dur) {
+    flushRaf(dur + 50);
+    // Tick-synced popups schedule reap at +900ms; advancing past that clears them before we assert.
+    if (dur < POPUP_REAP_MS) vi.advanceTimersByTime(Math.ceil(dur));
+  }
 
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -128,8 +135,7 @@ describe('flashCountUp', () => {
     const node = mountCountSurface();
     flashCountUp(node, 10, 13, n => String(Math.round(n)), { popups: true });
     const dur = strictSyncRollMs(3, 3);
-    flushRaf(dur + 50);
-    vi.advanceTimersByTime(Math.ceil(dur));
+    finishStrictSyncAnimation(dur);
     const popups = [...document.querySelectorAll('.library-count-popup')];
     expect(popups.length).toBe(3);
     const tops = popups.map(el => parseFloat(el.style.top));
@@ -180,8 +186,7 @@ describe('flashCountUp', () => {
     const firstBurstCount = document.querySelectorAll('.library-count-popup').length;
     expect(firstBurstCount).toBeGreaterThan(0);
     flashCountUp(node, 3, 6, n => String(Math.round(n)), { popups: true });
-    flushRaf(roll3);
-    vi.advanceTimersByTime(roll3);
+    finishStrictSyncAnimation(roll3);
     const second = document.querySelectorAll('.library-count-popup').length;
     // Popups from the first episode + new ones — second total should be >= first.
     expect(second).toBeGreaterThanOrEqual(firstBurstCount);
@@ -214,8 +219,7 @@ describe('flashCountUp', () => {
     armLibraryCountAnimations();
     fireLibraryCountFlash('library', 1946, 1949);
     const dur3 = strictSyncRollMs(3, 3);
-    flushRaf(dur3 + 50);
-    vi.advanceTimersByTime(Math.ceil(dur3));
+    finishStrictSyncAnimation(dur3);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 
@@ -233,8 +237,7 @@ describe('flashCountUp', () => {
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13, { rowPrev: 8, rowNext: 11 });
     const dur3 = strictSyncRollMs(3, 3);
-    flushRaf(dur3 + 50);
-    vi.advanceTimersByTime(Math.ceil(dur3));
+    finishStrictSyncAnimation(dur3);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 
@@ -246,8 +249,7 @@ describe('flashCountUp', () => {
     state.activeView = 'library';
     fireLibraryCountFlash('library', 10, 13);
     const dur3 = strictSyncRollMs(3, 3);
-    flushRaf(dur3 + 50);
-    vi.advanceTimersByTime(Math.ceil(dur3));
+    finishStrictSyncAnimation(dur3);
     expect(document.querySelectorAll('.library-count-popup').length).toBe(3);
   });
 

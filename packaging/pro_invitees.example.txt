@@ -1,0 +1,3 @@
+# Comp-Pro invitee emails (local maintainer list — copy to pro_invitees.txt).
+# One address per line; # comments ok. Never commit pro_invitees.txt (gitignored).
+# you@example.com

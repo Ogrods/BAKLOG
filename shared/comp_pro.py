@@ -1,6 +1,7 @@
 """Comp / paid Pro accounts that receive plan=pro on hosted sign-in.
 
-Maintainer list: ``packaging/pro_invitees.txt`` (one email per line).
+Maintainer list: ``packaging/pro_invitees.txt`` (gitignored; copy from
+``packaging/pro_invitees.example.txt``). One email per line.
 On each ``GET /api/auth/session``, listed emails are upgraded via Supabase
 admin when ``SUPABASE_SERVICE_ROLE_KEY`` is available, then the client refreshes
 its JWT so Pro persists across API calls.

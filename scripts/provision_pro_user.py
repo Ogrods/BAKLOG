@@ -1,6 +1,7 @@
 """Pre-create hosted Supabase users with plan=pro (maintainer one-off).
 
-**Prefer self-service signup:** listed emails in ``packaging/pro_invitees.txt`` get
+**Prefer self-service signup:** emails in the gitignored ``packaging/pro_invitees.txt``
+(get ``packaging/pro_invitees.example.txt``) get
 Pro on first sign-in via ``shared.comp_pro`` when the server has
 ``SUPABASE_SERVICE_ROLE_KEY`` (dev/maintainer ``.env``). Use ``--delete`` to remove
 admin-pre-created rows so **Create account** works again.

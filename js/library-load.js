@@ -413,6 +413,17 @@ function preserveLibraryMeta(metaKey, fetched) {
 
 export { LIBRARY_STORE_JSON };
 
+/** Pre-legacy carry catalogs may still have stale=true on disk until the next Nintendo sync. */
+function nintendoLibraryRow(g) {
+  const row = { ...g, store: "nintendo", id: g.id ?? g.nintendo_id };
+  if (row.stale) {
+    row.nintendo_legacy = true;
+    delete row.stale;
+    delete row.stale_since;
+  }
+  return normalizeGame(row);
+}
+
 export function rebuildAllGamesFromMetas() {
   const allManual = loadManualGames().map(g => normalizeGame(g));
   const nonWishlistManual = allManual.filter(g => !g.wishlist);
@@ -425,7 +436,7 @@ export function rebuildAllGamesFromMetas() {
     (psn?.games || []).map(g => normalizeGame({ ...g, store: "psn", id: g.id ?? g.psn_id })),
     (epic?.games || []).map(g => normalizeGame({ ...g, store: "epic", id: g.id })),
     (amazon?.games || []).map(g => normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id })),
-    (nintendo?.games || []).map(g => normalizeGame({ ...g, store: "nintendo", id: g.id ?? g.nintendo_id })),
+    (nintendo?.games || []).map(nintendoLibraryRow),
     (xbox?.games || []).map(g => normalizeGame({ ...g, store: "xbox", id: g.id ?? g.xbox_title_id })),
     (battlenet?.games || []).map(g => normalizeGame({ ...g, store: "battlenet", id: g.id ?? g.battlenet_id })),
     (ubisoft?.games || []).map(g => normalizeGame({ ...g, store: "ubisoft", id: g.id ?? g.ubisoft_id })),

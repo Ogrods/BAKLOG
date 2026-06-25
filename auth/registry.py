@@ -360,7 +360,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         expiry_days=30,
         fetcher_keys=("wishlistNintendo",),
         tips=(
-            "Separate nintendo.com sign-in from the eShop library path above \u2014 wishlists live on the storefront.",
+            "Separate nintendo.com sign-in from the eShop library path above - wishlists live on the storefront.",
             "Sign in with your Nintendo Account and keep the window open until your wish list loads.",
             "If email verification is required, complete it in the browser window before closing.",
         ),

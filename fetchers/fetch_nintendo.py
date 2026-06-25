@@ -59,6 +59,11 @@ def fetch_debug_json() -> Path:
 
 HLTB_DELAY_SEC = 1.0
 
+
+def _norm_nintendo_title(name: str) -> str:
+    return " ".join((name or "").lower().split())
+
+
 # Skip non-game purchases (funds, subscriptions, vouchers).
 SKIP_CONTENT_TYPES = frozenset(
     {
@@ -136,6 +141,16 @@ def load_existing() -> dict[str, dict]:
         return {}
     data = json.loads(catalog_file(GAMES_NINTENDO_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
+
+
+def load_existing_by_title(existing: dict[str, dict]) -> dict[str, dict]:
+    """Title index for cache/carry when transaction ids churn between syncs."""
+    by_title: dict[str, dict] = {}
+    for row in existing.values():
+        title_key = _norm_nintendo_title(str(row.get("name") or ""))
+        if title_key and title_key not in by_title:
+            by_title[title_key] = row
+    return by_title
 
 
 def load_nintendo_dropped_ids() -> set[str]:
@@ -229,6 +244,11 @@ def carry_forward_nintendo_legacy(
     """Union prior rows missing from the fresh fetch; tag nintendo_legacy, not stale."""
     now = now_iso or datetime.now(UTC).isoformat()
     present = {key_fn(row) for row in fresh_rows}
+    present_titles = {
+        _norm_nintendo_title(str(row.get("name") or ""))
+        for row in fresh_rows
+        if row.get("name")
+    }
     out: list[dict] = []
     for row in fresh_rows:
         merged = dict(row)
@@ -241,6 +261,9 @@ def carry_forward_nintendo_legacy(
     for old in existing_rows:
         key = key_fn(old)
         if key in present or key in dropped_ids:
+            continue
+        title_key = _norm_nintendo_title(str(old.get("name") or ""))
+        if title_key and title_key in present_titles:
             continue
         legacy_row = dict(old)
         legacy_row[NINTENDO_LEGACY_FIELD] = True
@@ -256,6 +279,103 @@ def carry_forward_nintendo_legacy(
             flush=True,
         )
     return out
+
+
+def repair_nintendo_stale_catalog(
+    games: list[dict],
+    *,
+    dropped_ids: set[str] | None = None,
+) -> tuple[list[dict], int]:
+    """One-shot: stale Nintendo rows from pre-legacy carry become nintendo_legacy."""
+    dropped = dropped_ids or set()
+    repaired = 0
+    out: list[dict] = []
+    for row in games:
+        merged = dict(row)
+        key = str(merged.get("id") or merged.get("nintendo_id") or "")
+        if merged.get(STALE_FIELD) and key not in dropped:
+            merged[NINTENDO_LEGACY_FIELD] = True
+            merged.pop(STALE_FIELD, None)
+            merged.pop(STALE_SINCE_FIELD, None)
+            repaired += 1
+        out.append(merged)
+    return out, repaired
+
+
+def maybe_repair_nintendo_catalog_on_disk(dropped_ids: set[str] | None = None) -> int:
+    """Heal on-disk games_nintendo.json rows still flagged stale from older syncs."""
+    path = catalog_file(GAMES_NINTENDO_JSON)
+    if not path.exists():
+        return 0
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    games, repaired = repair_nintendo_stale_catalog(
+        payload.get("games") or [],
+        dropped_ids=dropped_ids,
+    )
+    if not repaired:
+        return 0
+    payload["games"] = games
+    if not isinstance(payload.get("fresh_count"), int):
+        payload["fresh_count"] = sum(
+            1
+            for row in games
+            if isinstance(row, dict) and not row.get(NINTENDO_LEGACY_FIELD)
+        )
+    payload["game_count"] = len(games)
+    write_catalog_text(
+        GAMES_NINTENDO_JSON,
+        json.dumps(payload, indent=2, ensure_ascii=False),
+    )
+    print(
+        f"  Repaired {repaired} stale Nintendo row(s) "
+        f"({NINTENDO_LEGACY_FIELD}=true).",
+        flush=True,
+    )
+    return repaired
+
+
+def maybe_backfill_nintendo_catalog_meta() -> bool:
+    """Heal envelopes written before fresh_count was introduced."""
+    path = catalog_file(GAMES_NINTENDO_JSON)
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    games = payload.get("games")
+    if not isinstance(games, list):
+        return False
+    fresh_count = payload.get("fresh_count")
+    game_count = payload.get("game_count")
+    computed_fresh = sum(
+        1
+        for row in games
+        if isinstance(row, dict) and not row.get(NINTENDO_LEGACY_FIELD)
+    )
+    computed_total = len(games)
+    needs_write = False
+    if not isinstance(fresh_count, int):
+        payload["fresh_count"] = computed_fresh
+        needs_write = True
+    if not isinstance(game_count, int) or game_count != computed_total:
+        payload["game_count"] = computed_total
+        needs_write = True
+    if not needs_write:
+        return False
+    write_catalog_text(
+        GAMES_NINTENDO_JSON,
+        json.dumps(payload, indent=2, ensure_ascii=False),
+    )
+    print(
+        f"  Backfilled Nintendo catalog meta "
+        f"(fresh_count={payload['fresh_count']}, game_count={payload['game_count']}).",
+        flush=True,
+    )
+    return True
 
 
 def _build_row(item: dict, hltb: dict | None) -> dict:
@@ -396,14 +516,19 @@ def main() -> int:
 
     hltb_client = HltbClient()
     dropped_ids = load_nintendo_dropped_ids()
+    maybe_repair_nintendo_catalog_on_disk(dropped_ids)
+    maybe_backfill_nintendo_catalog_meta()
     existing = {
         key: row
         for key, row in load_existing().items()
         if key not in dropped_ids
     }
+    existing_by_title = load_existing_by_title(existing)
     games_out: list[dict] = []
     for i, item in enumerate(merged, 1):
         cached = existing.get(str(item["id"]))
+        if not cached:
+            cached = existing_by_title.get(_norm_nintendo_title(item["name"]))
         if args.only_new and cached:
             games_out.append(cached)
             continue

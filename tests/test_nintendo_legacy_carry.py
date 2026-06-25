@@ -10,7 +10,9 @@ from fetchers.fetch_nintendo import (
     NINTENDO_LEGACY_FIELD,
     carry_forward_nintendo_legacy,
     load_nintendo_dropped_ids,
+    maybe_repair_nintendo_catalog_on_disk,
     refuse_nintendo_drift_result,
+    repair_nintendo_stale_catalog,
     _nintendo_drift_baseline,
 )
 
@@ -178,3 +180,78 @@ def test_dropped_ids_excluded_from_fresh_slice() -> None:
     )
     out = [row for row in out if row_key_by_id(row) not in {"2"}]
     assert {r["id"] for r in out} == {"1"}
+
+
+def test_carry_forward_nintendo_legacy_skips_title_match_when_id_churns() -> None:
+    fresh = [{"id": "new-tx", "name": "Mario Kart 8 Deluxe"}]
+    existing = [
+        {
+            "id": "old-tx",
+            "name": "Mario Kart 8 Deluxe",
+            STALE_FIELD: True,
+            "hltb_main_hours": 12,
+        },
+    ]
+    out = carry_forward_nintendo_legacy(
+        fresh,
+        existing,
+        dropped_ids=set(),
+        key_fn=row_key_by_id,
+        now_iso="2026-06-25T12:00:00+00:00",
+    )
+    assert len(out) == 1
+    assert out[0]["id"] == "new-tx"
+    assert out[0].get("hltb_main_hours") is None
+
+
+def test_repair_nintendo_stale_catalog_promotes_legacy() -> None:
+    games = [
+        {"id": "1", "name": "Fresh"},
+        {
+            "id": "2",
+            "name": "Old",
+            STALE_FIELD: True,
+            STALE_SINCE_FIELD: "2026-01-01T00:00:00+00:00",
+        },
+    ]
+    out, repaired = repair_nintendo_stale_catalog(games)
+    assert repaired == 1
+    assert out[0].get(STALE_FIELD) is None
+    assert out[1][NINTENDO_LEGACY_FIELD] is True
+    assert STALE_FIELD not in out[1]
+    assert STALE_SINCE_FIELD not in out[1]
+
+
+def test_repair_nintendo_stale_catalog_skips_dropped_ids() -> None:
+    games = [{"id": "gone", "name": "Gone", STALE_FIELD: True}]
+    out, repaired = repair_nintendo_stale_catalog(games, dropped_ids={"gone"})
+    assert repaired == 0
+    assert out[0][STALE_FIELD] is True
+
+
+def test_maybe_repair_nintendo_catalog_on_disk_writes(tmp_path: Path, monkeypatch) -> None:
+    catalog = tmp_path / "games_nintendo.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "games": [
+                    {"id": "1", "name": "A"},
+                    {"id": "2", "name": "B", STALE_FIELD: True},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "fetchers.fetch_nintendo.catalog_file",
+        lambda _rel: catalog,
+    )
+    monkeypatch.setattr(
+        "fetchers.fetch_nintendo.write_catalog_text",
+        lambda _rel, text: catalog.write_text(text, encoding="utf-8"),
+    )
+    assert maybe_repair_nintendo_catalog_on_disk() == 1
+    payload = json.loads(catalog.read_text(encoding="utf-8"))
+    legacy = next(g for g in payload["games"] if g["id"] == "2")
+    assert legacy[NINTENDO_LEGACY_FIELD] is True
+    assert STALE_FIELD not in legacy

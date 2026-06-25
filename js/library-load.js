@@ -7,6 +7,7 @@ import {
   applyCoopOverrides,
   gameKey,
   rebuildGameKeyIndex,
+  itchIsGame,
 } from './game-core.js';
 import { personalStore } from './personal-store.js';
 import {
@@ -31,6 +32,7 @@ import {
   applyHiddenTitleNorms,
   filterCounted,
   libraryGamesBase,
+  seedNoiseAutoHidden,
 } from './personal-storage.js';
 import { savePrefs } from './prefs.js';
 import { isDebugEnabled } from './debug-overlay.js';
@@ -345,6 +347,10 @@ export async function applyMergedLibrary(mergeKey = null) {
   state._lastNewlyAddedCount = recordLibraryFirstSeen();
   canonicalizeNotesAcrossTitles();
   applyHiddenTitleNorms({ silent: true });
+  seedNoiseAutoHidden(
+    [...state.allGames, ...(state.itchGames || [])],
+    { itchIsGameFn: itchIsGame },
+  );
   state.dashboardDataReady = true;
   buildOwnedNormNames();
   const banner = document.getElementById("bootErrorBanner");

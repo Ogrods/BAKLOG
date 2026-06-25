@@ -21,10 +21,10 @@ def test_get_app_details_batch_chunks_and_caches(
     appids = list(range(1, APP_DETAILS_BATCH_SIZE + 5))
     calls: list[str] = []
 
-    def fake_get(url, params, **kwargs):
-        calls.append(str(params.get("appids")))
+    def fake_requests_get(url, params=None, **kwargs):
+        calls.append(str((params or {}).get("appids")))
         raw = {}
-        for part in str(params["appids"]).split(","):
+        for part in str((params or {})["appids"]).split(","):
             aid = int(part)
             raw[str(aid)] = {"success": True, "data": {"name": f"Game {aid}", "type": "game"}}
         resp = MagicMock()
@@ -33,11 +33,7 @@ def test_get_app_details_batch_chunks_and_caches(
         resp.raise_for_status = MagicMock()
         return resp
 
-    def _block_network(*_args, **_kwargs):
-        raise AssertionError("unexpected network call in batch appdetails test")
-
-    monkeypatch.setattr("clients.steam_client._get_with_retry", fake_get)
-    monkeypatch.setattr("clients.steam_client.requests.get", _block_network)
+    monkeypatch.setattr("clients.steam_client.requests.get", fake_requests_get)
     monkeypatch.setattr(steam_client, "_throttle_store", lambda: None)
     out = steam_client.get_app_details_batch(appids)
 

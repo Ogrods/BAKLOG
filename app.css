@@ -7359,6 +7359,38 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
     min-width: 180px;
   }
 }
+/* Header full-screen (F11) */
+.header-fullscreen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  color: var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.header-fullscreen-btn:hover {
+  border-color: var(--text-mute);
+  color: var(--text);
+}
+.header-fullscreen-btn[aria-pressed="true"] {
+  border-color: var(--text-mute);
+  color: var(--text-bright);
+  background: var(--bg-elev);
+}
+.header-fullscreen-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.header-fullscreen-icon {
+  display: block;
+}
+
 /* Header profile switcher */
 .profile-menu-wrap {
   position: relative;
@@ -8243,6 +8275,10 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
     border: 0;
   }
   .profile-menu-trigger {
+    min-height: var(--touch-min);
+  }
+  .header-fullscreen-btn {
+    min-width: var(--touch-min);
     min-height: var(--touch-min);
   }
   #summary {

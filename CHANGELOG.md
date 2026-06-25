@@ -28,6 +28,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
   bundled auth `.env`, data-dir migration, `/api/config`, and fetcher dispatch.
 - Release workflow fail-fast check for `BAKLOG_SUPABASE_URL` / `BAKLOG_SUPABASE_ANON_KEY`
   before PyInstaller runs.
+- Maintainer `provision_pro_user` CLI for comp-Pro beta ops.
+- Header full-screen toggle (TV icon) between fetcher log and profile menu.
+
+### Changed
+
+- Affiliate disclosures: Green Man Gaming (Impact) enrollment noted in
+  `landing/index.html`, `PRIVACY.md`, and `js/affiliate.js` (sponsor creatives
+  still pending).
 
 ## [0.8.19] - 2026-06-25
 

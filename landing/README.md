@@ -262,7 +262,7 @@ No per-user impression or click tracking is sent from the app unless the user op
 | **Epic** | [Support-A-Creator](https://sac.epicgames.com/overview) | Creator tag | `js/affiliate.js` Epic rule `value` (`epic_creator_id`) | 5% min, $100 payout floor |
 | **Humble** | [Impact](https://impact.com) | Deeplink template | `js/affiliate.js` Humble rule `template` **and/or** sponsor creative | ~5.6%+, 30-day |
 | **Fanatical** | CJ Affiliate / Awin | `?ref=` tag or deeplink | **Sponsor feed only** (`curated/sponsors.json`) | Up to 5%, 30-day |
-| **Green Man Gaming** | Awin | Deeplink template | **Sponsor feed only** | 5% new / 2% returning |
+| **Green Man Gaming** | [Impact](https://impact.com) | Deeplink template | **Sponsor feed only** (`curated/sponsors.json`) | 5% new / 2% returning — **enrolled 2026-06-24** |
 | **Gamesplanet** | partners@gamesplanet.com | `?ref=` tag | **Sponsor feed only** (gated ~4k followers) | 5–10% |
 | **ITAD** | Contact ITAD re: official app / partner status | Revenue share on organic deal clicks | N/A today — only legit path to ITAD redirect revenue | API ToS invites contact |
 

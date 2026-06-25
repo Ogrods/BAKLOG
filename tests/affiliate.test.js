@@ -11,6 +11,8 @@ import {
   affiliateUrl,
   AFFILIATE_RULES,
   AFFILIATE_CREDENTIALS,
+  AFFILIATE_DISCLOSURE_LINE,
+  AFFILIATE_ENROLLED_PROGRAMS,
   hasLiveAffiliates,
   liveAffiliateShops,
 } from '../js/affiliate.js';
@@ -30,6 +32,16 @@ describe('affiliateUrl', () => {
 
   afterEach(() => {
     restoreCreds(baseline);
+  });
+
+  it('lists enrolled programs in public disclosure copy', () => {
+    expect(AFFILIATE_ENROLLED_PROGRAMS).toEqual([
+      'Epic Games Store Support-A-Creator',
+      'Green Man Gaming',
+      'itch.io Partner',
+    ]);
+    expect(AFFILIATE_DISCLOSURE_LINE).toContain('Green Man Gaming');
+    expect(AFFILIATE_DISCLOSURE_LINE).toContain('itch.io Partner');
   });
 
   it('ships with Epic and itch affiliate programs live and other programs disabled', () => {

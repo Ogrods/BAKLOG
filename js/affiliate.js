@@ -48,9 +48,26 @@ export const AFFILIATE_CREDENTIALS = {
   // not by BAKLOG's own store buttons, so filling them here has no effect on
   // the dashboard. Add a sponsor creative with a pre-tagged `url` instead.
   fanatical: '',
+  // Green Man Gaming (sponsor feed): Impact deeplink with {url} in curated(params creative url).
   gmg: '',
   gamesplanet: '',
 };
+
+/**
+ * Enrolled affiliate programs (disclosure copy). Includes sponsor-feed-only shops
+ * before their creative is live. Sync: landing/index.html .foot-affiliate (first p).
+ */
+export const AFFILIATE_ENROLLED_PROGRAMS = [
+  'Epic Games Store Support-A-Creator',
+  'Green Man Gaming',
+  'itch.io Partner',
+];
+
+/** Public footer / disclosure line for enrolled programs. */
+export const AFFILIATE_DISCLOSURE_LINE =
+  'BAKLOG is an Epic Games Store Support-A-Creator affiliate, a Green Man Gaming affiliate, '
+  + 'and an itch.io Partner affiliate. Store links and disclosed sponsored deal slots in the app '
+  + 'may include our affiliate tags.';
 
 /** Hosts that must never be re-tagged (ITAD deal redirects). */
 const BLOCKED_HOST_SUFFIXES = ['isthereanydeal.com'];

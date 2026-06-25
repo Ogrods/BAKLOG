@@ -83,6 +83,7 @@ import {
 import { reloadGames } from './library-load.js';
 import { bindAddGameModal } from './add-game-modal.js';
 import { openBugReportDialog } from './bug-report.js';
+import { initFullscreenToggle } from './fullscreen-toggle.js';
 import { reportError } from './error-boundary.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
 import { bindHiddenPanelUI } from './hidden-panel.js';
@@ -142,6 +143,7 @@ export function bindEvents() {
   if (_eventsBound) return;
   _eventsBound = true;
   initTrophyPopover();
+  initFullscreenToggle();
 
   document.getElementById("undoToast")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-undo-action]");

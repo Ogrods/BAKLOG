@@ -255,9 +255,11 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
   **Send report** in the consent dialog.
 - No third-party ad/affiliate **scripts** — outbound links may carry an
   affiliate tag when the maintainer is enrolled (store-page links BAKLOG builds
-  itself; disclosed Sponsored slots). No per-user click tracking unless you opt
-  in (Connections). Wishlist deal links from IsThereAnyDeal use ITAD's own
-  redirect URLs and are left unchanged (ITAD API terms).
+  itself; disclosed Sponsored slots). As of 2026-06, BAKLOG is enrolled in the
+  Epic Games Store Support-A-Creator, Green Man Gaming (Impact), and itch.io
+  Partner programs. No per-user click tracking unless you opt in (Connections).
+  Wishlist deal links from IsThereAnyDeal use ITAD's own redirect URLs and are
+  left unchanged (ITAD API terms).
 - No project-owned cloud service.
 - No automatic sync between machines — use the portable secrets bundle
   (Connections → Export bundle…) if you move to a new PC.

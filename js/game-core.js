@@ -340,7 +340,7 @@ export function recomputeWishlistCrossStore() {
 export function normalizeGame(g) {
   if (g.store && g.id != null) return g;
   const store = g.store || "steam";
-  const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id ?? g.humble_id ?? g.ea_id;
+  const id = g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.application_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id ?? g.humble_id ?? g.ea_id;
   return { ...g, store, id };
 }
 
@@ -349,7 +349,7 @@ export function gameStore(g) {
 }
 
 export function gameId(g) {
-  return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id ?? g.humble_id ?? g.ea_id;
+  return g.id ?? g.appid ?? g.gog_id ?? g.psn_id ?? g.epic_catalog_id ?? g.amazon_id ?? g.application_id ?? g.nintendo_id ?? g.itch_id ?? g.xbox_title_id ?? g.battlenet_id ?? g.ubisoft_id ?? g.humble_id ?? g.ea_id;
 }
 
 export function gameKey(g) {

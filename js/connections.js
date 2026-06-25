@@ -342,7 +342,7 @@ function groupConnectNote(groupKey, members) {
     const lead = anyConnected
       ? 'Ready to pull - at least one Nintendo sign-in is connected.'
       : 'Connect the library and/or wishlist cards below when you need them.';
-    const legacyNote = 'Nintendo only shows about two years of eShop purchase history. BAKLOG keeps older digital purchases in your library across syncs - they are not marked stale. Use bulk Remove on a row if you want a title gone for good. Physical cartridges are not included.';
+    const legacyNote = 'Library sync uses Virtual Game Cards for your full digital entitlement list, plus eShop receipts for purchase dates. Nintendo receipts only cover about two years; BAKLOG keeps older digital purchases in your library across syncs - they are not marked stale. Use bulk Remove on a row if you want a title gone for good. Physical cartridges are not included.';
     return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>Library and wishlist are separate sign-ins for Nintendo. They use different credentials - connect each one you want. The library card is on top.</p><p>${escapeHtml(legacyNote)}</p></div>`;
   }
   if (def.type === 'content') {

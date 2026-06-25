@@ -265,7 +265,8 @@ describe('connections content groups (Nintendo)', () => {
     await refreshConnections();
 
     const note = document.querySelector('.conn-group-note')?.textContent || '';
-    expect(note).toMatch(/two years of eShop purchase history/i);
+    expect(note).toMatch(/Virtual Game Cards/i);
+    expect(note).toMatch(/about two years/i);
     expect(note).toMatch(/not marked stale/i);
     expect(note).toMatch(/bulk Remove/i);
   });

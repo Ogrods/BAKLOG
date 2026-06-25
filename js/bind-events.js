@@ -18,6 +18,7 @@ import {
   savePrefs,
   persistCurrentSort,
   setCoopFilterMode,
+  setPicksLimitForView,
 } from './prefs.js';
 import {
   renderTable,
@@ -52,6 +53,7 @@ import {
   normalizePicksLimit,
   renderPicksLimitButtons,
   applyPicksCollapsedState,
+  picksViewKey,
 } from './picks-ui.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
 import { recordSponsoredClick } from './anon-metrics.js';
@@ -431,8 +433,7 @@ export function bindEvents() {
   document.getElementById("picksLimitGroup").addEventListener("click", e => {
     const btn = e.target.closest(".picks-limit-btn");
     if (!btn) return;
-    state.prefs.picksLimit = +btn.dataset.limit || 16;
-    savePrefs();
+    setPicksLimitForView(picksViewKey(), +btn.dataset.limit || 16);
     renderPicksLimitButtons();
     renderPicks();
   });

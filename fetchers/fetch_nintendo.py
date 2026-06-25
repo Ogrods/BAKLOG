@@ -220,7 +220,7 @@ def _nintendo_drift_baseline(output_path: Path) -> int | None:
     return len(games) or None
 
 
-def refuse_nintendo_drift_result(
+def refuse_nintendo_source_drift(
     items: list[dict],
     *,
     label: str,
@@ -729,7 +729,7 @@ def main() -> int:
             )
         )
 
-    drift_exit = refuse_nintendo_drift_result(
+    drift_exit = refuse_nintendo_source_drift(
         games_out,
         label="Nintendo library rows",
         allow_drift=args.allow_drift,

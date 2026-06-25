@@ -21,7 +21,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
-import { savePrefs } from './prefs.js';
+import { getPicksLimitForView, setPicksLimitForView } from './prefs.js';
 import { syncCoverFits } from './covers.js';
 import { sponsoredPickSlotHtml, sponsoredDealPickSlotHtml, pickLocationForView, houseLocationForView, renderHouseLocationSlot } from './sponsored-deals.js';
 
@@ -88,14 +88,17 @@ export function dealCardHtml(g) {
     </div>`;
 }
 
+export function picksViewKey() {
+  const v = state.activeView;
+  return v === "wishlist" ? "wishlist" : v === "itch" ? "itch" : "library";
+}
+
 export function normalizePicksLimit() {
-  const validLimits = [16, 24, 48, 96];
-  const n = Number(state.prefs.picksLimit);
-  if (!validLimits.includes(n)) {
-    state.prefs.picksLimit = 16;
-    savePrefs();
-  }
-  return state.prefs.picksLimit;
+  const view = picksViewKey();
+  const limit = getPicksLimitForView(view);
+  const stored = Number(state.prefs.viewPicksLimits?.[view]);
+  if (stored !== limit) setPicksLimitForView(view, limit);
+  return limit;
 }
 
 export function renderPicksLimitButtons() {
@@ -186,7 +189,7 @@ export function renderPicks() {
     default: data = pickView === "wishlist" ? wishlistDeals : backlogRated;
   }
   if (pickView === "itch" && tab !== "topRated") data = backlogRated;
-  const limit = state.prefs.picksLimit || 16;
+  const limit = getPicksLimitForView(pickView);
   const pickLoc = tab === 'wishlistDeals'
     ? pickLocationForView(pickView === 'wishlist' ? 'wishlist' : 'deals', 'pick')
     : pickLocationForView(pickView, 'pick');

@@ -31,7 +31,6 @@ from shared.free_claims_sources import (
     is_epic_mobile_store,
     item_missing_link_fields,
     norm_title,
-    normalize_claim_urls,
 )
 from shared.profile_paths import (
     free_claims_path,

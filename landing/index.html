@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BAKLOG: One honest backlog across every store</title>
-  <meta name="description" content="One honest backlog across every store. Free forever to import · 12 libraries and 8 wishlists · runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now helps you never miss a free game again. Open source (MIT). Optional paid tier to support BAKLOG. Invite-only early access." />
+  <meta name="description" content="One honest backlog across every store. Free forever to import · 12 libraries and 8 wishlists · runs on your machine, no telemetry. Watch 0 → 2,000+ games climb in ~90 seconds. MIT source on GitHub. Invite-only early access." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="BAKLOG" />
@@ -698,7 +698,7 @@
       <div class="form-reassure">
         <p class="form-secure">
           <svg class="secure-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <strong>Secure by design.</strong> No telemetry &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">Open source (MIT)</a> &middot; Invite-only, your place is reserved on request.
+          <strong>Runs on your PC.</strong> No telemetry &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a> (server, fetchers, auth) &middot; Invite-only beta in small waves.
         </p>
       </div>
       <p class="form-msg" id="formMsg" role="status" aria-live="polite"></p>
@@ -713,7 +713,7 @@
     <div class="wrap">
       <span class="eyebrow">The accidental library</span>
       <h2>You didn't buy 600 games. They piled up.</h2>
-      <p>Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG pulls what you already own from each store into one table on your machine.</p>
+      <p>Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG pulls what you already own from each store into one table on your machine. There is no project-owned server collecting that catalog.</p>
       <p class="section-invite"><a class="btn" href="#waitlist">Request an invite</a></p>
     </div>
   </section>
@@ -724,7 +724,7 @@
       <div class="section-head">
         <span class="eyebrow">The demo is the product</span>
         <h2>This is your dashboard on day one.</h2>
-        <p>Connect your stores and watch your library count climb. This live sample uses dummy data from seven stores. The real app supports 12 libraries and 8 wishlists.</p>
+        <p>Connect your stores and watch your library count climb. This live sample uses dummy data; the shipped app is the same UI on your PC. Clone <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">the MIT repo</a> and run it today, or use a packaged invite build.</p>
       </div>
       <div class="demo-mount" id="demoMount" aria-label="BAKLOG dashboard sample"></div>
       <p class="demo-cta"><a class="btn" href="#waitlist">Request an invite</a></p>
@@ -737,13 +737,13 @@
       <div class="section-head">
         <span class="eyebrow">Watch your library appear</span>
         <h2>From empty to 2,000+ games in 90 seconds.</h2>
-        <p>Connect your stores once. BAKLOG fetches your library locally. No cloud vault.</p>
+        <p>Connect once. Each fetch runs on your PC from your IP. No shared credential pool and no cloud copy of your library.</p>
       </div>
       <div class="steps">
         <div class="step">
           <div class="num">1</div>
           <h3>Connect</h3>
-          <p>Link your stores once. Credentials stay encrypted on your machine.</p>
+          <p>Link each store. Sign-in opens your installed Chrome or Edge locally; credentials encrypt to disk with your OS keychain.</p>
         </div>
         <div class="step">
           <div class="num">2</div>
@@ -791,7 +791,7 @@
       <div class="section-head">
         <span class="eyebrow">What you get</span>
         <h2>Your whole library, in one table.</h2>
-        <p><a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">Open source (MIT)</a> and runs on your machine. BAKLOG fetches your library from every store, then dedupes it into something you can sort, filter, and act on.</p>
+        <p><a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a>: server, fetchers, auth, and dashboard in one public tree you can clone and audit. BAKLOG fetches your library from every store on your machine, then dedupes it into something you can sort, filter, and act on.</p>
       </div>
 
       <div class="features-grid">
@@ -846,7 +846,7 @@
           <ul>
             <li>Store sign-in opens your own installed Chrome or Edge on your machine. Session cookies stay in a local browser profile on disk. No container, no remote sandbox, nothing shipped to us.</li>
             <li>Credentials encrypted at rest (AES-256-GCM); keys in Windows Credential Manager, macOS Keychain, or Linux Secret Service</li>
-            <li>No telemetry in the app. <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a> with a published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> you can read before you trust us</li>
+            <li>No telemetry. <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a> with a published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> you can read before you trust us</li>
             <li>baklog.app is separate from your library: waitlist email if you request an invite, a bug report only if you click Send, and a public free-games feed. Your catalog never uploads there.</li>
             <li>We do not sell data because we do not host it. Optional invite login stores email only; your games stay in your local profile folder.</li>
           </ul>
@@ -973,7 +973,7 @@
         </article>
         <article class="card">
           <h3>vs launchers</h3>
-          <p>Playnite is an open-source launcher; Galaxy and deal sites are not. BAKLOG sits on top: ownership-aware deals, backlog status, and wishlist radar, also open source (MIT), without hogging memory like a full launcher.</p>
+          <p>Playnite opens your games. BAKLOG answers what to play next and whether a sale is worth it. Both are MIT-licensed; BAKLOG is not a launcher and does not stay resident like one.</p>
         </article>
         <article class="card">
           <h3>vs manual loggers</h3>
@@ -995,7 +995,7 @@
       <div class="score-grid">
         <div class="score-tile"><div class="num">300+</div><div class="lbl">stats &amp; sabermetrics, from AVG to WAR</div></div>
         <div class="score-tile"><div class="num">12 + 8</div><div class="lbl">library and wishlist sources</div></div>
-        <div class="score-tile"><div class="num">100%</div><div class="lbl">on your machine, open source, nothing uploaded</div></div>
+        <div class="score-tile"><div class="num">MIT</div><div class="lbl">full app on GitHub - clone, read, run</div></div>
         <div class="score-tile"><div class="num">90 sec</div><div class="lbl">from empty to your whole library</div></div>
         <div class="score-tile"><div class="num">$0</div><div class="lbl">free forever to import your library</div></div>
         <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (Pro)</div></div>
@@ -1009,7 +1009,9 @@
     <div class="wrap">
       <span class="eyebrow">Local-first</span>
       <h2>There is no BAKLOG server to breach.</h2>
-      <p>Your libraries never leave your machine. Store fetches run through your own browser session and your IP - nothing is stored on our side because there is no our side. The <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">full source is on GitHub</a> (MIT). Audit every line that touches your credentials, your library JSON, and your network.</p>
+      <p>Your library JSON and store credentials stay on your PC. Fetches go to each storefront from your IP, through your own browser session. We do not run a datacenter copy of anyone's catalog.</p>
+      <p>Sign-in is not a remote container: your installed Chrome or Edge opens locally, cookies land in a browser profile on disk, and nothing is shipped to us. Local-first is that architecture, not a trick about binding to localhost.</p>
+      <p>Skeptical? Read the published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> and <a href="https://github.com/Ogrods/BAKLOG/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">privacy inventory</a> before you trust us. The <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">full MIT tree</a> is public: server, fetchers, auth, dashboard. baklog.app only touches waitlist email, opt-in bug reports you send, and a public free-games feed.</p>
     </div>
   </section>
 
@@ -1025,7 +1027,7 @@
         </details>
         <details>
           <summary>Is it open source?</summary>
-          <p>Yes. BAKLOG is released under the <a href="https://github.com/Ogrods/BAKLOG/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The full app (server, fetchers, auth, and dashboard) lives in the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">public GitHub repo</a>. No hidden builds, no closed-source telemetry layer. Optional paid features are conveniences on top of the same open codebase, not a fork of your data into our cloud.</p>
+          <p>Yes. BAKLOG is released under the <a href="https://github.com/Ogrods/BAKLOG/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The full app (server, fetchers, auth, and dashboard) lives in the <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">public GitHub repo</a>: clone it and run from source today. No hidden builds, no closed-source telemetry layer. The invite beta is packaged builds on top of the same tree. Optional paid features are conveniences on top of the same open codebase, not a fork of your data into our cloud.</p>
         </details>
         <details>
           <summary>Is it free?</summary>
@@ -1056,8 +1058,20 @@
           <p>Stores pad your library with things that aren't games: DLC skins, soundtracks, wallpapers, betas, and store apps. BAKLOG filters those out automatically so the number you see is real games, not shelf clutter. That filter is built-in and you never have to manage it. Separately, you can hide any game you just don't want to see and restore it later from the Hidden games panel.</p>
         </details>
         <details>
+          <summary>Does it upload my library?</summary>
+          <p>No. Your catalog and credentials stay in your local profile folder. Store fetches go straight from your PC to each storefront. baklog.app never receives your library JSON. The only things that touch this site are a waitlist email if you request an invite, a bug report only if you click Send, and a public free-games metadata feed.</p>
+        </details>
+        <details>
+          <summary>Can I run it without waiting for an invite?</summary>
+          <p>Yes. Clone <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">github.com/Ogrods/BAKLOG</a> and run from source on Windows, macOS, or Linux. The invite beta is optional packaged builds and update delivery on top of the same MIT tree.</p>
+        </details>
+        <details>
+          <summary>How is this different from Playnite?</summary>
+          <p>Playnite is a launcher: it opens games and unifies your library view. BAKLOG is a backlog dashboard: what to play next, cross-store dedupe, wishlist deal radar, and ownership-aware sale checks. Many people use both. BAKLOG is not trying to replace your launcher.</p>
+        </details>
+        <details>
           <summary>Isn't scraping against the rules?</summary>
-          <p>BAKLOG automates requests you could make yourself, in your own browser, with your own credentials, on your own machine.</p>
+          <p>BAKLOG automates requests you could make yourself, in your own browser, with your own credentials, on your own machine. Each storefront sees normal traffic from your IP, as you.</p>
         </details>
         <details>
           <summary>Why invite-only right now?</summary>
@@ -1065,7 +1079,7 @@
         </details>
         <details>
           <summary>Do you sell my data?</summary>
-          <p>No. BAKLOG has no business model built on your library. We do not collect, host, or sell personal data - there is no server holding it to sell in the first place.</p>
+          <p>No. BAKLOG has no business model built on your library. We do not collect, host, or sell catalog data. There is no server holding it to sell. Optional invite login (Supabase) stores your email only; games stay local.</p>
         </details>
       </div>
       <p class="section-invite"><a href="https://github.com/Ogrods/BAKLOG/tree/main/guide" target="_blank" rel="noopener noreferrer">Full user guide on GitHub</a> · <a class="btn" href="#waitlist">Request an invite</a></p>
@@ -1076,7 +1090,7 @@
   <section class="band cta-band">
     <div class="wrap">
       <h2>Request your invite.</h2>
-      <p>Free forever to import your library. Optional paid tier to support BAKLOG. Invite-only early access &middot; invites go out in small waves.</p>
+      <p>Free forever to import your library. Optional paid tier to support BAKLOG. MIT source on GitHub if you want to verify the privacy claims before you install. Invite-only early access &middot; invites go out in small waves.</p>
       <a class="btn" href="#waitlist">Request an invite</a>
     </div>
   </section>
@@ -1129,6 +1143,8 @@
             <!-- GitHub: keep in sync with shared/community.json -->
             <a href="#waitlist">Request an invite</a>
             <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">Security model</a>
+            <a href="https://github.com/Ogrods/BAKLOG/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">Privacy</a>
             <a href="mailto:dan@baklog.app">dan@baklog.app</a>
           </div>
           <div class="foot-col">
@@ -1141,7 +1157,7 @@
         </nav>
       </div>
       <div class="foot-bottom">
-        <p class="foot-legal">Local-first &middot; No telemetry &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">Open source (MIT)</a> &middot; &copy; <span id="year"></span> BAKLOG</p>
+        <p class="foot-legal">Local-first &middot; No telemetry &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">Open source (MIT)</a> &middot; <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">Security</a> &middot; <a href="https://github.com/Ogrods/BAKLOG/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">Privacy</a> &middot; &copy; <span id="year"></span> BAKLOG</p>
         <p class="foot-affiliate">BAKLOG is an Epic Games Store Support-A-Creator affiliate and an itch.io Partner affiliate. Store links in the app may include our creator codes.</p>
         <p class="foot-affiliate">Payments are handled by <a href="https://polar.sh" target="_blank" rel="noopener noreferrer">Polar.sh</a>, an open-source Merchant of Record.</p>
         <p class="foot-trademark">BAKLOG&trade; is a trademark of its owner</p>

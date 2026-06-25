@@ -79,7 +79,8 @@ You're on the list. BAKLOG is in invite-only beta and we're onboarding in small 
 
 A quick refresher on what you signed up for:
 - One honest backlog across every store - 12 libraries and 8 wishlists, all on your machine.
-- Local-first: credentials stay encrypted; nothing is uploaded by default.
+- Local-first: no project-owned server for your catalog; credentials encrypt to disk with your OS keychain; store fetches run from your IP.
+- MIT source on GitHub if you want to verify before install; invite beta is packaged builds on the same tree.
 - Claimable Now surfaces free giveaways; importing your library stays free forever.
 
 No action needed right now - just keep an eye on your inbox.
@@ -96,7 +97,8 @@ const CONFIRM_HTML = `<!doctype html>
       <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">A quick refresher on what you signed up for:</p>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
         <li>One honest backlog across every store - 12 libraries and 8 wishlists, all on your machine.</li>
-        <li>Local-first: credentials stay encrypted; nothing is uploaded by default.</li>
+        <li>Local-first: no project-owned server for your catalog; credentials encrypt to disk with your OS keychain; store fetches run from your IP.</li>
+        <li>MIT source on GitHub if you want to verify before install; invite beta is packaged builds on the same tree.</li>
         <li>Claimable Now surfaces free giveaways; importing your library stays free forever.</li>
       </ul>
       <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">No action needed right now - just keep an eye on your inbox.</p>

@@ -291,6 +291,10 @@ export function applyProTabVisibility() {
   const pending = isProActivationPending();
   const show = !isPro() || pending;
   tab.classList.toggle('hidden', !show);
+  tab.hidden = !show;
+  tab.setAttribute('aria-hidden', show ? 'false' : 'true');
+  if (show) tab.removeAttribute('hidden');
+  document.documentElement.toggleAttribute('data-pro-tier', isPro());
   if (!show && !pending && state.activeView === 'pro') {
     switchView('dashboard');
   }

@@ -222,6 +222,7 @@ describe('Pro activation UX', () => {
     applyProTabVisibility();
     const tab = document.querySelector('.view-tab[data-view="pro"]');
     expect(tab.classList.contains('hidden')).toBe(true);
+    expect(tab.hidden).toBe(true);
   });
 
   it('showProWelcomeBanner renders once when flag is set and user is Pro', async () => {

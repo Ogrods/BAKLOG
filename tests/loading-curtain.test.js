@@ -71,7 +71,7 @@ describe('releaseViewOverlayWhenReady', () => {
     expect(document.getElementById('viewLoadingOverlay').classList.contains('show')).toBe(true);
   });
 
-  it('cached switchView clears abandoned overlay when superseded navigation bails', async () => {
+  it('hideViewOverlay re-enables tabs after abandoned scrim', async () => {
     const { state } = await import('../js/state.js');
     state.activeView = 'dashboard';
     document.querySelector('.view-tab').disabled = true;

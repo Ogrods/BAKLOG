@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-06-25T18:31:16.975950+00:00",
+  "fetched_at": "2026-06-25T20:17:08.238750+00:00",
   "sources": {
     "epic": 2,
     "gamerpower": 11,
@@ -15,12 +15,12 @@
       "title": "RollerCoaster Tycoon 3 Complete Edition",
       "claim_url": "https://store.epicgames.com/en-US/p/rollercoaster-tycoon-3-complete-edition",
       "ends_at": "2026-07-02T15:00:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1368820/header.jpg?t=1779306991",
+      "header_image": "https://cdn1.epicgames.com/f01b3e0178d448f0b93911e292d8e614/offer/EGS_RollerCoasterTycoon3CompleteEdition_FrontierDevelopments_S5-1920x1080-689d96ca4d5a4e8de183b7a928960c87.jpg",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-06-25T18:31:16.975950+00:00",
       "review_percent": 87,
-      "steam_appid": 1368820
+      "steam_appid": 1368820,
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
       "id": "epic-voidwrought-ce8f4b",
@@ -28,12 +28,12 @@
       "title": "Voidwrought",
       "claim_url": "https://store.epicgames.com/en-US/p/voidwrought-ce8f4b",
       "ends_at": "2026-07-02T15:00:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2014550/header.jpg?t=1782215852",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/ae3f962fab4d42eba2dbefa4a1e76ff6/voidwrought-bio8j.jpg",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-06-25T18:31:16.975950+00:00",
       "review_percent": 77,
-      "steam_appid": 2014550
+      "steam_appid": 2014550,
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
       "id": "gamerpower-3692",
@@ -177,11 +177,11 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16306/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1361510/library_600x900_2x.jpg",
-      "blurb": "Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/teenage-mutant-ninja-turtles-shredders-revenge/info/\">Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 02 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-45108224b9eb45c8a86556d4a0d6c8d1-b430f3e8c16e4a519a99d32a4453f7c7&amp;offers=1-45108224b9eb45c8a86556d4a0d6c8d1-64230acdae9b4f82972b8d979eb2b617>go to giveaway</a>",
       "source": "itad",
-      "first_seen": "2026-06-25T18:31:16.975950+00:00",
       "review_percent": 94,
-      "steam_appid": 1361510
+      "steam_appid": 1361510,
+      "first_seen": "2026-06-25T18:31:16.975950+00:00"
     },
     {
       "id": "itad-c2d91592ecf7",
@@ -212,7 +212,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16253/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2800500/library_600x900_2x.jpg",
-      "blurb": "Blacklist Mafia",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/blacklist-mafia/info/\">Blacklist Mafia</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/blacklist-mafia>go to giveaway</a>",
       "source": "itad",
       "review_percent": 82,
       "steam_appid": 2800500,
@@ -236,7 +236,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16196/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2074560/library_600x900_2x.jpg",
-      "blurb": "Mr.Brocco & Co",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/mr-brocco-and-co/info/\">Mr.Brocco &amp; Co</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/mrbrocco-co>go to giveaway</a>",
       "source": "itad",
       "review_percent": 83,
       "steam_appid": 2074560,
@@ -249,7 +249,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16143/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2635070/library_600x900_2x.jpg",
-      "blurb": "The Brave Little Cloud",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/the-brave-little-cloud/info/\">The Brave Little Cloud</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/the-brave-little-cloud>go to giveaway</a>",
       "source": "itad",
       "review_percent": 97,
       "steam_appid": 2635070,
@@ -284,7 +284,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/15746/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "Smiley Dusty",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
@@ -295,7 +295,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/7433/",
       "ends_at": null,
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014",
-      "blurb": "Die Young: Prologue",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/die-young-prologue/info/\">Die Young: Prologue</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/die-young-prologue>go to giveaway</a>",
       "source": "itad",
       "review_percent": 78,
       "steam_appid": 973000,

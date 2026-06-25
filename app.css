@@ -138,11 +138,11 @@
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
   border-radius: 0.5rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
-  color: #e2e8f0;
+  color: var(--text);
 }
 .baklog-bug-report-head {
   display: flex;
@@ -150,24 +150,24 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--border-subtle);
 }
 .baklog-bug-report-title {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--text-bright);
 }
 .baklog-bug-report-close {
   border: 0;
   background: transparent;
-  color: #94a3b8;
+  color: var(--text-mute);
   font-size: 1.5rem;
   line-height: 1;
   padding: 0 0.35rem;
   cursor: pointer;
 }
-.baklog-bug-report-close:hover { color: #f8fafc; }
+.baklog-bug-report-close:hover { color: var(--text-bright); }
 .baklog-bug-report-body {
   padding: 1rem;
   overflow-y: auto;
@@ -179,18 +179,18 @@
   margin: 0 0 0.25rem;
   font-size: 0.8125rem;
   line-height: 1.5;
-  color: #94a3b8;
+  color: var(--text-mute);
 }
 .baklog-bug-report-label {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-mute);
 }
 .baklog-bug-report-field {
   width: 100%;
   border-radius: 0.25rem;
-  border: 1px solid #475569;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-bright);
   font-size: 0.875rem;
   padding: 0.375rem 0.5rem;
 }
@@ -205,11 +205,11 @@
   overflow: auto;
   padding: 0.5rem 0.625rem;
   border-radius: 0.25rem;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
   font-size: 0.6875rem;
   line-height: 1.45;
-  color: #cbd5e1;
+  color: var(--text-dim);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -225,7 +225,7 @@
   justify-content: flex-end;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--border-subtle);
 }
 .baklog-bug-report-btn {
   border-radius: 0.25rem;
@@ -235,16 +235,16 @@
   cursor: pointer;
 }
 .baklog-bug-report-btn-neutral {
-  background: #334155;
-  color: #f1f5f9;
+  background: var(--bg-elev);
+  color: var(--text-bright);
 }
-.baklog-bug-report-btn-neutral:hover { background: #475569; }
+.baklog-bug-report-btn-neutral:hover { background: var(--bg-hover); }
 .baklog-bug-report-btn-primary {
-  background: #0ea5e9;
-  color: #0f172a;
+  background: var(--accent-dim);
+  color: var(--text-bright);
   font-weight: 600;
 }
-.baklog-bug-report-btn-primary:hover { background: #38bdf8; }
+.baklog-bug-report-btn-primary:hover { background: var(--accent); }
 .baklog-bug-report-btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1465,7 +1465,7 @@ html[data-theme="default"] .store-badge.steam { box-shadow: inset 0 0 0 1px #647
   outline: none;
 }
 .claim-detail-dialog::backdrop {
-  background: rgba(2, 6, 23, 0.72);
+  background: var(--overlay-scrim-soft);
 }
 /* Tailwind v4 preflight applies `* { margin: 0 }` as an author rule, which
    overrides the UA `dialog:modal { margin: auto }` that centers native modals —
@@ -2233,7 +2233,7 @@ body.bulk-bar-open { padding-bottom: 56px; }
 .active-filter-pill-x { line-height: 1; opacity: 0.85; font-size: 13px; }
 #filtersBtnBadge { min-width: 1.1rem; }
 /* === Filter drawer === */
-#filterDrawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+#filterDrawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; background: var(--overlay-scrim-soft); }
 #filterDrawerBackdrop.open { opacity: 1; pointer-events: auto; }
 #filterDrawer { transform: translateX(100%); transition: transform 0.22s ease; }
 #filterDrawer.open { transform: translateX(0); }
@@ -2907,11 +2907,6 @@ html:has(#viewLoadingOverlay.show) .app-footer { visibility: hidden; }
 .profile-menu-trigger {
   display: inline-flex;
   align-items: center;
-}
-.app-header-tagline {
-  padding-left: 0.5rem;
-  border-left: 1px solid var(--border-subtle);
-  color: var(--text-mute);
 }
 .app-header-brand h1 { color: var(--accent); }
 /* BETA tag — in-flow flex child; delete the .brand-beta span to snap header back. */
@@ -6053,26 +6048,57 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   line-height: 1;
 }
 
-/* === Column picker modal: follow the active theme + compact two-column grid === */
-/* Center + constrain the panel without relying on Tailwind utilities that get
-   purged from tailwind.css (max-w-md was dropped, leaving the panel full-width). */
-#columnsModal { align-items: center; justify-content: center; }
+/* === App modals: theme Tailwind slate surfaces to match the active profile theme === */
+.app-modal {
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay-scrim-soft) !important;
+}
+.app-modal .bg-slate-800 { background: var(--bg-panel); }
+.app-modal .bg-slate-700 { background: var(--bg-elev); }
+.app-modal .bg-slate-900\/40 { background: color-mix(in srgb, var(--bg) 40%, transparent); }
+.app-modal .hover\:bg-slate-600:hover,
+.app-modal .hover\:bg-slate-700:hover { background: var(--bg-hover); }
+.app-modal .hover\:bg-slate-700\/40:hover {
+  background: color-mix(in srgb, var(--bg-hover) 40%, transparent);
+}
+.app-modal .border-slate-600 { border-color: var(--border); }
+.app-modal .border-slate-700 { border-color: var(--border-subtle); }
+.app-modal .text-slate-100 { color: var(--text-bright); }
+.app-modal .text-slate-200 { color: var(--text); }
+.app-modal .text-slate-300 { color: var(--text-dim); }
+.app-modal .text-slate-400 { color: var(--text-mute); }
+.app-modal .text-slate-500 { color: var(--text-mute); }
+.app-modal .hover\:text-slate-100:hover { color: var(--text-bright); }
+/* Primary actions inside modals follow accent instead of fixed cyan. */
+.app-modal .bg-cyan-700,
+.app-modal .bg-cyan-800 { background: var(--accent-dim); color: var(--text-bright); }
+.app-modal .hover\:bg-cyan-600:hover,
+.app-modal .hover\:bg-cyan-700:hover { background: var(--accent); }
+.app-modal .orphan-has-data { color: var(--accent-muted); }
+
+/* Standalone dialog panels (secrets bundle) reuse the same token mapping. */
+.app-modal-panel.bg-slate-800 { background: var(--bg-panel); color: var(--text-bright); }
+.app-modal-panel .bg-slate-700 { background: var(--bg-elev); }
+.app-modal-panel .hover\:bg-slate-600:hover { background: var(--bg-hover); }
+.app-modal-panel .border-slate-600 { border-color: var(--border); }
+.app-modal-panel .text-slate-100 { color: var(--text-bright); }
+.app-modal-panel .text-slate-300 { color: var(--text-dim); }
+.app-modal-panel .text-slate-400 { color: var(--text-mute); }
+
+/* Column picker: width cap without relying on purged max-w-md utility. */
 #columnsModal > [role="dialog"] {
   width: 100%;
   max-width: 30rem;
   margin: auto;
 }
-#columnsModal .bg-slate-800 { background: var(--bg-panel); }
-#columnsModal .bg-slate-700 { background: var(--bg-elev); }
-#columnsModal .hover\:bg-slate-600:hover,
-#columnsModal .hover\:bg-slate-700:hover { background: var(--bg-hover); }
-#columnsModal .border-slate-600 { border-color: var(--border); }
-#columnsModal .border-slate-700 { border-color: var(--border-subtle); }
-#columnsModal .text-slate-100 { color: var(--text-bright); }
-#columnsModal .text-slate-200 { color: var(--text); }
-#columnsModal .text-slate-300 { color: var(--text-dim); }
-#columnsModal .text-slate-400 { color: var(--text-mute); }
-#columnsModal .hover\:text-slate-100:hover { color: var(--text-bright); }
+#orphanPruneModal > [role="dialog"],
+#hiddenPanelModal > [role="dialog"],
+#addGameModal > [role="dialog"] {
+  width: 100%;
+  max-width: 42rem;
+  margin: auto;
+}
 
 /* Multi-column (not grid) so checkboxes read top-to-bottom down the first
    column, then continue down the second — i.e. in order as you go down. */
@@ -7376,7 +7402,8 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
     min-width: 180px;
   }
 }
-/* Header full-screen (F11) */
+/* Header icon buttons (full screen, report bug, etc.) */
+.header-icon-btn,
 .header-fullscreen-btn {
   display: inline-flex;
   align-items: center;
@@ -7391,19 +7418,23 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   cursor: pointer;
   transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
+.header-icon-btn:hover,
 .header-fullscreen-btn:hover {
   border-color: var(--text-mute);
   color: var(--text);
 }
+.header-icon-btn[aria-pressed="true"],
 .header-fullscreen-btn[aria-pressed="true"] {
   border-color: var(--text-mute);
   color: var(--text-bright);
   background: var(--bg-elev);
 }
+.header-icon-btn:focus-visible,
 .header-fullscreen-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+.header-icon-btn-svg,
 .header-fullscreen-icon {
   display: block;
 }
@@ -7541,7 +7572,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .profile-modal-label {
   display: block;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-mute);
 }
 .profile-modal-row {
   display: flex;
@@ -7552,9 +7583,9 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   flex: 1;
   min-width: 0;
   border-radius: 0.25rem;
-  border: 1px solid #475569;
-  background: #0f172a;
-  color: #f1f5f9;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-bright);
   font-size: 0.875rem;
   padding: 0.375rem 0.5rem;
 }
@@ -7572,13 +7603,13 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   line-height: 1.25;
   text-align: center;
   cursor: pointer;
-  color: #f1f5f9;
+  color: var(--text-bright);
 }
 .profile-modal-btn-neutral {
-  background: #334155;
+  background: var(--bg-elev);
 }
 .profile-modal-btn-neutral:hover {
-  background: #475569;
+  background: var(--bg-hover);
 }
 .profile-modal-btn-primary {
   background: var(--accent-dim);
@@ -7609,16 +7640,16 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
   flex-direction: column;
   gap: 0.85rem;
   padding: 0.75rem;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-subtle);
   border-radius: 0.5rem;
-  background: rgba(15, 23, 42, 0.45);
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
 }
 .profile-modal-group-title {
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #64748b;
+  color: var(--text-mute);
 }
 .profile-modal-optional {
   margin-left: 0.35rem;
@@ -7643,7 +7674,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-popover-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.65);
+  background: var(--overlay-scrim-soft);
   z-index: 80;
 }
 .conn-popover-backdrop[hidden] { display: none; }
@@ -8192,9 +8223,6 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
     order: 3;
     max-width: 100%;
   }
-  .app-header-tagline {
-    display: none;
-  }
   .app-header-actions {
     margin-left: auto;
     order: 2;
@@ -8294,6 +8322,7 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
   .profile-menu-trigger {
     min-height: var(--touch-min);
   }
+  .header-icon-btn,
   .header-fullscreen-btn {
     min-width: var(--touch-min);
     min-height: var(--touch-min);
@@ -8441,7 +8470,7 @@ body {
 .fetcher-popover-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.5);
+  background: var(--overlay-scrim-soft);
   z-index: 90;
 }
 .fetcher-popover-backdrop[hidden] {
@@ -8463,7 +8492,7 @@ body {
   padding: 12px 12px 10px;
   z-index: 91;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
-  color: #cbd5e1;
+  color: var(--text-dim);
 }
 /* Slimmer in compact, wider in landscape so source chips get more room.
    Layout flag lives on the nested #dashboardFetcherHealth (data-stat-layout). */

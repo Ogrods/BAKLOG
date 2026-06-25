@@ -133,6 +133,7 @@ async function bootstrap() {
   const bootPerf = bootPerfBegin();
   initScrollLock();
   await initAuthGate();
+  applyProTabVisibility();
   bootPerfMark(bootPerf, 'auth:done');
   await ensureActiveProfileResolved();
   const checkoutReturn = consumeCheckoutQuery();

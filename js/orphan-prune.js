@@ -42,7 +42,7 @@ function rowHtml(rec) {
   const dataBits = [notePart, hltbPart].filter(Boolean).join(' · ');
   const dataHtml = dataBits ? `<div class="text-xs text-slate-400 truncate">${dataBits}</div>` : '';
   const meta = rec.hasData
-    ? `<span class="text-amber-400" title="Has saved data (status / notes / HLTB)">●</span>`
+    ? `<span class="orphan-has-data" title="Has saved data (status / notes / HLTB)">●</span>`
     : `<span class="text-slate-500" title="Default record (no edits)">○</span>`;
   return `<label class="flex items-start gap-2 p-2 rounded hover:bg-slate-700/40 cursor-pointer" data-orphan-row="${escapeAttr(rec.key)}">
     <input type="checkbox" class="orphan-row-checkbox mt-0.5" data-key="${escapeAttr(rec.key)}" ${rec.hasData ? '' : 'checked'} />

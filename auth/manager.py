@@ -714,7 +714,6 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
     with _sessions_lock:
         _active_sessions[session_id] = session
 
-
     def _worker() -> None:
         try:
             creds = run_browser_auth(provider, session)

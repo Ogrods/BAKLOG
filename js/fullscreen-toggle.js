@@ -1,8 +1,8 @@
 /** Header control: toggle browser full screen (same result as F11). */
 
-const TV_ICON = `<svg class="header-fullscreen-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="19" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M8.5 21h7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M12 17v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
+const TV_ICON = `<svg class="header-icon-btn-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="19" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M8.5 21h7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M12 17v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
 
-const EXIT_ICON = `<svg class="header-fullscreen-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M9 4H4v5M15 4h5v5M15 20h5v-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const EXIT_ICON = `<svg class="header-icon-btn-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M9 4H4v5M15 4h5v5M15 20h5v-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 export function isFullscreenActive() {
   return Boolean(

@@ -16,7 +16,7 @@ function ensureShell() {
   if (_shellEl) return;
   const shell = document.createElement('div');
   shell.id = 'bugReportModal';
-  shell.className = 'baklog-bug-report hidden fixed inset-0 z-[60] items-center justify-center p-4 bg-black/70';
+  shell.className = 'app-modal baklog-bug-report hidden fixed inset-0 z-[60] items-center justify-center p-4 bg-black/70';
   shell.setAttribute('role', 'presentation');
   shell.innerHTML = `
     <div class="baklog-bug-report-card" role="dialog" aria-modal="true" aria-labelledby="bugReportTitle">

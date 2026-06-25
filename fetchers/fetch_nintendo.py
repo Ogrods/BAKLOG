@@ -23,6 +23,11 @@ from clients.nintendo_client import (
     NintendoClient,
     NintendoEndpointError,
 )
+from clients.nintendo_vgc import (
+    NintendoVgcAuthError,
+    NintendoVgcCaptureError,
+    NintendoVgcClient,
+)
 from fetchers._authoritative import NINTENDO
 from fetchers._base import (
     LAST_SEEN_FIELD,
@@ -39,6 +44,12 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from fetchers.nintendo_hybrid import (
+    find_existing_row,
+    index_existing_rows,
+    merge_vgc_with_transactions,
+    norm_nintendo_title,
+)
 from shared.profile_paths import personal_path
 from shared.raw_dumps import profile_raw_dump_path
 
@@ -61,7 +72,7 @@ HLTB_DELAY_SEC = 1.0
 
 
 def _norm_nintendo_title(name: str) -> str:
-    return " ".join((name or "").lower().split())
+    return norm_nintendo_title(name)
 
 
 # Skip non-game purchases (funds, subscriptions, vouchers).
@@ -380,16 +391,18 @@ def maybe_backfill_nintendo_catalog_meta() -> bool:
 
 def _build_row(item: dict, hltb: dict | None) -> dict:
     name = item["name"]
-    nid = item["id"]
+    row_id = str(item["id"])
+    nid = item.get("nintendo_id")
+    icon = item.get("icon_url")
     row = {
         "store": "nintendo",
-        "id": nid,
-        "nintendo_id": nid,
+        "id": row_id,
+        "nintendo_id": str(nid) if nid else None,
         "name": name,
         "playtime_minutes": None,
         "last_played": None,
-        "header_image": None,
-        "library_image": None,
+        "header_image": icon,
+        "library_image": icon,
         "release_date": item.get("purchase_date"),
         "genres": [],
         "tags": list(item.get("tags") or []),
@@ -407,8 +420,20 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
         "price_initial": None,
         "discount_percent": None,
         "currency": None,
-        "nintendo_platform": item.get("device_type"),
+        "nintendo_platform": item.get("nintendo_platform") or item.get("device_type"),
     }
+    app_id = item.get("application_id")
+    if app_id:
+        row["application_id"] = str(app_id)
+    vgc_id = item.get("vgc_id")
+    if vgc_id:
+        row["vgc_id"] = str(vgc_id)
+    publisher = item.get("publisher")
+    if publisher:
+        row["publisher"] = publisher
+    source = item.get("ownership_source")
+    if source:
+        row["nintendo_ownership_source"] = source
     if hltb:
         row.update(
             {
@@ -432,6 +457,11 @@ def _nintendo_connected() -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Nintendo eShop purchase history")
     parser.add_argument("--skip-hltb", action="store_true")
+    parser.add_argument(
+        "--skip-vgc",
+        action="store_true",
+        help="Use eShop transactions only (skip Virtual Game Cards entitlements)",
+    )
     add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
@@ -498,8 +528,35 @@ def main() -> int:
         )
         print(f"Wrote raw dump to {NINTENDO_RAW_DUMP}.")
 
-    merged = _merge_transactions(raw_tx)
-    print(f"Found {len(merged)} unique game/DLC titles (after filtering funds/NSO).")
+    merged_tx = _merge_transactions(raw_tx)
+    print(f"Found {len(merged_tx)} unique game/DLC titles from transactions.")
+
+    vgc_rows: list[dict] = []
+    if args.skip_vgc:
+        print("Skipping Virtual Game Cards (--skip-vgc).")
+    else:
+        try:
+            vgc_rows = run_with_heartbeat(
+                lambda: NintendoVgcClient(
+                    profile_path=prof,
+                    headless=not args.headed,
+                ).fetch_all_cards(),
+                "Nintendo VGC",
+            )
+            print(f"Fetched {len(vgc_rows)} Virtual Game Cards.")
+        except NintendoVgcAuthError as e:
+            mark_invalid("nintendo", error=str(e))
+            stats.error(str(e))
+            return stats.finish("fetch_nintendo", t0, exit_code=EXIT_CODE_AUTH)
+        except NintendoVgcCaptureError as e:
+            print(f"  VGC warning: {e} — continuing with transactions only.", flush=True)
+
+    merged = (
+        merge_vgc_with_transactions(vgc_rows, merged_tx)
+        if vgc_rows
+        else merged_tx
+    )
+    print(f"Hybrid library slice: {len(merged)} title(s).")
 
     empty_exit = refuse_empty_result(
         merged,
@@ -510,7 +567,7 @@ def main() -> int:
     if empty_exit is not None:
         stats.error(
             f"No games found. Check {NINTENDO_RAW_DUMP} — session may be valid "
-            "but account has no eShop purchases in the last ~2 years."
+            "but account has no entitlements or eShop purchases in range."
         )
         return stats.finish("fetch_nintendo", t0, exit_code=empty_exit)
 
@@ -523,12 +580,18 @@ def main() -> int:
         for key, row in load_existing().items()
         if key not in dropped_ids
     }
-    existing_by_title = load_existing_by_title(existing)
+    existing_by_title, existing_by_app_id, existing_by_nintendo_id = index_existing_rows(
+        existing
+    )
     games_out: list[dict] = []
     for i, item in enumerate(merged, 1):
-        cached = existing.get(str(item["id"]))
-        if not cached:
-            cached = existing_by_title.get(_norm_nintendo_title(item["name"]))
+        cached = find_existing_row(
+            item,
+            existing=existing,
+            by_title=existing_by_title,
+            by_app_id=existing_by_app_id,
+            by_nintendo_id=existing_by_nintendo_id,
+        )
         if args.only_new and cached:
             games_out.append(cached)
             continue
@@ -583,7 +646,8 @@ def main() -> int:
         "fresh_count": fresh_count,
         "game_count": len(final_games),
         "note": (
-            "eShop digital purchases only; ~2 year history limit; no cartridge games; "
+            "Digital entitlements via Virtual Game Cards when available; eShop purchase "
+            "dates from transaction history (~2 year window); no cartridge-only games; "
             "older purchases kept as nintendo_legacy"
         ),
         "games": sorted(final_games, key=lambda g: g["name"].lower()),

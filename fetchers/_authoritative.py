@@ -64,7 +64,12 @@ XBOX = library_authoritative(
 )
 BATTLENET = library_authoritative("battlenet_id")
 UBISOFT = library_authoritative("ubisoft_id")
-NINTENDO = library_authoritative("nintendo_id", "nintendo_platform")
+NINTENDO = library_authoritative(
+    "nintendo_id",
+    "application_id",
+    "vgc_id",
+    "nintendo_platform",
+)
 HUMBLE = library_authoritative(
     "humble_id",
     "humble_gamekey",

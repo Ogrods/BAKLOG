@@ -717,11 +717,9 @@ export function switchView(view) {
       } else if (view === "pro") {
         overlayReady = Promise.resolve(refreshDone).then(() => import('./pro-view.js').then((m) => m.renderProView()));
       } else if (view === "wishlist") {
-        // Keep the scrim up until claimables paint so they don't pop in above
-        // the picks after reveal and shove the visible page down.
-        overlayReady = Promise.resolve(refreshDone)
-          .then(() => import('./claimable.js'))
-          .then((m) => m.renderClaimableModule());
+        // Paint table + claimables in parallel; keep scrim until both settle.
+        const claimsPaint = import('./claimable.js').then((m) => m.renderClaimableModule());
+        overlayReady = Promise.all([refreshDone, claimsPaint]);
       } else {
         overlayReady = refreshDone;
       }

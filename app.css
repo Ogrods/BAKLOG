@@ -2573,6 +2573,12 @@ html:has(#viewLoadingOverlay.show) #proContainer {
 }
 @keyframes view-spin { to { transform: rotate(360deg); } }
 html[data-page-hidden] .dash-marquee-track { animation-play-state: paused !important; }
+html[data-page-hidden] .fh-bar-dot.is-live,
+html[data-page-hidden] .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before,
+html[data-page-hidden] .dash-spotlight.has-portrait-art .dash-spotlight-art.is-loaded,
+html[data-page-hidden] .dash-spotlight-hero-zoom img {
+  animation-play-state: paused !important;
+}
 .view-tab[disabled] { opacity: 0.5; cursor: progress; }
 /* Tabs stay hidden while the boot curtain is up, then the whole bar reveals
    as one unit when liftBootCurtain() removes data-boot-loading — no per-tab

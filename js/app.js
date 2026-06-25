@@ -66,6 +66,12 @@ import {
   liftBootCurtain,
   hideViewOverlay,
 } from './loading-curtain.js';
+import {
+  bootPerfBegin,
+  bootPerfMark,
+  bootPerfMeasure,
+  bootPerfEnd,
+} from './boot-perf.js';
 import { reloadGames, reloadAfterFetcher, finishEmptyLibraryLoad } from './library-load.js';
 import { initLibraryWatches } from './library-watch.js';
 import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
@@ -123,8 +129,10 @@ function hydrateState() {
 }
 
 async function bootstrap() {
+  const bootPerf = bootPerfBegin();
   initScrollLock();
   await initAuthGate();
+  bootPerfMark(bootPerf, 'auth:done');
   await ensureActiveProfileResolved();
   const checkoutReturn = consumeCheckoutQuery();
   if (!checkoutReturn) consumeProHash();
@@ -147,6 +155,8 @@ async function bootstrap() {
     console.warn("[personalStore] init failed, falling back to localStorage", err);
     reportError(err, { source: "personalStore.init", kind: "bootstrap" });
   }
+  bootPerfMark(bootPerf, 'personalStore:done');
+  bootPerfMeasure(bootPerf, 'boot:personalStore', 'start');
   migrateV3();
   stripLegacyTags();
   seedPreHiddenDefaults();
@@ -271,8 +281,12 @@ async function bootstrap() {
   });
   try {
     await Promise.all([reloadPromise, fetcherPromise]);
+    bootPerfMark(bootPerf, 'library:done');
+    bootPerfMark(bootPerf, 'fetcher:done');
   } finally {
     suppressChartStaggerForBoot();
+    bootPerfMark(bootPerf, 'curtain:lift');
+    bootPerfEnd(bootPerf);
     liftBootCurtain(tBoot);
     hideViewOverlay();
     if (state.activeView === "dashboard") {
@@ -296,6 +310,9 @@ async function bootstrap() {
       void handleCheckoutSuccessReturn();
     } else {
       scheduleIdlePrewarm();
+      if (state.activeView === "library" && state.dashboardDataReady) {
+        prewarmTableQueryForView("library").catch(() => {});
+      }
     }
     // Arm the count-up combat text only AFTER boot. The initial page-load
     // count-up (including any 0 -> full jump during boot) stays silent; popups

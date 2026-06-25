@@ -22,6 +22,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.20] - 2026-06-25
+
 ### Added
 
 - Post-build frozen bundle smoke gate (`scripts/frozen_bundle_smoke.py`): layout,
@@ -30,12 +32,15 @@ version is `pyproject.toml` (mirrored into `package.json` and the
   before PyInstaller runs.
 - Maintainer `provision_pro_user` CLI for comp-Pro beta ops.
 - Header full-screen toggle (TV icon) between fetcher log and profile menu.
+- `scripts/release_preflight.ps1` local gate before tagging (version sync, GH secrets, test-all -Full, optional frozen build).
 
 ### Changed
 
 - Affiliate disclosures: Green Man Gaming (Impact) enrollment noted in
   `landing/index.html`, `PRIVACY.md`, and `js/affiliate.js` (sponsor creatives
   still pending).
+- Release workflow runs frontend build + dist-integrity + bundle-size checks before PyInstaller.
+- `packaging/build_windows.ps1` logs whether auth env vars are set (no values) before writing bundled `.env`.
 
 ## [0.8.19] - 2026-06-25
 

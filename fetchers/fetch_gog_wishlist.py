@@ -25,7 +25,9 @@ from clients.gog_client import GogAuthError, GogClient
 from clients.hltb_client import HltbClient
 from fetchers._base import (
     add_allow_empty_arg,
+    add_only_new_arg,
     configure_stdout,
+    load_existing_games,
     refuse_drift_result,
     refuse_empty_result,
     write_catalog_text,
@@ -218,6 +220,7 @@ def main() -> int:
     parser.add_argument("--refresh", action="store_true", help="Ignore cached wishlist ID list")
     parser.add_argument("--country", default="US", help="GOG storefront country code (default US)")
     parser.add_argument("--hltb", action="store_true", help="Look up HLTB hours (slow)")
+    add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     configure_stdout()
@@ -268,9 +271,14 @@ def main() -> int:
     session = requests.Session()
     session.headers["User-Agent"] = "steam-backlog/1.0"
     hltb = HltbClient() if args.hltb else None
+    existing = load_existing_games(GAMES_WISHLIST_GOG_JSON)
 
     rows: list[dict] = []
     for i, gog_id in enumerate(ids, 1):
+        cached = existing.get(str(gog_id))
+        if args.only_new and cached:
+            rows.append(cached)
+            continue
         print(f"[{i}/{len(ids)}] product {gog_id}", flush=True)
         product = _fetch_product(session, gog_id, args.country)
         time.sleep(GOG_PRODUCT_DELAY_SEC)

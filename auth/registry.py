@@ -9,6 +9,7 @@ from auth.epic_wishlist_session import epic_store_login_url
 from clients.amazon_web_client import amazon_signin_url
 
 AuthKind = Literal["form", "browser", "oauth", "local", "manual"]
+PostConnectProbe = Literal["required", "advisory", "skip"]
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,10 @@ class ProviderSpec:
     # OS restriction for this provider. Empty = all platforms (the common case).
     # Amazon Games reads a Windows-only launcher DB, so it sets ("win32",).
     platforms: tuple[str, ...] = ()
+    connect_strategy: str = ""
+    preserve_profile_on_reconnect: bool = False
+    post_connect_probe: PostConnectProbe = "required"
+    login_success_url: str = ""
 
 
 PROVIDERS: dict[str, ProviderSpec] = {
@@ -71,6 +76,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "On Windows/macOS with GOG Galaxy installed, the local Galaxy source below "
             "is preferred — no browser sign-in needed.",
         ),
+        connect_strategy="cookie_probe",
     ),
     "gog_galaxy": ProviderSpec(
         key="gog_galaxy",
@@ -159,6 +165,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Cloudflare may show a quick checkbox; clear it, then let the wishlist fully load before closing.",
             "Storefront sessions are short (~7 days), so expect to reconnect this one more often.",
         ),
+        connect_strategy="graphql_response",
+        preserve_profile_on_reconnect=True,
+        post_connect_probe="required",
+        login_success_url="https://store.epicgames.com/wishlist",
     ),
     "amazon": ProviderSpec(
         key="amazon",
@@ -244,6 +254,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Easiest login: click \u201cSign in another way\u201d and have Microsoft email you a one-time "
             "code \u2014 no password or authenticator needed.",
         ),
+        connect_strategy="xhr_sniffer",
+        post_connect_probe="advisory",
+        login_success_url="https://www.xbox.com/en-us/wishlist",
     ),
     "itch": ProviderSpec(
         key="itch",
@@ -310,6 +323,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Battle.net sessions are short (~7 days) \u2014 reconnect here when the library looks stale.",
             "Covers Blizzard titles tied to your account (WoW, Diablo, Overwatch, etc.).",
         ),
+        connect_strategy="cookie_api_probe",
     ),
     "nintendo": ProviderSpec(
         key="nintendo",
@@ -366,6 +380,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
                 "titles and dedupe against Steam by name."
             ),
         ),
+        connect_strategy="profile_marker",
     ),
     "ubisoft": ProviderSpec(
         key="ubisoft",
@@ -401,6 +416,8 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Each sync uses your saved session token; the browser profile is refreshed when needed.",
             "Only PC titles sold on EA are listed \u2014 Steam/Epic copies stay on those store fetchers.",
         ),
+        connect_strategy="bearer_header",
+        login_success_url="https://www.ea.com/",
     ),
 }
 

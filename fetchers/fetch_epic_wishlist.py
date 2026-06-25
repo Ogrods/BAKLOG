@@ -40,6 +40,7 @@ from auth.secrets import profile_dir
 from clients.hltb_client import HltbClient
 from fetchers._base import (
     add_allow_empty_arg,
+    add_only_new_arg,
     catalog_file,
     configure_stdout,
     refuse_drift_result,
@@ -442,6 +443,7 @@ def _load_existing() -> dict[str, dict]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Epic wishlist into games_wishlist_epic.json")
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
+    add_only_new_arg(parser)
     parser.add_argument("--country", default="US", help="Storefront country code (default US)")
     parser.add_argument("--locale", default="en-US", help="Storefront locale (default en-US)")
     parser.add_argument(
@@ -516,6 +518,9 @@ def main() -> int:
         hltb = None
         row_id = f"epic-{el.get('namespace') or offer.get('namespace')}:{el.get('offerId') or offer.get('id')}"
         cached = existing.get(row_id)
+        if args.only_new and cached:
+            rows.append(cached)
+            continue
         if hltb_client and name:
             if cached and cached.get("hltb_main_hours") is not None:
                 hltb = {

@@ -87,7 +87,7 @@ class TestProbeXboxWishlistSession:
 
 class TestQuietProbes:
     def test_probeable_quiet_set(self) -> None:
-        assert PROBEABLE_QUIET == frozenset({"gog", "epic", "steam", "itch", "itad"})
+        assert PROBEABLE_QUIET == frozenset({"gog", "epic", "steam", "itch", "itad", "psn"})
 
     def test_gog_quiet_ok(self) -> None:
         with patch("auth.session_probe.GogClient") as cls:

@@ -111,7 +111,7 @@ describe('dashboard picks row', () => {
     expect(recap.querySelector('.itch-onboard-cta--primary')?.getAttribute('href')).toContain('itch.io/games/free');
   });
 
-  it('renders onboarding when a stale itch catalog exists but itch is not set up', async () => {
+  it('renders cached itch recap when disconnected but library data remains', async () => {
     const { setAuthStatusSnapshot } = await import('../js/connections-status.js');
     const { renderDashboardItchRecap } = await import('../js/dashboard-cards.js');
     setAuthStatusSnapshot([
@@ -124,8 +124,8 @@ describe('dashboard picks row', () => {
     document.getElementById('dashItchRecap').innerHTML = '';
     renderDashboardItchRecap();
     const recap = document.getElementById('dashItchRecap');
-    expect(recap.textContent).toContain('Start collecting free games on itch.io');
-    expect(recap.querySelector('.itch-value-block')).toBeFalsy();
+    expect(recap.textContent).not.toContain('Start collecting free games on itch.io');
+    expect(recap.querySelector('.itch-value-block')).toBeTruthy();
   });
 
   it('renders library value block when itch videogames exist', async () => {

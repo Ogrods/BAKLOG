@@ -2,6 +2,7 @@
 """Fetch GOG library data and write games_gog.json for the dashboard."""
 
 import argparse
+import concurrent.futures
 import json
 import os
 import re
@@ -35,6 +36,7 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, sta
 
 GAMES_GOG_JSON = Path("games_gog.json")
 HLTB_DELAY_SEC = 1.0
+GOG_WEB_DETAIL_WORKERS = 6
 LEGACY_ROW_SOURCE = "web"
 
 # Stable metadata that the other GOG source may have populated (web has release_date;
@@ -630,6 +632,33 @@ def main() -> int:
                 products = [{"id": args.gog_id, "title": f"GOG {args.gog_id}"}]
 
         skipped = 0
+        details_by_id: dict[int, dict | None] = {}
+        if source == "web":
+            detail_ids: list[int] = []
+            for product in products:
+                gog_id = int(product.get("id") or product.get("productId") or 0)
+                if args.only_new and gog_id in existing and not args.refresh and not args.gog_id:
+                    row = existing.get(gog_id)
+                    if row and _effective_row_source(row) == source:
+                        continue
+                cached_row = existing.get(gog_id)
+                if _needs_product_details(args, cached_row):
+                    detail_ids.append(gog_id)
+            if detail_ids:
+                def _fetch_detail(pid: int) -> tuple[int, dict | None]:
+                    try:
+                        return pid, gog.get_product_details(pid, refresh=args.refresh)
+                    except Exception:  # noqa: BLE001
+                        return pid, None
+
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=GOG_WEB_DETAIL_WORKERS
+                ) as ex:
+                    futures = [ex.submit(_fetch_detail, pid) for pid in detail_ids]
+                    for fut in concurrent.futures.as_completed(futures):
+                        pid, det = fut.result()
+                        details_by_id[pid] = det
+
         for i, product in enumerate(products, 1):
             gog_id = int(product.get("id") or product.get("productId") or 0)
             name = product.get("title") or product.get("name") or str(gog_id)
@@ -645,8 +674,13 @@ def main() -> int:
             cached_row = existing.get(gog_id)
 
             need_details = _needs_product_details(args, cached_row)
-            details = None
-            if need_details:
+            details = details_by_id.get(gog_id) if source == "web" else None
+            if need_details and details is None and source != "web":
+                try:
+                    details = gog.get_product_details(gog_id, refresh=args.refresh)
+                except Exception as e:
+                    print(f"  Details warning: {e}", flush=True)
+            elif need_details and source == "web" and gog_id not in details_by_id:
                 try:
                     details = gog.get_product_details(gog_id, refresh=args.refresh)
                 except Exception as e:

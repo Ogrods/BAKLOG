@@ -50,3 +50,26 @@ def test_stored_token_skips_sniff(monkeypatch) -> None:
     assert token == "stored-tok"
     assert cookies == []
     assert dbg.get("token_source") == "stored"
+
+
+def test_stored_token_apq_stale_skips_sniff(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "fetchers.fetch_ea.resolve_env",
+        lambda key, **_k: "stored-tok" if key == "EA_BEARER_TOKEN" else "",
+    )
+    monkeypatch.setattr(
+        "fetchers.fetch_ea.probe_ea_token",
+        lambda *_a, **_k: {
+            "ok": False,
+            "error": 'EA GraphQL HTTP 400: {"errors":[{"message":"PersistedQueryNotFound"}]}',
+        },
+    )
+
+    with patch("auth.cdp_browser.launch_persistent_profile") as mock_launch:
+        import fetchers.fetch_ea as fetch_ea
+
+        token, cookies, dbg = fetch_ea._resolve_session(headless=True)
+        mock_launch.assert_not_called()
+
+    assert token == "stored-tok"
+    assert dbg.get("token_source") == "stored_apq_stale"

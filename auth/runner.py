@@ -19,6 +19,8 @@ from auth.api_keys import (
 )
 from auth.cdp_browser import (
     STEALTH_INIT_SCRIPT,
+    ConnectBrowserClosed,
+    abort_if_browser_closed,
     auth_banner_init_script,
     is_blank_browser_url,
     launch_persistent_profile,
@@ -55,6 +57,25 @@ def _drive_connect_page(page, context):
             return pg
     pages = _connect_pages(page, context)
     return pages[0]
+
+
+def _wait_for_connect_page(context, *, timeout_s: float = 15.0):
+    """Return a live connect page, preferring a non-blank tab when CDP attaches popups."""
+    deadline = time.time() + timeout_s
+    last_err = ""
+    while time.time() < deadline:
+        live = [p for p in context.pages if not p.is_closed]
+        if live:
+            for pg in live:
+                if not is_blank_browser_url(pg.url or ""):
+                    return pg
+            return live[0]
+        try:
+            return context.new_page()
+        except Exception as exc:  # noqa: BLE001
+            last_err = str(exc)
+            time.sleep(0.25)
+    raise RuntimeError(last_err or "Connect browser has no usable page")
 PSN_SSOCOOKIE_URL = "https://ca.account.sony.com/api/v1/ssocookie"
 PSN_SSOCOOKIE_INTERVAL_SEC = 10
 
@@ -127,87 +148,40 @@ def _battlenet_has_session(context) -> bool:
 
 def _extract_battlenet_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Open account.battle.net/games and save cookies only after the library API works."""
+    from auth.connect_extractors import battlenet_connect_hint, extract_battlenet_session
+    from auth.connect_loop import run_connect_poll
+
     try:
         page.goto(BATTLENET_GAMES_URL, wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
 
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    last_msg = 0.0
-    while time.time() < deadline:
-        if _battlenet_has_session(context):
-            header = _cookie_header(context.cookies(), (".battle.net", "battle.net"))
-            if not header:
-                break
-            from clients.battlenet_client import probe_session
+    def _on_signed_in(_creds: dict[str, str]) -> None:
+        if session:
+            session.emit("signed_in", {"url": page.url or BATTLENET_GAMES_URL})
 
-            probe_session(header)
-            if session:
-                session.emit("signed_in", {"url": page.url or BATTLENET_GAMES_URL})
-            return {"BATTLENET_COOKIE": header}
-
-        now = time.time()
-        if session and now - last_msg > 8:
-            last_msg = now
-            url = (page.url or "").lower()
-            if "login" in url or "signin" in url or "authorize" in url:
-                msg = "Sign in to your Battle.net account in the browser window."
-            elif "battle.net" not in url:
-                msg = "Open account.battle.net/games after signing in."
-            else:
-                msg = (
-                    "On your Games page? Wait until your library list finishes loading, "
-                    "then we'll save the session automatically."
-                )
-            session.emit("waiting_for_user", {"message": msg})
-
-        page.wait_for_timeout(int(POLL_SEC * 1000))
-
-    raise RuntimeError(
-        "Could not verify a Battle.net library session — sign in at account.battle.net/games, "
-        "wait until your Games list loads, then click Connect again."
+    return run_connect_poll(
+        context=context,
+        session=session,
+        deadline=time.time() + SUCCESS_WAIT_SEC,
+        poll_sec=POLL_SEC,
+        check=lambda: extract_battlenet_session(context),
+        hint=lambda: battlenet_connect_hint(page),
+        on_signed_in=_on_signed_in,
+        timeout_message=(
+            "Could not verify a Battle.net library session — sign in at account.battle.net/games, "
+            "wait until your Games list loads, then click Connect again."
+        ),
     )
 
 
 NINTENDO_ACCOUNT_URL = "https://ec.nintendo.com/my/transactions/"
-# Nintendo session cookies that prove we can read the eShop purchase history.
-# Capturing any nintendo.com cookie isn't enough — sign-in completes on
-# accounts.nintendo.com, but the eShop session cookies only get set once we're
-# actually on ec.nintendo.com, so we must land there before reading the jar.
-_NINTENDO_SESSION_COOKIES = (
-    "MIST",
-    "JViDD",
-    "_gh_sess",
-    "NASID",
-    "ecsid",
-    "__Secure-next-auth.session-token",
+from auth.connect_extractors import (  # noqa: E402
+    extract_nintendo_session,
+    nintendo_connect_hint,
+    nintendo_has_session as _nintendo_has_session,
+    nintendo_session_has_id_token as _nintendo_session_has_id_token,
 )
-
-
-def _nintendo_has_session(context) -> bool:
-    """True when known eShop session cookies exist on ec.nintendo.com."""
-    for c in context.cookies():
-        domain = (c.get("domain") or "").lstrip(".")
-        if not domain.startswith("ec.nintendo.com"):
-            continue
-        name = c.get("name") or ""
-        if name in _NINTENDO_SESSION_COOKIES and c.get("value"):
-            return True
-    return False
-
-
-def _nintendo_session_has_id_token(context) -> bool:
-    """Verify /api/auth/session returns an idToken (GraphQL prerequisite)."""
-    try:
-        from clients.nintendo_client import PLAYWRIGHT_REQUEST_TIMEOUT_MS, probe_session_id_token
-
-        return bool(
-            probe_session_id_token(
-                context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS
-            ).get("ok")
-        )
-    except Exception:
-        return False
 
 
 def _extract_nintendo_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
@@ -231,15 +205,11 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
         url = (drive.url or "").lower()
         signed_in = "ec.nintendo.com" in url and "login" not in url and "connect" not in url
 
-        # Once signed in (we've returned to ec.nintendo.com), the eShop session
-        # cookies should be present — capture and finish.
-        if signed_in and _nintendo_has_session(context) and _nintendo_session_has_id_token(context):
-            header = _cookie_header(context.cookies(), ("nintendo.com",))
-            if header:
-                return {"NINTENDO_COOKIE": header}
+        if signed_in:
+            creds = extract_nintendo_session(context)
+            if creds:
+                return creds
 
-        # User finished sign-in but we're parked on accounts.nintendo.com / home —
-        # auto-redirect to the transactions page so the eShop cookies get set.
         on_account = (
             "accounts.nintendo.com" in url
             or "nintendo.com" in url
@@ -261,21 +231,16 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
         now = time.time()
         if session and now - last_hint > 10:
             last_hint = now
-            if "login" in url or "signin" in url or "authorize" in url:
-                msg = "Sign in to your Nintendo Account in the browser window."
-            elif on_account:
-                msg = "Signed in — opening your eShop transactions page to capture the session."
-            else:
-                msg = "Loading your Nintendo eShop transactions — keep the window open."
-            session.emit("waiting_for_user", {"message": msg})
+            session.emit(
+                "waiting_for_user",
+                {"message": nintendo_connect_hint(drive, on_account=on_account)},
+            )
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
 
-    # Last resort: session cookies + idToken probe (not merely any nintendo.com cookie).
-    if _nintendo_has_session(context) and _nintendo_session_has_id_token(context):
-        header = _cookie_header(context.cookies(), ("nintendo.com",))
-        if header:
-            return {"NINTENDO_COOKIE": header}
+    creds = extract_nintendo_session(context)
+    if creds:
+        return creds
     raise RuntimeError(
         "No Nintendo session captured — sign in, then make sure the eShop transactions page "
         "at ec.nintendo.com finished loading. Close any blank tab and click Connect again if needed."
@@ -409,49 +374,37 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
 
 def pick_gog_al_from_cookies(cookies: list[dict]) -> str:
     """Return the gog-al session value from Playwright cookie dicts, or \"\"."""
-    gog_al = next((c["value"] for c in cookies if c.get("name") == "gog-al" and c.get("value")), "")
-    if gog_al:
-        return str(gog_al)
-    header = _cookie_header(cookies, ("gog.com",))
-    if header and "gog-al=" in header:
-        return header.split("gog-al=")[-1].split(";")[0].strip()
-    return ""
+    from auth.connect_extractors import pick_gog_al_from_cookies as _pick
+
+    return _pick(cookies)
 
 
 def _extract_gog_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Poll for gog-al after the user signs in — do not trust the /en homepage URL."""
+    from auth.connect_extractors import extract_gog_session, gog_connect_hint
+    from auth.connect_loop import run_connect_poll
+
     try:
         page.goto("https://www.gog.com/", wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
 
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    last_msg = 0.0
-    while time.time() < deadline:
-        gog_al = pick_gog_al_from_cookies(context.cookies())
-        if gog_al:
-            if session:
-                session.emit("signed_in", {"url": page.url or "https://www.gog.com/"})
-            return {"GOG_AL": gog_al}
+    def _on_signed_in(creds: dict[str, str]) -> None:
+        if session:
+            session.emit("signed_in", {"url": page.url or "https://www.gog.com/"})
 
-        now = time.time()
-        if session and now - last_msg > 8:
-            last_msg = now
-            url = (page.url or "").lower()
-            if "login" in url or "signin" in url or "auth" in url:
-                msg = "Sign in to your GOG account in the browser window."
-            else:
-                msg = (
-                    "Sign in at gog.com if prompted. We'll save your session automatically "
-                    "once you're logged in."
-                )
-            session.emit("waiting_for_user", {"message": msg})
-
-        page.wait_for_timeout(int(POLL_SEC * 1000))
-
-    raise RuntimeError(
-        "Could not capture a GOG session in time — sign in at gog.com in the browser window, "
-        "then click Connect again."
+    return run_connect_poll(
+        context=context,
+        session=session,
+        deadline=time.time() + SUCCESS_WAIT_SEC,
+        poll_sec=POLL_SEC,
+        check=lambda: extract_gog_session(context),
+        hint=lambda: gog_connect_hint(page),
+        on_signed_in=_on_signed_in,
+        timeout_message=(
+            "Could not capture a GOG session in time — sign in at gog.com in the browser window, "
+            "then click Connect again."
+        ),
     )
 
 
@@ -503,11 +456,8 @@ def _psn_on_blocked_account_page(url: str, body: str) -> bool:
     return False
 
 
-def _fetch_npsso_background(page, context) -> str:
-    """Fetch npsso via in-page request — never navigate away from the store."""
-    npsso = _psn_cookie(context)
-    if npsso:
-        return npsso
+def _fetch_npsso_via_ssocookie(page) -> str:
+    """Fetch npsso from Sony's ssocookie endpoint (browser session must be signed in)."""
     try:
         result = page.evaluate(
             """async () => {
@@ -529,7 +479,22 @@ def _fetch_npsso_background(page, context) -> str:
             return result
     except Exception:
         pass
-    return _psn_cookie(context)
+    return ""
+
+
+def _fetch_npsso_background(page, context) -> tuple[str, str]:
+    """Return ``(token, source)`` where source is ``ssocookie``, ``cookie``, or ``""``.
+
+    Sony's ssocookie endpoint is the source of truth after sign-in. The browser
+    cookie jar can keep a stale npsso from a prior session and must not win.
+    """
+    via_api = _fetch_npsso_via_ssocookie(page)
+    cookie_jar = _psn_cookie(context)
+    if via_api:
+        return via_api, "ssocookie"
+    if cookie_jar:
+        return cookie_jar, "cookie"
+    return "", ""
 
 
 def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str, str]:
@@ -546,7 +511,7 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
         now = time.time()
         if now - last_ssocookie >= PSN_SSOCOOKIE_INTERVAL_SEC:
             last_ssocookie = now
-            fresh = _fetch_npsso_background(page, context)
+            fresh, _source = _fetch_npsso_background(page, context)
             if fresh and fresh not in tried_cookie:
                 result = _check_npsso(fresh)
                 if result == PSN_CHECK_VALID:
@@ -623,23 +588,16 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
     fetch_epic_wishlist.py. Connect completes when wishlistItems is present in
     either a GraphQL response or Epic's dehydrated React Query HTML state.
     """
+    from auth.connect_extractors import build_epic_wishlist_graphql_sniffer
     from auth.epic_wishlist_session import (
-        graphql_debug_entry,
-        is_epic_graphql_url,
         storefront_bounced_to_home,
         wishlist_capture_complete_from_html,
-        wishlist_graphql_ok,
     )
 
+    sniffer = build_epic_wishlist_graphql_sniffer()
     wishlist_loaded = False
     saw_id_login = False
     did_post_login_nav = False
-    # Reader-thread handlers must NOT call response.json()/getResponseBody — that
-    # issues another CDP command and waits on the very thread that pumps the
-    # reply, deadlocking until timeout and freezing cookie polling. Just stash
-    # candidate responses; the polling thread parses their bodies safely.
-    candidates: list[Any] = []
-    seen_graphql: list[dict[str, Any]] = []
 
     try:
         _debug_path = profile_dir("epic_wishlist").parent / "epic_wishlist_connect_debug.json"
@@ -647,45 +605,18 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
         _debug_path = None
 
     def _write_debug() -> None:
-        if _debug_path is None:
+        if _debug_path is None or not sniffer.debug_log:
             return
         try:
             _debug_path.parent.mkdir(parents=True, exist_ok=True)
             _debug_path.write_text(
-                json.dumps(seen_graphql[:50], indent=2, default=str, ensure_ascii=False),
+                json.dumps(sniffer.debug_log[:50], indent=2, default=str, ensure_ascii=False),
                 encoding="utf-8",
             )
         except Exception:  # noqa: BLE001
             pass
 
-    def on_response(response) -> None:
-        try:
-            if not is_epic_graphql_url(response.url or ""):
-                return
-            if response.status == 200:
-                candidates.append(response)
-        except Exception:  # noqa: BLE001
-            pass
-
-    def _drain_candidates() -> bool:
-        found = False
-        while candidates:
-            resp = candidates.pop(0)
-            try:
-                payload = resp.json()
-            except Exception:  # noqa: BLE001
-                continue
-            try:
-                seen_graphql.append(graphql_debug_entry(resp.url or "", payload))
-            except Exception:  # noqa: BLE001
-                pass
-            if wishlist_graphql_ok(payload):
-                found = True
-        if seen_graphql:
-            _write_debug()
-        return found
-
-    page.on("response", on_response)
+    sniffer.attach(page)
     try:
         page.goto(epic_store_login_url(), wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
@@ -694,8 +625,9 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
     while time.time() < deadline:
-        if not wishlist_loaded and _drain_candidates():
+        if not wishlist_loaded and sniffer.drain():
             wishlist_loaded = True
+            _write_debug()
         url = page.url or ""
         ul = url.lower()
         on_wishlist = _epic_on_wishlist(url)
@@ -718,8 +650,9 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
                 page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
             except Exception:  # noqa: BLE001
                 pass
-            if not wishlist_loaded and _drain_candidates():
+            if not wishlist_loaded and sniffer.drain():
                 wishlist_loaded = True
+                _write_debug()
         if wishlist_loaded:
             try:
                 page.wait_for_timeout(800)
@@ -1245,39 +1178,25 @@ def _humble_has_session(context) -> bool:
 
 def _extract_humble_inline(page, context, session) -> dict[str, str]:
     """Open humblebundle.com/home/library, wait for sign-in, return marker cred."""
+    from auth.connect_extractors import extract_humble_session, humble_connect_hint
+    from auth.connect_loop import run_connect_poll
+
     try:
         page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
 
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    last_msg = 0.0
-    while time.time() < deadline:
-        if _humble_has_session(context):
-            try:
-                page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=15_000)
-                page.wait_for_timeout(800)
-            except Exception:  # noqa: BLE001
-                pass
-            return {"HUMBLE_PROFILE": "ready"}
-
-        now = time.time()
-        if session and now - last_msg > 8:
-            last_msg = now
-            url = (page.url or "").lower()
-            if "login" in url or "sign" in url and "library" not in url:
-                msg = "Sign in to Humble Bundle in the browser window (email or Google)."
-            elif "humblebundle.com" not in url:
-                msg = "Open humblebundle.com/home/library after signing in."
-            else:
-                msg = "On the library page? Finish sign-in if prompted, then wait a moment."
-            session.emit("waiting_for_user", {"message": msg})
-
-        page.wait_for_timeout(int(HUMBLE_POLL_SEC * 1000))
-
-    raise RuntimeError(
-        "Could not detect a Humble sign-in \u2014 sign in at humblebundle.com/home/library "
-        "and keep the window open until it closes."
+    return run_connect_poll(
+        context=context,
+        session=session,
+        deadline=time.time() + SUCCESS_WAIT_SEC,
+        poll_sec=HUMBLE_POLL_SEC,
+        check=lambda: extract_humble_session(context, page),
+        hint=lambda: humble_connect_hint(page),
+        timeout_message=(
+            "Could not detect a Humble sign-in - sign in at humblebundle.com/home/library "
+            "and keep the window open until it closes."
+        ),
     )
 
 
@@ -1308,23 +1227,15 @@ def _ubisoft_active_page(live: list) -> object | None:
 
 
 def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[str, str]:
-    captured: dict[str, str] = {}
+    from auth.connect_extractors import (
+        build_ubisoft_header_sniffer,
+        extract_ubisoft_session,
+        ubisoft_connect_hint,
+        ubisoft_session_captured,
+    )
 
-    def on_request(request) -> None:
-        if "public-ubiservices.ubi.com" not in request.url:
-            return
-        auth = request.headers.get("authorization") or request.headers.get("Authorization")
-        ubi_session = request.headers.get("ubi-sessionid") or request.headers.get("Ubi-SessionId")
-        app_id = request.headers.get("ubi-appid") or request.headers.get("Ubi-AppId")
-        if auth:
-            captured["UBISOFT_AUTH"] = auth
-        if ubi_session:
-            captured["UBISOFT_SESSION_ID"] = ubi_session
-        if app_id:
-            captured["UBISOFT_APP_ID"] = app_id
-
-    # Sniff on every page so a request fired from the post-2FA landing tab still counts.
-    context.on("request", on_request)
+    sniffer = build_ubisoft_header_sniffer()
+    sniffer.attach(context)
     try:
         page.goto("https://www.ubisoft.com/en-us/ubisoft-connect", wait_until="domcontentloaded", timeout=25_000)
     except Exception:
@@ -1335,15 +1246,15 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
     seen_success = False
     nudged = 0
     while time.time() < deadline:
-        if captured.get("UBISOFT_AUTH") and captured.get("UBISOFT_SESSION_ID"):
-            return captured
+        creds = extract_ubisoft_session(sniffer)
+        if creds:
+            return creds
 
         live = [pg for pg in context.pages if not pg.is_closed]
         main = _ubisoft_active_page(live) or (live[0] if live else context.new_page())
         urls = [(pg.url or "").lower() for pg in live]
         if len(live) > 1:
             main_url = (main.url or "").lower()
-            # Don't steal focus from the Ubisoft SDK while it hands off to the opener.
             if "connect.ubisoft.com/login" in main_url or UBISOFT_SUCCESS_URL in main_url:
                 try:
                     main.bring_to_front()
@@ -1351,9 +1262,6 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
                     pass
         on_success = any(UBISOFT_SUCCESS_URL in u for u in urls)
 
-        # Post-2FA we land on connect.ubisoft.com/logged-in.html. That page doesn't
-        # call ubiservices on its own, so drive a real tab to the library to trigger
-        # the authenticated API requests we sniff for credentials.
         if on_success and not seen_success:
             seen_success = True
             if session:
@@ -1373,18 +1281,11 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
         now = time.time()
         if session and now - last_hint > 10:
             last_hint = now
-            joined = " ".join(urls)
-            if "account.ubisoft" in joined or "login" in joined:
-                msg = (
-                    "Finish Ubisoft sign-in and 2FA in the browser window (use the popup if it "
-                    "stays open). Close DevTools if you see a yellow 'Debugger paused' banner."
-                )
-            elif seen_success and not captured:
-                msg = "Signed in — opening your Ubisoft games list to finish capturing the session."
-            elif not captured:
-                msg = "Signed in? Open your Ubisoft Connect games list so we can capture the session."
-            else:
-                msg = "Almost there — keep the window open while we finish capturing your session."
+            msg = ubisoft_connect_hint(
+                urls=urls,
+                seen_success=seen_success,
+                captured=ubisoft_session_captured(sniffer),
+            )
             session.emit("waiting_for_user", {"message": msg})
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
@@ -1397,76 +1298,66 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
 
 def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Confirm ea.com login, persist profile + web-session Bearer token."""
-    from clients.ea_session import (
-        EA_DEALS_URL,
-        EA_GRAPHQL_HOST,
-        EA_LOGIN_URL,
-        normalize_bearer,
-        probe_ea_token,
+    from auth.connect_extractors import (
+        build_ea_header_sniffer,
+        ea_connect_hint,
+        extract_ea_bearer_session,
     )
+    from auth.connect_loop import run_connect_poll
+    from clients.ea_session import EA_DEALS_URL, EA_HOME_URL, EA_LOGIN_URL
 
-    saw_token: dict[str, Any] = {"ok": False, "value": ""}
+    sniffer = build_ea_header_sniffer()
+    sniffer.attach(context)
+    nudged = {"done": False}
 
-    def on_request(request) -> None:
-        if EA_GRAPHQL_HOST not in (request.url or ""):
-            return
-        auth = request.headers.get("authorization") or request.headers.get("Authorization")
-        token = normalize_bearer(auth)
-        if token:
-            saw_token["ok"] = True
-            saw_token["value"] = token
+    def _active_page():
+        return _drive_connect_page(page, context)
 
-    context.on("request", on_request)
-    try:
-        page.goto(EA_LOGIN_URL, wait_until="domcontentloaded", timeout=25_000)
-    except Exception:
-        pass
-
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    last_hint = 0.0
-    nudged = False
-    while time.time() < deadline:
-        if saw_token["ok"] and saw_token["value"]:
-            cookies = context.cookies()
-            if probe_ea_token(saw_token["value"], cookies).get("ok"):
-                return {
-                    "EA_PROFILE": "ready",
-                    "EA_BEARER_TOKEN": saw_token["value"],
-                }
-            saw_token["ok"] = False
-            saw_token["value"] = ""
-
-        url = (page.url or "").lower()
-        signed_in = "ea.com" in url and "login" not in url and "signin.ea.com" not in url
-        if signed_in and not nudged:
-            nudged = True
+    def _maybe_nudge_deals() -> None:
+        active = _active_page()
+        url = (active.url or "").lower()
+        signed_in = (
+            url.rstrip("/") in (EA_HOME_URL.rstrip("/"), EA_HOME_URL.rstrip("/") + "/")
+            or ("ea.com" in url and "login" not in url and "signin.ea.com" not in url)
+        )
+        if signed_in and not nudged["done"]:
+            nudged["done"] = True
             if session:
-                session.emit("signed_in", {"url": page.url or EA_LOGIN_URL})
+                session.emit("signed_in", {"url": active.url or EA_LOGIN_URL})
             try:
-                page.bring_to_front()
+                active.bring_to_front()
             except Exception:
                 pass
             try:
-                page.goto(EA_DEALS_URL, wait_until="domcontentloaded", timeout=25_000)
+                active.goto(EA_DEALS_URL, wait_until="domcontentloaded", timeout=25_000)
             except Exception:
                 pass
 
-        now = time.time()
-        if session and now - last_hint > 10:
-            last_hint = now
-            if "signin.ea.com" in url or "/login" in url:
-                msg = "Sign in to your EA account in the browser window."
-            elif signed_in and not saw_token["ok"]:
-                msg = "Signed in — wait for the deals page to finish loading so we can save your session."
-            else:
-                msg = "Keep the window open while we confirm your EA App session."
-            session.emit("waiting_for_user", {"message": msg})
+    def _check() -> dict[str, str] | None:
+        abort_if_browser_closed(context)
+        active = _active_page()
+        if is_blank_browser_url(active.url or ""):
+            try:
+                active.goto(EA_LOGIN_URL, wait_until="domcontentloaded", timeout=25_000)
+            except Exception:
+                pass
+        _maybe_nudge_deals()
+        return extract_ea_bearer_session(context, sniffer=sniffer)
 
-        page.wait_for_timeout(int(POLL_SEC * 1000))
+    def _hint() -> str:
+        return ea_connect_hint(_active_page(), saw_token=bool(sniffer.captured.get("EA_BEARER_TOKEN")))
 
-    raise RuntimeError(
-        "EA session not confirmed — sign in at ea.com, then wait on the deals page "
-        "before the window closes."
+    return run_connect_poll(
+        context=context,
+        session=session,
+        deadline=time.time() + SUCCESS_WAIT_SEC,
+        poll_sec=POLL_SEC,
+        check=_check,
+        hint=_hint,
+        timeout_message=(
+            "EA session not confirmed — sign in at ea.com, then wait on the deals page "
+            "before the window closes."
+        ),
     )
 
 
@@ -1616,73 +1507,85 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
     )
     session.emit("waiting_for_user", {"message": connect_hint})
 
-    with launch_persistent_profile(user_data, headless=False) as context:
-        context.add_init_script(_STEALTH_INIT)
-        # Paint a persistent, click-through banner inside the popup so users see
-        # the same guidance there (not just on the dashboard). Keep it in sync
-        # with the live waiting_for_user / signed_in messages.
-        context.add_init_script(auth_banner_init_script(connect_hint))
+    from auth.cdp_browser import release_chromium_profile_lock
 
-        def _sync_auth_banner(event: str, data: dict) -> None:
-            if event == "waiting_for_user":
-                context.set_auth_banner((data or {}).get("message") or connect_hint)
-            elif event == "signed_in":
-                context.set_auth_banner(
-                    "Signed in \u2014 keep this window open until it closes automatically."
-                )
+    release_chromium_profile_lock(user_data)
 
-        session.add_listener(_sync_auth_banner)
-        page = context.pages[0] if context.pages else context.new_page()
-
-        # Raise the connect window to the OS foreground — on Windows it often
-        # opens behind the dashboard/IDE, and Page.bringToFront alone only swaps
-        # the active tab without focusing the window.
+    with launch_persistent_profile(
+        user_data,
+        headless=False,
+        initial_url=spec.login_url if provider == "ea" else None,
+    ) as context:
         try:
-            page.focus_window()
-        except Exception:
-            pass
+            context.add_init_script(_STEALTH_INIT)
+            # Paint a persistent, click-through banner inside the popup so users see
+            # the same guidance there (not just on the dashboard). Keep it in sync
+            # with the live waiting_for_user / signed_in messages.
+            context.add_init_script(auth_banner_init_script(connect_hint))
 
-        if provider in INLINE_PROVIDERS:
-            if provider == "psn":
-                try:
-                    page.goto(PSN_STORE_URL, wait_until="domcontentloaded", timeout=20000)
-                except Exception:
-                    pass
-                creds = _extract_psn(page, context, session)
-            elif provider == "epic_wishlist":
-                creds = _extract_epic_wishlist_inline(page, context, session)
-            elif provider == "xbox_wishlist":
-                creds = _extract_xbox_wishlist_inline(page, context, session)
-            elif provider == "nintendo_wishlist":
-                creds = _extract_nintendo_wishlist_inline(page, context, session)
-            elif provider in ("steam", "itch", "itad", "xbox"):
-                try:
-                    page.goto(spec.login_url, wait_until="domcontentloaded", timeout=20000)
-                except Exception:
-                    pass
-                api_extractors = {
-                    "steam": extract_steam,
-                    "itch": extract_itch,
-                    "itad": extract_itad,
-                    "xbox": extract_xbox,
-                }
-                creds = api_extractors[provider](page, context, session)
-            elif provider == "ubisoft":
-                creds = _extract_ubisoft(page, context, session)
-            elif provider == "ea":
-                creds = _extract_ea(page, context, session)
-            elif provider == "nintendo":
-                creds = _extract_nintendo_inline(page, context, session)
-            elif provider == "epic":
-                creds = _extract_epic_inline(page, context, session)
-            elif provider == "humble":
-                creds = _extract_humble_inline(page, context, session)
-            elif provider == "amazon_web":
-                creds = _extract_amazon_web(page, context, session)
-            elif provider == "battlenet":
-                creds = _extract_battlenet_inline(page, context, session)
-            elif provider == "gog":
-                creds = _extract_gog_inline(page, context, session)
-            else:  # pragma: no cover — gate above guarantees an inline provider
-                raise RuntimeError(f"No inline handler for {provider}")
-            return creds
+            def _sync_auth_banner(event: str, data: dict) -> None:
+                if event == "waiting_for_user":
+                    context.set_auth_banner((data or {}).get("message") or connect_hint)
+                elif event == "signed_in":
+                    context.set_auth_banner(
+                        "Signed in \u2014 keep this window open until it closes automatically."
+                    )
+
+            session.add_listener(_sync_auth_banner)
+            page = _wait_for_connect_page(context)
+            page = _drive_connect_page(page, context)
+
+            # Raise the connect window to the OS foreground — on Windows it often
+            # opens behind the dashboard/IDE, and Page.bringToFront alone only swaps
+            # the active tab without focusing the window.
+            try:
+                page.focus_window()
+            except Exception:
+                pass
+
+            if provider in INLINE_PROVIDERS:
+                if provider == "psn":
+                    try:
+                        page.goto(PSN_STORE_URL, wait_until="domcontentloaded", timeout=20000)
+                    except Exception:
+                        pass
+                    creds = _extract_psn(page, context, session)
+                elif provider == "epic_wishlist":
+                    creds = _extract_epic_wishlist_inline(page, context, session)
+                elif provider == "xbox_wishlist":
+                    creds = _extract_xbox_wishlist_inline(page, context, session)
+                elif provider == "nintendo_wishlist":
+                    creds = _extract_nintendo_wishlist_inline(page, context, session)
+                elif provider in ("steam", "itch", "itad", "xbox"):
+                    try:
+                        page.goto(spec.login_url, wait_until="domcontentloaded", timeout=20000)
+                    except Exception:
+                        pass
+                    api_extractors = {
+                        "steam": extract_steam,
+                        "itch": extract_itch,
+                        "itad": extract_itad,
+                        "xbox": extract_xbox,
+                    }
+                    creds = api_extractors[provider](page, context, session)
+                elif provider == "ubisoft":
+                    creds = _extract_ubisoft(page, context, session)
+                elif provider == "ea":
+                    creds = _extract_ea(page, context, session)
+                elif provider == "nintendo":
+                    creds = _extract_nintendo_inline(page, context, session)
+                elif provider == "epic":
+                    creds = _extract_epic_inline(page, context, session)
+                elif provider == "humble":
+                    creds = _extract_humble_inline(page, context, session)
+                elif provider == "amazon_web":
+                    creds = _extract_amazon_web(page, context, session)
+                elif provider == "battlenet":
+                    creds = _extract_battlenet_inline(page, context, session)
+                elif provider == "gog":
+                    creds = _extract_gog_inline(page, context, session)
+                else:  # pragma: no cover — gate above guarantees an inline provider
+                    raise RuntimeError(f"No inline handler for {provider}")
+                return creds
+        except ConnectBrowserClosed:
+            return None

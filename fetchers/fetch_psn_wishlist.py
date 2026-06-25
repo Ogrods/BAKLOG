@@ -26,6 +26,7 @@ from clients.hltb_client import HltbClient
 from clients.psn_client import PsnAuthError, PsnClient, PsnWishlistEntry
 from fetchers._base import (
     add_allow_empty_arg,
+    add_only_new_arg,
     catalog_file,
     configure_stdout,
     refuse_drift_result,
@@ -100,6 +101,7 @@ def _load_existing() -> dict[str, dict]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch PSN wishlist into games_wishlist_psn.json")
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
+    add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     configure_stdout()
@@ -161,9 +163,12 @@ def main() -> int:
 
     for i, entry in enumerate(items, 1):
         row_id = f"psn-{entry.id}"
+        cached = existing.get(row_id)
+        if args.only_new and cached:
+            rows.append(cached)
+            continue
         print(f"[{i}/{len(items)}] {entry.name}")
         hltb = None
-        cached = existing.get(row_id)
         if hltb_client:
             if cached and cached.get("hltb_main_hours") is not None:
                 hltb = {

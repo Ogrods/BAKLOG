@@ -19,6 +19,7 @@ from fetchers._authoritative import UBISOFT
 from fetchers._base import (
     add_allow_empty_arg,
     add_no_carry_arg,
+    add_only_new_arg,
     apply_carry_forward,
     catalog_file,
     configure_stdout,
@@ -271,6 +272,7 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch Ubisoft Connect library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
+    add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     parser.add_argument(
@@ -344,8 +346,12 @@ def main() -> int:
     games_out: list[dict] = []
     for i, item in enumerate(deduped, 1):
         name = _name_of(item)
+        row_id = _id_of(item, name or "")
+        cached = existing.get(row_id)
+        if args.only_new and cached:
+            games_out.append(cached)
+            continue
         print(f"[{i}/{len(deduped)}] {name}")
-        cached = existing.get(_id_of(item, name or ""))
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:

@@ -79,11 +79,10 @@ def test_nintendo_connect_drives_non_blank_tab(monkeypatch: pytest.MonkeyPatch) 
 
     login.goto = _goto  # type: ignore[method-assign]
 
-    monkeypatch.setattr(runner, "_nintendo_has_session", lambda _ctx: True)
-    monkeypatch.setattr(runner, "_nintendo_session_has_id_token", lambda _ctx: True)
+    monkeypatch.setattr("auth.connect_extractors.nintendo_has_session", lambda _ctx: True)
+    monkeypatch.setattr("auth.connect_extractors.nintendo_session_has_id_token", lambda _ctx: True)
     monkeypatch.setattr(
-        runner,
-        "_cookie_header",
+        "auth.connect_extractors._cookie_header",
         lambda _cookies, _domains: "NASID=abc; idToken=tok",
     )
 

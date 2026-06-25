@@ -62,10 +62,10 @@ There are **two completely separate** ad/banner systems. Picking the wrong one i
 - Commit, push, let **Vercel redeploy** baklog.app.
 - **Verify live:** `Invoke-WebRequest https://baklog.app/sponsors.json` and confirm your id + copy are present. Do not trust the local repo file — confirm the hosted feed.
 
-**2. Hardcoded JS banners** (the dashboard `PRO_PROMO` banner `proPromoBannerHtml`, the wishlist house banner, and the Connections-tab Pro card `renderConnectionsProLink` / `CONN_PRO_PITCH` in `js/pro-view.js`). Source: `js/` only — **not** `sponsors.json`. To update:
+**2. Hardcoded JS banners** (the dashboard `PRO_PROMO` banner `proPromoBannerHtml`, the wishlist house banner, and the Connections-tab background-refresh note via `bgRefreshPlanNote()` in `js/connections.js`). Source: `js/` only — **not** `sponsors.json`. To update:
 
 - Edit the `js/` source. In dev the server sends raw ESM with `Cache-Control: no-store`, so a **page reload** picks it up (an already-open SPA tab must be reloaded — modules don't hot-swap).
 - If the server runs built mode (`BAKLOG_SERVE_BUILT=1` or a frozen PyInstaller exe), run `npm run build` to regenerate `dist/` first.
-- The Connections Pro card only renders on the **Connections tab** in a **non‑Pro** session (`isPro()` false). It's hidden for Pro users / `?pro=1`.
+- The Connections background-refresh note only renders on the **Connections tab** in a **non‑Pro** session (`isPro()` false). It's hidden for Pro users / `?pro=1`.
 
 **Quick triage when a banner won't show:** (a) which system is it? (b) for feed-driven, is the **hosted** feed updated (curl it)? (c) for JS, did you reload / rebuild? (d) are you Pro / on the right tab? (e) is the slot dismissed this session?

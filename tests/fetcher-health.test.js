@@ -860,6 +860,144 @@ describe('reconcileRunStateFromSnapshot', () => {
     });
     expect(fetcherRunner.stateFor('hltb')).toBeNull();
   });
+
+  it('tracks enrich lane runs in inFlightKeys', () => {
+    fetcherRunner.markChipStateForTest('hltb', 'running', 'run-hltb-1');
+    fetcherRunner.reconcileRunStateFromSnapshot({
+      active: null,
+      queue: [],
+      enrich_active: { key: 'hltb', id: 'run-hltb-1', status: 'running' },
+      enrich_queue: [],
+      history: [],
+    });
+    expect(fetcherRunner.stateFor('hltb')).toBe('running');
+    fetcherRunner.markChipStateForTest('hltb', null);
+  });
+});
+
+describe('lane-aware queue slots', () => {
+  const stubFetchers = () => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [
+              { key: 'steam', label: 'Steam', group: 'library', metaKey: 'steam', available: true },
+              { key: 'hltb', label: 'HLTB', group: 'enrich', metaKey: 'hltb', available: true },
+            ],
+          }),
+        };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(async () => {
+    stubFetchers();
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    fetcherRunner.applyServerSnapshotInFlight({});
+    fetcherRunner.markChipStateForTest('steam', null);
+    fetcherRunner.markChipStateForTest('hltb', null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    fetcherRunner.applyServerSnapshotInFlight({});
+    fetcherRunner.markChipStateForTest('steam', null);
+    fetcherRunner.markChipStateForTest('hltb', null);
+  });
+
+  it('fetcher lane busy blocks library keys only', () => {
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { key: 'steam', id: 'r1', status: 'running' },
+    });
+    expect(fetcherRunner.isQueueFullForKey('steam')).toBe(true);
+    expect(fetcherRunner.isQueueFullForKey('hltb')).toBe(false);
+    expect(fetcherRunner.getLastServerInFlight()).toBe(true);
+  });
+
+  it('enrich lane busy blocks enrich keys only', () => {
+    fetcherRunner.applyServerSnapshotInFlight({
+      enrich_active: { key: 'hltb', id: 'r2', status: 'running' },
+    });
+    expect(fetcherRunner.isQueueFullForKey('hltb')).toBe(true);
+    expect(fetcherRunner.isQueueFullForKey('steam')).toBe(false);
+  });
+
+  it('both lanes busy block both key types', () => {
+    fetcherRunner.applyServerSnapshotInFlight({
+      active: { key: 'steam', id: 'r1', status: 'running' },
+      enrich_active: { key: 'hltb', id: 'r2', status: 'running' },
+    });
+    expect(fetcherRunner.isQueueFullForKey('steam')).toBe(true);
+    expect(fetcherRunner.isQueueFullForKey('hltb')).toBe(true);
+  });
+
+  it('client-side running state is lane-scoped', () => {
+    fetcherRunner.markChipStateForTest('steam', 'running', 'run-steam-1');
+    expect(fetcherRunner.isQueueFullForKey('steam')).toBe(true);
+    expect(fetcherRunner.isQueueFullForKey('hltb')).toBe(false);
+    fetcherRunner.markChipStateForTest('steam', null);
+    fetcherRunner.markChipStateForTest('hltb', 'running', 'run-hltb-1');
+    expect(fetcherRunner.isQueueFullForKey('hltb')).toBe(true);
+    expect(fetcherRunner.isQueueFullForKey('steam')).toBe(false);
+    fetcherRunner.markChipStateForTest('hltb', null);
+  });
+});
+
+describe('cancel enrich lane', () => {
+  beforeEach(async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
+      const u = String(url);
+      if (u.includes('/api/runs') && !u.includes('/cancel')) {
+        return {
+          ok: true,
+          json: async () => ({
+            active: null,
+            queue: [],
+            enrich_active: { id: 'enrich-1', key: 'hltb', status: 'running' },
+            enrich_queue: [],
+            history: [],
+          }),
+        };
+      }
+      if (u.includes('/api/runs/cancel')) {
+        return { ok: true, json: async () => ({ cancelled: [{ id: 'enrich-1' }] }) };
+      }
+      if (u.includes('/api/fetchers') || u.includes('manifest.json')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    }));
+    fetcherRunner.invalidateApiProbe();
+    fetcherRunner.setCancelInFlightForTest(false);
+    await fetcherRunner.probeApi(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    fetcherRunner.applyServerSnapshotInFlight({});
+  });
+
+  it('posts cancel for fetcher and enrich lanes', async () => {
+    await fetcherRunner.cancelInFlightRuns();
+    const fetchMock = /** @type {import('vitest').Mock} */ (globalThis.fetch);
+    await vi.waitFor(() => {
+      const cancelUrls = fetchMock.mock.calls
+        .map(([url]) => String(url))
+        .filter(u => u.includes('/api/runs/cancel'));
+      expect(cancelUrls.some(u => u.includes('lane=fetcher'))).toBe(true);
+      expect(cancelUrls.some(u => u.includes('lane=enrich'))).toBe(true);
+    });
+  });
 });
 
 describe('syncLogHeightToCard', () => {

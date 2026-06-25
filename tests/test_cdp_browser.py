@@ -24,6 +24,8 @@ from auth.cdp_browser import (
     _BROWSER_LAUNCH_HINT,
     CdpContext,
     CdpPage,
+    CdpRequest,
+    CdpResponse,
     _cdp_websocket_error,
     _chromium_executable_candidates,
     _should_preserve_popup,
@@ -63,7 +65,7 @@ class TestCookieHeader:
 class TestBlankUrl:
     @pytest.mark.parametrize(
         "url",
-        ["", "about:blank", "chrome://newtab/"],
+        ["", "about:blank", "chrome://newtab/", "chrome://new-tab-page/"],
     )
     def test_blank_urls(self, url: str) -> None:
         assert is_blank_browser_url(url)
@@ -110,6 +112,28 @@ class TestRegisterPageDebugger:
         assert not any(m.startswith("Debugger.") for m, _ in calls)
         assert ("Page.enable", "SESSION-1") in calls
         assert ("Network.enable", "SESSION-1") in calls
+
+
+class TestCdpContextResponseHandlers:
+    def test_dispatch_response_invokes_context_handlers(self) -> None:
+        ctx = _bare_context()
+        ctx._request_handlers = []
+        ctx._response_handlers = []
+        page = CdpPage(ctx, "TARGET-1", "SESSION-1")
+        seen: list[str] = []
+
+        ctx.on("response", lambda _resp: seen.append("ctx"))
+        req = CdpRequest(url="https://example.com/gql", headers={})
+        resp = CdpResponse(
+            url=req.url,
+            status=200,
+            request=req,
+            headers={},
+            _page=page,
+            _request_id="req-1",
+        )
+        page._dispatch_response(resp)
+        assert seen == ["ctx"]
 
 
 class TestCdpErrors:

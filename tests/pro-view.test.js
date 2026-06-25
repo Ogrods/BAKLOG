@@ -6,6 +6,7 @@ vi.mock('../js/auth-gate.js', () => ({
   isAccountAuthMode: vi.fn(() => false),
   isLocalProfilesEnabled: vi.fn(() => false),
   licenseActivationEnabled: vi.fn(() => true),
+  proCheckoutEnabled: vi.fn(() => true),
   proCheckoutUrls: vi.fn(() => ({})),
   getAccountEmail: vi.fn(() => ''),
   getAccountProfileId: vi.fn(() => ''),
@@ -38,8 +39,11 @@ describe('proPromoBannerHtml', () => {
 });
 
 describe('renderProView', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '<div id="proContainer"><div id="proViewRoot"></div></div>';
+    const authGate = await import('../js/auth-gate.js');
+    authGate.licenseActivationEnabled.mockReturnValue(true);
+    authGate.proCheckoutEnabled.mockReturnValue(true);
   });
 
   it('renders conversion funnel with hero banner, toggle, six perks, and license field', async () => {
@@ -65,12 +69,23 @@ describe('renderProView', () => {
   it('shows license field and refresh even when license activation is disabled in config', async () => {
     const authGate = await import('../js/auth-gate.js');
     authGate.licenseActivationEnabled.mockReturnValue(false);
+    authGate.proCheckoutEnabled.mockReturnValue(false);
     const { renderProView } = await import('../js/pro-view.js');
     renderProView();
     const root = document.getElementById('proViewRoot');
-    expect(root.querySelector('[data-pro-license-form]')).toBeTruthy();
+    expect(root.querySelector('[data-pro-license-form]')).toBeNull();
     expect(root.querySelector('[data-pro-refresh]')).toBeTruthy();
-    expect(root.innerHTML).not.toContain('BAKLOG_POLAR_ORG_ID');
+    expect(root.innerHTML).toContain('BAKLOG_POLAR_ORG_ID');
+  });
+
+  it('hides checkout CTAs when proCheckoutEnabled is false', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.proCheckoutEnabled.mockReturnValue(false);
+    const { renderProView } = await import('../js/pro-view.js');
+    renderProView();
+    const root = document.getElementById('proViewRoot');
+    expect(root.querySelector('[data-pro-checkout]')).toBeNull();
+    expect(root.innerHTML).toContain('Checkout is closed during beta');
   });
 
   it('switches checkout label and hero banner when monthly plan is selected', async () => {
@@ -158,6 +173,7 @@ describe('post-checkout return', () => {
   it('handleCheckoutSuccessReturn focuses license key for local-only users', async () => {
     const authGate = await import('../js/auth-gate.js');
     authGate.isAccountAuthMode.mockReturnValue(false);
+    authGate.licenseActivationEnabled.mockReturnValue(true);
     const input = document.getElementById('proViewLicenseKey');
     const focusSpy = vi.spyOn(input, 'focus');
     const { markCheckoutSuccessPending, handleCheckoutSuccessReturn } = await import('../js/pro-view.js');

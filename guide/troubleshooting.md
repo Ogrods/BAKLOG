@@ -14,6 +14,25 @@ Common problems when connecting stores, running fetchers, or launching BAKLOG.
 
 Sessions expire on different schedules per store. Epic wishlist, Nintendo, and cookie-based stores tend to need refresh more often than API-key stores like Steam.
 
+## Connect saved, fetch still fails
+
+**Symptom:** Connections shows **Connected**, but the fetcher exits `4` or logs auth/capture errors.
+
+**Cause:** Connect and fetch use different checks. Connect saves cookies or a Bearer token from the sign-in browser; fetch replays that session against the store API. A connect can succeed while the token is missing, stale, or rejected on the first library call.
+
+**Fix by store:**
+
+| Store | After Connect | If fetch still fails |
+|-------|---------------|----------------------|
+| **EA App** | Stay on **ea.com/sales/deals** until the window closes on its own | **Reconnect** (do not close early). Run `fetch_ea.py --headed --dump-debug` and check `cache/ea/fetch_debug.json` for token capture. |
+| **GOG (web)** | Sign in at gog.com; wait for auto-close | Reconnect, or use `fetch_gog.py --source local` with Galaxy on Windows/macOS. |
+| **Battle.net** | Open **account.battle.net/games** until your library list loads | Reconnect; on Windows Edge v127+ use Connect (not `--browser edge` jar read) or paste `BATTLENET_COOKIE` in `.env`. |
+| **Humble** | Complete sign-in and any CAPTCHA on the library page | Reconnect with the library URL open. |
+| **Epic wishlist** | Finish Epic login; use manual code paste if the redirect fails | Reconnect with **Fresh** if the profile is stuck. |
+| **Xbox wishlist** | Complete Microsoft login in the headed window | Reconnect; advisory probe may show connected before wishlist fetch works. |
+
+**General:** Use **Reconnect** (fresh profile clear when the store allows it), complete the full headed flow, then retry from Fetcher health.
+
 ## Suspicious empty result (exit code 2)
 
 **Symptom:** Fetcher refuses to write an empty file; log mentions exit `2`.

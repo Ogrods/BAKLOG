@@ -33,6 +33,7 @@ from auth.secrets import profile_dir
 from clients.hltb_client import HltbClient
 from fetchers._base import (
     add_allow_empty_arg,
+    add_only_new_arg,
     catalog_file,
     configure_stdout,
     refuse_drift_result,
@@ -318,6 +319,7 @@ def main() -> int:
         description="Fetch Ubisoft Store wishlist into games_wishlist_ubisoft.json",
     )
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
+    add_only_new_arg(parser)
     parser.add_argument(
         "--include-dlc",
         action="store_true",
@@ -388,9 +390,12 @@ def main() -> int:
 
     for i, item in enumerate(kept, 1):
         row_id = f"ubisoft-{item.store_id}"
+        cached = existing.get(row_id)
+        if args.only_new and cached:
+            rows.append(cached)
+            continue
         print(f"[{i}/{len(kept)}] {item.name}", flush=True)
         hltb = None
-        cached = existing.get(row_id)
         if hltb_client and item.name:
             if cached and cached.get("hltb_main_hours") is not None:
                 hltb = {

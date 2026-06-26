@@ -11,13 +11,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from shared.library_noise import should_auto_hide_gog_title
+
 _PROMO_SUFFIX_RES: tuple[re.Pattern[str], ...] = (
     re.compile(r"\s*-\s*Amazon Luna\s*$", re.IGNORECASE),
     re.compile(r"\s*-\s*Amazon Prime\s*$", re.IGNORECASE),
     re.compile(r"\s*-\s*Prime Giveaway\s*$", re.IGNORECASE),
 )
 
-_DLC_NAME_RE = re.compile(r"\bDLC\b", re.IGNORECASE)
 _YEAR_QUALIFIER_RE = re.compile(r"\s*\(\d{4}\)\s*$")
 # Subtitle after ":" that signals a parallel SKU (edition / deluxe / musical …), not a
 # distinct sequel subtitle like "The Legend of Darkmoon".
@@ -26,8 +27,6 @@ _EDITION_VARIANT_SUBTITLE_RE = re.compile(
     r"goty|definitive|remastered|remaster|ultimate)\b",
     re.IGNORECASE,
 )
-_NON_GAME_TITLES = frozenset({"freedom to buy games"})
-
 _PACK_REGISTRY: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     (
         re.compile(r"^Silver Box Classics$", re.IGNORECASE),
@@ -82,17 +81,9 @@ _PACK_REGISTRY: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
 )
 
 
-def is_non_game_title(name: str) -> bool:
-    return (name or "").strip().lower() in _NON_GAME_TITLES
-
-
-def looks_like_dlc_name(name: str) -> bool:
-    return bool(_DLC_NAME_RE.search(name or ""))
-
-
 def should_skip_gog_title(name: str) -> bool:
     """Drop a row before it enters the catalog (voucher / name-DLC)."""
-    return is_non_game_title(name) or looks_like_dlc_name(name)
+    return should_auto_hide_gog_title(name)
 
 
 def has_promo_suffix(name: str) -> bool:

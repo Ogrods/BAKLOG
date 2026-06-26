@@ -7,6 +7,8 @@ from collections import defaultdict
 from typing import Any
 from urllib.parse import quote
 
+from shared.library_noise import is_nintendo_noise_row
+
 _TRADEMARK_RE = re.compile(r"[™®©]")
 _PUNCT_RE = re.compile(r"[^\w\s]+", re.UNICODE)
 
@@ -20,21 +22,6 @@ _EDITION_SUFFIXES = (
     " special edition",
     " collectors edition",
     " collector's edition",
-)
-
-_NON_GAME_TITLE_PATTERNS = re.compile(
-    r"\b(expansion pass|season pass|fighter pass|\bdlc\b|add-?on content|"
-    r"bonus content|upgrade pack|costume pack|skin pack|\bskin\b|coins?\b|"
-    r"coin set|soundtrack|artbook|art book|character pack|challenge pack|"
-    r"\bpicaro\b|mini digital sound|digital art book|"
-    r"nintendo switch online|membership|e?shop\s+card|add-on content bundle)\b",
-    re.I,
-)
-
-_STREAMING_APP_PATTERNS = re.compile(
-    r"\b(hulu|youtube|twitch|crunchyroll|inkypen|pokémon home|pokemon home|"
-    r"pokémon tv|pokemon tv)\b",
-    re.I,
 )
 
 _DELUXE_MARKERS = (
@@ -197,29 +184,7 @@ def _hybrid_from_tx_only(tx: dict[str, Any]) -> dict[str, Any]:
 
 def is_nintendo_playable_game(item: dict[str, Any]) -> bool:
     """True for base-game library rows; false for DLC, skins, streaming apps, etc."""
-    if item.get("is_dlc") or item.get("nintendo_is_dlc"):
-        return False
-    tags = item.get("tags") or []
-    if "dlc" in tags:
-        has_app = bool(
-            item.get("has_application")
-            or item.get("has_nx_application")
-            or item.get("has_ounce_application")
-            or item.get("application_id")
-            or item.get("nintendo_has_application")
-            or item.get("nintendo_has_nx_application")
-            or item.get("nintendo_has_ounce_application")
-        )
-        if not has_app:
-            return False
-    name = str(item.get("name") or "")
-    if not name.strip():
-        return False
-    if _NON_GAME_TITLE_PATTERNS.search(name):
-        return False
-    if _STREAMING_APP_PATTERNS.search(name):
-        return False
-    return True
+    return not is_nintendo_noise_row(item)
 
 
 def dedupe_deluxe_edition_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

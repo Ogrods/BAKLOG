@@ -13,6 +13,7 @@ from psnawp_api import PSNAWP
 from psnawp_api.core import PSNAWPAuthenticationError, PSNAWPForbiddenError
 
 from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
+from shared.library_noise import should_auto_hide_psn_title
 
 
 class PsnAuthError(Exception):
@@ -109,50 +110,6 @@ _ROMAN_WORDS = {
     "xv": "15",
 }
 
-_NON_GAME_EXACT = frozenset(
-    {
-        "amazon prime video",
-        "disney plus",
-        "disney",
-        "spotify",
-        "youtube",
-        "twitch",
-        "netflix",
-        "hulu",
-        "watchesn",
-        "watchespn",
-        "pluto tv",
-        "sharefactory",
-        "share factory studio",
-        "the playroom",
-        "project catch",
-        "directv nfl sunday ticket",
-    }
-)
-
-_NON_GAME_PATTERNS = (
-    re.compile(r"\bdemo\b"),
-    re.compile(r"\bopen beta\b"),
-    re.compile(r"\bbeta\b"),
-    re.compile(r"\bb e t a\b"),
-    re.compile(r"\btrial version\b"),
-    re.compile(r"\bsoundtrack\b"),
-    re.compile(r"\bart book\b"),
-    re.compile(r"\bdigital deluxe soundtrack\b"),
-    re.compile(r"^dlc\b"),
-    re.compile(r"\btrophy set$"),
-    re.compile(r"\btrophies$"),
-    re.compile(r"\btheme$"),
-    re.compile(r"\bdynamic theme$"),
-    re.compile(r"\bwallpaper$"),
-    re.compile(r"\bavatar pack\b"),
-    re.compile(r"^cusa\d+_\d+$"),
-    re.compile(r"^ppsa\d+_\d+$"),
-    re.compile(r"^up\d+-cusa\d+_\d+$"),
-    re.compile(r"^npwr\d+_\d+$"),
-)
-
-
 def _strip_marketing(name: str) -> str:
     return name.replace("\u2122", "").replace("\u00ae", "").replace("\u00a9", "")
 
@@ -162,17 +119,6 @@ def _display_name(name: str) -> str:
     n = _strip_marketing(name).strip()
     n = re.sub(r"\bT elltale\b", "Telltale", n, flags=re.I)
     return n
-
-
-def _norm_name_raw(name: str | None) -> str:
-    """Normalize for filtering — does not strip trophy/platform suffixes."""
-    if not name:
-        return ""
-    n = _strip_marketing(name)
-    n = unicodedata.normalize("NFKD", n).lower()
-    n = "".join(c for c in n if not unicodedata.combining(c))
-    n = re.sub(r"[^a-z0-9\s]", " ", n)
-    return " ".join(n.split())
 
 
 def _norm_name(name: str | None) -> str:
@@ -202,15 +148,7 @@ def _dedupe_key(name: str | None) -> str:
 
 
 def _is_non_game(name: str) -> bool:
-    raw = name.strip()
-    if re.fullmatch(r"(?i)(?:UP\d+-)?(CUSA|PPSA|NPWR)\d+_\d+$", raw):
-        return True
-    norm = _norm_name_raw(name)
-    if not norm:
-        return True
-    if norm in _NON_GAME_EXACT:
-        return True
-    return any(p.search(norm) for p in _NON_GAME_PATTERNS)
+    return should_auto_hide_psn_title(name)
 
 
 def _iso(dt: datetime | None) -> str | None:

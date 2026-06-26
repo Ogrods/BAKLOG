@@ -73,6 +73,25 @@ const NOISE_TITLE_PATTERNS = [
 
 const PSN_ENTITLEMENT_ID_RE = /^(?:up\d+-)?(?:cusa|ppsa|npwr)\d+_\d+$/i;
 
+const NINTENDO_EXTRA_TITLE_RE = /\b(dlc|skin|coins?|membership|expansion pack)\b/i;
+
+const PSN_EXTRA_TITLE_PATTERNS = [
+  /\bdemo\b/i,
+  /\bopen beta\b/i,
+  /\bbeta\b/i,
+  /\bb e t a\b/i,
+  /\btrial version\b/i,
+  /\bdigital deluxe soundtrack\b/i,
+  /^dlc\b/i,
+  /\btrophy set$/i,
+  /\btrophies$/i,
+  /\btheme$/i,
+  /\bdynamic theme$/i,
+  /\bavatar pack\b/i,
+];
+
+const GOG_DLC_RE = /\bDLC\b/i;
+
 const EDITION_SUFFIXES = [
   " digital deluxe edition",
   " deluxe edition",
@@ -118,6 +137,26 @@ export function shouldAutoHideByTitle(name) {
   return NOISE_TITLE_PATTERNS.some((re) => re.test(raw) || re.test(norm));
 }
 
+export function shouldAutoHideNintendoTitle(name) {
+  const raw = String(name || "").trim();
+  if (shouldAutoHideByTitle(raw)) return true;
+  return NINTENDO_EXTRA_TITLE_RE.test(raw);
+}
+
+export function shouldAutoHidePsnTitle(name) {
+  const raw = String(name || "").trim();
+  if (!raw) return true;
+  if (shouldAutoHideByTitle(raw)) return true;
+  const norm = normalizeNoiseTitle(raw);
+  return PSN_EXTRA_TITLE_PATTERNS.some((re) => re.test(raw) || re.test(norm));
+}
+
+export function shouldAutoHideGogTitle(name) {
+  const raw = String(name || "").trim();
+  if (shouldAutoHideByTitle(raw)) return true;
+  return GOG_DLC_RE.test(raw);
+}
+
 export function editionBaseKey(name) {
   let key = normalizeNoiseTitle(name);
   for (const suffix of EDITION_SUFFIXES) {
@@ -149,12 +188,12 @@ export function isNintendoNoiseRow(g) {
     );
     if (!hasApp) return true;
   }
-  return shouldAutoHideByTitle(g.name);
+  return shouldAutoHideNintendoTitle(g.name);
 }
 
 /**
  * True when a library row should be auto-hidden (not hard-dropped).
- * itch: classification guardrail only (caller passes itchIsGame).
+ * itch: classification guardrail only (caller passes itchIsGameFn).
  */
 export function shouldAutoHideLibraryRow(g, { itchIsGameFn } = {}) {
   if (!g) return false;
@@ -163,6 +202,8 @@ export function shouldAutoHideLibraryRow(g, { itchIsGameFn } = {}) {
     return true;
   }
   if (store === "nintendo" && isNintendoNoiseRow(g)) return true;
+  if (store === "psn") return shouldAutoHidePsnTitle(g.name);
+  if (store === "gog") return shouldAutoHideGogTitle(g.name);
   return shouldAutoHideByTitle(g.name);
 }
 

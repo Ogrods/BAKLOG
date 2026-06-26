@@ -31,6 +31,7 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
+from shared.library_noise import is_entitlement_slug, should_auto_hide_by_title
 
 GAMES_EPIC_JSON = Path("games_epic.json")
 HLTB_DELAY_SEC = 1.0
@@ -107,14 +108,8 @@ def _epic_store_url_from_record(rec: dict, name: str) -> str:
 
 
 def _is_entitlement_slug(name: str | None) -> bool:
-    """Internal entitlement slugs leak in as titles (e.g. ``Fortnite_StWContent``,
-    ``Fortnite_Studio``): a single token with no spaces joined by an underscore.
-
-    Real titles use spaces, so ``Aerial_Knight's Never Yield`` is unaffected.
-    Mirrors the ``/^\\S*_\\S*$/`` junk pattern in js/game-core.js.
-    """
-    s = str(name or "").strip()
-    return bool(s) and "_" in s and not any(ch.isspace() for ch in s)
+    """Internal entitlement slugs leak in as titles (e.g. ``Fortnite_StWContent``)."""
+    return is_entitlement_slug(name)
 
 
 # Epic catalog category paths that are never playable library games.
@@ -124,32 +119,12 @@ _NON_GAME_CATEGORY_FRAGMENTS = (
     "software",
 )
 
-# Title keywords for non-game extras that still ship keyImages (soundtracks,
-# wallpapers, editors, etc.). Playable DLC maps/expansions are intentionally
-# excluded (e.g. "ARK Ragnarok", "Dying Light The Following").
-_NON_GAME_TITLE_RE = re.compile(
-    r"(?i)("
-    r"soundtrack|"
-    r"wallpaper|"
-    r"art\s+book|"
-    r"resource\s+archiver|"
-    r"pre[- ]?game\s+editor|"
-    r"puzzle\s+pack|"
-    r"glove\s+skin|"
-    r"public\s+testing|"
-    r"test\s+branch|"
-    r"\bcontent$"  # e.g. "Death Stranding Content"
-    r")"
-)
-
 
 def _is_non_game_title(title: str | None) -> bool:
     s = str(title or "").strip()
     if not s:
         return False
-    if _is_entitlement_slug(s):
-        return True
-    return bool(_NON_GAME_TITLE_RE.search(s))
+    return should_auto_hide_by_title(s)
 
 
 def _should_keep_game_row(row: dict) -> bool:

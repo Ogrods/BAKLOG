@@ -54,6 +54,7 @@ from fetchers.nintendo_hybrid import (
     nintendo_store_url,
     norm_nintendo_title,
 )
+from shared.library_noise import should_auto_hide_nintendo_title
 from shared.profile_paths import personal_path
 from shared.raw_dumps import profile_raw_dump_path
 
@@ -90,11 +91,7 @@ SKIP_CONTENT_TYPES = frozenset(
         "balance",
     }
 )
-SKIP_TITLE_PATTERNS = re.compile(
-    r"\b(nintendo switch online|expansion pack|membership|e?shop\s+card|"
-    r"add-on content bundle|funds)\b",
-    re.I,
-)
+_FUNDS_TITLE_RE = re.compile(r"\bfunds\b", re.I)
 
 
 def _clean_name(raw: str) -> str:
@@ -106,7 +103,7 @@ def _is_game_transaction(tx: dict) -> bool:
     if ctype in SKIP_CONTENT_TYPES:
         return False
     title = tx.get("title") or ""
-    if SKIP_TITLE_PATTERNS.search(title):
+    if _FUNDS_TITLE_RE.search(title) or should_auto_hide_nintendo_title(title):
         return False
     # Refunds are negative entries for the same title.
     if (tx.get("transaction_type") or "").lower() == "refund":

@@ -9,5 +9,15 @@
   { "title": "Foo_Bar_Entitlement", "should_auto_hide": true },
   { "title": "CUSA20387_00", "should_auto_hide": true },
   { "title": "Skyrim Special Edition", "edition_base_key": "skyrim" },
-  { "title": "Skyrim", "edition_base_key": "skyrim" }
+  { "title": "Skyrim", "edition_base_key": "skyrim" },
+  { "title": "Fortnite Demo", "should_auto_hide_psn": true, "should_auto_hide": false },
+  { "title": "Dark Souls Dynamic Theme", "should_auto_hide_psn": true, "should_auto_hide": false },
+  { "title": "Brigador: Deluxe DLC Upgrade", "should_auto_hide_gog": true, "should_auto_hide": false },
+  { "title": "Animal Crossing Coins", "should_auto_hide_nintendo": true, "should_auto_hide": false },
+  {
+    "title": "Europa Universalis IV: Common Sense Expansion Pack",
+    "should_auto_hide": false,
+    "should_auto_hide_nintendo": true
+  },
+  { "title": "Nintendo Switch Online + Expansion Pack", "should_auto_hide": true, "should_auto_hide_nintendo": true }
 ]

@@ -57,7 +57,11 @@ async function sampleView(page, view) {
 }
 
 function ruleOk(snap) {
-  return snap.rowHasRuleShadow && snap.gapRowToHeaderBottom < 16;
+  if (!snap.rowHasRuleShadow) return false;
+  // Library/wishlist/itch keep summary chips below the header row — gap to
+  // header bottom includes that strip; row shadow is the signal we care about.
+  if (snap.summaryHidden === false && (snap.summaryChildCount ?? 0) > 0) return true;
+  return snap.gapRowToHeaderBottom < 16;
 }
 
 async function main() {

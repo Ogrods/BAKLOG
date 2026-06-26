@@ -18,24 +18,21 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[1]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
+
+from scripts.smoke_port_guard import (  # noqa: E402
+    port_collision_message,
+    port_listener_pid,
+    wait_for_owned_server,
+)
 
 
-def _wait_for_server(base: str, *, timeout_sec: float = 25.0) -> bool:
-    deadline = time.monotonic() + timeout_sec
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(f"{base}/api/config", timeout=2) as resp:
-                if resp.status == 200:
-                    return True
-        except (urllib.error.URLError, TimeoutError, OSError):
-            time.sleep(0.4)
-    return False
+def _wait_for_server(base: str, proc: subprocess.Popen, *, timeout_sec: float = 25.0) -> tuple[bool, str | None]:
+    return wait_for_owned_server(proc, base, timeout_sec=timeout_sec)
 
 
 def run_smoke(bundle_dir: Path) -> dict:
@@ -60,6 +57,11 @@ def run_smoke(bundle_dir: Path) -> dict:
     (bundle_dir / "games_steam_smoke.json").write_text('{"games":[]}', encoding="utf-8")
 
     report: dict = {"ok": False, "bundle_dir": str(bundle_dir)}
+    holder = port_listener_pid()
+    if holder is not None:
+        report["port_collision_before_start"] = holder
+        report["error"] = port_collision_message(holder)
+        return report
     proc: subprocess.Popen | None = None
     try:
         with tempfile.TemporaryDirectory(prefix="baklog-migrate-smoke-") as td:
@@ -80,9 +82,10 @@ def run_smoke(bundle_dir: Path) -> dict:
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
             )
-            if not _wait_for_server("http://127.0.0.1:8765"):
+            ok, wait_err = _wait_for_server("http://127.0.0.1:8765", proc)
+            if not ok:
                 err = (proc.stderr.read() if proc.stderr else b"").decode("utf-8", errors="replace")
-                report["error"] = f"server did not respond within timeout; stderr tail: {err[-500:]}"
+                report["error"] = wait_err or f"server did not respond within timeout; stderr tail: {err[-500:]}"
                 return report
 
             migrated_index = data_dir / "profiles" / "index.json"

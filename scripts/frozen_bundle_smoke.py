@@ -36,16 +36,10 @@ def _read_expected_version() -> str:
     return m.group(1)
 
 
-def _wait_for_server(base: str, *, timeout_sec: float = 30.0) -> bool:
-    deadline = time.monotonic() + timeout_sec
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(f"{base}/api/config", timeout=2) as resp:
-                if resp.status == 200:
-                    return True
-        except (urllib.error.URLError, TimeoutError, OSError):
-            time.sleep(0.4)
-    return False
+def _wait_for_server(base: str, proc: subprocess.Popen, *, timeout_sec: float = 30.0) -> tuple[bool, str | None]:
+    from scripts.smoke_port_guard import wait_for_owned_server
+
+    return wait_for_owned_server(proc, base, timeout_sec=timeout_sec)
 
 
 def _manifest_fetcher_count(bundle_dir: Path) -> int:
@@ -108,6 +102,7 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
         return report
 
     from scripts.frozen_data_dir_migration_smoke import run_smoke as migrate_smoke
+    from scripts.smoke_port_guard import port_collision_message, port_listener_pid
 
     migrate = migrate_smoke(bundle_dir)
     report["checks"]["migration"] = migrate
@@ -117,6 +112,11 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
 
     proc: subprocess.Popen | None = None
     config: dict | None = None
+    holder = port_listener_pid()
+    if holder is not None:
+        report["error"] = port_collision_message(holder)
+        report["port_collision_before_start"] = holder
+        return report
     try:
         with tempfile.TemporaryDirectory(prefix="baklog-bundle-smoke-") as td:
             localappdata = Path(td)
@@ -135,9 +135,10 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
             )
-            if not _wait_for_server("http://127.0.0.1:8765"):
+            ok, wait_err = _wait_for_server("http://127.0.0.1:8765", proc)
+            if not ok:
                 err = (proc.stderr.read() if proc.stderr else b"").decode("utf-8", errors="replace")
-                report["error"] = f"server did not respond; stderr tail: {err[-400:]}"
+                report["error"] = wait_err or f"server did not respond; stderr tail: {err[-400:]}"
                 return report
             with urllib.request.urlopen("http://127.0.0.1:8765/api/config", timeout=5) as resp:
                 config = json.loads(resp.read().decode("utf-8"))

@@ -10,7 +10,8 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
 - `assets/sample/*.{webp,png}` — fictional game covers for the spotlight carousel.
-- `api/subscribe.js` — Vercel serverless function; logs signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
+- `api/subscribe.js` — Vercel serverless function; logs waitlist signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
+- `api/auth-signup-notify.js` — Vercel serverless function; receives Supabase Database Webhooks on `auth.users` INSERT and emails you when someone creates a BAKLOG account in the app.
 - `api/_rate-limit.js` — shared distributed rate limiter (Vercel KV / Upstash) used by `subscribe.js`.
 - `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
@@ -92,6 +93,30 @@ Local app: set `BAKLOG_POLAR_ORG_ID` to your Polar organization id (Settings →
 After payment, Polar redirects back to the local app, which opens the **Pro** tab with activation instructions. Hosted-auth users click **Refresh Pro status** once the webhook has run; pure-local users paste the `BAKLOG-XXXX` license key from the Polar receipt.
 
 Without the Resend trio, `/api/subscribe` returns `500 Server not configured` and the form shows a friendly error.
+
+### BAKLOG account signup notifications (Supabase auth)
+
+When invite-only auth is on, users create accounts via **Create account** in the local app (`js/auth-gate.js` → Supabase `signUp`). That writes directly to Supabase Auth; it does **not** hit `/api/subscribe`.
+
+To get an email when a new `auth.users` row appears:
+
+1. Generate a long random secret (e.g. `openssl rand -hex 32`).
+2. Add to Vercel (Production + Preview if you test there):
+
+| Variable | Notes |
+| --- | --- |
+| `AUTH_SIGNUP_WEBHOOK_SECRET` | Shared secret; must match the Supabase webhook header below. |
+| `RESEND_API_KEY`, `NOTIFY_FROM`, `NOTIFY_TO` | Same trio as the waitlist (can reuse). |
+
+3. Deploy so `https://baklog.app/api/auth-signup-notify` is live.
+4. Supabase project → **Database** → **Webhooks** → **Create a new hook**:
+   - **Table:** `auth.users` (schema `auth`)
+   - **Events:** Insert
+   - **HTTP request:** POST `https://baklog.app/api/auth-signup-notify`
+   - **HTTP headers:** `Authorization` = `Bearer <AUTH_SIGNUP_WEBHOOK_SECRET>` (same value as Vercel)
+5. Smoke test: create a throwaway account in the app (or run `scripts/invite_beta_user.py --send`); you should receive `New BAKLOG account: …` at `NOTIFY_TO`.
+
+Admin invites (`invite_beta_user.py`) also insert into `auth.users`, so you will get a notification for those too.
 
 ## Rate limiting (required for production)
 

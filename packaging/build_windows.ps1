@@ -72,6 +72,10 @@ Write-Host "  Auth env: BAKLOG_SUPABASE_URL=$(if ($urlSet) { 'set' } else { 'MIS
 & $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host "Deduping stray BAKLOG servers on port 8765..."
+& $Python scripts/stop_baklog.py --dedupe
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "Smoke: frozen bundle (migration + /api/config + fetcher dispatch)..."
 & $Python scripts/frozen_bundle_smoke.py --bundle-dir $OutDir
 if ($LASTEXITCODE -ne 0) {

@@ -180,4 +180,8 @@ def test_frozen_syncs_bundled_auth_env_when_data_dir_missing_keys(monkeypatch, t
     assert install_paths.data_root() == data_dir.resolve()
     merged = (data_dir / ".env").read_text(encoding="utf-8")
     assert "BAKLOG_SUPABASE_URL=https://proj.supabase.co" in merged
-    assert "BAKLOG_SUPABASE_JWT_SECRET=jwt-secret" in merged
+    assert "BAKLOG_SUPABASE_JWT_SECRET" not in merged
+    from shared.bundled_auth_env import apply_install_dir_auth_env
+
+    apply_install_dir_auth_env()
+    assert os.environ.get("BAKLOG_SUPABASE_JWT_SECRET") == "jwt-secret"

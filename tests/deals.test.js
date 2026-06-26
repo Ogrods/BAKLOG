@@ -10,6 +10,7 @@ import {
   getDealInfo,
   cutBucketClass,
   dealScore,
+  computeWishlistWoba,
   passesDealFilters,
   effectiveDiscountPercent,
   effectiveSortPrice,
@@ -166,6 +167,17 @@ describe('dealScore and isOwnedByTitle', () => {
     buildOwnedNormNames();
     expect(isOwnedByTitle('Deal Game')).toBe(true);
     expect(dealScore(baseGame)).toBeLessThan(0);
+  });
+
+  it('matches computeWishlistWoba minus owned penalty', () => {
+    state.itadByKey['wishlist:wl-1'] = {
+      price: 12,
+      cut: 55,
+      is_historical_low: true,
+      shop: 'Steam',
+    };
+    const woba = computeWishlistWoba(baseGame);
+    expect(dealScore(baseGame)).toBe(woba);
   });
 });
 

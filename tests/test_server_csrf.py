@@ -98,10 +98,11 @@ def test_local_header_post_allowed(csrf_server: str) -> None:
     assert status == 200
 
 
-def test_local_origin_post_allowed(csrf_server: str) -> None:
+def test_local_origin_post_requires_local_header(csrf_server: str) -> None:
     base = csrf_server
-    status, _body = _post(base, "/api/runs/cancel", origin=base)
-    assert status == 200
+    status, body = _post(base, "/api/runs/cancel", origin=base)
+    assert status == 403
+    assert "cross-origin" in body.get("error", "").lower()
 
 
 def _put_personal(

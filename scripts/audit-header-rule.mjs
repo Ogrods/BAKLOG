@@ -15,7 +15,17 @@ async function clickView(page, view) {
   await page.waitForFunction(
     (v) => document.documentElement.getAttribute('data-init-view') === v,
     view,
-    { timeout: 10000 },
+    { timeout: 20000 },
+  );
+  await page.waitForFunction(
+    () => {
+      const v = document.documentElement.getAttribute('data-init-view');
+      if (v === 'dashboard' || v === 'connections' || v === 'pro') return true;
+      return !!window.__baklogBootPerf?.dashboardDataReady
+        || document.getElementById('summary')?.children?.length > 0;
+    },
+    null,
+    { timeout: 20000 },
   );
   await page.waitForTimeout(600);
 }

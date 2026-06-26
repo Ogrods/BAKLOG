@@ -556,7 +556,7 @@ export function updateViewChrome(options) {
     void import('./pro-view.js').then((m) => m.applyProTabVisibility());
   }
   renderBulkStatusButtons();
-  if (!drillIn && !deferChrome) renderSummary();
+  if (!drillIn && !deferChrome && !options?.skipSummary) renderSummary();
 }
 
 export function updatePickTabsVisibility() {
@@ -694,7 +694,7 @@ export function switchView(view) {
     updateBulkBar();
     const skipDashboardSchedule = view === "dashboard";
     const deferTableChrome = useOverlay && !drillIn && view !== "dashboard";
-    updateViewChrome({ drillIn, skipDashboardSchedule, deferTableChrome });
+    updateViewChrome({ drillIn, skipDashboardSchedule, deferTableChrome, skipSummary: true });
     void flushDeferredRenders();
     const refreshDone = refreshFilterUI({ force: true, drillIn, skipDashboardSchedule });
     const paintDashboard = () => {

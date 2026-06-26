@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 # Admin internal routes moved to shared/server_internal_routes.py (2026-06-12).
 # Frozen fetcher dispatch + deferred durable-queue restore (2026-06-14).
 # HLTB no-runtime-cap sentinel handling in _max_run_seconds_for_key (2026-06-14).
-SERVER_PY_MAX_LINES = 4320
+# Auth CSRF gates (secrets + master-password) consolidated 2026-06-26.
+SERVER_PY_MAX_LINES = 4322
 GIT_TREE_PY_MAX_LINES = 720
 
 

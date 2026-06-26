@@ -139,7 +139,7 @@ jobs:
           if (gh release view $tag 2>$null) {
             Write-Host "Release $tag exists; uploading replacement assets (--clobber)."
             gh release upload $tag @assets --clobber
-            gh release edit $tag --title "BAKLOG $tag" --generate-notes
+            gh release edit $tag --title "BAKLOG $tag"
           } else {
             gh release create $tag @assets --title "BAKLOG $tag" --generate-notes
           }

@@ -139,6 +139,24 @@ def test_decode_jwks_es256(monkeypatch: pytest.MonkeyPatch) -> None:
     assert user["id"] == payload["sub"]
 
 
+def test_warmup_jwks_client_noop_without_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    from shared.bundled_auth_env import warmup_auth_verification
+
+    warmup_auth_verification()
+
+
+def test_warmup_jwks_skips_network_when_hs256_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "anon-key")
+    monkeypatch.setenv("BAKLOG_SUPABASE_JWT_SECRET", "secret")
+
+    def _open(*_a: object, **_k: object) -> object:
+        raise AssertionError("JWKS fetch should be skipped when JWT secret is set")
+
+    monkeypatch.setattr("urllib.request.urlopen", _open)
+    supabase_auth.warmup_jwks_client()
+
+
 def test_auth_enabled_without_jwt_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://x.supabase.co")
     monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "anon-key")

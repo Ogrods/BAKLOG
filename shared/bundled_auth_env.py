@@ -40,23 +40,29 @@ def render_env_lines(values: dict[str, str]) -> list[str]:
     return lines
 
 
-def sync_bundled_auth_env_to_data_dir(install_dir: Path, data_dir: Path) -> bool:
-    """Fill missing auth keys in data_dir/.env from install_dir/.env (in-place upgrades)."""
-    src = install_dir / ".env"
-    if not src.is_file():
-        return False
-    bundled = parse_env_file(src)
+def bundled_auth_values(install_dir: Path) -> dict[str, str]:
+    """Auth keys shipped beside the frozen exe (source of truth for beta builds)."""
+    bundled = parse_env_file(install_dir / ".env")
     if not bundled.get("BAKLOG_SUPABASE_URL") or not bundled.get("BAKLOG_SUPABASE_ANON_KEY"):
+        return {}
+    return {k: bundled[k] for k in AUTH_ENV_KEYS if bundled.get(k)}
+
+
+def sync_bundled_auth_env_to_data_dir(install_dir: Path, data_dir: Path) -> bool:
+    """Align data_dir/.env auth keys with the install-dir bundle.
+
+    Fills missing keys and overwrites stale values left by older installers or
+    partial migrations (upgrade path where BAKLOG-Data kept a wrong .env).
+    """
+    bundled = bundled_auth_values(install_dir)
+    if not bundled:
         return False
     data_dir.mkdir(parents=True, exist_ok=True)
     dest = data_dir / ".env"
     merged = parse_env_file(dest)
     changed = False
-    for key in AUTH_ENV_KEYS:
-        if merged.get(key):
-            continue
-        val = bundled.get(key)
-        if val:
+    for key, val in bundled.items():
+        if merged.get(key) != val:
             merged[key] = val
             changed = True
     if not changed and dest.is_file():
@@ -68,22 +74,24 @@ def sync_bundled_auth_env_to_data_dir(install_dir: Path, data_dir: Path) -> bool
 
 
 def apply_install_dir_auth_env() -> None:
-    """Load auth keys from the install folder when the data-dir .env omits them."""
+    """Load auth keys from the install folder.
+
+    Frozen builds: install-dir bundle always wins so a stale data-dir .env
+    cannot block JWT verification after an in-place upgrade.
+    """
     from shared.install_paths import frozen_bundle_dir, is_frozen
 
     if not is_frozen():
         return
-    bundled = parse_env_file(frozen_bundle_dir() / ".env")
-    for key in AUTH_ENV_KEYS:
-        if os.environ.get(key, "").strip():
-            continue
-        val = bundled.get(key)
-        if val:
-            os.environ[key] = val
+    bundled = bundled_auth_values(frozen_bundle_dir())
+    if not bundled:
+        return
+    for key, val in bundled.items():
+        os.environ[key] = val
 
 
 def bootstrap_server_env(data_root: Path) -> None:
-    """Load data-dir .env, then fill missing auth keys from the install folder."""
+    """Load data-dir .env, then apply install-dir auth (frozen wins on conflicts)."""
     ensure_ssl_cert_bundle()
     try:
         from dotenv import load_dotenv
@@ -92,6 +100,7 @@ def bootstrap_server_env(data_root: Path) -> None:
     except ImportError:
         pass
     apply_install_dir_auth_env()
+    warmup_auth_verification()
 
 
 def ensure_ssl_cert_bundle() -> None:
@@ -102,3 +111,13 @@ def ensure_ssl_cert_bundle() -> None:
         return
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
     os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+
+
+def warmup_auth_verification() -> None:
+    """Prime JWKS fetch at boot so the first sign-in probe is not a cold HTTPS miss."""
+    try:
+        from shared.supabase_auth import warmup_jwks_client
+
+        warmup_jwks_client()
+    except Exception:
+        pass

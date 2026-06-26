@@ -35,8 +35,8 @@ let _licenseActivation = false;
 let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: '', yearly: '' };
 let _lastSessionProbeStatus = 0;
-const SESSION_PROBE_ATTEMPTS = 3;
-const SESSION_PROBE_DELAY_MS = 400;
+const SESSION_PROBE_ATTEMPTS = 6;
+const SESSION_PROBE_DELAY_MS = 500;
 const _planListeners = new Set();
 
 function sessionProbeDelay(attempt) {
@@ -351,12 +351,14 @@ async function probeServerToken() {
     if (data.profile) _accountProfileId = String(data.profile);
     if (data.email) _accountEmail = data.email;
     if (typeof data.plan === 'string' && data.plan) setPlan(data.plan);
-    if (data.refreshSession && _supabase) {
+    const ok = !!data.ok;
+    if (ok && data.refreshSession && _supabase) {
       const { data: refData, error } = await _supabase.auth.refreshSession();
       if (!error && refData.session) applySession(refData.session);
-      return probeServerTokenWithRetry(2);
+      // Re-probe for updated plan claim; do not fail sign-in on a transient miss.
+      await probeServerTokenWithRetry(2);
     }
-    return !!data.ok;
+    return ok;
   } catch {
     return false;
   }
@@ -379,7 +381,7 @@ async function ensureServerReadySession(session) {
   applySession(session);
   if (await probeServerTokenWithRetry()) return true;
   await refreshAccessToken();
-  return probeServerTokenWithRetry(2);
+  return probeServerTokenWithRetry(SESSION_PROBE_ATTEMPTS);
 }
 
 function resolveAuthedWaiter() {
@@ -401,10 +403,10 @@ function onAuthenticated(session) {
         }
       } else {
         const hint = _lastSessionProbeStatus === 401
-          ? ' If this keeps happening after a reinstall, quit BAKLOG and copy .env from the app folder into BAKLOG-Data.'
+          ? ' Quit BAKLOG from the tray and restart once. If it persists, reinstall from the latest BAKLOG-Setup.exe.'
           : '';
         setAuthError(`Could not verify your session on the server. Try again or refresh the page.${hint}`);
-        applySession(null);
+        setOverlayVisible(true);
       }
     } finally {
       _authHandling = null;

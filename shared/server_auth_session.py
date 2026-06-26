@@ -29,11 +29,15 @@ def handle_auth_session_get(handler: SimpleHTTPRequestHandler) -> None:
     plan = current_plan(authorization)
     refresh_session = False
     if email:
-        should_pro, _upgraded = ensure_comp_pro_on_login(user_id, email)
+        should_pro, upgraded = ensure_comp_pro_on_login(user_id, email)
         if should_pro and plan != PLAN_PRO:
             plan = PLAN_PRO
             note_authenticated_plan(plan)
-            refresh_session = True
+            # Only ask the client to refresh when Supabase app_metadata was updated.
+            # Comp-Pro invitees without service_role on frozen builds still get plan=pro
+            # in this response; forcing refreshSession caused false sign-in failures on
+            # v0.8.24 when the follow-up probe missed.
+            refresh_session = upgraded
     s._send_json(
         handler,
         HTTPStatus.OK,

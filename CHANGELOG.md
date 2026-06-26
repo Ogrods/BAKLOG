@@ -22,6 +22,19 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.25] - 2026-06-26
+
+### Fixed
+
+- Sign-in "Could not verify your session on the server" on frozen upgrades: install-dir auth `.env` now wins over stale `BAKLOG-Data` keys; data-dir auth file is overwritten on migration when bundled keys differ.
+- ES256 Supabase access tokens: JWKS warmup at server boot, client retry with cache reset on transient HTTPS failures.
+- Auth gate no longer fails sign-in after a successful session probe when comp-Pro refresh is best-effort only; longer probe backoff.
+- Comp-Pro invitees on builds without `service_role`: server returns `plan=pro` without forcing `refreshSession` unless Supabase metadata was actually updated.
+
+### Added
+
+- `scripts/debug_auth_env.py` for local auth env / JWKS / JWT-secret alignment checks (no secrets printed).
+
 ## [0.8.24] - 2026-06-26
 
 ### Fixed

@@ -29,6 +29,7 @@ from scripts.smoke_port_guard import (  # noqa: E402
     port_listener_pid,
     wait_for_owned_server,
 )
+from shared.bundled_auth_env import parse_env_file  # noqa: E402
 
 
 def _wait_for_server(base: str, proc: subprocess.Popen, *, timeout_sec: float = 25.0) -> tuple[bool, str | None]:
@@ -67,6 +68,12 @@ def run_smoke(bundle_dir: Path) -> dict:
         with tempfile.TemporaryDirectory(prefix="baklog-migrate-smoke-") as td:
             localappdata = Path(td)
             data_dir = localappdata / "BAKLOG-Data"
+            data_dir.mkdir(parents=True, exist_ok=True)
+            (data_dir / ".env").write_text(
+                "BAKLOG_SUPABASE_URL=https://stale.supabase.co\n"
+                "BAKLOG_SUPABASE_ANON_KEY=stale-anon\n",
+                encoding="utf-8",
+            )
             env = {
                 **os.environ,
                 "LOCALAPPDATA": str(localappdata),
@@ -94,11 +101,20 @@ def run_smoke(bundle_dir: Path) -> dict:
             report["migrated_index"] = migrated_index.is_file()
             report["migrated_games"] = migrated_games.is_file()
             report["legacy_profiles_gone"] = not legacy_profiles.exists()
+            bundle_auth = parse_env_file(bundle_dir / ".env")
+            data_auth = parse_env_file(data_dir / ".env")
+            report["auth_env_synced"] = (
+                bundle_auth.get("BAKLOG_SUPABASE_URL") == data_auth.get("BAKLOG_SUPABASE_URL")
+                and bundle_auth.get("BAKLOG_SUPABASE_ANON_KEY")
+                == data_auth.get("BAKLOG_SUPABASE_ANON_KEY")
+                and data_auth.get("BAKLOG_SUPABASE_URL") != "https://stale.supabase.co"
+            )
             report["ok"] = all(
                 (
                     report["migrated_index"],
                     report["migrated_games"],
                     report["legacy_profiles_gone"],
+                    report["auth_env_synced"],
                 )
             )
             return report

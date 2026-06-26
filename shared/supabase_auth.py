@@ -85,17 +85,39 @@ def _parse_bearer(authorization: str | None) -> str | None:
     return token or None
 
 
+def _jwks_url() -> str | None:
+    url = _supabase_url()
+    return f"{url}/auth/v1/.well-known/jwks.json" if url else None
+
+
 def _get_jwks_client() -> jwt.PyJWKClient | None:
     global _cached_jwks_client
-    url = _supabase_url()
-    if not url:
+    jwks_url = _jwks_url()
+    if not jwks_url:
         return None
     if _cached_jwks_client is None:
         try:
-            _cached_jwks_client = jwt.PyJWKClient(f"{url}/auth/v1/.well-known/jwks.json")
+            _cached_jwks_client = jwt.PyJWKClient(jwks_url)
         except Exception:
             return None
     return _cached_jwks_client
+
+
+def warmup_jwks_client() -> None:
+    """Fetch JWKS once at server boot when auth is on (best-effort)."""
+    if not auth_enabled() or _jwt_secret():
+        return
+    jwks_url = _jwks_url()
+    if not jwks_url:
+        return
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen(jwks_url, timeout=10) as resp:
+            resp.read()
+        _get_jwks_client()
+    except Exception:
+        pass
 
 
 def _decode_hs256(raw: str) -> dict[str, Any] | None:
@@ -120,27 +142,37 @@ def _decode_hs256(raw: str) -> dict[str, Any] | None:
 
 
 def _decode_jwks(raw: str) -> dict[str, Any] | None:
-    client = _get_jwks_client()
-    if client is None:
-        return None
-    try:
-        signing_key = client.get_signing_key_from_jwt(raw)
-        issuer = _jwt_issuer()
-        payload = jwt.decode(
-            raw,
-            signing_key.key,
-            algorithms=list(_JWKS_ALGORITHMS),
-            audience=_AUDIENCE,
-            issuer=issuer,
-            options={"require": list(_JWT_REQUIRED_CLAIMS)},
-        )
-    except InvalidTokenError:
-        return None
-    except Exception:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return payload
+    """Verify asymmetric Supabase access tokens (ES256/RS256) via JWKS."""
+    import time
+
+    global _cached_jwks_client
+    for attempt in range(3):
+        client = _get_jwks_client()
+        if client is None:
+            return None
+        try:
+            signing_key = client.get_signing_key_from_jwt(raw)
+            issuer = _jwt_issuer()
+            payload = jwt.decode(
+                raw,
+                signing_key.key,
+                algorithms=list(_JWKS_ALGORITHMS),
+                audience=_AUDIENCE,
+                issuer=issuer,
+                options={"require": list(_JWT_REQUIRED_CLAIMS)},
+            )
+        except InvalidTokenError:
+            return None
+        except Exception:
+            _cached_jwks_client = None
+            if attempt < 2:
+                time.sleep(0.35 * (attempt + 1))
+                continue
+            return None
+        if not isinstance(payload, dict):
+            return None
+        return payload
+    return None
 
 
 def _decode_access_token(raw: str) -> dict[str, Any] | None:

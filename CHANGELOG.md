@@ -22,6 +22,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.24] - 2026-06-26
+
 ### Fixed
 
 - Auth gate retries `/api/auth/session` briefly before showing a false "could not verify" error on first sign-in.

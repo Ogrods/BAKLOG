@@ -78,6 +78,11 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
 }
 
+# Migration smoke moves co-located .env into %LOCALAPPDATA%\BAKLOG-Data; restore bundled auth for the zip.
+Write-Host "Restoring bundled account-auth .env after migration smoke..."
+& $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 @"
 @echo off
 cd /d "%~dp0"

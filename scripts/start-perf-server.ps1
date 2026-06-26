@@ -10,7 +10,7 @@ Set-Location $root
 
 $py = Join-Path $root '.venv\Scripts\python.exe'
 if (-not (Test-Path $py)) {
-    Write-Error "Missing $py — create .venv first."
+    Write-Error "Missing $py - create .venv first."
 }
 
 $fixturePerf = Join-Path $root 'tests\fixtures\perf-profile\perf'
@@ -30,6 +30,7 @@ if (-not $SkipBuild) {
 $env:BAKLOG_PROFILE = 'perf'
 $env:BAKLOG_SERVE_BUILT = '1'
 $env:BAKLOG_ADMIN = '0'
+$env:BAKLOG_AUTH_DISABLED = '1'
 
 Write-Host '==> starting server (BAKLOG_PROFILE=perf, BAKLOG_SERVE_BUILT=1)'
 $server = Start-Process -FilePath $py -ArgumentList 'server.py' -WorkingDirectory $root -PassThru -WindowStyle Hidden

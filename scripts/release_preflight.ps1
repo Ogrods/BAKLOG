@@ -97,12 +97,6 @@ Write-Host "==> packaging/build_windows.ps1"
 powershell -ExecutionPolicy Bypass -File (Join-Path $Root "packaging\build_windows.ps1")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-if (-not $SkipFrozenSmoke) {
-    Write-Host "==> frozen_bundle_smoke (redundant if build script already ran it)"
-    & $Python (Join-Path $Root "scripts\frozen_bundle_smoke.py") --bundle-dir (Join-Path $Root "release\BAKLOG")
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-}
-
 Write-Host ""
 Write-Host "Preflight OK for v$pyVer. Safe to tag:"
 Write-Host "  git tag -a v$pyVer -m ""BAKLOG v$pyVer"""

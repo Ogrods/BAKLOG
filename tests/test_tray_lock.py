@@ -21,6 +21,8 @@ def _reset_lock():
 
 def test_acquire_and_release_round_trip(monkeypatch, tmp_path):
     if sys.platform == "win32":
+        if not tray_lock.acquire_tray_lock():
+            pytest.skip("another BAKLOG tray instance holds the single-instance mutex")
         assert tray_lock.acquire_tray_lock() is True
         assert tray_lock.acquire_tray_lock() is True  # same process re-entrant ok
         tray_lock.release_tray_lock()

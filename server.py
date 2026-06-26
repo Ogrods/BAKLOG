@@ -3047,6 +3047,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/auth/master-password":
             self._handle_auth_master_password()
             return
+        if path == "/api/auth/secrets/export" or path.startswith("/api/auth/secrets/import"):
+            if self._reject_if_csrf_strict():
+                return
         if path == "/api/auth/secrets/export":
             self._handle_auth_secrets_export()
             return

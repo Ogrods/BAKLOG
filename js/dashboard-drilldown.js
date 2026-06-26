@@ -30,7 +30,9 @@ function dashResetLibraryFiltersExceptDedup() {
   state.prefs.releaseYearFilter = "";
   state.prefs.hltbBucket = null;
   state.prefs.genreFilters = [];
+  state.prefs.customListFilter = null;
   state.cleanupModeActive = false;
+  savePrefs();
   syncFilterDomFromState();
 }
 

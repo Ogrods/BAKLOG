@@ -8,7 +8,7 @@ import { affiliateUrl, hasLiveAffiliates } from './affiliate.js';
 import { freeItchCount, paidItchCount, itchSpendTotal } from './sabermetrics.js';
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
-import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, isStealDeal } from './deals.js';
+import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, effectiveDiscountPercent, isStealDeal } from './deals.js';
 import {
   sponsoredDealCardHtml,
   getAdsForLocation,
@@ -411,15 +411,13 @@ export function buildWishlistStatsHtml(slot = 'wishlist') {
   let hasPricing = false;
   let bestCut = 0;
   let bestCutGame = "";
-  let cutSum = 0;
   const cuts = [];
   for (const g of wl) {
     const d = getDealInfo(g);
     if (!d) continue;
     if (d.price != null || d.regular != null || d.cut) hasPricing = true;
-    const cut = d.cut || 0;
-    if (cut > 0) {
-      cutSum += cut;
+    const cut = effectiveDiscountPercent(g);
+    if (cut > 0 && cut < 100) {
       cuts.push(cut);
       if (cut > bestCut) {
         bestCut = cut;
@@ -427,7 +425,7 @@ export function buildWishlistStatsHtml(slot = 'wishlist') {
       }
     }
   }
-  const avgCut = onSale.length ? Math.round(cutSum / onSale.length) : 0;
+  const avgCut = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : 0;
   const steals = wl.filter(isStealDeal);
 
   const cards = [

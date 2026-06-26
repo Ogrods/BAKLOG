@@ -31,6 +31,12 @@ def test_has_valid_claim_links_epic_mobile():
     assert has_valid_claim_links({"store": "epic", "claim_url": "https://store.epicgames.com/x"})
 
 
+def test_has_valid_claim_links_rejects_unsafe_claim_url():
+    assert not has_valid_claim_links({"store": "epic", "claim_url": "javascript:alert(1)"})
+    assert not has_valid_claim_links({"store": "steam", "claim_url": "ftp://example.com/x"})
+    assert not has_valid_claim_links({"store": "gog", "claim_url": ""})
+
+
 def test_item_missing_link_fields():
     assert item_missing_link_fields({"store": "epic_mobile"}) == ["claim_urls"]
     assert item_missing_link_fields({"store": "epic"}) == ["claim_url"]

@@ -97,6 +97,34 @@ def _post_bytes(base: str, path: str, body: bytes) -> tuple[int, dict]:
         return exc.code, parsed
 
 
+def _post_json_origin_only(base: str, path: str, body: dict) -> tuple[int, dict | bytes, dict]:
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        f"{base}{path}",
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Origin": base,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read()
+            headers = dict(resp.headers)
+            ctype = resp.headers.get("Content-Type", "")
+            if "json" in ctype:
+                return resp.status, json.loads(raw.decode("utf-8")), headers
+            return resp.status, raw, headers
+    except urllib.error.HTTPError as exc:
+        payload = exc.read()
+        try:
+            parsed = json.loads(payload.decode("utf-8"))
+        except json.JSONDecodeError:
+            parsed = {"error": payload.decode("utf-8", errors="replace")}
+        return exc.code, parsed, dict(exc.headers)
+
+
 def test_export_short_passphrase_400(auth_bundle_server: str) -> None:
     status, body, _ = _post_json(auth_bundle_server, "/api/auth/secrets/export", {"passphrase": "short"})
     assert status == 400
@@ -138,3 +166,13 @@ def test_import_bad_passphrase_403(auth_bundle_server: str) -> None:
     )
     assert status == 403
     assert body["code"] == "bad_passphrase"
+
+
+def test_secrets_export_blocked_without_local_header(auth_bundle_server: str) -> None:
+    status, body, _ = _post_json_origin_only(
+        auth_bundle_server,
+        "/api/auth/secrets/export",
+        {"passphrase": "server-test-pass"},
+    )
+    assert status == 403
+    assert "cross-origin" in str(body.get("error", "")).lower()

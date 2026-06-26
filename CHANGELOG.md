@@ -22,6 +22,24 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.22] - 2026-06-26
+
+### Added
+
+- Hosted auth pages on baklog.app (`/auth/confirmed`, `/auth/reset`) plus `api/auth-config` for password reset.
+- Resend confirmation email button on the auth gate when sign-in fails with unconfirmed email.
+- Supabase email template files under `landing/supabase-email-templates/`.
+- Pre-release `release_smoke` pytest marker: live Steam store contract + batch client regression (`tests/test_release_smoke.py`); runs in `release.yml` and `test-all.ps1 -Full`.
+
+### Changed
+
+- Sign-up and password-reset redirects default to baklog.app (confirm from phone or any device).
+- Tagged releases build and ship `BAKLOG-Setup.exe` (Inno Setup on CI) alongside the portable zip.
+
+### Fixed
+
+- Steam library fetch: store `/api/appdetails` returns HTTP 400 for comma-separated appids; `get_app_details_batch` now fetches one appid per request.
+
 ## [0.8.21] - 2026-06-25
 
 ### Added

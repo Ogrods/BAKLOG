@@ -7,7 +7,6 @@ from pathlib import Path
 import requests
 
 STORE_DELAY_SEC = 1.5
-APP_DETAILS_BATCH_SIZE = 40
 _STORE_RETRY_BACKOFF = (2, 5, 10)
 _RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
 
@@ -120,9 +119,13 @@ class SteamClient:
     def get_app_details_batch(
         self, appids: list[int], refresh: bool = False
     ) -> dict[int, dict | None]:
-        """Fetch appdetails for many appids; one store throttle per chunk."""
+        """Fetch appdetails for many appids; one store request per appid.
+
+        Steam's store API returns 400 when multiple comma-separated appids are
+        sent without a narrow filters= price_overview-only mode, so batching
+        HTTP calls is not viable for full app metadata.
+        """
         results: dict[int, dict | None] = {}
-        pending: list[int] = []
         for appid in appids:
             cache_key = str(appid)
             if not refresh:
@@ -130,23 +133,7 @@ class SteamClient:
                 if cached is not None:
                     results[appid] = cached
                     continue
-            pending.append(appid)
-
-        for offset in range(0, len(pending), APP_DETAILS_BATCH_SIZE):
-            chunk = pending[offset : offset + APP_DETAILS_BATCH_SIZE]
-            self._throttle_store()
-            url = "https://store.steampowered.com/api/appdetails"
-            params = {"appids": ",".join(str(a) for a in chunk), "l": "english"}
-            resp = _get_with_retry(url, params)
-            raw = resp.json()
-            for appid in chunk:
-                entry = raw.get(str(appid), {})
-                if not entry.get("success"):
-                    result: dict = {"success": False, "data": None}
-                else:
-                    result = {"success": True, "data": entry.get("data")}
-                self._write_cache("appdetails", str(appid), result)
-                results[appid] = result
+            results[appid] = self.get_app_details(appid, refresh=refresh)
         return results
 
     def get_review_summary(self, appid: int, refresh: bool = False) -> dict | None:

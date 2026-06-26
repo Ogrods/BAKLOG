@@ -8,7 +8,7 @@ include = ["auth*", "clients*", "fetchers*", "enrichers*", "shared*"]
 
 [project]
 name = "steam-backlog"
-version = "0.8.21"
+version = "0.8.22"
 description = "Local multi-store game library dashboard and fetchers"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -42,7 +42,7 @@ tray = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration and not release_smoke'"
 timeout = 60
 timeout_method = "thread"
 faulthandler_timeout = 70
@@ -50,6 +50,7 @@ markers = [
     "integration: optional tests that launch a real Chrome/Edge browser",
     "no_leak_check: skip autouse thread/child leak detector for self-check tests",
     "slow: timing/subprocess-heavy tests (run on the dedicated Ubuntu slow lane; excluded from Windows/macOS smoke). Run locally with -m slow; skip with -m 'not slow'.",
+    "release_smoke: store API contracts and fetcher regressions required before tagging a release (release.yml + test-all.ps1 -Full).",
 ]
 
 [tool.ruff]

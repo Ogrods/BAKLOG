@@ -147,13 +147,23 @@ if ($Iscc) {
     try {
         & $Iscc "/DAppVersion=$Version" "baklog.iss"
         if ($LASTEXITCODE -ne 0) {
+            if ($env:BAKLOG_REQUIRE_INSTALLER -eq "1") {
+                Write-Error "Inno Setup compile failed (exit $LASTEXITCODE) and BAKLOG_REQUIRE_INSTALLER=1."
+            }
             Write-Warning "Inno Setup compile failed (exit $LASTEXITCODE). Zip still available."
         }
     } finally {
         Pop-Location
     }
 } else {
+    if ($env:BAKLOG_REQUIRE_INSTALLER -eq "1") {
+        Write-Error "ISCC.exe not found and BAKLOG_REQUIRE_INSTALLER=1."
+    }
     Write-Warning "ISCC.exe not found - skipping BAKLOG-Setup.exe (install Inno Setup 6 to enable)."
+}
+
+if ($env:BAKLOG_REQUIRE_INSTALLER -eq "1" -and -not (Test-Path $SetupExe)) {
+    Write-Error "BAKLOG-Setup.exe missing and BAKLOG_REQUIRE_INSTALLER=1."
 }
 
 Write-Host ""

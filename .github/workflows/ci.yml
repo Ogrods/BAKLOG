@@ -46,7 +46,7 @@ jobs:
       # though it is not a TTY, so a long run shows how far it has gotten instead
       # of looking hung. --durations=20 prints the slowest tests at the end.
       - name: Run pytest (excluding slow)
-        run: pytest --force-sugar -m "not integration and not slow" --durations=20
+        run: pytest --force-sugar -m "not integration and not slow and not release_smoke" --durations=20
 
   python-slow:
     name: Python (slow suite)
@@ -93,7 +93,7 @@ jobs:
       # python-slow lane; full cross-platform logic runs on Ubuntu's python lane.
       - name: Run pytest smoke subset
         run: >
-          pytest --force-sugar --durations=20 -m "not integration and not slow"
+          pytest --force-sugar --durations=20 -m "not integration and not slow and not release_smoke"
           tests/test_subprocess_guard.py
           tests/test_dev_server_pids.py
           tests/test_stop_baklog.py
@@ -138,7 +138,7 @@ jobs:
       # cap on macOS runners.
       - name: Run pytest smoke subset
         run: >
-          pytest --force-sugar --durations=20 -m "not integration and not slow"
+          pytest --force-sugar --durations=20 -m "not integration and not slow and not release_smoke"
           tests/test_server_csrf.py
           tests/test_fetcher_progress.py
           tests/test_fetcher_auth_exit.py

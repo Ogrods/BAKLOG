@@ -11,7 +11,7 @@ python -m ruff check .
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> pytest"
-python -m pytest --force-sugar -m "not integration and not slow" --durations=20
+python -m pytest --force-sugar -m "not integration and not slow and not release_smoke" --durations=20
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> vitest"
@@ -56,6 +56,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> audit profile security"
 python scripts/audit_security.py --fail-on high --ignore-disk-bleed
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host "==> release smoke (store API contracts; required before tagging)"
+python -m pytest -q -m release_smoke
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 exit 0

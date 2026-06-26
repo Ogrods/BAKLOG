@@ -231,6 +231,38 @@ def is_nintendo_noise_row(item: dict[str, Any]) -> bool:
     return should_auto_hide_nintendo_title(str(item.get("name") or ""))
 
 
+def is_catalog_noise_row(row: dict[str, Any]) -> bool:
+    return "noise" in (row.get("tags") or [])
+
+
+def is_library_noise_row(row: dict[str, Any], store: str | None = None) -> bool:
+    """True when row matches library noise rules (tag or title/metadata heuristics)."""
+    if is_catalog_noise_row(row):
+        return True
+    store_key = str(store or row.get("store") or "").lower()
+    if store_key == "nintendo":
+        return is_nintendo_noise_row(row)
+    name = str(row.get("name") or "")
+    if store_key == "psn":
+        return should_auto_hide_psn_title(name)
+    if store_key == "gog":
+        return should_auto_hide_gog_title(name)
+    return should_auto_hide_by_title(name)
+
+
+def maybe_tag_library_noise_row(row: dict[str, Any], store: str | None = None) -> bool:
+    """Tag row with ``noise`` when it matches library noise rules; returns True if tagged."""
+    if is_library_noise_row(row, store):
+        tag_noise_row(row)
+        return True
+    return False
+
+
+def catalog_game_count(games: list[dict[str, Any]]) -> int:
+    """Playable library size (rows without a ``noise`` tag)."""
+    return sum(1 for g in games if not is_catalog_noise_row(g))
+
+
 def tag_noise_row(row: dict[str, Any]) -> None:
     """Mark a catalog row as library noise (UI auto-hides)."""
     tags = list(row.get("tags") or [])

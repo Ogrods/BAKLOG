@@ -31,7 +31,6 @@ from pathlib import Path
 
 from .gog_filters import (
     apply_gog_name_filters,
-    should_skip_gog_title,
 )
 
 GALAXY_DB_NAME = "galaxy-2.0.db"
@@ -399,8 +398,6 @@ class GogGalaxyClient:
 
             piece = pieces.get(rk, {})
             title = (piece.get("title") or "").strip() or f"GOG {gog_id}"
-            if should_skip_gog_title(title):
-                continue
             meta = piece.get("meta")
             images = piece.get("images")
             cover = _pick_cover_url(images)

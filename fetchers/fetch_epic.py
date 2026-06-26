@@ -31,7 +31,12 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
-from shared.library_noise import is_entitlement_slug, should_auto_hide_by_title
+from shared.library_noise import (
+    catalog_game_count,
+    is_entitlement_slug,
+    maybe_tag_library_noise_row,
+    should_auto_hide_by_title,
+)
 
 GAMES_EPIC_JSON = Path("games_epic.json")
 HLTB_DELAY_SEC = 1.0
@@ -127,9 +132,42 @@ def _is_non_game_title(title: str | None) -> bool:
     return should_auto_hide_by_title(s)
 
 
-def _should_keep_game_row(row: dict) -> bool:
-    """Final gate on output rows (catches cached survivors from merge_cached_row)."""
-    return not _is_non_game_title(row.get("name"))
+def _is_epic_catalog_excluded(item: dict) -> bool:
+    """Hard exclude: engines/software/addon-only paths (not writable library rows)."""
+    paths = [
+        str(c.get("path", "")).lower()
+        for c in (item.get("categories") or [])
+        if isinstance(c, dict)
+    ]
+    if any(any(frag in p for frag in _NON_GAME_CATEGORY_FRAGMENTS) for p in paths):
+        return True
+    return any("addons" in p and "games" not in p for p in paths)
+
+
+def _can_build_epic_catalog_row(item: dict) -> bool:
+    """Whether catalog metadata can produce a catalog row (playable or noise-tagged)."""
+    if _is_epic_catalog_excluded(item):
+        return False
+    title = item.get("title")
+    if _is_non_game_title(title):
+        return True
+    paths = [
+        str(c.get("path", "")).lower()
+        for c in (item.get("categories") or [])
+        if isinstance(c, dict)
+    ]
+    if any("games" in p for p in paths):
+        return True
+    return bool(title and item.get("keyImages"))
+
+
+def _is_game_item(item: dict) -> bool:
+    """Back-compat alias used by cache reuse checks."""
+    return _can_build_epic_catalog_row(item)
+
+
+def _tag_epic_row(row: dict) -> None:
+    maybe_tag_library_noise_row(row, "epic")
 
 
 def _can_reuse_cached_epic_row(
@@ -178,8 +216,6 @@ def _needs_catalog_fetch(rec: dict, existing: dict[str, dict], args: argparse.Na
     cached = existing.get(row_id)
     if cached is None:
         return True
-    if not _should_keep_game_row(cached):
-        return True
     may_reuse = args.skip_hltb or (
         cached.get("hltb_main_hours") is not None and cached.get("library_image")
     )
@@ -188,32 +224,13 @@ def _needs_catalog_fetch(rec: dict, existing: dict[str, dict], args: argparse.Na
     return not _can_reuse_cached_epic_row(cached, None, skip_hltb=args.skip_hltb)
 
 
-def _is_game_item(item: dict) -> bool:
-    title = item.get("title")
-    if _is_non_game_title(title):
-        return False
-    paths = [
-        str(c.get("path", "")).lower()
-        for c in (item.get("categories") or [])
-        if isinstance(c, dict)
-    ]
-    if any(any(frag in p for frag in _NON_GAME_CATEGORY_FRAGMENTS) for p in paths):
-        return False
-    if any("addons" in p and "games" not in p for p in paths):
-        return False
-    if any("games" in p for p in paths):
-        return True
-    # keyImages alone is insufficient — Epic tags soundtracks/editors with cover art.
-    return bool(title and item.get("keyImages"))
-
-
 def _build_game_row(
     catalog_id: str,
     namespace: str,
     item: dict,
     hltb: dict | None,
 ) -> dict | None:
-    if not _is_game_item(item):
+    if not _can_build_epic_catalog_row(item):
         return None
     name = item.get("title") or catalog_id
     key_images = item.get("keyImages") or []
@@ -266,6 +283,7 @@ def _build_game_row(
                 "hltb_name": hltb.get("hltb_name"),
             }
         )
+    _tag_epic_row(row)
     return row
 
 
@@ -287,11 +305,9 @@ def _build_game_row_from_record(
     cid = rec.get("catalogItemId")
     if not ns or not cid:
         return None
-    # When catalog metadata exists, trust the game-vs-addon filter in
-    # _build_game_row. If it rejects the item (soundtrack/wallpaper/editor/
-    # asset pack), skip it — do NOT fall through to the bare fallback below,
-    # which would resurrect the very rows the filter deliberately dropped.
     if catalog_item is not None:
+        if _is_epic_catalog_excluded(catalog_item):
+            return None
         row = _build_game_row(str(cid), str(ns), catalog_item, hltb)
         if row is not None:
             acquired = _acquired_at_from_record(rec)
@@ -299,10 +315,6 @@ def _build_game_row_from_record(
                 row["acquired_at"] = acquired
         return row
     name = rec.get("sandboxName") or rec.get("appName") or str(cid)
-    # No catalog hit: the only signal we have is the record name. Drop internal
-    # entitlement slugs (e.g. Fortnite_StWContent) that aren't real titles.
-    if _is_entitlement_slug(name):
-        return None
     row = {
         "store": "epic",
         "id": f"{ns}:{cid}",
@@ -345,6 +357,7 @@ def _build_game_row_from_record(
                 "hltb_name": hltb.get("hltb_name"),
             }
         )
+    _tag_epic_row(row)
     return row
 
 
@@ -588,23 +601,14 @@ def main() -> int:
             skipped += 1
             continue
         merged = merge_cached_row(row, cached_row, authoritative=EPIC, hltb_updated=hltb_updated)
-        if not _should_keep_game_row(merged):
-            skipped += 1
-            continue
         games_out.append(merged)
 
-    # Drop any non-game extras that survived via cached rows (name is not in the
-    # Epic authoritative merge set, so old soundtracks/editors can linger).
-    filtered: list[dict] = []
-    filtered_non_game = 0
+    tagged_non_game = 0
     for g in games_out:
-        if _should_keep_game_row(g):
-            filtered.append(g)
-        else:
-            filtered_non_game += 1
-    games_out = filtered
+        if maybe_tag_library_noise_row(g, "epic"):
+            tagged_non_game += 1
 
-    # Collapse duplicate entitlements: Epic hands out many catalogItemIds under
+    # Collapse duplicate entitlements:
     # one namespace for the same title (base game + editions/DLC tokens that all
     # report the identical name), e.g. "Fallout: New Vegas" x7. Keep the first
     # row per (namespace, name) — distinct names in a namespace (real DLC like
@@ -622,7 +626,7 @@ def main() -> int:
     games_out = deduped
 
     drift_exit = refuse_drift_result(
-        games_out,
+        catalog_game_count(games_out),
         label="Epic library rows",
         allow_drift=args.allow_drift,
         output_path=GAMES_EPIC_JSON,
@@ -650,19 +654,19 @@ def main() -> int:
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "epic",
-        "game_count": len(games_out),
+        "game_count": catalog_game_count(games_out),
         "entitlement_set_hash": set_hash,
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
     write_catalog_text(GAMES_EPIC_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(
-        f"\nWrote {len(games_out)} games to {GAMES_EPIC_JSON} "
-        f"(skipped {skipped}, filtered {filtered_non_game} non-game extras, "
+        f"\nWrote {catalog_game_count(games_out)} games to {GAMES_EPIC_JSON} "
+        f"(skipped {skipped}, tagged {tagged_non_game} library noise, "
         f"collapsed {collapsed} duplicate entitlements).",
         flush=True,
     )
     print("Reload the dashboard (or click Reload library) to refresh Picks.", flush=True)
-    stats.ok = len(games_out)
+    stats.ok = catalog_game_count(games_out)
     return stats.finish("fetch_epic", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 

@@ -191,23 +191,48 @@ export function isNintendoNoiseRow(g) {
   return shouldAutoHideNintendoTitle(g.name);
 }
 
+export function isCatalogNoiseRow(g) {
+  return Boolean(g?.tags?.includes("noise"));
+}
+
+export function tagNoiseRow(row) {
+  if (!row) return;
+  const tags = Array.isArray(row.tags) ? [...row.tags] : [];
+  if (!tags.includes("noise")) tags.push("noise");
+  row.tags = tags;
+}
+
+export function maybeTagLibraryNoiseRow(row, store) {
+  if (!row) return false;
+  if (shouldAutoHideLibraryRow(row, { store })) {
+    tagNoiseRow(row);
+    return true;
+  }
+  return false;
+}
+
 /**
  * True when a library row should be auto-hidden (not hard-dropped).
  * itch: classification guardrail only (caller passes itchIsGameFn).
  */
-export function shouldAutoHideLibraryRow(g, { itchIsGameFn } = {}) {
+export function shouldAutoHideLibraryRow(g, { itchIsGameFn, store } = {}) {
   if (!g) return false;
-  const store = String(g.store || "").toLowerCase();
-  if (store === "itch" && typeof itchIsGameFn === "function" && !itchIsGameFn(g)) {
+  if (isCatalogNoiseRow(g)) return true;
+  const storeKey = String(store || g.store || "").toLowerCase();
+  if (storeKey === "itch" && typeof itchIsGameFn === "function" && !itchIsGameFn(g)) {
     return true;
   }
-  if (store === "nintendo" && isNintendoNoiseRow(g)) return true;
-  if (store === "psn") return shouldAutoHidePsnTitle(g.name);
-  if (store === "gog") return shouldAutoHideGogTitle(g.name);
+  if (storeKey === "nintendo" && isNintendoNoiseRow(g)) return true;
+  if (storeKey === "psn") return shouldAutoHidePsnTitle(g.name);
+  if (storeKey === "gog") return shouldAutoHideGogTitle(g.name);
   return shouldAutoHideByTitle(g.name);
 }
 
 /** Back-compat alias for isJunkEntry callers during migration. */
 export function isJunkEntry(g) {
-  return shouldAutoHideByTitle(g?.name);
+  if (g && typeof g === "object") {
+    if (isCatalogNoiseRow(g)) return true;
+    return shouldAutoHideByTitle(g.name);
+  }
+  return shouldAutoHideByTitle(g);
 }

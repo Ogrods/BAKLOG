@@ -69,9 +69,9 @@ Yes. You don't need a paid library to start. See [baklog.app/#start](https://bak
 
 ## Why is my count different from what the store shows?
 
-Stores pad your library with things that aren't games: DLC skins, soundtracks, wallpapers, betas, and store apps. BAKLOG filters those out automatically via the built-in blacklist so the number you see is real games.
+Stores pad your library with things that are not games: DLC skins, soundtracks, wallpapers, betas, and store apps. BAKLOG treats those as **library noise** and auto-hides them so the number you see is real games. Rules live in `js/library-noise.js` (mirrored in Python for fetchers).
 
-Separately, you can hide any game you don't want to see and restore it later from the **Hidden games** panel. See [Using the dashboard](using-the-dashboard.md#blacklist-vs-hidden-list).
+Separately, you can hide any game you do not want to see and restore it later from the **Hidden games** panel. See [Using the dashboard](using-the-dashboard.md#library-noise-vs-hidden-list).
 
 ## How long does the first import take?
 

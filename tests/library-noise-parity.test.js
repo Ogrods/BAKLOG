@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import vectors from './fixtures/library_noise.json';
-import { shouldAutoHideByTitle, editionBaseKey, shouldAutoHidePsnTitle, shouldAutoHideGogTitle, shouldAutoHideNintendoTitle } from '../js/library-noise.js';
+import { shouldAutoHideByTitle, editionBaseKey, shouldAutoHidePsnTitle, shouldAutoHideGogTitle, shouldAutoHideNintendoTitle, isCatalogNoiseRow, tagNoiseRow, maybeTagLibraryNoiseRow, shouldAutoHideLibraryRow } from '../js/library-noise.js';
 
 describe('library noise parity (JS)', () => {
   for (const row of vectors) {
@@ -35,4 +35,19 @@ describe('library noise parity (JS)', () => {
       });
     }
   }
+});
+
+describe('library noise catalog tags', () => {
+  it('tagNoiseRow + isCatalogNoiseRow', () => {
+    const row = { name: 'YouTube', tags: [] };
+    tagNoiseRow(row);
+    expect(isCatalogNoiseRow(row)).toBe(true);
+    expect(shouldAutoHideLibraryRow(row)).toBe(true);
+  });
+
+  it('maybeTagLibraryNoiseRow tags PSN demo titles', () => {
+    const row = { store: 'psn', name: 'Fortnite Demo', tags: [] };
+    expect(maybeTagLibraryNoiseRow(row, 'psn')).toBe(true);
+    expect(row.tags).toContain('noise');
+  });
 });

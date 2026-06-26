@@ -7,7 +7,7 @@ from collections import defaultdict
 from typing import Any
 from urllib.parse import quote
 
-from shared.library_noise import is_nintendo_noise_row
+from shared.library_noise import is_nintendo_noise_row, maybe_tag_library_noise_row
 
 _TRADEMARK_RE = re.compile(r"[™®©]")
 _PUNCT_RE = re.compile(r"[^\w\s]+", re.UNICODE)
@@ -214,9 +214,13 @@ def dedupe_deluxe_edition_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def finalize_nintendo_library_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Drop non-game entitlements and collapse duplicate edition SKUs."""
-    kept = [row for row in rows if is_nintendo_playable_game(row)]
-    return dedupe_deluxe_edition_rows(kept)
+    """Tag library noise rows and collapse duplicate edition SKUs."""
+    tagged: list[dict[str, Any]] = []
+    for row in rows:
+        merged = dict(row)
+        maybe_tag_library_noise_row(merged, "nintendo")
+        tagged.append(merged)
+    return dedupe_deluxe_edition_rows(tagged)
 
 
 def merge_vgc_with_transactions(

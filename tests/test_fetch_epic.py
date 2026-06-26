@@ -6,11 +6,12 @@ import argparse
 
 from fetchers.fetch_epic import (
     _can_reuse_cached_epic_row,
+    _is_epic_catalog_excluded,
     _is_game_item,
     _is_non_game_title,
     _needs_catalog_fetch,
-    _should_keep_game_row,
 )
+from shared.library_noise import is_catalog_noise_row, maybe_tag_library_noise_row
 
 
 def test_non_game_title_soundtrack_wallpaper_editor() -> None:
@@ -36,12 +37,22 @@ def test_playable_dlc_titles_are_kept() -> None:
     assert not _is_non_game_title("Botany Manor")
 
 
-def test_is_game_item_rejects_keyimage_soundtrack() -> None:
+def test_is_game_item_accepts_noise_soundtrack_for_tagging() -> None:
     item = {
         "title": "HD Wallpaper",
         "keyImages": [{"type": "OfferImageWide", "url": "https://example/x.jpg"}],
         "categories": [],
     }
+    assert _is_game_item(item)
+
+
+def test_is_epic_catalog_excluded_addon_only() -> None:
+    item = {
+        "title": "Sand Patch Grade",
+        "keyImages": [{"type": "OfferImageWide", "url": "https://example/x.jpg"}],
+        "categories": [{"path": "addons"}],
+    }
+    assert _is_epic_catalog_excluded(item)
     assert not _is_game_item(item)
 
 
@@ -54,9 +65,10 @@ def test_is_game_item_accepts_games_category_dlc() -> None:
     assert _is_game_item(item)
 
 
-def test_should_keep_game_row_filters_cached_slug() -> None:
-    row = {"name": "Fortnite_StWContent", "store": "epic"}
-    assert not _should_keep_game_row(row)
+def test_maybe_tag_library_noise_row_epic_slug() -> None:
+    row = {"name": "Fortnite_StWContent", "store": "epic", "tags": []}
+    assert maybe_tag_library_noise_row(row, "epic")
+    assert is_catalog_noise_row(row)
 
 
 def test_is_game_item_rejects_addon_only_catalog() -> None:
@@ -131,7 +143,7 @@ def test_needs_catalog_fetch_for_refresh_flag() -> None:
     assert _needs_catalog_fetch(rec, existing, _args(refresh=True))
 
 
-def test_needs_catalog_fetch_for_non_game_cached_row() -> None:
+def test_needs_catalog_fetch_reuses_warm_cached_noise_row() -> None:
     rec = {"namespace": "fn", "catalogItemId": "junk"}
     existing = {
         "fn:junk": {
@@ -140,7 +152,7 @@ def test_needs_catalog_fetch_for_non_game_cached_row() -> None:
             "library_image": "https://example/cover.jpg",
         }
     }
-    assert _needs_catalog_fetch(rec, existing, _args())
+    assert not _needs_catalog_fetch(rec, existing, _args())
 
 
 class _PlaytimeResp:

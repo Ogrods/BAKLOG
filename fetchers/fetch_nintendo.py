@@ -54,7 +54,7 @@ from fetchers.nintendo_hybrid import (
     nintendo_store_url,
     norm_nintendo_title,
 )
-from shared.library_noise import should_auto_hide_nintendo_title
+from shared.library_noise import catalog_game_count, maybe_tag_library_noise_row
 from shared.profile_paths import personal_path
 from shared.raw_dumps import profile_raw_dump_path
 
@@ -103,7 +103,7 @@ def _is_game_transaction(tx: dict) -> bool:
     if ctype in SKIP_CONTENT_TYPES:
         return False
     title = tx.get("title") or ""
-    if _FUNDS_TITLE_RE.search(title) or should_auto_hide_nintendo_title(title):
+    if _FUNDS_TITLE_RE.search(title):
         return False
     # Refunds are negative entries for the same title.
     if (tx.get("transaction_type") or "").lower() == "refund":
@@ -347,15 +347,15 @@ def repair_nintendo_cover_urls(games: list[dict]) -> tuple[list[dict], int]:
 
 
 def prune_nintendo_non_playable_rows(games: list[dict]) -> tuple[list[dict], int]:
-    """Drop junk entitlements already on disk (streaming apps, DLC packs, etc.)."""
+    """Tag on-disk junk entitlements as library noise instead of removing."""
     out: list[dict] = []
-    dropped = 0
+    tagged = 0
     for row in games:
-        if is_nintendo_playable_game(row):
-            out.append(row)
-        else:
-            dropped += 1
-    return out, dropped
+        merged = dict(row)
+        if maybe_tag_library_noise_row(merged, "nintendo"):
+            tagged += 1
+        out.append(merged)
+    return out, tagged
 
 
 def maybe_repair_nintendo_catalog_on_disk(dropped_ids: set[str] | None = None) -> int:
@@ -379,12 +379,10 @@ def maybe_repair_nintendo_catalog_on_disk(dropped_ids: set[str] | None = None) -
         return 0
     payload["games"] = games
     if not isinstance(payload.get("fresh_count"), int):
-        payload["fresh_count"] = sum(
-            1
-            for row in games
-            if isinstance(row, dict) and not row.get(NINTENDO_LEGACY_FIELD)
+        payload["fresh_count"] = catalog_game_count(
+            [row for row in games if isinstance(row, dict) and not row.get(NINTENDO_LEGACY_FIELD)]
         )
-    payload["game_count"] = len(games)
+    payload["game_count"] = catalog_game_count(games)
     write_catalog_text(
         GAMES_NINTENDO_JSON,
         json.dumps(payload, indent=2, ensure_ascii=False),
@@ -395,7 +393,7 @@ def maybe_repair_nintendo_catalog_on_disk(dropped_ids: set[str] | None = None) -
     if cover_repaired:
         notes.append(f"{cover_repaired} cover URL(s)")
     if pruned:
-        notes.append(f"{pruned} non-game row(s)")
+        notes.append(f"{pruned} library noise tag(s)")
     print(f"  Repaired Nintendo catalog on disk ({', '.join(notes)}).", flush=True)
     return repaired
 
@@ -414,12 +412,10 @@ def maybe_backfill_nintendo_catalog_meta() -> bool:
         return False
     fresh_count = payload.get("fresh_count")
     game_count = payload.get("game_count")
-    computed_fresh = sum(
-        1
-        for row in games
-        if isinstance(row, dict) and not row.get(NINTENDO_LEGACY_FIELD)
+    computed_fresh = catalog_game_count(
+        [row for row in games if isinstance(row, dict) and not row.get(NINTENDO_LEGACY_FIELD)]
     )
-    computed_total = len(games)
+    computed_total = catalog_game_count(games)
     needs_write = False
     if not isinstance(fresh_count, int):
         payload["fresh_count"] = computed_fresh
@@ -727,7 +723,7 @@ def main() -> int:
         )
 
     drift_exit = refuse_nintendo_source_drift(
-        games_out,
+        catalog_game_count(games_out),
         label="Nintendo library rows",
         allow_drift=args.allow_drift,
         output_path=GAMES_NINTENDO_JSON,
@@ -735,7 +731,7 @@ def main() -> int:
     if drift_exit is not None:
         return stats.finish("fetch_nintendo", t0, exit_code=drift_exit)
 
-    fresh_count = len(games_out)
+    fresh_count = catalog_game_count(games_out)
     if args.no_carry:
         final_games = [
             row for row in games_out if row_key_by_id(row) not in dropped_ids
@@ -756,7 +752,7 @@ def main() -> int:
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "nintendo",
         "fresh_count": fresh_count,
-        "game_count": len(final_games),
+        "game_count": catalog_game_count(final_games),
         "note": (
             "Primary: Virtual Game Cards (entitlements, icons, platform flags, publisher). "
             "Secondary: eShop transaction receipts for purchase dates (~2 year window). "

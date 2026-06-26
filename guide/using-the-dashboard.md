@@ -63,17 +63,18 @@ Open the filter drawer footer for shortcuts:
 | `B` `N` `P` `U` `L` `F` `S` | Set status (Library) |
 | `Space` | Toggle row select |
 
-## Blacklist vs hidden list
+## Library noise vs hidden list
 
 Two different mechanisms keep the library clean:
 
-| | **Blacklist** | **Hidden list** |
+| | **Library noise** (built-in) | **Hidden list** |
 |---|---|---|
-| What | Entries that aren't games (store apps, DLC skins, soundtracks, internal entitlement slugs) | Real games you choose not to see |
-| Who decides | Built into BAKLOG | You |
-| Editable | No - never shown, can't be restored | Yes - restore from the **Hidden games** panel |
+| What | Entries that are not games (store apps, DLC skins, soundtracks, entitlement slugs) | Real games you choose not to see |
+| Who decides | Built into BAKLOG (`js/library-noise.js` / `shared/library_noise.py`) | You |
+| How it applies | Fetchers write matching rows to the catalog with a `noise` tag; the dashboard auto-hides them on load | You hide a row, or defaults seed it on first run |
+| Restorable | Yes - restore from **Hidden games** when the row is in the catalog | Yes - restore from **Hidden games** |
 
-The **blacklist** removes noise that is never a game. The **hidden list** is your preference for games you own but don't want in the main view.
+**Library noise** keeps non-games out of your counts and main view. The **hidden list** is your preference for real games you own but do not want front and center.
 
 ## Personal data storage
 

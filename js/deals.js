@@ -101,7 +101,7 @@ export function dealHeroCardHtml(g) {
     : `<span class="deal-hero-price">${cut > 0 ? `${cut}% off` : "On sale"}</span>`;
   const reviewPct = g.steam_review_percent != null ? `${g.steam_review_percent}%` : null;
   const hltb = hltbMain(g);
-  const hltbLabel = hltb != null ? `${hltb}h` : null;
+  const hltbLabel = hltb != null && hltb > 0 ? `${hltb}h` : null;
   const genres = (g.genres || []).filter(x => !isPlatformToken(x) && !/^early access$/i.test(x)).slice(0, 2);
   const statPills = [];
   if (reviewPct) statPills.push(`<span class="deal-hero-stat" title="Steam review score"><span class="deal-hero-stat-dot deal-hero-stat-dot-review"></span>${reviewPct}</span>`);

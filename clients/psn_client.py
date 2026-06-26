@@ -147,10 +147,6 @@ def _dedupe_key(name: str | None) -> str:
     return _roman_to_digit(_norm_name(base))
 
 
-def _is_non_game(name: str) -> bool:
-    return should_auto_hide_psn_title(name)
-
-
 def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
 
@@ -560,8 +556,10 @@ class PsnClient:
         deduped = self._dedupe_by_name(list(entries.values()))
         self.last_dedupe_dropped = len(entries) - len(deduped)
 
-        games = [e for e in deduped if not _is_non_game(e.name)]
-        self.last_filtered_non_games = len(deduped) - len(games)
+        games = list(deduped)
+        self.last_filtered_non_games = sum(
+            1 for e in deduped if should_auto_hide_psn_title(e.name)
+        )
         return sorted(games, key=lambda g: g.name.lower())
 
     @staticmethod

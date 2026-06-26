@@ -18,7 +18,7 @@ from auth import mark_invalid, resolve_env
 from auth.manager import is_local_provider_disabled, mark_connected
 from auth.session_probe import probe_gog_session
 from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
-from clients.gog_filters import apply_gog_name_filters, filter_gog_game_rows, should_skip_gog_title
+from clients.gog_filters import apply_gog_name_filters, filter_gog_game_rows
 from clients.hltb_client import HltbClient
 from fetchers._authoritative import GOG
 from fetchers._base import (
@@ -33,6 +33,7 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from shared.library_noise import catalog_game_count, maybe_tag_library_noise_row
 
 GAMES_GOG_JSON = Path("games_gog.json")
 HLTB_DELAY_SEC = 1.0
@@ -135,8 +136,6 @@ def _build_game_row(
         or (details or {}).get("title")
         or f"GOG {gog_id}"
     )
-    if should_skip_gog_title(name):
-        return None
     image = (
         product.get("image")
         or product.get("img")
@@ -201,6 +200,7 @@ def _build_game_row(
             }
         )
 
+    maybe_tag_library_noise_row(row, "gog")
     return row
 
 
@@ -416,6 +416,7 @@ def _build_game_row_from_local(rec: dict, hltb: dict | None, source: str) -> dic
                 "hltb_name": hltb.get("hltb_name"),
             }
         )
+    maybe_tag_library_noise_row(row, "gog")
     return row
 
 
@@ -756,21 +757,25 @@ def main() -> int:
         no_carry=args.no_carry,
     )
 
+    for row in games_out:
+        maybe_tag_library_noise_row(row, "gog")
+
+    playable = catalog_game_count(games_out)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "gog",
         "source": source,
-        "game_count": len(games_out),
+        "game_count": playable,
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
 
     write_catalog_text(GAMES_GOG_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     if source == "local":
         mark_connected("gog_galaxy", {})
-    print(f"\nWrote {len(games_out)} games to {GAMES_GOG_JSON}.", flush=True)
+    print(f"\nWrote {playable} games to {GAMES_GOG_JSON}.", flush=True)
     print("Open index.html in your browser to view the dashboard.", flush=True)
-    stats.ok = len(games_out)
-    return stats.finish("fetch_gog", t0, exit_code=0, extra=f"{len(games_out)} games")
+    stats.ok = playable
+    return stats.finish("fetch_gog", t0, exit_code=0, extra=f"{playable} games")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from shared.library_noise import (
     edition_base_key,
+    edition_title_join_key,
     should_auto_hide_by_title,
     should_auto_hide_gog_title,
     should_auto_hide_nintendo_title,
@@ -30,3 +31,5 @@ def test_library_noise_parity_vectors() -> None:
             assert should_auto_hide_nintendo_title(title) is row["should_auto_hide_nintendo"], title
         if row.get("edition_base_key"):
             assert edition_base_key(title) == row["edition_base_key"], title
+        if row.get("edition_title_join_key"):
+            assert edition_title_join_key(title) == row["edition_title_join_key"], title

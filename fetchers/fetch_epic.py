@@ -36,6 +36,7 @@ from shared.library_noise import (
     is_entitlement_slug,
     maybe_tag_library_noise_row,
     should_auto_hide_by_title,
+    tag_noise_row,
 )
 
 GAMES_EPIC_JSON = Path("games_epic.json")
@@ -146,11 +147,11 @@ def _is_epic_catalog_excluded(item: dict) -> bool:
 
 def _can_build_epic_catalog_row(item: dict) -> bool:
     """Whether catalog metadata can produce a catalog row (playable or noise-tagged)."""
-    if _is_epic_catalog_excluded(item):
-        return False
     title = item.get("title")
     if _is_non_game_title(title):
         return True
+    if _is_epic_catalog_excluded(item):
+        return bool(str(title or "").strip())
     paths = [
         str(c.get("path", "")).lower()
         for c in (item.get("categories") or [])
@@ -284,6 +285,8 @@ def _build_game_row(
             }
         )
     _tag_epic_row(row)
+    if _is_epic_catalog_excluded(item):
+        tag_noise_row(row)
     return row
 
 
@@ -306,8 +309,6 @@ def _build_game_row_from_record(
     if not ns or not cid:
         return None
     if catalog_item is not None:
-        if _is_epic_catalog_excluded(catalog_item):
-            return None
         row = _build_game_row(str(cid), str(ns), catalog_item, hltb)
         if row is not None:
             acquired = _acquired_at_from_record(rec)

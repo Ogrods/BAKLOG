@@ -24,16 +24,28 @@ import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getPicksLimitForView, setPicksLimitForView } from './prefs.js';
 import { syncCoverFits } from './covers.js';
 import { sponsoredPickSlotHtml, sponsoredDealPickSlotHtml, pickLocationForView, houseLocationForView, renderHouseLocationSlot } from './sponsored-deals.js';
+import {
+  parseCustomListTabId,
+  isCustomListTab,
+  getCustomLists,
+  resolveCustomListGames,
+  resolveLibraryPicksTab,
+  renderCustomPickTabs,
+} from './custom-lists.js';
 
-export function pickCardHtml(g) {
+export function pickCardHtml(g, opts = {}) {
   const key = gameKey(g);
   const headerFallback = coverFallbackFor(g);
   const cover = libraryCoverFor(g);
   const rating = g.steam_review_percent != null ? `${g.steam_review_percent}%` : " - ";
   const h = hltbMain(g);
   const store = normalizeGame(g).store;
+  const dragHandle = opts.reorderable
+    ? `<button type="button" class="pick-card-drag-handle" draggable="true" aria-label="Drag to reorder" title="Drag to reorder">⠿</button>`
+    : '';
   return `
     <div class="pick-card relative rounded p-2 cursor-pointer" data-game-key="${escapeAttr(key)}" title="${escapeAttr(g.name)} · ${rating}${h != null ? ` · ${h}h` : ""}">
+      ${dragHandle}
       <span class="pick-store">${storeLogoHtml(store, { size: 'sm' })}</span>
       <div class="cover-wrap w-full block${window.coverLandscapeAttr(cover)}">
         <img class="pick-cover${window.coverLandscapeAttr(cover)}" src="${safeCoverAttrUrl(cover)}" data-fallback="${escapeAttr(headerFallback)}" data-name="${escapeAttr(g.name)}" alt="" loading="lazy" onload="window.markLandscape(this)" onerror="window.coverFallback(this)" />
@@ -88,13 +100,13 @@ export function dealCardHtml(g) {
     </div>`;
 }
 
-export function picksViewKey() {
+export function picksLimitView() {
   const v = state.activeView;
   return v === "wishlist" ? "wishlist" : v === "itch" ? "itch" : "library";
 }
 
 export function normalizePicksLimit() {
-  const view = picksViewKey();
+  const view = picksLimitView();
   const limit = getPicksLimitForView(view);
   const stored = Number(state.prefs.viewPicksLimits?.[view]);
   if (stored !== limit) setPicksLimitForView(view, limit);
@@ -102,7 +114,7 @@ export function normalizePicksLimit() {
 }
 
 export function renderPicksLimitButtons() {
-  const limit = normalizePicksLimit();
+  const limit = getPicksLimitForView(picksLimitView());
   document.querySelectorAll(".picks-limit-btn").forEach(btn => {
     btn.classList.toggle("active", +btn.dataset.limit === limit);
   });
@@ -134,11 +146,12 @@ export function effectivePicksTab() {
   if (view === "wishlist") return "wishlistDeals";
   if (view === "itch") {
     const t = state.prefs.itchPicksTab || state.prefs.picksTab;
-    return t === "wishlistDeals" ? "topRated" : (t || "topRated");
+    if (t === "wishlistDeals" || isCustomListTab(t)) return state.prefs.itchPicksTab || "topRated";
+    return t || "topRated";
   }
   const t = state.prefs.picksTab;
   if (t === "wishlistDeals") return state.prefs.libraryPicksTab || "topRated";
-  return t || "topRated";
+  return resolveLibraryPicksTab(t, state.prefs.libraryPicksTab);
 }
 
 export function renderPicks() {
@@ -180,22 +193,31 @@ export function renderPicks() {
       return dealScore(b) - dealScore(a);
     });
   let data;
+  const customIdx = parseCustomListTabId(tab);
   switch (tab) {
     case "nextUp": data = pickView === "library" ? nextUp : []; break;
     case "quickWins": data = pickView === "library" ? quickWins : []; break;
     case "hiddenGems": data = pickView === "library" ? hidden : []; break;
     case "returnTo": data = pickView === "library" ? returnTo : []; break;
     case "wishlistDeals": data = wishlistDeals; break;
-    default: data = pickView === "wishlist" ? wishlistDeals : backlogRated;
+    default:
+      if (customIdx >= 0 && pickView === "library") {
+        data = resolveCustomListGames(getCustomLists()[customIdx]);
+      } else {
+        data = pickView === "wishlist" ? wishlistDeals : backlogRated;
+      }
   }
-  if (pickView === "itch" && tab !== "topRated") data = backlogRated;
+  if (pickView === "itch" && tab !== "topRated" && customIdx < 0) data = backlogRated;
   const limit = getPicksLimitForView(pickView);
+  const isCustomTab = isCustomListTab(tab);
   const pickLoc = tab === 'wishlistDeals'
     ? pickLocationForView(pickView === 'wishlist' ? 'wishlist' : 'deals', 'pick')
     : pickLocationForView(pickView, 'pick');
-  const sponsoredHtml = tab === 'wishlistDeals'
-    ? sponsoredDealPickSlotHtml(pickLoc)
-    : sponsoredPickSlotHtml(pickLoc);
+  const sponsoredHtml = isCustomTab
+    ? ''
+    : tab === 'wishlistDeals'
+      ? sponsoredDealPickSlotHtml(pickLoc)
+      : sponsoredPickSlotHtml(pickLoc);
   const sponsorSlot = !!sponsoredHtml;
   // The sponsored slot occupies one grid cell, so drop one real card to keep the
   // grid at exactly `limit` tiles — otherwise the extra card wraps to a new row.
@@ -204,8 +226,9 @@ export function renderPicks() {
   const shownTiles = Math.min(limit, shownDeals + (sponsorSlot ? 1 : 0));
   const countLabel = `${shownTiles} of ${data.length}`;
   document.getElementById("pickMeta").textContent = countLabel;
-  const renderCard = tab === "wishlistDeals" ? dealCardHtml : pickCardHtml;
-  const emptyMsg = tab === "wishlistDeals"
+  const emptyMsg = isCustomTab
+    ? 'Select games in the table, then use Add to list in the bulk bar.'
+    : tab === "wishlistDeals"
     ? (state.wishlistGames.length === 0
       ? "No deals on your wishlist yet. Connect a store and run the wishlist and deal price fetchers from Fetcher health."
       : "No wishlist deals on sale right now. Refresh prices from Fetcher health, or check back after the next sale.")
@@ -214,6 +237,16 @@ export function renderPicks() {
       : "No games match this tab yet.";
   const picksGrid = document.getElementById("picksGrid");
   const rendererTag = tab === "wishlistDeals" ? "deal" : "pick";
+  const reorderablePicks = isCustomTab && customIdx >= 0;
+  if (reorderablePicks) {
+    picksGrid.classList.add("picks-grid--custom-reorder");
+    picksGrid.dataset.customListIndex = String(customIdx);
+  } else {
+    picksGrid.classList.remove("picks-grid--custom-reorder");
+    delete picksGrid.dataset.customListIndex;
+  }
+  const renderLibraryCard = g => pickCardHtml(g, reorderablePicks ? { reorderable: true } : {});
+  const renderCardForGrid = tab === "wishlistDeals" ? dealCardHtml : renderLibraryCard;
   if (data.length) {
     const slice = data.slice(0, cardBudget);
     const newKeys = slice.map(g => gameKey(g));
@@ -231,7 +264,7 @@ export function renderPicks() {
       const keysMatch = expectedKeys.every((k, i) => existingKeys[i] === k);
       if (keysMatch && data.length >= limit) {
         picksGrid.querySelector(".sponsored-pick-card")?.remove();
-        picksGrid.insertAdjacentHTML("beforeend", renderCard(data[limit - 1]));
+        picksGrid.insertAdjacentHTML("beforeend", renderCardForGrid(data[limit - 1]));
         document.getElementById("pickMeta").textContent = `${limit} of ${data.length}`;
         syncCoverFits(picksGrid);
         handled = true;
@@ -248,12 +281,12 @@ export function renderPicks() {
       if (newKeys.length < existingKeys.length) {
         for (let i = newKeys.length; i < existingKeys.length; i++) existingCards[i].remove();
       } else if (newKeys.length > existingKeys.length) {
-        const tail = slice.slice(existingKeys.length).map(renderCard).join("");
+        const tail = slice.slice(existingKeys.length).map(renderCardForGrid).join("");
         picksGrid.insertAdjacentHTML("beforeend", tail);
         syncCoverFits(picksGrid);
       }
     } else if (!handled) {
-      const parts = slice.map(renderCard);
+      const parts = slice.map(renderCardForGrid);
       if (sponsoredHtml) parts.splice(Math.min(1, parts.length), 0, sponsoredHtml);
       picksGrid.innerHTML = parts.join("");
       picksGrid.dataset.renderer = rendererTag;
@@ -270,6 +303,7 @@ export function renderPicks() {
   });
   updatePicksChrome();
   renderPicksLimitButtons();
+  renderCustomPickTabs();
   renderViewHouseSlot();
 }
 

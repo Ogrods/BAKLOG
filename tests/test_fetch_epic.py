@@ -53,7 +53,20 @@ def test_is_epic_catalog_excluded_addon_only() -> None:
         "categories": [{"path": "addons"}],
     }
     assert _is_epic_catalog_excluded(item)
-    assert not _is_game_item(item)
+    assert _is_game_item(item)
+
+
+def test_build_game_row_tags_excluded_catalog_as_noise() -> None:
+    from fetchers.fetch_epic import _build_game_row
+
+    item = {
+        "title": "Sand Patch Grade",
+        "keyImages": [{"type": "OfferImageWide", "url": "https://example/x.jpg"}],
+        "categories": [{"path": "addons"}],
+    }
+    row = _build_game_row("cid", "ns", item, None)
+    assert row is not None
+    assert is_catalog_noise_row(row)
 
 
 def test_is_game_item_accepts_games_category_dlc() -> None:
@@ -71,13 +84,13 @@ def test_maybe_tag_library_noise_row_epic_slug() -> None:
     assert is_catalog_noise_row(row)
 
 
-def test_is_game_item_rejects_addon_only_catalog() -> None:
+def test_is_game_item_accepts_addon_only_catalog_for_noise_row() -> None:
     item = {
         "title": "Sand Patch Grade",
         "keyImages": [{"type": "OfferImageWide", "url": "https://example/x.jpg"}],
         "categories": [{"path": "addons"}],
     }
-    assert not _is_game_item(item)
+    assert _is_game_item(item)
 
 
 def test_can_reuse_cached_row_rejects_live_placeholder_mismatch() -> None:

@@ -161,6 +161,11 @@ def _build_row(entry: dict, hltb: dict | None) -> dict | None:
                 "hltb_name": hltb.get("hltb_name"),
             }
         )
+    if not itch_is_videogame(row):
+        tags = list(row.get("tags") or [])
+        if "noise" not in tags:
+            tags.append("noise")
+        row["tags"] = tags
     return row
 
 

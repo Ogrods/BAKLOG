@@ -28,13 +28,14 @@ def test_build_game_row_tags_non_game_title() -> None:
     assert "noise" in row["tags"]
 
 
-def test_build_game_row_skips_non_game_media_type() -> None:
+def test_build_game_row_tags_non_game_media_type() -> None:
     row = fg._build_game_row(
         {"id": 2, "title": "Soundtrack", "mediaType": 3},
         None,
         None,
     )
-    assert row is None
+    assert row is not None
+    assert "noise" in row["tags"]
 
 
 def test_forgotten_realms_pack_dropped_when_components_present() -> None:

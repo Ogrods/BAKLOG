@@ -22,6 +22,25 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.21] - 2026-06-25
+
+### Added
+
+- Custom ordered lists in Picks (up to three user-named library tabs, drag reorder, bulk Add to list).
+- Library noise transparency: **Filtered N non-games** summary chip, noise-only hidden panel view, **Not a game?** false-positive report.
+- Automated tests for noise summary chip, chip-to-panel wiring, custom-lists integration, and fetcher noise-tag migrations.
+
+### Changed
+
+- Fetchers tag more non-game rows with `noise` instead of dropping them (GOG non-game `mediaType`, Nintendo vouchers/subs, Epic addon-only catalog, itch non-videogame classifications).
+- Guide: document the Filtered non-games chip under library noise.
+
+### Fixed
+
+- Deal-hero card omits HLTB stat when main story hours are zero or missing.
+- Nintendo `edition_title_join_key` for receipt-to-catalog title joins.
+- Fetcher library-noise rule consolidation (`shared/library_noise.py` sync pair).
+
 ## [0.8.20] - 2026-06-25
 
 ### Added

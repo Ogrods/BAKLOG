@@ -99,14 +99,10 @@ def _clean_name(raw: str) -> str:
 
 
 def _is_game_transaction(tx: dict) -> bool:
-    ctype = (tx.get("content_type") or "").lower()
-    if ctype in SKIP_CONTENT_TYPES:
+    if (tx.get("transaction_type") or "").lower() == "refund":
         return False
     title = tx.get("title") or ""
     if _FUNDS_TITLE_RE.search(title):
-        return False
-    # Refunds are negative entries for the same title.
-    if (tx.get("transaction_type") or "").lower() == "refund":
         return False
     if not title.strip():
         return False
@@ -129,6 +125,9 @@ def _merge_transactions(transactions: list[dict]) -> list[dict]:
         tid = tx.get("transaction_id") or key
 
         if key not in by_title:
+            tags: list[str] = ["dlc"] if is_dlc else []
+            if ctype in SKIP_CONTENT_TYPES and "noise" not in tags:
+                tags.append("noise")
             by_title[key] = {
                 "name": name,
                 "id": str(tid),
@@ -136,10 +135,15 @@ def _merge_transactions(transactions: list[dict]) -> list[dict]:
                 "purchase_date": date,
                 "device_type": tx.get("device_type"),
                 "content_type": tx.get("content_type"),
-                "tags": ["dlc"] if is_dlc else [],
+                "tags": tags,
             }
             continue
         row = by_title[key]
+        if ctype in SKIP_CONTENT_TYPES:
+            row_tags = list(row.get("tags") or [])
+            if "noise" not in row_tags:
+                row_tags.append("noise")
+            row["tags"] = row_tags
         if date and (not row.get("purchase_date") or date < row["purchase_date"]):
             row["purchase_date"] = date
         if is_dlc and "dlc" not in row["tags"]:

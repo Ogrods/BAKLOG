@@ -56,6 +56,7 @@ import {
   renderSummary,
   renderStoreChips,
   renderWishlistStoreChips,
+  renderCustomListFilterChips,
   updateCleanupBtnState,
   updateViewChrome,
   collectActiveFilters,
@@ -227,6 +228,7 @@ async function bootstrap() {
   }
   renderStoreChips();
   renderWishlistStoreChips();
+  renderCustomListFilterChips();
   renderBulkStatusButtons();
   renderPicksLimitButtons();
   startDebugOverlay();

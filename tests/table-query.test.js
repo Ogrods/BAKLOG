@@ -226,6 +226,33 @@ describe('queryGames — integration', () => {
     const out = queryGames({ source, ctx: ctx({ personal, params: { q: 'xyzzy' } }) });
     expect(out).toHaveLength(0);
   });
+
+  it('filters library rows to a custom list key set', () => {
+    const source = [
+      { ...baseGame, id: 1, name: 'In List' },
+      { ...baseGame, id: 2, name: 'Out' },
+    ];
+    const out = queryGames({
+      source,
+      ctx: {
+        ...ctx(),
+        customListFilterKeys: ['steam:1'],
+      },
+    });
+    expect(out.map(g => g.name)).toEqual(['In List']);
+  });
+
+  it('shows no library rows when custom list filter is active but empty', () => {
+    const source = [{ ...baseGame, id: 1, name: 'Solo' }];
+    const out = queryGames({
+      source,
+      ctx: {
+        ...ctx(),
+        customListFilterKeys: [],
+      },
+    });
+    expect(out).toHaveLength(0);
+  });
 });
 
 describe('collectTableParams', () => {

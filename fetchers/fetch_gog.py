@@ -127,8 +127,7 @@ def _build_game_row(
         return None
 
     media_type = product.get("mediaType") or product.get("media_type")
-    if media_type not in (None, 1, "1", "game"):
-        return None
+    non_game_media = media_type not in (None, 1, "1", "game")
 
     name = (
         product.get("title")
@@ -200,6 +199,11 @@ def _build_game_row(
             }
         )
 
+    if non_game_media:
+        tags = list(row.get("tags") or [])
+        if "noise" not in tags:
+            tags.append("noise")
+        row["tags"] = tags
     maybe_tag_library_noise_row(row, "gog")
     return row
 

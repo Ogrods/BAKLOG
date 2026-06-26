@@ -155,6 +155,21 @@ describe('exportPersonalDoc / mergeImportedPersonalDoc', () => {
     });
     expect(state.personal[key].notes).toBe('legacy import');
   });
+
+  it('merges customLists order from imported prefs', () => {
+    mergeImportedPersonalDoc({
+      personal: {},
+      prefs: {
+        customLists: [
+          { name: 'Queue', keys: ['steam:2', 'steam:1'] },
+          { name: 'List 2', keys: [] },
+          { name: 'List 3', keys: [] },
+        ],
+      },
+    });
+    expect(state.prefs.customLists[0].keys).toEqual(['steam:2', 'steam:1']);
+    expect(state.prefs.customLists[0].name).toBe('Queue');
+  });
 });
 
 describe('canonical cross-store notes', () => {

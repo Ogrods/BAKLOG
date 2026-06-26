@@ -95,7 +95,7 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 
 **Symptom:** BAKLOG shows fewer games than Steam/Epic/etc.
 
-**Cause:** BAKLOG filters non-games (DLC skins, soundtracks, store apps, entitlement slugs) via the built-in blacklist. That is intentional - see [Using the dashboard](using-the-dashboard.md#blacklist-vs-hidden-list).
+**Cause:** BAKLOG auto-hides non-games (DLC skins, soundtracks, store apps, entitlement slugs) as **library noise**. That is intentional - see [Using the dashboard](using-the-dashboard.md#library-noise-vs-hidden-list).
 
 **Also:** Nintendo eShop fetch covers ~2 years of digital history only. Cartridge and older purchases need manual adds.
 

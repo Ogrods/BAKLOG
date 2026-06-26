@@ -90,15 +90,15 @@ async function refreshPreview() {
   preview.textContent = JSON.stringify(transport, null, 2);
 }
 
-export function openBugReportDialog() {
+export function openBugReportDialog({ note = '', contact = '' } = {}) {
   if (typeof document === 'undefined' || !document.body) return;
   ensureShell();
   setStatus('');
   refreshPreview();
-  const contact = document.getElementById('bugReportContact');
-  const note = document.getElementById('bugReportNote');
-  if (contact) contact.value = '';
-  if (note) note.value = '';
+  const contactEl = document.getElementById('bugReportContact');
+  const noteEl = document.getElementById('bugReportNote');
+  if (contactEl) contactEl.value = contact || '';
+  if (noteEl) noteEl.value = note || '';
   _shellEl.classList.remove('hidden');
   _shellEl.classList.add('flex');
   _releaseFocus?.();
@@ -109,7 +109,7 @@ export function openBugReportDialog() {
     releaseEsc();
     _releaseFocus = null;
   };
-  contact?.focus();
+  contactEl?.focus();
 }
 
 export function closeBugReportDialog() {

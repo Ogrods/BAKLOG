@@ -132,18 +132,20 @@ BAKLOG is free forever to import and browse. The optional **$5/mo** (**$50/yr**)
 
 See [baklog.app](https://baklog.app/) for the full free-vs-paid breakdown.
 
-### Blacklist vs hidden list
+### Library noise vs hidden list
 
-Two different mechanisms keep the library clean — keep the terms distinct:
+Two different mechanisms keep the library clean. Keep the terms distinct:
 
-| | **Blacklist** | **Hidden list** |
+| | **Library noise** (built-in) | **Hidden list** |
 |---|---|---|
-| What | Entries that aren't games (store apps, DLC skins, soundtracks, internal entitlement slugs like `Fortnite_StWContent`) | Real games a user chooses not to see |
-| Who decides | Hardcoded by us | The user |
-| Editable | No — never shown, can't be restored | Yes — restore any entry from the **Hidden games** panel |
-| Where | `isJunkEntry()` / `JUNK_NAMES` / `JUNK_NAME_PATTERNS` in [`js/game-core.js`](js/game-core.js), mirrored by Python source filters (e.g. `_is_entitlement_slug` in `fetch_epic.py`, `psn_client.py`, `gog_filters.py`) | User hides in personal storage, seeded by the pre-hidden defaults in [`js/hidden-defaults.js`](js/hidden-defaults.js) |
+| What | Entries that are not games (store apps, DLC skins, soundtracks, internal entitlement slugs like `Fortnite_StWContent`) | Real games you choose not to see |
+| Who decides | Hardcoded rules in [`js/library-noise.js`](js/library-noise.js), mirrored in [`shared/library_noise.py`](shared/library_noise.py) | You |
+| How it applies | Fetchers write matching rows to the catalog with a ``noise`` tag; the dashboard auto-hides them via `personal.hidden` on load (`seedNoiseAutoHidden()`). Vouchers/funds and hard-excluded Epic catalog paths are still skipped at sync. | You hide a row, or it is seeded from [`js/hidden-defaults.js`](js/hidden-defaults.js) on first run |
+| Restorable | Yes - restore from the **Hidden games** panel when the row is in the catalog | Yes - restore from the **Hidden games** panel |
 
-In short: the **blacklist** removes noise that is never a game; the **hidden list** is a user preference for games they own but don't want cluttering the view. When adding new filtering, decide which bucket it belongs in first.
+In short: **library noise** keeps the count honest by treating non-games as clutter; the **hidden list** is your preference for real games you own but do not want in the main view. When adding new filtering, decide which bucket it belongs in first.
+
+Landing copy may still say "blacklist" for brevity; in the app and docs we use **library noise** for this built-in ruleset.
 
 ## Dashboard CSS
 

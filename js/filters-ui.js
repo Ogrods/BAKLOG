@@ -37,7 +37,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { gameGenresCanonical } from './genres.js';
-import { getPersonal, filterOutHidden, filterCounted } from './personal-storage.js';
+import { getPersonal, filterOutHidden, filterCounted, countHiddenLibraryNoiseGames } from './personal-storage.js';
 import {
   savePrefs,
   saveActiveView,
@@ -868,10 +868,15 @@ export function renderSummary() {
   const staleChip = staleCount
     ? `<button type="button" class="summary-stale-chip${staleActive ? " active" : ""}" data-stale-filter="1" title="${staleActive ? "Clear: show all library games" : "Show only games not seen in the latest store sync"}">Stale sync <span class="text-amber-200 font-semibold ml-1">${staleCount}</span></button>`
     : "";
+  const noiseCount = countHiddenLibraryNoiseGames(state.allGames);
+  const noiseChip = noiseCount
+    ? `<button type="button" class="summary-noise-chip" data-open-noise-hidden="1" title="View auto-filtered non-games (library noise) and restore or report mistakes">Filtered <span class="text-violet-200 font-semibold ml-1">${noiseCount}</span> non-games</button>`
+    : "";
   el.innerHTML = `
     <div class="w-full flex flex-wrap gap-2">
       <div class="summary-stat-chip" data-stat="games" title="Visible games in library (after filters and dedup)">Games <span class="library-count-host" data-libcount-host><span class="text-slate-100 font-semibold ml-1" data-count-target="library">${visible.length}</span></span>${hiddenCount ? ` <span class="text-slate-400 ml-1">(${hiddenCount} dupes hidden)</span>` : ""}</div>
       <div class="summary-stat-chip" data-stat="sources" title="Stores with games in your library">Sources <span class="text-slate-100 font-semibold ml-1">${sourceCount}</span></div>
+      ${noiseChip}
       ${staleChip}
       ${storeChips}
     </div>

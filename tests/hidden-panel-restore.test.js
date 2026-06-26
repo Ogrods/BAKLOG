@@ -9,6 +9,7 @@ import { hydrateIndexDocument } from './a11y/hydrate-index.js';
 
 let state;
 let bindHiddenPanelUI;
+let openHiddenPanel;
 let updateHiddenGamesMenuCount;
 let setGameHidden;
 let setPersonalByKey;
@@ -18,6 +19,7 @@ let PRE_HIDDEN_KEYS;
 
 const a = { store: 'steam', id: 1, name: 'Alpha', playtime_minutes: 0 };
 const b = { store: 'steam', id: 2, name: 'Bravo', playtime_minutes: 0 };
+const noise = { store: 'epic', id: 3, name: 'YouTube', tags: ['noise'], playtime_minutes: 0 };
 
 beforeEach(async () => {
   vi.resetModules();
@@ -27,7 +29,7 @@ beforeEach(async () => {
   hydrateIndexDocument();
 
   ({ state } = await import('../js/state.js'));
-  ({ bindHiddenPanelUI, updateHiddenGamesMenuCount } = await import('../js/hidden-panel.js'));
+  ({ bindHiddenPanelUI, openHiddenPanel, updateHiddenGamesMenuCount } = await import('../js/hidden-panel.js'));
   ({ setGameHidden, setPersonalByKey, getPersonal } = await import('../js/personal-storage.js'));
   ({ gameKey } = await import('../js/game-core.js'));
   ({ PRE_HIDDEN_KEYS } = await import('../js/hidden-defaults.js'));
@@ -90,6 +92,20 @@ describe('Restore all', () => {
     expect(getPersonal(a).hidden).toBe(false);
     expect(getPersonal(b).hidden).toBe(false);
     expect(document.getElementById('hiddenGamesMenu').textContent).toBe('Hidden games');
+  });
+});
+
+describe('library noise copy', () => {
+  it('labels auto-filtered rows and offers false-positive report', () => {
+    state.allGames = [a, noise];
+    setGameHidden(noise, true, { silent: true });
+    openHiddenPanel({ noiseOnly: true });
+
+    const summary = document.getElementById('hiddenPanelSummary').textContent;
+    expect(summary).toMatch(/auto-filtered/i);
+    const row = document.querySelector(`#hiddenPanelList [data-hidden-key="${gameKey(noise)}"]`);
+    expect(row.textContent).toMatch(/library noise/i);
+    expect(document.querySelector('.hidden-noise-report')).toBeTruthy();
   });
 });
 

@@ -1051,6 +1051,18 @@ button[disabled] { cursor: not-allowed; }
   border-color: rgba(251, 191, 36, 0.55);
   background: rgba(251, 191, 36, 0.18);
 }
+.summary-noise-chip {
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(139, 92, 246, 0.12);
+  color: #ddd6fe;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.summary-noise-chip:hover {
+  background: rgba(139, 92, 246, 0.22);
+}
 .trophy-pill {
   display: inline-flex; align-items: center; gap: 2px;
   padding: 0 5px; height: 16px;

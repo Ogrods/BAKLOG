@@ -18,13 +18,14 @@ def test_should_skip_voucher_and_name_dlc() -> None:
     assert not should_skip_gog_title("Ashworld")
 
 
-def test_build_game_row_skips_non_game_title() -> None:
+def test_build_game_row_tags_non_game_title() -> None:
     row = fg._build_game_row(
         {"id": 1, "title": "Freedom to buy games", "mediaType": 1},
         None,
         None,
     )
-    assert row is None
+    assert row is not None
+    assert "noise" in row["tags"]
 
 
 def test_build_game_row_skips_non_game_media_type() -> None:

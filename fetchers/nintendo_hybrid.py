@@ -7,35 +7,14 @@ from collections import defaultdict
 from typing import Any
 from urllib.parse import quote
 
+from shared.library_noise import (
+    edition_title_join_key,
+    is_nintendo_noise_row,
+    maybe_tag_library_noise_row,
+)
+
 _TRADEMARK_RE = re.compile(r"[™®©]")
 _PUNCT_RE = re.compile(r"[^\w\s]+", re.UNICODE)
-
-_EDITION_SUFFIXES = (
-    " digital deluxe edition",
-    " deluxe edition",
-    " gold edition",
-    " ultimate edition",
-    " complete edition",
-    " definitive edition",
-    " special edition",
-    " collectors edition",
-    " collector's edition",
-)
-
-_NON_GAME_TITLE_PATTERNS = re.compile(
-    r"\b(expansion pass|season pass|fighter pass|\bdlc\b|add-?on content|"
-    r"bonus content|upgrade pack|costume pack|skin pack|\bskin\b|coins?\b|"
-    r"coin set|soundtrack|artbook|art book|character pack|challenge pack|"
-    r"\bpicaro\b|mini digital sound|digital art book|"
-    r"nintendo switch online|membership|e?shop\s+card|add-on content bundle)\b",
-    re.I,
-)
-
-_STREAMING_APP_PATTERNS = re.compile(
-    r"\b(hulu|youtube|twitch|crunchyroll|inkypen|pokémon home|pokemon home|"
-    r"pokémon tv|pokemon tv)\b",
-    re.I,
-)
 
 _DELUXE_MARKERS = (
     "digital deluxe",
@@ -57,11 +36,7 @@ def norm_nintendo_title(name: str) -> str:
 
 def match_nintendo_title_key(name: str) -> str:
     """Aggressive normalize for receipt↔VGC title join (edition suffixes stripped)."""
-    key = norm_nintendo_title(name)
-    for suffix in _EDITION_SUFFIXES:
-        if key.endswith(suffix):
-            key = key[: -len(suffix)].strip()
-    return key
+    return edition_title_join_key(name)
 
 
 def nintendo_store_url(application_id: str | None, name: str) -> str:
@@ -197,29 +172,7 @@ def _hybrid_from_tx_only(tx: dict[str, Any]) -> dict[str, Any]:
 
 def is_nintendo_playable_game(item: dict[str, Any]) -> bool:
     """True for base-game library rows; false for DLC, skins, streaming apps, etc."""
-    if item.get("is_dlc") or item.get("nintendo_is_dlc"):
-        return False
-    tags = item.get("tags") or []
-    if "dlc" in tags:
-        has_app = bool(
-            item.get("has_application")
-            or item.get("has_nx_application")
-            or item.get("has_ounce_application")
-            or item.get("application_id")
-            or item.get("nintendo_has_application")
-            or item.get("nintendo_has_nx_application")
-            or item.get("nintendo_has_ounce_application")
-        )
-        if not has_app:
-            return False
-    name = str(item.get("name") or "")
-    if not name.strip():
-        return False
-    if _NON_GAME_TITLE_PATTERNS.search(name):
-        return False
-    if _STREAMING_APP_PATTERNS.search(name):
-        return False
-    return True
+    return not is_nintendo_noise_row(item)
 
 
 def dedupe_deluxe_edition_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -249,9 +202,13 @@ def dedupe_deluxe_edition_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def finalize_nintendo_library_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Drop non-game entitlements and collapse duplicate edition SKUs."""
-    kept = [row for row in rows if is_nintendo_playable_game(row)]
-    return dedupe_deluxe_edition_rows(kept)
+    """Tag library noise rows and collapse duplicate edition SKUs."""
+    tagged: list[dict[str, Any]] = []
+    for row in rows:
+        merged = dict(row)
+        maybe_tag_library_noise_row(merged, "nintendo")
+        tagged.append(merged)
+    return dedupe_deluxe_edition_rows(tagged)
 
 
 def merge_vgc_with_transactions(

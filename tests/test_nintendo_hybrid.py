@@ -116,10 +116,11 @@ def test_merge_vgc_tags_lending() -> None:
     assert merged[0]["tags"] == ["lending"]
 
 
-def test_merge_vgc_filters_pure_dlc_entitlements() -> None:
+def test_merge_vgc_tags_pure_dlc_entitlements() -> None:
     vgc = [_sample_vgc(is_dlc=True, is_lending=True, application_id="dlc-1")]
     merged = merge_vgc_with_transactions(vgc, [])
-    assert merged == []
+    assert len(merged) == 1
+    assert "noise" in merged[0]["tags"]
 
 
 def test_merge_vgc_fuzzy_matches_trademark_and_edition_titles() -> None:

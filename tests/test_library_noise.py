@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from shared.library_noise import (
+    catalog_game_count,
     edition_title_join_key,
+    is_catalog_noise_row,
     is_nintendo_noise_row,
+    maybe_tag_library_noise_row,
     should_auto_hide_by_title,
 )
 
@@ -45,3 +48,18 @@ def test_nintendo_dlc_with_app_is_not_noise_by_metadata() -> None:
         "has_nx_application": True,
     }
     assert not is_nintendo_noise_row(row)
+
+
+def test_maybe_tag_library_noise_row() -> None:
+    row = {"store": "epic", "name": "YouTube", "tags": []}
+    assert maybe_tag_library_noise_row(row, "epic")
+    assert row["tags"] == ["noise"]
+    assert is_catalog_noise_row(row)
+
+
+def test_catalog_game_count_excludes_noise() -> None:
+    games = [
+        {"name": "Hades", "tags": []},
+        {"name": "YouTube", "tags": ["noise"]},
+    ]
+    assert catalog_game_count(games) == 1

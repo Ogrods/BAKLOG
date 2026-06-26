@@ -73,6 +73,25 @@ const NOISE_TITLE_PATTERNS = [
 
 const PSN_ENTITLEMENT_ID_RE = /^(?:up\d+-)?(?:cusa|ppsa|npwr)\d+_\d+$/i;
 
+const NINTENDO_EXTRA_TITLE_RE = /\b(dlc|skin|coins?|membership|expansion pack)\b/i;
+
+const PSN_EXTRA_TITLE_PATTERNS = [
+  /\bdemo\b/i,
+  /\bopen beta\b/i,
+  /\bbeta\b/i,
+  /\bb e t a\b/i,
+  /\btrial version\b/i,
+  /\bdigital deluxe soundtrack\b/i,
+  /^dlc\b/i,
+  /\btrophy set$/i,
+  /\btrophies$/i,
+  /\btheme$/i,
+  /\bdynamic theme$/i,
+  /\bavatar pack\b/i,
+];
+
+const GOG_DLC_RE = /\bDLC\b/i;
+
 const EDITION_SUFFIXES = [
   " digital deluxe edition",
   " deluxe edition",
@@ -118,6 +137,26 @@ export function shouldAutoHideByTitle(name) {
   return NOISE_TITLE_PATTERNS.some((re) => re.test(raw) || re.test(norm));
 }
 
+export function shouldAutoHideNintendoTitle(name) {
+  const raw = String(name || "").trim();
+  if (shouldAutoHideByTitle(raw)) return true;
+  return NINTENDO_EXTRA_TITLE_RE.test(raw);
+}
+
+export function shouldAutoHidePsnTitle(name) {
+  const raw = String(name || "").trim();
+  if (!raw) return true;
+  if (shouldAutoHideByTitle(raw)) return true;
+  const norm = normalizeNoiseTitle(raw);
+  return PSN_EXTRA_TITLE_PATTERNS.some((re) => re.test(raw) || re.test(norm));
+}
+
+export function shouldAutoHideGogTitle(name) {
+  const raw = String(name || "").trim();
+  if (shouldAutoHideByTitle(raw)) return true;
+  return GOG_DLC_RE.test(raw);
+}
+
 export function editionBaseKey(name) {
   let key = normalizeNoiseTitle(name);
   for (const suffix of EDITION_SUFFIXES) {
@@ -129,6 +168,15 @@ export function editionBaseKey(name) {
     if (colonSub && EDITION_VARIANT_SUBTITLE_RE.test(colonSub)) {
       return normalizeNoiseTitle(raw.split(":")[0]);
     }
+  }
+  return key;
+}
+
+/** Strip trailing edition suffixes only — for receipt↔catalog title joins. */
+export function editionTitleJoinKey(name) {
+  let key = normalizeNoiseTitle(name);
+  for (const suffix of EDITION_SUFFIXES) {
+    if (key.endsWith(suffix)) key = key.slice(0, -suffix.length).trim();
   }
   return key;
 }
@@ -149,24 +197,51 @@ export function isNintendoNoiseRow(g) {
     );
     if (!hasApp) return true;
   }
-  return shouldAutoHideByTitle(g.name);
+  return shouldAutoHideNintendoTitle(g.name);
+}
+
+export function isCatalogNoiseRow(g) {
+  return Boolean(g?.tags?.includes("noise"));
+}
+
+export function tagNoiseRow(row) {
+  if (!row) return;
+  const tags = Array.isArray(row.tags) ? [...row.tags] : [];
+  if (!tags.includes("noise")) tags.push("noise");
+  row.tags = tags;
+}
+
+export function maybeTagLibraryNoiseRow(row, store) {
+  if (!row) return false;
+  if (shouldAutoHideLibraryRow(row, { store })) {
+    tagNoiseRow(row);
+    return true;
+  }
+  return false;
 }
 
 /**
  * True when a library row should be auto-hidden (not hard-dropped).
- * itch: classification guardrail only (caller passes itchIsGame).
+ * itch: classification guardrail only (caller passes itchIsGameFn).
  */
-export function shouldAutoHideLibraryRow(g, { itchIsGameFn } = {}) {
+export function shouldAutoHideLibraryRow(g, { itchIsGameFn, store } = {}) {
   if (!g) return false;
-  const store = String(g.store || "").toLowerCase();
-  if (store === "itch" && typeof itchIsGameFn === "function" && !itchIsGameFn(g)) {
+  if (isCatalogNoiseRow(g)) return true;
+  const storeKey = String(store || g.store || "").toLowerCase();
+  if (storeKey === "itch" && typeof itchIsGameFn === "function" && !itchIsGameFn(g)) {
     return true;
   }
-  if (store === "nintendo" && isNintendoNoiseRow(g)) return true;
+  if (storeKey === "nintendo" && isNintendoNoiseRow(g)) return true;
+  if (storeKey === "psn") return shouldAutoHidePsnTitle(g.name);
+  if (storeKey === "gog") return shouldAutoHideGogTitle(g.name);
   return shouldAutoHideByTitle(g.name);
 }
 
 /** Back-compat alias for isJunkEntry callers during migration. */
 export function isJunkEntry(g) {
-  return shouldAutoHideByTitle(g?.name);
+  if (g && typeof g === "object") {
+    if (isCatalogNoiseRow(g)) return true;
+    return shouldAutoHideByTitle(g.name);
+  }
+  return shouldAutoHideByTitle(g);
 }

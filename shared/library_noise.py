@@ -79,6 +79,31 @@ NOISE_TITLE_RE = re.compile(
 
 _BETA_END_RE = re.compile(r"\s+beta\s*$", re.I)
 
+# Nintendo fetch-time extras — stricter than global rules (eShop subs/vouchers).
+_NINTENDO_EXTRA_TITLE_RE = re.compile(
+    r"(?i)\b(dlc|skin|coins?|membership|expansion pack)\b"
+)
+
+# PSN-only patterns (demo/beta/themes/trophies) — not promoted globally.
+_PSN_EXTRA_TITLE_RE = re.compile(
+    r"(?i)("
+    r"\bdemo\b|"
+    r"\bopen beta\b|"
+    r"\bbeta\b|"
+    r"\bb e t a\b|"
+    r"\btrial version\b|"
+    r"\bdigital deluxe soundtrack\b|"
+    r"^dlc\b|"
+    r"\btrophy set$|"
+    r"\btrophies$|"
+    r"\btheme$|"
+    r"\bdynamic theme$|"
+    r"\bavatar pack\b"
+    r")"
+)
+
+_GOG_DLC_RE = re.compile(r"\bDLC\b", re.I)
+
 _PSN_ENTITLEMENT_ID_RE = re.compile(
     r"(?i)^(?:up\d+-)?(?:cusa|ppsa|npwr)\d+_\d+$"
 )
@@ -139,6 +164,30 @@ def should_auto_hide_by_title(name: str | None) -> bool:
     return False
 
 
+def should_auto_hide_nintendo_title(name: str | None) -> bool:
+    raw = str(name or "").strip()
+    if should_auto_hide_by_title(raw):
+        return True
+    return bool(_NINTENDO_EXTRA_TITLE_RE.search(raw))
+
+
+def should_auto_hide_psn_title(name: str | None) -> bool:
+    raw = str(name or "").strip()
+    if not raw:
+        return True
+    if should_auto_hide_by_title(raw):
+        return True
+    norm = normalize_noise_title(raw)
+    return bool(_PSN_EXTRA_TITLE_RE.search(raw) or _PSN_EXTRA_TITLE_RE.search(norm))
+
+
+def should_auto_hide_gog_title(name: str | None) -> bool:
+    raw = str(name or "").strip()
+    if should_auto_hide_by_title(raw):
+        return True
+    return bool(_GOG_DLC_RE.search(raw))
+
+
 def edition_base_key(name: str) -> str:
     """Edition-aware grouping key for within-store dedupe (not noise hide)."""
     key = normalize_noise_title(name)
@@ -179,7 +228,39 @@ def is_nintendo_noise_row(item: dict[str, Any]) -> bool:
         )
         if not has_app:
             return True
-    return should_auto_hide_by_title(str(item.get("name") or ""))
+    return should_auto_hide_nintendo_title(str(item.get("name") or ""))
+
+
+def is_catalog_noise_row(row: dict[str, Any]) -> bool:
+    return "noise" in (row.get("tags") or [])
+
+
+def is_library_noise_row(row: dict[str, Any], store: str | None = None) -> bool:
+    """True when row matches library noise rules (tag or title/metadata heuristics)."""
+    if is_catalog_noise_row(row):
+        return True
+    store_key = str(store or row.get("store") or "").lower()
+    if store_key == "nintendo":
+        return is_nintendo_noise_row(row)
+    name = str(row.get("name") or "")
+    if store_key == "psn":
+        return should_auto_hide_psn_title(name)
+    if store_key == "gog":
+        return should_auto_hide_gog_title(name)
+    return should_auto_hide_by_title(name)
+
+
+def maybe_tag_library_noise_row(row: dict[str, Any], store: str | None = None) -> bool:
+    """Tag row with ``noise`` when it matches library noise rules; returns True if tagged."""
+    if is_library_noise_row(row, store):
+        tag_noise_row(row)
+        return True
+    return False
+
+
+def catalog_game_count(games: list[dict[str, Any]]) -> int:
+    """Playable library size (rows without a ``noise`` tag)."""
+    return sum(1 for g in games if not is_catalog_noise_row(g))
 
 
 def tag_noise_row(row: dict[str, Any]) -> None:

@@ -18,6 +18,7 @@ import {
   shopSlug,
   dealLowBadgeHtml,
   priceLowStarHtml,
+  dealHeroCardHtml,
   applyItadPriceSnapshot,
   slimItadSnapshot,
   buildOwnedNormNames,
@@ -259,6 +260,23 @@ describe('dealLowBadgeHtml and priceLowStarHtml', () => {
     expect(dealLowBadgeHtml(null)).toBe('');
     expect(priceLowStarHtml({ lowKind: 'all' })).toContain('★');
     expect(priceLowStarHtml(null)).toBe('');
+  });
+});
+
+describe('dealHeroCardHtml', () => {
+  it('omits HLTB stat when missing or zero', () => {
+    state.itadByKey['wishlist:wl-1'] = { price: 8.99, regular: 14.99, cut: 40, shop: 'Steam' };
+    const noHltb = dealHeroCardHtml({ ...baseGame, hltb_main_hours: null });
+    expect(noHltb).not.toContain('deal-hero-stat-dot-hltb');
+    const zeroHltb = dealHeroCardHtml({ ...baseGame, hltb_main_hours: 0 });
+    expect(zeroHltb).not.toContain('deal-hero-stat-dot-hltb');
+  });
+
+  it('shows HLTB stat when hours are positive', () => {
+    state.itadByKey['wishlist:wl-1'] = { price: 8.99, regular: 14.99, cut: 40, shop: 'Steam' };
+    const html = dealHeroCardHtml({ ...baseGame, hltb_main_hours: 12 });
+    expect(html).toContain('deal-hero-stat-dot-hltb');
+    expect(html).toContain('12h');
   });
 });
 

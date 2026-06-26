@@ -28,6 +28,7 @@ from fetchers._base import (
     write_catalog_text,
 )
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from shared.library_noise import catalog_game_count, maybe_tag_library_noise_row
 
 GAMES_PSN_JSON = Path("games_psn.json")
 HLTB_DELAY_SEC = 1.0
@@ -143,6 +144,7 @@ def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
             }
         )
 
+    maybe_tag_library_noise_row(row, "psn")
     return row
 
 
@@ -233,7 +235,7 @@ def main() -> int:
             "fetched_at": datetime.now(UTC).isoformat(),
             "store": "psn",
             "online_id": online_id,
-            "game_count": len(games_out),
+            "game_count": catalog_game_count(games_out),
             "title_stats_count": prev_meta.get("title_stats_count"),
             "trophy_count": prev_meta.get("trophy_count"),
             "entitlement_count": prev_meta.get("entitlement_count"),
@@ -260,7 +262,7 @@ def main() -> int:
     if dropped:
         parts.append(f"merged {dropped} cross-platform duplicates")
     if filtered:
-        parts.append(f"filtered {filtered} non-games")
+        parts.append(f"tagged {filtered} library noise")
     suffix = f" ({', '.join(parts)})" if parts else ""
     print(f"Found {len(library)} titles{suffix}.")
 
@@ -304,6 +306,9 @@ def main() -> int:
             )
         )
 
+    for row in games_out:
+        maybe_tag_library_noise_row(row, "psn")
+
     empty_exit = refuse_empty_result(
         games_out,
         label="PSN library rows",
@@ -314,7 +319,7 @@ def main() -> int:
         return stats.finish("fetch_psn", t0, exit_code=empty_exit)
     if not args.psn_id:
         drift_exit = refuse_drift_result(
-            games_out,
+            catalog_game_count(games_out),
             label="PSN library rows",
             allow_drift=args.allow_drift,
             output_path=GAMES_PSN_JSON,
@@ -332,7 +337,7 @@ def main() -> int:
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "psn",
         "online_id": online_id,
-        "game_count": len(games_out),
+        "game_count": catalog_game_count(games_out),
         "title_stats_count": getattr(psn, "last_title_stats_count", None),
         "trophy_count": getattr(psn, "last_trophy_count", None),
         "entitlement_count": getattr(psn, "last_entitlement_count", None),

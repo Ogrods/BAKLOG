@@ -367,15 +367,15 @@ def test_library_releases_fallback_when_no_purchase_dates(tmp_path: Path) -> Non
     assert records[0]["name"] == "Library Release Game"
 
 
-def test_skips_dlcs_listed_and_non_game_titles(tmp_path: Path) -> None:
+def test_skips_dlcs_listed_and_keeps_name_noise_titles(tmp_path: Path) -> None:
     db = tmp_path / "galaxy-2.0.db"
     _seed_galaxy_db_with_dlcs_list(db)
     records = GogGalaxyClient(db).get_library_records()
     names = {r["name"] for r in records}
-    # gog_5002 dropped (base game's dlcs list), gog_5003 dropped (name has DLC),
-    # gog_5004 dropped (non-game voucher). Only the base game remains.
-    assert names == {"Base Game"}
-    assert {r["gog_id"] for r in records} == {5001}
+    # gog_5002 dropped (base game's dlcs list). Name-DLC + voucher rows are kept
+    # for fetch_gog to tag as library noise.
+    assert names == {"Base Game", "Some Deluxe DLC Upgrade", "Freedom to buy games"}
+    assert {r["gog_id"] for r in records} == {5001, 5003, 5004}
 
 
 def test_default_galaxy_db_windows(monkeypatch: pytest.MonkeyPatch) -> None:

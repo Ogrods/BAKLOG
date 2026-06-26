@@ -71,16 +71,21 @@ def _vertical_gradient(size: tuple[int, int]) -> Image.Image:
 
 
 def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    candidates = []
+    dejavu = (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    )
+    mac_font = (
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+        if bold
+        else "/System/Library/Fonts/Supplemental/Arial.ttf"
+    )
+    candidates: list[Path] = []
     if sys.platform == "win32":
         name = "segoeuib.ttf" if bold else "segoeui.ttf"
         candidates.append(Path("C:/Windows/Fonts") / name)
-    candidates.extend(
-        [
-            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-            Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf"),
-        ]
-    )
+    candidates.extend([Path(dejavu), Path(mac_font)])
     for path in candidates:
         if path.is_file():
             return ImageFont.truetype(str(path), size=size)

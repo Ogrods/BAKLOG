@@ -94,8 +94,6 @@ def test_pyinstaller_datas_include_curated_feeds() -> None:
 
 def test_inno_installer_branding_assets() -> None:
     """Inno Setup wizard/icon files must exist with expected dimensions."""
-    from PIL import Image
-
     packaging = ROOT / "packaging"
     iss = (packaging / "baklog.iss").read_text(encoding="utf-8")
     for key in (
@@ -105,8 +103,16 @@ def test_inno_installer_branding_assets() -> None:
     ):
         assert key in iss, f"packaging/baklog.iss missing {key}"
 
-    large = Image.open(packaging / "installer-wizard-large.bmp")
-    small = Image.open(packaging / "installer-wizard-small.bmp")
-    assert large.size == (164, 314)
-    assert small.size == (55, 55)
-    assert (packaging / "installer-icon.ico").is_file()
+    def bmp_size(path: Path) -> tuple[int, int]:
+        with path.open("rb") as handle:
+            handle.read(18)
+            width = int.from_bytes(handle.read(4), "little", signed=True)
+            height = int.from_bytes(handle.read(4), "little", signed=True)
+        return abs(width), abs(height)
+
+    large_path = packaging / "installer-wizard-large.bmp"
+    small_path = packaging / "installer-wizard-small.bmp"
+    ico_path = packaging / "installer-icon.ico"
+    assert bmp_size(large_path) == (164, 314)
+    assert bmp_size(small_path) == (55, 55)
+    assert ico_path.is_file() and ico_path.stat().st_size > 0

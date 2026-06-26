@@ -6,12 +6,15 @@ import sys
 from pathlib import Path
 
 root = Path(SPEC).resolve().parent.parent
+app_icon = str(root / "packaging" / "BAKLOG.ico")
 
 block_cipher = None
 
 datas = [
     (str(root / "index.html"), "."),
     (str(root / "favicon.svg"), "."),
+    (str(root / "packaging" / "BAKLOG.ico"), "."),
+    (str(root / "assets" / "tray-icon.png"), "assets"),
     (str(root / "dist"), "dist"),
     (str(root / "assets"), "assets"),
     (str(root / "vendor"), "vendor"),
@@ -118,6 +121,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=app_icon,
 )
 
 exe_tray = EXE(
@@ -136,6 +140,7 @@ exe_tray = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=app_icon,
 )
 
 coll = COLLECT(

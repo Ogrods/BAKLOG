@@ -117,3 +117,7 @@ def test_inno_installer_branding_assets() -> None:
     assert bmp_size(large_path) == (164, 314)
     assert bmp_size(small_path) == (55, 55)
     assert ico_path.is_file() and ico_path.stat().st_size > 0
+    baklog_ico = packaging / "BAKLOG.ico"
+    assert baklog_ico.is_file() and baklog_ico.stat().st_size > 0
+    iss_text = (packaging / "baklog.iss").read_text(encoding="utf-8")
+    assert 'IconFilename: "{app}\\BAKLOG.ico"' in iss_text

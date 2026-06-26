@@ -22,6 +22,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Auth gate retries `/api/auth/session` briefly before showing a false "could not verify" error on first sign-in.
+
+### Changed
+
+- Installer branding uses the canonical rounded app icon (gradient mark, proper alpha in `.ico`); desktop and Start Menu shortcuts use `BAKLOG.ico`; tray and frozen exes embed the same icon.
+
 ## [0.8.23] - 2026-06-26
 
 ### Fixed

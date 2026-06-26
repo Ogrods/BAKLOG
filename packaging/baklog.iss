@@ -31,7 +31,7 @@ SetupIconFile=installer-icon.ico
 WizardImageFile=installer-wizard-large.bmp
 WizardSmallImageFile=installer-wizard-small.bmp
 InfoBeforeFile=installer-welcome.txt
-UninstallDisplayIcon={app}\BAKLOG Tray.exe
+UninstallDisplayIcon={app}\BAKLOG.ico
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
@@ -48,10 +48,10 @@ Name: "{localappdata}\BAKLOG-Data"; Permissions: users-full
 Source: "..\release\BAKLOG\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\BAKLOG Tray.exe"; Comment: "Open BAKLOG (system tray)"
-Name: "{group}\{#MyAppName} (server console)"; Filename: "{app}\BAKLOG.exe"; Comment: "BAKLOG server with console window"
-Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\BAKLOG Tray.exe"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\BAKLOG Tray.exe"; IconFilename: "{app}\BAKLOG.ico"; Comment: "Open BAKLOG (system tray)"
+Name: "{group}\{#MyAppName} (server console)"; Filename: "{app}\BAKLOG.exe"; IconFilename: "{app}\BAKLOG.ico"; Comment: "BAKLOG server with console window"
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\BAKLOG.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\BAKLOG Tray.exe"; IconFilename: "{app}\BAKLOG.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\BAKLOG Tray.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent

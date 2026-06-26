@@ -140,6 +140,37 @@ describe('auth-gate', () => {
     expect(getAccountProfileId()).toBe('550e8400-e29b-41d4-a716-446655440000');
   });
 
+  it('initAuthGate retries session probe after transient failure', async () => {
+    let sessionHits = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url === '/api/config') {
+        return new Response(JSON.stringify({
+          authRequired: true,
+          supabaseUrl: 'https://test.supabase.co',
+          supabaseAnonKey: 'anon',
+        }), { status: 200 });
+      }
+      if (url === '/api/auth/session') {
+        sessionHits += 1;
+        if (sessionHits < 2) return new Response('{}', { status: 401 });
+        return new Response(JSON.stringify({
+          ok: true,
+          email: 'user@example.com',
+          profile: '550e8400-e29b-41d4-a716-446655440000',
+        }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    }));
+    supabaseMock.setSession({
+      access_token: 'tok',
+      user: { email: 'user@example.com' },
+    });
+    const { initAuthGate } = await import('../js/auth-gate.js');
+    await initAuthGate();
+    expect(sessionHits).toBeGreaterThanOrEqual(2);
+    expect(document.getElementById('authGateOverlay').hidden).toBe(true);
+  }, 10_000);
+
   it('initAuthGate with valid session leaves boot curtain up', async () => {
     document.documentElement.setAttribute('data-boot-loading', 'dashboard');
     supabaseMock.setSession({

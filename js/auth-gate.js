@@ -35,7 +35,15 @@ let _licenseActivation = false;
 let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: '', yearly: '' };
 let _lastSessionProbeStatus = 0;
+const SESSION_PROBE_ATTEMPTS = 3;
+const SESSION_PROBE_DELAY_MS = 400;
 const _planListeners = new Set();
+
+function sessionProbeDelay(attempt) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, SESSION_PROBE_DELAY_MS * (attempt + 1));
+  });
+}
 
 /** Subscribe to plan changes (free ↔ pro). Returns unsubscribe. */
 export function onPlanChange(fn) {
@@ -344,13 +352,22 @@ async function probeServerToken() {
     if (data.email) _accountEmail = data.email;
     if (typeof data.plan === 'string' && data.plan) setPlan(data.plan);
     if (data.refreshSession && _supabase) {
-      await refreshAccessToken();
-      if (!(await probeServerToken())) return false;
+      const { data: refData, error } = await _supabase.auth.refreshSession();
+      if (!error && refData.session) applySession(refData.session);
+      return probeServerTokenWithRetry(2);
     }
     return !!data.ok;
   } catch {
     return false;
   }
+}
+
+async function probeServerTokenWithRetry(attempts = SESSION_PROBE_ATTEMPTS) {
+  for (let i = 0; i < attempts; i++) {
+    if (await probeServerToken()) return true;
+    if (i < attempts - 1) await sessionProbeDelay(i);
+  }
+  return false;
 }
 
 /**
@@ -360,9 +377,9 @@ async function probeServerToken() {
 async function ensureServerReadySession(session) {
   if (!session || !_supabase) return false;
   applySession(session);
-  if (await probeServerToken()) return true;
-  const tok = await refreshAccessToken();
-  return !!tok;
+  if (await probeServerTokenWithRetry()) return true;
+  await refreshAccessToken();
+  return probeServerTokenWithRetry(2);
 }
 
 function resolveAuthedWaiter() {
@@ -384,9 +401,9 @@ function onAuthenticated(session) {
         }
       } else {
         const hint = _lastSessionProbeStatus === 401
-          ? ' The local server rejected your sign-in token (common after upgrading: quit BAKLOG, copy .env from the app folder into BAKLOG-Data, restart).'
+          ? ' If this keeps happening after a reinstall, quit BAKLOG and copy .env from the app folder into BAKLOG-Data.'
           : '';
-        setAuthError(`Could not verify your session on the server. Try again.${hint}`);
+        setAuthError(`Could not verify your session on the server. Try again or refresh the page.${hint}`);
         applySession(null);
       }
     } finally {
@@ -721,11 +738,8 @@ export async function refreshAccessToken() {
       }
       if (!data.session) return null;
       applySession(data.session);
-      if (!(await probeServerToken())) {
-        applySession(null);
-        return null;
-      }
-      return _accessToken;
+      if (await probeServerTokenWithRetry(2)) return _accessToken;
+      return null;
     } finally {
       _refreshInFlight = null;
     }

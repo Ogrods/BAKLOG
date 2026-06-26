@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
 
+Disallow: /auth-confirmed
+Disallow: /auth-reset
+Disallow: /success
+
 Sitemap: https://baklog.app/sitemap.xml

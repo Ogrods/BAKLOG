@@ -195,12 +195,30 @@ const AUTH_PANEL_COPY = {
   },
 };
 
-function authRedirectUrl() {
-  try {
-    return `${location.origin}${location.pathname}`;
-  } catch {
-    return 'http://127.0.0.1:8765/';
-  }
+function authConfirmRedirectUrl() {
+  const fromConfig = _config?.authConfirmRedirectUrl;
+  if (typeof fromConfig === 'string' && fromConfig.trim()) return fromConfig.trim();
+  return 'https://baklog.app/auth/confirmed';
+}
+
+function authResetRedirectUrl() {
+  const fromConfig = _config?.authResetRedirectUrl;
+  if (typeof fromConfig === 'string' && fromConfig.trim()) return fromConfig.trim();
+  return 'https://baklog.app/auth/reset';
+}
+
+function isEmailNotConfirmedError(error) {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return msg.includes('email not confirmed')
+    || msg.includes('not confirmed')
+    || msg.includes('confirm your email');
+}
+
+function setResendConfirmVisible(show) {
+  const btn = document.getElementById('authGateResendConfirm');
+  if (!btn) return;
+  btn.hidden = !show;
+  btn.classList.toggle('hidden', !show);
 }
 
 /** Show sign-in, forgot-password, or reset-password panel on the auth gate. */
@@ -215,7 +233,11 @@ export function showAuthGatePanel(panel = 'signin') {
     form.hidden = !active;
     form.classList.toggle('hidden', !active);
   }
-  if (key === 'signin') setAuthError('');
+  if (key === 'signin') {
+    setAuthError('');
+    setPanelMessage('authGateSignInSuccess', '');
+    setResendConfirmVisible(false);
+  }
   if (key === 'signup') {
     setPanelMessage('authGateSignupError', '');
     setPanelMessage('authGateSignupSuccess', '');
@@ -391,9 +413,16 @@ function bindSignInForm() {
     try {
       const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setAuthError(error.message || 'Sign in failed.');
+        if (isEmailNotConfirmedError(error)) {
+          setAuthError('Confirm your email first. Check your inbox, or resend the confirmation email below.');
+          setResendConfirmVisible(true);
+        } else {
+          setAuthError(error.message || 'Sign in failed.');
+          setResendConfirmVisible(false);
+        }
         return;
       }
+      setResendConfirmVisible(false);
       if (!data.session) {
         setAuthError('No session returned. Confirm your email if you just signed up, then try again.');
         return;
@@ -416,6 +445,35 @@ function bindSignInForm() {
     const signupEmail = document.getElementById('authGateSignupEmail');
     if (signupEmail && email) signupEmail.value = email;
     showAuthGatePanel('signup');
+  });
+
+  document.getElementById('authGateResendConfirm')?.addEventListener('click', async () => {
+    const email = document.getElementById('authGateEmail')?.value?.trim();
+    if (!email) {
+      setAuthError('Enter your email above, then resend the confirmation email.');
+      return;
+    }
+    const btn = document.getElementById('authGateResendConfirm');
+    if (btn) btn.disabled = true;
+    try {
+      const { error } = await _supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: authConfirmRedirectUrl() },
+      });
+      if (error) {
+        setAuthError(error.message || 'Could not resend confirmation email.');
+        return;
+      }
+      setAuthError('');
+      setPanelMessage(
+        'authGateSignInSuccess',
+        'Confirmation email sent. Check your inbox, then sign in here.',
+        { success: true },
+      );
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
 }
 
@@ -452,7 +510,7 @@ function bindSignUpForm() {
       const { data, error } = await _supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: authRedirectUrl() },
+        options: { emailRedirectTo: authConfirmRedirectUrl() },
       });
       if (error) {
         setPanelMessage('authGateSignupError', error.message || 'Could not create account.');
@@ -464,11 +522,11 @@ function bindSignUpForm() {
       }
       setPanelMessage(
         'authGateSignupSuccess',
-        'Account created. Check your email to confirm, then sign in.',
+        'Account created. We sent a confirmation email. You can confirm from any device. When it is confirmed, return to BAKLOG on this PC and sign in.',
         { success: true },
       );
       showAuthGatePanel('signin');
-      setAuthError('Confirm your email, then sign in with your new password.');
+      setAuthError('Waiting for confirmation? Check your inbox, then sign in here.');
       const signInEmail = document.getElementById('authGateEmail');
       if (signInEmail) signInEmail.value = email;
     } finally {
@@ -498,7 +556,7 @@ function bindForgotPasswordForm() {
     btn.disabled = true;
     try {
       const { error } = await _supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: authRedirectUrl(),
+        redirectTo: authResetRedirectUrl(),
       });
       if (error) {
         setPanelMessage('authGateForgotError', error.message || 'Could not send reset email.');

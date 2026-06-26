@@ -13,6 +13,7 @@ const supabaseMock = vi.hoisted(() => {
       signOut,
       refreshSession: vi.fn(async () => ({ data: { session }, error: null })),
       resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
+      resend: vi.fn(async () => ({ data: {}, error: null })),
       updateUser: vi.fn(async () => ({ data: { session }, error: null })),
       onAuthStateChange: vi.fn((cb) => {
         authListener = cb;
@@ -33,7 +34,7 @@ const supabaseMock = vi.hoisted(() => {
       getSessionResult = null;
       signOut.mockClear();
       client.auth.resetPasswordForEmail.mockClear();
-      client.auth.updateUser.mockClear();
+      client.auth.resend.mockClear();
       client.auth.signUp.mockClear();
     },
   };
@@ -53,10 +54,12 @@ describe('auth-gate', () => {
       <form id="authGateForm" data-auth-panel="signin">
         <input id="authGateEmail" />
         <input id="authGatePassword" />
-        <p id="authGateError" class="hidden"></p>
+        <p id="authGateError" class="auth-gate-error hidden"></p>
+        <p id="authGateSignInSuccess" class="auth-gate-success hidden"></p>
         <button type="submit" id="authGateSubmit"></button>
         <button type="button" id="authGateForgotLink"></button>
         <button type="button" id="authGateCreateLink"></button>
+        <button type="button" id="authGateResendConfirm" class="hidden" hidden></button>
       </form>
       <form id="authGateSignupForm" class="hidden" data-auth-panel="signup" hidden>
         <input id="authGateSignupEmail" />
@@ -88,6 +91,8 @@ describe('auth-gate', () => {
           authRequired: true,
           supabaseUrl: 'https://test.supabase.co',
           supabaseAnonKey: 'anon',
+          authConfirmRedirectUrl: 'https://baklog.app/auth/confirmed',
+          authResetRedirectUrl: 'https://baklog.app/auth/reset',
         }), { status: 200 });
       }
       if (url === '/api/auth/session') {
@@ -209,7 +214,7 @@ describe('auth-gate', () => {
     expect(document.getElementById('authGateTitle').textContent).toContain('Create');
   });
 
-  it('signup submit calls signUp', async () => {
+  it('signup submit calls signUp with hosted confirm redirect', async () => {
     supabaseMock.setGetSessionResult({
       data: { session: null },
       error: { message: 'Invalid Refresh Token: Refresh Token Not Found' },
@@ -226,7 +231,7 @@ describe('auth-gate', () => {
     expect(supabaseMock.client.auth.signUp).toHaveBeenCalledWith({
       email: 'new@example.com',
       password: 'password123',
-      options: { emailRedirectTo: expect.any(String) },
+      options: { emailRedirectTo: 'https://baklog.app/auth/confirmed' },
     });
   });
 
@@ -252,7 +257,7 @@ describe('auth-gate', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(supabaseMock.client.auth.resetPasswordForEmail).toHaveBeenCalledWith(
       'user@example.com',
-      expect.objectContaining({ redirectTo: expect.any(String) }),
+      { redirectTo: 'https://baklog.app/auth/reset' },
     );
   });
 
@@ -267,5 +272,31 @@ describe('auth-gate', () => {
     supabaseMock.fireAuthChange('PASSWORD_RECOVERY', { access_token: 'recovery-tok' });
     expect(document.getElementById('authGateResetForm').hidden).toBe(false);
     expect(document.getElementById('authGateTitle').textContent).toContain('new password');
+  });
+
+  it('unconfirmed sign-in shows resend and calls resend on click', async () => {
+    supabaseMock.client.auth.signInWithPassword.mockResolvedValueOnce({
+      data: { session: null },
+      error: { message: 'Email not confirmed' },
+    });
+    supabaseMock.setGetSessionResult({
+      data: { session: null },
+      error: { message: 'Invalid Refresh Token: Refresh Token Not Found' },
+    });
+    const { initAuthGate } = await import('../js/auth-gate.js');
+    initAuthGate();
+    await new Promise((r) => setTimeout(r, 50));
+    document.getElementById('authGateEmail').value = 'new@example.com';
+    document.getElementById('authGatePassword').value = 'password123';
+    document.getElementById('authGateForm').requestSubmit();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.getElementById('authGateResendConfirm').hidden).toBe(false);
+    document.getElementById('authGateResendConfirm').click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(supabaseMock.client.auth.resend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'new@example.com',
+      options: { emailRedirectTo: 'https://baklog.app/auth/confirmed' },
+    });
   });
 });

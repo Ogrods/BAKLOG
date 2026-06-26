@@ -25,7 +25,7 @@ from shared.supabase_admin import (
     set_user_plan,
 )
 
-DEFAULT_REDIRECT = "http://127.0.0.1:8765"
+DEFAULT_REDIRECT = "https://baklog.app/auth/reset"
 
 
 def main(argv: list[str] | None = None) -> int:

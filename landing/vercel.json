@@ -55,7 +55,32 @@
     {
       "source": "/success",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=300" }
+        { "key": "Cache-Control", "value": "public, max-age=300" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    },
+    {
+      "source": "/auth-confirmed",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=300" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    },
+    {
+      "source": "/auth-reset",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=300" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+        }
+      ]
+    },
+    {
+      "source": "/(auth-confirmed|auth-reset|auth-url-state)\\.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]
     }
   ]

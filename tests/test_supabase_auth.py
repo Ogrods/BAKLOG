@@ -87,7 +87,19 @@ def test_public_config_masks_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cfg["authRequired"] is True
     assert cfg["supabaseUrl"] == "https://x.supabase.co"
     assert cfg["supabaseAnonKey"] == "anon-key"
+    assert cfg["authConfirmRedirectUrl"] == "https://baklog.app/auth/confirmed"
+    assert cfg["authResetRedirectUrl"] == "https://baklog.app/auth/reset"
     assert "secret" not in cfg.values()
+
+
+def test_public_config_auth_redirect_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "anon-key")
+    monkeypatch.setenv("BAKLOG_AUTH_CONFIRM_REDIRECT_URL", "https://staging.example/confirm")
+    monkeypatch.setenv("BAKLOG_AUTH_RESET_REDIRECT_URL", "https://staging.example/reset")
+    cfg = supabase_auth.public_auth_config()
+    assert cfg["authConfirmRedirectUrl"] == "https://staging.example/confirm"
+    assert cfg["authResetRedirectUrl"] == "https://staging.example/reset"
 
 
 def test_decode_jwks_es256(monkeypatch: pytest.MonkeyPatch) -> None:

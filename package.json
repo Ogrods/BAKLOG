@@ -20,7 +20,7 @@
     "landing": "python -m http.server 4000 --directory landing",
     "check:spotlight:baseline": "node scripts/spotlight-visual-check.mjs --mode=baseline",
     "check:spotlight": "node scripts/spotlight-visual-check.mjs --mode=after",
-    "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --outfile=js/vendor/supabase-js.mjs",
+    "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --outfile=js/vendor/supabase-js.mjs && node -e \"import fs from 'node:fs'; fs.mkdirSync('landing/vendor',{recursive:true}); fs.copyFileSync('js/vendor/supabase-js.mjs','landing/vendor/supabase-js.mjs')\"",
     "invite:beta": "node scripts/send-beta-invites.mjs",
     "lint": "eslint js/",
     "check:module-size": "node scripts/check-module-size.mjs",

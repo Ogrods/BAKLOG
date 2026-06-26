@@ -64,6 +64,14 @@ def public_auth_config() -> dict[str, Any]:
         "supabaseAnonKey": _anon_key(),
         "authRequired": auth_enabled(),
         "localProfiles": local_profiles_enabled(),
+        "authConfirmRedirectUrl": os.environ.get(
+            "BAKLOG_AUTH_CONFIRM_REDIRECT_URL",
+            "https://baklog.app/auth/confirmed",
+        ).strip(),
+        "authResetRedirectUrl": os.environ.get(
+            "BAKLOG_AUTH_RESET_REDIRECT_URL",
+            "https://baklog.app/auth/reset",
+        ).strip(),
     }
 
 

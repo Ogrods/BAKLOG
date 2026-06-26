@@ -87,12 +87,14 @@
           <input type="password" id="authGatePassword" name="password" autocomplete="current-password" required class="auth-gate-input" />
         </label>
         <p id="authGateError" class="auth-gate-error hidden" role="alert"></p>
+        <p id="authGateSignInSuccess" class="auth-gate-success hidden" role="status"></p>
         <button type="submit" id="authGateSubmit" class="auth-gate-submit">Sign in</button>
         <p class="auth-gate-foot">
           <button type="button" id="authGateForgotLink" class="auth-gate-link">Forgot password?</button>
           <span class="auth-gate-foot-sep" aria-hidden="true"> · </span>
           <button type="button" id="authGateCreateLink" class="auth-gate-link">Create account</button>
         </p>
+        <button type="button" id="authGateResendConfirm" class="auth-gate-link hidden" hidden>Resend confirmation email</button>
       </form>
       <form id="authGateSignupForm" class="auth-gate-form hidden" data-auth-panel="signup" hidden>
         <label class="auth-gate-field">

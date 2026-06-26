@@ -12,6 +12,12 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `assets/sample/*.{webp,png}` — fictional game covers for the spotlight carousel.
 - `api/subscribe.js` — Vercel serverless function; logs waitlist signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
 - `api/auth-signup-notify.js` — Vercel serverless function; receives Supabase Database Webhooks on `auth.users` INSERT and emails you when someone creates a BAKLOG account in the app.
+- `api/auth-config.js` — read-only public Supabase URL + anon key for hosted auth pages (`/auth-reset`).
+- `auth-confirmed.html` + `auth-confirmed.js` — email confirmation landing page (works from phone; no local server required).
+- `auth-reset.html` + `auth-reset.js` — password reset landing page (Supabase recovery flow).
+- `auth-url-state.js` — shared URL hash/query parsing for auth landing pages.
+- `vendor/supabase-js.mjs` — bundled copy of `@supabase/supabase-js` for `/auth-reset` (sync via `npm run vendor:supabase` from repo root).
+- `supabase-email-templates/` — copy-paste Supabase dashboard email subjects + HTML (BAKLOG-branded).
 - `api/_rate-limit.js` — shared distributed rate limiter (Vercel KV / Upstash) used by `subscribe.js`.
 - `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
@@ -118,9 +124,46 @@ To get an email when a new `auth.users` row appears:
 
 Admin invites (`invite_beta_user.py`) also insert into `auth.users`, so you will get a notification for those too.
 
+### Hosted auth pages (email confirm + password reset)
+
+Sign-up and password-reset emails redirect to **baklog.app**, not `127.0.0.1`, so users can confirm from a phone or any device. The local app (`js/auth-gate.js`) sets `emailRedirectTo` / `redirectTo` from `/api/config` (defaults below).
+
+| Page | URL | Purpose |
+| --- | --- | --- |
+| Email confirmed | `https://baklog.app/auth/confirmed` | After signup confirm; tells user to sign in on their PC |
+| Password reset | `https://baklog.app/auth/reset` | Choose a new password (also used for admin invite password setup) |
+
+**Vercel env** (required for `/auth-reset`; optional for `/auth-confirmed` which is static):
+
+| Variable | Notes |
+| --- | --- |
+| `BAKLOG_SUPABASE_URL` | Same project URL as local app auth (falls back to `SUPABASE_URL`). |
+| `BAKLOG_SUPABASE_ANON_KEY` | Public anon key from Project Settings → API (falls back to `SUPABASE_ANON_KEY`). |
+
+**Security:**
+
+- Never set `BAKLOG_SUPABASE_ANON_KEY` to the **service_role** key. Use the public **anon** key only.
+- The anon key is public by design (same as the local app `/api/config`). The security boundary is Supabase Auth settings + RLS on any `anon`-accessible tables.
+- `/api/auth-config` is rate-limited by client IP (5 requests per minute), same as `/api/subscribe`. Production requires Vercel KV / Upstash credentials or the endpoint returns `503`.
+
+Deploy landing, then add redirect URLs in Supabase before shipping an app build that points at these pages.
+
+### Supabase Auth email branding and URL allowlist
+
+Supabase sends confirm / reset / invite mail. Branding is configured in the **Supabase dashboard** (not deployed from git). Use the versioned templates in `supabase-email-templates/`.
+
+1. **Authentication → URL Configuration**
+   - **Redirect URLs:** add `https://baklog.app/auth/**`, keep `http://127.0.0.1:8765/**` and `http://localhost:8765/**` for dev.
+   - **Site URL:** `https://baklog.app` recommended (hosted redirects are explicit in app code).
+2. **Authentication → Email Templates:** paste subjects + HTML from `supabase-email-templates/` (subjects include **BAKLOG**).
+3. **Authentication → SMTP** (recommended): Resend SMTP with sender `BAKLOG <noreply@baklog.app>` so auth mail matches waitlist sender domain.
+4. **Authentication → Providers → Email:** keep **Confirm email** enabled.
+
+**Deploy order:** (1) ship landing pages + `/api/auth-config`, (2) update Supabase allowlist + templates + SMTP, (3) ship app build with new redirect URLs, (4) E2E: signup → branded email → phone lands on `/auth/confirmed` → sign in on PC.
+
 ## Rate limiting (required for production)
 
-`/api/subscribe` rate-limits by client IP (5 requests per minute). Production uses a **distributed** store so limits survive Vercel cold starts and scale-out. Without KV credentials in production, `/api/subscribe` returns `503 Server not configured`.
+`/api/subscribe` rate-limits by client IP (5 requests per minute). `/api/auth-config` uses the same limit and KV requirement. Production uses a **distributed** store so limits survive Vercel cold starts and scale-out. Without KV credentials in production, `/api/subscribe` and `/api/auth-config` return `503 Server not configured`.
 
 1. Vercel project (root `landing/`) → **Storage** → **Create Database** → **KV** → connect to this project.
 2. Redeploy so Production receives the auto-injected credentials below.

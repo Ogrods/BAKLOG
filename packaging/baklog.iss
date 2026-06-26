@@ -42,7 +42,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Dirs]
-Name: "{userlocalappdata}\BAKLOG-Data"; Permissions: users-full
+Name: "{localappdata}\BAKLOG-Data"; Permissions: users-full
 
 [Files]
 Source: "..\release\BAKLOG\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -63,7 +63,7 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    DataDir := ExpandConstant('{userlocalappdata}\BAKLOG-Data');
+    DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
     MsgBox(
       'BAKLOG was removed from your PC.' + #13#10 + #13#10 +
       'Your library and connections are still in:' + #13#10 +

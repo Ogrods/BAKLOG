@@ -40,6 +40,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 
 - Steam library fetch: store `/api/appdetails` returns HTTP 400 for comma-separated appids; `get_app_details_batch` now fetches one appid per request.
+- Inno Setup script: `{localappdata}` constant for `BAKLOG-Data` path (was invalid `{userlocalappdata}`).
 
 ## [0.8.21] - 2026-06-25
 

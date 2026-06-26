@@ -63,6 +63,13 @@ describe('custom-lists', () => {
     expect(games.map(g => g.name)).toEqual(['Beta', 'Alpha']);
   });
 
+  it('resolveCustomListGames still resolves library-noise-tagged catalog rows', () => {
+    state.allGames.push({ store: 'epic', id: '9', name: 'YouTube', tags: ['noise'] });
+    const games = mod.resolveCustomListGames({ keys: ['epic:9'] });
+    expect(games).toHaveLength(1);
+    expect(games[0].name).toBe('YouTube');
+  });
+
   it('shouldShowCustomListTab when renamed or has resolvable game', () => {
     expect(mod.shouldShowCustomListTab({ name: 'List 1', keys: [] }, 0)).toBe(false);
     expect(mod.shouldShowCustomListTab({ name: 'RPG queue', keys: [] }, 0)).toBe(true);

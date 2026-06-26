@@ -107,6 +107,18 @@ describe('library noise copy', () => {
     expect(row.textContent).toMatch(/library noise/i);
     expect(document.querySelector('.hidden-noise-report')).toBeTruthy();
   });
+
+  it('prefills bug report note from Not a game? button', async () => {
+    const { closeBugReportDialog } = await import('../js/bug-report.js');
+    state.allGames = [noise];
+    setGameHidden(noise, true, { silent: true });
+    openHiddenPanel({ noiseOnly: true });
+    document.querySelector('.hidden-noise-report').click();
+    const note = document.getElementById('bugReportNote')?.value || '';
+    expect(note).toMatch(/Library noise false positive/i);
+    expect(note).toMatch(/YouTube/i);
+    closeBugReportDialog();
+  });
 });
 
 describe('orphan-key fallback', () => {

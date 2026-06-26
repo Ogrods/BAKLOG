@@ -76,6 +76,8 @@ Two different mechanisms keep the library clean:
 
 **Library noise** keeps non-games out of your counts and main view. The **hidden list** is your preference for real games you own but do not want front and center.
 
+When library noise rows are auto-hidden, the library summary bar shows a **Filtered N non-games** chip. Click it to open the hidden-games panel filtered to auto-filtered entries only. Restore a row from there, or use **Not a game?** to report a false positive.
+
 ## Personal data storage
 
 When you launch via `python server.py`, your statuses, notes, priorities, tags, UI prefs, and manually-added games persist to `data/personal.json` (or `profiles/<id>/data/personal.json` in multi-profile mode).

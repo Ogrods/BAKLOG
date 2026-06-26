@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import vectors from './fixtures/library_noise.json';
-import { shouldAutoHideByTitle, editionBaseKey, shouldAutoHidePsnTitle, shouldAutoHideGogTitle, shouldAutoHideNintendoTitle, isCatalogNoiseRow, tagNoiseRow, maybeTagLibraryNoiseRow, shouldAutoHideLibraryRow } from '../js/library-noise.js';
+import { shouldAutoHideByTitle, editionBaseKey, editionTitleJoinKey, shouldAutoHidePsnTitle, shouldAutoHideGogTitle, shouldAutoHideNintendoTitle, isCatalogNoiseRow, tagNoiseRow, maybeTagLibraryNoiseRow, shouldAutoHideLibraryRow } from '../js/library-noise.js';
 
 describe('library noise parity (JS)', () => {
   for (const row of vectors) {
@@ -32,6 +32,11 @@ describe('library noise parity (JS)', () => {
     if (row.edition_base_key) {
       it(`editionBaseKey ${JSON.stringify(row.title)}`, () => {
         expect(editionBaseKey(row.title)).toBe(row.edition_base_key);
+      });
+    }
+    if (row.edition_title_join_key) {
+      it(`editionTitleJoinKey ${JSON.stringify(row.title)}`, () => {
+        expect(editionTitleJoinKey(row.title)).toBe(row.edition_title_join_key);
       });
     }
   }

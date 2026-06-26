@@ -77,3 +77,12 @@ class TestResolveSource:
         monkeypatch.setattr(fi, "_butler_db_ready", lambda _p: False)
         monkeypatch.setattr(fi, "_api_creds_ready", lambda: True)
         assert fi.resolve_source("auto", None) == "api"
+
+
+def test_build_row_tags_non_videogame_classification() -> None:
+    row = fi._build_row(
+        {"game": {"id": 9, "title": "Jam Toolkit", "classification": "tool"}},
+        None,
+    )
+    assert row is not None
+    assert "noise" in row["tags"]

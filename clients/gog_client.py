@@ -86,6 +86,8 @@ class GogClient:
         if not path.exists():
             return None
         if max_age_seconds is not None:
+            if max_age_seconds <= 0:
+                return None
             age = time.time() - path.stat().st_mtime
             if age >= max_age_seconds:
                 return None

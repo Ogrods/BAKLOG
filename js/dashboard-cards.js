@@ -417,12 +417,12 @@ export function buildWishlistStatsHtml(slot = 'wishlist') {
     if (!d) continue;
     if (d.price != null || d.regular != null || d.cut) hasPricing = true;
     const cut = effectiveDiscountPercent(g);
-    if (cut > 0 && cut < 100) {
-      cuts.push(cut);
+    if (cut > 0) {
       if (cut > bestCut) {
         bestCut = cut;
         bestCutGame = g.name || "";
       }
+      if (cut < 100) cuts.push(cut);
     }
   }
   const avgCut = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : 0;

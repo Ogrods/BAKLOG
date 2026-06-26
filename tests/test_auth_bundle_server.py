@@ -176,3 +176,13 @@ def test_secrets_export_blocked_without_local_header(auth_bundle_server: str) ->
     )
     assert status == 403
     assert "cross-origin" in str(body.get("error", "")).lower()
+
+
+def test_secrets_import_blocked_without_local_header(auth_bundle_server: str) -> None:
+    status, body, _ = _post_json_origin_only(
+        auth_bundle_server,
+        "/api/auth/secrets/import",
+        {"passphrase": "server-test-pass", "blob": ""},
+    )
+    assert status == 403
+    assert "cross-origin" in str(body.get("error", "")).lower()

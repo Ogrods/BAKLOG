@@ -1,9 +1,17 @@
-Welcome to the BAKLOG beta.
+Welcome to BAKLOG
 
-Windows may show "Windows protected your PC" or "Unknown publisher" because this build is not code-signed yet. Click More info, then Run anyway.
+One honest backlog across every store.
+
+This beta build is not code-signed yet. If Windows shows "Windows protected your PC" or "Unknown publisher", click More info, then Run anyway.
+
+What installs where
+  App folder: %LOCALAPPDATA%\BAKLOG (Start Menu shortcut and tray launcher)
+  Your data: %LOCALAPPDATA%\BAKLOG-Data (library, connections, and profiles)
+
+Upgrading or reinstalling keeps your data. Uninstall removes only the app folder.
 
 After install, launch BAKLOG from the Start Menu. A tray icon appears in the notification area. Right-click it for Open, Restart, or Quit. You do not need to keep a console window open.
 
 Connections sign-in requires Google Chrome or Microsoft Edge.
 
-Your library data stays on this PC in %LOCALAPPDATA%\BAKLOG-Data (separate from the app folder). Uninstalling BAKLOG removes only the app; your library and connections remain until you delete that data folder.
+Help and updates: baklog.app

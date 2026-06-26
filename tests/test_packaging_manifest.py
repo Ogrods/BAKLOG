@@ -90,3 +90,23 @@ def test_pyinstaller_datas_include_curated_feeds() -> None:
     assert '("curated"), "curated")' in text.replace(" ", "") or (
         'root / "curated"' in text and '"curated"' in text
     ), "packaging/baklog.spec datas must bundle curated/ (free_claims.fallback.json offline)"
+
+
+def test_inno_installer_branding_assets() -> None:
+    """Inno Setup wizard/icon files must exist with expected dimensions."""
+    from PIL import Image
+
+    packaging = ROOT / "packaging"
+    iss = (packaging / "baklog.iss").read_text(encoding="utf-8")
+    for key in (
+        "SetupIconFile=installer-icon.ico",
+        "WizardImageFile=installer-wizard-large.bmp",
+        "WizardSmallImageFile=installer-wizard-small.bmp",
+    ):
+        assert key in iss, f"packaging/baklog.iss missing {key}"
+
+    large = Image.open(packaging / "installer-wizard-large.bmp")
+    small = Image.open(packaging / "installer-wizard-small.bmp")
+    assert large.size == (164, 314)
+    assert small.size == (55, 55)
+    assert (packaging / "installer-icon.ico").is_file()

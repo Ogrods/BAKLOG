@@ -35,6 +35,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - Sign-up and password-reset redirects default to baklog.app (confirm from phone or any device).
 - Tagged releases build and ship `BAKLOG-Setup.exe` (Inno Setup on CI) alongside the portable zip.
+- Windows installer branding: BAKLOG icon, wizard images, and updated welcome copy (`packaging/generate_installer_assets.py`).
 
 ### Fixed
 

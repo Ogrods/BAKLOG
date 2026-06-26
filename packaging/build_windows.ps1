@@ -65,6 +65,10 @@ if (-not (Test-Path $FallbackJson)) {
 
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 
+Write-Host "Generating installer branding assets..."
+& $Python (Join-Path $Root "packaging\generate_installer_assets.py")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "Writing bundled account-auth .env..."
 $urlSet = [bool]$env:BAKLOG_SUPABASE_URL
 $anonSet = [bool]$env:BAKLOG_SUPABASE_ANON_KEY

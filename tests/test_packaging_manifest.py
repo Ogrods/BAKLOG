@@ -56,6 +56,7 @@ def _spec_resolved_hiddenimports() -> set[str]:
         "auth.secrets",
         "shared.install_paths",
         "shared.data_dir_migration",
+        "shared.bundled_auth_env",
         "shared.built_frontend",
         "shared.legacy_env",
         "keyring.backends.Windows",

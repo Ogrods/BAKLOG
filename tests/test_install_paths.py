@@ -152,3 +152,32 @@ def test_frozen_migrates_legacy_when_data_dir_override_set(monkeypatch, tmp_path
     assert install_paths.data_root() == custom_data.resolve()
     assert (custom_data / "games_steam.json").is_file()
     assert not (app_dir / "games_steam.json").exists()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows LOCALAPPDATA frozen data dir")
+def test_frozen_syncs_bundled_auth_env_when_data_dir_missing_keys(monkeypatch, tmp_path):
+    _reset_frozen_cache()
+    monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)
+    monkeypatch.delenv("BAKLOG_PORTABLE", raising=False)
+    app_dir = tmp_path / "BAKLOG"
+    app_dir.mkdir()
+    data_dir = tmp_path / "BAKLOG-Data"
+    data_dir.mkdir()
+    prof = data_dir / "profiles"
+    prof.mkdir()
+    (prof / "index.json").write_text('{"active":"default","profiles":[]}', encoding="utf-8")
+    (data_dir / ".legacy_migration_done").write_text("{}", encoding="utf-8")
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    (app_dir / ".env").write_text(
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\n"
+        "BAKLOG_SUPABASE_ANON_KEY=anon-key\n"
+        "BAKLOG_SUPABASE_JWT_SECRET=jwt-secret\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths.sys, "executable", str(app_dir / "BAKLOG.exe"))
+    assert install_paths.data_root() == data_dir.resolve()
+    merged = (data_dir / ".env").read_text(encoding="utf-8")
+    assert "BAKLOG_SUPABASE_URL=https://proj.supabase.co" in merged
+    assert "BAKLOG_SUPABASE_JWT_SECRET=jwt-secret" in merged

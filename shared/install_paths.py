@@ -66,10 +66,17 @@ def _maybe_migrate_legacy_to(target: Path) -> None:
     legacy = legacy_frozen_data_dir()
     if legacy == target:
         return
+    from shared.bundled_auth_env import sync_bundled_auth_env_to_data_dir
     from shared.data_dir_migration import migrate_legacy_colocated_data
 
     for note in migrate_legacy_colocated_data(legacy, target):
         print(f"[data_dir] {note}", file=sys.stderr, flush=True)
+    if sync_bundled_auth_env_to_data_dir(legacy, target):
+        print(
+            "[data_dir] synced bundled auth .env into data dir (upgrade path)",
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 def _resolve_frozen_data_root() -> Path:

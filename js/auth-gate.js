@@ -34,6 +34,7 @@ let _plan = 'free';
 let _licenseActivation = false;
 let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: '', yearly: '' };
+let _lastSessionProbeStatus = 0;
 const _planListeners = new Set();
 
 /** Subscribe to plan changes (free ↔ pro). Returns unsubscribe. */
@@ -334,7 +335,10 @@ async function probeServerToken() {
     const res = await fetch('/api/auth/session', {
       headers: { Authorization: `Bearer ${_accessToken}` },
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      _lastSessionProbeStatus = res.status;
+      return false;
+    }
     const data = await res.json();
     if (data.profile) _accountProfileId = String(data.profile);
     if (data.email) _accountEmail = data.email;
@@ -379,7 +383,10 @@ function onAuthenticated(session) {
           location.reload();
         }
       } else {
-        setAuthError('Could not verify your session on the server. Try again.');
+        const hint = _lastSessionProbeStatus === 401
+          ? ' The local server rejected your sign-in token (common after upgrading: quit BAKLOG, copy .env from the app folder into BAKLOG-Data, restart).'
+          : '';
+        setAuthError(`Could not verify your session on the server. Try again.${hint}`);
         applySession(null);
       }
     } finally {

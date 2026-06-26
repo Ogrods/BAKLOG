@@ -113,9 +113,22 @@ def _warn_built_manifest_version_mismatch() -> None:
 ROOT = data_root()
 
 try:
+    from shared.bundled_auth_env import apply_install_dir_auth_env, ensure_ssl_cert_bundle
+
+    ensure_ssl_cert_bundle()
+except ImportError:
+    pass
+
+try:
     from dotenv import load_dotenv
 
     load_dotenv(ROOT / ".env")
+    try:
+        from shared.bundled_auth_env import apply_install_dir_auth_env
+
+        apply_install_dir_auth_env()
+    except ImportError:
+        pass
 except ImportError:
     pass
 

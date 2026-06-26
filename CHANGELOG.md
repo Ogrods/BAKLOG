@@ -22,6 +22,13 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.23] - 2026-06-26
+
+### Fixed
+
+- Frozen upgrades: sync bundled auth `.env` from the install folder into `BAKLOG-Data` when auth keys are missing (fixes sign-in "Could not verify your session on the server" after reinstall).
+- PyInstaller builds set certifi CA bundle for Supabase JWKS verification.
+
 ## [0.8.22] - 2026-06-26
 
 ### Added

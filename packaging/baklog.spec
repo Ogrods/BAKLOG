@@ -49,10 +49,13 @@ hiddenimports = [
     "auth.secrets",
     "shared.install_paths",
     "shared.data_dir_migration",
+    "shared.bundled_auth_env",
     "shared.built_frontend",
     "shared.legacy_env",
     "keyring.backends.Windows",
     "cryptography.hazmat.primitives.ciphers.aead",
+    "certifi",
+    "jwt",
 ]
 
 tray_hiddenimports = hiddenimports + [

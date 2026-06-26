@@ -54,6 +54,7 @@ import {
   renderPicksLimitButtons,
   applyPicksCollapsedState,
   picksLimitView,
+  effectivePicksTab,
 } from './picks-ui.js';
 import {
   addKeysToCustomList,

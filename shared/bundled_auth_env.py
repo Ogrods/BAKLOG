@@ -82,6 +82,18 @@ def apply_install_dir_auth_env() -> None:
             os.environ[key] = val
 
 
+def bootstrap_server_env(data_root: Path) -> None:
+    """Load data-dir .env, then fill missing auth keys from the install folder."""
+    ensure_ssl_cert_bundle()
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(data_root / ".env")
+    except ImportError:
+        pass
+    apply_install_dir_auth_env()
+
+
 def ensure_ssl_cert_bundle() -> None:
     """PyInstaller onefile/onedir: make HTTPS (Supabase JWKS) use certifi roots."""
     try:

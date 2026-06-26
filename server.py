@@ -113,24 +113,16 @@ def _warn_built_manifest_version_mismatch() -> None:
 ROOT = data_root()
 
 try:
-    from shared.bundled_auth_env import apply_install_dir_auth_env, ensure_ssl_cert_bundle
+    from shared.bundled_auth_env import bootstrap_server_env
 
-    ensure_ssl_cert_bundle()
+    bootstrap_server_env(ROOT)
 except ImportError:
-    pass
-
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv(ROOT / ".env")
     try:
-        from shared.bundled_auth_env import apply_install_dir_auth_env
+        from dotenv import load_dotenv
 
-        apply_install_dir_auth_env()
+        load_dotenv(ROOT / ".env")
     except ImportError:
         pass
-except ImportError:
-    pass
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))

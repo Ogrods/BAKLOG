@@ -130,9 +130,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" `
-            "release/BAKLOG-win64.zip" `
-            "release/BAKLOG-win64.sha256" `
-            "release/BAKLOG-win64.sbom.spdx.json" `
-            --title "BAKLOG ${{ github.ref_name }}" `
-            --generate-notes
+          $tag = "${{ github.ref_name }}"
+          $assets = @(
+            "release/BAKLOG-win64.zip",
+            "release/BAKLOG-win64.sha256",
+            "release/BAKLOG-win64.sbom.spdx.json"
+          )
+          if (gh release view $tag 2>$null) {
+            Write-Host "Release $tag exists; uploading replacement assets (--clobber)."
+            gh release upload $tag @assets --clobber
+            gh release edit $tag --title "BAKLOG $tag" --generate-notes
+          } else {
+            gh release create $tag @assets --title "BAKLOG $tag" --generate-notes
+          }

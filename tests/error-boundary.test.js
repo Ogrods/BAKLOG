@@ -25,6 +25,7 @@ import {
   getBugReportEndpoint,
   getCapturedErrors,
   installGlobalErrorHandler,
+  noteServerRuntime,
   registerBugBundleContext,
   reportError,
   submitBugReport,
@@ -111,6 +112,31 @@ describe("error-boundary persistence", () => {
 
 describe("error-boundary rehydration", () => {
   afterEach(() => { teardownWindow(); });
+
+  it("tags persisted errors with server_frozen when noteServerRuntime was called", () => {
+    installWindow();
+    _resetForTests();
+    installGlobalErrorHandler();
+    noteServerRuntime({ frozen: true });
+    reportError(new Error("frozen session error"));
+    const parsed = JSON.parse(window.localStorage.getItem("baklog-error-log"));
+    expect(parsed[0].server_frozen).toBe(true);
+  });
+
+  it("warns when persisted errors mix dev and frozen sessions", () => {
+    installWindow();
+    _resetForTests();
+    window.localStorage.setItem(
+      "baklog-error-log",
+      JSON.stringify([
+        { kind: "error", time: 1, message: "dev", stack: "", server_frozen: false, repeats: 1 },
+      ]),
+    );
+    installGlobalErrorHandler();
+    const bundle = buildBugBundle({ server: { frozen: true } });
+    expect(bundle.warnings?.length).toBe(1);
+    expect(bundle.warnings[0]).toMatch(/dev and frozen/);
+  });
 
   it("installGlobalErrorHandler rehydrates persisted ring from localStorage", () => {
     const seeded = JSON.stringify([

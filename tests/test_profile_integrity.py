@@ -60,11 +60,41 @@ def test_reconcile_skips_adoption_when_auth_enabled(isolated_profiles: Path) -> 
     orphan = isolated_profiles / "profiles" / "play"
     orphan.mkdir(parents=True)
     with patch("shared.supabase_auth.auth_enabled", return_value=True):
-        notes = reconcile_profile_store()
+        with patch("shared.supabase_auth.local_profiles_enabled", return_value=False):
+            notes = reconcile_profile_store()
     doc = profile_paths.load_index()
     ids = {p["id"] for p in doc["profiles"]}
     assert "play" not in ids
     assert any("orphan profile dir not in index" in n for n in notes)
+
+
+def test_reconcile_adopts_orphans_when_auth_and_local_profiles(isolated_profiles: Path) -> None:
+    orphan = isolated_profiles / "profiles" / "play"
+    orphan.mkdir(parents=True)
+    (orphan / "data").mkdir()
+    with patch("shared.supabase_auth.auth_enabled", return_value=True):
+        with patch("shared.supabase_auth.local_profiles_enabled", return_value=True):
+            notes = reconcile_profile_store()
+    doc = profile_paths.load_index()
+    ids = {p["id"] for p in doc["profiles"]}
+    assert "play" in ids
+    assert any("adopted orphan" in n for n in notes)
+
+
+def test_reconcile_materializes_index_when_profile_dir_exists_without_index(
+    isolated_profiles: Path,
+) -> None:
+    default_dir = isolated_profiles / "profiles" / "default"
+    default_dir.mkdir(parents=True)
+    (default_dir / "data").mkdir()
+    assert not (isolated_profiles / "profiles" / "index.json").is_file()
+    with patch("shared.supabase_auth.auth_enabled", return_value=True):
+        with patch("shared.supabase_auth.local_profiles_enabled", return_value=True):
+            notes = reconcile_profile_store()
+    assert (isolated_profiles / "profiles" / "index.json").is_file()
+    assert any("materialized profiles/index.json" in n for n in notes)
+    doc = profile_paths.load_index()
+    assert doc["active"] == "default"
 
 
 def test_quarantined_delete_dir_not_readopted(

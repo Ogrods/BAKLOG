@@ -8,7 +8,7 @@ import { state } from './state.js';
 // Side-effect import: installs window.coverFallback / window.markLandscape
 // before any module emits row HTML that references them inline.
 import './covers.js';
-import { installGlobalErrorHandler, registerBugBundleContext, reportError } from './error-boundary.js';
+import { installGlobalErrorHandler, registerBugBundleContext, reportError, noteServerRuntime } from './error-boundary.js';
 import { initScrollLock } from './scroll-lock.js';
 
 // Install the global error + unhandled-rejection listeners as early as
@@ -257,6 +257,7 @@ async function bootstrap() {
       const cfgRes = await fetch('/api/config');
       if (cfgRes.ok) {
         const cfg = await cfgRes.json();
+        if (typeof cfg.frozen === 'boolean') noteServerRuntime({ frozen: cfg.frozen });
         if (cfg.running_from_temp) {
           const banner = document.getElementById('bootErrorBanner');
           if (banner) {

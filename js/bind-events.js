@@ -92,7 +92,7 @@ import { openBugReportDialog } from './bug-report.js';
 import { initFullscreenToggle } from './fullscreen-toggle.js';
 import { reportError } from './error-boundary.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
-import { bindHiddenPanelUI } from './hidden-panel.js';
+import { bindHiddenPanelUI, openHiddenPanel } from './hidden-panel.js';
 import { bindColumnPicker } from './column-picker.js';
 import { createGlobalKeydownHandler } from './events.js';
 import { bindFetcherHealthEvents } from './bind-events-fetcher.js';
@@ -495,6 +495,11 @@ export function bindEvents() {
     const staleChip = e.target.closest(".summary-stale-chip");
     if (staleChip) {
       applyPrefsChange({ sessionPrefs: { staleOnly: !state.sessionPrefs.staleOnly } });
+      return;
+    }
+    const noiseChip = e.target.closest(".summary-noise-chip[data-open-noise-hidden]");
+    if (noiseChip) {
+      openHiddenPanel({ noiseOnly: true });
       return;
     }
     const dealChip = e.target.closest(".summary-deal-chip[data-wishlist-deal-filter]");

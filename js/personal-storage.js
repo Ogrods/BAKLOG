@@ -21,7 +21,7 @@ import {
   itchIsGame,
 } from './game-core.js';
 import { PRE_HIDDEN_KEYS, getPreHiddenFallback } from './hidden-defaults.js';
-import { shouldAutoHideLibraryRow } from './library-noise.js';
+import { shouldAutoHideLibraryRow, isCatalogNoiseRow, shouldAutoHideByTitle } from './library-noise.js';
 import { visibleItchGames } from './connections-status.js';
 import { migrateColumnPrefs } from './table-columns.js';
 
@@ -828,6 +828,24 @@ export function seedNoiseAutoHidden(games, { itchIsGameFn } = {}) {
   return changed;
 }
 
+/** True when a hidden row matches built-in library noise rules (not user preference). */
+export function isLibraryNoiseEntry(entry) {
+  if (!entry) return false;
+  const g = entry.game;
+  if (g) return isCatalogNoiseRow(g) || shouldAutoHideLibraryRow(g);
+  const name = entry.fallbackName || entry.key || "";
+  return shouldAutoHideByTitle(name);
+}
+
+export function countHiddenLibraryNoiseGames(games) {
+  let n = 0;
+  for (const g of games || []) {
+    if (!g || !isGameHidden(g)) continue;
+    if (isCatalogNoiseRow(g) || shouldAutoHideLibraryRow(g)) n++;
+  }
+  return n;
+}
+
 export function setGameHidden(g, hidden, options) {
   setPersonal(g, "hidden", !!hidden, options);
 }
@@ -839,21 +857,24 @@ function entryDisplayName(entry) {
 }
 
 /** Keys with user-hidden flag (game may still exist in catalog). */
-export function listUserHiddenEntries() {
+export function listUserHiddenEntries({ noiseOnly = false } = {}) {
   const out = [];
   for (const [key, rec] of Object.entries(state.personal)) {
     if (isMetaPersonalKey(key)) continue;
     if (!rec || rec.hidden !== true) continue;
     const g = findGameByKey(key);
     const fallback = g ? null : getPreHiddenFallback(key);
-    out.push({
+    const entry = {
       key,
       game: g || null,
       status: rec.status || "backlog",
       notes: String(rec.notes || ""),
       fallbackName: fallback?.name || null,
       fallbackStore: fallback?.store || null,
-    });
+    };
+    entry.isLibraryNoise = isLibraryNoiseEntry(entry);
+    if (noiseOnly && !entry.isLibraryNoise) continue;
+    out.push(entry);
   }
   out.sort((a, b) => entryDisplayName(a).localeCompare(entryDisplayName(b)));
   return out;

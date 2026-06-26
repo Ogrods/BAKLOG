@@ -172,6 +172,15 @@ export function editionBaseKey(name) {
   return key;
 }
 
+/** Strip trailing edition suffixes only — for receipt↔catalog title joins. */
+export function editionTitleJoinKey(name) {
+  let key = normalizeNoiseTitle(name);
+  for (const suffix of EDITION_SUFFIXES) {
+    if (key.endsWith(suffix)) key = key.slice(0, -suffix.length).trim();
+  }
+  return key;
+}
+
 export function isNintendoNoiseRow(g) {
   if (!g) return false;
   if (g.is_dlc || g.nintendo_is_dlc) return true;

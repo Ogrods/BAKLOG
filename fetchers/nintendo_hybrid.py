@@ -7,22 +7,14 @@ from collections import defaultdict
 from typing import Any
 from urllib.parse import quote
 
-from shared.library_noise import is_nintendo_noise_row, maybe_tag_library_noise_row
+from shared.library_noise import (
+    edition_title_join_key,
+    is_nintendo_noise_row,
+    maybe_tag_library_noise_row,
+)
 
 _TRADEMARK_RE = re.compile(r"[™®©]")
 _PUNCT_RE = re.compile(r"[^\w\s]+", re.UNICODE)
-
-_EDITION_SUFFIXES = (
-    " digital deluxe edition",
-    " deluxe edition",
-    " gold edition",
-    " ultimate edition",
-    " complete edition",
-    " definitive edition",
-    " special edition",
-    " collectors edition",
-    " collector's edition",
-)
 
 _DELUXE_MARKERS = (
     "digital deluxe",
@@ -44,11 +36,7 @@ def norm_nintendo_title(name: str) -> str:
 
 def match_nintendo_title_key(name: str) -> str:
     """Aggressive normalize for receipt↔VGC title join (edition suffixes stripped)."""
-    key = norm_nintendo_title(name)
-    for suffix in _EDITION_SUFFIXES:
-        if key.endswith(suffix):
-            key = key[: -len(suffix)].strip()
-    return key
+    return edition_title_join_key(name)
 
 
 def nintendo_store_url(application_id: str | None, name: str) -> str:

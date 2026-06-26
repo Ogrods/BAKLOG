@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   editionBaseKey,
+  editionTitleJoinKey,
   isNintendoNoiseRow,
   shouldAutoHideByTitle,
   shouldAutoHideLibraryRow,
@@ -25,6 +26,14 @@ describe('shouldAutoHideByTitle', () => {
 describe('editionBaseKey', () => {
   it('groups edition SKUs for within-store dedupe', () => {
     expect(editionBaseKey('Game Digital Deluxe Edition')).toBe(editionBaseKey('Game'));
+  });
+});
+
+describe('editionTitleJoinKey', () => {
+  it('joins receipt and VGC edition titles', () => {
+    const deluxe = editionTitleJoinKey('Samba de Amigo: Party Central Digital Deluxe Edition');
+    const base = editionTitleJoinKey('Samba de Amigo: Party Central');
+    expect(deluxe).toBe(base);
   });
 });
 

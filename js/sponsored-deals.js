@@ -766,7 +766,7 @@ export const PRO_PROMO = {
   features: [
     {
       title: 'Queued bulk refresh',
-      desc: 'Queue every stale store at once and let them refresh back-to-back instead of one at a time.',
+      desc: 'Coming soon: queue every stale store at once and let them refresh back-to-back instead of one at a time.',
       icon: '⚡',
     },
     {
@@ -781,7 +781,7 @@ export const PRO_PROMO = {
     },
     {
       title: 'Cloud sync',
-      desc: 'Keep your library and personal data aligned across machines without manual exports.',
+      desc: 'Coming soon: keep your library and personal data aligned across machines without manual exports.',
       icon: '☁',
     },
     {
@@ -796,20 +796,20 @@ export const PRO_PROMO = {
     },
     {
       title: 'Deal/watchlist alerts',
-      desc: 'Never miss a free game again - alerts when Epic, GOG, Steam, and Prime drops land, plus wishlist price targets.',
+      desc: 'Coming soon: alerts when Epic, GOG, Steam, and Prime drops land, plus wishlist price targets.',
       icon: '🔔',
     },
   ],
   tierCompare: [
     { feature: 'Import & browse all stores', free: '✓', pro: '✓' },
-    { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores' },
+    { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores (coming)' },
     { feature: 'Auto-refresh while app is open', free: '✓ (one store / ~30 min)', pro: '✓' },
     { feature: 'Refresh while app is closed', free: '-', pro: '✓' },
     { feature: 'Claimable Now (full games)', free: '✓', pro: '✓ + bonus DLC/bonus feed' },
     { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
-    { feature: 'Cloud sync', free: '-', pro: '✓' },
-    { feature: 'Deal/watchlist alerts', free: '-', pro: '✓' },
+    { feature: 'Cloud sync', free: '-', pro: 'Coming' },
+    { feature: 'Deal/watchlist alerts', free: '-', pro: 'Coming' },
   ],
   trustPoints: [
     'Local-first - your library stays on your machine',

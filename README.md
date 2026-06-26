@@ -145,8 +145,6 @@ Two different mechanisms keep the library clean. Keep the terms distinct:
 
 In short: **library noise** keeps the count honest by treating non-games as clutter; the **hidden list** is your preference for real games you own but do not want in the main view. When adding new filtering, decide which bucket it belongs in first.
 
-Landing copy may still say "blacklist" for brevity; in the app and docs we use **library noise** for this built-in ruleset.
-
 ## Dashboard CSS
 
 Tailwind is precompiled into `tailwind.css` (no browser JIT in dev). Rebuild the CSS only if you change the Tailwind build pipeline in the repo.

@@ -96,11 +96,45 @@ describe('marketing copy guardrails', () => {
     expect(table).toMatch(/Manual store refresh[\s\S]*coming/i);
   });
 
-  it('landing uses qualified telemetry wording', () => {
-    const text = readFileSync('landing/index.html', 'utf8');
-    expect(text).toMatch(/no telemetry by default/i);
-    expect(text).not.toMatch(/\bNo telemetry\b(?!\s+by default)/i);
-  });
+  const UNQUALIFIED_TELEMETRY = /\b(?:No|Zero) telemetry\b/gi;
+
+  function assertQualifiedTelemetryCopy(text) {
+    let match;
+    UNQUALIFIED_TELEMETRY.lastIndex = 0;
+    while ((match = UNQUALIFIED_TELEMETRY.exec(text)) !== null) {
+      const window = text.slice(match.index, match.index + 80);
+      expect(window, `unqualified telemetry near: ${window.slice(0, 40)}…`).toMatch(
+        /by default/i,
+      );
+    }
+  }
+
+  const TELEMETRY_CANONICAL_FILES = [
+    'landing/index.html',
+    'README.md',
+    'guide/faq.md',
+    'js/sponsored-deals.js',
+  ];
+
+  const TELEMETRY_GUARD_FILES = [
+    ...TELEMETRY_CANONICAL_FILES,
+    'PRIVACY.md',
+    'SECURITY.md',
+  ];
+
+  for (const rel of TELEMETRY_CANONICAL_FILES) {
+    it(`${rel} states no telemetry by default`, () => {
+      const text = readFileSync(rel, 'utf8');
+      expect(text).toMatch(/no telemetry by default/i);
+      assertQualifiedTelemetryCopy(text);
+    });
+  }
+
+  for (const rel of TELEMETRY_GUARD_FILES) {
+    it(`${rel} avoids unqualified telemetry claims`, () => {
+      assertQualifiedTelemetryCopy(readFileSync(rel, 'utf8'));
+    });
+  }
 
   it('PRIVACY.md matches opt-in telemetry policy', () => {
     const text = readFileSync('PRIVACY.md', 'utf8');

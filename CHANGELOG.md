@@ -22,6 +22,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Changed
+
+- Public copy aligned to canonical **no telemetry by default** wording (README, SECURITY, Pro promo trust points, guide FAQ, landing trust section).
+
 ### Added
 
 - In-app update recovery: apply scripts write `apply-result.json`, restore from backup on copy failure, and retain the newest `BAKLOG-backup-*` only.

@@ -57,4 +57,10 @@ describe('PRO_PROMO sync with landing', () => {
       'Deal/watchlist alerts',
     ]);
   });
+
+  it('trustPoints use canonical no telemetry by default wording', () => {
+    const joined = PRO_PROMO.trustPoints.join(' ');
+    expect(joined).toMatch(/no telemetry by default/i);
+    expect(joined).not.toMatch(/\bZero telemetry\b/i);
+  });
 });

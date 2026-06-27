@@ -44,6 +44,10 @@ No. BAKLOG has no business model built on your library. We do not collect, host,
 
 The marketing site at [baklog.app](https://baklog.app) has a separate waitlist and optional bug-report endpoint - see [PRIVACY.md](../PRIVACY.md#hosted-surfaces).
 
+## Does BAKLOG have telemetry?
+
+No telemetry by default. Optional anonymous aggregate metrics (active sessions, sponsored-slot impressions) stay off unless you turn on **Share anonymous stats** in Connections. No library data or per-game telemetry leaves your machine. See [PRIVACY.md](../PRIVACY.md).
+
 ## Why invite-only right now?
 
 We are onboarding in small waves so we can fix what breaks on real setups before opening the doors. Request access at [baklog.app](https://baklog.app).

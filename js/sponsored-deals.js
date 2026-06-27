@@ -815,7 +815,7 @@ export const PRO_PROMO = {
     'Local-first - your library stays on your machine',
     'Open source (MIT) - audit every fetcher path',
     'Polar.sh Merchant of Record (open source, like us) - cancel anytime',
-    'Zero telemetry unless you opt in',
+    'No telemetry by default',
   ],
 };
 

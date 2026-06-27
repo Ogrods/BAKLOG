@@ -61,6 +61,9 @@ from shared.built_frontend import (
     maybe_serve_built_index as _maybe_serve_built_index,
 )
 from shared.dev_server_pids import (
+    pid_alive as _pid_alive,  # noqa: F401 — re-exported for tests
+)
+from shared.dev_server_pids import (
     reclaim_or_exit as _reclaim_or_exit,
 )
 from shared.dev_server_pids import (

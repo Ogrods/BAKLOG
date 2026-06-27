@@ -25,15 +25,25 @@ def frozen_bundle_dir() -> Path:
 
 
 def frozen_server_exe() -> Path:
+    root = frozen_bundle_dir()
+    for name in ("BAKLOG.exe", "BAKLOG"):
+        candidate = root / name
+        if candidate.is_file():
+            return candidate
     from shared.update_platform import server_binary_name
 
-    return frozen_bundle_dir() / server_binary_name()
+    return root / server_binary_name()
 
 
 def frozen_tray_exe() -> Path:
+    root = frozen_bundle_dir()
+    for name in ("BAKLOG Tray.exe", "BAKLOG Tray"):
+        candidate = root / name
+        if candidate.is_file():
+            return candidate
     from shared.update_platform import tray_binary_name
 
-    return frozen_bundle_dir() / tray_binary_name()
+    return root / tray_binary_name()
 
 
 def legacy_frozen_data_dir() -> Path:

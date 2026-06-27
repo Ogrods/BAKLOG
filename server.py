@@ -216,6 +216,7 @@ from shared.profile_paths import (  # noqa: E402
     free_claims_path,
     get_active_profile_id,
     personal_backup_dir,
+    personal_path,  # noqa: F401 — re-exported for tests
     profile_root,
     runs_dir,
     set_request_profile_id,

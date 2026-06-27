@@ -40,7 +40,11 @@ def patch_reconnect_body(body: str) -> str:
     # Drop duplicate humanizeMissingRequirements - exported separately in header
     start = body.find("function humanizeMissingRequirements")
     if start >= 0:
-        end = body.find("// ---------------------------------------------------------------------------\n// Per-provider reconnect", start)
+        end = body.find(
+            "// ---------------------------------------------------------------------------\n"
+            "// Per-provider reconnect",
+            start,
+        )
         if end >= 0:
             body = body[:start] + body[end:]
     return body
@@ -448,7 +452,10 @@ export function cycleStatLayout() {
     # cycleStatLayout must stay sync - fix with import at top
     dash_text = dash_text.replace(
         "import { statLayout, syncStatLayoutToggle } from './layout.js';",
-        "import { statLayoutStorageKey } from '../../profiles.js';\nimport { statLayout, syncStatLayoutToggle } from './layout.js';",
+        (
+            "import { statLayoutStorageKey } from '../../profiles.js';\n"
+            "import { statLayout, syncStatLayoutToggle } from './layout.js';"
+        ),
     )
     dash_text = dash_text.replace(
         """export function cycleStatLayout() {

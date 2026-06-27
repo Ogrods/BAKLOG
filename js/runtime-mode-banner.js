@@ -25,7 +25,9 @@ export function syncRuntimeModeBanner(cfg = {}) {
 
   if (mode === 'dev') {
     label = 'Dev server';
-    detail = `python server.py is serving this tab.${pathTip} Browser prefs are shared with the installed app at the same address.`;
+    detail =
+      `python server.py is serving this tab.${pathTip} ` +
+      'Browser prefs are shared with the installed app when both use port 8765 — use PORT=8766 in .env for isolation (see User guide).';
   } else if (hasPersistedMixedRuntimeErrors(true)) {
     label = 'Mixed sessions';
     detail =

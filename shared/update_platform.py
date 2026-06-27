@@ -24,6 +24,17 @@ _PLATFORM_APPLY_SCRIPT: dict[str, str] = {
 _SUPPORTED_APPLY_PLATFORMS = frozenset({"win32", "darwin"})
 
 
+def release_platform(platform: str | None = None) -> str:
+    """Platform key for GitHub release zip/sha256 names (win32 or darwin).
+
+    Linux dev/CI has no release bundle; callers fall back to win32 artifact names.
+    """
+    plat = platform or sys.platform
+    if plat in _PLATFORM_ARTIFACTS:
+        return plat
+    return "win32"
+
+
 def current_platform() -> str:
     return sys.platform
 

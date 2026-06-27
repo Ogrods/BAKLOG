@@ -44,7 +44,6 @@ def test_is_allowed_download_url_rejects_unknown_asset_name() -> None:
 
 
 def test_parse_sha256_sidecar() -> None:
-    text = "abc123def4567890123456789012345678901234567890123456789012345678  BAKLOG-win64.zip\n"
     # use valid 64 hex chars
     valid = "a" * 64 + "  BAKLOG-win64.zip"
     assert parse_sha256_sidecar(valid) == "a" * 64
@@ -66,7 +65,7 @@ def test_build_release_artifacts_from_release_json() -> None:
         ],
     }
     with patch("shared.update_release._fetch_text_asset", return_value="a" * 64 + "  BAKLOG-win64.zip"):
-        artifacts = build_release_artifacts(release)
+        artifacts = build_release_artifacts(release, platform="win32")
     assert artifacts.version == "0.8.26"
     assert artifacts.zip_url.endswith(STABLE_ZIP_NAME)
 

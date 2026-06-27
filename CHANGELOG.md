@@ -22,9 +22,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.27] - 2026-06-27
+
 ### Changed
 
 - Public copy aligned to canonical **no telemetry by default** wording (README, SECURITY, Pro promo trust points, guide FAQ, landing trust section).
+- **Run** / **RunManager** extracted from `server.py` into `shared/run_manager.py`; server line budget ratcheted to 3000.
+- Connections left-rail grouping and status pills moved to `js/connections-rail.js`.
+- Dev vs frozen footgun mitigated: document `PORT=8766` with separate `BAKLOG_DATA_DIR`; dev banner warns about shared localhost storage.
 
 ### Added
 
@@ -34,13 +39,15 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Zip bundle ships **Uninstall BAKLOG.bat** for portable cleanup; Inno uninstall/finish copy is portable-aware when `portable.txt` exists.
 - Apply blocked while a store sign-in window is open; update-check exposes `fetchers_in_flight` for proactive UI hints.
 - Streaming download progress in `fetch_url_to_file`; tray notifies when a verified update is ready to install.
-
+- Diagnostics and update-check expose `install_source`, `arp_version`, and `arp_version_mismatch` (Windows Setup vs zip apply visibility).
+- Update install confirm footnote when Add/Remove Programs may lag behind in-app zip updates.
 - Uninstall wizard choice: keep library data or remove everything (including `%LOCALAPPDATA%\BAKLOG-Data`, OS keyring master key, and login autostart).
 - Header **Dev server** chip when `python server.py` is active; warns when persisted errors mix dev and installed sessions on shared localhost storage.
 - `resolved_data_dir_for_uninstall()` so portable installs wipe co-located data beside `BAKLOG.exe`.
 - `/api/config` `runtime_label` (`dev` / `installed` / `portable`) for UI runtime detection; `frozen` kept for compatibility.
 - Tray menu **Open data folder** opens the active profile data directory in Explorer.
 - Installer finish page shows library vs app paths; full uninstall nudges Connections **Export bundle** before wipe.
+- `packaging/build_macos.sh` maintainer checklist; ARCHITECTURE rough-edges table refreshed.
 
 ### Fixed
 

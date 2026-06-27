@@ -5,16 +5,17 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sys
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 from shared.server_support import github_releases_latest_api_url, normalize_version_tag
 from shared.update_platform import (
     allowed_asset_names,
+    release_platform,
     required_bundle_files,
     server_binary_name,
     stable_sha256_name,
@@ -90,7 +91,7 @@ def is_allowed_download_url(url: str) -> bool:
 
 def parse_sha256_sidecar(text: str, *, zip_name: str | None = None) -> str:
     """Parse ``<hex>  <zip-name>`` sidecar format."""
-    expected_name = zip_name or stable_zip_name()
+    expected_name = zip_name or stable_zip_name(release_platform())
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
@@ -144,7 +145,7 @@ def _sanitize_release_notes(body: str | None, *, max_len: int = 4096) -> str | N
 
 
 def build_release_artifacts(release: dict[str, Any], platform: str | None = None) -> ReleaseArtifacts:
-    plat = platform or sys.platform
+    plat = platform or release_platform()
     zip_asset = stable_zip_name(plat)
     sha_asset = stable_sha256_name(plat)
 
@@ -289,19 +290,20 @@ def safe_extract_zip(zip_path: Path, dest_dir: Path) -> Path:
 
 def locate_bundle_root(extracted_dir: Path, platform: str | None = None) -> Path:
     """Find the directory containing required frozen executables."""
-    plat = platform or sys.platform
-    server_name = server_binary_name(plat)
-    required = required_bundle_files(plat)
-    for binary in extracted_dir.rglob(server_name):
-        parent = binary.parent
-        if all((parent / name).is_file() for name in required):
-            return parent.resolve()
+    plats = (platform,) if platform is not None else ("win32", "darwin")
+    for plat in plats:
+        server_name = server_binary_name(plat)
+        required = required_bundle_files(plat)
+        for binary in extracted_dir.rglob(server_name):
+            parent = binary.parent
+            if all((parent / name).is_file() for name in required):
+                return parent.resolve()
     raise UpdateSecurityError("extracted bundle missing BAKLOG executables")
 
 
 def recommended_artifact(runtime_label: str) -> str:
     if runtime_label in {"installed", "portable"}:
-        return stable_zip_name()
+        return stable_zip_name(release_platform())
     return "none"
 
 

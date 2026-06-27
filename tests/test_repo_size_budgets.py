@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # HLTB no-runtime-cap sentinel handling in _max_run_seconds_for_key (2026-06-14).
 # Auth CSRF gates (secrets + master-password) consolidated 2026-06-26.
 # Profile rename PIN gate 2026-06-26.
-SERVER_PY_MAX_LINES = 4325
+SERVER_PY_MAX_LINES = 3000
 GIT_TREE_PY_MAX_LINES = 720
 
 

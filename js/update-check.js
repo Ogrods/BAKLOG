@@ -19,6 +19,50 @@ const UPDATE_TOAST_ID = 'updateNoticeToast';
 /** @type {AbortController | null} */
 let _modalKeyAbort = null;
 
+/** @type {{ installSource: string | null, arpVersionMismatch: boolean }} */
+let _installHints = { installSource: null, arpVersionMismatch: false };
+
+/**
+ * @param {unknown} data
+ * @returns {{ installSource: string | null, arpVersionMismatch: boolean }}
+ */
+export function installHintsFromPayload(data) {
+  if (!data || typeof data !== 'object') {
+    return { installSource: null, arpVersionMismatch: false };
+  }
+  const installSource = typeof data.install_source === 'string' && data.install_source.trim()
+    ? data.install_source.trim()
+    : null;
+  return {
+    installSource,
+    arpVersionMismatch: data.arp_version_mismatch === true,
+  };
+}
+
+/** @param {unknown} data */
+export function rememberInstallHints(data) {
+  _installHints = installHintsFromPayload(data);
+}
+
+/** @internal Vitest helper */
+export function _resetInstallHintsForTests() {
+  _installHints = { installSource: null, arpVersionMismatch: false };
+}
+
+/**
+ * Footnote for Setup installs where zip apply does not refresh Add/Remove Programs.
+ * @param {{ installSource?: string | null, arpVersionMismatch?: boolean }} [hints]
+ */
+export function renderSetupArpFootnote(hints = _installHints) {
+  if (hints?.installSource !== 'setup' && !hints?.arpVersionMismatch) return '';
+  return (
+    '<p class="text-xs text-slate-500 mt-2">' +
+    'Installed with BAKLOG-Setup.exe? Add/Remove Programs may still show an older version after in-app updates. ' +
+    'Re-run the installer from the release page when you want Settings to match, or ignore it if the app version looks correct.' +
+    '</p>'
+  );
+}
+
 /**
  * @param {unknown} data
  * @returns {{
@@ -80,6 +124,7 @@ export function parseUpdateCheckResponse(data) {
     publishedAt,
     dismissed: data.dismissed === true,
     fetchersInFlight: data.fetchers_in_flight === true,
+    ...installHintsFromPayload(data),
   };
 }
 
@@ -245,11 +290,12 @@ export function renderUpdateModalHtml(parsed) {
   );
 }
 
-function renderInstallConfirmModalHtml() {
+function renderInstallConfirmModalHtml(hints = _installHints) {
   return (
     `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-5" role="dialog" aria-modal="true" aria-labelledby="updateInstallTitle">` +
     '<h2 id="updateInstallTitle" class="text-lg font-semibold text-slate-100">Install and restart?</h2>' +
     '<p class="text-sm text-slate-400 mt-2">The update is downloaded and verified. BAKLOG will restart to finish installing. Your library data stays where it is.</p>' +
+    renderSetupArpFootnote(hints) +
     '<div class="flex flex-wrap gap-2 justify-end mt-4">' +
     '<button type="button" class="update-install-decline text-sm px-3 py-2 rounded hover:bg-slate-700">Not yet</button>' +
     '<button type="button" class="update-install-confirm bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Install &amp; restart</button>' +
@@ -731,6 +777,7 @@ export async function checkForUpdates(opts = {}) {
       return { ok: false, error: msg };
     }
     const data = await res.json().catch(() => ({}));
+    rememberInstallHints(data);
     const parsed = parseUpdateCheckResponse(data);
     if (!parsed.ok) {
       const msg = `Could not check for updates: ${parsed.error}`;

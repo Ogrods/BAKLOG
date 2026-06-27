@@ -42,14 +42,15 @@ def test_build_update_check_payload_ok() -> None:
     }
     with patch("shared.server_support.fetch_latest_github_release", return_value=release):
         with patch("shared.server_support.is_frozen", return_value=True):
-            with patch("shared.install_paths.runtime_label", return_value="installed"):
-                with patch("shared.server_support._apply_script_present", return_value=True):
-                    with patch("shared.server_support.is_running_from_temp_dir", return_value=False):
-                        with patch(
-                            "shared.update_release._fetch_text_asset",
-                            return_value="a" * 64 + "  BAKLOG-win64.zip",
-                        ):
-                            payload = build_update_check_payload("1.2.0")
+            with patch("shared.update_platform.is_in_app_apply_platform", return_value=True):
+                with patch("shared.install_paths.runtime_label", return_value="installed"):
+                    with patch("shared.server_support._apply_script_present", return_value=True):
+                        with patch("shared.server_support.is_running_from_temp_dir", return_value=False):
+                            with patch(
+                                "shared.update_release._fetch_text_asset",
+                                return_value="a" * 64 + "  BAKLOG-win64.zip",
+                            ):
+                                payload = build_update_check_payload("1.2.0")
     assert payload["update_available"] is True
     assert payload["latest"] == "1.2.3"
     assert payload["release_notes"] == "## Notes\n- fix bug"

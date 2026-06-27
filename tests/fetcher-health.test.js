@@ -41,6 +41,7 @@ import {
   filterFetcherHealthRows,
   isFetcherAuthHealthy,
   coverableRows,
+  primaryFailureNavigateTarget,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -66,9 +67,11 @@ vi.mock('../js/connections.js', () => ({
   providerStatus: (p) => connMock.statuses[p] ?? null,
   ingestAuthStatusProviders: vi.fn(),
   groupRepFor: (key) => (key === 'gog_galaxy' ? 'gog' : key === 'amazon' ? 'amazon_web' : key === 'itch_local' ? 'itch' : key),
+  reconnectProvider: vi.fn(() => Promise.resolve()),
 }));
 
-import { isProviderConnected, showReconnectBanner } from '../js/connections.js';
+import { isProviderConnected, showReconnectBanner, reconnectProvider } from '../js/connections.js';
+import { handleGlobalStatusClick } from '../js/bind-events-fetcher.js';
 
 describe('isFetcherDisconnected', () => {
   beforeEach(() => {
@@ -1289,6 +1292,143 @@ describe('failed chip routes to Connections', () => {
     expect(chip.disabled).toBe(false);
     // Still visibly failed while the run-state flash lingers.
     expect(chip.classList.contains('fh-chip-failed')).toBe(true);
+  });
+});
+
+describe('global failure nav', () => {
+  const stubFetchers = (fetchers) => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return { ok: true, json: async () => ({ fetchers }) };
+      }
+      if (u.includes('manifest.json')) {
+        return { ok: true, json: async () => ({ fetchers: [] }) };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(() => {
+    connMock.loaded = true;
+    connMock.statuses = {};
+    reconnectProvider.mockClear();
+    document.body.innerHTML = `
+      <div id="fetcherPopoverBackdrop" hidden></div>
+      <div id="fetcherPopover" role="dialog" hidden>
+        <div class="fetcher-popover-scroll"><div id="dashboardFetcherHealth"></div></div>
+      </div>
+      <button type="button" id="fetcherGlobalStatus" class="fh-global-status fh-global-status-idle">
+        <span id="fetcherGlobalStatusLive"></span>
+        <span id="fetcherGlobalStatusText">Fetcher log</span>
+        <span id="fetcherGlobalStatusTail"></span>
+      </button>
+      <div id="fetcherRunLog"></div>`;
+  });
+
+  afterEach(() => {
+    fetcherRunner.resetPillAggregatesForTest();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  it('primaryFailureNavigateTarget returns provider for auth-related sticky failure', () => {
+    connMock.statuses.xbox_wishlist = 'expired';
+    markReconnectRequired('xbox_wishlist');
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    expect(primaryFailureNavigateTarget()).toEqual({
+      fetcherKey: 'wishlistXbox',
+      provider: 'xbox_wishlist',
+    });
+    clearReconnectRequired('xbox_wishlist');
+  });
+
+  it('showFetcherPopover preserves lastRunFailedByKey and chip connect routing', async () => {
+    stubFetchers([{
+      key: 'wishlistXbox',
+      label: 'WL Xbox',
+      metaKey: 'wishlist_xbox',
+      group: 'library',
+      color: '#107c10',
+      cmd: 'fetch_xbox_wishlist.py',
+      available: true,
+    }]);
+    await fetcherRunner.probeApi(true);
+    connMock.statuses.xbox_wishlist = 'expired';
+    markReconnectRequired('xbox_wishlist');
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    fetcherRunner.markChipStateForTest('wishlistXbox', 'failed');
+    renderDashboardFetcherHealth();
+
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(true);
+    const chip = document.querySelector('.fh-chip[data-fetcher-key="wishlistXbox"]');
+    expect(chip?.getAttribute('data-fetcher-connect')).toBe('xbox_wishlist');
+    expect(chip?.classList.contains('fh-chip-failed')).toBe(true);
+    clearReconnectRequired('xbox_wishlist');
+  });
+
+  it('pill click routes auth failure to Connections', async () => {
+    stubFetchers([{
+      key: 'wishlistXbox',
+      label: 'WL Xbox',
+      metaKey: 'wishlist_xbox',
+      group: 'library',
+      color: '#107c10',
+      cmd: 'fetch_xbox_wishlist.py',
+      available: true,
+    }]);
+    await fetcherRunner.probeApi(true);
+    connMock.statuses.xbox_wishlist = 'expired';
+    markReconnectRequired('xbox_wishlist');
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    fetcherRunner.refreshGlobalIndicator();
+
+    handleGlobalStatusClick({ shiftKey: false });
+
+    expect(reconnectProvider).toHaveBeenCalledWith('xbox_wishlist', { autoStart: false });
+    clearReconnectRequired('xbox_wishlist');
+  });
+
+  it('shift+click pill opens log even when auth failure would route to Connections', async () => {
+    const openSpy = vi.spyOn(fetcherRunner, 'openFetcherLog');
+    stubFetchers([{
+      key: 'wishlistXbox',
+      label: 'WL Xbox',
+      metaKey: 'wishlist_xbox',
+      group: 'library',
+      color: '#107c10',
+      cmd: 'fetch_xbox_wishlist.py',
+      available: true,
+    }]);
+    await fetcherRunner.probeApi(true);
+    connMock.statuses.xbox_wishlist = 'expired';
+    markReconnectRequired('xbox_wishlist');
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    fetcherRunner.refreshGlobalIndicator();
+
+    handleGlobalStatusClick({ shiftKey: true });
+
+    expect(openSpy).toHaveBeenCalledWith({ focusPanel: false });
+    expect(reconnectProvider).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+    clearReconnectRequired('xbox_wishlist');
+  });
+
+  it('pill click opens log when failure has no Connections target', () => {
+    const openSpy = vi.spyOn(fetcherRunner, 'openFetcherLog');
+    fetcherRunner.markRunFailedForTest('hltb');
+    fetcherRunner.refreshGlobalIndicator();
+
+    handleGlobalStatusClick({ shiftKey: false });
+
+    expect(reconnectProvider).not.toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalledWith({ focusPanel: false });
+    openSpy.mockRestore();
   });
 });
 

@@ -4634,6 +4634,7 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   border-color: rgba(239, 68, 68, 0.75);
 }
 .fh-global-status-failed::before { background: #ef4444; }
+.fh-global-status-failed[data-fetcher-connect] { cursor: pointer; }
 .fh-chips { display: flex; flex-direction: column; gap: 0.4rem; }
 .fh-group { display: flex; flex-direction: column; gap: 0.25rem; }
 .fh-group-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }

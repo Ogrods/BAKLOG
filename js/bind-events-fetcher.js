@@ -5,8 +5,28 @@ import {
   renderDashboardFetcherHealth,
   toggleLegendTips,
   formatRefreshIntervalLabel,
+  primaryFailureNavigateTarget,
 } from './fetcher-health.js';
 import { reconnectProvider } from './connections.js';
+
+/** @internal Vitest + bind-events entry for global status pill clicks. */
+export function handleGlobalStatusClick(e) {
+  const pill = document.getElementById('fetcherGlobalStatus');
+  if (!pill) return;
+  if (e.shiftKey) {
+    fetcherRunner.openFetcherLog({ focusPanel: false });
+    return;
+  }
+  const navTarget = pill.classList.contains('fh-global-status-failed')
+    ? primaryFailureNavigateTarget()
+    : null;
+  if (navTarget) {
+    fetcherRunner.hideFetcherPopover();
+    void reconnectProvider(navTarget.provider, { autoStart: false });
+    return;
+  }
+  fetcherRunner.openFetcherLog({ focusPanel: false });
+}
 
 /**
  * Wire every fetcher-health surface: the dashboard health panel toggles/sliders,
@@ -124,8 +144,8 @@ export function bindFetcherHealthEvents() {
     document.getElementById("kebabMenu")?.classList.remove("open");
     fetcherRunner.openFetcherLog();
   });
-  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", () => {
-    fetcherRunner.openFetcherLog({ focusPanel: false });
+  document.getElementById("fetcherGlobalStatus")?.addEventListener("click", (e) => {
+    handleGlobalStatusClick(e);
   });
   document.getElementById("fetcherStatLayoutToggle")?.addEventListener("click", () => {
     fetcherRunner.cycleStatLayout();

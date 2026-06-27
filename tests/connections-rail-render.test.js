@@ -41,6 +41,14 @@ vi.mock('../js/api-client.js', () => ({
 
 vi.mock('../js/auth-gate.js', () => ({
   isAccountAuthMode: vi.fn(() => false),
+  isPro: vi.fn(() => false),
+  getAccessToken: vi.fn(() => null),
+  getProSettings: vi.fn(() => ({ cloudMirrorEnabled: false })),
+  refreshAccountPlan: vi.fn(async () => {}),
+}));
+
+vi.mock('../js/pro-capabilities.js', () => ({
+  capabilityStatus: vi.fn(() => 'coming'),
 }));
 
 vi.mock('../js/filters-ui.js', () => ({

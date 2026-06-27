@@ -3045,9 +3045,11 @@ class Handler(SimpleHTTPRequestHandler):
             provider = path[len("/api/auth/") : -len("/enable")].strip("/")
             self._handle_auth_enable(provider)
             return
-        if path in ("/api/auth/master-password", "/api/auth/secrets/export", "/api/auth/secrets/reset") or path.startswith(
-            "/api/auth/secrets/import"
-        ):
+        if path in (
+            "/api/auth/master-password",
+            "/api/auth/secrets/export",
+            "/api/auth/secrets/reset",
+        ) or path.startswith("/api/auth/secrets/import"):
             if self._reject_if_csrf_strict():
                 return
         if path == "/api/auth/master-password":

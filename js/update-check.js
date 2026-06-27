@@ -81,6 +81,7 @@ export function renderSetupArpFootnote(hints = _installHints) {
  *   publishedAt: string | null,
  *   dismissed: boolean,
  *   fetchersInFlight: boolean,
+ *   signInActive: boolean,
  * } | { ok: false, error: string }}
  */
 export function parseUpdateCheckResponse(data) {
@@ -124,8 +125,14 @@ export function parseUpdateCheckResponse(data) {
     publishedAt,
     dismissed: data.dismissed === true,
     fetchersInFlight: data.fetchers_in_flight === true,
+    signInActive: data.sign_in_active === true,
     ...installHintsFromPayload(data),
   };
+}
+
+/** @param {{ fetchersInFlight?: boolean, signInActive?: boolean }} parsed */
+function updateMutationsBlocked(parsed) {
+  return parsed.fetchersInFlight === true || parsed.signInActive === true;
 }
 
 /** @param {{ latest: string | null, dismissed?: boolean }} parsed */
@@ -185,13 +192,16 @@ export function mapUpdateError(message, code = null) {
  *   applyBlockedMessage?: string | null,
  *   applySupported?: boolean,
  *   fetchersInFlight?: boolean,
+ *   signInActive?: boolean,
  * }} parsed
  */
 export function renderApplyBlockedHint(parsed) {
-  if (parsed.applySupported && !parsed.fetchersInFlight) return '';
-  const msg = parsed.fetchersInFlight
-    ? mapUpdateError('', 'fetchers_running')
-    : parsed.applyBlockedMessage?.trim();
+  if (parsed.applySupported && !updateMutationsBlocked(parsed)) return '';
+  const msg = parsed.signInActive
+    ? mapUpdateError('', 'sign_in_active')
+    : parsed.fetchersInFlight
+      ? mapUpdateError('', 'fetchers_running')
+      : parsed.applyBlockedMessage?.trim();
   if (!msg) return '';
   return `<p class="update-blocked-hint text-sm text-slate-400 mt-1">${escapeHtml(msg)}</p>`;
 }
@@ -204,12 +214,13 @@ export function renderApplyBlockedHint(parsed) {
  *   applySupported?: boolean,
  *   applyBlockedMessage?: string | null,
  *   fetchersInFlight?: boolean,
+ *   signInActive?: boolean,
  *   releaseNotes?: string | null,
  * }} parsed
  */
 export function renderUpdateBannerHtml(parsed) {
   const href = parsed.url || 'https://github.com/Ogrods/BAKLOG/releases/latest';
-  const canUpdateNow = parsed.applySupported && !parsed.fetchersInFlight;
+  const canUpdateNow = parsed.applySupported && !updateMutationsBlocked(parsed);
   const updateBtn = canUpdateNow
     ? '<button type="button" class="update-available-banner-apply ml-2 text-sky-300 hover:underline">Update now</button>'
     : '';
@@ -265,6 +276,7 @@ export function renderUpdateProgressHtml(status, { cancellable = false } = {}) {
  *   applySupported?: boolean,
  *   applyBlockedMessage?: string | null,
  *   fetchersInFlight?: boolean,
+ *   signInActive?: boolean,
  * }} parsed
  */
 export function renderUpdateModalHtml(parsed) {
@@ -272,7 +284,7 @@ export function renderUpdateModalHtml(parsed) {
   const notes = parsed.releaseNotes
     ? `<pre class="update-modal-notes whitespace-pre-wrap text-sm text-slate-300 max-h-64 overflow-y-auto mt-3 p-3 rounded bg-slate-900/80 border border-slate-700">${escapeHtml(parsed.releaseNotes)}</pre>`
     : '<p class="text-sm text-slate-400 mt-3">See the release page for details.</p>';
-  const canUpdateNow = parsed.applySupported && !parsed.fetchersInFlight;
+  const canUpdateNow = parsed.applySupported && !updateMutationsBlocked(parsed);
   const updateBtn = canUpdateNow
     ? '<button type="button" class="update-modal-apply bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Update now</button>'
     : '';

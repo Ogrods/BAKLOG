@@ -95,11 +95,13 @@ def handle_update_support_get(
         send_json(HTTPStatus.OK, {"ok": True, "result": mgr.apply_result_dict()})
         return True
     if path == "/api/update-check":
+        sign_in_active = has_active_sessions() if has_active_sessions else False
         send_json(
             HTTPStatus.OK,
             build_update_check_payload(
                 current_version(),
                 fetchers_in_flight=has_in_flight_runs(),
+                sign_in_active=sign_in_active,
             ),
         )
         return True

@@ -187,6 +187,7 @@ def build_update_check_payload(
     current_version: str,
     *,
     fetchers_in_flight: bool = False,
+    sign_in_active: bool = False,
 ) -> dict[str, Any]:
     from shared.install_paths import runtime_label
     from shared.install_visibility import install_visibility_fields
@@ -218,6 +219,7 @@ def build_update_check_payload(
         "release_notes": None,
         "published_at": None,
         "fetchers_in_flight": fetchers_in_flight,
+        "sign_in_active": sign_in_active,
         **install_visibility_fields(current_version),
     }
     try:

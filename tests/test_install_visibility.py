@@ -55,14 +55,25 @@ def test_read_arp_display_version_non_windows() -> None:
 
 
 def test_install_visibility_fields_includes_keys() -> None:
-    with patch("shared.install_visibility.detect_install_source", return_value="zip"):
-        with patch("shared.install_visibility.read_arp_display_version", return_value=None):
-            fields = install_visibility_fields("1.0.0")
+    with patch("shared.install_visibility.is_frozen", return_value=False):
+        with patch("shared.install_visibility.detect_install_source", return_value="zip"):
+            with patch("shared.install_visibility.read_arp_display_version", return_value=None):
+                fields = install_visibility_fields("1.0.0")
     assert fields == {
         "install_source": "zip",
         "arp_version": None,
         "arp_version_mismatch": False,
     }
+
+
+def test_install_trust_fields_when_frozen() -> None:
+    with patch("shared.install_visibility.is_frozen", return_value=True):
+        with patch("shared.install_visibility.sys.platform", "win32"):
+            with patch("shared.install_visibility.detect_install_source", return_value="zip"):
+                with patch("shared.install_visibility.read_arp_display_version", return_value=None):
+                    fields = install_visibility_fields("0.8.27")
+    assert fields["unsigned_beta"] is True
+    assert "SmartScreen" in fields["trust_note"]
 
 
 def test_build_diagnostics_payload_includes_install_visibility() -> None:

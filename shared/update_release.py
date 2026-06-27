@@ -290,13 +290,14 @@ def safe_extract_zip(zip_path: Path, dest_dir: Path) -> Path:
 
 def locate_bundle_root(extracted_dir: Path, platform: str | None = None) -> Path:
     """Find the directory containing required frozen executables."""
-    plat = platform or release_platform()
-    server_name = server_binary_name(plat)
-    required = required_bundle_files(plat)
-    for binary in extracted_dir.rglob(server_name):
-        parent = binary.parent
-        if all((parent / name).is_file() for name in required):
-            return parent.resolve()
+    plats = (platform,) if platform is not None else ("win32", "darwin")
+    for plat in plats:
+        server_name = server_binary_name(plat)
+        required = required_bundle_files(plat)
+        for binary in extracted_dir.rglob(server_name):
+            parent = binary.parent
+            if all((parent / name).is_file() for name in required):
+                return parent.resolve()
     raise UpdateSecurityError("extracted bundle missing BAKLOG executables")
 
 

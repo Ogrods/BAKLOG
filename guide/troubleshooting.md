@@ -182,11 +182,13 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 
 **Symptom:** You want to know if a newer BAKLOG release is available.
 
-**Behavior:** The installed (frozen) app checks GitHub once per session on boot. When an update exists, a banner appears under the header with a download link. Dismiss it for the session with **×**; it returns next launch until you upgrade.
+**Behavior:** The installed (frozen) app checks GitHub once per session on boot. When an update exists, a banner appears under the header with **Update now** (in-app download + verified install) and a link to the release page. Dismiss it for the session with **×**; it returns next launch until you upgrade.
 
-**Manual check:** Open the **⋮** menu and choose **Check for updates…** (works in dev and installed builds).
+**Manual check:** Open the **⋮** menu and choose **Check for updates…** (works in dev and installed builds). On an installed build you can confirm the prompt to download, verify (SHA-256), and restart automatically.
 
-**Note:** BAKLOG does not auto-download or auto-install. Download the new zip or installer from the release page, then replace your install. Your library data stays in `%LOCALAPPDATA%\\BAKLOG-Data` (or your portable data folder).
+**Security:** Updates download only from the official `Ogrods/BAKLOG` GitHub release assets. The server verifies the published `.sha256` sidecar before apply is allowed. Apply is blocked while fetchers are running or when BAKLOG is running from a temporary zip-extract folder.
+
+**Note:** Your library data stays in `%LOCALAPPDATA%\\BAKLOG-Data` (or your portable data folder) — updates replace app binaries only.
 
 ## Bug reports vs fetcher failures
 

@@ -2661,7 +2661,7 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
     path = _api_path(handler)
     if not path.startswith("/api/"):
         return True
-    if path in ("/api/config", "/api/update-check", "/api/diagnostics"):
+    if path in ("/api/config", "/api/update-check", "/api/update/status", "/api/diagnostics"):
         return True
     if ADMIN_ENABLED and _is_admin_exempt_api(path):
         return True
@@ -2879,7 +2879,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/config":
             self._handle_config_get()
             return
-        if path in ("/api/update-check", "/api/diagnostics"):
+        if path in ("/api/update-check", "/api/update/status", "/api/diagnostics"):
             self._handle_support_get(path)
             return
         if path.startswith("/oauth/epic/callback"):
@@ -2965,6 +2965,11 @@ class Handler(SimpleHTTPRequestHandler):
             if self._reject_if_csrf_strict():
                 return
             self._handle_shutdown()
+            return
+        if path in ("/api/update/download", "/api/update/cancel", "/api/update/apply"):
+            if self._reject_if_csrf_strict():
+                return
+            self._handle_update_post(path)
             return
         if _is_internal_admin_path(path):
             if self._reject_if_csrf_strict():
@@ -3194,9 +3199,17 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_support_get(self, path: str) -> None:
         from shared.server_support import build_diagnostics_payload, build_update_check_payload
+        from shared.update_manager import get_update_manager
 
         if path == "/api/update-check":
             _send_json(self, HTTPStatus.OK, build_update_check_payload(_app_version()))
+            return
+        if path == "/api/update/status":
+            mgr = get_update_manager(
+                current_version=_app_version,
+                has_in_flight_runs=lambda: bool(MANAGER._in_flight_targets()),
+            )
+            _send_json(self, HTTPStatus.OK, mgr.status_dict())
             return
         _send_json(
             self,
@@ -3610,6 +3623,35 @@ class Handler(SimpleHTTPRequestHandler):
         threading.Thread(
             target=_trigger_dev_shutdown, name="dev-shutdown", daemon=True
         ).start()
+
+    def _handle_update_post(self, path: str) -> None:
+        from shared.update_manager import get_update_manager
+
+        mgr = get_update_manager(
+            current_version=_app_version,
+            has_in_flight_runs=lambda: bool(MANAGER._in_flight_targets()),
+        )
+        if path == "/api/update/download":
+            payload = mgr.start_download()
+            status = HTTPStatus.OK if payload.get("ok") else HTTPStatus.BAD_REQUEST
+            _send_json(self, status, payload)
+            return
+        if path == "/api/update/cancel":
+            payload = mgr.cancel_download()
+            _send_json(self, HTTPStatus.OK, payload)
+            return
+        if path == "/api/update/apply":
+            payload = mgr.apply_ready_update()
+            status = HTTPStatus.OK if payload.get("ok") else HTTPStatus.BAD_REQUEST
+            _send_json(self, status, payload)
+            if payload.get("ok") and payload.get("applying"):
+                threading.Thread(
+                    target=_trigger_dev_shutdown,
+                    name="update-apply-shutdown",
+                    daemon=True,
+                ).start()
+            return
+        _send_json(self, HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def _handle_license_activate(self) -> None:
         """Validate a Polar license key and persist license.json (pure-local mode)."""

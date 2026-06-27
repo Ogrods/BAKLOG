@@ -875,11 +875,21 @@ export function bindEvents() {
   }
   document.getElementById("checkUpdates")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
-    const { checkForUpdates } = await import('./update-check.js');
-    await checkForUpdates({
+    const { checkForUpdates, runInAppUpdateFlow } = await import('./update-check.js');
+    const result = await checkForUpdates({
       source: 'manual',
       onManualMessage: (msg, opts) => showKebabBanner(msg, opts),
     });
+    if (result.ok && result.updateAvailable && result.parsed?.applySupported) {
+      const go = window.confirm('Download and install the update now? BAKLOG will restart. Your library data stays in BAKLOG-Data.');
+      if (go) {
+        try {
+          await runInAppUpdateFlow({ onManualMessage: (msg, opts) => showKebabBanner(msg, opts) });
+        } catch {
+          /* message already shown */
+        }
+      }
+    }
   });
   document.getElementById("copyDiagnostics")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");

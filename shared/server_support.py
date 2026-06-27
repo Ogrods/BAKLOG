@@ -167,24 +167,47 @@ def tail_text_file(path: Path, *, max_lines: int = 80) -> list[str]:
 
 
 def build_update_check_payload(current_version: str) -> dict[str, Any]:
+    from shared.install_paths import runtime_label
+    from shared.update_release import (
+        UpdateSecurityError,
+        build_release_artifacts,
+        recommended_artifact,
+    )
+
+    base: dict[str, Any] = {
+        "current": current_version,
+        "latest": None,
+        "update_available": False,
+        "url": None,
+        "runtime_label": runtime_label(),
+        "recommended_artifact": recommended_artifact(runtime_label()),
+        "download_url": None,
+        "sha256": None,
+        "apply_supported": runtime_label() in {"installed", "portable"},
+    }
     try:
         release = fetch_latest_github_release()
-        latest = normalize_version_tag(str(release.get("tag_name", "")))
-        url = str(release.get("html_url", "") or "")
-        return {
-            "current": current_version,
-            "latest": latest or None,
-            "update_available": bool(latest) and update_available(current_version, latest),
-            "url": url or None,
-        }
+        artifacts = build_release_artifacts(release)
+        latest = artifacts.version
+        url = artifacts.html_url or None
+        update = bool(latest) and update_available(current_version, latest)
+        base.update(
+            {
+                "latest": latest or None,
+                "update_available": update,
+                "url": url,
+                "download_url": artifacts.zip_url if update else None,
+                "sha256": artifacts.sha256 or None,
+                "sha256_url": artifacts.sha256_url,
+            }
+        )
+        return base
+    except UpdateSecurityError as exc:
+        base["error"] = str(exc)
+        return base
     except Exception as exc:  # noqa: BLE001 - soft failure for opt-in check
-        return {
-            "current": current_version,
-            "latest": None,
-            "update_available": False,
-            "url": None,
-            "error": str(exc),
-        }
+        base["error"] = str(exc)
+        return base
 
 
 def build_diagnostics_payload(

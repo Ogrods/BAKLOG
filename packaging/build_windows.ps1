@@ -69,6 +69,7 @@ if (-not (Test-Path $FallbackJson)) {
 
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 Copy-Item -Force (Join-Path $Root "packaging\BAKLOG.ico") (Join-Path $OutDir "BAKLOG.ico")
+Copy-Item -Force (Join-Path $Root "packaging\apply_update.ps1") (Join-Path $OutDir "apply_update.ps1")
 
 Write-Host "Writing bundled account-auth .env..."
 $urlSet = [bool]$env:BAKLOG_SUPABASE_URL

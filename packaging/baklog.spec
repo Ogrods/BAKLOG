@@ -56,6 +56,8 @@ hiddenimports = [
     "shared.built_frontend",
     "shared.legacy_env",
     "shared.uninstall_cleanup",
+    "shared.update_release",
+    "shared.update_manager",
     "keyring.backends.Windows",
     "cryptography.hazmat.primitives.ciphers.aead",
     "certifi",

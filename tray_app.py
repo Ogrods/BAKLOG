@@ -210,7 +210,11 @@ class ServerController:
         if self.is_running():
             return True
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        child_env = {**os.environ, "BAKLOG_DATA_DIR": str(data_root().resolve())}
+        child_env = {
+            **os.environ,
+            "BAKLOG_DATA_DIR": str(data_root().resolve()),
+            "BAKLOG_TRAY_PID": str(os.getpid()),
+        }
         self.proc = subprocess.Popen(
             _server_argv(),
             cwd=str(bundle_root()),

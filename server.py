@@ -1242,6 +1242,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/profiles":
             self._handle_profiles_get()
             return
+        if path == "/api/mirror":
+            from shared.server_mirror import handle_mirror_get
+
+            handle_mirror_get(self)
+            return
         if path == "/api/auth/session":
             self._handle_auth_session_get()
             return

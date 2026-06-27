@@ -216,6 +216,12 @@ def current_plan(authorization: str | None = None) -> str:
                 except Exception:  # noqa: BLE001 - entitlement must never crash a request
                     pass
                 note_authenticated_plan(plan)
+                try:
+                    from shared.mirror_session import note_authenticated_mirror_session
+
+                    note_authenticated_mirror_session(authorization)
+                except Exception:  # noqa: BLE001
+                    pass
                 return plan
         return PLAN_FREE
 

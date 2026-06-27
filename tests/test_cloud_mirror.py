@@ -1,23 +1,32 @@
-"""Tests for shared/cloud_mirror.py (M1 scaffolding)."""
+"""Tests for shared/cloud_mirror.py."""
 
 from __future__ import annotations
 
 import json
 import time
 
+import jwt
 import pytest
 
 from shared import cloud_mirror as cm
+from shared import entitlement as ent
+from shared.mirror_session import clear_mirror_session_for_tests
 from shared.profile_paths import catalog_path, personal_path
+from shared.pro_settings import write_pro_settings
+from shared.supabase_auth import reset_jwks_client_for_tests
 
 
 @pytest.fixture(autouse=True)
 def _reset_mirror_state():
     with cm._lock:
         cm._pending.clear()
+    clear_mirror_session_for_tests()
+    ent._LAST_AUTH_PLAN = None
     yield
     with cm._lock:
         cm._pending.clear()
+    clear_mirror_session_for_tests()
+    ent._LAST_AUTH_PLAN = None
 
 
 @pytest.fixture()
@@ -38,7 +47,30 @@ def profile_root(tmp_path, monkeypatch):
     monkeypatch.setenv("BAKLOG_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("BAKLOG_SUPABASE_URL", raising=False)
     monkeypatch.delenv("BAKLOG_SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("BAKLOG_SUPABASE_JWT_SECRET", raising=False)
     return tmp_path
+
+
+def _enable_auth(monkeypatch):
+    monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "anon-test")
+    monkeypatch.setenv("BAKLOG_SUPABASE_JWT_SECRET", "unit-test-secret")
+    reset_jwks_client_for_tests()
+
+
+def _pro_bearer(sub: str = "550e8400-e29b-41d4-a716-446655440000") -> str:
+    token = jwt.encode(
+        {
+            "sub": sub,
+            "aud": "authenticated",
+            "iss": "https://test.supabase.co/auth/v1",
+            "exp": int(time.time()) + 3600,
+            "app_metadata": {"plan": "pro"},
+        },
+        "unit-test-secret",
+        algorithm="HS256",
+    )
+    return f"Bearer {token}"
 
 
 def test_mirrorable_games_json(profile_root):
@@ -65,22 +97,46 @@ def test_schedule_and_flush_gated_when_free(profile_root, monkeypatch):
     assert cm._pending == {}
 
 
-def test_schedule_and_flush_stub_when_pro_and_enabled(profile_root, monkeypatch, capsys):
-    monkeypatch.setenv("BAKLOG_PLAN", "pro")
-    from shared.pro_settings import write_pro_settings
-
+def test_flush_uploads_when_pro_auth_and_session(profile_root, monkeypatch):
+    _enable_auth(monkeypatch)
     write_pro_settings({"cloudMirrorEnabled": True}, profile_id="default")
+    ent.current_plan(_pro_bearer())
     path = catalog_path("games_steam.json", profile_id="default")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('{"games":[]}', encoding="utf-8")
+
+    uploaded: list[str] = []
+
+    def _upload(**kwargs):
+        uploaded.append(kwargs["artifact_path"])
+        return {"Key": kwargs["artifact_path"]}
+
+    monkeypatch.setattr("shared.supabase_mirror.upload_mirror_object", _upload)
+    monkeypatch.setattr("shared.supabase_mirror.upsert_mirror_snapshot_row", lambda **kwargs: None)
+
+    cm.schedule_mirror_upload(path, profile_id="default")
+    with cm._lock:
+        cm._pending["default"]["flush_at"] = time.time() - 1
+    cm.maybe_flush_mirror_uploads()
+    assert uploaded == ["games_steam.json"]
+    state = cm.read_mirror_upload_state(profile_id="default")
+    assert state["artifacts"]["games_steam.json"]["status"] == "ok"
+
+
+def test_flush_skips_without_cached_session(profile_root, monkeypatch, capsys):
+    _enable_auth(monkeypatch)
+    write_pro_settings({"cloudMirrorEnabled": True}, profile_id="default")
+    ent.current_plan(_pro_bearer())
+    clear_mirror_session_for_tests()
+    path = catalog_path("games_steam.json", profile_id="default")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}", encoding="utf-8")
     cm.schedule_mirror_upload(path, profile_id="default")
     with cm._lock:
         cm._pending["default"]["flush_at"] = time.time() - 1
     monkeypatch.setenv("BAKLOG_DEBUG", "1")
     cm.maybe_flush_mirror_uploads()
-    err = capsys.readouterr().err
-    assert "stub upload" in err
-    assert "games_steam.json" in err
+    assert "no cached bearer session" in capsys.readouterr().err
 
 
 def test_personal_json_mirrorable(profile_root):
@@ -101,3 +157,21 @@ def test_debounce_coalesces_paths(profile_root):
     with cm._lock:
         paths = cm._pending["default"]["paths"]
     assert paths == {"games_steam.json", "games_gog.json"}
+
+
+def test_mirror_read_allowed_requires_pro_jwt(profile_root, monkeypatch):
+    assert cm.mirror_read_allowed(authorization=None) is False
+    _enable_auth(monkeypatch)
+    assert cm.mirror_read_allowed(authorization=_pro_bearer()) is True
+    free = jwt.encode(
+        {
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "aud": "authenticated",
+            "iss": "https://test.supabase.co/auth/v1",
+            "exp": int(time.time()) + 3600,
+            "app_metadata": {"plan": "free"},
+        },
+        "unit-test-secret",
+        algorithm="HS256",
+    )
+    assert cm.mirror_read_allowed(authorization=f"Bearer {free}") is False

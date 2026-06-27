@@ -115,6 +115,14 @@ describe('renderApplyBlockedHint', () => {
   it('returns empty string when apply is supported', () => {
     expect(renderApplyBlockedHint({ applySupported: true })).toBe('');
   });
+
+  it('shows sign-in hint when sign-in window is active', () => {
+    const html = renderApplyBlockedHint({
+      applySupported: true,
+      signInActive: true,
+    });
+    expect(html).toContain('sign-in window');
+  });
 });
 
 describe('isUpdateBannerDismissed', () => {

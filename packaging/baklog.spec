@@ -8,6 +8,12 @@ from pathlib import Path
 root = Path(SPEC).resolve().parent.parent
 app_icon = str(root / "packaging" / "BAKLOG.ico")
 
+_keyring_backends = (
+    ["keyring.backends.Windows"]
+    if sys.platform == "win32"
+    else ["keyring.backends.macOS"]
+)
+
 block_cipher = None
 
 datas = [
@@ -63,7 +69,7 @@ hiddenimports = [
     "shared.update_messages",
     "shared.update_api",
     "shared.update_ready_state",
-    "keyring.backends.Windows",
+    *_keyring_backends,
     "cryptography.hazmat.primitives.ciphers.aead",
     "certifi",
     "jwt",

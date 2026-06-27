@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -62,7 +63,11 @@ def _spec_resolved_hiddenimports() -> set[str]:
         "shared.built_frontend",
         "shared.legacy_env",
         "shared.uninstall_cleanup",
-        "keyring.backends.Windows",
+        (
+            "keyring.backends.macOS"
+            if sys.platform == "darwin"
+            else "keyring.backends.Windows"
+        ),
         "cryptography.hazmat.primitives.ciphers.aead",
     }
     return out
@@ -153,6 +158,20 @@ def test_build_script_ships_uninstall_bat() -> None:
     text = (ROOT / "packaging" / "build_windows.ps1").read_text(encoding="utf-8")
     assert "Uninstall BAKLOG.bat" in text
     assert (ROOT / "packaging" / "Uninstall BAKLOG.bat").is_file()
+
+
+def test_build_macos_script_exists() -> None:
+    script = ROOT / "packaging" / "build_macos.sh"
+    assert script.is_file()
+    text = script.read_text(encoding="utf-8")
+    assert "BAKLOG-macos.zip" in text
+    assert "apply_update.sh" in text
+
+
+def test_release_workflow_includes_macos_job() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "build-macos:" in workflow
+    assert "BAKLOG-macos.zip" in workflow
 
 
 def test_build_script_generates_assets_before_pyinstaller() -> None:

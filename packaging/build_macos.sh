@@ -1,49 +1,104 @@
 #!/usr/bin/env bash
-# macOS frozen build checklist (manual — not run in CI yet).
-# Mirrors packaging/build_windows.ps1: frontend build → PyInstaller onedir → zip + sha256.
+# Build BAKLOG macOS onedir bundle with PyInstaller + zip + sha256 sidecar.
+# Run from repo root. Requires: Python 3.11+, Node 22+, pip install pyinstaller.
+#
+# Release artifacts use STABLE filenames (same pattern as build_windows.ps1):
+#   BAKLOG-macos.zip
+#   BAKLOG-macos.sha256
+#
+# Usage:
+#   ./packaging/build_macos.sh
+
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT_DIR="${1:-$ROOT/release/BAKLOG}"
+cd "$ROOT"
 
-cat <<'EOF'
-BAKLOG macOS frozen build — maintainer checklist
-==============================================
+RELEASE_DIR="${ROOT}/release"
+OUT_DIR="${RELEASE_DIR}/BAKLOG"
 
-Status: DEFERRED — GitHub Releases ship BAKLOG-win64.zip + Setup.exe only.
-macOS installs use update-check notify + release-page link until BAKLOG-macos.zip exists.
+if [[ -x "${ROOT}/.venv/bin/python" ]]; then
+  PYTHON="${ROOT}/.venv/bin/python"
+else
+  PYTHON="python3"
+fi
 
-Prerequisites
-  - macOS 13+ on Apple Silicon or Intel (match CI smoke target)
-  - Python 3.11+ venv with pip install -r requirements.txt
-  - pip install pyinstaller
-  - Node.js 22+ (npm run build for dist/index.html parity)
+echo "Installing Python dependencies..."
+"${PYTHON}" -m pip install -r requirements.txt
+"${PYTHON}" -m pip install pyinstaller
 
-Build steps
-  1. cd "$ROOT" && npm ci && npm run build
-  2. pyinstaller packaging/baklog.spec --distpath release --workpath build/pyinstaller
-  3. cp packaging/apply_update.sh "$OUT_DIR/apply_update.sh"
-  4. chmod +x "$OUT_DIR/apply_update.sh"
-  5. (Optional) codesign ad-hoc or Developer ID — unsigned builds match current Windows beta policy
-  6. cd release && zip -r BAKLOG-macos.zip BAKLOG
-  7. shasum -a 256 BAKLOG-macos.zip | tee BAKLOG-macos.sha256
+if ! command -v npm >/dev/null 2>&1; then
+  echo "npm not found — install Node.js 22+ before building the frozen bundle" >&2
+  exit 1
+fi
 
-Release wiring (after first successful artifact)
-  - Upload BAKLOG-macos.zip + .sha256 to GitHub Release (same tag as Windows)
-  - Confirm shared/update_release.py picks mac asset on darwin
-  - Run scripts/frozen_bundle_smoke.py against the onedir bundle
-  - Add release.yml macOS job or manual upload step (see ARCHITECTURE.md rough edges)
+echo "Building production frontend (esbuild dist/)..."
+npm ci
+npm run vendor:supabase
+npm run build
+npm run check:dist-integrity
 
-Verify locally
-  - open release/BAKLOG/BAKLOG (or BAKLOG.app if spec bundles one)
-  - GET http://127.0.0.1:8765/api/config → frozen: true, runtime_label: installed
-  - apply_update.sh present beside server binary
+mkdir -p "${RELEASE_DIR}"
 
+echo "Building BAKLOG + BAKLOG Tray (onedir)..."
+"${PYTHON}" -m PyInstaller packaging/baklog.spec --noconfirm --distpath "${RELEASE_DIR}" --workpath "${ROOT}/build/pyinstaller"
+
+SERVER_BIN="${OUT_DIR}/BAKLOG"
+TRAY_BIN="${OUT_DIR}/BAKLOG Tray"
+if [[ ! -x "${SERVER_BIN}" ]]; then
+  echo "Build failed: ${SERVER_BIN} not found" >&2
+  exit 1
+fi
+if [[ ! -x "${TRAY_BIN}" ]]; then
+  echo "Build failed: ${TRAY_BIN} not found" >&2
+  exit 1
+fi
+
+FALLBACK_JSON="${OUT_DIR}/_internal/curated/free_claims.fallback.json"
+if [[ ! -f "${FALLBACK_JSON}" ]]; then
+  echo "Build failed: bundled curated feed missing at ${FALLBACK_JSON}" >&2
+  exit 1
+fi
+
+cp -f "${ROOT}/packaging/BETA-README.txt" "${OUT_DIR}/BETA-README.txt"
+cp -f "${ROOT}/packaging/apply_update.sh" "${OUT_DIR}/apply_update.sh"
+chmod +x "${OUT_DIR}/apply_update.sh" "${SERVER_BIN}" "${TRAY_BIN}"
+
+echo "Writing bundled account-auth .env..."
+if [[ -z "${BAKLOG_SUPABASE_URL:-}" || -z "${BAKLOG_SUPABASE_ANON_KEY:-}" ]]; then
+  echo "  Auth env: BAKLOG_SUPABASE_URL=${BAKLOG_SUPABASE_URL:+set}${BAKLOG_SUPABASE_URL:-MISSING}, BAKLOG_SUPABASE_ANON_KEY=${BAKLOG_SUPABASE_ANON_KEY:+set}${BAKLOG_SUPABASE_ANON_KEY:-MISSING}" >&2
+fi
+"${PYTHON}" "${ROOT}/scripts/write_bundle_auth_env.py" "${OUT_DIR}"
+
+cat > "${OUT_DIR}/Start BAKLOG.command" <<'EOF'
+#!/bin/bash
+cd "$(dirname "$0")"
+open -a "Google Chrome" "http://127.0.0.1:8765" 2>/dev/null || true
+exec "./BAKLOG Tray"
 EOF
+chmod +x "${OUT_DIR}/Start BAKLOG.command"
 
-echo "Target output dir: $OUT_DIR"
-echo "(Build commands are commented out until CI/mac maintainer capacity exists.)"
+VERSION="0.0.0"
+if [[ -f "${ROOT}/pyproject.toml" ]]; then
+  VERSION="$(grep -E '^version\s*=' "${ROOT}/pyproject.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+fi
 
-# Uncomment when running manually:
-# cp "$ROOT/packaging/apply_update.sh" "$OUT_DIR/apply_update.sh"
-# chmod +x "$OUT_DIR/apply_update.sh"
+ZIP_NAME="BAKLOG-macos.zip"
+ZIP_PATH="${RELEASE_DIR}/${ZIP_NAME}"
+rm -f "${ZIP_PATH}"
+(
+  cd "${RELEASE_DIR}"
+  zip -r -q "${ZIP_NAME}" BAKLOG
+)
+
+HASH="$(shasum -a 256 "${ZIP_PATH}" | awk '{print $1}')"
+HASH_FILE="${RELEASE_DIR}/BAKLOG-macos.sha256"
+printf '%s  %s' "${HASH}" "${ZIP_NAME}" > "${HASH_FILE}"
+
+echo ""
+echo "Done (macOS unsigned beta — Gatekeeper may prompt on first launch or after in-app update)."
+echo "  Folder:  ${OUT_DIR}"
+echo "  Zip:     ${ZIP_PATH}"
+echo "  SHA256:  ${HASH_FILE}"
+echo "  Version: ${VERSION} (embedded in bundle; zip filename is stable)"
+echo "Upload both zip + .sha256 to the GitHub Release tag alongside Windows assets."

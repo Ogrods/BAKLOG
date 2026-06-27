@@ -178,6 +178,18 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 | **Secrets store corrupt** | The encrypted credentials file for this profile cannot be read (wrong keyring entry, moved data, or a damaged file). Use **Reset store** on the banner, restore a backup on Connections, or reconnect each store. Archived copies are kept as `secrets.bin.corrupt-*` beside the old file. |
 | **Cloud sync** | Signing in on a second PC does not copy your library yet. Copy `BAKLOG-Data` manually or wait for the planned Pro cloud mirror. |
 
+## Unsigned beta builds (no code signing)
+
+BAKLOG beta builds are **not code-signed** yet. That is normal for invite-only testing — you are not doing anything wrong.
+
+| Platform | What you may see | What to do |
+|----------|------------------|------------|
+| **Windows** | SmartScreen "Unknown publisher" on first launch or after manual download | **More info** → **Run anyway**. Only download from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases) or your official invite link. |
+| **Windows Setup + in-app updates** | Add/Remove Programs shows an older version than the app header | Expected: zip-based in-app updates replace files but do not refresh Inno's registry entry. Re-run **BAKLOG-Setup.exe** when you want Settings → Apps to match, or ignore if the in-app version is correct. **Copy diagnostics** shows `install_source`, `arp_version`, and `arp_version_mismatch`. |
+| **macOS** | "App can't be opened" or quarantine after download/update | Right-click the app → **Open** once, or `xattr -cr /path/to/BAKLOG` in Terminal. Unzip to Applications or another stable folder, not directly from Downloads. |
+
+We skip paid signing for now; future releases may add certificates. Verify SHA-256 sidecars on release assets when you want extra assurance.
+
 ## App updates (installed build)
 
 **Symptom:** You want to know if a newer BAKLOG release is available.
@@ -198,11 +210,9 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 
 **Version:** Your current build version appears at the bottom of the **⋮** menu on installed builds.
 
-**Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses the same pipeline with `BAKLOG-macos.zip` + `apply_update.sh` once a mac frozen build is published on GitHub; until then mac installs still get notify + release-page link only.
+**Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses `BAKLOG-macos.zip` + `apply_update.sh` on tagged releases (built in CI alongside Windows).
 
-**macOS zip deferred:** There is no official `BAKLOG-macos.zip` on GitHub Releases yet. macOS users should run from source or wait for release notifications; in-app apply stays blocked with `platform_zip_missing` until the artifact ships. Maintainers: see `packaging/build_macos.sh` for the manual build checklist.
-
-**Add/Remove Programs vs in-app version:** On Windows Setup installs, zip-based in-app updates replace app files but do not refresh the Inno uninstall registry version. Use **Copy diagnostics** or `GET /api/diagnostics` (`install_source`, `arp_version`, `arp_version_mismatch`) to compare; re-run **BAKLOG-Setup.exe** when Settings → Apps should match the running build.
+**Add/Remove Programs vs in-app version:** On Windows Setup installs, zip-based in-app updates replace app files but do not refresh the Inno uninstall registry version. Use **Copy diagnostics** or `GET /api/diagnostics` (`install_source`, `arp_version`, `arp_version_mismatch`, `trust_note`) to compare; re-run **BAKLOG-Setup.exe** when Settings → Apps should match the running build.
 
 **Security:** Updates download only from the official `Ogrods/BAKLOG` GitHub release assets. The server verifies the published `.sha256` sidecar before apply is allowed. Apply is blocked while fetchers are running, a store sign-in window is open, or when BAKLOG is running from a temporary zip-extract folder.
 

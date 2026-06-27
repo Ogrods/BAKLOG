@@ -90,3 +90,10 @@ def test_build_update_check_payload_soft_failure() -> None:
         payload = build_update_check_payload("1.0.0")
     assert payload["update_available"] is False
     assert payload["error"] == "offline"
+
+
+def test_build_update_check_payload_sign_in_active() -> None:
+    with patch("shared.server_support.fetch_latest_github_release", side_effect=RuntimeError("offline")):
+        payload = build_update_check_payload("1.0.0", sign_in_active=True)
+    assert payload["sign_in_active"] is True
+    assert payload["fetchers_in_flight"] is False

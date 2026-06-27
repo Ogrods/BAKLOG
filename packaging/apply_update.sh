@@ -44,11 +44,7 @@ json_field_int() {
 
 realpath_safe() {
   local target="$1"
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$target"
-  else
-    (cd "$(dirname "$target")" && pwd -P)/$(basename "$target")
-  fi
+  (cd "$(dirname "$target")" && pwd -P)/$(basename "$target")
 }
 
 restore_install_from_backup() {

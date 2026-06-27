@@ -160,3 +160,53 @@ jobs:
           } else {
             gh release create $tag @assets --title "BAKLOG $tag" --generate-notes
           }
+
+  build-macos:
+    name: Build and attach macOS release
+    runs-on: macos-latest
+    needs: build
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Verify release auth secrets (fail fast)
+        env:
+          BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
+          BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$BAKLOG_SUPABASE_URL" ] || [ -z "$BAKLOG_SUPABASE_ANON_KEY" ]; then
+            echo "::error::GitHub repo secrets BAKLOG_SUPABASE_URL and BAKLOG_SUPABASE_ANON_KEY must be set before tagging."
+            exit 1
+          fi
+          echo "Release auth secrets present (values not printed)."
+
+      - name: Build macOS bundle
+        env:
+          BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
+          BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: bash packaging/build_macos.sh
+
+      - name: Verify macOS artifacts exist
+        run: |
+          test -f release/BAKLOG-macos.zip
+          test -f release/BAKLOG-macos.sha256
+          shasum -a 256 release/BAKLOG-macos.zip
+
+      - name: Upload macOS assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.ref_name }}"
+          gh release upload "$tag" release/BAKLOG-macos.zip release/BAKLOG-macos.sha256 --clobber

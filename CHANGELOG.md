@@ -24,20 +24,26 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [0.8.27] - 2026-06-27
 
-### Changed
-
-- Public copy aligned to canonical **no telemetry by default** wording (README, SECURITY, Pro promo trust points, guide FAQ, landing trust section).
-- **Run** / **RunManager** extracted from `server.py` into `shared/run_manager.py`; server line budget ratcheted to 3000.
-- Connections left-rail grouping and status pills moved to `js/connections-rail.js`.
-- Dev vs frozen footgun mitigated: document `PORT=8766` with separate `BAKLOG_DATA_DIR`; dev banner warns about shared localhost storage.
-
 ### Added
 
+- macOS release pipeline: `packaging/build_macos.sh`, CI `build-macos` job uploads `BAKLOG-macos.zip` + `.sha256` on tag.
+- Unsigned-beta trust notes in diagnostics/update-check (`unsigned_beta`, `trust_note`) and guide docs (SmartScreen, Gatekeeper, ARP drift).
+- `sign_in_active` on `/api/update-check` so the update banner hides **Update now** while a store sign-in window is open.
 - In-app update recovery: apply scripts write `apply-result.json`, restore from backup on copy failure, and retain the newest `BAKLOG-backup-*` only.
 - Ready-state persistence (`ready.json`) survives server/tray restart; **Discard download** clears verified packages from disk.
 - `GET /api/update/apply-result`, `POST /api/update/discard-ready`; post-apply UI polling with tray restart recovery copy.
 - Zip bundle ships **Uninstall BAKLOG.bat** for portable cleanup; Inno uninstall/finish copy is portable-aware when `portable.txt` exists.
 - Apply blocked while a store sign-in window is open; update-check exposes `fetchers_in_flight` for proactive UI hints.
+
+### Changed
+
+- Personal doc load/save extracted to `shared/server_personal.py`; `server.py` line budget headroom restored.
+- `apply_update.sh` no longer depends on system `python3` for path resolution.
+- `js/fetcher/runner/index.js` added to module-size CI budget (2200 lines, ratchet down after splits).
+- Public copy aligned to canonical **no telemetry by default** wording (README, SECURITY, Pro promo trust points, guide FAQ, landing trust section).
+- **Run** / **RunManager** extracted from `server.py` into `shared/run_manager.py`; server line budget ratcheted to 3000.
+- Connections left-rail grouping and status pills moved to `js/connections-rail.js`.
+- Dev vs frozen footgun mitigated: document `PORT=8766` with separate `BAKLOG_DATA_DIR`; dev banner warns about shared localhost storage.
 - Streaming download progress in `fetch_url_to_file`; tray notifies when a verified update is ready to install.
 - Diagnostics and update-check expose `install_source`, `arp_version`, and `arp_version_mismatch` (Windows Setup vs zip apply visibility).
 - Update install confirm footnote when Add/Remove Programs may lag behind in-app zip updates.
@@ -47,7 +53,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - `/api/config` `runtime_label` (`dev` / `installed` / `portable`) for UI runtime detection; `frozen` kept for compatibility.
 - Tray menu **Open data folder** opens the active profile data directory in Explorer.
 - Installer finish page shows library vs app paths; full uninstall nudges Connections **Export bundle** before wipe.
-- `packaging/build_macos.sh` maintainer checklist; ARCHITECTURE rough-edges table refreshed.
+- `packaging/build_macos.sh` full PyInstaller build + CI attach on tag.
 
 ### Fixed
 

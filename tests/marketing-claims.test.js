@@ -78,4 +78,21 @@ describe('marketing copy guardrails', () => {
     expect(text).not.toMatch(/\$2\.99|\$4\.99/);
     expect(text).toMatch(/Support BAKLOG/);
   });
+
+  it('landing tier table marks cloud sync and deal alerts as Coming on paid', () => {
+    const text = readFileSync('landing/index.html', 'utf8');
+    const start = text.indexOf('class="tier-compare"');
+    expect(start).toBeGreaterThan(-1);
+    const end = text.indexOf('</table>', start);
+    const table = text.slice(start, end);
+    expect(table).toMatch(/Cloud sync[\s\S]*?<td>✕<\/td>[\s\S]*?<td>Coming<\/td>/i);
+    expect(table).toMatch(/Deal\/watchlist alerts[\s\S]*?<td>✕<\/td>[\s\S]*?<td>Coming<\/td>/i);
+  });
+
+  it('landing tier table keeps queue-all refresh as coming on paid', () => {
+    const text = readFileSync('landing/index.html', 'utf8');
+    const start = text.indexOf('class="tier-compare"');
+    const table = text.slice(start, text.indexOf('</table>', start));
+    expect(table).toMatch(/Manual store refresh[\s\S]*coming/i);
+  });
 });

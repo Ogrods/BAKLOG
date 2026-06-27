@@ -95,4 +95,23 @@ describe('marketing copy guardrails', () => {
     const table = text.slice(start, text.indexOf('</table>', start));
     expect(table).toMatch(/Manual store refresh[\s\S]*coming/i);
   });
+
+  it('landing uses qualified telemetry wording', () => {
+    const text = readFileSync('landing/index.html', 'utf8');
+    expect(text).toMatch(/no telemetry by default/i);
+    expect(text).not.toMatch(/\bNo telemetry\b(?!\s+by default)/i);
+  });
+
+  it('PRIVACY.md matches opt-in telemetry policy', () => {
+    const text = readFileSync('PRIVACY.md', 'utf8');
+    expect(text).toMatch(/by default/i);
+    expect(text).toMatch(/shareAnonStats|share anonymous stats/i);
+  });
+
+  it('ARCHITECTURE.md documents network boundaries', () => {
+    const text = readFileSync('ARCHITECTURE.md', 'utf8');
+    expect(text).toMatch(/Network calls/i);
+    expect(text).toMatch(/baklog\.app/);
+    expect(text).toMatch(/server\.py/);
+  });
 });

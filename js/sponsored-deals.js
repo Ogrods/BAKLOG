@@ -748,7 +748,7 @@ const HOUSE_BANNER_FEATURES = [
   },
   {
     title: 'Open source',
-    desc: 'No telemetry. Full source on GitHub (MIT) - audit every line.',
+    desc: 'No telemetry by default. Full source on GitHub (MIT) - audit every line.',
   },
 ];
 

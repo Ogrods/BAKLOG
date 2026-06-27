@@ -4,9 +4,11 @@
 
 ![BAKLOG dashboard — KPI cards, store/status charts, and a deduped cross-store library](dashboard.png)
 
-**BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Nothing is hosted: your credentials and library JSON never leave your machine.
+**BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
 
 **Open source (MIT)** — [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Invite-only early access.** Request access at **[baklog.app](https://baklog.app)**.
+
+**Reviewing the repo?** See [ARCHITECTURE.md](ARCHITECTURE.md) for an honest map (local vs network, monolith shape, Pro licensing, store ToS).
 
 **No games yet?** You don't need an existing library on any store. Start free with Epic, GOG, or Prime Gaming — see [baklog.app/#start](https://baklog.app/#start) for free entry paths and **Claimable Now** (Epic, GamerPower, IsThereAnyDeal) so you never miss a free game again.
 
@@ -43,7 +45,7 @@ The shot above is the real dashboard. Prefer to click around before installing? 
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 
-See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: your library and credentials stay on your machine; the local app does not phone home) and [SECURITY.md](SECURITY.md) for the threat model. The marketing site at [baklog.app](https://baklog.app) has a separate waitlist and optional bug-report endpoint — see PRIVACY.md § Hosted surfaces. The full app is open source under the [MIT license](LICENSE) — server, fetchers, auth, and dashboard in the [public repo](https://github.com/Ogrods/BAKLOG).
+See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: library and credentials stay local; optional network calls are listed explicitly) and [SECURITY.md](SECURITY.md) for the threat model. See [ARCHITECTURE.md](ARCHITECTURE.md) for repo layout and what actually hits the network.
 
 ## Supported platforms
 

@@ -1,7 +1,8 @@
 # Security model
 
 BAKLOG is a **local-first** desktop tool. By default it has no project-owned
-hosted backend and no telemetry. This document is the threat model: what BAKLOG
+hosted backend and no telemetry **unless you opt in** to anonymous aggregate
+metrics in Settings. This document is the threat model: what BAKLOG
 defends, what it explicitly does **not**, and the cryptography behind the
 claims. For the plain-language data inventory and network-host list, see
 [PRIVACY.md](PRIVACY.md).

@@ -100,3 +100,14 @@ automatically.
 
 Do not open a public issue for security reports. See
 [SECURITY.md](SECURITY.md) for how to report privately.
+
+## Architecture and review notes
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - repo layout, runtime diagram, network
+  boundaries, Pro licensing, and why `server.py` is still large.
+- **Telemetry** - off by default; opt-in aggregate metrics only (`shareAnonStats`).
+- **Hosted feeds** - public `sponsors.json` / `free-claims.json` on baklog.app when
+  online; library data is not uploaded.
+- **Store ToS** - several fetchers replay your web session; see [SECURITY.md](SECURITY.md).
+- **CI scope** - default pytest skips `@integration` and `@release_smoke`; run
+  `pytest -m integration` locally for CDP/browser flows.

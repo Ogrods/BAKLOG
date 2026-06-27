@@ -1486,6 +1486,27 @@ describe('fetcher header popover', () => {
     expect(log.style.height).toBe('');
   });
 
+  it('flushLinesNow pins popover log body scroll when followTail is true', () => {
+    document.body.innerHTML = `
+      <div id="fetcherPopover" class="fetcher-popover">
+        <div class="fetcher-popover-scroll">
+          <div id="fetcherRow" class="fh-row fh-row--popover is-expanded">
+            <div id="dashboardFetcherHealth"></div>
+            <div id="fetcherRunLog" class="fh-log open"></div>
+          </div>
+        </div>
+      </div>`;
+    fetcherRunner.reopenLogPanel();
+    const body = document.querySelector('[data-role="body"]');
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 800 });
+    Object.defineProperty(body, 'clientHeight', { configurable: true, value: 200 });
+    body.scrollTop = 0;
+    fetcherRunner.setFollowTailForTest(true);
+    fetcherRunner.appendLineForTest('steam line');
+    fetcherRunner.flushLinesNow();
+    expect(body.scrollTop).toBe(800);
+  });
+
   it('toggleFetcherPopover opens then closes', () => {
     fetcherRunner.toggleFetcherPopover();
     expect(fetcherRunner.isFetcherPopoverOpen()).toBe(true);

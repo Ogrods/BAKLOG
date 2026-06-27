@@ -485,11 +485,14 @@ export const fetcherRunner = (() => {
     if (!scroller) return;
     requestAnimationFrame(() => {
       if (where === 'console') {
+        scrollLogToBottom();
         const log = logPanel();
         if (log) {
           const logRect = log.getBoundingClientRect();
           const scRect = scroller.getBoundingClientRect();
-          scroller.scrollTop += logRect.top - scRect.top - 8;
+          if (logRect.bottom > scRect.bottom || logRect.top < scRect.top) {
+            scroller.scrollTop += logRect.top - scRect.top - 8;
+          }
         } else {
           scroller.scrollTop = scroller.scrollHeight;
         }
@@ -1169,7 +1172,11 @@ export const fetcherRunner = (() => {
     if (!body) return;
     followTail = true;
     clearFollowTailIdleTimer();
-    body.scrollTop = body.scrollHeight;
+    const pin = () => {
+      body.scrollTop = body.scrollHeight;
+    };
+    pin();
+    requestAnimationFrame(pin);
     updateJumpButton();
   }
 
@@ -1240,8 +1247,15 @@ export const fetcherRunner = (() => {
     }
     body.appendChild(fragment);
     while (body.children.length > LOG_DOM_CAP) body.removeChild(body.firstChild);
-    if (followTail) body.scrollTop = body.scrollHeight;
-    updateJumpButton();
+    if (followTail) {
+      body.scrollTop = body.scrollHeight;
+      requestAnimationFrame(() => {
+        if (followTail) body.scrollTop = body.scrollHeight;
+        updateJumpButton();
+      });
+    } else {
+      updateJumpButton();
+    }
   }
 
   function flushLinesNow() {

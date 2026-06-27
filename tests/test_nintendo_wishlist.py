@@ -47,6 +47,43 @@ def test_build_row_schema() -> None:
     assert row["nintendo_product_id"] == "71000000012345"
 
 
+def test_build_row_tags_dlc() -> None:
+    from fetchers.fetch_nintendo_wishlist import WishlistItem
+
+    item = WishlistItem(
+        product_id="71000000099999",
+        title="Adventure Expansion Pass",
+        image_url=None,
+        store_url="https://www.nintendo.com/us/store/products/adventure-dlc-switch/",
+        release_date=None,
+        genres=[],
+        price="$19.99",
+        price_initial=None,
+        discount_percent=None,
+        currency="USD",
+        is_dlc=True,
+    )
+    row = _build_row(item, None)
+    assert row["type"] == "dlc"
+    assert row["tags"] == ["dlc"]
+    assert row["nintendo_is_dlc"] is True
+
+
+def test_wishlist_item_is_dlc_from_product_type() -> None:
+    from fetchers.fetch_nintendo_wishlist import _item_from_dict
+
+    item = _item_from_dict(
+        {
+            "nsUid": "71000000088888",
+            "title": "Bonus Tracks Pack",
+            "productType": "DLC",
+            "url": "/us/store/products/bonus-tracks-switch/",
+        }
+    )
+    assert item is not None
+    assert item.is_dlc is True
+
+
 def test_signed_out_login_page() -> None:
     assert _signed_out("", "https://accounts.nintendo.com/login")
     assert not _signed_out(FIXTURE.read_text(encoding="utf-8"), "https://www.nintendo.com/us/wish-list/")

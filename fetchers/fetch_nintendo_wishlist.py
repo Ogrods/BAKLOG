@@ -120,6 +120,37 @@ class WishlistItem:
     price_initial: str | None
     discount_percent: int | None
     currency: str | None
+    is_dlc: bool = False
+
+
+def _wishlist_item_is_dlc(obj: dict) -> bool:
+    for k in (
+        "productType",
+        "product_type",
+        "contentType",
+        "content_type",
+        "type",
+        "productClass",
+        "product_class",
+    ):
+        val = obj.get(k)
+        if isinstance(val, str) and val.lower() in (
+            "dlc",
+            "aoc",
+            "addon",
+            "add_on",
+            "downloadable_content",
+            "downloadablecontent",
+        ):
+            return True
+    title = _first_str(obj, _TITLE_KEYS) or ""
+    if re.search(r"\b(dlc|expansion pass|season pass)\b", title, re.I):
+        return True
+    for nested_key in ("product", "item", "game"):
+        nested = obj.get(nested_key)
+        if isinstance(nested, dict) and _wishlist_item_is_dlc(nested):
+            return True
+    return False
 
 
 def _parse_json_assignment(html: str, marker: str) -> dict | None:
@@ -388,6 +419,7 @@ def _item_from_dict(obj: dict) -> WishlistItem | None:
         price_initial=price_initial,
         discount_percent=discount,
         currency=currency,
+        is_dlc=_wishlist_item_is_dlc(obj),
     )
 
 
@@ -1041,7 +1073,8 @@ def _fetch_with_profile(
 
 
 def _build_row(item: WishlistItem, hltb: dict | None) -> dict:
-    return {
+    tags: list[str] = ["dlc"] if item.is_dlc else []
+    row = {
         "store": "wishlist",
         "wishlist_store": "nintendo",
         "id": f"nintendo-{item.product_id}",
@@ -1053,7 +1086,7 @@ def _build_row(item: WishlistItem, hltb: dict | None) -> dict:
         "library_image": item.image_url,
         "release_date": item.release_date,
         "genres": list(dict.fromkeys(item.genres)),
-        "tags": [],
+        "tags": tags,
         "steam_review_percent": None,
         "steam_review_count": None,
         "steam_review_desc": None,
@@ -1063,12 +1096,15 @@ def _build_row(item: WishlistItem, hltb: dict | None) -> dict:
         "hltb_match_confidence": (hltb or {}).get("hltb_match_confidence"),
         "hltb_name": (hltb or {}).get("hltb_name"),
         "store_url": item.store_url,
-        "type": "game",
+        "type": "dlc" if item.is_dlc else "game",
         "price": item.price,
         "price_initial": item.price_initial,
         "discount_percent": item.discount_percent,
         "currency": item.currency,
     }
+    if item.is_dlc:
+        row["nintendo_is_dlc"] = True
+    return row
 
 
 def _load_existing() -> dict[str, dict]:

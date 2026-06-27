@@ -3,6 +3,8 @@
  */
 
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const isProMock = vi.hoisted(() => vi.fn(() => false));
 
@@ -36,6 +38,7 @@ import {
   CLAIMS_HOSTED_FETCH_MS,
   sanitizeBlurb,
   handleClaimableClick,
+  animateClaimOut,
   loadClaimableNow,
   claimCoverFallback,
 } from '../js/claimable.js';
@@ -735,6 +738,26 @@ describe('handleClaimableClick URL safety', () => {
       window.open = orig;
     }
     expect(opened).toEqual(['https://example.com/safe']);
+  });
+});
+
+describe('claimable clear cascade guard', () => {
+  it('CSS blocks pointer events on claim-clearing rows', () => {
+    const text = fs.readFileSync(path.join(process.cwd(), 'app.css'), 'utf8');
+    expect(text).toMatch(/\.claim-clearing\s*\{[^}]*pointer-events:\s*none/);
+  });
+
+  it('animateClaimOut adds claim-clearing without removing sibling rows', () => {
+    document.body.innerHTML = `
+      <div id="claimableNowModule">
+        <div class="claim-row" data-claim-id="a"><button data-claim-clear="a">Clear</button></div>
+        <div class="claim-row" data-claim-id="b"><button data-claim-clear="b">Clear</button></div>
+      </div>`;
+    const sibling = document.querySelector('[data-claim-id="b"]');
+    animateClaimOut('a', () => {});
+    const clearing = document.querySelector('[data-claim-id="a"]');
+    expect(clearing.classList.contains('claim-clearing')).toBe(true);
+    expect(document.querySelector('[data-claim-id="b"]')).toBe(sibling);
   });
 });
 

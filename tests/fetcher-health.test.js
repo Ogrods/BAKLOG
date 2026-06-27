@@ -36,6 +36,7 @@ import {
   connectionsNavigateProvider,
   fetcherRunner,
   renderDashboardFetcherHealth,
+  tryPatchFetcherHealthDashboard,
   buildFetcherHealthRows,
   filterFetcherHealthRows,
   isFetcherAuthHealthy,
@@ -1867,5 +1868,87 @@ describe('coverableRows', () => {
     expect(keys).toContain('wishlist:xbox-9NQPJ4M6SMDF');
     expect(keys).toContain('itch:1');
     expect(keys).not.toContain('itch:2');
+  });
+});
+
+describe('tryPatchFetcherHealthDashboard', () => {
+  it('returns false when dashboard shell is missing', () => {
+    document.body.innerHTML = '<div id="dashboardFetcherHealth"></div>';
+    expect(tryPatchFetcherHealthDashboard(document.getElementById('dashboardFetcherHealth'), {
+      layout: 'landscape',
+      showReadonly: false,
+      legendTipsOpen: false,
+      chipPatches: [],
+      staleCount: 0,
+      missingCount: 0,
+      healthSummary: 'All fresh',
+      statTotals: { lib: { connected: 0, total: 0 }, wish: { connected: 0, total: 0 }, enrich: { connected: 0, total: 0 }, lastSyncValue: 'never', connected: 0, total: 0, pct: 0 },
+    })).toBe(false);
+  });
+
+  it('patches existing chips without replacing the slot root', () => {
+    document.body.innerHTML = `
+      <div id="dashboardFetcherHealth" data-stat-layout="landscape">
+        <div class="fh-bar"></div>
+        <div class="fh-chips">
+          <button type="button" class="fh-chip fh-chip-ok" data-fetcher-key="steam" data-status="fresh">
+            <span class="fh-chip-label">Steam</span>
+            <span class="fh-chip-count">10</span>
+            <span class="fh-chip-age">1h</span>
+          </button>
+        </div>
+        <span class="fh-count fh-count--fresh" title="">0 missing</span>
+        <div class="fh-stat fh-stat--hero"><span class="fh-stat-value">1/1</span></div>
+        <div class="fh-stat"><span class="fh-stat-value">never</span></div>
+        <div class="fh-stat"><span class="fh-stat-value">1</span></div>
+        <div class="fh-stat"><span class="fh-stat-value">0</span></div>
+        <div class="fh-stat"><span class="fh-stat-value">0</span></div>
+        <span class="fh-stat-bar-fill" style="--pct:100%"></span>
+        <div id="fhLegendTips" class="fh-legend-tips"></div>
+      </div>`;
+    const slot = document.getElementById('dashboardFetcherHealth');
+    const chip = slot.querySelector('[data-fetcher-key="steam"]');
+    const ok = tryPatchFetcherHealthDashboard(slot, {
+      layout: 'landscape',
+      showReadonly: false,
+      legendTipsOpen: false,
+      chipPatches: [{
+        key: 'steam',
+        displayStatus: 'stale',
+        status: 'stale',
+        title: 'Steam stale',
+        disabled: false,
+        connectProvider: '',
+        chipLabel: 'Steam',
+        countStr: '10',
+        ageText: '2d',
+        chipAriaLabel: 'Steam, 10, 2d',
+        showWarn: false,
+        modifiers: {
+          'fh-chip-needs-config': false,
+          'fh-chip-readonly': false,
+          'fh-chip-auth-cooldown': false,
+          'fh-chip-reconnect-required': false,
+          'fh-chip-disconnected': false,
+          'fh-chip-unavailable': false,
+        },
+      }],
+      staleCount: 0,
+      missingCount: 0,
+      healthSummary: 'All fresh',
+      statTotals: {
+        lib: { connected: 1, total: 1 },
+        wish: { connected: 0, total: 0 },
+        enrich: { connected: 0, total: 0 },
+        lastSyncValue: '2d ago',
+        connected: 1,
+        total: 1,
+        pct: 100,
+      },
+    });
+    expect(ok).toBe(true);
+    expect(chip).toBe(slot.querySelector('[data-fetcher-key="steam"]'));
+    expect(chip.classList.contains('fh-chip-stale')).toBe(true);
+    expect(chip.querySelector('.fh-chip-age').textContent).toBe('2d');
   });
 });

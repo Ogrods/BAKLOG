@@ -231,4 +231,47 @@ describe('recordLibraryFirstSeen', () => {
     expect(state.libraryFirstSeenByKey['nintendo:new-1']).toBeGreaterThan(0);
     expect(state.libraryFirstSeenByKey[gameKey(state.allGames[0])]).toBe(0);
   });
+
+  it('baselines a first Steam import instead of flooding recents', () => {
+    recordLibraryFirstSeen();
+    state._libraryKeysBeforeMerge = new Set();
+    const bulk = [];
+    for (let i = 0; i < 20; i++) {
+      bulk.push({ store: 'steam', id: String(400 + i), name: `Game ${i}` });
+    }
+    state.allGames = bulk;
+    const n = recordLibraryFirstSeen();
+    expect(n).toBe(0);
+    expect(state.libraryFirstSeenByKey['steam:400']).toBe(0);
+    expect(state.libraryFirstSeenByKey['steam:419']).toBe(0);
+  });
+
+  it('still stamps a single game added after seed', () => {
+    recordLibraryFirstSeen();
+    state._libraryKeysBeforeMerge = new Set(state.allGames.map(g => gameKey(g)));
+    state.allGames.push({ store: 'steam', id: '999', name: 'One New Game' });
+    const n = recordLibraryFirstSeen();
+    expect(n).toBe(1);
+    expect(state.libraryFirstSeenByKey['steam:999']).toBeGreaterThan(0);
+  });
+});
+
+describe('repairBulkFirstSeenStamps', () => {
+  it('collapses persisted bulk-import batches to baseline', async () => {
+    const { repairBulkFirstSeenStamps } = await import('../js/library-load.js');
+    const ts = Date.now() - 3 * 60 * 60 * 1000;
+    const map = {};
+    for (let i = 0; i < 12; i++) map[`steam:${i}`] = ts + i;
+    expect(repairBulkFirstSeenStamps(map)).toBe(true);
+    expect(map['steam:0']).toBe(0);
+    expect(map['steam:11']).toBe(0);
+  });
+
+  it('leaves small batches alone', async () => {
+    const { repairBulkFirstSeenStamps } = await import('../js/library-load.js');
+    const ts = Date.now();
+    const map = { 'steam:400': ts, 'steam:620': ts + 1 };
+    expect(repairBulkFirstSeenStamps(map)).toBe(false);
+    expect(map['steam:400']).toBe(ts);
+  });
 });

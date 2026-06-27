@@ -178,6 +178,16 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 | **Secrets store corrupt** | The encrypted credentials file for this profile cannot be read (wrong keyring entry, moved data, or a damaged file). Use **Reset store** on the banner, restore a backup on Connections, or reconnect each store. Archived copies are kept as `secrets.bin.corrupt-*` beside the old file. |
 | **Cloud sync** | Signing in on a second PC does not copy your library yet. Copy `BAKLOG-Data` manually or wait for the planned Pro cloud mirror. |
 
+## App updates (installed build)
+
+**Symptom:** You want to know if a newer BAKLOG release is available.
+
+**Behavior:** The installed (frozen) app checks GitHub once per session on boot. When an update exists, a banner appears under the header with a download link. Dismiss it for the session with **×**; it returns next launch until you upgrade.
+
+**Manual check:** Open the **⋮** menu and choose **Check for updates…** (works in dev and installed builds).
+
+**Note:** BAKLOG does not auto-download or auto-install. Download the new zip or installer from the release page, then replace your install. Your library data stays in `%LOCALAPPDATA%\\BAKLOG-Data` (or your portable data folder).
+
 ## Bug reports vs fetcher failures
 
 Dashboard JavaScript errors can be reported via the sticky toast or **Report a bug…** menu. Fetcher failures are separate - check **Fetcher health**, exit codes, and `profiles/<id>/cache/runs/*.jsonl`. See [Getting help](getting-help.md).

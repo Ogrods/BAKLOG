@@ -895,3 +895,5 @@ export function startClaimableReadOnlyPolling(intervalMs = 15 * 60_000) {
     } catch (_) { /* silent */ }
   }, intervalMs);
 }
+
+export { animateClaimOut };

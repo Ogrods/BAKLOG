@@ -142,6 +142,7 @@ jobs:
           tests/test_server_csrf.py
           tests/test_fetcher_progress.py
           tests/test_fetcher_auth_exit.py
+          tests/test_fetcher_main_contract.py
           tests/test_auth_secrets.py
           tests/test_auth_status_platform.py
           tests/test_cdp_browser.py

@@ -58,6 +58,38 @@ def _protect_real_profile_store() -> None:
             real_index.write_bytes(index_bytes)
 
 
+@pytest.fixture(autouse=True)
+def _stub_os_keyring_on_macos(monkeypatch: pytest.MonkeyPatch) -> None:
+    """macOS CI can hang on blocking keychain prompts; use an in-memory stub."""
+    if sys.platform != "darwin":
+        return
+    store: dict[tuple[str, str], str] = {}
+
+    class _KeyringErrors:
+        class KeyringError(Exception):
+            pass
+
+        class PasswordDeleteError(KeyringError):
+            pass
+
+    class _FakeKeyring:
+        errors = _KeyringErrors()
+
+        @staticmethod
+        def get_password(service: str, account: str) -> str | None:
+            return store.get((service, account))
+
+        @staticmethod
+        def set_password(service: str, account: str, password: str) -> None:
+            store[(service, account)] = password
+
+        @staticmethod
+        def delete_password(service: str, account: str) -> None:
+            store.pop((service, account), None)
+
+    monkeypatch.setitem(sys.modules, "keyring", _FakeKeyring())
+
+
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False

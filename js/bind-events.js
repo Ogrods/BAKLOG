@@ -875,26 +875,11 @@ export function bindEvents() {
   }
   document.getElementById("checkUpdates")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
-    try {
-      const res = await fetch('/api/update-check');
-      if (!res.ok) {
-        showKebabBanner(`Could not check for updates (server returned ${res.status}).`);
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
-      if (data.error) {
-        showKebabBanner(`Could not check for updates: ${data.error}`);
-        return;
-      }
-      if (data.update_available) {
-        const url = data.url ? ` Download: ${data.url}` : '';
-        showKebabBanner(`Update available: v${data.latest} (you have v${data.current}).${url}`);
-        return;
-      }
-      showKebabBanner(`You're on the latest release (v${data.current}).`);
-    } catch (err) {
-      showKebabBanner(`Update check failed: ${err?.message || err}`, { error: true });
-    }
+    const { checkForUpdates } = await import('./update-check.js');
+    await checkForUpdates({
+      source: 'manual',
+      onManualMessage: (msg, opts) => showKebabBanner(msg, opts),
+    });
   });
   document.getElementById("copyDiagnostics")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");

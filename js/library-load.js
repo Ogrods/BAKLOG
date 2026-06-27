@@ -211,21 +211,63 @@ export function captureLibraryKeysBeforeMerge() {
   );
 }
 
-function stampMergeDiffFirstSeen(priorKeys) {
-  if (!priorKeys || priorKeys.size === 0) return { n: 0, changed: false };
+/** Keys stamped together in one import (e.g. first Steam sync) stay baseline (div 0). */
+export const BULK_FIRST_SEEN_THRESHOLD = 8;
+
+export function shouldBaselineImportBatch(newStampCount, priorKeyCount) {
+  if (newStampCount <= 1) return false;
+  if (priorKeyCount === 0 && newStampCount >= BULK_FIRST_SEEN_THRESHOLD) return true;
+  if (newStampCount >= BULK_FIRST_SEEN_THRESHOLD && newStampCount > priorKeyCount) return true;
+  return false;
+}
+
+/** Collapse bulk-import batches already persisted (same second, many keys). */
+export function repairBulkFirstSeenStamps(map) {
+  if (!map || typeof map !== 'object') return false;
+  const bySecond = new Map();
+  for (const [key, val] of Object.entries(map)) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const sec = Math.floor(n / 1000);
+    if (!bySecond.has(sec)) bySecond.set(sec, []);
+    bySecond.get(sec).push(key);
+  }
+  let changed = false;
+  for (const keys of bySecond.values()) {
+    if (keys.length < BULK_FIRST_SEEN_THRESHOLD) continue;
+    for (const key of keys) {
+      if (map[key] !== 0) {
+        map[key] = 0;
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
+function collectMergeDiffFirstSeenKeys(priorKeys, pendingRealKeys) {
+  if (!priorKeys || priorKeys.size === 0) return 0;
   const itchGames = Array.isArray(state.itchGames) ? state.itchGames : [];
   let n = 0;
-  let changed = false;
   for (const g of [...state.allGames, ...itchGames]) {
     const key = gameKey(g);
     if (priorKeys.has(key)) continue;
     const cur = state.libraryFirstSeenByKey[key] ?? 0;
     if (cur > 0) continue;
-    state.libraryFirstSeenByKey[key] = Date.now();
+    pendingRealKeys.add(key);
     n += 1;
-    changed = true;
   }
-  return { n, changed };
+  return n;
+}
+
+function applyPendingFirstSeenStamps(pendingRealKeys, priorKeyCount) {
+  const baseline = shouldBaselineImportBatch(pendingRealKeys.size, priorKeyCount);
+  if (baseline) return 0;
+  const now = Date.now();
+  for (const key of pendingRealKeys) {
+    state.libraryFirstSeenByKey[key] = now;
+  }
+  return pendingRealKeys.size;
 }
 
 /** Stamp first-seen timestamps for library keys (silent seed on first load).
@@ -234,6 +276,7 @@ export function recordLibraryFirstSeen() {
   if (!state.libraryFirstSeenByKey || typeof state.libraryFirstSeenByKey !== 'object') {
     state.libraryFirstSeenByKey = {};
   }
+  let changed = repairBulkFirstSeenStamps(state.libraryFirstSeenByKey);
   const mapWasEmpty = Object.keys(state.libraryFirstSeenByKey).length === 0;
   const seeded = !!state.prefs.librarySeenSeeded;
   // If the persisted map is empty but seeding already happened, the first-seen
@@ -244,8 +287,9 @@ export function recordLibraryFirstSeen() {
   const effectiveSeeded = seeded && !mapWasEmpty;
   const isReseed = seeded && mapWasEmpty;
   const priorKeys = state._libraryKeysBeforeMerge;
-  let changed = false;
+  const priorKeyCount = priorKeys?.size ?? 0;
   let newlyStamped = 0;
+  const pendingRealKeys = new Set();
   const debugNewKeys = isDebugEnabled() && effectiveSeeded ? [] : null;
   // itch games live in state.itchGames (their own tab), not state.allGames.
   // Stamp them too so itch additions get a first-seen timestamp and can
@@ -259,29 +303,27 @@ export function recordLibraryFirstSeen() {
         && priorKeys?.size > 0
         && !priorKeys.has(key)
       ) {
-        state.libraryFirstSeenByKey[key] = Date.now();
-        changed = true;
-        newlyStamped += 1;
-        debugNewKeys?.push(key);
+        pendingRealKeys.add(key);
       }
       continue;
     }
-    let stamp = 0;
-    if (effectiveSeeded) {
-      stamp = Date.now();
-    } else if (isReseed && priorKeys?.size > 0 && !priorKeys.has(key)) {
-      stamp = Date.now();
-    }
-    state.libraryFirstSeenByKey[key] = stamp;
+    state.libraryFirstSeenByKey[key] = 0;
     changed = true;
-    if (stamp > 0) {
-      newlyStamped += 1;
-      debugNewKeys?.push(key);
+    if (effectiveSeeded) {
+      pendingRealKeys.add(key);
+    } else if (isReseed && priorKeys?.size > 0 && !priorKeys.has(key)) {
+      pendingRealKeys.add(key);
     }
   }
-  const mergeDiff = stampMergeDiffFirstSeen(priorKeys);
-  newlyStamped += mergeDiff.n;
-  changed = changed || mergeDiff.changed;
+  collectMergeDiffFirstSeenKeys(priorKeys, pendingRealKeys);
+  const applied = applyPendingFirstSeenStamps(pendingRealKeys, priorKeyCount);
+  if (applied > 0) {
+    changed = true;
+    newlyStamped = applied;
+    if (debugNewKeys) {
+      for (const key of pendingRealKeys) debugNewKeys.push(key);
+    }
+  }
   state._libraryKeysBeforeMerge = null;
   const currentKeys = new Set([...state.allGames, ...itchGames].map(gameKey));
   state.knownLibraryKeySet = currentKeys;
@@ -292,8 +334,9 @@ export function recordLibraryFirstSeen() {
       seeded,
       effectiveSeeded,
       isReseed,
-      priorKeyCount: priorKeys?.size ?? 0,
-      mergeDiffStamped: mergeDiff.n,
+      priorKeyCount,
+      pendingRealCount: pendingRealKeys.size,
+      appliedRealStamps: applied,
       totalKeys: Object.keys(state.libraryFirstSeenByKey).length,
       newlyStamped,
       newlyStampedKeys: debugNewKeys ?? [],

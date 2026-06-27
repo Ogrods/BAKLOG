@@ -20,6 +20,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+from http import HTTPStatus
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -141,6 +142,41 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
                 return report
             with urllib.request.urlopen("http://127.0.0.1:8765/api/config", timeout=5) as resp:
                 config = json.loads(resp.read().decode("utf-8"))
+            mirror_status: int | None = None
+            mirror_body: dict | None = None
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:8765/api/mirror", timeout=5) as resp:
+                    mirror_status = resp.status
+                    mirror_body = json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as exc:
+                mirror_status = exc.code
+                try:
+                    mirror_body = json.loads(exc.read().decode("utf-8"))
+                except json.JSONDecodeError:
+                    mirror_body = {"error": exc.read().decode("utf-8", errors="replace")}
+            import_status: int | None = None
+            try:
+                req = urllib.request.Request(
+                    "http://127.0.0.1:8765/api/mirror/import",
+                    data=b"{}",
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    import_status = resp.status
+            except urllib.error.HTTPError as exc:
+                import_status = exc.code
+            report["checks"]["mirror_routes"] = {
+                "get_mirror_status": mirror_status,
+                "get_mirror_pro_error": (mirror_body or {}).get("error"),
+                "post_import_status": import_status,
+            }
+            if mirror_status != HTTPStatus.FORBIDDEN:
+                report["error"] = f"expected GET /api/mirror -> 403, got {mirror_status}"
+                return report
+            if import_status not in (HTTPStatus.FORBIDDEN, HTTPStatus.UNAUTHORIZED):
+                report["error"] = f"expected POST /api/mirror/import -> 403/401, got {import_status}"
+                return report
     finally:
         if proc is not None and proc.poll() is None:
             if sys.platform == "win32":

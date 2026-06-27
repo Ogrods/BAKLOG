@@ -266,9 +266,16 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
   Partner programs. No per-user click tracking unless you opt in (Connections).
   Wishlist deal links from IsThereAnyDeal use ITAD's own redirect URLs and are
   left unchanged (ITAD API terms).
-- No project-owned cloud service.
-- No automatic sync between machines — use the portable secrets bundle
-  (Connections → Export bundle…) if you move to a new PC.
+- **Opt-in Pro cloud mirror:** when you enable **Cloud sync to your account**
+  (Connections), BAKLOG uploads derived library JSON to Supabase Storage tied
+  to your sign-in. This is catalog + personal metadata only — never credentials,
+  browser cookie profiles, cache, or secrets. You can browse the mirror at
+  [baklog.app/mirror](https://baklog.app/mirror) or import it on another PC.
+  Disable the toggle to stop new uploads; delete mirror objects in Supabase or
+  revoke your account to remove hosted copies.
+- Without cloud sync, there is no automatic sync between machines — use the
+  portable secrets bundle (Connections → Export bundle…) plus a folder copy of
+  your data directory if you move to a new PC.
 
 ## Removing your data
 

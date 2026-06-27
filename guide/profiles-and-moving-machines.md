@@ -69,6 +69,16 @@ Copy these folders/files to the new machine (or sync via Dropbox/OneDrive):
 
 Re-run fetchers on the new machine to refresh stale data, or copy `cache/` to skip re-downloading API responses.
 
+### Pro cloud sync (optional)
+
+If you have Pro and want to avoid copying large `games_*.json` folders:
+
+1. **Home PC:** Connections → enable **Cloud sync to your account** → refresh or save your library → wait ~30 seconds for upload.
+2. **New PC:** Install BAKLOG, sign in with the same account, import credentials via portable bundle (above), then Connections → **Import from cloud mirror**. This replaces local catalogs and personal data with the cloud copy; credentials are not included.
+3. **Browse only:** sign in at [baklog.app/mirror](https://baklog.app/mirror) for a read-only library view (no credentials needed on that device).
+
+With `BAKLOG_LOCAL_PROFILES=1`, uploads use your active Work/Play profile id; the hosted viewer lists all mirrored profiles automatically.
+
 ## Optional invite-only accounts
 
 Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. Set `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing.

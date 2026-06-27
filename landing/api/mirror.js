@@ -1,21 +1,22 @@
 // Vercel serverless: read-only Pro cloud mirror (Supabase Storage).
 // GET /api/mirror — list artifacts for signed-in Pro user
 // GET /api/mirror?path=games_steam.json — download one artifact
+// GET /api/mirror?profile=default — scope list/download to one BAKLOG profile
 // Requires BAKLOG_SUPABASE_URL + BAKLOG_SUPABASE_ANON_KEY on Vercel.
 
 import { checkRateLimit } from "./_rate-limit.js";
-
-const MIRROR_BUCKET = "baklog-mirror";
-const ALLOWED_ARTIFACT =
-  /^(games_[a-z0-9_]+\.json|games_wishlist_[a-z0-9_]+\.json|itad_prices\.json|free_claims\.json|data\/personal\.json)$/;
-
-function pickEnv(...keys) {
-  for (const key of keys) {
-    const val = process.env[key];
-    if (typeof val === "string" && val.trim()) return val.trim();
-  }
-  return "";
-}
+import {
+  ALLOWED_ARTIFACT,
+  MIRROR_BUCKET,
+  encodeObjectKey,
+  isProUser,
+  isValidProfileId,
+  normalizeProfileId,
+  parseMirrorListRows,
+  pickEnv,
+  resolveArtifactProfile,
+  storageBase,
+} from "./_mirror-helpers.js";
 
 function clientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -57,12 +58,6 @@ function jsonResponse(body, status, request, extraHeaders = {}) {
   });
 }
 
-function extractPlan(user) {
-  const meta = user?.app_metadata || {};
-  const plan = String(meta.plan || user?.plan || "").trim().toLowerCase();
-  return plan === "pro" || plan === "paid" || plan === "premium";
-}
-
 async function verifySession(request, supabaseUrl, anonKey) {
   const auth = request.headers.get("Authorization") || "";
   if (!auth.startsWith("Bearer ")) return null;
@@ -71,12 +66,26 @@ async function verifySession(request, supabaseUrl, anonKey) {
   });
   if (!res.ok) return null;
   const user = await res.json();
-  if (!extractPlan(user)) return null;
+  if (!isProUser(user)) return null;
   return { auth, user };
 }
 
-function storageBase(supabaseUrl) {
-  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object`;
+async function listStorageObjects({ supabaseUrl, anonKey, auth, prefix, limit = 200 }) {
+  const listUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/list/${MIRROR_BUCKET}`;
+  const listRes = await fetch(listUrl, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      Authorization: auth,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prefix, limit, offset: 0 }),
+  });
+  if (!listRes.ok) {
+    throw new Error("list_failed");
+  }
+  const rows = await listRes.json();
+  return Array.isArray(rows) ? rows : [];
 }
 
 export default {
@@ -110,16 +119,43 @@ export default {
 
     const userId = String(session.user.id || "").trim();
     const url = new URL(request.url);
-    const profileId = (url.searchParams.get("profile") || userId).trim();
+    const profileParam = (url.searchParams.get("profile") || "").trim();
     const artifact = (url.searchParams.get("path") || "").trim();
-    const prefix = `${userId}/${profileId}`;
+
+    let profileId = "";
+    if (profileParam) {
+      if (!isValidProfileId(profileParam)) {
+        return jsonResponse({ error: "Invalid profile id" }, 400, request);
+      }
+      profileId = normalizeProfileId(profileParam);
+    }
 
     if (artifact) {
       if (!ALLOWED_ARTIFACT.test(artifact)) {
         return jsonResponse({ error: "Invalid artifact path" }, 400, request);
       }
-      const objectKey = `${prefix}/${artifact}`.split("/").map(encodeURIComponent).join("/");
-      const objectUrl = `${storageBase(supabaseUrl)}/${MIRROR_BUCKET}/${objectKey}`;
+
+      let resolvedProfile = profileId;
+      if (!resolvedProfile) {
+        try {
+          const rows = await listStorageObjects({
+            supabaseUrl,
+            anonKey,
+            auth: session.auth,
+            prefix: `${userId}/`,
+          });
+          const parsed = parseMirrorListRows(rows, userId);
+          resolvedProfile = resolveArtifactProfile(parsed.artifacts, artifact, userId);
+        } catch {
+          return jsonResponse({ error: "Could not list mirror" }, 502, request);
+        }
+        if (!resolvedProfile) {
+          return jsonResponse({ error: "Artifact not found" }, 404, request);
+        }
+      }
+
+      const objectKey = `${userId}/${resolvedProfile}/${artifact}`;
+      const objectUrl = `${storageBase(supabaseUrl)}/${MIRROR_BUCKET}/${encodeObjectKey(objectKey)}`;
       const res = await fetch(objectUrl, {
         headers: { apikey: anonKey, Authorization: session.auth },
       });
@@ -137,30 +173,43 @@ export default {
       }
     }
 
-    const listUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/list/${MIRROR_BUCKET}`;
-    const listRes = await fetch(listUrl, {
-      method: "POST",
-      headers: {
-        apikey: anonKey,
-        Authorization: session.auth,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prefix, limit: 200, offset: 0 }),
-    });
-    if (!listRes.ok) {
-      return jsonResponse({ error: "Could not list mirror" }, 502, request);
-    }
-    const rows = await listRes.json();
-    const artifacts = Array.isArray(rows)
-      ? rows
+    try {
+      let artifacts = [];
+      let profiles = [];
+
+      if (profileId) {
+        const rows = await listStorageObjects({
+          supabaseUrl,
+          anonKey,
+          auth: session.auth,
+          prefix: `${userId}/${profileId}/`,
+        });
+        artifacts = rows
           .filter((row) => row && row.name && !String(row.name).endsWith("/"))
           .map((row) => ({
-            path: row.name,
+            path: String(row.name).trim().replace(/^\/+/, ""),
+            profile: profileId,
             id: row.id,
             updated_at: row.updated_at,
             metadata: row.metadata,
           }))
-      : [];
-    return jsonResponse({ artifacts, profile: profileId }, 200, request);
+          .filter((row) => ALLOWED_ARTIFACT.test(row.path));
+        profiles = [profileId];
+      } else {
+        const rows = await listStorageObjects({
+          supabaseUrl,
+          anonKey,
+          auth: session.auth,
+          prefix: `${userId}/`,
+        });
+        const parsed = parseMirrorListRows(rows, userId);
+        artifacts = parsed.artifacts;
+        profiles = parsed.profiles;
+      }
+
+      return jsonResponse({ artifacts, profiles, profile: profileId || null }, 200, request);
+    } catch {
+      return jsonResponse({ error: "Could not list mirror" }, 502, request);
+    }
   },
 };

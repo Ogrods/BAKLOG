@@ -194,6 +194,23 @@ def note_authenticated_plan(plan: str) -> None:
     _LAST_AUTH_PLAN = (time.time(), norm)
 
 
+def clear_authenticated_plan_cache() -> None:
+    """Drop cached JWT plan (e.g. on sign-out)."""
+    global _LAST_AUTH_PLAN
+    _LAST_AUTH_PLAN = None
+
+
+def clear_background_auth_caches() -> None:
+    """Clear process-scoped auth caches used by mirror upload and the scheduler."""
+    clear_authenticated_plan_cache()
+    try:
+        from shared.mirror_session import clear_mirror_session
+
+        clear_mirror_session()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def current_plan(authorization: str | None = None) -> str:
     """Resolve the effective plan. See module docstring for the resolution matrix."""
     if _auth_enabled():

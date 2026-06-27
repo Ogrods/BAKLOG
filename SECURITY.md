@@ -55,7 +55,10 @@ Everything inside the machine boundary is assumed to run as **your** OS user.
 BAKLOG's security goal is that nothing crosses the boundary except the
 storefront calls you ask for and the files you explicitly export. Optional
 Supabase auth adds a small hosted login box (credentials and catalog JSON still
-on your machine unless you later opt into Phase 6 cloud mirror work).
+on your machine unless you opt into **Pro cloud sync** (Connections → **Cloud sync to
+your account**). When enabled, derived catalog JSON (games, wishlists, personal
+statuses, deal prices, claimables) uploads to your Supabase account storage;
+credentials, cache, and secrets never sync.
 
 ## Assets we protect
 

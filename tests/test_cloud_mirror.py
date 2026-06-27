@@ -97,6 +97,28 @@ def test_schedule_and_flush_gated_when_free(profile_root, monkeypatch):
     assert cm._pending == {}
 
 
+def test_flush_skips_when_pro_but_toggle_off(profile_root, monkeypatch):
+    _enable_auth(monkeypatch)
+    write_pro_settings({"cloudMirrorEnabled": False}, profile_id="default")
+    ent.current_plan(_pro_bearer())
+    path = catalog_path("games_steam.json", profile_id="default")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"games":[]}', encoding="utf-8")
+
+    uploaded: list[str] = []
+
+    def _upload(**kwargs):
+        uploaded.append(kwargs["artifact_path"])
+        return {"Key": kwargs["artifact_path"]}
+
+    monkeypatch.setattr("shared.supabase_mirror.upload_mirror_object", _upload)
+    cm.schedule_mirror_upload(path, profile_id="default")
+    with cm._lock:
+        cm._pending["default"]["flush_at"] = time.time() - 1
+    cm.maybe_flush_mirror_uploads(force=True)
+    assert uploaded == []
+
+
 def test_flush_uploads_when_pro_auth_and_session(profile_root, monkeypatch):
     _enable_auth(monkeypatch)
     write_pro_settings({"cloudMirrorEnabled": True}, profile_id="default")
@@ -223,3 +245,65 @@ def test_import_remote_mirror_empty_raises(profile_root, monkeypatch):
     monkeypatch.setattr(cm, "list_remote_mirror_artifacts", lambda **kwargs: [])
     with pytest.raises(ValueError, match="no importable"):
         cm.import_remote_mirror_to_profile(authorization=_pro_bearer())
+
+
+def test_import_rejects_empty_games_catalog(profile_root, monkeypatch):
+    _enable_auth(monkeypatch)
+    monkeypatch.setattr(
+        cm,
+        "list_remote_mirror_artifacts",
+        lambda **kwargs: [{"path": "games_steam.json"}],
+    )
+    monkeypatch.setattr(
+        cm,
+        "download_remote_mirror_artifact",
+        lambda **kwargs: json.dumps({"games": []}).encode("utf-8"),
+    )
+    with pytest.raises(ValueError, match="empty games"):
+        cm.import_remote_mirror_to_profile(authorization=_pro_bearer())
+
+
+def test_import_rollback_on_catalog_failure(profile_root, monkeypatch):
+    _enable_auth(monkeypatch)
+    steam_doc = {"games": [{"store": "steam", "id": "570", "name": "Dota 2"}]}
+    personal_doc = {
+        "personal": {"steam:570": {"status": "playing"}},
+        "prefs": {},
+        "manual": [],
+        "libraryFirstSeen": {},
+    }
+    local_personal = {
+        "personal": {"steam:1": {"status": "backlog"}},
+        "prefs": {},
+        "manual": [],
+        "libraryFirstSeen": {},
+    }
+    personal_path(profile_id="default").parent.mkdir(parents=True, exist_ok=True)
+    personal_path(profile_id="default").write_text(json.dumps(local_personal), encoding="utf-8")
+
+    monkeypatch.setattr(
+        cm,
+        "list_remote_mirror_artifacts",
+        lambda **kwargs: [{"path": "games_steam.json"}, {"path": "data/personal.json"}],
+    )
+
+    def _download(**kwargs):
+        path = kwargs["artifact_path"]
+        if path == "games_steam.json":
+            return json.dumps(steam_doc).encode("utf-8")
+        if path == "data/personal.json":
+            return json.dumps(personal_doc).encode("utf-8")
+        raise AssertionError(path)
+
+    monkeypatch.setattr(cm, "download_remote_mirror_artifact", _download)
+
+    def _fail_import(payload):
+        raise ValueError("catalog write failed")
+
+    monkeypatch.setattr("shared.server_catalog_import.import_catalog_payload", _fail_import)
+
+    with pytest.raises(ValueError, match="catalog write failed"):
+        cm.import_remote_mirror_to_profile(authorization=_pro_bearer())
+
+    restored = json.loads(personal_path(profile_id="default").read_text(encoding="utf-8"))
+    assert restored["personal"]["steam:1"]["status"] == "backlog"

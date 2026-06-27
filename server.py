@@ -1335,6 +1335,11 @@ class Handler(SimpleHTTPRequestHandler):
             ):
                 self._handle_stream_ticket_mint()
                 return
+        if path == "/api/auth/sign-out":
+            from shared.server_auth_sign_out import handle_auth_sign_out_post
+
+            handle_auth_sign_out_post(self)
+            return
         if path == "/api/license/activate":
             self._handle_license_activate()
             return

@@ -15,6 +15,8 @@ from shared import profile_paths
 from shared.pro_settings import DEFAULT_PRO_SETTINGS, read_pro_settings, write_pro_settings
 from tests.test_server_supabase_auth import _get_json, _request
 
+pytest_plugins = ["tests.test_server_supabase_auth"]
+
 
 @pytest.fixture()
 def local_server(tmp_path, monkeypatch):
@@ -106,3 +108,19 @@ def test_pro_settings_put_persists_for_local_pro(local_server, monkeypatch):
     assert cfg_status == HTTPStatus.OK
     assert cfg["proSettings"]["cloudMirrorEnabled"] is True
     assert cfg["capabilities"]["queue_bulk_refresh"]["enabled"] is True
+
+
+def test_pro_settings_put_blocked_without_local_header(auth_server):
+    base, _secret, _tmp = auth_server
+    body = json.dumps({"cloudMirrorEnabled": True}).encode("utf-8")
+    status, _raw = _request(
+        base,
+        "/api/pro-settings",
+        method="PUT",
+        headers={
+            "Content-Type": "application/json",
+            "Host": "public.example.com",
+        },
+        body=body,
+    )
+    assert status == HTTPStatus.FORBIDDEN

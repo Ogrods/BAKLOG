@@ -764,6 +764,14 @@ export async function signOutAccount(opts = {}) {
   if (_supabase) await _supabase.auth.signOut();
   _accessToken = null;
   _accountProfileId = '';
+  try {
+    await fetch('/api/auth/sign-out', {
+      method: 'POST',
+      headers: { 'X-BAKLOG-Local': '1' },
+    });
+  } catch {
+    /* server cache clear is best-effort */
+  }
   if (opts.intentional) {
     showAuthGatePanel('signin');
     setOverlayVisible(true);

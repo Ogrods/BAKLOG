@@ -36,7 +36,16 @@ def handle_mirror_get(handler: Any) -> None:
 
     qs = _query(handler)
     artifact = (qs.get("path") or [""])[0].strip()
-    profile = (qs.get("profile") or [""])[0].strip() or None
+    profile_raw = (qs.get("profile") or [""])[0].strip()
+    profile: str | None = None
+    if profile_raw:
+        from shared.profile_paths import normalize_profile_id
+
+        try:
+            profile = normalize_profile_id(profile_raw)
+        except ValueError:
+            srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "Invalid profile id"})
+            return
 
     try:
         if artifact:
@@ -108,6 +117,11 @@ def handle_mirror_import_post(handler: Any) -> None:
         srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "includePersonal must be boolean"})
         return
 
+    allow_empty_catalogs = body.get("allowEmptyCatalogs", False)
+    if not isinstance(allow_empty_catalogs, bool):
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "allowEmptyCatalogs must be boolean"})
+        return
+
     paths_raw = body.get("paths")
     paths: list[str] | None = None
     if paths_raw is not None:
@@ -121,6 +135,7 @@ def handle_mirror_import_post(handler: Any) -> None:
             authorization=authorization,
             paths=paths,
             include_personal=include_personal,
+            allow_empty_catalogs=allow_empty_catalogs,
         )
     except PermissionError as exc:
         srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": str(exc)})

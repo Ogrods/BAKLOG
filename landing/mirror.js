@@ -76,8 +76,12 @@ async function loadConfig() {
   return res.json();
 }
 
-async function mirrorFetch(path, token) {
-  const url = path ? `/api/mirror?path=${encodeURIComponent(path)}` : '/api/mirror';
+async function mirrorFetch(path, token, profile) {
+  const params = new URLSearchParams();
+  if (path) params.set('path', path);
+  if (profile) params.set('profile', profile);
+  const qs = params.toString();
+  const url = qs ? `/api/mirror?${qs}` : '/api/mirror';
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -156,25 +160,38 @@ function renderTable() {
   emptyFiltered.classList.toggle('hidden', filtered.length > 0 || allRows.length === 0);
 }
 
-async function loadLibrary(token) {
+async function loadLibrary(session) {
+  const token = session?.access_token;
+  if (!token) return;
+  const userId = String(session?.user?.id || '').trim();
   showAlert('');
   signInBtn.disabled = true;
   refreshBtn.disabled = true;
   try {
     const list = await mirrorFetch('', token);
-    const catalogPaths = catalogArtifactPaths(list.artifacts || []);
-    const hasPersonal = (list.artifacts || []).some((row) => row.path === 'data/personal.json');
+    const catalogRows = (list.artifacts || []).filter((row) => catalogArtifactPaths([row]).length);
+    const personalRows = (list.artifacts || []).filter((row) => row.path === 'data/personal.json');
 
-    if (!catalogPaths.length) {
+    if (!catalogRows.length) {
       lead.textContent = 'Signed in — waiting for your home PC to upload a mirror.';
       showPanel('setup');
       return;
     }
 
     const catalogs = await Promise.all(
-      catalogPaths.map(async (path) => ({ path, doc: await mirrorFetch(path, token) })),
+      catalogRows.map(async (row) => ({
+        path: row.path,
+        doc: await mirrorFetch(row.path, token, row.profile),
+      })),
     );
-    const personal = hasPersonal ? await mirrorFetch('data/personal.json', token) : null;
+    let personal = null;
+    if (personalRows.length) {
+      const pref =
+        personalRows.find((row) => row.profile === userId)
+        || personalRows.find((row) => row.profile === 'default')
+        || personalRows[0];
+      personal = await mirrorFetch('data/personal.json', token, pref.profile);
+    }
     allRows = mergeMirrorLibrary(catalogs, personal);
 
     if (!allRows.length) {
@@ -213,7 +230,7 @@ async function handleSignedIn(session) {
     return;
   }
   try {
-    await loadLibrary(token);
+    await loadLibrary(session);
   } catch (err) {
     if (err.status === 403) {
       showPanel('signin');

@@ -25,7 +25,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `sql/waitlist.sql` — one-time Supabase table for durable signup logging.
 - `sql/bug_reports.sql` — one-time Supabase table for durable bug-report logging.
 - `sql/cloud_mirror.sql` — one-time Supabase Storage bucket + RLS for Pro cloud read-only mirror (run before enabling uploads).
-- `api/mirror.js` — Vercel serverless read API for Pro cloud mirror (`GET /api/mirror` list, `GET /api/mirror?path=games_steam.json` download). Requires `BAKLOG_SUPABASE_URL` + `BAKLOG_SUPABASE_ANON_KEY` (or `SUPABASE_*` aliases). Bearer must be a signed-in Pro user; RLS scopes objects to `{auth.uid()}/{profile_id}/…`.
+- `api/mirror.js` — Vercel serverless read API for Pro cloud mirror (`GET /api/mirror` list, `GET /api/mirror?path=games_steam.json` download). Requires `BAKLOG_SUPABASE_URL` + `BAKLOG_SUPABASE_ANON_KEY` (or `SUPABASE_*` aliases). Bearer must be a signed-in Pro user; RLS scopes objects to `{auth.uid()}/{profile_id}/…` and requires Pro JWT plan. Optional `BAKLOG_COMP_PRO_EMAILS` (comma/newline list) mirrors local `packaging/pro_invitees.txt` for comp-Pro on hosted read. Omit `?profile=` to aggregate all mirrored BAKLOG profiles under the account.
 - `mirror.html` + `mirror.js` — Pro read-only cloud library viewer at `/mirror` (sign in with Supabase, browse mirrored catalogs from any browser). Uses `/api/mirror` + `/api/auth-config`.
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
 - `assets/store-logos/*.svg` — copy of repo-root `assets/store-logos/` for the hero trust strip (CSS mask). Re-sync when app logos change: `cp ../assets/store-logos/*.svg assets/store-logos/`.
@@ -148,6 +148,16 @@ Sign-up and password-reset emails redirect to **baklog.app**, not `127.0.0.1`, s
 - Never set `BAKLOG_SUPABASE_ANON_KEY` to the **service_role** key. Use the public **anon** key only.
 - The anon key is public by design (same as the local app `/api/config`). The security boundary is Supabase Auth settings + RLS on any `anon`-accessible tables.
 - `/api/auth-config` is rate-limited by client IP (5 requests per minute), same as `/api/subscribe`. Production requires Vercel KV / Upstash credentials or the endpoint returns `503`.
+
+### Cloud mirror (`/mirror`, `/api/mirror`)
+
+Run `sql/cloud_mirror.sql` in the Supabase SQL editor before enabling uploads. **Re-run the Pro entitlement section** after upgrading from the M1–M5 RLS (adds `mirror_is_pro_jwt()` on Storage + metadata policies).
+
+| Variable | Notes |
+| --- | --- |
+| `BAKLOG_SUPABASE_URL` | Same as auth (falls back to `SUPABASE_URL`). |
+| `BAKLOG_SUPABASE_ANON_KEY` | Public anon key only (falls back to `SUPABASE_ANON_KEY`). |
+| `BAKLOG_COMP_PRO_EMAILS` | Optional. Comma/newline list of comp-Pro invitee emails (mirror local `packaging/pro_invitees.txt`) so `baklog.app/mirror` grants Pro when JWT `plan` is still `free`. |
 
 Deploy landing, then add redirect URLs in Supabase before shipping an app build that points at these pages.
 

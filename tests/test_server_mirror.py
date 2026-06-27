@@ -7,6 +7,7 @@ import time
 from http import HTTPStatus
 
 import jwt
+import pytest
 
 from tests.test_server_supabase_auth import _get_json
 
@@ -113,6 +114,17 @@ def test_mirror_get_rejects_bad_artifact(auth_server, monkeypatch):
     assert status == HTTPStatus.BAD_REQUEST
 
 
+def test_mirror_get_rejects_invalid_profile(auth_server):
+    base, secret, _tmp = auth_server
+    status, data = _get_json(
+        base,
+        "/api/mirror?profile=../evil",
+        auth=_pro_bearer(secret),
+    )
+    assert status == HTTPStatus.BAD_REQUEST
+    assert "profile" in data.get("error", "").lower()
+
+
 def test_mirror_import_post_success(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     monkeypatch.setattr(
@@ -139,3 +151,42 @@ def test_mirror_import_post_forbidden_for_free(auth_server):
     )
     status, data = _post_json(base, "/api/mirror/import", {}, auth=f"Bearer {token}")
     assert status == HTTPStatus.FORBIDDEN
+
+
+def test_mirror_import_post_blocked_without_csrf_or_bearer(auth_server):
+    base, _secret, _tmp = auth_server
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(
+        f"{base}/api/mirror/import",
+        data=b"{}",
+        method="POST",
+        headers={"Content-Type": "application/json", "Host": "public.example.com"},
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(req, timeout=10)
+    assert exc.value.code == HTTPStatus.FORBIDDEN
+
+
+def test_mirror_import_post_allowed_with_bearer_only(auth_server, monkeypatch):
+    base, secret, _tmp = auth_server
+    monkeypatch.setattr(
+        "shared.server_mirror.import_remote_mirror_to_profile",
+        lambda **kwargs: {"ok": True, "imported": ["games_steam.json"], "count": 1, "personal": False},
+    )
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(
+        f"{base}/api/mirror/import",
+        data=b"{}",
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": _pro_bearer(secret),
+            "Host": "public.example.com",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        assert resp.status == HTTPStatus.OK

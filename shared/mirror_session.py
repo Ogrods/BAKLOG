@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 
-_SESSION_TTL_SEC = 24 * 60 * 60
+_SESSION_TTL_SEC = 60 * 60  # 1h — background uploads reuse last verified bearer
 _LAST_MIRROR_SESSION: tuple[float, str, str] | None = None  # epoch, user_id, bearer
 
 
@@ -51,6 +51,11 @@ def get_mirror_session() -> tuple[str, str] | None:
     return user_id, token
 
 
-def clear_mirror_session_for_tests() -> None:
+def clear_mirror_session() -> None:
+    """Drop cached bearer used for background mirror uploads (e.g. on sign-out)."""
     global _LAST_MIRROR_SESSION
     _LAST_MIRROR_SESSION = None
+
+
+def clear_mirror_session_for_tests() -> None:
+    clear_mirror_session()

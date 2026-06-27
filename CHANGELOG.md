@@ -39,6 +39,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Cloud mirror audit (P0): Supabase Storage RLS now requires Pro JWT plan (`mirror_is_pro_jwt()` in `landing/sql/cloud_mirror.sql`); hosted `/api/mirror` honors comp-Pro via `BAKLOG_COMP_PRO_EMAILS` on Vercel; multi-profile discovery when `?profile=` is omitted (fixes `BAKLOG_LOCAL_PROFILES` empty viewer); profile id validation on local `GET /api/mirror`.
+- Cloud mirror audit (P1): transactional mirror import (validate-all-then-write with rollback); reject empty `games_*` catalogs on import unless `allowEmptyCatalogs`; `POST /api/auth/sign-out` clears server mirror session + plan cache; mirror bearer cache TTL 1h; docs updated for live cloud sync (FAQ, troubleshooting, PRIVACY, SECURITY, profiles guide).
 - CI/release gate: Inno verify skips Pillow when branding assets exist; packaging test strips Pascal comments before `{app}` guard.
 
 ## [0.8.30] - 2026-06-27

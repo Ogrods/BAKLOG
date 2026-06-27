@@ -1144,7 +1144,13 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
     path = _api_path(handler)
     if not path.startswith("/api/"):
         return True
-    if path in ("/api/config", "/api/update-check", "/api/update/status", "/api/update/apply-result", "/api/diagnostics"):
+    if path in (
+        "/api/config",
+        "/api/update-check",
+        "/api/update/status",
+        "/api/update/apply-result",
+        "/api/diagnostics",
+    ):
         return True
     if ADMIN_ENABLED and _is_admin_exempt_api(path):
         return True
@@ -1449,7 +1455,13 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._handle_shutdown()
             return
-        if path in ("/api/update/download", "/api/update/cancel", "/api/update/apply", "/api/update/discard-ready", "/api/update/dismiss"):
+        if path in (
+            "/api/update/download",
+            "/api/update/cancel",
+            "/api/update/apply",
+            "/api/update/discard-ready",
+            "/api/update/dismiss",
+        ):
             if self._reject_if_csrf_strict():
                 return
             self._handle_update_post(path)

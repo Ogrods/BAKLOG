@@ -1501,9 +1501,10 @@ class RunManager:
             launch_abandoned.set()
             run.status = "failed"
             run.exit_code = -1
+            launch_timeout = _run_cfg("LAUNCH_TIMEOUT_SEC", LAUNCH_TIMEOUT_SEC)
             run.add_line(
                 "stderr",
-                f"[server] subprocess launch did not return within {_run_cfg('LAUNCH_TIMEOUT_SEC', LAUNCH_TIMEOUT_SEC)}s "
+                f"[server] subprocess launch did not return within {launch_timeout}s "
                 f"(likely Windows AppX Python activation deadlock); abandoning the launcher thread. "
                 f"Restart the server if subsequent runs also fail to start.",
             )

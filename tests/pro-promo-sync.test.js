@@ -30,4 +30,31 @@ describe('PRO_PROMO sync with landing', () => {
     const indexHtml = readFileSync('index.html', 'utf8');
     expect(indexHtml).not.toMatch(/Pro \(planned/i);
   });
+
+  it('bulk refresh is live in tierCompare, not coming soon', () => {
+    const row = PRO_PROMO.tierCompare.find((r) => r.feature === 'Manual store refresh');
+    expect(row).toBeTruthy();
+    expect(row.pro).toMatch(/queue all stale/i);
+    expect(row.pro).not.toMatch(/coming/i);
+  });
+
+  it('landing tier table bulk refresh cell matches PRO_PROMO', () => {
+    const tableStart = LANDING_HTML.indexOf('aria-label="Free vs paid tier"');
+    expect(tableStart).toBeGreaterThan(-1);
+    const tableSlice = LANDING_HTML.slice(tableStart, tableStart + 4000);
+    const rowMatch = tableSlice.match(
+      /<th scope="row">Manual store refresh<\/th>\s*<td>[^<]*<\/td>\s*<td>([^<]+)<\/td>/,
+    );
+    expect(rowMatch).toBeTruthy();
+    const promoRow = PRO_PROMO.tierCompare.find((r) => r.feature === 'Manual store refresh');
+    expect(rowMatch[1].trim()).toBe(promoRow.pro);
+  });
+
+  it('only cloud sync and deal alerts use Coming in tierCompare pro column', () => {
+    const comingRows = PRO_PROMO.tierCompare.filter((r) => /coming/i.test(String(r.pro)));
+    expect(comingRows.map((r) => r.feature).sort()).toEqual([
+      'Cloud sync',
+      'Deal/watchlist alerts',
+    ]);
+  });
 });

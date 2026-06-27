@@ -414,7 +414,7 @@ const STALE_SWEEP_ORDER = {
   protondb: 240,
 };
 
-function staleSweepRank(key) {
+export function staleSweepRank(key) {
   return STALE_SWEEP_ORDER[key] ?? 150;
 }
 const STALE_OVERRIDES = {
@@ -831,6 +831,7 @@ function coverageTooltipLine(key) {
 let reloadGamesFn = async () => {};
 let reloadAfterFetcherFn = null;
 let runStaleCooldownUntil = 0;
+let runFailedCooldownUntil = 0;
 
 export function configureFetcherHealth({ reloadGames, reloadAfterFetcher }) {
   reloadGamesFn = reloadGames;
@@ -1153,6 +1154,25 @@ export function fetcherFreshness(source) {
  * the whole runAllStale pipeline. Inputs are the already-resolved dependency
  * results for `src`.
  */
+export function resolveStaleSweepKeys(sources, {
+  freshnessStatus,
+  credentialsSatisfied,
+  hasRunState,
+  cooldownMs,
+  disconnected,
+} = {}) {
+  return sources
+    .filter(src => staleSweepEligible(src, {
+      freshnessStatus: freshnessStatus(src),
+      credentialsSatisfied: credentialsSatisfied(src.key),
+      hasRunState: hasRunState(src.key),
+      cooldownMs: cooldownMs(src.key),
+      disconnected: disconnected(src.key),
+    }))
+    .map(src => src.key)
+    .sort((a, b) => staleSweepRank(a) - staleSweepRank(b));
+}
+
 export function staleSweepEligible(src, {
   freshnessStatus,
   credentialsSatisfied,
@@ -2638,47 +2658,67 @@ export const fetcherRunner = (() => {
     return true;
   }
 
-  async function runAllStale() {
-    if (!isApiAvailable()) return;
-    runStaleCooldownUntil = Date.now() + 2000;
-    renderDashboardFetcherHealth();
-    await loadFetcherSources(true);
-    const staleKeys = fetcherSources
-      .filter(src => staleSweepEligible(src, {
-        freshnessStatus: fetcherFreshness(src).status,
-        credentialsSatisfied: fetcherCredentialsSatisfied(src.key),
-        hasRunState: runStateByKey.has(src.key),
-        cooldownMs: authCooldownRemainingMs(src.key),
-        disconnected: isFetcherDisconnected(src.key),
-      }))
-      .map(src => src.key)
-      .sort((a, b) => staleSweepRank(a) - staleSweepRank(b));
-    if (!staleKeys.length) return;
+  async function runBatchKeys(keys, { logPrefix = 'batch', runFn = run } = {}) {
+    if (!keys.length) return;
     const batchEpoch = getCancelEpoch();
-    // Respect the global cap. Wait for an open slot between submits so we
-    // never stack the queue beyond 1 active + 1 queued, matching the rule
-    // the server enforces and the chip-disable logic in chipHtml.
-    for (const key of staleKeys) {
+    for (const key of keys) {
       if (getCancelEpoch() !== batchEpoch) {
-        logEvent('info', '[run stale aborted: cancelled]');
+        logEvent('info', `[${logPrefix} aborted: cancelled]`);
         break;
       }
       try {
         await waitForQueueSlot({ batchEpoch, key });
         if (getCancelEpoch() !== batchEpoch) {
-          logEvent('info', '[run stale aborted: cancelled]');
+          logEvent('info', `[${logPrefix} aborted: cancelled]`);
           break;
         }
-        await run(key);
+        await runFn(key);
       } catch (err) {
         if (err?.message === 'cancelled') {
-          logEvent('info', '[run stale aborted: cancelled]');
+          logEvent('info', `[${logPrefix} aborted: cancelled]`);
         } else {
-          logEvent('error', `[run stale aborted: ${err}]`);
+          logEvent('error', `[${logPrefix} aborted: ${err}]`);
         }
         break;
       }
     }
+  }
+
+  async function runAllStale() {
+    if (!isApiAvailable()) return;
+    runStaleCooldownUntil = Date.now() + 2000;
+    renderDashboardFetcherHealth();
+    await loadFetcherSources(true);
+    const staleKeys = resolveStaleSweepKeys(fetcherSources, {
+      freshnessStatus: (src) => fetcherFreshness(src).status,
+      credentialsSatisfied: fetcherCredentialsSatisfied,
+      hasRunState: (key) => runStateByKey.has(key),
+      cooldownMs: (key) => authCooldownRemainingMs(key),
+      disconnected: (key) => isFetcherDisconnected(key),
+    });
+    if (!staleKeys.length) return;
+    await runBatchKeys(staleKeys, { logPrefix: 'run stale' });
+  }
+
+  async function runAllFailed() {
+    if (!isApiAvailable()) return;
+    runFailedCooldownUntil = Date.now() + 2000;
+    renderDashboardFetcherHealth();
+    await loadFetcherSources(true);
+    const failedKeys = fetcherSources
+      .filter(src => {
+        const key = src.key;
+        if (!lastRunFailedByKey.has(key)) return false;
+        if (runStateByKey.has(key)) return false;
+        if (authCooldownRemainingMs(key) > 0) return false;
+        if (isFetcherDisconnected(key)) return false;
+        if (src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) return false;
+        return true;
+      })
+      .map(src => src.key)
+      .sort((a, b) => (source(a)?.label || a).localeCompare(source(b)?.label || b));
+    if (!failedKeys.length) return;
+    await runBatchKeys(failedKeys, { logPrefix: 'retry failed' });
   }
 
   async function subscribe(runId, key, src, { reconnect = false, quiet = false, queuedOnly = false } = {}) {
@@ -3029,6 +3069,8 @@ export const fetcherRunner = (() => {
     waitForQueueSlot,
     run,
     runAllStale,
+    runAllFailed,
+    runBatchKeysForTest: runBatchKeys,
     syncFromServer,
     startDashboardPolling,
     stopDashboardPolling,
@@ -3239,6 +3281,15 @@ export function renderDashboardFetcherHealth() {
     if (r.src.missingRequirements?.length && !fetcherCredentialsSatisfied(r.src.key)) return false;
     if (fetcherRunner.stateFor(r.src.key)) return false;
     if (isFetcherDisconnected(r.src.key)) return false;
+    return true;
+  });
+  const runnableFailed = rows.filter(r => {
+    const key = r.src.key;
+    if (!lastRunFailedByKey.has(key)) return false;
+    if (fetcherRunner.stateFor(key)) return false;
+    if (authCooldownRemainingMs(key) > 0) return false;
+    if (isFetcherDisconnected(key)) return false;
+    if (r.src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) return false;
     return true;
   });
   const visible = filterFetcherHealthRows(rows, { showConnected, showStaleMissing });
@@ -3469,10 +3520,16 @@ export function renderDashboardFetcherHealth() {
 
   const staleBtnDisabled = !apiReady || !runnableStale.length || Date.now() < runStaleCooldownUntil;
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
+  const failedBtnDisabled = !apiReady || !runnableFailed.length || Date.now() < runFailedCooldownUntil;
+  const failedBtnLabel = `Retry failed (${runnableFailed.length})`;
 
   const staleButtonHtml = isPro()
     ? `<button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale store back-to-back (Pro)">${escapeHtml(staleBtnLabel)}</button>`
     : '';
+  const failedButtonHtml = runnableFailed.length
+    ? `<button type="button" class="fh-run-failed" ${failedBtnDisabled ? 'disabled' : ''} title="Queue every fetcher that failed its last run">${escapeHtml(failedBtnLabel)}</button>`
+    : '';
+  const batchButtonsHtml = `${failedButtonHtml}${staleButtonHtml}`;
   const filterHint = (!showConnected && !showStaleMissing)
     ? 'Showing all'
     : `Uncheck both to show all ${rows.length}`;
@@ -3500,7 +3557,7 @@ export function renderDashboardFetcherHealth() {
       <div class="fh-legend-row fh-legend-row--bar">
         <div class="fh-control-bar">
           ${countsBlockHtml}
-          ${staleButtonHtml}
+          ${batchButtonsHtml}
           ${filterToggleHtml}
           ${legendToggleHtml}
         </div>
@@ -3515,7 +3572,7 @@ export function renderDashboardFetcherHealth() {
         ${buildStatTilesHtml(rows)}
         <div class="fh-head fh-head--stack">
           ${countsBlockHtml}
-          ${staleButtonHtml}
+          ${batchButtonsHtml}
           ${filterToggleHtml}
           ${legendToggleHtml}
         </div>

@@ -4417,7 +4417,8 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 .fh-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 .fh-head-left { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .fh-head-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.fh-run-stale {
+.fh-run-stale,
+.fh-run-failed {
   font-size: 0.7rem;
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
@@ -4426,8 +4427,10 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   color: var(--text-dim);
   cursor: pointer;
 }
-.fh-run-stale:hover:not(:disabled) { background: var(--bg-hover); }
-.fh-run-stale:disabled { opacity: 0.45; cursor: not-allowed; }
+.fh-run-stale:hover:not(:disabled),
+.fh-run-failed:hover:not(:disabled) { background: var(--bg-hover); }
+.fh-run-stale:disabled,
+.fh-run-failed:disabled { opacity: 0.45; cursor: not-allowed; }
 .fh-title { font-size: 0.75rem; font-weight: 600; color: #cbd5e1; letter-spacing: 0.04em; text-transform: uppercase; }
 .fh-counts { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
 .fh-count {
@@ -4715,7 +4718,8 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 }
 .fh-readonly-banner code { font-size: 0.68rem; background: rgba(15, 23, 42, 0.5); padding: 0.1rem 0.25rem; border-radius: 0.2rem; }
 .fh-readonly-link { color: var(--accent-muted); text-decoration: underline; }
-.fh-readonly .fh-run-stale { pointer-events: none; opacity: 0.45; }
+.fh-readonly .fh-run-stale,
+.fh-readonly .fh-run-failed { pointer-events: none; opacity: 0.45; }
 .fh-chip-warn {
   display: inline-flex;
   align-items: center;
@@ -9182,7 +9186,8 @@ body {
   flex: 0 0 auto;
   align-self: start;
 }
-.fh-legend-row--bar .fh-control-bar .fh-run-stale {
+.fh-legend-row--bar .fh-control-bar .fh-run-stale,
+.fh-legend-row--bar .fh-control-bar .fh-run-failed {
   flex: 0 0 auto;
 }
 .fh-legend-row--bar .fh-control-bar .fh-legend-toggle {
@@ -9334,13 +9339,15 @@ body {
 .fh-legend-row .fh-legend > summary:hover {
   color: var(--text, #e2e8f0);
 }
-.fh-legend-row .fh-run-stale {
+.fh-legend-row .fh-run-stale,
+.fh-legend-row .fh-run-failed {
   font-weight: 600;
   color: var(--accent-muted, #7dd3fc);
   border-color: var(--accent-border, rgba(56, 189, 248, 0.45));
   background: var(--accent-subtle, rgba(56, 189, 248, 0.15));
 }
-.fh-legend-row .fh-run-stale:hover:not(:disabled) {
+.fh-legend-row .fh-run-stale:hover:not(:disabled),
+.fh-legend-row .fh-run-failed:hover:not(:disabled) {
   color: var(--text, #e2e8f0);
   border-color: var(--accent, #38bdf8);
   background: var(--accent, #38bdf8);

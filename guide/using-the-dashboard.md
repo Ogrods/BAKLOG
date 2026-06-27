@@ -99,6 +99,7 @@ Free forever to import and browse. Optional **$5/mo** ($50/yr) adds:
 
 - No sponsored deal cards
 - Scheduled stale-store refresh without keeping the app open
+- Queued bulk refresh (every stale store in one sweep from Fetcher health)
 - Deep achievement/trophy sync (full re-pull; free tier: cached % only)
 - Bonus claimables feed (DLC, add-ons, in-game bonuses)
 

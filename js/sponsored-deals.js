@@ -802,7 +802,7 @@ export const PRO_PROMO = {
   ],
   tierCompare: [
     { feature: 'Import & browse all stores', free: '✓', pro: '✓' },
-    { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores (coming)' },
+    { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores' },
     { feature: 'Auto-refresh while app is open', free: '✓ (one store / ~30 min)', pro: '✓' },
     { feature: 'Refresh while app is closed', free: '-', pro: '✓' },
     { feature: 'Claimable Now (full games)', free: '✓', pro: '✓ + bonus DLC/bonus feed' },

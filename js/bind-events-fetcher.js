@@ -71,6 +71,12 @@ export function bindFetcherHealthEvents() {
       fetcherRunner.runAllStale();
       return;
     }
+    const failedBtn = e.target.closest(".fh-run-failed");
+    if (failedBtn && !failedBtn.disabled) {
+      e.preventDefault();
+      fetcherRunner.runAllFailed();
+      return;
+    }
     const chip = e.target.closest(".fh-chip[data-fetcher-key]");
     if (!chip) return;
     if (chip.dataset.fetcherConnect) {
@@ -98,7 +104,7 @@ export function bindFetcherHealthEvents() {
     btn.addEventListener("click", () => fetcherRunner.hideFetcherPopover());
   });
   document.getElementById("fetcherRow")?.addEventListener("click", e => {
-    if (e.target.closest(".fh-chip, .fh-run-stale, .fh-toggle, .fh-log, .fh-head-actions label")) {
+    if (e.target.closest(".fh-chip, .fh-run-stale, .fh-run-failed, .fh-toggle, .fh-log, .fh-head-actions label")) {
       return;
     }
     const toggleBtn = e.target.closest("[data-role='bar-toggle']");

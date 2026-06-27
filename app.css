@@ -7275,6 +7275,27 @@ html[data-init-view="wishlist"] .steal-list-footer-passive { display: none; }
 .conn-prefs-note--pro {
   color: var(--accent, #38bdf8);
 }
+.conn-prefs-import {
+  flex-basis: 100%;
+  margin: 0.35rem 0 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border, #334155);
+  background: transparent;
+  color: var(--accent, #38bdf8);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-end;
+}
+.conn-prefs-import:hover {
+  border-color: var(--accent, #38bdf8);
+  background: rgba(56, 189, 248, 0.08);
+}
+.conn-prefs-import:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .pro-view-root { width: 100%; }
 .pro-view-funnel {
   display: flex;

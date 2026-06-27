@@ -315,3 +315,100 @@ def _bearer_token(authorization: str) -> str:
     if not token:
         raise PermissionError("missing bearer token")
     return token
+
+
+def _parse_mirror_json(body: bytes, artifact_path: str) -> Any:
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{artifact_path}: invalid JSON") from exc
+
+
+def import_remote_mirror_to_profile(
+    *,
+    authorization: str,
+    profile_id: str | None = None,
+    paths: list[str] | None = None,
+    include_personal: bool = True,
+) -> dict[str, Any]:
+    """Download mirrored artifacts and write them into the active local profile."""
+    from shared.profile_paths import catalog_path, get_active_profile_id
+    from shared.safe_write import safe_write_text
+    from shared.server_catalog_import import (
+        import_catalog_payload,
+        is_allowed_catalog_filename,
+        validate_catalog_doc,
+    )
+    from shared.server_personal import save_personal_doc
+
+    pid = profile_id if profile_id is not None else get_active_profile_id()
+    remote_rows = list_remote_mirror_artifacts(authorization=authorization, profile_id=pid)
+    remote_paths = {str(row.get("path") or "").strip() for row in remote_rows}
+    remote_paths.discard("")
+
+    candidates: list[str] = []
+    for path in sorted(remote_paths):
+        rel = mirrorable_relative_path(profile_root(profile_id=pid) / path, profile_id=pid)
+        if rel is None:
+            continue
+        if rel == "data/personal.json" and not include_personal:
+            continue
+        candidates.append(rel)
+
+    if paths is not None:
+        wanted = {str(item).strip().lstrip("/") for item in paths if str(item).strip()}
+        candidates = [rel for rel in candidates if rel in wanted]
+
+    if not candidates:
+        raise ValueError("no importable mirror artifacts")
+
+    catalogs: dict[str, Any] = {}
+    imported: list[str] = []
+    personal_saved = False
+
+    for rel in candidates:
+        body = download_remote_mirror_artifact(
+            authorization=authorization,
+            artifact_path=rel,
+            profile_id=pid,
+        )
+        doc = _parse_mirror_json(body, rel)
+
+        if rel == "data/personal.json":
+            if not isinstance(doc, dict):
+                raise ValueError(f"{rel}: must be a JSON object")
+            save_personal_doc(doc, allow_empty=False)
+            imported.append(rel)
+            personal_saved = True
+            continue
+
+        if rel == "free_claims.json":
+            if not isinstance(doc, dict):
+                raise ValueError(f"{rel}: must be a JSON object")
+            dest = catalog_path("free_claims.json", profile_id=pid)
+            safe_write_text(dest, json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
+            imported.append(rel)
+            continue
+
+        if is_allowed_catalog_filename(rel):
+            validate_catalog_doc(rel, doc)
+            catalogs[rel] = doc
+
+    if catalogs:
+        batch = import_catalog_payload({"catalogs": catalogs, "profile": pid})
+        imported.extend(batch.get("imported") or [])
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in imported:
+        if name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+
+    return {
+        "ok": True,
+        "imported": ordered,
+        "count": len(ordered),
+        "personal": personal_saved,
+    }

@@ -1425,6 +1425,13 @@ class Handler(SimpleHTTPRequestHandler):
 
             handle_catalogs_import_post(self)
             return
+        if path == "/api/mirror/import":
+            if self._reject_if_csrf_strict():
+                return
+            from shared.server_mirror import handle_mirror_import_post
+
+            handle_mirror_import_post(self)
+            return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_DELETE(self) -> None:  # noqa: N802 - http.server API

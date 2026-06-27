@@ -35,6 +35,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Cloud mirror M2: real Supabase Storage upload on debounced flush (`shared/supabase_mirror.py`, cached bearer via `shared/mirror_session.py`); local upload state in `cache/runs/mirror_upload_state.json`; `GET /api/mirror` list/download (Pro bearer, read does not require `cloudMirrorEnabled`); hosted read API `landing/api/mirror.js`.
 - Cloud mirror M3: hosted read-only viewer at `https://baklog.app/mirror` (`landing/mirror.html`, `mirror.js`, `mirror-merge.js`) — Pro sign-in, multi-store table with status/playtime/HLTB from mirrored JSON.
 - Cloud mirror M4: `cloud_sync_mirror` capability live; Connections opt-in toggle (`Cloud sync to your account`) persists via `PUT /api/pro-settings`; marketing copy synced (PRO_PROMO + landing tier table).
+- Cloud mirror M5: `POST /api/mirror/import` pulls mirrored catalogs + personal data into the active profile; Connections **Import from cloud mirror** button for new-PC migration (`js/cloud-mirror-import.js`).
 
 ### Fixed
 

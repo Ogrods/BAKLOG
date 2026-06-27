@@ -175,3 +175,51 @@ def test_mirror_read_allowed_requires_pro_jwt(profile_root, monkeypatch):
         algorithm="HS256",
     )
     assert cm.mirror_read_allowed(authorization=f"Bearer {free}") is False
+
+
+def test_import_remote_mirror_writes_catalogs_and_personal(profile_root, monkeypatch):
+    _enable_auth(monkeypatch)
+    steam_doc = {"games": [{"store": "steam", "id": "570", "name": "Dota 2"}]}
+    personal_doc = {
+        "personal": {"steam:570": {"status": "playing"}},
+        "prefs": {},
+        "manual": [],
+        "libraryFirstSeen": {},
+    }
+
+    monkeypatch.setattr(
+        cm,
+        "list_remote_mirror_artifacts",
+        lambda **kwargs: [
+            {"path": "games_steam.json"},
+            {"path": "data/personal.json"},
+        ],
+    )
+
+    def _download(**kwargs):
+        path = kwargs["artifact_path"]
+        if path == "games_steam.json":
+            return json.dumps(steam_doc).encode("utf-8")
+        if path == "data/personal.json":
+            return json.dumps(personal_doc).encode("utf-8")
+        raise AssertionError(path)
+
+    monkeypatch.setattr(cm, "download_remote_mirror_artifact", _download)
+
+    result = cm.import_remote_mirror_to_profile(authorization=_pro_bearer())
+    assert result["count"] == 2
+    assert "games_steam.json" in result["imported"]
+    assert "data/personal.json" in result["imported"]
+    assert result["personal"] is True
+
+    saved_steam = json.loads(catalog_path("games_steam.json", profile_id="default").read_text(encoding="utf-8"))
+    assert saved_steam["games"][0]["name"] == "Dota 2"
+    saved_personal = json.loads(personal_path(profile_id="default").read_text(encoding="utf-8"))
+    assert saved_personal["personal"]["steam:570"]["status"] == "playing"
+
+
+def test_import_remote_mirror_empty_raises(profile_root, monkeypatch):
+    _enable_auth(monkeypatch)
+    monkeypatch.setattr(cm, "list_remote_mirror_artifacts", lambda **kwargs: [])
+    with pytest.raises(ValueError, match="no importable"):
+        cm.import_remote_mirror_to_profile(authorization=_pro_bearer())

@@ -1,5 +1,6 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
 import { getAccessToken, getProSettings, isAccountAuthMode, isPro, refreshAccountPlan } from './auth-gate.js';
+import { importFromCloudMirror } from './cloud-mirror-import.js';
 import { capabilityStatus } from './pro-capabilities.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
@@ -536,9 +537,12 @@ function renderConnPrefs() {
   const cloudWrap = document.getElementById('cloudMirrorToggleWrap');
   const cloudToggle = document.getElementById('cloudMirrorEnabledToggle');
   const cloudNote = document.getElementById('cloudMirrorPlanNote');
+  const importBtn = document.getElementById('cloudMirrorImportBtn');
   const showCloudMirror =
     isPro() && isAccountAuthMode() && !!getAccessToken() && capabilityStatus('cloud_sync_mirror') === 'live';
+  const showMirrorImport = isPro() && isAccountAuthMode() && !!getAccessToken();
   if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
+  if (importBtn) importBtn.hidden = !showMirrorImport;
   if (cloudToggle && showCloudMirror) {
     cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
   }
@@ -600,6 +604,26 @@ async function handleCloudMirrorToggle(ev) {
     window.alert(err?.message || 'Could not save cloud sync setting.');
   } finally {
     toggle.disabled = false;
+  }
+}
+
+async function handleCloudMirrorImport() {
+  const btn = document.getElementById('cloudMirrorImportBtn');
+  const confirmed = window.confirm(
+    'Import library catalogs and personal data from your cloud mirror?\n\n'
+    + 'Matching local files will be replaced. Store credentials are not copied — reconnect stores afterward.',
+  );
+  if (!confirmed) return;
+  try {
+    if (btn) btn.disabled = true;
+    const result = await importFromCloudMirror({ includePersonal: true });
+    const count = result?.count ?? 0;
+    window.alert(`Cloud mirror import complete (${count} file${count === 1 ? '' : 's'}). The app will reload.`);
+    window.location.reload();
+  } catch (err) {
+    window.alert(err?.message || 'Cloud mirror import failed.');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -710,7 +734,10 @@ function handleLayoutClick(ev) {
 
   const target = ev.target;
 
-
+  if (target.id === 'cloudMirrorImportBtn') {
+    void handleCloudMirrorImport();
+    return;
+  }
 
   const startSteam = target.closest('[data-conn-start-steam]');
 

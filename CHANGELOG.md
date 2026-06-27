@@ -22,6 +22,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.28] - 2026-06-27
+
+### Fixed
+
+- Inno Setup compile error on `CreateOutputMsgPage` (invalid extra parameters blocked v0.8.27 Windows release).
+
 ## [0.8.27] - 2026-06-27
 
 ### Added

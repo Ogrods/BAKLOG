@@ -80,9 +80,7 @@ begin
     DataDir + #13#10 + #13#10 +
     'App files:' + #13#10 +
     ExpandConstant('{app}') + #13#10 + #13#10 +
-    'Before a full uninstall later, open Connections and use Export bundle to back up your sign-ins.',
-    True,
-    True);
+    'Before a full uninstall later, open Connections and use Export bundle to back up your sign-ins.');
 end;
 
 function InitializeUninstall(): Boolean;

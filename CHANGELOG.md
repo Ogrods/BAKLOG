@@ -19,8 +19,19 @@ version is `pyproject.toml` (mirrored into `package.json` and the
    `git push origin vX.Y.Z`. The tag is the install-reproducibility contract;
    without it, "which version do you have?" is unanswerable for a second
    contributor.
+4. **Before tagging:** run `.\scripts\release_preflight.ps1 -TagVersion vX.Y.Z`
+   on Windows (includes pytest, Inno ISCC compile, optional full
+   `build_windows.ps1`). CI `python-windows` must also compile `baklog.iss`.
+5. **Broken public installer:** do not bump version for a bad build alone. Fix
+   on `main`, keep `pyproject.toml` on the same version, run
+   `.\scripts\replace_release_tag.ps1 -Version X.Y.Z -Force` to replace the tag
+   and re-publish assets at the same version.
 
 ## [Unreleased]
+
+### Fixed
+
+- Inno Setup install wizard: finish page uses `{localappdata}` paths only (never `{app}` during install); removes CurPageChanged runtime crash.
 
 ## [0.8.30] - 2026-06-27
 

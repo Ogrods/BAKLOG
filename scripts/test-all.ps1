@@ -69,4 +69,13 @@ Write-Host "==> release smoke (store API contracts; required before tagging)"
 & $Python -m pytest -q -m release_smoke
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+if ($IsWindows -or $env:OS -match "Windows") {
+    Write-Host "==> verify_inno_script (ISCC compile; required before tagging on Windows)"
+    $verifyInno = Join-Path $PSScriptRoot "verify_inno_script.ps1"
+    if (Test-Path $verifyInno) {
+        & powershell -ExecutionPolicy Bypass -File $verifyInno
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+}
+
 exit 0

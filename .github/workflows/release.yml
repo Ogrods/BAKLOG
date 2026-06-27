@@ -3,9 +3,12 @@
 # publishes the GitHub Release. The artifact is built from the tagged commit by
 # CI (not hand-uploaded), so anyone can verify it with `gh attestation verify`.
 #
-# Policy: tags are immutable. Never move or re-point a published v* tag - cut a
-# new patch tag instead. The job refuses to build when the tag does not match
-# the version in pyproject.toml, so a tag always names exactly what it ships.
+# Policy: prefer not to move tags. If a published installer is broken for
+# strangers/beta, replace the SAME version: fix on main, run
+# scripts/replace_release_tag.ps1 -Version X.Y.Z -Force (deletes tag + release,
+# re-tags HEAD, re-runs this workflow). Do not bump patch solely for a broken
+# public build. release.yml uploads assets with --clobber when the release
+# already exists (same tag re-run).
 name: Release
 
 on:
@@ -122,6 +125,10 @@ jobs:
             if (-not (Test-Path $f)) { Write-Error "Missing build artifact: $f"; exit 1 }
           }
           Get-FileHash release/BAKLOG-win64.zip -Algorithm SHA256 | Format-List
+
+      - name: Silent install smoke (BAKLOG-Setup.exe)
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/verify_inno_install_smoke.ps1
 
       - name: Generate SBOM
         uses: anchore/sbom-action@v0

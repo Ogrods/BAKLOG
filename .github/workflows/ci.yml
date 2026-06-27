@@ -121,6 +121,14 @@ jobs:
           tests/test_server_update_api.py
           tests/test_auth_fetcher_smoke.py
 
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Verify Inno Setup script compiles
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/verify_inno_script.ps1
+
   python-macos:
     name: Python (macOS smoke)
     runs-on: macos-latest

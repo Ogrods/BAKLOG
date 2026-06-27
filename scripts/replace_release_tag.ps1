@@ -46,11 +46,20 @@ if (-not $Force) {
     }
 }
 
-if (gh release view $tag 2>$null) {
+$releaseExists = $false
+try {
+    gh release view $tag 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $releaseExists = $true }
+} catch {
+    $releaseExists = $false
+}
+if ($releaseExists) {
     gh release delete $tag --yes
 }
 git push origin --delete $tag 2>$null
+if ($LASTEXITCODE -ne 0) { $global:LASTEXITCODE = 0 }
 git tag -d $tag 2>$null
+if ($LASTEXITCODE -ne 0) { $global:LASTEXITCODE = 0 }
 
 git tag -a $tag -m "BAKLOG $tag (replacement build)"
 git push origin $tag

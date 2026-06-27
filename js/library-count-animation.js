@@ -61,7 +61,7 @@ function cancelEpisode(node, opts = {}) {
     && prev.host
     && opts.keepPopups !== false
   ) {
-    mountOnePopup(prev.host, prev.node);
+    mountOnePopup(prev.host, prev.node, 0);
   }
   // Settle text to its final value so we never leave half-rolled digits.
   try { if (prev.format && prev.to != null) node.textContent = prev.format(prev.to); } catch (_) {}
@@ -145,15 +145,24 @@ function mountOnePopup(host, anchorNode, stackIndex = null) {
     const fs = parseFloat(getComputedStyle(anchorEl).fontSize) || 16;
     const isHero = anchorEl.id === 'dashHeroCount';
     el.classList.add('library-count-popup--floated');
+    let popupFs;
     if (!isHero) {
       el.classList.add('library-count-popup--floated-chip');
-      el.style.fontSize = `${Math.max(20, Math.min(32, fs * 1.75)).toFixed(1)}px`;
+      popupFs = Math.max(20, Math.min(32, fs * 1.75));
+      el.style.fontSize = `${popupFs.toFixed(1)}px`;
     } else {
-      el.style.fontSize = `${Math.max(28, Math.min(52, fs * 0.48)).toFixed(1)}px`;
+      popupFs = Math.max(28, Math.min(52, fs * 0.48));
+      el.style.fontSize = `${popupFs.toFixed(1)}px`;
     }
     const stack = Number.isFinite(stackIndex) ? stackIndex : activePopupStackIndex(anchorNode);
     let left = rect.right + Math.max(3, fs * 0.25);
-    let top = rect.top + (isHero ? fs * 0.05 : 0) + stack * (isHero ? fs * 0.42 : fs * 0.55);
+    let top;
+    if (isHero) {
+      // Top-right anchor; stack upward so bursts do not pile at the bottom-right.
+      top = rect.top - stack * popupFs * 0.55;
+    } else {
+      top = rect.top + stack * fs * 0.55;
+    }
     if (typeof window !== 'undefined') {
       left = Math.min(left, window.innerWidth - 80);
       top = Math.max(8, Math.min(top, window.innerHeight - 40));
@@ -183,7 +192,7 @@ function syncPopupsOnTick(episode, v) {
   ) {
     episode.lastPopupInt += 1;
     if (episode.lastPopupInt > episode.from) {
-      mountOnePopup(episode.host, episode.node);
+      mountOnePopup(episode.host, episode.node, episode.popupsSpawned);
       episode.popupsSpawned += 1;
     }
   }
@@ -208,7 +217,7 @@ function spawnPopups(host, popupCount, opts) {
     const delay = delays[i];
     const id = setTimeout(() => {
       if (!host.isConnected && !anchorNode.isConnected) return;
-      mountOnePopup(host, anchorNode);
+      mountOnePopup(host, anchorNode, i);
     }, delay);
     timers.push(id);
   }

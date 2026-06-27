@@ -1,9 +1,9 @@
 {
-  "fetched_at": "2026-06-26T02:09:19.372703+00:00",
+  "fetched_at": "2026-06-27T01:41:17.508743+00:00",
   "sources": {
     "epic": 2,
     "gamerpower": 11,
-    "itad": 11
+    "itad": 12
   },
   "attribution": [
     "GamerPower.com"
@@ -171,13 +171,29 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
+      "id": "itad-31969d48cb26",
+      "store": "steam",
+      "title": "POPGOES Arcade - FREE on Steam on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16309/",
+      "ends_at": null,
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1986840/library_600x900_2x.jpg",
+      "blurb": "POPGOES Arcade",
+      "source": "itad",
+      "first_seen": "2026-06-27T01:41:17.508743+00:00",
+      "review_percent": 96,
+      "steam_appid": 1986840,
+      "genres": [
+        "RPG"
+      ]
+    },
+    {
       "id": "itad-f520d9928848",
       "store": "epic",
       "title": "TMNT - Shredder's Revenge free on Mobile from EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16306/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1361510/library_600x900_2x.jpg",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/teenage-mutant-ninja-turtles-shredders-revenge/info/\">Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 02 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/purchase?offers=1-45108224b9eb45c8a86556d4a0d6c8d1-b430f3e8c16e4a519a99d32a4453f7c7&amp;offers=1-45108224b9eb45c8a86556d4a0d6c8d1-64230acdae9b4f82972b8d979eb2b617>go to giveaway</a>",
+      "blurb": "Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge",
       "source": "itad",
       "review_percent": 94,
       "steam_appid": 1361510,
@@ -284,7 +300,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/15746/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
+      "blurb": "Smiley Dusty",
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },

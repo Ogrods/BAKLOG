@@ -19,7 +19,8 @@
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
     "itad-f0cffe659c19",
-    "itad-f520d9928848"
+    "itad-f520d9928848",
+    "itad-31969d48cb26"
   ],
   "store_overrides": {
     "gamerpower-3266": "indiegala",
@@ -64,8 +65,8 @@
       "title": "Guild of Dungeoneering Ultimate Edition"
     },
     "itad-6d00ffeb0fdc": {
-      "title": "Another World Adventures",
-      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures"
+      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
+      "title": "Another World Adventures"
     },
     "itad-7a69412dd110": {
       "title": "Relaxing Simulator"
@@ -80,8 +81,8 @@
       "title": "Smiley Dusty"
     },
     "itad-f0cffe659c19": {
-      "title": "Blacklist Mafia",
-      "claim_url": "https://freebies.indiegala.com/blacklist-mafia"
+      "claim_url": "https://freebies.indiegala.com/blacklist-mafia",
+      "title": "Blacklist Mafia"
     },
     "itad-f520d9928848": {
       "claim_urls": {
@@ -89,6 +90,10 @@
         "android": "https://buff.ly/ugVKgPs"
       },
       "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge"
+    },
+    "itad-31969d48cb26": {
+      "claim_url": "https://store.steampowered.com/app/1986840/POPGOES_Arcade/",
+      "title": "POPGOES Arcade"
     }
   },
   "dismissed": [

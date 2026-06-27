@@ -40,8 +40,8 @@
  *   editing js/ source + reload (dev raw ESM) or `npm run build` (frozen/built mode).
  */
 import { state } from './state.js';
-import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
-import { normalizeNameForDedup } from './game-core.js';
+import { escapeHtml, escapeAttr, isSafeHttpUrl, formatNum } from './dom-util.js';
+import { normalizeNameForDedup, combinedPlaytime } from './game-core.js';
 import { isOwnedByTitle } from './deals.js';
 import { dataFetch } from './api-client.js';
 import { isPro } from './auth-gate.js';
@@ -858,6 +858,45 @@ export const PRO_PROMO_ITEM = {
   url: PRO_PROMO.url,
 };
 
+/** Placeholder copy for house-lib-backlog when the library catalog is still empty. */
+export const HOUSE_LIB_BACKLOG_FAKE_STATS = { owned: 600, played: 40 };
+
+function isLibraryGamePlayed(g) {
+  const norm = normalizeNameForDedup(g.name);
+  return combinedPlaytime(g) > 0 || !!(norm && state.playedTitleNorms?.has(norm));
+}
+
+function countLibraryPlayedGames(games) {
+  let n = 0;
+  for (const g of games) {
+    if (isLibraryGamePlayed(g)) n += 1;
+  }
+  return n;
+}
+
+function formatOwnedGamesLabel(count) {
+  return count === 1 ? '1 game' : `${formatNum(count)} games`;
+}
+
+/** Dynamic title for the library house stripe: real counts when loaded, else marketing placeholders. */
+export function houseLibBacklogStatsTitle(games = state.allGames) {
+  const list = games || [];
+  if (list.length === 0) {
+    const { owned, played } = HOUSE_LIB_BACKLOG_FAKE_STATS;
+    return `You own ${formatOwnedGamesLabel(owned)}. You've played ${formatNum(played)}.`;
+  }
+  const played = countLibraryPlayedGames(list);
+  return `You own ${formatOwnedGamesLabel(list.length)}. You've played ${formatNum(played)}.`;
+}
+
+function resolveHouseItemTitle(item) {
+  if (!item) return '';
+  if (String(item.id || '').trim() === 'house-lib-backlog') {
+    return houseLibBacklogStatsTitle();
+  }
+  return item.title || '';
+}
+
 /**
  * Full-width house promo banner for the deal-rail slot. Spans the whole
  * deal-radar grid row (sm:col-span-3) and fills it with BAKLOG promo material
@@ -868,6 +907,7 @@ export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
   if (!item) return '';
   const discTitle = sponsorDiscTitle(item);
   const cta = sponsorCta(item);
+  const title = resolveHouseItemTitle(item);
   const accentCls = accent === 'green' ? ' sponsored-deal-banner--green' : '';
   const tagline = item.tagline
     ? `<p class="house-banner-tagline">${escapeHtml(item.tagline)}</p>`
@@ -890,7 +930,7 @@ export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
             <span class="dash-kpi-label">Featured deal</span>
             ${sponsorBadgeHtml(item, 'sponsored-badge--inline')}
           </div>
-          <div class="house-banner-title">${escapeHtml(item.title)}</div>
+          <div class="house-banner-title">${escapeHtml(title)}</div>
           ${tagline}
         </div>
       </div>
@@ -961,6 +1001,7 @@ export function proPromoSlotHtml() {
 /** Compact house stripe below picks (library / itch). */
 export function houseStripeCardHtml(item, { variant = 'lib' } = {}) {
   if (!item) return '';
+  const title = resolveHouseItemTitle(item);
   const discTitle = sponsorDiscTitle(item);
   const cta = sponsorCta(item);
   const variantCls = variant === 'itch' ? ' house-stripe-card--itch' : ' house-stripe-card--lib';
@@ -970,7 +1011,7 @@ export function houseStripeCardHtml(item, { variant = 'lib' } = {}) {
     title="${escapeAttr(discTitle)}">
     <span class="house-stripe-mark" aria-hidden="true">${baklogBannerMarkHtml(`houseStripe-${item.id || variant}`)}</span>
     <span class="house-stripe-copy min-w-0 flex-1">
-      <span class="house-stripe-title">${escapeHtml(item.title)}</span>
+      <span class="house-stripe-title">${escapeHtml(title)}</span>
       ${item.tagline ? `<span class="house-stripe-tagline">${escapeHtml(item.tagline)}</span>` : ''}
     </span>
     <span class="house-stripe-cta">${escapeHtml(cta)} &rarr;</span>

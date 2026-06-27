@@ -175,6 +175,7 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 | **Today's top deal ranking** | The wishlist hero picks the highest **deal score** (discount, historical low, rating), not always the lowest price. Hover the label for details. |
 | **ITAD "no price data" warnings** | Some wishlist titles have no ITAD listing in your region (delisted, F2P, bundle-only, or title mismatch). The fetch still succeeds for the rest. |
 | **Profile PIN** | PIN gates switching into a profile and destructive rename/delete on PIN-locked profiles. Library JSON on disk is not encrypted - treat PIN as a household lock, not encryption. |
+| **Secrets store corrupt** | The encrypted credentials file for this profile cannot be read (wrong keyring entry, moved data, or a damaged file). Use **Reset store** on the banner, restore a backup on Connections, or reconnect each store. Archived copies are kept as `secrets.bin.corrupt-*` beside the old file. |
 | **Cloud sync** | Signing in on a second PC does not copy your library yet. Copy `BAKLOG-Data` manually or wait for the planned Pro cloud mirror. |
 
 ## Bug reports vs fetcher failures

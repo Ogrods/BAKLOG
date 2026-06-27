@@ -1796,12 +1796,42 @@ function renderSecretsCorruptBanner() {
   }
   el.classList.remove('hidden');
   el.innerHTML = `
-    <span><strong>Secrets store corrupt.</strong> Re-export from a backup or re-enter credentials on the Connections page.</span>
-    <button type="button" class="underline ml-2" data-jump-connections-secrets>Open Connections</button>
+    <div class="migration-banner-body">
+      <span><strong>Secrets store corrupt.</strong> Restore from a backup on Connections, or reset the store and reconnect stores.</span>
+      <span class="migration-banner-actions">
+        <button type="button" class="underline" data-jump-connections-secrets>Open Connections</button>
+        <button type="button" class="underline" data-reset-secrets-store>Reset store</button>
+      </span>
+    </div>
   `;
   el.querySelector('[data-jump-connections-secrets]')?.addEventListener('click', () => {
     document.querySelector('.view-tab[data-view="connections"]')?.click();
   });
+  el.querySelector('[data-reset-secrets-store]')?.addEventListener('click', () => {
+    void resetSecretsStoreFromBanner();
+  });
+}
+
+async function resetSecretsStoreFromBanner() {
+  const ok = window.confirm(
+    'Reset the encrypted credentials store? Saved API keys and sign-in cookies for this profile will be removed. You can reconnect stores afterward.'
+  );
+  if (!ok) return;
+  try {
+    const res = await baklogFetch('/api/auth/secrets/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      window.alert(data.error || `Reset failed (${res.status})`);
+      return;
+    }
+    await fetchAuthStatus();
+  } catch {
+    window.alert('Could not reach the local server.');
+  }
 }
 
 async function openManualUrl(provider) {

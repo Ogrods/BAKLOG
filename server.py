@@ -29,6 +29,7 @@ Endpoints:
     POST /api/auth/master-password -> set optional portable encryption passphrase
     POST /api/auth/secrets/export  -> download encrypted portable bundle
     POST /api/auth/secrets/import  -> restore bundle (?passphrase=...)
+    POST /api/auth/secrets/reset   -> archive corrupt secrets.bin and start fresh
     GET  /oauth/epic/callback -> Epic OAuth redirect handler
 
 Bind: 127.0.0.1 only. The fetcher whitelist is loaded from fetchers/manifest.json
@@ -3044,7 +3045,7 @@ class Handler(SimpleHTTPRequestHandler):
             provider = path[len("/api/auth/") : -len("/enable")].strip("/")
             self._handle_auth_enable(provider)
             return
-        if path in ("/api/auth/master-password", "/api/auth/secrets/export") or path.startswith(
+        if path in ("/api/auth/master-password", "/api/auth/secrets/export", "/api/auth/secrets/reset") or path.startswith(
             "/api/auth/secrets/import"
         ):
             if self._reject_if_csrf_strict():
@@ -3057,6 +3058,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if path.startswith("/api/auth/secrets/import"):
             self._handle_auth_secrets_import()
+            return
+        if path == "/api/auth/secrets/reset":
+            self._handle_auth_secrets_reset()
             return
         if path == "/api/profiles":
             if self._reject_if_csrf_strict():
@@ -3826,6 +3830,34 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 return
             _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "export_failed", exc)
+
+    def _handle_auth_secrets_reset(self) -> None:
+        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
+        if err:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
+            return
+        assert payload is not None
+        if not payload.get("confirm"):
+            _send_json(
+                self,
+                HTTPStatus.BAD_REQUEST,
+                {"error": "confirm: true required to reset the secrets store"},
+            )
+            return
+        try:
+            from auth.secrets import reset_secrets_store, secrets_store_corrupt
+
+            if not secrets_store_corrupt():
+                _send_json(
+                    self,
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "secrets store is readable; reset refused", "code": "not_corrupt"},
+                )
+                return
+            reset_secrets_store()
+            _send_json(self, HTTPStatus.OK, {"ok": True})
+        except Exception as exc:  # noqa: BLE001
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "secrets_reset_failed", exc)
 
     def _handle_auth_secrets_import(self) -> None:
         import base64

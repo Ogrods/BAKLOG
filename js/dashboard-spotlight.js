@@ -60,6 +60,9 @@ const RECENT_QUOTA = 5;
 // Capped to pool.length - 1 at lookup time so small libraries can't deadlock.
 export const SPOTLIGHT_NO_REPEAT_WINDOW = 25;
 
+/** Minimum game slides between permanent Pro house spotlight creatives. */
+export const SPOTLIGHT_HOUSE_AD_INTERVAL = 17;
+
 /** Fraction of art-eligible library rows that can enter the rotating pool. */
 export const SPOTLIGHT_POOL_FRACTION = 0.5;
 /** Max share of the pool that RATING-family eyebrows may occupy. */
@@ -862,14 +865,17 @@ export function pickSpotlightGames(games, snapIn) {
   const houseAds = getSpotlightHouseAds().map(sponsorToSpotlightGame);
   if (houseAds.length) {
     const [logoAd, ...restAds] = houseAds;
-    const positions = [4, 8, 12];
-    restAds.forEach((ad, i) => {
-      pool.splice(Math.min(positions[i] ?? pool.length, pool.length), 0, ad);
-    });
     if (!_spotlightCurrentKey) {
       pool.unshift(logoAd);
     } else {
       pool.splice(Math.min(2, pool.length), 0, logoAd);
+    }
+    let lastHouseAt = 0;
+    for (const ad of restAds) {
+      const targetAt = lastHouseAt + SPOTLIGHT_HOUSE_AD_INTERVAL;
+      if (targetAt > pool.length) break;
+      pool.splice(targetAt, 0, ad);
+      lastHouseAt = targetAt;
     }
   }
 

@@ -3332,6 +3332,7 @@ html:has(#viewLoadingOverlay.show) .app-footer { visibility: hidden; }
   background: rgb(120 53 15 / 0.35);
   border: 1px solid rgb(251 191 36 / 0.45);
 }
+.runtime-mode-banner.hidden { display: none; }
 .runtime-mode-banner-label {
   font-weight: 700;
   text-transform: uppercase;
@@ -4216,6 +4217,11 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
 }
 .migration-banner.hidden { display: none; }
 #migrationBanner { margin-top: 0.75rem; }
+#authReconnectBanner:not(.hidden),
+#authSecretsBanner:not(.hidden) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
 .migration-banner-recommended {
   display: block;
   margin-top: 0.35rem;

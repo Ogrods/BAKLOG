@@ -208,12 +208,12 @@ python fetch_games.py
 **Option A (recommended):** run the bundled dev server, which serves the dashboard *and* lets you trigger fetchers from the dashboard "Fetcher health" row:
 
 ```bash
-py -3.13 -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-.\.venv\Scripts\python.exe server.py
+python server.py
 ```
 
-Windows shortcut: `.\scripts\start-server.ps1` (same venv launcher).
+If you have not created a venv yet, run the [Setup](#setup) steps first (`python -m venv .venv` then `pip install -r requirements.txt`). Developers and CI can use `pip install -e ".[dev]"` instead of `requirements.txt`.
+
+Windows shortcut: `.\scripts\start-server.ps1` (uses the project venv; run `pip install -e ".[dev]"` once if that script reports a missing venv).
 
 Requires **Google Chrome** or **Microsoft Edge** installed (Edge ships with Windows). Connections opens a headed browser window for cookie/OAuth sign-in. Override the browser path with `BAKLOG_CHROME_PATH` if needed.
 

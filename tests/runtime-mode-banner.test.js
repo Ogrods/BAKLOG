@@ -29,6 +29,8 @@ describe('runtime-mode-banner', () => {
     syncRuntimeModeBanner({ frozen: false });
     document.querySelector('.runtime-mode-banner-dismiss')?.click();
     syncRuntimeModeBanner({ frozen: false });
-    expect(document.getElementById('runtimeModeBanner').classList.contains('hidden')).toBe(true);
+    const slot = document.getElementById('runtimeModeBanner');
+    expect(slot.classList.contains('hidden')).toBe(true);
+    expect(slot.textContent).toBe('');
   });
 });

@@ -617,6 +617,39 @@ def test_secrets_export_corrupt_returns_400(auth_server, monkeypatch: pytest.Mon
     assert payload.get("code") == "secrets_corrupt"
 
 
+def test_secrets_reset_requires_corrupt_store(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+    base, secret, _tmp = auth_server
+    monkeypatch.setattr("auth.secrets.secrets_store_corrupt", lambda: False)
+    body = json.dumps({"confirm": True}).encode("utf-8")
+    status, raw = _request(
+        base,
+        "/api/auth/secrets/reset",
+        method="POST",
+        auth=_bearer(secret),
+        headers={"Content-Type": "application/json"},
+        body=body,
+    )
+    assert status == 400
+    payload = json.loads(raw.decode("utf-8"))
+    assert payload.get("code") == "not_corrupt"
+
+
+def test_secrets_reset_clears_corrupt_store(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+    base, secret, _tmp = auth_server
+    monkeypatch.setattr("auth.secrets.secrets_store_corrupt", lambda: True)
+    body = json.dumps({"confirm": True}).encode("utf-8")
+    status, raw = _request(
+        base,
+        "/api/auth/secrets/reset",
+        method="POST",
+        auth=_bearer(secret),
+        headers={"Content-Type": "application/json"},
+        body=body,
+    )
+    assert status == 200
+    assert json.loads(raw.decode("utf-8")).get("ok") is True
+
+
 def test_run_cancel_denied_cross_profile(auth_server) -> None:
     base, secret, _tmp = auth_server
     uid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"

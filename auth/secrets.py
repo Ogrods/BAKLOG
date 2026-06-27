@@ -329,6 +329,37 @@ def _read_master_key_file() -> bytes:
     return raw
 
 
+def _profile_key_from_master(master: bytes, profile_id: str | None = None) -> bytes:
+    pid = (profile_id or _effective_profile_id() or "default").strip() or "default"
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b"baklog-profile:" + pid.encode("utf-8"),
+    ).derive(master)
+
+
+def _master_key_unlocks_store(master: bytes) -> bool:
+    """Return True when ``master`` decrypts the on-disk secrets bundle."""
+    secrets_path = _secrets_file()
+    if not secrets_path.is_file():
+        return True
+    raw = secrets_path.read_bytes()
+    pid = _effective_profile_id()
+    try:
+        if raw[0:1] == bytes([KEY_VERSION_PROFILE]) and len(raw) >= 29:
+            nonce, ciphertext = raw[1:13], raw[13:]
+            AESGCM(_profile_key_from_master(master, pid)).decrypt(nonce, ciphertext, None)
+            return True
+        if len(raw) >= 28:
+            nonce, ciphertext = raw[:12], raw[12:]
+            AESGCM(master).decrypt(nonce, ciphertext, None)
+            return True
+    except Exception:
+        return False
+    return False
+
+
 def _get_master_key() -> bytes:
     global _mpw_kdf_stale
     if _master_password:
@@ -338,14 +369,35 @@ def _get_master_key() -> bytes:
         _mpw_kdf_stale = n_log < MPW_SCRYPT_N_LOG
         return _derive_key_from_password(_master_password, salt, n_log=n_log)
 
-    key = _load_keyring_key()
-    if key:
-        return key
+    keyring_key = _load_keyring_key()
+    file_key: bytes | None = None
+    if _master_key_file().exists():
+        try:
+            file_key = _read_master_key_file()
+        except SecretsCorruptError:
+            file_key = None
+
+    if keyring_key and file_key and keyring_key != file_key:
+        keyring_ok = _master_key_unlocks_store(keyring_key)
+        file_ok = _master_key_unlocks_store(file_key)
+        if file_ok and not keyring_ok:
+            _save_keyring_key(file_key)
+            return file_key
+        if keyring_ok and not file_ok:
+            _write_master_key_file(keyring_key)
+            return keyring_key
+        if file_ok:
+            return file_key
+        if keyring_ok:
+            return keyring_key
+
+    if keyring_key:
+        return keyring_key
+
+    if file_key is not None:
+        return file_key
 
     _ensure_dir()
-    if _master_key_file().exists():
-        return _read_master_key_file()
-
     key = secrets.token_bytes(32)
     if not _save_keyring_key(key):
         _warn_plaintext_master_key(action="writing")
@@ -368,14 +420,7 @@ def reset_cache() -> None:
 
 
 def _get_profile_key(profile_id: str | None = None) -> bytes:
-    pid = (profile_id or _effective_profile_id() or "default").strip() or "default"
-    master = _get_master_key()
-    return HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=b"baklog-profile:" + pid.encode("utf-8"),
-    ).derive(master)
+    return _profile_key_from_master(_get_master_key(), profile_id)
 
 
 class SecretsCorruptError(RuntimeError):
@@ -520,6 +565,28 @@ def secrets_store_corrupt() -> bool:
         return False
     except Exception:
         return True
+
+
+def reset_secrets_store(*, archive: bool = True) -> None:
+    """Remove an unreadable secrets bundle so the profile can reconnect stores."""
+    global _cache
+    with _lock:
+        _cache = None
+        path = _secrets_file()
+        if path.is_file():
+            if archive:
+                stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+                archived = path.with_name(f"secrets.bin.corrupt-{stamp}")
+                try:
+                    path.replace(archived)
+                except OSError:
+                    path.unlink(missing_ok=True)
+            else:
+                path.unlink(missing_ok=True)
+        bak = path.with_suffix(path.suffix + ".bak")
+        if bak.is_file():
+            bak.unlink(missing_ok=True)
+        _cache = _empty_doc()
 
 
 def set_provider_blob(provider: str, blob: dict[str, Any]) -> None:

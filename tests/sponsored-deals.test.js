@@ -40,6 +40,8 @@ import {
   HOUSE_DEAL_ITEM,
   houseDealBannerHtml,
   houseStripeCardHtml,
+  houseLibBacklogStatsTitle,
+  HOUSE_LIB_BACKLOG_FAKE_STATS,
   houseTableRowHtml,
   sponsoredTableRowHtml,
 } from '../js/sponsored-deals.js';
@@ -684,6 +686,43 @@ describe('renderHouseLocationSlot', () => {
 });
 
 describe('house promo dismiss', () => {
+  it('uses placeholder stats when the library is empty', () => {
+    state.allGames = [];
+    state.playedTitleNorms = new Set();
+    expect(houseLibBacklogStatsTitle()).toBe(
+      `You own ${HOUSE_LIB_BACKLOG_FAKE_STATS.owned} games. You've played ${HOUSE_LIB_BACKLOG_FAKE_STATS.played}.`,
+    );
+    const stripe = houseStripeCardHtml({
+      id: 'house-lib-backlog',
+      kind: 'house',
+      title: 'You own 600 games. You\'ve played 40.',
+      tagline: 'One honest backlog across every store.',
+      cta: 'Support BAKLOG',
+      url: 'https://baklog.app/',
+    });
+    expect(stripe).toContain(`You've played ${HOUSE_LIB_BACKLOG_FAKE_STATS.played}`);
+  });
+
+  it('uses real library stats when games are loaded', () => {
+    state.allGames = [
+      { name: 'Alpha', store: 'steam', id: '1', playtime_minutes: 60 },
+      { name: 'Beta', store: 'steam', id: '2', playtime_minutes: 0 },
+      { name: 'Gamma', store: 'gog', id: '3', playtime_minutes: 0 },
+    ];
+    state.playedTitleNorms = new Set();
+    expect(houseLibBacklogStatsTitle()).toBe("You own 3 games. You've played 1.");
+    const stripe = houseStripeCardHtml({
+      id: 'house-lib-backlog',
+      kind: 'house',
+      title: 'ignored',
+      tagline: 'tag',
+      cta: 'Go',
+      url: 'https://baklog.app/',
+    });
+    expect(stripe).toContain("You've played 1");
+    expect(stripe).not.toContain('600');
+  });
+
   it('never renders dismiss on house banner or stripe', () => {
     const banner = houseDealBannerHtml(HOUSE_DEAL_ITEM, { accent: 'green' });
     expect(banner).toContain('sponsored-deal-banner--green');

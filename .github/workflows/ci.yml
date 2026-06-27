@@ -114,6 +114,12 @@ jobs:
           tests/test_profile_pin.py
           tests/test_auth_secrets.py
           tests/test_auth_secrets_atomic.py
+          tests/test_update_platform.py
+          tests/test_update_manager.py
+          tests/test_update_release.py
+          tests/test_update_snooze.py
+          tests/test_server_update_api.py
+          tests/test_auth_fetcher_smoke.py
 
   python-macos:
     name: Python (macOS smoke)
@@ -152,6 +158,12 @@ jobs:
           tests/test_csrf_profiles.py
           tests/test_install_paths.py
           tests/test_packaging_manifest.py
+          tests/test_update_platform.py
+          tests/test_update_manager.py
+          tests/test_update_release.py
+          tests/test_update_snooze.py
+          tests/test_server_update_api.py
+          tests/test_auth_fetcher_smoke.py
 
   javascript:
     name: JavaScript (vitest)

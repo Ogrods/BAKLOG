@@ -182,13 +182,19 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 
 **Symptom:** You want to know if a newer BAKLOG release is available.
 
-**Behavior:** The installed (frozen) app checks GitHub once per session on boot. When an update exists, a banner appears under the header with **Update now** (in-app download + verified install) and a link to the release page. Dismiss it for the session with **×**; it returns next launch until you upgrade.
+**Behavior:** The installed (frozen) app can check GitHub once per launch for a newer release (toggle **Check for updates on startup** in the **⋮** menu; on by default). When an update exists, a banner appears under the header with **Update now** (when in-app apply is available), **What's new**, **Release page**, and **Remind me later** (snoozes that version until a newer one ships). If in-app apply is unavailable, the banner explains why (dev build, temp install, missing mac zip, etc.). The tray may also show a one-time notification on frozen builds.
 
-**Manual check:** Open the **⋮** menu and choose **Check for updates…** (works in dev and installed builds). On an installed build you can confirm the prompt to download, verify (SHA-256), and restart automatically.
+**Manual check:** Open the **⋮** menu and choose **Check for updates…** (works in dev and installed builds). When an update is available, a dialog shows release notes plus **Update now** / **Remind me later**. Progress and install steps use the same update banner (not the boot error strip). After download, an in-app **Install & restart** dialog replaces the browser confirm box. If you choose **Not yet**, a **Install & restart** banner stays until you apply or dismiss.
+
+**Cancel:** While downloading, use **Cancel download** on the progress banner.
+
+**Version:** Your current build version appears at the bottom of the **⋮** menu on installed builds.
+
+**Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses the same pipeline with `BAKLOG-macos.zip` + `apply_update.sh` once a mac frozen build is published on GitHub; until then mac installs still get notify + release-page link only.
 
 **Security:** Updates download only from the official `Ogrods/BAKLOG` GitHub release assets. The server verifies the published `.sha256` sidecar before apply is allowed. Apply is blocked while fetchers are running or when BAKLOG is running from a temporary zip-extract folder.
 
-**Note:** Your library data stays in `%LOCALAPPDATA%\\BAKLOG-Data` (or your portable data folder) — updates replace app binaries only.
+**Note:** Your library data stays in `%LOCALAPPDATA%\\BAKLOG-Data` (macOS: `~/Library/Application Support/BAKLOG`) or your portable data folder — updates replace app binaries only.
 
 ## Bug reports vs fetcher failures
 

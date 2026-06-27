@@ -584,9 +584,14 @@
             <div class="kebab-group-label">Help</div>
             <button type="button" id="reportBug" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Review and optionally send a sanitized bug report (errors + app context). Nothing is sent until you confirm in the dialog.">Report a bug…</button>
             <button type="button" id="checkUpdates" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Compare your build to the latest GitHub release (opt-in network check; nothing runs in the background)">Check for updates</button>
+            <label id="checkUpdatesOnBootRow" class="hidden w-full text-left px-3 py-2 hover:bg-slate-700 cursor-pointer flex items-center gap-2 text-sm" title="When enabled, installed builds check GitHub once per launch for a newer release">
+              <input type="checkbox" id="checkUpdatesOnBoot" class="rounded border-slate-500" />
+              <span>Check for updates on startup</span>
+            </label>
             <button type="button" id="copyDiagnostics" class="w-full text-left px-3 py-2 hover:bg-slate-700" title="Copy a scrubbed server diagnostics bundle to the clipboard for Discord support (local-only; nothing is sent automatically)">Copy diagnostics</button>
             <!-- Discord invite: keep in sync with shared/community.json + landing/index.html footer -->
             <a id="joinDiscord" href="https://discord.gg/baklog" target="_blank" rel="noopener noreferrer" class="w-full text-left px-3 py-2 hover:bg-slate-700 block" title="Chat with other beta testers and the maintainer (opens Discord in a new tab)">Join community (Discord)</a>
+            <p id="kebabAppVersion" class="hidden px-3 py-2 text-xs text-slate-500 border-t border-slate-600/80"></p>
           </div>
         </div>
       </div>

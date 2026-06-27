@@ -79,7 +79,6 @@ import { reloadGames, reloadAfterFetcher, finishEmptyLibraryLoad, repairBulkFirs
 import { initLibraryWatches } from './library-watch.js';
 import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
-import { checkForUpdates } from './update-check.js';
 import { ensureActiveProfileResolved, initProfiles } from './profiles.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
@@ -266,7 +265,10 @@ async function bootstrap() {
         if (typeof cfg.frozen === 'boolean') noteServerRuntime({ frozen: cfg.frozen });
         syncRuntimeModeBanner(cfg);
         if (cfg.frozen === true) {
-          checkForUpdates({ source: 'boot', frozen: true }).catch(() => {});
+          const bootCheck = state.prefs?.checkUpdatesOnBoot !== false;
+          const { checkForUpdates, syncReadyUpdateFromStatus } = await import('./update-check.js');
+          syncReadyUpdateFromStatus({ frozen: true }).catch(() => {});
+          checkForUpdates({ source: 'boot', frozen: true, checkOnBoot: bootCheck }).catch(() => {});
         }
         if (cfg.running_from_temp) {
           const banner = document.getElementById('bootErrorBanner');

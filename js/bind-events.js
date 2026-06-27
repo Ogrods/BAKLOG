@@ -875,22 +875,29 @@ export function bindEvents() {
   }
   document.getElementById("checkUpdates")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
-    const { checkForUpdates, runInAppUpdateFlow } = await import('./update-check.js');
-    const result = await checkForUpdates({
+    const { checkForUpdates, showUpdateToast } = await import('./update-check.js');
+    await checkForUpdates({
       source: 'manual',
-      onManualMessage: (msg, opts) => showKebabBanner(msg, opts),
+      onNotice: (msg, opts) => showUpdateToast(msg, opts),
     });
-    if (result.ok && result.updateAvailable && result.parsed?.applySupported) {
-      const go = window.confirm('Download and install the update now? BAKLOG will restart. Your library data stays in BAKLOG-Data.');
-      if (go) {
-        try {
-          await runInAppUpdateFlow({ onManualMessage: (msg, opts) => showKebabBanner(msg, opts) });
-        } catch {
-          /* message already shown */
-        }
-      }
-    }
   });
+  const bootUpdateRow = document.getElementById('checkUpdatesOnBootRow');
+  const bootUpdateToggle = document.getElementById('checkUpdatesOnBoot');
+  if (bootUpdateToggle) {
+    bootUpdateToggle.checked = state.prefs.checkUpdatesOnBoot !== false;
+    bootUpdateToggle.addEventListener('change', () => {
+      state.prefs.checkUpdatesOnBoot = bootUpdateToggle.checked;
+      savePrefs();
+    });
+  }
+  fetch('/api/config').then((res) => res.json()).then((cfg) => {
+    if (cfg?.frozen === true && bootUpdateRow) bootUpdateRow.classList.remove('hidden');
+    const versionEl = document.getElementById('kebabAppVersion');
+    if (versionEl && typeof cfg?.version === 'string' && cfg.version.trim()) {
+      versionEl.textContent = `Version ${cfg.version.trim()}`;
+      versionEl.classList.remove('hidden');
+    }
+  }).catch(() => {});
   document.getElementById("copyDiagnostics")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
     try {

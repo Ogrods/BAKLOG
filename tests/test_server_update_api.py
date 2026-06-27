@@ -99,6 +99,8 @@ def test_update_download_blocked_when_not_frozen(update_api_server: str, monkeyp
     status, body = _post(update_api_server, "/api/update/download", local_header=True)
     assert status == 400
     assert body.get("ok") is False
+    assert body.get("error_code") == "dev_runtime"
+    assert "desktop app" in body.get("error", "").lower()
 
 
 def test_update_status_is_public_read(update_api_server: str) -> None:

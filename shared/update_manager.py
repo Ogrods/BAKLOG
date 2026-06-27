@@ -1,11 +1,9 @@
-"""In-process update download/apply coordinator (frozen Windows builds)."""
+"""In-process update download/apply coordinator (frozen Windows/macOS builds)."""
 
 from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 import tempfile
 import threading
 from collections.abc import Callable
@@ -15,6 +13,12 @@ from typing import Any
 
 from shared.install_paths import frozen_bundle_dir, is_frozen, runtime_label
 from shared.server_support import is_running_from_temp_dir, update_available
+from shared.update_platform import (
+    apply_script_name,
+    is_in_app_apply_platform,
+    launch_apply_subprocess,
+    server_binary_name,
+)
 from shared.update_release import (
     ReleaseArtifacts,
     UpdateSecurityError,
@@ -23,7 +27,6 @@ from shared.update_release import (
     verify_file_sha256,
 )
 
-_APPLY_SCRIPT_NAME = "apply_update.ps1"
 _MANIFEST_NAME = "apply-manifest.json"
 
 
@@ -74,8 +77,8 @@ class UpdateManager:
     def _preflight_mutating(self) -> str | None:
         if not is_frozen():
             return "Updates apply only to installed BAKLOG builds"
-        if sys.platform != "win32":
-            return "In-app apply is supported on Windows only"
+        if not is_in_app_apply_platform():
+            return "In-app apply is not supported on this platform"
         if is_running_from_temp_dir(frozen_bundle_dir()):
             return "Move BAKLOG out of a temporary folder before updating"
         if self._has_in_flight_runs():
@@ -92,6 +95,9 @@ class UpdateManager:
             artifacts = fetch_release_artifacts()
         except UpdateSecurityError as exc:
             return {"ok": False, "error": str(exc)}
+
+        if not artifacts.zip_url:
+            return {"ok": False, "error": "Release download URL unavailable for this platform"}
 
         if not update_available(current, artifacts.version):
             return {"ok": False, "error": "Already on latest release"}
@@ -166,9 +172,13 @@ class UpdateManager:
             return {"ok": False, "error": "Update package path is outside the trusted update workspace"}
 
         install_dir = frozen_bundle_dir()
-        script = install_dir / _APPLY_SCRIPT_NAME
+        script = install_dir / apply_script_name()
         if not script.is_file():
-            return {"ok": False, "error": "apply_update.ps1 missing from install"}
+            return {"ok": False, "error": f"{apply_script_name()} missing from install"}
+
+        server_bin = install_dir / server_binary_name()
+        if not server_bin.is_file():
+            return {"ok": False, "error": "Install dir is not a BAKLOG bundle"}
 
         manifest = {
             "install_dir": str(install_dir),
@@ -183,18 +193,12 @@ class UpdateManager:
 
         self._set_status(phase="applying", can_apply=False, ready=False)
 
-        cmd = [
-            "powershell.exe",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(script),
-            "-ManifestPath",
-            str(manifest_path),
-        ]
         try:
-            subprocess.Popen(cmd, cwd=str(install_dir))  # noqa: S603
+            launch_apply_subprocess(
+                script=script,
+                manifest_path=manifest_path,
+                install_dir=install_dir,
+            )
         except OSError as exc:
             self._set_status(phase="ready", ready=True, can_apply=True, error=str(exc))
             return {"ok": False, "error": f"Failed to launch updater: {exc}"}
@@ -224,6 +228,9 @@ class UpdateManager:
                     return
                 except UpdateSecurityError:
                     zip_path.unlink(missing_ok=True)
+
+            if not artifacts.zip_url:
+                raise UpdateSecurityError("release download url missing")
 
             written = fetch_url_to_file(artifacts.zip_url, zip_path)
             if self._cancel.is_set():

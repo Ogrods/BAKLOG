@@ -2966,7 +2966,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._handle_shutdown()
             return
-        if path in ("/api/update/download", "/api/update/cancel", "/api/update/apply"):
+        if path in ("/api/update/download", "/api/update/cancel", "/api/update/apply", "/api/update/dismiss"):
             if self._reject_if_csrf_strict():
                 return
             self._handle_update_post(path)
@@ -3625,33 +3625,16 @@ class Handler(SimpleHTTPRequestHandler):
         ).start()
 
     def _handle_update_post(self, path: str) -> None:
-        from shared.update_manager import get_update_manager
+        from shared.update_api import handle_update_post
 
-        mgr = get_update_manager(
+        handle_update_post(
+            path,
             current_version=_app_version,
             has_in_flight_runs=lambda: bool(MANAGER._in_flight_targets()),
+            read_json_body=lambda: _read_json_body(self, max_bytes=4096),
+            send_json=lambda status, payload: _send_json(self, status, payload),
+            trigger_shutdown=_trigger_dev_shutdown,
         )
-        if path == "/api/update/download":
-            payload = mgr.start_download()
-            status = HTTPStatus.OK if payload.get("ok") else HTTPStatus.BAD_REQUEST
-            _send_json(self, status, payload)
-            return
-        if path == "/api/update/cancel":
-            payload = mgr.cancel_download()
-            _send_json(self, HTTPStatus.OK, payload)
-            return
-        if path == "/api/update/apply":
-            payload = mgr.apply_ready_update()
-            status = HTTPStatus.OK if payload.get("ok") else HTTPStatus.BAD_REQUEST
-            _send_json(self, status, payload)
-            if payload.get("ok") and payload.get("applying"):
-                threading.Thread(
-                    target=_trigger_dev_shutdown,
-                    name="update-apply-shutdown",
-                    daemon=True,
-                ).start()
-            return
-        _send_json(self, HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def _handle_license_activate(self) -> None:
         """Validate a Polar license key and persist license.json (pure-local mode)."""

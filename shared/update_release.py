@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -12,15 +13,21 @@ from typing import Any
 from urllib.parse import urlparse
 
 from shared.server_support import github_releases_latest_api_url, normalize_version_tag
+from shared.update_platform import (
+    allowed_asset_names,
+    required_bundle_files,
+    server_binary_name,
+    stable_sha256_name,
+    stable_zip_name,
+)
 
 _COMMUNITY_JSON = Path(__file__).resolve().parent / "community.json"
 _DEFAULT_REPO_SLUG = "Ogrods/BAKLOG"
 
-STABLE_ZIP_NAME = "BAKLOG-win64.zip"
-STABLE_SHA256_NAME = "BAKLOG-win64.sha256"
-STABLE_SETUP_NAME = "BAKLOG-Setup.exe"
+STABLE_ZIP_NAME = stable_zip_name("win32")
+STABLE_SHA256_NAME = stable_sha256_name("win32")
 
-REQUIRED_BUNDLE_FILES = ("BAKLOG.exe", "BAKLOG Tray.exe")
+REQUIRED_BUNDLE_FILES = required_bundle_files("win32")
 MAX_DOWNLOAD_BYTES = 600 * 1024 * 1024  # 600 MiB hard cap
 
 _ALLOWED_DOWNLOAD_HOSTS = frozenset({"github.com", "objects.githubusercontent.com"})
@@ -35,9 +42,11 @@ class ReleaseArtifacts:
     tag: str
     version: str
     html_url: str
-    zip_url: str
+    zip_url: str | None
     sha256: str
     sha256_url: str | None = None
+    release_notes: str | None = None
+    published_at: str | None = None
 
 
 def github_repo_slug() -> str:
@@ -74,13 +83,14 @@ def is_allowed_download_url(url: str) -> bool:
     if not path_lower.startswith(_releases_download_prefix()):
         return False
     filename = PurePosixPath(path).name
-    if filename not in {STABLE_ZIP_NAME, STABLE_SHA256_NAME, STABLE_SETUP_NAME}:
+    if filename not in allowed_asset_names():
         return False
     return True
 
 
-def parse_sha256_sidecar(text: str) -> str:
-    """Parse ``<hex>  BAKLOG-win64.zip`` sidecar format."""
+def parse_sha256_sidecar(text: str, *, zip_name: str | None = None) -> str:
+    """Parse ``<hex>  <zip-name>`` sidecar format."""
+    expected_name = zip_name or stable_zip_name()
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
@@ -88,6 +98,10 @@ def parse_sha256_sidecar(text: str) -> str:
         match = re.match(r"^([0-9a-fA-F]{64})\b", stripped)
         if match:
             return match.group(1).lower()
+        if expected_name in stripped:
+            parts = stripped.split()
+            if parts and re.fullmatch(r"[0-9a-fA-F]{64}", parts[0]):
+                return parts[0].lower()
     raise UpdateSecurityError("sha256 sidecar format invalid")
 
 
@@ -120,27 +134,44 @@ def _asset_map(release: dict[str, Any]) -> dict[str, str]:
     return out
 
 
-def build_release_artifacts(release: dict[str, Any]) -> ReleaseArtifacts:
+def _sanitize_release_notes(body: str | None, *, max_len: int = 4096) -> str | None:
+    if not body or not str(body).strip():
+        return None
+    text = str(body).strip()
+    if len(text) > max_len:
+        return text[: max_len - 1] + "…"
+    return text
+
+
+def build_release_artifacts(release: dict[str, Any], platform: str | None = None) -> ReleaseArtifacts:
+    plat = platform or sys.platform
+    zip_asset = stable_zip_name(plat)
+    sha_asset = stable_sha256_name(plat)
+
     tag = str(release.get("tag_name", "")).strip()
     version = normalize_version_tag(tag)
     if not version:
         raise UpdateSecurityError("release tag missing")
 
     assets = _asset_map(release)
-    zip_url = assets.get(STABLE_ZIP_NAME)
-    if not zip_url:
+    zip_url = assets.get(zip_asset)
+    if not zip_url and plat == "win32":
         slug = github_repo_slug()
-        zip_url = f"https://github.com/{slug}/releases/download/{tag}/{STABLE_ZIP_NAME}"
-        if not is_allowed_download_url(zip_url):
-            raise UpdateSecurityError("constructed zip url rejected")
+        candidate = f"https://github.com/{slug}/releases/download/{tag}/{zip_asset}"
+        if is_allowed_download_url(candidate):
+            zip_url = candidate
 
-    sha256_url = assets.get(STABLE_SHA256_NAME)
+    sha256_url = assets.get(sha_asset)
     sha256 = ""
     if sha256_url:
-        sha256 = _fetch_text_asset(sha256_url)
-        sha256 = parse_sha256_sidecar(sha256)
+        sidecar = _fetch_text_asset(sha256_url)
+        sha256 = parse_sha256_sidecar(sidecar, zip_name=zip_asset)
 
     html_url = str(release.get("html_url", "") or "").strip()
+    published_at = release.get("published_at")
+    published = str(published_at).strip() if published_at else None
+    notes = _sanitize_release_notes(release.get("body"))
+
     return ReleaseArtifacts(
         tag=tag,
         version=version,
@@ -148,6 +179,8 @@ def build_release_artifacts(release: dict[str, Any]) -> ReleaseArtifacts:
         zip_url=zip_url,
         sha256=sha256,
         sha256_url=sha256_url,
+        release_notes=notes,
+        published_at=published,
     )
 
 
@@ -169,13 +202,13 @@ def _fetch_text_asset(url: str) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-def fetch_release_artifacts() -> ReleaseArtifacts:
+def fetch_release_artifacts(platform: str | None = None) -> ReleaseArtifacts:
     from shared.server_support import fetch_latest_github_release
 
     release = fetch_latest_github_release()
     if not release:
         raise UpdateSecurityError("no GitHub release metadata")
-    return build_release_artifacts(release)
+    return build_release_artifacts(release, platform=platform)
 
 
 def fetch_url_to_file(url: str, dest: Path, *, max_bytes: int = MAX_DOWNLOAD_BYTES) -> int:
@@ -237,18 +270,21 @@ def safe_extract_zip(zip_path: Path, dest_dir: Path) -> Path:
     return locate_bundle_root(dest_resolved)
 
 
-def locate_bundle_root(extracted_dir: Path) -> Path:
+def locate_bundle_root(extracted_dir: Path, platform: str | None = None) -> Path:
     """Find the directory containing required frozen executables."""
-    for exe in extracted_dir.rglob("BAKLOG.exe"):
-        parent = exe.parent
-        if all((parent / name).is_file() for name in REQUIRED_BUNDLE_FILES):
+    plat = platform or sys.platform
+    server_name = server_binary_name(plat)
+    required = required_bundle_files(plat)
+    for binary in extracted_dir.rglob(server_name):
+        parent = binary.parent
+        if all((parent / name).is_file() for name in required):
             return parent.resolve()
     raise UpdateSecurityError("extracted bundle missing BAKLOG executables")
 
 
 def recommended_artifact(runtime_label: str) -> str:
     if runtime_label in {"installed", "portable"}:
-        return "zip"
+        return stable_zip_name()
     return "none"
 
 

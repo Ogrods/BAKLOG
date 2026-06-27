@@ -166,24 +166,52 @@ def tail_text_file(path: Path, *, max_lines: int = 80) -> list[str]:
     return lines[-max_lines:]
 
 
+def _apply_script_present() -> bool:
+    from shared.update_platform import apply_script_name
+
+    return (frozen_bundle_dir() / apply_script_name()).is_file()
+
+
+def _apply_supported_for_runtime() -> bool:
+    from shared.install_paths import runtime_label
+    from shared.update_platform import is_in_app_apply_platform
+
+    if runtime_label() not in {"installed", "portable"}:
+        return False
+    if not is_frozen() or not is_in_app_apply_platform():
+        return False
+    return _apply_script_present()
+
+
 def build_update_check_payload(current_version: str) -> dict[str, Any]:
     from shared.install_paths import runtime_label
+    from shared.update_messages import resolve_apply_blocked_for_check
+    from shared.update_platform import is_in_app_apply_platform
     from shared.update_release import (
         UpdateSecurityError,
         build_release_artifacts,
         recommended_artifact,
     )
+    from shared.update_snooze import is_version_dismissed
 
+    root = data_root()
+    runtime = runtime_label()
+    apply_ok = _apply_supported_for_runtime()
     base: dict[str, Any] = {
         "current": current_version,
         "latest": None,
         "update_available": False,
         "url": None,
-        "runtime_label": runtime_label(),
-        "recommended_artifact": recommended_artifact(runtime_label()),
+        "runtime_label": runtime,
+        "recommended_artifact": recommended_artifact(runtime),
         "download_url": None,
         "sha256": None,
-        "apply_supported": runtime_label() in {"installed", "portable"},
+        "apply_supported": apply_ok,
+        "apply_blocked_reason": None,
+        "apply_blocked_message": None,
+        "dismissed": False,
+        "release_notes": None,
+        "published_at": None,
     }
     try:
         release = fetch_latest_github_release()
@@ -191,14 +219,33 @@ def build_update_check_payload(current_version: str) -> dict[str, Any]:
         latest = artifacts.version
         url = artifacts.html_url or None
         update = bool(latest) and update_available(current_version, latest)
+        zip_url = artifacts.zip_url if update else None
+        sha256 = artifacts.sha256 if update else None
+        apply_supported, blocked_reason, blocked_message = resolve_apply_blocked_for_check(
+            update_available=update,
+            zip_url=zip_url,
+            sha256=sha256,
+            runtime_label=runtime,
+            frozen=is_frozen(),
+            in_apply_platform=is_in_app_apply_platform(),
+            running_from_temp=is_frozen() and is_running_from_temp_dir(frozen_bundle_dir()),
+            apply_script_present=_apply_script_present(),
+        )
+        can_download = bool(update and zip_url and (sha256 or apply_ok))
         base.update(
             {
                 "latest": latest or None,
                 "update_available": update,
                 "url": url,
-                "download_url": artifacts.zip_url if update else None,
-                "sha256": artifacts.sha256 or None,
-                "sha256_url": artifacts.sha256_url,
+                "download_url": zip_url if can_download else None,
+                "sha256": (sha256 or None) if can_download else None,
+                "sha256_url": artifacts.sha256_url if can_download else None,
+                "release_notes": artifacts.release_notes if update else None,
+                "published_at": artifacts.published_at if update else None,
+                "apply_supported": apply_supported,
+                "apply_blocked_reason": blocked_reason,
+                "apply_blocked_message": blocked_message,
+                "dismissed": is_version_dismissed(root, latest) if update else False,
             }
         )
         return base
@@ -216,6 +263,9 @@ def build_diagnostics_payload(
     version: str,
     load_run_history: Callable[[], list[dict[str, Any]]],
 ) -> dict[str, Any]:
+    from shared.install_paths import runtime_label
+    from shared.update_release import recommended_artifact
+
     history = load_run_history()[-10:]
     recent_runs: list[dict[str, Any]] = []
     for entry in history:
@@ -232,6 +282,21 @@ def build_diagnostics_payload(
                 "ended_at": entry.get("ended_at"),
             }
         )
+
+    update_status: dict[str, Any] | None = None
+    try:
+        from shared.update_manager import get_update_manager
+
+        def _noop_in_flight() -> bool:
+            return False
+
+        update_status = get_update_manager(
+            current_version=lambda: version,
+            has_in_flight_runs=_noop_in_flight,
+        ).status_dict()
+    except Exception:  # noqa: BLE001
+        update_status = None
+
     return {
         "version": version,
         "platform": sys.platform,
@@ -242,4 +307,7 @@ def build_diagnostics_payload(
         "running_from_temp": is_frozen() and is_running_from_temp_dir(frozen_bundle_dir()),
         "recent_runs": recent_runs,
         "refresh_log_tail": tail_text_file(data_root / "refresh.log"),
+        "apply_supported": _apply_supported_for_runtime(),
+        "recommended_artifact": recommended_artifact(runtime_label()),
+        "update": update_status,
     }

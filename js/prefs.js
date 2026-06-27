@@ -88,6 +88,7 @@ export function loadPrefs() {
     claimsAutoRefreshDisabled: true,
     autoFetchOnConnect: true,
     autoFetchStale24h: true,
+    checkUpdatesOnBoot: true,
     connectionNotes: {},
     customLists: defaultCustomLists(),
     customListFilter: null,

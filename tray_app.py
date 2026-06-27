@@ -23,6 +23,7 @@ server, opens the browser, and waits — same data, no tray icon.
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import socket
@@ -328,6 +329,46 @@ def _run_headless(controller: ServerController) -> int:
     return 0
 
 
+def _start_update_notify(icon) -> None:
+    """One-shot frozen update notification after the server is healthy."""
+
+    def _poll() -> None:
+        if not is_frozen():
+            return
+        deadline = time.monotonic() + 30.0
+        while time.monotonic() < deadline:
+            if _port_open():
+                break
+            time.sleep(0.5)
+        else:
+            return
+        try:
+            req = urllib.request.Request(
+                f"http://{HOST}:{PORT}/api/update-check",
+                headers={"Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            return
+        if not isinstance(payload, dict):
+            return
+        if not payload.get("update_available"):
+            return
+        if payload.get("dismissed") is True:
+            return
+        latest = str(payload.get("latest") or "").strip()
+        if not latest:
+            return
+        _tray_notify(
+            icon,
+            "Update available",
+            f"BAKLOG v{latest} is ready. Open BAKLOG to install.",
+        )
+
+    threading.Thread(target=_poll, name="tray-update-notify", daemon=True).start()
+
+
 def _start_server_watchdog(icon, controller: ServerController) -> threading.Thread:
     """Notify when our owned server child dies and nothing is listening."""
 
@@ -416,6 +457,8 @@ def run_tray() -> int:
     menu = pystray.Menu(*menu_items)
     icon = pystray.Icon("baklog", load_icon_image(), "BAKLOG", menu=menu)
     _start_server_watchdog(icon, controller)
+    if started:
+        _start_update_notify(icon)
     try:
         icon.run()
     finally:

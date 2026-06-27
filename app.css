@@ -4233,6 +4233,38 @@ html[data-theme="ember"] .brand-logo-pills { fill: url(#brandMarkGrad); }
   gap: 0.75rem; flex-wrap: wrap;
 }
 .migration-banner-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.update-notice-toast {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 55;
+  max-width: min(24rem, calc(100vw - 2rem));
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+}
+.update-notice-toast.hidden { display: none; }
+.update-notice-toast-info {
+  background: var(--bg-elev);
+  color: var(--text);
+}
+.update-notice-toast-error {
+  background: color-mix(in srgb, #f87171 12%, var(--bg-elev));
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+.update-available-banner-body,
+.update-ready-banner-body,
+.update-progress-banner-body {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+.update-blocked-hint {
+  flex-basis: 100%;
+  margin: 0;
+}
 .pro-welcome-banner {
   border-color: color-mix(in srgb, var(--accent, #38bdf8) 45%, var(--border));
   background: color-mix(in srgb, var(--accent, #38bdf8) 8%, var(--bg-elev));

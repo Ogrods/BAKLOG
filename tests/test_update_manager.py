@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -39,7 +40,7 @@ def test_start_download_blocked_when_not_frozen(monkeypatch: pytest.MonkeyPatch)
 
 def test_start_download_blocked_when_fetchers_running(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
-    monkeypatch.setattr("shared.update_manager.sys.platform", "win32")
+    monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
     mgr = UpdateManager(current_version=lambda: "0.8.25", has_in_flight_runs=lambda: True)
     with patch("shared.update_manager.fetch_release_artifacts", return_value=_artifacts()):
@@ -53,7 +54,7 @@ def test_download_worker_marks_ready_after_verify(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
-    monkeypatch.setattr("shared.update_manager.sys.platform", "win32")
+    monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
 
     payload = b"fake-zip-bytes"
@@ -88,12 +89,57 @@ def test_download_worker_marks_ready_after_verify(
     assert status["can_apply"] is True
 
 
+def test_apply_ready_update_launches_helper_darwin(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
+    monkeypatch.setattr("shared.update_manager.frozen_bundle_dir", lambda: tmp_path)
+    (tmp_path / "BAKLOG").write_text("x", encoding="utf-8")
+    (tmp_path / "apply_update.sh").write_text("#!/bin/bash", encoding="utf-8")
+
+    payload_bytes = b"verified"
+    digest = hashlib.sha256(payload_bytes).hexdigest()
+    zip_path = tmp_path / "0.8.26" / "package.zip"
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    zip_path.write_bytes(payload_bytes)
+
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.25",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    with mgr._lock:
+        mgr._status.phase = "ready"
+        mgr._status.ready = True
+        mgr._zip_path = zip_path
+        mgr._artifacts = ReleaseArtifacts(
+            tag="v0.8.26",
+            version="0.8.26",
+            html_url="https://example.com",
+            zip_url="https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-macos.zip",
+            sha256=digest,
+        )
+
+    popen_calls: list[list[str]] = []
+
+    class FakePopen:
+        def __init__(self, cmd, **kwargs):
+            popen_calls.append(cmd)
+
+    monkeypatch.setattr("shared.update_manager.launch_apply_subprocess", lambda **kwargs: FakePopen([]))
+    result = mgr.apply_ready_update()
+    assert result["ok"] is True
+
+
 def test_apply_ready_update_launches_helper(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
-    monkeypatch.setattr("shared.update_manager.sys.platform", "win32")
+    monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
     monkeypatch.setattr("shared.update_manager.frozen_bundle_dir", lambda: tmp_path)
     (tmp_path / "BAKLOG.exe").write_text("x", encoding="utf-8")
@@ -122,17 +168,16 @@ def test_apply_ready_update_launches_helper(
             sha256=digest,
         )
 
-    popen_calls: list[list[str]] = []
+    launched: list[bool] = []
 
-    class FakePopen:
-        def __init__(self, cmd, **kwargs):
-            popen_calls.append(cmd)
+    def fake_launch(**kwargs):
+        launched.append(True)
+        return type("P", (), {})()
 
-    monkeypatch.setattr("shared.update_manager.subprocess.Popen", FakePopen)
+    monkeypatch.setattr("shared.update_manager.launch_apply_subprocess", fake_launch)
     result = mgr.apply_ready_update()
     assert result["ok"] is True
-    assert popen_calls
-    assert "-ManifestPath" in popen_calls[0]
+    assert launched
 
 
 def test_apply_rejects_zip_outside_work_root(
@@ -140,7 +185,7 @@ def test_apply_rejects_zip_outside_work_root(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
-    monkeypatch.setattr("shared.update_manager.sys.platform", "win32")
+    monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
     monkeypatch.setattr("shared.update_manager.frozen_bundle_dir", lambda: tmp_path / "install")
     install = tmp_path / "install"
@@ -178,7 +223,7 @@ def test_apply_requires_sha256(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
-    monkeypatch.setattr("shared.update_manager.sys.platform", "win32")
+    monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
     monkeypatch.setattr("shared.update_manager.frozen_bundle_dir", lambda: tmp_path)
     (tmp_path / "BAKLOG.exe").write_text("x", encoding="utf-8")

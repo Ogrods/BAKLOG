@@ -25,11 +25,15 @@ def frozen_bundle_dir() -> Path:
 
 
 def frozen_server_exe() -> Path:
-    return frozen_bundle_dir() / "BAKLOG.exe"
+    from shared.update_platform import server_binary_name
+
+    return frozen_bundle_dir() / server_binary_name()
 
 
 def frozen_tray_exe() -> Path:
-    return frozen_bundle_dir() / "BAKLOG Tray.exe"
+    from shared.update_platform import tray_binary_name
+
+    return frozen_bundle_dir() / tray_binary_name()
 
 
 def legacy_frozen_data_dir() -> Path:

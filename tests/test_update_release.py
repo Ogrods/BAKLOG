@@ -109,3 +109,40 @@ def test_safe_extract_zip_and_locate_bundle_root(tmp_path: Path) -> None:
 def test_fetch_url_to_file_rejects_disallowed_url(tmp_path: Path) -> None:
     with pytest.raises(UpdateSecurityError):
         fetch_url_to_file("https://evil.example/x.zip", tmp_path / "x.zip")
+
+
+def test_build_release_artifacts_macos_asset() -> None:
+    release = {
+        "tag_name": "v0.8.26",
+        "html_url": "https://github.com/Ogrods/BAKLOG/releases/tag/v0.8.26",
+        "assets": [
+            {
+                "name": "BAKLOG-macos.zip",
+                "browser_download_url": "https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-macos.zip",
+            },
+            {
+                "name": "BAKLOG-macos.sha256",
+                "browser_download_url": "https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-macos.sha256",
+            },
+        ],
+    }
+    with patch("shared.update_release._fetch_text_asset", return_value="a" * 64 + "  BAKLOG-macos.zip"):
+        artifacts = build_release_artifacts(release, platform="darwin")
+    assert artifacts.version == "0.8.26"
+    assert artifacts.zip_url is not None
+    assert artifacts.zip_url.endswith("BAKLOG-macos.zip")
+
+
+def test_build_release_artifacts_macos_missing_asset() -> None:
+    release = {
+        "tag_name": "v0.8.26",
+        "html_url": "https://github.com/Ogrods/BAKLOG/releases/tag/v0.8.26",
+        "assets": [
+            {
+                "name": "BAKLOG-win64.zip",
+                "browser_download_url": "https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-win64.zip",
+            },
+        ],
+    }
+    artifacts = build_release_artifacts(release, platform="darwin")
+    assert artifacts.zip_url is None

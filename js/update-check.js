@@ -3,8 +3,17 @@
 import { baklogFetch } from './api-client.js';
 import { escapeHtml } from './dom-util.js';
 
+/** @deprecated legacy session flag; per-version dismiss uses server + localStorage mirror */
 export const UPDATE_BANNER_DISMISS_KEY = 'baklog.updateBannerDismissed';
+export const UPDATE_DISMISSED_VERSION_KEY = 'baklog.updateDismissedVersion';
+
 const UPDATE_STATUS_POLL_MS = 800;
+const UPDATE_MODAL_ID = 'updateReleaseModal';
+const UPDATE_INSTALL_MODAL_ID = 'updateInstallConfirmModal';
+const UPDATE_TOAST_ID = 'updateNoticeToast';
+
+/** @type {AbortController | null} */
+let _modalKeyAbort = null;
 
 /**
  * @param {unknown} data
@@ -17,7 +26,12 @@ const UPDATE_STATUS_POLL_MS = 800;
  *   downloadUrl: string | null,
  *   sha256: string | null,
  *   applySupported: boolean,
+ *   applyBlockedReason: string | null,
+ *   applyBlockedMessage: string | null,
  *   runtimeLabel: string | null,
+ *   releaseNotes: string | null,
+ *   publishedAt: string | null,
+ *   dismissed: boolean,
  * } | { ok: false, error: string }}
  */
 export function parseUpdateCheckResponse(data) {
@@ -33,6 +47,18 @@ export function parseUpdateCheckResponse(data) {
     ? data.download_url.trim()
     : null;
   const sha256 = typeof data.sha256 === 'string' && data.sha256.trim() ? data.sha256.trim() : null;
+  const releaseNotes = typeof data.release_notes === 'string' && data.release_notes.trim()
+    ? data.release_notes.trim()
+    : null;
+  const publishedAt = typeof data.published_at === 'string' && data.published_at.trim()
+    ? data.published_at.trim()
+    : null;
+  const blockedReason = typeof data.apply_blocked_reason === 'string' && data.apply_blocked_reason.trim()
+    ? data.apply_blocked_reason.trim()
+    : null;
+  const blockedMessage = typeof data.apply_blocked_message === 'string' && data.apply_blocked_message.trim()
+    ? data.apply_blocked_message.trim()
+    : null;
   return {
     ok: true,
     current,
@@ -42,8 +68,35 @@ export function parseUpdateCheckResponse(data) {
     downloadUrl,
     sha256,
     applySupported: data.apply_supported === true,
+    applyBlockedReason: blockedReason,
+    applyBlockedMessage: blockedMessage,
     runtimeLabel: typeof data.runtime_label === 'string' ? data.runtime_label : null,
+    releaseNotes,
+    publishedAt,
+    dismissed: data.dismissed === true,
   };
+}
+
+/** @param {{ latest: string | null, dismissed?: boolean }} parsed */
+export function isUpdateBannerDismissed(parsed) {
+  if (parsed.dismissed === true) return true;
+  if (!parsed.latest) return false;
+  try {
+    const stored = localStorage.getItem(UPDATE_DISMISSED_VERSION_KEY);
+    return stored === parsed.latest;
+  } catch {
+    return false;
+  }
+}
+
+/** @param {string} version */
+export function rememberDismissedVersion(version) {
+  if (!version) return;
+  try {
+    localStorage.setItem(UPDATE_DISMISSED_VERSION_KEY, version);
+  } catch {
+    /* quota / private mode */
+  }
 }
 
 /** @param {{ current: string, latest: string | null, url: string | null }} parsed */
@@ -58,11 +111,42 @@ export function formatUpToDateMessage(parsed) {
 }
 
 /**
+ * @param {string | null | undefined} message
+ * @param {string | null | undefined} [code]
+ */
+export function mapUpdateError(message, code = null) {
+  const text = (message || '').trim();
+  if (code === 'fetchers_running') {
+    return 'Finish or stop fetchers in Fetcher health, then try again.';
+  }
+  if (code === 'dev_runtime') {
+    return 'Updates install only in the desktop app, not the dev server.';
+  }
+  if (text) return text;
+  return 'Update failed.';
+}
+
+/**
+ * @param {{
+ *   applyBlockedMessage?: string | null,
+ *   applySupported?: boolean,
+ * }} parsed
+ */
+export function renderApplyBlockedHint(parsed) {
+  if (parsed.applySupported) return '';
+  const msg = parsed.applyBlockedMessage?.trim();
+  if (!msg) return '';
+  return `<p class="update-blocked-hint text-sm text-slate-400 mt-1">${escapeHtml(msg)}</p>`;
+}
+
+/**
  * @param {{
  *   latest: string | null,
  *   url: string | null,
  *   current: string,
  *   applySupported?: boolean,
+ *   applyBlockedMessage?: string | null,
+ *   releaseNotes?: string | null,
  * }} parsed
  */
 export function renderUpdateBannerHtml(parsed) {
@@ -74,15 +158,86 @@ export function renderUpdateBannerHtml(parsed) {
     '<div class="migration-banner-body update-available-banner-body">' +
     `<span class="text-amber-400">BAKLOG v${escapeHtml(parsed.latest || '')} is available (you have v${escapeHtml(parsed.current)}).</span> ` +
     updateBtn +
+    `<button type="button" class="update-available-banner-notes ml-2 text-sky-300 hover:underline">What's new</button>` +
     `<a href="${escapeHtml(href)}" class="update-available-banner-release ml-2 text-sky-300 hover:underline" target="_blank" rel="noopener noreferrer">Release page</a>` +
-    '<button type="button" class="update-available-banner-dismiss ml-2 text-slate-400 hover:text-slate-200" aria-label="Dismiss for this session">×</button>' +
+    '<button type="button" class="update-available-banner-snooze ml-2 text-slate-400 hover:text-slate-200 text-sm">Remind me later</button>' +
+    renderApplyBlockedHint(parsed) +
     '</div>'
   );
 }
 
-export function dismissUpdateBannerForSession() {
-  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(UPDATE_BANNER_DISMISS_KEY, '1');
-  hideUpdateBanner();
+/**
+ * @param {{ version: string | null }} status
+ */
+export function renderUpdateReadyBannerHtml(status) {
+  const version = status.version || 'new';
+  return (
+    '<div class="migration-banner-body update-ready-banner-body">' +
+    `<span class="text-amber-400">Update v${escapeHtml(version)} downloaded and verified.</span> ` +
+    '<button type="button" class="update-ready-banner-install ml-2 text-sky-300 hover:underline">Install &amp; restart</button>' +
+    '<button type="button" class="update-ready-banner-later ml-2 text-slate-400 hover:text-slate-200 text-sm">Not yet</button>' +
+    '</div>'
+  );
+}
+
+/**
+ * @param {ReturnType<typeof parseUpdateStatusResponse> & { ok: true }} status
+ * @param {{ cancellable?: boolean }} [opts]
+ */
+export function renderUpdateProgressHtml(status, { cancellable = false } = {}) {
+  const msg = formatProgressMessage(status);
+  const cancelBtn = cancellable && status.phase === 'downloading'
+    ? '<button type="button" class="update-progress-cancel ml-2 text-slate-400 hover:text-slate-200 text-sm">Cancel download</button>'
+    : '';
+  return (
+    `<div class="migration-banner-body update-progress-banner-body">` +
+    `<span class="text-amber-400">${escapeHtml(msg)}</span> ${cancelBtn}` +
+    '</div>'
+  );
+}
+
+/**
+ * @param {{
+ *   latest: string | null,
+ *   current: string,
+ *   url: string | null,
+ *   releaseNotes?: string | null,
+ *   applySupported?: boolean,
+ *   applyBlockedMessage?: string | null,
+ * }} parsed
+ */
+export function renderUpdateModalHtml(parsed) {
+  const href = parsed.url || 'https://github.com/Ogrods/BAKLOG/releases/latest';
+  const notes = parsed.releaseNotes
+    ? `<pre class="update-modal-notes whitespace-pre-wrap text-sm text-slate-300 max-h-64 overflow-y-auto mt-3 p-3 rounded bg-slate-900/80 border border-slate-700">${escapeHtml(parsed.releaseNotes)}</pre>`
+    : '<p class="text-sm text-slate-400 mt-3">See the release page for details.</p>';
+  const updateBtn = parsed.applySupported
+    ? '<button type="button" class="update-modal-apply bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Update now</button>'
+    : '';
+  return (
+    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-lg w-full mx-4 p-5" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">` +
+    `<h2 id="updateModalTitle" class="text-lg font-semibold text-slate-100">Update available: v${escapeHtml(parsed.latest || '')}</h2>` +
+    `<p class="text-sm text-slate-400 mt-1">You have v${escapeHtml(parsed.current)}.</p>` +
+    renderApplyBlockedHint(parsed) +
+    notes +
+    `<div class="flex flex-wrap gap-2 justify-end mt-4">` +
+    `<a href="${escapeHtml(href)}" class="update-modal-release text-sm text-sky-300 hover:underline px-3 py-2" target="_blank" rel="noopener noreferrer">Release page</a>` +
+    '<button type="button" class="update-modal-later text-sm px-3 py-2 rounded hover:bg-slate-700">Remind me later</button>' +
+    updateBtn +
+    '</div></div>'
+  );
+}
+
+function renderInstallConfirmModalHtml() {
+  return (
+    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-5" role="dialog" aria-modal="true" aria-labelledby="updateInstallTitle">` +
+    '<h2 id="updateInstallTitle" class="text-lg font-semibold text-slate-100">Install and restart?</h2>' +
+    '<p class="text-sm text-slate-400 mt-2">The update is downloaded and verified. BAKLOG will restart to finish installing. Your library data stays where it is.</p>' +
+    '<div class="flex flex-wrap gap-2 justify-end mt-4">' +
+    '<button type="button" class="update-install-decline text-sm px-3 py-2 rounded hover:bg-slate-700">Not yet</button>' +
+    '<button type="button" class="update-install-confirm bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Install &amp; restart</button>' +
+    '</div></div>'
+  );
 }
 
 export function hideUpdateBanner() {
@@ -92,31 +247,209 @@ export function hideUpdateBanner() {
   banner.replaceChildren();
 }
 
-function setBannerMessage(html, { hidden = false } = {}) {
+function setBannerHtml(html, { hidden = false } = {}) {
   const banner = document.getElementById('updateAvailableBanner');
   if (!banner) return;
   banner.innerHTML = html;
   banner.classList.toggle('hidden', hidden);
 }
 
+function hideUpdateModal() {
+  _modalKeyAbort?.abort();
+  _modalKeyAbort = null;
+  const modal = document.getElementById(UPDATE_MODAL_ID);
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.replaceChildren();
+}
+
+function hideInstallConfirmModal() {
+  _modalKeyAbort?.abort();
+  _modalKeyAbort = null;
+  const modal = document.getElementById(UPDATE_INSTALL_MODAL_ID);
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.replaceChildren();
+}
+
 /**
- * @param {{ latest: string | null, url: string | null, current: string, applySupported?: boolean }} parsed
- * @param {{ onManualMessage?: (msg: string, opts?: { error?: boolean }) => void, fetchFn?: typeof fetch }} [handlers]
+ * @param {HTMLElement} modal
+ * @param {() => void} onClose
  */
-export function showUpdateBanner(parsed, handlers = {}) {
-  if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(UPDATE_BANNER_DISMISS_KEY) === '1') {
-    return;
+function bindModalDismiss(modal, onClose) {
+  _modalKeyAbort?.abort();
+  const controller = new AbortController();
+  _modalKeyAbort = controller;
+  const { signal } = controller;
+  modal.addEventListener('click', (ev) => {
+    if (ev.target === modal) onClose();
+  }, { signal });
+  modal.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') onClose();
+  }, { signal });
+}
+
+/**
+ * @param {string} message
+ * @param {{ error?: boolean }} [opts]
+ */
+export function showUpdateToast(message, { error = false } = {}) {
+  if (typeof document === 'undefined') return;
+  let el = document.getElementById(UPDATE_TOAST_ID);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = UPDATE_TOAST_ID;
+    el.className = 'update-notice-toast hidden';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    document.body.appendChild(el);
   }
+  el.className = `update-notice-toast ${error ? 'update-notice-toast-error' : 'update-notice-toast-info'}`;
+  el.textContent = message;
+  el.classList.remove('hidden');
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(() => el.classList.add('hidden'), 5000);
+}
+
+/**
+ * @param {object} parsed
+ * @param {{ fetchFn?: typeof fetch, onNotice?: (msg: string, opts?: { error?: boolean }) => void }} [handlers]
+ */
+export function showUpdateModal(parsed, handlers = {}) {
+  let modal = document.getElementById(UPDATE_MODAL_ID);
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = UPDATE_MODAL_ID;
+    modal.className = 'fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60';
+    modal.tabIndex = -1;
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = renderUpdateModalHtml(parsed);
+  modal.classList.remove('hidden');
+  modal.focus();
+
+  const close = () => hideUpdateModal();
+  bindModalDismiss(modal, close);
+  modal.querySelector('.update-modal-later')?.addEventListener('click', () => {
+    dismissUpdateForVersion(parsed.latest, handlers).catch(() => {});
+  }, { once: true });
+  modal.querySelector('.update-modal-apply')?.addEventListener('click', () => {
+    close();
+    runInAppUpdateFlow(handlers).catch(() => {});
+  }, { once: true });
+}
+
+/**
+ * @returns {Promise<boolean>}
+ */
+export function confirmInstallUpdate() {
+  return new Promise((resolve) => {
+    let modal = document.getElementById(UPDATE_INSTALL_MODAL_ID);
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = UPDATE_INSTALL_MODAL_ID;
+      modal.className = 'fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/60';
+      modal.tabIndex = -1;
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = renderInstallConfirmModalHtml();
+    modal.classList.remove('hidden');
+    modal.focus();
+
+    const finish = (value) => {
+      hideInstallConfirmModal();
+      resolve(value);
+    };
+    bindModalDismiss(modal, () => finish(false));
+    modal.querySelector('.update-install-decline')?.addEventListener('click', () => finish(false), { once: true });
+    modal.querySelector('.update-install-confirm')?.addEventListener('click', () => finish(true), { once: true });
+  });
+}
+
+/**
+ * @param {string | null | undefined} version
+ * @param {{ fetchFn?: typeof fetch }} [opts]
+ */
+export async function dismissUpdateForVersion(version, opts = {}) {
+  if (!version) return;
+  rememberDismissedVersion(version);
+  hideUpdateBanner();
+  hideUpdateModal();
+  const fetchFn = opts.fetchFn || baklogFetch;
+  try {
+    await fetchFn('/api/update/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version }),
+    });
+  } catch {
+    /* local mirror still applies */
+  }
+}
+
+/** @deprecated use dismissUpdateForVersion */
+export function dismissUpdateBannerForSession() {
+  hideUpdateBanner();
+}
+
+/**
+ * @param {{ fetchFn?: typeof fetch, onNotice?: (msg: string, opts?: { error?: boolean }) => void }} [handlers]
+ */
+export async function cancelUpdateDownload(handlers = {}) {
+  const fetchFn = handlers.fetchFn || baklogFetch;
+  try {
+    await fetchFn('/api/update/cancel', { method: 'POST' });
+    hideUpdateBanner();
+    handlers.onNotice?.('Update download cancelled.');
+  } catch (err) {
+    handlers.onNotice?.(`Could not cancel download: ${err?.message || err}`, { error: true });
+  }
+}
+
+function bindUpdateBannerHandlers(parsed, handlers = {}) {
   const banner = document.getElementById('updateAvailableBanner');
   if (!banner) return;
-  banner.innerHTML = renderUpdateBannerHtml(parsed);
-  banner.classList.remove('hidden');
-  banner.querySelector('.update-available-banner-dismiss')?.addEventListener('click', () => {
-    dismissUpdateBannerForSession();
+  banner.querySelector('.update-available-banner-snooze')?.addEventListener('click', () => {
+    dismissUpdateForVersion(parsed.latest, handlers).catch(() => {});
   });
   banner.querySelector('.update-available-banner-apply')?.addEventListener('click', () => {
-    runInAppUpdateFlow({ onManualMessage: handlers.onManualMessage, fetchFn: handlers.fetchFn }).catch(() => {});
+    runInAppUpdateFlow(handlers).catch(() => {});
   });
+  banner.querySelector('.update-available-banner-notes')?.addEventListener('click', () => {
+    showUpdateModal(parsed, handlers);
+  });
+}
+
+function bindReadyBannerHandlers(status, handlers = {}) {
+  const banner = document.getElementById('updateAvailableBanner');
+  if (!banner) return;
+  banner.querySelector('.update-ready-banner-install')?.addEventListener('click', () => {
+    runApplyReadyUpdate(handlers).catch(() => {});
+  });
+  banner.querySelector('.update-ready-banner-later')?.addEventListener('click', () => {
+    handlers.onNotice?.('Update ready — choose Install & restart when you want.');
+  });
+}
+
+/**
+ * @param {ReturnType<typeof parseUpdateStatusResponse> & { ok: true }} status
+ * @param {{ fetchFn?: typeof fetch, onNotice?: (msg: string, opts?: { error?: boolean }) => void }} [handlers]
+ */
+export function showReadyToInstallBanner(status, handlers = {}) {
+  setBannerHtml(renderUpdateReadyBannerHtml(status));
+  bindReadyBannerHandlers(status, handlers);
+}
+
+/**
+ * @param {{ latest: string | null, url: string | null, current: string, applySupported?: boolean, releaseNotes?: string | null, dismissed?: boolean, applyBlockedMessage?: string | null }} parsed
+ * @param {{ onNotice?: (msg: string, opts?: { error?: boolean }) => void, fetchFn?: typeof fetch }} [handlers]
+ */
+export function showUpdateBanner(parsed, handlers = {}) {
+  if (isUpdateBannerDismissed(parsed)) {
+    return;
+  }
+  setBannerHtml(renderUpdateBannerHtml(parsed));
+  bindUpdateBannerHandlers(parsed, handlers);
 }
 
 /**
@@ -148,12 +481,26 @@ function formatProgressMessage(status) {
   }
   if (status.phase === 'ready') return 'Update downloaded and verified. Ready to install.';
   if (status.phase === 'applying') return 'Installing update and restarting BAKLOG…';
-  if (status.phase === 'error') return status.error || 'Update failed';
+  if (status.phase === 'error') return mapUpdateError(status.error);
   return '';
 }
 
+function bindProgressCancel(handlers = {}) {
+  const banner = document.getElementById('updateAvailableBanner');
+  banner?.querySelector('.update-progress-cancel')?.addEventListener('click', () => {
+    cancelUpdateDownload(handlers).catch(() => {});
+  });
+}
+
+function showUpdateError(message, handlers = {}) {
+  setBannerHtml(
+    `<div class="migration-banner-body"><span class="text-red-400">${escapeHtml(mapUpdateError(message))}</span></div>`,
+  );
+  handlers.onNotice?.(mapUpdateError(message), { error: true });
+}
+
 /**
- * @param {{ fetchFn?: typeof fetch, onManualMessage?: (msg: string, opts?: { error?: boolean }) => void, sleepMs?: number }} [opts]
+ * @param {{ fetchFn?: typeof fetch, onNotice?: (msg: string, opts?: { error?: boolean }) => void, sleepMs?: number }} [opts]
  */
 export async function pollUpdateStatusUntilDone(opts = {}) {
   const fetchFn = opts.fetchFn || baklogFetch;
@@ -163,12 +510,9 @@ export async function pollUpdateStatusUntilDone(opts = {}) {
     const data = await res.json().catch(() => ({}));
     const status = parseUpdateStatusResponse(data);
     if (!status.ok) throw new Error(status.error || 'Update status unavailable');
-    const msg = formatProgressMessage(status);
-    if (msg) {
-      setBannerMessage(
-        `<div class="migration-banner-body"><span class="text-amber-400">${escapeHtml(msg)}</span></div>`,
-      );
-      opts.onManualMessage?.(msg);
+    if (status.phase !== 'error') {
+      setBannerHtml(renderUpdateProgressHtml(status, { cancellable: true }));
+      bindProgressCancel(opts);
     }
     if (status.phase === 'ready' || status.phase === 'error' || status.phase === 'idle') {
       return status;
@@ -179,100 +523,164 @@ export async function pollUpdateStatusUntilDone(opts = {}) {
 }
 
 /**
- * @param {{ fetchFn?: typeof fetch, onManualMessage?: (msg: string, opts?: { error?: boolean }) => void }} [opts]
+ * @param {{ fetchFn?: typeof fetch, onNotice?: (msg: string, opts?: { error?: boolean }) => void }} [opts]
  */
-export async function runInAppUpdateFlow(opts = {}) {
+export async function runApplyReadyUpdate(opts = {}) {
   const fetchFn = opts.fetchFn || baklogFetch;
-  const onManualMessage = opts.onManualMessage;
-
-  const downloadRes = await fetchFn('/api/update/download', { method: 'POST' });
-  const downloadPayload = await downloadRes.json().catch(() => ({}));
-  if (!downloadRes.ok || downloadPayload.ok === false) {
-    const msg = downloadPayload.error || `Download request failed (${downloadRes.status})`;
-    onManualMessage?.(msg, { error: true });
-    throw new Error(msg);
-  }
-
-  const status = await pollUpdateStatusUntilDone(opts);
-  if (status.phase === 'error') {
-    const msg = status.error || 'Update download failed';
-    onManualMessage?.(msg, { error: true });
-    throw new Error(msg);
-  }
-  if (!status.canApply) {
-    const msg = 'Update package is not ready to apply';
-    onManualMessage?.(msg, { error: true });
-    throw new Error(msg);
-  }
-
-  const confirmed = typeof window !== 'undefined'
-    ? window.confirm('Install the downloaded update and restart BAKLOG now? Your library data will be kept.')
-    : true;
+  const confirmed = await confirmInstallUpdate();
   if (!confirmed) {
-    onManualMessage?.('Update ready — choose Update now when you want to install.');
+    const res = await fetchFn('/api/update/status');
+    const status = parseUpdateStatusResponse(await res.json().catch(() => ({})));
+    if (status.ok && status.canApply) {
+      showReadyToInstallBanner(status, opts);
+    }
+    opts.onNotice?.('Update ready — choose Install & restart when you want.');
     return { ok: true, ready: true, applied: false };
   }
 
   const applyRes = await fetchFn('/api/update/apply', { method: 'POST' });
   const applyPayload = await applyRes.json().catch(() => ({}));
   if (!applyRes.ok || applyPayload.ok === false) {
-    const msg = applyPayload.error || `Apply request failed (${applyRes.status})`;
-    onManualMessage?.(msg, { error: true });
+    const msg = mapUpdateError(applyPayload.error, applyPayload.error_code);
+    showUpdateError(msg, opts);
     throw new Error(msg);
   }
 
-  setBannerMessage(
+  setBannerHtml(
     '<div class="migration-banner-body"><span class="text-amber-400">Installing update and restarting BAKLOG…</span></div>',
   );
-  onManualMessage?.('Installing update and restarting BAKLOG…');
+  opts.onNotice?.('Installing update and restarting BAKLOG…');
+  return { ok: true, applied: true, version: applyPayload.version };
+}
+
+/**
+ * @param {{ fetchFn?: typeof fetch, onNotice?: (msg: string, opts?: { error?: boolean }) => void, sleepMs?: number }} [opts]
+ */
+export async function runInAppUpdateFlow(opts = {}) {
+  const fetchFn = opts.fetchFn || baklogFetch;
+
+  const downloadRes = await fetchFn('/api/update/download', { method: 'POST' });
+  const downloadPayload = await downloadRes.json().catch(() => ({}));
+  if (!downloadRes.ok || downloadPayload.ok === false) {
+    const msg = mapUpdateError(downloadPayload.error, downloadPayload.error_code);
+    showUpdateError(msg, opts);
+    throw new Error(msg);
+  }
+
+  const status = await pollUpdateStatusUntilDone(opts);
+  if (status.phase === 'error') {
+    const msg = mapUpdateError(status.error);
+    showUpdateError(msg, opts);
+    throw new Error(msg);
+  }
+  if (!status.canApply) {
+    const msg = 'Update package is not ready to apply';
+    showUpdateError(msg, opts);
+    throw new Error(msg);
+  }
+
+  const confirmed = typeof opts.confirmInstall === 'function'
+    ? await opts.confirmInstall()
+    : await confirmInstallUpdate();
+  if (!confirmed) {
+    showReadyToInstallBanner(status, opts);
+    opts.onNotice?.('Update ready — choose Install & restart when you want.');
+    return { ok: true, ready: true, applied: false };
+  }
+
+  const applyRes = await fetchFn('/api/update/apply', { method: 'POST' });
+  const applyPayload = await applyRes.json().catch(() => ({}));
+  if (!applyRes.ok || applyPayload.ok === false) {
+    const msg = mapUpdateError(applyPayload.error, applyPayload.error_code);
+    showUpdateError(msg, opts);
+    throw new Error(msg);
+  }
+
+  setBannerHtml(
+    '<div class="migration-banner-body"><span class="text-amber-400">Installing update and restarting BAKLOG…</span></div>',
+  );
+  opts.onNotice?.('Installing update and restarting BAKLOG…');
   return { ok: true, applied: true, version: applyPayload.version || status.version };
 }
 
 /**
- * @param {{ source?: 'boot' | 'manual', frozen?: boolean, fetchFn?: typeof fetch, onManualMessage?: (msg: string, opts?: { error?: boolean }) => void }} [opts]
+ * @param {{ fetchFn?: typeof fetch, frozen?: boolean, onNotice?: (msg: string, opts?: { error?: boolean }) => void }} [opts]
+ */
+export async function syncReadyUpdateFromStatus(opts = {}) {
+  if (opts.frozen === false) return { ok: true, ready: false };
+  const fetchFn = opts.fetchFn || baklogFetch;
+  try {
+    const res = await fetchFn('/api/update/status');
+    if (!res.ok) return { ok: false };
+    const status = parseUpdateStatusResponse(await res.json().catch(() => ({})));
+    if (status.ok && status.phase === 'ready' && status.canApply) {
+      showReadyToInstallBanner(status, opts);
+      return { ok: true, ready: true, status };
+    }
+    return { ok: true, ready: false, status };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * @param {{ source?: 'boot' | 'manual', frozen?: boolean, fetchFn?: typeof fetch, onNotice?: (msg: string, opts?: { error?: boolean }) => void, checkOnBoot?: boolean }} [opts]
  */
 export async function checkForUpdates(opts = {}) {
   const fetchFn = opts.fetchFn || fetch;
   const source = opts.source || 'manual';
   const frozen = opts.frozen === true;
-  if (source === 'boot' && !frozen) return { skipped: true, reason: 'not-frozen' };
+  if (source === 'boot') {
+    if (!frozen) return { skipped: true, reason: 'not-frozen' };
+    if (opts.checkOnBoot === false) return { skipped: true, reason: 'pref-disabled' };
+  }
+
+  const handlers = {
+    fetchFn: opts.fetchFn || baklogFetch,
+    onNotice: opts.onNotice,
+  };
 
   try {
     const res = await fetchFn('/api/update-check');
     if (!res.ok) {
       const msg = `Could not check for updates (server returned ${res.status}).`;
-      if (source === 'manual') opts.onManualMessage?.(msg, { error: true });
+      if (source === 'manual') opts.onNotice?.(msg, { error: true });
       return { ok: false, error: msg };
     }
     const data = await res.json().catch(() => ({}));
     const parsed = parseUpdateCheckResponse(data);
     if (!parsed.ok) {
       const msg = `Could not check for updates: ${parsed.error}`;
-      if (source === 'manual') opts.onManualMessage?.(msg, { error: true });
+      if (source === 'manual') opts.onNotice?.(msg, { error: true });
       return { ok: false, error: parsed.error };
     }
     if (parsed.updateAvailable) {
       if (source === 'boot') {
-        showUpdateBanner(parsed, {
-          onManualMessage: opts.onManualMessage,
-          fetchFn: opts.fetchFn || baklogFetch,
-        });
+        showUpdateBanner(parsed, handlers);
       } else {
-        opts.onManualMessage?.(formatUpdateAvailableMessage(parsed));
+        showUpdateModal(parsed, handlers);
       }
       return { ok: true, updateAvailable: true, parsed };
     }
-    if (source === 'manual') opts.onManualMessage?.(formatUpToDateMessage(parsed));
+    if (source === 'manual') opts.onNotice?.(formatUpToDateMessage(parsed));
     return { ok: true, updateAvailable: false, parsed };
   } catch (err) {
     const msg = `Update check failed: ${err?.message || err}`;
-    if (source === 'manual') opts.onManualMessage?.(msg, { error: true });
+    if (source === 'manual') opts.onNotice?.(msg, { error: true });
     return { ok: false, error: msg };
   }
 }
 
 /** @internal Vitest helper */
 export function _resetUpdateBannerForTests() {
-  if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(UPDATE_BANNER_DISMISS_KEY);
+  try {
+    sessionStorage.removeItem(UPDATE_BANNER_DISMISS_KEY);
+    localStorage.removeItem(UPDATE_DISMISSED_VERSION_KEY);
+  } catch {
+    /* ignore */
+  }
   hideUpdateBanner();
+  hideUpdateModal();
+  hideInstallConfirmModal();
+  document.getElementById(UPDATE_TOAST_ID)?.remove();
 }

@@ -541,13 +541,10 @@ export function effectiveSortPrice(g) {
 export function dealScore(g) {
   const d = getDealInfo(g);
   if (!d) return -Infinity;
-  const cut = d.cut || 0;
-  const lowBonus = d.isHistoricalLow ? 25 : 0;
-  const rating = ratingValue(g);
-  const ratingBonus = rating >= 90 ? 15 : rating >= 80 ? 10 : rating >= 70 ? 5 : 0;
+  const woba = computeWishlistWoba(g, d);
+  if (woba == null) return -Infinity;
   const ownedPenalty = isOwnedByTitle(g.name) ? 1000 : 0;
-  const pricePenalty = d.price != null ? Math.max(0, d.price - 30) * 0.5 : 0;
-  return cut + lowBonus + ratingBonus - ownedPenalty - pricePenalty;
+  return woba - ownedPenalty;
 }
 
 export function passesDealFilters(g) {

@@ -363,9 +363,12 @@ def reconcile_profile_store(*, adopt_orphans: bool | None = None) -> list[str]:
     """Align index.json with on-disk profile dirs; adopt orphan dirs on boot."""
     if adopt_orphans is None:
         try:
-            from shared.supabase_auth import auth_enabled
+            from shared.supabase_auth import auth_enabled, local_profiles_enabled
 
-            adopt_orphans = not auth_enabled()
+            # Supabase-only installs map one user id per profile dir; local
+            # profile switcher (BAKLOG_LOCAL_PROFILES) still needs index.json
+            # when data was migrated without an index (frozen BAKLOG-Data).
+            adopt_orphans = not auth_enabled() or local_profiles_enabled()
         except Exception:
             adopt_orphans = True
     notes: list[str] = []
@@ -397,8 +400,11 @@ def reconcile_profile_store(*, adopt_orphans: bool | None = None) -> list[str]:
         if active not in indexed_ids and indexed_ids:
             doc["active"] = sorted(indexed_ids)[0]
             notes.append(f"active profile reset to {doc['active']!r}")
-        if orphans and adopt_orphans:
+        materialize_index = not INDEX_FILE.is_file() and bool(disk_ids)
+        if (orphans and adopt_orphans) or materialize_index:
             _save_index_unlocked(doc)
+            if materialize_index and not (orphans and adopt_orphans):
+                notes.append("materialized profiles/index.json from on-disk profile dirs")
     return notes
 
 

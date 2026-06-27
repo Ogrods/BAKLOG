@@ -133,6 +133,25 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 
 **Note:** Browser `localStorage` at `http://127.0.0.1:8765` can still hold default-profile UI prefs after a reinstall even when server files are gone. Use the migration banner to upload into `data/personal.json`, or clear site data if you want a truly fresh start.
 
+## Dev server vs frozen exe (same browser origin)
+
+**Symptom:** The frozen beta shows the wrong library, old errors in bug reports, or UI prefs that match your git checkout - but `BAKLOG.exe` is supposed to use `%LOCALAPPDATA%\BAKLOG-Data`.
+
+**Cause:** Dev (`python server.py`) and frozen (`BAKLOG.exe`) both serve on `http://127.0.0.1:8765`. The browser treats them as one site, so **localStorage is shared** (status chips, filters, `baklog-error-log`, Supabase session keys). Server library files are **not** shared - they come from the active data directory.
+
+**How to tell which server is running:** Open `http://127.0.0.1:8765/api/diagnostics` (or use **Report a bug**). Check `frozen` and `data_dir_path`:
+
+| `frozen` | `data_dir_path` (typical) | Data source |
+|----------|---------------------------|-------------|
+| `false` | Your git repo folder | Dev checkout `profiles/` |
+| `true` | `~/AppData/Local/BAKLOG-Data` | Frozen install data dir |
+
+**Fix (library):** With BAKLOG closed, copy `profiles/` from your dev checkout into `%LOCALAPPDATA%\BAKLOG-Data`, or connect stores and refresh in the frozen app. Missing store files return an empty catalog (HTTP 200, zero games) - not your dev repo.
+
+**Fix (UI prefs / stale bug-report errors):** Edge or Chrome → site data for `127.0.0.1` → clear **localStorage**, or test the frozen build in an InPrivate window. Clearing site data does not delete `BAKLOG-Data`.
+
+**Check migration:** `%LOCALAPPDATA%\BAKLOG-Data\.legacy_migration_done` lists what moved from the install folder on first frozen boot. If only `.env` moved, your library was never beside the exe - copy `profiles/` manually or refresh stores.
+
 ## Connections lists many stores on a new profile
 
 **Symptom:** A fresh profile shows many store cards (about 19) on the Connections tab.

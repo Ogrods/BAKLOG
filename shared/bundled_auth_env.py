@@ -12,6 +12,13 @@ AUTH_ENV_KEYS = (
     "BAKLOG_LOCAL_PROFILES",
 )
 
+# JWT secret stays install-bundle-only — never copy into writable BAKLOG-Data/.env.
+DATA_DIR_AUTH_ENV_KEYS = (
+    "BAKLOG_SUPABASE_URL",
+    "BAKLOG_SUPABASE_ANON_KEY",
+    "BAKLOG_LOCAL_PROFILES",
+)
+
 
 def parse_env_file(path: Path) -> dict[str, str]:
     out: dict[str, str] = {}
@@ -34,7 +41,7 @@ def render_env_lines(values: dict[str, str]) -> list[str]:
         "# BAKLOG account auth (data dir).",
         "# Anon key is public; included so the local app can require sign-in.",
     ]
-    for key in AUTH_ENV_KEYS:
+    for key in DATA_DIR_AUTH_ENV_KEYS:
         if key in values:
             lines.append(f"{key}={values[key]}")
     return lines
@@ -62,10 +69,14 @@ def sync_bundled_auth_env_to_data_dir(install_dir: Path, data_dir: Path) -> bool
     merged = parse_env_file(dest)
     changed = False
     for key, val in bundled.items():
+        if key not in DATA_DIR_AUTH_ENV_KEYS:
+            continue
         if merged.get(key) != val:
             merged[key] = val
             changed = True
-    if not changed and dest.is_file():
+    if merged.pop("BAKLOG_SUPABASE_JWT_SECRET", None) is not None:
+        changed = True
+    if not changed:
         return False
     if not merged:
         return False

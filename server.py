@@ -2968,7 +2968,7 @@ class Handler(SimpleHTTPRequestHandler):
         if _is_internal_admin_path(path):
             if self._reject_if_csrf_strict():
                 return
-        elif self._reject_if_csrf():
+        elif self._reject_if_csrf_strict():
             return
         if path.startswith("/api/internal/run/"):
             if not ADMIN_ENABLED:
@@ -3044,6 +3044,11 @@ class Handler(SimpleHTTPRequestHandler):
             provider = path[len("/api/auth/") : -len("/enable")].strip("/")
             self._handle_auth_enable(provider)
             return
+        if path in ("/api/auth/master-password", "/api/auth/secrets/export") or path.startswith(
+            "/api/auth/secrets/import"
+        ):
+            if self._reject_if_csrf_strict():
+                return
         if path == "/api/auth/master-password":
             self._handle_auth_master_password()
             return
@@ -3086,7 +3091,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_DELETE(self) -> None:  # noqa: N802 - http.server API
         self._begin_request()
-        if self._reject_if_csrf():
+        if self._reject_if_csrf_strict():
             return
         if not _require_api_auth(self):
             return
@@ -3113,7 +3118,7 @@ class Handler(SimpleHTTPRequestHandler):
         if _is_internal_admin_path(path):
             if self._reject_if_csrf_strict():
                 return
-        elif self._reject_if_csrf():
+        elif self._reject_if_csrf_strict():
             return
         if path == "/api/internal/free-claims/approved":
             if not ADMIN_ENABLED:

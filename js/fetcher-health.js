@@ -1562,6 +1562,7 @@ export const fetcherRunner = (() => {
   }
 
   function logBody() {
+    if (typeof document === 'undefined') return null;
     if (!logBodyEl || !document.body.contains(logBodyEl)) {
       logBodyEl = logPanel()?.querySelector('.fh-log-body') || logPanel()?.querySelector('[data-role="body"]') || null;
     }

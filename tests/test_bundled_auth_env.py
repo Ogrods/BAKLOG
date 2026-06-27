@@ -26,7 +26,7 @@ def test_sync_fills_missing_auth_keys_when_data_env_absent(tmp_path: Path) -> No
     merged = parse_env_file(data / ".env")
     assert merged["BAKLOG_SUPABASE_URL"] == "https://proj.supabase.co"
     assert merged["BAKLOG_SUPABASE_ANON_KEY"] == "anon-key"
-    assert merged["BAKLOG_SUPABASE_JWT_SECRET"] == "jwt-secret"
+    assert "BAKLOG_SUPABASE_JWT_SECRET" not in merged
 
 
 def test_sync_overwrites_stale_data_auth_keys(tmp_path: Path) -> None:
@@ -48,7 +48,7 @@ def test_sync_overwrites_stale_data_auth_keys(tmp_path: Path) -> None:
     assert merged["BAKLOG_SUPABASE_ANON_KEY"] == "new-anon"
 
 
-def test_sync_fills_only_missing_jwt_secret(tmp_path: Path) -> None:
+def test_sync_does_not_copy_jwt_secret_to_data_dir(tmp_path: Path) -> None:
     install = tmp_path / "install"
     data = tmp_path / "data"
     install.mkdir()
@@ -63,9 +63,29 @@ def test_sync_fills_only_missing_jwt_secret(tmp_path: Path) -> None:
         "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n",
         encoding="utf-8",
     )
+    assert sync_bundled_auth_env_to_data_dir(install, data) is False
+    merged = parse_env_file(data / ".env")
+    assert "BAKLOG_SUPABASE_JWT_SECRET" not in merged
+
+
+def test_sync_strips_legacy_jwt_secret_from_data_env(tmp_path: Path) -> None:
+    install = tmp_path / "install"
+    data = tmp_path / "data"
+    install.mkdir()
+    data.mkdir()
+    (install / ".env").write_text(
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n",
+        encoding="utf-8",
+    )
+    (data / ".env").write_text(
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\n"
+        "BAKLOG_SUPABASE_ANON_KEY=anon-key\n"
+        "BAKLOG_SUPABASE_JWT_SECRET=legacy-jwt\n",
+        encoding="utf-8",
+    )
     assert sync_bundled_auth_env_to_data_dir(install, data) is True
     merged = parse_env_file(data / ".env")
-    assert merged["BAKLOG_SUPABASE_JWT_SECRET"] == "jwt-secret"
+    assert "BAKLOG_SUPABASE_JWT_SECRET" not in merged
 
 
 def test_apply_install_dir_auth_env_overwrites_stale_process_env(

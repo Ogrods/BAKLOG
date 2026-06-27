@@ -60,7 +60,7 @@ export function stripClaimTitleDecorations(title) {
 // Lower rank wins when the same game shows up from multiple sources — mirrors
 // SOURCE_PRECEDENCE in shared/free_claims_sources.py (a direct store offer over
 // an aggregator listing).
-const CLAIM_SOURCE_RANK = { epic: 0, gamerpower: 1, itad: 2 };
+export const CLAIM_SOURCE_RANK = { epic: 0, gamerpower: 1, itad: 2 };
 
 export function claimDedupKey(c) {
   if (c.steam_appid != null && c.steam_appid !== '') {

@@ -249,6 +249,17 @@ describe('getAdsForLocation round-robin', () => {
     ));
     expect(getAdsForLocation('claim-cards', { count: 3 }).map(x => x.id)).toEqual(['a', 'b', 'c']);
   });
+
+  it('returns no ads when isPro()', () => {
+    __setSponsorsForTest(v2Doc(
+      { a: sponsor({ id: 'a', title: 'A' }) },
+      { 'claim-cards': ['a'], 'lib-pick': ['a'] },
+    ));
+    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    expect(getAdsForLocation('claim-cards')).toEqual([]);
+    expect(getAdsForLocation('lib-pick')).toEqual([]);
+    spy.mockRestore();
+  });
 });
 
 describe('sponsorCoverUrl', () => {

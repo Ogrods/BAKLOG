@@ -49,6 +49,7 @@ let _detailsOpen = false;
 let _dismissed = false;
 let _persistedRing = []; // larger than _errors so bundles can include history across reloads
 let _bundleCtx = null; // { getFingerprint, getActiveFilterCount } — injected by app.js
+let _serverFrozenHint = null; // true/false from last /api/config; tags persisted errors
 const _errors = [];
 const _signatures = new Map(); // sig -> last seen timestamp
 
@@ -171,6 +172,18 @@ function shouldDedupe(entry) {
   return last != null && now - last < DEDUPE_WINDOW_MS;
 }
 
+/** Record whether the active server is frozen (from /api/config). Tags new persisted errors. */
+export function noteServerRuntime({ frozen } = {}) {
+  if (typeof frozen === 'boolean') _serverFrozenHint = frozen;
+}
+
+function persistedErrorsMixedRuntime(currentFrozen) {
+  if (typeof currentFrozen !== 'boolean' || !_persistedRing.length) return false;
+  const tagged = _persistedRing.filter((e) => typeof e.server_frozen === 'boolean');
+  if (!tagged.length) return false;
+  return tagged.some((e) => e.server_frozen !== currentFrozen);
+}
+
 function publishToWindow() {
   if (typeof window === 'undefined') return;
   window.__baklogErrors = {
@@ -223,6 +236,7 @@ function entryForStorage(entry) {
     stored.stack = stored.stack.slice(0, MAX_PERSIST_STACK_LEN) + PERSIST_STACK_TRUNCATED;
   }
   if (!stored.repeats) stored.repeats = 1;
+  if (typeof _serverFrozenHint === 'boolean') stored.server_frozen = _serverFrozenHint;
   return stored;
 }
 
@@ -361,7 +375,14 @@ export function buildBugBundle(extra = {}) {
   const dataVersion = (win && '_dataVersion' in win) ? win._dataVersion : null;
   const perf = win?.__baklogPerf?.last || null;
   const dashStats = win?.__baklogDash?.stats || null;
-  return {
+  const server = extra.server || null;
+  const warnings = [];
+  if (server && typeof server.frozen === 'boolean' && persistedErrorsMixedRuntime(server.frozen)) {
+    warnings.push(
+      'Persisted errors include entries from both dev and frozen sessions (shared localhost localStorage). Filter by server_frozen or clear site data for 127.0.0.1.',
+    );
+  }
+  const base = {
     bundle: 'baklog-bug-bundle',
     bundle_version: 2,
     app_version: appVersion,
@@ -376,7 +397,7 @@ export function buildBugBundle(extra = {}) {
       dash_stats: dashStats ? { ...dashStats } : null,
       propagation: win?.__baklogProp ? { ...win.__baklogProp } : null,
     },
-    server: extra.server || null,
+    server,
     errors: {
       session_count: _errors.length,
       persisted_count: _persistedRing.length,
@@ -385,6 +406,8 @@ export function buildBugBundle(extra = {}) {
     },
     notice: 'This bundle was assembled locally. Nothing was sent anywhere. Paste it into a GitHub issue if you want to share it.',
   };
+  if (warnings.length) base.warnings = warnings;
+  return base;
 }
 
 /** Fetch redacted server diagnostics for bug bundles (best-effort). */
@@ -647,6 +670,7 @@ export function _resetForTests() {
   _signatures.clear();
   _persistedRing = [];
   _bundleCtx = null;
+  _serverFrozenHint = null;
   _dismissed = false;
   hideToast();
   try { window?.localStorage?.removeItem(PERSIST_STORAGE_KEY); } catch (_) { /* noop */ }

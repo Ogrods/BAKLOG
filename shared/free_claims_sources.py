@@ -50,7 +50,7 @@ def has_valid_claim_links(item: dict) -> bool:
     """True when the item has the outbound link(s) required for its store."""
     if is_epic_mobile_store(item.get("store")):
         return bool(normalize_claim_urls(item.get("claim_urls")))
-    return bool(str(item.get("claim_url") or "").strip())
+    return _is_safe_http_url(str(item.get("claim_url") or ""))
 
 
 def item_missing_link_fields(item: dict) -> list[str]:

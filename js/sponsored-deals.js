@@ -766,7 +766,7 @@ export const PRO_PROMO = {
   features: [
     {
       title: 'Queued bulk refresh',
-      desc: 'Coming soon: queue every stale store at once and let them refresh back-to-back instead of one at a time.',
+      desc: 'Queue every stale store at once and let them refresh back-to-back instead of one at a time.',
       icon: '⚡',
     },
     {

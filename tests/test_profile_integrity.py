@@ -186,6 +186,17 @@ def test_save_index_rejects_active_not_in_profiles(isolated_profiles: Path) -> N
         profile_paths.save_index(doc)
 
 
+def test_rename_locked_profile_requires_pin(isolated_profiles: Path) -> None:
+    profiles.create_profile("Work")
+    profiles.set_profile_pin("work", "1234")
+    with pytest.raises(ValueError, match="current PIN is incorrect"):
+        profiles.rename_profile("work", "Renamed")
+    with pytest.raises(ValueError, match="current PIN is incorrect"):
+        profiles.rename_profile("work", "Renamed", current_pin="0000")
+    updated = profiles.rename_profile("work", "Renamed", current_pin="1234")
+    assert updated["label"] == "Renamed"
+
+
 def test_delete_profile_clears_pin_lockout(isolated_profiles: Path) -> None:
     profiles.create_profile("Work")
     profiles.create_profile("Play")

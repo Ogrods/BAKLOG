@@ -127,8 +127,8 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 
 BAKLOG is free forever to import and browse. The optional **$5/mo** (**$50/yr**) paid tier is live (via Polar checkout) and adds power-user conveniences; none of today's free features move behind it:
 
-- **Live:** no sponsored deal cards; scheduled stale-store refresh without keeping the app open; deep achievement/trophy sync (full re-pull; free tier: cached % only); bonus claimables feed (DLC, add-ons, in-game bonuses)
-- **Coming soon:** cloud sync across machines; queued bulk refresh (every stale store in one sweep; free tier: one store at a time, on demand); deal/watchlist alerts
+- **Live:** no sponsored deal cards; scheduled stale-store refresh without keeping the app open; deep achievement/trophy sync (full re-pull; free tier: cached % only); bonus claimables feed (DLC, add-ons, in-game bonuses); queued bulk refresh (every stale store in one sweep from Fetcher health)
+- **Coming soon:** cloud sync across machines; deal/watchlist alerts
 
 See [baklog.app](https://baklog.app/) for the full free-vs-paid breakdown.
 

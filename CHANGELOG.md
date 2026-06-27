@@ -38,6 +38,23 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Uninstall cleanup stops running BAKLOG processes before wiping data; tray uninstall flags require the frozen exe (dev `tray_app.py` cannot wipe install data).
 - `/api/config` exposes `data_dir_path` for dev sessions (redacted), not only frozen builds.
 
+## [0.8.26] - 2026-06-26
+
+### Added
+
+- Pro-gated **Run stale** button in Fetcher health (queues every stale store back-to-back).
+- Guide **Known issues (beta)** section for stranger-wave expectations.
+
+### Changed
+
+- FAQ, README, landing, and in-app `PRO_PROMO`: queued bulk refresh is **live on Pro** (not coming soon).
+- `EVENT_AUDIT.md`: EVT-03 agent-log blocks marked resolved.
+
+### Fixed
+
+- Profile **rename** requires PIN when the profile is PIN-locked (matches delete).
+- Persisted **queue wait timeout** errors pruned after a healthy `/api/runs` sync.
+
 ## [0.8.25] - 2026-06-26
 
 ### Fixed

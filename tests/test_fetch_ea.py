@@ -109,6 +109,7 @@ def test_stored_token_browser_fallback_when_apq_stale(monkeypatch, tmp_path) -> 
     sample_cookies = [{"name": "remid", "value": "x"}]
     monkeypatch.setattr("fetchers.fetch_ea._load_ea_profile_cookies", lambda: sample_cookies)
     monkeypatch.setattr("fetchers.fetch_ea.read_ea_connect_snapshot", lambda **_k: None)
+    monkeypatch.setattr("fetchers.fetch_ea.mark_connected", lambda *_a, **_k: None)
 
     fake_result = type(
         "R",

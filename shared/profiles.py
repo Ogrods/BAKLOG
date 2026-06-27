@@ -245,10 +245,23 @@ def set_active_profile(profile_id: str) -> dict[str, Any]:
     return {"active": profile_id, "label": label}
 
 
-def rename_profile(profile_id: str, label: str) -> dict[str, Any]:
+def rename_profile(
+    profile_id: str,
+    label: str,
+    *,
+    current_pin: str | None = None,
+) -> dict[str, Any]:
     profile_id = normalize_profile_id(profile_id)
     label = _validate_label(label)
     with mutate_index() as doc:
+        if profile_has_pin(profile_id, doc):
+            limit_err = pin_rate_limit_error(profile_id)
+            if limit_err:
+                raise ValueError(limit_err)
+            if not current_pin or not verify_profile_pin(profile_id, current_pin, doc):
+                record_pin_failure(profile_id)
+                raise ValueError("current PIN is incorrect")
+            clear_pin_failures(profile_id)
         found = False
         for p in doc.get("profiles", []):
             if isinstance(p, dict) and p.get("id") == profile_id:

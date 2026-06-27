@@ -1,5 +1,5 @@
 import { baklogFetch, urlWithStreamTicket, withBaklogHeaders } from './api-client.js';
-import { isAccountAuthMode } from './auth-gate.js';
+import { isAccountAuthMode, isPro } from './auth-gate.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { state, ITCH_NON_GAME_CLASSIFICATIONS } from './state.js';
 import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
@@ -2885,6 +2885,10 @@ export const fetcherRunner = (() => {
     applyServerSnapshotInFlight(snap);
     pruneSuppressedRuns(snap);
     reconcileRunStateFromSnapshot(snap);
+    if (!isQueueFull()) {
+      const { refreshPersistedErrorRing } = await import('./error-boundary.js');
+      refreshPersistedErrorRing();
+    }
 
     const pending = [];
     if (snap.active) pending.push(snap.active);
@@ -3466,9 +3470,9 @@ export function renderDashboardFetcherHealth() {
   const staleBtnDisabled = !apiReady || !runnableStale.length || Date.now() < runStaleCooldownUntil;
   const staleBtnLabel = `Run stale (${runnableStale.length})`;
 
-  // Bulk "Run stale" queue sweep is reserved for the planned paid tier; hidden for now.
-  // (runAllStale and its click handler stay intact so this is a one-line re-enable.)
-  const staleButtonHtml = '';
+  const staleButtonHtml = isPro()
+    ? `<button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale store back-to-back (Pro)">${escapeHtml(staleBtnLabel)}</button>`
+    : '';
   const filterHint = (!showConnected && !showStaleMissing)
     ? 'Showing all'
     : `Uncheck both to show all ${rows.length}`;

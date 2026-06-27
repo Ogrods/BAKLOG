@@ -12,14 +12,15 @@ An optional **$5/mo** paid tier ($50/yr) adds more - see [What's in the paid tie
 
 ## What's in the paid tier?
 
-**$5/mo** or **$50/yr** live today:
+**Live today:**
 
 - No sponsored deal cards
 - Scheduled stale-store refresh without keeping the app open
 - Deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only)
 - Bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed
+- **Queued bulk refresh** (queue every stale store back-to-back from Fetcher health)
 
-**Coming soon:** cloud sync across machines, **queued bulk refresh** (queue every stale store back-to-back instead of babysitting one at a time), and deal/watchlist alerts.
+**Coming soon:** cloud sync across machines and deal/watchlist alerts.
 
 See [baklog.app](https://baklog.app/) for checkout links and the full comparison.
 
@@ -27,7 +28,7 @@ See [baklog.app](https://baklog.app/) for checkout links and the full comparison
 
 On the free tier, you refresh one store at a time: click a fetcher chip, wait, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open.
 
-Pro adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). Queued bulk refresh (one action queues every stale store) is coming soon. Your credentials and data still stay on your machine.
+Pro adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). **Queued bulk refresh** (one action queues every stale store from Fetcher health) is live on Pro. Your credentials and data still stay on your machine.
 
 Details: [Refresh and enrichment](refresh-and-enrichment.md).
 

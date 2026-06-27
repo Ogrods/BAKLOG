@@ -605,15 +605,32 @@ async function createProfile() {
   }
 }
 
+async function performProfileRename(id, label, pin) {
+  const body = { label };
+  if (pin) body.currentPin = pin;
+  await api('PUT', `/api/profiles/${encodeURIComponent(id)}`, body);
+  await fetchProfilesStatus();
+  const input = el('profileRenameInput');
+  if (input && id === _status?.active) input.value = _status.active_label || label;
+  setManageStatus(`Renamed to “${label}”.`);
+}
+
 async function renameActiveProfile() {
   const input = el('profileRenameInput');
   const label = (input?.value || '').trim();
   if (!label || !_status?.active) return;
+  const id = _status.active;
+  const active = (_status.profiles || []).find((p) => p.id === id);
+  if (active?.hasPin) {
+    openPinPrompt(id, {
+      note: `Enter the PIN for “${profileDisplayLabel(active, _status.profiles)}” to rename it.`,
+      submitLabel: 'Rename',
+      onSubmit: (pid, pin) => performProfileRename(pid, label, pin),
+    });
+    return;
+  }
   try {
-    await api('PUT', `/api/profiles/${encodeURIComponent(_status.active)}`, { label });
-    await fetchProfilesStatus();
-    if (input) input.value = _status.active_label || label;
-    setManageStatus(`Renamed to “${label}”.`);
+    await performProfileRename(id, label);
   } catch (e) {
     showManageError(e.message);
   }

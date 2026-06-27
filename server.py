@@ -3410,7 +3410,8 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             from shared.profiles import rename_profile
 
-            updated = rename_profile(profile_id, str(payload.get("label") or ""))
+            pin = str(payload.get("currentPin") or payload.get("pin") or "").strip() or None
+            updated = rename_profile(profile_id, str(payload.get("label") or ""), current_pin=pin)
             _send_json(self, HTTPStatus.OK, updated)
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -3418,7 +3419,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_profiles_delete(self, profile_id: str) -> None:
         if _profile_admin_blocked():
             _send_json(self, HTTPStatus.FORBIDDEN, {
-                "error": "profile management is disabled while account sign-in is enabled"})
+                "error": "profile management is disabled while account sign-in is enabled",
+            })
             return
         if MANAGER.has_runs_for_profile(profile_id):
             _send_json(self, HTTPStatus.CONFLICT, {"error": (

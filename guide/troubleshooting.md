@@ -164,6 +164,19 @@ If you still have `BAKLOG-Data`, reinstall BAKLOG and launch normally - first bo
 
 **Expected:** BAKLOG lists every supported store you *can* connect. That is not the same as already connected. A new profile should show **0 stores connected** in the header until you click Connect. Local launcher sources (Amazon Games, GOG Galaxy, itch app) stay disabled on new profiles until you enable them on that profile.
 
+## Known issues (beta)
+
+These are expected limits in the current invite-only beta, not one-off bugs:
+
+| Topic | What to expect |
+|-------|----------------|
+| **Windows-first** | The frozen installer and full Connect matrix are tested primarily on Windows 10/11. macOS/Linux work for most web stores; Amazon Games launcher and GOG Galaxy local are platform-limited (see [Supported platforms](../README.md#supported-platforms)). |
+| **Dev vs installed on same PC** | `python server.py` and `BAKLOG.exe` share `http://127.0.0.1:8765` and browser site data. Use one at a time, or clear site data / use a private window when switching. Library files live in `%LOCALAPPDATA%\\BAKLOG-Data` for the installed app. |
+| **Today's top deal ranking** | The wishlist hero picks the highest **deal score** (discount, historical low, rating), not always the lowest price. Hover the label for details. |
+| **ITAD "no price data" warnings** | Some wishlist titles have no ITAD listing in your region (delisted, F2P, bundle-only, or title mismatch). The fetch still succeeds for the rest. |
+| **Profile PIN** | PIN gates switching into a profile and destructive rename/delete on PIN-locked profiles. Library JSON on disk is not encrypted - treat PIN as a household lock, not encryption. |
+| **Cloud sync** | Signing in on a second PC does not copy your library yet. Copy `BAKLOG-Data` manually or wait for the planned Pro cloud mirror. |
+
 ## Bug reports vs fetcher failures
 
 Dashboard JavaScript errors can be reported via the sticky toast or **Report a bug…** menu. Fetcher failures are separate - check **Fetcher health**, exit codes, and `profiles/<id>/cache/runs/*.jsonl`. See [Getting help](getting-help.md).

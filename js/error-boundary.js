@@ -158,6 +158,11 @@ function prunePersistedRing() {
   } catch (_) { /* best-effort */ }
 }
 
+/** Drop fixed-noise entries from the persisted ring (e.g. after a healthy queue sync). */
+export function refreshPersistedErrorRing() {
+  prunePersistedRing();
+}
+
 function shouldDedupe(entry) {
   const sig = makeSignature(entry);
   const now = entry.time;

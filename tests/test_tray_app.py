@@ -268,11 +268,10 @@ def test_open_data_folder_opens_data_root(monkeypatch, tmp_path):
     if sys.platform == "win32":
         monkeypatch.setattr(tray_app.os, "startfile", lambda p: opened.__setitem__("path", p))
     else:
-        monkeypatch.setattr(
-            tray_app.subprocess,
-            "run",
-            lambda args, check=False: opened.__setitem__("path", args[-1]),
-        )
+        def fake_run(args, **kwargs):
+            opened["path"] = args[-1]
+
+        monkeypatch.setattr(tray_app.subprocess, "run", fake_run)
     tray_app.open_data_folder()
     assert Path(opened["path"]) == tmp_path
     assert tmp_path.is_dir()

@@ -208,7 +208,7 @@ def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:
     return True
 
 # Personal-data persistence (scoped to active profile via shared.profile_paths).
-from shared import server_internal_routes  # noqa: E402
+from shared import server_auth_secrets, server_internal_routes  # noqa: E402
 from shared.platform_support import platform_supported  # noqa: E402
 from shared.profile_paths import (  # noqa: E402
     PROFILE_CACHE_JSON_FILES,
@@ -3056,13 +3056,13 @@ class Handler(SimpleHTTPRequestHandler):
             self._handle_auth_master_password()
             return
         if path == "/api/auth/secrets/export":
-            self._handle_auth_secrets_export()
+            server_auth_secrets.handle_auth_secrets_export(self)
             return
         if path.startswith("/api/auth/secrets/import"):
             self._handle_auth_secrets_import()
             return
         if path == "/api/auth/secrets/reset":
-            self._handle_auth_secrets_reset()
+            server_auth_secrets.handle_auth_secrets_reset(self)
             return
         if path == "/api/profiles":
             if self._reject_if_csrf_strict():
@@ -3791,75 +3791,6 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
             _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "master_password_failed", exc)
-
-    def _handle_auth_secrets_export(self) -> None:
-        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
-        if err == "empty body":
-            payload = {}
-        elif err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        try:
-            from auth.bundle import BundleError, BundleTooLarge, bundle_filename, export_bundle
-
-            passphrase = (payload.get("passphrase") or "").strip()
-            include_profiles = payload.get("include_profiles", True)
-            if not isinstance(include_profiles, bool):
-                include_profiles = True
-            blob = export_bundle(passphrase, include_profiles=include_profiles)
-            _send_bytes(
-                self,
-                HTTPStatus.OK,
-                blob,
-                content_type="application/octet-stream",
-                filename=bundle_filename(),
-            )
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "invalid_passphrase"})
-        except BundleTooLarge as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "too_large"})
-        except BundleError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "bundle_error"})
-        except Exception as exc:  # noqa: BLE001
-            from auth.secrets import SecretsCorruptError
-
-            if isinstance(exc, SecretsCorruptError):
-                _send_json(
-                    self,
-                    HTTPStatus.BAD_REQUEST,
-                    {"error": str(exc), "code": "secrets_corrupt"},
-                )
-                return
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "export_failed", exc)
-
-    def _handle_auth_secrets_reset(self) -> None:
-        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
-        if err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        if not payload.get("confirm"):
-            _send_json(
-                self,
-                HTTPStatus.BAD_REQUEST,
-                {"error": "confirm: true required to reset the secrets store"},
-            )
-            return
-        try:
-            from auth.secrets import reset_secrets_store, secrets_store_corrupt
-
-            if not secrets_store_corrupt():
-                _send_json(
-                    self,
-                    HTTPStatus.BAD_REQUEST,
-                    {"error": "secrets store is readable; reset refused", "code": "not_corrupt"},
-                )
-                return
-            reset_secrets_store()
-            _send_json(self, HTTPStatus.OK, {"ok": True})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "secrets_reset_failed", exc)
 
     def _handle_auth_secrets_import(self) -> None:
         import base64

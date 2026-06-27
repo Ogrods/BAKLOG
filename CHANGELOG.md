@@ -22,6 +22,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.30] - 2026-06-27
+
+### Fixed
+
+- Inno Setup install crash: `{app}` expanded in `InitializeWizard` before the install path exists (runtime error at line 82). Finish-page copy now fills on `CurPageChanged` when `{app}` is valid.
+
 ## [0.8.29] - 2026-06-27
 
 ### Fixed

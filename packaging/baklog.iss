@@ -59,27 +59,41 @@ Filename: "{app}\BAKLOG Tray.exe"; Description: "Launch {#MyAppName}"; Flags: no
 
 [Code]
 var
-  DataDirFinishPage: TWizardPage;
+  DataDirFinishPage: TOutputMsgWizardPage;
   WipeUserData: Boolean;
   CleanupRan: Boolean;
 
-procedure InitializeWizard();
+function BuildFinishPageMessage(): String;
 var
-  DataDir: string;
+  DataDir, AppDir: String;
 begin
-  if FileExists(ExpandConstant('{app}\portable.txt')) then
-    DataDir := ExpandConstant('{app}')
+  AppDir := ExpandConstant('{app}');
+  if FileExists(AppDir + '\portable.txt') then
+    DataDir := AppDir
   else
     DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
+  Result :=
+    'Your games, profiles, and saved connections live separately from the app:' + #13#10 + #13#10 +
+    DataDir + #13#10 + #13#10 +
+    'App files:' + #13#10 +
+    AppDir + #13#10 + #13#10 +
+    'Before a full uninstall later, open Connections and use Export bundle to back up your sign-ins.';
+end;
+
+procedure InitializeWizard();
+begin
+  { Do not ExpandConstant('{app}') here — {app} is not initialized until after wpSelectDir. }
   DataDirFinishPage := CreateOutputMsgPage(
     wpFinished,
     'Your library folder',
     'Where BAKLOG stores your data',
-    'Your games, profiles, and saved connections live separately from the app:' + #13#10 + #13#10 +
-    DataDir + #13#10 + #13#10 +
-    'App files:' + #13#10 +
-    ExpandConstant('{app}') + #13#10 + #13#10 +
-    'Before a full uninstall later, open Connections and use Export bundle to back up your sign-ins.');
+    ' ');
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (DataDirFinishPage <> nil) and (CurPageID = DataDirFinishPage.ID) then
+    DataDirFinishPage.RichEditViewer.Lines.Text := BuildFinishPageMessage();
 end;
 
 function InitializeUninstall(): Boolean;

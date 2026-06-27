@@ -146,11 +146,16 @@ def test_inno_installer_finish_page_and_export_nudge() -> None:
     iss = (ROOT / "packaging" / "baklog.iss").read_text(encoding="utf-8")
     assert "procedure InitializeWizard();" in iss
     assert "CreateOutputMsgPage" in iss
+    assert "CurPageChanged" in iss
+    assert "BuildFinishPageMessage" in iss
     assert "Your library folder" in iss
     assert "BAKLOG-Data" in iss
     assert "portable.txt" in iss
     assert "Export bundle" in iss
     assert "Export a backup first?" in iss
+    # {app} must not be expanded in InitializeWizard (runtime error before wpSelectDir).
+    wiz = iss.split("procedure InitializeWizard();", 1)[1].split("procedure CurPageChanged", 1)[0]
+    assert "ExpandConstant('{app}')" not in wiz
 
 
 def test_build_script_ships_uninstall_bat() -> None:

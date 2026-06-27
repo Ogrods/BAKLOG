@@ -30,9 +30,7 @@ def frozen_server_exe() -> Path:
         candidate = root / name
         if candidate.is_file():
             return candidate
-    from shared.update_platform import server_binary_name
-
-    return root / server_binary_name()
+    return root / "BAKLOG.exe"
 
 
 def frozen_tray_exe() -> Path:
@@ -41,9 +39,7 @@ def frozen_tray_exe() -> Path:
         candidate = root / name
         if candidate.is_file():
             return candidate
-    from shared.update_platform import tray_binary_name
-
-    return root / tray_binary_name()
+    return root / "BAKLOG Tray.exe"
 
 
 def legacy_frozen_data_dir() -> Path:

@@ -128,9 +128,17 @@ def test_update_check_includes_download_metadata(
         ],
     }
     with patch("shared.server_support.fetch_latest_github_release", return_value=fake_release):
-        with patch("shared.update_release.release_platform", return_value="win32"):
-            with patch("shared.update_release._fetch_text_asset", return_value="a" * 64 + "  BAKLOG-win64.zip"):
-                status, body = _get(update_api_server, "/api/update-check")
+        with patch("shared.server_support.is_frozen", return_value=True):
+            with patch("shared.update_platform.is_in_app_apply_platform", return_value=True):
+                with patch("shared.install_paths.runtime_label", return_value="installed"):
+                    with patch("shared.server_support._apply_script_present", return_value=True):
+                        with patch("shared.server_support.is_running_from_temp_dir", return_value=False):
+                            with patch("shared.update_release.release_platform", return_value="win32"):
+                                with patch(
+                                    "shared.update_release._fetch_text_asset",
+                                    return_value="a" * 64 + "  BAKLOG-win64.zip",
+                                ):
+                                    status, body = _get(update_api_server, "/api/update-check")
     assert status == 200
     assert body.get("download_url", "").endswith("BAKLOG-win64.zip")
     assert body.get("sha256") == "a" * 64

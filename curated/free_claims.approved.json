@@ -12,15 +12,12 @@
     "itad-0c69ed1f1bd8",
     "itad-0d4598c53ffe",
     "itad-1b0433806065",
-    "itad-330faa9821bf",
-    "itad-6d00ffeb0fdc",
-    "itad-7a69412dd110",
+    "itad-31969d48cb26",
     "itad-b07aac9ebd26",
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
     "itad-f0cffe659c19",
-    "itad-f520d9928848",
-    "itad-31969d48cb26"
+    "itad-f520d9928848"
   ],
   "store_overrides": {
     "gamerpower-3266": "indiegala",
@@ -61,15 +58,10 @@
     "itad-1b0433806065": {
       "title": "Die Young: Prologue"
     },
-    "itad-330faa9821bf": {
-      "title": "Guild of Dungeoneering Ultimate Edition"
-    },
-    "itad-6d00ffeb0fdc": {
-      "claim_url": "https://s-xavier-uy.itch.io/another-world-adventures",
-      "title": "Another World Adventures"
-    },
-    "itad-7a69412dd110": {
-      "title": "Relaxing Simulator"
+    "itad-31969d48cb26": {
+      "ends_at": "2026-06-29T06:59:59.000Z",
+      "claim_url": "https://store.steampowered.com/app/1986840/POPGOES_Arcade/",
+      "title": "POPGOES Arcade"
     },
     "itad-b07aac9ebd26": {
       "title": "Wytchwood"
@@ -90,10 +82,6 @@
         "android": "https://buff.ly/ugVKgPs"
       },
       "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge"
-    },
-    "itad-31969d48cb26": {
-      "claim_url": "https://store.steampowered.com/app/1986840/POPGOES_Arcade/",
-      "title": "POPGOES Arcade"
     }
   },
   "dismissed": [

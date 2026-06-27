@@ -16,14 +16,14 @@ export const BAKLOG_EVENT_REGISTRY = {
   [BAKLOG_AUTH_STATUS]: {
     name: BAKLOG_AUTH_STATUS,
     target: 'document',
-    emitters: ['js/connections.js'],
-    listeners: ['js/fetcher-health.js', 'js/connections.js'],
+    emitters: ['js/connections-status.js'],
+    listeners: ['js/fetcher/reconnect.js', 'js/connections.js'],
   },
   [BAKLOG_RECONNECT_DISMISS]: {
     name: BAKLOG_RECONNECT_DISMISS,
     target: 'document',
     emitters: ['js/connections.js'],
-    listeners: ['js/fetcher-health.js'],
+    listeners: ['js/fetcher/reconnect.js'],
   },
   [BAKLOG_DEEP_SYNC]: {
     name: BAKLOG_DEEP_SYNC,

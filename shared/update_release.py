@@ -7,9 +7,10 @@ import json
 import re
 import sys
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 from shared.server_support import github_releases_latest_api_url, normalize_version_tag

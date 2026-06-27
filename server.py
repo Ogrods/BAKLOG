@@ -232,7 +232,7 @@ from shared.server_static import (  # noqa: E402
 from shared.server_static import (  # noqa: E402
     static_class as _static_class_impl,
 )
-from shared.subprocess_guard import _max_run_seconds_from_env  # noqa: E402
+from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402, F401 — re-exported for tests
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
 

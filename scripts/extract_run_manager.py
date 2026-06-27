@@ -111,7 +111,10 @@ text = text.replace(
 )
 text = text.replace("runs_dir(profile_id=profile_id)", "profile_runs_dir(profile_id=profile_id)")
 text = text.replace("runs_dir(profile_id=pid)", "profile_runs_dir(profile_id=pid)")
-text = text.replace("hist_file = runs_dir(profile_id=profile_id)", "hist_file = profile_runs_dir(profile_id=profile_id)")
+text = text.replace(
+    "hist_file = runs_dir(profile_id=profile_id)",
+    "hist_file = profile_runs_dir(profile_id=profile_id)",
+)
 text = text.replace("self._runs_dir = runs_dir()", "self._runs_dir = profile_runs_dir()")
 text = re.sub(r"\bFETCHERS\b", "_fetchers()", text)
 text = re.sub(r"\bINTERNAL_JOBS\b", "_internal_jobs()", text)

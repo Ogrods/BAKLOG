@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Callable
+from typing import Any
 
 from shared.install_paths import data_root
 from shared.update_manager import get_update_manager

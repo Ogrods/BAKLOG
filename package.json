@@ -31,7 +31,8 @@
     "perf:profile": "node scripts/generate-perf-profile.mjs",
     "audit:header": "node scripts/audit-header-rule.mjs",
     "audit:tab-curtain": "node scripts/audit-tab-curtain.mjs",
-    "audit:ui": "node scripts/audit-header-rule.mjs && node scripts/audit-tab-curtain.mjs"
+    "audit:ui": "node scripts/audit-header-rule.mjs && node scripts/audit-tab-curtain.mjs",
+    "audit:lighthouse": "powershell -ExecutionPolicy Bypass -File scripts/run-lighthouse-audits.ps1 -SkipBuild"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

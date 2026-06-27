@@ -189,6 +189,7 @@ def build_update_check_payload(
     fetchers_in_flight: bool = False,
 ) -> dict[str, Any]:
     from shared.install_paths import runtime_label
+    from shared.install_visibility import install_visibility_fields
     from shared.update_messages import resolve_apply_blocked_for_check
     from shared.update_platform import is_in_app_apply_platform
     from shared.update_release import (
@@ -217,6 +218,7 @@ def build_update_check_payload(
         "release_notes": None,
         "published_at": None,
         "fetchers_in_flight": fetchers_in_flight,
+        **install_visibility_fields(current_version),
     }
     try:
         release = fetch_latest_github_release()
@@ -269,6 +271,7 @@ def build_diagnostics_payload(
     load_run_history: Callable[[], list[dict[str, Any]]],
 ) -> dict[str, Any]:
     from shared.install_paths import runtime_label
+    from shared.install_visibility import install_visibility_fields
     from shared.update_release import recommended_artifact
 
     history = load_run_history()[-10:]
@@ -315,4 +318,5 @@ def build_diagnostics_payload(
         "apply_supported": _apply_supported_for_runtime(),
         "recommended_artifact": recommended_artifact(runtime_label()),
         "update": update_status,
+        **install_visibility_fields(version),
     }

@@ -17,6 +17,7 @@ describe('runtime-mode-banner', () => {
     const slot = document.getElementById('runtimeModeBanner');
     expect(slot.classList.contains('hidden')).toBe(false);
     expect(slot.textContent).toContain('Dev server');
+    expect(slot.textContent).toMatch(/PORT=8766|port 8765/i);
   });
 
   it('hides for pure frozen sessions without mixed errors', () => {

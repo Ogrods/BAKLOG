@@ -200,6 +200,10 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 
 **Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses the same pipeline with `BAKLOG-macos.zip` + `apply_update.sh` once a mac frozen build is published on GitHub; until then mac installs still get notify + release-page link only.
 
+**macOS zip deferred:** There is no official `BAKLOG-macos.zip` on GitHub Releases yet. macOS users should run from source or wait for release notifications; in-app apply stays blocked with `platform_zip_missing` until the artifact ships. Maintainers: see `packaging/build_macos.sh` for the manual build checklist.
+
+**Add/Remove Programs vs in-app version:** On Windows Setup installs, zip-based in-app updates replace app files but do not refresh the Inno uninstall registry version. Use **Copy diagnostics** or `GET /api/diagnostics` (`install_source`, `arp_version`, `arp_version_mismatch`) to compare; re-run **BAKLOG-Setup.exe** when Settings → Apps should match the running build.
+
 **Security:** Updates download only from the official `Ogrods/BAKLOG` GitHub release assets. The server verifies the published `.sha256` sidecar before apply is allowed. Apply is blocked while fetchers are running, a store sign-in window is open, or when BAKLOG is running from a temporary zip-extract folder.
 
 **Note:** Your library data stays in `%LOCALAPPDATA%\\BAKLOG-Data` (macOS: `~/Library/Application Support/BAKLOG`) or your portable data folder — updates replace app binaries only.

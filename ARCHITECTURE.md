@@ -100,3 +100,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for running locally.
 | "Not real OSS" | MIT app tree is here; invite gate is distribution, not license. |
 | "Pro is DRM" | Local license file + optional Supabase plan; documented in `shared/entitlement.py`. |
 | "Electron would be simpler" | Deliberate choice: stdlib server + browser tab + PyInstaller (smaller, auditable). |
+
+## Rough edges (honest status)
+
+| Edge | Status | Notes |
+|------|--------|-------|
+| `server.py` size | Improving | Run/RunManager moved to `shared/run_manager.py`; CI line budget ratcheted |
+| `connections.js` size | Improving | Rail/status in `js/connections-rail.js`; session flows remain in barrel |
+| `fetcher-health.js` | Done | Barrel + `js/fetcher/` split (#91) |
+| Dev vs frozen localStorage | Mitigated | Use `PORT=8766` + separate `BAKLOG_DATA_DIR` for dev (see `.env.example`) |
+| macOS frozen zip | Deferred | Notify-only until `BAKLOG-macos.zip` ships; checklist in `packaging/build_macos.sh` |
+| Windows ARP version drift | Visible | Diagnostics + update install footnote when Setup + zip apply diverge |
+| Code signing | Out of scope | Unsigned beta builds (Windows Inno + portable zip) |

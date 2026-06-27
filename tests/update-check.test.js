@@ -9,6 +9,9 @@ import {
   renderUpdateReadyBannerHtml,
   renderUpdateProgressHtml,
   renderApplyBlockedHint,
+  renderSetupArpFootnote,
+  installHintsFromPayload,
+  _resetInstallHintsForTests,
   checkForUpdates,
   runInAppUpdateFlow,
   runApplyReadyUpdate,
@@ -33,6 +36,7 @@ import {
 beforeEach(() => {
   document.body.innerHTML = '<div id="updateAvailableBanner" class="migration-banner hidden"></div>';
   _resetUpdateBannerForTests();
+  _resetInstallHintsForTests();
 });
 
 describe('parseUpdateCheckResponse', () => {
@@ -65,6 +69,37 @@ describe('parseUpdateCheckResponse', () => {
       ok: false,
       error: 'rate limited',
     });
+  });
+
+  it('parses install visibility fields', () => {
+    const parsed = parseUpdateCheckResponse({
+      current: '0.8.27',
+      latest: '0.8.27',
+      update_available: false,
+      install_source: 'setup',
+      arp_version_mismatch: true,
+    });
+    expect(parsed).toMatchObject({
+      ok: true,
+      installSource: 'setup',
+      arpVersionMismatch: true,
+    });
+  });
+});
+
+describe('renderSetupArpFootnote', () => {
+  it('shows footnote for setup installs', () => {
+    const html = renderSetupArpFootnote({ installSource: 'setup', arpVersionMismatch: false });
+    expect(html).toContain('Add/Remove Programs');
+  });
+
+  it('shows footnote when ARP version already mismatches', () => {
+    const html = renderSetupArpFootnote({ installSource: 'zip', arpVersionMismatch: true });
+    expect(html).toContain('Add/Remove Programs');
+  });
+
+  it('returns empty for zip installs without mismatch', () => {
+    expect(renderSetupArpFootnote({ installSource: 'zip', arpVersionMismatch: false })).toBe('');
   });
 });
 

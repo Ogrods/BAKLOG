@@ -9526,14 +9526,9 @@ body {
 .fetcher-popover .fh-row--popover .fh-log.open .fh-log-body {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: min(28vh, 240px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-@media (min-width: 1024px) {
-  .fetcher-popover .fh-row--popover .fh-log.open .fh-log-body {
-    max-height: 360px;
-  }
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: auto;
 }
 @media (max-width: 639.98px) {
   .fetcher-popover {

@@ -35,6 +35,7 @@ import {
   loadPersonal,
   loadLibraryFirstSeen,
   loadKnownLibraryKeys,
+  saveLibraryFirstSeen,
   migrateV3,
   stripLegacyTags,
   seedPreHiddenDefaults,
@@ -74,10 +75,11 @@ import {
   bootPerfMeasure,
   bootPerfEnd,
 } from './boot-perf.js';
-import { reloadGames, reloadAfterFetcher, finishEmptyLibraryLoad } from './library-load.js';
+import { reloadGames, reloadAfterFetcher, finishEmptyLibraryLoad, repairBulkFirstSeenStamps } from './library-load.js';
 import { initLibraryWatches } from './library-watch.js';
 import { runLibraryCountDemo, runLibraryCountSmallDemo, armLibraryCountAnimations } from './library-count-animation.js';
 import { bindEvents } from './bind-events.js';
+import { checkForUpdates } from './update-check.js';
 import { ensureActiveProfileResolved, initProfiles } from './profiles.js';
 import { startDebugOverlay } from './debug-overlay.js';
 import { ensureChartJs } from './chart-loader.js';
@@ -126,6 +128,9 @@ function hydrateState() {
   state.prefs = loadPrefs();
   state.sessionPrefs = loadSessionPrefs();
   state.libraryFirstSeenByKey = loadLibraryFirstSeen();
+  if (repairBulkFirstSeenStamps(state.libraryFirstSeenByKey)) {
+    saveLibraryFirstSeen(state.libraryFirstSeenByKey);
+  }
   state.knownLibraryKeySet = loadKnownLibraryKeys();
   setBootCurtainLabel(loadActiveView() || 'dashboard');
   installPersonalStorageSync();
@@ -260,6 +265,9 @@ async function bootstrap() {
         const cfg = await cfgRes.json();
         if (typeof cfg.frozen === 'boolean') noteServerRuntime({ frozen: cfg.frozen });
         syncRuntimeModeBanner(cfg);
+        if (cfg.frozen === true) {
+          checkForUpdates({ source: 'boot', frozen: true }).catch(() => {});
+        }
         if (cfg.running_from_temp) {
           const banner = document.getElementById('bootErrorBanner');
           if (banner) {

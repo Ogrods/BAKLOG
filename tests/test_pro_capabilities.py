@@ -12,6 +12,8 @@ from shared.pro_capabilities import (
     resolve_capabilities,
 )
 
+OPT_IN_LIVE_CAPABILITY_IDS = frozenset({"cloud_sync_mirror"})
+
 
 @pytest.fixture(autouse=True)
 def _no_auth(monkeypatch):
@@ -36,7 +38,7 @@ def test_free_plan_disables_live_capabilities():
 
 def test_pro_plan_enables_live_capabilities_without_opt_in():
     caps = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": False})
-    for cap_id in LIVE_CAPABILITY_IDS:
+    for cap_id in LIVE_CAPABILITY_IDS - OPT_IN_LIVE_CAPABILITY_IDS:
         assert caps[cap_id]["enabled"] is True, cap_id
 
 
@@ -47,20 +49,17 @@ def test_coming_capabilities_never_enabled():
         assert caps[cap_id]["status"] == "coming"
 
 
-def test_cloud_mirror_requires_opt_in_when_live(monkeypatch):
+def test_cloud_mirror_requires_auth_and_opt_in_when_live(monkeypatch):
+    off = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": False})
+    assert off["cloud_sync_mirror"]["status"] == "live"
+    assert off["cloud_sync_mirror"]["enabled"] is False
+
     monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "anon")
-    from shared import pro_capabilities as pc
+    still_off = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": False})
+    assert still_off["cloud_sync_mirror"]["enabled"] is False
 
-    original = pc.CAPABILITY_REGISTRY
-    patched = tuple(
-        {**spec, "status": "live"} if spec["id"] == "cloud_sync_mirror" else spec
-        for spec in original
-    )
-    monkeypatch.setattr(pc, "CAPABILITY_REGISTRY", patched)
-    off = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": False})
     on = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": True})
-    assert off["cloud_sync_mirror"]["enabled"] is False
     assert on["cloud_sync_mirror"]["enabled"] is True
 
 

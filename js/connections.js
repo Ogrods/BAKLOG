@@ -1,5 +1,6 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
-import { isAccountAuthMode, isPro } from './auth-gate.js';
+import { getAccessToken, getProSettings, isAccountAuthMode, isPro, refreshAccountPlan } from './auth-gate.js';
+import { capabilityStatus } from './pro-capabilities.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
@@ -532,6 +533,27 @@ function renderConnPrefs() {
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
   if (shareStats) shareStats.checked = state.prefs.shareAnonStats === true;
 
+  const cloudWrap = document.getElementById('cloudMirrorToggleWrap');
+  const cloudToggle = document.getElementById('cloudMirrorEnabledToggle');
+  const cloudNote = document.getElementById('cloudMirrorPlanNote');
+  const showCloudMirror =
+    isPro() && isAccountAuthMode() && !!getAccessToken() && capabilityStatus('cloud_sync_mirror') === 'live';
+  if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
+  if (cloudToggle && showCloudMirror) {
+    cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
+  }
+  if (cloudNote) {
+    if (showCloudMirror) {
+      cloudNote.hidden = false;
+      cloudNote.classList.add('conn-prefs-note--pro');
+      cloudNote.textContent = getProSettings().cloudMirrorEnabled
+        ? 'Cloud mirror uploads catalog JSON after fetch/save. Browse read-only at baklog.app/mirror.'
+        : 'Enable to upload catalog JSON to your account after fetch/save (credentials stay on this PC).';
+    } else {
+      cloudNote.hidden = true;
+    }
+  }
+
   const note = document.getElementById('bgRefreshPlanNote');
   if (note) {
     if (isPro()) {
@@ -544,6 +566,40 @@ function renderConnPrefs() {
       note.classList.remove('conn-prefs-note--pro');
     }
     note.hidden = false;
+  }
+}
+
+async function saveCloudMirrorEnabled(enabled) {
+  const res = await baklogFetch('/api/pro-settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cloudMirrorEnabled: !!enabled }),
+  });
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+  if (!res.ok) {
+    throw new Error(data.error || `Save failed (${res.status})`);
+  }
+  await refreshAccountPlan();
+  return data;
+}
+
+async function handleCloudMirrorToggle(ev) {
+  const toggle = ev.target;
+  const prev = !toggle.checked;
+  try {
+    toggle.disabled = true;
+    await saveCloudMirrorEnabled(toggle.checked);
+    renderConnPrefs();
+  } catch (err) {
+    toggle.checked = prev;
+    window.alert(err?.message || 'Could not save cloud sync setting.');
+  } finally {
+    toggle.disabled = false;
   }
 }
 
@@ -878,6 +934,8 @@ function wireGridEvents() {
       savePrefs();
       if (ev.target.checked) startMetrics();
       else stopMetrics();
+    } else if (ev.target.id === 'cloudMirrorEnabledToggle') {
+      void handleCloudMirrorToggle(ev);
     }
   });
 

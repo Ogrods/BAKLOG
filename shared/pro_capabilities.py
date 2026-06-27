@@ -69,7 +69,7 @@ CAPABILITY_REGISTRY: tuple[CapabilitySpec, ...] = (
     },
     {
         "id": "cloud_sync_mirror",
-        "status": "coming",
+        "status": "live",
         "requires_plan": True,
         "requires_auth": True,
         "requires_opt_in": True,

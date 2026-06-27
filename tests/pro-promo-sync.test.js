@@ -50,12 +50,9 @@ describe('PRO_PROMO sync with landing', () => {
     expect(rowMatch[1].trim()).toBe(promoRow.pro);
   });
 
-  it('only cloud sync and deal alerts use Coming in tierCompare pro column', () => {
+  it('only deal alerts use Coming in tierCompare pro column', () => {
     const comingRows = PRO_PROMO.tierCompare.filter((r) => /coming/i.test(String(r.pro)));
-    expect(comingRows.map((r) => r.feature).sort()).toEqual([
-      'Cloud sync',
-      'Deal/watchlist alerts',
-    ]);
+    expect(comingRows.map((r) => r.feature).sort()).toEqual(['Deal/watchlist alerts']);
   });
 
   it('trustPoints use canonical no telemetry by default wording', () => {

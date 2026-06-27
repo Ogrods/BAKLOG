@@ -21,7 +21,7 @@ describe('Pro capabilities marketing sync', () => {
     expect(tableStart).toBeGreaterThan(-1);
     const tableSlice = LANDING_HTML.slice(tableStart, tableStart + 5000);
     for (const [capId, label] of Object.entries(CAPABILITY_MARKETING)) {
-      if (capId !== 'cloud_sync_mirror' && capId !== 'deal_watchlist_alerts') continue;
+      if (capId !== 'deal_watchlist_alerts') continue;
       const rowRe = new RegExp(
         `<th scope="row">${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</th>[\\s\\S]*?<td>Coming</td>`,
         'i',
@@ -30,14 +30,24 @@ describe('Pro capabilities marketing sync', () => {
     }
   });
 
+  it('cloud sync tier row is live in PRO_PROMO and landing', () => {
+    const row = PRO_PROMO.tierCompare.find((r) => r.feature === 'Cloud sync');
+    expect(row?.pro).toBe('Opt-in mirror');
+    expect(row?.pro).not.toMatch(/coming/i);
+    const tableStart = LANDING_HTML.indexOf('aria-label="Free vs paid tier"');
+    const tableSlice = LANDING_HTML.slice(tableStart, tableStart + 5000);
+    expect(tableSlice).toMatch(/Cloud sync[\s\S]*?Opt-in mirror/i);
+  });
+
   it('live bulk refresh tier row does not say Coming', () => {
     const row = PRO_PROMO.tierCompare.find((r) => r.feature === 'Manual store refresh');
     expect(row?.pro).toMatch(/queue all stale/i);
     expect(row?.pro).not.toMatch(/coming/i);
   });
 
-  it('PRO_PROMO cloud sync feature is marked coming in copy', () => {
+  it('PRO_PROMO cloud sync feature describes opt-in mirror', () => {
     const cloud = PRO_PROMO.features.find((f) => /cloud sync/i.test(f.title));
-    expect(cloud?.desc).toMatch(/coming soon/i);
+    expect(cloud?.desc).toMatch(/connections/i);
+    expect(cloud?.desc).not.toMatch(/coming soon/i);
   });
 });

@@ -781,7 +781,7 @@ export const PRO_PROMO = {
     },
     {
       title: 'Cloud sync',
-      desc: 'Coming soon: keep your library and personal data aligned across machines without manual exports.',
+      desc: 'Opt in from Connections: your home PC uploads catalog JSON and personal prefs to your account. Browse read-only at baklog.app/mirror. Credentials never leave this machine.',
       icon: '☁',
     },
     {
@@ -808,7 +808,7 @@ export const PRO_PROMO = {
     { feature: 'Claimable Now (full games)', free: '✓', pro: '✓ + bonus DLC/bonus feed' },
     { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
-    { feature: 'Cloud sync', free: '-', pro: 'Coming' },
+    { feature: 'Cloud sync', free: '-', pro: 'Opt-in mirror' },
     { feature: 'Deal/watchlist alerts', free: '-', pro: 'Coming' },
   ],
   trustPoints: [

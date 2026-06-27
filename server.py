@@ -14,6 +14,7 @@ Endpoints:
     GET  /api/stream/<run_id>      -> SSE: status / line / done events (?since=N or Last-Event-ID for resume)
     GET  /api/personal        -> {personal, prefs, manual, updated_at}
     PUT  /api/personal        -> overwrite the whole document atomically
+    PUT  /api/pro-settings    -> Pro-gated profile toggles (cloud mirror opt-in)
     POST /api/catalogs/import -> restore games_*.json / itad_prices.json from backup
     GET  /api/profiles        -> {active, active_label, legacy, profiles[]}
     POST /api/profiles        -> create profile {label}
@@ -1477,6 +1478,13 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._handle_personal_put()
             return
+        if path == "/api/pro-settings":
+            if self._reject_if_csrf_strict():
+                return
+            from shared.server_pro_settings import handle_pro_settings_put
+
+            handle_pro_settings_put(self)
+            return
         if path.startswith("/api/profiles/"):
             if self._reject_if_csrf_strict():
                 return
@@ -1494,14 +1502,21 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_config_get(self) -> None:
         from shared.entitlement import current_plan, maybe_refresh_local_license
         from shared.polar_license import polar_configured
+        from shared.pro_capabilities import resolve_capabilities
         from shared.pro_checkout import pro_checkout_enabled, public_checkout_urls
+        from shared.pro_settings import read_pro_settings
         from shared.supabase_auth import auth_enabled, public_auth_config
 
         maybe_refresh_local_license()
         config = dict(public_auth_config())
+        authorization = self.headers.get("Authorization")
+        plan = current_plan(authorization)
+        pro_settings = read_pro_settings()
         # Entitlement: signed JWT claim (when a bearer is sent) wins, else the
         # local license file / BAKLOG_PLAN override. Defaults to "free".
-        config["plan"] = current_plan(self.headers.get("Authorization"))
+        config["plan"] = plan
+        config["capabilities"] = resolve_capabilities(plan=plan, pro_settings=pro_settings)
+        config["proSettings"] = pro_settings
         config["licenseActivation"] = polar_configured() and not auth_enabled()
         config["proCheckoutEnabled"] = pro_checkout_enabled()
         config["proCheckout"] = public_checkout_urls()
@@ -1849,6 +1864,13 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError as exc:
             _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "personal_write_failed", exc)
             return
+        try:
+            from shared.cloud_mirror import schedule_mirror_upload
+            from shared.profile_paths import personal_path
+
+            schedule_mirror_upload(personal_path())
+        except Exception:  # noqa: BLE001 - mirror must never block personal save
+            pass
         _send_json(self, HTTPStatus.OK, doc)
 
     def _handle_runs(self) -> None:
@@ -2403,6 +2425,12 @@ def _start_background_scheduler() -> None:
         SCHEDULER.start()
     except Exception as exc:  # noqa: BLE001 - scheduler must never block server boot
         print(f"[scheduler] not started: {exc!r}", file=sys.stderr, flush=True)
+    try:
+        from shared.cloud_mirror import start_flush_worker
+
+        start_flush_worker()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[cloud_mirror] worker not started: {exc!r}", file=sys.stderr, flush=True)
 
 
 def _start_idle_shutdown_watchdog() -> None:

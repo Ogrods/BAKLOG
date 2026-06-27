@@ -33,6 +33,12 @@ def write_catalog_text(path: Path, text: str) -> Path:
     """Atomic write + rotated backup for a games_*.json / itad catalog file."""
     disk = resolve_catalog_path(path)
     safe_write_text(disk, text)
+    try:
+        from shared.cloud_mirror import schedule_mirror_upload
+
+        schedule_mirror_upload(disk)
+    except Exception:  # noqa: BLE001 - mirror hook must never block catalog write
+        pass
     return disk
 
 
@@ -361,7 +367,7 @@ def write_games_json(
     }
     if dry_run:
         return False
-    safe_write_text(path, dumps_games_json(payload))
+    write_catalog_text(path, dumps_games_json(payload))
     return True
 
 

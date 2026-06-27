@@ -29,6 +29,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- Pro foundation: canonical capability registry on `GET /api/config` (`capabilities` + `proSettings`); profile-scoped `data/pro_settings.json` with `PUT /api/pro-settings` (Pro-gated); cloud mirror M1 scaffolding (`shared/cloud_mirror.py` debounced post-write hooks, disabled until `cloudMirrorEnabled`); Supabase schema stub `landing/sql/cloud_mirror.sql`.
+
 ### Fixed
 
 - CI/release gate: Inno verify skips Pillow when branding assets exist; packaging test strips Pascal comments before `{app}` guard.

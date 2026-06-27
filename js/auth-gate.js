@@ -4,6 +4,7 @@
  */
 
 import { stopBootTipRotation } from './tips.js';
+import { setCapabilitiesFromConfig } from './pro-capabilities.js';
 
 // Loaded lazily inside initAuthGate so merely importing this module (e.g. via
 // api-client.js in unit tests) never triggers the remote esm.sh fetch, and the
@@ -34,6 +35,7 @@ let _plan = 'free';
 let _licenseActivation = false;
 let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: '', yearly: '' };
+let _proSettings = { cloudMirrorEnabled: false };
 let _lastSessionProbeStatus = 0;
 const SESSION_PROBE_ATTEMPTS = 6;
 const SESSION_PROBE_DELAY_MS = 500;
@@ -268,6 +270,10 @@ function applyConfigEntitlement(config) {
     monthly: checkout?.monthly || '',
     yearly: checkout?.yearly || '',
   };
+  if (config.proSettings && typeof config.proSettings === 'object') {
+    _proSettings = { ..._proSettings, ...config.proSettings };
+  }
+  setCapabilitiesFromConfig(config.capabilities);
 }
 
 export function licenseActivationEnabled() {
@@ -280,6 +286,11 @@ export function proCheckoutEnabled() {
 
 export function proCheckoutUrls() {
   return { ..._proCheckout };
+}
+
+/** Server-side Pro toggles from GET /api/config. */
+export function getProSettings() {
+  return { ..._proSettings };
 }
 
 /** Re-read plan from the server (JWT session probe or /api/config). */

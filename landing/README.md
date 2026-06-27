@@ -24,6 +24,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `api/metrics.js` — Vercel serverless function; receives opt-in anonymous aggregate metrics from the local app (session counts + sponsored-slot impressions/clicks). Optional Supabase log via `sql/aggregate_metrics.sql`.
 - `sql/waitlist.sql` — one-time Supabase table for durable signup logging.
 - `sql/bug_reports.sql` — one-time Supabase table for durable bug-report logging.
+- `sql/cloud_mirror.sql` — one-time Supabase Storage bucket + RLS for Pro cloud read-only mirror (M1; upload wiring in M2).
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
 - `assets/store-logos/*.svg` — copy of repo-root `assets/store-logos/` for the hero trust strip (CSS mask). Re-sync when app logos change: `cp ../assets/store-logos/*.svg assets/store-logos/`.
 - `favicon.svg` — white BAKLOG mark.

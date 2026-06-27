@@ -143,9 +143,16 @@ def test_inno_installer_finish_page_and_export_nudge() -> None:
     assert "CreateOutputMsgPage" in iss
     assert "Your library folder" in iss
     assert "BAKLOG-Data" in iss
+    assert "portable.txt" in iss
     assert "Export bundle" in iss
     assert "function NextButtonClick(CurPageID: Integer): Boolean;" in iss
     assert "Export a backup first?" in iss
+
+
+def test_build_script_ships_uninstall_bat() -> None:
+    text = (ROOT / "packaging" / "build_windows.ps1").read_text(encoding="utf-8")
+    assert "Uninstall BAKLOG.bat" in text
+    assert (ROOT / "packaging" / "Uninstall BAKLOG.bat").is_file()
 
 
 def test_build_script_generates_assets_before_pyinstaller() -> None:

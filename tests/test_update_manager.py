@@ -67,9 +67,11 @@ def test_download_worker_marks_ready_after_verify(
         sha256=digest,
     )
 
-    def fake_fetch(url: str, dest: Path, *, max_bytes: int = 0) -> int:
+    def fake_fetch(url: str, dest: Path, *, max_bytes: int = 0, on_progress=None) -> int:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(payload)
+        if on_progress:
+            on_progress(len(payload), len(payload))
         return len(payload)
 
     mgr = UpdateManager(
@@ -244,4 +246,75 @@ def test_apply_requires_sha256(
     payload = mgr.apply_ready_update()
     assert payload["ok"] is False
     assert "sha256" in payload["error"].lower()
+
+
+def test_rehydrate_ready_state_on_init(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    payload = b"verified-package"
+    digest = hashlib.sha256(payload).hexdigest()
+    version_dir = tmp_path / "0.8.27"
+    version_dir.mkdir()
+    zip_path = version_dir / "package.zip"
+    zip_path.write_bytes(payload)
+    from shared.update_ready_state import write_ready_state
+
+    write_ready_state(
+        tmp_path,
+        version="0.8.27",
+        sha256=digest,
+        zip_path=zip_path,
+    )
+
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.25",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    status = mgr.status_dict()
+    assert status["phase"] == "ready"
+    assert status["can_apply"] is True
+    assert status["version"] == "0.8.27"
+
+
+def test_discard_ready_update_clears_disk(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    payload = b"verified-package"
+    digest = hashlib.sha256(payload).hexdigest()
+    version_dir = tmp_path / "0.8.27"
+    version_dir.mkdir()
+    zip_path = version_dir / "package.zip"
+    zip_path.write_bytes(payload)
+    from shared.update_ready_state import write_ready_state
+
+    write_ready_state(tmp_path, version="0.8.27", sha256=digest, zip_path=zip_path)
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.25",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    result = mgr.discard_ready_update()
+    assert result["ok"] is True
+    assert result["discarded"] is True
+    status = mgr.status_dict()
+    assert status["phase"] == "idle"
+    assert not zip_path.is_file()
+
+
+def test_start_download_blocked_when_sign_in_active(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.25",
+        has_in_flight_runs=lambda: False,
+        has_active_sessions=lambda: True,
+    )
+    with patch("shared.update_manager.fetch_release_artifacts", return_value=_artifacts()):
+        payload = mgr.start_download()
+    assert payload["ok"] is False
+    assert "sign-in" in payload["error"].lower()
 

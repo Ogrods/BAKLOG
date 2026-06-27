@@ -7,9 +7,31 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$script:UpdateRoot = [System.IO.Path]::GetFullPath((Join-Path $env:TEMP "BAKLOG-update"))
+New-Item -ItemType Directory -Path $script:UpdateRoot -Force | Out-Null
+
 function Fail([string]$Message) {
+    Write-ApplyResult -Ok $false -ErrorMessage $Message -Restored $false
     Write-Error $Message
     exit 1
+}
+
+function Write-ApplyResult {
+    param(
+        [bool]$Ok,
+        [string]$ErrorMessage = "",
+        [string]$Version = "",
+        [bool]$Restored = $false
+    )
+    $resultPath = Join-Path $script:UpdateRoot "apply-result.json"
+    $payload = @{
+        ok = $Ok
+        error = $ErrorMessage
+        version = $Version
+        restored_from_backup = $Restored
+        finished_at = (Get-Date).ToUniversalTime().ToString("o")
+    }
+    $payload | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding UTF8
 }
 
 function Test-SafeChildPath([string]$Root, [string]$Relative) {
@@ -21,6 +43,21 @@ function Test-SafeChildPath([string]$Root, [string]$Relative) {
 function Get-FileSha256([string]$Path) {
     $hash = Get-FileHash -Path $Path -Algorithm SHA256
     return $hash.Hash.ToLowerInvariant()
+}
+
+function Restore-InstallFromBackup([string]$InstallDir, [string]$BackupDir) {
+    if (-not (Test-Path -LiteralPath $BackupDir)) { return $false }
+    Get-ChildItem -LiteralPath $InstallDir -Force | ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Copy-Item -LiteralPath (Join-Path $BackupDir "*") -Destination $InstallDir -Recurse -Force
+    return $true
+}
+
+function Remove-OldBackups([string]$InstallParent, [string]$KeepBackup) {
+    Get-ChildItem -LiteralPath $InstallParent -Directory -Filter "BAKLOG-backup-*" |
+        Where-Object { $_.FullName -ne $KeepBackup } |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 if (-not (Test-Path -LiteralPath $ManifestPath)) {
@@ -36,6 +73,7 @@ try {
 $installDir = [string]$manifest.install_dir
 $zipPath = [string]$manifest.zip_path
 $expectedSha = ([string]$manifest.sha256).ToLowerInvariant()
+$version = [string]$manifest.version
 $serverPid = [int]$manifest.server_pid
 $trayPid = [int]$manifest.tray_pid
 
@@ -57,9 +95,8 @@ if ($actualSha -ne $expectedSha) {
     Fail "Update zip sha256 mismatch"
 }
 
-$updateRoot = [System.IO.Path]::GetFullPath((Join-Path $env:TEMP "BAKLOG-update"))
 $zipFull = [System.IO.Path]::GetFullPath($zipPath)
-if (-not $zipFull.StartsWith($updateRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+if (-not $zipFull.StartsWith($script:UpdateRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
     Fail "Zip path outside trusted update workspace"
 }
 
@@ -76,8 +113,9 @@ function Wait-ProcessGone([int]$ProcessId, [int]$TimeoutSec) {
 Wait-ProcessGone -ProcessId $serverPid -TimeoutSec 45
 Wait-ProcessGone -ProcessId $trayPid -TimeoutSec 15
 
-$staging = Join-Path $updateRoot ("staging-" + [Guid]::NewGuid().ToString("n"))
+$staging = Join-Path $script:UpdateRoot ("staging-" + [Guid]::NewGuid().ToString("n"))
 New-Item -ItemType Directory -Path $staging | Out-Null
+$backupDir = $null
 
 try {
     Expand-Archive -LiteralPath $zipPath -DestinationPath $staging -Force
@@ -94,26 +132,37 @@ try {
         Fail "Extracted bundle layout invalid"
     }
 
-    $backupDir = Join-Path ([System.IO.Path]::GetDirectoryName($installDir)) ("BAKLOG-backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $installParent = [System.IO.Path]::GetDirectoryName($installDir)
+    $backupDir = Join-Path $installParent ("BAKLOG-backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
     Copy-Item -LiteralPath $installDir -Destination $backupDir -Recurse -Force
 
-    Get-ChildItem -LiteralPath $bundleRoot -Force | ForEach-Object {
-        $dest = Join-Path $installDir $_.Name
-        if ($_.PSIsContainer) {
-            if (Test-Path -LiteralPath $dest) {
-                Remove-Item -LiteralPath $dest -Recurse -Force
+    try {
+        Get-ChildItem -LiteralPath $bundleRoot -Force | ForEach-Object {
+            $dest = Join-Path $installDir $_.Name
+            if ($_.PSIsContainer) {
+                if (Test-Path -LiteralPath $dest) {
+                    Remove-Item -LiteralPath $dest -Recurse -Force
+                }
+                Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force
+            } else {
+                Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
             }
-            Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force
-        } else {
-            Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
         }
+    } catch {
+        $restored = Restore-InstallFromBackup -InstallDir $installDir -BackupDir $backupDir
+        Write-ApplyResult -Ok $false -ErrorMessage $_.Exception.Message -Version $version -Restored $restored
+        exit 1
     }
 
     $trayExePath = Join-Path $installDir "BAKLOG Tray.exe"
     if (-not (Test-Path -LiteralPath $trayExePath)) {
-        Fail "Updated bundle missing tray launcher"
+        $restored = Restore-InstallFromBackup -InstallDir $installDir -BackupDir $backupDir
+        Write-ApplyResult -Ok $false -ErrorMessage "Updated bundle missing tray launcher" -Version $version -Restored $restored
+        exit 1
     }
 
+    Remove-OldBackups -InstallParent $installParent -KeepBackup $backupDir
+    Write-ApplyResult -Ok $true -Version $version -Restored $false
     Start-Process -FilePath $trayExePath -WorkingDirectory $installDir | Out-Null
 } finally {
     if (Test-Path -LiteralPath $staging) {

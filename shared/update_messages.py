@@ -40,6 +40,11 @@ _UPDATE_ERROR_ALIASES: tuple[tuple[str, str, str], ...] = (
         "Finish or stop fetchers in Fetcher health, then try again.",
     ),
     (
+        "Finish or cancel the sign-in window before updating",
+        "sign_in_active",
+        "Finish or cancel the sign-in window before updating.",
+    ),
+    (
         "Release download URL unavailable for this platform",
         "platform_zip_missing",
         APPLY_BLOCKED_MESSAGES["platform_zip_missing"],

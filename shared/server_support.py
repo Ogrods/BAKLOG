@@ -183,7 +183,11 @@ def _apply_supported_for_runtime() -> bool:
     return _apply_script_present()
 
 
-def build_update_check_payload(current_version: str) -> dict[str, Any]:
+def build_update_check_payload(
+    current_version: str,
+    *,
+    fetchers_in_flight: bool = False,
+) -> dict[str, Any]:
     from shared.install_paths import runtime_label
     from shared.update_messages import resolve_apply_blocked_for_check
     from shared.update_platform import is_in_app_apply_platform
@@ -212,6 +216,7 @@ def build_update_check_payload(current_version: str) -> dict[str, Any]:
         "dismissed": False,
         "release_notes": None,
         "published_at": None,
+        "fetchers_in_flight": fetchers_in_flight,
     }
     try:
         release = fetch_latest_github_release()

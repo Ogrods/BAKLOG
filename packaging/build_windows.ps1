@@ -70,6 +70,7 @@ if (-not (Test-Path $FallbackJson)) {
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 Copy-Item -Force (Join-Path $Root "packaging\BAKLOG.ico") (Join-Path $OutDir "BAKLOG.ico")
 Copy-Item -Force (Join-Path $Root "packaging\apply_update.ps1") (Join-Path $OutDir "apply_update.ps1")
+Copy-Item -Force (Join-Path $Root "packaging\Uninstall BAKLOG.bat") (Join-Path $OutDir "Uninstall BAKLOG.bat")
 
 Write-Host "Writing bundled account-auth .env..."
 $urlSet = [bool]$env:BAKLOG_SUPABASE_URL
@@ -181,5 +182,5 @@ if (Test-Path $SetupExe) {
     Write-Host "  Setup:   $SetupExe"
     Write-Host "Ship the Setup.exe to beta testers (zip is the portable fallback)."
 } else {
-    Write-Host "Copy the zip + .sha256 to testers. Data files are written beside BAKLOG.exe."
+    Write-Host "Copy the zip + .sha256 to testers. Library data defaults to %LOCALAPPDATA%\BAKLOG-Data (add portable.txt beside exe for co-located data)."
 }

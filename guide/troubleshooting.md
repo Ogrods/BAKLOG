@@ -188,11 +188,19 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 
 **Cancel:** While downloading, use **Cancel download** on the progress banner.
 
+**Ready after restart:** If you downloaded an update but did not install yet, BAKLOG restores the **Install & restart** banner after a server or tray restart. Use **Discard download** to remove the verified package from disk.
+
+**Apply failure:** If install fails mid-copy, the updater restores your previous build from a backup when possible and writes `%TEMP%\\BAKLOG-update\\apply-result.json`. The UI shows the error; if BAKLOG does not restart automatically, open **BAKLOG Tray** from the Start Menu (or run `BAKLOG Tray.exe`).
+
+**In-app update vs Setup.exe:** Use in-app **Update now** for routine binary updates on Windows/macOS frozen builds. Re-run **BAKLOG-Setup.exe** when Add/Remove Programs version drifts, shortcuts break, or `apply_update.ps1` / `apply_update.sh` is missing from the install folder.
+
+**Zip-only uninstall:** Portable zip installs include **Uninstall BAKLOG.bat** beside the exes. Run it to clear login autostart and optionally wipe library data, then delete the install folder.
+
 **Version:** Your current build version appears at the bottom of the **⋮** menu on installed builds.
 
 **Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses the same pipeline with `BAKLOG-macos.zip` + `apply_update.sh` once a mac frozen build is published on GitHub; until then mac installs still get notify + release-page link only.
 
-**Security:** Updates download only from the official `Ogrods/BAKLOG` GitHub release assets. The server verifies the published `.sha256` sidecar before apply is allowed. Apply is blocked while fetchers are running or when BAKLOG is running from a temporary zip-extract folder.
+**Security:** Updates download only from the official `Ogrods/BAKLOG` GitHub release assets. The server verifies the published `.sha256` sidecar before apply is allowed. Apply is blocked while fetchers are running, a store sign-in window is open, or when BAKLOG is running from a temporary zip-extract folder.
 
 **Note:** Your library data stays in `%LOCALAPPDATA%\\BAKLOG-Data` (macOS: `~/Library/Application Support/BAKLOG`) or your portable data folder — updates replace app binaries only.
 

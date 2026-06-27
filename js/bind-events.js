@@ -876,8 +876,16 @@ export function bindEvents() {
   document.getElementById("checkUpdates")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
     const { checkForUpdates, showUpdateToast } = await import('./update-check.js');
+    let frozen;
+    try {
+      const cfg = await (await fetch('/api/config')).json();
+      frozen = cfg?.frozen === true;
+    } catch {
+      /* optional */
+    }
     await checkForUpdates({
       source: 'manual',
+      frozen,
       onNotice: (msg, opts) => showUpdateToast(msg, opts),
     });
   });

@@ -365,6 +365,26 @@ def _start_update_notify(icon) -> None:
             "Update available",
             f"BAKLOG v{latest} is ready. Open BAKLOG to install.",
         )
+        try:
+            status_req = urllib.request.Request(
+                f"http://{HOST}:{PORT}/api/update/status",
+                headers={"Accept": "application/json"},
+            )
+            with urllib.request.urlopen(status_req, timeout=10) as status_resp:
+                status_payload = json.loads(status_resp.read().decode("utf-8"))
+            if (
+                isinstance(status_payload, dict)
+                and status_payload.get("phase") == "ready"
+                and status_payload.get("can_apply") is True
+            ):
+                ready_version = str(status_payload.get("version") or latest).strip()
+                _tray_notify(
+                    icon,
+                    "Update ready to install",
+                    f"BAKLOG v{ready_version} is downloaded. Open BAKLOG and choose Install & restart.",
+                )
+        except Exception:  # noqa: BLE001
+            pass
 
     threading.Thread(target=_poll, name="tray-update-notify", daemon=True).start()
 

@@ -24,6 +24,13 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Added
 
+- In-app update recovery: apply scripts write `apply-result.json`, restore from backup on copy failure, and retain the newest `BAKLOG-backup-*` only.
+- Ready-state persistence (`ready.json`) survives server/tray restart; **Discard download** clears verified packages from disk.
+- `GET /api/update/apply-result`, `POST /api/update/discard-ready`; post-apply UI polling with tray restart recovery copy.
+- Zip bundle ships **Uninstall BAKLOG.bat** for portable cleanup; Inno uninstall/finish copy is portable-aware when `portable.txt` exists.
+- Apply blocked while a store sign-in window is open; update-check exposes `fetchers_in_flight` for proactive UI hints.
+- Streaming download progress in `fetch_url_to_file`; tray notifies when a verified update is ready to install.
+
 - Uninstall wizard choice: keep library data or remove everything (including `%LOCALAPPDATA%\BAKLOG-Data`, OS keyring master key, and login autostart).
 - Header **Dev server** chip when `python server.py` is active; warns when persisted errors mix dev and installed sessions on shared localhost storage.
 - `resolved_data_dir_for_uninstall()` so portable installs wipe co-located data beside `BAKLOG.exe`.

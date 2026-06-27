@@ -13,6 +13,9 @@ import {
   runInAppUpdateFlow,
   runApplyReadyUpdate,
   pollUpdateStatusUntilDone,
+  pollPostApplyOutcome,
+  discardReadyUpdate,
+  POST_APPLY_RECOVERY_MESSAGE,
   dismissUpdateForVersion,
   isUpdateBannerDismissed,
   rememberDismissedVersion,
@@ -174,19 +177,48 @@ describe('checkForUpdates', () => {
   });
 
   it('opens modal on manual update available', async () => {
-    const fetchFn = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        current: '0.8.25',
-        latest: '0.8.26',
-        update_available: true,
-        url: 'https://example.com/release',
-        release_notes: 'Bug fixes',
-      }),
-    }));
+    const fetchFn = vi.fn(async (url) => {
+      if (url === '/api/update/status') {
+        return {
+          ok: true,
+          json: async () => ({ phase: 'idle', ready: false, can_apply: false }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          current: '0.8.25',
+          latest: '0.8.26',
+          update_available: true,
+          url: 'https://example.com/release',
+          release_notes: 'Bug fixes',
+        }),
+      };
+    });
     await checkForUpdates({ source: 'manual', fetchFn });
     expect(document.getElementById('updateReleaseModal')).not.toBeNull();
     expect(document.body.textContent).toContain('Bug fixes');
+  });
+
+  it('manual check prefers ready banner over update modal', async () => {
+    const fetchFn = vi.fn(async (url) => {
+      if (url === '/api/update/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            phase: 'ready',
+            ready: true,
+            can_apply: true,
+            version: '0.8.26',
+          }),
+        };
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    const result = await checkForUpdates({ source: 'manual', fetchFn });
+    expect(result.ready).toBe(true);
+    expect(document.getElementById('updateReleaseModal')).toBeNull();
+    expect(document.getElementById('updateAvailableBanner').textContent).toContain('0.8.26');
   });
 
   it('snoozes version when modal Remind me later is clicked', async () => {
@@ -264,11 +296,15 @@ describe('runInAppUpdateFlow', () => {
       if (url === '/api/update/apply' && init?.method === 'POST') {
         return { ok: true, json: async () => ({ ok: true, applying: true, version: '0.8.26' }) };
       }
+      if (url === '/api/update/apply-result') {
+        return { ok: true, json: async () => ({ ok: true, result: { ok: true, version: '0.8.26' } }) };
+      }
       throw new Error(`unexpected fetch ${url}`);
     });
     const result = await runInAppUpdateFlow({
       fetchFn,
       sleepMs: 1,
+      timeoutMs: 1,
       confirmInstall: async () => true,
     });
     expect(result.applied).toBe(true);
@@ -453,5 +489,62 @@ describe('renderUpdateModalHtml', () => {
       applySupported: true,
     });
     expect(html).toContain('Remind me later');
+  });
+
+  it('hides Update now when fetchers are in flight', () => {
+    const html = renderUpdateModalHtml({
+      current: '0.8.25',
+      latest: '0.8.26',
+      url: 'https://example.com',
+      applySupported: true,
+      fetchersInFlight: true,
+    });
+    expect(html).not.toContain('Update now');
+    expect(html).toContain('Fetcher health');
+  });
+});
+
+describe('renderUpdateReadyBannerHtml', () => {
+  it('includes discard download action', () => {
+    const html = renderUpdateReadyBannerHtml({ version: '0.8.26' });
+    expect(html).toContain('Discard download');
+  });
+});
+
+describe('discardReadyUpdate', () => {
+  it('posts discard-ready and hides banner', async () => {
+    document.getElementById('updateAvailableBanner').classList.remove('hidden');
+    const fetchFn = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, discarded: true }) }));
+    const onNotice = vi.fn();
+    await discardReadyUpdate({ fetchFn, onNotice });
+    expect(fetchFn).toHaveBeenCalledWith('/api/update/discard-ready', { method: 'POST' });
+    expect(document.getElementById('updateAvailableBanner').classList.contains('hidden')).toBe(true);
+    expect(onNotice).toHaveBeenCalledWith('Downloaded update discarded.');
+  });
+});
+
+describe('pollPostApplyOutcome', () => {
+  it('shows recovery copy after timeout', async () => {
+    vi.useFakeTimers();
+    const fetchFn = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (
+        url === '/api/update/apply-result'
+          ? { ok: true, result: null }
+          : { ok: true, phase: 'applying' }
+      ),
+    }));
+    const onNotice = vi.fn();
+    const promise = pollPostApplyOutcome({
+      fetchFn,
+      onNotice,
+      timeoutMs: 50,
+      sleepMs: 10,
+    });
+    await vi.advanceTimersByTimeAsync(60);
+    await promise;
+    expect(onNotice).toHaveBeenCalledWith(POST_APPLY_RECOVERY_MESSAGE);
+    expect(document.getElementById('updateAvailableBanner').textContent).toContain('BAKLOG Tray');
+    vi.useRealTimers();
   });
 });

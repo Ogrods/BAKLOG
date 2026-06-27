@@ -62,6 +62,7 @@ hiddenimports = [
     "shared.update_snooze",
     "shared.update_messages",
     "shared.update_api",
+    "shared.update_ready_state",
     "keyring.backends.Windows",
     "cryptography.hazmat.primitives.ciphers.aead",
     "certifi",

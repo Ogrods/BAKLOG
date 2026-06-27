@@ -133,3 +133,55 @@ def test_update_check_includes_download_metadata(
     assert status == 200
     assert body.get("download_url", "").endswith("BAKLOG-win64.zip")
     assert body.get("sha256") == "a" * 64
+
+
+def test_update_apply_result_public_read(
+    update_api_server: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from shared.update_manager import UpdateManager, reset_update_manager_for_tests
+
+    reset_update_manager_for_tests()
+    work_root = tmp_path / "BAKLOG-update"
+    work_root.mkdir()
+    (work_root / "apply-result.json").write_text(
+        '{"ok": false, "error": "copy failed", "restored_from_backup": true}',
+        encoding="utf-8",
+    )
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.25",
+        has_in_flight_runs=lambda: False,
+        work_root=work_root,
+    )
+    monkeypatch.setattr("shared.update_api.get_update_manager", lambda **kwargs: mgr)
+
+    status, body = _get(update_api_server, "/api/update/apply-result")
+    assert status == 200
+    assert body.get("ok") is True
+    assert body.get("result", {}).get("ok") is False
+
+
+def test_update_discard_ready_endpoint(
+    update_api_server: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from shared.update_manager import UpdateManager, reset_update_manager_for_tests
+
+    reset_update_manager_for_tests()
+    work_root = tmp_path / "work"
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.25",
+        has_in_flight_runs=lambda: False,
+        work_root=work_root,
+    )
+    monkeypatch.setattr("shared.update_api.get_update_manager", lambda **kwargs: mgr)
+    with mgr._lock:
+        mgr._status.phase = "ready"
+        mgr._status.ready = True
+        mgr._status.can_apply = True
+
+    status, body = _post(update_api_server, "/api/update/discard-ready", local_header=True)
+    assert status == 200
+    assert body.get("discarded") is True

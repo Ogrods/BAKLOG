@@ -9,7 +9,7 @@ import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 from shared.server_support import github_releases_latest_api_url, normalize_version_tag
@@ -211,7 +211,13 @@ def fetch_release_artifacts(platform: str | None = None) -> ReleaseArtifacts:
     return build_release_artifacts(release, platform=platform)
 
 
-def fetch_url_to_file(url: str, dest: Path, *, max_bytes: int = MAX_DOWNLOAD_BYTES) -> int:
+def fetch_url_to_file(
+    url: str,
+    dest: Path,
+    *,
+    max_bytes: int = MAX_DOWNLOAD_BYTES,
+    on_progress: Callable[[int, int | None], None] | None = None,
+) -> int:
     """Stream an allowlisted URL to *dest*. Returns bytes written."""
     import urllib.error
     import urllib.request
@@ -225,8 +231,17 @@ def fetch_url_to_file(url: str, dest: Path, *, max_bytes: int = MAX_DOWNLOAD_BYT
         headers={"User-Agent": "BAKLOG-local-update-check"},
     )
     total = 0
+    total_hint: int | None = None
     try:
         with urllib.request.urlopen(req, timeout=60) as resp, dest.open("wb") as handle:
+            length = resp.headers.get("Content-Length")
+            if length:
+                try:
+                    total_hint = int(length)
+                except ValueError:
+                    total_hint = None
+            if on_progress:
+                on_progress(0, total_hint)
             while True:
                 chunk = resp.read(1024 * 1024)
                 if not chunk:
@@ -235,6 +250,8 @@ def fetch_url_to_file(url: str, dest: Path, *, max_bytes: int = MAX_DOWNLOAD_BYT
                 if total > max_bytes:
                     raise UpdateSecurityError("download exceeds size cap")
                 handle.write(chunk)
+                if on_progress:
+                    on_progress(total, total_hint)
     except urllib.error.HTTPError as exc:
         if dest.is_file():
             dest.unlink(missing_ok=True)

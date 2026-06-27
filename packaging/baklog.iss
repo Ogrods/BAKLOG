@@ -68,7 +68,10 @@ procedure InitializeWizard();
 var
   DataDir: string;
 begin
-  DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
+  if FileExists(ExpandConstant('{app}\portable.txt')) then
+    DataDir := ExpandConstant('{app}')
+  else
+    DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
   DataDirFinishPage := CreateOutputMsgPage(
     wpFinished,
     'Your library folder',
@@ -89,7 +92,10 @@ begin
   Result := True;
   WipeUserData := False;
   CleanupRan := False;
-  DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
+  if FileExists(ExpandConstant('{app}\portable.txt')) then
+    DataDir := ExpandConstant('{app}')
+  else
+    DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
   UninstallDataPage := CreateInputOptionPage(
     uwUninstall,
     'Library data',
@@ -152,7 +158,10 @@ begin
     RunUninstallCleanup()
   else if CurUninstallStep = usPostUninstall then
   begin
-    DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
+    if FileExists(ExpandConstant('{app}\portable.txt')) then
+      DataDir := ExpandConstant('{app}')
+    else
+      DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
     if WipeUserData then
       MsgBox(
         'BAKLOG and all local data were removed from your PC.' + #13#10 + #13#10 +

@@ -2661,7 +2661,7 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
     path = _api_path(handler)
     if not path.startswith("/api/"):
         return True
-    if path in ("/api/config", "/api/update-check", "/api/update/status", "/api/diagnostics"):
+    if path in ("/api/config", "/api/update-check", "/api/update/status", "/api/update/apply-result", "/api/diagnostics"):
         return True
     if ADMIN_ENABLED and _is_admin_exempt_api(path):
         return True
@@ -2879,7 +2879,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/config":
             self._handle_config_get()
             return
-        if path in ("/api/update-check", "/api/update/status", "/api/diagnostics"):
+        if path in ("/api/update-check", "/api/update/status", "/api/update/apply-result", "/api/diagnostics"):
             self._handle_support_get(path)
             return
         if path.startswith("/oauth/epic/callback"):
@@ -2966,7 +2966,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._handle_shutdown()
             return
-        if path in ("/api/update/download", "/api/update/cancel", "/api/update/apply", "/api/update/dismiss"):
+        if path in ("/api/update/download", "/api/update/cancel", "/api/update/apply", "/api/update/discard-ready", "/api/update/dismiss"):
             if self._reject_if_csrf_strict():
                 return
             self._handle_update_post(path)
@@ -3198,18 +3198,17 @@ class Handler(SimpleHTTPRequestHandler):
         _send_json(self, HTTPStatus.OK, config)
 
     def _handle_support_get(self, path: str) -> None:
-        from shared.server_support import build_diagnostics_payload, build_update_check_payload
-        from shared.update_manager import get_update_manager
+        from auth.manager import has_active_sessions
+        from shared.server_support import build_diagnostics_payload
+        from shared.update_api import handle_update_support_get
 
-        if path == "/api/update-check":
-            _send_json(self, HTTPStatus.OK, build_update_check_payload(_app_version()))
-            return
-        if path == "/api/update/status":
-            mgr = get_update_manager(
-                current_version=_app_version,
-                has_in_flight_runs=lambda: bool(MANAGER._in_flight_targets()),
-            )
-            _send_json(self, HTTPStatus.OK, mgr.status_dict())
+        if handle_update_support_get(
+            path,
+            current_version=_app_version,
+            has_in_flight_runs=lambda: bool(MANAGER._in_flight_targets()),
+            has_active_sessions=has_active_sessions,
+            send_json=lambda status, payload: _send_json(self, status, payload),
+        ):
             return
         _send_json(
             self,
@@ -3625,12 +3624,14 @@ class Handler(SimpleHTTPRequestHandler):
         ).start()
 
     def _handle_update_post(self, path: str) -> None:
+        from auth.manager import has_active_sessions
         from shared.update_api import handle_update_post
 
         handle_update_post(
             path,
             current_version=_app_version,
             has_in_flight_runs=lambda: bool(MANAGER._in_flight_targets()),
+            has_active_sessions=has_active_sessions,
             read_json_body=lambda: _read_json_body(self, max_bytes=4096),
             send_json=lambda status, payload: _send_json(self, status, payload),
             trigger_shutdown=_trigger_dev_shutdown,

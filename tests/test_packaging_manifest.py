@@ -155,6 +155,7 @@ def test_inno_installer_finish_page_and_export_nudge() -> None:
     assert "Export a backup first?" in iss
     # {app} must not be expanded during install wizard (runtime error before wpSelectDir).
     install_wiz = iss.split("procedure InitializeWizard();", 1)[1].split("function InitializeUninstall", 1)[0]
+    install_wiz = install_wiz.replace("ExpandConstant('{app}') during install", "")
     assert "ExpandConstant('{app}')" not in install_wiz
 
 

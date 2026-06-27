@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import time
-
-import jwt
-import pytest
-
 from http import HTTPStatus
 
-from tests.test_server_supabase_auth import _get_json, _request, auth_server, local_server
+import jwt
+
+from tests.test_server_supabase_auth import _get_json
+
+pytest_plugins = ["tests.test_server_supabase_auth"]
 
 
 def _pro_bearer(secret: str, sub: str = "550e8400-e29b-41d4-a716-446655440000") -> str:

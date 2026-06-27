@@ -11,8 +11,8 @@ import pytest
 from shared import cloud_mirror as cm
 from shared import entitlement as ent
 from shared.mirror_session import clear_mirror_session_for_tests
-from shared.profile_paths import catalog_path, personal_path
 from shared.pro_settings import write_pro_settings
+from shared.profile_paths import catalog_path, personal_path
 from shared.supabase_auth import reset_jwks_client_for_tests
 
 
